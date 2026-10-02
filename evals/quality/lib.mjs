@@ -10,12 +10,13 @@
  *   packets         what a judge is shown - the brief, the rubric and the
  *                   rendered pages, and nothing the author wrote about them
  *   parse           the judge's JSON, from whatever wrapper its CLI put round it
- *   results         one JSON line per judged deck, keyed by skill, judge, brief, run
- *   summarize       mean and spread per brief, and the pairwise win rate
+ *   results         one JSON line per judged deck, keyed by skill, judge, treatment
+ *                   (agent and prompt), brief and run
+ *   summarize       mean and spread per brief, and the pairwise win rate, per treatment
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, appendFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -102,35 +103,108 @@ function walk(dir, out = []) {
 
 const slideNumber = (file) => Number(path.basename(file).match(/(\d+)/)?.[1] ?? 0);
 const newest = (files) => files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0] ?? null;
+const readQuiet = (file) => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; } };
+const realQuiet = (file) => { try { return realpathSync(file); } catch { return null; } };
+
+// The files a deck is authored in, by role. author-deck.mjs writes
+// `<id>.deck.json` and `<id>.plan.json` beside the pages file, and the build
+// reads the plan from beside the spec: one deck id and one directory name all three.
+const AUTHORED = Object.freeze({ plan: ".plan.json", pages: ".pages.json", deck: ".deck.json" });
+
+/**
+ * The deck a build directory holds, as its build recorded it: the id - the
+ * build writes `<id>.pptx` (build-result.json `pptxPath`, delivery.json
+ * `build.pptx`) and delivery `<id>-DELIVERED.pptx` - and, where the build
+ * recorded a stage as absent at `<spec dir>/<id>.plan.json`, the spec's
+ * directory. Null when the build recorded neither.
+ */
+function builtDeck(buildDir) {
+  const build = readQuiet(path.join(buildDir, "build-result.json")) ?? {};
+  const delivery = readQuiet(path.join(buildDir, "delivery.json")) ?? {};
+  const expected = Object.values(build.stages ?? {}).map((stage) => stage?.expectedAt).find((at) => typeof at === "string");
+  const named = [[build.pptxPath, /\.pptx$/], [delivery.build?.pptx, /\.pptx$/], [delivery.deliverable, /-DELIVERED\.pptx$/],
+                 [expected, /\.(plan|content)\.json$/]];
+  for (const [file, suffix] of named) {
+    if (typeof file === "string" && suffix.test(file)) return { id: path.basename(file).replace(suffix, ""), specDir: expected ? path.dirname(expected) : null };
+  }
+  return null;
+}
+
+/**
+ * The authoring files of the deck in `buildDir`, and why any is missing. They
+ * are that deck's - its id, in its spec's directory - never the newest on
+ * disk, which may be another attempt's. The directory is the one the build
+ * recorded, else the nearest one above the build holding the deck's files,
+ * else the only one in the workspace holding them. A build that recorded no
+ * id is matched by a workspace-wide search only when that finds exactly one
+ * candidate; anything else is recorded as missing, with the reason, not guessed.
+ */
+function authoredFiles(files, workspace, buildDir) {
+  const found = {}, missing = {};
+  const rel = (file) => path.relative(workspace, file) || ".";
+  const deck = buildDir ? builtDeck(buildDir) : null;
+  if (!deck) {
+    for (const [role, suffix] of Object.entries(AUTHORED)) {
+      const candidates = files.filter((f) => f.endsWith(suffix));
+      if (candidates.length === 1) found[role] = candidates[0];
+      else missing[role] = candidates.length
+        ? `${buildDir ? "the build recorded no deck id" : "no deck was built"}, and the workspace holds ${candidates.length} ${suffix} files (${candidates.map(rel).join(", ")})`
+        : `the workspace holds no ${suffix} file`;
+    }
+    return { found, missing };
+  }
+  const named = (f) => Object.values(AUTHORED).some((suffix) => path.basename(f) === `${deck.id}${suffix}`);
+  const dirs = [...new Set(files.filter(named).map((f) => path.dirname(f)))];
+  const encloses = (dir) => buildDir === dir || buildDir.startsWith(dir + path.sep);
+  const dir = (deck.specDir && dirs.find((d) => realQuiet(d) === realQuiet(deck.specDir)))
+    ?? dirs.filter(encloses).sort((a, b) => b.length - a.length)[0]
+    ?? (dirs.length === 1 ? dirs[0] : null);
+  if (!dir) {
+    const why = dirs.length
+      ? `${dirs.length} directories hold deck ${deck.id}'s files (${dirs.map(rel).join(", ")}) and none encloses its build ${rel(buildDir)}`
+      : `the workspace holds no file of deck ${deck.id}, the deck built in ${rel(buildDir)}`;
+    for (const role of Object.keys(AUTHORED)) missing[role] = why;
+    return { found, missing };
+  }
+  for (const [role, suffix] of Object.entries(AUTHORED)) {
+    const file = path.join(dir, `${deck.id}${suffix}`);
+    // A pages file may carry the id inside it (`deck.id`) under another name.
+    const inside = role === "pages" ? files.filter((f) => path.dirname(f) === dir && f.endsWith(suffix) && readQuiet(f)?.deck?.id === deck.id) : [];
+    if (files.includes(file)) found[role] = file;
+    else if (inside.length === 1) found[role] = inside[0];
+    else missing[role] = `no ${deck.id}${suffix} in ${rel(dir)}, where deck ${deck.id}'s other files are`;
+  }
+  return { found, missing };
+}
 
 /**
  * The deck a run produced: the build directory (the one holding scene.json,
  * preferring one that was delivered), its renders and review sheets, and the
- * authoring files that sit beside the spec. Null fields are things the run did
- * not write.
+ * authoring files of that same deck (authoredFiles). Null fields are things
+ * the run did not write or that cannot be told apart; `missing` says why for
+ * each authoring file.
  */
 export function collectArtifacts(workspace) {
   const files = existsSync(workspace) ? walk(workspace) : [];
   const scenes = files.filter((f) => path.basename(f) === "scene.json");
-  const delivered = scenes.filter((f) => {
-    const delivery = path.join(path.dirname(f), "delivery.json");
-    try { return JSON.parse(readFileSync(delivery, "utf8")).accepted === true; } catch { return false; }
-  });
+  const delivered = scenes.filter((f) => readQuiet(path.join(path.dirname(f), "delivery.json"))?.accepted === true);
   const scene = newest(delivered.length ? delivered : scenes);
   const buildDir = scene ? path.dirname(scene) : null;
   const rendered = buildDir ? path.join(buildDir, "rendered") : null;
   const inRendered = (pattern) => (rendered && existsSync(rendered)
     ? readdirSync(rendered).filter((f) => pattern.test(f)).map((f) => path.join(rendered, f)).sort((a, b) => slideNumber(a) - slideNumber(b))
     : []);
-  const authored = (suffix) => newest(files.filter((f) => f.endsWith(suffix) && !f.includes(`${path.sep}rendered${path.sep}`)));
+  const authoring = files.filter((f) => !f.includes(`${path.sep}rendered${path.sep}`));
+  const { found, missing } = authoredFiles(authoring, workspace, buildDir);
   return {
     workspace,
     buildDir,
     scene,
     delivery: buildDir && existsSync(path.join(buildDir, "delivery.json")) ? path.join(buildDir, "delivery.json") : null,
-    plan: authored(".plan.json"),
-    pages: authored(".pages.json"),
-    deck: authored(".deck.json"),
+    plan: found.plan ?? null,
+    pages: found.pages ?? null,
+    deck: found.deck ?? null,
+    missing,
     slides: inRendered(/^slide-\d+\.png$/),
     sheets: inRendered(/^spread-\d+\.png$/),
   };
@@ -138,8 +212,9 @@ export function collectArtifacts(workspace) {
 
 /**
  * Keep a run: the authoring files and the scene (gzipped), the delivery record
- * and the rendered pages. Kept under the store so a later version of the skill
- * can be judged against this one, deck against deck.
+ * and the rendered pages, and why any authoring file is missing. Kept under the
+ * store so a later version of the skill can be judged against this one, deck
+ * against deck.
  */
 export function storeArtifacts(artifacts, dir) {
   mkdirSync(path.join(dir, "rendered"), { recursive: true });
@@ -149,6 +224,7 @@ export function storeArtifacts(artifacts, dir) {
     copyFileSync(artifacts[role], path.join(dir, `${role}.json`));
     kept[role] = `${role}.json`;
   }
+  if (Object.keys(artifacts.missing ?? {}).length) kept.missing = artifacts.missing;
   if (artifacts.scene) {
     writeFileSync(path.join(dir, "scene.json.gz"), gzipSync(readFileSync(artifacts.scene)));
     kept.scene = "scene.json.gz";
@@ -287,39 +363,84 @@ export function validatePreference(verdict, order) {
 
 // --- results --------------------------------------------------------------------
 
-export const keyOf = (row) => [row.key.skillSha, row.key.judge, row.key.brief, row.key.run].join(" | ");
+/**
+ * The treatment a row ran under when it does not say: config.json's default
+ * agent and prompt. Rows written before the treatment joined the key carry it
+ * beside the key (`row.agent`, `row.prompt`), or - written by hand - not at all.
+ */
+export const DEFAULT_TREATMENT = Object.freeze({ agent: "claude", prompt: "brief" });
+
+// What one measurement is: the version under test, the judge that scored it,
+// the treatment - the agent and the prompt it was given - and the brief. Runs
+// 1..n of a measurement share all five; rows that differ in any one are
+// numbered, keyed, kept and reported apart, and never pooled.
+const IDENTITY = Object.freeze(["skillSha", "judge", "agent", "prompt", "brief"]);
+const TREATMENT = Object.freeze(["agent", "prompt"]);
+
+/** A row's identity (IDENTITY), a missing treatment read as DEFAULT_TREATMENT. */
+export function identityOf(row) {
+  const key = row?.key ?? {};
+  return { skillSha: key.skillSha, judge: key.judge, agent: key.agent ?? row?.agent ?? DEFAULT_TREATMENT.agent,
+           prompt: key.prompt ?? row?.prompt ?? DEFAULT_TREATMENT.prompt, brief: key.brief };
+}
+
+/** Rows of the measurement `want` names, compared on `fields` (all of IDENTITY by default). Anchor rows are no measurement. */
+function sameAs(want, fields = IDENTITY) {
+  const target = identityOf({ key: want });
+  return (row) => {
+    if (row.kind === "anchors") return false;
+    const id = identityOf(row);
+    return fields.every((f) => id[f] === target[f]);
+  };
+}
+
+export function keyOf(row) {
+  const id = identityOf(row);
+  return [...IDENTITY.map((f) => id[f]), row.key.run].join(" | ");
+}
+
+/** Where a run's deck is kept under the store: one directory per key. */
+export function keptDir(store, key) {
+  const { skillSha, judge, agent, prompt, brief } = identityOf({ key });
+  const safe = (text) => String(text).replace(/[^A-Za-z0-9._-]+/g, "_");
+  return path.join(store, safe(skillSha), safe(brief), `${safe(agent)}-${safe(prompt)}-${safe(judge)}-run${key.run}`);
+}
 
 export function readResults(file) {
   if (!existsSync(file)) return [];
   return readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
 }
 
-/** Append one row; a row whose key is already recorded is refused rather than doubled. */
+/** Is this row's key already recorded among `rows`? Anchor rows carry no key. */
+export const isRecorded = (rows, row) => row.kind !== "anchors" && rows.some((r) => r.kind !== "anchors" && keyOf(r) === keyOf(row));
+
+/**
+ * Append one row; a row whose key is already recorded is refused rather than
+ * doubled. Unless told otherwise the file is read at the moment of writing, so
+ * a row another runner recorded since this one started is seen.
+ */
 export function appendResult(file, row, existing = readResults(file)) {
-  if (row.kind !== "anchors" && existing.some((r) => r.kind !== "anchors" && keyOf(r) === keyOf(row))) {
-    throw new Error(`already recorded: ${keyOf(row)}`);
-  }
+  if (isRecorded(existing, row)) throw new Error(`already recorded: ${keyOf(row)}`);
   mkdirSync(path.dirname(file), { recursive: true });
   appendFileSync(file, JSON.stringify(row) + "\n");
   return row;
 }
 
-/** Runs of one deck identity already recorded, so new runs continue the count. */
-export function nextRun(rows, { skillSha, brief, agent, prompt }) {
-  const runs = rows.filter((r) => r.kind !== "anchors" && r.key.skillSha === skillSha && r.key.brief === brief
-    && r.agent === agent && r.prompt === prompt).map((r) => r.key.run);
+/** The next run of a measurement (IDENTITY), so new runs continue its count. */
+export function nextRun(rows, identity) {
+  const runs = rows.filter(sameAs(identity)).map((r) => r.key.run);
   return runs.length ? Math.max(...runs) + 1 : 1;
 }
 
 /**
  * The deck a new version is compared with: the most recently recorded judged
- * deck of the same brief, agent and prompt from a different skill version,
- * whose stored pages still exist under `store` (rows record the kept deck
- * relative to the store, so results.jsonl carries no machine path).
+ * deck of the same brief and treatment from a different skill version, whose
+ * stored pages still exist under `store` (rows record the kept deck relative
+ * to the store, so results.jsonl carries no machine path). The judge that
+ * scored it does not matter: the pair is judged afresh.
  */
-export function previousDeck(rows, { skillSha, brief, agent, prompt }, store) {
-  const candidates = rows.filter((r) => r.kind !== "anchors" && r.key.brief === brief && r.key.skillSha !== skillSha
-    && r.agent === agent && r.prompt === prompt && r.deck?.artifacts);
+export function previousDeck(rows, identity, store) {
+  const candidates = rows.filter((r) => sameAs(identity, ["brief", ...TREATMENT])(r) && r.key.skillSha !== identity.skillSha && r.deck?.artifacts);
   for (let i = candidates.length - 1; i >= 0; i -= 1) {
     const dir = path.resolve(store, candidates[i].deck.artifacts);
     if (existsSync(path.join(dir, "kept.json")) && deckPages(dir).length) {
@@ -349,12 +470,25 @@ export function winRate(pairs) {
   return { comparisons: decided.length, wins, ties, losses, rate: decided.length ? round((wins + ties / 2) / decided.length) : null };
 }
 
+/** The treatments recorded for one skill version and judge, each one a report of its own. */
+export function treatmentsOf(rows, { skillSha, judge }) {
+  const seen = new Map();
+  for (const row of rows.filter(sameAs({ skillSha, judge }, ["skillSha", "judge"]))) {
+    const { agent, prompt } = identityOf(row);
+    seen.set(`${agent}\n${prompt}`, { agent, prompt });
+  }
+  return [...seen.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, treatment]) => treatment);
+}
+
 /**
- * Mean and spread of the judge's rating per brief for one skill version and
- * judge, with the build and plan verdicts and the pairwise record beside it.
+ * Mean and spread of the judge's rating per brief for one skill version, judge
+ * and treatment (DEFAULT_TREATMENT when none is named), with the build and
+ * plan verdicts and the pairwise record beside it. Another treatment's rows
+ * are another measurement and never pooled in.
  */
-export function summarize(rows, { skillSha, judge }) {
-  const mine = rows.filter((r) => r.kind !== "anchors" && r.key.skillSha === skillSha && r.key.judge === judge);
+export function summarize(rows, identity) {
+  const { skillSha, judge, agent, prompt } = identityOf({ key: identity });
+  const mine = rows.filter(sameAs(identity, ["skillSha", "judge", ...TREATMENT]));
   const byBrief = {};
   for (const row of mine) (byBrief[row.key.brief] ??= []).push(row);
   const perBrief = {};
@@ -371,11 +505,11 @@ export function summarize(rows, { skillSha, judge }) {
       pairwise: winRate(list.map((r) => r.pairwise)),
     };
   }
-  return { skillSha, judge, briefs: perBrief, pairwise: winRate(mine.map((r) => r.pairwise)) };
+  return { skillSha, judge, agent, prompt, briefs: perBrief, pairwise: winRate(mine.map((r) => r.pairwise)) };
 }
 
 export function formatSummary(summary) {
-  const lines = [`skill ${summary.skillSha} · judge ${summary.judge}`];
+  const lines = [`skill ${summary.skillSha} · judge ${summary.judge} · agent ${summary.agent} · prompt ${summary.prompt}`];
   lines.push(`  ${"brief".padEnd(32)}${"runs".padStart(5)}${"mean".padStart(7)}${"sd".padStart(6)}${"min".padStart(6)}${"max".padStart(6)}${"no deck".padStart(9)}${"build".padStart(7)}${"plan".padStart(6)}${"W-T-L".padStart(9)}${"win".padStart(6)}`);
   for (const [brief, s] of Object.entries(summary.briefs)) {
     const p = s.pairwise;

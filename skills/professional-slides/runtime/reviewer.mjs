@@ -416,7 +416,10 @@ function revisionErrors(review, revision, items) {
   return errors;
 }
 
-/** A verdict for each waiver the packet showed, and none for a bar it did not. */
+/**
+ * Exactly one verdict for each waiver the packet showed, and none for a bar it
+ * did not: two verdicts on one waiver leave acceptance to pick between them.
+ */
 function waiverVerdictErrors(verdicts, waivers = []) {
   if (!waivers.length) return verdicts?.length ? ["waivers: the packet showed no waivers; leave waivers empty"] : [];
   if (!Array.isArray(verdicts)) return [`waivers: give a verdict (confirmed or refused, with the reason) for each waiver: ${waivers.map((w) => w.code).join(", ")}`];
@@ -424,6 +427,7 @@ function waiverVerdictErrors(verdicts, waivers = []) {
   const codes = waivers.map((w) => w.code);
   for (const [i, v] of verdicts.entries()) {
     if (!codes.includes(v?.code)) errors.push(`waivers[${i}]: ${v?.code} is not a waiver the packet showed`);
+    else if (verdicts.findIndex((other) => other?.code === v.code) !== i) errors.push(`waivers[${i}]: a second verdict for ${v.code}; give one verdict per waiver`);
     if (!WAIVER_VERDICTS.includes(v?.verdict)) errors.push(`waivers[${i}]: verdict must be confirmed or refused`);
     if (typeof v?.reason !== "string" || v.reason.trim().length < 20) errors.push(`waivers[${i}]: say why the deck is or is not right to miss the bar`);
   }
@@ -800,7 +804,8 @@ function rightVerdictErrors(entry, i, page, band, pageText) {
 
 /**
  * What else holds an otherwise clean review back: a rating under the
- * acceptance bar, and a build-bar waiver the reviewer refused or did not judge.
+ * acceptance bar, and a build-bar waiver the reviewer refused, did not judge,
+ * or judged more than once - a waiver holds on its one verdict, confirmed.
  */
 function acceptanceBlockers(review, waivers = []) {
   const blocking = [];
@@ -808,9 +813,10 @@ function acceptanceBlockers(review, waivers = []) {
     reason: `rated ${review?.rating ?? "?"}/10, below the acceptance bar of ${ACCEPT_RATING}: a deck is delivered only when its reader rates it ${ACCEPT_RATING} or more`,
     repair: "Repair the findings that hold the rating down and rebuild; the next pass verifies them" });
   for (const w of waivers) {
-    const verdict = (review?.waivers || []).find((v) => v?.code === w.code);
+    const given = (review?.waivers || []).filter((v) => v?.code === w.code);
+    const verdict = given.length === 1 ? given[0] : null;
     if (verdict?.verdict !== "confirmed") blocking.push({ id: `waiver:${w.code}`, slide: null, slides: [], code: w.code, severity: "blocker",
-      reason: `build bar ${w.measure} at ${w.measured} against ${w.floor ?? w.ceiling}: the waiver ("${w.reason}") was ${verdict ? `refused - ${verdict.reason}` : "not judged"}`,
+      reason: `build bar ${w.measure} at ${w.measured} against ${w.floor ?? w.ceiling}: the waiver ("${w.reason}") was ${verdict ? `refused - ${verdict.reason}` : given.length ? `given ${given.length} verdicts (${given.map((v) => v?.verdict).join(", ")}), not one` : "not judged"}`,
       repair: "Clear the bar on the rebuilt deck, or make the waiver's case on the pages so the reviewer can confirm it" });
   }
   return blocking;

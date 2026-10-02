@@ -9,18 +9,22 @@ Three things land in out-dir:
 
     <id>.inventory.json  every slide by stable id (s01, s02, ...): layout,
                          hidden flag, title, subtitle, body paragraphs with
-                         their indent levels in reading order, table cells,
-                         chart series and values, pictures and speaker notes
+                         their indent levels in reading order (where the slide
+                         shows them, through turned and mirrored groups), table
+                         cells, chart series and values, pictures with the size
+                         and turn they show at, and speaker notes
     <id>.pages.json      the starter: a deck/v3 head that names the inventory,
-                         a cover when slide 1 is a title slide, and one page
-                         per remaining slide carrying its old copy as `draft`
+                         a cover when slide 1 is a shown title slide, and one
+                         page per remaining slide carrying its old copy as
+                         `draft` and, when the slide was hidden, `hidden: true`
     assets/<id>/         the pictures, as s01-1.png, s01-2.jpg, ... (one folder
                          per imported deck, so two decks never share a name)
 
 The starter does not compile as written, by design. Each page's `draft` is the
 slide's old copy; the author maps every page, by its stable id, to a page type
 (`type`, `form`, `commentary`, `title`, `exhibit`, ...) and revises its claims
-before author-deck.mjs compiles it. The inventory keeps the full data (table
+before author-deck.mjs compiles it, keeping the page's `hidden` (or setting it
+false to show the slide again). The inventory keeps the full data (table
 cells, chart values) to copy into exhibits.
 
 A starter holds the author's revisions, so it is never overwritten: when
@@ -60,7 +64,9 @@ EXTENSIONS = {
     "image/bmp": "bmp", "image/tiff": "tiff", "image/svg+xml": "svg",
     "image/x-emf": "emf", "image/x-wmf": "wmf", "image/webp": "webp",
 }
-IDENTITY = (0.0, 1.0, 0.0, 1.0)  # slide x = ax + bx * x, slide y = ay + by * y
+# A placement carries a shape's own coordinates onto the slide, as the affine
+# (a, b, c, d, e, f): slide x = a * x + c * y + e, slide y = b * x + d * y + f.
+IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
 class Refusal(Exception):
@@ -103,38 +109,77 @@ def placeholder_kind(shape) -> str | None:
         return None
 
 
-def child_transform(transform: tuple, group) -> tuple:
-    """The transform of a group's members: the group's child frame (chOff,
-    chExt) is stretched onto the group's own frame (off, ext)."""
+def then(outer: tuple, inner: tuple) -> tuple:
+    """The placement that applies `inner`, then `outer`."""
+    a1, b1, c1, d1, e1, f1 = outer
+    a2, b2, c2, d2, e2, f2 = inner
+    return (a1 * a2 + c1 * b2, b1 * a2 + d1 * b2, a1 * c2 + c1 * d2, b1 * c2 + d1 * d2,
+            a1 * e2 + c1 * f2 + e1, b1 * e2 + d1 * f2 + f1)
+
+
+def turned(xfrm, left: float, top: float, width: float, height: float) -> tuple:
+    """A frame's own flips and rotation, both about its centre: flipH and flipV
+    mirror it, then `rot` (60,000ths of a degree, clockwise) turns it."""
+    if xfrm is None:
+        return IDENTITY
+    theta = math.radians(int(xfrm.get("rot", 0)) / 60000)
+    fx = -1.0 if xfrm.get("flipH") in ("1", "true") else 1.0
+    fy = -1.0 if xfrm.get("flipV") in ("1", "true") else 1.0
+    a, b, c, d = math.cos(theta) * fx, math.sin(theta) * fx, -math.sin(theta) * fy, math.cos(theta) * fy
+    cx, cy = left + width / 2, top + height / 2
+    return (a, b, c, d, cx - a * cx - c * cy, cy - b * cx - d * cy)
+
+
+def child_placement(placement: tuple, group) -> tuple:
+    """The placement of a group's members: the group's child frame (chOff,
+    chExt) stretched onto its own frame (off, ext), then the group's flips and
+    rotation about that frame's centre, then wherever the group itself sits."""
     xfrm = group._element.find("p:grpSpPr/a:xfrm", NS)
     if xfrm is None:
-        return transform
+        return placement
     def pair(tag, first, second):
         el = xfrm.find(f"a:{tag}", NS)
         return None if el is None else (int(el.get(first, 0)), int(el.get(second, 0)))
     off, ext, ch_off, ch_ext = pair("off", "x", "y"), pair("ext", "cx", "cy"), pair("chOff", "x", "y"), pair("chExt", "cx", "cy")
     if None in (off, ext, ch_off, ch_ext):
-        return transform
+        return placement
     sx = ext[0] / ch_ext[0] if ch_ext[0] else 1.0
     sy = ext[1] / ch_ext[1] if ch_ext[1] else 1.0
-    ax, bx, ay, by = transform
-    return (ax + bx * (off[0] - ch_off[0] * sx), bx * sx, ay + by * (off[1] - ch_off[1] * sy), by * sy)
+    stretch = (sx, 0.0, 0.0, sy, off[0] - ch_off[0] * sx, off[1] - ch_off[1] * sy)
+    return then(placement, then(turned(xfrm, off[0], off[1], ext[0], ext[1]), stretch))
 
 
-def walk(shapes, transform=IDENTITY):
-    """Every leaf shape on the slide, group members included, with its frame
-    (left, top, width, height) in slide EMU."""
+def displayed(shape, placement: tuple) -> tuple:
+    """Where the slide shows a leaf shape: (frame, rotation, mirrored). The
+    frame (left, top, width, height, slide EMU) is the axis-aligned box its
+    turned corners cover; the rotation is how far its upright edge is turned
+    clockwise, in degrees, net of every group's mirrors; mirrored is whether an
+    odd number of flips shows it reversed, read as a left-right flip."""
+    left, top, width, height = shape.left or 0, shape.top or 0, shape.width or 0, shape.height or 0
+    element = shape._element
+    own = element.find("p:spPr/a:xfrm", NS)
+    m = then(placement, turned(own if own is not None else element.find("p:xfrm", NS), left, top, width, height))
+    corners = [(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]) for x in (left, left + width) for y in (top, top + height)]
+    xs, ys = [x for x, _ in corners], [y for _, y in corners]
+    # A left-right flip leaves the upright edge where it was, so its direction
+    # is the turn whether or not the shape is mirrored.
+    rotation = round(math.degrees(math.atan2(-m[2], m[3])), 2) % 360
+    return (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)), int(rotation) if rotation.is_integer() else rotation, m[0] * m[3] - m[1] * m[2] < 0
+
+
+def walk(shapes, placement=IDENTITY):
+    """Every leaf shape on the slide, group members included, with where the
+    slide shows it (displayed)."""
     for shape in shapes:
         if isinstance(shape, GroupShape):
-            yield from walk(shape.shapes, child_transform(transform, shape))
+            yield from walk(shape.shapes, child_placement(placement, shape))
             continue
-        ax, bx, ay, by = transform
-        left, top = shape.left or 0, shape.top or 0
-        yield shape, (ax + bx * left, ay + by * top, bx * (shape.width or 0), by * (shape.height or 0))
+        yield (shape, *displayed(shape, placement))
 
 
 def reading_order(slide) -> list:
-    """The slide's leaf shapes top to bottom, then left to right."""
+    """The slide's leaf shapes top to bottom, then left to right, by where the
+    slide shows them."""
     return sorted(walk(slide.shapes), key=lambda item: (item[1][1], item[1][0]))
 
 
@@ -223,15 +268,17 @@ def read_chart(shape) -> dict:
     return record
 
 
-def read_picture(shape, frame, name: str, assets: Path) -> dict:
-    """Write the picture to assets/ and record its displayed size on the slide."""
+def read_picture(shape, frame, rotation, mirrored: bool, name: str, assets: Path) -> dict:
+    """Write the picture to assets/ and record how the slide shows it: the box
+    it covers, its turn and, when it shows reversed, that it is mirrored. The
+    file is the image as stored, unturned."""
     alt = None
     try:
         props = shape._element.find(".//p:cNvPr", NS)
         alt = clean(props.get("descr")) or clean(props.get("name")) or None
     except Exception:
         pass
-    record = {"file": None, "width": px(frame[2]), "height": px(frame[3]), "alt": alt}
+    record = {"file": None, "width": px(frame[2]), "height": px(frame[3]), "rotation": rotation, **({"mirrored": True} if mirrored else {}), "alt": alt}
     try:
         image = shape.image
         ext = EXTENSIONS.get(image.content_type, image.ext)
@@ -263,9 +310,9 @@ def read_slide(slide, index: int, sid: str, assets: Path) -> dict:
         record["layout"] = slide.slide_layout.name
     except Exception:
         pass
-    for shape, frame in reading_order(slide):
+    for shape, frame, rotation, mirrored in reading_order(slide):
         if isinstance(shape, Picture):
-            record["pictures"].append(read_picture(shape, frame, f"{sid}-{len(record['pictures']) + 1}", assets))
+            record["pictures"].append(read_picture(shape, frame, rotation, mirrored, f"{sid}-{len(record['pictures']) + 1}", assets))
         elif getattr(shape, "has_chart", False):
             record["charts"].append(read_chart(shape))
         elif getattr(shape, "has_table", False):
@@ -308,19 +355,23 @@ def draft_of(slide: dict) -> dict:
         "charts": [{"type": c["type"], "categories": len(c["categories"]), "series": [s["name"] for s in c["series"]]} for c in slide["charts"]],
         "pictures": [p["file"] for p in slide["pictures"] if p["file"]],
         "notes": slide["notes"],
-        "hidden": slide["hidden"] or None,
     }
     return {key: value for key, value in draft.items() if value not in (None, [], "")}
 
 
 def starter(identifier: str, inventory_name: str, slides: list) -> dict:
+    """The deck head and a page per slide. A hidden slide's page carries
+    `hidden: true` beside its draft, not in it: mapping the page to a type
+    replaces the draft, and the flag must outlive it so the rebuilt slide stays
+    out of the slide show. A cover cannot be hidden, so a hidden title slide
+    stays a page."""
     deck = {"schema": DECK_SCHEMA, "id": identifier, "workflow": "existing_deck_revision", "inventory": inventory_name, "request": ""}
     body = slides
-    if slides and looks_like_cover(slides[0]):
+    if slides and looks_like_cover(slides[0]) and not slides[0]["hidden"]:
         first = slides[0]
         deck["cover"] = {"title": first["title"], **({"subtitle": first["subtitle"]} if first["subtitle"] else {})}
         body = slides[1:]
-    pages = [{"id": s["id"], "sourceSlide": s["index"], "title": s["title"] or "", "draft": draft_of(s)} for s in body]
+    pages = [{"id": s["id"], "sourceSlide": s["index"], "title": s["title"] or "", **({"hidden": True} if s["hidden"] else {}), "draft": draft_of(s)} for s in body]
     return {"deck": deck, "pages": pages}
 
 

@@ -19,10 +19,12 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -128,6 +130,37 @@ def convert(pptx: Path, outdir: Path, profile: Path) -> Path:
     return pdf
 
 
+# A slide part, and the show="0" (or "false") on its root element that hides
+# it from the slide show.
+SLIDE_PART = re.compile(r"ppt/slides/slide\d+\.xml")
+HIDDEN_ROOT = re.compile(rb"(<(?:\w+:)?sld\b[^>]*?)\s+show=\"(?:0|false)\"")
+
+
+def shown(pptx: Path, td: Path) -> Path:
+    """The deck with every slide shown, for the render. LibreOffice leaves a
+    hidden slide out of the PDF, which would set every later page against the
+    scene slide before it; a hidden slide is still a page of the deck, so it
+    is rendered, gated and reviewed in its place. The deck itself is never
+    changed: a deck that hides a slide is copied into `td` (same name) with
+    the flag cleared, and any other deck is rendered as it is."""
+    with zipfile.ZipFile(pptx) as zin:
+        cleared = {}
+        for item in zin.infolist():
+            if SLIDE_PART.fullmatch(item.filename):
+                data = zin.read(item.filename)
+                shown_data = HIDDEN_ROOT.sub(rb"\1", data, count=1)
+                if shown_data != data:
+                    cleared[item.filename] = shown_data
+        if not cleared:
+            return pptx
+        td.mkdir(parents=True, exist_ok=True)
+        copy = td / pptx.name
+        with zipfile.ZipFile(copy, "w") as zout:
+            for item in zin.infolist():
+                zout.writestr(item, cleared[item.filename] if item.filename in cleared else zin.read(item.filename))
+    return copy
+
+
 def to_pdf(pptx: Path, td: Path) -> Path:
     """The deck as a PDF in `td`. A kept profile that fails the conversion is
     discarded and the conversion run once more in a fresh private one: a
@@ -208,7 +241,7 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
                                " and ".join(sorted(missing)), "; ".join(missing.values()))}
     out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as td:
-        pdf = to_pdf(pptx, Path(td))
+        pdf = to_pdf(shown(pptx, Path(td) / "shown"), Path(td))
         saved_pdf = out_dir / (pptx.stem + ".pdf")
         shutil.copyfile(pdf, saved_pdf)
         for old in out_dir.glob("slide-*.png"):

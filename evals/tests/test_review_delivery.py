@@ -186,6 +186,81 @@ console.log(JSON.stringify({ refused: [refused.accepted, refused.rejectedAt, ref
         self.assertEqual(result['pending3'], ['verification', 3])
         self.assertTrue(result['carried'])
 
+    def test_a_rerun_after_acceptance_hands_over_the_same_delivery(self):
+        made = run_node(FIXTURES + '''
+const d = await prebuilt();
+await storylineReady(d);
+// To a confirmed acceptance: a rejected pass 1, an accepting verification, an accepting confirmation read.
+await deliver(d, { reviewer: 'packet' });
+const rec1 = await record(d);
+await deliver(d, { reviewFile: await write(d, 'r1.json', firstPass(rec1, d.ids, [major()])) });
+await fs.writeFile(path.join(d.out, 'rendered', 'slide-3.png'), 'pixels repaired');
+await deliver(d, { reviewer: 'packet' });
+const rec2 = await record(d);
+await deliver(d, { reviewFile: await write(d, 'r2.json', { pass: 2, verifies: rec1.binding, accepted: true, summary: 'The time axis now spaces months by time; the repair held.', rating: 8.4, binding: rec2.binding,
+  opened: ['p02'], provenance: provenanceOf(rec2), pages: [pageEntry('p02')], statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.' }], findings: [], density }) });
+const rec3 = await record(d);
+const c1 = await write(d, 'c1.json', { confirms: rec2.binding, accepted: true, summary: 'A clear deck that answers both horizons with its evidence on the page.', rating: 8.6, binding: rec3.binding,
+  opened: [...d.ids], provenance: provenanceOf(rec3), pages: d.ids.map((id) => ({ slide: id, verdict: 'ok', note: `Read ${id} at full size; nothing to raise.` })), findings: [], assessment: assessment() });
+const accepted = await deliver(d, { reviewFile: c1 });
+const read = (file) => fs.readFile(file, 'utf8').catch(() => null);
+const deliveryFile = path.join(d.out, 'delivery.json'), deliverable = path.join(d.out, 'fixture-DELIVERED.pptx');
+const before = { delivery: await read(deliveryFile), packet: await read(path.join(d.store, 'review-packet.json')), history: (await fs.readdir(path.join(d.store, 'review-history'))).sort() };
+// The same command again, and a plain rerun: the approved build is handed over again, with no new read.
+const again = await deliver(d, { reviewFile: c1 });
+const plain = await deliver(d, { reviewer: 'packet' });
+const unchanged = async () => [await read(deliveryFile) === before.delivery, await read(path.join(d.store, 'review-packet.json')) === before.packet,
+  JSON.stringify((await fs.readdir(path.join(d.store, 'review-history'))).sort()) === JSON.stringify(before.history), await read(deliverable) === 'editable'];
+const reruns = { again: [again.accepted, again.stage, again.score], plain: [plain.accepted, plain.stage, plain.score], unchanged: await unchanged() };
+// With the copy and its report gone, a rerun writes them again from the lineage.
+await fs.rm(deliveryFile, { force: true }); await fs.rm(deliverable, { force: true });
+const restored = await deliver(d, { reviewer: 'packet' });
+const rewritten = JSON.parse(await read(deliveryFile));
+// A pass-1 acceptance is final the same way.
+const p = await prebuilt();
+await storylineReady(p);
+await deliver(p, { reviewer: 'packet' });
+const first = await deliver(p, { reviewFile: await write(p, 'r1.json', firstPass(await record(p), p.ids)) });
+const firstDelivery = await read(path.join(p.out, 'delivery.json'));
+const firstRerun = await deliver(p, { reviewer: 'packet' });
+const passOne = [first.accepted, firstRerun.accepted, firstRerun.score, await read(path.join(p.out, 'delivery.json')) === firstDelivery, await exists(path.join(p.out, 'fixture-DELIVERED.pptx'))];
+await done(p);
+console.log(JSON.stringify({ dir: d.dir, out: d.out, spec: d.specPath, store: d.store, accepted: [accepted.accepted, accepted.score], reruns,
+  restored: [restored.accepted, restored.score, rewritten.accepted, rewritten.score, await exists(deliverable)], passOne }));
+''')
+        try:
+            self.assertEqual(made['accepted'][0], True)
+            score = made['accepted'][1]
+            self.assertEqual(score['rating'], 8.6)
+            self.assertEqual(made['reruns']['again'], [True, 'delivered', score])
+            self.assertEqual(made['reruns']['plain'], [True, 'delivered', score])
+            # The same delivery.json, no new packet or pass, the same deliverable.
+            self.assertEqual(made['reruns']['unchanged'], [True, True, True, True])
+            self.assertEqual(made['restored'], [True, score, True, score, True])
+            self.assertEqual(made['passOne'][:2], [True, True])
+            self.assertEqual(made['passOne'][2], {'rating': 8.5, 'from': 'review pass 1'})
+            self.assertEqual(made['passOne'][3:], [True, True])
+            # From the command line the rerun exits 0 and leaves the delivery as it was.
+            delivery = Path(made['out'], 'delivery.json')
+            text = delivery.read_text()
+            rerun = subprocess.run([NODE, str(RUNTIME / 'deliver-deck.mjs'), made['spec'], made['out'], '--skip-build', '--reviewer', 'packet'], capture_output=True, text=True)
+            self.assertEqual(rerun.returncode, 0, rerun.stderr)
+            self.assertEqual(delivery.read_text(), text)
+            self.assertTrue(Path(made['out'], 'fixture-DELIVERED.pptx').exists())
+            # A rebuilt page is a different outcome: the approved copy is withdrawn while the next pass waits.
+            rebuilt = run_node(FIXTURES + f'''
+const d = {{ specPath: {json.dumps(made['spec'])}, out: {json.dumps(made['out'])} }};
+await fs.writeFile(path.join(d.out, 'rendered', 'slide-5.png'), 'pixels rebuilt');
+const report = await deliver(d, {{ reviewer: 'packet' }});
+console.log(JSON.stringify({{ review: [report.accepted, report.review?.status, report.review?.mode, report.review?.pass], delivered: await exists(path.join(d.out, 'fixture-DELIVERED.pptx')) }}));
+''')
+            self.assertEqual(rebuilt, {'review': [False, 'pending', 'verification', 3], 'delivered': False})
+        finally:
+            run_node(FIXTURES + f'''
+await done({{ dir: {json.dumps(made['dir'])}, store: {json.dumps(made['store'])} }});
+console.log(JSON.stringify({{ ok: true }}));
+''')
+
 
 class DeliveryRejectionTests(unittest.TestCase):
     def test_rating_provenance_and_unknown_keys_reject(self):
@@ -261,6 +336,45 @@ console.log(JSON.stringify({ unwaived: [unwaived.rejectedAt, unwaived.blockers.m
         self.assertEqual(result['confirmed'], [True, 8.5])
         self.assertEqual(result['invalid'], ['waivers', ['WAIVERS_INVALID']])
 
+    def test_a_waiver_takes_exactly_one_verdict(self):
+        result = run_node(FIXTURES + '''
+const reason = 'A lookup deck: every page is the same register of facilities, and a reader compares rows, not devices.';
+const d = await prebuilt({ count: 12, rich: false, deck: { waivers: [{ code: 'BAR_EXHIBIT_VARIETY', reason }, { code: 'BAR_TABLES_TREATED', reason }] } });
+await storylineReady(d);
+await deliver(d, { reviewer: 'packet' });
+const rec = await record(d);
+const verdict = (code, v) => ({ code, verdict: v, reason: 'The pages are one register; a varied device would hide the row comparison.' });
+// The reviewer confirms the variety waiver and then refuses it: two verdicts for one bar.
+const twice = [verdict('BAR_EXHIBIT_VARIETY', 'confirmed'), verdict('BAR_TABLES_TREATED', 'confirmed'), verdict('BAR_EXHIBIT_VARIETY', 'refused')];
+const report = await deliver(d, { reviewFile: await write(d, 'twice.json', firstPass(rec, d.ids, [], { waivers: twice })) });
+const delivered = await exists(path.join(d.out, 'fixture-DELIVERED.pptx'));
+// Every read that judges waivers holds them to one verdict each, and acceptance never takes the first of two.
+const { waivers } = rec;
+const review = firstPass(rec, d.ids, [], { waivers: twice });
+const confirmation = { confirms: 'c'.repeat(64), accepted: true, summary: 'A clear deck that answers both horizons with its evidence on the page.', rating: 8.6, binding: rec.binding,
+  opened: [...d.ids], provenance: provenanceOf(rec), pages: d.ids.map((id) => ({ slide: id, verdict: 'ok', note: `Read ${id} at full size; nothing to raise.` })), findings: [], assessment: assessment(), waivers: twice };
+const spine = { part: { kind: 'spine', id: 'spine', slides: d.ids }, binding: rec.binding, accepted: true, summary: 'The sequence builds to the answer without a repeated step.', rating: 8.5,
+  opened: [], provenance: provenanceOf(rec), pages: [], findings: [], completeness: clean(R.DECK_DIMENSIONS), assessment: assessment(), density, waivers: twice };
+const twiceErrors = (errors) => errors.filter((e) => e.includes('BAR_EXHIBIT_VARIETY'));
+const stranger = [verdict('BAR_EXHIBIT_VARIETY', 'confirmed'), verdict('BAR_TABLES_TREATED', 'confirmed'), verdict('BAR_LAYOUT_RANGE', 'confirmed')];
+await done(d);
+console.log(JSON.stringify({ report: [report.accepted, report.rejectedAt, (report.blockers || []).map((b) => b.reason).join(' | ')], delivered,
+  review: twiceErrors(R.validateReview(review, d.ids, { waivers })), confirmation: twiceErrors(R.validateConfirmation(confirmation, d.ids, { confirms: 'c'.repeat(64), waivers })),
+  part: twiceErrors(R.validatePart(spine, d.ids, { waivers })), stranger: R.validateReview(firstPass(rec, d.ids, [], { waivers: stranger }), d.ids, { waivers }).filter((e) => e.includes('BAR_LAYOUT_RANGE')),
+  outcome: R.reviewOutcome(review, [], { waivers }), confirmationOutcome: R.confirmationOutcome(confirmation, { waivers }).accepted }));
+''')
+        self.assertEqual(result['report'][:2], [False, 'invalid review'])
+        self.assertIn('BAR_EXHIBIT_VARIETY', result['report'][2])
+        self.assertFalse(result['delivered'])
+        for read in ['review', 'confirmation', 'part']:
+            self.assertEqual(len(result[read]), 1, read)
+            self.assertIn('one verdict', result[read][0])
+        # A verdict for a bar the deck does not waive is refused as before.
+        self.assertEqual(len(result['stranger']), 1)
+        self.assertFalse(result['outcome']['accepted'])
+        self.assertIn('BAR_EXHIBIT_VARIETY', [b['code'] for b in result['outcome']['blocking']])
+        self.assertFalse(result['confirmationOutcome'])
+
     def test_a_new_deck_without_its_request_is_refused(self):
         result = run_node(FIXTURES + '''
 const d = await prebuilt({ deck: { request: undefined } });
@@ -321,12 +435,13 @@ console.log(JSON.stringify({ capped: [capped.rejectedAt, capped.blockers[0].code
 
 REVISION = FIXTURES + '''
 // A revision of an imported deck: every page carries its source slide, and the
-// inventory beside the deck holds what each source slide said.
-async function revised(edit = (slides) => slides) {
+// inventory beside the deck holds what each source slide said and drew
+// (`drew`: a page id's source slide's tables, charts and pictures).
+async function revised(edit = (slides) => slides, drew = {}) {
   const d = await prebuilt({ deck: { workflow: 'existing_deck_revision', inventory: 'fixture.inventory.json', request: undefined } });
   const body = d.spec.slides.filter((s) => !s.kind);
   const inventory = { schema: 'professional-slides.inventory/v1', id: 'fixture', slides: [{ index: 1, id: 's01', title: 'The deck', paragraphs: [], tables: [], charts: [] },
-    ...body.map((s, i) => ({ index: i + 2, id: `s0${i + 2}`, title: s.title, paragraphs: [{ text: `On ${s.id} the total is 412 against 388 a year earlier.`, level: 0 }], tables: [], charts: [] }))] };
+    ...body.map((s, i) => ({ index: i + 2, id: `s0${i + 2}`, title: s.title, paragraphs: [{ text: `On ${s.id} the total is 412 against 388 a year earlier.`, level: 0 }], tables: [], charts: [], pictures: [], ...drew[s.id] }))] };
   await fs.writeFile(path.join(d.dir, 'fixture.inventory.json'), JSON.stringify(inventory));
   const slides = edit(body.map((s, i) => ({ ...s, points: [`On ${s.id} the total is 412 against 388 a year earlier.`], pageType: { type: 'numbers', form: 'tiles', sourceSlide: i + 2, content: { claim: s.title } } })));
   d.spec = { ...d.spec, cover: { title: 'The deck' }, slides: [d.spec.slides[0], ...slides] };
@@ -409,6 +524,55 @@ console.log(JSON.stringify({ ready: [ready.status, ready.pass], gate, pending: [
         self.assertEqual(result['spine'], ['packet-written', 1, True, False])
         self.assertEqual(result['unchangedItem'], ['invalid', True])
         self.assertEqual(result['changedItem'], 'revise')
+
+    def test_a_page_drawn_unlike_its_source_slide_is_read_beside_the_copy_changes(self):
+        result = run_node(REVISION + '''
+// p05's copy changes; p03 says what its source slide said, and only how it is drawn may change.
+const recopied = (s) => (s.id === 'p05' ? { ...s, points: ['On p05 the total fell to 301, a third below the year before, as two routes closed.'] } : s);
+const redrawn = (change, drew = {}) => revised((slides) => slides.map(recopied).map((s) => (s.id === 'p03' ? change(s) : s)), drew);
+const series = { categories: ['2023', '2024'], series: [{ name: 'Total', values: [388, 412] }] };
+const column = { p03: { charts: [{ type: 'COLUMN_CLUSTERED', title: null, ...series }] } };
+const picture = (file) => ({ p03: { pictures: [{ file, width: 400, height: 300, alt: 'The route map' }] } });
+const cases = {
+  asItWas: await redrawn((s) => s),
+  styled: await redrawn((s) => ({ ...s, style: 'accent' })),
+  framed: await redrawn((s) => ({ ...s, frame: 'card' })),
+  icons: await redrawn((s) => ({ ...s, points: s.points.map((text) => ({ text, icon: 'route' })) })),
+  // Another page type: the same words and numbers drawn as cards instead of text.
+  asCards: await redrawn(({ points, ...s }) => ({ ...s, pageType: { ...s.pageType, type: 'parallel', form: 'cards' }, exhibit: { type: 'cards', items: points.map((text) => ({ title: 'Total', text })) } })),
+  newPicture: await redrawn((s) => ({ ...s, pictures: [{ path: 'assets/fixture/s04-2.png', alt: 'The route map' }] }), picture('assets/fixture/s04-1.png')),
+  samePicture: await redrawn((s) => ({ ...s, pictures: [{ path: 'assets/fixture/s04-1.png', alt: 'The route map' }] }), picture('assets/fixture/s04-1.png')),
+  lineForColumns: await redrawn((s) => ({ ...s, exhibit: { type: 'chart.line', ...series } }), column),
+  sameColumns: await redrawn((s) => ({ ...s, exhibit: { type: 'chart.column', ...series } }), column),
+  chartForTable: await redrawn((s) => ({ ...s, exhibit: { type: 'chart.column', ...series } }), { p03: { tables: [{ rows: 3, cols: 2, cells: [['Year', 'Total'], ['2023', '388'], ['2024', '412']] }] } }),
+};
+const content = Object.fromEntries(Object.entries(cases).map(([name, d]) => [name, P.revisionChanges(d.spec, d.inventory).content]));
+// Delivery reads both pages, and a finding on the redrawn one is the review's to file.
+const mixed = cases.styled;
+const pending = await deliver(mixed, { reviewer: 'packet' });
+const rec = await record(mixed);
+const prompt = await fs.readFile(path.join(rec.staging, 'prompt.md'), 'utf8');
+const onRedrawn = await deliver(mixed, { reviewFile: await write(mixed, 'redrawn.json', firstPass(rec, ['p03', 'p05'], [major({ slides: ['p03'] })])) });
+// A revision that changes no words or numbers is a restyle: every page is read.
+const restyle = await revised((slides) => slides.map((s) => (s.id === 'p03' ? { ...s, style: 'accent' } : s)));
+const restyled = P.revisionChanges(restyle.spec, restyle.inventory);
+const restylePending = await deliver(restyle, { reviewer: 'packet' });
+for (const d of [...Object.values(cases), restyle]) await done(d);
+console.log(JSON.stringify({ content, pending: [pending.review.mode, pending.review.pages], marked: prompt.includes('[p03]') && prompt.split('\\n').some((l) => l.includes('[p03]') && l.includes('[changed]')),
+  onRedrawn: [onRedrawn.rejectedAt, onRedrawn.blockers.map((b) => b.code)], restyle: [restyled.restyle, restyled.copy, restyled.content, restylePending.review.mode, restylePending.review.pages] }));
+''')
+        content = result['content']
+        self.assertEqual(content['asItWas'], ['p05'])
+        # A drawing setting, another page type, another picture or chart than the source slide's: the page is read.
+        for name in ['styled', 'framed', 'icons', 'asCards', 'newPicture', 'lineForColumns', 'chartForTable']:
+            self.assertEqual(content[name], ['p03', 'p05'], name)
+        # The source slide's own picture and chart, drawn as it drew them, are not a change.
+        self.assertEqual(content['samePicture'], ['p05'])
+        self.assertEqual(content['sameColumns'], ['p05'])
+        self.assertEqual(result['pending'], ['revision', 2])
+        self.assertTrue(result['marked'])
+        self.assertEqual(result['onRedrawn'], ['review pass 1 of 3', ['MISLEADING_TIME_AXIS', 'REVIEW_RATING']])
+        self.assertEqual(result['restyle'], [True, [], ['p03'], 'full', 7])
 
 
 class BackendTests(unittest.TestCase):

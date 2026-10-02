@@ -51,7 +51,16 @@ export const TYPE_SHAPES = Object.freeze({
 });
 const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], mix: ["parts"], "measure-pair": ["members"], bridge: ["steps"] };
 
-/** How wide an insight's data is: its `breadth` counts, over the counts read off its `data`. */
+/**
+ * How wide an insight's data is: its `breadth` counts, over the counts read off its `data`.
+ *
+ * A mix's parts are what its chart splits the whole into. Where two or more
+ * series stack over the categories (stacked bar or column, marimekko), each
+ * category - a member, a period, a column - is a whole and the series are its
+ * parts. Otherwise each category, label, item or row is a part and the one
+ * series, if any, holds their values: a donut, pie, waffle, treemap,
+ * pictogram or one-series stacked bar over A, B and C is three parts.
+ */
 export function breadthOf(insight) {
   const data = insight?.data && typeof insight.data === "object" ? insight.data : null;
   const n = (list) => (Array.isArray(list) ? list.length : undefined);
@@ -61,7 +70,7 @@ export function breadthOf(insight) {
     const series = n(data.series);
     if (insight.shape === "series") Object.assign(read, { periods: rows, series: series ?? 1 });
     if (insight.shape === "peer-set" || insight.shape === "measure-pair") read.members = rows;
-    if (insight.shape === "mix") read.parts = data.categories && series ? series : rows;
+    if (insight.shape === "mix") read.parts = series >= 2 ? series : rows;
     if (insight.shape === "bridge" && rows !== undefined) read.steps = rows - 2;
   }
   const counts = { ...read, ...(insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : {}) };

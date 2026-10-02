@@ -7,8 +7,9 @@ the envelope a CLI in JSON mode prints. What is under test is the harness: that
 the judge sees the brief, the rubric and the pages and nothing the author
 wrote; that a new version is compared with the last one deck against deck and
 the answer is mapped back through the shuffled order; that results are keyed by
-skill version, judge, brief and run and never doubled; and that the summary's
-arithmetic is right.
+skill version, judge, treatment (agent and prompt), brief and run and never
+doubled; that the deck kept is one attempt's, scene and authoring files alike;
+and that the summary's arithmetic is right.
 """
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ class Harness:
                                 "timeoutMinutes": 1}},
         }))
 
-    def run_eval(self, sha, *extra, slides=4, anchors=None, check=True):
+    def run_eval(self, sha, *extra, slides=4, anchors=None, check=True, env=None):
         args = [NODE, str(RUN), "--set", "dev", "--brief", BRIEF, "--config", str(self.config),
                 "--results", str(self.results), "--store", str(self.store), "--skill-sha", sha, *extra]
         if anchors is None:
@@ -58,7 +59,7 @@ class Harness:
         else:
             args += ["--anchors-file", str(anchors)]
         env = {**os.environ, "FAKE_AGENT_SLIDES": str(slides), "FAKE_JUDGE_LOG": str(self.judge_log),
-               "FAKE_AGENT_LOG": str(self.agent_log)}
+               "FAKE_AGENT_LOG": str(self.agent_log), **(env or {})}
         out = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, env=env, timeout=120)
         if check:
             self.assertEqual(out.returncode, 0, out.stderr + out.stdout)
@@ -69,6 +70,9 @@ class Harness:
 
     def judged(self):
         return [json.loads(line) for line in self.judge_log.read_text().splitlines() if line.strip()]
+
+    def agent_calls(self):
+        return len(self.agent_log.read_text().splitlines()) if self.agent_log.exists() else 0
 
 
 class BlindingTests(Harness, unittest.TestCase):
@@ -150,16 +154,63 @@ class PairingTests(Harness, unittest.TestCase):
         self.assertEqual([p["mode"] for p in self.judged()], ["deck", "deck"])
 
 
+class TreatmentTests(Harness, unittest.TestCase):
+    """The agent and the prompt it was given are part of what a row measures."""
+
+    def setUp(self):
+        super().setUp()
+        config = json.loads(self.config.read_text())
+        config["prompts"]["unattended"] = "{brief}\n\nNo one is available to answer questions during this run."
+        config["agents"]["other"] = config["agents"]["fake"]
+        self.config.write_text(json.dumps(config))
+
+    def test_another_agent_or_prompt_is_its_own_measurement(self):
+        self.run_eval("aaa", "--runs", "1")
+        # Same skill, judge and brief under another prompt, then another agent:
+        # each starts at run 1 under its own key, and none is refused after
+        # its agent and judge have run.
+        self.run_eval("aaa", "--runs", "1", "--prompt", "unattended")
+        self.run_eval("aaa", "--runs", "1", "--agent", "other")
+        rows = self.rows()
+        self.assertEqual([(r["key"]["agent"], r["key"]["prompt"], r["key"]["run"]) for r in rows],
+                         [("fake", "brief", 1), ("fake", "unattended", 1), ("other", "brief", 1)])
+        self.assertEqual(self.agent_calls(), 3)
+        self.assertEqual(len({r["deck"]["artifacts"] for r in rows}), 3, "each kept in its own place")
+
+    def test_the_report_keeps_treatments_apart(self):
+        self.run_eval("aaa", "--runs", "2")
+        self.run_eval("aaa", "--runs", "1", "--prompt", "unattended", slides=8)
+        report = self.run_eval("aaa", "--report").stdout
+        brief_block, unattended_block = report.split("\n\n")
+        self.assertIn("agent fake · prompt brief", brief_block)
+        self.assertIn("agent fake · prompt unattended", unattended_block)
+        # Two runs rated 4 under the brief alone; one rated 5 unattended.
+        row = lambda block: next(line.split() for line in block.splitlines() if BRIEF in line)
+        self.assertEqual(row(brief_block)[1:3], ["2", "4"])
+        self.assertEqual(row(unattended_block)[1:3], ["1", "5"])
+        only = self.run_eval("aaa", "--report", "--prompt", "unattended").stdout
+        self.assertNotIn("prompt brief", only)
+
+    def test_pairwise_compares_like_with_like(self):
+        self.run_eval("aaa", "--runs", "1")
+        self.run_eval("bbb", "--runs", "1", "--prompt", "unattended", slides=8)
+        self.assertEqual(self.rows()[-1]["pairwise"], {"skipped": "no previous version stored for this brief"})
+        # bbb's deck is the most recent, but it ran under another prompt.
+        self.run_eval("ccc", "--runs", "1")
+        pair = self.rows()[-1]["pairwise"]
+        self.assertEqual((pair["against"], pair["againstRun"]), ("aaa", 1))
+
+
 class ResultsTests(Harness, unittest.TestCase):
-    def test_rows_are_keyed_by_version_judge_brief_and_run_and_only_appended(self):
+    def test_rows_are_keyed_by_version_judge_treatment_brief_and_run_and_only_appended(self):
         self.run_eval("aaa", "--runs", "2")
         before = self.results.read_text()
         self.run_eval("aaa", "--runs", "1")
         after = self.results.read_text()
         self.assertTrue(after.startswith(before), "earlier rows are never rewritten")
-        keys = [(r["key"]["skillSha"], r["key"]["judge"], r["key"]["brief"], r["key"]["run"]) for r in self.rows()]
-        self.assertEqual(keys, [("aaa", "fake:fixture", BRIEF, 1), ("aaa", "fake:fixture", BRIEF, 2),
-                                ("aaa", "fake:fixture", BRIEF, 3)])
+        keys = [tuple(r["key"][f] for f in ("skillSha", "judge", "agent", "prompt", "brief", "run")) for r in self.rows()]
+        self.assertEqual(keys, [("aaa", "fake:fixture", "fake", "brief", BRIEF, 1), ("aaa", "fake:fixture", "fake", "brief", BRIEF, 2),
+                                ("aaa", "fake:fixture", "fake", "brief", BRIEF, 3)])
         row = self.rows()[0]
         self.assertEqual(row["schema"], "professional-slides.quality-result/v1")
         self.assertEqual(row["status"], "judged")
@@ -209,12 +260,98 @@ console.log(JSON.stringify({refused,lines:fs.readFileSync(file,'utf8').trim().sp
 ''')
         self.assertEqual(result, {"refused": True, "lines": 2})
 
+    def test_a_key_recorded_while_the_run_was_under_way_is_refused_before_the_agent_runs(self):
+        # A second runner sharing the results file records run 2 while this
+        # runner's run 1 is under way. Run 2 is refused before its agent and
+        # judge are paid for, and is never doubled.
+        taken = {"schema": "professional-slides.quality-result/v1", "status": "judged",
+                 "key": {"skillSha": "aaa", "judge": "fake:fixture", "agent": "fake", "prompt": "brief", "brief": BRIEF, "run": 2}}
+        out = self.run_eval("aaa", "--runs", "2", check=False,
+                            env={"FAKE_AGENT_RECORDS": json.dumps({"file": str(self.results), "row": taken})})
+        self.assertEqual(out.returncode, 1, out.stdout)
+        self.assertIn("already recorded", out.stderr)
+        self.assertEqual(self.agent_calls(), 1, "the agent ran for run 1 only")
+        self.assertEqual([p["mode"] for p in self.judged()], ["deck"])
+        runs = [r["key"]["run"] for r in self.rows()]
+        self.assertEqual(sorted(runs), [1, 2])
+
+    def test_old_rows_read_as_the_default_treatment(self):
+        result = run_node('''
+import {DEFAULT_TREATMENT,identityOf,keyOf,nextRun} from './evals/quality/lib.mjs';
+import fs from 'node:fs';
+const config=JSON.parse(fs.readFileSync('./evals/quality/config.json','utf8'));
+const key={skillSha:'a',judge:'j:m',brief:'dev/x',run:1};
+// Written before the treatment joined the key: beside it, or (by hand) not at all.
+const beside={key,agent:'codex',prompt:'unattended'}, bare={key};
+console.log(JSON.stringify({defaults:DEFAULT_TREATMENT,config:config.defaults,beside:identityOf(beside),bare:identityOf(bare),
+  sameKey:keyOf(bare)===keyOf({key:{...key,...DEFAULT_TREATMENT}}),
+  next:nextRun([beside,bare],{skillSha:'a',judge:'j:m',brief:'dev/x',...DEFAULT_TREATMENT}),
+  nextCodex:nextRun([beside,bare],{skillSha:'a',judge:'j:m',brief:'dev/x',agent:'codex',prompt:'brief'})}));
+''')
+        # The defaults are config.json's, so the two cannot drift apart.
+        self.assertEqual(result["defaults"], {"agent": result["config"]["agent"], "prompt": result["config"]["prompt"]})
+        self.assertEqual((result["beside"]["agent"], result["beside"]["prompt"]), ("codex", "unattended"))
+        self.assertEqual((result["bare"]["agent"], result["bare"]["prompt"]), ("claude", "brief"))
+        self.assertTrue(result["sameKey"])
+        self.assertEqual(result["next"], 2)
+        self.assertEqual(result["nextCodex"], 1)
+
     def test_unknown_arguments_fail_with_the_usage(self):
         out = self.run_eval("aaa", "--runs", "0", check=False)
         self.assertEqual(out.returncode, 1)
         self.assertIn("--runs must be a positive whole number", out.stderr)
         out = self.run_eval("aaa", "--bogus", check=False)
         self.assertIn("Usage: run.mjs", out.stderr)
+
+
+class CollectTests(Harness, unittest.TestCase):
+    """The deck kept is one attempt's: its scene, and the authoring files of that deck."""
+
+    def test_an_abandoned_attempt_s_newer_files_are_not_kept_as_the_delivered_deck_s(self):
+        self.run_eval("aaa", "--runs", "1", env={"FAKE_AGENT_RETRY": "1"})
+        row = self.rows()[0]
+        kept = self.store / row["deck"]["artifacts"]
+        self.assertEqual(row["deckSlides"], 4, "the delivered scene is judged")
+        # The plan gates and the authoring files are the delivered deck's, not
+        # the newer retry's one-page plan.
+        for role in ("plan", "pages", "deck"):
+            with self.subTest(role=role):
+                doc = json.loads((kept / f"{role}.json").read_text())
+                self.assertEqual(doc.get("id", doc.get("deck", {}).get("id")), "fake")
+        self.assertEqual(len(json.loads((kept / "plan.json").read_text())["pages"]), 4)
+        self.assertNotIn("missing", row["deck"])
+
+    def test_authoring_files_follow_the_selected_deck_or_are_missing_with_a_reason(self):
+        result = run_node('''
+import {collectArtifacts} from './evals/quality/lib.mjs';
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+const later=new Date(Date.now()+60000);
+const workspace=(files)=>{const ws=fs.mkdtempSync(path.join(os.tmpdir(),'q-ws-'));
+  for(const [rel,body] of Object.entries(files)){const f=path.join(ws,rel);fs.mkdirSync(path.dirname(f),{recursive:true});
+    fs.writeFileSync(f,JSON.stringify(typeof body==='function'?body(ws):body));if(rel.startsWith('two/'))fs.utimesSync(f,later,later);}
+  return ws;};
+const attempt=(dir,id,built)=>({[`${dir}/${id}.pages.json`]:{deck:{id}},[`${dir}/${id}.plan.json`]:{dir},[`${dir}/${id}.deck.json`]:{id,dir},
+  [`${dir}/out/scene.json`]:{slides:[]},...(built?{[`${dir}/out/build-result.json`]:(ws)=>({pptxPath:path.join(ws,dir,'out',`${id}.pptx`)})}:{})});
+const rel=(a,ws)=>Object.fromEntries(['scene','plan','pages','deck'].map((r)=>[r,a[r]&&path.relative(ws,a[r])]));
+// Two attempts at one deck id, each built beside its spec; the older one delivered.
+const same=workspace({...attempt('one','deck',true),...attempt('two','deck',true),'one/out/delivery.json':{accepted:true}});
+// Two attempts whose builds recorded no deck id: which plan is whose would be a guess.
+const blind=workspace({...attempt('one','a',false),...attempt('two','b',false)});
+// One attempt, its build silent: the only candidate is unambiguous.
+const lone=workspace(attempt('one','a',false));
+const out={};
+for(const [name,ws] of Object.entries({same,blind,lone})){const a=collectArtifacts(ws);out[name]={...rel(a,ws),missing:a.missing};}
+console.log(JSON.stringify(out));
+''')
+        self.assertEqual(result["same"], {"scene": "one/out/scene.json", "plan": "one/deck.plan.json", "pages": "one/deck.pages.json",
+                                          "deck": "one/deck.deck.json", "missing": {}})
+        blind = result["blind"]
+        self.assertEqual(blind["scene"], "two/out/scene.json")
+        self.assertEqual((blind["plan"], blind["pages"], blind["deck"]), (None, None, None))
+        for role in ("plan", "pages", "deck"):
+            self.assertIn("no deck id", blind["missing"][role])
+            self.assertIn("2 ", blind["missing"][role])
+        self.assertEqual((result["lone"]["plan"], result["lone"]["missing"]), ("one/a.plan.json", {}))
 
 
 class AnchorTests(Harness, unittest.TestCase):
@@ -267,13 +404,15 @@ const row=(sha,brief,run,rating,preferred,extra={})=>({key:{skillSha:sha,judge:'
   pairwise:preferred?{against:'old',preferred}:{skipped:'none'},...extra});
 const rows=[row('new','dev/a',1,6,'current'),row('new','dev/a',2,8,'tie'),row('new','dev/a',3,7,'previous'),
   row('new','dev/b',1,5,null),{key:{skillSha:'new',judge:'j:m',brief:'dev/b',run:2},status:'no-deck'},
-  row('old','dev/a',1,2,null),row('new','dev/a',4,1,'current',{key:{skillSha:'new',judge:'j:other',brief:'dev/a',run:4}})];
+  row('old','dev/a',1,2,null),row('new','dev/a',4,1,'current',{key:{skillSha:'new',judge:'j:other',brief:'dev/a',run:4}}),
+  row('new','dev/a',1,1,'previous',{key:{skillSha:'new',judge:'j:m',agent:'claude',prompt:'unattended',brief:'dev/a',run:1}}),
+  row('new','dev/a',1,1,'previous',{key:{skillSha:'new',judge:'j:m',brief:'dev/a',run:1},agent:'codex'})];
 const s=summarize(rows,{skillSha:'new',judge:'j:m'});
 console.log(JSON.stringify({a:s.briefs['dev/a'],b:s.briefs['dev/b'],all:s.pairwise,
   one:spread([4]),none:spread([]),mae:anchorError([{humanScore:8,judgeScore:5},{humanScore:3,judgeScore:5},{humanScore:null,judgeScore:9}])}));
 ''')
         a = result["a"]
-        self.assertEqual(a["runs"], 3, "another judge's rows and another version's rows stay out")
+        self.assertEqual(a["runs"], 3, "another judge's, version's or treatment's rows stay out")
         self.assertEqual(a["rating"], {"n": 3, "mean": 7, "sd": 1, "min": 6, "max": 8})
         self.assertEqual(a["buildAccepted"], 2)
         self.assertEqual(a["pairwise"], {"comparisons": 3, "wins": 1, "ties": 1, "losses": 1, "rate": 0.5})

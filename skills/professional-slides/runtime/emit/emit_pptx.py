@@ -214,7 +214,17 @@ class CachedFreeform(FreeformBuilder):
 # caller sets one (the reproducible-builds convention), else the earliest time
 # a zip entry can record.
 EPOCH = datetime.fromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]), timezone.utc) if os.environ.get("SOURCE_DATE_EPOCH") else datetime(1980, 1, 1, tzinfo=timezone.utc)
+# The dates a zip entry can record: its DOS date counts years from 1980 in
+# seven bits and seconds in two-second steps. An epoch outside them - the
+# common SOURCE_DATE_EPOCH=0 is 1970 - stamps the entries at the nearer end,
+# and the XML dates, which hold any year, keep the epoch itself.
+ZIP_FIRST, ZIP_LAST = (1980, 1, 1, 0, 0, 0), (2107, 12, 31, 23, 59, 58)
 CORE_DATE = re.compile(rb"(<dcterms:(created|modified)\b[^>]*>)[^<]*(</dcterms:\2>)")
+
+
+def zip_stamp(moment: datetime) -> tuple:
+    """`moment` as a zip entry's date_time, held to the range a zip records."""
+    return min(max(moment.timetuple()[:6], ZIP_FIRST), ZIP_LAST)
 
 
 def fixed_dates(xml: bytes) -> bytes:
@@ -223,12 +233,12 @@ def fixed_dates(xml: bytes) -> bytes:
 
 
 def repack(data: bytes, rewrite) -> bytes:
-    """The zip `data` rewritten entry by entry at EPOCH: `rewrite(name, bytes)`
-    returns each entry's new bytes. Entry times are the only other thing a
-    zip stamps with the clock, so a package repacked here is a function of its
-    content."""
+    """The zip `data` rewritten entry by entry at EPOCH (zip_stamp):
+    `rewrite(name, bytes)` returns each entry's new bytes. Entry times are the
+    only other thing a zip stamps with the clock, so a package repacked here is
+    a function of its content."""
     buf = io.BytesIO()
-    stamp = EPOCH.timetuple()[:6]
+    stamp = zip_stamp(EPOCH)
     with zipfile.ZipFile(io.BytesIO(data)) as zin, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():
             info = zipfile.ZipInfo(item.filename, date_time=stamp)
@@ -954,6 +964,9 @@ class Emitter:
         instances = {ci["instanceId"]: ci for ci in sl.get("componentInstances", [])}
         title_node = next((n for n in nodes if n["type"] == "text" and n.get("role") in ("action-title", "cover-title", "deck-title", "section-title")), None)
         slide = self.prs.slides.add_slide(self.title_layout if title_node else self.blank_layout)
+        if sl.get("hidden"):
+            # Out of the slide show (PowerPoint's Hide Slide), still in the file.
+            slide._element.set("show", "0")
         canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or self.colors.get("color.canvas", "#FFFFFF")
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = rgb(canvas)

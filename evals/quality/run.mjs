@@ -8,9 +8,10 @@
  * agent given the brief and nothing else, the deck it leaves behind collected
  * and kept, a blind judge shown only the brief, the rubric and the rendered
  * pages, a pairwise judgement against the previous skill version's deck for the
- * same brief, and the build bars and plan gates on what was built. One line per
- * judged deck goes to results.jsonl, keyed by skill version, judge model, brief
- * and run; the report is the mean and spread per brief and the pairwise win rate.
+ * same brief, agent and prompt, and the build bars and plan gates on what was
+ * built. One line per judged deck goes to results.jsonl, keyed by skill
+ * version, judge model, treatment (agent and prompt), brief and run; the report
+ * is the mean and spread per brief and the pairwise win rate, per treatment.
  *
  * Options
  *   --set NAME            dev (the cold-run briefs), heldout, or all
@@ -21,7 +22,8 @@
  *   --judge-model MODEL   override the judge's configured model
  *   --prompt NAME         an entry of config.prompts (default: the brief alone)
  *   --dry-run             print what would run; run and write nothing
- *   --report              print the summary for this skill version and judge, and stop
+ *   --report              print the summary for this skill version and judge, one per treatment
+ *                         recorded (or only --agent / --prompt's), and stop
  *   --no-pairwise         skip the comparison with the previous version
  *   --no-anchors          skip judge calibration on scored anchors
  *   --keep-workspace      leave each agent workspace in place
@@ -40,8 +42,9 @@ import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import {
   QUALITY, ROOT, RESULT_SCHEMA, anchorError, appendResult, briefRequest, briefs, buildAnchorPacket, buildDeckPacket,
-  buildPairPacket, collectArtifacts, deckPages, fillTemplate, formatSummary, nextRun, pairSwap, parseJudgeOutput,
-  previousDeck, readResults, skillSha as readSkillSha, storeArtifacts, summarize, validatePreference, validateVerdict,
+  buildPairPacket, collectArtifacts, deckPages, fillTemplate, formatSummary, isRecorded, keptDir, keyOf, nextRun, pairSwap,
+  parseJudgeOutput, previousDeck, readResults, skillSha as readSkillSha, storeArtifacts, summarize, treatmentsOf,
+  validatePreference, validateVerdict,
 } from "./lib.mjs";
 import { scoreRun } from "../cold-run/score.mjs";
 import { isMain, pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
@@ -187,7 +190,11 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
   const rows = readResults(resultsFile);
 
   if (options.report) {
-    log(formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey })));
+    // One report per treatment: runs under another agent or prompt measure something else.
+    const recorded = treatmentsOf(rows, { skillSha: sha, judge: judgeKey })
+      .filter((t) => (!options.agent || t.agent === options.agent) && (!options.prompt || t.prompt === options.prompt));
+    const shown = recorded.length ? recorded : [{ agent: agentName, prompt: promptName }];
+    log(shown.map((t) => formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey, ...t }))).join("\n\n"));
     return 0;
   }
   if (!options.set && !options.brief.length) throw new Error(`--set is required. ${USAGE}`);
@@ -205,22 +212,26 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
   for (const brief of chosen) {
     const request = briefRequest(brief.text);
     const prompt = promptTemplate.replace("{brief}", request.trim());
-    const first = nextRun(rows, { skillSha: sha, brief: brief.id, agent: agentName, prompt: promptName });
+    const identity = { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName, brief: brief.id };
+    const first = nextRun(rows, identity);
     for (let runNumber = first; runNumber < first + options.runs; runNumber += 1) {
-      const key = { skillSha: sha, judge: judgeKey, brief: brief.id, run: runNumber };
-      const keep = path.join(store, safe(sha), safe(brief.id), `${safe(agentName)}-${safe(promptName)}-run${runNumber}`);
+      const key = { ...identity, run: runNumber };
+      const keep = keptDir(store, key);
       if (options.dryRun) {
         log(`\n${brief.id} run ${runNumber}`);
         log(`  agent  ${fillTemplate(agent.command, { prompt: shorten(prompt), workspace: "<workspace>", plugin }).join(" ")}`);
         log(`  keep   ${relative(keep)}`);
         log(`  judge  ${fillTemplate(judge.command, { prompt: "<deck prompt>", packet: "<packet>", schema: "<judge-schema.json>", model }).join(" ")}`);
-        const previous = options.noPairwise ? null : previousDeck(rows, { skillSha: sha, brief: brief.id, agent: agentName, prompt: promptName }, store);
+        const previous = options.noPairwise ? null : previousDeck(rows, identity, store);
         log(`  pair   ${previous ? `against ${previous.skillSha} run ${previous.run}` : "no previous version stored"}`);
         continue;
       }
 
+      // A key recorded since the results were read - by another runner sharing
+      // the file - is refused here, before the agent and the judge are paid for.
+      if (isRecorded(readResults(resultsFile), { key })) throw new Error(`already recorded: ${keyOf({ key })}; nothing was run for it`);
       const workspace = mkdtempSync(path.join(os.tmpdir(), "ps-quality-run-"));
-      const row = { schema: RESULT_SCHEMA, key, recorded: new Date().toISOString(), set: brief.set, agent: agentName, prompt: promptName };
+      const row = { schema: RESULT_SCHEMA, key, recorded: new Date().toISOString(), set: brief.set };
       try {
         const agentOut = run(fillTemplate(agent.command, { prompt, workspace, plugin: plugin ?? "" }), {
           cwd: workspace, timeoutMinutes: agent.timeoutMinutes ?? 120,
@@ -242,6 +253,8 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
           artifacts: path.relative(store, keep), pages: pages.length,
           delivered: delivery ? delivery.accepted === true : null,
           ...(delivery?.stage ? { deliveryStage: delivery.stage } : {}),
+          // Authoring files that could not be told to be this deck's, and why.
+          ...(kept.missing ? { missing: kept.missing } : {}),
         };
         Object.assign(row, (({ plan, build, slides }) => ({ plan, build, deckSlides: slides }))(scoreStored(keep, kept)));
         if (!pages.length) {
@@ -257,7 +270,7 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
           } finally {
             rmSync(packetDir, { recursive: true, force: true });
           }
-          const previous = options.noPairwise ? null : previousDeck(rows, { skillSha: sha, brief: brief.id, agent: agentName, prompt: promptName }, store);
+          const previous = options.noPairwise ? null : previousDeck(rows, identity, store);
           if (!previous) {
             row.pairwise = { skipped: options.noPairwise ? "--no-pairwise" : "no previous version stored for this brief" };
           } else {
@@ -278,7 +291,7 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
         if (!options.keepWorkspace) rmSync(workspace, { recursive: true, force: true });
         else log(`workspace kept: ${workspace}`);
       }
-      appendResult(resultsFile, row, rows);
+      appendResult(resultsFile, row);
       rows.push(row);
       const rating = row.judge ? `rating ${row.judge.rating}` : row.status;
       const pair = row.pairwise?.preferred ? `, preferred ${row.pairwise.preferred} over ${row.pairwise.against.slice(0, 12)}` : "";
@@ -287,7 +300,7 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
   }
 
   if (!options.noAnchors) calibrate({ judge, judgeKey, model, anchorsFile, resultsFile, dryRun: options.dryRun, log });
-  if (!options.dryRun) log(`\n${formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey }))}`);
+  if (!options.dryRun) log(`\n${formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName }))}`);
   return 0;
 }
 

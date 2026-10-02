@@ -764,6 +764,34 @@ console.log(JSON.stringify({{
         self.assertIn('a: `strength` is one of strong, supporting, context (got "high")', result['ungraded'])
         self.assertIn('b: `soWhat`', result['ungraded'])
 
+    def test_a_mix_counts_the_parts_its_chart_draws(self):
+        # Read from each composition form's own sample data: the parts are the
+        # slices, tiles, waffle categories, figure rows - or, where two or more
+        # series stack over the categories, the series every stack is split into.
+        result = run_node(f'''
+import {{ breadthOf, breadthProblem }} from '{KIT}';
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+const mix = (data) => ({{ id: 'm', shape: 'mix', data }});
+const forms = ['chart.donut', 'chart.pie', 'chart.waffle', 'chart.treemap', 'pictogram', 'chart.stacked-bar', 'chart.stacked-column', 'chart.marimekko'];
+const abc = {{ categories: ['A', 'B', 'C'], series: [{{ name: 'Share', values: [50, 30, 20] }}] }};
+console.log(JSON.stringify({{
+  forms: Object.fromEntries(forms.map((id) => [id, breadthOf(mix(REGISTRY.get(id).sample)).parts])),
+  oneSeries: breadthOf(mix(abc)), oneSeriesProblem: breadthProblem(mix(abc)),
+  twoParts: breadthProblem(mix({{ categories: ['2022', '2023', '2024', '2025'], series: [{{ name: 'Home' }}, {{ name: 'Away' }}] }})),
+  oneStack: breadthOf(mix({{ series: [{{ name: 'Core', values: [5] }}, {{ name: 'Growth', values: [3] }}, {{ name: 'New', values: [2] }}] }})),
+  recorded: breadthOf({{ shape: 'mix', breadth: {{ parts: 8 }}, data: {{ categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x' }}, {{ name: 'y' }}] }} }}),
+}}));
+''')
+        self.assertEqual(result['forms'], {'chart.donut': 3, 'chart.pie': 4, 'chart.waffle': 4, 'chart.treemap': 6, 'pictogram': 2,
+                                           'chart.stacked-bar': 3, 'chart.stacked-column': 3, 'chart.marimekko': 2})
+        # Three categories and one series of values is the standard part-to-whole: three parts.
+        self.assertEqual(result['oneSeries'], {'parts': 3})
+        self.assertIsNone(result['oneSeriesProblem'])
+        # Two series stacked over four periods is a two-part mix, however many periods.
+        self.assertIn('2 parts', result['twoParts'])
+        self.assertEqual(result['oneStack'], {'parts': 3})
+        self.assertEqual(result['recorded'], {'parts': 8})  # a recorded breadth is the author's word
+
     def test_the_many_value_forms_compile_and_compose(self):
         result = run_node(f'''
 import {{ compilePage, describeTypes, pageSchema }} from '{KIT}';

@@ -145,49 +145,120 @@ export async function readInventory(spec, deckPath) {
 }
 
 const normalTitle = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").replace(/^[\s\W]+|[\s\W]+$/g, "");
-// Every string and number an object holds, bar the keys that record how a page
-// is built rather than what it says.
-const QUIET = new Set(["id", "pageType", "layout", "kind", "source", "highlight", "arrange", "style", "icon", "path", "alt", "frame", "sourceSlide"]);
+
+// A revision page against the slide it was imported from, in two halves: what
+// it says (sameContent) and how it is drawn (sameDrawing). The inventory
+// records a source slide's words and numbers, its tables, its charts and their
+// type, and its pictures - not a page type or a layout, which a revision gives
+// every page. So a page draws as its slide did only when it draws the same
+// evidence (a table as a table, a column chart as a column chart, text as
+// text), the same pictures, and nothing the inventory cannot vouch for: a part
+// of the rebuild's own (cards, tiles, a hero number) or a drawing setting.
+//
+// Identity and authoring notes: never drawn, never copy.
+const INERT = new Set(["id", "pageType", "sourceSlide", "sourceSlideId", "alt"]);
+// Set by the build from the page's type, form and commentary (page-types.mjs
+// OWNED); a page type that draws other evidence shows in what the page draws.
+const BUILT = new Set(["layout", "arrange", "shape", "kind", "soWhat"]);
+// How a part is drawn, which no source slide records: present at all, a change.
+const SETTINGS = new Set(["icon", "style", "frame", "crop", "variant", "treatment"]);
+// A picture, by its file: `path` anywhere, or `image` and `photo` given as a path.
+const PICTURES = new Set(["path", "image", "photo"]);
+// The page's parts that show pictures: compared by file.
+const PICTURE_PARTS = new Set(["pictures", "image", "photo"]);
+// The page's parts that set copy as text: compared as copy. Every other part
+// draws evidence - an exhibit by its kind, `rows` as a table, and the rest
+// (tiles, a hero number, labelled rows) as parts no source slide had.
+const TEXT = new Set(["points", "paragraphs", "panel", "items", "summary", "highlight", "columns"]);
+// Every string and number a page holds that a reader reads as copy: not its
+// identity, not a value that names how something is drawn (an exhibit's
+// `type`, a setting), not its source line or emphasis, not a picture's file.
+const QUIET = new Set([...INERT, "layout", "arrange", "shape", "kind", "type", "source", "highlight", ...SETTINGS, "path"]);
 function said(value, out = []) {
   if (typeof value === "string" || typeof value === "number") out.push(String(value));
   else if (Array.isArray(value)) for (const v of value) said(v, out);
-  else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) if (!QUIET.has(key)) said(v, out);
+  else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) if (!QUIET.has(key) && !(PICTURES.has(key) && typeof v === "string")) said(v, out);
   return out;
 }
 const wordsOf = (texts) => new Set(texts.join(" ").toLowerCase().match(/[a-z][a-z'-]{2,}/g) || []);
 const numbersOf = (texts) => (texts.join(" ").match(/\d+(?:[.,]\d+)*/g) || []).map((n) => n.replace(/,/g, "")).sort().join(" ");
 function sameContent(slide, source) {
   const page = said({ ...slide, title: undefined });
-  const before = said({ subtitle: source.subtitle, paragraphs: (source.paragraphs || []).map((p) => p.text), tables: source.tables, charts: source.charts });
+  // A source table says its cells and a chart its title, categories and series: not their sizes or type.
+  const before = said({ subtitle: source.subtitle, paragraphs: (source.paragraphs || []).map((p) => p.text), tables: (source.tables || []).map((t) => t?.cells),
+    charts: (source.charts || []).map((c) => ({ title: c?.title, categories: c?.categories, series: c?.series })) });
   const [a, b] = [wordsOf(page), wordsOf(before)];
   const shared = [...a].filter((w) => b.has(w)).length;
   const jaccard = a.size || b.size ? shared / (a.size + b.size - shared) : 1;
   return jaccard >= 0.8 && numbersOf(page) === numbersOf(before);
 }
 
+// A chart's kind as the inventory names it (python-pptx's chart type) and as a
+// page names it (`chart.<kind>`). A type with no counterpart keeps its own
+// name, so it never matches and the page is read.
+function sourceChartKind(type) {
+  const name = String(type ?? "").toUpperCase();
+  const stacked = /STACKED/.test(name) ? "stacked-" : "";
+  const kinds = [[/^BAR_/, `${stacked}bar`], [/^COLUMN_/, `${stacked}column`], [/^LINE/, "line"], [/^PIE/, "pie"], [/^DOUGHNUT/, "donut"], [/^AREA/, `${stacked}area`], [/^(?:XY_SCATTER|BUBBLE)/, "scatter"], [/^RADAR/, "radar"]];
+  return kinds.find(([pattern]) => pattern.test(name))?.[1] ?? `pptx:${name}`;
+}
+const exhibitKind = (exhibit) => { const type = String(exhibit?.type ?? "exhibit"); return type.startsWith("chart.") ? type.slice("chart.".length) : type; };
+const fileName = (file) => String(file ?? "").split(/[\\/]/).pop();
+const sameList = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+/** How a page is drawn: the evidence it draws by kind, its pictures by file, and the drawing settings it carries. */
+function drawingOf(slide) {
+  const evidence = [], pictures = [], settings = [];
+  for (const [key, value] of Object.entries(slide)) {
+    if (!value || typeof value !== "object" || INERT.has(key) || BUILT.has(key) || TEXT.has(key) || PICTURE_PARTS.has(key)) continue;
+    if (key === "exhibit" || key === "exhibits") evidence.push(...[value].flat().filter((e) => e && typeof e === "object").map(exhibitKind));
+    else evidence.push(key === "rows" ? "table" : key);
+  }
+  const walk = (value, top) => {
+    if (Array.isArray(value)) { for (const v of value) walk(v, false); return; }
+    if (!value || typeof value !== "object") return;
+    for (const [key, v] of Object.entries(value)) {
+      if (INERT.has(key) || (top && BUILT.has(key))) continue;
+      if (SETTINGS.has(key)) settings.push(key);
+      if (PICTURES.has(key) && typeof v === "string") pictures.push(fileName(v));
+      else walk(v, false);
+    }
+  };
+  walk(slide, true);
+  return { evidence, pictures, settings };
+}
+function sameDrawing(slide, source) {
+  const page = drawingOf(slide);
+  const evidence = [...(source.tables || []).map(() => "table"), ...(source.charts || []).map((c) => sourceChartKind(c?.type))];
+  return !page.settings.length && sameList(page.evidence, evidence) && sameList(page.pictures, (source.pictures || []).map((p) => fileName(p?.file)));
+}
+
 /**
  * What a revision changed, against the deck it was imported from: `spine`,
  * the content pages whose title changed, that are new or moved, or that sit
- * beside a cut slide - what the storyline critique reads; `content`, those
- * plus the pages whose words or numbers changed - what the deck review's
- * first pass reads. A revision whose spine is unchanged needs no storyline
- * critique. Null for new work.
+ * beside a cut slide - what the storyline critique reads; `copy`, those plus
+ * the pages whose words or numbers changed; `drawn`, the pages drawn other
+ * than their slide was (sameDrawing); and `content`, every page in `copy` or
+ * `drawn` - what the deck review's first pass reads. A revision whose spine
+ * is unchanged needs no storyline critique; one whose copy is unchanged is a
+ * `restyle`, and the deck review reads every page. Null for new work.
  */
 export function revisionChanges(spec, inventory) {
   if (spec?.workflow !== REVISION || !Array.isArray(inventory?.slides)) return null;
   const bySource = new Map(inventory.slides.map((s) => [s.index, s]));
   const pages = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s?.pageType);
   const sourceOf = (s) => s.pageType.sourceSlide ?? s.sourceSlide;
-  const spine = new Set(), content = new Set(), used = new Set();
+  const spine = new Set(), copy = new Set(), drawn = new Set(), used = new Set();
   let furthest = 0;
   for (const s of pages) {
     const from = sourceOf(s);
     const source = bySource.get(from);
-    if (!source) { spine.add(s.id); content.add(s.id); continue; }
+    if (!source) { spine.add(s.id); copy.add(s.id); continue; }
     used.add(from);
     if (normalTitle(s.title ?? s.text) !== normalTitle(source.title) || from < furthest) spine.add(s.id);
     furthest = Math.max(furthest, from);
-    if (spine.has(s.id) || !sameContent(s, source)) content.add(s.id);
+    if (spine.has(s.id) || !sameContent(s, source)) copy.add(s.id);
+    if (!sameDrawing(s, source)) drawn.add(s.id);
   }
   for (const s of [...(spec.slides || []), ...(spec.appendix || [])]) if (s?.sourceSlide !== undefined) used.add(s.sourceSlide);
   // A source slide with body content that no page carries was cut: the pages either side of the gap changed with it.
@@ -196,10 +267,11 @@ export function revisionChanges(spec, inventory) {
   for (const index of dropped) {
     const before = pages.filter((s) => (sourceOf(s) ?? Infinity) < index).at(-1);
     const after = pages.find((s) => (sourceOf(s) ?? -Infinity) > index);
-    for (const s of [before, after]) if (s) { spine.add(s.id); content.add(s.id); }
+    for (const s of [before, after]) if (s) { spine.add(s.id); copy.add(s.id); }
   }
   const ids = pages.map((s) => s.id);
-  return { spine: ids.filter((id) => spine.has(id)), content: ids.filter((id) => content.has(id)), dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0 };
+  return { spine: ids.filter((id) => spine.has(id)), copy: ids.filter((id) => copy.has(id)), drawn: ids.filter((id) => drawn.has(id)),
+    content: ids.filter((id) => copy.has(id) || drawn.has(id)), restyle: copy.size === 0, dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0 };
 }
 
 /**

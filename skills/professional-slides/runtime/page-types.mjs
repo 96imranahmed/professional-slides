@@ -1826,6 +1826,8 @@ const FORM_SCHEMA = {
  */
 export function pageSchema(only = null) {
   if (only !== null && !PAGE_TYPES[only]) throw new Error(`unknown page type "${only}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
+  // Any page, typed or structural, may be hidden.
+  const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it; false shows the slide again" };
   const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => ({
     type: "object",
     required: ["id", "type", "form", "commentary", "why", "title"],
@@ -1848,6 +1850,7 @@ export function pageSchema(only = null) {
       settles: { type: "object", required: ["kind", "what"], properties: { kind: { enum: SETTLES_KINDS }, what: { type: "string", minLength: 8 } } },
       adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }], description: "what the commentary says that the exhibit cannot; required with commentary beside, beside-left, below, captions or on-exhibit" },
       evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },
+      hidden,
     },
     not: { anyOf: OWNED.map((key) => ({ required: [key] })) },
     ...(() => {
@@ -1859,7 +1862,7 @@ export function pageSchema(only = null) {
     })(),
   }));
   if (only !== null) return { $schema: "https://json-schema.org/draft/2020-12/schema", $id: `professional-slides.pages/v1#${only}`, ...typed[0] };
-  const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] } } };
+  const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] }, hidden } };
   const source = { type: "object", required: ["name"], additionalProperties: false,
     properties: { name: { type: "string" }, url: { type: "string" }, status: { type: "string", description: "how far the source can be relied on, printed after its name: audited, company-reported, press report, estimate, survey" } } };
   return {

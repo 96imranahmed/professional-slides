@@ -2325,6 +2325,7 @@ export const SLIDE_KEYS = Object.freeze({
   note: "the footnote line, or a list of numbered notes",
   footnotes: "notes tied to a label, printed with a superscript marker",
   notes: "the speaker notes, which print in the file and never on the page",
+  hidden: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide carries it",
   // the rest
   serves: "which ranked criteria this page answers",
   pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
@@ -3916,9 +3917,13 @@ function composeDeckWith(spec, baseDir) {
   };
   // Every page is composed and every failure reported together.
   mapAll(expanded, (raw) => {
-    const { sourceSlideId, ...page } = resolveReferences(raw);
+    // Hidden is the slide's state in the file, not its layout: it rides past
+    // the composer, and a page split in two hides both halves.
+    const { sourceSlideId, hidden, ...page } = resolveReferences(raw);
+    if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
     const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
+    if (hidden) composed.hidden = true;
     slides.push(composed);
     recent.splice(4);
     recentStyles.splice(9);

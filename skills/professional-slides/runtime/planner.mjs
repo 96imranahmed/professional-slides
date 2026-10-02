@@ -490,6 +490,11 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
-  deck.slides.forEach((slide, index) => { if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role; });
+  // Two keys the planned specs do not carry ride onto the scene slide: the
+  // page's role, and `hidden`, its show state in the file (emit_pptx.py).
+  deck.slides.forEach((slide, index) => {
+    if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role;
+    if (deckPlan.slides[index].hidden) slide.hidden = true;
+  });
   return {deck, decisions:planned.map(item=>item.decision)};
 }

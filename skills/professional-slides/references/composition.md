@@ -132,6 +132,8 @@ For a planned icon list, supply a supported `icon` on each peer and choose `poin
 
 `tracker` controls section navigation independently of the deck's `contents` page. On a section divider, `contents` lists sections and `contentsActive` identifies the current one. `kicker` is an optional structural label above the title; use `evidenceStatus` for qualifications such as Judgement in the shared subtitle band instead. `subtitle` is the page's standfirst: one line under the title naming the measure, population, period or scope, set above the title rule and counted with the title rather than the body ([page types](page-types.md#the-standfirst)); the rule, the title's balanced break and where the body starts are the design system's ([theming](theming.md#the-title-band)). `footnotes: [{on, text}]` attaches numbered scope notes to exact labels. `notes` stores speaker notes without putting them on the page.
 
+`hidden: true` keeps a slide in the file but out of the slide show (PowerPoint's Hide Slide): it is still rendered, gated and reviewed, and `readback.hidden` in build-result.json lists it. An imported deck's hidden slides arrive with `hidden: true` beside their `draft`; keep it when mapping the page, or set it to `false` to show the slide.
+
 ## What the compiler writes
 
 `author-deck.mjs` writes `layout`, `shape`, `arrange` and `soWhat` into `<id>.deck.json` from each page's type, form and commentary, and records the choices in the page's `pageType`. Writing them on a page is refused, and editing them after compiling is `PAGE_TYPE_EDITED`: change the choice in the pages file and recompile. They are listed here to read a compiled deck, a finding that names one, or a deck built outside the pages file.

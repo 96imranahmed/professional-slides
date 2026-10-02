@@ -26,11 +26,18 @@
 // for a repair that changed the argument itself; it needs --reason, which is
 // logged, and a second restart needs --user-approved.
 //
+// A lineage that has accepted the current build is done: a rerun hands the
+// approved build over again, with the same deliverable and delivery.json, and
+// starts no further read.
+//
 // Exit codes (EXIT in errors.mjs): 0 accepted - the deliverable is
 // out/<id>-DELIVERED.pptx; 2 rejected or refused - no deliverable is written,
 // out/REJECTED.md lists the blockers, and any earlier deliverable copy is
 // removed so a stale file can never be mistaken for an accepted one; 3 a review
-// or confirmation packet is waiting for its reviewer; 1 a crash or bad usage.
+// or confirmation packet is waiting for its reviewer, and any earlier
+// deliverable copy is removed likewise; 1 a crash or bad usage, which reaches
+// no outcome and leaves the last one's deliverable, REJECTED.md and
+// delivery.json as they were.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { deckStem } from "./artifact-path.mjs";
@@ -73,22 +80,23 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const directory = await assertOutputDirectory(outputDirectory);
   const spec = await readJson(specPath);
   const stem = deckStem(spec);
+  // The deliverable and REJECTED.md of an earlier run stay until this run
+  // reaches an outcome of its own: deliver, reject and pending each replace them.
   const delivered = path.join(directory, `${stem}-DELIVERED.pptx`);
   const rejectedNote = path.join(directory, "REJECTED.md");
-  await fs.rm(delivered, { force: true });
-  await fs.rm(rejectedNote, { force: true });
   const report = { accepted: false, stage: "build" };
+  const context = { specPath, spec, directory, delivered, rejectedNote, report };
   try {
-    return await deliverSteps({ specPath, spec, directory, delivered, rejectedNote, report }, { reviewer, model, reviewFile, skipBuild, fullReview, reason, userApproved, maxPasses });
+    return await deliverSteps(context, { reviewer, model, reviewFile, skipBuild, fullReview, reason, userApproved, maxPasses });
   } catch (error) {
     if (!isRefusal(error)) throw error;
-    return reject(report, directory, rejectedNote, report.stage, refusalBlockers(error));
+    return reject(context, report.stage, refusalBlockers(error));
   }
 }
 
 async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, fullReview, reason, userApproved, maxPasses }) {
-  const { specPath, spec, directory, delivered, rejectedNote, report } = context;
-  const refuse = (stage, blockers) => reject(report, directory, rejectedNote, stage, blockers);
+  const { specPath, spec, directory, report } = context;
+  const refuse = (stage, blockers) => reject(context, stage, blockers);
   const build = skipBuild ? await readJson(path.join(directory, "build-result.json")) : await buildDeck(specPath, directory);
   report.build = { status: build.status, pptx: build.pptxPath, montage: build.montagePath };
   const blockers = [];
@@ -162,6 +170,10 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   const maxConfirmations = MAX_CONFIRMATIONS + Math.max(0, maxPasses - MAX_PASSES);
   const shared = { ...context, refuse, store, historyDir, slideIds, binding, waivers, reviewer, model, reviewFile, maxPasses, maxConfirmations, confirmations, request };
 
+  // A lineage that has approved this very build is done: a rerun hands it over
+  // again rather than starting another read of it.
+  const approved = approval(prior, confirmations, binding);
+  if (approved) return redeliver(shared, build, approved);
   // An accepted verification of this very build that no confirmation read has
   // judged yet: the answer now expected is that read.
   if (prior?.accepted === true && prior.pass >= 2 && prior.binding === binding && !confirmations.some((c) => c.afterPass === prior.pass && c.confirms === prior.binding))
@@ -169,10 +181,11 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
 
   const ledger0 = prior ? await lineageLedger(store, prior) : [];
   const scope = prior ? verificationScope(prior, await slideHashes(directory), { maxPasses, ledger: ledger0 }) : null;
-  // A revision's first pass reads the pages it changed; a revision that changed
-  // no page's words or numbers is a restyle, and every page is read.
+  // A revision's first pass reads the pages it changed, in what they say or in
+  // how they are drawn; a revision that changed no page's words or numbers is
+  // a restyle, and every page is read.
   const changes = scope ? null : revisionChanges(spec, await readInventory(spec, specPath));
-  const revision = changes?.content.length && changes.content.length < changes.pages.length ? { changed: changes.content } : null;
+  const revision = changes && !changes.restyle && changes.content.length < changes.pages.length ? { changed: changes.content } : null;
   if (revision) report.revision = { changed: revision.changed.length, of: changes.pages.length };
   const priorLedger = scope ? ledger0 : [];
   report.reviewMode = scope ? "verification" : revision ? "revision" : "full";
@@ -258,25 +271,62 @@ async function confirm(shared, accepted) {
   return deliver(shared, null, { rating: review.rating, from: `confirmation read after pass ${accepted.pass}` });
 }
 
-async function deliver({ report, directory, delivered }, build, score) {
+/**
+ * The score of the delivery a lineage has approved for this build (`binding`),
+ * or null: its latest pass accepted the build at pass 1, or accepted it as a
+ * verification that the confirmation read of the same build accepted too.
+ */
+function approval(prior, confirmations, binding) {
+  if (prior?.accepted !== true || prior.binding !== binding) return null;
+  if (prior.pass < 2) return { rating: prior.review.rating, from: "review pass 1" };
+  const read = confirmations.filter((c) => c.afterPass === prior.pass && c.confirms === prior.binding).at(-1);
+  return read?.accepted === true && read.binding === binding ? { rating: read.review.rating, from: `confirmation read after pass ${prior.pass}` } : null;
+}
+
+/**
+ * Hand over a build the lineage already approved: the deliverable copied from
+ * the build again, and the delivery.json that recorded this build's delivery
+ * kept as it is - or, when there is none, written anew with the same score.
+ */
+async function redeliver(shared, build, score) {
+  const { directory, delivered, binding } = shared;
+  const recorded = await readJson(path.join(directory, "delivery.json"), { optional: true }).catch(() => null);
+  if (!(recorded?.accepted === true && recorded.binding === binding && recorded.deliverable === delivered
+    && recorded.score?.rating === score.rating && recorded.score?.from === score.from)) return deliver(shared, build, score);
+  await handOver(shared, build);
+  return recorded;
+}
+
+// The build's PPTX as the deliverable; a rejection note from an earlier run no longer stands.
+async function handOver({ directory, delivered, rejectedNote }, build) {
   const pptx = build?.pptxPath ?? (await readJson(path.join(directory, "build-result.json"))).pptxPath;
   await fs.copyFile(pptx, delivered);
-  report.accepted = true; report.stage = "delivered"; report.deliverable = delivered; report.score = score;
+  await fs.rm(rejectedNote, { force: true });
+}
+
+async function deliver(shared, build, score) {
+  const { report, directory, delivered, binding } = shared;
+  await handOver(shared, build);
+  report.accepted = true; report.stage = "delivered"; report.binding = binding; report.deliverable = delivered; report.score = score;
   await writeJson(path.join(directory, "delivery.json"), report);
   return report;
 }
 
-async function pending({ report, directory, maxPasses }, run, { mode, pass, pages }) {
+// A read is waiting: no deliverable stands for this build until it answers.
+async function pending({ report, directory, delivered, rejectedNote, maxPasses }, run, { mode, pass, pages }) {
+  await fs.rm(delivered, { force: true });
+  await fs.rm(rejectedNote, { force: true });
   report.review = { status: "pending", mode, pass, maxPasses, pages, sections: run.sections, packet: run.packetDir, answer: run.reviewPath, note: run.note };
   await writeJson(path.join(directory, "delivery.json"), report);
   return report;
 }
 
-async function reject(report, directory, notePath, stage, blockers) {
+async function reject({ report, directory, delivered, rejectedNote }, stage, blockers) {
+  await fs.rm(delivered, { force: true });
   report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
   const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s). No deliverable was written.`, ""];
   for (const b of blockers) lines.push(`- slide ${b.slide ?? "deck"} · ${b.code} · ${b.severity}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}`);
-  await fs.writeFile(notePath, lines.join("\n") + "\n");
+  await fs.writeFile(rejectedNote, lines.join("\n") + "\n");
   await writeJson(path.join(directory, "delivery.json"), report);
   return report;
 }

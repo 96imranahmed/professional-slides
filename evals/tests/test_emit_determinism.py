@@ -15,6 +15,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -22,10 +23,11 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from node_probe import requires_python_package, run_node
+from node_probe import RUNTIME_PYTHON, requires_python_package, run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 EMIT = ROOT / "skills" / "professional-slides" / "runtime" / "emit"
+PYTHON = RUNTIME_PYTHON or sys.executable
 sys.path.insert(0, str(EMIT))
 
 
@@ -74,6 +76,54 @@ class DeterministicEmitTests(unittest.TestCase):
             charts = [shape for slide in deck.slides for shape in slide.shapes if getattr(shape, "has_chart", False)]
             self.assertEqual(len(charts), 2)
             self.assertEqual(len(list(charts[0].chart.plots[0].series)), 2)
+
+
+@requires_python_package("pptx")
+class SourceDateEpochTests(unittest.TestCase):
+    """SOURCE_DATE_EPOCH=0, the reproducible-builds default, is 1970: a zip
+    entry cannot record a date before 1980 (nor after 2107), so the archive
+    raised and no deck was written. The entries take the nearest date a zip
+    holds; the package's and the workbooks' XML dates keep the epoch itself."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp_dir = tempfile.TemporaryDirectory()
+        cls.scene = Path(cls.tmp_dir.name) / "scene.json"
+        cls.scene.write_text(json.dumps(chart_scene()))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp_dir.cleanup()
+
+    def emit(self, epoch: str, name: str) -> Path:
+        # The epoch is read when the emitter loads, so each build is its own process.
+        out = Path(self.tmp_dir.name) / name
+        run = subprocess.run([PYTHON, str(EMIT / "emit_pptx.py"), str(self.scene), str(out)], capture_output=True, text=True,
+                             env={**os.environ, "SOURCE_DATE_EPOCH": epoch}, timeout=240)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return out
+
+    def assert_stamped(self, epoch: str, xml_date: bytes, zip_date: tuple):
+        first, second = self.emit(epoch, f"{epoch}-a.pptx"), self.emit(epoch, f"{epoch}-b.pptx")
+        self.assertEqual(first.read_bytes(), second.read_bytes())
+        with zipfile.ZipFile(first) as package:
+            self.assertEqual({info.date_time for info in package.infolist()}, {zip_date})
+            self.assertIn(xml_date, package.read("docProps/core.xml"))
+            workbooks = [n for n in package.namelist() if n.startswith("ppt/embeddings/") and n.endswith(".xlsx")]
+            self.assertTrue(workbooks, "the scene carries native charts")
+            for workbook in workbooks:
+                with zipfile.ZipFile(io.BytesIO(package.read(workbook))) as book:
+                    self.assertIn(xml_date, book.read("docProps/core.xml"))
+                    self.assertEqual({info.date_time for info in book.infolist()}, {zip_date})
+
+    def test_an_epoch_before_1980_stamps_the_entries_at_1980(self):
+        self.assert_stamped("0", b"1970-01-01T00:00:00Z", (1980, 1, 1, 0, 0, 0))
+
+    def test_an_epoch_after_2107_stamps_the_entries_at_2107(self):
+        self.assert_stamped(str(2 ** 33), b"2242-03-16T12:56:32Z", (2107, 12, 31, 23, 59, 58))
+
+    def test_an_epoch_inside_the_range_stamps_both_alike(self):
+        self.assert_stamped("1700000000", b"2023-11-14T22:13:20Z", (2023, 11, 14, 22, 13, 20))
 
 
 @requires_python_package("pptx")
