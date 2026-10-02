@@ -20,7 +20,7 @@ export function markerSize() { return tokenValue(token("icon.medium")); }
  */
 export function numberMarker({ id, role = "marker", labelRole = `${role}-label`, x, y, size = markerSize(), number, reverse = false, data = {} }) {
   const fill = reverse ? WHITE : PRIMARY, ink = reverse ? PRIMARY : WHITE;
-  const label = measureText(String(number), size, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(token("type.compact")), bold: true, wrapWidthRatio: 1 });
+  const label = measureText(String(number), size, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(token("type.compact")), bold: true });
   return [
     ellipsePrimitive({ id: stableId(id, "disc"), role, frame: { x, y, width: size, height: size }, style: { fill, stroke: reverse ? PRIMARY : WHITE, lineWidth: token("line.hairline"), radius: token("radius.round") }, data: { ...data, marker: "number", number } }),
     textPrimitive({ id: stableId(id, "numeral"), role: labelRole, frame: { x, y: y + (size - label.height) / 2, width: size, height: label.height }, text: String(number), style: { fontFamily: token("font.body"), fontSize: token("type.compact"), color: ink, bold: true, align: "center", valign: "top", wrap: false, lineHeight: label.lineHeight }, data: { ...data, marker: "number", number, textLayout: label } })
@@ -60,8 +60,8 @@ export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outlin
 /** ✓ / ✗ disc for checklists: green tick or red cross on a filled disc. */
 export function stateMarker({ id, role = "marker", x, y, size = markerSize(), state, data = {} }) {
   // `open`: an empty box - a question still to answer, a criterion not yet
-  // judged. A checklist of open questions drew each one as a red cross,
-  // because anything that was not "yes" was "no".
+  // judged, so a checklist of open questions is not drawn as red crosses, as
+  // though anything not "yes" were "no".
   if (state === "open") {
     const box = size * 0.78, inset = (size - box) / 2;
     return [rectPrimitive({ id: stableId(id, "box"), role, frame: { x: x + inset, y: y + inset, width: box, height: box },

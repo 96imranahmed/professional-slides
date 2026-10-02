@@ -8,10 +8,12 @@ Opens the file with python-pptx (not the emitter's in-memory objects) and checks
   * the action title is a real title placeholder;
   * every native chart instance has a graphicFrame chart with the right series count;
   * grouped diagrams exist as <p:grpSp>;
-  * hard editability facts: zero wrap="none" text boxes on content slides.
-Exit 0 on pass, 2 on findings. JSON report on stdout.
+  * hard editability facts: zero wrap="none" text boxes on content slides;
+  * a slide is hidden from the slide show exactly when its scene slide is.
+Exit 0 on pass, 2 on findings. JSON report on stdout; its `hidden` lists the
+slides the file hides, by number and page id, so the build result says which.
 
-Usage: readback_pptx.py scene.json deck.pptx [--tolerance 2]
+Usage: readback_pptx.py scene.json deck.pptx
 """
 from __future__ import annotations
 
@@ -45,6 +47,7 @@ READBACK_CODES = {
     "MISSING_NATIVE_CHART": "a native chart instance has no chart object in the file",
     "SERIES_COUNT": "a native chart carries a different number of series than planned",
     "NATIVE_AXIS_DRIFT": "a native chart's axis settings differ from the scene's",
+    "HIDDEN_STATE": "a slide is hidden from the slide show in the file and not in the scene, or the other way",
 }
 
 
@@ -61,11 +64,16 @@ def walk(shapes):
 
 def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
     prs = Presentation(str(pptx))
-    findings = []
+    findings, hidden = [], []
     stats = {"text_checked": 0, "charts_checked": 0, "groups": 0, "wrap_none": 0, "title_placeholders": 0}
     if len(prs.slides) != len(scene["slides"]):
         findings.append({"code": "SLIDE_COUNT", "expected": len(scene["slides"]), "actual": len(prs.slides)})
     for si, (sl, slide) in enumerate(zip(scene["slides"], prs.slides), start=1):
+        shown = slide._element.get("show") not in ("0", "false")
+        if shown == bool(sl.get("hidden")):
+            findings.append({"slide": si, "code": "HIDDEN_STATE", "expected": bool(sl.get("hidden")), "actual": not shown})
+        if not shown:
+            hidden.append({"slide": si, "id": sl.get("sourceSlideId") or sl.get("id")})
         canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or scene.get("tokens", {}).get("color.canvas", {}).get("value")
         if canvas:
             saved = slide._element.find("./" + qn("p:cSld") + "/" + qn("p:bg") + "/" + qn("p:bgPr") + "/" + qn("a:solidFill") + "/" + qn("a:srgbClr"))
@@ -143,14 +151,14 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
                     actual_value = getattr(sh.chart.value_axis, attr)
                     if target is not None and (actual_value is None or abs(actual_value - target) > 1e-8):
                         findings.append({"slide": si, "code": "NATIVE_AXIS_DRIFT", "shape": name, "field": key, "expected": target, "actual": actual_value})
-    return {"pptx": str(pptx), "accepted": not findings, "stats": stats, "findings": findings}
+    return {"pptx": str(pptx), "accepted": not findings, "stats": stats, "hidden": hidden, "findings": findings}
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("scene"); ap.add_argument("pptx"); ap.add_argument("--tolerance", type=float, default=2.0)
+    ap.add_argument("scene"); ap.add_argument("pptx")
     a = ap.parse_args(argv)
-    report = readback(json.loads(Path(a.scene).read_text()), Path(a.pptx), a.tolerance)
+    report = readback(json.loads(Path(a.scene).read_text()), Path(a.pptx))
     print(json.dumps(report, indent=1))
     sys.exit(0 if report["accepted"] else 2)
 

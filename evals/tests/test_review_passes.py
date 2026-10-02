@@ -28,27 +28,41 @@ const finding = (o = {}) => ({ id: 'F1', scope: 'page', slides: ['p02'], dimensi
   repair: 'Replot the line on a true time axis so the gaps show as gaps.', checkable: null, ...o });
 const worstOn = (findings, id) => findings.filter((f) => f.slides.includes(id) && f.severity !== 'none').map((f) => f.severity).sort((a, b) => RANK.indexOf(b) - RANK.indexOf(a))[0];
 const density = { deck: 'No density profile was built for this fixture, so no medians are compared.', pages: [] };
+const prov = (promptHash = 'd'.repeat(64)) => ({ backend: 'subagent', model: 'fixture-model', promptHash });
+const blocks = (findings) => findings.some((f) => ['major', 'blocker'].includes(f.severity));
 function firstPass(findings = [], o = {}, ids = IDS) {
-  return { pass: 1, verifies: null, accepted: !findings.some((f) => ['major', 'blocker'].includes(f.severity)),
-    summary: 'The deck argues well; one chart misleads.', rating: 7, binding: 'a'.repeat(64),
+  return { pass: 1, verifies: null, accepted: !blocks(findings),
+    summary: 'The deck argues well; one chart misleads.', rating: blocks(findings) ? 7 : 8.5, binding: 'a'.repeat(64), opened: [...ids], provenance: prov(),
     pages: ids.map((id) => pageEntry(id, worstOn(findings, id) ?? 'ok')), findings,
     completeness: R.DIMENSIONS.map((d) => findings.some((f) => f.dimension === d) ? { dimension: d, result: 'findings', note: 'Filed the findings above.' }
       : { dimension: d, result: 'clean', note: `Checked ${d} on every page and found nothing to raise.` }),
     assessment: Object.fromEntries(R.ASSESSMENT_KEYS.map((k) => [k, `A sentence about ${k}.`])), density, ...o };
 }
+// The spine critique (the default); storyFull adds the page-level entries of --full.
 function storyReady(spec, o = {}) {
   const ids = spec.slides.map((s) => s.id);
   return { pass: 1, verifies: null, verdict: 'ready', rating: 8, binding: S.storylineBinding(spec), summary: 'The answer is sharp and the pillars hold on the evidence shown.',
     spine: 'Read alone, the titles build from the market to the answer without a gap or a repeated step.',
     answer: 'The subject is growing faster than every rival on every measure that matters.',
+    answerParts: [{ part: 'Which company is winning', verdict: 'answered', missingEvidence: '' }],
     pillars: [{ pillar: 'Growth', pages: ids, verdict: 'holds', overlap: 'No overlap with any other pillar.', strongestCounter: 'The base is still small.', reversal: 'Growth below the peer median for two years.', answered: true }],
-    pages: ids.map((id) => ({ page: id, verdict: 'ok', claim: 'a finding', shape: 'trend with its rate', sourcing: { status: 'n/a', insights: [], note: 'no log' }, restatement: 'moves on', consequence: 'states it' })),
     numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.',
     execSummary: 'The summary states the answer the body proves.', missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
     completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })), ...o };
 }
-const specOf = (ids = IDS, titles = {}) => ({ schema: 'professional-slides.deck/v3', id: 'fixture', brief: 'Which company is winning?', answer: 'The subject is.',
+const storyFull = (spec, o = {}) => storyReady(spec, { pages: spec.slides.map((s) => ({ page: s.id, verdict: 'ok', claim: 'a finding', shape: 'trend with its rate', sourcing: { status: 'n/a', insights: [], note: 'no log' }, restatement: 'moves on', consequence: 'states it' })), ...o });
+const specOf = (ids = IDS, titles = {}) => ({ schema: 'professional-slides.deck/v3', id: 'fixture', request: 'Which company is winning this market, and why?', answer: 'The subject is.',
   slides: ids.map((id) => ({ id, title: titles[id] ?? `Title of ${id} states one finding` })) });
+// The hash of the packet a critique or review answers, read from the staged packet.
+const hashOf = async (staging) => JSON.parse(await fs.readFile(path.join(staging, 'packet.json'), 'utf8')).promptHash;
+// A fixture folder and the staging folders its lineage stores point at.
+async function cleanup(dir) {
+  for (const deck of await fs.readdir(path.join(dir, '.reviews')).catch(() => [])) for (const file of ['review-packet.json', 'storyline-packet.json']) {
+    const staging = await fs.readFile(path.join(dir, '.reviews', deck, file), 'utf8').then((t) => JSON.parse(t).staging, () => null);
+    if (staging) await fs.rm(staging, { recursive: true, force: true });
+  }
+  await fs.rm(dir, { recursive: true, force: true });
+}
 async function builtDeck(ids = IDS) {
   // The real path: delivery resolves its output directory, and the binding hashes the PPTX path relative to it.
   const dir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'review-passes-')));
@@ -88,6 +102,9 @@ console.log(JSON.stringify({
   wrongVerdict: errors(wrongVerdict), incomplete: errors(incomplete), cleanButFound: errors(cleanButFound), unnoted: errors(unnoted),
   pageOnTwo: errors(pageOnTwo), noCheckable: errors(firstPass([(({ checkable, ...f }) => f)(finding())])),
   accepted: errors(firstPass([finding()], { accepted: true })),
+  rebuttal: errors(firstPass([finding()], { authorResponse: 'F1 is a stylistic preference; the axis is fine.' })),
+  unopened: errors(firstPass([finding()], { opened: ['p02'] })),
+  lowAndClean: errors(firstPass([], { rating: 7.5 })),
 }));
 ''')
         self.assertEqual(result['ok'], [])
@@ -104,6 +121,12 @@ console.log(JSON.stringify({
         self.assertTrue(any('deck finding' in e for e in result['pageOnTwo']))
         self.assertTrue(any('checkable is required' in e for e in result['noCheckable']))
         self.assertTrue(any('accepted cannot be true' in e for e in result['accepted']))
+        # A field the schema does not name - an author's rebuttal - is not part of a review.
+        self.assertTrue(any('authorResponse' in e for e in result['rebuttal']))
+        # `opened` is what the reader looked at, and a first pass opens every page.
+        self.assertTrue(any('opened' in e and 'p01' in e for e in result['unopened']))
+        # A rating under the bar with nothing major open leaves the author nothing to repair.
+        self.assertTrue(any('below the acceptance bar' in e for e in result['lowAndClean']))
 
     def test_the_prompt_carries_the_rubric_and_the_page_list(self):
         result = run_node(FIXTURES + '''
@@ -122,14 +145,16 @@ const prior = { binding: 'b'.repeat(64), pass: 1, pageHashes: Object.fromEntries
 const scope = R.verificationScope(prior, { ...prior.pageHashes, p04: 'changed' });
 const status = (o = {}) => ({ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.', ...o });
 const verify = (o = {}) => ({ pass: 2, verifies: 'b'.repeat(64), accepted: true, summary: 'The repair held on the chart page.', rating: 8, binding: 'a'.repeat(64),
-  pages: [pageEntry('p02'), pageEntry('p04')], statuses: [status()], findings: [], density, ...o });
-const added = (o) => ({ ...finding({ id: 'F9', ...o }), basis: 'changed', justification: '', ...(o.basis ? { basis: o.basis } : {}), ...(o.justification ? { justification: o.justification } : {}) });
-const check = (review) => R.validateReview(review, IDS, { scope, ledger: scope.ledger });
+  opened: ['p02', 'p04'], provenance: prov(), pages: [pageEntry('p02'), pageEntry('p04')], statuses: [status()], findings: [], density, ...o });
+const added = (o) => ({ ...finding({ id: 'F9', ...o }), basis: 'changed', justification: '', evidence: '', ...(o.basis ? { basis: o.basis } : {}), ...(o.justification ? { justification: o.justification } : {}), ...(o.evidence ? { evidence: o.evidence } : {}) });
+const check = (review, o = {}) => R.validateReview(review, IDS, { scope, ledger: scope.ledger, ...o });
 '''
 
     def test_a_later_pass_gives_every_open_finding_a_status_and_adds_only_what_is_additive(self):
         result = run_node(self.PRIOR + '''
 const table = { dimension: 'table', code: 'UNFINISHED_TOTAL_ROW', reason: 'The rebuilt table ends with a Total label and a blank result row.', repair: 'Fill the total row with the column sums or cut the row.' };
+const justification = 'The first pass read an older render in which the table sat behind the legend and the row was hidden.';
+const pageText = { p05: 'Route economics\\nTotal | 412 | 388 | —\\nSource: filings' };
 console.log(JSON.stringify({
   scope: { pass: scope.pass, changed: scope.changed, must: scope.mustInspect, capped: scope.capped },
   good: check(verify()),
@@ -138,8 +163,12 @@ console.log(JSON.stringify({
   minorUnchanged: check(verify({ findings: [added({ slides: ['p05'], severity: 'minor', dimension: 'text', code: 'LONG_LABEL', reason: 'The label wording runs long for its box.', repair: 'Shorten the label to the product name only.' })] })),
   majorChanged: check(verify({ accepted: false, pages: [pageEntry('p02'), pageEntry('p04', 'major')], findings: [added({ slides: ['p04'], ...table })] })),
   majorUnchanged: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table })] })),
-  missedMajor: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, basis: 'missed', justification: 'The first pass read an older render in which the table sat behind the legend and the row was hidden.' })] })),
-  missedBlocker: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, severity: 'blocker', basis: 'missed', justification: 'The first pass read an older render in which the table sat behind the legend and the row was hidden.' })] })),
+  // A missed major on an unchanged page is admitted on the page's own words.
+  missedUnquoted: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, basis: 'missed', justification })] })),
+  missedMajor: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, basis: 'missed', justification, evidence: 'Total | 412 | 388 | —' })] })),
+  missedMisquoted: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, basis: 'missed', justification, evidence: 'Total | 999 | 000' })] }), { pageText }),
+  missedQuoted: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, basis: 'missed', justification, evidence: 'total | 412 | 388' })] }), { pageText }),
+  missedBlocker: check(verify({ accepted: false, findings: [added({ slides: ['p05'], ...table, severity: 'blocker', basis: 'missed', justification, evidence: 'Total | 412 | 388 | —' })] })),
   repeat: check(verify({ accepted: false, pages: [pageEntry('p02', 'major'), pageEntry('p04')], statuses: [status({ status: 'not fixed', evidence: 'The months are still drawn at equal spacing on the axis.' })],
     findings: [added({ id: 'F9', slides: ['p02'] })] })),
   reusedId: check(verify({ accepted: false, pages: [pageEntry('p02'), pageEntry('p04', 'major')], findings: [added({ id: 'F1', slides: ['p04'], ...table })] })),
@@ -154,7 +183,11 @@ console.log(JSON.stringify({
         self.assertTrue(any('not additive' in e for e in result['minorUnchanged']))
         self.assertEqual(result['majorChanged'], [])
         self.assertTrue(any('did not change' in e for e in result['majorUnchanged']))
-        self.assertTrue(any('only a blocker' in e for e in result['missedMajor']))
+        # A missed major is admitted now - but only with the page quoted, and the quote must be on the page.
+        self.assertTrue(any('quotes the evidence' in e for e in result['missedUnquoted']), result['missedUnquoted'])
+        self.assertEqual(result['missedMajor'], [])
+        self.assertTrue(any('not printed on p05' in e for e in result['missedMisquoted']), result['missedMisquoted'])
+        self.assertEqual(result['missedQuoted'], [])
         self.assertEqual(result['missedBlocker'], [])
         self.assertTrue(any('already F1' in e for e in result['repeat']))
         self.assertTrue(any('already in the ledger' in e for e in result['reusedId']))
@@ -169,21 +202,58 @@ const partly = verify({ pages: [pageEntry('p02', 'minor'), pageEntry('p04')], st
 const at = (pass) => R.verificationScope({ ...prior, pass }, { ...prior.pageHashes, p04: 'changed' });
 console.log(JSON.stringify({
   fixed: R.reviewOutcome(verify(), scope.ledger).accepted,
+  lowRated: R.reviewOutcome(verify({ rating: 7.8 }), scope.ledger),
   notFixed: R.reviewOutcome(notFixed, scope.ledger), notFixedValid: check(notFixed),
-  partly: R.reviewOutcome(partly, scope.ledger).accepted, partlyValid: check(partly),
+  partly: R.reviewOutcome(partly, scope.ledger), partlyValid: check(partly),
   third: at(2).capped, fourth: at(3).capped, fourthPass: at(3).pass, custom: R.verificationScope({ ...prior, pass: 3 }, prior.pageHashes, { maxPasses: 4 }).capped,
+  // The scope a verifier is handed never carries the earlier rating.
+  scopeKeys: Object.keys(scope),
 }));
 ''')
         self.assertTrue(result['fixed'])
+        # Nothing open is not enough: the deck must be rated at the bar.
+        self.assertFalse(result['lowRated']['accepted'])
+        self.assertIn('REVIEW_RATING', [b['code'] for b in result['lowRated']['blocking']])
         self.assertFalse(result['notFixed']['accepted'])
         self.assertEqual([b['id'] for b in result['notFixed']['blocking']], ['F1'])
         self.assertEqual(result['notFixedValid'], [])
-        self.assertTrue(result['partly'])
-        self.assertEqual(result['partlyValid'], [])
+        # A partly fixed finding no longer drops from major to minor on the
+        # reviewer's say-so: it keeps its severity, blocks, and the lowered
+        # severity is refused.
+        self.assertFalse(result['partly']['accepted'])
+        self.assertEqual([(b['id'], b['severity']) for b in result['partly']['blocking']], [('F1', 'major')])
+        self.assertTrue(any('keeps its major severity' in e for e in result['partlyValid']), result['partlyValid'])
         self.assertFalse(result['third'])
         self.assertTrue(result['fourth'])
         self.assertEqual(result['fourthPass'], 4)
         self.assertFalse(result['custom'])
+        self.assertNotIn('priorRating', result['scopeKeys'])
+
+    def test_a_deck_finding_drops_only_when_its_measure_passes(self):
+        # TABLE_MONOTONY is a deck finding with a deterministic measure: the
+        # share of treated tables and the exhibit variety. "Partly fixed" may
+        # lower it only when that measure passes on the rebuilt scene.
+        result = run_node(FIXTURES + '''
+const ids = Array.from({ length: 12 }, (_, i) => `q${String(i + 1).padStart(2, '0')}`);
+const page = (id, component, roles) => ({ id, nodes: [{ type: 'text', role: 'action-title', text: `Title of ${id}` }, ...roles.map((role) => ({ type: 'rect', role })),
+  ...Array.from({ length: 14 }, () => ({ type: 'rect', role: 'mark' }))], componentInstances: [{ component: 'slide-chrome' }, { component }] });
+const kinds = ['table', 'chart.bar', 'chart.line', 'map', 'cards', 'steps', 'timeline', 'framework', 'comparison-table', 'heatmap', 'chart.scatter', 'matrix'];
+const scene = (treated) => ({ slides: ids.map((id, i) => page(id, kinds[i], /table|heatmap/.test(kinds[i]) ? (treated ? ['table-harvey'] : ['table-cell']) : kinds[i].startsWith('chart') ? ['chart-callout'] : [])) });
+const monotony = finding({ id: 'F1', scope: 'deck', slides: ['q01', 'q09', 'q10'], dimension: 'consistency', code: 'TABLE_MONOTONY',
+  reason: 'The same plain grid carries q01, q09 and q10, so three different comparisons read alike.', repair: 'Encode the verdict columns with Harvey balls or bars so each table shows its judgement.' });
+const first = firstPass([monotony], {}, ids);
+const prior = { binding: 'b'.repeat(64), pass: 1, pageHashes: Object.fromEntries(ids.map((id) => [id, 'h'])), review: first, ledger: R.deckLedger([], first) };
+const scope = R.verificationScope(prior, { ...prior.pageHashes, q01: 'rebuilt', q09: 'rebuilt', q10: 'rebuilt' });
+const review = { pass: 2, verifies: 'b'.repeat(64), accepted: true, summary: 'The tables now encode their verdicts with Harvey balls.', rating: 8.2, binding: 'a'.repeat(64),
+  opened: ['q01', 'q09', 'q10'], provenance: prov(), pages: ['q01', 'q09', 'q10'].map((id) => pageEntry(id, 'minor')),
+  statuses: [{ finding: 'F1', status: 'partly fixed', severity: 'minor', evidence: 'Harvey balls now carry the verdict columns; one header still reads alike.' }], findings: [], density };
+const judge = (s) => { const downgrade = R.downgradeRule(s); return { errors: R.validateReview(review, ids, { scope, ledger: scope.ledger, downgrade }), outcome: R.reviewOutcome(review, scope.ledger, { downgrade }).accepted }; };
+console.log(JSON.stringify({ plain: judge(scene(false)), treated: judge(scene(true)) }));
+''')
+        self.assertTrue(any('keeps its major severity' in e for e in result['plain']['errors']), result['plain'])
+        self.assertFalse(result['plain']['outcome'])
+        self.assertEqual(result['treated']['errors'], [])
+        self.assertTrue(result['treated']['outcome'])
 
 
 class DensityVerificationTests(unittest.TestCase):
@@ -200,7 +270,7 @@ const prior = { binding: 'b'.repeat(64), pass: 1, pageHashes: hashes, review: fi
 const scope = R.verificationScope(prior, { ...hashes, p03: 'rebuilt' });
 const rebuilt = { deck: {}, pages: [{ id: 'p03', page: 3, flags: [] }], flaggedPages: [] };
 const verify = (pages) => ({ pass: 2, verifies: 'b'.repeat(64), accepted: true, summary: 'The rebuilt page now carries its reasoning.', rating: 8, binding: 'a'.repeat(64),
-  pages: [pageEntry('p03')], statuses: [], findings: [], density: { deck: 'The deck now sits on its targets on every measure compared.', pages } });
+  opened: ['p03'], provenance: prov(), pages: [pageEntry('p03')], statuses: [], findings: [], density: { deck: 'The deck now sits on its targets on every measure compared.', pages } });
 const silent = verify([]);
 const judged = verify([{ slide: 'p03', verdict: 'right', reason: 'The page now gives the reasoning behind its finding.' }]);
 const packet = { scope, density: rebuilt, slides: [], titles: [], montage: 'm.png', schema: R.VERIFICATION_SCHEMA, binding: 'a'.repeat(64) };
@@ -221,11 +291,11 @@ class SectionMergeTests(unittest.TestCase):
     PARTS = FIXTURES + '''
 const dead = (id, slides) => finding({ id, scope: 'deck', slides, dimension: 'layout', code: 'DEAD_SPACE', reason: `Large empty bands under the exhibit on ${slides.join(', ')}.`, repair: 'Enlarge the exhibit to fill the band on each page.' });
 const section = (id, slides, findings) => ({ part: { kind: 'section', id, slides }, binding: 'a'.repeat(64), accepted: false, summary: 'The section reads well apart from its bands.', rating: 7,
-  pages: slides.map((s) => pageEntry(s, worstOn(findings, s) ?? 'ok')), findings,
+  opened: [...slides], provenance: prov(), pages: slides.map((s) => pageEntry(s, worstOn(findings, s) ?? 'ok')), findings,
   completeness: R.PAGE_DIMENSIONS.map((d) => findings.some((f) => f.dimension === d) ? { dimension: d, result: 'findings', note: 'Filed above.' } : { dimension: d, result: 'clean', note: `Checked ${d} on each page of the section; nothing to raise.` }) });
 const s1 = section('s1', ['p01', 'p02', 'p03'], [dead('F1', ['p01', 'p03'])]);
 const s2 = section('s2', ['p04', 'p05', 'p06'], [dead('F1', ['p05']), finding({ id: 'F2', slides: ['p04'], severity: 'minor', reason: 'The axis title repeats the chart heading word for word.', repair: 'Cut the axis title and keep the unit in the heading.' })]);
-const spine = { part: { kind: 'spine', id: 'spine', slides: IDS }, binding: 'a'.repeat(64), accepted: false, summary: 'Sound argument; repeated tables and empty bands.', rating: 6, pages: [],
+const spine = { part: { kind: 'spine', id: 'spine', slides: IDS }, binding: 'a'.repeat(64), accepted: false, summary: 'Sound argument; repeated tables and empty bands.', rating: 6, opened: [], provenance: prov(), pages: [],
   findings: [finding({ id: 'F1', scope: 'deck', slides: ['p02', 'p05'], dimension: 'consistency', code: 'TABLE_MONOTONY', reason: 'The same dark first-column table carries p02 and p05.', repair: 'Redraw p05 as a ranked bar so the pair reads differently.' })],
   completeness: R.DECK_DIMENSIONS.map((d) => d === 'consistency' ? { dimension: d, result: 'findings', note: 'Filed above.' } : { dimension: d, result: 'clean', note: `Checked ${d} across the whole sequence; nothing to raise.` }),
   assessment: Object.fromEntries(R.ASSESSMENT_KEYS.map((k) => [k, `A sentence about ${k}.`])), density };
@@ -268,9 +338,9 @@ const dir = await builtDeck();
 const parts = path.join(dir, 'review-packet', 'parts');
 await fs.mkdir(parts, { recursive: true });
 for (const part of [s1, s2, spine]) for (const name of [`${part.part.id}.json`, `${part.part.id}.last-message.json`]) await fs.writeFile(path.join(parts, name), JSON.stringify(part));
-const merged = await R.mergeReviewDirectory(dir);
+const merged = await R.mergeReviewDirectory(dir, parts);
 const read = await P.readParts(parts);
-await fs.rm(dir, { recursive: true, force: true });
+await cleanup(dir);
 console.log(JSON.stringify({ status: merged.status, errors: merged.errors ?? [], files: read.files }));
 ''')
         self.assertEqual(result['errors'], [])
@@ -286,8 +356,8 @@ const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'storyline-split-'));
 const specPath = path.join(dir, 'fixture.deck.json');
 const content = Array.from({ length: 40 }, (_, i) => ({ id: `q${i + 1}`, title: `Title of q${i + 1} states one finding` }));
 await fs.writeFile(specPath, JSON.stringify({ ...specOf([]), slides: [{ id: 'd1', kind: 'section', title: 'The whole market' }, ...content] }));
-const { packet } = await S.buildStorylinePacket(specPath, path.join(dir, 'out'));
-await fs.rm(dir, { recursive: true, force: true });
+const { packet } = await S.buildStorylinePacket(specPath, path.join(dir, 'out'), { mode: 'full' });
+await cleanup(dir);
 const part = (kind, id, pages) => ({ part: { kind, id, pages }, binding: 'x' });
 const twice = S.mergeStorylineParts([part('section', 's1', ['p01', 'p02']), part('section', 's2', ['p02', 'p03']), part('spine', 'spine', [])],
   { binding: 'x', pages: ['p01', 'p02', 'p03'].map((id) => ({ id, kind: 'content' })), sections: null });
@@ -305,26 +375,34 @@ const dir = await builtDeck();
 const spec = specOf();
 const specPath = path.join(dir, 'fixture.deck.json');
 await fs.writeFile(specPath, JSON.stringify(spec));
-const attempt = async (s) => { try { await R.buildReviewPacket({ outputDirectory: dir, spec: s }); return 'written'; } catch (e) { return e.message; } };
+const attempt = async (s) => { try { return (await R.buildReviewPacket({ outputDirectory: dir, spec: s, deckPath: specPath })).packetDir; } catch (e) { return e.message; } };
 const none = await attempt(spec);
-await S.buildStorylinePacket(specPath, dir);
-await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { verdict: 'revise', topFixes: ['Show the whole peer set'] })));
+const { dir: staging } = await S.buildStorylinePacket(specPath, dir);
+const provenance = prov(await hashOf(staging));
+await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { verdict: 'revise', topFixes: ['Show the whole peer set'], provenance })));
 const revise = await attempt(spec);
-await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec)));
-const ready = await attempt(spec);
-const prompt = await fs.readFile(path.join(dir, 'review-packet', 'prompt.md'), 'utf8').then(() => true, () => false);
+await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { provenance })));
+const packetDir = await attempt(spec);
+const staged = (await fs.readdir(packetDir)).sort();
+const prompt = await fs.readFile(path.join(packetDir, 'prompt.md'), 'utf8');
 const retitled = specOf(IDS, { p03: 'A different claim now stands on page three' });
 const changed = await attempt(retitled);
 const deliver = (await import('./skills/professional-slides/runtime/deliver-deck.mjs')).deliverDeck;
 await fs.writeFile(specPath, JSON.stringify(retitled));
 const refused = await deliver(specPath, dir, { skipBuild: true, reviewFile: path.join(dir, 'nothing.json') });
-await fs.rm(dir, { recursive: true, force: true });
-console.log(JSON.stringify({ none, revise, ready, prompt, changed, refusedAt: refused.rejectedAt, reason: refused.blockers[0].reason }));
+await cleanup(dir);
+console.log(JSON.stringify({ none, revise, staged, outside: !packetDir.startsWith(dir), request: prompt.includes("THE USER'S REQUEST (verbatim"),
+  requestText: prompt.includes('Which company is winning this market, and why?'), hashLine: /"promptHash": "[a-f0-9]{64}"/.test(prompt), readFiles: /references\\/[a-z-]+\\.md/.test(prompt),
+  changed, refusedAt: refused.rejectedAt, reason: refused.blockers[0].reason }));
 ''')
         self.assertIn('storyline-review.json is missing', result['none'])
         self.assertIn('says revise', result['revise'])
-        self.assertEqual(result['ready'], 'written')
-        self.assertTrue(result['prompt'])
+        # The packet is staged outside the output directory with only what the reviewer is given.
+        self.assertTrue(result['outside'])
+        self.assertEqual(result['staged'], ['packet.json', 'prompt.md', 'rendered', 'schema.json'])
+        # It carries the user's request verbatim and the hash the answer echoes, and sends the reviewer to no other file.
+        self.assertTrue(result['request'] and result['requestText'] and result['hashLine'])
+        self.assertFalse(result['readFiles'])
         self.assertIn('re-run the storyline critique first', result['changed'])
         self.assertIn('p03', result['changed'])
         # Delivery refuses a supplied deck review the same way, before reading it.
@@ -344,61 +422,44 @@ const spec = specOf(['p01', 'p02', 'p03']);
 await fs.writeFile(specPath, JSON.stringify(spec));
 const reviewPath = path.join(out, 'storyline-review.json');
 await fs.writeFile(reviewPath, JSON.stringify(storyReady(spec)));
-const handWritten = await S.storylineGate(spec, out);
+const handWritten = await S.storylineGate(spec, out, { deckPath: specPath });
 await fs.rm(reviewPath);
-await S.prepareStoryline(specPath, out);
-const critique = storyReady(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' }] });
-critique.pages[1].verdict = 'major'; critique.completeness.find((c) => c.check === 'claim').result = 'findings';
+const step = await S.prepareStoryline(specPath, out);
+const critique = storyReady(spec, { verdict: 'revise', provenance: prov(await hashOf(step.dir)), findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' }] });
+critique.completeness.find((c) => c.check === 'claim').result = 'findings';
+await fs.writeFile(reviewPath, JSON.stringify({ ...critique, authorResponse: 'F1 misreads the page; the count is the finding.' }));
+const rebutted = await S.prepareStoryline(specPath, out);
 await fs.writeFile(reviewPath, JSON.stringify(critique));
 const recorded = await S.prepareStoryline(specPath, out);
 await fs.writeFile(reviewPath, JSON.stringify({ ...critique, verdict: 'ready', findings: [] }));
-const edited = await S.storylineGate(spec, out);
-await fs.rm(dir, { recursive: true, force: true });
-console.log(JSON.stringify({ handWritten, recorded: recorded.status, edited }));
+const edited = await S.storylineGate(spec, out, { deckPath: specPath });
+// A new output directory is the same lineage: the record is found beside the deck.
+const elsewhere = await S.storylineGate(spec, path.join(dir, 'out-2'), { deckPath: specPath });
+const store = (await fs.readdir(path.join(dir, '.reviews', 'fixture'))).sort();
+await cleanup(dir);
+console.log(JSON.stringify({ handWritten, rebutted, recorded: recorded.status, edited, elsewhere, store }));
 ''')
         self.assertTrue(any('answers no packet' in e for e in result['handWritten']), result['handWritten'])
+        self.assertEqual(result['rebutted']['status'], 'invalid')
+        self.assertTrue(any('authorResponse' in e for e in result['rebutted']['errors']), result['rebutted'])
         self.assertEqual(result['recorded'], 'revise')
         self.assertTrue(any('says revise' in e for e in result['edited']), result['edited'])
-
-    def test_delivery_enforces_the_pass_cap_and_the_ledger(self):
-        result = run_node(FIXTURES + '''
-const dir = await builtDeck();
-const spec = specOf();
-const specPath = path.join(dir, 'fixture.deck.json');
-await fs.writeFile(specPath, JSON.stringify(spec));
-await S.buildStorylinePacket(specPath, dir);
-await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec)));
-const { deliverDeck } = await import('./skills/professional-slides/runtime/deliver-deck.mjs');
-const binding = await R.reviewBinding(dir);
-const write = async (name, review) => { const file = path.join(dir, name); await fs.writeFile(file, JSON.stringify(review)); return file; };
-const first = await deliverDeck(specPath, dir, { skipBuild: true, reviewFile: await write('r1.json', firstPass([finding()], { binding })) });
-const capped = await deliverDeck(specPath, dir, { skipBuild: true, maxPasses: 1, reviewFile: await write('r2.json', {}) });
-const second = await deliverDeck(specPath, dir, { skipBuild: true, reviewFile: await write('r3.json', { pass: 2, verifies: binding, accepted: true, summary: 'The repair held on the chart page.', rating: 8, binding,
-  pages: [pageEntry('p02')], statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.' }], findings: [], density }) });
-const history = (await fs.readdir(path.join(dir, 'review-history'))).filter((f) => f.startsWith('pass-')).sort();
-const last = JSON.parse(await fs.readFile(path.join(dir, 'review-history', history.at(-1)), 'utf8'));
-await fs.rm(dir, { recursive: true, force: true });
-console.log(JSON.stringify({ first: [first.accepted, first.rejectedAt], capped: [capped.rejectedAt, capped.blockers[0].code], second: [second.accepted, second.review.pass],
-  lineage: [last.pass, last.verifies === binding], ledger: last.ledger.map((e) => [e.id, e.status]) }));
-''')
-        self.assertEqual(result['first'], [False, 'review pass 1 of 3'])
-        self.assertEqual(result['capped'], ['review cap', 'REVIEW_PASS_CAP'])
-        self.assertEqual(result['second'], [True, 2])
-        self.assertEqual(result['lineage'], [2, True])
-        self.assertEqual(result['ledger'], [['F1', 'fixed']])
+        self.assertTrue(any('says revise' in e for e in result['elsewhere']), result['elsewhere'])
+        self.assertEqual(result['store'], ['storyline-history', 'storyline-packet.json'])
 
 
 class StorylinePassTests(unittest.TestCase):
     def test_a_first_critique_covers_every_page_without_sampling(self):
+        # The page-level critique (--full): every content page, no sampling.
         result = run_node(FIXTURES + '''
 const spec = specOf(['p01', 'p02', 'p03']);
-const missing = storyReady(spec); missing.pages = missing.pages.slice(0, 2);
-const sampled = storyReady(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'spine', pages: ['p01'], check: 'claim', severity: 'major', problem: 'Several titles report counts, e.g. p01 and p02, without an implication.', fix: 'Rewrite each title as the finding the count supports.' }] });
+const missing = storyFull(spec); missing.pages = missing.pages.slice(0, 2);
+const sampled = storyFull(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'spine', pages: ['p01'], check: 'claim', severity: 'major', problem: 'Several titles report counts, e.g. p01 and p02, without an implication.', fix: 'Rewrite each title as the finding the count supports.' }] });
 sampled.pages[0].verdict = 'major';
-const unsupported = storyReady(spec); unsupported.pages[1].sourcing = { status: 'unsupported', insights: [], note: 'no insight carries the claim' };
-const readyWithMajor = storyReady(spec, { findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'shape', severity: 'major', problem: 'A two-number chart carries a ranking claim.', fix: 'Plot the whole peer set ranked on the same basis.' }] });
+const unsupported = storyFull(spec); unsupported.pages[1].sourcing = { status: 'unsupported', insights: [], note: 'no insight carries the claim' };
+const readyWithMajor = storyFull(spec, { findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'shape', severity: 'major', problem: 'A two-number chart carries a ranking claim.', fix: 'Plot the whole peer set ranked on the same basis.' }] });
 readyWithMajor.pages[1].verdict = 'major'; readyWithMajor.completeness.find((c) => c.check === 'shape').result = 'findings';
-console.log(JSON.stringify({ ok: S.validateStorylineReview(storyReady(spec), spec), missing: S.validateStorylineReview(missing, spec),
+console.log(JSON.stringify({ ok: S.validateStorylineReview(storyFull(spec), spec), missing: S.validateStorylineReview(missing, spec),
   sampled: S.validateStorylineReview(sampled, spec), unsupported: S.validateStorylineReview(unsupported, spec), readyWithMajor: S.validateStorylineReview(readyWithMajor, spec) }));
 ''')
         self.assertEqual(result['ok'], [])
@@ -406,6 +467,41 @@ console.log(JSON.stringify({ ok: S.validateStorylineReview(storyReady(spec), spe
         self.assertTrue(any('by example' in e for e in result['sampled']))
         self.assertTrue(any('unsupported claim' in e for e in result['unsupported']))
         self.assertTrue(any('verdict is ready while F1' in e for e in result['readyWithMajor']))
+
+    def test_the_spine_critique_answers_the_request_in_ten_items_or_fewer(self):
+        # The first Emirates critique returned 141 items from 272 KB of prompts,
+        # and the Anthropic deck answered two of its three questions "unranked".
+        # The spine critique returns at most ten items; its answer check fails
+        # an answer that declines part of the request; and only data known to
+        # be public can carry a major missing analysis.
+        result = run_node(FIXTURES + '''
+const spec = specOf(['p01', 'p02', 'p03']);
+const item = (i) => ({ id: `F${i}`, scope: 'page', pages: ['p02'], check: 'claim', severity: 'minor', problem: `Minor point number ${i} about the claim on this page.`, fix: 'Rewrite the title so it states the implication, not the count.' });
+const eleven = storyReady(spec, { findings: Array.from({ length: 11 }, (_, i) => item(i + 1)) });
+eleven.completeness.find((c) => c.check === 'claim').result = 'findings';
+const parts = (verdicts) => verdicts.map(([part, verdict, missingEvidence = '']) => ({ part, verdict, missingEvidence }));
+const twoUnranked = storyReady(spec, { answerParts: parts([['short run', 'answered'], ['long run', 'cannot rank', 'No audited retention or margin series exists for either company.'], ['capital structure', 'cannot rank', 'The debt terms of both facilities are private.']]) });
+const answerFinding = { id: 'F1', scope: 'spine', pages: ['p01', 'p02', 'p03'], check: 'answer', severity: 'major', problem: 'Two of the three questions are left unranked by the answer.', fix: 'Commit to a directional call on the long run with its confidence and reversal.' };
+const flagged = storyReady(spec, { verdict: 'revise', answerParts: twoUnranked.answerParts, findings: [answerFinding] });
+flagged.completeness.find((c) => c.check === 'answer').result = 'findings';
+const oneUnranked = storyReady(spec, { answerParts: parts([['short run', 'answered'], ['long run', 'cannot rank', 'No audited retention or margin series exists for either company.']]) });
+const unnamed = storyReady(spec, { answerParts: parts([['long run', 'cannot rank']]) });
+const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides the long-run call.', data: 'Company S-1 cohort tables', public: pub, severity: 'major' }] });
+const m = (r) => { r.completeness.find((c) => c.check === 'missing').result = 'findings'; return r; };
+console.log(JSON.stringify({ eleven: S.validateStorylineReview(eleven, spec), twoUnranked: S.validateStorylineReview(twoUnranked, spec), flagged: S.validateStorylineReview(flagged, spec),
+  oneUnranked: S.validateStorylineReview(oneUnranked, spec), unnamed: S.validateStorylineReview(unnamed, spec),
+  speculative: S.validateStorylineReview(m(missing('speculative')), spec), known: S.validateStorylineReview(m(missing('known')), spec),
+  declines: S.declinesIn('OpenAI leads reach; Anthropic leads enterprise. Neither has a provably superior capital structure, and the long run cannot be ranked.') }));
+''')
+        self.assertTrue(any('at most 10 items' in e for e in result['eleven']), result['eleven'])
+        self.assertTrue(any('answer check fails' in e for e in result['twoUnranked']), result['twoUnranked'])
+        # Filed as a major answer finding with the verdict at revise, the critique is valid - and the gate says revise.
+        self.assertTrue(result['flagged'] and all('says revise' in e for e in result['flagged']), result['flagged'])
+        self.assertEqual(result['oneUnranked'], [])
+        self.assertTrue(any('missingEvidence' in e for e in result['unnamed']))
+        self.assertTrue(any('known to be public' in e for e in result['speculative']), result['speculative'])
+        self.assertTrue(result['known'] and all('says revise' in e for e in result['known']), result['known'])
+        self.assertEqual(len(result['declines']), 2)
 
     def test_the_storyline_loop_verifies_changed_pages_and_converges(self):
         result = run_node(FIXTURES + '''
@@ -416,37 +512,48 @@ const ids = ['p01', 'p02', 'p03', 'p04'];
 await fs.writeFile(specPath, JSON.stringify(specOf(ids)));
 const one = await S.prepareStoryline(specPath, out);
 const weak = { id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' };
-const critique = storyReady(specOf(ids), { verdict: 'revise', findings: [weak] });
-critique.pages[1].verdict = 'major'; critique.completeness.find((c) => c.check === 'claim').result = 'findings';
+const critique = storyReady(specOf(ids), { verdict: 'revise', findings: [weak], provenance: prov(await hashOf(one.dir)) });
+critique.completeness.find((c) => c.check === 'claim').result = 'findings';
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(critique));
 const revise = await S.prepareStoryline(specPath, out);
 const revised = specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival' });
 await fs.writeFile(specPath, JSON.stringify(revised));
 const two = await S.prepareStoryline(specPath, out);
-const packet = JSON.parse(await fs.readFile(path.join(out, 'storyline-review', 'packet.json'), 'utf8'));
-const entry = (page, verdict = 'ok') => ({ page, verdict, claim: 'a finding now', shape: 'trend with its rate', sourcing: { status: 'n/a', insights: [], note: 'no log' }, restatement: 'moves on', consequence: 'states it' });
+const packet = JSON.parse(await fs.readFile(path.join(two.dir, 'packet.json'), 'utf8'));
 const verification = (o = {}) => ({ pass: 2, verifies: critique.binding, verdict: 'ready', rating: 8, binding: S.storylineBinding(revised), summary: 'The rewritten title now states the finding the count supports.',
-  pages: [entry('p02')], statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The title now states the rate against the nearest rival.' }], findings: [], topFixes: [], ...o });
-await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '' }] })));
+  provenance: prov(packet.promptHash), statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The title now states the rate against the nearest rival.' }], findings: [], topFixes: [], ...o });
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
 const nit = await S.prepareStoryline(specPath, out);
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ provenance: prov('0'.repeat(64)) })));
+const forged = await S.prepareStoryline(specPath, out);
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification()));
 const ready = await S.prepareStoryline(specPath, out);
-const gate = await S.storylineGate(revised, out);
-const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out);
+const gate = await S.storylineGate(revised, out, { deckPath: specPath });
+const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out, { deckPath: specPath });
 const capped = P.nextPassScope({ pass: 3, binding: 'b'.repeat(64), pageHashes: S.storylinePageHashes(revised), review: critique }, { ...S.storylinePageHashes(revised), p03: 'x' }, { ids, ledger: [] });
-await fs.rm(dir, { recursive: true, force: true });
-console.log(JSON.stringify({ one: [one.status, one.pass], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect],
-  nit: [nit.status, nit.errors?.some((e) => e.includes('not additive'))], ready: ready.status, gate, moved, capped: capped.capped }));
+// Switching to the page-level critique is a new lineage: it needs a reason.
+const switched = await S.prepareStoryline(specPath, out, { mode: 'full' });
+const withReason = await S.prepareStoryline(specPath, out, { mode: 'full', reason: 'The user asked for a page-level critique before the copy.' });
+await cleanup(dir);
+console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect, 'ledger' in packet.scope, 'priorRating' in packet.scope],
+  nit: [nit.status, nit.errors?.some((e) => e.includes('not additive'))], forged: [forged.status, forged.errors?.some((e) => e.includes('promptHash'))], ready: ready.status, gate, moved, capped: capped.capped,
+  switched, withReason: [withReason.status, withReason.mode, withReason.pass] }));
 ''')
-        self.assertEqual(result['one'], ['packet-written', 1])
+        self.assertEqual(result['one'], ['packet-written', 1, 'spine'])
         self.assertEqual(result['revise'], 'revise')  # the spine has not changed since the critique
         self.assertEqual(result['two'], ['packet-written', 2])
-        self.assertEqual(result['scope'], [['p02'], ['p02']])
+        # The spine verifier reads the whole (small) spine; the staged packet carries no ledger and no earlier rating.
+        self.assertEqual(result['scope'], [['p02'], [], False, False])
         self.assertEqual(result['nit'], ['invalid', True])
+        self.assertEqual(result['forged'], ['invalid', True])
         self.assertEqual(result['ready'], 'ready')
         self.assertEqual(result['gate'], [])
         self.assertTrue(any('p03' in e and 're-run the storyline critique first' in e for e in result['moved']))
         self.assertTrue(result['capped'])
+        self.assertEqual(result['switched']['status'], 'refused')
+        self.assertTrue(any('--reason' in e for e in result['switched']['errors']))
+        self.assertEqual(result['withReason'], ['packet-written', 'full', 1])
+
 
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@
 // case; these two sources cover most country-level questions.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { UsageError, isMain, parseCli, runCli, writeJson } from "./cli.mjs";
 import { UA } from "./fetch-logos.mjs";
 
 /** Compound annual growth between two values `years` apart, as a fraction; null when undefined. */
@@ -122,14 +122,17 @@ export async function fetchSeries(provider, id, entities, { from, to, column } =
   throw new Error(`Unknown provider ${provider}; use worldbank or owid`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [provider, id, list, ...flags] = process.argv.slice(2);
-  if (!provider || !id || !list) { console.error("Usage: fetch-series.mjs worldbank|owid <indicator|slug> <entities, comma-separated> [--from YYYY] [--to YYYY] [--column name] [--out sources/name]"); process.exit(1); }
-  const flag = (name) => { const at = flags.indexOf(`--${name}`); return at >= 0 ? flags[at + 1] : undefined; };
-  const { csv, summary } = await fetchSeries(provider, id, list.split(",").map((s) => s.trim()).filter(Boolean), { from: Number(flag("from")) || undefined, to: Number(flag("to")) || undefined, column: flag("column") });
-  const out = path.resolve(flag("out") ?? path.join("sources", `${provider}-${id}`.replace(/[^A-Za-z0-9.-]+/g, "-")));
+const USAGE = "Usage: fetch-series.mjs worldbank|owid <indicator|slug> <entities, comma-separated> [--from YYYY] [--to YYYY] [--column name] [--out sources/name]";
+
+async function main(argv) {
+  const { values, positionals: [provider, id, list] } = parseCli(argv, { from: { type: "string" }, to: { type: "string" }, column: { type: "string" }, out: { type: "string" } }, { usage: USAGE });
+  if (!provider || !id || !list) throw new UsageError(USAGE);
+  const { csv, summary } = await fetchSeries(provider, id, list.split(",").map((s) => s.trim()).filter(Boolean), { from: Number(values.from) || undefined, to: Number(values.to) || undefined, column: values.column });
+  const out = path.resolve(values.out ?? path.join("sources", `${provider}-${id}`.replace(/[^A-Za-z0-9.-]+/g, "-")));
   await fs.mkdir(path.dirname(out), { recursive: true });
   await fs.writeFile(`${out}.csv`, csv);
-  await fs.writeFile(`${out}.json`, JSON.stringify(summary, null, 1) + "\n");
+  await writeJson(`${out}.json`, summary);
   console.log(JSON.stringify({ csv: `${out}.csv`, indicator: summary.indicator, series: summary.series, years: summary.chart.categories.length }, null, 1));
 }
+
+if (isMain(import.meta.url)) runCli(main);

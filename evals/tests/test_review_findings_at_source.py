@@ -20,7 +20,7 @@ TIME = "./skills/professional-slides/runtime/time-axis.mjs"
 
 PAGE = """
 const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
-const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
 const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
 """
 
@@ -311,14 +311,15 @@ class VocabularyTests(unittest.TestCase):
         result = run_node(f'''
 import {{ describeTypes }} from '{KIT}';
 import {{ VARIETY_CODES }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+import {{ AUTHORING_CODES }} from './skills/professional-slides/runtime/author-deck.mjs';
 import {{ wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
-console.log(JSON.stringify({{ types: describeTypes(), codes: Object.keys(VARIETY_CODES), summary: wordBudgetOf('text-page', {{ role: 'executive-summary' }}).ceiling }}));
+console.log(JSON.stringify({{ types: describeTypes(), codes: [...Object.keys(VARIETY_CODES), ...Object.keys(AUTHORING_CODES)], summary: wordBudgetOf('text-page', {{ role: 'executive-summary' }}).ceiling }}));
 ''')
         self.assertTrue({"TOTAL_ROW_BLANK", "TABLE_PANELS_MERGE", "SHARES_IN_TILES", "MAP_COARSE"} <= raised)  # the patterns read the source
         for code in sorted(raised):
             self.assertIn(code, result["types"])
-        # Every compile refusal is in the deck's vocabulary but the title's, a page-gate code checked early.
-        self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS"})
+        # Every compile refusal is in the deck's vocabulary but the title's and the takeaway's, page-gate codes checked early.
+        self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS", "TAKEAWAY_LONG"})
         docs = (REFERENCES / "page-types.md").read_text(encoding="utf-8")
         for code in result["codes"]:
             self.assertIn(f"`{code}`", docs)
@@ -364,7 +365,7 @@ class ProseTests(unittest.TestCase):
 import {{ compilePage }} from '{KIT}';
 {PAGE}
 const words = (n, seed) => Array.from({{ length: n }}, (_, i) => ['buyers', 'retain', 'both', 'models', 'while', 'serving', 'costs', 'fall', 'faster', 'than', 'prices'][(i + seed) % 11]).join(' ') + '.';
-const memo = (title, paragraphs) => ({{ id: 'p1', type: 'argument', form: 'sidebar', commentary: 'none', ...base, title, paragraphs, panel: {{ text: 'The base case is split leadership with a contested middle.' }} }});
+const memo = (title, paragraphs) => ({{ id: 'p1', type: 'argument', form: 'sidebar', commentary: 'none', ...base, title, paragraphs, panel: {{ text: 'The base case is split leadership with a contested middle: models consolidate, applications fragment, and the clouds take the margin that neither of the other two keeps.' }} }});
 const cards = {{ id: 'p2', type: 'parallel', form: 'cards', commentary: 'in-exhibit', ...base, title: 'Three market structures divide the value differently',
   exhibit: {{ items: [0, 1, 2].map((i) => ({{ title: 'Scenario ' + (i + 1), text: words(64, i) }})) }} }};
 console.log(JSON.stringify({{
@@ -380,6 +381,33 @@ console.log(JSON.stringify({{
         self.assertIsNone(result["argument"])
         self.assertIsNone(result["short"])
         self.assertIn("SCENARIO_PROSE", result["cards"])
+
+    def test_a_panel_beside_prose_alone_holds_more_than_a_sentence(self):
+        # A memo's panel takes the width the prose leaves - over half the page,
+        # since prose that reaches the foot does so at a reading measure - and
+        # a twenty-word statement set a 700px column of tint that was mostly
+        # empty. It is refused at compile, its repair naming what to put there
+        # rather than how many words to add; beside an exhibit or points the
+        # panel keeps a third of the row and a sentence fills it.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+const prose = ['Today the two labs lead different things, and neither signal yet ranks overall task economics for a buyer.', 'A lasting lead needs retained paid tasks at positive contribution and cash coverage of compute obligations.'];
+const short = 'One lab leads overall only when it clears the task and cash tests and leads both direct and enterprise demand.';
+const kept = 'One lab leads overall only when it clears the task and cash tests - paid tasks retained at positive contribution, and cash covering compute obligations - and leads both direct and enterprise demand.';
+const page = (form, panel, extra = {{}}) => ({{ id: 'p1', type: 'argument', form, commentary: 'none', ...base, title: 'Retained paid tasks and margin, not current leads, decide the long run', paragraphs: prose, panel: {{ kicker: 'The reversal test', text: panel }}, ...extra }});
+console.log(JSON.stringify({{
+  memo: error(() => compilePage(page('memo', short))),
+  sidebar: error(() => compilePage(page('sidebar', short))),
+  kept: error(() => compilePage(page('memo', kept))),
+  beside: error(() => compilePage(page('sidebar', short, {{ points: ['OpenAI leads direct reach with a billion weekly users', 'Anthropic leads the Ramp paid panel, 43.8% to 39.8%'] }}))),
+}}));
+''')
+        self.assertIn("20 words set a column of tint that is mostly empty", result["memo"])
+        self.assertIn("the figures, the conditions, the decision and its cost", result["memo"])
+        self.assertIn("mostly empty", result["sidebar"])
+        self.assertIsNone(result["kept"])
+        self.assertNotIn("mostly empty", result["beside"] or "")
 
     def test_the_summary_ceiling_and_the_block_a_reader_meets(self):
         result = run_node('''
@@ -456,11 +484,13 @@ console.log(JSON.stringify({
         self.assertEqual(result["aliased"], [])  # a logo under the player's short name introduces it
 
     def test_shares_of_one_measure_in_equal_tiles_are_advised(self):
+        # The chart prints other figures than the strip: a strip that repeats its
+        # chart's labels is refused (test_design_findings).
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 {PAGE}
 const strip = (metrics) => compilePage({{ id: 'p1', type: 'numbers', form: 'metric-strip', commentary: 'none', ...base, title: 'Claude gained web share, but ChatGPT still drew six times its visits', metrics,
-  exhibit: {{ type: 'chart.bar', heading: 'Web visit share, Aug 2026', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], series: [{{ name: 's', values: [57, 9.6, 8, 7, 6, 5, 4, 3] }}] }} }}).pageType.advisories ?? [];
+  exhibit: {{ type: 'chart.bar', heading: 'Web visit share, Aug 2026', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], series: [{{ name: 's', values: [55, 10, 8, 7, 6, 5, 4, 3] }}] }} }}).pageType.advisories ?? [];
 console.log(JSON.stringify({{
   same: strip([{{ value: '9.6%', label: 'Claude web visit share, Aug 2026' }}, {{ value: '57%', label: 'ChatGPT web visit share, Aug 2026' }}]),
   close: strip([{{ value: '41%', label: 'Claude web visit share, Aug 2026' }}, {{ value: '57%', label: 'ChatGPT web visit share, Aug 2026' }}]),

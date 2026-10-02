@@ -102,7 +102,7 @@ const by = role => dark.slides[0].nodes.find(n=>n.role===role);
 assert.equal(by('cover-surface').style.fill.tokenId,'color.ink');
 assert.equal(by('cover-title').style.color.tokenId,'color.onPrimary');
 assert.equal(by('cover-title').style.fontFamily.tokenId,'font.display');
-assert.equal(by('cover-title').style.fontSize.tokenId,'type.deckTitle');
+assert.equal(by('cover-title').style.fontSize.tokenId,'type.coverTitle'); // a step over the deck title
 assert.equal(by('cover-subtitle').style.fontSize.tokenId,'type.heading');
 assert.equal(by('cover-title').frame.x,60);
 assert.equal(by('cover-logo').frame.y,44);

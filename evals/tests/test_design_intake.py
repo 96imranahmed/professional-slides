@@ -65,6 +65,71 @@ class PreferencesFileTests(unittest.TestCase):
         self.assertEqual(run({"HOME": str(self.home), "XDG_CONFIG_HOME": ""}), str(self.home / ".professional-slides" / "preferences.json"))
         self.assertEqual(run({"PROFESSIONAL_SLIDES_HOME": str(self.home / "ps"), "XDG_CONFIG_HOME": str(xdg)}), str(self.home / "ps" / "preferences.json"))
 
+    def test_an_unwritable_home_keeps_the_file_in_the_workspace_and_says_so(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root writes to a read-only directory")
+        home, workspace = self.home / "home", Path(tempfile.mkdtemp()).resolve()
+        home.mkdir()
+        home.chmod(0o555)
+        self.addCleanup(home.chmod, 0o755)
+        env = {**{k: v for k, v in os.environ.items() if k != "PROFESSIONAL_SLIDES_HOME"}, "HOME": str(home), "XDG_CONFIG_HOME": ""}
+        run = lambda *args: subprocess.run([NODE, str(PREFERENCES), *args], capture_output=True, text=True, env=env, cwd=workspace, timeout=60)
+        expected = workspace / ".professional-slides" / "preferences.json"
+        located = run("path")
+        self.assertEqual(located.stdout.strip(), str(expected), "path prints only the path on stdout")
+        self.assertIn("workspace", located.stderr)
+        self.assertIn("~/.professional-slides is not writable", located.stderr)
+        stored = run("set", "design=editorial")
+        self.assertEqual(stored.returncode, 0, stored.stderr)
+        report = json.loads(stored.stdout)
+        self.assertEqual((report["file"], report["location"]), (str(expected), "workspace"))
+        self.assertIn("not writable", report["locationReason"])
+        self.assertEqual(json.loads(expected.read_text())["answers"]["design"]["value"], "editorial")
+        self.assertFalse((home / ".professional-slides").exists())
+        self.assertEqual(json.loads(run("show").stdout)["location"], "workspace")
+        # The chosen location is reported whichever it is.
+        self.assertEqual(json.loads(cli(self.home, "show").stdout)["location"], "PROFESSIONAL_SLIDES_HOME")
+
+    def test_answers_stored_in_a_read_only_home_are_still_read(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root writes to a read-only directory")
+        home, workspace = self.home / "home", Path(tempfile.mkdtemp()).resolve()
+        stored = home / ".professional-slides"
+        stored.mkdir(parents=True)
+        (stored / "preferences.json").write_text(json.dumps({"schema": "professional-slides.preferences/v1", "updated": None,
+            "answers": {"design": {"value": "journal", "at": "2026-09-01T00:00:00Z", "source": "asked"}}}))
+        stored.chmod(0o555)
+        self.addCleanup(stored.chmod, 0o755)
+        env = {**{k: v for k, v in os.environ.items() if k != "PROFESSIONAL_SLIDES_HOME"}, "HOME": str(home), "XDG_CONFIG_HOME": ""}
+        run = lambda *args: subprocess.run([NODE, str(PREFERENCES), *args], capture_output=True, text=True, env=env, cwd=workspace, timeout=60)
+        shown = json.loads(run("show").stdout)
+        self.assertEqual((shown["location"], shown["deckKeys"]["design"]), ("home", "journal"))
+        self.assertIn("read-only", shown["locationReason"])
+        # A new answer is written to the workspace, carrying the stored ones with it.
+        report = json.loads(run("set", "tracker=label").stdout)
+        self.assertEqual(report["location"], "workspace")
+        copied = json.loads((workspace / ".professional-slides" / "preferences.json").read_text())["answers"]
+        self.assertEqual((copied["design"]["value"], copied["tracker"]["value"]), ("journal", "label"))
+        self.assertEqual(json.loads(run("show").stdout)["location"], "workspace")
+
+    def test_nothing_unanswered_is_applied_and_each_unset_answer_names_its_default(self):
+        shown = json.loads(cli(self.home, "show").stdout)
+        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "density"]
+        self.assertEqual([u["key"] for u in shown["unset"]], asked)
+        self.assertEqual({u["key"]: u["default"] for u in shown["unset"]}["design"], "consulting", "the recommendation is shown")
+        self.assertEqual(shown["deckKeys"], {}, "an empty store sets no deck key")
+        self.assertEqual(json.loads(cli(self.home, "deck-keys").stdout), {})
+        pages = self.home / "d.pages.json"
+        pages.write_text(json.dumps({"deck": {"id": "d"}, "pages": []}))
+        applied = json.loads(cli(self.home, "apply", str(pages)).stdout)
+        self.assertEqual(applied["set"], [])
+        self.assertEqual([u["key"] for u in applied["unset"]], asked)
+        self.assertEqual(json.loads(pages.read_text())["deck"], {"id": "d"}, "apply writes no default the user never chose")
+        cli(self.home, "set", "design=journal", "density=pre-read")
+        shown = json.loads(cli(self.home, "show").stdout)
+        self.assertEqual([u["key"] for u in shown["unset"]], ["reference", "colours", "tracker", "titleRule", "surfaces"])
+        self.assertEqual(shown["deckKeys"], {"design": "journal", "density": "pre-read"})
+
     def test_invalid_answers_and_files_are_refused(self):
         for pair in ["tracker=tabs", "design=corporate", "colours=teal", "titleRule=underline", "density=dense", "nonsense=1", 'brand={"primary":"red"}']:
             result = cli(self.home, "set", pair, check=False)
@@ -108,6 +173,7 @@ const out = {
   subject: deckKeys({ design: 'journal', colours: 'subject' }),
   paletteConsulting: deckKeys({ design: 'consulting', colours: 'crimson' }),
   paletteEditorial: deckKeys({ design: 'editorial', colours: 'crimson' }),
+  paletteUnset: deckKeys({ colours: 'crimson' }),
   bar: deckKeys({ design: 'consulting', colours: 'evergreen', titleRule: 'bar' }),
   system: deckKeys({ titleRule: 'system', tracker: 'auto' }),
   none: deckKeys({ tracker: 'none', surfaces: 'open', density: 'live-pitch', footer: 'Acme | Confidential', wordmark: 'Acme', typography: { body: 'Calibri' } }),
@@ -115,7 +181,7 @@ const out = {
 };
 console.log(JSON.stringify(out));
 ''')
-        self.assertEqual(result["empty"], {"design": "consulting"})
+        self.assertEqual(result["empty"], {})
         self.assertEqual(result["brand"], {"design": "editorial", "identity": {"primary": "#0B6E4F", "accent": "#F2A900"}})
         self.assertEqual(result["subject"], {"design": "journal"})
         self.assertEqual(result["paletteConsulting"]["palette"], "crimson")
@@ -123,7 +189,9 @@ console.log(JSON.stringify(out));
         self.assertEqual(editorial["base"], "crimson")
         self.assertTrue(all(k.startswith("color.") for k in editorial["colors"]), "a palette on another system brings colours, not its frame")
         self.assertEqual(result["bar"]["palette"], {"base": "evergreen", "colors": {"style.titleRule": "rule", "style.titleRuleLength": "short", "style.titleRuleColor": "accent", "line.titleRule": 4}})
-        self.assertEqual(result["system"], {"design": "consulting"})
+        self.assertEqual(result["system"], {})
+        # A deck with no design is built as consulting, so a palette answer is its name.
+        self.assertEqual(result["paletteUnset"], {"palette": "crimson"})
         none = result["none"]
         self.assertIs(none["tracker"], False)
         self.assertEqual((none["surfaces"], none["density"], none["footer"], none["logo"]), ("open", "live-pitch", "Acme | Confidential", "Acme"))

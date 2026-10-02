@@ -11,7 +11,7 @@
  },
  "slides": [
   {
-   "title": "Lead with Park Slope; move to SF only for a role inside model decisions",
+   "title": "Park Slope, unless the interview puts the role inside model decisions",
    "exhibit": {
     "type": "table",
     "columns": [
@@ -79,7 +79,7 @@
    ]
   },
   {
-   "title": "Both cities offer the role; only Anthropic lets you take it in New York",
+   "title": "Both cities offer the role; only Anthropic offers it in New York",
    "exhibit": {
     "type": "chart.range",
     "heading": "Published annual pay for PM roles at AI labs",
@@ -125,7 +125,7 @@
      "highlight": "inside model decisions"
     },
     {
-     "text": "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west",
+     "text": "The two OpenAI roles are SF-only, so an OpenAI offer is a reason to move west; neither posting offers New York or remote",
      "highlight": "SF-only"
     },
     {
@@ -144,11 +144,10 @@
    ],
    "tag": "Illustrative",
    "note": "Published base-salary bands; total compensation is not disclosed",
-   "subtitle": "Published base-salary bands for product roles at both labs, $k, September 2026",
-   "density": "pre-read"
+   "subtitle": "Published base-salary bands for product roles at both labs, $k, September 2026"
   },
   {
-   "title": "NYC schools beat their peers by 7–12 points; the SF pair is a preference",
+   "title": "NYC schools beat peers by 7–12 points; SF's pair is a preference",
    "exhibits": [
     {
      "type": "chart.column",
@@ -179,6 +178,13 @@
         76,
         77
        ]
+      }
+     ],
+     "annotations": [
+      {
+       "category": "P.S. 87 English",
+       "series": "School",
+       "text": "Twelve points above its peer group, the widest gap"
       }
      ]
     },
@@ -268,13 +274,12 @@
     "walkability"
    ],
    "subtitle": "Violent crime per 100,000 residents on the matched FBI measure, 2024",
-   "density": "pre-read",
    "note": [
     "Rates are citywide on the FBI matched measure, 2024"
    ]
   },
   {
-   "title": "Every shortlisted commute fits in 45 minutes except Berkeley, which fails by 10",
+   "title": "Every shortlisted commute fits in 45 minutes except Berkeley, over by 10",
    "exhibit": {
     "type": "chart.stacked-bar",
     "heading": "Illustrative door-to-door journey to a central office",
@@ -357,7 +362,7 @@
    ]
   },
   {
-   "title": "Rent moves five points of gross pay: a comfort decision, not a viability one",
+   "title": "Rent moves five points of gross pay: comfort, not viability",
    "exhibits": [
     {
      "type": "chart.column",
@@ -383,6 +388,18 @@
       "Hoboken",
       "Park Slope",
       "Noe Valley"
+     ],
+     "changeAnnotations": [
+      {
+       "start": {
+        "category": "$4,000"
+       },
+       "end": {
+        "category": "$5,500"
+       },
+       "style": "arrow",
+       "text": "+$18k"
+      }
      ]
     },
     {
@@ -397,21 +414,18 @@
        "group": "Share of gross salary",
        "label": "$305k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       },
       {
        "group": "Share of gross salary",
        "label": "$385k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       },
       {
        "group": "Share of gross salary",
        "label": "$460k",
        "unit": "%",
-       "type": "text",
        "align": "right"
       }
      ],
@@ -453,7 +467,7 @@
    ]
   },
   {
-   "title": "Hoboken is the midtown fallback: cheapest and safest, but its school trails its district",
+   "title": "Hoboken is the midtown fallback: cheapest and safest, with a weaker school",
    "exhibits": [
     {
      "type": "chart.column",
@@ -497,7 +511,6 @@
       {
        "label": "Rent",
        "unit": "$ a month",
-       "type": "text",
        "align": "right"
       }
      ],
@@ -538,7 +551,7 @@
    ]
   },
   {
-   "title": "Every gate resolves on evidence except the role, which only the interview can settle",
+   "title": "Every gate resolves on evidence except the role, which interviews settle",
    "columns": [
     "Gate",
     "What the evidence showed",
@@ -660,7 +673,7 @@
    ]
   },
   {
-   "title": "Rent for stage one, book two visits, and fix the school before entry year",
+   "title": "Rent for stage one, book two visits, fix the school before entry",
    "exhibits": [
     {
      "type": "process",
@@ -712,7 +725,8 @@
        "Connors placement; timed PATH journey to the real office",
        "Fallback for a midtown office"
       ]
-     ]
+     ],
+     "highlightRow": "NYC (Park Slope)"
     }
    ],
    "soWhat": "Require the family fit first; among the locations that pass, take the role with the closest researcher collaboration.",

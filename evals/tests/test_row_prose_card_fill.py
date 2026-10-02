@@ -210,7 +210,7 @@ console.log(JSON.stringify(find(page.items,i=>i.component==='bullet-list').props
 import {{compileDeck}} from '{RUNTIME}/author-deck.mjs';
 const years=['2019','2020','2021','2022','2023','2024','2025','2026'];
 const page={{id:'p',type:'trend',form:'line',commentary:'below',takeaway:false,why:'The trend is the claim',
-  settles:{{kind:'qualitative',what:'journeys by year'}},adds:'The points say why',title:'Journeys peaked in FY22 and have not recovered since',
+  settles:{{kind:'rate',what:'journeys by year'}},adds:'The points say why the peak has not returned',title:'Journeys peaked in FY22 and have not recovered since',
   exhibit:{{categories:years,series:[{{name:'x',values:[1,2,3,4,5,6,7,8]}}],annotations:[{{category:'2022',text:'The peak year before hybrid working took hold'}}]}},
   points:['Journeys peaked in FY22 at 52 million.','They have recovered to 48 million since.'],highlight:['22','48 million']}};
 let message='';

@@ -1,5 +1,4 @@
 import { formatValue, withUnit } from "./value-format.mjs";
-export { formatValue } from "./value-format.mjs";
 import {
   ellipsePrimitive,
   houseStyle,
@@ -18,15 +17,16 @@ import {
   wedgePrimitive,
   onFill
 } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
+import { STEP_LADDER, decade, onLadder, stepCandidates } from "./nice-numbers.mjs";
 import { iconMarker } from "./marks.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { mediaNode } from "./media.mjs";
 import { legendRowCount, legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { EXTRA_CHARTS } from "./charts-extra.mjs";
-import { contrastRatio } from "./palettes.mjs";
+import { contrastRatio } from "./color.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
-import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
+import { timePositions, spacedLabelIndices, monthlyLabelStep } from "./time-axis.mjs";
 import {
   HORIZONS_SAMPLE,
   HORIZONS_TOKENS,
@@ -41,6 +41,7 @@ import {
   evidenceRailWidth,
   evidenceTreatment,
   releasedEvidenceProps,
+  packedEvidenceProps,
   renderAnnotationRail,
   renderChangeAnnotations,
   renderEvidenceAnnotations
@@ -87,15 +88,15 @@ export const plotHeadroom = (type) => (horizontalChart(type) ? BAR_HEADROOM : VA
 export const topBand = (legendRows, headroom = VALUE_HEADROOM) => (legendRows ? 24 + headroom + (legendRows - 1) * 26 : headroom);
 // The band under a plot that only its category labels use: the gap to the
 // labels, their measured height and the theme's trailing gap. A fixed 56px
-// left a one-line row of period labels 34px of air above the frame's foot.
+// leaves a one-line row of period labels 34px of air above the frame's foot.
 export const LABEL_BAND = 56;
 export const labelBand = (gap, labelHeight) => gap + labelHeight + tokenValue(token("space.3"));
 
 // Mark weight (core.mjs `style.marks`). One 2px line with 10px dots across a
-// full-width plot was the lightest page a deck drew - 6% of its body inked -
-// where a strong deck's line is about 2.5pt with a marker a reader can find
-// and, when the line is alone, a light fill beneath it that gives the plot a
-// body. `light` keeps the old construction for a house that draws that way.
+// full-width plot inks 6% of the page's body, where a strong deck's line is
+// about 2.5pt with a marker a reader can find and, when the line is alone, a
+// light fill beneath it that gives the plot a body. `light` keeps the thin
+// construction for a house that draws that way.
 export const MARK_WEIGHT_TOKENS = Object.freeze(["line.medium", "color.surfaceTint"]);
 export function markWeight() {
   return houseStyle("style.marks") === "light"
@@ -104,14 +105,31 @@ export function markWeight() {
 }
 
 /**
+ * The plot's insets for a chart set over its own data table
+ * (`categoryColumns: { label }`, which the composer sets): the table's label
+ * column, `label` px wide, then one equal column per category across the rest
+ * of the shared width. Bars and columns centre each category in its slot, so
+ * the plot spans the value columns exactly; points (`points`) sit at the
+ * plot's edges first and last, so the plot runs from the first column's
+ * centre to the last's. Null for a chart with no table under it.
+ */
+function tableSpan(props, frame, count, { points = false } = {}) {
+  const columns = props.categoryColumns;
+  if (columns === undefined || columns === null) return null;
+  if (!Number.isFinite(columns.label) || columns.label < 0 || columns.label >= frame.width) throw new Error("categoryColumns gives the width in px of the data table's label column (`label`)");
+  const column = (frame.width - columns.label) / Math.max(1, count);
+  return points ? { left: columns.label + column / 2, right: column / 2 } : { left: columns.label, right: 0 };
+}
+
+/**
  * The plot rectangle inside a chart's frame, after the bands above it (legend,
  * callouts, change annotations, periods) and the gutters beside it.
  *
  * When full-height callout bands would leave the plot under its minimum, the
  * bands close up to the boxes' own measured heights (`plot.evidenceCompact`)
- * before the chart gives up: a two-callout chart in a 300px panel lost 176px
- * of plot to 88px bands holding one-line notes. Only a plot that is short even
- * with compact bands throws, naming what to change.
+ * before the chart gives up: in a 300px panel, two 88px bands holding one-line
+ * notes take 176px of plot. Only a plot that is short even with compact bands
+ * throws, naming what to change.
  *
  * `labels: { gap, height(width) }`: the band under the plot is its category
  * labels', estimated at `bottomInset` so the checks here count the room it
@@ -119,10 +137,13 @@ export function markWeight() {
  * labels give the difference back to the plot, taller ones take it. A band
  * a change annotation's rows widened keeps its measure and gives up only what
  * the labels need past one line.
+ *
+ * `span: { left, right }` (tableSpan): the insets of a chart set over its own
+ * data table, taken exactly.
  */
-export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = LABEL_BAND, periodBand = 0, headroom = VALUE_HEADROOM, labels = null } = {}) {
+export function chartFrame(frame, { topLegend = false, annotations = [], changeAnnotations = [], annotationRail = null, endLabels = false, leftInset = 54, centerPlot = false, valueLabelInset = 0, totalLabelInset = 0, topInset = 0, bottomInset = LABEL_BAND, periodBand = 0, headroom = VALUE_HEADROOM, labels = null, span = null } = {}) {
   const bands = chartAnnotationBands({ changeAnnotations, annotationRail });
-  leftInset = Math.max(leftInset, bands.left);
+  leftInset = span ? span.left : Math.max(leftInset, bands.left);
   // Peer charts in a row pass the row's tallest top band as topInset so their
   // plots start (and end) on the same lines and one value scale means one pixel scale.
   // topLegend may be a row count (a wrapped legend takes 24px per extra row).
@@ -132,7 +153,15 @@ export function chartFrame(frame, { topLegend = false, annotations = [], changeA
   const bottom = bands.bottom ? Math.max(bottomInset, 40 + bands.bottom + tokenValue(token("space.3"))) : bottomInset;
   // Callouts the chart moved into a right-hand rail (see renderEvidenceAnnotations) take their width from the plot.
   const railWidth = evidenceRailWidth({ annotations });
-  const rightInset = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
+  // A chart over its own data table (`span`, tableSpan) keeps its plot over
+  // the table's value columns. A gutter it would take beside the plot - a
+  // callout rail, end labels, an outside reference label, a rail of values -
+  // would pull its categories off their columns, so it is refused instead.
+  if (span) {
+    const wanted = Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : 0) + railWidth;
+    if (bands.left > span.left + 0.5 || wanted > span.right + 0.5) throw new Error(`A chart over its own data table keeps its categories over the table's columns, and has no room beside its plot for ${railWidth ? "a callout moved into a rail - shorten the note or annotate a mark with room above it" : endLabels ? "end labels - the table names the series" : "labels in a gutter - put them in the callouts or the table"}`);
+  }
+  const rightInset = span ? span.right : Math.max(valueLabelInset, bands.right || 0, endLabels ? 186 : centerPlot && !bands.left ? leftInset : 16) + railWidth;
   let top = topFor(false), compact = false;
   // A peer in a row is given the row's top band; when its full bands would
   // overrun that budget and compact ones fit it, it closes them and keeps the
@@ -191,22 +220,6 @@ export function topLegend({ id, frame, items, align = "right", variant = "swatch
 /** Rows a chart's top legend needs, for the plot inset. */
 export const legendRowsFor = (items, frame) => items.length ? legendRowCount(items, frame.width - 70) : 0;
 
-/**
- * Tick steps a reader recognises: 1, 2, 2.5 or 5 times a power of ten.
- * Interpolating the raw data extrema instead yields axes reading 14.025 or
- * 22.75, which is the loudest amateur tell a chart can carry.
- */
-const STEP_LADDER = Object.freeze([1, 2, 2.5, 5]);
-
-/** Candidate steps in ascending order, starting a decade below the rough step. */
-function* stepCandidates(rough) {
-  const start = Math.floor(Math.log10(rough > 0 && Number.isFinite(rough) ? rough : 1)) - 1;
-  for (let exponent = start; exponent <= start + 4; exponent += 1) {
-    const magnitude = Math.pow(10, exponent);
-    for (const rung of STEP_LADDER) yield rung * magnitude;
-  }
-}
-
 function tightRange(values, includeZero) {
   let min = Math.min(...values), max = Math.max(...values);
   if (includeZero) { min = Math.min(0, min); max = Math.max(0, max); return { min, max, span: max - min || 1, step: (max - min) / 4 || 1 }; }
@@ -246,7 +259,7 @@ function range(values, includeZero) {
     }
   }
   const { step, niceMin, steps } = best ?? { step: (dataMax - dataMin) / 4, niceMin: dataMin, steps: 4 };
-  const decimals = Math.max(0, -Math.floor(Math.log10(step)) + (STEP_LADDER.includes(step / Math.pow(10, Math.floor(Math.log10(step)))) && String(step / Math.pow(10, Math.floor(Math.log10(step)))) === "2.5" ? 1 : 0));
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)) + (STEP_LADDER.includes(step / decade(step)) && String(step / decade(step)) === "2.5" ? 1 : 0));
   const round = (value) => Number(value.toFixed(Math.min(10, decimals)));
   min = round(niceMin);
   max = round(niceMin + step * steps);
@@ -256,15 +269,11 @@ function range(values, includeZero) {
 /**
  * How many ticks divide a domain into ladder steps: the preferred count if it
  * does, else three, five, six or two. An explicit domain keeps a readable
- * interval (four intervals on 0-6 printed 1.5 steps and failed the tick gate),
+ * interval (four intervals on 0-6 print 1.5 steps and fail the tick gate),
  * and an automatic one is built on one of these counts (range above).
  */
 export function tickCount(min, max, preferred = 4) {
-  const onLadder = (count) => {
-    const step = (max - min) / count, normalized = step / 10 ** Math.floor(Math.log10(step));
-    return [1, 2, 2.5, 5, 10].some((value) => Math.abs(normalized - value) < 1e-9);
-  };
-  return [preferred, 3, 5, 6, 2].find(onLadder) ?? preferred;
+  return [preferred, 3, 5, 6, 2].find((count) => onLadder((max - min) / count)) ?? preferred;
 }
 
 function assertGridlineOption(props) {
@@ -316,17 +325,18 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 // A target or capacity is part of the quantitative comparison. Include it in
 // automatic domains; numericBounds also rejects it outside an explicit domain.
 // A reference line at or near the top of the data - "FY19 peak", a target the
-// last bar reaches - had no room above it for its label or the bars' value
-// labels, and failed with "Reference lines leave no room for value labels".
-// The domain now reaches 15% past such a line, as an author setting yMax would.
-// On a line's own scale, which need not start at zero, the 15% is of the
-// data's span, not of the value: a peak of 2.66m tonnes over a floor of 1.85m
-// took the domain to 3.06, and once the chart's callouts moved into the plot
-// the empty band it left above the line read as a void.
-const withReferenceValues = (values, props, { base = 0 } = {}) => {
+// last bar reaches - needs room above it for its label and the bars' value
+// labels, so the domain reaches 15% past such a line, as an author setting
+// yMax would. On a line's own scale, which need not start at zero, the 15% is
+// of the data's span, not of the value: 15% of a 2.66m-tonne peak over a floor
+// of 1.85m would take the domain to 3.06 and leave a void above the line.
+// A line's domain fitted to its data (`padded`: no value axis) already runs a
+// quarter of its span past the top, which holds the label; the 15% added again
+// on top of it left a quarter of the plot empty over a peak line.
+export const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
   const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
-  const headroom = props.yMax === undefined && props.xMax === undefined ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
+  const headroom = props.yMax === undefined && props.xMax === undefined && !padded ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
   return [...values, ...references, ...headroom];
 };
 
@@ -389,7 +399,7 @@ function axisTickText(min, max, index, steps = 4) {
 
 export function axisLabelWidth(bounds) {
   const steps = tickCount(bounds.min, bounds.max);
-  return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width)));
+  return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL) }).width)));
 }
 
 export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
@@ -517,7 +527,7 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   events.forEach((event, index) => {
     const x = centre(event.index);
     const row = index % 2, labelTop = eventsTop + row * 34;
-    const label = measureText(event.label, EVENT_LABEL_WIDTH, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), wrapWidthRatio: 1 });
+    const label = measureText(event.label, EVENT_LABEL_WIDTH, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL) });
     if (label.lines.length > 2) throw new Error(`event label "${event.label}" exceeds two lines; shorten it`);
     // The flag sits to the right of its line, or to the left near the plot's edge.
     const fits = x + 6 + label.width <= plot.x + plot.width;
@@ -551,7 +561,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         cursor = Math.max(cursor, end);
       }
       if (reference.label) {
-        const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 });
+        const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
         const left = Math.min(plot.x + plot.width - measured.width, x + 6);
         overlay.push(textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: { x: left, y: plot.y - measured.height - 6, width: measured.width, height: measured.height }, text: measured.text, style: { ...textStyle(CHART_LABEL, token("color.componentPrimary"), labelBold(), "left"), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value } }));
       }
@@ -645,7 +655,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         cursor = Math.max(cursor, end);
       }
       const text = reference.label || String(reference.value);
-      const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: 1 });
+      const measured = measureText(text, Math.min(240, plot.width * 0.45), { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(CHART_ANNOTATION), bold: true });
       const labelWidth = Math.ceil(measured.width) + 2;
       const labelHeight = measured.height;
       // Outside, the gutter holds nothing else, so a line at the very top or
@@ -663,7 +673,22 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
         // the plot, which a line chart (with no outside gutter) cannot leave.
         ...[0.5, 0.25, 0.75, 0.375, 0.625, 0.125, 0.875].flatMap(at => [y - labelHeight - 8, y + 8].map(top => ({ x: plot.x + (plot.width - labelWidth) * at, y: top, width: labelWidth, height: labelHeight, align: "center" })))
       ];
-      const labelFrame = labelCandidates.find((candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4)));
+      const fits = (candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
+      // A label the series runs through is read as part of the line: the
+      // first place clear of every plotted line and point is taken, and only
+      // where there is none does the label settle for clear of the marks.
+      const series = obstacles.filter((node) => node.role === "chart-line" && node.type === "line");
+      const points = obstacles.filter((node) => node.role === "chart-marker");
+      const clearOfSeries = (candidate) => points.every((node) => !overlaps(candidate, node.frame)) && series.every(({ data: { x1, y1, x2, y2 } = {} }) => {
+        if (![x1, y1, x2, y2].every(Number.isFinite)) return true;
+        const steps = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 3));
+        for (let i = 0; i <= steps; i++) {
+          const px = x1 + (x2 - x1) * i / steps, py = y1 + (y2 - y1) * i / steps;
+          if (px > candidate.x - 2 && px < candidate.x + candidate.width + 2 && py > candidate.y - 2 && py < candidate.y + candidate.height + 2) return false;
+        }
+        return true;
+      });
+      const labelFrame = labelCandidates.find((candidate) => fits(candidate) && clearOfSeries(candidate)) ?? labelCandidates.find(fits);
       if (!labelFrame) throw Object.assign(new Error(`No collision-free reference-line label position${reference.placement === "outside-end" ? " outside the plot" : allowOutsideReferenceLabels ? "; set placement: \"outside-end\" or revise the chart composition" : "; revise the chart composition"}`), { referenceIndex: index });
       overlay.push(textPrimitive({
         id: stableId(id, "reference-label", index),
@@ -681,12 +706,15 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   return { underlay, overlay };
 }
 
-function withDecorations(nodes, options) {
+// Exported for the wider catalogue (charts-extra.mjs): a chart there that sets
+// its marks by category and series takes callouts, highlights and reference
+// lines from here rather than dropping them.
+export function withDecorations(nodes, options) {
   const { underlay, overlay } = decorations({ ...options, obstacles: nodes });
   const backings = [];
   for (const label of nodes.filter((node) => node.role === "data-label")) {
     const resolve = (value, fallback) => isTokenReference(value) ? tokenValue(value) : (value?.value ?? value ?? fallback);
-    const measured = measureText(label.text, label.frame.width + 0.5, { fontFamily: resolve(label.style.fontFamily, "Arial"), fontSize: resolve(label.style.fontSize, tokenValue(CHART_LABEL)), bold: label.style.bold, wrapWidthRatio: 1 });
+    const measured = measureText(label.text, label.frame.width + 0.5, { fontFamily: resolve(label.style.fontFamily, "Arial"), fontSize: resolve(label.style.fontSize, tokenValue(CHART_LABEL)), bold: label.style.bold });
     const width = measured.width + 4, height = measured.height + 2;
     const x = label.style.align === "left" ? label.frame.x - 2 : label.style.align === "right" ? label.frame.x + label.frame.width - width + 2 : label.frame.x + (label.frame.width - width) / 2;
     const frame = { x, y: label.frame.y + (label.frame.height - height) / 2, width, height };
@@ -746,7 +774,7 @@ const attachedLabelText = (primary,secondary,props) => secondary
   : primary;
 const measureDataLabel = (text, width = 1000) => {
   const measured = measureText(text, width, {
-    fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1
+    fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true
   });
   // Keep the same font-engine clearance used by ordinary text wrapping, and
   // survive the scene's coordinate rounding without creating a spurious wrap.
@@ -769,7 +797,7 @@ function growthColumn(g, categories, series, name) {
     return years ? (Math.pow(v1 / v0, 1 / years) - 1) * 100 : (v1 / v0 - 1) * 100;
   });
   // The column is read down, so it takes one precision: a decimal when any
-  // rate is under ten, which gave "+4.2%" above "+12%" when chosen per rate.
+  // rate is under ten - chosen per rate, "+4.2%" would sit above "+12%".
   const decimals = rates.some((rate) => rate !== null && Math.abs(rate) < 10) ? 1 : 0;
   const rows = series.map((item, index) => {
     const rate = rates[index];
@@ -807,8 +835,8 @@ function normalizeCategoryIcons(props, categories) {
 
 /**
  * A logo's frame inside its slot, sized to a common visual area rather than
- * fitted to the box. Fitted, a wide wordmark filled its 64px slot while a
- * square mark shrank to the slot's height, a third of the ink; logo walls
+ * fitted to the box. Fitted, a wide wordmark fills its 64px slot while a
+ * square mark shrinks to the slot's height, a third of the ink; logo walls
  * equalise area instead. `area` is the ink each logo gets; the result keeps
  * the logo's aspect, stays inside the box, and sits against `align`.
  */
@@ -862,12 +890,11 @@ function periodKey(name) {
 
 /**
  * The peer a two-mark contrast paints in the primary when the author named
- * none. It used to be the first, and a comparison written in time order
- * ("2019", "2024"; "FY2024-25", "FY2025-26"; "Pre-COVID", "Current") painted
- * the old year red and the year the title is about grey - three pages of an
- * Emirates deck read backwards. When every name reads as a period, the latest
- * is the point (the last on a tie); otherwise the first stays the subject, as
- * peers are written subject first ("Emirates", "Qatar"). An explicit
+ * none. A comparison written in time order ("2019", "2024"; "FY2024-25",
+ * "FY2025-26"; "Pre-COVID", "Current") is about its latest period, so when
+ * every name reads as a period, the latest is the point (the last on a tie);
+ * otherwise the first stays the subject, as peers are written subject first
+ * ("Emirates", "Qatar"). An explicit
  * `focusSeries` always wins. The change bracket reads focus minus the other,
  * so it follows the same choice (compose.mjs).
  */
@@ -883,16 +910,15 @@ export function defaultFocusIndex(names, focus) {
  * A reference label that finds no free corner inside the plot moves outside.
  *
  * Callouts take the band above the plot and drop leaders through it, value
- * labels ride the column tops, and a target line near the tallest column has
- * all four inside corners taken: a Qatar traffic page with two callouts and an
- * "Emirates FY26: 53.2m" line threw rather than render. `placement:
- * "outside-end"` already solved it by hand - the label in a right gutter,
- * level with its line - but the gutter narrows the plot, so it has to be
- * decided before the marks are laid out. The chart renders once as authored;
- * a line whose label was left to the chart (no `placement`) and failed inside
- * is set outside-end and the chart renders again, one line at a time. A
- * horizontal chart has no right gutter on its value axis, and an author who
- * asked for "inside" meant it, so both keep the error.
+ * labels ride the column tops, and a target line near the tallest column can
+ * find all four inside corners taken. `placement: "outside-end"` sets the
+ * label in a right gutter, level with its line, but the gutter narrows the
+ * plot, so it has to be decided before the marks are laid out. The chart
+ * renders once as authored; a line whose label was left to the chart (no
+ * `placement`) and failed inside is set outside-end and the chart renders
+ * again, one line at a time. A horizontal chart has no right gutter on its
+ * value axis, and an author who asked for "inside" meant it, so both keep the
+ * error.
  */
 function categoricalChart(context) {
   let props = context.props;
@@ -908,25 +934,25 @@ function categoricalChart(context) {
 
 function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   assertGridlineOption(props);
+  if (horizontal && props.categoryColumns) throw new Error(`${id}: a data table's columns run across the page, and a bar chart's categories run down it - set the table beside the bars as a column, or draw columns`);
   const { categories, series } = normalizedCategoricalData(props);
   const stackLabels = stackLabelPlan(props, categories, series, stacked);
   const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked,
     defaultStyle: stacked ? "region-tint" : defaultHighlightStyle(horizontal ? "chart.bar" : "chart.column", { series }) });
-  // Every highlighted bar takes the accent: a fleet page marking two aircraft
-  // variants lit only the first, since one bar highlight was all the chart kept.
+  // Every highlighted bar takes the accent, not only the first: a fleet page
+  // marking two aircraft variants lights both.
   const barHighlighted = new Set(highlights.filter(highlight => highlight.style === "bar").map(highlight => highlight.category));
   const barHighlight = barHighlighted.size > 0;
   const regionHighlight = highlights.find(highlight => highlight.style === "region-box" || highlight.style === "region-tint");
   if (props.focusSeries !== undefined) {
-    if (stacked || series.length !== 2) throw new Error("focusSeries requires two unstacked series; preserve distinct colours for multiple peer series");
+    if (stacked || series.length < 2) throw new Error("focusSeries needs two unstacked series or more; a stack keeps a colour per part");
     if (!series.some(item => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
     if (props.colorIndices !== undefined) throw new Error("focusSeries conflicts with an explicit colour-index mapping");
   }
   const chartProps = { ...props, highlights };
   // `forecastFrom` greys every column from that category on, and grey alone
   // is a colour the reader has to decode with nothing to decode it against:
-  // a Qatar traffic page showed three dark and three grey columns and never
-  // said the grey ones were a required path, not traffic. Where the tint
+  // three dark and three grey columns never say what grey means. Where the tint
   // applies (one unstacked series) the chart keys it - a legend naming the
   // actual and forecast runs (`actualLabel`/`forecastLabel`, "Actual" and
   // "Forecast" by default) - and draws a dashed divider at the boundary, so
@@ -947,7 +973,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   const barLabelGap = tokenValue(token("space.3"));
-  const barLabelWidth = Math.max(50, ...(props.comparisonDomain?.values ?? values).map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1}).width)));
+  const barLabelWidth = Math.max(50, ...(props.comparisonDomain?.values ?? values).map(value => Math.ceil(measureText(formatValue(value, props), 300, {fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true}).width)));
   // `categoryLabels: false`: the right panel of a paired bar chart shares the
   // left panel's category column and draws none of its own.
   const hideCategoryLabels = horizontal && props.categoryLabels === false;
@@ -962,7 +988,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   // centred on the bar. When the lanes are too thin for that block, the notes
   // move to a column of their own at the right of the bars - one line each,
   // level with its bar - rather than wrapping into the next bar's lane.
-  const axisText = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 });
+  const axisText = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
   const noteTexts = horizontal && !hideCategoryLabels ? (props.categoryNotes || []).filter((n) => typeof n === "string" && n.trim()) : [];
   const baseLabelWidth = barLabelColumn(props.comparisonDomain?.categories ?? categories);
   const noteWidth = noteTexts.length ? Math.min(220, Math.ceil(Math.max(...noteTexts.map((n) => axisText(n, 400).width))) + 12) : 0;
@@ -1001,13 +1027,13 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   if (horizontal && (props.periods || props.events)) throw new Error("periods and events annotate vertical columns and lines, not horizontal bars");
   // Periods too many for their slots are labelled every nth, counted back from
   // the latest so it keeps its label, each label free to use the slots it
-  // skips - as the line chart already does. Three ten-year column panels in a
-  // row left 25px a slot and "FY17" (29px) failed the page as unbreakable text.
+  // skips - as the line chart does. Three ten-year column panels in a row
+  // leave 25px a slot, narrower than an unbreakable "FY17" (29px).
   // Only periods thin: every category carries a digit, so a skipped label is
   // one the reader counts to. Named categories keep every label, and a name
   // wider than its slot still fails, for the author to shorten.
-  const axisFont = { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) };
-  const widestWord = horizontal ? 0 : Math.max(...categories.flatMap(category => String(category).split(/\s+/).map(word => measureText(word, 1000, { ...axisFont, wrapWidthRatio: 1 }).width)));
+  const axisFont = { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE };
+  const widestWord = horizontal ? 0 : Math.max(...categories.flatMap(category => String(category).split(/\s+/).map(word => measureText(word, 1000, axisFont).width)));
   const periodic = !horizontal && categories.length > 2 && categories.every(category => /\d/.test(String(category))) && !(props.categoryNotes || []).some(Boolean);
   // One note per category, in category order; `null` or a missing entry leaves
   // that category with its label alone.
@@ -1026,7 +1052,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
       try { return measureText(category, labelSpan, axisFont); }
       catch (error) {
         if (!/Unbreakable text/.test(error.message)) throw error;
-        const word = Math.max(...String(category).split(/\s+/).map(part => measureText(part, 1000, { ...axisFont, wrapWidthRatio: 1 }).width));
+        const word = Math.max(...String(category).split(/\s+/).map(part => measureText(part, 1000, axisFont).width));
         const fit = Math.max(1, Math.floor(width / (widestWord + 8)));
         throw new Error(`Column names are wider than their columns: "${String(category)}" needs ${Math.ceil(word)}px and each of ${categories.length} columns has ${Math.floor(labelSpan)}px in this ${Math.round(frame.width)}px chart, which holds about ${fit} columns named this long; shorten the names, use a bar chart, or give the chart a wider panel (author-deck --types lists the columns a panel holds)`);
       }
@@ -1064,7 +1090,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : showValueAxis ? 54 : 16,
     valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
-    centerPlot: !horizontal && !showValueAxis
+    centerPlot: !horizontal && !showValueAxis,
+    span: horizontal ? null : tableSpan(props, frame, categories.length)
   });
   const { labelStep, labelSpan, layouts: categoryLayouts, height: categoryLabelHeight } = horizontal ? { layouts: [] } : columnLabels(plot.width);
   const labelEvery = labelStep?.every;
@@ -1083,7 +1110,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     if(indices.some((n,i)=>n<0 || i>0&&n!==indices[i-1]+1) || group.categories.some(category=>groupedCategories.has(category))) throw new Error("Category groups require exact contiguous ordered non-overlapping categories");
     group.categories.forEach(category=>groupedCategories.add(category));
   }
-  const groupLayouts=categoryGroups.map(group=>measureText(group.label,plot.width/categories.length*group.categories.length-16,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL)}));
+  const groupLayouts=categoryGroups.map(group=>measureText(group.label,plot.width/categories.length*group.categories.length-16,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL),wrapWidthRatio:ENGINE_RESERVE}));
   plot.categoryGroupHeight=categoryGroups.length?Math.max(...groupLayouts.map(m=>m.height))+tokenValue(token("space.3"))*2:0;
   plot.height-=plot.categoryGroupHeight;
   if(plot.height<100)throw new Error(`Category groups leave insufficient plot height (${Math.floor(plot.height)}px of 100px); shorten the group labels or give the chart more height`);
@@ -1105,7 +1132,10 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     bounds.span = bounds.max - bounds.min;
   }
   const twoMarkContrast = !stacked && !barHighlight && props.colorIndices === undefined && categories.length * series.length === 2;
-  const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && series.length === 2;
+  // Two series contrast by default; three or more contrast once one is named
+  // the subject (`focusSeries`), the peers all in the comparator grey: four
+  // saturated series side by side give the eye nowhere to start.
+  const twoSeriesContrast = !stacked && !barHighlight && props.colorIndices === undefined && (series.length === 2 || (series.length > 2 && props.focusSeries !== undefined));
   const colorIndexFor = (seriesIndex, categoryIndex) => {
     const explicit = props.colorIndices?.[seriesIndex];
     if (explicit !== undefined) {
@@ -1153,8 +1183,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   }));
   const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
   // Forty members down a 420px plot give each row 10px, under the 13px line of
-  // the chart's label face; every name and value was set in a box that tall
-  // and printed at six pixels, the subject's among them. When a row is thinner
+  // the chart's label face, and every name and value set in a box that tall
+  // prints at six pixels, the subject's among them. When a row is thinner
   // than a line, the rows are labelled every nth from the top at full size,
   // the highlighted member always, and the rows beside it that its label
   // would touch go unlabelled: the reader finds the subject by its colour and
@@ -1162,11 +1192,11 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   //
   // Before any name is dropped the rows' labels step down to 8pt, the
   // smallest the page sets type at, when that line fits the row: 32 members
-  // were labelled every second one at 10pt when every name fitted at 8. And a
+  // that all fit at 8pt are all named, not every second one at 10pt. And a
   // member a callout names keeps its label as the subject does: a note on an
   // unnamed bar says nothing. page-types.mjs describeTypes publishes the rule.
-  const fullLine = measureText("Ag", 1000, { ...axisFont, wrapWidthRatio: 1 }).height;
-  const smallLine = measureText("Ag", 1000, { ...axisFont, fontSize: tokenValue(ROW_LABEL_MIN), wrapWidthRatio: 1 }).height;
+  const fullLine = measureText("Ag", 1000, axisFont).height;
+  const smallLine = measureText("Ag", 1000, { ...axisFont, fontSize: tokenValue(ROW_LABEL_MIN) }).height;
   const crowded = horizontal && !stacked && categorySpan < fullLine;
   const rowSize = crowded && categorySpan >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
   const rowLine = rowSize === AXIS_LABEL ? fullLine : smallLine;
@@ -1177,7 +1207,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   // Bar weight follows the category count. Four categories drawn at the
   // many-category gap read as ribbons with the page showing through; a well-made
   // page sets few, fat bars and many, thinner ones - but not ribbons: ten bars
-  // at 0.7 left a gap nearly as wide as each bar (markWeight).
+  // at 0.7 leave a gap nearly as wide as each bar (markWeight).
   const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : markWeight().bars;
   let groupSpan = categorySpan * barWeight;
   let stackExternalWidth = 0;
@@ -1391,12 +1421,12 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     // measure ("n=412"), the year, the unit of that column. A well-made chart
     // carries it and it is most of what separates its label band from a bare one.
     const noteText = hideCategoryLabels ? null : categoryNotes[categoryIndex];
-    const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? (noteColumn ? noteWidth : horizontalCategoryLabelWidth) : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    const noteLayout = noteText ? measureText(noteText, Math.max(40, horizontal ? (noteColumn ? noteWidth : horizontalCategoryLabelWidth) : categorySpan - 8), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }) : null;
     // With a note under it, a bar's label stops being a box centred on the bar
     // and becomes the first line of a two-line block, measured and placed.
     // In the note column the label keeps its own place and the note is level
     // with the bar at the right.
-    const barLabelLayout = horizontal && noteLayout && !noteColumn ? measureText(category, horizontalCategoryLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }) : null;
+    const barLabelLayout = horizontal && noteLayout && !noteColumn ? measureText(category, horizontalCategoryLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }) : null;
     const barBlockTop = barLabelLayout ? categoryStart + (groupSpan - barLabelLayout.height - noteLayout.height) / 2 : 0;
     if (horizontal && noteLayout && (noteColumn ? noteLayout.height : barLabelLayout.height + noteLayout.height) > categorySpan + 2)
       throw new Error(`Category "${category}" and its note do not fit its ${Math.floor(categorySpan)}px lane even in a note column: shorten the note or give the chart more height`);
@@ -1454,13 +1484,13 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     for(const [part,a,b,c,d] of [["span",x1,y,x2,y],["left",x1,y-4,x1,y],["right",x2,y-4,x2,y]])nodes.push(linePrimitive({id:stableId(id,"category-group",group.id,part),role:"category-group-rule",x1:a,y1:b,x2:c,y2:d,style:lineStyle(SECONDARY),data}));
     nodes.push(textPrimitive({id:stableId(id,"category-group",group.id,"label"),role:"category-group-label",frame:{x:x1,y:y+4,width:x2-x1,height:groupLayouts[i].height},text:groupLayouts[i].text,style:{...textStyle(AXIS_LABEL,SECONDARY),valign:"top",lineHeight:groupLayouts[i].lineHeight,wrap:false},data:{...data,textLayout:groupLayouts[i]}}));
   }
-  // A value label a reference line runs through stays on its column. It used
-  // to be lifted to sit above the line, which left a label on a column just
-  // under a target floating 45px over its own mark, and threw when the lift
-  // left the frame. Now, in order: a line through the label's edge nudges it
-  // a few pixels clear; a column tall enough takes the label inside its top,
-  // under the line; otherwise the label keeps its place and the reference line
-  // is broken around it (see `referenceGaps` in decorations).
+  // A value label a reference line runs through stays on its column: lifted
+  // above the line, a label on a column just under a target would float 45px
+  // over its own mark, or leave the frame. In order: a line through the
+  // label's edge nudges it a few pixels clear; a column tall enough takes the
+  // label inside its top, under the line; otherwise the label keeps its place
+  // and the reference line is broken around it (see `referenceGaps` in
+  // decorations).
   if(!horizontal && !stacked && (props.referenceLines||[]).length) for(const label of nodes.filter(n=>n.role === "data-label" && n.data?.series !== undefined)) {
     const lines=(props.referenceLines||[]).map(r=>yScale(r.value));
     const ink=measureDataLabel(label.text), pad=(label.frame.height-ink.height)/2;
@@ -1519,7 +1549,7 @@ function sparseLineChart({ id, frame, props }) {
   let assumptionNode = null;
   if (props.assumption !== undefined) {
     if (!textRequired(props.assumption)) fail("assumption must contain substantive text");
-    const measured = measureText(props.assumption, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+    const measured = measureText(props.assumption, frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE });
     const height = measured.height + tokenValue(token("space.3"));
     assumptionNode = textPrimitive({ id: stableId(id, "assumption"), role: "chart-assumption", frame: { x: frame.x, y: frame.y, width: frame.width, height: measured.height }, text: measured.text, style: { ...textStyle(AXIS_LABEL, SECONDARY), align: "left", valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured } });
     frame = { ...frame, y: frame.y + height, height: frame.height - height };
@@ -1564,7 +1594,7 @@ function sparseLineChart({ id, frame, props }) {
   const showValueAxis = props.showValueAxis !== false;
   const labelWidth = axisLabelWidth(bounds);
   const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend, leftInset: showValueAxis ? Math.max(labelWidth + 8, 54) : 54, annotations: props.annotations });
-  const statusHeight = boundary ? Math.max(...[boundary.beforeLabel, boundary.afterLabel].map(label => measureText(label, plot.width / 2 - 16, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).height)) + tokenValue(token("space.3")) : 0;
+  const statusHeight = boundary ? Math.max(...[boundary.beforeLabel, boundary.afterLabel].map(label => measureText(label, plot.width / 2 - 16, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height)) + tokenValue(token("space.3")) : 0;
   plot.y += statusHeight; plot.height -= statusHeight;
   if (plot.height < 100) fail("status labels leave insufficient plot height");
   const xScale = value => plot.x + (value - axis.min) / (axis.max - axis.min) * plot.width;
@@ -1572,7 +1602,7 @@ function sparseLineChart({ id, frame, props }) {
   const nodes = [...(showLegend ? topLegend({ id, frame, items: series.map((item, index) => ({ label: item.name, colorIndex: props.colorIndices?.[index] ?? index })) }) : []), ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })];
   const tickFrames = [];
   for (const tick of ticks) {
-    const measured = measureText(tick.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+    const measured = measureText(tick.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE });
     const width = measured.width, x = Math.max(plot.x, Math.min(xScale(tick.value) - width / 2, plot.x + plot.width - width));
     const tickFrame = { x, y: plot.y + plot.height + 12, width, height: measured.height };
     if (tickFrames.some(other => other.x + other.width + 8 > x)) fail("numeric axis labels overlap; choose fewer explicit ticks");
@@ -1583,7 +1613,7 @@ function sparseLineChart({ id, frame, props }) {
     const x = xScale(boundary.x), boundaryId = stableId(id, "status-boundary");
     nodes.push(linePrimitive({ id: boundaryId, role: "chart-status-boundary", x1: x, y1: plot.y, x2: x, y2: plot.y + plot.height, style: { ...lineStyle(SECONDARY, token("line.hairline")), dash: "dash" }, data: { xValue: boundary.x, xUnit: axis.unit, beforeLabel: boundary.beforeLabel, afterLabel: boundary.afterLabel } }));
     for (const [side, label, left, width] of [["before", boundary.beforeLabel, plot.x, x - plot.x - 8], ["after", boundary.afterLabel, x + 8, plot.x + plot.width - x - 8]]) {
-      const measured = measureText(label, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) });
+      const measured = measureText(label, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE });
       if (width <= 0 || measured.height > statusHeight) fail("status label does not fit its true time span");
       nodes.push(textPrimitive({ id: stableId(boundaryId, side), role: "chart-status-label", frame: { x: left, y: plot.y - statusHeight, width, height: measured.height }, text: measured.text, style: { ...textStyle(AXIS_LABEL, SECONDARY), align: "center", valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { status: side, textLayout: measured, dependencies: [boundaryId] } }));
     }
@@ -1602,7 +1632,7 @@ function sparseLineChart({ id, frame, props }) {
       pointMap.set(`${item.name}:${point.key}`, { x: point.px, y: point.py, value: point.y, category: point.key, nodeId: point.nodeId });
       if (series.length === 1) pointMap.set(`value:${point.key}`, pointMap.get(`${item.name}:${point.key}`));
       if (props.dataLabels === true || point.label) {
-        const label = formatValue(point.y, props), measured = measureText(label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
+        const label = formatValue(point.y, props), measured = measureText(label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: ENGINE_RESERVE });
         const labelFrame = { x: Math.max(plot.x, Math.min(point.px - measured.width / 2, plot.x + plot.width - measured.width)), y: point.py - measured.height - 8, width: measured.width, height: measured.height };
         if (labelFrame.y < plot.y - 1 || labelFrames.some(other => other.x < labelFrame.x + labelFrame.width + 4 && other.x + other.width + 4 > labelFrame.x && other.y < labelFrame.y + labelFrame.height + 4 && other.y + other.height + 4 > labelFrame.y)) fail("selected point labels overlap or exceed plot; allocate height or label fewer anchors");
         labelFrames.push(labelFrame);
@@ -1664,21 +1694,25 @@ function lineChart({ id, frame, props, area = false }) {
   if (props.seriesGrowth && !endLabels) throw new Error("seriesGrowth sits beside the end labels; set directLabels: \"end\"");
   const seriesGrowth = props.seriesGrowth ? growthColumn(props.seriesGrowth, categories, series, "seriesGrowth") : null;
   // Dated observations at uneven gaps (Jan, Mar, Jun, Aug) sit where they fall
-  // in time: one slot apart, a run-rate line steepened where the observations
-  // bunched rather than where the growth did (time-axis.mjs). Two a month apart
+  // in time: one slot apart, a run-rate line steepens where the observations
+  // bunch rather than where the growth does (time-axis.mjs). Two a month apart
   // on a year-and-a-half axis sit closer than a value label is wide - the label
-  // of the second landed on the segment climbing into it, and thinned labels
-  // left the first one on the value axis - so such a line is read off its
+  // of the second lands on the segment climbing into it, and thinned labels
+  // leave the first one on the value axis - so such a line is read off its
   // value axis, with the latest value labelled at its end.
   const spacing = timePositions(categories);
+  // A table's columns are even; points on an uneven time axis would drift
+  // off them, the further the more uneven the gaps.
+  if (spacing && props.categoryColumns) throw new Error(`${id}: a data table sets its periods in even columns, and these dates are unevenly spaced (${categories[0]} to ${categories.at(-1)}) - their points cannot sit over the columns; drop the table and label the points, or plot evenly spaced periods`);
   const crowded = Boolean(spacing) && spacing.slice(1).some((v, i) => (v - spacing[i]) * (frame.width - 120) < 64);
   const labelAt = (index) => !crowded || index === categories.length - 1;
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels && !crowded });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
-  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values) }), { min: props.yMin, max: props.yMax, axis: "y", tight: !showValueAxis && props.gridlines !== true });
+  const tight = !showValueAxis && props.gridlines !== true;
+  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values), padded: tight }), { min: props.yMin, max: props.yMax, axis: "y", tight });
   const labelWidth = axisLabelWidth(bounds);
-  const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).height; } catch { return 28; } }));
+  const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height; } catch { return 28; } }));
   // The period labels sit 16px under the plot, clear of the markers on its
   // floor; the band keeps their measured height and no more, estimated at the
   // narrowest slot a label gets and settled once the plot is laid out.
@@ -1694,7 +1728,8 @@ function lineChart({ id, frame, props, area = false }) {
     periodBand: periodBandHeight(props, categories),
     endLabels,
     bottomInset: labelBand(16, labelHeightAt(76)),
-    labels: { gap: 16, height: (width) => labelHeightAt(labelSlotAt(width)) }
+    labels: { gap: 16, height: (width) => labelHeightAt(labelSlotAt(width)) },
+    span: tableSpan(props, frame, categories.length, { points: true })
   });
   const labelSlot = labelSlotAt(plot.width);
   const labelHeight = labelHeightAt(labelSlot);
@@ -1714,8 +1749,8 @@ function lineChart({ id, frame, props, area = false }) {
   // Dense periods (more categories than the plot has label slots) label every
   // nth point, always keeping the first and last, as a strong deck does.
   const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
-  const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width));
-  const { every, fromFirst } = periodLabelStep(categories.length, Math.max(1, Math.ceil((widest + 10) / Math.max(1, pitch))));
+  const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL) }).width));
+  const { every, fromFirst } = periodLabelStep(categories.length, Math.max(monthlyLabelStep(categories), Math.ceil((widest + 10) / Math.max(1, pitch))));
   categories.forEach((category, index) => {
     // Every label is centred on its point; the first and last may reach into
     // the chart's own insets so the spacing stays even.
@@ -1850,21 +1885,18 @@ function waterfall({ id, frame, props }) {
     running.push(total);
   });
   const bounds = numericBounds(withReferenceValues([0, ...running], props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
-  // A label row below negative endpoints, above the category labels. It was
-  // taken from the plot after the frame was laid out, so the frame's own
-  // fallbacks - compact callout bands, callouts moved beside their marks -
-  // never saw it: three callouts on a full-width bridge closed their bands
-  // to a 100px plot, lost 30 more here and failed the page with "give the
-  // chart more height", which an author cannot do. It is reserved only when a
-  // falling step's label - set under the step's end - would reach past the
-  // baseline; a bridge whose falls all end well above zero left the row as a
-  // 30px stripe of air between its bars and their names.
+  // A label row below negative endpoints, above the category labels. It is
+  // laid out with the frame (its bottom inset), so the frame's own fallbacks -
+  // compact callout bands, callouts moved beside their marks - see it too. It
+  // is reserved only when a falling step's label - set under the step's end -
+  // would reach past the baseline; a bridge whose falls all end well above
+  // zero would otherwise carry a 30px stripe of air between its bars and their
+  // names.
   // The category labels are measured against the slot they have and wrap into
   // it. Set unmeasured at the slot's width, a label longer than its slot prints
-  // straight over its neighbours - which is how "Superman (2025)", "Other DC
-  // features" and "All DC features" became one unreadable line - and the band
-  // below the plot has to be as tall as the labels that go in it.
-  const labelsAt = (width) => props.categories.map((category) => measureText(String(category), width / props.categories.length - 10, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }));
+  // straight over its neighbours, and the band below the plot has to be as
+  // tall as the labels that go in it.
+  const labelsAt = (width) => props.categories.map((category) => measureText(String(category), width / props.categories.length - 10, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
   const frameFor = (row) => chartFrame(frame, { topInset: props.plotTopInset, annotations: props.annotations, changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail, centerPlot: !showValueAxis, bottomInset: LABEL_BAND + row,
     labels: { gap: 8 + row, height: (width) => Math.max(...labelsAt(width).map((layout) => layout.height)) } });
@@ -1916,19 +1948,23 @@ function waterfall({ id, frame, props }) {
  */
 /**
  * The category a chart was told to pick out, for the plot types that draw their
- * own marks and cannot host a callout.
+ * own marks (a waffle, a bubble grid, a marimekko): one member of `members`, or
+ * null.
  *
- * `highlights` was honoured by the column, bar and range charts and silently
- * ignored everywhere else, alongside `annotations`, which three plot types
- * accepted and drew nothing from. A recoloured category is the commonest mark
- * in a strong deck and the only one that costs a plot no layout, so it
- * is the one these types get.
+ * A recoloured category is the commonest mark in a strong deck and the only
+ * one that costs a plot no layout, so it is the one these types get.
  */
-function highlightedCategory(props) {
-  const first = (props.highlights || [])[0];
+function highlightedCategory(props, members, id) {
+  const highlights = props.highlights || [];
+  // One member recoloured: a second would be dropped unseen, and a name the
+  // chart does not draw would light nothing.
+  if (highlights.length > 1) throw new Error(`${id}: this chart picks out one member in the accent; highlights names ${highlights.length} - keep the one the page is about and say the rest in the commentary`);
+  const first = highlights[0];
   if (first === undefined || first === null) return null;
   const name = typeof first === "string" ? first : first.category;
-  return name === undefined || name === null ? null : String(name);
+  if (name === undefined || name === null) return null;
+  if (!members.map(String).includes(String(name))) throw new Error(`${id}: highlights names "${name}", which this chart does not draw; name one of ${members.slice(0, 8).map((m) => `"${m}"`).join(", ")}`);
+  return String(name);
 }
 
 // A unit dot grows to about three lines of label type; past that it stops
@@ -1945,10 +1981,10 @@ function waffleLayout(frameIn, props) {
   if (values.some((v) => !(Number.isInteger(v) && v >= 0))) throw new Error("Unit chart counts are non-negative integers");
   const percent = props.percent === true;
   if (percent && values.some((v) => v > 100)) throw new Error("Unit chart percent values run 0–100");
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false });
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: 0, valueLabelInset: 0, centerPlot: false, span: tableSpan(props, frame, categories.length) });
   const slot = plot.width / categories.length;
   const gapRatio = 0.45;
-  const categoryLayouts = categories.map((c) => measureText(String(c), slot - 12, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const categoryLayouts = categories.map((c) => measureText(String(c), slot - 12, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }));
   const labelBand = 30, categoryBand = Math.max(...categoryLayouts.map((l) => l.height)) + 16;
   const most = Math.max(1, ...values);
   const shape = (columns) => {
@@ -1957,10 +1993,10 @@ function waffleLayout(frameIn, props) {
     return { columns, rows, cell };
   };
   // The block takes the shape that gives its dots the most room in the plot,
-  // up to WAFFLE_DOT_MAX; among shapes that reach it, the widest. The columns
-  // were fixed at four or more from the count alone, so fourteen dots in four
-  // groups drew as rows of two 21px dots across a 400px plot - a strip
-  // centred in air, where two columns of four give dots twice the size.
+  // up to WAFFLE_DOT_MAX; among shapes that reach it, the widest. Four columns
+  // or more fixed from the count alone would draw fourteen dots in four groups
+  // as rows of two 21px dots across a 400px plot - a strip centred in air,
+  // where two columns of four give dots twice the size.
   let best = null;
   if (!percent) for (let columns = Math.min(10, most); columns >= 1; columns -= 1) {
     const next = shape(columns);
@@ -1975,7 +2011,7 @@ function waffleChart({ id, frame, props }) {
   const { categories, values, percent, plot, slot, columns, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight } = waffleLayout(frame, props);
   const nodes = [];
   const fill = props.color ? token(props.color) : PRIMARY, empty = GRID;
-  const picked = highlightedCategory(props);
+  const picked = highlightedCategory(props, categories, id);
   categories.forEach((category, index) => {
     const lit = picked !== null && String(category) === picked;
     const dotFill = lit ? token("color.accent") : fill;
@@ -1993,7 +2029,8 @@ function waffleChart({ id, frame, props }) {
       const on = !percent || i < count;
       nodes.push(ellipsePrimitive({ id: stableId(id, "dot", category, i), role: on ? "chart-mark" : "chart-unit-empty", frame: { x: x0 + c * pitch, y, width: cell, height: cell }, style: fillStyle(on ? dotFill : empty), data: { category, index: i, on, ...(lit && on ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+    // `dataLabels: false`: the counts are printed elsewhere (a data table under the block).
+    if (props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "value", category), role: "data-label", frame: { x: plot.x + index * slot, y: y0 - labelBand + 2, width: slot, height: 24 }, text: percent ? `${count}%` : formatValue(count, props), style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     const layout = categoryLayouts[index];
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + index * slot + 6, y: y0 + blockHeight + 12, width: slot - 12, height: layout.height }, text: layout.text, style: { ...textStyle(AXIS_LABEL, SECONDARY, false, "center"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
   });
@@ -2011,10 +2048,10 @@ function bubbleGridLayout(frameIn, props) {
   if (!rows.length || !columns.length || values.length !== rows.length || values.some((r) => !Array.isArray(r) || r.length !== columns.length)) throw new Error("Bubble grid requires rows, columns and a values matrix of that shape");
   const flat = values.flat();
   if (flat.some((v) => !(Number.isFinite(v) && v >= 0))) throw new Error("Bubble grid values are non-negative numbers");
-  const labelWidth = Math.min(200, Math.max(80, ...rows.map((r) => Math.ceil(measureText(String(r), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 16)));
+  const labelWidth = Math.min(200, Math.max(80, ...rows.map((r) => Math.ceil(measureText(String(r), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).width) + 16)));
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth, valueLabelInset: 0, centerPlot: false });
   const columnLabelWidth = Math.max(plot.width / columns.length - 12, 72);
-  const columnLayouts = columns.map((c) => measureText(String(c), columnLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const columnLayouts = columns.map((c) => measureText(String(c), columnLabelWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }));
   const footBand = Math.max(...columnLayouts.map((l) => l.height)) + 16;
   const cellW = plot.width / columns.length, cellH = (plot.height - footBand) / rows.length;
   const max = Math.max(1, ...flat);
@@ -2025,6 +2062,7 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
   const L = bubbleGridLayout(frame, props);
   const nodes = [];
   const fill = PRIMARY;
+  const picked = highlightedCategory(props, L.rows, id);
   // Values inside the bubbles read in white on a dark fill, ink on a light one.
   const insideColor = onFill(fill);
   L.rows.forEach((row, r) => {
@@ -2035,7 +2073,7 @@ function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
       const value = L.values[r][c];
       const cx = L.plot.x + c * L.cellW + L.cellW / 2;
       const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
-      const lit = highlightedCategory(props) !== null && String(row) === highlightedCategory(props);
+      const lit = picked !== null && String(row) === picked;
       if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? token("color.accent") : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
       const inside = d >= 24;
       nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
@@ -2061,8 +2099,9 @@ function marimekkoLayout(frameIn, props) {
   const widths = Array.isArray(props.widths) ? props.widths : totals;
   if (widths.length !== categories.length || widths.some((w) => !(Number.isFinite(w) && w > 0))) throw new Error("Marimekko widths must be positive, one per category; give every category a positive total");
   const showLegend = props.legend !== false && series.length > 1;
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false });
-  const categoryLayouts = categories.map((c, i) => measureText(String(c), Math.max(72, plot.width * widths[i] / widths.reduce((a, b) => a + b, 0) - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  // Callouts take their bands above the column totals, as on any chart.
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: showLegend ? legendRowsFor(series.map((sr) => sr.name), frame) : false, leftInset: 8, valueLabelInset: 8, totalLabelInset: 26, centerPlot: false, annotations: props.annotations });
+  const categoryLayouts = categories.map((c, i) => measureText(String(c), Math.max(72, plot.width * widths[i] / widths.reduce((a, b) => a + b, 0) - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }));
   const footBand = Math.max(...categoryLayouts.map((l) => l.height)) + 12;
   return { categories, series, totals, widths, plot, showLegend, categoryLayouts, footBand, height: (plot.y - frame.y) + plot.height + footBand };
 }
@@ -2073,6 +2112,10 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
   const usable = plot.width - gap * (categories.length - 1);
   const bodyH = plot.height - L.footBand;
   const nodes = [...(L.showLegend ? topLegend({ id, frame, items: series.map((sr, i) => ({ label: sr.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : [])];
+  const picked = highlightedCategory(props, categories, id);
+  // A callout names a column and, for one segment, its series: it points at
+  // that segment's middle, or without a series at the column's top.
+  const pointMap = new Map();
   let x = plot.x;
   categories.forEach((category, ci) => {
     const w = usable * widths[ci] / sumW;
@@ -2083,15 +2126,17 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
       const h = bodyH * v / total;
       if (h <= 0) return;
       const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
-      const lit = highlightedCategory(props) !== null && String(category) === highlightedCategory(props);
+      const lit = picked !== null && String(category) === picked;
+      pointMap.set(`${sr.name}:${category}`, { x: x + w / 2, y: y + h / 2 });
       nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? token("color.accent") : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
       const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
-      const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold(), wrapWidthRatio: 1 });
+      const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold() });
       if (h >= label.height + 4 && w >= label.width + 6) {
         nodes.push(textPrimitive({ id: stableId(id, "segment-label", category, sr.name), role: "data-label", frame: { x: x + 2, y: y + (h - label.height) / 2, width: w - 4, height: label.height }, text, style: textStyle(CHART_LABEL, onFill(SERIES[colorIndex]), labelBold(), "center"), data: { category, series: sr.name } }));
       }
       y += h;
     });
+    pointMap.set(`value:${category}`, { x: x + w / 2, y: plot.y });
     // Column total above, category (and its width when widths are given) below.
     nodes.push(textPrimitive({ id: stableId(id, "total", category), role: "data-label", frame: { x: x - 10, y: plot.y - 24, width: w + 20, height: 20 }, text: formatValue(Array.isArray(props.widths) ? widths[ci] : totals[ci], props), style: textStyle(CHART_LABEL, INK, true, "center"), data: { category, total: true } }));
     const layout = L.categoryLayouts[ci];
@@ -2100,7 +2145,8 @@ function marimekko({ id, frame, props, tokens = TOKENS }) {
     x += w + gap;
   });
   nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "chart-axis", x1: plot.x, y1: plot.y + bodyH, x2: plot.x + plot.width, y2: plot.y + bodyH, style: lineStyle(INK, token("line.hairline")) }));
-  return nodes;
+  // The picked column is recoloured above, so highlights are not drawn twice.
+  return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, allowAnnotationRail: false });
 }
 
 function rangeChart({ id, frame, props }) {
@@ -2110,8 +2156,8 @@ function rangeChart({ id, frame, props }) {
   categories.forEach((c, i) => { if (!(Number.isFinite(props.low[i]) && Number.isFinite(props.high[i]) && props.high[i] >= props.low[i])) throw new Error(`Range chart ${c}: high must be a finite value at or above low`); });
   const highlights = normalizedHighlights(props, { categories, series: [{ name: "range" }], allowBar: true });
   const barHighlight = highlights.find((h) => h.style === "bar");
-  const labelWidth = Math.max(56, ...[...props.low, ...props.high].map((value) => Math.ceil(measureText(formatValue(value, props), 300, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }).width) + 12));
-  const categoryWidth = Math.max(90, ...categories.map((c) => Math.ceil(measureText(c, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width) + 12));
+  const labelWidth = Math.max(56, ...[...props.low, ...props.high].map((value) => Math.ceil(measureText(formatValue(value, props), 300, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true }).width) + 12));
+  const categoryWidth = Math.max(90, ...categories.map((c) => Math.ceil(measureText(c, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).width) + 12));
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: categoryWidth + labelWidth, valueLabelInset: labelWidth, centerPlot: false });
   const bounds = numericBounds(withReferenceValues([...props.low, ...props.high], props), { min: props.xMin, max: props.xMax, axis: "x", includeZero: props.includeZero === true });
   const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
@@ -2148,7 +2194,8 @@ function comboChart({ id, frame, props }) {
     topLegend: true,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
-    annotationRail: props.annotationRail
+    annotationRail: props.annotationRail,
+    span: tableSpan(props, frame, categories.length)
   });
   // Labelled marks need no value axis; the bars take a zero-anchored domain and,
   // with `secondaryAxis`, the line takes its own padded domain (a margin over a revenue).
@@ -2160,10 +2207,10 @@ function comboChart({ id, frame, props }) {
   const secondary = props.secondaryAxis === true;
   // Independent units get separate vertical fields on the same categories.
   // Reserve their label clearance before scaling, including when the primary
-  // value axis is visible; padding its domain alone allowed the line to cross labels.
+  // value axis is visible; padding its domain alone lets the line cross labels.
   // The line's band is a third of the plot, and half when a third leaves its
   // change under LINE_RISE_MIN: under two callout bands a fleet age that
-  // doubled (5.2 to 10.8 years) rose 14px, drawn as a flat line over the bars.
+  // doubles (5.2 to 10.8 years) can rise 14px, a flat line over the bars.
   const lineBounds = secondary ? numericBounds(lineSeries.values, { min: props.y2Min, max: props.y2Max, axis: "y", tight: true }) : null;
   // A line that does not move is drawn flat because it is flat - a margin
   // held level while revenue grew is the finding - so only a line that changes
@@ -2189,7 +2236,7 @@ function comboChart({ id, frame, props }) {
   const pointMap = new Map();
   const categoryMap = new Map();
   const linePoints = [];
-  // A currency leads its figure: suffixed, "$m" gave "888$m" on a deck that
+  // A currency leads its figure: suffixed, "$m" prints "888$m" on a deck that
   // writes "$878m" on every other page. The unit decides which end it goes on.
   const secondaryCurrency = String(props.secondaryUnit ?? "").trim().match(/^([$£€¥₹])\s*(.*)$/);
   const secondaryFormat = props.secondaryValueFormat ?? props.valueFormat ?? {};
@@ -2333,9 +2380,9 @@ function scatter({ id, frame, props, bubble = false }) {
   if (bubble && props.points.some(point => !Number.isFinite(point.size) || point.size <= 0)) throw new Error("Bubble charts require a positive finite size for every point");
   if (!bubble && props.sizeLegend !== undefined) throw new Error("Only bubble charts accept a size legend");
   // `focus: ["name", ...]` sets the named points in the accent and the rest in
-  // the comparator grey. A scatter had no emphasis at all, so the one
-  // observation a page is about looked exactly like the eight it is measured
-  // against, and the reader had to find it by reading labels.
+  // the comparator grey. Without it the one observation a page is about looks
+  // exactly like the eight it is measured against, and the reader has to find
+  // it by reading labels.
   const focus = props.focus === undefined ? [] : Array.isArray(props.focus) ? props.focus : [props.focus];
   if (focus.some(name => typeof name !== "string" || !props.points.some(point => point.name === name))) {
     throw new Error("Scatter focus must name exact points on the chart");
@@ -2347,26 +2394,43 @@ function scatter({ id, frame, props, bubble = false }) {
   const declaredSeries = props.points.filter(point => typeof point.series === "string" && point.series.trim()).length;
   if (declaredSeries && declaredSeries !== props.points.length) throw new Error("Scatter points must either all declare a series or all use the default series");
   const seriesNames = [...new Set(props.points.map(point => point.series).filter(value => typeof value === "string" && value.trim()))];
-  const showLegend = props.legend !== false && (seriesNames.length > 1 || props.sizeLegend !== undefined);
+  // `connect: true` joins each series' points in x order: a curve computed
+  // from a formula, or one measure swept across another, is a line, and as
+  // loose dots it reads as a sample of observations. Connected series carry
+  // their names at their right-hand ends, so they need no key.
+  if (props.connect !== undefined && typeof props.connect !== "boolean") throw new Error("Scatter connect is true or false");
+  const connected = props.connect === true;
+  const seriesEnds = connected && seriesNames.length > 1 && props.seriesLabels !== false;
+  // Points coloured by series are read against the names of the series: a
+  // key, or the names at the ends of connected series. With neither, three
+  // colours of dot say nothing about which is which.
+  if (seriesNames.length > 1 && !focus.length && props.legend === false && !seriesEnds)
+    throw new Error(`The scatter colours ${seriesNames.length} series (${seriesNames.join(", ")}) and names none of them; keep its legend, or connect each series (connect: true) so its name sits at its end`);
+  const showLegend = props.legend !== false && !seriesEnds && (seriesNames.length > 1 || props.sizeLegend !== undefined);
+  // Named series ends sit in a gutter right of the plot, as a line chart's do,
+  // clear of the curves they name.
+  const endFace = { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true };
+  const endGutter = seriesEnds ? Math.ceil(Math.max(...seriesNames.map((name) => measureText(name, 400, endFace).width))) + 18 : 0;
   let plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
-    annotationRail: props.annotationRail
+    annotationRail: props.annotationRail,
+    valueLabelInset: endGutter
   });
   let thresholdLabelLayout = null;
   if (props.quadrants?.xLabel !== undefined) {
     if (typeof props.quadrants.xLabel !== "string" || !props.quadrants.xLabel.trim()) throw new Error("Scatter x threshold label must be non-empty text");
-    thresholdLabelLayout = measureText(props.quadrants.xLabel, Math.min(220, plot.width), { fontSize: tokenValue(CHART_ANNOTATION), bold: true });
+    thresholdLabelLayout = measureText(props.quadrants.xLabel, Math.min(220, plot.width), { fontSize: tokenValue(CHART_ANNOTATION), bold: true, wrapWidthRatio: ENGINE_RESERVE });
     const occupiedTop = showLegend || evidenceAnnotationTopBandCount({ annotations: props.annotations || [] }) || chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: props.annotationRail }).top;
     const extra = occupiedTop ? thresholdLabelLayout.height + 6 : Math.max(0, thresholdLabelLayout.height + 6 - (plot.y - frame.y));
     if (plot.height - extra < MIN_PLOT_HEIGHT) throw new Error("Scatter threshold label leaves insufficient plot height; enlarge the exhibit");
     plot = { ...plot, y: plot.y + extra, height: plot.height - extra };
   }
-  // Axis titles: a scatter's two measures are its whole argument, and it drew
-  // neither name - `xLabel` and `yLabel` were accepted and ignored. The x title
-  // sits under the tick labels, the y title above the value axis.
+  // Axis titles: a scatter's two measures are its whole argument, so it names
+  // both (`xLabel`, `yLabel`). The x title sits under the tick labels, the y
+  // title above the value axis.
   const xTitle = typeof props.xLabel === "string" && props.xLabel.trim() ? props.xLabel.trim() : null;
   const yTitle = typeof props.yLabel === "string" && props.yLabel.trim() ? props.yLabel.trim() : null;
   if (xTitle) plot = { ...plot, height: plot.height - 24 };
@@ -2391,7 +2455,12 @@ function scatter({ id, frame, props, bubble = false }) {
       data: { thresholdAxis: "x", threshold: quadrants.x, textLayout: thresholdLabelLayout } }));
   }
   if (xTitle) nodes.push(textPrimitive({ id: stableId(id, "x-axis-title"), role: "axis-title", frame: { x: plot.x, y: plot.y + plot.height + 46, width: plot.width, height: 20 }, text: xTitle, style: textStyle(AXIS_LABEL, INK, true, "center"), data: { axis: "x" } }));
-  if (yTitle) nodes.push(textPrimitive({ id: stableId(id, "y-axis-title"), role: "axis-title", frame: { x: Math.max(frame.x, plot.x - 54), y: plot.y - 26, width: plot.width, height: 20 }, text: yTitle, style: textStyle(AXIS_LABEL, INK, true, "left"), data: { axis: "y" } }));
+  // The y title's box is its text's width, not the plot's: a full-width box
+  // above the plot would be an obstacle no callout leader could route around.
+  if (yTitle) {
+    const measured = measureText(yTitle, plot.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), bold: true });
+    nodes.push(textPrimitive({ id: stableId(id, "y-axis-title"), role: "axis-title", frame: { x: Math.max(frame.x, plot.x - 54), y: plot.y - 26, width: Math.min(plot.width, Math.ceil(measured.width) + 4), height: 20 }, text: yTitle, style: textStyle(AXIS_LABEL, INK, true, "left"), data: { axis: "y" } }));
+  }
   // Both quantitative dimensions need a visible scale, even without point labels.
   // A declared step sets the ticks when it divides the domain; four quarters
   // otherwise, which on a 40-90 axis read 52.5 and 77.5.
@@ -2438,18 +2507,54 @@ function scatter({ id, frame, props, bubble = false }) {
     categoryMap.set(point.name, { x: x - size, y: y - size, width: size * 2, height: size * 2 });
   });
   const placed = [];
+  if (connected) {
+    const weight = markWeight();
+    const groups = seriesNames.length ? seriesNames.map((name) => props.points.filter((point) => point.series === name)) : [props.points];
+    groups.forEach((group, seriesIndex) => {
+      const ordered = [...group].sort((a, b) => a.x - b.x);
+      const color = focus.length ? token("color.chartComparator") : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
+      ordered.slice(1).forEach((point, at) => nodes.unshift(linePrimitive({ id: stableId(id, "segment", seriesNames[seriesIndex] ?? "value", at), role: "chart-line",
+        x1: xScale(ordered[at].x), y1: yScale(ordered[at].y), x2: xScale(point.x), y2: yScale(point.y), style: lineStyle(color, weight.line) })));
+      if (seriesEnds) {
+        const last = ordered.at(-1);
+        placed.push({ series: seriesNames[seriesIndex], x: xScale(last.x), y: yScale(last.y), color });
+      }
+    });
+    // Series names in the gutter right of the plot, level with each series'
+    // last point and pushed apart as a line chart's end labels are.
+    const ends = placed.splice(0).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 22);
+    for (const end of ends) {
+      const width = Math.ceil(measureText(end.series, 400, endFace).width) + 2;
+      nodes.push(textPrimitive({ id: stableId(id, "series-label", end.series), role: "data-label", frame: { x: plot.x + plot.width + 10, y: end.y - 12, width, height: 24 }, text: end.series, style: textStyle(CHART_LABEL, end.color, true, "left"), data: { series: end.series, labelKind: "series-end" } }));
+    }
+  }
+  // Lines a point's label may not sit on: the joined series and the
+  // reference lines drawn over the plot.
+  const segments = [
+    ...nodes.filter((node) => node.role === "chart-line").map((node) => ({ x1: node.data.x1, y1: node.data.y1, x2: node.data.x2, y2: node.data.y2 })),
+    ...(props.referenceLines || []).filter((reference) => Number.isFinite(reference?.value)).map((reference) => ({ x1: plot.x, y1: yScale(reference.value), x2: plot.x + plot.width, y2: yScale(reference.value) })),
+  ];
+  const onSegment = (box) => segments.some(({ x1, y1, x2, y2 }) => {
+    const steps = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 3));
+    for (let i = 0; i <= steps; i++) {
+      const px = x1 + (x2 - x1) * i / steps, py = y1 + (y2 - y1) * i / steps;
+      if (px > box.x - 2 && px < box.x + box.width + 2 && py > box.y - 2 && py < box.y + box.height + 2) return true;
+    }
+    return false;
+  });
   const marks = nodes.filter((node) => node.role === "chart-marker");
   // Thresholds are fixed evidence; move outside labels, never their points or bounds.
-  const labelObstacles = nodes.filter((node) => ["chart-marker", "chart-threshold-line", "chart-quadrant-title"].includes(node.role)).map((node) => node.frame);
+  const labelObstacles = nodes.filter((node) => ["chart-marker", "chart-threshold-line", "chart-quadrant-title", "axis-title"].includes(node.role)).map((node) => node.frame);
   const intersects = (a, b) => a.x < b.x + b.width + 3 && a.x + a.width + 3 > b.x && a.y < b.y + b.height + 3 && a.y + a.height + 3 > b.y;
-  for (const label of nodes.filter((node) => node.role === "data-label")) {
+  for (const label of nodes.filter((node) => node.role === "data-label" && node.data?.labelKind !== "series-end")) {
     const point = pointMap.get(`value:${label.text}`);
     const mark = marks.find((node) => node.id === stableId(id, "point", label.text));
     // Measured in the face it prints in - a focus label is bold - and at the
     // width it needs: a fixed 96px box failed "Scarborough" in bold as
     // unbreakable text. A name up to 220px sets on one line; a longer one
     // wraps at 220px and the box takes its lines.
-    const face = { fontFamily: tokenValue(label.style.bold ? token("font.bodySemibold") : FONT), fontSize: tokenValue(CHART_LABEL), bold: label.style.bold === true, wrapWidthRatio: 1 };
+    const face = { fontFamily: tokenValue(label.style.bold ? token("font.bodySemibold") : FONT), fontSize: tokenValue(CHART_LABEL), bold: label.style.bold === true };
     const single = measureText(label.text, 100000, face);
     const measured = single.width <= 220 ? single : measureText(label.text, 220, face);
     const width = Math.ceil(measured.width) + 2, height = Math.max(24, Math.ceil(measured.height));
@@ -2476,7 +2581,7 @@ function scatter({ id, frame, props, bubble = false }) {
       { x: mark.frame.x + mark.frame.width + gap * 3, y: point.y - height / 2, width, height },
       { x: mark.frame.x - width - gap * 3, y: point.y - height / 2, width, height }
     ];
-    const free = (candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...labelObstacles].every((other) => !intersects(candidate, other));
+    const free = (candidate) => candidate.x >= plot.x && candidate.x + width <= plot.x + plot.width && candidate.y >= plot.y && candidate.y + height <= plot.y + plot.height && [...placed, ...labelObstacles].every((other) => !intersects(candidate, other)) && !onSegment(candidate);
     let candidate = candidates.find(free);
     // In a cluster every position touching the point is taken. The label then
     // moves further out - rings at growing distances, sixteen directions each,
@@ -2522,7 +2627,9 @@ function scatter({ id, frame, props, bubble = false }) {
     }
     placed.push(candidate);
   }
-  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, allowAnnotationRail: false });
+  // `referenceLines` on the value axis: the break-even, the parity line, the
+  // 50% hurdle a curve is read against.
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, allowAnnotationRail: false });
 }
 
 const PART_TO_WHOLE_VARIANTS = Object.freeze({ "legend-top-right": {}, "outside-labels": { props: { labels: ["Category 1", "Category 2", "Category 3", "Category 4"], values: [25, 25, 25, 25] } }, "shared-legend": {} });
@@ -2544,7 +2651,7 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   if (!Array.isArray(props.labels) || !Array.isArray(props.values) || props.values.length < 2 || props.values.length > 5 || props.labels.length !== props.values.length || props.labels.some(label => typeof label !== "string" || !label.trim()) || new Set(props.labels).size !== props.labels.length || props.values.some(v => !Number.isFinite(v) || v < 0) || props.values.filter(v => v > 0).length < 2) throw new Error("Pie/donut needs two to five unique categories and at least two positive finite values");
   let availableHeight = frame.height - legendHeight;
   const outside = variant === "outside-labels";
-  let labelWidth = outside ? Math.max(...props.labels.map(label => measureText(label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width)) : 0;
+  let labelWidth = outside ? Math.max(...props.labels.map(label => measureText(label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold }).width)) : 0;
   const total = props.values.reduce((sum, value) => sum + value, 0);
   const sweeps = [];
   props.values.reduce((start, value) => { sweeps.push({ mid: (start + 180 * value / total) * Math.PI / 180, half: Math.PI * value / total }); return start + 360 * value / total; }, -90);
@@ -2552,10 +2659,9 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   // A slice under half a percent rounds to "0%", which reads as no slice at
   // all; it prints as "<1%" instead of failing the chart.
   const percentText = (index) => percentages[index] ? `${percentages[index]}%` : "<1%";
-  // Each percentage is measured at its own width. The label box used to be a
-  // fixed 64px measured at a 64px cap, so its frame never said how wide its
-  // text was; the fit test below and the box drawn now share one measurement.
-  const labelMetrics = percentages.map((_, index) => measureText(percentText(index), 1000, { fontSize: tokenValue(CHART_LABEL), bold: true, wrapWidthRatio: 1 }));
+  // Each percentage is measured at its own width, so its frame says how wide
+  // its text is; the fit test below and the box drawn share one measurement.
+  const labelMetrics = percentages.map((_, index) => measureText(percentText(index), 1000, { fontSize: tokenValue(CHART_LABEL), bold: true }));
   const OUTSIDE_GAP = 8;
   // Where each percentage goes for a circle of `size` centred at (cx, cy):
   // inside its slice when the slice holds the text plus clearance, otherwise
@@ -2637,7 +2743,7 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
         availableHeight = frame.height - legendHeight;
         plotBounds = { x: frame.x, y: frame.y + legendHeight, width: frame.width, height: availableHeight };
       }
-      if (outside) labelWidth = Math.max(...props.labels.map((label, index) => measureText(keyed.has(index) ? `${label} ${percentText(index)}` : label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold, wrapWidthRatio: 1 }).width));
+      if (outside) labelWidth = Math.max(...props.labels.map((label, index) => measureText(keyed.has(index) ? `${label} ${percentText(index)}` : label, frame.width, { fontSize: tokenValue(CHART_ANNOTATION), fontFamily: tokenValue(token("font.bodySemibold")), bold: tokenDefinition("font.bodySemibold").nativeBold }).width));
       ({ size, circle, labels } = layout(outside ? labelWidth + 24 : 16, 16));
       labels = labels.map((label, index) => keyed.has(index) || (label && label.placement === "outside") ? null : label);
       keyed = new Set([...keyed, ...labels.map((label, index) => !label && props.values[index] && props.dataLabels !== false ? index : -1).filter(index => index >= 0)]);
@@ -2711,78 +2817,104 @@ function partToWhole({ id, frame, props, donut = false, tokens = TOKENS }) {
   return nodes;
 }
 
+/**
+ * The marks an author asks a chart to set over its data, by prop. Every chart
+ * says which of them it draws (`draws`) and which its renderer refuses in its
+ * own words (`refuses`); one authored on a chart that does neither is refused
+ * when the chart renders - at compile, where it is cheap to change - naming
+ * the charts that draw it. Nothing an author asks a chart to mark is dropped
+ * unseen. (`focus` on a column, bar, line, area or lollipop chart is read by
+ * the composer into `focusSeries` or `highlights` before the chart sees it.)
+ */
+export const CHART_DECORATIONS = Object.freeze({
+  annotations: "callouts (`annotations`)",
+  referenceLines: "reference lines (`referenceLines`)",
+  highlights: "highlights (`highlights`)",
+  focus: "a subject (`focus`)",
+  focusSeries: "a subject series (`focusSeries`)",
+  changeAnnotations: "change annotations (`changeAnnotations`)",
+  annotationRail: "an annotation rail (`annotationRail`)",
+  periods: "periods (`periods`)",
+  events: "events (`events`)",
+  pointHighlights: "point highlights (`pointHighlights`)",
+});
+const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
+// What a chart on a vertical category axis draws through the shared decorations.
+const CATEGORY_DECORATIONS = ["annotations", "referenceLines", "highlights", "changeAnnotations", "annotationRail", "periods", "events"];
+
 const chartDefinitions = [
   {
-    id: "chart.column", render: (context) => categoricalChart(context),
+    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries"],
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "value", values: [32, 46, 61, 74] }], highlights: [{ category: "2026" }], annotations: [], referenceLines: [{ value: 60, label: "Target" }] }
   },
   {
-    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }),
+    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries"], refuses: ["periods", "events", "annotationRail"],
     sample: { categories: ["North", "West", "South", "East"], series: [{ name: "value", values: [74, 62, 48, 35] }], highlights: [{ category: "North" }], annotations: [{ category: "North", text: "Scale leader" }] }
   },
   {
-    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }),
+    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: CATEGORY_DECORATIONS, refuses: ["focusSeries"],
     sample: { categories: ["2024", "2025", "2026"], series: [{ name: "Core", values: [30, 32, 35] }, { name: "Growth", values: [12, 20, 30] }, { name: "New", values: [5, 9, 14] }], annotations: [{ series: "New", category: "2026", text: "New scales" }] }
   },
   {
-    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }),
+    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
     sample: { categories: ["Segment A", "Segment B", "Segment C"], series: [{ name: "Core", values: [45, 35, 25] }, { name: "Growth", values: [35, 40, 45] }, { name: "New", values: [20, 25, 30] }] }
   },
   {
-    id: "chart.line", render: (context) => lineChart(context),
+    id: "chart.line", render: (context) => lineChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
     sample: { categories: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Actual", values: [22, 31, 43, 55] }, { name: "Plan", values: [25, 34, 42, 48] }], highlights: [{ category: "Q4" }], annotations: [{ series: "Actual", category: "Q4", text: "Ahead of plan" }] }
   },
   {
-    id: "chart.area", render: (context) => lineChart({ ...context, area: true }),
+    id: "chart.area", render: (context) => lineChart({ ...context, area: true }), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
     sample: { categories: ["Jan", "Feb", "Mar", "Apr", "May"], series: [{ name: "value", values: [18, 28, 34, 47, 59] }], annotations: [{ category: "May", text: "Demand builds" }] }
   },
   {
-    id: "chart.waterfall", render: waterfall,
+    id: "chart.waterfall", render: waterfall, draws: CATEGORY_DECORATIONS,
     sample: { categories: ["Start", "Price", "Volume", "Cost", "End"], values: [80, 18, 12, -9, 101], totals: [0, 4], annotations: [{ category: "End", text: "+21 net" }] }
   },
   {
-    id: "chart.scatter", render: (context) => scatter(context),
+    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 20, y: 36 }, { name: "B", x: 42, y: 58 }, { name: "C", x: 68, y: 74 }, { name: "D", x: 82, y: 44 }], annotations: [{ category: "C", text: "Best position" }] }
   },
   {
-    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }),
+    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 18, y: 38, size: 12 }, { name: "B", x: 43, y: 66, size: 36 }, { name: "C", x: 72, y: 76, size: 58 }, { name: "D", x: 84, y: 42, size: 20 }] }
   },
   {
-    id: "chart.pie", render: (context) => partToWhole(context),
+    id: "chart.pie", render: (context) => partToWhole(context), draws: [], refuses: ["changeAnnotations", "annotationRail"],
     sample: { labels: ["Direct", "Partner", "Digital", "Other"], values: [42, 28, 18, 12] }
   },
   {
-    id: "chart.donut", render: (context) => partToWhole({ ...context, donut: true }),
+    id: "chart.donut", render: (context) => partToWhole({ ...context, donut: true }), draws: [], refuses: ["changeAnnotations", "annotationRail"],
     sample: { labels: ["Core", "Growth", "New"], values: [52, 31, 17] }
   },
   {
-    id: "chart.marimekko", render: marimekko,
+    id: "chart.marimekko", render: marimekko, draws: ["annotations", "highlights"],
     sample: { heading: "(Insert measure and population)", categories: ["Retail", "Corporate", "Wealth", "Markets"], series: [{ name: "Domestic", values: [42, 30, 12, 8] }, { name: "International", values: [18, 25, 10, 22] }], unit: "$B" }
   },
   {
-    id: "chart.bubble-grid", render: bubbleGrid,
+    id: "chart.bubble-grid", render: bubbleGrid, draws: ["highlights"],
     sample: { heading: "(Insert measure and population)", rows: ["Mega banks", "Super regionals", "Core regionals", "Other"], columns: ["Ideation", "Concept", "Pilot", "Deployed"], values: [[30, 9, 9, 4], [15, 12, 9, 6], [54, 13, 13, 6], [8, 9, 9, 0]], unit: "Number of use cases" }
   },
   {
-    id: "chart.waffle", render: waffleChart,
+    id: "chart.waffle", render: waffleChart, draws: ["highlights"],
     sample: { heading: "(Insert measure and population)", categories: ["Underwriting", "Credit applications", "Portfolio monitoring", "Controls and reporting"], series: [{ name: "Respondents", values: [38, 42, 58, 42] }], unit: "Number of respondents" }
   },
   {
-    id: "chart.range", render: rangeChart,
+    id: "chart.range", render: rangeChart, draws: ["annotations", "referenceLines", "highlights", "changeAnnotations"], refuses: ["annotationRail"],
     sample: { heading: "(Insert measure and population)", categories: ["Research", "Labs", "Core Models", "API Agents"], low: [305, 385, 347, 300], high: [385, 460, 490, 400], unit: "$k", highlights: [{ category: "Core Models", style: "bar" }] }
   },
   {
-    id: "chart.combo", render: comboChart,
+    id: "chart.combo", render: comboChart, draws: CATEGORY_DECORATIONS,
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "Revenue", values: [42, 55, 68, 82] }, { name: "Plan", values: [45, 58, 70, 85] }], annotations: [{ series: "Revenue", category: "2026", text: "Revenue reaches $82m" }] }
   },
   {
     id: "chart.horizons",
     render: renderHorizons,
+    draws: [],
     sample: HORIZONS_SAMPLE,
     tokens: HORIZONS_TOKENS
   },
-  ...EXTRA_CHARTS.map(({ id, render, sample }) => ({ id, render, sample }))
+  ...EXTRA_CHARTS.map(({ id, render, sample, draws, refuses }) => ({ id, render, sample, draws, refuses }))
 ];
 
 function chartExamples(id) {
@@ -2906,31 +3038,46 @@ function renderResolved(render, context) {
       if (first) return first;
       // Too narrow for the rail: the note is set on its own bar instead, in
       // the annotation face without a box (chart-annotations insidePlacement).
-      // The longest bar of a six-bar panel had no room past its end and no
-      // panel width to spare for a rail, so the bar the page was about was
-      // the one that could not be annotated.
+      // The longest bar of a six-bar panel - often the bar the page is about -
+      // can have no room past its end and no panel width to spare for a rail.
       if (railed && !narrow && (tooNarrow(error) || /no clear position for the callout/.test(error.message))) {
         narrow = error;
         props = { ...props, annotations: (props.annotations || []).map((item) => (item?._placement === "rail" ? { ...item, _placement: "on-bar" } : item)) };
         continue;
       }
-      // The rail a callout asked for narrowed the plot until something else
-      // failed: a bar panel in a row of three reported "insufficient plot
-      // width (0px ...)" and a bridge "Unbreakable text ... Revenue", neither
-      // naming the callout that caused it. Report the callout, and why the
-      // rail could not hold it in this chart.
+      // The rail a callout asked for can narrow the plot until something else
+      // fails - "insufficient plot width" on a bar panel, "Unbreakable text" on
+      // a bridge - with an error that does not name the callout that caused
+      // it. Report the callout, and why the rail could not hold it in this
+      // chart.
       const cause = narrow && tooNarrow(narrow) ? narrow : tooNarrow(error) ? error : null;
       if (railed && cause)
         throw new Error(`${railed.message.replace(/; shorten the note.*$/, "")}: a rail beside the plot leaves it too narrow in this ${Math.round(context.frame?.width ?? 0)}px chart (${cause.message.replace(/[;:].*$/, "")}), and its bar has no room to carry it. Put the note in the commentary or caption, annotate a mark with clear space above or beside it, or give the chart a wider panel`);
       throw error;
     }
-    if (first) return nodes;
-    const released = releasedEvidenceProps(nodes, props);
-    if (!released) return nodes;
-    first = nodes;
-    props = released;
+    const released = first ? null : releasedEvidenceProps(nodes, props);
+    if (released) { first = nodes; props = released; continue; }
+    // The callouts still in bands share them where their boxes do not meet
+    // across (packedEvidenceProps), and the plot takes back the height of every
+    // band that frees. Tried once; a packed layout that does not render keeps
+    // this one.
+    const packed = packedEvidenceProps(nodes, props);
+    if (!packed) return nodes;
+    try { return render({ ...context, props: packed }); } catch { return nodes; }
   }
   return first;
+}
+
+// An authored mark the chart neither draws nor refuses in its own words:
+// refused before anything is laid out, naming the charts that draw it.
+function refuseUndrawn(chart, props, id) {
+  const handled = new Set([...chart.draws, ...(chart.refuses || [])]);
+  for (const key of Object.keys(CHART_DECORATIONS)) {
+    if (handled.has(key) || !authoredDecoration(props[key])) continue;
+    const drawers = chartDefinitions.filter((other) => other.draws.includes(key)).map((other) => other.id.replace("chart.", ""));
+    const name = chart.id.replace("chart.", "");
+    throw new Error(`${id}: ${/^[aeiou]/.test(name) ? "an" : "a"} ${name} chart does not draw ${CHART_DECORATIONS[key]}, and set here it would be dropped unseen - remove it and say it in the commentary or a caption${drawers.length ? `, or show the evidence as a chart that draws it (${drawers.join(", ")})` : ""}`);
+  }
 }
 
 export function registerCharts(registry) {
@@ -2952,6 +3099,9 @@ export function registerCharts(registry) {
       version: "2.6.0",
       category: "chart",
       role: "chart",
+      // The marks it draws over its data and the ones its renderer refuses
+      // itself (CHART_DECORATIONS); any other is refused at render.
+      decorations: Object.freeze({ draws: Object.freeze([...chart.draws]), refuses: Object.freeze([...(chart.refuses || [])]) }),
       tokens: [...new Set([...tokens, ...registry.get("chart-title").tokens])].sort(),
       preferredSize: chart.id === "chart.horizons" ? { width: 1160, height: 460 } : { width: 760, height: 420 },
       sample: chart.sample,
@@ -2989,6 +3139,7 @@ export function registerCharts(registry) {
         return { top: frame.y, ruled: layout.ruled, height: layout.height };
       },
       render: ({ id, frame, props = {}, tokens }) => {
+        refuseUndrawn(chart, props, id);
         if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
@@ -3007,6 +3158,6 @@ export const CHART_IDS = Object.freeze(chartDefinitions.map((chart) => chart.id)
 
 /** The width a horizontal bar chart gives its category labels: shared with a chart group that aligns bars on one axis. */
 export function barLabelColumn(categories) {
-  const width = (text) => measureText(String(text), 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: 1 }).width;
+  const width = (text) => measureText(String(text), 180, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).width;
   return Math.min(180, Math.max(72, Math.ceil(Math.max(...categories.map(width))) + 12));
 }

@@ -30,4 +30,20 @@ Keep repaired candidates separate from first-pass candidates. After freezing a r
 
 Declare thresholds before judging. Every admitted deck requires a complete forward plan, a source-page comparison, rendered evidence, and a closed gap ledger. Generated PowerPoint candidates must pass the existing canonical provenance, deterministic, visual, and consistency gates. Each substantive page must preserve decision-relevant evidence and qualifications at comparable readable density. A corpus-wide equivalence claim requires every admitted case to pass; incomplete, inaccessible, or failed cases remain visible. A passing finite corpus supports only its measured coverage, not universal zero-shot equivalence.
 
-Use `evals/scripts/validate_client_deck_benchmark.py <manifest.json> --report <report.json>` to audit coverage and evidence hashes. Bind the complete listing inventory with `inventory: {path, sha256}`; each source record uses its inventory ID or an explicit `listingId` when a mixed bundle yields multiple decks. Every inventory entry needs an admission record, including excluded and inaccessible documents. The audit checks admitted and excluded pages, complete source/candidate render inventories, bound acceptance reports, per-page comparison dimensions, and preserved first-pass evidence. A repaired candidate is counted separately from an unchanged first pass. This accounting audit relies on the recorded page counts and independent judges; it does not itself inspect pixels or establish visual quality.
+## Tooling
+
+No tool audits a benchmark manifest: keep the accounting above (inventory,
+admission records, page counts, first-pass and repaired candidates) in the
+task's own `output/<task>/` directory and audit it by hand. What the repository
+does provide:
+
+- `evals/quality/run.mjs` runs first-pass candidates repeatably: a headless
+  agent per brief and run, a blind judge on the renders, a pairwise comparison
+  with the previous skill version, and results keyed by skill version, judge,
+  brief and run. Its `--set heldout` briefs are the held-out partition; reading
+  a held-out run to decide a repair spends it (see
+  `evals/quality/briefs/heldout/README.md`).
+- `evals/quality/defects.json` and `gate-validity.mjs` record gaps as labelled
+  defects and measure how many the gates catch.
+- `evals/calibration/` re-derives the targets the gates compare against from a
+  set kept outside the repository (`PS_CALIBRATION_CORPUS`), numbers only.

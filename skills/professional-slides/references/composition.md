@@ -2,7 +2,7 @@
 
 Composition is an open tree, not a catalogue of page silhouettes. Start from the approved title, list the content items the page needs, and choose the smallest tree that makes their relationships legible. Each item declares its semantic job, registered component, content, relationship to its peers and relative weight.
 
-The executable contract is `runtime/core.mjs`; the content-to-composition planner is `runtime/planner.mjs`. Decks are authored as [page types](page-types.md), which compile to the deck-spec keys below: the page type's `commentary` and `form` choices set `layout`, `shape`, `arrange` and the exhibit's type, so the presets named here are what the compiler targets, not keys an author writes.
+The executable contract is `runtime/core.mjs`; the content-to-composition planner is `runtime/planner.mjs`. Decks are authored as [page types](page-types.md): the page type's `commentary` and `form` choices set `layout`, `shape`, `arrange` and the exhibit's type. Those four keys are listed under [What the compiler writes](#what-the-compiler-writes), for reading a compiled deck; an author never writes them. Read this reference when a composition finding points here.
 
 ## Primitives
 
@@ -33,7 +33,7 @@ A section may contain any other composition, including more sections. A slide ma
 
 Automatic composition allocates the authored content; it does not convert charts to metrics, prose to cards or add a duplicate data table. Author these alternatives when their reading task warrants them.
 
-An explicit sequence outranks the peer-count rule; framed and layered relationships outrank both, because they declare the coordinate system. Override the selection when reading order, density or a reference design calls for a different relationship, and record the reason in the slide plan.
+An explicit sequence outranks the peer-count rule; framed and layered relationships outrank both, because they declare the coordinate system. When reading order, density or a reference design calls for a different relationship, choose another page type or form and record the reason in the page's `why`.
 
 Row and column plans, including nested sections, declare `gap` as a spacing token - `space.2` for a tight heading-and-body group, `space.4` for peer sections. Choose the gap from the relationship.
 
@@ -46,7 +46,7 @@ Row and column plans, including nested sections, declare `gap` as a spacing toke
 | What does this evidence imply? | Evidence beside developed explanation | Mechanism, significance, material qualification |
 | Is the recommendation robust? | Decision table plus sensitivity | Explicit criteria, economics, sensitivity, countercase |
 
-Write these as the deck spec describes them: the composition is the shape of the slide's keys, not a call into a second builder. The four heavy shapes have names the composer knows - `shape: "findings-matrix" | "measure-table" | "model-page" | "half-and-half"` - and everything else is the exhibit, the points and the arrangement.
+Author each as page types, not as a call into a second builder: paired evidence is `panels` or `options`, a trend above its drivers `panels` form `stack` or a `bridge`, evidence beside its explanation an exhibit with commentary `beside`, a decision table a `scorecard` or a `lookup` with an implication column. The compiled presets they produce are listed under [What the compiler writes](#what-the-compiler-writes).
 
 Worked patterns:
 
@@ -95,33 +95,32 @@ Use content-hugging groups where a sparse object is complete. A short group star
 
 Components expose occupied bounds and comparison/header anchors where supported. Use those anchors to inspect group relationships after composition; allocation frames alone cannot establish alignment. Optional surface, focus or divider treatments must preserve unrelated geometry. References participate in chart domains. [Production](tools/production.md) owns saved-artifact checks.
 
-At the handoff compare authored intent with scene and rendered output: each nested category axis, icon set, exact focus, heading owner, status and evidence qualification must appear as intended. Record any deliberate revision in the existing plan before rebuilding. A visible icon can still be semantically wrong; deterministic checks preserve declared choices but cannot choose them.
+At the handoff compare authored intent with scene and rendered output: each nested category axis, icon set, exact focus, heading owner, status and evidence qualification must appear as intended. Make any deliberate revision in the pages file and recompile before rebuilding. A visible icon can still be semantically wrong; deterministic checks preserve declared choices but cannot choose them.
 
-## Named composition presets
+## Page and deck keys
 
-Choose a preset because its evidence relationship fits the page, not to meet a word quota. Presets remain subordinate to the page’s actual content.
+The keys an author writes on a page or the deck, beyond its type's choices.
 
-| `shape` | What it is | What it needs |
-| --- | --- | --- |
-| `executive-summary` | the opening answer, proof, consequence and action | two to seven developed `points`, each with optional sub-`points`; optional `metrics` |
-| `findings-matrix` | findings down the left, two or three columns of short bulleted evidence across | `rows` with `cells` |
-| `measure-table` | grouped measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` |
-| `model-page` | the assumptions grid behind a forecast | a chart plus its `dataTable` |
-| `half-and-half` | a chart with its own callout on one side, six icon-led points on the other | an exhibit and `points` |
+`density` is set once, on the deck ([Density profiles](theming.md#density-profiles)); a page type refuses it on a page. A chart's mark count steps its own labels down one size at most and never the page's prose, so a role keeps one size across the deck; a page that still does not fit is an authoring finding, not a smaller font. A `panels` page carries its panels in `exhibits`; `stackWeights` sets their height shares and `pairedWeights` their width shares. Keep matched measures on matched scales.
 
-The basic evidence presets are `exhibit-full` (full-width evidence), `exhibit-left` (evidence beside support) and `exhibit-top` (evidence above support). Other supported presets are `exhibit-right` (dominant evidence on the right), `hero-number` (one meaningful number with its supporting proof), `split-tone` (a treated support rail), `two-up` (peer exhibits), `metrics-over-exhibit` (a concise metric strip over underlying evidence), `table-halves` (a comparison split across matched tables), and `picture-pair`, `picture-strip`, `picture-hero` (two, several or one dominant sourced image). These are composition conveniences; their names do not establish distinct evidence relationships.
+A lone implication beneath a full-width exhibit (commentary `below`, one point) owns that support region and takes the exhibit's own track: its heading sits at the body's left margin and runs the paragraph to the same right edge as the exhibit above, a band the width of the thing it is read off; a narrower centred measure would float in an empty region, joined to its exhibit by nothing. Two or more implications keep their shared column widths and the line-length check. This is the close under one exhibit, not licence to run sustained prose across the canvas elsewhere; inspect the relationship to the exhibit above.
 
-A lone implication beneath a full-width exhibit owns that support region and takes the exhibit's own track: `exhibit-top` sets its heading at the body's left margin and runs the paragraph to the same right edge as the exhibit above, the way the reference pages close an exhibit with a band the width of the thing it is read off. Hugging a narrower measure and centring left it floating in the middle of an empty region, joined to its table by nothing. Two or more implications keep their shared column widths and the line-length check. This is the close under one exhibit, not licence to run sustained prose across the canvas elsewhere; inspect the relationship to the exhibit above.
+Geometry that leaves a page empty is corrected where the page is composed:
 
-## Deck-spec controls
+- A flow starts at the top of its frame and grows its steps and gaps to fill it (up to about twice their measured height); its arrow labels sit in the gutter clear of every arrow and step, outside a branch's wedge.
+- On a page whose page type placed the commentary `beside` a chart or a flow, a column of points that stays under about seven tenths of the body's height even at its narrowest runs under the exhibit instead, in columns, and the exhibit takes the width. A number, a statement box or prose in the column keeps it beside, as does a `layout` written on a deck built outside the pages file.
+- Developed points (twenty words or more each) that each carry a `lead` run as a ledger on an executive summary of three or four, and on a text page of four: each lead set beside its statement at a reading measure, a hairline between rows, the rows spread to the body's foot so the page reads in order. Otherwise a text page's developed points run in columns: three across, four two by two, more in two columns.
+- The small tables of a page's row blocks share one treatment and one type size: where one cannot carry its inferred bars at the width it is drawn, none does, and where one steps down a size, all do.
+- A chart prints a value to the precision the page's copy quotes it (at most two places): a bar beside a sentence saying 11.6 is labelled 11.6, not 12; every other label keeps the chart's own precision.
+- Panel captions are compact, left-aligned text under their panels at the panel's width; the statement box is the page's takeaway alone.
 
-Use `density` for a coherent page type scale, not local font shrinking. `exhibits` carries multiple exhibits; `arrange: "row" | "stack" | "grid" | "sequence"` selects their relationship; `sequence` draws an arrow between each exhibit and the next. `stackWeights` sets height shares and `pairedWeights` width shares. `layout: "two-up-contrast"` holds two peer exhibits without shared commentary; `layout: "stack"` reads them vertically. Keep matched measures on matched scales.
-
-`tracker` names the navigation construction: `pills` (every section, the current one filled), `label` (the current section's name alone, at the left above the title), `breadcrumb` (the section under its parent) or `number-strip`. Left unset it is chosen from the section map rather than always taken as pills: six sections or more, or any name past fourteen characters, takes `label`; four or more with medium-length names takes `number-strip`. A deck that carried pills on every one of fifty-one pages is what that default was hiding.
+`tracker` names the navigation construction: `pills` (every section, the current one filled), `label` (the current section's name alone, at the left above the title), `breadcrumb` (the section under its parent) or `number-strip`. Left unset it is chosen from the section map rather than always taken as pills: six sections or more, or any name past fourteen characters, takes `label`; four or more with medium-length names takes `number-strip`.
 
 `pictures` carries one to five labelled photographs. A `metrics` strip uses `metricsPosition: "top" | "bottom"`; omit it when it duplicates the argument. 
 
-A `sidebar` page sets `panel: { text, kicker, tone }` - a question, claim or figure in heading type down a filled left column - beside its exhibit, points or paragraphs. A memo (a text page of `paragraphs` with a `panel`) sets the prose first and the panel down the right in the tint, carrying the conclusion or the figures the reader keeps. Prose beside a panel is sized to the text: one column, or two past about 280 words, each as narrow as lets the prose reach the foot of the body and never wider than a paragraph's measure, and the panel takes the width left. So 150 to 330 words make a full page; a column handed a fixed share wider than the measure leaves a strip down its right edge. A `photo-backdrop` page sets one exhibit on a white card over a full-bleed `photo`, the card on the right unless `photoSide: "right"` keeps the right of the photograph clear.
+A `sidebar` page (`argument` form `sidebar`) sets `panel: { text, kicker, tone }` - a question, claim or figure in heading type down a filled left column - beside its exhibit, points or paragraphs.
+
+A memo (a text page of `paragraphs` with a `panel`) sets the prose first and the panel down the right in the tint, carrying the conclusion or the figures the reader keeps. Prose beside a panel is sized to the text: one column, or two past about 280 words, each as narrow as lets the prose reach the foot of the body and never wider than a paragraph's measure, and the panel takes the width left. So 150 to 330 words make a full page; a column handed a fixed share wider than the measure leaves a strip down its right edge. A `photo-backdrop` page (`picture` form `photo-backdrop`) sets one exhibit on a white card over a full-bleed `photo`, the card on the right unless `photoSide: "right"` keeps the right of the photograph clear.
 
 `paragraphs` carries body prose; on a text page with no points it flows from the top as a report page does, opening a second column past about 110 words and a third past about 220, and `textColumns: 1 | 2 | 3` fixes the count. `pointsHeading: false` omits a commentary heading, while `pointsAlign: "middle"` centres the group; headed commentary normally begins at the top. A column that runs less than four fifths down its track starts at the top and narrows instead - beside a chart down to 280px, the width a line of prose needs; beside a table by a fifth at most, since a wider table ends higher. `pointsAlign: "middle"` centres it when the author asks. `insights` holds a reading followed by its consequence, while `insight` holds a single developed implication.
 
@@ -132,3 +131,27 @@ A `sidebar` page sets `panel: { text, kicker, tone }` - a question, claim or fig
 For a planned icon list, supply a supported `icon` on each peer and choose `pointsStyle: "icon-lead"` or `"icon-framed"`. An explicit `"prose"` treatment suppresses markers even if the records contain icons. Inspect the rendered glyphs against the plan; icon metadata alone does not establish that the chosen treatment reached the page.
 
 `tracker` controls section navigation independently of the deck's `contents` page. On a section divider, `contents` lists sections and `contentsActive` identifies the current one. `kicker` is an optional structural label above the title; use `evidenceStatus` for qualifications such as Judgement in the shared subtitle band instead. `subtitle` is the page's standfirst: one line under the title naming the measure, population, period or scope, set above the title rule and counted with the title rather than the body ([page types](page-types.md#the-standfirst)); the rule, the title's balanced break and where the body starts are the design system's ([theming](theming.md#the-title-band)). `footnotes: [{on, text}]` attaches numbered scope notes to exact labels. `notes` stores speaker notes without putting them on the page.
+
+`hidden: true` keeps a slide in the file but out of the slide show (PowerPoint's Hide Slide): it is still rendered, gated and reviewed, and `readback.hidden` in build-result.json lists it; the readback reports a slide hidden in the file and not in the scene, or the other way, as `HIDDEN_STATE`. An imported deck's hidden slides arrive with `hidden: true` beside their `draft`; keep it when mapping the page, or set it to `false` to show the slide. A cover cannot be hidden, so an imported hidden title slide stays a page rather than becoming the cover. This paragraph owns hidden slides.
+
+## What the compiler writes
+
+`author-deck.mjs` writes `layout`, `shape`, `arrange` and `soWhat` into `<id>.deck.json` from each page's type, form and commentary, and records the choices in the page's `pageType`. Writing them on a page is refused, and editing them after compiling is `PAGE_TYPE_EDITED`: change the choice in the pages file and recompile. They are listed here to read a compiled deck, a finding that names one, or a deck built outside the pages file.
+
+### Named presets
+
+A preset follows from the page's type, form and commentary; its name does not establish a distinct evidence relationship.
+
+| `shape` | What it is | What it needs | Written by |
+| --- | --- | --- | --- |
+| `executive-summary` | the opening answer, proof, consequence and action | two to seven developed `points`, each with optional sub-`points`; optional `metrics` | `summary` form `executive-summary` |
+| `findings-matrix` | findings down the left, two or three columns of short bulleted evidence across | `rows` with `cells` | `matrix` form `findings-matrix` |
+| `measure-table` | grouped measures under grouped headers with their units, footnote markers on the cells that need a basis | a `table` exhibit, `derive`, `total` | `lookup` form `measure-table` |
+| `model-page` | a forecast's series over its data table | a chart plus its `dataTable` | `trend` form `model` |
+| `half-and-half` | a chart with icon-led points beside it | an exhibit and `points` | internal: a page type writes it as commentary `beside` with `pointsStyle: "icon-lead"` |
+
+`layout` presets: `exhibit-full` (full-width evidence; commentary `none`, `on-exhibit` or `in-exhibit`), `exhibit-left` (evidence beside support; commentary `beside`), `exhibit-right` (commentary `beside-left`), `exhibit-top` (evidence above support; commentary `below`), `sidebar` (commentary `rail`), `hero-number` and `metrics-over-exhibit` (`numbers` forms `hero-number` and `metric-strip`), `two-up-contrast` and `table-halves` (`options` forms `two-up` and `table-halves`), `picture-pair`, `picture-strip`, `picture-hero` and `photo-backdrop` (`picture` forms), `two-up` (`panels` form `row` with commentary `below`), and `split-tone`, which is internal: it draws the same page as `options` form `two-up`.
+
+### Arrangement
+
+`arrange: "row" | "stack" | "grid" | "sequence"` is a `panels` page's form: it sets how its `exhibits` relate, and `sequence` draws an arrow between each exhibit and the next. `layout: "two-up-contrast"` holds two peer exhibits without shared commentary (`options` form `two-up`); `layout: "stack"` reads them vertically. `soWhat` is the filled bar a `so-what-bar` page writes from its `bar`.

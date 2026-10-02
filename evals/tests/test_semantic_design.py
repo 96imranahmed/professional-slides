@@ -87,7 +87,8 @@ const reference={id:'source',title:'The figures have a traceable basis',points:[
 const spec={schema:'professional-slides.deck/v3',id:'x',slides:[target,reference],contents:false};
 const one=composeDeck(spec),two=composeDeck({...spec,slides:[{id:'extra',title:'An unrelated context page',points:['Context only.']},target,reference]});
 const findChart=items=>{for(const i of items){if(i.component==='chart.bar')return i;const v=i.items&&findChart(i.items);if(v)return v;}};
-for(const deck of [one,two]){const chart=findChart(deck.slides.find(s=>s.id==='ranking').items);assert.deepEqual(chart.props.highlights??[],[]);}
+// The title names Alpha, so Alpha's bar is lit - on its own page, whatever comes before it.
+for(const deck of [one,two]){const chart=findChart(deck.slides.find(s=>s.id==='ranking').items);assert.deepEqual(chart.props.highlights,[{category:'Alpha',style:'bar'}]);}
 assert.ok(JSON.stringify(one.slides.at(-1)).includes('See 1 for'));
 assert.ok(JSON.stringify(two.slides.at(-1)).includes('See 2 for'));
 console.log('{}');

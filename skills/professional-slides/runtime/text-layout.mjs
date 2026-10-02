@@ -3,8 +3,6 @@ import { fontContext } from "./font-metrics.mjs";
 
 const measurements=new Map();
 const MAX_MEASUREMENTS=4096;
-export function clearTextMeasurementCache(){measurements.clear();}
-export function textMeasurementCacheSize(){return measurements.size;}
 function cachedMeasurement(key,fn){if(measurements.has(key)){const value=measurements.get(key);measurements.delete(key);measurements.set(key,value);return structuredClone(value);}const value=fn();measurements.set(key,structuredClone(value));if(measurements.size>MAX_MEASUREMENTS)measurements.delete(measurements.keys().next().value);return value;}
 function measureWidth(ctx,text){return cachedMeasurement(JSON.stringify([ctx.font,text]),()=>({width:ctx.measureText(text).width}));}
 
@@ -15,8 +13,14 @@ export function lineBox(fontSizePt) {
   return Math.ceil((fontSizePt * 96 / 72 * 1.12) / BASELINE) * BASELINE;
 }
 
+// The share of its box a line may fill when the text keeps a reserve for the
+// font engine: PowerPoint can set a line a little wider than it is measured
+// here. Headings and chart labels keep it; a component measuring against the
+// frame it draws in (the default, draw.mjs measureAt) does not.
+export const ENGINE_RESERVE = 0.97;
+
 // Wrap once, using the resolved font. The box is sized here; PowerPoint owns the final wrap.
-export function measureText(text, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, bold = false, wrapWidthRatio = 0.97 } = {}) {
+export function measureText(text, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, bold = false, wrapWidthRatio = 1 } = {}) {
   if (!(width > 0)) throw new Error("Text width must be positive");
   if (!(wrapWidthRatio > 0 && wrapWidthRatio <= 1)) throw new Error("Text wrap width ratio must be greater than zero and at most one");
   const ctx = fontContext();
@@ -43,7 +47,7 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
 
 // Styled runs share a single font family, point size and line box. Only emphasis
 // varies; neither the author nor an adapter may independently reflow a run.
-export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, wrapWidthRatio = 0.97 } = {}) {
+export function measureTextRuns(runs, width, { fontFamily = activeDesignTokens()?.["font.body"].value ?? "Arial", fontSize = 16, wrapWidthRatio = 1 } = {}) {
   if (!Array.isArray(runs) || !runs.length || runs.some(run => !run || typeof run.text !== 'string' || typeof run.bold !== 'boolean' || (run.accent !== undefined && typeof run.accent !== 'boolean') || Object.keys(run).some(key => !['text', 'bold', 'accent'].includes(key)))) throw new Error('Text runs require text and boolean bold (and optional boolean accent) only');
   if (!(width > 0) || !(wrapWidthRatio > 0 && wrapWidthRatio <= 1)) throw new Error('Text runs require a positive width and valid wrap ratio');
   const ctx = fontContext();
@@ -155,9 +159,9 @@ export const hasPhrase = (text, phrase, options) => phraseAt(text, phrase, 0, op
  *
  * Matched regardless of case, as the compile check matches it (page-types),
  * and cut from the text as written. Matched exactly, "Only one of five"
- * offered to "the only one of five" passed compile and was drawn plain, and
- * every caller that took the page's phrase had to find it again in the text's
- * own case before it could ask for the runs.
+ * offered to "the only one of five" would pass compile and be drawn plain, and
+ * every caller that took the page's phrase would have to find it again in the
+ * text's own case before it could ask for the runs.
  */
 export function accentRuns(text, phrases, { bold = true, accent = true, strict = true } = {}) {
   const list = (Array.isArray(phrases) ? phrases : phrases === undefined || phrases === null ? [] : [phrases])

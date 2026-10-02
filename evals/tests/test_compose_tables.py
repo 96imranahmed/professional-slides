@@ -317,20 +317,220 @@ class InferredTreatmentTests(unittest.TestCase):
     one that differs.
     """
 
-    def test_rating_words_remain_text_without_an_authored_rubric(self):
+    def test_rating_words_on_one_ordinal_scale_are_drawn_as_harvey_balls(self):
+        # The words are the scale: every cell one word of one ordinal ladder
+        # draws its ball, with the word kept beside it. An authored rubric
+        # still wins, and words from no one scale stay words.
         run_node(r"""
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 const columns=['Function','Recognition','Owner'];
 const rows=[['Finance','Full','A'],['Operations','Strong','B'],['Sales','Partial','C']];
-const neutral=styleTable({columns,rows});
-assert.equal(neutral.rows[0][1],'Full');
-assert.equal(neutral.scales,undefined);
+const inferred=styleTable({columns,rows});
+assert.deepEqual(inferred.rows.map(r=>r[1].type),['harvey','harvey','harvey']);
+assert.deepEqual(inferred.rows.map(r=>r[1].value),[4,3,2]);
+const scale=inferred.scales[inferred.rows[0][1].scale];
+assert.equal(scale.label,'Recognition');
+assert.deepEqual([scale.anchors[2],scale.anchors[3],scale.anchors[4]],['Partial','Strong','Full']);
+const lmh=styleTable({columns:['Option','Risk'],rows:[['A','Low'],['B','High'],['C','Moderate']]});
+assert.deepEqual(lmh.rows.map(r=>r[1].value),[1,3,2]);
+assert.equal(lmh.scales[lmh.rows[0][1].scale].anchors[2],'Moderate','the anchor is the word the author wrote');
+const mixed=styleTable({columns,rows:[['Finance','Full','A'],['Operations','High','B'],['Sales','Partial','C']]});
+assert.equal(mixed.rows[1][1],'High','two ladders in one column are not one scale');
 const rated=styleTable({columns:['Function',{label:'Readiness',scale:'r'},'Owner'],rows,
  scales:{r:{type:'harvey',label:'Readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}}}});
 assert.deepEqual(rated.rows.map(r=>r[1].value),[4,3,2]);
+assert.equal(rated.rows[0][1].scale,'r');
 console.log('{}');
 """)
+
+    def test_figures_take_the_treatment_their_shape_supports(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+// A matrix: three columns of exact figures in one unit share one heat scale,
+// each cell keeping its figure.
+const matrix=styleTable({columns:['Region','2023','2024','2025'],rows:[['North','12%','14%','19%'],['South','8%','9%','11%'],['East','21%','24%','30%']]});
+assert.deepEqual(matrix.rows[2].slice(1).map(c=>[c.type,c.figure,c.value]),[['heatmap','21%',3],['heatmap','24%',4],['heatmap','30%',5]]);
+assert.equal(new Set(matrix.rows.flatMap(r=>r.slice(1).map(c=>c.scale))).size,1);
+// A measure: the first column of figures with a unit carries bars.
+const measure=styleTable({columns:['Model','Score','Cost / task'],rows:[['Opus','58','$5.98'],['Fable','53','$7.63'],['Astra','53','$3.26'],['Sol','48','$1.06']]});
+assert.equal(measure.columns[1].type,'text','a score with no unit is a length without a measure');
+assert.equal(measure.columns[2].type,'bars');
+assert.deepEqual(measure.rows.map(r=>r[2].labels[0]),['$5.98','$7.63','$3.26','$1.06']);
+// A closing row that adds up the rows above it is the total band.
+const total=styleTable({columns:['Line',{label:'Journeys',unit:'million'},{label:'Punctuality',unit:'%'}],
+  rows:[['East','14.6','86.1'],['Valley','11.2','89.4'],['Dales','9.1','90.2'],['Airport','7.9','91.5'],['Network','42.8','89.0']]});
+assert.equal(total.rows.at(-1).style,'total');
+const notTotal=styleTable({columns:['Line',{label:'Journeys',unit:'million'}],rows:[['East','14.6'],['Valley','11.2'],['Dales','9.1'],['Airport','7.9'],['Coast','5.5']]});
+assert.notEqual(notTotal.rows.at(-1).style,'total');
+// A bound or an approximation is a figure written as more than a point: its
+// bar is drawn for what it says (an approximation as its bar, a lower bound
+// left open), the figure kept as written; a table its author treated is left
+// as treated.
+const approx=styleTable({columns:['Firm',{label:'Revenue',unit:'$B'}],rows:[['A','~5'],['B','>2'],['C','1']]});
+assert.deepEqual(approx.rows.map(r=>[r[1].type,r[1].values[0],r[1].bound,r[1].labels[0]]),[['bars',5,'approx','~5'],['bars',2,'lower','>2'],['bars',1,undefined,'1']]);
+const authored=styleTable({columns:['Region',{label:'Share',unit:'%',heat:true},'Growth'],rows:[['North','3','12'],['South','2','8'],['East','5','21']],zebra:false});
+assert.deepEqual(authored.rows.map(r=>r[2]),['12','8','21']);
+// Presence answered under a header that asks: a filled or empty dot.
+const presence=styleTable({columns:['Vendor','Has an API?'],rows:[['A','Yes'],['B','No'],['C','Yes']]});
+assert.deepEqual(presence.rows.map(r=>[r[1].type,r[1].value]),[['dot',true],['dot',false],['dot',true]]);
+console.log('{}');
+""")
+
+    def test_a_labelled_table_of_figures_takes_its_bars_and_keeps_its_total(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+// A filled label column styles the names, not the figures beside them.
+const pair=styleTable({columns:[{label:'Lab',type:'category'},'Committed round'],rows:[['OpenAI','$122B'],['Anthropic','$65B']]});
+assert.equal(pair.columns[1].type,'bars');
+assert.equal(pair.columns[1].unit,'$B','the currency and its scale are one unit');
+assert.deepEqual(pair.rows.map(r=>r[1].labels[0]),['$122B','$65B']);
+// Two rows of a wider table are a record, not a pair of figures.
+const record=styleTable({columns:['Place','Rent','Change'],rows:[['A','£2640.00','1250%'],['B','£2000.50','1000%']]});
+assert.equal(record.rows[0][1],'£2,640.00');
+// A measure table's computed total stays a figure in its band, not a bar off the scale.
+const measure=styleTable({total:'auto',columns:[{label:'Line',type:'category'},'Journeys (m)','Train-km (m)'],rows:[['Eastern','14.2','3.1'],['Dales','9.8','2.2'],['Valley','8.1','1.9']]});
+assert.equal(measure.columns[1].type,'bars');
+assert.deepEqual(measure.rows.at(-1),{style:'total',cells:['Total',{type:'text',text:'32.1'},'7.2']});
+// Four-figure values keep their separators beside their bars.
+const big=styleTable({columns:[{label:'City',type:'category'},'Rent, £'],rows:[['A','2640'],['B','2000'],['C','1500']]});
+assert.deepEqual(big.rows.map(r=>r[1].labels[0]),['2,640','2,000','1,500']);
+console.log('{}');
+""")
+
+    def test_devices_that_say_nothing_about_the_figures_leave_them_their_treatment(self):
+        # The shared definition (gates/table-treatments.json): an implication
+        # gutter, banding and a value pill are not treatments, so a measure
+        # table with a "What it means" column still takes its bars. A device
+        # the definition names - here a highlighted row - is the table's own.
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+const rows=[['Eastern','14.6','Electrify first'],['Valley','11.2','Extend the sidings'],['Dales','9.1','Grows first']];
+const columns=['Line',{label:'Journeys',unit:'million'},{label:'What it means',implication:true}];
+const gutter=styleTable({columns,rows});
+assert.equal(gutter.columns[1].type,'bars','bars beside the implication gutter');
+assert.ok(gutter.columns.some(c=>c.type==='implication'));
+assert.equal(styleTable({columns,rows,zebra:true}).columns[1].type,'bars','banding is not a treatment');
+const accented=styleTable({columns,rows,highlightRow:'Dales'});
+assert.notEqual(accented.columns[1].type,'bars','an accented row is the treatment the author chose');
+console.log('{}');
+""")
+
+    def test_a_derived_rank_reads_the_figures_under_their_bars(self):
+        # The bars are drawn before the rank is derived; read as text the bar
+        # cells were empty and every row ranked first.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+const last=(t)=>t.rows.map(r=>(Array.isArray(r)?r:r.cells).at(-1));
+const authored=styleTable({columns:['Company',{label:'Deal size',unit:'$m',bar:true}],rows:[['A','300'],['B','450'],['C','149']],derive:['rank'],deriveFrom:'Deal size'});
+const inferred=styleTable({columns:['Company',{label:'Deal size',unit:'$m'}],rows:[['A','300'],['B','450'],['C','149']],derive:['rank','share']});
+console.log(JSON.stringify({authored:last(authored),inferred:inferred.rows.map(r=>(Array.isArray(r)?r:r.cells).slice(-2)),bars:inferred.columns[1].type}));
+""")
+        self.assertEqual(result["authored"], ["2", "1", "3"])
+        self.assertEqual(result["bars"], "bars")
+        self.assertEqual(result["inferred"], [["2", "33"], ["1", "50"], ["3", "17"]])
+
+    def test_a_figure_written_as_a_bound_a_range_or_missing_is_drawn_for_what_it_says(self):
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable, quantity} from './skills/professional-slides/runtime/compose.mjs';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+// What a cell says: exact, approximate, bounded, a range, or none of those.
+assert.deepEqual(quantity('$4,500–5,600'),{value:5600,low:4500,mark:'$|',bound:'range'});
+assert.deepEqual(quantity('3-5%'),{value:5,low:3,mark:'|%',bound:'range'});
+assert.equal(quantity('500+').bound,'lower');
+assert.equal(quantity('at least $40B').bound,'lower');
+assert.equal(quantity('<5%').bound,'upper');
+assert.equal(quantity('c. 40%').bound,'approx');
+assert.equal(quantity('$3-£5'),null,'two currencies are not one range');
+assert.equal(quantity('5-3'),null,'a range runs low to high');
+assert.equal(quantity('Company, March'),null);
+const table=styleTable({columns:['Product',{label:'Revenue run rate',unit:'$B'},'Basis'],
+  rows:[['Code','>$2.5B','Company'],['Chat','~$1.2B','Estimate'],['API','$0.8B','Company'],['Agents','<$0.5B','Press'],['Ads','n/a','Not disclosed']]});
+const cells=table.rows.map(r=>r[1]);
+assert.deepEqual(cells.slice(0,4).map(c=>[c.type,c.values[0],c.bound]),[['bars',2.5,'lower'],['bars',1.2,'approx'],['bars',0.8,undefined],['bars',0.5,'upper']]);
+assert.deepEqual(cells[4],{type:'text',text:'n/a',align:'right'},'a missing figure keeps its words, with no bar');
+assert.deepEqual(cells.slice(0,4).map(c=>c.labels[0]),['>$2.5B','~$1.2B','$0.8B','<$0.5B']);
+assert.ok(table.scales['revenue-run-rate-bar'].max>=2.75,'a lower bound keeps room to open past its end');
+// A heat matrix colours a cell at its figure: a bounded column is not one.
+const heat=styleTable({columns:['Region','2023','2024','2025'],rows:[['North','12%','14%','>19%'],['South','8%','9%','11%'],['East','21%','24%','30%']]});
+assert.notEqual(heat.rows[0][1].type,'heatmap');
+// An author's bar column reads a range as its span and refuses one it cannot read.
+const rent=styleTable({columns:['Listing',{label:'Rent',unit:'$ a month',bar:true}],rows:[['A','$3,600'],['B','$4,400'],['Range','$4,500–5,600']]});
+assert.deepEqual([rent.rows[2][1].bound,rent.rows[2][1].low,rent.rows[2][1].values[0]],['range',4500,5600]);
+assert.throws(()=>styleTable({columns:['Listing',{label:'Rent',unit:'$',bar:true}],rows:[['A','$3,600 to $4,000 or so'],['B','2']]}),/numeric cells/);
+// Drawn: a lower bound is its bar and an open end; an upper bound and a range
+// are a span with no point claimed inside it; the missing figure draws nothing.
+const nodes=renderTable({id:'t',frame:{x:0,y:0,width:1160,height:420},props:table}).nodes;
+const rows=(role)=>nodes.filter(n=>n.role===role).map(n=>n.data.row);
+assert.deepEqual(rows('table-bar'),[0,1,2]);
+assert.deepEqual(rows('table-bar-open'),[0]);
+assert.ok(nodes.find(n=>n.role==='table-bar-open').data.endArrow);
+assert.deepEqual(rows('table-bar-range'),[3]);
+const span=renderTable({id:'r',frame:{x:0,y:0,width:900,height:300},props:rent}).nodes.find(n=>n.role==='table-bar-range');
+const bars=renderTable({id:'r',frame:{x:0,y:0,width:900,height:300},props:rent}).nodes.filter(n=>n.role==='table-bar');
+assert.ok(span.frame.x>bars[0].frame.x+10,'the range starts at its low end, not at zero');
+console.log(JSON.stringify({ok:true}));
+""")
+        self.assertTrue(result["ok"])
+
+    def test_inferred_bars_give_way_to_heat_in_a_narrow_panel(self):
+        # Where the bars do not fit, the column keeps its figures and takes the
+        # treatment that needs no width - heat, keyless because every cell
+        # prints its figure - rather than going back to a plain column.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props=styleTable({columns:['Line','Revenue, $','Basis of the estimate and its period'],rows:[['A','1,250,000.50','Company filing for the year to March, audited'],['B','980,250.25','Press report of the private metric, unaudited'],['C','1,105,750.75','Analyst estimate from the round memo, unaudited']]});
+const nodes=(width)=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height:400},props}).nodes;
+const narrow=nodes(320);
+console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow:narrow.some(n=>n.role==='table-bar'),
+  heat:narrow.filter(n=>n.role==='table-cell'&&n.data?.cellType==='heatmap').length,key:narrow.some(n=>/^table-legend/.test(n.role)),
+  figures:narrow.filter(n=>n.role==='table-cell-text'&&n.data?.column===1).map(n=>n.text)}));
+""")
+        self.assertTrue(result["wide"])
+        self.assertFalse(result["narrow"])
+        self.assertEqual(result["heat"], 3)
+        self.assertFalse(result["key"])
+        self.assertEqual(result["figures"], ["1,250,000.50", "980,250.25", "1,105,750.75"])
+
+    def test_a_range_the_bars_cannot_hold_marks_the_row_the_title_ranks(self):
+        # The rent table of a half-width panel: its bars are too cramped, and a
+        # shade cannot state "$4,500-5,600". The title says "cheapest", and one
+        # row's figure is the least whatever the range, so that row is accented;
+        # a title that ranks nothing leaves the figures as written.
+        result = run_node(r"""
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const table={type:'table',panelHeading:'Two-bedroom asks',columns:[{label:'Listing',type:'text'},{label:'Size',unit:'bath / sq ft',type:'text'},{label:'Rent',unit:'$ a month',align:'right'}],
+  rows:[['332 Jefferson #415','1 bath / 1,000 sq ft','$3,600'],['300 Newark #4F','2 bath / 1,150 sq ft','$4,400'],['Park Slope range','900-1,000 sq ft','$4,500-5,600']]};
+const chart={type:'chart.column',heading:'Share meeting NJ standards',unit:'%',categories:['ELA','Math'],series:[{name:'Connors',values:[73,65]},{name:'District',values:[75,67]}]};
+const page=(title)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[{id:'s',title,exhibits:[chart,JSON.parse(JSON.stringify(table))]}]})).deck.slides[0].nodes;
+const accented=(nodes)=>nodes.filter(n=>n.role==='table-row-band'&&n.data?.rowStyle==='accented').map(n=>n.data.row);
+const ranked=page('Hoboken is the midtown fallback: cheapest and safest, with a weaker school');
+const plain=page('Hoboken is the midtown fallback, with a weaker school');
+console.log(JSON.stringify({ranked:accented(ranked),bars:ranked.some(n=>n.role.startsWith('table-bar')),plain:accented(plain)}));
+""")
+        self.assertEqual(result["ranked"], [0])
+        self.assertFalse(result["bars"])
+        self.assertEqual(result["plain"], [])
+
+    def test_inferred_bars_give_way_where_their_width_would_overflow_the_frame(self):
+        # A row block's table has a fixed height: the width the bars take made
+        # the names beside them wrap past it, and the page refused to compose.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props=styleTable({columns:[{label:'Lab',type:'category'},'Post-money, $B'],rows:[['OpenAI, March round','852'],['Anthropic, May round','965']]});
+const at=(width,height)=>{ try { const nodes=REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height},props}).nodes;
+  return nodes.some(n=>n.role==='table-bar') ? 'bars' : nodes.some(n=>n.data?.cellType==='heatmap') ? 'heat' : 'plain'; } catch (e) { return e.message.slice(0,40); } };
+console.log(JSON.stringify({roomy:at(300,160),tight:at(300,100)}));
+""")
+        self.assertEqual(result["roomy"], "bars")
+        self.assertEqual(result["tight"], "heat", "the figures keep a treatment rather than the page refusing")
 
     def test_cards_wrap_into_a_grid(self):
         run_node(r'''
@@ -361,3 +561,100 @@ for (const n of [2,3,5,7]) {
 }
 console.log(JSON.stringify({ok:true}));
 ''')
+
+
+class FindingsMatrixMarkTests(unittest.TestCase):
+    def test_a_matrix_headed_by_players_carries_their_marks_and_an_accented_row(self):
+        # A findings matrix compares the declared players column by column:
+        # its headers take the players' marks as a table's do (the matrix's
+        # own columns were never read, so they stayed names), and the row the
+        # argument turns on is banded in the accent.
+        result = run_node(r"""
+import assert from 'node:assert/strict';
+import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
+const page={id:'m',type:'matrix',form:'findings-matrix',commentary:'in-exhibit',takeaway:false,
+  why:'Each lever is set against both labs, finding by finding',settles:{kind:'comparison',what:'services commitments of the two labs'},
+  title:'Both labs build services channels; one puts a sum on it',
+  columns:['Services lever','Anthropic','OpenAI route'],
+  rows:[{label:'Partner programme',cells:['A network launched in March to move pilots into workflows','A lab set up to drive enterprise adoption']},
+        {label:'Committed support',cells:['$100 million of initial support this year','No sum published for partner support'],style:'accented'},
+        {label:'Integrators',cells:['A plan to certify 30,000 professionals','Integrators engaged for training and deployment']}],
+  source:'Illustrative'};
+const slide=compilePage(page,0,{players:[{name:'Anthropic'},{name:'OpenAI'}]});
+const alts=slide.columns.map(c=>typeof c==='string'?null:c.logo?.alt??null);
+// Logos on disk replace the placeholders, as the build fills them.
+const media=TABLE_VARIANTS['category-logo-comparison'].props.rows[0][1].media;
+slide.columns=slide.columns.map(c=>typeof c==='string'?c:{...c,logo:media});
+const scene=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[slide]})).deck.slides[0];
+const roles=scene.nodes.map(n=>n.role);
+const band=scene.nodes.find(n=>n.role==='table-row-band'&&n.data?.rowStyle==='accented');
+let refused=null; try { toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[{...slide,rows:slide.rows.map((r,i)=>i?r:{...r,style:'total'})}]}); } catch (e) { refused=e.message; }
+console.log(JSON.stringify({alts,logos:roles.filter(r=>r==='table-header-logo').length,band:band?.data?.row??null,refused}));
+""")
+        self.assertEqual(result["alts"], [None, "Anthropic logo", "OpenAI logo"], "the row-label header carries no mark")
+        self.assertEqual(result["logos"], 2)
+        self.assertEqual(result["band"], 1)
+        self.assertIn("accented", result["refused"] or "")
+
+    def test_a_heat_key_names_missing_states_only_where_a_cell_is_missing(self):
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+const key=(rows)=>{ const props=styleTable({columns:['Rent',{label:'$305k',unit:'%'},{label:'$385k',unit:'%'},{label:'$460k',unit:'%'}],rows});
+  return renderTable({id:'t',frame:{x:0,y:0,width:900,height:400},props}).nodes.filter(n=>n.role==='table-legend').map(n=>n.text).join(' '); };
+const full=key([['$4,000','15.7','12.5','10.4'],['$5,500','21.6','17.1','14.3'],['$6,500','25.6','20.3','17.0']]);
+const scales={h:{type:'heatmap',label:'Score',min:1,max:5,anchors:{1:'Low',5:'High'},palette:'theme-sequential'}};
+const gap=renderTable({id:'g',frame:{x:0,y:0,width:900,height:400},props:styleTable({scales,columns:['Firm','Score'],rows:[['A',{type:'heatmap',value:2,scale:'h'}],['B',{type:'heatmap',value:'missing',scale:'h'}],['C',{type:'heatmap',value:5,scale:'h'}]]})}).nodes.filter(n=>n.role==='table-legend').map(n=>n.text).join(' ');
+console.log(JSON.stringify({full,gap}));
+""")
+        self.assertEqual(result["full"], "10.4% 25.6%", "a ramp from the least figure to the greatest, in their units")
+        self.assertNotIn("Missing", result["full"], "no cell is missing, so the key does not define the state")
+        self.assertIn("Missing = Not available", result["gap"])
+
+    def test_a_heat_key_reads_in_the_figures_units_and_may_be_dropped(self):
+        # "$305k, $385k, $460k (%): 1 = 10.4; 5 = 25.6" over swatches numbered
+        # one to five read as a second scale the table does not have. The key
+        # is a ramp from the least figure to the greatest, in their units; and
+        # since every cell prints its figure, the author may drop it.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+const table={columns:['Monthly rent',{label:'$305k',unit:'%'},{label:'$385k',unit:'%'},{label:'$460k',unit:'%'}],rows:[['$4,000','15.7','12.5','10.4'],['$5,500','21.6','17.1','14.3'],['$6,500','25.6','20.3','17.0']]};
+const draw=(extra)=>renderTable({id:'t',frame:{x:0,y:0,width:560,height:400},props:styleTable({...table,...extra})}).nodes;
+const keyed=draw({}), dropped=draw({legend:false});
+const ramp=keyed.filter(n=>n.role==='table-legend-swatch'&&n.data?.heatStep!==undefined).map(n=>n.data.heatStep);
+console.log(JSON.stringify({texts:keyed.filter(n=>n.role==='table-legend').map(n=>n.text),ramp,numbered:keyed.some(n=>n.role==='table-cell-text'&&/^[1-5]$/.test(n.text)),
+  dropped:dropped.filter(n=>/^table-legend/.test(n.role)).length,heat:dropped.filter(n=>n.data?.cellType==='heatmap'&&n.role==='table-cell').length}));
+""")
+        self.assertEqual(result["texts"], ["10.4%", "25.6%"])
+        self.assertEqual(result["ramp"], [1, 2, 3, 4, 5])
+        self.assertFalse(result["numbered"], "no swatch carries a step number")
+        self.assertEqual(result["dropped"], 0)
+        self.assertEqual(result["heat"], 9, "the cells keep their shades without the key")
+
+
+class CardLogoTests(unittest.TestCase):
+    def test_a_card_about_a_recognisable_subject_draws_its_logo(self):
+        # A card's `logo` satisfied PROFILE_UNPICTURED and was then dropped by
+        # the renderer, so a product page showed generic icons. An embedded mark
+        # takes the icon's slot at one visual area; a mark with no file yet
+        # keeps the icon.
+        result = run_node(r"""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
+const [wide, other] = [TABLE_VARIANTS['category-logo-comparison'].props.rows[0][1].media, TABLE_VARIANTS['category-logo-comparison'].props.rows[1][1].media];
+const card = (title, extra) => ({ title, icon: 'people', text: 'A product the page compares on its published measure.', ...extra });
+const render = (items) => REGISTRY.get('cards').render({ id: 'c', frame: { x: 0, y: 0, width: 1160, height: 420 }, props: { tone: 'outline', items } }).nodes;
+const marked = render([card('First', { logo: wide }), card('Second', { logo: other })]);
+const pending = render([card('First', { logo: { alt: 'First logo' } }), card('Second')]);
+const logos = marked.filter((n) => n.role === 'card-logo').map((n) => n.frame.width * n.frame.height);
+console.log(JSON.stringify({ logos: logos.length, icons: marked.filter((n) => n.role.startsWith('card-icon')).length,
+  ratio: Math.max(...logos) / Math.min(...logos), pendingIcons: new Set(pending.filter((n) => n.role.startsWith('card-icon')).map((n) => n.id.split(':')[0])).size }));
+""")
+        self.assertEqual(result["logos"], 2)
+        self.assertEqual(result["icons"], 0, "the mark replaces the icon")
+        self.assertLess(result["ratio"], 1.3, "two marks of different shapes read at one weight")
+        self.assertGreaterEqual(result["pendingIcons"], 1, "a mark with no file keeps the icon")

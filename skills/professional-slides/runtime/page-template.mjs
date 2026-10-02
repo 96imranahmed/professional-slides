@@ -1,5 +1,5 @@
 import { CHROME, SLIDE, component, linePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 
 export const PAGE_RULES = ["none", "bottom", "top-and-bottom"];
 export const PAGE_BRANDING = ["footer-company", "top-right-logo", "none"];
@@ -7,11 +7,11 @@ export const PAGE_TEMPLATE_TOKENS = ["font.body", "type.source", "color.textSeco
 
 // The footer row is furniture inside the page's own margin system, so the
 // clearance under it is measured against the page's side margin (CHROME.left /
-// CHROME.right) instead of being whatever CHROME.footerTop happened to leave:
-// the row's bottom edge keeps this share of that margin clear of the page's
-// bottom edge. Before this the row bottom sat at CHROME.footerTop + the row
-// height = 706 on a 720 page - 14px against a 60px side margin - and the page
-// number read as though it had slipped off the page.
+// CHROME.right) rather than left to CHROME.footerTop: the row's bottom edge
+// keeps this share of that margin clear of the page's bottom edge. At
+// CHROME.footerTop + the row height the row would end at 706 on a 720 page -
+// 14px against a 60px side margin - and the page number would read as though
+// it had slipped off the page.
 //
 // A third of the margin, not half of it, because the padding is taken out of
 // the band the footer already shares with the body - space.4 above the row,
@@ -68,7 +68,7 @@ export function pageTemplateLayout(frame, props = {}) {
   const edgePadding = Math.round(Math.min(CHROME.left, CHROME.right) * FOOTER_EDGE_MARGIN_RATIO);
   const footerLift = Math.max(0, edgePadding - (frame.height - CHROME.footerTop - rowHeight));
   const style = { fontFamily: token("font.body"), fontSize: token("type.source"), color: token(props.inverse ? "color.onPrimary" : "color.textSecondary"), bold: false, align: "left", valign: "top", wrap: false };
-  const measure = (value, width) => measureText(value, width, { fontSize: tokenValue(style.fontSize) });
+  const measure = (value, width) => measureText(value, width, { fontSize: tokenValue(style.fontSize), wrapWidthRatio: ENGINE_RESERVE });
   // The deck's length reaches the footer through the page template the deck
   // already carries: `pageTemplate.pageCount` is merged into every slide's
   // chrome props, so one declaration on the deck sets the width of every page's

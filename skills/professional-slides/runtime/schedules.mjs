@@ -1,5 +1,5 @@
 import { token, tokenValue, textPrimitive, linePrimitive, ellipsePrimitive, shapePrimitive, stableId } from './core.mjs';
-import { measureText } from './text-layout.mjs';
+import { ENGINE_RESERVE, measureText } from './text-layout.mjs';
 
 export const SCHEDULE_TOKENS = ['font.body','type.body','type.heading','type.compact','type.source','color.ink','color.textSecondary','color.componentPrimary','color.surface','color.rule','line.hairline','line.standard','space.1','space.2','space.3','space.4','icon.small'];
 const t = token;
@@ -8,7 +8,7 @@ function scheduleGap(props) {
   check(props.spacing===undefined||['normal','tight'].includes(props.spacing),'unknown spacing');
   return props.spacing==='tight'?tokenValue(t('space.1')):gap();
 }
-const metrics = (text,width,size='type.body',bold=false) => measureText(text,width,{fontFamily:tokenValue(t('font.body')),fontSize:tokenValue(t(size)),bold});
+const metrics = (text,width,size='type.body',bold=false) => measureText(text,width,{fontFamily:tokenValue(t('font.body')),fontSize:tokenValue(t(size)),bold,wrapWidthRatio:ENGINE_RESERVE});
 const check = (ok,message) => { if (!ok) throw new Error(`Schedule: ${message}`); };
 function labelRole(props) {
   check(props.labelTreatment===undefined||['standard','prominent'].includes(props.labelTreatment),'unknown label treatment');

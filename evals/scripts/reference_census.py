@@ -1,7 +1,7 @@
 """Measure a built deck page by page and set it beside a reference census.
 
 A deck that passes every gate can still read thinner, emptier or more uniform
-than the decks it is meant to stand beside, and that difference was found by
+than the decks it is meant to stand beside, and that difference shows by
 laying two PDFs side by side and counting. This makes the count repeatable:
 
     python3 evals/scripts/reference_census.py deck.pdf \
@@ -62,11 +62,11 @@ from pathlib import Path
 RUNTIME = Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "runtime"
 sys.path.insert(0, str(RUNTIME / "gates"))
 from page_gates import analytical  # noqa: E402
+from text_stats import printed_words, word_count  # noqa: E402
 _infer = importlib.util.spec_from_file_location("infer_style", RUNTIME / "infer-style.py")
 infer_style = importlib.util.module_from_spec(_infer)
 _infer.loader.exec_module(infer_style)
 
-WORD = re.compile(r"[A-Za-zÀ-ÿ0-9%$£€.,'’\-]+")
 INK_DELTA = 25            # grey levels from the page background that count as ink
 CENSUS_WIDTH = 200        # px; ink and occupied-grid render
 BAND_WIDTH = 300          # px; empty-band render
@@ -175,11 +175,11 @@ def title_rule(image) -> bool:
 def measure_pdf(path: Path) -> list[dict]:
     pdf = PdfPages(path)
     census, band, rule = pdf.grey(CENSUS_WIDTH), pdf.grey(BAND_WIDTH), pdf.grey(RULE_WIDTH)
-    has_text = any(WORD.search(text or "") for text in pdf.texts)
+    has_text = any(printed_words(text) for text in pdf.texts)
     rows = []
     for index in range(pdf.count):
         text = pdf.texts[index] if index < len(pdf.texts) else ""
-        words = [w for w in WORD.findall(text) if re.search(r"[A-Za-zÀ-ÿ0-9]", w)]
+        words = printed_words(text)
         ink, occ = ink_and_grid(census[index])
         rows.append({
             # Read by analytical_by_render and dropped before the report.
@@ -305,7 +305,7 @@ def scene_structure(scene_path: Path, plotted_by_id: dict[str, int] | None, comp
                 "exhibitBesideColumn": len(exhibits) == 1 and any(_beside(exhibits[0]["frame"], t["frame"]) for t in texts if t.get("frame")),
                 "chart": bool(charts),
                 "titleLines": len(lines),
-                "shortLastLine": len(lines) > 1 and 1 <= len(lines[-1].split()) <= 3,
+                "shortLastLine": len(lines) > 1 and 1 <= word_count(lines[-1]) <= 3,
                 "subtitle": any("subtitle" in str(n.get("role")) and not str(n.get("role")).startswith(("cover", "divider")) for n in nodes),
                 "sceneRule": any(n.get("role") in ("title-rule", "action-title-rule") for n in nodes) or "with-line" in str(chrome.get("variant", "")),
             })

@@ -50,6 +50,51 @@ def slides_with(report, code):
 WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1}
 
 
+class ChartDataTableNumbersTests(unittest.TestCase):
+    def test_a_charts_own_data_table_prints_its_numbers(self):
+        # The model page (page-types p20b) prints its twelve figures in the
+        # table under its columns and leaves the bars unlabelled, so each
+        # figure is printed once; NUMBERS_ON_MARKS read the bars alone and
+        # flagged a chart whose every value is on the page. Stripped of the
+        # table, the same twelve marks carry no figure and the gate fires.
+        scene = copy.deepcopy(example_scene("page-types"))
+        model = next(s for s in scene["slides"] if s["id"] == "p20b")
+        self.assertTrue(any((n.get("data") or {}).get("chartData") for n in model["nodes"]))
+        self.assertFalse(any(n.get("role") == "data-label" and any(c.isdigit() for c in str(n.get("text"))) for n in model["nodes"]))
+        report = page_gates.run_gates({**scene, "slides": [model]}, gates={"NUMBERS_ON_MARKS"})
+        self.assertNotIn("NUMBERS_ON_MARKS", codes(report))
+        bare = {**model, "nodes": [n for n in model["nodes"] if not (n.get("data") or {}).get("chartData")]}
+        report = page_gates.run_gates({**scene, "slides": [bare]}, gates={"NUMBERS_ON_MARKS"})
+        self.assertIn("NUMBERS_ON_MARKS", codes(report))
+
+
+class MetricColumnVoidTests(unittest.TestCase):
+    def test_measures_beside_a_short_exhibit_leave_no_band_empty(self):
+        # Three measures stood in thirds of a 500px column beside a four-row
+        # dumbbell, each figure centred in air: 110px between them read as a
+        # half-empty column (COLUMN_VOID, SCENE_VOID). As filled tiles dividing
+        # the column they carry it to the foot, where the dumbbell stops short.
+        from node_probe import run_node
+        scene = run_node('''
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const metrics=[{value:'5.9x',label:'ChatGPT visits per Claude visit, Aug 2026',sublabel:'Six-site Similarweb panel'},{value:'+7.6pp',label:'Claude visit share gained in a year',sublabel:'August 2025 to August 2026'},{value:'-21pp',label:'ChatGPT visit share lost in a year',sublabel:'Same six-site panel'}];
+const exhibit={type:'chart.dumbbell',heading:'Web visits and cross-use',unit:'%',categories:['Visits: Claude','Visits: ChatGPT','Claude users also on ChatGPT','ChatGPT users also on Claude'],
+  series:[{name:'2025',values:[2,78,78,2]},{name:'2026',values:[9.6,57,61,14]}],xMin:0,xMax:100,valueFormat:{decimals:1,suffix:'%'}};
+console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',fill:'balanced',weight:{pageWords:95,columnFill:0.55,plotSpan:0.52,pointWords:8,tableFill:0.45,elements:1},
+  slides:[{id:'s',title:'Claude gained web share, but ChatGPT still drew six times its visits',layout:'metrics-over-exhibit',metrics,exhibit}]})).deck));
+''')
+        slide = scene["slides"][0]
+        tiles = [c["frame"] for c in slide["componentInstances"] if c["component"] == "metric"]
+        chart = next(c["frame"] for c in slide["componentInstances"] if c["component"].startswith("chart."))
+        self.assertEqual(len(tiles), 3)
+        self.assertTrue(all(t["x"] + t["width"] <= chart["x"] for t in tiles), "the measures stand beside the exhibit")
+        self.assertAlmostEqual(max(t["y"] + t["height"] for t in tiles), chart["y"] + chart["height"], delta=1)
+        self.assertEqual(sum(1 for n in slide["nodes"] if n.get("role") == "metric-surface"), 3, "each tile is filled")
+        report = page_gates.run_gates(scene, gates={"SCENE_VOID"})
+        self.assertNotIn("SCENE_VOID", codes(report))
+
+
 class EvidenceMultiplicityTests(unittest.TestCase):
     def test_area_and_label_counts_preserve_review_findings_without_forcing_filler(self):
         from test_deck_shape import page, deck
@@ -243,8 +288,10 @@ class SyntheticGoodPageTests(unittest.TestCase):
         report = page_gates.run_gates(scene, render_dir=None)
         self.assertTrue(report["findings"])
         for item in report["findings"]:
-            self.assertEqual(
-                sorted(item), ["code", "measured", "repair", "severity", "slide", "threshold"])
+            # A void past its blocking bar also names the bar (blockAbove); a
+            # rule the deck predates says so (waived).
+            self.assertLessEqual({"code", "measured", "repair", "severity", "slide", "threshold"}, set(item))
+            self.assertLessEqual(set(item) - {"code", "measured", "repair", "severity", "slide", "threshold"}, {"blockAbove", "waived"})
             self.assertGreaterEqual(len(item["repair"]), 40, item)
             self.assertIn(" ", item["repair"].strip())
 

@@ -37,7 +37,7 @@ import { compilePage, describeTypes } from './skills/professional-slides/runtime
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const S = { kind: 'comparison', what: 'The operator annual reports' };
-const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S };
+const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S, adds: 'The commentary names the mechanism the exhibit cannot show' };
 const compose = (pages) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: pages.map((p, i) => compilePage(p, i)) }, '.').deck.slides;
 const error = (fn) => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } };
 // The emphasised text of a composed page, runs joined across line breaks.
@@ -173,6 +173,52 @@ console.log(JSON.stringify({ plain: tallest(plain), inPlot: tallest(inPlot), ban
         self.assertAlmostEqual(result["inPlot"], result["plain"], delta=0.5, msg="the plot keeps its height")
         self.assertLess(result["banded"], result["plain"] - 40, "a band would have taken it")
         self.assertTrue(result["clear"])
+
+    def test_a_dumbbell_and_a_lollipop_draw_the_callouts_authored_on_them(self):
+        # Both charts set their marks by category without the shared chart
+        # decorations, so a callout authored on them was dropped without a word
+        # and the page lost its commentary. The dumbbell's subject row is drawn
+        # bold with its change in the accent.
+        result = run_node(PRELUDE + """
+const frame = { x: 60, y: 160, width: 1160, height: 500 };
+const render = (type, props) => REGISTRY.get(type).render({ id: 'c', frame, props }).nodes;
+const dumbbell = render('chart.dumbbell', { categories: ['North', 'South', 'East', 'West', 'Centre'],
+  series: [{ name: '2024', values: [20, 25, 30, 28, 22] }, { name: '2025', values: [42, 31, 38, 33, 30] }],
+  annotations: [{ category: 'North', series: '2025', text: 'Field sales doubled here after the spring campaign' }], highlights: [{ category: 'North' }] });
+const lollipop = render('chart.lollipop', { categories: ['Portland', 'Washington', 'Seattle', 'Boston'], series: [{ name: 'Share', values: [5.2, 4.0, 3.7, 2.5] }],
+  annotations: [{ category: 'Boston', text: 'Winter cuts the share by half' }] });
+const inside = (n) => n.frame.x >= frame.x - 1 && n.frame.x + n.frame.width <= frame.x + frame.width + 1;
+const boxes = (nodes) => nodes.filter((n) => n.role === 'annotation-surface');
+const north = dumbbell.filter((n) => n.data?.category === 'North' && n.data?.highlighted).map((n) => n.role).sort();
+console.log(JSON.stringify({ dumbbell: boxes(dumbbell).length, lollipop: boxes(lollipop).length, inside: [...boxes(dumbbell), ...boxes(lollipop)].every(inside),
+  north, bold: dumbbell.find((n) => n.role === 'category-label' && n.text === 'North').style.bold }));
+""")
+        self.assertEqual(result["dumbbell"], 1)
+        self.assertEqual(result["lollipop"], 1)
+        self.assertTrue(result["inside"])
+        self.assertEqual(result["north"], ["chart-line", "chart-mark", "chart-mark"])
+        self.assertTrue(result["bold"])
+
+    def test_callouts_that_do_not_meet_across_share_one_band(self):
+        # Two notes over years far apart were stacked one band each, 176px off
+        # a plot that one 88px band served; notes whose boxes meet still stack.
+        result = run_node(PRELUDE + """
+const categories = ['FY26', 'FY27', 'FY28', 'FY29', 'FY30', 'FY31'];
+const props = (annotations) => ({ categories, series: [{ name: 'Train-km', values: [18.2, 18.9, 19.8, 20.7, 21.4, 21.9] }], highlights: [], referenceLines: [], annotations, calloutBand: 'band' });
+const frame = { x: 60, y: 272, width: 1160, height: 396 };
+const render = (p) => REGISTRY.get('chart.column').render({ id: 'c', frame, props: p }).nodes;
+const apart = render(props([{ category: 'FY28', text: 'Dales and Valley off-peak services added' }, { category: 'FY31', text: 'Electric trains replace diesel on the Eastern line' }]));
+const near = render(props([{ category: 'FY28', text: 'Dales and Valley off-peak services added' }, { category: 'FY29', text: 'Electric trains replace diesel on the Eastern line' }]));
+const one = render(props([{ category: 'FY28', text: 'Dales and Valley off-peak services added' }]));
+const boxes = (nodes) => nodes.filter((n) => n.role === 'annotation-surface').map((n) => ({ y: n.frame.y + n.frame.height, placement: n.data.evidencePlacement }));
+const tallest = (nodes) => Math.max(...nodes.filter((n) => n.role === 'chart-mark').map((n) => n.frame.height));
+console.log(JSON.stringify({ apart: boxes(apart), near: boxes(near), heights: { apart: tallest(apart), near: tallest(near), one: tallest(one) } }));
+""")
+        self.assertEqual([b["placement"] for b in result["apart"]], ["band", "band"])
+        self.assertEqual(result["apart"][0]["y"], result["apart"][1]["y"], "one band holds both")
+        self.assertAlmostEqual(result["heights"]["apart"], result["heights"]["one"], delta=0.5, msg="the plot loses one band, not two")
+        self.assertNotEqual(result["near"][0]["y"], result["near"][1]["y"], "boxes that meet across keep a band each")
+        self.assertGreater(result["heights"]["apart"], result["heights"]["near"] + 40)
 
 
 class PointsUnderPanelsTests(unittest.TestCase):
@@ -363,6 +409,11 @@ class RestatementAndCalloutTests(unittest.TestCase):
 
 
 class PlotSpanTests(unittest.TestCase):
+    # The span floor is the fill level's; another test's deck may have left
+    # the module configured for an airy deck, whose floor is off.
+    def setUp(self):
+        page_gates.configure()
+
     def test_a_bar_panel_that_spends_its_width_on_names_and_values_passes(self):
         frame = {"x": 647, "y": 152, "width": 560, "height": 465}
         marks = [{"role": "chart-mark", "frame": {"x": 900 - (40 if i == 2 else 0), "y": 250 + i * 57, "width": 40 if i == 2 else 20 + i * 25, "height": 40}} for i in range(6)]

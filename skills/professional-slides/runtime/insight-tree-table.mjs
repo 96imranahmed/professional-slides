@@ -3,11 +3,9 @@ import {
   linePrimitive,
   rectPrimitive,
   stableId,
-  textPrimitive,
   token,
   tokenValue
 } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
 import { textStyle as baseTextStyle, boxStyle as baseBoxStyle, measuredTextNode as baseMeasuredTextNode } from "./text-style.mjs";
 
 const INK = token("color.ink");

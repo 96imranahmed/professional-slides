@@ -12,27 +12,36 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from node_probe import run_node  # noqa: E402
+from node_probe import HAS_PILLOW, HAS_PPTX, HAS_RENDERER, RUNTIME_PYTHON, run_node  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "skills/professional-slides/runtime"
+EMIT = RUNTIME / "emit"
+PYTHON = RUNTIME_PYTHON or sys.executable
 
 
 class DonutLegendTests(unittest.TestCase):
     def test_a_composed_donut_names_its_categories_and_its_native_chart_keeps_the_legend(self):
+        # A composed donut names its slices at the rim by default (drawn, since
+        # PowerPoint cannot place rim labels); one that asks for a legend keeps
+        # it in the native chart.
         result = run_node("""
 import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
-const spec={schema:'professional-slides.deck/v3',id:'d',cover:{title:'x'},slides:[{title:'Two firms supply most of the judged pages',layout:'exhibit-full',
-  exhibit:{type:'chart.donut',heading:'Pages by firm',unit:'pages',labels:['BCG','McKinsey','Bain'],values:[75,52,5]}}]};
-const {deck}=planDeck(toDeckPlan(spec,'.'));
-const page=deck.slides.at(-1);
-const donut=page.componentInstances.find(c=>c.component==='chart.donut');
-console.log(JSON.stringify({variant:donut.variant,legend:page.nodes.filter(n=>n.role==='legend-label').map(n=>n.text),native:donut.nativeChart?.legend}));
+const build=(extra)=>{const spec={schema:'professional-slides.deck/v3',id:'d',cover:{title:'x'},slides:[{title:'Two firms supply most of the judged pages',layout:'exhibit-full',
+  exhibit:{type:'chart.donut',heading:'Pages by firm',unit:'pages',labels:['Firm A','Firm B','Firm C'],values:[75,52,5],...extra}}]};
+  const page=planDeck(toDeckPlan(spec,'.')).deck.slides.at(-1);
+  const donut=page.componentInstances.find(c=>c.component==='chart.donut');
+  return {variant:donut.variant,legend:page.nodes.filter(n=>n.role==='legend-label').map(n=>n.text),
+    rim:page.nodes.filter(n=>n.role==='category-label').map(n=>n.text.replace(/ \\d+%$/,'')),native:donut.nativeChart?.legend??null};};
+console.log(JSON.stringify({rim:build({}),keyed:build({legend:true})}));
 """)
-        self.assertEqual(result["variant"], "legend-top-right")
-        self.assertEqual(result["legend"], ["BCG", "McKinsey", "Bain"])
-        self.assertTrue(result["native"])
+        self.assertEqual(result["rim"]["variant"], "outside-labels")
+        self.assertEqual(result["rim"]["rim"], ["Firm A", "Firm B", "Firm C"])
+        self.assertIsNone(result["rim"]["native"])
+        self.assertEqual(result["keyed"]["variant"], "legend-top-right")
+        self.assertEqual(result["keyed"]["legend"], ["Firm A", "Firm B", "Firm C"])
+        self.assertTrue(result["keyed"]["native"])
 
 
 class HighlightWrapTests(unittest.TestCase):
@@ -100,7 +109,12 @@ console.log(JSON.stringify([3.55, -1.25, 2.345].map(v => formatValue(v, {valueFo
 class SeriesRoundingTests(unittest.TestCase):
     def test_the_native_label_format_matches_the_drawn_one(self):
         sys.path.insert(0, str(RUNTIME / "emit"))
-        from pptx import Presentation  # noqa: E402
+        # The emitter runs under this interpreter, so this interpreter is the
+        # one that needs python-pptx.
+        try:
+            from pptx import Presentation  # noqa: E402
+        except ModuleNotFoundError:
+            self.skipTest("needs python-pptx (python3 -m pip install -r requirements.txt)")
         scene = run_node("""
 import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
@@ -159,6 +173,96 @@ console.log(JSON.stringify(lineLabelSides({values})));
 """)
         self.assertEqual(python_sides, js)
         self.assertEqual(python_sides, ["above", "above", "below", "above", "below", "above", "right"])
+
+
+HIDDEN_DECK = """
+import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
+const page = (id, extra) => ({ id, title: `The ${id} page states one finding in a sentence`, layout: 'text',
+  points: ['A point that says something about the finding and why it matters.'], ...extra });
+const spec = { schema: 'professional-slides.deck/v3', id: 'hidden', cover: { title: 'A deck with a backup page' },
+  slides: [page('shown'), page('backup', { hidden: true }), page('unhidden', { hidden: false })] };
+console.log(JSON.stringify(composeAll(spec, process.cwd()).deck));
+"""
+
+
+@unittest.skipUnless(HAS_PPTX, "needs python-pptx (python3 -m pip install -r requirements.txt)")
+class HiddenSlideTests(unittest.TestCase):
+    """A page marked `hidden` is a slide the file keeps out of the slide show
+    (show="0", PowerPoint's Hide Slide) and the build still renders and
+    reviews. The scene had no such field, so a hidden backup slide of an
+    imported deck came back shown."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp_dir = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp_dir.name)
+        cls.scene = run_node(HIDDEN_DECK)
+        cls.scene_path, cls.pptx = tmp / "scene.json", tmp / "hidden.pptx"
+        cls.scene_path.write_text(json.dumps(cls.scene))
+        subprocess.run([PYTHON, str(EMIT / "emit_pptx.py"), str(cls.scene_path), str(cls.pptx)], check=True, capture_output=True, timeout=240)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp_dir.cleanup()
+
+    def readback(self, scene):
+        sys.path.insert(0, str(EMIT))
+        from readback_pptx import readback
+        return readback(scene, self.pptx)
+
+    def test_the_scene_carries_the_flag_and_the_file_hides_that_slide_alone(self):
+        from pptx import Presentation
+        self.assertEqual([(s["id"], s.get("hidden")) for s in self.scene["slides"]],
+                         [("cover", None), ("shown", None), ("backup", True), ("unhidden", None)])
+        self.assertEqual([s._element.get("show") for s in Presentation(str(self.pptx)).slides], [None, None, "0", None])
+
+    def test_the_readback_lists_the_hidden_slides(self):
+        report = self.readback(self.scene)
+        self.assertTrue(report["accepted"], report["findings"][:5])
+        self.assertEqual(report["hidden"], [{"slide": 3, "id": "backup"}])
+
+    def test_the_readback_refuses_a_file_that_hides_other_slides_than_its_scene(self):
+        scene = json.loads(json.dumps(self.scene))
+        scene["slides"][1]["hidden"] = True
+        del scene["slides"][2]["hidden"]
+        findings = [f for f in self.readback(scene)["findings"] if f["code"] == "HIDDEN_STATE"]
+        self.assertEqual(findings, [{"slide": 2, "code": "HIDDEN_STATE", "expected": True, "actual": False},
+                                    {"slide": 3, "code": "HIDDEN_STATE", "expected": False, "actual": True}])
+
+    def test_hidden_is_true_or_false(self):
+        message = run_node(HIDDEN_DECK.replace("hidden: false", "hidden: 'no'").replace(
+            "console.log(JSON.stringify(composeAll(spec, process.cwd()).deck));",
+            "try { composeAll(spec, process.cwd()); console.log(JSON.stringify('composed')); } catch (error) { console.log(JSON.stringify(error.message)); }"))
+        self.assertIn("unhidden: `hidden` is true or false", message)
+
+    def test_the_render_copy_shows_every_slide_and_leaves_the_deck_as_it_was(self):
+        sys.path.insert(0, str(EMIT))
+        import render_pptx
+        from pptx import Presentation
+        before = self.pptx.read_bytes()
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = render_pptx.shown(self.pptx, Path(tmp))
+            self.assertNotEqual(copy, self.pptx)
+            self.assertEqual(copy.name, self.pptx.name)
+            self.assertEqual([s._element.get("show") for s in Presentation(str(copy)).slides], [None] * 4)
+        self.assertEqual(self.pptx.read_bytes(), before)
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = Path(tmp) / "plain.pptx"
+            Presentation().save(str(plain))
+            self.assertEqual(render_pptx.shown(plain, Path(tmp) / "unused"), plain)
+
+    @unittest.skipUnless(HAS_RENDERER and HAS_PILLOW, "needs LibreOffice, poppler and Pillow")
+    def test_a_hidden_slide_still_renders_in_its_place(self):
+        # LibreOffice leaves a hidden slide out of its PDF, so every later page
+        # was gated and reviewed against the scene slide before it.
+        sys.path.insert(0, str(EMIT))
+        import render_pptx
+        with tempfile.TemporaryDirectory() as tmp:
+            result = render_pptx.render(self.pptx, Path(tmp) / "rendered")
+            self.assertEqual(len(result["renders"]), 4)
+            pages = json.loads(Path(result["pageText"]).read_text())
+            self.assertEqual(len(pages), 4)
+            self.assertIn("backup", pages[2])
 
 
 class PictureRowTests(unittest.TestCase):

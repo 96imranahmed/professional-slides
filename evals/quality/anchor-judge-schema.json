@@ -1,0 +1,1 @@
+{"type":"object","required":["rating"],"additionalProperties":false,"properties":{"rating":{"type":"number","minimum":1,"maximum":10}}}

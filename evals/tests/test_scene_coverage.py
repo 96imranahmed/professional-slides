@@ -207,7 +207,12 @@ class SceneVoidTests(unittest.TestCase):
         report = page_gates.run_gates(scene)
         voids = [f for f in report["findings"] if f["code"] == "SCENE_VOID"]
         self.assertEqual([f["slide"] for f in voids], [2])
-        self.assertEqual(voids[0]["severity"], "advisory")
+        # Half the body empty is past the page's blocking bar for the band it
+        # measured, so it blocks where the author hears it (weight.json
+        # geometryByFill `_block`); a mild band stays a question
+        # (VoidSeverityTests).
+        self.assertEqual(voids[0]["severity"], "blocker")
+        self.assertEqual(voids[0]["blockAbove"], page_gates.THRESHOLDS[page_gates.SCENE_VOID_BLOCK[voids[0]["measured"]["kind"]]])
         self.assertNotIn("DECK_SCENE_VOID", report["countsByCode"])
 
 
@@ -582,6 +587,71 @@ class ColumnVoidTests(unittest.TestCase):
         self.assertEqual(budget[0]["columnVoid"]["column"], "left")
         self.assertIsNone(budget[1]["columnVoid"])
         self.assertFalse(budget[1]["void"])
+
+
+class HairlineTests(unittest.TestCase):
+    """A hairline across a gap - a subsection rule, a divider - does not split
+    the gap into two voids each under the bar, as ROW_MIN keeps a vertical
+    rule from filling a row."""
+
+    @staticmethod
+    def rows(*marks):
+        rows = [0] * page_gates.CANVAS_H
+        for top, bottom, width in marks:
+            rows[top:bottom] = [width] * (bottom - top)
+        return rows
+
+    def test_a_short_rule_in_a_gap_leaves_one_void(self):
+        # Content to 329, a 16px rule on row 418, content again from 507: read
+        # as content the rule leaves two halves of 89 and 88 rows, both under
+        # internal_void_max; the gap is one band of 178, past the blocking bar.
+        rows = self.rows((150, 329, 900), (418, 419, 16), (507, 640, 900))
+        found = page_gates.void_bands(rows)
+        self.assertEqual((found["voidTop"], found["voidBottom"]), (329, 507))
+        self.assertGreater(found["internalVoid"], page_gates.THRESHOLDS["internal_void_block"])
+        self.assertEqual(page_gates.filled_rows(rows)[418], False)
+
+    def test_two_rows_are_a_hairline_and_three_are_content(self):
+        two = page_gates.void_bands(self.rows((150, 329, 900), (418, 420, 900), (507, 640, 900)))
+        three = page_gates.void_bands(self.rows((150, 329, 900), (418, 421, 900), (507, 640, 900)))
+        self.assertEqual((two["voidTop"], two["voidBottom"]), (329, 507))
+        self.assertEqual((three["voidTop"], three["voidBottom"]), (329, 418))
+
+    def test_a_rule_touching_content_is_part_of_it(self):
+        # A rule set directly under a block, with no empty row between, closes
+        # the block rather than standing in the gap.
+        found = page_gates.void_bands(self.rows((150, 329, 900), (329, 330, 16), (507, 640, 900)))
+        self.assertEqual((found["voidTop"], found["voidBottom"]), (330, 507))
+
+    def test_the_last_thing_drawn_still_ends_the_content(self):
+        # A box's bottom edge under its text is where the page's content stops:
+        # the trailing band starts under the edge, not under the text.
+        found = page_gates.void_bands(self.rows((150, 560, 900), (579, 580, 1160)))
+        self.assertEqual(found["lastInk"], 579)
+        self.assertAlmostEqual(found["deadBand"], (page_gates.FOOTER_TOP - 1 - 579) / page_gates.CANVAS_H)
+        self.assertEqual((found["voidTop"], found["voidBottom"]), (560, 579))
+
+    def test_the_scene_reads_a_rule_in_a_gap_as_the_gap(self):
+        rule = {"type": "line", "role": "section-rule", "frame": {"x": 72, "y": 418, "width": 16, "height": 0},
+                "style": {"stroke": "#333333", "lineWidth": 1}}
+        page = content_page("rule", [text("paragraph", 162, 160, lines=8), rule, text("paragraph", 507, 140, lines=7)])
+        found = []
+        page_gates.gate_scene_void(1, page, found)
+        self.assertEqual([f["measured"]["kind"] for f in found], ["internal"])
+        self.assertGreater(found[0]["measured"]["band"], page_gates.THRESHOLDS["internal_void_block"])
+
+
+class StepColumnTests(unittest.TestCase):
+    def test_a_solid_step_column_is_a_mark_not_a_box(self):
+        # A tinted box holding text is measured to the depth of its text; a
+        # step's solid column is drawn whole, whatever it carries at its top.
+        def page(role):
+            column = {"type": "rect", "role": role, "frame": {"x": 200, "y": 200, "width": 200, "height": 400},
+                      "style": {"fill": "#D9E2EC"}}
+            return content_page(role, [column, text("step-title", 210, 40, x=210, width=180, lines=2)])
+        foot = 590
+        self.assertGreater(page_gates.scene_rows(page("step-column"))[foot], 150)
+        self.assertLess(page_gates.scene_rows(page("card-surface"))[foot], 3)
 
 
 class BudgetTests(unittest.TestCase):

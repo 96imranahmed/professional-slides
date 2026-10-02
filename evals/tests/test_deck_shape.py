@@ -195,9 +195,13 @@ class OutsideLabelTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "emit"))
         import emit_pptx
 
-        self.assertEqual(emit_pptx._nice_ceiling(619 * emit_pptx.LABEL_HEADROOM), 800)
-        self.assertEqual(emit_pptx._nice_ceiling(4.2 * emit_pptx.LABEL_HEADROOM), 5)
+        # The stop is the renderer's own domain (charts.mjs range()) over the
+        # largest bar and its label's room: three steps of 250, one of five.
+        self.assertEqual(emit_pptx.headroom_stop(619), 750)
+        self.assertEqual(emit_pptx.headroom_stop(4.2), 5)
         self.assertGreater(emit_pptx.LABEL_HEADROOM, 1.0)
+        for largest in (0.37, 4.2, 58, 619, 902, 4119):
+            self.assertGreaterEqual(emit_pptx.headroom_stop(largest), largest * emit_pptx.LABEL_HEADROOM)
         source = (ROOT / "skills" / "professional-slides" / "runtime" / "emit" / "emit_pptx.py").read_text()
         inside = [line for line in source.splitlines() if "INSIDE_END" in line]
         # Only a floating range band keeps an inside label: it has no outside.
@@ -530,8 +534,9 @@ const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
 const parts=page.items.flatMap(find);
 assert.ok(parts.find(i=>String(i.component||'').startsWith('chart.')),'the chart stays the hero');
 const table=parts.find(i=>i.component==='table');
-// Values print the way the chart's own labels do: whole numbers from ten up.
-assert.deepEqual(table.props.rows,[['Revenue','52','58','61'],['Cost','47','51','55']]);
+// Values print the way the chart's own labels do: one precision for the
+// chart, a decimal while its largest value is under a hundred and any has one.
+assert.deepEqual(table.props.rows,[['Revenue','52.0','58.4','61.0'],['Cost','47.0','51.0','55.0']]);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])

@@ -1,16 +1,13 @@
 // Page types: the authoring kit a deck is written through.
 //
-// A deck written straight into the deck spec came out as one page repeated. A
-// harness authored fifty pages through a single helper - title, three points,
-// a closing line, a source, one exhibit - and every page took the same
-// skeleton: a takeaway line on 43 of 43 pages and bullets under the exhibit on
-// nearly all of them. Strong consulting decks put a closing line on
-// about one page in ten and bullets under the exhibit on about one in fifty;
-// their commentary sits on the chart, in the table, under each panel, beside
-// the exhibit or nowhere, and a quarter of their pages carry two or more
-// exhibits. The composer could draw all of that. Nothing asked the author to
-// choose it: the skill said to leave the layout unset, and a default taken
-// fifty times is a template.
+// A deck written straight into the deck spec, every page through one helper -
+// title, three points, a closing line, a source, one exhibit - is one page
+// repeated. Strong consulting decks put a closing line on about one page in
+// ten and bullets under the exhibit on about one in fifty; their commentary
+// sits on the chart, in the table, under each panel, beside the exhibit or
+// nowhere, and a quarter of their pages carry two or more exhibits. The
+// composer draws all of that, but only a choice made per page reaches it: a
+// default taken fifty times is a template.
 //
 // So every analytical page is written as a page *type* - the reading task it
 // serves - and each type has choices with no defaults. `commentary` says where
@@ -26,29 +23,31 @@
 //   node runtime/author-deck.mjs <id>.pages.json  compile, gate, write the deck and plan
 
 import { REGISTRY, measureInsight } from "./registry.mjs";
-import { trivialChart } from "./gates/craft_gates.mjs";
-import { calloutFits } from "./chart-annotations.mjs";
+import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
 import { SCALAR_FIGURE as NUMERIC } from "./value-format.mjs";
-import { timePositions, describeGaps, isPeriodLabel } from "./time-axis.mjs";
-import { verdictCell } from "./compose.mjs";
-import { REVIEWED, CODED, isTable, rowCells, playerNames } from "./gates/variety_gates.mjs";
-import { readFileSync } from "node:fs";
+import { timePositions, describeGaps, isPeriodLabel, readablePeriod } from "./time-axis.mjs";
+import { verdictCell, focusFromTitle } from "./compose.mjs";
+import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
+import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
+import { POLARITIES } from "./tables.mjs";
+import { waivedRules, predatedRule, ruleIntroduced } from "./weight.mjs";
+import { textWordList, textWords } from "./text-contract.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
-// so an author meets them by reading rather than by failing. The title's word
-// limit is read from the contract the gates read (weight.json) and checked at
-// compile: a 15-word title used to compile, compose and fail at the scene
-// check. The line limits are the gates' own (page_gates.py TITLE_LINES,
-// TAKEAWAY_LONG; the subtitle's and the bar's are refused as they compose).
-const TITLE_WORDS = JSON.parse(readFileSync(new URL("./weight.json", import.meta.url), "utf8")).plan.titleWords;
+// so an author meets them by reading rather than by failing, and checked at
+// compile. A title sets on one line at twelve words; past them it is carrying
+// the period or scope its `subtitle` is for. Strong decks' titles run 7 to 13
+// words, median 10. The page gates hold the same numbers (weight.json
+// `plan.titleWords.max`, page_gates.py TITLE_WORDS, TITLE_LINES and
+// TAKEAWAY_LONG), and a test holds each pair to one value.
 // The executive summary's ceiling, as the budget every check reads sets it.
 const SUMMARY_WORDS = wordBudgetOf("text-page", { role: "executive-summary" }).ceiling;
-export const TEXT_LIMITS = Object.freeze({ titleWords: TITLE_WORDS.max, titleTarget: TITLE_WORDS.target, titleLines: 2, subtitleLines: 1, takeawayLines: 3, barLines: 2 });
-export const titleWords = (title) => String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, "").trim().split(/\s+/).filter(Boolean).length;
+export const TEXT_LIMITS = Object.freeze({ titleWords: 12, titleTarget: 10, titleLines: 2, subtitleLines: 1, takeawayLines: 2, barLines: 2 });
+export const titleWords = (title) => textWords(String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, ""));
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
 export const COMMENTARY = Object.freeze({
@@ -64,6 +63,11 @@ export const COMMENTARY = Object.freeze({
 });
 
 const CHART = (name) => `chart.${name}`;
+// The fewest words a panel beside prose alone holds before it reads as an
+// empty column (compilePage, argument pages).
+const PANEL_WORDS_MIN = 25;
+// The series charts a model page may draw over its data table.
+const MODEL_CHARTS = ["chart.column", "chart.line", "chart.area", "chart.stacked-column", "chart.combo"];
 // The so-what bar closes whatever the page drew, so it joins every placement
 // list of a type whose evidence can end on one implication.
 const ANY_TEXT = ["beside", "beside-left", "below", "rail", "so-what-bar"];
@@ -76,20 +80,28 @@ const ANY_TEXT = ["beside", "beside-left", "below", "rail", "so-what-bar"];
 export const PAGE_TYPES = Object.freeze({
   trend: {
     task: "how a measure moved over time, with the rate or the break marked on the plot",
+    // `sparklines`: one small line per member over the same window - the
+    // question is which of many series moved, not one series' path; `model`:
+    // the series over its own data table, a forecast read with its numbers.
     forms: { line: CHART("line"), column: CHART("column"), "stacked-column": CHART("stacked-column"), area: CHART("area"),
-      "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope"), indexed: CHART("line") },
+      "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope"), indexed: CHART("line"),
+      sparklines: CHART("sparklines"), model: "model-page" },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, periods: true,
   },
   ranking: {
     task: "where every member of the set stands on one measure, the subject marked",
+    // `boxplot`: each member's spread - its range, middle half and median -
+    // where one figure per member would hide how far its values run.
     forms: { bar: CHART("bar"), column: CHART("column"), lollipop: CHART("lollipop"), dumbbell: CHART("dumbbell"), bullet: CHART("bullet"),
-      distribution: CHART("bar"), "aligned-bars": "aligned-bars" },
+      distribution: CHART("bar"), "aligned-bars": "aligned-bars", boxplot: CHART("boxplot") },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, minCategories: 4,
   },
   composition: {
     task: "what a whole is made of, and how the mix differs between members or periods",
+    // `pictogram`: a population's share counted in figures - six in ten -
+    // for one to five populations, where a percentage reads as precision.
     forms: { "stacked-bar": CHART("stacked-bar"), "stacked-column": CHART("stacked-column"), marimekko: CHART("marimekko"),
-      waffle: CHART("waffle"), donut: CHART("donut"), treemap: CHART("treemap"), pie: CHART("pie") },
+      waffle: CHART("waffle"), donut: CHART("donut"), treemap: CHART("treemap"), pie: CHART("pie"), pictogram: "pictogram" },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
   },
   relationship: {
@@ -133,7 +145,9 @@ export const PAGE_TYPES = Object.freeze({
   },
   schedule: {
     task: "what happens when: phases, milestones, workstreams",
-    forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap" },
+    // `horizons`: the portfolio of bets by when each pays - the core now,
+    // growth next, options later - where a timeline would date them as tasks.
+    forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap", horizons: CHART("horizons") },
     commentary: ["beside", "below", "so-what-bar", "none"], exhibits: 1,
   },
   numbers: {
@@ -155,7 +169,9 @@ export const PAGE_TYPES = Object.freeze({
   },
   profiles: {
     task: "who the named players are, with their marks and the numbers the deck compares",
-    forms: { logos: "logos", people: "people", "logo-table": "table", cards: "cards" },
+    // `radar`: each player's profile across three to eight attributes on one
+    // scale, where the shape of the profile is the comparison.
+    forms: { logos: "logos", people: "people", "logo-table": "table", cards: "cards", radar: CHART("radar") },
     commentary: ["in-exhibit", "below", "none"], exhibits: 1,
   },
   place: {
@@ -190,89 +206,64 @@ export const PAGE_TYPES = Object.freeze({
   },
 });
 
+/**
+ * How each of the composer's named presets is reached: the page type, form
+ * and commentary that write it, or `internal` with why no page asks for it by
+ * name. A preset no page type writes is either a composition some reading
+ * task needs - and then it is a form - or a device the composer applies
+ * itself; left as neither it is dead code an author reads about and cannot use.
+ */
+export const PRESET_ROUTES = Object.freeze({
+  shapes: {
+    "executive-summary": { type: "summary", form: "executive-summary" },
+    "findings-matrix": { type: "matrix", form: "findings-matrix" },
+    "measure-table": { type: "lookup", form: "measure-table" },
+    "model-page": { type: "trend", form: "model" },
+    "half-and-half": { internal: "a chart with icon-led points beside it is `exhibit-left`, which commentary \"beside\" draws with `pointsStyle: \"icon-lead\"`; the name adds no composition" },
+  },
+  layouts: {
+    "exhibit-left": { commentary: "beside" }, "exhibit-right": { commentary: "beside-left" }, "exhibit-top": { commentary: "below" },
+    "exhibit-full": { type: "trend", form: "line", commentary: "on-exhibit" }, "hero-number": { type: "numbers", form: "hero-number" }, "metrics-over-exhibit": { type: "numbers", form: "metric-strip" },
+    "two-up-contrast": { type: "options", form: "two-up" }, "two-up": { type: "panels", form: "row", commentary: "below" },
+    "split-tone": { internal: "two captioned exhibits side by side, which is `options` form `two-up`: the toned half it was named for is an alternation a row of panels does not keep (planner.mjs alignRowPanels), so it draws the same page" },
+    stack: { type: "panels", form: "stack" }, grid: { type: "panels", form: "grid" }, "table-halves": { type: "options", form: "table-halves" },
+    "picture-pair": { type: "picture", form: "picture-pair" }, "picture-strip": { type: "picture", form: "picture-strip" }, "picture-hero": { type: "picture", form: "picture-hero" },
+    text: { type: "argument", form: "memo" },
+  },
+});
+
+// Placements a form cannot draw, narrowed from its type's list: small
+// multiples, box plots and pictograms carry no callouts on their marks; a
+// radar's profile has no cells to hold the reading; a chart over its own data
+// table keeps the table under it, so its commentary sits beside it or on it.
+export const FORM_COMMENTARY = Object.freeze({
+  "trend/sparklines": [...ANY_TEXT], "ranking/boxplot": [...ANY_TEXT], "composition/pictogram": [...ANY_TEXT],
+  "profiles/radar": ["below", "none"], "trend/model": ["beside", "on-exhibit"],
+});
+const commentaryOf = (type, form) => FORM_COMMENTARY[`${type}/${form}`] ?? PAGE_TYPES[type]?.commentary ?? [];
+
 // What kind of evidence settles a claim (the content plan's vocabulary), and
 // the shape of the data behind it (the insight log's). A page type can only be
 // chosen where the evidence has its shape: a ranking needs the whole peer set,
 // a trend a series over time. A page whose evidence lacks the shape is a
 // research task, found here rather than by the storyline critic or the review.
+// The shapes, their breadth and the values an exhibit plots are evidence.mjs's.
+export { breadthOf, breadthProblem, plottedValues };
 export const SETTLES_KINDS = ["count", "share", "rank", "rate", "sequence", "comparison", "structure", "qualitative"];
-//
-// A shape also has a breadth. A generated deck's chart pages plotted a median
-// of five values against about twenty-two on strong decks' pages, because the
-// research stopped at the subject and one comparator: a "series" of four years,
-// a "peer set" of three. So each chart-bearing shape records how wide its data
-// is - `breadth: { periods, series, members, parts, steps }`, or the `data`
-// itself (`categories`, `series`, `points`, ...) for the counts to be read
-// from - and the insight log refuses a shape narrower than a page needs while
-// finding the longer window or the rest of the peer set is still research.
-export const SHAPES = Object.freeze({
-  series: { kind: "rate", means: "one measure over six or more periods, or four or more for two or more series (the subject and its peers or a benchmark)",
-    needs: ({ periods = 0, series = 1 }) => periods >= 6 || (periods >= 4 && series >= 2),
-    deepen: "the longer window (six or more periods), or the same measure for the peers or a benchmark over the same periods" },
-  "peer-set": { kind: "rank", means: "one measure for every member of the set, six or more members",
-    needs: ({ members = 0 }) => members >= 6, deepen: "the whole peer set on the same basis, six members or more" },
-  mix: { kind: "share", means: "the parts of a whole, three or more", needs: ({ parts = 0 }) => parts >= 3, deepen: "the whole broken into three or more parts" },
-  "measure-pair": { kind: "comparison", means: "two measures for each of eight or more members",
-    needs: ({ members = 0 }) => members >= 8, deepen: "both measures for eight or more members of the set" },
-  bridge: { kind: "structure", means: "the three or more steps between two totals",
-    needs: ({ steps = 0 }) => steps >= 3, deepen: "the drivers of the change, three or more steps between the totals" },
-  geography: { kind: "structure", means: "places with coordinates or regions" },
-  schedule: { kind: "sequence", means: "dated phases, milestones or workstreams" },
-  roster: { kind: "count", means: "the named members and their attributes" },
-  fact: { kind: "count", means: "a few measured numbers" },
-  qualitative: { kind: "qualitative", means: "sourced statements, judgements or mechanisms" },
-});
-const QUANT = ["series", "peer-set", "mix", "measure-pair", "bridge", "fact"];
-export const TYPE_SHAPES = Object.freeze({
-  trend: ["series"], ranking: ["peer-set"], composition: ["mix"], relationship: ["measure-pair"], bridge: ["bridge"],
-  place: ["geography"], schedule: ["schedule"], profiles: ["roster", "peer-set"], numbers: [...QUANT],
-  panels: [...QUANT], scorecard: ["peer-set", "roster", "qualitative", "measure-pair"], lookup: [...QUANT, "roster"],
-});
-const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], mix: ["parts"], "measure-pair": ["members"], bridge: ["steps"] };
-
-/** How wide an insight's data is: its `breadth` counts, over the counts read off its `data`. */
-export function breadthOf(insight) {
-  const data = insight?.data && typeof insight.data === "object" ? insight.data : null;
-  const n = (list) => (Array.isArray(list) ? list.length : undefined);
-  const read = {};
-  if (data) {
-    const rows = n(data.categories) ?? n(data.labels) ?? n(data.points) ?? n(data.rows) ?? n(data.items) ?? n(data.values);
-    const series = n(data.series);
-    if (insight.shape === "series") Object.assign(read, { periods: rows, series: series ?? 1 });
-    if (insight.shape === "peer-set" || insight.shape === "measure-pair") read.members = rows;
-    if (insight.shape === "mix") read.parts = data.categories && series ? series : rows;
-    if (insight.shape === "bridge" && rows !== undefined) read.steps = rows - 2;
-  }
-  const counts = { ...read, ...(insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : {}) };
-  return Object.fromEntries(Object.entries(counts).filter(([, v]) => Number.isFinite(v)));
-}
-
-/**
- * Why an insight's data is too narrow for its shape, or null. A chart-bearing
- * shape with no breadth recorded is refused with what to record, so a log
- * written before breadth was recorded names every insight to update at once.
- */
-export function breadthProblem(insight) {
-  const shape = SHAPES[insight?.shape];
-  if (!shape?.needs) return null;
-  const id = insight.id ?? "?", counts = breadthOf(insight);
-  if (!Object.keys(counts).length)
-    return `${id} (${insight.shape}): record how wide its data is - \`breadth: { ${BREADTH_KEYS[insight.shape].map((k) => `${k}: n`).join(", ")} }\` or the \`data\` itself - so the pages resting on it can be held to what a ${insight.shape} is: ${shape.means}`;
-  if (shape.needs(counts)) return null;
-  return `${id} (${insight.shape}): the data has ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}; a ${insight.shape} is ${shape.means}. ` +
-    `That is a research task before any page is written: find ${shape.deepen}. If the data does not exist, record the shape it has (\`fact\`) and carry it on a numbers page`;
-}
 
 // The exhibit family each type reads as, for its reading task (reading-tasks.json).
 const FAMILY = { trend: "chart", ranking: "chart", composition: "chart", relationship: "chart", bridge: "chart",
   scorecard: "table", lookup: "table", matrix: "table", mechanism: "diagram", schedule: "diagram",
   argument: "text", statement: "text", summary: "text" };
-export const familyOf = (type, form) => (type === "profiles" && form === "logo-table") || (type === "options" && form !== "two-up") ? "table" : FAMILY[type] ?? "exhibit";
+export const familyOf = (type, form) => (type === "profiles" && form === "logo-table") || (type === "options" && form !== "two-up") ? "table"
+  : type === "profiles" && form === "radar" ? "chart" : FAMILY[type] ?? "exhibit";
 
 // Keys the compiler owns. Written by the author they would bypass the choices.
 const OWNED = ["layout", "shape", "arrange", "soWhat", "pageType"];
 // Keys of a typed page that are choices or authoring notes, not slide keys.
-const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "bar", "settles", "adds", "evidence"];
+// `draft` and `sourceSlide` are a revision's: the imported slide's old copy
+// and its position in the source deck (runtime/import-deck.py).
+const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "bar", "settles", "adds", "evidence", "draft", "sourceSlide"];
 
 const exhibitsOf = (page) => [page.exhibit, ...(page.exhibits || [])].filter((e) => e && typeof e === "object");
 
@@ -285,56 +276,13 @@ export function markedChart(ex) {
     || ["change", "cagr", "growth", "focusSeries"].some((key) => ex?.[key] !== undefined && ex[key] !== false);
 }
 
-// How many values an exhibit plots: every number a reader can read off it - a
-// bar, a point on a line, a slice, a dot on a scatter, a box's five figures, a
-// cell with a number in it (the row label is not one). A waffle counts its
-// parts, not its squares: the squares are one count drawn out. A chart group
-// is the sum of its charts, a page the sum of its exhibits.
-const finite = (v) => v !== null && v !== "" && typeof v !== "boolean" && !Array.isArray(v) && typeof v !== "object" && Number.isFinite(Number(v));
-const counted = (list) => (Array.isArray(list) ? list.filter(finite).length : 0);
-
-// A table cell as the reader reads it: its text or value, or - for a logo
-// drawn in place of a name - the player it names. Read as text alone, a logo
-// cell was blank, and a total row of player names was refused as empty.
-const cellText = (cell) => {
-  if (!cell || typeof cell !== "object") return String(cell ?? "");
-  if (cell.blank === true) return "";
-  const said = cell.text ?? cell.value ?? cell.label ?? cell.player ?? cell.media?.alt ?? cell.state ?? cell.score;
-  return said === undefined || said === null ? "" : String(said);
-};
-// A row's label and the cells that carry its results. An array row leads with
-// its label; an object row carries it as `label` or, without one, as its first cell.
-const labelInCells = (row) => Array.isArray(row) || row?.label === undefined;
-const rowLabel = (row) => (labelInCells(row) ? rowCells(row)[0] : row.label);
-const resultCells = (row) => rowCells(row).slice(labelInCells(row) ? 1 : 0);
-const numericCells = (ex) => ex.rows.reduce((n, row) => n + resultCells(row).filter((c) => /\d/.test(cellText(c))).length, 0);
-
-export function plottedValues(ex) {
-  if (Array.isArray(ex)) return ex.reduce((n, e) => n + plottedValues(e), 0);
-  if (!ex || typeof ex !== "object") return 0;
-  const type = String(ex.type ?? "");
-  if (type === "chart-group") return (ex.charts || []).reduce((n, c) => n + plottedValues({ type: c?.component, ...(c?.props || {}) }), 0);
-  if (type === "chart.waffle") return (ex.categories || []).length;
-  if (isTable(ex)) return numericCells(ex);
-  if (Array.isArray(ex.boxes)) return ex.boxes.length * 5;
-  if (Array.isArray(ex.low) && Array.isArray(ex.high)) return counted(ex.low) + counted(ex.high);
-  if (Array.isArray(ex.series) && ex.series.length)
-    return ex.series.reduce((n, s) => n + (Array.isArray(s?.points) ? s.points.length : counted(s?.values)), 0) + counted(ex.targets);
-  if (Array.isArray(ex.points)) return ex.points.length;
-  if (Array.isArray(ex.values)) return ex.values.flat().filter(finite).length;
-  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) ? 1 : 0), 0);
-  if (Array.isArray(ex.markers)) return ex.markers.length;
-  return 0;
-}
-
 // The evidence floor for a chart page. Strong consulting decks' chart pages
-// plot a median of about 22 values (the middle half 10 to 48); a generated
-// fifty-page deck plotted a median of 5, because every type's minimum - four
-// periods, four members - was a single series at its least. The floor sits
-// under strong decks' lower quartile, so it refuses only what they rarely
-// draw, one series of four to seven values, and each way of deepening clears
-// it in one move: a second series doubles a four-period trend, a peer set of
-// eight fills a ranking.
+// plot a median of about 22 values (the middle half 10 to 48), while a type's
+// minimum - four periods, four members - is a single series at its least. The
+// floor sits under strong decks' lower quartile, so it refuses only what they
+// rarely draw, one series of four to seven values, and each way of deepening
+// clears it in one move: a second series doubles a four-period trend, a peer
+// set of eight fills a ranking.
 //   - A bridge's steps are the drivers the change has; splitting a driver to
 //     reach eight bars would invent precision. Start, three steps and end is
 //     the least that decomposes a change rather than restating two totals.
@@ -344,7 +292,7 @@ export function plottedValues(ex) {
 // The deck-level median (variety_gates.mjs EVIDENCE_DEPTH) holds the rest.
 export const EVIDENCE_FLOOR = Object.freeze({ chart: 8, bridge: 5 });
 const CHART_TYPES = ["trend", "ranking", "composition", "relationship", "bridge"];
-const WHOLE_PARTS = ["pie", "donut", "treemap", "waffle"];
+const WHOLE_PARTS = ["pie", "donut", "treemap", "waffle", "pictogram"];
 const isChartExhibit = (ex) => /^chart[.-]/.test(String(ex?.type ?? ""));
 /** Is this a chart page: a chart type, or panels that carry a chart? */
 export const chartPage = (type, exhibits) => CHART_TYPES.includes(type) || (type === "panels" && exhibits.some(isChartExhibit));
@@ -380,6 +328,11 @@ export const LIMITS = Object.freeze({
   // three or more peers, and past eight lines the grey peers cannot be told apart.
   "ranking/distribution": { key: "categories", min: 15, max: 40 }, "ranking/aligned-bars": { key: "series", min: 2, max: 4 },
   "trend/indexed": { key: "series", min: 4, max: 8 },
+  // Forms held by their component: a radar holds three to eight axes
+  // (past eight its labels collide round the rim), a box plot four to twelve
+  // members, a pictogram one to five populations, the horizons two to five bets.
+  "chart.radar": { key: "categories", min: 3, max: 8 }, "chart.boxplot": { key: "categories", min: 4, max: 12 },
+  pictogram: { key: "rows", min: 1, max: 5 }, "chart.horizons": { key: "horizons", min: 2, max: 5 },
 });
 /** The limit a page's primary exhibit is held to: its form's, else its component's. */
 const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMITS[target];
@@ -396,20 +349,26 @@ export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, widt
 // an argument belongs beside the exhibit.
 const BAR_WIDTH = 1160;
 export const barFits = (text) => (measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "primary" }).body?.lines?.length ?? 99) <= 2;
+// The takeaway band runs the body's width too and says the reading once, in a
+// line or two (page_gates.py TAKEAWAY_LONG measures it as it composes).
+export const takeawayLines = (text) => measureInsight({ x: 0, y: 0, width: BAR_WIDTH, height: 400 }, { text, variant: "tonal" }).body?.lines?.length ?? 99;
 // A row block's label is a name set bold on the house colour, not a sentence:
 // it has to read at a glance down the left edge.
 const BLOCK_LABEL_WORDS = 5, BLOCK_CHART_ROWS = 2;
 
 // The least a page of each type carries to be worth a page. Below it the type
 // was chosen for less evidence than it needs: a three-phase roadmap, a two-part
-// pie and a four-row matrix each left half a page empty on a real deck.
+// pie or a four-row matrix leaves half a page empty.
 const MINIMUM = Object.freeze({
-  composition: (ex, form) => form === "waffle"
+  composition: (ex, form) => form === "pictogram"
+    ? (ex.rows || []).length >= 1 || "a pictogram counts a share of each population in figures - `rows`, each { label, value } out of `of` (10 or 20)"
+    : form === "waffle"
     ? ((ex.series || []).length === 1 && (ex.categories || []).length >= 2) || "a waffle counts the members of each part - `categories` for the parts and one series of whole counts"
     : ["pie", "donut", "treemap"].includes(form)
     ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
     : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
-  schedule: (ex, form) => form === "gantt" ? true : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items, or pair it with the evidence behind them as panels",
+  schedule: (ex, form) => form === "gantt" ? true : form === "horizons" ? (ex.horizons || []).length >= 2 || "the horizons are two to five bets, each { label, title, description } in the order they pay"
+    : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items, or pair it with the evidence behind them as panels",
   parallel: (ex) => (ex.items || []).length >= 3 || "three or more parallel ideas",
   mechanism: (ex) => ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3) || "a mechanism has three or more parts",
   relationship: (ex) => (ex.points || ex.rows || []).length >= 5 || "a relationship needs five or more members to show one",
@@ -431,9 +390,15 @@ const CONSTRUCTION_DATA = {
 };
 // Forms that read more than their component's sample says.
 const FORM_DATA = {
-  "argument/memo": ["paragraphs (150 to 330 words)", "panel ({ text, kicker }: the conclusion or the figures to keep, down the right)"],
+  "argument/memo": ["paragraphs (150 to 330 words)", `panel ({ text, kicker }: the conclusion or the figures to keep, down the right; ${PANEL_WORDS_MIN} words or more)`],
   "trend/indexed": ["categories", "series (raw values, the subject and three or more peers)", "indexBase (the period set to 100)", "subject (the series in colour)"],
   "ranking/distribution": ["categories (15 to 40 members, sorted by the value)", "series (one measure)", "highlights (the subject)"],
+  "ranking/boxplot": ["categories (4 to 12 members)", "boxes (one { min, q1, median, q3, max } per member)", "highlights (the subject)"],
+  "trend/sparklines": ["items (2 to 12, each { label, values } over the same four or more periods)", "highlights (the subject's `category`: its label)", "unit (the measure and the window)"],
+  "trend/model": ["categories", "series", "the chart's `type` (chart.column by default; line, area, stacked-column or combo)"],
+  "composition/pictogram": ["rows (1 to 5, each { label, value, text } - the figures filled out of `of`)", "of (10 or 20)", "icon (the figure: person by default)"],
+  "profiles/radar": ["categories (3 to 8 attributes)", "series (1 to 4 players, one value per attribute)", "max (the scale's top)", "focusSeries (the subject)"],
+  "schedule/horizons": ["horizons (2 to 5, each { label, title, description })", "variant (curves, stepped, stepped-minimal, stepped-bands)"],
 };
 export function dataKeys(exhibitType, { type, form } = {}) {
   if (FORM_DATA[`${type}/${form}`]) return FORM_DATA[`${type}/${form}`];
@@ -462,7 +427,7 @@ function formExhibit(id, page, ex) {
       return { ...s, values: s.values.map((v) => (finite(v) ? Math.round((Number(v) / base) * 1000) / 10 : v)) };
     });
     // Every line passes through 100 at the base and the unit names it; a
-    // labelled base line was tried and its label sat on the peers' lines.
+    // labelled base line would set its label on the peers' lines.
     ex.focusSeries = ex.subject;
     if (!String(ex.heading ?? "").trim()) ex.heading = `Index, ${ex.indexBase} = 100`;
     else if (!ex.unit) ex.unit = `Index, ${ex.indexBase} = 100`;
@@ -482,6 +447,30 @@ function formExhibit(id, page, ex) {
     if ((ex.annotations || []).length > 1)
       throw new Error(`${id}: a distribution carries one callout (this one has ${ex.annotations.length}) - its rows are too close for a second box; keep the note on the subject and put the rest in the commentary`);
   }
+  // The subject a small-multiple or box-plot page is about is marked by name:
+  // these charts draw no callouts, so the highlight is the finding on the plot.
+  const names = (list) => new Set((list || []).map((item) => String(item?.label ?? item ?? "")));
+  const marksSubject = (members) => (ex.highlights || []).some((h) => members.has(String(h?.category)));
+  if (page.type === "trend" && page.form === "sparklines") {
+    const items = Array.isArray(ex.items) ? ex.items : [];
+    const short = items.find((item) => !Array.isArray(item?.values) || item.values.filter(finite).length < 4);
+    if (short) throw new Error(`${id}: small multiples run over four or more periods each; "${short?.label ?? "?"}" has ${Array.isArray(short?.values) ? short.values.length : 0} - two or three periods are a comparison, a \`ranking\` or a \`numbers\` page`);
+    const lengths = new Set(items.map((item) => item.values.length));
+    if (lengths.size > 1) throw new Error(`${id}: small multiples share one window - every item carries the same periods (${[...lengths].join(", ")} values given); a missing period is null`);
+    if (!marksSubject(names(items))) throw new Error(`${id}: small multiples mark the member the page is about - \`highlights: [{ category }]\` naming one item's label; the rest stay grey`);
+    if ((ex.annotations || []).length) throw new Error(`${id}: small multiples carry no callouts; say what moved in the commentary, or draw the one series as a \`line\` with its callouts`);
+  }
+  if (page.type === "ranking" && page.form === "boxplot") {
+    if (!marksSubject(names(cats))) throw new Error(`${id}: a box plot marks its subject - \`highlights: [{ category }]\` naming one of its members`);
+    if ((ex.annotations || []).length) throw new Error(`${id}: a box plot carries no callouts; say what the spread shows in the commentary`);
+  }
+  if (page.type === "profiles" && page.form === "radar") {
+    if (series.length < 1 || series.length > 4) throw new Error(`${id}: a radar sets one to four players over the same attributes; this one has ${series.length}`);
+    const bad = series.find((s) => !Array.isArray(s?.values) || s.values.length !== cats.length);
+    if (bad) throw new Error(`${id}: every player on a radar has one value per attribute - "${bad?.name ?? "?"}" does not`);
+    if (!Number.isFinite(Number(ex.max))) throw new Error(`${id}: a radar names its scale's top in \`max\` (5 on a five-point rating, 100 on a share) - the same for every attribute`);
+    if (series.length > 1 && !series.some((s) => s?.name === ex.focusSeries)) throw new Error(`${id}: a radar of several players names the one the page is about in \`focusSeries\`; it is filled and the others outlined`);
+  }
   if (page.type === "ranking" && page.form === "aligned-bars") {
     if (page.commentary === "on-exhibit") throw new Error(`${id}: aligned bars carry no callouts - a callout on one column pushes its bars out of line with the others; choose "beside", "below" or "rail"`);
     // Each column needs about two hundred pixels for its bars and their values:
@@ -499,7 +488,7 @@ function alignedBarsGroup(ex) {
   return { ...rest, type: "chart-group", aligned: true, charts: series.map((s) => ({ heading: s.name, ...(s.unit ? { unit: s.unit } : {}), component: "chart.bar",
     props: { categories, series: [{ name: s.name, values: s.values }], highlights, ...(s.valueFormat ?? valueFormat ? { valueFormat: s.valueFormat ?? valueFormat } : {}) } })) };
 }
-const words = (text) => String(text ?? "").trim().split(/\s+/).filter(Boolean);
+const words = textWordList;
 const overlap = (a, b) => { const x = new Set(words(a).map((w) => w.toLowerCase())); const y = words(b).map((w) => w.toLowerCase()); return y.length ? y.filter((w) => x.has(w)).length / y.length : 0; };
 
 const choose = (id, axis, allowed, value) =>
@@ -536,8 +525,8 @@ const exhibitFamily = (ex) => (String(ex?.type ?? "").startsWith("chart") ? "cha
  * family is what the reader sees, so it stays.
  *
  * The column and the exhibit count are drawnOf's, which VARIETY_COLUMN and
- * VARIETY_PANELS read: counted here a second way, a rail or a hero number
- * with its points was a column to one rule and not to the other.
+ * VARIETY_PANELS read, so a rail or a hero number with its points is a column
+ * to both rules or to neither.
  */
 export function skeletonOf(slide) {
   const { exhibits, column } = drawnOf(slide);
@@ -560,10 +549,10 @@ export function skeletonOf(slide) {
  * exhibit on, the small exhibit at the right of each row block. Aligned bars
  * are one exhibit - one category axis read across - whatever their columns.
  *
- * The column is the page strong decks draw about one time in eight and a
- * generated deck drew one time in three: a column of points or a rail beside
- * a single exhibit, on either side, and a hero number with its points in the
- * column beside its proof, which reads the same way.
+ * The column is the page strong decks draw about one time in eight: a column
+ * of points or a rail beside a single exhibit, on either side, and a hero
+ * number with its points in the column beside its proof, which reads the same
+ * way.
  */
 export function drawnOf(slide) {
   const exhibits = exhibitsOf(slide);
@@ -602,11 +591,24 @@ function checkBlocks(page, id, exhibits) {
       if (keys.length && !keys.some((key) => block.exhibit[key] !== undefined)) throw new Error(`${where}: a ${block.exhibit.type} exhibit reads ${keys.map((k) => `\`${k}\``).join(", ")} - none is given`);
     }
   });
+  // The label names the area and the evidence at the right carries its
+  // figures. A label written as "OpenAI $122B / Anthropic $65B" over a table
+  // of 122 and 65 prints each number twice a row apart, and leaves the row with
+  // no name for what the numbers measure.
+  blocks.forEach((block, at) => {
+    const said = figuresIn(block.label);
+    if (!said.length) return;
+    const shown = new Set([...(block.metric ? figuresIn(block.metric.value) : []),
+      ...(isTable(block.exhibit || {}) ? (block.exhibit.rows || []).flatMap((row) => resultCells(row).flatMap((cell) => figuresIn(cellText(cell)))) : []),
+      ...chartsIn(block.exhibit).flatMap((chart) => [...(chart?.series || []).flatMap((s) => s?.values || []), ...(chart?.values || [])]).filter(finite).map(Number)]);
+    const repeated = said.filter((figure) => shown.has(figure));
+    if (repeated.length) throw new Error(`${id}: block ${at + 1}'s label "${String(block.label).replace(/\s*\n\s*/g, " / ")}" repeats ${repeated.join(" and ")}, which its ${block.metric ? "metric" : "exhibit"} prints beside it; the label names the area the row is about (the measure, the question) in ${BLOCK_LABEL_WORDS} words or fewer, and the figures stay in the evidence`);
+  });
   const sides = blocks.filter((block) => block.metric || block.exhibit).length;
   if (sides && sides !== blocks.length) throw new Error(`${id}: ${sides} of ${blocks.length} blocks carry a metric or exhibit at the right; give every row one or none, so the column lines up`);
   // A chart keeps a 100px plot under its heading and above its axis, which a
   // row takes only when the body is split in two: at three rows a two-bar
-  // chart came out 12px short. A number or a two-row table fits any row.
+  // chart comes out 12px short. A number or a two-row table fits any row.
   const charts = blocks.filter((block) => String(block.exhibit?.type ?? "").startsWith("chart.")).length;
   if (charts && blocks.length > BLOCK_CHART_ROWS)
     throw new Error(`${id}: a chart at the right of a row needs half the body's height, so it fits a page of ${BLOCK_CHART_ROWS} blocks; with ${blocks.length}, give each row a \`metric\` or a two-row table`);
@@ -614,8 +616,8 @@ function checkBlocks(page, id, exhibits) {
   if (unheaded) throw new Error(`${id}: a chart in a block carries its \`heading\` - the measure and, with \`unit\`, its unit`);
 }
 
-// Defects a whole-deck review found on a fifty-page deck, refused here where
-// the page is written rather than left for the next review to find again.
+// Defects a whole-deck review finds, refused here where the page is written
+// rather than left for the review to find.
 const BLANK = /^[\s\-–—]*$/;
 const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
 // A heading that says the columns are snapshots, not a series: the gaps are then the point.
@@ -634,8 +636,8 @@ const TABLE_ROWS = 3, ROSTER_ROWS = 2;
 
 // The review's refusals as the catalogue prints them - the code, what it
 // refuses, what to draw instead. `--types` is built from these lists and a
-// test holds them to the codes the compiler raises: written out by hand, the
-// catalogue left one refusal out and named four of the verdict words the check reads.
+// test holds them to the codes the compiler raises, so the catalogue names
+// every refusal and every verdict word the check reads.
 const or = (list) => `${list.slice(0, -1).join(", ")} or ${list.at(-1)}`;
 const REVIEW_RULES = [
   ["TABLE_TOO_SHORT", `a table of fewer than ${TABLE_ROWS} body rows (a logo table introducing two players, and a row block's small table, are exempt)`, "two or three figures are a numbers page"],
@@ -654,11 +656,9 @@ const ADVISED_RULES = [
 const printRules = (rules) => rules.map(([code, rule, repair]) => `${rule} (${code} - ${repair})`).join("; ");
 
 /**
- * A total row with nothing in it. Four measure tables on one deck closed on a
- * "Total" label over a blank row: the measure-table preset asked for a total
- * on tables of text, and the total row left every cell the arithmetic could
- * not reach empty (compose.mjs totalRow now adds one only where a column sums).
- * A row the author writes is held to the same: labelled a total, it carries one.
+ * A total row with nothing in it: a "Total" label over blank result cells.
+ * compose.mjs totalRow adds a total only where a column sums, and a row the
+ * author writes is held to the same: labelled a total, it carries one.
  */
 function blankTotal(rows) {
   for (const row of rows || []) {
@@ -688,10 +688,10 @@ function tableColumns(headers, rows) {
 }
 
 /**
- * A column of judgements set as words. Four judgement tables on one deck -
- * lead, winner, confidence, status - set "Firm A", "Medium", "No verdict" in
- * the same grey text as the evidence beside them, so the page's answer read
- * as one more fact. A coded column (a type, or words the composer codes on its
+ * A column of judgements set as words. A column headed lead, winner,
+ * confidence or status that sets "Firm A", "Medium", "No verdict" in the same
+ * grey text as the evidence beside it reads the page's answer as one more
+ * fact. A coded column (a type, or words the composer codes on its
  * own: on track, wins, ✓) passes; numbers are measures, not verdicts.
  */
 function plainVerdict(headers, rows) {
@@ -725,8 +725,8 @@ function proseBlocks(page, exhibits) {
  * credit, the other's on round size and included commitments) nothing reads
  * across at all. One table with the members as columns and every measure as
  * a row, "n/a" where a member does not disclose one, compares them on the
- * same terms and makes the gap the finding. One refusal says both, where
- * three used to fire on the one page with one repair.
+ * same terms and makes the gap the finding. One refusal says both, since the
+ * two share one repair.
  *
  * Tables with different columns stacked one above another read no better: the
  * reader holds the first grid in mind while reading the second. Side by side
@@ -735,11 +735,11 @@ function proseBlocks(page, exhibits) {
  * Alone, a table earns its grid at three rows. A row block's small table is
  * not passed here: there it is the row's evidence, beside the row's bullets.
  */
-function tableDefect(page, id, exhibits) {
+function tableDefect(page, id, exhibits, skip = new Set()) {
   const tables = exhibits.filter(isTable);
   const headers = (ex) => (ex.columns || []).map((c) => String(typeof c === "string" ? c : c?.label ?? "").trim().toLowerCase()).join("|");
   const twins = tables.filter((ex, at) => headers(ex) && tables.some((other, k) => k !== at && headers(other) === headers(ex)));
-  if (twins.length) {
+  if (twins.length && !skip.has("TABLE_PANELS_MERGE")) {
     const measures = (ex) => ex.rows.map((row) => cellText(rowLabel(row)).trim()).filter(Boolean);
     const union = [...new Map(twins.flatMap(measures).map((m) => [m.toLowerCase(), m])).values()];
     const differ = twins.some((ex) => measures(ex).length !== union.length);
@@ -751,12 +751,12 @@ function tableDefect(page, id, exhibits) {
   // A stack draws its panels one above another; a grid draws two rows of two.
   const row = { stack: (at) => at, grid: (at) => Math.floor(at / 2) }[page.type === "panels" ? page.form : ""];
   const stacked = row ? new Set(exhibits.flatMap((ex, at) => (isTable(ex) ? [row(at)] : []))).size : 0;
-  if (stacked > 1) return `${id}: TABLE_STACK - ${stacked} tables are set one above another (panels form "${page.form}"), so the reader holds the first grid in mind while reading the next and their columns do not line up. ` +
+  if (stacked > 1 && !skip.has("TABLE_STACK")) return `${id}: TABLE_STACK - ${stacked} tables are set one above another (panels form "${page.form}"), so the reader holds the first grid in mind while reading the next and their columns do not line up. ` +
     "Set them as one table with the members as columns, or keep one table and draw the other evidence as a chart or a strip of numbers beside or above it (`panels` form `row` with a chart beside the table, or `numbers` form `metric-strip` over it)";
   const least = page.type === "profiles" && page.form === "logo-table" ? ROSTER_ROWS : TABLE_ROWS;
   const bodyRows = (ex) => ex.rows.filter((r) => !(r && !Array.isArray(r) && ["total", "group"].includes(r.style))).length;
   const short = tables.find((ex) => bodyRows(ex) < least);
-  if (short) return `${id}: TABLE_TOO_SHORT - a table of ${bodyRows(short)} row${bodyRows(short) === 1 ? "" : "s"}${short.heading ? ` ("${short.heading}")` : ""} is a form half filled in; ` +
+  if (short && !skip.has("TABLE_TOO_SHORT")) return `${id}: TABLE_TOO_SHORT - a table of ${bodyRows(short)} row${bodyRows(short) === 1 ? "" : "s"}${short.heading ? ` ("${short.heading}")` : ""} is a form half filled in; ` +
     (least === ROSTER_ROWS ? "a logo table introduces two players or more" : "a table earns its grid at three rows. Set two or three figures as a numbers page (fact-grid, stat-list, or a metric strip over the exhibit that proves them), or two members side by side as profile cards or a compare");
   return null;
 }
@@ -767,21 +767,21 @@ function tableDefect(page, id, exhibits) {
  * prose. Checked before the type's own evidence rules, since the page it asks
  * for has other rules.
  */
-function reshapeDefect(page, id, exhibits, players) {
-  const table = tableDefect(page, id, exhibits);
+function reshapeDefect(page, id, exhibits, players, skip = new Set()) {
+  const table = tableDefect(page, id, exhibits, skip);
   if (table) return table;
   // A comparison sets every member on the same measures: panels headed by
-  // two players, one on revenue and the other on weekly users, compared nothing.
+  // two players, one on revenue and the other on weekly users, compare nothing.
   const names = [...playerNames(players)];
   const memberOf = (ex) => names.find(([alias]) => new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(String(ex?.heading ?? "")))?.[1];
   const members = page.type === "panels" ? exhibits.filter(memberOf) : [];
-  if (members.length >= 2 && new Set(members.map(memberOf)).size === members.length) {
+  if (members.length >= 2 && new Set(members.map(memberOf)).size === members.length && !skip.has("COMPARISON_MEASURES_DIFFER")) {
     const measure = (ex) => (isTable(ex) ? ex.rows.map((row) => cellText(rowLabel(row)).trim().toLowerCase()).sort().join("|") : String(ex.unit ?? "").trim().toLowerCase());
     if (new Set(members.map(measure)).size > 1)
       return `${id}: COMPARISON_MEASURES_DIFFER - the panels set ${members.map((ex) => `${memberOf(ex)} on "${ex.unit ?? measure(ex)}"`).join(" and ")}: members compared side by side are measured the same way. ` +
         "Give each member the same measure in each panel (one panel per measure, the members as its bars or series), with \"n/a\" where one does not publish it";
   }
-  if (!PROSE_TYPES.has(page.type)) {
+  if (!PROSE_TYPES.has(page.type) && !skip.has("SCENARIO_PROSE")) {
     const blocks = proseBlocks(page, exhibits), long = blocks.filter((b) => words(b.text).length >= SCENARIO_WORDS);
     const about = `${page.title ?? ""} ${page.why ?? ""} ${page.settles?.what ?? ""} ${blocks.map((b) => b.lead).join(" ")}`;
     if (long.length >= 2 && long.length <= 4 && long.length === blocks.length && (SCENARIO_TERMS.test(about) || blocks.every((b) => /^(scenario|option|case|path)\b/i.test(b.lead || b.text))))
@@ -797,24 +797,194 @@ function reshapeDefect(page, id, exhibits, players) {
  * set as words - as the refusal to throw, or null. Checked last: the fix is
  * to the cells, and a page still to be reshaped would be fixed twice.
  */
-function reviewedDefect(page, id, exhibits) {
+function reviewedDefect(page, id, exhibits, skip = new Set()) {
   const tables = exhibits.filter(isTable);
-  const total = [...tables.map((ex) => ex.rows), page.type === "matrix" ? page.rows : null].map(blankTotal).find(Boolean);
+  const total = !skip.has("TOTAL_ROW_BLANK") && [...tables.map((ex) => ex.rows), page.type === "matrix" ? page.rows : null].map(blankTotal).find(Boolean);
   if (total) return `${id}: TOTAL_ROW_BLANK - the row "${total.label}" closes the table as a total with no value in any result cell; a total row carries its computed total - or delete it. ` +
     "Totals belong only where the columns share a basis (counts, amounts); `total: true` on a measure table sums the columns that add up";
   for (const chart of exhibits.flatMap(chartsIn)) {
     // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
     // trough, now); four or more read as a series, and the eye reads the rhythm.
-    if (!COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || SNAPSHOTS.test(`${chart.heading ?? ""} ${chart.unit ?? ""}`)) continue;
+    if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || SNAPSHOTS.test(`${chart.heading ?? ""} ${chart.unit ?? ""}`)) continue;
     if (timePositions(chart.categories)) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
       "Plot the series as a line or an area (the runtime spaces dated points by the time between them), fill in the missing periods, or say in the heading that the columns are snapshots (\"selected years\", \"snapshots\")";
   }
-  if (["lookup", "options", "matrix"].includes(page.type)) {
+  if (["lookup", "options", "matrix"].includes(page.type) && !skip.has("VERDICT_TABLE_PLAIN")) {
     const plain = [...tables, ...(page.type === "matrix" ? [page] : [])].map((ex) => plainVerdict(ex.columns || [], ex.rows)).find(Boolean);
     if (plain) return `${id}: VERDICT_TABLE_PLAIN - the "${plain.header}" column judges each row (${plain.examples.map((e) => `"${e}"`).join(", ")}) in plain text, where it reads as one more fact beside the evidence. ` +
       "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars). Where the column names who leads, declare the companies in the deck's `players`: a cell naming a player is drawn as its logo, which says who without spending a status colour";
   }
   return null;
+}
+
+// An x axis that measures time: a scatter over "months since launch" is a
+// trend drawn without its line.
+const TIME_AXIS_WORDS = /\b(?:months?|years?|quarters?|weeks?|days?|dates?|since|elapsed|time|periods?)\b/i;
+// Categorical charts whose marks a reader reads by value.
+const VALUE_CHARTS = new Set(["chart.column", "chart.bar", "chart.line", "chart.area", "chart.stacked-column", "chart.stacked-bar",
+  "chart.grouped-column", "chart.lollipop", "chart.dumbbell", "chart.slope", "chart.combo"]);
+const LABELLED_MARKS_MAX = 12;
+// A header that reads the row: what an implication gutter points at.
+const INFERENCE_HEADER = /\b(?:implications?|impl(?:y|ies)|meaning|means|so what|therefore|verdict|decisions?|decide|recommend\w*|actions?|takeaways?|consequences?|reading|conclusions?|what follows)\b/i;
+// A pill's words that say there is no verdict to colour.
+const NO_VERDICT = /^(?:split|mixed|even|parity|unranked|no (?:rank|verdict|lead|leader|winner|call|data)|not (?:ranked|comparable|disclosed)|n\/?a|measured only|unclear|undecided|open|timing differs|too early)$/i;
+const seriesOf = (points) => [...(points || []).reduce((groups, point) => {
+  const key = typeof point?.series === "string" && point.series.trim() ? point.series : "";
+  return groups.set(key, [...(groups.get(key) || []), point]);
+}, new Map()).values()];
+const monotone = (points) => {
+  const ys = [...points].filter((p) => finite(p?.x) && finite(p?.y)).sort((a, b) => a.x - b.x).map((p) => Number(p.y));
+  return ys.length >= 6 && (ys.every((y, i) => !i || y < ys[i - 1]) || ys.every((y, i) => !i || y > ys[i - 1]));
+};
+// A figure written as a tile value or a chart value, as a number: "~$24B" is 24.
+const figureOf = (value) => { const m = /-?\d[\d,]*(?:\.\d+)?/.exec(String(value ?? "")); return m ? Number(m[0].replace(/,/g, "")) : null; };
+// Every figure a text writes, as numbers - years left out, which a label may
+// name ("Since 2019") without repeating a result.
+const figuresIn = (text) => [...String(text ?? "").matchAll(/\d[\d,]*(?:\.\d+)?/g)].map((m) => Number(m[0].replace(/,/g, "")))
+  .filter((v) => Number.isFinite(v) && !(Number.isInteger(v) && v >= 1900 && v <= 2100));
+// What a tile's label measures once the dates and the members are taken out:
+// "Jan 2025 cohort retained at six months" and "Feb 2026 cohort retained at
+// six months" measure one thing.
+const DATE_WORDS = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|q[1-4]|h[12]|fy\d*|\d{4}|latest|current|today|now|previous|prior)\b/gi;
+const unitOf = (value) => (/%/.test(String(value)) ? "%" : /[$€£]/.test(String(value)) ? "$" : /pp\b/i.test(String(value)) ? "pp" : /x\b|×/i.test(String(value)) ? "x" : "n");
+
+/**
+ * A chart's year-and-month categories ("2025-08") as the page prints them
+ * ("Aug 25"), with every reference to them - callouts, highlights, change
+ * brackets, forecast and period bands - renamed with them, so the deck, its
+ * text plan and the drawn axis say the same thing.
+ */
+function readableCategories(ex) {
+  if (!String(ex?.type ?? "").startsWith("chart.") || !Array.isArray(ex.categories)) return;
+  const renamed = new Map(ex.categories.map((c) => [String(c), readablePeriod(c)]).filter(([from, to]) => from !== to));
+  if (!renamed.size) return;
+  const to = (value) => (renamed.has(String(value)) ? renamed.get(String(value)) : value);
+  ex.categories = ex.categories.map(to);
+  for (const key of ["annotations", "highlights", "pointHighlights", "events"]) if (Array.isArray(ex[key])) ex[key] = ex[key].map((item) => (item && typeof item === "object" && item.category !== undefined ? { ...item, category: to(item.category) } : item));
+  for (const key of ["changeAnnotations", "periods"]) if (Array.isArray(ex[key])) ex[key] = ex[key].map((item) => (item && typeof item === "object" ? Object.fromEntries(Object.entries(item).map(([k, v]) => [k, ["start", "end", "from", "to"].includes(k) ? to(v) : v])) : item));
+  if (ex.forecastFrom !== undefined) ex.forecastFrom = to(ex.forecastFrom);
+}
+
+// The chart-form refusals, by the code a replay of a stored build reports.
+export const CHART_FORM_CODES = Object.freeze({
+  SCATTER_OVER_TIME: "a scatter whose x axis is time: a trend drawn without its line",
+  SCATTER_CURVE: "six or more points running one way as x grows, drawn as loose dots",
+  LABELS_OFF: "value labels switched off on twelve marks or fewer with no gridlines",
+  GUTTER_UNEARNED: "an implication chevron before a column that names another fact",
+  PILL_NO_VERDICT: "a status colour on a pill that says there is no verdict",
+  TILES_ONE_MEASURE: "one measure at two dates or for two members, in separate tiles",
+  STRIP_REPEATS_CHART: "a metric strip that repeats the figures its chart prints",
+  NUMBER_CARDS: "a one-column fact grid whose tiles carry no sentence",
+});
+
+/**
+ * The chart or figure a page drew where another form says the finding: dots
+ * over time, a curve set as loose dots, numbers the reader has to compare in
+ * boxes, a strip that prints what the chart under it prints, and value marks
+ * with nothing to read them by. Each is refused with the form that says it.
+ */
+function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
+  for (const chart of exhibits.flatMap(chartsIn)) {
+    if (["chart.scatter", "chart.bubble"].includes(chart?.type)) {
+      const xs = (chart.points || []).map((p) => Number(p?.x)).filter(Number.isFinite);
+      const years = xs.length >= 3 && xs.every((x) => Number.isInteger(x) && x >= 1900 && x <= 2100);
+      if ((TIME_AXIS_WORDS.test(String(chart.xLabel ?? "")) || years) && !skip.has("SCATTER_OVER_TIME"))
+        return { code: "SCATTER_OVER_TIME", message: `${id}: the scatter plots against time ("${chart.xLabel ?? `x from ${Math.min(...xs)} to ${Math.max(...xs)}`}"), which is a trend drawn without its line; set it as a \`trend\` page (form line), the dates as its categories and each series as a line, with a \`referenceLines\` entry for the level it is read against` };
+      if (chart.connect !== true && !skip.has("SCATTER_CURVE")) {
+        const curve = seriesOf(chart.points).find(monotone);
+        if (curve) return { code: "SCATTER_CURVE", message: `${id}: ${curve.length} points${curve[0]?.series ? ` of "${curve[0].series}"` : ""} run in one direction as x grows - a curve, which as loose dots reads as a sample of observations; join each series in x order (\`connect: true\`, the series named at its end) and mark the level it is read against with \`referenceLines\` ({ value, label }: the break-even, the parity line, the hurdle)` };
+      }
+    }
+    if (VALUE_CHARTS.has(chart?.type) && chart.dataLabels === false && chart.gridlines !== true && !skip.has("LABELS_OFF")) {
+      const marks = (chart.series || []).reduce((n, s) => n + counted(s?.values), 0);
+      if (marks && marks <= LABELLED_MARKS_MAX)
+        return { code: "LABELS_OFF", message: `${id}: the ${chart.type.slice(6)} switches its value labels off with ${marks} marks and no gridlines, so the reader has nothing to read a value by; at ${LABELLED_MARKS_MAX} marks or fewer the values are printed on the marks - drop \`dataLabels: false\`, or set \`gridlines: true\` where the shape is the point` };
+    }
+  }
+  // One tile across the page is a grey band holding a figure at its left end;
+  // a single column earns its width only when every tile carries its sentence.
+  const cards = exhibits.find((ex) => ex?.type === "fact-grid" && ex.columns === 1 && (ex.items || []).some((item) => !item?.text));
+  if (cards && !skip.has("NUMBER_CARDS")) return { code: "NUMBER_CARDS", message: `${id}: a fact grid of one column sets each figure at the left of a band the page's width; run the ${(cards.items || []).length} facts across (drop \`columns\`, or set 2 to 4), or give every tile its sentence in \`text\`` };
+  for (const table of exhibits.filter(isTable)) {
+    // The chevron gutter says "therefore": it belongs before a column that
+    // reads the row ("Competitive meaning"), not before one more fact
+    // ("Conversion known?").
+    const inferred = (table.columns || []).find((c) => c && typeof c === "object" && c.implication === true && !INFERENCE_HEADER.test(String(c.label ?? "")));
+    if (inferred && !skip.has("GUTTER_UNEARNED")) return { code: "GUTTER_UNEARNED", message: `${id}: the column "${inferred.label}" is marked \`implication: true\`, which draws a "therefore" chevron before it, but its header names another fact, not what the row implies; drop \`implication\`, or head the column with the inference it draws ("Implication", "What it means", "Verdict", "Decision")` };
+    // A status colour on a row that has no status: amber for "Split" and
+    // "Unranked" says the row is behind.
+    const loud = table.rows.flatMap(rowCells).find((cell) => cell && typeof cell === "object" && cell.type === "rag" && cell.value !== "neutral" && NO_VERDICT.test(String(cell.text ?? "").trim()));
+    if (loud && !skip.has("PILL_NO_VERDICT")) return { code: "PILL_NO_VERDICT", message: `${id}: the status pill "${loud.text}" is drawn as ${loud.value}, a status colour, on a row with no verdict; set it \`value: "neutral"\` (a grey pill), and keep green, amber and red for states` };
+  }
+  // Tiles of one measure at two dates or for two members: the reader
+  // compares them, and a comparison belongs on one axis.
+  const names = [...playerNames(players).keys()];
+  const scrub = (label) => names.reduce((text, name) => text.replace(new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), " "), String(label ?? ""))
+    .replace(DATE_WORDS, " ").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+  const tiles = [...(page.metrics || []), ...exhibits.filter((ex) => ["fact-grid", "stat-list"].includes(ex?.type)).flatMap((ex) => ex.items || [])]
+    .filter((item) => item && typeof item === "object" && figureOf(item.value) !== null);
+  for (const [i, a] of tiles.entries()) for (const b of tiles.slice(i + 1)) {
+    if (unitOf(a.value) !== unitOf(b.value) || String(a.label ?? "").trim().toLowerCase() === String(b.label ?? "").trim().toLowerCase()) continue;
+    const x = new Set(scrub(a.label)), y = new Set(scrub(b.label));
+    const shared = [...x].filter((w) => y.has(w)).length, union = new Set([...x, ...y]).size;
+    if (union >= 2 && shared / union >= 0.75 && !skip.has("TILES_ONE_MEASURE"))
+      return { code: "TILES_ONE_MEASURE", message: `${id}: the tiles ${a.value} ("${a.label}") and ${b.value} ("${b.label}") are one measure at two dates or for two members, which the reader has to compare in separate boxes; plot the measure on one axis - a \`trend\` page across the dates, a \`ranking\` across the members, or the chart the page already carries - and keep tiles for measures that differ` };
+  }
+  // A strip over a chart that prints the same figures says them twice.
+  if (page.type === "numbers" && page.form === "metric-strip" && (page.metrics || []).length) {
+    const plotted = new Set(exhibits.flatMap(chartsIn).filter((chart) => chart?.dataLabels !== false)
+      .flatMap((chart) => [...(chart.series || []).flatMap((s) => s?.values || []), ...(chart.values || []), ...(chart.points || []).flatMap((p) => [p?.x, p?.y])])
+      .filter(finite).map((v) => Math.round(Number(v) * 100) / 100));
+    const repeated = page.metrics.filter((m) => { const v = figureOf(m?.value); return v !== null && plotted.has(Math.round(v * 100) / 100); });
+    if (plotted.size && repeated.length >= 2 && repeated.length * 2 > page.metrics.length && !skip.has("STRIP_REPEATS_CHART"))
+      return { code: "STRIP_REPEATS_CHART", message: `${id}: the strip repeats ${repeated.map((m) => m.value).join(", ")}, which the chart under it prints on its marks; the strip carries what the chart does not - the change, the rate, the gap, a share of the total - or the page is the chart alone` };
+  }
+  return null;
+}
+
+/**
+ * The first refusal `check(skip)` finds that the deck is held to. A revision
+ * (`workflow: "existing_deck_revision"`) that records an older `rulesVersion`
+ * predates every rule introduced since (weight.json rules): each such refusal
+ * is recorded in `advisories` with the version that introduced it, and the
+ * check is read again past it, so a later refusal the deck is held to is not
+ * hidden behind a waived one. A refusal is `"<id>: CODE - ..."` or
+ * `{ code, message }`.
+ */
+function unwaived(check, { waived, rules, advisories }) {
+  const skip = new Set();
+  for (;;) {
+    const found = check(skip);
+    if (!found) return null;
+    const message = typeof found === "string" ? found : found.message;
+    const code = typeof found === "string" ? /^[^:]+: ([A-Z][A-Z_]+) - /.exec(found)?.[1] : found.code;
+    if (!code || skip.has(code) || !predatedRule(rules, code, undefined, waived)) return found;
+    advisories.push(waivedAdvice(code, code, message, rules));
+    skip.add(code);
+  }
+}
+
+/** A refusal the deck predates, as the advisory the author reads in its place. */
+const waivedAdvice = (code, rule, message, rules) =>
+  `${code}: ${String(message).replace(/^[^:]+:\s*(?:[A-Z][A-Z_]+ - )?/, "")} (not enforced: introduced in rules version ${ruleIntroduced(rule)}, after the version ${rules?.rulesVersion} this revision records)`;
+
+/**
+ * The chart-form refusals read off a compiled deck, for replaying a stored
+ * build against them: each page's refusal as `{ code, slide }`, with a
+ * one-column fact grid reported beside whatever else the page is refused for.
+ */
+export function chartFormFindings(deck) {
+  const findings = [];
+  for (const slide of deck?.slides || []) {
+    const t = slide.pageType;
+    if (!t) continue;
+    const exhibits = exhibitsOf(slide);
+    const defect = chartFormDefect({ type: t.type, form: t.form, metrics: slide.metrics }, slide.id, exhibits, deck.players);
+    if (defect) findings.push({ code: defect.code, slide: slide.id });
+    if (defect?.code !== "NUMBER_CARDS" && exhibits.some((ex) => ex.type === "fact-grid" && ex.columns === 1 && (ex.items || []).some((item) => !item?.text)))
+      findings.push({ code: "NUMBER_CARDS", slide: slide.id });
+  }
+  return findings;
 }
 
 /**
@@ -879,46 +1049,107 @@ function unaccentedPlaces(page) {
 }
 
 /**
- * Compile one typed page into a deck-spec slide. Throws with the choice to
- * make when a choice is missing or impossible; structural pages (`kind`
- * cover, section, agenda) pass through unchanged.
- *
- * Only the first refusal is shown, so the checks run in the order a fix is
- * made: the choices are valid; the page is the right shape (the exhibits,
- * their data and limits, the tables and prose a review would send to another
- * page); the type's evidence holds (marked, periods, members, the floor); and
- * last the cells. A blank total refused before the table is found too short
- * to be a table would be a fix made and then thrown away.
+ * The page types a data shape can carry: the types that ask for it
+ * (TYPE_SHAPES), and every type that asks for no shape at all.
  */
-export function compilePage(pageIn, index = 0, { insights = null, draft = false, players = null } = {}) {
-  if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
-  const page = structuredClone(pageIn);
-  const id = page.id ?? `page-${index + 1}`;
-  if (!page.type) {
-    if (page.kind && ["section", "divider", "agenda", "cover"].includes(page.kind)) return { ...page };
-    throw new Error(`${id}: give the page a \`type\` - one of ${Object.keys(PAGE_TYPES).join(", ")} - or a structural \`kind\` (section, agenda). Run \`node runtime/author-deck.mjs --types\` for what each is for.`);
-  }
+export function typesForShape(shape) {
+  return { asking: Object.entries(TYPE_SHAPES).filter(([, shapes]) => shapes.includes(shape)).map(([name]) => name),
+    open: Object.keys(PAGE_TYPES).filter((name) => !TYPE_SHAPES[name]) };
+}
+const typesLine = (shapes) => {
+  const lines = [...new Set(shapes)].map((shape) => { const { asking } = typesForShape(shape); return `${shape} carries ${asking.length ? asking.join(", ") : "none of the data types"}`; });
+  return `${lines.join("; ")}; any shape carries ${typesForShape(null).open.join(", ")}`;
+};
+
+// A title leads with the finding. One that states a gap or a method note -
+// what the evidence lacks, cannot settle or leaves undisclosed - puts the
+// limitation where the answer belongs; the limitation goes in the `subtitle`
+// or a footnote, and the title says which way the evidence leans.
+export const TITLE_GAP = /\b(lacks?|lacking|unproven|undisclosed|unranked|unresolved|unverified|unpublished|unknown|unclear|uncertain|unsettled|inconclusive|cannot (?:settle|rank|tell|say|prove|establish|determine|confirm|show|be (?:ranked|settled|compared|determined))|can't|neither|no (?:public|matched|disclosed|comparable|published|audited|clear|single|defensible|provabl\w*)|not (?:yet )?(?:disclosed|published|public|proven|known|comparable|like-for-like|provabl\w*|settled|ranked|clear)|too early|insufficient|remains? (?:open|split|a gap)|(?:verdict|leadership|signals?|call|evidence|picture) (?:is |are |remains? )?split|mix(?:es)? (?:company|sources|disclosures)|different (?:denominators?|bases|definitions)|incompatible|(?:require|need)s? (?:[\w-]+ )?verification)\b/i;
+export const titleGap = (title) => TITLE_GAP.exec(String(title ?? ""))?.[0] ?? null;
+
+// A title that is only a measurement - "The fleet is 116 aircraft": a count
+// stated with a verb of state, no comparator and no consequence. It tells the
+// reader how many, not against what or so what.
+const COUNT = /(?<![\p{L}\d])(?!(?:19|20)\d\d(?![\d.,]))\d[\d,.]*/u;
+const STATIVE = /\b(is|are|was|were|has|have|had|holds?|flies|fly|operates?|carries|carry|employs?|serves?|reports?|counts?|totals?|stands?|numbers?|runs?|owns?|lists?|remains?)\b/i;
+const COMPARATOR = /\b(than|vs\.?|versus|against|while|but|yet|so|because|since|though|although|despite|which|leaving|making|putting|giving|cutting|turning|driving|means?|enough|too|only|still|ahead|behind|leads?|led|leading|trails?|gap|twice|times|doubl\w*|tripl\w*|half|halv\w*|more|fewer|less|above|below|beyond|under|over|outpac\w*|faster|slower|higher|lower|larger|smaller|biggest|largest|smallest|most|least|top|first|last|record|peak|rank\w*|rose|fell|grew|shrank|passed|overtook|slipped|climbed|dropped|jumped|gained|lost|won|wins|rising|falling|growing|widen\w*|narrow\w*|clos\w*|exceed\w*|miss\w*|beat\w*|without|unless|if|until|before|after|share|every|none|nearly|almost|per|not)\b|%|×|→/i;
+export const countOnlyTitle = (title) => { const t = String(title ?? ""); return COUNT.test(t) && STATIVE.test(t) && !COMPARATOR.test(t); };
+
+// A point's own figure: its first quantity with a currency, a percentage or a
+// unit, else its first number that is not a year. In a point of evidence the
+// number is what the reader should see first, so an unmarked point is marked
+// on it (and a point with no figure is named, not refused).
+const FIGURE = /(?<![\p{L}\d.,])(?:US\$|A\$|[$£€¥]|(?:AED|USD|EUR|GBP|SAR|QAR)\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:million|billion|trillion|percentage points|bn|mn|m|k|pp|pts|x)(?![\p{L}\d])|%|×)?/gu;
+export function pointFigure(text) {
+  const found = [...String(text ?? "").matchAll(FIGURE)].map((m) => m[0].trim()).filter((figure) => hasPhrase(text, figure));
+  const unit = found.find((figure) => /[%×$£€¥]|[a-z]$|^(?:AED|USD|EUR|GBP|SAR|QAR)/i.test(figure));
+  return unit ?? found.find((figure) => !/^(?:19|20)\d\d$/.test(figure)) ?? null;
+}
+
+// Commentary placements whose text says something the exhibit does not, and
+// so records what (`adds`). A rail and a so-what bar are one sentence each,
+// which is what they add; the others carry several and say it in `adds`.
+const ADDS_WRITTEN = ["beside", "beside-left", "below", "captions", "on-exhibit"];
+const ADDS_SAID = { rail: "rail", "so-what-bar": "bar" };
+
+/** A chart or a table measures something: its claim is settled by a count, share, rank, rate, sequence, comparison or structure. */
+const measuredPage = (type, form, exhibits) => chartPage(type, exhibits) || (familyOf(type, form) === "table" && type !== "matrix");
+
+/**
+ * A page's `source` as its citation line. A list names keys of the pages
+ * file's `sources` registry - `{ key: { name, url, status } }` - and is set
+ * as "Source: name (status); name", so one source is written once and cited
+ * by key on every page that rests on it.
+ */
+export function citationOf(source, registry, id = "page") {
+  if (!Array.isArray(source)) return source;
+  if (!registry || typeof registry !== "object") throw new Error(`${id}: \`source\` lists registry keys (${source.join(", ")}), but the pages file has no \`sources\` registry - add \`sources: { key: { name, url, status } }\` beside \`deck\` and \`pages\`, or write the citation as text`);
+  const unknown = source.filter((key) => !registry[key]);
+  if (unknown.length) throw new Error(`${id}: \`source\` names ${unknown.map((k) => `"${k}"`).join(", ")}, which the \`sources\` registry does not hold; its keys are ${Object.keys(registry).join(", ")}`);
+  const names = source.map((key) => (registry[key].status ? `${registry[key].name} (${registry[key].status})` : registry[key].name));
+  return `${names.length > 1 ? "Sources" : "Source"}: ${names.join("; ")}`;
+}
+
+/**
+ * The page's spine, checked before anything else and in every mode: the
+ * type and its choices, the title, what settles the claim and the insights it
+ * rests on. A spine compile stops here; the exhibit and the copy are the full
+ * compile's.
+ */
+function spineOf(page, id, { insights = null, sources = null, rules = null, waived = new Set(), waivedAdvisories = [] } = {}) {
   const type = PAGE_TYPES[page.type];
   if (!type) throw new Error(`${id}: unknown page type "${page.type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   for (const key of OWNED) if (page[key] !== undefined) throw new Error(`${id}: \`${key}\` is set by the page's choices, not written - choose \`commentary\`, \`form\` and \`takeaway\` instead`);
+  // One body size across the deck: a page set a size smaller than its
+  // neighbours reads as a different document. A page that needs room takes it
+  // from its layout, and the appendix is set at its own size by the composer.
+  if (page.density !== undefined) throw new Error(`${id}: \`density\` is the deck's, not the page's - the deck sets one body size (\`density\` on the deck); a page that needs room changes its layout (another form, fewer rows, a split across two pages) or moves to the appendix`);
   const forms = Object.keys(type.forms);
   if (!forms.includes(page.form)) throw new Error(choose(id, "form", forms, page.form));
-  if (!type.commentary.includes(page.commentary)) throw new Error(choose(id, "commentary", type.commentary, page.commentary));
+  if (!commentaryOf(page.type, page.form).includes(page.commentary)) throw new Error(choose(id, "commentary", commentaryOf(page.type, page.form), page.commentary));
   // Row blocks carry their explanation in their own bullets; a band of points
   // under five rows of bullets says it twice.
   if (page.form === "labelled-rows" && !["in-exhibit", "so-what-bar"].includes(page.commentary))
     throw new Error(choose(id, "commentary", ["in-exhibit", "so-what-bar"], page.commentary).replace("There is no default", "Each row's bullets are the commentary; there is no default"));
-  if (page.takeaway === undefined || !(page.takeaway === false || (typeof page.takeaway === "string" && page.takeaway.trim())))
-    throw new Error(`${id}: choose \`takeaway\` - false, or the closing sentence. Strong decks close about one page in ten on a line; most let the title carry the message.`);
+  // No close is the norm: strong decks close about one page in ten on a line.
+  if (page.takeaway === undefined) page.takeaway = false;
+  if (!(page.takeaway === false || (typeof page.takeaway === "string" && page.takeaway.trim())))
+    throw new Error(`${id}: \`takeaway\` is the closing sentence, or false (the default); most pages let the title carry the message`);
   if (page.commentary === "so-what-bar" && page.takeaway !== false)
-    throw new Error(`${id}: the so-what bar is the page's close; set \`takeaway: false\` - a closing line under the bar says the implication twice`);
+    throw new Error(`${id}: the so-what bar is the page's close; leave \`takeaway\` out (or \`takeaway: false\`) - a closing line under the bar says the implication twice`);
   if (page.bar !== undefined && page.commentary !== "so-what-bar")
     throw new Error(`${id}: \`bar\` is the text of a so-what bar - choose commentary "so-what-bar" for it, or drop it`);
-  if (typeof page.why !== "string" || page.why.trim().split(/\s+/).length < 4)
+  if (typeof page.why !== "string" || textWords(page.why) < 4)
     throw new Error(`${id}: say in \`why\` why a ${page.type} page (${type.task}) is the right one for this claim`);
   const said = titleWords(page.title);
-  if (said > TEXT_LIMITS.titleWords)
-    throw new Error(`${id}: TITLE_WORDS - the title runs to ${said} words and the build refuses past ${TEXT_LIMITS.titleWords}; cut it to the claim, ${TEXT_LIMITS.titleTarget} words or fewer sets on one line`);
+  if (said > TEXT_LIMITS.titleWords) {
+    const message = `${id}: TITLE_WORDS - the title runs to ${said} words and the build refuses past ${TEXT_LIMITS.titleWords}; keep the finding and its comparator (${TEXT_LIMITS.titleTarget} words is the norm) and move the period, the population and the scope to \`subtitle\``;
+    // A revision recorded under an earlier rules version is held to that version's bar.
+    const rule = predatedRule(rules, "TITLE_WORDS", said, waived);
+    if (!rule) throw new Error(message);
+    waivedAdvisories.push(waivedAdvice("TITLE_WORDS", rule, message, rules));
+  }
   if (page.subtitle !== undefined) {
     const problem = subtitleProblem(String(page.title ?? ""), page.subtitle, exhibitsOf(page));
     if (problem) throw new Error(`${id}: the subtitle ${problem}`);
@@ -930,28 +1161,114 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   walk(page);
   const unknown = icons.find((name) => !iconDefinition(name));
   if (unknown) throw new Error(`${id}: ${unknownIcon(unknown)}`);
+  // A delta or a trend arrow is coloured by merit: `better` names the
+  // direction that is good news - "down" for a cost, churn or a wait - on a
+  // metric, a table's row or column, or one trend cell.
+  const polarity = [];
+  const seek = (value, path) => { if (Array.isArray(value)) value.forEach((v, i) => seek(v, `${path}[${i}]`)); else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) { if (key === "better") polarity.push([path, v]); else seek(v, path ? `${path}.${key}` : key); } };
+  seek(page, "");
+  const wrong = polarity.find(([, v]) => !POLARITIES.includes(v));
+  if (wrong) throw new Error(`${id}: \`better\` on ${wrong[0] || "the page"} is ${JSON.stringify(wrong[1])}; it names the direction that is good news for the measure - "up" (the default: revenue, share, retention) or "down" (a cost, churn, a wait) - so a delta or trend arrow is coloured by merit, not by sign`);
+  if (page.source !== undefined) page.source = citationOf(page.source, sources, id);
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log
   // the page names the insights it rests on, and they settle it.
+  const measured = measuredPage(page.type, page.form, exhibitsOf(page));
   let settles = page.settles;
   const evidence = Array.isArray(page.evidence) ? page.evidence : [];
   if (insights) {
     const needs = TYPE_SHAPES[page.type];
     if (needs && !evidence.length) throw new Error(`${id}: name the insights this ${page.type} page rests on in \`evidence\` (ids from the insight log)`);
     const found = evidence.map((key) => insights.get(key));
-    const unknown = evidence.filter((key, i) => !found[i]);
-    if (unknown.length) throw new Error(`${id}: \`evidence\` names ${unknown.join(", ")}, which the insight log does not hold`);
-    if (needs && !found.some((item) => needs.includes(item.shape)))
-      throw new Error(`${id}: a ${page.type} page needs evidence shaped as ${needs.map((s) => `${s} (${SHAPES[s].means})`).join(" or ")}; its insights are ${[...new Set(found.map((i) => i.shape ?? "unshaped"))].join(", ")}. Find that data, or choose the type the evidence supports`);
+    const missing = evidence.filter((key, i) => !found[i]);
+    if (missing.length) throw new Error(`${id}: \`evidence\` names ${missing.join(", ")}, which the insight log does not hold`);
+    if (needs && !found.some((item) => needs.includes(item.shape))) {
+      const shapes = found.map((i) => i.shape ?? "unshaped");
+      throw new Error(`${id}: a ${page.type} page needs evidence shaped as ${needs.map((s) => `${s} (${SHAPES[s].means})`).join(" or ")}; its insights are ${[...new Set(shapes)].join(", ")}. ` +
+        `Find that data, or choose a type the evidence supports: ${typesLine(shapes.filter((s) => SHAPES[s]))}`);
+    }
     if (!settles && found.length) {
       const lead = found.find((item) => !needs || needs.includes(item.shape)) ?? found[0];
-      settles = { kind: SHAPES[lead.shape]?.kind ?? "qualitative", what: found.map((item) => item.finding).join(" ") };
+      // A scorecard of judgements is settled by the comparison it draws.
+      const kind = SHAPES[lead.shape]?.kind ?? "qualitative";
+      settles = { kind: measured && kind === "qualitative" ? "comparison" : kind, what: found.map((item) => item.finding).join(" ") };
     }
   }
   if (!["statement", "summary"].includes(page.type)) {
     if (!settles || !SETTLES_KINDS.includes(settles.kind) || typeof settles.what !== "string" || !settles.what.trim())
       throw new Error(`${id}: say what settles the claim - \`settles: { kind, what }\`, kind one of ${SETTLES_KINDS.join(", ")}${insights ? ", or name its insights in `evidence`" : ""}`);
+    if (measured && settles.kind === "qualitative")
+      throw new Error(`${id}: a ${page.type} page ${familyOf(page.type, page.form) === "table" ? "tabulates" : "plots"} a measure, so its claim is not settled by a "qualitative" judgement; name what the ${familyOf(page.type, page.form) === "table" ? "table" : "chart"} settles - ${SETTLES_KINDS.filter((k) => k !== "qualitative").join(", ")} - or, where the evidence is statements rather than measures, choose the type that carries them (matrix, mechanism, argument, parallel)`);
+  }
+  const titleAdvisories = countOnlyTitle(page.title)
+    ? [`TITLE_COUNT_ONLY: the title states a number without a comparator or consequence ("${page.title}"); say against what, or what follows - the finding, not only the measurement`] : [];
+  return { type, settles, evidence, titleAdvisories };
+}
+
+/**
+ * A page whose spine holds and whose exhibit or copy does not yet, compiled
+ * for a draft with the refusal the full compile will make recorded on it: the
+ * spine can be critiqued before the copy exists, and the full compile refuses
+ * the page until the refusal is met.
+ */
+function deferredSlide(page, id, type, { settles, evidence, titleAdvisories, deferred }) {
+  const slide = {};
+  for (const [key, value] of Object.entries(page)) if (!CHOICE_KEYS.includes(key)) slide[key] = value;
+  const target = type.forms[page.form];
+  const exhibits = exhibitsOf(slide);
+  if (exhibits.length && !exhibits[0].type && /^chart\./.test(target)) exhibits[0].type = target;
+  if (page.type === "panels") { slide.arrange = page.form; if (slide.exhibit) { slide.exhibits = [slide.exhibit, ...(slide.exhibits || [])]; delete slide.exhibit; } }
+  if (page.commentary === "rail") slide.panel = { text: String(page.rail ?? "").trim() || String(page.title ?? "") };
+  if (page.commentary === "so-what-bar" && typeof page.bar === "string" && page.bar.trim()) slide.soWhat = { text: page.bar.trim(), style: "bar" };
+  if (typeof page.takeaway === "string") slide.soWhat = page.takeaway.trim();
+  const values = plottedValues(exhibits);
+  slide.pageType = { type: page.type, form: page.form, commentary: page.commentary, takeaway: typeof page.takeaway === "string",
+    ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
+    ...(exhibits.length ? { values } : {}), ...(chartPage(page.type, exhibits) ? { chart: true } : {}),
+    ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}),
+    advisories: [...titleAdvisories, `deferred to the full compile: ${deferred.replace(`${id}: `, "")}`], deferred,
+    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
+  slide.pageType.structure = structureOf(slide);
+  slide.pageType.skeleton = skeletonOf(slide);
+  slide.pageType.drawn = drawnOf(slide);
+  return slide;
+}
+
+/**
+ * Compile one typed page into a deck-spec slide. Throws with the choice to
+ * make when a choice is missing or impossible; structural pages (`kind`
+ * cover, section, agenda) pass through unchanged.
+ *
+ * Only the first refusal is shown, so the checks run in the order a fix is
+ * made: the choices are valid; the page is the right shape (the exhibits,
+ * their data and limits, the tables and prose a review would send to another
+ * page); the type's evidence holds (marked, periods, members, the floor); and
+ * last the cells. A blank total refused before the table is found too short
+ * to be a table would be a fix made and then thrown away.
+ */
+export function compilePage(pageIn, index = 0, { insights = null, draft = false, players = null, spine = false, sources = null, rules = null } = {}) {
+  if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
+  const page = structuredClone(pageIn);
+  const id = page.id ?? `page-${index + 1}`;
+  if (!page.type) {
+    // A section's number is the divider's numeral and the tracker's marker;
+    // "01 / " written into its title as well numbers it three ways.
+    if (page.kind === "section" && typeof page.title === "string" && /^\s*\d{1,2}\s*[/|.:)\-–—]/.test(page.title)) return { ...page, title: page.title.replace(/^\s*(?:section\s+)?\d{1,2}\s*(?:[/|.:)\-–—]\s*)+/i, "").trim() || page.title };
+    if (page.kind && ["section", "divider", "agenda", "cover"].includes(page.kind)) return { ...page };
+    throw new Error(`${id}: give the page a \`type\` - one of ${Object.keys(PAGE_TYPES).join(", ")} - or a structural \`kind\` (section, agenda). Run \`node runtime/author-deck.mjs --types\` for what each is for.`);
+  }
+  // `rules` is the deck's { workflow, rulesVersion }: a revision recorded
+  // under an older version hears the refusals introduced since as advisories.
+  const waived = waivedRules(rules ?? {}), waivedAdvisories = [];
+  const { type, settles, evidence, titleAdvisories } = spineOf(page, id, { insights, sources, rules, waived, waivedAdvisories });
+  // A spine compile (`author-deck --draft`) is held to the spine alone - the
+  // title, the claim, the type and its choices, the insights it rests on. The
+  // exhibit's data and every copy rule wait for the full compile, since a
+  // draft is written before its copy exists.
+  if (spine) {
+    try { return compilePage(pageIn, index, { insights, draft: true, players, sources, rules }); }
+    catch (error) { return deferredSlide(page, id, type, { settles, evidence, titleAdvisories: [...titleAdvisories, ...waivedAdvisories], deferred: error.message }); }
   }
   if (page.adds !== undefined && page.adds !== null && typeof page.adds !== "string") throw new Error(`${id}: \`adds\` is what the commentary says that the exhibit cannot - a sentence, or null`);
 
@@ -970,7 +1287,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (ex.type !== undefined && ex.type !== value) throw new Error(`${id}: form "${page.form}" draws ${value}, but the exhibit says type "${ex.type}"; drop the exhibit's type and let the form set it`);
     ex.type = value;
   };
-  if (target.startsWith("chart.") || target === "aligned-bars" || ["mechanism", "schedule"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
+  if (target === "model-page") {
+    // A chart over its own data table: the chart is the trend's, its type the
+    // author's among the series charts, and the table is built from its data.
+    if (!exhibits.length) throw new Error(`${id}: form "model" needs its chart`);
+    const chart = slide.exhibit ?? slide.exhibits[0];
+    chart.type ??= CHART("column");
+    if (!MODEL_CHARTS.includes(chart.type)) throw new Error(`${id}: a model page sets a series over its data table - its chart is ${MODEL_CHARTS.join(", ")}; "${chart.type}" is not one`);
+    if (!Array.isArray(chart.series) || !chart.series.length) throw new Error(`${id}: a model page's chart carries the \`series\` its data table prints`);
+    slide.shape = "model-page";
+  } else if (target.startsWith("chart.") || target === "aligned-bars" || ["mechanism", "schedule", "composition"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
       || (page.type === "parallel" && exhibits.length) || (page.type === "numbers" && ["fact-grid", "stat-list"].includes(page.form))) {
     if (!exhibits.length) throw new Error(`${id}: form "${page.form}" needs its exhibit`);
     setType(slide.exhibit ?? slide.exhibits[0], target);
@@ -995,6 +1321,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   if (untyped.length) throw new Error(`${id}: ${untyped.length === 1 ? "the exhibit has" : `${untyped.length} exhibits have`} no \`type\`; a ${page.type}/${page.form} page does not set it, so name it (table, chart.bar, map, ...)`);
   // Cells naming a player become its mark before any check reads the table.
   if (players) markPlayerCells(slide, players);
+  for (const ex of exhibitsOf(slide)) readableCategories(ex);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of exhibitsOf(slide)) {
@@ -1012,9 +1339,9 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (ex.type?.startsWith("chart.") && (ex.annotations || []).length > CALLOUTS_MAX)
       throw new Error(`${id}: a chart carries ${CALLOUTS_MAX} callouts at most (this one has ${ex.annotations.length}); the rest is commentary - choose "beside" or "rail" for it`);
     // A bridge over a band of points is the page's width and a third short of
-    // its height: three callouts' bands left no room beside the tall totals
-    // for the third, and it had nowhere to go. Two fit; beside a column the
-    // bridge keeps its height and takes three.
+    // its height: three callouts' bands leave no room beside the tall totals
+    // for the third. Two fit; beside a column the bridge keeps its height and
+    // takes three.
     if (ex.type === "chart.waterfall" && page.commentary === "below" && (ex.annotations || []).length > WATERFALL_BELOW_CALLOUTS)
       throw new Error(`${id}: a bridge over commentary "below" carries ${WATERFALL_BELOW_CALLOUTS} callouts at most (this one has ${ex.annotations.length}) - the points take a third of its height; choose "rail" or "beside" for three, or move a note into the points`);
   }
@@ -1045,13 +1372,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     const flat = exhibits.filter((ex) => trivialChart(ex));
     if (flat.length) throw new Error(`${id}: ${flat.length} panel${flat.length === 1 ? " plots" : "s plot"} two numbers of one series; two numbers are a metric pair - set them as a numbers page, or give each panel the whole set or the series over time`);
   }
-  const reshape = reshapeDefect(page, id, exhibits, players);
+  const held = { waived, rules, advisories: waivedAdvisories };
+  const reshape = unwaived((skip) => reshapeDefect(page, id, exhibits, players, skip), held);
   if (reshape) throw new Error(reshape);
 
   // Evidence checks the type makes.
-  if (type.marked && !markedChart(primary))
+  // A title that names one series or bar marks it (compose.mjs focusFromTitle).
+  if (type.marked && !markedChart(primary) && !markedChart(focusFromTitle(primary, page.title)))
     throw new Error(`${id}: a ${page.type} chart marks its finding on the plot - an annotation, a highlight, a reference line or the rate of change. A bare chart is a picture of the data, not evidence for the title.`);
-  if (type.periods && page.form !== "slope") {
+  // Small multiples carry their periods in each item's values (formExhibit).
+  if (type.periods && !["slope", "sparklines"].includes(page.form)) {
     const cats = (primary.categories || []).map(String);
     if (cats.length < 4 || cats.filter(isPeriodLabel).length < Math.ceil(cats.length * 0.75))
       throw new Error(`${id}: a trend runs over four or more periods (years, quarters, months); this one has ${cats.length} categories. Two or three periods are a comparison: use numbers or ranking.`);
@@ -1066,8 +1396,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (values < floor) throw new Error(`${id}: this ${page.type} page plots ${values} value${values === 1 ? "" : "s"}; a chart page plots ${floor} or more (strong decks' chart pages plot about 22, the middle half 10 to 48). ` +
       `Deepen the evidence, not the styling: ${DEEPEN[page.type]}. If the data stops here, it is a numbers page - or a research task`);
   }
-  const reviewed = reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)]);
+  const reviewed = unwaived((skip) => reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)], skip), held);
   if (reviewed) throw new Error(reviewed);
+  const form = unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip), held);
+  if (form) throw new Error(form.message);
   if (page.type === "ranking" && page.form === "aligned-bars") {
     if (slide.exhibit) slide.exhibit = alignedBarsGroup(primary); else slide.exhibits = [alignedBarsGroup(primary)];
   }
@@ -1102,27 +1434,27 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   // A draft is the spine: titles, types, data and evidence. The copy checks
   // below wait for the full compile.
   // The finding is marked in each point, not only the first: a page-level
-  // phrase is accented where it occurs, so a single phrase lit one point and
-  // left the rest grey. `highlight` takes a list - a phrase from each point -
+  // phrase is accented where it occurs, so a single phrase lights one point and
+  // leaves the rest grey. `highlight` takes a list - a phrase from each point -
   // or a point carries its own.
   const phrases = (Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []).map((p) => String(p).toLowerCase());
   const pointTexts = (page.points || []).map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase());
   // A phrase that lands nowhere marks nothing. Checked in a draft too, since
   // a draft with its copy written would otherwise pass it on to the full
   // compile to find.
-  // Found as whole words, by the rule the accent is set by (phraseAt): "22"
-  // passed here on "FY22" and was then drawn as half a year in the accent.
-  // Read against every place the page draws an accent (accentTexts), not only
-  // its points: a rail, a matrix cell or a comparison column took a phrase
-  // unchecked, and a phrase that sat in a chart callout or the title - which
-  // draw no accent - compiled and marked nothing.
+  // Found as whole words, by the rule the accent is set by (phraseAt), so "22"
+  // does not pass on "FY22" and draw half a year in the accent.
+  // Read against every place the page draws an accent (accentTexts) - a rail,
+  // a matrix cell or a comparison column as well as its points - and not
+  // against a chart callout or the title, which draw no accent.
   const written = accentTexts(page);
   const stray = phrases.filter((p) => p && !written.some((text) => hasPhrase(text, p, { ignoreCase: true })));
   if (stray.length) {
     const partWord = written.find((text) => text.toLowerCase().includes(stray[0]));
     const at = partWord ? partWord.toLowerCase().indexOf(stray[0]) : -1;
     // A cell naming a declared player is drawn as its logo (markPlayerCells),
-    // and a mark takes no accent; the name was reported as "only in the title".
+    // and a mark takes no accent, so the refusal names the logo rather than
+    // reporting the name as only in the title.
     const logo = !partWord && exhibitsOf(page).filter(isTable).flatMap((ex) => ex.rows.flatMap(rowCells))
       .find((cell) => cell?.type === "logo" && hasPhrase(cellText(cell), stray[0], { ignoreCase: true }));
     const elsewhere = !partWord && !logo && unaccentedPlaces(page).find(([, text]) => hasPhrase(text, stray[0], { ignoreCase: true }))?.[0];
@@ -1134,9 +1466,19 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
         : places ? `${id}: \`highlight\` "${stray[0]}" appears nowhere the page draws an accent (${places}); use a phrase exactly as the page writes it`
           : `${id}: \`highlight\` "${stray[0]}" has nowhere to land - this page draws no commentary text to set it in; drop \`highlight\`, or mark the chart with \`highlights\` instead`);
   }
+  // A point the author left unmarked is marked on its own figure; one with no
+  // figure is named in the advisories, since the phrase that carries a
+  // qualitative point is the author's to choose.
+  const unmarkedPoints = [];
   if (!draft && points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
-    const marked = (page.points || []).filter((point, at) => (point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))).length;
-    if (marked < Math.ceil(points / 2)) throw new Error(`${id}: mark the finding in each point - ${marked} of ${points} points carry a highlighted phrase; give \`highlight\` a list with a phrase from each point (the number or claim the reader should see first), or \`highlight\` on the point`);
+    const derived = [];
+    (page.points || []).forEach((point, at) => {
+      if ((point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))) return;
+      const text = typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`;
+      const figure = pointFigure(text);
+      if (figure) derived.push(figure); else unmarkedPoints.push(at + 1);
+    });
+    if (derived.length) slide.highlight = [...(Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []), ...derived];
   }
   if (!draft && ["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" needs the points it places`);
@@ -1157,7 +1499,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     // Each callout is measured the way the chart will set it: a box that holds
     // two lines, so a paragraph belongs in two callouts or beside the chart.
     const long = (primary.annotations || []).filter((a) => !calloutFits(a.text));
-    if (long.length) throw new Error(`${id}: ${long.length} callout${long.length === 1 ? " is" : "s are"} too long for the chart's callout box ("${long[0].text}"); a callout holds about twelve words - split it, or choose "beside" for the argument`);
+    if (long.length) throw new Error(`${id}: ${long.length} callout${long.length === 1 ? " is" : "s are"} too long for the chart's callout box ("${long[0].text}"); a callout holds about ${countInWords(calloutCapacity())} words - split it, or choose "beside" for the argument`);
     const said = (primary.annotations || []).reduce((n, a) => n + words(a.text).length, 0);
     if (said < 10) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
   }
@@ -1176,6 +1518,20 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (typeof page.bar === "string" && overlap(page.title, page.bar) > 0.7)
       throw new Error(`${id}: the bar "${page.bar}" repeats the title; say what follows from the evidence, not what it shows`);
     if (typeof page.bar === "string" && page.bar.trim()) slide.soWhat = { text: page.bar.trim(), style: "bar" };
+  }
+  const closing = typeof page.takeaway === "string" ? takeawayLines(page.takeaway) : 0;
+  if (closing > TEXT_LIMITS.takeawayLines) {
+    const message = `${id}: TAKEAWAY_LONG - the takeaway runs past ${TEXT_LIMITS.takeawayLines} lines; it says the reading once - cut it to one implication, put the qualification in the note, or set a second argument as commentary`;
+    const rule = predatedRule(rules, "TAKEAWAY_LONG", closing, waived);
+    if (!rule) throw new Error(message);
+    waivedAdvisories.push(waivedAdvice("TAKEAWAY_LONG", rule, message, rules));
+  }
+  // What the commentary says that the exhibit cannot. A rail or a bar is one
+  // sentence and is its own answer; points, captions and callouts say it in
+  // `adds`, and `adds: null` there says the commentary adds nothing.
+  if (!draft && ADDS_WRITTEN.includes(page.commentary) && !(typeof page.adds === "string" && words(page.adds).length >= 4)) {
+    const what = page.commentary === "captions" ? "captions" : page.commentary === "on-exhibit" ? "callouts" : "points";
+    throw new Error(`${id}: say in \`adds\` what the ${what} say that the exhibit cannot - one sentence${page.adds === null ? "; `adds: null` says they add nothing, and then the page's commentary is \"none\" (or \"in-exhibit\") and the exhibit takes the room" : ""}`);
   }
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
   if (page.type === "panels") {
@@ -1207,16 +1563,29 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (page.form === "sidebar" && !page.panel) throw new Error(`${id}: a sidebar argument sets its claim in \`panel\``);
     // A memo's prose runs at a readable measure, which a text page's words
     // fill down but not across: the width it leaves is the panel's. Without
-    // one the memo was set in equal columns that needed some 500 words to
-    // reach the foot, and every memo page stopped halfway down.
+    // one the memo sets in equal columns that need some 500 words to reach
+    // the foot, and the page stops halfway down.
     if (page.form === "memo" && (page.paragraphs || []).length && !page.panel)
       throw new Error(`${id}: a memo sets its prose at a readable measure with a \`panel\` beside it - { text, kicker } carrying the conclusion or the figures the reader keeps - which takes the width the prose leaves`);
+    // That width is over half the page: prose that reaches the foot does so
+    // at a reading measure (compose.mjs proseBeside), whatever the panel
+    // holds. A sentence of a statement set in it is a column of tint that is
+    // mostly empty, so under PANEL_WORDS_MIN the panel is refused here, where
+    // its words are cheap to change - not widened, nor the prose thinned to
+    // fill it. A sidebar beside an exhibit or points keeps a third of the row.
+    const proseBeside = page.form === "memo" || (!(page.exhibit || (page.exhibits || []).length) && !points);
+    const panelWords = textWords(page.panel?.text ?? "");
+    if (page.panel && proseBeside && (page.paragraphs || []).length && panelWords < PANEL_WORDS_MIN)
+      throw new Error(`${id}: the panel takes the width the prose leaves - over half the page - and ${panelWords} words set a column of tint that is mostly empty. Give it what the reader keeps beside the reasoning - the figures, the conditions, the decision and its cost, as the argument states them - in ${PANEL_WORDS_MIN} words or more; or, with no more to hold, set the page as a sidebar beside its evidence (an exhibit or points), where the panel keeps a third of the row`);
   } else if (page.type === "statement") {
     if (page.form === "statement") { slide.kind = "statement"; if (!page.text) throw new Error(`${id}: a statement page carries its \`text\``); }
     else { if (!primary) throw new Error(`${id}: a quotes page carries a quote-cluster exhibit`); setType(primary, "quote-cluster"); }
   } else if (page.type === "summary") {
     if (page.form === "executive-summary") { slide.role = "executive-summary"; if (!points) throw new Error(`${id}: an executive summary carries its developed \`points\``); }
     else { slide.kind = "takeaways"; if (!(page.items || []).length) throw new Error(`${id}: a takeaways page carries its \`items\``); }
+  } else if (slide.shape === "model-page") {
+    // The chart and its table stack in the exhibit's column, the points beside.
+    slide.layout = "stack";
   } else if (!type.rows && slide.shape !== "measure-table") {
     slide.layout = layoutFor[page.commentary] ?? "exhibit-full";
   } else if (layoutFor[page.commentary]) {
@@ -1226,7 +1595,8 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   // A statement or takeaways page has no title band to hang a standfirst in.
   if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
   // Advisories the compiler can see and the author should: they do not block.
-  const advisories = [];
+  const advisories = [...titleAdvisories, ...waivedAdvisories];
+  if (unmarkedPoints.length) advisories.push(`POINT_UNMARKED: point${unmarkedPoints.length === 1 ? "" : "s"} ${unmarkedPoints.join(", ")} carr${unmarkedPoints.length === 1 ? "ies" : "y"} no figure to mark and no \`highlight\`; name the phrase the reader should see first, on the point or in the page's \`highlight\` list`);
   const tiles = sharesInTiles(page, exhibits);
   if (tiles) advisories.push(tiles);
   if (page.type === "place" && typeof primary?.geography === "string") {
@@ -1239,9 +1609,11 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
     // What the page plots, for the deck's evidence depth (EVIDENCE_DEPTH) and the author's summary.
     ...(exhibits.length ? { values } : {}), ...(isChart ? { chart: true } : {}),
+    ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}),
     ...(advisories.length ? { advisories } : {}),
     // The claim is the title: the build holds the two together.
-    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
+    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}),
+      adds: page.adds ?? (ADDS_SAID[page.commentary] && typeof page[ADDS_SAID[page.commentary]] === "string" ? page[ADDS_SAID[page.commentary]].trim() : null), ...(evidence.length ? { evidence } : {}) } };
   slide.pageType.structure = structureOf(slide);
   // What the variety contract counts: the page as drawn, not as declared.
   slide.pageType.skeleton = skeletonOf(slide);
@@ -1260,12 +1632,12 @@ export function subtitleProblem(title, subtitle, exhibits = []) {
   if (typeof subtitle !== "string" || !subtitle.trim() || subtitle.includes("\n")) return "is one line of text under the title";
   const n = words(subtitle).length;
   if (n > SUBTITLE_WORDS) return `runs to ${n} words; keep it to ${SUBTITLE_WORDS} or fewer - the scope, the unit, the population or the period, not a second finding`;
-  if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12, wrapWidthRatio: 1 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
+  if (measureText(subtitle.trim(), SUBTITLE_WIDTH, { fontSize: 12 }).lines.length > 1) return "runs past one line; cut it to the scope, the unit, the population or the period";
   if (overlap(title, subtitle) > 0.7) return "repeats the title; say what the title leaves out - the measure, the population, the period";
   // The chart already names its measure and unit in its heading, so a
-  // subtitle built from the heading says it twice, one line apart; only the
-  // title was compared, and "Revenue by region, FY26 (AED bn)" over a chart
-  // headed "Revenue by region, FY26 · AED bn" passed.
+  // subtitle built from the heading says it twice, one line apart - "Revenue
+  // by region, FY26 (AED bn)" over a chart headed "Revenue by region, FY26 ·
+  // AED bn" - so it is compared with the heading as well as the title.
   const bare = (text) => String(text ?? "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ");
   for (const ex of exhibits) {
     const heading = [ex?.heading, ex?.unit].filter((part) => typeof part === "string" && part.trim()).join(" ");
@@ -1287,15 +1659,50 @@ export function subtitleProblem(title, subtitle, exhibits = []) {
  */
 export function markPlayerCells(slide, players) {
   const names = playerNames(players);
+  // The player a short verdict opens with: "Firm A leads", "Firm B
+  // confirmed" - four words at most, so a sentence stays prose.
+  const leading = (text) => {
+    const said = String(text).trim();
+    if (words(said).length > 4) return null;
+    for (const [alias, name] of names) if (new RegExp(`^${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(said)) return name;
+    return null;
+  };
   const mark = (value) => {
     // A cell that carries its own accent stays text: a mark cannot be accented.
     const text = typeof value === "string" ? value : value && typeof value === "object" && !value.type && typeof value.text === "string" && value.highlight === undefined && value.accent === undefined ? value.text : null;
     const name = text === null ? null : names.get(text.trim().toLowerCase());
-    return name ? { type: "logo", player: name, media: { alt: `${name} logo` } } : value;
+    if (name) return { type: "logo", player: name, media: { alt: `${name} logo` } };
+    // A status pill saying who leads ("Firm A" in green, "Firm B" in green)
+    // spends the status colours on a name; the verdict is the player's mark
+    // with its words beside it, and colour keeps meaning a state.
+    const verdict = value && typeof value === "object" && value.type === "rag" && typeof value.text === "string" ? leading(value.text) : text !== null ? leading(text) : null;
+    if (verdict && (value?.type === "rag" || text !== null)) return { type: "logo", player: verdict, media: { alt: `${verdict} logo` }, text: String(value?.text ?? text).trim() };
+    return value;
   };
-  if (names.size) for (const ex of exhibitsOf(slide).filter(isTable)) {
+  // A column headed by a player ("Firm A", "Firm B result") carries the
+  // player's mark beside its label.
+  const headed = (label) => { const said = String(label ?? "").trim(); for (const [alias, name] of names) if (new RegExp(`(^|\\W)${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\W|$)`, "i").test(said)) return name; return null; };
+  // Every header from `first` on that names a player; the columns before it
+  // head the row labels.
+  const markHeaders = (columns, first) => columns.map((column, c) => {
+    const label = typeof column === "string" ? column : column?.label;
+    const player = c >= first && !(column && typeof column === "object" && (column.logo || column.type === "logo")) ? headed(label) : null;
+    if (!player) return column;
+    return { ...(typeof column === "string" ? { label: column } : column), logo: { alt: `${player} logo` } };
+  });
+  if (!names.size) return;
+  for (const ex of exhibitsOf(slide).filter(isTable)) {
     ex.rows = ex.rows.map((row) => Array.isArray(row) ? row.map((cell, c) => c === 0 ? cell : mark(cell))
       : row && Array.isArray(row.cells) ? { ...row, cells: row.cells.map((cell, c) => c === 0 && row.label === undefined ? cell : mark(cell)) } : row);
+    if (Array.isArray(ex.columns)) ex.columns = markHeaders(ex.columns, 1);
+  }
+  // A findings matrix heads its columns at the page's level ("Anthropic",
+  // "OpenAI route"): a column headed by a player carries the mark as a
+  // table's does. Its first header heads the row labels when it heads one
+  // more column than the rows carry (compose.mjs reads it the same way).
+  if (Array.isArray(slide.columns) && Array.isArray(slide.rows) && slide.rows.some((row) => Array.isArray(row?.cells))) {
+    const count = Math.max(...slide.rows.map((row) => (Array.isArray(row?.cells) ? row.cells.length : 0)));
+    slide.columns = markHeaders(slide.columns, slide.columns.length > count ? 1 : 0);
   }
 }
 
@@ -1317,13 +1724,8 @@ export function architectureOf(slide) {
   return ["on-exhibit", "none", "in-exhibit"].includes(t.commentary) ? "evidence-only" : "evidence-with-commentary";
 }
 
-/** How many words of ordinary prose a chart callout holds, by the renderer's own measure. */
-export function calloutCapacity() {
-  const words = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
-  let n = 1;
-  while (n < 40 && calloutFits(Array.from({ length: n + 1 }, (_, i) => words[i % words.length]).join(" "))) n += 1;
-  return n;
-}
+/** How many words of ordinary prose a chart callout holds, by the renderer's own measure (chart-annotations.mjs). */
+export { calloutCapacity };
 
 /** How many words of ordinary prose the rail's panel holds, by the renderer's own measure. */
 export function railCapacity() {
@@ -1338,9 +1740,8 @@ export function railCapacity() {
  * by the renderer's own measure: a column chart of eight-letter names drawn at
  * the panel's width until a name no longer fits its column. Period labels
  * (FY17, 2019, Q1 2025) are not counted - the chart labels every second or
- * third when they crowd - but a name is never dropped, and a row of three
- * ten-column panels failed on "FY17" (29px in a 25px column) before periods
- * thinned. The widths are the composer's (compose.mjs peerExhibitsRow).
+ * third when they crowd - but a name is never dropped. The widths are the
+ * composer's (compose.mjs peerExhibitsRow).
  */
 export function panelColumnCapacity() {
   const names = ["Northern", "Southern", "Atlantic", "Pacifica", "Midlands", "Highland", "Lowlands", "Eastward", "Westward", "Frontier", "Lakeside", "Seaboard", "Downtown", "Hillside"];
@@ -1362,8 +1763,8 @@ export function panelColumnCapacity() {
  * How many members a distribution names, by the renderer's own measure: a
  * bar chart of `n` members in a 440px frame beside a rail, grown until its
  * rows' names step down from 10pt to 8pt, and then until they thin to every
- * second one. The docs said names were never dropped; at 32 and 40 members
- * every second one was, and nothing said so.
+ * second one. The catalogue prints both counts, so an author knows where the
+ * names shrink and where every second one is dropped.
  */
 export function distributionLabelCapacity() {
   const chart = REGISTRY.get("chart.bar");
@@ -1384,25 +1785,28 @@ export function distributionLabelCapacity() {
 
 /** The catalogue as the author reads it. */
 export function describeTypes() {
-  const lines = ["# Page types", "", "Every analytical page is one of these. Each choice is required; none has a default.", "",
+  const lines = ["# Page types", "", "Every analytical page is one of these. `type`, `form`, `commentary` and `why` are required and have no default.", "",
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
-    "`takeaway` - `false`, or the closing sentence (strong decks close about one page in ten on a line or a band).", "",
+    `\`takeaway\` - optional: the closing sentence, ${TEXT_LIMITS.takeawayLines} lines at most (TAKEAWAY_LONG, refused at compile); absent, the page closes on its exhibit, as most do (strong decks close about one page in ten on a line or a band).`, "",
+    "`adds` - what the commentary says that the exhibit cannot, one sentence: required with commentary `beside`, `beside-left`, `below`, `captions` or `on-exhibit` (`null` there is refused - it says the commentary adds nothing); a `rail` or `bar` is its own answer; optional elsewhere.", "",
     "`bar` - with commentary `so-what-bar`, the implication set in a filled bar across the foot of the exhibit: a sentence of eight words or more that fits two lines. The bar is the page's close, so `takeaway` is `false`, and it counts toward the closing share.", "",
     "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
-    "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log.", "",
+    "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log (then `settles` is derived from them). A chart or table page is settled by a count, share, rank, rate, sequence, comparison or structure, never `qualitative`.", "",
+    "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, url, status } }` beside `deck` and `pages`), set as \"Source: name (status); name\".", "",
     `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
-    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type to start from.", "",
-    "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",
+    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type> [--evidence <insight-id>]` prints a page of that type that compiles, with the insight's data in its exhibit, to fill in.", "",
+    "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). A point left unmarked is marked on its own figure (its first percentage, amount or count); a point with no figure is named in the advisories (POINT_UNMARKED). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",
+    "`better` - on a metric (a strip's `metrics`, a hero's `kpi`, a row block's `metric`), a table column, a table row or one trend cell: the direction that is good news for the measure, \"up\" (the default) or \"down\" (a cost, churn, a wait). A delta and a trend arrow are coloured by it - a rising cost is red - not by their sign.", "",
     `Refused at compile, because a review found each on a finished deck: ${printRules(REVIEW_RULES)}. Advised: ${printRules(ADVISED_RULES)}. Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
-    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across; two rows or more fill the frame, one row grows by a third) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
-    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - write to ${TEXT_LIMITS.titleTarget}, which sets on one line, since more than a third of titles past it is PLAN_TITLE_LENGTH; a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines, one or two the norm (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
+    `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across, one only when every tile carries its \`text\`; two rows or more fill the frame, one row grows by a third, a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
+    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - the finding and its comparator, ${TEXT_LIMITS.titleTarget} words the norm, with the period, population and scope moved to the \`subtitle\`; a title that states a gap (lacks, unproven, undisclosed, cannot settle, neither) on more than 15% of the analytical pages is refused (TITLE_GAP_SHARE), and a bare count ("The fleet is 116 aircraft") is advised (TITLE_COUNT_ONLY); a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
     ...(() => { const names = distributionLabelCapacity(); return [
     `A \`distribution\` (or any bar chart of many rows) names every member while its rows hold a line: at the chart's 10pt up to about ${names.full} members at full height, at 8pt up to about ${names.small}; past that it names every second member (every nth when the rows are thinner still) and reads the field's shape from the bars. The subject, any highlighted member and any member a callout names are always named, and the rows beside them go unnamed so their labels do not touch. To name them all, give the chart the page's height (commentary "rail" or "none"), or cut the field to the members that matter.`, ""]; })(),
     ...(() => { const columns = panelColumnCapacity(); return [
     `A chart callout takes free space inside the plot first - above a short mark, beside a line, in an empty corner, its leader to the mark - and a band above the plot only when the plot has none, so the plot keeps its height; panels sharing one scale keep their shared band. Chart limits the runtime cannot lift: a bridge over commentary \`below\` carries ${WATERFALL_BELOW_CALLOUTS} callouts (beside a column, ${CALLOUTS_MAX}); a \`distribution\` one callout, which sits beside its bar; \`aligned-bars\` none. Panels in a row: a column panel holds about ${columns[2]} named columns (eight-letter names) in a row of two, ${columns[3]} in a row of three and ${columns[4]} in a row of four - period labels (FY17, 2019, Q1) thin to every second or third, so ten or more periods fit any row, but a column chart never drops a name: shorten them or use bars. On bar panels that read across (the same members) in different units a callout sits in its bar's row - past the bar's end, past the axis for a bar below zero, or set inside a long bar - so bars reading across panels keep their rows level and no band stands empty over the neighbour; where the row has no room it takes a rail, which a panel in a row of three or four cannot spare, so there annotate a shorter bar or say it in the caption. Column and line panels on one value scale (the same unit) share the tallest panel's callout band so their plots stay one height; panels in different units keep their own bands, so annotate one and leave its neighbours plain freely. Two-series lines in a row of three or four name their series in a legend rather than at the line ends.`, ""]; })(),
     // A placement is also a word floor: points beside or below make the page
-    // one read with its commentary, and moving a rail below took a chart
-    // page's floor from 42 to 112 words, learnt only when the budget line moved.
+    // one read with its commentary, and moving a rail below raises a chart
+    // page's floor from 42 to 112 words, so the catalogue prints both floors.
     `Word floors follow the reading task, which the commentary placement decides - points \`beside\` or \`below\` (or paragraphs) make a page read with its commentary; a rail, captions, callouts, a so-what bar or none leave it led by its exhibit: ${
       ["chart", "table", "exhibit", "diagram"].map((family) => `${family} pages ${wordBudgetOf(`${family}-led`).floor} words led, ${wordBudgetOf(`${family}-with-commentary`).floor} with points`).join("; ")
     }; a text page ${wordBudgetOf("text-page").floor}. \`author-deck --check\` prints each page's floor and the one the other placement would set.`, "",
@@ -1415,13 +1819,20 @@ export function describeTypes() {
       ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, limitOf(name, form, target)]).filter(([, l]) => l);
         return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}${l.valueChars ? ` (values ${l.valueChars} characters at most)` : ""}`).join("; ")}`] : []; })(),
       ...(data.length ? [`- data: ${[...data.reduce((m, [form, keys]) => m.set(keys.join(", "), [...(m.get(keys.join(", ")) || []), form]), new Map())]
-        .map(([keys, forms]) => forms.length === data.length ? keys : `${keys} (${forms.join(", ")})`).join("; ")}`] : []), `- commentary: ${t.commentary.join(" | ")}`, `- exhibits: ${n}` +
+        .map(([keys, forms]) => forms.length === data.length ? keys : `${keys} (${forms.join(", ")})`).join("; ")}`] : []), `- commentary: ${t.commentary.join(" | ")}${Object.keys(t.forms).filter((form) => FORM_COMMENTARY[`${name}/${form}`])
+        .map((form) => `; form ${form} takes ${FORM_COMMENTARY[`${name}/${form}`].join(" | ")}`).join("")}`, `- exhibits: ${n}` +
       (t.marked ? "; the chart marks its finding (annotation, highlight, reference line or rate)" : "") +
       (t.periods ? "; four or more periods" : "") + (t.minCategories ? `; ${t.minCategories}+ members` : "") + (t.rows ? "; `rows` with `cells`" : "") +
       (CHART_TYPES.includes(name) || name === "panels" ? `; plots ${name === "bridge" ? EVIDENCE_FLOOR.bridge : EVIDENCE_FLOOR.chart}+ values${name === "panels" ? " when a panel is a chart" : ""}` : ""), "");
   }
   return lines.join("\n");
 }
+
+// Which way a measure is good news: a delta or a trend arrow is coloured by
+// it. On a metric, a table column (every trend cell under it), a row, or a cell.
+const POLARITY_SCHEMA = { enum: [...POLARITIES], default: "up", description: "the direction that is good news for this measure: \"up\" (revenue, share, retention) or \"down\" (a cost, churn, a wait); a delta or trend arrow is coloured by it, not by its sign" };
+const METRIC_SCHEMA = { type: "object", required: ["value"], properties: { value: { type: ["string", "number"] }, label: { type: "string" }, sublabel: { type: "string" },
+  delta: { type: "string", description: "the signed change, \"+8 pts\" or \"-3%\"; green or red by `better`" }, better: POLARITY_SCHEMA } };
 
 // The exhibit each many-value form reads, for a harness that generates to the schema.
 const FORM_SCHEMA = {
@@ -1434,35 +1845,56 @@ const FORM_SCHEMA = {
       items: { type: "object", required: ["name", "values"], properties: { name: { type: "string" }, unit: { type: "string" }, values: { type: "array" } } } } } },
 };
 
-/** A JSON Schema for a typed page, for harnesses that validate or constrain generation. */
-export function pageSchema() {
-  const typed = Object.entries(PAGE_TYPES).map(([name, t]) => ({
+/**
+ * A JSON Schema for a typed page, for harnesses that validate or constrain
+ * generation: the pages file, or with `only` the page schema of one type.
+ */
+export function pageSchema(only = null) {
+  if (only !== null && !PAGE_TYPES[only]) throw new Error(`unknown page type "${only}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
+  // Any page, typed or structural, may be hidden.
+  const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it; false shows the slide again" };
+  const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => ({
     type: "object",
-    required: ["id", "type", "form", "commentary", "takeaway", "why", "title"],
+    required: ["id", "type", "form", "commentary", "why", "title"],
     properties: {
       id: { type: "string" }, type: { const: name }, title: { type: "string" },
       subtitle: { type: "string", description: `optional standfirst under the title: the measure and unit, the population, the period or the scope, in one line of ${SUBTITLE_WORDS} words or fewer; never a restatement of the title` },
       form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
-      takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }] },
+      takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }], description: `optional closing sentence, ${TEXT_LIMITS.takeawayLines} lines at most; absent or false, the page closes on its exhibit` },
+      source: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" }, minItems: 1 }], description: "the citation as text, or keys of the pages file's `sources` registry" },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },
       bar: { type: "string", minLength: 8, description: "with commentary so-what-bar: the implication in a filled bar under the exhibit, two lines at most" },
       ...(t.forms["labelled-rows"] ? { blocks: { type: "array", minItems: 2, maxItems: 5, description: "form labelled-rows: the rows down the page", items: {
         type: "object", required: ["label", "points"], additionalProperties: false,
         properties: { label: { type: "string" }, points: { type: "array", minItems: 2, maxItems: 4 },
-          metric: { type: "object", required: ["value", "label"] }, exhibit: { type: "object", required: ["type"] } } } } } : {}),
+          metric: { ...METRIC_SCHEMA, required: ["value", "label"] }, exhibit: { type: "object", required: ["type"] } } } } } : {}),
+      ...(name === "numbers" ? { metrics: { type: "array", items: METRIC_SCHEMA, description: "form metric-strip: the figures across the top" }, kpi: { ...METRIC_SCHEMA, description: "form hero-number: the one figure" } } : {}),
+      ...(t.table ? { exhibit: { type: "object", properties: {
+        columns: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object", properties: { better: POLARITY_SCHEMA } }] } },
+        rows: { type: "array", items: { oneOf: [{ type: "array" }, { type: "object", properties: { better: POLARITY_SCHEMA } }] } } } } } : {}),
       settles: { type: "object", required: ["kind", "what"], properties: { kind: { enum: SETTLES_KINDS }, what: { type: "string", minLength: 8 } } },
-      adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }] },
+      adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }], description: "what the commentary says that the exhibit cannot; required with commentary beside, beside-left, below, captions or on-exhibit" },
       evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },
+      hidden,
     },
     not: { anyOf: OWNED.map((key) => ({ required: [key] })) },
-    ...(Object.keys(t.forms).some((form) => FORM_SCHEMA[`${name}/${form}`]) ? { allOf: Object.keys(t.forms).filter((form) => FORM_SCHEMA[`${name}/${form}`])
-      .map((form) => ({ if: { properties: { form: { const: form } } }, then: { required: ["exhibit"], properties: { exhibit: FORM_SCHEMA[`${name}/${form}`] } } })) } : {}),
+    ...(() => {
+      const forms = Object.keys(t.forms), rules = [
+        ...forms.filter((form) => FORM_SCHEMA[`${name}/${form}`]).map((form) => ({ if: { properties: { form: { const: form } } }, then: { required: ["exhibit"], properties: { exhibit: FORM_SCHEMA[`${name}/${form}`] } } })),
+        // A form that narrows its type's placements says so to the generator.
+        ...forms.filter((form) => FORM_COMMENTARY[`${name}/${form}`]).map((form) => ({ if: { properties: { form: { const: form } } }, then: { properties: { commentary: { enum: FORM_COMMENTARY[`${name}/${form}`] } } } }))];
+      return rules.length ? { allOf: rules } : {};
+    })(),
   }));
-  const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] } } };
+  if (only !== null) return { $schema: "https://json-schema.org/draft/2020-12/schema", $id: `professional-slides.pages/v1#${only}`, ...typed[0] };
+  const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] }, hidden } };
+  const source = { type: "object", required: ["name"], additionalProperties: false,
+    properties: { name: { type: "string" }, url: { type: "string" }, status: { type: "string", description: "how far the source can be relied on, printed after its name: audited, company-reported, press report, estimate, survey" } } };
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema", $id: "professional-slides.pages/v1",
     type: "object", required: ["deck", "pages"],
-    properties: { deck: { type: "object", description: "the deck-level keys of the deck spec (schema, id, design, identity, cover, players, ...), without slides" },
+    properties: { deck: { type: "object", description: "the deck-level keys of the deck spec (schema, id, workflow, request, design, identity, cover, players, waivers, ...), without slides" },
+      sources: { type: "object", additionalProperties: source, description: "the source registry: each source once, cited from a page's `source` by key" },
       pages: { type: "array", items: { oneOf: [...typed, structural] } }, appendix: { type: "array", items: { oneOf: typed } } },
   };
 }

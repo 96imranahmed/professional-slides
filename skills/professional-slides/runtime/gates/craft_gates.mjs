@@ -1,18 +1,22 @@
 // Deck craft floors, measured on what was actually built.
 //
-// A 62-page deck shipped with every table a plain grid (0 of 16 treated),
-// every chart bare (0 of 16 annotated), eleven of its sixteen charts comparing
-// two bars of one series, five step diagrams, no icon anywhere and no page
-// introducing the six airlines it compared. The plan gates had said most of
-// this - as advisories - and the plan itself recorded `treatment: "plain"` on
-// every table, which is easy to write and says nothing. These floors read the
+// The plan gates advise on a deck's craft from what the plan records, and a
+// plan can record `treatment: "plain"` on every table. These floors read the
 // deck spec and the composed scene, which cannot be written around, and they
-// block: a deck under them is not delivered.
+// block: a deck whose tables are all plain grids, whose charts are bare or
+// compare two bars of one series, that repeats step diagrams, carries no icon
+// or never introduces the players it compares is not delivered.
 //
 // They are floors, not targets. A deck well above them can still be flat, and
 // the review judges that; a deck below them has not made the choices at all.
 
-import { isPeriodLabel } from "../time-axis.mjs";
+import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { photographsWaived } from "./plan_gates.mjs";
+import { tableStatistics } from "../build-bars.mjs";
+import { trivialChart, trendChart } from "../evidence.mjs";
+import { registered } from "../errors.mjs";
+
+export { trivialChart, trendChart };
 
 export const CRAFT_CODES = Object.freeze({
   CRAFT_TRIVIAL_CHARTS: "too many charts compare two numbers, which a metric with its delta says better",
@@ -32,24 +36,16 @@ export const CRAFT_CODES = Object.freeze({
 const SOURCE_CODE = /\b[A-Z][A-Z0-9]{1,6}(?:\+[A-Z][A-Z0-9]{1,6})+\b|\b(?:source|evidence|citation) (?:ledger|register)\b|\bsee ledger\b/i;
 export const codedSource = (text) => SOURCE_CODE.test(String(text ?? ""));
 
-// Decks shorter than this are diagnostics and probes; the floors are about a
-// deck's rhythm, which a handful of pages does not have.
-const FROM_PAGES = 12;
+// Decks shorter than DECK_LENGTH.craft are diagnostics and probes; the floors
+// are about a deck's rhythm, which a handful of pages does not have. The
+// deck-wide devices (icons, photographs, the exhibit range) are read from
+// DECK_LENGTH.craftDevices, where a deck has room for all of them.
+const CRAFT = PLAN.craft;
 const STEP_TYPES = new Set(["steps", "process", "chevron-process", "staircase"]);
-// Zebra striping is house style, not a decision about the evidence, so it does not count.
-const TREATMENT = /^table-(bubble|bar|rating-|implication|column-band|row-band|harvey|status-pill|number-circle|lamp|dot|check|progress-|cell-icon|section-marker|section-number)|^table-logo$|^table-photo$/;
 const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 const isChart = (ex) => String(ex.type ?? "").startsWith("chart.");
-
-/** A chart that shows two numbers of one series: a metric pair with a chart drawn round it. */
-export function trivialChart(ex) {
-  if (!isChart(ex) || ["chart.scatter", "chart.bubble", "chart.bubble-grid", "chart.waffle"].includes(ex.type)) return false;
-  const series = Array.isArray(ex.series) ? ex.series.length : 1;
-  const categories = Array.isArray(ex.categories) ? ex.categories.length : Array.isArray(ex.rows) ? ex.rows.length : Infinity;
-  return series <= 1 && categories <= 2;
-}
 
 /** Two bars of one series that add up to a whole: a share drawn as a comparison. */
 export function shareAsBars(ex) {
@@ -59,21 +55,21 @@ export function shareAsBars(ex) {
   return values.length === 2 && values.every((v) => v >= 0) && Math.abs(total - 100) <= 1.5;
 }
 
-/** A chart over time: four or more period categories. */
-export function trendChart(ex) {
-  const categories = Array.isArray(ex.categories) ? ex.categories.map(String) : [];
-  return isChart(ex) && categories.length >= 4 && categories.filter(isPeriodLabel).length >= Math.ceil(categories.length * 0.75);
-}
 
 export function craftFindings(spec, scene) {
+  // A deck revised under older rules hears the rules introduced since as advisories.
+  return applyRulesVersion(floorFindings(spec, scene), spec);
+}
+
+function floorFindings(spec, scene) {
   // A catalogue shows each component in its plain form so it can be copied;
   // it makes no argument, and the floors are about decks that do.
   if (spec.purpose === "catalogue") return [];
   const content = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => (!s.kind || s.kind === "content") && s.title);
-  if (content.length < FROM_PAGES) return [];
+  if (content.length < DECK_LENGTH.craft) return [];
   const findings = [];
-  const block = (code, measured, threshold, repair, slides = null) => findings.push({ slide: slides, code, severity: "blocker", measured, threshold, repair });
-  const advise = (code, measured, threshold, repair) => findings.push({ slide: null, code, severity: "advisory", measured, threshold, repair });
+  const block = (code, measured, threshold, repair, slides = null) => findings.push({ slide: slides, code: registered(CRAFT_CODES, code), severity: "blocker", measured, threshold, repair });
+  const advise = (code, measured, threshold, repair) => findings.push({ slide: null, code: registered(CRAFT_CODES, code), severity: "advisory", measured, threshold, repair });
 
   const charts = content.flatMap((slide) => exhibitsOf(slide).filter(isChart).map((ex) => ({ slide, ex })));
   const trivial = charts.filter(({ ex }) => trivialChart(ex));
@@ -95,15 +91,18 @@ export function craftFindings(spec, scene) {
       "reports, regulators, industry bodies) before settling for a snapshot.");
   }
 
+  // The built deck's floors sit under the plan's targets on purpose
+  // (weight.json plan.craft: `min` asks the plan, `blockBelow` stops the deck).
   const stats = sceneStatistics(scene);
-  if (stats.tables >= 4 && stats.tablesTreated / stats.tables < 0.5) {
-    block("CRAFT_TABLES_PLAIN", { treated: stats.tablesTreated, of: stats.tables }, 0.5,
+  const treated = CRAFT.tableTreated, annotated = CRAFT.chartAnnotated;
+  if (stats.tables >= treated.blockFrom && stats.tablesTreated / stats.tables < treated.blockBelow) {
+    block("CRAFT_TABLES_PLAIN", { treated: stats.tablesTreated, of: stats.tables }, treated.blockBelow,
       `${stats.tablesTreated} of ${stats.tables} tables carry a treatment. A table that compares options on criteria wants Harvey balls or ` +
       "ratings; one that ranks wants bars in the cells; one that judges wants a check, cross or status column and an implication column; " +
       "one about named companies or products wants their logos. A plain grid is right for a record lookup, rarely for an argument.");
   }
-  if (stats.charts >= 6 && stats.chartsAnnotated / stats.charts < 0.3) {
-    block("CRAFT_CHARTS_BARE", { annotated: stats.chartsAnnotated, of: stats.charts }, 0.3,
+  if (stats.charts >= annotated.blockFrom && stats.chartsAnnotated / stats.charts < annotated.blockBelow) {
+    block("CRAFT_CHARTS_BARE", { annotated: stats.chartsAnnotated, of: stats.charts }, annotated.blockBelow,
       `${stats.chartsAnnotated} of ${stats.charts} charts mark anything on the plot. Put the finding where the eye already is: the CAGR on ` +
       "the growth arrow, the gap bracketed, the focal bar highlighted and the rest neutral, the target or benchmark as a reference line, " +
       "the event that explains the break flagged on the axis.");
@@ -118,7 +117,7 @@ export function craftFindings(spec, scene) {
       "are icon cards, a path with gates is a roadmap, conditions are a checklist. Keep the steps diagram for the one page that is a genuine procedure.");
   }
 
-  if (content.length >= 20 && stats.icons === 0) {
+  if (content.length >= DECK_LENGTH.craftDevices && stats.icons === 0) {
     block("CRAFT_NO_ICONS", { pages: content.length, icons: 0 }, 1,
       "No page carries an icon. The pages that list parallel categories - the three pillars of a case, the risks, the levers, the " +
       "segments - read faster with an icon per point (`pointsStyle: \"icon-lead\"`) or as icon cards.");
@@ -126,9 +125,9 @@ export function craftFindings(spec, scene) {
 
   // Pictures: a deck about airlines, films, products or places with no
   // photograph reads as a spreadsheet. Logos do not count - they identify, they
-  // do not show. `noPictures` states in a sentence why a deck has none.
-  const excused = String(spec.noPictures ?? "").trim().split(/\s+/).filter(Boolean).length >= 3;
-  if (content.length >= 20 && stats.pictures === 0 && !excused) {
+  // do not show. `noPictures` states in a sentence why a deck has none, and
+  // waives this alone (plan_gates.mjs photographsWaived).
+  if (content.length >= DECK_LENGTH.craftDevices && stats.pictures === 0 && !photographsWaived(spec)) {
     block("CRAFT_NO_PICTURES", { pages: content.length, pictures: 0 }, 1,
       "No page carries a photograph. The cover, the section dividers and the pages about a recognisable subject - an aircraft, a cabin, " +
       "a hub, a city, a product - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Plan each " +
@@ -154,8 +153,9 @@ export function craftFindings(spec, scene) {
   }
 
   const perTen = content.length ? (stats.distinctExhibits / content.length) * 10 : 0;
-  if (content.length >= 20 && perTen < 2) {
-    block("CRAFT_EXHIBIT_VARIETY", { distinct: stats.distinctExhibits, pages: content.length, perTen: Math.round(perTen * 10) / 10 }, 2,
+  const sceneMin = CRAFT.exhibitVarietyPerTen.sceneMin;
+  if (content.length >= DECK_LENGTH.craftDevices && perTen < sceneMin) {
+    block("CRAFT_EXHIBIT_VARIETY", { distinct: stats.distinctExhibits, pages: content.length, perTen: Math.round(perTen * 10) / 10 }, sceneMin,
       `${stats.distinctExhibits} kinds of exhibit across ${content.length} pages. Go back through the pages and ask what each has to show: a ` +
       "ranking across many entities, a trend with its growth rate, a composition, a network on a map, a scorecard, a portrait of each player. " +
       "The catalogue has sixty exhibits; a deck of this length that uses a handful has chosen by habit.");
@@ -163,18 +163,18 @@ export function craftFindings(spec, scene) {
   return findings;
 }
 
-function sceneStatistics(scene) {
-  let tables = 0, tablesTreated = 0, charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
+/** What the built scene draws: its tables and how many carry a treatment, its charts and how many mark the finding, its anchors. */
+export function sceneStatistics(scene) {
+  let charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
+  // Tables are counted one definition for every treated share
+  // (build-bars.mjs tableStatistics, gates/table-treatments.json).
+  const { tables, treated: tablesTreated } = tableStatistics(scene);
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
     if (!slide.nodes?.some((n) => n.role === "action-title") || /^picture-credits(?:-\d+)?$/.test(String(slide.id ?? ""))) continue;
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
-    if (components.some((c) => /^(table|comparison-table|heatmap|trend-rows)$/.test(c))) {
-      tables += 1;
-      if (roles.some((r) => TREATMENT.test(r))) tablesTreated += 1;
-    }
     // A chart-group composes its charts inside one instance, so its name does
     // not start with "chart."; its plotted marks still say it is a chart page.
     if (components.some((c) => c.startsWith("chart.") || c === "chart-group") || roles.includes("chart-mark")) {

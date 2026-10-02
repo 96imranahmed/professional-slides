@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Run the eval suite.
 #
-#   evals/run.sh            unit tests + the deterministic page gates
+#   evals/run.sh            unit tests, the example decks' content stage and
+#                           build bars, the stored specimens, gate validity
 #   evals/run.sh --slow     also the LibreOffice end-to-end render
+#                           (PS_RUN_SLOW=1, read by test_end_to_end_render.py)
 #
 # Everything here is vendor-neutral: python3 with Pillow, numpy and python-pptx,
 # plus node and Playwright Chromium for the rendered geometry probes.
@@ -49,20 +51,21 @@ done
 [ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
 
 echo "== cold-run baseline =="
-# The same harness a cold run is scored with, pointed at the example decks. It
-# prints rather than fails: where a hand-authored deck misses a bar that is a
-# finding about the deck, and the number moving is the thing to notice.
-for deck in gallery-acceptance house-style nyc-or-sf; do
-  if [ -d "/tmp/ps-build-$deck" ]; then
-    printf '  %-20s ' "$deck"
-    # `|| true`: the scorer exits 2 on a deck that misses a bar, and under
-    # `set -e` with pipefail that would end the run at the first one - which is
-    # exactly the deck worth printing.
-    { "$NODE" evals/cold-run/score.mjs - "/tmp/ps-build-$deck" 2>/dev/null || true; } | sed -n 's/^ *\(pass\|FAIL\) *\([a-zA-Z]*\) *\([0-9.]*\).*/\2=\3/p' | tr '\n' ' '
-    echo
-  fi
-done
-[ -d /tmp/ps-build-gallery-acceptance ] || echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
+# The same harness a cold run is scored with, pointed at the example decks,
+# compiled in-process so nothing has to be built first. It prints rather than
+# fails: where a hand-authored deck misses a bar that is a finding about the
+# deck, and the number moving is the thing to notice.
+"$NODE" evals/cold-run/baseline.mjs || true
+
+echo "== stored specimens =="
+# Recorded runs scored again under today's rules; test_cold_run.py holds the
+# expected verdicts, this prints where each stands.
+"$NODE" evals/cold-run/specimens.mjs || true
+
+echo "== gate validity =="
+# Per-gate recall and precision against the defects people found on the
+# specimens (evals/quality/defects.json).
+"$NODE" evals/quality/gate-validity.mjs || true
 
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs

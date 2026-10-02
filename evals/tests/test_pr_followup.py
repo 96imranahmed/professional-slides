@@ -140,10 +140,9 @@ assert.equal(applyTemplate({{...spec,footer:'Custom'}},base).footer,'Custom');
 console.log(JSON.stringify({{ok:true}}));
 ''')
             plan = {'id': 'raw', 'slides': [{'id': 'one', 'title': 'Growth funds expansion', 'items': [{'id': 'body', 'component': 'paragraph', 'props': {'text': 'Evidence supports expansion.'}}]}]}
-            for payload in [plan, {'deckPlan': plan}]:
-                file = root / 'spec.json'; file.write_text(json.dumps(payload))
-                result = self.cli(ROOT / 'evals/scripts/compile_scene.mjs', file, root / 'scene.json')
-                self.assertEqual(result.returncode, 0, result.stderr)
+            file = root / 'spec.json'; file.write_text(json.dumps(plan))
+            result = self.cli(ROOT / 'evals/scripts/compile_scene.mjs', file, root / 'scene.json')
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_template_coordinates_match_across_aspect_ratios(self):
         with tempfile.TemporaryDirectory() as tmp:

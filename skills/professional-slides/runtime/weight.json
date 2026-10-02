@@ -1,6 +1,47 @@
 {
   "$comment": "The weight contract: the targets every page is built and judged against. This file is the single source: runtime/weight.mjs reads it for the composer and runtime/gates/page_gates.py reads it for the gates, so a change to a floor moves the page and the finding together. Every number under byFill is a floor, never a ceiling - the ceiling on prose is the WORDS gate. Everything under `reference` is a target a well-made deck meets.",
   "schema": "professional-slides.weight/v1",
+  "rulesVersion": 3,
+  "rules": {
+    "$comment": "Which blocking rules each rules version introduced. A deck records the version it was authored under (`rulesVersion` on the deck spec); a deck revised under `workflow: \"existing_deck_revision\"` that records an older version hears every rule introduced after it as an advisory, so a rule added today cannot refuse a deck that was accepted yesterday. A rule is a code, or `CODE.variant` where only one variant of a code began to block. A deck that records no version is held to the current rules. Version 1 is every blocking rule in force before versioning began; version 2 the table, identity and comparison rules a whole-deck review added; version 3 the void escalation, the exhibit mix and range at authoring, the unmeasured-content and answer ceilings, the text-fragmentation band, the twelve-word title and two-line takeaway, the authoring rules on title gaps, stamped fields and unsupported pillars, the build bars, the compile's chart-form refusals (page-types.mjs CHART_FORM_CODES), and the scene's label-on-line, descender-on-rule and unkeyed-scatter checks (validate-overlap.mjs OVERLAP_CODES). The compile reads this list too: a revision's page refused by a rule it predates compiles, with the refusal among its advisories. The revision workflow's own integrity checks (REVISION_UNMAPPED, REVISION_INVENTORY_MISSING, WAIVERS_INVALID) are not listed: they are what makes a revision a revision, so no version waives them.",
+    "revisionWorkflow": "existing_deck_revision",
+    "introduced": {
+      "2": ["TOTAL_ROW_BLANK", "TABLE_TOO_SHORT", "TABLE_PANELS_MERGE", "TABLE_STACK", "COMPARISON_MEASURES_DIFFER", "TIME_AXIS_UNEVEN", "VERDICT_TABLE_PLAIN", "SCENARIO_PROSE", "VARIETY_TABLES", "PLAYERS_UNMARKED", "PROFILE_UNPICTURED"],
+      "3": ["SCENE_VOID", "COLUMN_VOID", "INTERNAL_VOID", "DEAD_BAND", "VARIETY_EXHIBIT_MIX", "VARIETY_EXHIBIT_RANGE", "CONTENT_UNMEASURED", "CONTENT_ANSWER_UNCARRIED.coverage", "TEXT_FRAGMENTED",
+            "TITLE_WORDS.tightened", "TAKEAWAY_LONG.tightened", "TITLE_GAP_SHARE", "GENERATOR_SIGNATURE", "PILLAR_UNSUPPORTED",
+            "BAR_EXHIBIT_VARIETY", "BAR_TABLES_TREATED", "BAR_CHARTS_ANNOTATED", "BAR_DRAWINGS_PER_PAGE", "BAR_UNSOURCED_PICTURES",
+            "SCATTER_OVER_TIME", "SCATTER_CURVE", "LABELS_OFF", "GUTTER_UNEARNED", "PILL_NO_VERDICT", "TILES_ONE_MEASURE", "STRIP_REPEATS_CHART", "NUMBER_CARDS",
+            "TEXT_ON_LINE", "DESCENDER_ON_RULE", "SCATTER_UNKEYED"]
+    },
+    "tightened": {
+      "$comment": "Bars a version lowered. A finding between the old bar and the new is the rule `CODE.tightened`, introduced in that version; past the old bar it is the rule as it always was, and an older revision is still held to it.",
+      "TITLE_WORDS": { "version": 3, "before": 14 },
+      "TAKEAWAY_LONG": { "version": 3, "before": 3 }
+    }
+  },
+  "calibration": {
+    "$comment": "Where the reference figures under `reference`, `geometryByFill` and `plan` come from. The sample is described, not named: the decks are third-party work and their identity is withheld.",
+    "date": "2026-09",
+    "method": "Analytical pages of well-made working decks rendered on the gates' 1280x720 canvas and measured with the gates' own code: ink and band shares off the PNG, words by band off the page text, exhibit families, treatments and annotations read page by page. Each geometric threshold is set in the tail of that distribution (`reference.slides.exceedance` records the share of those pages each candidate flags), each text figure at its quartiles.",
+    "sample": "withheld",
+    "units": "shares of the canvas height or area unless stated; words counted by textWords (text-contract.mjs), ported as gates/text_stats.py"
+  },
+  "deckLength": {
+    "$comment": "How long a deck must be before each deck-wide rule is worth reading. A share or a range over a handful of pages is noise, so every deck-wide rule names the floor it reads from here rather than carrying its own copy. Counts are of content pages (analytical pages for the page gates).",
+    "variety": 12,
+    "plan": 8,
+    "content": 8,
+    "sections": 12,
+    "frontMatter": 12,
+    "deckShape": 8,
+    "evidenceMix": 8,
+    "pageVariety": 10,
+    "shapeVariety": 10,
+    "craft": 12,
+    "craftDevices": 20,
+    "emptyHabit": 12,
+    "density": 8
+  },
   "keys": {
     "pageWords": "words in the page BODY - the title band, source and notes do not count",
     "columnFill": "share of its own height the side column must reach",
@@ -63,24 +104,33 @@
     }
   },
   "geometryByFill": {
-    "$comment": "The geometric thresholds that move with fill, each set as a tail a page must stay out of, so a floor can be read as a promise: an `airy` deck avoids the emptiest few percent of well-made pages, a `balanced` deck the emptiest tenth, a `full` deck the emptiest quarter. A floor that rejects a third of good pages is not a floor on emptiness but a demand to be denser than most. The dead band and column-void ceilings sit in the same small tail. A column's internal void is held to internal_void_max, measured on its own height; `column_void_max` is a column's trailing band, set on the right-column band of well-made pages (columnVoidAbove: 0.13 flags 9.3% of them, 0.2 flags 4.3%), because a side column stopping above its neighbour is commoner on good pages than a page-wide dead band. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead.",
+    "$comment": "The geometric thresholds that move with fill, each set as a tail a page must stay out of, so a floor can be read as a promise: an `airy` deck avoids the emptiest few percent of well-made pages, a `balanced` deck the emptiest tenth, a `full` deck the emptiest quarter. A floor that rejects a third of good pages is not a floor on emptiness but a demand to be denser than most. The dead band and column-void ceilings sit in the same small tail. A column's internal void is held to internal_void_max, measured on its own height; `column_void_max` is a column's trailing band, set on the right-column band of well-made pages (columnVoidAbove: 0.13 flags 9.3% of them, 0.2 flags 4.3%), because a side column stopping above its neighbour is commoner on good pages than a page-wide dead band. A page of type alone cannot reach ink_min at any honest length: see inkPerWord, which sets that page's floor instead. The `_block` bars are where the same finding stops being a question and blocks: a band past them is empty space no reading of the page explains (on well-made pages internalVoidAbove 0.14 falls between the 4.3% flagged at 0.13 and the 2.9% at 0.18, deadBandAbove 0.12 between the 7.1% at 0.08 and the 5% at 0.14, and a column's band past 0.2 flags 4.3%). Between the two bars a finding stays advisory.",
     "full": {
       "ink_min": 0.118,
       "dead_band_max": 0.06,
       "internal_void_max": 0.12,
-      "column_void_max": 0.13
+      "column_void_max": 0.13,
+      "dead_band_block": 0.1,
+      "internal_void_block": 0.14,
+      "column_void_block": 0.2
     },
     "balanced": {
       "ink_min": 0.077,
       "dead_band_max": 0.08,
       "internal_void_max": 0.13,
-      "column_void_max": 0.2
+      "column_void_max": 0.2,
+      "dead_band_block": 0.12,
+      "internal_void_block": 0.14,
+      "column_void_block": 0.2
     },
     "airy": {
       "ink_min": 0.05,
       "dead_band_max": 0.14,
       "internal_void_max": 0.18,
-      "column_void_max": 0.2
+      "column_void_max": 0.2,
+      "dead_band_block": 0.2,
+      "internal_void_block": 0.22,
+      "column_void_block": 0.25
     }
   },
   "inkPerWord": {
@@ -104,13 +154,12 @@
     "shareMax": 0.6
   },
   "analyticalPage": {
-    "$comment": "The population every page figure here describes, and the one definition the gates (page_gates.py analytical), the evaluation's page census and the review's design statistics (reviewer.mjs designStatistics) count: a page that argues carries an action title or a reading task, and is not a cover, not a structural page (a page carrying one of structuralComponents, or the first page when no slide-chrome says it is content), and not a page the build generated (its id matches `generated`). The three used to disagree - one counted a takeaways page, one counted every page with an action title, agendas and the credits page included - so the same deck read differently to each.",
+    "$comment": "The population every page figure here describes, and the one definition the gates (page_gates.py analytical), the evaluation's page census and the review's design statistics (build-bars.mjs designStatistics) count: a page that argues carries an action title or a reading task, and is not a cover, not a structural page (a page carrying one of structuralComponents, or the first page when no slide-chrome says it is content), and not a page the build generated (its id matches `generated`). The three used to disagree - one counted a takeaways page, one counted every page with an action title, agendas and the credits page included - so the same deck read differently to each.",
     "structuralComponents": ["cover", "section-divider", "agenda", "tracker-page", "takeaways", "statement"],
     "generated": "^picture-credits(?:-\\d+)?$"
   },
   "plan": {
     "$comment": "Thresholds for the plan gates, which judge the dot-dash before a page is drawn. The mix bands and the entropy floor are calibrated on the example decks and are GUIDELINES - move them with judgement as real plans are measured against them. The shapes of the tests are not guidelines: charts and tables get separate bands because merging them into one 45% floor is what let a deck of 43% tables pass more comfortably than a balanced one.",
-    "from": 8,
     "measuredMin": 0.45,
     "runMax": 2,
     "entropyMin": 0.7,
@@ -121,7 +170,7 @@
       0.92
     ],
     "titleWords": {
-      "max": 14,
+      "max": 12,
       "target": 12,
       "overShareMax": 0.35
     },
@@ -143,8 +192,17 @@
       },
       "diagram": {
         "min": 0.07,
+        "max": 0.25,
         "observed": 0.098,
         "present": 0.148
+      },
+      "numbers": {
+        "$comment": "Metric tiles, fact grids, cards and labelled rows: pages whose evidence is a handful of stated numbers or a set of parallel points. They were counted as diagrams, which put a deck of fact grids and cards at 42% diagram against a 10-15% reference and hid that its charts had fallen under their floor.",
+        "max": 0.25
+      },
+      "mixed": {
+        "$comment": "A page that pairs two exhibits of different families, recorded in the plan as `paired`, `panels` or `two-up`. No band: it is a structure, not a family, and the variety contract counts it (VARIETY_PANELS).",
+        "observed": 0.131
       },
       "picture": {
         "max": 0.15,
@@ -155,6 +213,10 @@
         "max": 0.35,
         "observed": 0.254
       }
+    },
+    "mixEnforced": {
+      "$comment": "The bands the variety contract enforces on the compiled deck, at authoring and in the build's preflight (variety_gates.mjs VARIETY_EXHIBIT_MIX), where each page's family is read off the exhibits it draws and the count is exact. The plan's own mix statistics read the families the author declared and stay advisory. Floors other than the chart floor stay advisory everywhere: a floor on diagrams or pictures would ask for one drawn to meet a quota.",
+      "bands": ["chart.min", "table.max", "diagram.max", "numbers.max", "picture.max", "text.max"]
     },
     "craft": {
       "$comment": "What the dot-dash has to record about the *craft* of a page. A generated 50-page deck passed every mix, entropy and anchor gate and still read as dry: 10 tables with a median of 3 rows and not one treatment, 18 charts with not one annotation, 35 point lists with not one highlighted phrase. In a strong deck **every table carries a treatment** and four charts in five carry an annotation, which is where these floors sit.",
@@ -169,15 +231,23 @@
       "tableTreated": {
         "min": 0.75,
         "observed": 1.0,
-        "observedOf": 32
+        "observedOf": 32,
+        "blockBelow": 0.5,
+        "blockFrom": 4,
+        "$comment": "`min` is the plan's advisory target; `blockBelow` the lower floor a built deck is refused under (craft_gates.mjs CRAFT_TABLES_PLAIN), read on the composed scene from `blockFrom` tables. Two numbers on purpose: a plan short of the target is asked, a deck built with most of its tables plain is stopped."
       },
       "chartAnnotated": {
         "min": 0.65,
         "observed": 0.796,
-        "observedOf": 49
+        "observedOf": 49,
+        "blockBelow": 0.3,
+        "blockFrom": 6,
+        "$comment": "`min` is the plan's advisory target; `blockBelow` the lower floor a built deck is refused under (craft_gates.mjs CRAFT_CHARTS_BARE), from `blockFrom` chart pages."
       },
       "exhibitVarietyPerTen": {
         "min": 4.0,
+        "sceneMin": 2.0,
+        "$comment": "Distinct exhibits per ten content pages. `min` is enforced on the compiled deck at authoring (variety_gates.mjs VARIETY_EXHIBIT_RANGE: every exhibit type a page draws, and a page drawing none by its type and form) and asked of the plan (PLAN_EXHIBIT_VARIETY); `sceneMin` is the last-resort floor the build reads on the composed scene's component kinds (craft_gates.mjs CRAFT_EXHIBIT_VARIETY).",
         "observed": [
           7.1,
           7.5,
@@ -235,7 +305,7 @@
       }
     },
     "textForm": {
-      "$comment": "How a well-made page shapes its words: a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so.",
+      "$comment": "How a well-made page shapes its words: a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so. A deck whose prose pages (reading tasks with commentary, text pages, mixed pages) run a median words-per-block outside wordsPerBlock q1-q3 is refused once it has deckLength.density of them (density_profile.py TEXT_FRAGMENTED): under the band is copy broken into labels, over it copy set as one slab.",
       "pagesMeasured": 37,
       "blocksPerPage": {
         "median": 4,

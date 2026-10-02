@@ -9,11 +9,11 @@ A palette changes colour; a design system changes the page. Two decks on unrelat
 | `design` | Reader and occasion | Frame | Page repertoire to plan for |
 | --- | --- | --- | --- |
 | `consulting` (default) | steering committees, boards, diligence | white canvas, sans titles top-left over a thin grey rule margin to margin, commentary rail right, tinted takeaway band, dark cover, numbered chapter panels | exhibit with commentary, tables with treatments, metrics strips, trackers |
-| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles over a hairline run edge to edge, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture-hero`), quotations, fewer and larger exhibits, statement pages between parts |
-| `journal` | evidence-led briefings where the chart is the argument | red tab over short bold sans titles, the finding as a standfirst under the title, tight margins, zebra tables, no tinted boxes, masthead cover | full-width annotated charts with commentary in columns beneath (`exhibit-top`), small multiples (`grid`), metrics over an exhibit, record tables |
-| `keynote` | decks presented to a room, launches, pitches | titles reversed out of a colour block, larger type, the takeaway as a statement with an accent bar, colour-field cover and chapter pages, full-bleed picture covers | one idea a page: hero numbers (`kpi`), metrics over an exhibit, split-tone comparisons, statement and picture pages, sparse text |
+| `editorial` | pre-reads, strategy narratives and essays read alone | warm paper, large regular serif titles over a hairline run edge to edge, wide margins, commentary left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages, panels opened | text pages that carry an argument, a photograph beside prose (`picture` form `picture-hero`), quotations (`statement` form `quotes`), fewer and larger exhibits, statement pages between parts |
+| `journal` | evidence-led briefings where the chart is the argument | red tab over short bold sans titles, the finding as a standfirst under the title, tight margins, zebra tables, no tinted boxes, masthead cover | full-width annotated charts with commentary in columns beneath (commentary `below`), small multiples (`panels` form `grid`), metrics over an exhibit (`numbers` form `metric-strip`), record tables |
+| `keynote` | decks presented to a room, launches, pitches | titles reversed out of a colour block, larger type, the takeaway as a statement with an accent bar, colour-field cover and chapter pages, full-bleed picture covers | one idea a page: hero numbers (`numbers` form `hero-number`), metrics over an exhibit, two-up comparisons (`options` form `two-up`), statement and picture pages, sparse text |
 
-The system biases the layout chooser toward its repertoire and translates the author's panel tones into its grammar (an editorial page has no navy column), but it cannot make pages it was not given. Plan the slides for the system: a keynote dot-dash built from forty exhibit-with-commentary pages is a consulting deck in keynote colours. Choose each page's slide type from what it must show *and* from the system's repertoire.
+The system biases the layout chooser toward its repertoire and translates the author's panel tones into its grammar (an editorial page has no navy column), but it cannot make pages it was not given. Plan the slides for the system: a keynote dot-dash built from forty exhibit-with-commentary pages is a consulting deck in keynote colours. Choose each page's type and form from what it must show *and* from the system's repertoire.
 
 `identity: { primary, accent }` takes the colours from the subject - a franchise's house colours, a brand's, a flag's - onto any system: primary and accent are darkened until they read as text, tints and a chart-series ramp are derived, and the raw accent stays bright as a chart series. A deck about a recognisable subject carries its identity; two decks in one system on different subjects then differ at a glance.
 
@@ -23,11 +23,11 @@ The system biases the layout chooser toward its repertoire and translates the au
 
 ## Design intake
 
-How a user's decks look is a habit, not a property of one deck, so it is asked once per user and stored: `runtime/preferences.mjs` keeps the answers in a file outside any project (`$PROFESSIONAL_SLIDES_HOME/preferences.json`, else `$XDG_CONFIG_HOME/professional-slides/`, else `~/.professional-slides/`), with when and how each was chosen (`asked`, `inferred` from a reference deck, or a `default` accepted) and a reference deck recorded only as a hash of its path.
+How a user's decks look is a habit, not a property of one deck, so it is asked once per user and stored: `runtime/preferences.mjs` keeps the answers in a file outside any project (`$PROFESSIONAL_SLIDES_HOME/preferences.json`, else `$XDG_CONFIG_HOME/professional-slides/`, else `~/.professional-slides/`), with when and how each was chosen (`asked`, `inferred` from a reference deck, or a `default` accepted) and a reference deck recorded only as a hash of its path. Where the sandbox blocks the home directory it falls back to `.professional-slides/` in the working directory and says so (`location`, `locationReason` in its output); set `$PROFESSIONAL_SLIDES_HOME` to choose the place.
 
-**1. Read what is stored.** Before planning a new deck run `node runtime/preferences.mjs show`: it prints the stored answers, `missing` (the questions still to ask), the `deckKeys` they set and a `reuse` line. Where the host keeps its own memory of the user (Claude Code's memory files, a Codex memory, a project instruction file), read that too; an answer found only there is stored with `set` before asking anything. Nothing missing: tell the user the `reuse` line - what was reused and that they can change it - and go on. The brief's own instructions still win for this deck ("make it look like our annual report") and are not stored unless the user says to.
+**1. Read what is stored.** Before planning a new deck run `node runtime/preferences.mjs show`: it prints the stored answers, `missing` (the questions still to ask), `unset` (each answer not yet given, with the default the question would recommend - nothing is applied for it), the `deckKeys` the stored answers set and a `reuse` line. Where the host keeps its own memory of the user (Claude Code's memory files, a Codex memory, a project instruction file), read that too; an answer found only there is stored with `set` before asking anything. Nothing missing: tell the user the `reuse` line - what was reused and that they can change it - and go on. The brief's own instructions still win for this deck ("make it look like our annual report") and are not stored unless the user says to.
 
-**2. Ask only what is missing, in one message.** Ask in this order, at most six questions, each with its recommended default marked and a note that any answer can be changed later. Show each question's sheet from `assets/design-options/` beside it; `options.json` there lists every tile's label, meaning and deck keys.
+**2. Ask only what is missing: question 1 first, then the rest together.** When question 1 is missing, ask it alone first - a reference deck answers most of the others. Then ask whatever is still missing together, in this order, at most five more questions, each with its recommended default marked and a note that any answer can be changed later. Show each question's sheet from `assets/design-options/` beside it; `options.json` there lists every tile's label, meaning and deck keys.
 
 | # | Question | Options | Default | Show |
 | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ How a user's decks look is a habit, not a property of one deck, so it is asked o
 | 3 | Colours: the subject's own, your brand's, or a named palette? | `subject` (each deck takes its subject's identity colours when it has recognisable ones, else the system's), `brand` (give one or two hex colours, and a logo wordmark if wanted), `system`, `midnight`, `evergreen`, `crimson`, `graphite` | `subject` | `palettes.png` |
 | 4 | How should pages show where the reader is? | `pills`, `label`, `breadcrumb`, `number-strip`, `repeat-contents` (the contents page again before each section), `none`, or `auto` (each deck's variation draws label, breadcrumb or number strip) | `auto` | `trackers.png` |
 | 5 | Title treatment, and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
-| 6 | Who reads it, and how? | `live-pitch`: presented to a room, one idea a page, about 40 body words or fewer; `executive`: presented or sent, about 95 to 120 body words a page with commentary beside the evidence; `pre-read`: read alone, 120 body words a page and up | `executive` | - |
+| 6 | Who reads it, and how? | `live-pitch`: presented to a room, one idea a page, about 40 body words or fewer (each page's word floor is a quarter of its reading task's); `executive`: presented or sent, about 95 to 120 body words a page with commentary beside the evidence; `pre-read`: read alone, 120 body words a page and up | `executive` | - |
 
 Close the message with one optional line: fonts (only faces installed on the machine), a footer line reused on every deck (a confidentiality marking, the firm's name) and a cover wordmark. A user who answers only some questions takes the defaults for the rest; store those with `--source default`.
 
@@ -44,8 +44,8 @@ Close the message with one optional line: fonts (only faces installed on the mac
 
 **Hosts.** Show the sheet images with the questions: attach or open them where the host can, else give their paths.
 
-- *A structured question tool* (Claude Code's `AskUserQuestion`: up to four questions a call, two to four options each, "Other" always offered): ask question 1 alone first, since its answer removes most of the rest, then the remaining questions in one or two calls. Put the recommended option first, marked as recommended, with the option's meaning and the sheet's path in its description or preview. A question with more options than the tool takes lists the likeliest three beside the default and names the rest in the question text, answerable through "Other".
-- *No such tool* (Codex, a plain chat): one numbered message with the defaults marked and the sheets attached or linked.
+- *A structured question tool* (Claude Code's `AskUserQuestion`: up to four questions a call, two to four options each, "Other" always offered): question 1 in its own call, then the remaining questions in one or two calls. Put the recommended option first, marked as recommended, with the option's meaning and the sheet's path in its description or preview. A question with more options than the tool takes lists the likeliest three beside the default and names the rest in the question text, answerable through "Other".
+- *No such tool* (Codex, a plain chat): question 1 in one short message, then one numbered message with the rest, the defaults marked and the sheets attached or linked.
 
 Never block on the intake for a one-page fix or an existing-deck revision; those keep the deck's own design.
 
@@ -64,7 +64,7 @@ Never block on the intake for a one-page fix or an existing-deck revision; those
 | `titleRule` | `palette.colors`: `style.titleRule`, `style.titleRuleLength`, `style.titleRuleColor` (and `line.titleRule: 4` for `bar`); `system` sets nothing |
 | `tracker` | `tracker` (`none` is `false`; `auto` sets nothing, so the variation draws one) |
 | `surfaces` | `surfaces` |
-| `density` | `density`; the fill follows (`live-pitch` airy, `executive` balanced, `pre-read` full) |
+| `density` | `density`; the fill follows (`live-pitch` airy, `executive` balanced, `pre-read` full), and so do the word floors (`live-pitch` a quarter of each reading task's lower quartile) |
 | `typography` | `typography` (a body face other than Arial takes a bold semibold mapping) |
 | `footer`, `wordmark` | `footer`, `logo` (the cover wordmark) |
 | `house` (inferred) | `design`, `palette`, `typography`, `chrome`, `pageTemplate`, `density`, `fill`, `weight` from the house profile |
@@ -106,7 +106,7 @@ Use one family across a deck. A cover or chapter transition may use the family's
 | `pre-read` | evidence-led document read without narration | compact but readable type, tighter analytical rhythm |
 | `appendix` | source-rich analytical support | smallest approved type and tightest grid |
 
-Declare the profile per coherent slide family; a deck may run an `executive` main story with a `pre-read` analytical family. A profile changes every content type role together, while page furniture keeps the deck's base typography. When an exhibit crosses a capacity threshold, promote the whole page to the next profile rather than reducing one legend, cell or annotation. Measure the content at its allocated width: keep the larger type when the exhibit fits, and otherwise remove duplication, enlarge the exhibit, choose another encoding, or split the slide.
+This section owns density. The deck sets one `density`, and with it one body size for every page: a page type refuses `density` on a page, no preset sets it, and structural and tracker pages take `executive` unless the deck sets another. Appendix pages are set at `appendix`. A chart's mark count may step its own labels down one size; nothing else on the page shrinks. When content does not fit, change the page, not its type size: remove duplication, enlarge the exhibit, choose another form, split the page or move it to the appendix. Measure the content at its allocated width.
 
 ## Theme manifest
 
@@ -153,7 +153,7 @@ Each palette sets its `style.*` keyword tokens beyond its colours; components re
 | `style.labelWeight` | `bold` \| `regular` value labels, in the scene and the native chart |
 | `style.titleLead` | `accent`: the lead in the accent before the rest; `pipe`: "Topic \| statement", the `evergreen` title |
 
-The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette.
+The `midnight` palette also sets `font.display` to a serif; `examples/house-style.deck.json` shows the same eight pages under any palette. The display face sets titles only: data figures - metric and fact values, divider, agenda and closing numerals - are set in the body face, bold, with lining numerals, since a serif's old-style figures sit at uneven heights and descend below the line.
 
 ## Surface treatments
 
@@ -192,7 +192,7 @@ A palette may also be written by hand as `{ "base": "midnight", "colors": { "col
 
 ## Choose the kind of variation
 
-A request for alternative decks normally asks for different ways to explain the evidence. Before changing palette, define each version’s reader question, narrative order, evidence hierarchy and visualization choices in the slide plan. Reuse the verified facts and scope, but rewrite, consolidate or relocate material where the new argument needs it. A decision guide, a diagnostic and a mechanism-led explanation should remain distinguishable with colour removed. Swapping chart types inside the same repeated page is not enough. Record a source-to-page map and the rationale for every material change. Review alternatives side by side, including deletion candidates and their normalized architectures.
+A request for alternative decks normally asks for different ways to explain the evidence. Before changing palette, define each version’s reader question, narrative order, evidence hierarchy and page types in its own pages file. Reuse the verified facts and scope, but rewrite, consolidate or relocate material where the new argument needs it. A decision guide, a diagnostic and a mechanism-led explanation should remain distinguishable with colour removed. Swapping chart types inside the same repeated page is not enough. Record a source-to-page map and the rationale for every material change. Review alternatives side by side, including deletion candidates and their normalized architectures.
 
 Use cosmetic variations only when the user explicitly wants the same content restyled. The following preservation rules apply to that narrower task.
 
@@ -200,7 +200,7 @@ Use cosmetic variations only when the user explicitly wants the same content res
 
 Freeze the approved titles, claims, figures, labels, sources, notes, ordering and stage contracts before making style variations. Change deck-level palette, typography, surfaces and registered component treatments; compare authoring content and rendered text afterward so reflow cannot silently remove evidence. A palette change can change salience: categorical colours must not create an unintended highlighted cohort. When a treemap has an explicit focal item, keep other tiles neutral.
 
-Every variant needs a fresh full-deck taste review and bound delivery record. A passing review of the original does not transfer to a new style. Inspect dense tables, stacked labels, highlighted prose, navigation and the canvas at full size. Foreground contrast is measured against the final displayed fill after focus overrides, not against the nominal series colour. Positive/negative status colouring is limited to short text or compact status icons; chart marks and their legend swatches use chart-series colours, never a status override. Choose preset accents that remain legible both as text on the page and behind white compact labels; use a quieter readable swatch when a bright accent fails that dual role. The evergreen preset uses a darker green accent for this reason.
+Every variant needs a fresh full-deck taste review and bound delivery record. A passing review of the original does not transfer to a new style. Inspect dense tables, stacked labels, highlighted prose, navigation and the canvas at full size. Foreground contrast is measured against the final displayed fill after focus overrides, not against the nominal series colour. Status colour follows [one rule](design.md#status-colour): chart marks and their legend swatches keep chart-series colours in every variant. Choose preset accents that remain legible both as text on the page and behind white compact labels; use a quieter readable swatch when a bright accent fails that dual role. The evergreen preset uses a darker green accent for this reason.
 
 The exported slide background must resolve `color.canvas`; white is not an implicit substitute for a warm or dark family. Saved-file readback verifies it. Repair a failed role or exporter at its shared owner, preserve each candidate, regenerate affected variants and reassess without a score floor.
 
@@ -224,4 +224,4 @@ All named presets default to plain chart headings with inline units and a rule. 
 | `elements` | evidence elements on an analytical page; 2 on a document-weight deck (`THIN_EVIDENCE`) |
 
 
-Read each gate’s reported severity. Distribution diagnostics cannot justify unsupported prose, forced highlights or empty furniture. Sparse groups follow [Design](design.md#deck-rhythm) even at full density; fit, truthful scales and blocking content checks still apply.
+Read each gate’s reported severity. Distribution diagnostics cannot justify unsupported prose, forced highlights or empty furniture. Sparse groups follow [Design](design.md#space-type-and-boundaries) even at full density; fit, truthful scales and blocking content checks still apply.

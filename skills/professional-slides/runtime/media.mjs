@@ -1,28 +1,36 @@
 import { readFileSync } from "node:fs";
 import { primitive, stableId, token, tokenValue } from "./core.mjs";
+import { readJsonSync } from "./cli.mjs";
 
-const iconData = `data:image/png;base64,${readFileSync(new URL("../assets/lucide/briefcase-business.png", import.meta.url)).toString("base64")}`;
-export const MEDIA_SAMPLE = Object.freeze({
-  dataUri: iconData,
+// The component samples' images, read and encoded when a sample is first
+// drawn: a deck that shows no sample never reads them.
+const encoded = new Map();
+const pngUri = (file) => {
+  if (!encoded.has(file)) encoded.set(file, `data:image/png;base64,${readFileSync(new URL(`../assets/${file}`, import.meta.url)).toString("base64")}`);
+  return encoded.get(file);
+};
+/** A sample image: `dataUri` read from assets/`file` on first use, then `fields`. */
+export const sampleImage = (file, fields) => Object.assign({ get dataUri() { return pngUri(file); } }, fields);
+
+/** The size and treatment of each Simple Icons mark (assets/simple-icons/treatments.json). */
+export const WORDMARK_RECORDS = Object.freeze(readJsonSync(new URL("../assets/simple-icons/treatments.json", import.meta.url)));
+
+export const MEDIA_SAMPLE = Object.freeze(sampleImage("lucide/briefcase-business.png", {
   alt: "Briefcase",
   authorization: "Lucide ISC license; assets/lucide/LICENSE",
   sourceUrl:
     "https://github.com/lucide-icons/lucide/blob/main/icons/briefcase-business.svg",
   width: 192,
   height: 192,
-});
-const loadAsset = (directory, name, alt, authorization) => ({
-  dataUri: `data:image/png;base64,${readFileSync(new URL(`../assets/${directory}/${name}.png`, import.meta.url)).toString('base64')}`,
-  alt, authorization, width:192, height:192
-});
+}));
+const loadAsset = (directory, name, alt, authorization, size = { width: 192, height: 192 }) => sampleImage(`${directory}/${name}.png`, { alt, authorization, ...size });
 const TREND_MEDIA = [MEDIA_SAMPLE, ...['house','train-front','chart-no-axes-combined'].map(name => loadAsset('lucide',name,name,'Lucide ISC; assets/lucide/LICENSE'))];
 const LOGO_MEDIA = ['github','python','rust','javascript'].map(name => ({
   mediaVariants: Object.fromEntries(['grayscale','color'].map(mode => [mode,loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification')]))
 }));
-const WORDMARK_RECORDS=JSON.parse(readFileSync(new URL("../assets/simple-icons/treatments.json",import.meta.url),"utf8"));
 const WORDMARK_MEDIA=['visa','cisco','intel','samsung'].map(name=>{
   const record=WORDMARK_RECORDS.find(r=>r.name===name);
-  return {mediaVariants:Object.fromEntries(['grayscale','color'].map(mode=>[mode,{...loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification'),width:record.width,height:record.height}]))};
+  return {mediaVariants:Object.fromEntries(['grayscale','color'].map(mode=>[mode,loadAsset('simple-icons',name+'-'+mode,name,'Simple Icons CC0; assets/simple-icons/LICENSE.md; editorial identification',{width:record.width,height:record.height})]))};
 });
 const COLLAGE_MEDIA=[WORDMARK_MEDIA[0],LOGO_MEDIA[0],WORDMARK_MEDIA[1],LOGO_MEDIA[1],WORDMARK_MEDIA[2],LOGO_MEDIA[2],WORDMARK_MEDIA[3],LOGO_MEDIA[3]];
 const COLLAGE_CELLS=[
@@ -31,8 +39,10 @@ const COLLAGE_CELLS=[
   {x:.26,y:.37,width:.30,height:.20},{x:.68,y:.40,width:.13,height:.25},
   {x:.03,y:.77,width:.40,height:.20},{x:.86,y:.74,width:.10,height:.23}
 ];
-const IMAGE_MEDIA = {...loadAsset('pexels','category','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:480,height:480,sourceUrl:'https://images.pexels.com/photos/7135013/pexels-photo-7135013.jpeg'};
-const COVER_MEDIA = {...IMAGE_MEDIA,...loadAsset('pexels','cover','Abstract Pexels background','User-selected Pexels image; assets/pexels/source.json'),width:640,height:720};
+const PEXELS = { alt: 'Abstract Pexels background', authorization: 'User-selected Pexels image; assets/pexels/source.json' };
+const PEXELS_SOURCE = 'https://images.pexels.com/photos/7135013/pexels-photo-7135013.jpeg';
+const IMAGE_MEDIA = sampleImage('pexels/category.png', { ...PEXELS, width: 480, height: 480, sourceUrl: PEXELS_SOURCE });
+const COVER_MEDIA = sampleImage('pexels/cover.png', { ...PEXELS, width: 640, height: 720, sourceUrl: PEXELS_SOURCE });
 
 const T = [
   "space.3",
@@ -156,9 +166,8 @@ export function registerMedia(registry) {
     const panelWidth = Math.round(frame.width * 0.42);
     const base = dividerRender({ ...input, props: { ...props, panelWidth } });
     // The footer row is laid out for a page with nothing behind it, so on an
-    // image divider it landed on the photograph: white type over a crowd in
-    // one deck, unreadable where the photo was bright. The row moves, as one
-    // group, to end at the panel's right margin.
+    // image divider it would land on the photograph, unreadable where the photo
+    // is bright. The row moves, as one group, to end at the panel's right margin.
     const FURNITURE = new Set(["footer-right", "footer-left", "page-number", "source-text"]);
     const furniture = base.nodes.filter((node) => FURNITURE.has(node.role) && node.frame);
     const panelRight = frame.x + panelWidth - Math.round(frame.width * 0.025);

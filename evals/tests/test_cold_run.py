@@ -7,9 +7,10 @@ same loop as a command, and these tests hold the harness to what it claims:
 that it measures the deck rather than itself, that its bars are the contract's
 bars, and that the run which started all of this still fails it.
 
-The suite cannot run the model. Generating a deck is not deterministic and does
-not belong here; producing a cold run is a human step, and the point of the
-directory is that scoring one afterwards is not.
+The suite never runs a model. Generating a deck is not deterministic and does
+not belong here; `evals/quality/run.mjs` produces and judges runs, and what a
+run wrote is kept under `specimens/<name>/` so these tests can score it again
+under today's rules.
 """
 
 from __future__ import annotations
@@ -98,6 +99,51 @@ console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
 
+    def test_a_catalogue_is_held_to_the_ceilings_only(self):
+        # A catalogue shows each component plain so it can be copied; the floors
+        # are rates of a deck that argues (the craft floor reads it the same way).
+        # An empty frame is still an empty frame.
+        result = run_node('''
+import assert from 'node:assert/strict';
+import {scoreBuild} from './evals/cold-run/score.mjs';
+const page=(roles=[])=>({id:'s',nodes:[{role:'action-title',type:'text'},...roles.map(r=>({role:r,type:'rect'})),...Array(20).fill({role:'m',type:'rect'})],
+  componentInstances:[{component:'table'}]});
+const slides=Array.from({length:20},()=>page());
+assert.equal(scoreBuild({slides}).accepted,false);
+const catalogue=scoreBuild({slides},{purpose:'catalogue'});
+assert.deepEqual(catalogue.findings,[]);
+assert.equal(catalogue.statistics.tables,19,'the statistics are still measured (the first page is the cover)');
+const framed=scoreBuild({slides:[slides[0],page(['image-frame']),...slides.slice(2)]},{purpose:'catalogue'});
+assert.deepEqual(framed.findings.map(f=>f.measure),['unsourcedPictures']);
+console.log(JSON.stringify({ok:true}));
+''')
+        self.assertTrue(result["ok"])
+
+    def test_the_command_line_reads_the_deck_s_purpose(self):
+        # scoreBuild knew a catalogue; the command line never told it, so
+        # `score.mjs` flagged the gallery's floors that delivery and the craft
+        # floor hold it free of. It reads the purpose from the deck spec beside
+        # the plan, or beside the build directory, as the build lays them out.
+        import tempfile
+        page = {"id": "s", "nodes": [{"role": "action-title", "type": "text"}] + [{"role": "m", "type": "rect"}] * 20,
+                "componentInstances": [{"component": "table"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "out").mkdir()
+            (root / "out" / "scene.json").write_text(json.dumps({"id": "cat", "slides": [page] * 20}), encoding="utf-8")
+            (root / "cat.plan.json").write_text(json.dumps({"id": "cat"}), encoding="utf-8")
+            argues, code = score("-", str(root / "out"))
+            self.assertFalse(argues["build"]["accepted"], "with no spec beside it the floors apply")
+            self.assertEqual(code, 2)
+            (root / "cat.deck.json").write_text(json.dumps({"id": "cat", "purpose": "catalogue"}), encoding="utf-8")
+            alone, code = score("-", str(root / "out"))
+            self.assertTrue(alone["build"]["accepted"])
+            self.assertEqual(alone["build"]["purpose"], "catalogue")
+            self.assertEqual(code, 0)
+            (root / "out" / "scene.json").write_text(json.dumps({"id": "other", "slides": [page] * 20}), encoding="utf-8")
+            planned, _ = score(str(root / "cat.plan.json"), str(root / "out"))
+            self.assertTrue(planned["build"]["accepted"], "read from the spec beside the plan")
+
     def test_a_deck_that_ships_empty_frames_is_not_accepted(self):
         """Found by running the harness, which is the point of the harness.
 
@@ -133,16 +179,18 @@ console.log(JSON.stringify({ok:true}));
 
 
 class SpecimenTests(unittest.TestCase):
-    """The runs on record, and what they are for."""
+    """The runs on record kept as numbers, and what they are for."""
 
     def specimen(self, name):
         return json.loads((COLD / "specimens" / name).read_text(encoding="utf-8"))
 
-    def test_the_recorded_run_is_still_a_failing_run(self):
-        """The whole point of the specimen is that it cannot be re-argued.
+    def test_the_first_marvel_run_is_kept_as_a_record_of_its_numbers(self):
+        """A record, not a regression: that run's plan was never stored.
 
-        This deck passed every gate the skill had on 17 September. If a change
-        to the gates ever lets its shape through again, this is what says so.
+        This deck passed every gate the skill had on 17 September, and these
+        are the numbers that made the case. Scoring a run again under today's
+        rules needs the run itself, which is what the specimen directories hold
+        (StoredSpecimenTests).
         """
         recorded = self.specimen("2026-09-17-marvel-vs-dc.json")
         self.assertFalse(recorded["planScore"]["accepted"])
@@ -152,24 +200,38 @@ class SpecimenTests(unittest.TestCase):
             self.assertIn(expected, codes)
         built = recorded["deckAsBuilt"]
         reference = recorded["referenceCorpus"]
-        # The numbers that made the case, kept where they can be checked.
         self.assertLess(built["tableRowsMedian"], reference["tableRowsMedian"])
         self.assertEqual(built["tablesTreated"], 0.0)
         self.assertEqual(built["chartsAnnotated"], 0.0)
         self.assertLess(built["exhibitVarietyPerTen"], min(reference["exhibitVarietyPerTen"]))
 
-    def test_the_baseline_is_measured_by_the_same_harness(self):
-        """A harness only trusted on decks that fail it is not a harness."""
-        baseline = self.specimen("example-deck-baseline.json")
-        decks = baseline["decks"]
-        self.assertGreaterEqual(len(decks), 3)  # one per shipped example deck
-        for name, statistics in decks.items():
+    def test_the_baseline_is_measured_live_by_the_same_harness(self):
+        """A harness only trusted on decks that fail it is not a harness.
+
+        The example decks are compiled and scored now, not read from a record:
+        the recorded numbers had drifted a quarter from what the decks measure.
+        """
+        live = run_node('''
+import {measureBaseline} from './evals/cold-run/baseline.mjs';
+console.log(JSON.stringify(measureBaseline()));
+''')
+        self.assertEqual(sorted(live), ["gallery-acceptance", "house-style", "nyc-or-sf", "page-types"])
+        for name, statistics in live.items():
             with self.subTest(deck=name):
                 self.assertGreater(statistics["contentPages"], 0, name)
                 self.assertGreater(statistics["drawingsPerPage"], 12,
                                    f"{name}: a hand-authored page carries drawn elements")
                 self.assertGreaterEqual(statistics["exhibitVarietyPerTen"],
                                         CONTRACT["plan"]["craft"]["exhibitVarietyPerTen"]["min"], name)
+                self.assertEqual(statistics["accepted"], not statistics["misses"])
+        # The catalogue is held to the ceilings only; every deck that makes an
+        # argument clears its floors.
+        self.assertEqual(live["gallery-acceptance"].get("purpose"), "catalogue")
+        for name in ("house-style", "nyc-or-sf", "page-types"):
+            self.assertEqual(live[name]["misses"], [], name)
+        record = self.specimen("example-deck-baseline.json")
+        self.assertRegex(record["weightSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(sorted(record["decks"]), sorted(live))
 
     def test_a_specimen_records_what_looking_at_it_found(self):
         """The part of a cold run the score does not produce.
@@ -198,6 +260,109 @@ class SpecimenTests(unittest.TestCase):
                 text = brief.read_text(encoding="utf-8")
                 self.assertIn("Why this brief is in the suite", text)
                 self.assertIn("Audience", text)
+
+
+SCORED_SPECIMENS = '''
+import {listSpecimens,loadSpecimen,scoreSpecimen,inputHashes} from './evals/cold-run/specimens.mjs';
+console.log(JSON.stringify(listSpecimens().map((name)=>{
+  const specimen=loadSpecimen(name); const scored=scoreSpecimen(specimen);
+  const planIds=(specimen.plan?.pages??[]).filter(p=>p.kind!=='cover').map(p=>[p.id,p.title]);
+  const pageIds=(specimen.pages?.pages??[]).map(p=>[p.id,p.title]);
+  return {name,meta:specimen.meta,files:specimen.files,hashes:inputHashes(specimen.dir,specimen.files),
+          weightSha256:scored.weightSha256,verdict:scored.verdict,planIds,pageIds,
+          slides:specimen.scene?.slides?.length??null};
+})));
+'''
+
+
+class StoredSpecimenTests(unittest.TestCase):
+    """Recorded runs kept as inputs and scored again, live, by today's rules.
+
+    A specimen that stores the numbers scoring once produced cannot fail: no
+    change to the gates reaches it. These store what the run wrote - pages,
+    plan, scene, compiled deck - so a change that would let a known-bad deck
+    through fails here.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.scored = {s["name"]: s for s in run_node(SCORED_SPECIMENS)}
+
+    def test_the_stored_runs_are_the_ones_on_record(self):
+        self.assertIn("anthropic-vs-openai-2026", self.scored)
+        self.assertIn("emirates-v8", self.scored)
+        anthropic = self.scored["anthropic-vs-openai-2026"]
+        self.assertEqual(set(anthropic["files"]), {"pages", "plan", "scene", "deck"})
+        self.assertEqual(anthropic["slides"], 50)
+        self.assertEqual(set(self.scored["emirates-v8"]["files"]), {"pages", "plan"})
+
+    def test_the_delivered_deck_a_reader_rejected_is_not_accepted_today(self):
+        """Delivered on 27 September; an independent reader rated it 6.5 and did not accept it.
+
+        It cleared every gate the skill then had. Under today's rules the build
+        bars refuse it and the plan checks flag the repetition the reader saw.
+        """
+        specimen = self.scored["anthropic-vs-openai-2026"]
+        self.assertTrue(specimen["meta"]["outcome"]["delivered"])
+        self.assertLess(specimen["meta"]["outcome"]["independentReview"]["rating"], 7)
+        verdict = specimen["verdict"]
+        self.assertFalse(verdict["accepted"])
+        self.assertFalse(verdict["build"]["accepted"])
+        self.assertTrue(verdict["build"]["findings"])
+        for code in specimen["meta"]["expect"]["planCodes"]:
+            self.assertIn(code, verdict["plan"]["countsByCode"])
+
+    def test_every_specimen_meets_its_expected_verdict(self):
+        for name, specimen in self.scored.items():
+            expected = (specimen["meta"].get("expect") or {}).get("accepted")
+            if isinstance(expected, bool):
+                with self.subTest(specimen=name):
+                    self.assertEqual(specimen["verdict"]["accepted"], expected)
+
+    def test_a_specimen_is_the_bytes_it_was_stamped_with(self):
+        for name, specimen in self.scored.items():
+            with self.subTest(specimen=name):
+                self.assertEqual(specimen["hashes"], specimen["meta"]["inputs"],
+                                 "the stored inputs changed; a specimen is a record of one run")
+
+    def test_a_specimen_names_the_rules_it_was_recorded_under(self):
+        for name, specimen in self.scored.items():
+            with self.subTest(specimen=name):
+                recorded = specimen["meta"]["recorded"]
+                self.assertRegex(recorded["weightSha256"], r"^[0-9a-f]{64}$")
+                self.assertRegex(recorded["stamped"], r"^\d{4}-\d{2}-\d{2}$")
+                self.assertIn("accepted", recorded["verdict"])
+
+    def test_under_the_same_rules_the_verdict_comes_back_unchanged(self):
+        """Scoring is a function of the inputs and the rules.
+
+        With weight.json unchanged since the stamp, a different verdict means
+        the gates' behaviour changed: re-stamp with
+        `node evals/cold-run/specimens.mjs --stamp` and read the verdict delta in
+        the diff. With weight.json changed, the stamp records the old rules and
+        the expectations above are what must still hold.
+        """
+        for name, specimen in self.scored.items():
+            recorded = specimen["meta"]["recorded"]
+            if recorded["weightSha256"] == specimen["weightSha256"]:
+                with self.subTest(specimen=name):
+                    self.assertEqual(specimen["verdict"], recorded["verdict"])
+
+    def test_the_plan_and_the_pages_of_a_specimen_are_one_run(self):
+        for name, specimen in self.scored.items():
+            with self.subTest(specimen=name):
+                self.assertTrue(specimen["planIds"])
+                self.assertEqual(specimen["planIds"], specimen["pageIds"])
+
+    def test_what_looking_at_it_found_is_recorded(self):
+        for name, specimen in self.scored.items():
+            with self.subTest(specimen=name):
+                found = specimen["meta"]["foundByLooking"]
+                self.assertGreaterEqual(len(found), 3)
+                for entry in found:
+                    for field in ["defect", "why", "fix"]:
+                        self.assertTrue(entry.get(field, "").strip(), field)
+                    self.assertTrue(entry["pages"])
 
 
 if __name__ == "__main__":

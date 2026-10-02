@@ -3,48 +3,66 @@
 A deck is authored page by page as **page types**, in `<id>.pages.json`, and compiled into the deck spec. Each type is a reading task; each has choices with no defaults. The choices decide the page's structure, so variety is decided where it is cheap to change - in the pages file, before anything is drawn - not discovered in the render.
 
 ```bash
-node runtime/author-deck.mjs --types              # the catalogue: every type, its forms and placements
-node runtime/author-deck.mjs --schema             # JSON Schema for a pages file
-node runtime/author-deck.mjs <id>.pages.json      # compile, compose in memory, gate; write <id>.deck.json, .plan.json and .content.json, or refuse
+node runtime/author-deck.mjs --types                       # the catalogue: every type, its forms, placements, limits and data
+node runtime/author-deck.mjs --example <type>[/<form>]     # the worked pages of a type, or of one form, to copy the shape of
+node runtime/author-deck.mjs --scaffold <type> [--evidence <insight-id>]   # a page of that type that compiles, to fill in
+node runtime/author-deck.mjs --schema [type]               # JSON Schema for a pages file, or for one type's page
+node runtime/author-deck.mjs --icons                       # the icon names a point, card or row label can ask for
+node runtime/author-deck.mjs <id>.pages.json --draft       # the spine: titles, claims, types, insights; write the deck for the critique
+node runtime/author-deck.mjs <id>.pages.json --check       # compile and gate, print the page budgets, write nothing
+node runtime/author-deck.mjs <id>.pages.json               # compile, compose in memory, gate; write <id>.deck.json, .plan.json and .content.json, or refuse (exit 2)
+node runtime/author-deck.mjs <id>.pages.json --log         # the findings that came back run after run
 ```
+
+Start a page from `--example <type>` (or `--example <type>/<form>`, such as `ranking/boxplot`) or `--scaffold <type>` rather than from the whole worked example file: each prints one page, with the keys and the data shape its form reads. Every code the compiler raises, with its repair, is in [Codes and their repairs](#codes-and-their-repairs).
 
 ## Why types, not layouts
 
-A deck written straight into the spec takes the composer's defaults on every page. Fifty pages written through one helper - title, three points, a closing line, one exhibit - all came out as one page: a closing line on every page and bullets under the exhibit on nearly all of them. The composer could draw callouts on the chart, captions under panels, findings matrices, coded scorecards and side rails; nothing asked the author to choose them.
+A deck written straight into the spec takes the composer's defaults on every page. Fifty pages written through one helper - title, three points, a closing line, one exhibit - come out as one page: a closing line on every page and bullets under the exhibit on nearly all of them, though the composer can draw callouts on the chart, captions under panels, findings matrices, coded scorecards and side rails.
 
-Strong consulting decks spread the same decisions across the deck. On 123 of their content pages:
+Strong decks spread the same decisions across the deck. On 123 of their content pages:
 
-| Decision | Strong decks | The deck that prompted this |
+| Decision | Strong decks | One helper for every page |
 | --- | --- | --- |
 | Commonest page type | 23% (single annotated chart), then panels side by side 21% | one skeleton throughout |
-| Where the explanation lives | nowhere beyond the title 27%, in the table 20%, on the chart 16%, under each panel 16%, beside the exhibit 13%, in a band 7%, bullets under the exhibit 2% | bullets under the exhibit on ~95% |
-| Closing takeaway line | 9% (a standfirst under the title on another 15%, see [the standfirst](#the-standfirst)) | 100% |
-| Two or more exhibits | 24% | 9% |
+| Where the explanation lives | nowhere beyond the title 27%, in the table 20%, on the chart 16%, under each panel 16%, beside the exhibit 13%, in a band 7%, bullets under the exhibit 2% | bullets under the exhibit on nearly every page |
+| Closing takeaway line | 9% (a standfirst under the title on another 15%, see [the standfirst](#the-standfirst)) | every page |
+| Two or more exhibits | 24% | about one page in ten |
 | Chart pages marking something on the plot | 80% | under half |
 
 ## Writing a page
 
 ```json
-{ "id": "p07", "type": "trend", "form": "line", "commentary": "on-exhibit", "takeaway": false,
-  "why": "The recovery's shape is the claim; the break and the plateau are marked where they happen",
-  "title": "Passenger recovery plateaued near 53 million rather than returning to 59 million",
-  "exhibit": { "heading": "Emirates passengers", "unit": "million",
-    "categories": ["FY19", "FY20", "FY21", "FY22", "FY23", "FY24", "FY25", "FY26"], "series": [{ "name": "Passengers", "values": [58.6, 56.2, 6.6, 19.6, 43.6, 51.9, 53.7, 53.2] }],
-    "annotations": [{ "category": "FY21", "text": "Pandemic low of 6.6m as the network was grounded" }, { "category": "FY26", "text": "Still 5.4m below FY19: seats, not demand, now bind" }] },
-  "source": "Source: Emirates Group annual reports, FY2018-19 to FY2025-26" }
+{ "id": "p03", "type": "trend", "form": "line", "commentary": "on-exhibit", "takeaway": false,
+  "why": "The claim is the shape of the recovery - a rebound, then a plateau short of the FY20 peak - so the break and the stall are marked where they happen",
+  "settles": { "kind": "rate", "what": "annual journeys FY17-FY26 and the slowing of growth after FY24" },
+  "adds": "The callouts say why the series broke and why it has stalled, which the line alone cannot",
+  "title": "Journeys recovered to 48 million but stalled 4 million below peak",
+  "exhibit": { "heading": "Northvale Rail passenger journeys", "unit": "million",
+    "categories": ["FY17", "FY18", "FY19", "FY20", "FY21", "FY22", "FY23", "FY24", "FY25", "FY26"], "series": [{ "name": "Journeys", "values": [47.2, 49, 51.8, 52.4, 14.9, 31.6, 42.8, 46.1, 47.5, 48.3] }],
+    "referenceLines": [{ "value": 52.4, "label": "FY20 peak 52.4m" }],
+    "annotations": [{ "category": "FY21", "text": "Pandemic low of 14.9m while offices and schools were closed" }, { "category": "FY26", "text": "Growth slowed to 1.7%: peak trains are full, off-peak trains are not" }] },
+  "source": "Source: illustrative data for a fictional operator; financial years ending March" }
 ```
+
+With an insight log, `evidence: ["i3"]` names the insights and `settles` is derived from them.
 
 Every analytical page carries:
 
 - `type` - the reading task (below);
 - `form` - which exhibit or construction carries it; the form sets the exhibit's `type`;
 - `commentary` - where the explanation lives: `beside`, `beside-left` (a column), `below` (points under the exhibit), `rail` (one claim in a filled side panel, written as `rail`), `on-exhibit` (callouts on the chart, `annotations`), `in-exhibit` (in the table's cells, the matrix, the cards, the row blocks), `captions` (a `caption` under every panel), `so-what-bar` (one implication in a filled bar under the exhibit, written as `bar`) or `none` (the exhibit and title carry it);
-- `takeaway` - `false`, or the closing sentence, kept for the page whose implication goes beyond its title (`false` on a `so-what-bar` page: the bar is its close);
 - `why` - one sentence on why this type fits this claim;
-- `settles: { kind, what }` - what settles the claim and what kind of thing it is (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). With an insight log, name the insights instead - `evidence: ["i3", "i7"]` - and `settles` is derived from them;
-- `adds` - what the commentary says that the exhibit cannot, or `null`;
+- `settles: { kind, what }` - what settles the claim and what kind of thing it is (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). With an insight log, name the insights instead - `evidence: ["i3", "i7"]` - and `settles` is derived from them. A chart or table page measures something, so `qualitative` is refused there; a findings matrix may rest on statements;
+- `adds` - what the commentary says that the exhibit cannot, one sentence. Required on a page with commentary - `beside`, `beside-left`, `below`, `captions` and `on-exhibit` - where `adds: null` is refused (it says the commentary adds nothing - then the placement is `none`); a `rail` or `bar` is its own answer; leave it out elsewhere;
 - the content: `title`, `exhibit` or `exhibits`, `points`, `rows`, `kpi`, `metrics`, `pictures`, `source`, `highlight` and the other slide keys;
-- optionally `subtitle` - the standfirst (below).
+- optionally `takeaway` - the closing sentence, one or two lines, kept for the page whose implication goes beyond its title; left out, the page closes on its exhibit (a `so-what-bar` page takes none: the bar is its close);
+- optionally `subtitle` - the standfirst (below);
+- optionally `better: "up" | "down"` - the direction that is good news for a measure, on a metric (a strip's `metrics`, a hero's `kpi`, a row block's `metric`), a table column, a table row or one trend cell. `"up"` is the default (revenue, share, retention); `"down"` is for a cost, churn or a wait. A delta and a trend arrow are coloured by it, not by their sign ([Status colour](design.md#status-colour)).
+
+**Sources are written once.** A `sources` registry beside `deck` and `pages` - `{ "reports": { "name": "Northvale Rail annual reports, FY19-FY26", "url": "...", "status": "audited" } }` - lets a page cite by key: `"source": ["reports", "survey"]` is set as "Sources: Northvale Rail annual reports, FY19-FY26 (audited); ...". `status` says how far the source can be relied on (audited, company-reported, press report, estimate). An unknown key is refused with the keys the registry holds; `source` as text still works.
+
+**Nothing is stamped.** Metadata written the same on most pages - one `why`, one `settles`, one `adds` - was written by a loop, not chosen for the page; past 60% of the pages it is refused (`GENERATOR_SIGNATURE`). Leave optional fields out rather than stamping a default, and write the required ones page by page.
 
 ### The standfirst
 
@@ -65,9 +83,9 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 
 | Type | Reading task | Forms |
 | --- | --- | --- |
-| `trend` | a measure over four or more periods, its rate or break marked | line, column, stacked-column, area, stacked-area, combo, slope, indexed |
-| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet, distribution, aligned-bars |
-| `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie |
+| `trend` | a measure over four or more periods, its rate or break marked | line, column, stacked-column, area, stacked-area, combo, slope, indexed, sparklines, model |
+| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet, distribution, aligned-bars, boxplot |
+| `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie, pictogram |
 | `relationship` | two measures across the members | scatter, bubble, bubble-grid |
 | `bridge` | what a change between totals is made of | waterfall |
 | `panels` | one question for two to four cuts, side by side | row, grid, stack, sequence |
@@ -75,20 +93,33 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `lookup` | measures to look up under their units | measure-table, table |
 | `matrix` | findings down the side, evidence across | findings-matrix |
 | `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, ... |
-| `schedule` | what happens when | timeline, gantt, roadmap |
+| `schedule` | what happens when | timeline, gantt, roadmap, horizons |
 | `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list |
 | `parallel` | three to six parallel ideas (give each card an `icon` for icon columns) | cards, capsules, arrow-rows, labelled-rows |
-| `profiles` | who the players are, with their marks | logos, people, logo-table, cards |
-| `place` | where things are | map |
+| `profiles` | who the players are, with their marks | logos, people, logo-table, cards, radar |
+| `place` | where things are ([Geography](geography.md)) | map |
 | `picture` | what the subject looks like | picture-hero, picture-pair, picture-strip, photo-backdrop |
 | `options` | options compared on the same terms | compare, table-halves, two-up |
 | `argument` | reasoning in prose | memo, sidebar |
 | `statement` | one sentence, or the voices behind it | statement, quotes |
 | `summary` | the answer and its proof | executive-summary, takeaways |
 
+### Forms with rules of their own
+
+These forms narrow their type's commentary placements and carry checks of their own; `--types` prints their data and `--example <type>/<form>` a worked page.
+
+| Form | Choose it for | Data and limits | Commentary | Refused when |
+| --- | --- | --- | --- | --- |
+| `ranking/boxplot` | each member's spread - range, middle half, median - where one figure per member would hide how far its values run | `categories` (4 to 12 members), `boxes` (one `{ min, q1, median, q3, max }` per member), `highlights` naming the subject | `beside`, `beside-left`, `below`, `rail`, `so-what-bar`; no callouts | the subject is not highlighted; it carries `annotations` |
+| `trend/sparklines` | which of many series moved, one small line per member over one window | `items` (2 to 12, each `{ label, values }` over the same four or more periods), `highlights` naming the subject's label, `unit` | as boxplot; no callouts | an item has fewer than four periods, or items differ in length (a missing period is `null`); no subject highlighted; `annotations` |
+| `trend/model` | a forecast read with its numbers: the series over its own data table | `categories`, `series`, the chart's `type` (`chart.column` by default; line, area, stacked-column or combo) | `beside`, `on-exhibit` | no chart, another chart type, or no `series` |
+| `composition/pictogram` | a population's share counted in figures - six in ten - where a percentage reads as precision | `rows` (1 to 5, each `{ label, value, text }`, filled out of `of`), `of` (10 or 20), `icon` (a person by default) | as boxplot | no `rows` |
+| `profiles/radar` | each player's profile across three to eight attributes on one scale, where the shape is the comparison | `categories` (3 to 8 attributes), `series` (1 to 4 players, one value per attribute), `max` (the scale's top), `focusSeries` | `below`, `none` | more than four players; a player missing a value; no `max`; several players and no `focusSeries` |
+| `schedule/horizons` | the portfolio of bets by when each pays - the core now, growth next, options later | `horizons` (2 to 5, each `{ label, title, description }`, in the order they pay), `variant` (`curves`, `stepped`, `stepped-minimal`, `stepped-bands`) | `beside`, `below`, `so-what-bar`, `none` | fewer than two horizons |
+
 ## Beyond one exhibit and a column
 
-A generated deck drew two pages in five as one exhibit with a text column beside it; strong decks draw about one in eight that way and put a quarter of their pages on two or more exhibits. Three pages carry what those columns were holding:
+Strong decks draw about one page in eight as one exhibit with a text column beside it, and put a quarter of their pages on two or more exhibits; a deck that reaches for the column by habit draws two pages in five that way. Three pages carry what those columns usually hold:
 
 | Page | Choose it for | Write |
 | --- | --- | --- |
@@ -102,7 +133,7 @@ The variety contract holds the deck to this (`VARIETY_PANELS`, `VARIETY_COLUMN`,
 | --- | --- | --- |
 | a second cut of the same evidence - another measure, another member, the other period | two or more panels, each headed, its finding under it as a `caption` (`panels`, form `row`, `grid` or `stack`, commentary `captions`) | yes |
 | the three numbers that carry the claim | the exhibit under a strip of them (`numbers`, form `metric-strip`, commentary `none`) | yes |
-| notes on particular marks | callouts on the plot (commentary `on-exhibit`, three at most, about twelve words each) | no |
+| notes on particular marks | callouts on the plot (commentary `on-exhibit`, three at most, about ten words each) | no |
 | one implication | a so-what bar under the exhibit (commentary `so-what-bar`) | no |
 | a point per area, each with its own evidence | labelled row blocks, a number or a small exhibit at the right of each (`parallel`, form `labelled-rows`) | with a small `exhibit` on each row |
 | a point per row of a table | the table's last column, the implication of each row (`lookup` or `scorecard`, commentary `in-exhibit`) | no |
@@ -110,7 +141,7 @@ The variety contract holds the deck to this (`VARIETY_PANELS`, `VARIETY_COLUMN`,
 | the case for each of two options | the two options side by side, each with its exhibit (`options`, form `two-up`) | yes |
 | what the subject looks like | the exhibit on a card over its subject's photograph (`picture`, form `photo-backdrop`) | yes |
 
-Each row block is a filled label on the house colour - five words at most, read down the left edge as the page's outline - with two to four bullets beside it; the rows share the body height, so the page fills to its foot. The commentary is `in-exhibit`, since the bullets are the explanation, or `so-what-bar` to close the rows on what they add up to. A headed chart at the right of a row keeps its plot only on a page of two blocks; on three or more, give each row a number or a two-row table.
+Each row block is a filled label on the house colour - five words at most, read down the left edge as the page's outline - with two to four bullets beside it. The label names the area the row is about (the measure, the question), never its figures: a label that repeats what its `metric` or `exhibit` prints beside it is refused. The rows share the body height, so the page fills to its foot. The commentary is `in-exhibit`, since the bullets are the explanation, or `so-what-bar` to close the rows on what they add up to. A headed chart at the right of a row keeps its plot only on a page of two blocks; on three or more, give each row a number or a two-row table.
 
 The bar is drawn in the house colour with the implication in bold white, in every design system. It is a close, so it counts toward the closing share with the takeaway line: a deck cannot close every page by moving the line into a bar.
 
@@ -118,11 +149,17 @@ The compiler then composes the deck in memory, as the build will, filling logos,
 
 ## The pages file is the dot-dash
 
-Write it in two passes. `--draft` compiles the title spine with its page types, data and evidence, and writes the deck for the [storyline critique](storylining.md#stress-test-the-storyline) with the word floors reported rather than enforced; the copy - callouts, captions, points - is written after the critique, and the full compile holds it to every rule. A new deck cannot be built from a draft: the build holds its content plan to the complete text contract.
+Write it in two passes. `--draft` compiles the spine and writes the deck for the [storyline critique](storylining.md#stress-test-the-storyline): the rules that block are the spine's - each page's type and choices, its title (length, gaps), what settles it and the insights it rests on, the deck's `request`, the claims and the answer they carry. The exhibit's data, the copy, the word floors, the page gates and the variety contract are reported, not enforced: a page whose exhibit is not ready compiles with the refusal it will meet recorded (`deferred to the full compile`). With an insight log, `--draft` prints the page types each insight's shape can carry (`insightTypes`). The copy - callouts, captions, points - is written after the critique, and the full compile holds it to every rule. A new deck cannot be built from a draft: the build holds its content plan to the complete text contract.
+
+The spine rules and every other code the compiler raises, each with its repair, are in [Codes and their repairs](#codes-and-their-repairs). The deck-level keys `request`, `waivers` and `rulesVersion` pass into the deck spec unchanged; a deck that records no `rulesVersion` is stamped with the version it was authored under, and a revision stamped with an older one hears the rules added since as advisories ([Rules versions](evaluation/index.md#rules-versions)).
+
+### Rebuilding an existing deck
+
+`$RUNTIME_PYTHON runtime/import-deck.py deck.pptx <work>/` writes the inventory and a starter pages file whose pages carry stable ids, `sourceSlide` and the old copy as `draft` (`workflow: "existing_deck_revision"`, `inventory` on `deck`). Map each slide to a page type in place; the compiled plan records the inventory and each page's `sourceSlide`. A hidden slide's page carries `hidden: true` beside its `draft`, which mapping keeps ([hidden slides](composition.md#page-and-deck-keys)). The procedure is in [Storylining](storylining.md#revising-an-existing-deck).
 
 There is one authored record of the deck. `author-deck.mjs` writes the other three from it: the deck spec, the plan, and the content plan (`<id>.content.json`). The content plan's claim is each page's title; its `settles` and `adds` come from the page; its text plan is the page's copy as composed, so chart labels, formatted values and cells no longer have to be listed by hand; its reading task is the page type's exhibit family (chart, table, diagram, exhibit, text) and whether the composed page has a commentary column.
 
-The content gates then run in the same pass - claims that are topics, commentary that restates the exhibit, an answer no claim carries - and every page is held to the lower quartile of body words for its reading task (`TEXT_COVERAGE_LOW`): a chart carrying its own callouts from about 42 words, a table with commentary from about 149, less the share of the body a photograph holds. The ceiling (`WORDS`) is the task's outlier fence on the same count - the upper quartile plus one and a half times the spread. Both are set once, when the page composes (`wordFloor`, `wordCeiling` on the scene), and every check reads them: the budget line, `THIN_PAGE`, `WORDS` and the text contract cannot disagree about a page. Do not edit the three written files; change the pages file and run it again.
+The [content gates](#the-content-plan) then run in the same pass - claims that are topics, commentary that restates the exhibit, an answer no claim carries - and every page is held to its reading task's word floor and ceiling, set once when the page composes: a chart carrying its own callouts from about 42 words, a table with commentary from about 149 ([Word measures](evaluation/index.md#word-measures) says how the floor, the ceiling and the density checks relate). Do not edit the three written files; change the pages file and run it again.
 
 ## Evidence shapes
 
@@ -143,9 +180,11 @@ Each insight in `<id>.insights.json` records the `shape` of the data behind it, 
 
 With an insight log beside the pages file, every data-bearing page names its insights in `evidence`, and a ranking whose insights hold no peer set is refused: the missing data is a research task, found before the page is written rather than by the storyline critic or the review.
 
-Each chart-bearing shape also records its breadth - `breadth: { periods, series }` for a series, `{ members }` for a peer set or measure pair, `{ parts }` for a mix, `{ steps }` for a bridge - or the `data` itself, from which the counts are read. The log is refused when a shape is narrower than the table above says (a four-year series of one measure, a peer set of four), naming every such insight at once with what to find: the longer window, the peers' series, the rest of the set. An insight with no breadth recorded is refused with the keys to add; `fact`, `qualitative`, `roster`, `schedule` and `geography` need none.
+Each chart-bearing shape also records its breadth - `breadth: { periods, series }` for a series, `{ members }` for a peer set or measure pair, `{ parts }` for a mix, `{ steps }` for a bridge - or the `data` itself, from which the counts are read. A recorded `breadth` wins over the count read from `data`.
 
-The summary lists advisories the compiler can see without blocking: `MAP_COARSE` names a place page whose markers span under twenty degrees on the built-in 1:110m coastline, which is coarse at that scale - import a 1:10m or 1:50m geography with `runtime/import-geography.mjs` and pass it as the map's `geography`.
+A mix's parts are what its chart splits the whole into. With one series, or none, each category, label, item or row is a part: a donut, pie, waffle, treemap, pictogram or one-series stacked bar over A, B and C is three parts. Where two or more series stack over the categories (stacked bar or column, marimekko), each category is a whole and the series are its parts. Where neither reading fits the data, record `breadth: { parts }`.
+
+The log is refused when a shape is narrower than the table above says (a four-year series of one measure, a peer set of four), naming every such insight at once with what to find: the longer window, the peers' series, the rest of the set. An insight with no breadth recorded is refused with the keys to add; `fact`, `qualitative`, `roster`, `schedule` and `geography` need none.
 
 `--check` and `--draft` print each page's budget as it composes - body words against the floor and ceiling for its reading task, the footer's share, how much of the body the page fills - with a `!` on every line to act on, so a fix does not push a page across a line unseen.
 
@@ -163,17 +202,17 @@ The compiler checks what each type implies. A trend runs over four or more perio
 
 A period is a date (2025, FY25, Q1 2025, Jan 2025), a quarter or half within its year (Q1, H2), a span (2020-24, Jan-Mar) or a period with its qualifier (FY25 LTM, 2024 YTD); a trend's axis and the craft floor's chart over time are read by the same recogniser (`runtime/time-axis.mjs` isPeriodLabel), so "H3 2024" is a member, not a period, to both.
 
-Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about forty words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
+Each component's limits are published in `--types` (`holds:` - a donut takes two to five parts, cards two to six, steps three to six, a stat-list value nine characters and a fact-grid value ten) and checked at compile, with the capacities the renderer measures: a chart callout about ten words and a chart three callouts (a fourth note is commentary), a rail about 42 words (eight lines at heading size). Every `numbers` form sets its figures against one exhibit - the proof beside a hero number, the tiles of a grid, the chart under a strip.
 
 The text limits the page gates enforce are published in `--types` too, so they are met by reading rather than by failing:
 
 | Text | Limit | Code | Checked |
 | --- | --- | --- | --- |
-| `title` | 14 words; write to 12, which sets on one line | `TITLE_WORDS`; `PLAN_TITLE_LENGTH` when more than a third run past 12 | at compile |
+| `title` | [Action titles](copy.md#action-titles) owns the limit | `TITLE_WORDS` | at compile |
 | `title` | two lines | `TITLE_LINES` | as the page composes |
 | `subtitle` | one line, 16 words; not the title or an exhibit's heading restated | refused at compile | at compile |
 | chart or panel `heading` | one line at the frame's width, unit inline | `HEADING_WRAPS` - a short unit moves under the heading on its own; a heading that wraps, or a unit written as a phrase, is reported with its measured width against the frame's | as the page composes |
-| `takeaway` | three lines; one or two is the norm | `TAKEAWAY_LONG` | as the page composes |
+| `takeaway` | one or two lines | `TAKEAWAY_LONG` | at compile, and as the page composes |
 | `bar` | eight words or more, two lines | refused at compile | at compile |
 | prose | 35 to 90 characters a line; points no wider than 90 | `CPL` | as the page composes |
 
@@ -193,15 +232,17 @@ What the runtime resolves and what it cannot, also printed in `--types` under "C
 
 Each type also has a minimum it needs to be worth a page: a composition shows three or more parts, or the mix across two or more members or periods - a share of one thing is a numbers page; a timeline or roadmap has four or more dated items; a mechanism three or more parts; a relationship five or more members; a bridge a start, two steps and an end - and every chart page the evidence floor below. Small counts are counted, not shared out: fourteen cities as percentages of a pie overstates what the count can say - use form `waffle`, with the parts as `categories` and one series of whole counts.
 
-On a page with commentary points, mark the finding in each point: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A single phrase lights one point and leaves the rest grey. The page's `highlight` is set wherever the page writes it: points and row blocks, paragraphs, a rail or side panel, the so-what bar and the takeaway, panel captions, and the cells of a table, a findings matrix (bulleted cells too) or a comparison. On a dark or filled panel where the accent does not read, the phrase is set bold in a regular sentence. A phrase that lands nowhere the page draws an accent - only in the title, a heading or a chart's callout - is refused, in a draft too.
+On a page with commentary points, the finding in each point is marked: `highlight` takes a list, with the number or claim from each point the reader should see first, or a point carries its own `highlight`. A point left unmarked is marked on its own figure - its first percentage, amount or count, never a year - and a point with no figure is named in the advisories (`POINT_UNMARKED`), since the phrase that carries a qualitative point is the author's to choose.
 
-Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels - and each is measured against the chart's callout box, which holds about twelve words; every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
+The page's `highlight` is set wherever the page writes it: points and row blocks, paragraphs, a rail or side panel, the so-what bar and the takeaway, panel captions, and the cells of a table, a findings matrix (bulleted cells too) or a comparison. On a dark or filled panel where the accent does not read, the phrase is set bold in a regular sentence. A phrase that lands nowhere the page draws an accent - only in the title, a heading or a chart's callout - is refused.
+
+Moving the explanation off the page's text column is a choice to write it somewhere else, not to drop it. Callouts on a chart carry ten or more words between them - the mechanism and the qualification, not labels - and each is measured against the chart's callout box, which holds about ten words (`--types` prints the capacity); every caption is a sentence of eight words or more that says what its panel shows and does not repeat the title or the panel heading; a rail is a developed claim of ten words or more. An executive summary with no exhibit renders as a list; give it `metrics` or an exhibit when the page would otherwise be half empty.
 
 Choose the type from the claim, then the placement from where the reader's eye already is. The same evidence can take different pages: a peer comparison can be a ranking with callouts, panels of the same measure for three periods, or a scorecard. Pick the one whose reading task is the claim's, and then look at the neighbours - the page before and after should ask the reader to do something different.
 
 ## Evidence depth
 
-Strong decks' chart pages plot a median of about 22 values (the middle half 10 to 48); a generated fifty-page deck's plotted 5, every chart one series at its type's minimum. The compiler counts what each page plots (`plottedValues`: bars, points on lines, dots, slices, a box's five figures, numeric cells; a waffle counts its parts, a chart group and a panels page the sum) and records it as `pageType.values`.
+Strong decks' chart pages plot a median of about 22 values (the middle half 10 to 48); a deck whose every chart is one series at its type's minimum plots about 5. The compiler counts what each page plots (`plottedValues`: bars, points on lines, dots, slices, a box's five figures, numeric cells; a waffle counts its parts, a chart group and a panels page the sum) and records it as `pageType.values`.
 
 | Rule | Where | Threshold |
 | --- | --- | --- |
@@ -218,9 +259,66 @@ The refusal names how to deepen: the peer set, a prior period or a benchmark as 
 
 `--check` prints `plotted`: the chart pages, their median, range and the five thinnest.
 
-## What a review found, refused where the page is written
+## Codes and their repairs
 
-A whole-deck review of a fifty-page deck found these on pages that had passed every gate. Each is now refused, or resolved by the runtime, before anything is drawn, so a review does not have to find it again:
+A blocking code stops `author-deck.mjs` at exit 2 and nothing is written; an advisory is listed in the run's summary. Every refusal the page-type compiler raises is also printed by `--types`, and a finding's message names the page and the repair. Gate codes the build raises are in [Evaluation](evaluation/index.md#page-gates); a review's codes are in [Taste review](taste-review.md#the-rubric).
+
+### Spine rules
+
+| Code | Rule | Checked | Repair |
+| --- | --- | --- | --- |
+| `REQUEST_MISSING` | a new deck records the user's request verbatim as `request` on `deck` | draft and full | paste the user's words, not a restatement |
+| `TITLE_GAP_SHARE` | titles stating what the evidence lacks, cannot settle or leaves undisclosed on more than 15% of the analytical pages | draft and full | lead with the way the evidence leans; the gap goes in the `subtitle` ([Answer under uncertainty](storylining.md#answer-under-uncertainty)) |
+| `GENERATOR_SIGNATURE` | one non-trivial value of `why`, `settles`, `adds`, `takeaway`, `subtitle`, `rail` or `bar` on more than 60% of the pages | draft and full | write the field page by page, or leave an optional one out |
+| `PILLAR_UNSUPPORTED` | a section whose pages rest on no `strong` insight | draft and full, with an insight log | find the evidence the pillar needs, or merge the pillar into one that has it |
+| `WAIVERS_INVALID` | `waivers` on `deck` is a list of `{ code, reason }` naming a `BAR_*` code once each, each reason a sentence the reviewer can check | draft and full | fix the list, or drop the waiver and clear the bar |
+| `REVISION_UNMAPPED` | a revision's imported slide still carrying only its `draft` copy | reported in a draft, refused in the full compile | give the slide a `type` and its choices, or delete it from `pages` |
+| `REVISION_INVENTORY_MISSING` | a revision's `inventory` is not beside the pages file | draft and full | keep `<id>.inventory.json` where `import-deck.py` wrote it, beside the pages file |
+| `TITLE_COUNT_ONLY` | a title that states a count with no comparator or consequence | advised | add what the count is against: a peer, a target, a prior period, or what follows from it |
+| `POINT_UNMARKED` | a commentary point with no figure to mark and no `highlight` | advised | name the phrase the reader should see first in `highlight` |
+
+### The content plan
+
+The content gates run on the content plan the compile derives. They block unless marked advisory.
+
+| Code | Rule | Repair |
+| --- | --- | --- |
+| `CONTENT_NO_CLAIM` | a title that names a topic rather than proving something | state the finding: subject, verb, magnitude or comparator ([Action titles](copy.md#action-titles)) |
+| `CONTENT_ADDS_NOTHING` | `adds` empty, or built from the words of the exhibit it adds to | say what the commentary adds - the mechanism, the qualification, the consequence - or set commentary `none` |
+| `CONTENT_CLAIM_REPEATS` | two pages make the same claim | merge them, or make the second prove the next step |
+| `CONTENT_UNMEASURED` | more than a third of the pages settle on `qualitative` evidence (advisory); more than half blocks | research the pages whose claim is a quantity - a share, a rate, a rank, a count - and record what settles it |
+| `CONTENT_ANSWER_UNCARRIED` | from eight pages, no claim carries the deck's `answer`, or the claims between them leave part of it unproved | state the answer in the opening page's title, or narrow it to what the deck settles |
+| `CONTENT_ANSWER_CONTRADICTED` | a page recommends what the deck's unconditional answer rules out | name the condition in the answer, or change the page |
+| `CONTENT_NO_HIGHLIGHT` | no page names the phrase its reader should see first (advisory) | set `highlight` where a claim names its exact target |
+| `TEXT_COVERAGE_LOW` | a page's body under its reading task's floor | develop the missing reasoning, or move the page to the task it performs ([Word measures](evaluation/index.md#word-measures)) |
+| `TEXT_BLOCK_TOO_LONG` | one run of prose past 152 words | split it where it stops proving one thing, and give the second half its own lead |
+
+### Compile and compose
+
+| Code | Rule | Repair |
+| --- | --- | --- |
+| `COMPILE` | a page whose type refuses its choices; the rest of the deck is still checked | the message names the key and the choice; `--scaffold <type>` prints a page that compiles |
+| `PAGE_DOES_NOT_COMPOSE` | a page that compiles but cannot be laid out; every such page is reported in one run | the message names the overflow or the frame; shorten, split the exhibit or choose another form |
+| `MAP_COARSE` | a place page whose markers span under twenty degrees on the built-in 1:110m coastline (advisory) | import a 1:10m or 1:50m geography with `runtime/import-geography.mjs` and pass it as the map's `geography` |
+
+### Chart and figure forms
+
+A chart or figure drawn where another form says the finding is refused with that form.
+
+| Code | Rule | Repair |
+| --- | --- | --- |
+| `SCATTER_OVER_TIME` | a scatter whose x axis is time | a `trend` page, form `line`: the dates as categories, each series a line, a `referenceLines` entry for the level it is read against |
+| `SCATTER_CURVE` | six or more points running one way as x grows, drawn as loose dots | `connect: true`, the series named at its end, and `referenceLines` for the break-even, parity line or hurdle |
+| `LABELS_OFF` | `dataLabels: false` on twelve marks or fewer with no gridlines | drop `dataLabels: false`, or set `gridlines: true` where the shape is the point |
+| `GUTTER_UNEARNED` | `implication: true` before a column whose header names another fact | drop `implication`, or head the column with the inference: "Implication", "What it means", "Verdict", "Decision" |
+| `PILL_NO_VERDICT` | a status colour on a pill whose words say there is no verdict ("Split", "Unranked") | `value: "neutral"`, a grey pill ([Status colour](design.md#status-colour)) |
+| `TILES_ONE_MEASURE` | one measure at two dates or for two members, set in separate tiles | plot it on one axis: a `trend` across the dates, a `ranking` across the members, or the chart the page carries; tiles are for measures that differ |
+| `STRIP_REPEATS_CHART` | a metric strip that prints what its chart already prints | the strip carries what the chart does not - the change, the rate, the gap, a share of the total - or the page is the chart alone |
+| `NUMBER_CARDS` | a one-column fact grid whose tiles carry no sentence | run the facts across (`columns` 2 to 4), or give every tile its `text` |
+
+### What a review found, refused where the page is written
+
+These defects pass every page gate and show only when the deck is read whole, so each is refused, or resolved by the runtime, where the page is written:
 
 | Code | Where | Rule | What to do instead |
 | --- | --- | --- | --- |
@@ -237,24 +335,27 @@ A whole-deck review of a fifty-page deck found these on pages that had passed ev
 | `PLAYERS_UNMARKED` | variety contract | the deck declares two or more `players` - or, without them, two names recur in a fifth of its titles - and the cover and first three analytical pages do not show each one's logo | a `profiles` page (form `logos` or `logo-table`) or a `logo` column early; `{ alt: "<Name> logo" }` is fetched from the player's Wikipedia infobox |
 | `PROFILE_UNPICTURED` | variety contract | a `profiles` page of cards with no logo or picture on any card | each card's `logo` or a credited `image` (`{ alt, search }`) |
 
-Two word rules close the gaps the same review found. An executive summary (`summary` form `executive-summary`) is held to the text page's upper quartile, 204 body words, rather than its outlier fence of 329 (`WORDS`): the summary is read first and in full. And `TEXT_BLOCK_TOO_LONG` reads a block as the reader meets it - a point's bold lead and its text are one run, and a card's text or a table cell is prose too - so a 171-word scenario no longer passes as a 40-word lead and a 131-word point.
+Two word rules belong with them. An executive summary (`summary` form `executive-summary`) is held to the text page's upper quartile, 204 body words, rather than its outlier fence of 329 (`WORDS`): the summary is read first and in full. And `TEXT_BLOCK_TOO_LONG` reads a block as the reader meets it - a point's bold lead and its text are one run, and a card's text or a table cell is prose too - so a 171-word scenario no longer passes as a 40-word lead and a 131-word point.
 
-## The variety contract
+### The variety contract
 
-`author-deck.mjs` refuses to write a deck of twelve or more content pages that breaks these rules. The build refuses it too, because the rules run from the same code (`runtime/gates/variety_gates.mjs`):
+`author-deck.mjs` refuses to write a deck of twelve or more content pages that breaks these rules (exit 2, nothing written). The build refuses it too, because the rules run from the same code (`runtime/gates/variety_gates.mjs`):
 
-| Code | Rule |
-| --- | --- |
-| `PAGE_TYPE_UNDECLARED` | every content page has a page type |
-| `VARIETY_TYPE_SHARE` | no type is more than 25% of the pages |
-| `VARIETY_TYPE_RANGE` | at least one type per five pages, up to eight |
-| `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose); the finding names the run, the page to change and what its evidence could become, and a page of another type it could trade places with |
-| `VARIETY_COMMENTARY` | no placement is more than 30% of the pages; `beside` and `beside-left` count as one |
-| `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar |
-| `VARIETY_PANELS` | from fifteen pages, at least 20% carry two or more exhibits, counted on the page as drawn: each panel of a row, grid, stack or sequence, a metric strip over its exhibit, the photograph under a `photo-backdrop` exhibit, the exhibit on each labelled row (aligned bars are one exhibit) |
-| `VARIETY_COLUMN` | from fifteen pages, at most 20% are one exhibit with a text column beside it - points beside or before it (`beside`, `beside-left`), a `rail`, or a hero number with its points beside its proof |
-| `VARIETY_SIGNATURE` | no one drawn page - its layout, how many exhibits of which family, a text column or points, a rail, its close - is more than 20% of the pages |
-| `EVIDENCE_DEPTH` | from eight chart pages, the median chart page plots 15 values or more |
+| Code | Rule | Repair |
+| --- | --- | --- |
+| `PAGE_TYPE_UNDECLARED` | every content page has a page type | author the page in the pages file with its `type`, `form` and `commentary` |
+| `PAGE_TYPE_EDITED` | the compiled structure is what the choices produce; the build recomputes it | change the choice in the pages file and recompile; never edit `<id>.deck.json` |
+| `VARIETY_TYPE_SHARE` | no type is more than 25% of the pages | reread the commonest type's claims: a position in the set is a `ranking`, a mix a `composition`, one cut per member `panels` |
+| `VARIETY_TYPE_RANGE` | at least one type per five pages, up to eight | find the claims the deck states in another type's shape - a rate, a mix, a mechanism, a schedule - and give them that type |
+| `VARIETY_TYPE_RUN` | no three pages of one type in a row, unless they share a `series` (one template on purpose) | the finding names the run, the page to change, what its evidence could become and a page of another type it could trade places with |
+| `VARIETY_COMMENTARY` | no placement is more than 30% of the pages; `beside` and `beside-left` count as one | move the explanation where the reader's eye already is: callouts on the chart, captions, the table's cells, or `none` |
+| `VARIETY_TAKEAWAY` | at most 25% of pages close on a takeaway line or a so-what bar | drop the closes that restate the title; keep them where the implication goes beyond it |
+| `VARIETY_PANELS` | from fifteen pages, at least 20% carry two or more exhibits, counted on the page as drawn: each panel of a row, grid, stack or sequence, a metric strip over its exhibit, the photograph under a `photo-backdrop` exhibit, the exhibit on each labelled row (aligned bars are one exhibit) | [Beyond one exhibit and a column](#beyond-one-exhibit-and-a-column) |
+| `VARIETY_COLUMN` | from fifteen pages, at most 20% are one exhibit with a text column beside it - points beside or before it (`beside`, `beside-left`), a `rail`, or a hero number with its points beside its proof | [Beyond one exhibit and a column](#beyond-one-exhibit-and-a-column) |
+| `VARIETY_SIGNATURE` | no one drawn page - its layout, how many exhibits of which family, a text column or points, a rail, its close - is more than 20% of the pages | the finding names the pages that share it; redraw those whose claim asks the reader something else |
+| `EVIDENCE_DEPTH` | from eight chart pages, the median chart page plots 15 values or more | [Evidence depth](#evidence-depth): the peer set, a prior period or a benchmark as a second series, a longer window |
+| `VARIETY_EXHIBIT_MIX` | each evidence family - chart, table, diagram, numbers, picture, text - within its band across the compiled pages (`runtime/weight.json` `plan.mixEnforced`) | move pages out of the family over its band into the form their evidence reads as: a table of a trend is a chart, a list of steps a mechanism |
+| `VARIETY_EXHIBIT_RANGE` | enough kinds of exhibit for the deck's length: a floor of distinct exhibits per ten pages | draw each claim in the form its evidence is, from `--types`, rather than one exhibit restyled |
 
 The limits sit outside what strong decks measure, so a deck that chose each page for its claim passes them with room. Placement and repetition are counted on the page as drawn, not as declared: a column on the left and one on the right are one placement to a reader, and a trend beside its points and a stat list beside its points are one page. The compiler records each page's drawn skeleton in its `pageType` (`skeleton`, and `drawn`: how many exhibits and whether it is an exhibit beside a column), and `VARIETY_SIGNATURE` names the pages that share the commonest.
 
@@ -262,6 +363,6 @@ Strong decks carry two or more exhibits on a quarter to a third of their pages a
 
 ## Worked examples
 
-`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Before writing a page, find the example page of the type you are writing, copy its shape, and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build.
+`examples/page-types.pages.json` is a complete pages file - a fictional regional rail operator's growth plan, with illustrative numbers - that uses every page type at least once, with its `form`, `commentary`, `takeaway`, `why`, `settles` and `adds` filled in and each page's explanation written where its commentary says it lives. Do not read it whole: `author-deck.mjs --example <type>` prints the pages of one type. Copy the shape of the one you need and replace the content: the keys, the data shape its form reads and the length of its callouts, captions and points are the ones that compile and build.
 
 Page `p10b` is labelled row blocks with a number on each row and `p24b` the same with a headed chart on each of two rows, `p13b` a ranking closed by a so-what bar, `p16b` three exhibits joined by arrows, `p07c` four panels of one indexed measure with a caption under each, `p06b` a chart on a card over the photograph of its subject (`photo-backdrop`), and `p25` a scorecard whose last column is each row's implication.

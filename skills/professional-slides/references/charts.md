@@ -1,20 +1,24 @@
 # Charts
 
-Choose the chart from the analytical question. The chart makes the page's governing claim easy to verify.
+Choose the chart from the analytical question. The chart makes the page's governing claim easy to verify. The page type and form come first ([Design](design.md#pick-the-page-type-from-what-the-page-says)); this reference owns what the chart then draws, its props and its honesty rules.
 
 ## Router
 
-| The reader's question | Default |
-| --- | --- |
-| Which category is larger or smaller? | Sorted bar or column |
-| How does an observed or modeled trajectory evolve across meaningful periods? | Line, when the trajectory is the question |
-| How does a total divide into parts? | Stacked bars or areas |
-| How does one small total divide into a few familiar parts? | Pie or donut, by exception |
-| How does a survey response mix differ across user groups? | Percentage segments by group |
-| What explains a change from start to finish? | Waterfall |
-| How do two or three variables relate? | Scatter, or bubble with a meaningful third measure |
-| Where are concentrations, gaps or priorities? | Heatmap or typed table |
-| How do current, emerging and future growth plays mature over time? | Horizons |
+| The reader's question | Default | Page type, form |
+| --- | --- | --- |
+| Which category is larger or smaller? | Sorted bar or column | `ranking`, `bar` or `column` |
+| How does an observed or modeled trajectory evolve across meaningful periods? | Line, when the trajectory is the question | `trend`, `line` |
+| How does a total divide into parts? | Stacked bars or areas | `composition`, `stacked-bar` or `stacked-column`; `trend`, `stacked-area` |
+| How does one small total divide into a few familiar parts? | Pie or donut, by exception | `composition`, `donut` or `pie` |
+| How does a survey response mix differ across user groups? | Percentage segments by group | `composition`, `stacked-bar` |
+| What explains a change from start to finish? | Waterfall | `bridge`, `waterfall` |
+| How do two or three variables relate? | Scatter, or bubble with a meaningful third measure | `relationship`, `scatter` or `bubble` |
+| Where are concentrations, gaps or priorities? | Heatmap or typed table | `scorecard`, `heatmap`; `lookup`, `table` |
+| How do current, emerging and future growth plays mature over time? | Horizons | `schedule`, `horizons` |
+| How far does each member's spread run? | Box plot | `ranking`, `boxplot` |
+| Which of many series moved? | Small multiples | `trend`, `sparklines` |
+
+A chart that is no type's form - a range, radial bars - reaches a page as a panel's `type` on a `panels` page, which compiles any registered exhibit.
 
 ## Choose from the evidence you have
 
@@ -68,6 +72,14 @@ Calculate from unrounded inputs and round for display; keep independently rounde
 On a column chart the same `deltas` become pills in a band above the plot, one over each column under the `deltasLabel` heading (`false` drops it); they take the band periods and events use, so a chart shows one or the other.
 
 **Category marks.** `categoryIcons` sets a mark beside each category's label: an icon name (`{ "Messaging": "mail" }`) or `{ image }` for a brand logo or a flag. Put logos under columns and flags beside bars when the reader knows the mark before the name. It takes a map from category to entry, or an array in category order. An image the author has yet to supply is planned as `{ image: { alt } }` and draws an empty frame that `UNSOURCED_PICTURE` holds. The mark sits above the label on a column chart and between the label and the bar on a bar chart; a chart carrying marks is drawn as shapes, not a native chart.
+
+**Value labels, subject and period ticks.**
+
+- At twelve marks or fewer a value chart prints its values on the marks; `dataLabels: false` there is refused unless `gridlines: true` gives the reader a scale to read by.
+- `focus: "<series>"` or `focus: "<category>"` on a column, bar, line, area or lollipop chart names the subject: a series becomes `focusSeries` (the subject in the primary, every other series in the comparator grey, however many there are), a category a highlighted bar.
+- With no `focus`, `focusSeries` or `highlights`, the title picks the subject when it names exactly one mark: one series of a multi-series chart, one bar of a single-series ranking of three or more categories that are not periods, or one point of a scatter or bubble. A label is named by its whole text, or by a word no other label carries; a title that names two labels is a comparison and highlights neither. Write `focus` when the title names the subject some other way.
+- Year-and-month categories written as ISO keys ("2025-08") are printed as months ("Aug 25"): the page compiles them so, with every callout and highlight renamed. A monthly axis of more than nine months ticks by the quarter, more than twenty-five by the half-year.
+- A chart's mark count sets its own labels at most one size down; it never changes the page's prose, which keeps one size per role across the deck.
 
 **Reference lines and label space.** Use `referenceLines: [{value, label}]` for a named quantitative comparator; automatic domains include its value, and explicit domains must contain it. Plan space for the actual label alongside mark/value labels before plotting. On a column chart with a crowded in-plot reference, `placement: "outside-end"` reserves a right-hand gutter (the chart takes it itself when no in-plot corner is free and `placement` is unset); this placement is not supported by horizontal bars. An explicit domain may need modest annotation clearance. Keep common physical scales across peers and do not remove a decisive comparator merely to make a page fit. If the label cannot fit without distorting the comparison, change the encoding or move supporting copy.
 
@@ -135,7 +147,13 @@ Bridges from start to finish: price-volume-mix, margin, cash, headcount, varianc
 
 ## Scatter and bubble
 
-`focus: ["name", ...]` sets the named points in the accent and the rest in the comparator grey, with the focused labels in the accent too; a scatter had no emphasis at all, so the one observation a page was about looked exactly like the eight it was measured against. Marking every point is refused. Relationships between two measures, segmentation, prioritization, and a third magnitude as bubble area. One observation per point, x and y measures with units, an optional size measure, stable IDs, documented quadrant thresholds. Label axes with units and the direction of desirability: `xLabel` and `yLabel` draw the axis titles, and `xScale`/`yScale: {min, max, step}` set the domain, with ticks at the step when it divides it into two to ten intervals; encode magnitude by area, label the decisive points, and use association language unless the analysis supports causation. `quadrants: {x, y, style, titles, focus, xLabel?}` accepts `threshold-lines`, `alternating-tint` or `focus-tint`, both thresholds inside the bounds, each region labelled with the implication of being there. Use `xLabel` for a named vertical threshold such as `Required reserve 5`; it is anchored above the fixed line, distinct from region titles. Include it in the complete text plan. `sizeLegend: {label, markerSize}` renders a neutral grey key without rescaling the data. Add a trend line when the sample supports the named method, and report its basis.
+A scatter is a cloud of observations. Two other shapes are refused at compile, because as loose dots they read as a sample:
+
+- **Time on x** (an `xLabel` naming months, years, dates or "since", or x values that are years) is a trend: set a `trend` page, form `line`, the dates as its categories (SCATTER_OVER_TIME).
+- **A curve** - any series of six or more points running one way as x grows - is joined with `connect: true`: each series in x order, its name at its right-hand end in place of a key. Mark the level it is read against with `referenceLines: [{value, label}]` (the break-even, the parity line, the hurdle), which a scatter draws on its value axis (SCATTER_CURVE).
+- Points coloured by `series` carry a key by default; `legend: false` with more than one series and no connected, named ends is refused (SCATTER_UNKEYED when a stored build is replayed).
+
+`focus: ["name", ...]` sets the named points in the accent and the rest in the comparator grey, with the focused labels in the accent too; without it, the one observation a page is about looks exactly like the eight it is measured against. Marking every point is refused. Relationships between two measures, segmentation, prioritization, and a third magnitude as bubble area. One observation per point, x and y measures with units, an optional size measure, stable IDs, documented quadrant thresholds. Label axes with units and the direction of desirability: `xLabel` and `yLabel` draw the axis titles, and `xScale`/`yScale: {min, max, step}` set the domain, with ticks at the step when it divides it into two to ten intervals; encode magnitude by area, label the decisive points, and use association language unless the analysis supports causation. `quadrants: {x, y, style, titles, focus, xLabel?}` accepts `threshold-lines`, `alternating-tint` or `focus-tint`, both thresholds inside the bounds, each region labelled with the implication of being there. Use `xLabel` for a named vertical threshold such as `Required reserve 5`; it is anchored above the fixed line, distinct from region titles. Include it in the complete text plan. `sizeLegend: {label, markerSize}` renders a neutral grey key without rescaling the data. Add a trend line when the sample supports the named method, and report its basis.
 
 *Example:* twenty films, gross on x and audience rating on y from the same title record, four outliers labelled, no trend line because the sample is not modelled.
 
@@ -154,7 +172,27 @@ Cell types: `text`; `bullets`; `category` (primary fill with contrasting text, o
 | `implication: true` | Names the column that concludes from the columns before it, and inserts a gutter of `implication` chevrons in front of it | Cannot be the first column: the gutter carries the argument's direction |
 | `heat: true` | Every cell `type: "heatmap"` | The shared sequential scale |
 | `bubble: true` | Every value in a filled pill (`surface: "bubble"`) | - the table's counterpart to the chart's change bubble |
-| `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest; columns that measure the same thing set one `barScale` name and share one scale, so a row reads across them. The header prints the unit, so no key line is added under the table | `label` and `unit` on the column, both set; one unit per `barScale` |
+| `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest; columns that measure the same thing set one `barScale` name and share one scale, so a row reads across them. The header prints the unit, so no key line is added under the table, and a header that already ends in its unit (`Revenue, $M`, `Share (%)`) takes no unit line under it either | `label` and `unit` on the column, both set; one unit per `barScale` |
+
+**Inferred treatments.** A table with no treatment of its own is given the one its cells already imply (`inferredTreatments` in `runtime/compose.mjs`). Nothing is inferred on a table that carries any treatment, and a bound, range or approximation (`~5`, `>$1B`, `3-5`) is not a figure, so its column stays as written.
+
+| The cells hold | Drawn as |
+| --- | --- |
+| every cell of a column one word of one ordinal scale (none, weak, partial, strong, full; or none, low, medium, high, very high), two levels or more, three rows or more | Harvey balls, the word kept beside each |
+| every cell Yes or No under a header that asks a question ("Used the draft?") | a filled or empty dot |
+| three or more columns of exact figures in one unit | one shared heat scale across them, each cell keeping its figure |
+| otherwise, the first column of exact figures with a unit (in a table of five columns or fewer) | in-cell bars on a zero-based scale, the figure beside each; where the column is too narrow for a bar, or the bars would push the table past its frame, the figures stay plain |
+| a closing row whose figures add up the rows above (more than three rows) | the total band, set bold |
+
+A table that should stay plain - a record lookup - declares its columns' `type`.
+
+**What counts as a treated table.** This is the one definition, kept in `runtime/gates/table-treatments.json` and read by the build bar (`BAR_TABLES_TREATED`), the craft floor (`CRAFT_TABLES_PLAIN`) and the deck screen (`DECK_CRAFT`). A table is treated when it draws at least one device that says something about its data:
+
+| Treatments | Not treatments |
+| --- | --- |
+| heat cells; Harvey balls and dots; in-cell bars and progress bars; state pills and marks (status pills, lamps, checks, binary marks); logos in a cell or header; cell icons; trend arrows; a highlighted column; an accented row; a bold total band | zebra banding, group rows and the implication gutter, which keep the reader's place or structure the grid; value pills, number circles and section markers; photographs |
+
+Every table on an analytical page is counted, except a row block's small table of fewer than three body rows, which is the row's evidence and exempt from `TABLE_TOO_SHORT` too.
 
 `implicationStyle` is `per-row` or `single`; the default follows the row count, `per-row` at four rows or fewer. `single` is not one chevron on the middle row - that reads as a verdict on that row - but a dashed rule down the gutter carrying one disc centred on the rows it spans, which stops above a total: a total is the same evidence added up, not another line of it.
 
@@ -164,7 +202,7 @@ Choose a table treatment from its reading task and retain it across comparable p
 
 For an exact observation in a single-series bar column, set that cell's `markFocus: true` (shorthand example: `{text: "6", markFocus: true}`). It accents the bar and, where contrast permits, its value; it adds no cell or row fill and leaves peer marks and the common scale unchanged. Use a bold corresponding entity label when helpful. Multi-series bar cells reject this override so series identity survives; attach a local annotation instead. This is distinct from `highlight: true`, which retains the existing cell-background treatment.
 
-Apply **Categories > Dimensions > Items**: with real category groups organizing the rows, use `treatment: categories` and highlight the left category cells; with rows as items compared across distinct dimensions, use `treatment: dimensions` and fill the dimension headers. Declare `comparisonAxis: rows` or `columns` so the fill lands on the dimension axis. Bind the deck's one table-header treatment to a single `tableHeader` record, and distinguish columns through width, alignment, wording and data. Left-align text, right-align comparable numbers, and let row height follow the tallest measured cell. More than five rows or four columns suggest `pre-read`; more than eight or six suggest `appendix`.
+Apply **Categories > Dimensions > Items**: with real category groups organizing the rows, use `treatment: categories` and highlight the left category cells; with rows as items compared across distinct dimensions, use `treatment: dimensions` and fill the dimension headers. Declare `comparisonAxis: rows` or `columns` so the fill lands on the dimension axis. Bind the deck's one table-header treatment to a single `tableHeader` record, and distinguish columns through width, alignment, wording and data. Left-align text, right-align comparable numbers, and let row height follow the tallest measured cell. A table past about eight rows or six columns splits or moves to the appendix; its page does not shrink its type ([Density profiles](theming.md#density-profiles)).
 
 Give each case that will be discussed individually a stable circular `sectionNumber` on its category cell and keep it through sorting and across every exhibit. Order rows by a deliberate logic - chronology, dependency, ordinal outcome, magnitude or grouping. Prefer a compact comparative encoding when rows share a real criterion (exact metrics, Harvey balls, anchored 1-5 scores, feasibility checks) beside the evidence that explains it, and keep prose columns when rows cannot fairly share a measure. Distinguish "not assessed" from zero or poor performance.
 
@@ -176,9 +214,15 @@ Give each case that will be discussed individually a stable circular `sectionNum
 
 ## Pie and donut
 
-One total divided into two to five mutually exclusive parts, when approximate share is enough. One reconciled total, positive parts, stable labels, explicit units, one period and population, and shares summing to 100% within the disclosed rounding tolerance. Start at twelve o'clock and order slices by value. Variants: `legend-top-right` (default - one swatch row above the plot supplies identity, percentages inside the slices), `outside-labels`, `shared-legend` for a coordinated group. Every internal percentage fits its slice with four pixels of clearance; one that cannot goes outside at the rim, thin neighbours stack in a column beside the circle on leaders, and where even that has no room the percentage joins its key entry ("Other 2%"). A share under half a percent prints as "<1%". A circle that would fall under 140px is still refused: enlarge the chart or switch to bars.
+One total divided into two to five mutually exclusive parts, when approximate share is enough. One reconciled total, positive parts, stable labels, explicit units, one period and population, and shares summing to 100% within the disclosed rounding tolerance. Start at twelve o'clock and order slices by value. Every internal percentage fits its slice with four pixels of clearance; one that cannot goes outside at the rim, thin neighbours stack in a column beside the circle on leaders, and where even that has no room the percentage joins its key entry ("Other 2%"). A share under half a percent prints as "<1%". A circle that would fall under 140px is still refused: enlarge the chart or switch to bars.
 
-*Example:* revenue by three product lines for one year, largest slice from twelve o'clock, percentages inside, legend above right.
+Variants:
+
+- `outside-labels` - the composer's default: each slice named at the rim beside it, where the eye already is, percentages inside.
+- `legend-top-right` - a swatch row above the plot; the renderer's default and what an explicit `legend: true` asks for.
+- `shared-legend` - for a coordinated group.
+
+*Example:* revenue by three product lines for one year, largest slice from twelve o'clock, percentages inside, the lines named at the rim.
 
 ## Horizons
 
@@ -225,7 +269,7 @@ When a dedicated column organizes the evidence into distinct types or stages, us
 
 The slide subtitle is optional. Remove it if the chart heading already owns its measure, population and period, including semantic paraphrases. Preserve unique scope once in the heading or note. Tables and non-chart exhibits do not require an extra exhibit heading.
 
-Positive/negative status colours belong only to short text labels (such as Cleared or Missed) and compact check/cross icons. Do not apply them to chart marks, stacked segments, areas, series swatches or annotation backgrounds. Chart series use the deck palette even when their names describe success/failure; `series[].tone` is invalid. Signed waterfall contributions use chart-series colours and retain their signs, without interpreting increase/decrease as good/bad. Red or green may occur as ordinary house-series colours, but never as an automatic status mapping.
+Status colour follows [one rule](design.md#status-colour). On a chart it means: `series[].tone` is invalid, signed waterfall contributions use chart-series colours and keep their signs without reading increase or decrease as good or bad, and red or green may occur as ordinary house-series colours but never as an automatic status mapping.
 
 Continuation tables share the numeric domain and physical column/plot widths derived before pagination. Equal values must occupy equal lengths across pages. Footnote markers, repeated headers and display labels must not change the identity of that scale. Check the printed common range on every continuation page, not only the first.
 

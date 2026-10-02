@@ -7,7 +7,7 @@
   "pages": [
     {
       "n": 1,
-      "claim": "Lead with Park Slope; move to SF only for a role inside model decisions",
+      "claim": "Park Slope, unless the interview puts the role inside model decisions",
       "settles": {
         "kind": "comparison",
         "what": "the five gates scored across both cities and their shortlisted neighborhoods"
@@ -17,7 +17,7 @@
     },
     {
       "n": 2,
-      "claim": "Both cities offer the role; only Anthropic lets you take it in New York",
+      "claim": "Both cities offer the role; only Anthropic offers it in New York",
       "settles": {
         "kind": "rank",
         "what": "published base-salary bands for the four product roles at both labs"
@@ -27,7 +27,7 @@
     },
     {
       "n": 3,
-      "claim": "NYC schools beat their peers by 7\u201312 points; the SF pair is a preference",
+      "claim": "NYC schools beat peers by 7\u201312 points; SF's pair is a preference",
       "settles": {
         "kind": "comparison",
         "what": "state proficiency against district and state peers for the four shortlisted schools"
@@ -47,7 +47,7 @@
     },
     {
       "n": 5,
-      "claim": "Every shortlisted commute fits in 45 minutes except Berkeley, which fails by 10",
+      "claim": "Every shortlisted commute fits in 45 minutes except Berkeley, over by 10",
       "settles": {
         "kind": "comparison",
         "what": "door-to-door transit time by leg for each neighborhood against a 45-minute budget"
@@ -57,7 +57,7 @@
     },
     {
       "n": 6,
-      "claim": "Rent moves five points of gross pay: a comfort decision, not a viability one",
+      "claim": "Rent moves five points of gross pay: comfort, not viability",
       "settles": {
         "kind": "share",
         "what": "rent as a share of gross pay at each neighborhood's median two-bedroom"
@@ -67,7 +67,7 @@
     },
     {
       "n": 7,
-      "claim": "Hoboken is the midtown fallback: cheapest and safest, but its school trails its district",
+      "claim": "Hoboken is the midtown fallback: cheapest and safest, with a weaker school",
       "settles": {
         "kind": "comparison",
         "what": "the same five gates for Hoboken against Park Slope"
@@ -77,7 +77,7 @@
     },
     {
       "n": 8,
-      "claim": "Every gate resolves on evidence except the role, which only the interview can settle",
+      "claim": "Every gate resolves on evidence except the role, which interviews settle",
       "settles": {
         "kind": "structure",
         "what": "each gate, its evidence state, and what would still change it"
@@ -87,7 +87,7 @@
     },
     {
       "n": 9,
-      "claim": "Rent for stage one, book two visits, and fix the school before entry year",
+      "claim": "Rent for stage one, book two visits, fix the school before entry",
       "settles": {
         "kind": "sequence",
         "what": "the three actions, their timing and what each one depends on"

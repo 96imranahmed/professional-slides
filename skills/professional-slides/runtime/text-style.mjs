@@ -1,18 +1,14 @@
 // The three primitives every component that draws type needs: the style object,
 // the box style beside it, and the node that has been measured against its frame.
 //
-// There were five `textStyle`, three `measuredTextNode` and two `boxStyle`, one
-// set per component family, and they had drifted: the registry's textStyle
-// defaulted `valign` to "mid" and horizons' to "top", so the same call in two
-// files set type on different baselines. The measured node had drifted further
-// and in a way a reader would see - the registry's steps the font size down
-// through `fitText` before it refuses, while horizons and insight-tree-table
-// threw on the first overflow. A component that used the wrong one failed a
-// build where every other component would have adapted.
+// One implementation of each, shared by every component family, so the same
+// call sets type on the same baseline in every file and every measured node
+// steps the font size down through `fitText` before it refuses, rather than one
+// component failing a build where another would adapt.
 //
 // Each family keeps its own argument order where it has one (tables takes
-// `bold` first, chart annotations centre by default); what they no longer keep
-// is a second implementation.
+// `bold` first, chart annotations centre by default); none keeps a second
+// implementation.
 import { textPrimitive, tokenValue } from "./core.mjs";
 import { measureText, measureTextRuns } from "./text-layout.mjs";
 
@@ -24,8 +20,8 @@ import { measureText, measureTextRuns } from "./text-layout.mjs";
  */
 export function fitText({ text, runs, width, height, fontFamily, fontSize, bold, minScale = 0.8, floorPt = 9 }) {
   const measure = (size) => (runs
-    ? measureTextRuns(runs, width, { fontFamily, fontSize: size, wrapWidthRatio: 1 })
-    : measureText(text, width, { fontFamily, fontSize: size, bold, wrapWidthRatio: 1 }));
+    ? measureTextRuns(runs, width, { fontFamily, fontSize: size })
+    : measureText(text, width, { fontFamily, fontSize: size, bold }));
   let size = fontSize, layout = measure(size);
   const floor = Math.max(floorPt, Math.round(fontSize * minScale * 2) / 2);
   while (height !== undefined && layout.height > height && size - 0.5 >= floor) { size -= 0.5; layout = measure(size); }
@@ -62,7 +58,7 @@ export function measuredTextNode(input) {
   }
   const fontFamily = tokenValue(style.fontFamily), fontSize = tokenValue(style.fontSize);
   if (!fit) {
-    const layout = measureText(text, frame.width, { fontFamily, fontSize, bold: style.bold, wrapWidthRatio: 1 });
+    const layout = measureText(text, frame.width, { fontFamily, fontSize, bold: style.bold });
     if (layout.height > frame.height) {
       throw new Error(overflowMessage ? overflowMessage(id, layout, frame) : `${id} exceeds its allocated text height`);
     }

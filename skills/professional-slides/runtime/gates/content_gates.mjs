@@ -4,17 +4,9 @@
  *
  *   node runtime/gates/content_gates.mjs deck.content.json [--report out.json]
  *
- * This is the stage that did not exist, and its absence is the best-evidenced
- * failure in this repository. A 50-page deck recorded thirteen page
- * architectures, 0.93 style entropy and a stated reason on all fifty pages -
- * the best layout numbers ever measured here - and carried one chart,
- * twenty-eight pages opening with the literal word "Interpretation:", and
- * eighteen tables on two invented schemas. A reader rated it 2 out of 10.
- *
- * Layout planning passed with distinction. Content design never happened. They
- * were the same artefact - one dot-dash row asking for the claim, the exhibit,
- * the variant and the architecture together - so choosing the architecture felt
- * like choosing the content, and nothing noticed that it had not been chosen.
+ * A deck can score well on every layout measure and still say nothing. When
+ * one record asks for the claim, the exhibit, the variant and the architecture
+ * together, choosing the architecture passes for choosing the content.
  *
  * So the content file may not name a component, an architecture or a variant.
  * There is nowhere to put one. A page makes four analytical decisions,
@@ -29,14 +21,15 @@
  * job and focus. `settles.kind` suggests an encoding; it does not replace the
  * evidence or prescribe a quota of quantitative pages.
  *
- * `adds` is the field that did not exist. Its absence is the twenty-eight
- * "Interpretation:" pages: with nowhere to record what the commentary was for,
- * the commentary became a second reading of the exhibit.
+ * `adds` records what the commentary is for. With nowhere to record it, the
+ * commentary becomes a second reading of the exhibit, and pages open on
+ * "Interpretation:".
  *
  * Exit 0 when the content passes, 2 when it has findings, 1 on a crash.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { checkTextPlan } from "../text-contract.mjs";
+import { EXIT, UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "../cli.mjs";
+import { checkTextPlan, textWords } from "../text-contract.mjs";
+import { DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
 
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
@@ -70,17 +63,15 @@ export const EVIDENCE_KINDS = Object.freeze([
 ]);
 
 // Words that carry no argument, so two sentences sharing them share nothing.
-const STOPWORDS = new Set(`a an the and or but of to in on for with as is are was were be been being
-it its this that these those not no do does did can could may might will would should from by at
-into than then so such other their them they our we you your also more most each per over under
-between within has have had who whom which what when where how there here both either neither
-about across after before during through while because since although however therefore`.split(/\s+/));
+// One list, read here and by the page gates (text_stats.py content_words).
+const STOPWORDS = new Set(readJsonSync(new URL("./stopwords.json", import.meta.url)).content);
 
-const words = (text) => new Set(String(text ?? "").toLowerCase().match(/[a-z][a-z']+/g)?.filter(
+/** The content words of `text`: lower-case runs of letters, four and up, that are not stopwords. */
+export const contentWords = (text) => new Set(String(text ?? "").toLowerCase().match(/[a-z][a-z']+/g)?.filter(
   (w) => !STOPWORDS.has(w) && w.length > 3) ?? []);
 
 const overlap = (a, b) => {
-  const left = words(a), right = words(b);
+  const left = contentWords(a), right = contentWords(b);
   if (!left.size || !right.size) return 0;
   let shared = 0;
   for (const w of left) if (right.has(w)) shared += 1;
@@ -88,8 +79,12 @@ const overlap = (a, b) => {
 };
 
 export const CONTENT_THRESHOLDS = Object.freeze({
-  from: 8,                // pages before a deck-wide share is worth measuring
-  qualitativeMax: 0.34,   // a third. The deck that failed ran 47 of 50
+  from: DECK_LENGTH.content, // pages before a deck-wide share is worth measuring
+  qualitativeMax: 0.34,   // a third
+  // Past half the deck, "qualitative" is not a judgement about some pages; it
+  // is a deck that declared its evidence unmeasured, and an advisory at that
+  // share is read and shipped past, so it blocks.
+  qualitativeBlock: 0.5,
   addsOverlapMax: 0.5,    // `adds` built from the words of what it adds to
   claimWordsMin: 6,       // "Origins" is a topic; a claim is a sentence
   claimOverlapMax: 0.7,   // two pages proving the same thing
@@ -174,7 +169,7 @@ export function runContentGates(content, options = {}) {
         + "evidence - which is the whole reason these are two files. Move it to the layout plan."));
     }
     const claim = String(page.claim ?? "").trim();
-    if (claim.split(/\s+/).filter(Boolean).length < CONTENT_THRESHOLDS.claimWordsMin || !/\s/.test(claim)) {
+    if (textWords(claim) < CONTENT_THRESHOLDS.claimWordsMin || !/\s/.test(claim)) {
       findings.push(finding(at, "CONTENT_NO_CLAIM", claim || "(empty)", `${CONTENT_THRESHOLDS.claimWordsMin} words`,
         "A page proves something; a topic label does not. \"Origins\" is a section name, "
         + "\"DC's foundational icons predate Marvel's defining 1960s ensemble\" is a claim. "
@@ -215,12 +210,19 @@ export function runContentGates(content, options = {}) {
     const qualitative = kinds.filter((k) => k === "qualitative").length;
     const share = qualitative / kinds.length;
     if (share > CONTENT_THRESHOLDS.qualitativeMax) {
-      findings.push(finding(null, "CONTENT_UNMEASURED",
-        { share: round(share), pages: qualitative, of: kinds.length }, CONTENT_THRESHOLDS.qualitativeMax,
-        "Check whether these pages contain named examples, bounded comparisons or worked mechanisms. "
+      const blocks = share > CONTENT_THRESHOLDS.qualitativeBlock;
+      const which = pages.filter((p) => String(p.settles?.kind ?? "qualitative") === "qualitative").map((p) => p.id ?? p.n).filter((x) => x != null);
+      findings.push({ ...finding(null, "CONTENT_UNMEASURED",
+        { share: round(share), pages: qualitative, of: kinds.length, ids: which.slice(0, 20) },
+        blocks ? CONTENT_THRESHOLDS.qualitativeBlock : CONTENT_THRESHOLDS.qualitativeMax,
+        (blocks ? `${qualitative} of ${kinds.length} pages declare their evidence qualitative, past the half at which a deck is refused. `
+          + "Go back to the research for the pages whose claim is a quantity - a share, a rate, a ranking, a count - and record what "
+          + "settles it; keep `qualitative` for the pages that are genuinely about what something is like. "
+          : "Check whether these pages contain named examples, bounded comparisons or worked mechanisms. ")
         + "A qualitative label cannot establish evidence quality, and changing it to comparison "
         + "does not add evidence. Plot quantities when they settle the question; do not invent "
-        + "numbers or impose a chart quota on an operating or qualitative argument."));
+        + "numbers or impose a chart quota on an operating or qualitative argument."),
+        severity: blocks ? "blocking" : "advisory" });
     }
     const highlighted = pages.filter((p) => String(p.highlight ?? "").trim()).length;
     if (highlighted < CONTENT_THRESHOLDS.highlightMin) {
@@ -241,7 +243,7 @@ export function runContentGates(content, options = {}) {
       }
     }
   }
-  // The one question nothing asked: does the deck deliver its own answer?
+  // The one question no page gate asks: does the deck deliver its own answer?
   //
   // Every other gate here judges a page. This judges the deck: a governing
   // answer is written at the top of the file, and unless the claims carry it,
@@ -257,9 +259,9 @@ export function runContentGates(content, options = {}) {
       + "nothing to check them against."));
   } else if (pages.length) {
     const claims = pages.map((p) => String(p.claim ?? ""));
-    const answerWords = words(answer);
+    const answerWords = contentWords(answer);
     const union = new Set();
-    for (const claim of claims) for (const w of words(claim)) union.add(w);
+    for (const claim of claims) for (const w of contentWords(claim)) union.add(w);
     let covered = 0;
     for (const w of answerWords) if (union.has(w)) covered += 1;
     const coverage = answerWords.size ? covered / answerWords.size : 0;
@@ -268,12 +270,16 @@ export function runContentGates(content, options = {}) {
       const missing = [...answerWords].filter((w) => !union.has(w));
       // Where to say it, and how close the deck already is: the executive
       // summary's title (the first analytical page) is where a deck states its
-      // answer. Naming it saved an author three rounds of guessing which title
-      // the rule wanted.
+      // answer, so the finding names that title rather than leaving the author
+      // to guess which one the rule wants.
       const best = pages.map((p) => ({ id: p.id ?? p.n, claim: String(p.claim ?? ""), score: overlap(answer, String(p.claim ?? "")) })).sort((a, b) => b.score - a.score)[0];
       const opener = pages.find((p) => p.role !== "structural" && !p.kind);
       const where = ` State it in the title of ${opener ? `\`${opener.id ?? opener.n}\` (the opening page)` : "the opening page"}; the closest title now is ${best ? `\`${best.id}\`: "${best.claim.slice(0, 90)}"` : "none"}.`;
-      findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED",
+      // Blocks once the deck is long enough to judge: a deck whose claims do
+      // not deliver its own answer is not finished, however good its pages.
+      // As an advisory it is read and shipped past. A probe of a few pages
+      // hears it as a question.
+      findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.coverage", severity: pages.length >= CONTENT_THRESHOLDS.from ? "blocking" : "advisory", ...finding(null, "CONTENT_ANSWER_UNCARRIED",
         { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) },
         { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
         coverage < CONTENT_THRESHOLDS.answerCoverageMin
@@ -283,7 +289,7 @@ export function runContentGates(content, options = {}) {
             + "deck can actually settle." + where
           : "No single page states the answer. The claims between them cover it, which means "
             + "the reader can assemble it - but a deck leads with its answer rather than "
-            + "leaving it to be inferred from twenty pages. Write the page that says it." + where));
+            + "leaving it to be inferred from twenty pages. Write the page that says it." + where) });
     }
     const against = contradictions(answer, pages);
     if (against.length) {
@@ -297,10 +303,10 @@ export function runContentGates(content, options = {}) {
     }
   }
 
-  return {...report(content, findings, pages), textCoverage: textCheck};
+  return {...report(content, findings, pages, options.deck), textCoverage: textCheck};
 }
 
-function report(content, findings, pages) {
+function report(content, findings, pages, deck = content) {
   const kinds = {};
   for (const kind of EVIDENCE_KINDS) kinds[kind] = 0;
   for (const page of pages) {
@@ -312,10 +318,8 @@ function report(content, findings, pages) {
     const n = findings.filter((f) => f.code === code).length;
     if (n) counts[code] = n;
   }
-  const reported = findings.map(f => ({...f, severity: f.severity ?? (
-    ["CONTENT_NO_HIGHLIGHT", "CONTENT_UNMEASURED"].includes(f.code)
-      || (f.code === "CONTENT_ANSWER_UNCARRIED" && f.measured?.coverage !== undefined)
-      ? "advisory" : "blocking")}));
+  // A deck revised under older rules hears the rules introduced since as advisories.
+  const reported = applyRulesVersion(findings.map((f) => ({ ...f, severity: f.severity ?? (f.code === "CONTENT_NO_HIGHLIGHT" ? "advisory" : "blocking") })), deck ?? {});
   return {
     schema: "professional-slides.content-gates/v1",
     id: content?.id ?? null,
@@ -336,17 +340,13 @@ function report(content, findings, pages) {
   };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//, ""))) {
-  const args = process.argv.slice(2);
-  const path = args.find((a) => !a.startsWith("--"));
-  if (!path) {
-    console.error("usage: content_gates.mjs deck.content.json [--report out.json] [--json]");
-    process.exit(1);
-  }
-  const result = runContentGates(JSON.parse(readFileSync(path, "utf8")), {required: !args.includes("--legacy")});
-  const reportAt = args[args.indexOf("--report") + 1];
-  if (args.includes("--report") && reportAt) writeFileSync(reportAt, JSON.stringify(result, null, 2));
-  if (args.includes("--json")) console.log(JSON.stringify(result, null, 2));
+if (isMain(import.meta.url)) runCli((argv) => {
+  const usage = "usage: content_gates.mjs deck.content.json [--report out.json] [--json]";
+  const { values, positionals: [file] } = parseCli(argv, { report: { type: "string" }, json: { type: "boolean" } }, { usage });
+  if (!file) throw new UsageError(usage);
+  const result = runContentGates(readJsonSync(file), { required: true });
+  if (values.report) writeJsonSync(values.report, result);
+  if (values.json) console.log(JSON.stringify(result, null, 2));
   else {
     const counts = Object.entries(result.countsByCode).map(([c, n]) => `${c}=${n}`).join(", ");
     console.log(`content gates: ${result.accepted ? "accepted" : "REJECTED"} | ${counts || "none"}`);
@@ -354,5 +354,5 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//,
       console.log(`  ${f.code}${f.page ? ` p${f.page}` : ""}: ${JSON.stringify(f.measured)}`);
     }
   }
-  process.exit(result.accepted ? 0 : 2);
-}
+  return result.accepted ? EXIT.ok : EXIT.refused;
+});

@@ -19,12 +19,12 @@ class CompileTests(unittest.TestCase):
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
-const base = {{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim and sits where it happens', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+const base = {{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim and sits where it happens', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }};
 const error = (page) => {{ try {{ compilePage(page); return null; }} catch (e) {{ return e.message; }} }};
 const ok = compilePage(base);
 const side = compilePage({{ ...base, commentary: 'beside', points: ['One', 'Two'], highlight: ['One', 'Two'], takeaway: 'So what' }});
-const panels = compilePage({{ id: 'p2', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, why: 'Three airlines answer the same question side by side', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+const panels = compilePage({{ id: 'p2', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Three airlines answer the same question side by side', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
   title: 'Each hub grew', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Hub ' + i + ' added traffic in every year of the run' }})) }});
 console.log(JSON.stringify({{
   layout: ok.layout, type: ok.exhibit.type, pageType: ok.pageType.type, close: ok.soWhat ?? null,
@@ -33,7 +33,7 @@ console.log(JSON.stringify({{
   noForm: error({{ ...base, form: 'pie' }}), layoutWritten: error({{ ...base, layout: 'exhibit-top' }}),
   pointsOnExhibit: error({{ ...base, points: ['x'] }}), bare: error({{ ...base, exhibit: {{ ...base.exhibit, annotations: [] }} }}),
   twoPeriods: error({{ ...base, exhibit: {{ ...base.exhibit, categories: ['2019', '2020'] }} }}),
-  noCaption: error({{ id: 'p3', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, why: 'Two measures that together prove it', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+  noCaption: error({{ id: 'p3', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Two measures that together prove it', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
     title: 't', exhibits: [0, 1].map(() => ({{ type: 'chart.bar', categories: ['a', 'b', 'c', 'd'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}] }})) }}),
 }}));
 ''')
@@ -44,8 +44,9 @@ console.log(JSON.stringify({{
         self.assertEqual(result['sideLayout'], 'exhibit-left')
         self.assertEqual(result['sideClose'], 'So what')
         self.assertEqual(result['arrange'], 'row')
-        for key in ('noCommentary', 'noTakeaway', 'noForm'):
+        for key in ('noCommentary', 'noForm'):
             self.assertIn('choose', result[key])
+        self.assertIsNone(result['noTakeaway'])  # takeaway is optional: absent, the page closes on its exhibit
         self.assertIn('set by the page', result['layoutWritten'])
         self.assertIn('move the points', result['pointsOnExhibit'])
         self.assertIn('marks its finding', result['bare'])
@@ -61,8 +62,8 @@ import {{ varietyFindings }} from './skills/professional-slides/runtime/gates/va
 import {{ structureOf }} from '{KIT}';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const chart = (extra = {{}}) => ({{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}], annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}], ...extra }});
-const stamped = Array.from({{ length: 14 }}, (_, i) => ({{ id: 's' + i, type: 'trend', form: 'line', commentary: 'below', takeaway: 'So what ' + i,
-  why: 'Every page takes the same shape here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'], highlight: ['a', 'b', 'c'] }}));
+const stamped = Array.from({{ length: 14 }}, (_, i) => ({{ id: 's' + i, type: 'trend', form: 'line', commentary: 'below', takeaway: 'So what ' + i, adds: 'The commentary names the mechanism the exhibit cannot show',
+  why: 'Every page takes the same shape here', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'], highlight: ['a', 'b', 'c'] }}));
 let refused = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: stamped }}).findings.map((f) => f.code).sort();
 const kinds = [
   {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: chart() }},
@@ -71,18 +72,19 @@ const kinds = [
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }},
   {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
   {{ type: 'numbers', form: 'hero-number', commentary: 'none', kpi: {{ value: '5', label: 'x' }}, exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
-  {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps.' }} }},
+  {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps: what the argument settles, the condition it rests on, and the evidence that would reverse it before the next review of the plan.' }} }},
 ];
-const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, why: 'Chosen for what this page has to show', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
+const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Chosen for what this page has to show', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
 const ok = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: chosen }});
 const untyped = varietyFindings({{ slides: Array.from({{ length: 13 }}, (_, i) => ({{ id: 'u' + i, title: 't' }})) }}, {{ structureOf }}).map((f) => f.code);
 const edited = structuredClone(ok.spec); edited.slides[0].layout = 'exhibit-top';
 console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), untyped,
   edited: varietyFindings(edited, {{ structureOf }}).map((f) => f.code) }}));
 ''')
-        # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin too.
-        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_SIGNATURE', 'VARIETY_TAKEAWAY',
-                                             'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
+        # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin
+        # too; and fourteen line charts are one kind of exhibit (VARIETY_EXHIBIT_RANGE).
+        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_EXHIBIT_RANGE', 'VARIETY_SIGNATURE',
+                                             'VARIETY_TAKEAWAY', 'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
         # A hero number with its points beside its proof is drawn as the ranking
         # beside its points, so the chosen deck's hero numbers stand alone.
         self.assertEqual(result['chosen'], [])
@@ -101,8 +103,8 @@ class BeyondOneColumnTests(unittest.TestCase):
 
     # Shared page parts, spliced into each probe.
     PAGES = '''
-const S = { kind: 'qualitative', what: 'The operator statement of its plan' };
-const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S };
+const S = { kind: 'comparison', what: 'The operator statement of its plan' };
+const base = { takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim this page makes', settles: S };
 const point = (n) => 'The ' + n + ' constraint binds in the morning peak and lifting it takes a funded scheme';
 const rows = (extra = {}, n = 3) => ({ ...base, id: 'rows', type: 'parallel', form: 'labelled-rows', commentary: 'in-exhibit',
   title: 'Three constraints hold the peak where it is: fleet, track and depot',
@@ -249,8 +251,8 @@ class DrawnVarietyTests(unittest.TestCase):
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 import {{ varietyFindings, VARIETY }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
-const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
-const base = {{ takeaway: false, why: 'The page type fits the claim this page makes', settles: S }};
+const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim this page makes', settles: S }};
 const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const pts = ['Traffic fell to a fifth', 'It recovered by 2022'];
 const trend = compilePage({{ ...base, id: 't', type: 'trend', form: 'line', commentary: 'beside', points: pts, highlight: ['a fifth', 'by 2022'], title: 'Traffic recovered',
@@ -263,7 +265,7 @@ const full = compilePage({{ ...base, id: 'f', type: 'trend', form: 'line', comme
   exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
 // Synthetic decks of fourteen pages, each spreading its types so only the rule under test fires.
 const TYPES = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'mechanism', 'scorecard', 'lookup', 'panels', 'schedule', 'numbers', 'parallel', 'place', 'options'];
-const page = (i, choice) => ({{ id: 'p' + i, title: 'Page ' + i, pageType: {{ type: TYPES[i], commentary: ['none', 'in-exhibit', 'captions', 'on-exhibit'][i % 4], takeaway: false, skeleton: 'skeleton ' + i, ...choice }} }});
+const page = (i, choice) => ({{ id: 'p' + i, title: 'Page ' + i, pageType: {{ type: TYPES[i], commentary: ['none', 'in-exhibit', 'captions', 'on-exhibit'][i % 4], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', skeleton: 'skeleton ' + i, ...choice }} }});
 const deck = (choices) => ({{ slides: Array.from({{ length: 14 }}, (_, i) => page(i, choices(i))) }});
 const codes = (spec) => varietyFindings(spec).map((f) => f.code);
 const mirrored = deck((i) => (i < 5 ? {{ commentary: i % 2 ? 'beside-left' : 'beside' }} : {{}}));
@@ -304,8 +306,8 @@ class StructureTests(unittest.TestCase):
         result = run_node(f'''
 import {{ compilePage, drawnOf }} from '{KIT}';
 import {{ varietyFindings, structureMix, VARIETY }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
-const S = {{ kind: 'qualitative', what: 'The evidence recorded for this page' }};
-const base = {{ takeaway: false, why: 'The page type fits the claim this page makes', settles: S, title: 'A finding' }};
+const S = {{ kind: 'comparison', what: 'The evidence recorded for this page' }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim this page makes', settles: S, title: 'A finding' }};
 const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const chart = {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], highlights: [{{ category: '2020' }}] }};
 const pts = ['Traffic fell to a fifth', 'It recovered by 2022'];
@@ -320,7 +322,7 @@ const out = {{
 }};
 // Synthetic decks of fifteen pages: multi pages and column pages as given.
 const deck = (multi, column, n = 15) => ({{ slides: Array.from({{ length: n }}, (_, i) => ({{ id: 'p' + i, title: 'Page ' + i,
-  pageType: {{ type: 'trend', commentary: 'none', takeaway: false, skeleton: 'skeleton ' + i, drawn: {{ exhibits: i < multi ? 2 : 1, column: i >= n - column }} }} }})) }});
+  pageType: {{ type: 'trend', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', skeleton: 'skeleton ' + i, drawn: {{ exhibits: i < multi ? 2 : 1, column: i >= n - column }} }} }})) }});
 const codes = (spec) => varietyFindings(spec).map((f) => f.code).filter((c) => c === 'VARIETY_PANELS' || c === 'VARIETY_COLUMN');
 const column = varietyFindings(deck(3, 4)).find((f) => f.code === 'VARIETY_COLUMN');
 console.log(JSON.stringify({{ ...out, thin: codes(deck(2, 0)), enough: codes(deck(3, 3)), crowded: codes(deck(3, 4)), short: codes(deck(0, 8, 14)),
@@ -364,7 +366,7 @@ console.log(JSON.stringify({{ pages: slides.length, apart: slides.filter(({{ pag
         result = run_node('''
 import { varietyFindings, REDRAWS } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 const deck = (multi, column) => ({ slides: Array.from({ length: 15 }, (_, i) => ({ id: 'p' + i, title: 'Page ' + i,
-  pageType: { type: 'trend', commentary: 'none', takeaway: false, skeleton: 'skeleton ' + i, drawn: { exhibits: i < multi ? 2 : 1, column: i >= 15 - column } } })) });
+  pageType: { type: 'trend', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', skeleton: 'skeleton ' + i, drawn: { exhibits: i < multi ? 2 : 1, column: i >= 15 - column } } })) });
 const repair = (spec, code) => varietyFindings(spec).find((f) => f.code === code).repair;
 console.log(JSON.stringify({ redraws: REDRAWS, column: repair(deck(3, 4), 'VARIETY_COLUMN'), panels: repair(deck(2, 0), 'VARIETY_PANELS') }));
 ''')
@@ -385,18 +387,18 @@ class SourceChecksTests(unittest.TestCase):
 import {{ compilePage }} from '{KIT}';
 import {{ compileDeck }} from '{AUTHOR}';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
-const trend = (annotations) => ({{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+const trend = (annotations) => ({{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim here', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations }} }});
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const pair = {{ type: 'chart.column', categories: ['H1 25', 'H1 26'], series: [{{ name: 'x', values: [46, 31] }}], caption: 'Guests fell by a third in the first half' }};
 console.log(JSON.stringify({{
   labels: error(() => compilePage(trend([{{ category: '2020', text: 'Low' }}]))),
   sentence: error(() => compilePage(trend([{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}]))),
-  panelPair: error(() => compilePage({{ id: 'p', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, why: 'Two cuts of the shock side by side', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+  panelPair: error(() => compilePage({{ id: 'p', type: 'panels', form: 'row', commentary: 'captions', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Two cuts of the shock side by side', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
     title: 'The shock', exhibits: [pair, {{ ...pair, caption: 'April traffic was a tenth of the June level' }}] }})),
-  pieData: error(() => compilePage({{ id: 'c', type: 'composition', form: 'donut', commentary: 'beside', points: ['a'], takeaway: false, why: 'The mix is the claim here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+  pieData: error(() => compilePage({{ id: 'c', type: 'composition', form: 'donut', commentary: 'beside', points: ['a'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The mix is the claim here', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
     title: 'Mix', exhibit: {{ categories: ['A', 'B'], series: [{{ name: 'x', values: [60, 40] }}] }} }})),
-  sliver: error(() => compilePage({{ id: 'c', type: 'composition', form: 'pie', commentary: 'beside', points: ['a'], takeaway: false, why: 'The mix is the claim here', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+  sliver: error(() => compilePage({{ id: 'c', type: 'composition', form: 'pie', commentary: 'beside', points: ['a'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The mix is the claim here', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
     title: 'Mix', exhibit: {{ labels: ['A', 'B', 'C'], values: [80, 17, 3] }} }})),
   unknownKey: error(() => compileDeck({{ deck: {{ id: 'd' }}, pages: [{{ ...trend([{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}]), highlightRow: 2 }}] }})),
 }}));
@@ -419,14 +421,14 @@ const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const S = {{ kind: 'rate', what: 'The operator annual reports, five years' }};
 const long = 'Traffic fell to a fifth when the network was grounded and recovered only as aircraft returned from storage in stages';
-const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: S,
+const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim here', settles: S,
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: long }}] }} }};
-const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, why: 'Three numbers carry this claim', settles: S,
+const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Three numbers carry this claim', settles: S,
   title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }};
 // A short argument page: its content plan is derived from the composed page and held to the text-page floor.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test',
-  settles: {{ kind: 'qualitative', what: 'The operator statement of its plan' }}, adds: null, title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
+const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test',
+  settles: {{ kind: 'comparison', what: 'The operator statement of its plan' }}, adds: null, title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [memo] }}, {{ baseDir: dir }});
 const content = deriveContent(out.spec, out.deck);
 const page = content.pages.find((p) => p.id === 'm1');
@@ -448,10 +450,10 @@ import {{ compilePage }} from '{KIT}';
 import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.mjs';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const insights = new Map([['i1', {{ id: 'i1', shape: 'fact', finding: 'Two airlines carried 53m and 42m.' }}], ['i2', {{ id: 'i2', shape: 'peer-set', finding: 'Ten airlines ranked by orders.' }}]]);
-const ranking = (evidence) => ({{ id: 'r', type: 'ranking', form: 'bar', commentary: 'beside', takeaway: false, why: 'Where every member stands is the claim', evidence,
+const ranking = (evidence) => ({{ id: 'r', type: 'ranking', form: 'bar', commentary: 'beside', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Where every member stands is the claim', evidence,
   title: 'The book leads the set', points: ['A point.'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }});
 const derived = compilePage(ranking(['i2']), 0, {{ insights }});
-const onExhibit = {{ id: 'o', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim here', settles: {{ kind: 'rate', what: 'Five years of reports' }},
+const onExhibit = {{ id: 'o', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim here', settles: {{ kind: 'rate', what: 'Five years of reports' }},
   title: 'Traffic fell and recovered', exhibit: {{ categories: ['2019','2020','2021','2022','2023','2024','2025','2026'], series: [{{ name: 'x', values: [5,1,2,4,5,6,6,7] }}], highlights: [{{ category: '2020' }}] }} }};
 let all = null;
 try {{ composeAll({{ schema: 'professional-slides.deck/v3', id: 'x', slides: [
@@ -485,7 +487,7 @@ console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 const markers = [{{ label: 'Leeds', longitude: -1.55, latitude: 53.8 }}, {{ label: 'York', longitude: -1.08, latitude: 53.96 }}, {{ label: 'Hull', longitude: -0.34, latitude: 53.74 }}];
-const page = compilePage({{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points: ['A point.'], takeaway: false, why: 'Where the network runs is the claim',
+const page = compilePage({{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points: ['A point.'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Where the network runs is the claim',
   settles: {{ kind: 'structure', what: 'The operator route map' }}, title: 'The network is three cities', exhibit: {{ geography: 'europe', crop: 'fit', markers }} }});
 console.log(JSON.stringify({{ advisories: page.pageType.advisories ?? [] }}));
 ''')
@@ -496,11 +498,11 @@ console.log(JSON.stringify({{ advisories: page.pageType.advisories ?? [] }}));
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import {{ authorDeck }} from '{AUTHOR}';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
-const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, why: 'The measures are looked up here', settles: S,
+const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
+const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The measures are looked up here', settles: S,
   title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x'], ['y', '2'], ['z', '3']] }} }};
-const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
+const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, memo] }}, {{ baseDir: dir }});
 console.log(JSON.stringify({{ failed: [...out.failedIds], composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code) }}));
 ''')
@@ -515,7 +517,7 @@ class PublishedLimitsTests(unittest.TestCase):
 import {{ compilePage }} from '{KIT}';
 import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
-const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'share', what: 'The annual report split' }} }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: {{ kind: 'share', what: 'The annual report split' }} }};
 const pie = (labels, values) => compilePage({{ ...base, id: 'c', type: 'composition', form: 'pie', commentary: 'beside', points: ['A point.'], title: 'Mix',
   exhibit: {{ labels, values }} }});
 const road = (n) => compilePage({{ ...base, id: 'r', type: 'schedule', form: 'roadmap', commentary: 'none', title: 'Plan',
@@ -528,7 +530,9 @@ const content = {{ question: 'Is Emirates the strongest Gulf airline system?', a
 const answer = runContentGates(content).findings.find((f) => f.code === 'CONTENT_ANSWER_UNCARRIED');
 console.log(JSON.stringify({{ six: error(() => pie(['a','b','c','d','e','f'], [1,1,1,1,1,1])), two: error(() => pie(['cargo','other'], [12, 88])),
   small: error(() => pie(['Asia','Europe','Middle East'], [7, 4, 3])), three: error(() => road(3)), four: error(() => road(4)),
-  one: error(() => compilePage({{ ...bars, highlight: '2.4m tonnes' }})), each: error(() => compilePage({{ ...bars, highlight: ['2.4m tonnes', 'Thirteen freighters'] }})),
+  one: (({{ highlight, pageType }}) => ({{ highlight, advisories: pageType.advisories }}))(compilePage({{ ...bars, highlight: '2.4m tonnes' }})),
+  figures: compilePage({{ ...bars, points: ['Cargo carried 2.4m tonnes, up 3%', 'In FY22 thirteen freighters flew 1,400 hours', 'Yield rose to $1.2bn in 2025'] }}).highlight,
+  each: error(() => compilePage({{ ...bars, highlight: ['2.4m tonnes', 'Thirteen freighters'] }})),
   answer: answer?.repair ?? '' }}));
 ''')
         self.assertIn('2 to 5 labels', result['six'])
@@ -536,7 +540,11 @@ console.log(JSON.stringify({{ six: error(() => pie(['a','b','c','d','e','f'], [1
         self.assertIn('small count', result['small'])
         self.assertIn('four or more dated items', result['three'])
         self.assertIsNone(result['four'])
-        self.assertIn('mark the finding in each point', result['one'])
+        # An unmarked point is marked on its own figure - a percentage, an
+        # amount or a count, never a year - and one with no figure is named.
+        self.assertEqual(result['one']['highlight'], '2.4m tonnes')
+        self.assertIn('POINT_UNMARKED: points 2, 3', ' '.join(result['one']['advisories']))
+        self.assertEqual(result['figures'], ['2.4m', '1,400', '$1.2bn'])
         self.assertIsNone(result['each'])
         self.assertIn('p02', result['answer'])  # names where to say it and the closest title
 
@@ -548,7 +556,7 @@ class RerunGapsTests(unittest.TestCase):
         result = run_node(f'''
 import {{ compilePage, describeTypes, railCapacity }} from '{KIT}';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
-const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'count', what: 'The route page count' }} }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: {{ kind: 'count', what: 'The route page count' }} }};
 const waffle = (series) => compilePage({{ ...base, id: 'w', type: 'composition', form: 'waffle', commentary: 'beside', title: 'Outstations by region',
   exhibit: {{ categories: ['Asia', 'Europe', 'Middle East', 'Africa'], series }} }}, 0, {{ draft: true }});
 const facts = (value) => compilePage({{ ...base, id: 'f', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Cash',
@@ -593,11 +601,11 @@ console.log(JSON.stringify({{
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import {{ authorDeck }} from '{AUTHOR}';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const S = {{ kind: 'qualitative', what: 'The operator statement of its plan' }};
-const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, why: 'The page type fits the claim here', settles: S, title: 'Two years',
+const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
+const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: S, title: 'Two years',
   exhibit: {{ categories: ['2019', '2020'], series: [{{ name: 'x', values: [1, 2] }}] }} }};
-const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year.' }} }};
+const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [bad, memo] }}, {{ baseDir: dir }});
 console.log(JSON.stringify({{ codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')), composed: out.deck.slides.map((s) => s.id),
   floor: out.deck.slides.find((s) => s.id === 'm')?.wordFloor ?? null, ceiling: out.deck.slides.find((s) => s.id === 'm')?.wordCeiling ?? null }}));
@@ -681,7 +689,7 @@ console.log(JSON.stringify({{
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
-const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'rate', what: 'The operator annual reports' }}, title: 'Traffic', commentary: 'beside', points: ['A point.'] }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: {{ kind: 'rate', what: 'The operator annual reports' }}, title: 'Traffic', commentary: 'beside', points: ['A point.'] }};
 const years = ['2019','2020','2021','2022'];
 const trend = (series) => compilePage({{ ...base, id: 't', type: 'trend', form: 'line', exhibit: {{ categories: years, series, highlights: [{{ category: '2020' }}] }} }}, 0, {{ draft: true }});
 const bridge = (n) => compilePage({{ ...base, id: 'b', type: 'bridge', form: 'waterfall', exhibit: {{ categories: Array.from({{ length: n }}, (_, i) => 'Step ' + i), values: Array.from({{ length: n }}, (_, i) => i ? 1 : 10), totals: [0, n - 1] }} }}, 0, {{ draft: true }});
@@ -710,7 +718,7 @@ console.log(JSON.stringify({{
 import { varietyFindings, evidenceDepth } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 const types = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'panels', 'scorecard', 'mechanism'];
 const deck = (values, charts) => ({ slides: Array.from({ length: 16 }, (_, i) => ({ id: 'p' + i, title: 'Finding ' + i,
-  pageType: { type: types[i % 8], commentary: ['beside', 'below', 'none', 'rail'][i % 4], takeaway: false, ...(i < charts ? { chart: true, values: values[i % values.length] } : { values: 30 }) } })) });
+  pageType: { type: types[i % 8], commentary: ['beside', 'below', 'none', 'rail'][i % 4], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', ...(i < charts ? { chart: true, values: values[i % values.length] } : { values: 30 }) } })) });
 const codes = (spec) => varietyFindings(spec).map((f) => f.code);
 console.log(JSON.stringify({ thin: codes(deck([9, 10, 12], 12)), deep: codes(deck([12, 18, 30], 12)), depth: evidenceDepth(deck([9, 10, 12], 12).slides),
   few: codes(deck([9], 7)) }));
@@ -728,7 +736,8 @@ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'
 import {{ breadthProblem, breadthOf }} from '{KIT}';
 import {{ readInsights }} from '{AUTHOR}';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'insights-'));
-const log = (insights) => {{ fs.writeFileSync(path.join(dir, 'd.insights.json'), JSON.stringify({{ insights }})); return readInsights(dir, 'd').then(() => null, (e) => e.message); }};
+const raw = (insights) => {{ fs.writeFileSync(path.join(dir, 'd.insights.json'), JSON.stringify({{ insights }})); return readInsights(dir, 'd').then(() => null, (e) => e.message); }};
+const log = (insights) => raw(insights.map((i) => ({{ strength: 'supporting', soWhat: 'It decides which operator to back first', ...i }})));
 const series = (breadth) => ({{ id: 's', shape: 'series', breadth }});
 console.log(JSON.stringify({{
   short: breadthProblem(series({{ periods: 4, series: 1 }})), peers: breadthProblem(series({{ periods: 4, series: 3 }})), long: breadthProblem(series({{ periods: 8 }})),
@@ -738,6 +747,7 @@ console.log(JSON.stringify({{
   unrecorded: breadthProblem({{ id: 'u', shape: 'peer-set' }}), fact: breadthProblem({{ id: 'f', shape: 'fact' }}),
   logged: await log([{{ id: 'a', shape: 'peer-set', breadth: {{ members: 3 }} }}, {{ id: 'b', shape: 'series' }}, {{ id: 'c', shape: 'fact' }}]),
   clean: await log([{{ id: 'a', shape: 'peer-set', breadth: {{ members: 12 }} }}, {{ id: 'c', shape: 'qualitative' }}]),
+  ungraded: await raw([{{ id: 'a', shape: 'fact', strength: 'high', soWhat: 'It decides which operator to back first' }}, {{ id: 'b', shape: 'fact', strength: 'strong' }}]),
 }}));
 ''')
         self.assertIn('research task', result['short'])
@@ -750,13 +760,44 @@ console.log(JSON.stringify({{
         self.assertIsNone(result['fact'])
         self.assertIn('2 insights', result['logged'])  # every narrow insight named at once
         self.assertIsNone(result['clean'])
+        # A finding is graded and says what follows, every one named at once.
+        self.assertIn('a: `strength` is one of strong, supporting, context (got "high")', result['ungraded'])
+        self.assertIn('b: `soWhat`', result['ungraded'])
+
+    def test_a_mix_counts_the_parts_its_chart_draws(self):
+        # Read from each composition form's own sample data: the parts are the
+        # slices, tiles, waffle categories, figure rows - or, where two or more
+        # series stack over the categories, the series every stack is split into.
+        result = run_node(f'''
+import {{ breadthOf, breadthProblem }} from '{KIT}';
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+const mix = (data) => ({{ id: 'm', shape: 'mix', data }});
+const forms = ['chart.donut', 'chart.pie', 'chart.waffle', 'chart.treemap', 'pictogram', 'chart.stacked-bar', 'chart.stacked-column', 'chart.marimekko'];
+const abc = {{ categories: ['A', 'B', 'C'], series: [{{ name: 'Share', values: [50, 30, 20] }}] }};
+console.log(JSON.stringify({{
+  forms: Object.fromEntries(forms.map((id) => [id, breadthOf(mix(REGISTRY.get(id).sample)).parts])),
+  oneSeries: breadthOf(mix(abc)), oneSeriesProblem: breadthProblem(mix(abc)),
+  twoParts: breadthProblem(mix({{ categories: ['2022', '2023', '2024', '2025'], series: [{{ name: 'Home' }}, {{ name: 'Away' }}] }})),
+  oneStack: breadthOf(mix({{ series: [{{ name: 'Core', values: [5] }}, {{ name: 'Growth', values: [3] }}, {{ name: 'New', values: [2] }}] }})),
+  recorded: breadthOf({{ shape: 'mix', breadth: {{ parts: 8 }}, data: {{ categories: ['A', 'B', 'C', 'D'], series: [{{ name: 'x' }}, {{ name: 'y' }}] }} }}),
+}}));
+''')
+        self.assertEqual(result['forms'], {'chart.donut': 3, 'chart.pie': 4, 'chart.waffle': 4, 'chart.treemap': 6, 'pictogram': 2,
+                                           'chart.stacked-bar': 3, 'chart.stacked-column': 3, 'chart.marimekko': 2})
+        # Three categories and one series of values is the standard part-to-whole: three parts.
+        self.assertEqual(result['oneSeries'], {'parts': 3})
+        self.assertIsNone(result['oneSeriesProblem'])
+        # Two series stacked over four periods is a two-part mix, however many periods.
+        self.assertIn('2 parts', result['twoParts'])
+        self.assertEqual(result['oneStack'], {'parts': 3})
+        self.assertEqual(result['recorded'], {'parts': 8})  # a recorded breadth is the author's word
 
     def test_the_many_value_forms_compile_and_compose(self):
         result = run_node(f'''
 import {{ compilePage, describeTypes, pageSchema }} from '{KIT}';
 import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.mjs';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
-const base = {{ takeaway: false, why: 'The page type fits the claim here', settles: {{ kind: 'rank', what: 'The operator annual reports' }} }};
+const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: {{ kind: 'rank', what: 'The operator annual reports' }} }};
 const years = ['FY19','FY20','FY21','FY22','FY23','FY24'];
 const peers = ['Subject', 'Peer A', 'Peer B', 'Peer C'];
 const indexed = {{ ...base, id: 'i', type: 'trend', form: 'indexed', commentary: 'none', title: 'The subject recovered more slowly than every peer since FY19',
@@ -813,17 +854,20 @@ console.log(JSON.stringify({{ pageErrors, line: pages[0].exhibit, group: pages[2
         self.assertIn('aligned-bars', result['schema'])
 
     def test_title_limits_are_published_and_the_word_limit_is_checked_at_compile(self):
-        # A 15-word title compiled, composed and failed at the scene check;
-        # the limit is the gate's own, refused in the first run.
+        # A title sets on one line at twelve words; past them it carries the
+        # period or scope the subtitle is for. The limit is the gate's own,
+        # refused in the first run, and so is the takeaway's two lines.
         result = run_node(f'''
 import {{ compilePage, describeTypes, TEXT_LIMITS }} from '{KIT}';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
-const page = (title) => ({{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, why: 'The break is the claim and sits where it happens', settles: {{ kind: 'qualitative', what: 'The evidence recorded for this page' }},
+const page = (title) => ({{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim and sits where it happens', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
   title, exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
 const error = (p, draft = false) => {{ try {{ compilePage(p, 0, {{ draft }}); return null; }} catch (e) {{ return e.message; }} }};
 const words = (n) => Array.from({{ length: n }}, (_, i) => 'word' + i).join(' ');
-console.log(JSON.stringify({{ limits: TEXT_LIMITS, fourteen: error(page(words(14))), fifteen: error(page(words(15))), draft: error(page(words(15)), true),
-  continued: error(page(words(14) + ' (2/3)')), catalogue: describeTypes() }}));
+const long = 'Close on what follows: ' + Array.from({{ length: 60 }}, () => 'the plan').join(' ');
+console.log(JSON.stringify({{ limits: TEXT_LIMITS, twelve: error(page(words(12))), thirteen: error(page(words(13))), draft: error(page(words(13)), true),
+  continued: error(page(words(12) + ' (2/3)')), longTakeaway: error({{ ...page(words(8)), takeaway: long }}),
+  shortTakeaway: error({{ ...page(words(8)), takeaway: 'Electrify first: the Eastern line carries the most journeys at the highest cost' }}), catalogue: describeTypes() }}));
 ''')
         import sys
         sys.path.insert(0, str(RUNTIME / 'gates'))
@@ -831,12 +875,17 @@ console.log(JSON.stringify({{ limits: TEXT_LIMITS, fourteen: error(page(words(14
         self.assertEqual(result['limits']['titleWords'], page_gates.THRESHOLDS['title_words_max'])
         self.assertEqual(result['limits']['titleLines'], page_gates.THRESHOLDS['title_lines_max'])
         self.assertEqual(result['limits']['takeawayLines'], page_gates.TAKEAWAY_LINES_MAX)
-        self.assertIsNone(result['fourteen'])
+        self.assertEqual(result['limits']['titleWords'], 12)
+        self.assertEqual(result['limits']['takeawayLines'], 2)
+        self.assertIsNone(result['twelve'])
         self.assertIsNone(result['continued'])
-        self.assertIn('TITLE_WORDS', result['fifteen'])
-        self.assertIn('15 words', result['fifteen'])
+        self.assertIn('TITLE_WORDS', result['thirteen'])
+        self.assertIn('13 words', result['thirteen'])
+        self.assertIn('`subtitle`', result['thirteen'])  # the repair names where the period and scope go
         self.assertIn('TITLE_WORDS', result['draft'])
-        for published in ('title of 14 words at most', 'TITLE_LINES', 'HEADING_WRAPS', 'TAKEAWAY_LONG', 'rank, 1 = best', 'top 40'):
+        self.assertIn('TAKEAWAY_LONG', result['longTakeaway'])
+        self.assertIsNone(result['shortTakeaway'])
+        for published in ('title of 12 words at most', 'TITLE_LINES', 'HEADING_WRAPS', 'TAKEAWAY_LONG', 'TITLE_GAP_SHARE', 'rank, 1 = best', 'top 40'):
             self.assertIn(published, result['catalogue'])
 
 

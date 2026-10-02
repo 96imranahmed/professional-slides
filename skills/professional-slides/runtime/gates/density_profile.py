@@ -5,22 +5,25 @@
 The text contract checks what the dot-dash plans to say, and its word floor is
 hard. What it cannot see is whether the rendered page reads at the density of
 the targets it is set against: a deck can clear every floor with one long
-paragraph a page, or with commentary padded to reach the floor, and a deck
-measured on its plan alone once reported a median of 75 body words a page and
-a longest block of 52 while its rendered pages read nothing like either.
+paragraph a page, or with commentary padded to reach the floor, and a plan's
+counts need not describe the pages it renders.
 
-So this reads the rendered PDF itself: pdftotext -layout one page at a
-time, the first non-empty line dropped as the title, page numbers and
-Source/Note lines dropped, a block being a run of non-empty lines between
-blank ones, blocks under three words dropped as labels. It writes, for the
-deck and for each analytic page, these numbers beside the skill's targets,
-and flags every page outside the target band.
+So this reads the rendered PDF itself: pdftotext -layout over the whole
+document, split into pages at its form feeds, the first non-empty line
+dropped as the title, page numbers and Source/Note lines dropped, a block
+being a run of non-empty lines between blank ones, blocks under three words
+dropped as labels. It writes, for the deck and for each analytic page, these
+numbers beside the skill's targets, and flags every page outside the target
+band.
 
-The profile does not pass or fail anything. It is the input to the review's
-density pass (references/taste-review.md), where a reader looks at each
-flagged page and judges whether its density is right for the job it does -
-a flag is a question, and a padded page that clears the floor is the case it
-exists to catch.
+A page's flags are questions: the input to the review's density pass
+(references/taste-review.md), where a reader looks at each flagged page and
+judges whether its density is right for the job it does - a padded page that
+clears the floor is the case it exists to catch. One deck-level measure
+blocks: the median words a block across the prose pages, once the deck has
+weight.json deckLength.density of them (TEXT_FRAGMENTED). Five blocks of
+twenty-five words a page is copy broken into labels whatever each page's
+reviewer says about it, and a deck of it is refused at the build.
 """
 from __future__ import annotations
 
@@ -34,8 +37,14 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from page_gates import is_cover  # noqa: E402
-TEXT_FORM = json.loads((HERE.parent / "weight.json").read_text())["plan"]["textForm"]
+from gate_config import CONTRACT, is_cover, waived_rules  # noqa: E402
+from text_stats import printed_words  # noqa: E402
+TEXT_FORM = CONTRACT["plan"]["textForm"]
+DECK_LENGTH = CONTRACT["deckLength"]
+
+DENSITY_CODES = {
+    "TEXT_FRAGMENTED": "the deck's prose pages set their words in blocks outside the band strong pages keep",
+}
 SOURCE_LINE = re.compile(r"^\s*(source|sources|note|notes|footnote)\b[:\s]", re.I)
 PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
 # The targets exclude covers, dividers and contents; so does this, by the
@@ -44,7 +53,9 @@ STRUCTURAL_TASKS = {"cover", "structural"}
 
 
 def words(line: str) -> int:
-    return len([w for w in re.split(r"\s+", line.strip()) if re.search(r"[A-Za-z0-9]", w)])
+    """Printed words: a bullet or a dash pdftotext sets as its own token is
+    not one (text_stats.py)."""
+    return len(printed_words(line))
 
 
 def squash(text: str) -> str:
@@ -110,9 +121,11 @@ def header_lines(slide: dict) -> set[str]:
     return out
 
 
-def extract(pdf: Path, page: int) -> str:
-    return subprocess.run(["pdftotext", "-f", str(page), "-l", str(page), "-layout", str(pdf), "-"],
-                          capture_output=True, text=True, check=True).stdout
+def extract(pdf: Path) -> list[str]:
+    """Every page's text, in one pdftotext run split at its form feeds: one
+    run a page costs a second a page for the same text."""
+    text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True, check=True).stdout
+    return text.split("\f")
 
 
 def quartiles(values: list[float]) -> tuple[float, float, float]:
@@ -135,8 +148,11 @@ def prose_task(task) -> bool:
     return bool(task) and ("commentary" in task or task in ("text-page", "mixed"))
 
 
-def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
+def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = None) -> dict:
+    """The profile of the rendered `pdf`. `rules` ({workflow, rulesVersion})
+    says which rules the deck predates (gate_config.waived_rules)."""
     planned = {p["id"]: p for p in (content or {}).get("pages", []) if "id" in p}
+    texts = extract(pdf)
     pages = []
     for index, slide in enumerate(scene["slides"], 1):
         pid = slide.get("sourceSlideId") or slide.get("id")
@@ -147,7 +163,7 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
         # picture credits, split or not - carry no reading task of their own.
         if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|picture-credits(?:-\d+)?)$", str(slide.get("id") or "")):
             continue
-        text = extract(pdf, index)
+        text = texts[index - 1] if index - 1 < len(texts) else ""
         header = header_lines(slide) or None
         blocks = page_blocks(text, header)
         body = body_words(text, header)
@@ -209,14 +225,46 @@ def profile(pdf: Path, scene: dict, content: dict | None) -> dict:
                              "position": "above" if single > TEXT_FORM["singleBlockPagesMax"] else "within"},
     }
     deck["outsideBand"] = sorted(k for k, v in deck.items() if isinstance(v, dict) and v.get("position") in ("above", "below"))
+    findings = fragmentation(deck["wordsPerBlock"], prose)
+    waived = waived_rules(rules or {})
+    findings = [{**f, "severity": "advisory", "waived": {"rulesVersion": (rules or {}).get("rulesVersion"), "introducedIn": waived[f["code"]]}}
+                if f["code"] in waived else f for f in findings]
     return {
         "schema": "professional-slides.density-profile/v1",
         "$comment": ("Rendered pages measured with pdftotext -layout; targets from weight.json plan.textForm "
-                     "and each page's textReference. Flags are questions for the review's density pass, not failures."),
+                     "and each page's textReference. A page's flags are questions for the review's density pass; "
+                     "`findings` holds the deck-level measure that blocks."),
         "deck": deck,
+        "accepted": not any(f["severity"] == "blocker" for f in findings),
+        "findings": findings,
         "flaggedPages": [p["id"] for p in pages if p["flags"]],
         "pages": pages,
     }
+
+
+def fragmentation(words_per_block: dict, prose: list) -> list:
+    """TEXT_FRAGMENTED: the prose pages' median words a block outside the
+    wordsPerBlock band, read once the deck has deckLength.density prose pages.
+    Measured on prose pages only - a chart-led page's blocks are its labels."""
+    if len(prose) < DECK_LENGTH["density"] or words_per_block.get("position") not in ("above", "below"):
+        return []
+    low, high = words_per_block["band"]
+    below = words_per_block["position"] == "below"
+    worst = sorted(prose, key=lambda p: p["wordsPerBlock"], reverse=not below)[:6]
+    return [{
+        "code": "TEXT_FRAGMENTED", "severity": "blocker", "slide": None,
+        "measured": {"wordsPerBlock": words_per_block["measured"], "pages": len(prose), "direction": words_per_block["position"],
+                     "worst": [{"page": p["page"], "id": p["id"], "wordsPerBlock": p["wordsPerBlock"], "blocks": p["blocks"]} for p in worst]},
+        "threshold": [low, high],
+        "repair": ("The prose pages set a median of {} words a block, where strong pages' blocks run {} to {}. {}"
+                   .format(words_per_block["measured"], low, high,
+                           "The copy is broken into labels: merge the fragments on each page into the developed points they "
+                           "belong to - a finding, its evidence and what follows - rather than a line a fact. Start with "
+                           + ", ".join(str(p["id"]) for p in worst) + "."
+                           if below else
+                           "The copy is set as slabs: break each page's argument into its points, one finding and its "
+                           "evidence each. Start with " + ", ".join(str(p["id"]) for p in worst) + ".")),
+    }]
 
 
 def main() -> int:
@@ -225,13 +273,16 @@ def main() -> int:
     ap.add_argument("scene")
     ap.add_argument("content", nargs="?")
     ap.add_argument("--report", required=True)
+    ap.add_argument("--workflow", default=None)
+    ap.add_argument("--rules-version", default=None, type=float)
     a = ap.parse_args()
     scene = json.loads(Path(a.scene).read_text())
     content = json.loads(Path(a.content).read_text()) if a.content and Path(a.content).is_file() else None
-    result = profile(Path(a.pdf), scene, content)
+    result = profile(Path(a.pdf), scene, content, {"workflow": a.workflow, "rulesVersion": a.rules_version})
     Path(a.report).write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"analyticPages": result["deck"]["analyticPages"], "flagged": len(result["flaggedPages"]),
-                      "outsideBand": result["deck"]["outsideBand"]}))
+                      "outsideBand": result["deck"]["outsideBand"], "accepted": result["accepted"],
+                      "blockers": [f["code"] for f in result["findings"] if f["severity"] == "blocker"]}))
     return 0
 
 

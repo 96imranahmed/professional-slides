@@ -1,5 +1,5 @@
 import unittest
-from node_probe import run_node
+from node_probe import requires_chromium, run_node
 
 
 class SectionBoundaryTests(unittest.TestCase):
@@ -73,6 +73,7 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
 
+    @requires_chromium
     def test_marker_layers_do_not_exempt_foreign_objects_or_text(self):
         result = run_node('''
 import assert from 'node:assert/strict';

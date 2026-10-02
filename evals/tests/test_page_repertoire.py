@@ -12,6 +12,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from node_probe import run_node
 
@@ -349,9 +350,8 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
         slide = {'componentInstances': [{'component': 'chart.column', 'frame': frame}], 'nodes': [
             {'role': 'chart-mark', 'frame': {'x': 100+i*200, 'y': 440, 'width': 100, 'height': 100}}
             for i in range(2)]}
-        before = page_gates.WEIGHT
-        page_gates.WEIGHT = {'plotSpan': .6}
-        try:
+        # WEIGHT is one dict shared by every gate module; patch it in place.
+        with mock.patch.dict(page_gates.WEIGHT, {'plotSpan': .6}, clear=True):
             findings = []
             page_gates.gate_plot_span(1, slide, findings)
             self.assertTrue(any(f['code'] == 'PLOT_SPAN' for f in findings))
@@ -359,8 +359,6 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
             findings = []
             page_gates.gate_plot_span(1, slide, findings)
             self.assertFalse(findings)
-        finally:
-            page_gates.WEIGHT = before
 
     def test_only_a_standalone_bridge_has_the_reconciliation_relationship(self):
         def page(component, comments=False):
@@ -373,3 +371,20 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
         self.assertEqual(page_gates.page_architecture(page('chart.line')), 'evidence-only')
         self.assertEqual(page_gates.page_architecture(page('chart.waterfall', True)),
                          page_gates.page_architecture(page('chart.bar', True)))
+
+    def test_a_standalone_horizons_figure_is_its_own_architecture(self):
+        # The figure's component id is `chart.horizons`: listed as `horizons`
+        # it never matched, and a horizons page read as any lone chart.
+        registry = run_node('''
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+console.log(JSON.stringify([...REGISTRY.keys()]));
+''')
+        self.assertTrue(set(page_gates.DIAGRAM_COMPONENTS) <= set(registry), set(page_gates.DIAGRAM_COMPONENTS) - set(registry))
+        alone = {'componentInstances': [{'component': 'chart.horizons', 'frame': {'x': 60, 'y': 140, 'width': 1160, 'height': 480}}]}
+        self.assertEqual(page_gates.page_architecture(alone), 'chart.horizons')
+        # A diagram that draws as a chart is one exhibit: stacked over a bar
+        # chart it makes a stack of two, not a grid of three.
+        stacked = {'componentInstances': [
+            {'component': 'chart.horizons', 'frame': {'x': 60, 'y': 140, 'width': 1160, 'height': 230}},
+            {'component': 'chart.bar', 'frame': {'x': 60, 'y': 390, 'width': 1160, 'height': 230}}]}
+        self.assertEqual(page_gates.page_architecture(stacked), 'evidence-stack')

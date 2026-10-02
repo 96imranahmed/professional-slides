@@ -11,7 +11,8 @@ import {
   wedgePrimitive
 } from "./core.mjs";
 import { NATURAL_EARTH_COUNTRIES, NATURAL_EARTH_SOURCE } from "./natural-earth-map-data.mjs";
-import { measureText } from './text-layout.mjs';
+import { ENGINE_RESERVE, measureText } from './text-layout.mjs';
+import { niceCeiling } from './nice-numbers.mjs';
 import { MARK_TOKENS, markerSize, numberMarker } from './marks.mjs';
 import { normalizeQuantitativeScale, quantitativeScaleColor, quantitativeLegendNodes, QUANTITATIVE_SCALE_TOKENS } from './legends.mjs';
 
@@ -253,7 +254,7 @@ function polygonNode({ id, country, paths, highlighted, quantitative, recede = f
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
   // Under markers or routes a highlighted country recedes to the tint: the
   // points are the subject, and a navy country under a navy dot hides both.
-  // Land in the muted surface sat 8 grey levels off a cream page: the map read
+  // Land in the muted surface sits 8 grey levels off a cream page: the map reads
   // as routes and dots floating on nothing. Under the reference mark weight
   // (core.mjs `style.marks`) land is the filled surface, the ground the
   // markers and routes stand on.
@@ -327,7 +328,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, reverse: onHighlight, data: { geography: geography.id, number: marker.number } }));
       if (marker.label) {
         // The label sits on a white pill so it reads over land, sea or a filled country.
-        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
         const width = Math.ceil(measured.width) + 12, height = 22;
         const placeRight = pinFrame.x + disc + 4 + width <= frame.x + frame.width;
         const lx = placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width;
@@ -355,7 +356,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       // the labels already placed - right, left, above, below, then the
       // diagonals - and sits on a patch of canvas, so a route passing under it
       // does not strike through the name.
-      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
       const width = Math.ceil(measured.width) + 4, height = Math.max(14, Math.ceil(measured.height));
       const gap = 3, half = size / 2;
       const candidates = [
@@ -404,14 +405,13 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
 // `crop: "fit"` frames the map on its markers: a network from one hub read on
 // a map of the whole world is a cluster of dots in a tenth of the frame.
 //
-// The crop follows the network's own extent. It used never to narrow below 36
-// degrees of longitude, so a regional network - a UK operator's routes over
-// six degrees - rendered at the scale of Europe: markers on top of each
-// other, labels clipped at the frame and routes too short to draw, silently.
-// Now the span keeps a margin of a sixth of itself (at least half a degree),
-// a single place gets a 6 by 4 degree window around it, and the window then
-// widens on its shorter side to the frame's shape, so the map fills the
-// frame with context rather than letterboxing inside it.
+// The crop follows the network's own extent: a regional network - a UK
+// operator's routes over six degrees - at the scale of Europe would put its
+// markers on top of each other, clip its labels at the frame and leave routes
+// too short to draw. The span keeps a margin of a sixth of itself (at least
+// half a degree), a single place gets a 6 by 4 degree window around it, and
+// the window then widens on its shorter side to the frame's shape, so the map
+// fills the frame with context rather than letterboxing inside it.
 const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4];
 function fitBounds(markers, geography, frame = null) {
   const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
@@ -482,12 +482,7 @@ export function valueDiameter(value, maxValue) {
   return Math.max(VALUE_MIN_DIAMETER, VALUE_MAX_DIAMETER * Math.sqrt(Math.max(0, value) / maxValue));
 }
 
-function niceValue(v) {
-  if (!(v > 0)) return 0;
-  const power = 10 ** Math.floor(Math.log10(v));
-  const step = [1, 2, 2.5, 5, 10].find((n) => n * power >= v * 0.999) ?? 10;
-  return step * power;
-}
+const niceValue = (v) => (v > 0 ? niceCeiling(v, { slack: 0.999 }) : 0);
 const formatLegendValue = (v) => Number.isInteger(v) ? v.toLocaleString("en-US") : String(Math.round(v * 100) / 100);
 
 /**
@@ -516,7 +511,7 @@ function sizeLegendNodes(id, legend, box) {
   const nodes = [];
   const text = (key, x, y, width, value, align = "left", bold = false, color = SECONDARY) => nodes.push(textPrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-label", frame: { x, y, width, height: 14 }, text: value, style: { fontFamily: FONT, fontSize: LABEL, color, bold, align, valign: "mid" } }));
   const circle = (key, cx, cy, d) => nodes.push(ellipsePrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-circle", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: { fill: "none", stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
-  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 }).width) + 4;
+  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true }).width) + 4;
   const titleWidth = measure(legend.label);
   text("title", box.x, box.y, titleWidth, legend.label, "left", true, INK);
   const baseline = box.y + box.height;
@@ -584,11 +579,11 @@ function choroplethNodes({id,frame,props,geography}) {
     if (!item || typeof item.featureId!=='string'||values.has(item.featureId)||!geography.countries.some(c=>c.id===item.featureId)) throw new Error('Choropleth value needs a unique known featureId');
     quantitativeScaleColor(scale,item.value);
     values.set(item.featureId,item.value);
-    // `note`: what this region's sentence says. The lane has always carried the
-    // feature's name and nothing else, so a page whose subject was five named
-    // places had to put the sentences in a column beside a photograph and leave
-    // the reader to match them up. With the note the map *is* the page: the
-    // boundary, the value and what it means, keyed by a leader to the region.
+    // `note`: what this region's sentence says. Without it the lane carries the
+    // feature's name and nothing else, and a page about five named places has
+    // to set its sentences apart and leave the reader to match them up. With
+    // the note the map *is* the page: the boundary, the value and what it
+    // means, keyed by a leader to the region.
     if (item.note!==undefined) {
       if (typeof item.note!=='string'||!item.note.trim()) throw new Error('A choropleth note is a sentence about that region');
       notes.set(item.featureId,item.note.trim());
@@ -621,9 +616,9 @@ function choroplethNodes({id,frame,props,geography}) {
     if (!node) throw new Error(`Choropleth feature ${country.id} is not visible at this scale`);
     nodes.push(node);
     const [x,y]=projected.project(country.label),side=x<centerFrame.x+centerFrame.width/2?'left':'right';
-    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size),wrapWidthRatio:1});
+    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size)});
     const note=notes.get(country.id);
-    const noteLayout=note?measureText(note,labelWidth,{fontSize}):null;
+    const noteLayout=note?measureText(note,labelWidth,{fontSize,wrapWidthRatio:ENGINE_RESERVE}):null;
     const height=measured.height+(noteLayout?gap/2+noteLayout.height:0);
     labels.push({country,x,y,side,measured,noteLayout,height});
   }

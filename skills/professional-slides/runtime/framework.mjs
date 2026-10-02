@@ -4,8 +4,7 @@
 //
 // house:   { variant: "house", roof: "Ambition", pillars: [{ title, points? }], foundation: "Enablers" }
 // pyramid: { variant: "pyramid", tiers: [{ label, text? }] }   (apex first, 3–5 tiers)
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, shapePrimitive } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { token, tokenValue, stableId, shapePrimitive } from "./core.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const v = (id) => tokenValue(token(id));

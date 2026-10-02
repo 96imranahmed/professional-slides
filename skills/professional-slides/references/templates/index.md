@@ -5,6 +5,7 @@ A template gives a recurring audience decision its decision architecture: the go
 ## Select by the primary decision
 
 - [`commercial-due-diligence.md`](commercial-due-diligence.md) - a buyer, seller, investor or lender testing market attractiveness, customer quality, competitive position, commercial performance and plan credibility.
+- [`competitive-position.md`](competitive-position.md) - a reader asking who is better positioned, now and over a horizon: weighted criteria, every player scored, and a directional call on each question.
 - [`startup-pitch-deck.md`](startup-pitch-deck.md) - investors deciding whether to fund a startup and engage in the next stage.
 - [`project-progress-update.md`](project-progress-update.md) - a sponsor, steering committee, board or public authority deciding whether a programme remains on track and what intervention is required.
 
@@ -18,7 +19,7 @@ Template branches and chapter labels are seeds. Merge, split, rename or omit the
 
 Keep a coverage ledger: each core job is retained, merged, omitted with a reason, or unresolved. A shorter deck may merge related jobs while keeping every test visible in the hypothesis tree or the section structure, so a merge stays a merge rather than a quiet omission.
 
-For an existing deck, inventory the current architecture slide for slide before editing, and treat template gaps as recommendations until a structural rebuild is authorized.
+For an existing deck, inventory the current architecture slide for slide before editing ([Revising an existing deck](../storylining.md#revising-an-existing-deck)), and treat template gaps as recommendations until a structural rebuild is authorized.
 
 ## Specimen copy
 
@@ -26,7 +27,7 @@ Reusable specimens use neutral prompts - `(Insert action title)`, `(Insert secti
 
 ## Adding a template
 
-Add one when a recurring audience decision needs its own decision architecture; extend an existing template when its root decision and branches still fit. A new file carries: `Mandate`, `Decision question`, `Thesis and scope`, `Story structure`, `Analytical jobs`, `Evidence`, `Navigation`, `Failure checks` and `Acceptance check`. Register it in `registry.json` with a unique `id`, matching `file`, `stable` or `experimental` status, a decision sentence, audience labels and useful aliases.
+Add one when a recurring audience decision needs its own decision architecture; extend an existing template when its root decision and branches still fit. A new file carries the sections every template has, in this order: `Mandate` (when to use it and the modes it runs in), `Decision question`, `Page table` (each page's job, exhibit and the evidence it owes), `Evidence`, `Failure checks` and `Acceptance check`. Register it in `registry.json` with a unique `id`, matching `file`, `stable` or `experimental` status, a decision sentence, audience labels and useful aliases.
 
 ## Acceptance check
 

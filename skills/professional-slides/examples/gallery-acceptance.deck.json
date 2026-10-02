@@ -3,6 +3,7 @@
   "id": "gallery-acceptance",
   "palette": "midnight",
   "purpose": "catalogue",
+  "$comment": "A component catalogue, not a deck that argues: every registered exhibit is shown once in its own form so it can be copied, plain forms beside treated ones. The build bars' floors - tables treated, charts annotated, exhibit variety, drawings per page - are rates of a deck that argues, so the catalogue is held to the ceilings only (build-bars.mjs scoreBuild), as the craft floor and the variety contract already hold it. A chart here carries an annotation where the fixture exercises one; annotating the rest to clear a rate would hide the plain form each one documents.",
   "footer": "Component gallery",
   "agenda": true,
   "cover": {

@@ -236,7 +236,7 @@ const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[
     rows:{json.dumps(self.ROWS)}}},
   points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
 const table = JSON.parse(JSON.stringify(plan)).slides[0];
-const rows = JSON.stringify(table).match(/"rows":(\[\[.*?\]\])/)[1];
+const rows = JSON.stringify(table).match(/"rows":(\\[\\[.*?\\]\\])/)[1];
 console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
 ''')
 
@@ -265,7 +265,7 @@ const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[
     {{label:'Test', width:1.4}}, {{label:'Measure', width:2.2}}, {{label:'Verdict', width:1.0}}],
     rows:{json.dumps(self.ROWS)}}},
   points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
-const rows = JSON.stringify(plan).match(/"rows":(\[\[.*?\]\])/)[1];
+const rows = JSON.stringify(plan).match(/"rows":(\\[\\[.*?\\]\\])/)[1];
 console.log(JSON.stringify(JSON.parse(rows)[2]));
 ''')
         self.assertEqual(marked[1]["highlight"], ["Lowest critic score"])
@@ -289,8 +289,9 @@ class TakeawayLengthTests(unittest.TestCase):
     def test_two_lines_pass(self):
         self.assertEqual(self.codes(2), [])
 
-    def test_three_lines_are_tolerated(self):
-        self.assertEqual(self.codes(3), [])
+    def test_three_lines_are_a_paragraph_too(self):
+        # The band held three lines until rules version 3; two say the reading once.
+        self.assertEqual(self.codes(3), ["TAKEAWAY_LONG"])
 
     def test_four_lines_are_a_paragraph(self):
         self.assertEqual(self.codes(4), ["TAKEAWAY_LONG"])

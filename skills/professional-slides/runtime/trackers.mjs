@@ -129,8 +129,7 @@ function measuredText(id, role, frame, text, textStyle, data = {}) {
   const layout = measureText(text, frame.width, {
     fontFamily: tokenValue(textStyle.fontFamily),
     fontSize: tokenValue(textStyle.fontSize),
-    bold: textStyle.bold,
-    wrapWidthRatio: 1
+    bold: textStyle.bold
   });
   if (layout.height > frame.height) throw new Error(`${id} exceeds its tracker text frame`);
   return textPrimitive({ id, role, frame: { ...frame, height: layout.height }, text: layout.text, style: { ...textStyle, valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } });
@@ -172,7 +171,7 @@ function splitNodes({ id, frame, props, items, dark, density, selectionTreatment
   nodes.push(rectPrimitive({ id: stableId(id, "backdrop"), role: "tracker-backdrop", frame: { x: rightX, y: frame.y, width: rightWidth, height: frame.height }, style: box(rightFill, rightFill) }));
   const parentTitle = String(props.parentTitle ?? props.title ?? "Section A").trim();
   if (!parentTitle) throw new Error("Split contents requires a parent title");
-  const parent = measureText(parentTitle, leftWidth - 144, { fontFamily: tokenValue(DISPLAY_FONT), fontSize: tokenValue(token("type.sectionTitle")), bold: true, wrapWidthRatio: 1 });
+  const parent = measureText(parentTitle, leftWidth - 144, { fontFamily: tokenValue(DISPLAY_FONT), fontSize: tokenValue(token("type.sectionTitle")), bold: true });
   if (parent.lines.length > 3) throw new Error("Split contents parent title must fit without a subtitle");
   nodes.push(textPrimitive({ id: stableId(id, "parent-title"), role: "tracker-parent-title", frame: { x: frame.x + 72, y: frame.y + (frame.height - parent.height) / 2, width: leftWidth - 144, height: parent.height }, text: parent.text, style: { ...style(token("type.sectionTitle"), leftText, true, "left", "top", true), lineHeight: parent.lineHeight, wrap: false }, data: { trackerId: props.trackerId ?? "deck-sections", parentId: props.parentId ?? null, textLayout: parent } }));
   const rowHeight = density === "long" ? 50 : 66;
@@ -183,7 +182,7 @@ function splitNodes({ id, frame, props, items, dark, density, selectionTreatment
     const data = commonData(props, item, index), selected = data.selected, rowY = listY + index * rowHeight;
     const inverse = selected && selectionTreatment === "inverse";
     const labelStyle = style(density === "long" ? token("type.compact") : token("type.body"), inverse ? WHITE : rightText, selected, "left", "mid");
-    const labelMeasure = measureText(item.label, listWidth - 96, { fontFamily: tokenValue(BODY_FONT), fontSize: tokenValue(labelStyle.fontSize), bold: selected, wrapWidthRatio: 1 });
+    const labelMeasure = measureText(item.label, listWidth - 96, { fontFamily: tokenValue(BODY_FONT), fontSize: tokenValue(labelStyle.fontSize), bold: selected });
     const selectionWidth = Math.min(listWidth, Math.max(listWidth * 0.72, labelMeasure.width + 112));
     const selectionFill = inverse ? PRIMARY : dark ? SURFACE : PRIMARY_TINT;
     if (selected) nodes.push(rectPrimitive({ id: stableId(id, "selection", item.id), role: "tracker-selection", frame: { x: listX, y: rowY + 5, width: selectionWidth, height: rowHeight - 10 }, style: box(selectionFill, selectionFill, HAIRLINE, SMALL), data: { ...data, selectionTreatment } }));
@@ -204,7 +203,7 @@ function textAgendaNodes({ id, frame, props, items }) {
   const fontSize = token("type.deckTitle");
   // Measure every label at the stronger weight so selection never changes geometry.
   const labels = items.map(item => measureText(item.label, width, {
-    fontFamily: tokenValue(DISPLAY_FONT), fontSize: tokenValue(fontSize), bold: true, wrapWidthRatio: 1
+    fontFamily: tokenValue(DISPLAY_FONT), fontSize: tokenValue(fontSize), bold: true
   }));
   if (labels.some(label => label.lines.length !== 1)) throw new Error("Text agenda requires single-line labels; shorten copy or choose another tracker");
   const rowHeight = Math.max(...labels.map(label => label.height));
@@ -271,7 +270,7 @@ export function trackerLabelNodes({ id, frame, props }) {
     // every section as a pill, the current one filled in the accent.
     const nodes = [], padX = tokenValue(token("space.2")), gap = tokenValue(token("space.2"));
     const height = Math.min(20, frame.height), fontSize = tokenValue(token("type.label"));
-    const measured = items.map((item) => ({ item, layout: measureText(item.label, 240, { fontFamily: tokenValue(BODY_FONT), fontSize, bold: true, wrapWidthRatio: 1 }) }));
+    const measured = items.map((item) => ({ item, layout: measureText(item.label, 240, { fontFamily: tokenValue(BODY_FONT), fontSize, bold: true }) }));
     if (measured.some((m) => m.layout.lines.length > 1)) throw new Error("Pill tracker labels must fit one line; shorten the section labels");
     const widths = measured.map((m) => Math.ceil(m.layout.width) + 2 * padX);
     const total = widths.reduce((a, b) => a + b, 0) + gap * (items.length - 1);

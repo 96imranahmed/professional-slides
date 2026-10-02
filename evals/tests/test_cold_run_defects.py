@@ -175,7 +175,9 @@ class ImplicationGutterTests(unittest.TestCase):
         run_node('''
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
-const rows=Array.from({length:12},(_,i)=>[`Market ${i+1}`,`${i}`,`Wave ${i%3+1}`]);
+// Prizes that do not add up: a closing row equal to the sum of the rows above
+// is a total, which an implication gutter no longer stops the composer reading.
+const rows=Array.from({length:12},(_,i)=>[`Market ${i+1}`,`${10+i}`,`Wave ${i%3+1}`]);
 const long=styleTable({columns:['Market','Prize',{label:'Decision',implication:true}],rows});
 const at=long.columns.findIndex(c=>c.type==='implication');
 assert.equal(long.columns[at].divider,true);

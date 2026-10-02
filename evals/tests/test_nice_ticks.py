@@ -1,10 +1,11 @@
 """The nice-number axis ladder, fuzzed.
 
-`charts.mjs` rounds an axis domain outward to whole 1/2/2.5/5 steps; the page
-gate re-checks rendered ticks in Python. Two implementations of the same rule
-drift silently, so this fuzzes both: the Python `nice_domain` against its own
-invariants, and the rendered axis labels of a real chart against the Python
-port over several hundred random domains.
+`charts.mjs` rounds an axis domain outward to whole 1/2/2.5/5 steps
+(`range()`) and divides it into ticks (`tickCount()`); `nice_ticks.py` ports
+both for the Python readers - the page gate and the native chart's headroom
+stop - and holds the gate's rule for a rendered axis. Two implementations of
+one rule drift silently, so this holds the port to the JavaScript over many
+domains, and the rendered axis labels of a real chart to the port.
 """
 
 from __future__ import annotations
@@ -27,6 +28,18 @@ from node_probe import run_node  # noqa: E402
 SEED = 20260915
 
 
+def domains(count=2000, seed=SEED):
+    """(low, high) pairs across nine decades, signed, whole and fractional."""
+    rng = random.Random(seed)
+    for _ in range(count):
+        span = 10.0 ** rng.uniform(-3, 6)
+        low = rng.choice([0.0, rng.uniform(-span, span), round(rng.uniform(-span, span), rng.randint(0, 4))])
+        high = low + span * rng.uniform(0.01, 4)
+        if rng.random() < 0.3:
+            high = round(high, rng.randint(0, 4))
+        yield low, max(high, low + 1e-6)
+
+
 class LadderTests(unittest.TestCase):
     def test_the_ladder_accepts_the_shapes_a_reader_recognises(self):
         for value in (0, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 250, 0.5, 0.25, -50):
@@ -35,9 +48,9 @@ class LadderTests(unittest.TestCase):
             self.assertFalse(nt.on_ladder(value), value)
 
     def test_the_gate_rule_rejects_the_interpolated_axis_from_the_audit(self):
-        # charts.mjs:166 produced exactly this axis by interpolating the raw
-        # extrema. Two of its five ticks look innocent on their own; the axis
-        # as a whole does not, because the step is 1.625.
+        # Interpolating the raw extrema produces exactly this axis. Two of its
+        # five ticks look innocent on their own; the axis as a whole does not,
+        # because the step is 1.625.
         audited = [12.4, 14.025, 15.65, 17.275, 18.9]
         ok, detail = nt.nice_axis(audited)
         self.assertFalse(ok)
@@ -57,64 +70,90 @@ class LadderTests(unittest.TestCase):
         self.assertIsNone(nt.parse_number("Q1"))
         self.assertIsNone(nt.parse_number(""))
 
+    def test_to_fixed_rounds_a_tie_away_from_zero_as_javascript_does(self):
+        # Python's round() takes a tie to the even digit; toFixed takes it away from zero.
+        self.assertEqual(nt.to_fixed(0.125, 2), 0.13)
+        self.assertEqual(nt.to_fixed(-0.125, 2), -0.13)
+        self.assertEqual(nt.to_fixed(2.5, 0), 3.0)
+        self.assertEqual(nt.to_fixed(0.1 + 0.2, 10), 0.3)
 
-class FuzzTests(unittest.TestCase):
-    def domains(self, count=2000):
-        random.seed(SEED)
-        for _ in range(count):
-            exponent = random.uniform(-3, 6)
-            span = 10.0 ** exponent
-            low = random.uniform(-span, span)
-            high = low + span * random.uniform(0.01, 4)
-            yield low, high
 
-    def test_every_generated_tick_is_on_the_ladder_and_contains_the_data(self):
-        for low, high in self.domains():
-            for steps in (3, 4, 5, 6):
-                domain = nt.nice_domain(low, high, steps)
-                ticks = nt.ticks(low, high, steps)
-                self.assertLessEqual(domain["min"], low + 1e-6, (low, high, steps, domain))
-                self.assertGreaterEqual(domain["max"], high - 1e-6, (low, high, steps, domain))
-                self.assertEqual(len(ticks), steps + 1)
-                self.assertTrue(nt.on_ladder(domain["step"]), domain)
-                ok, detail = nt.nice_axis(ticks)
-                self.assertTrue(
-                    ok, f"axis {ticks} from domain {domain} of ({low}, {high}, {steps}): {detail}")
+class DomainTests(unittest.TestCase):
+    def test_every_domain_is_whole_ladder_steps_and_contains_the_data(self):
+        for low, high in domains():
+            for zero in (False, True):
+                domain = nt.nice_range([low, high], include_zero=zero)
+                where = (low, high, zero, domain)
+                self.assertLessEqual(domain["min"], low + 1e-6, where)
+                self.assertGreaterEqual(domain["max"], high - 1e-6, where)
+                self.assertIn(domain["steps"], nt.TICK_COUNTS, where)
+                self.assertTrue(nt.on_ladder(domain["step"]), where)
+                ok, detail = nt.nice_axis(nt.axis_ticks(domain["min"], domain["max"], domain["steps"]))
+                self.assertTrue(ok, f"{where}: {detail}")
+                if zero:
+                    self.assertLessEqual(domain["min"], 0.0)
+                    self.assertGreaterEqual(domain["max"], 0.0)
 
-    def test_include_zero_anchors_the_axis_without_leaving_the_ladder(self):
-        for low, high in self.domains(400):
-            domain = nt.nice_domain(low, high, 4, include_zero=True)
-            self.assertLessEqual(domain["min"], 0.0 + 1e-9)
-            self.assertGreaterEqual(domain["max"], 0.0 - 1e-9)
-
-    def test_varying_the_step_count_never_increases_headroom(self):
-        random.seed(SEED + 1)
-        for low, high in self.domains(300):
-            fixed = nt.nice_domain(low, high, 4)
-            best = nt.best_domain([low, high])
-            fixed_headroom = (fixed["max"] - high) + (low - fixed["min"])
-            best_headroom = (best["max"] - high) + (low - best["min"])
-            self.assertLessEqual(
-                best_headroom / best["span"], fixed_headroom / fixed["span"] + 1e-9)
+    def test_the_tightest_division_wins_and_four_wins_a_tie(self):
+        # The span each step count needs on its own, from the same ladder.
+        def span(low, high, steps):
+            for candidate in nt.step_candidates((high - low) / steps):
+                start = math.floor(low / candidate + 1e-9) * candidate
+                if start + candidate * steps >= high - 1e-9:
+                    return candidate * steps
+        for low, high in domains(400, SEED + 1):
+            domain = nt.nice_range([low, high])
+            spans = {steps: span(low, high, steps) for steps in nt.TICK_COUNTS}
+            tightest = min(spans.values())
+            self.assertLessEqual(domain["step"] * domain["steps"], tightest * (1 + 1e-9), (low, high, spans))
+            if abs(spans[4] - tightest) <= 1e-9:
+                self.assertEqual(domain["steps"], 4, (low, high, spans))
 
     def test_degenerate_and_tiny_domains_still_produce_a_usable_axis(self):
         for low, high in ((0, 0), (5, 5), (-2.5, -2.5), (1, 1 + 1e-9), (0, 1e-7)):
-            domain = nt.nice_domain(low, high, 4)
+            domain = nt.nice_range([low, high])
             self.assertGreater(domain["span"], 0)
             self.assertTrue(math.isfinite(domain["step"]))
 
 
 class JavaScriptParityTests(unittest.TestCase):
-    """The rendered axis is the contract; Python must agree with what ships."""
+    """The renderer's domain is the contract; the port must reproduce it."""
 
-    def test_rendered_axis_labels_match_the_python_port(self):
-        random.seed(SEED + 2)
+    def test_nice_range_is_the_renderers_range(self):
+        pairs = [list(pair) for pair in domains(1500, SEED + 3)]
+        pairs += [[0, 0], [5, 5], [-2.5, -2.5], [0, 1e-7], [132, 313], [0, 693.28], [0, 4.704],
+                  [-50, 50], [12.4, 18.9], [0, 100], [0.1, 0.3], [-0.004, 0.0021], [1e5, 1.00001e5]]
+        os.environ["NICE_RANGE_PAIRS"] = json.dumps(pairs)
+        result = run_node("""
+import {numericBounds} from './skills/professional-slides/runtime/charts.mjs';
+const pairs = JSON.parse(process.env.NICE_RANGE_PAIRS);
+console.log(JSON.stringify(pairs.map(([low, high]) => [false, true].map((includeZero) => {
+  const bounds = numericBounds([low, high], {includeZero});
+  return [bounds.min, bounds.max, bounds.span];
+}))));
+""")
+        self.assertEqual(len(result), len(pairs))
+        for (low, high), both in zip(pairs, result):
+            for zero, expected in zip((False, True), both):
+                domain = nt.nice_range([low, high], include_zero=zero)
+                self.assertEqual([domain["min"], domain["max"], domain["span"]], expected, (low, high, zero))
+
+    def test_tick_count_is_the_renderers_tick_count(self):
+        domains_ = [[nt.nice_range([low, high])[k] for k in ("min", "max")] for low, high in domains(600, SEED + 4)]
+        domains_ += [[0, 6], [0, 7], [0, 12.5], [0, 15], [-1, 1], [0, 0.3]]
+        os.environ["TICK_COUNT_DOMAINS"] = json.dumps(domains_)
+        result = run_node("""
+import {tickCount} from './skills/professional-slides/runtime/charts.mjs';
+console.log(JSON.stringify(JSON.parse(process.env.TICK_COUNT_DOMAINS).map(([low, high]) => tickCount(low, high))));
+""")
+        self.assertEqual(result, [nt.tick_count(low, high) for low, high in domains_])
+
+    def test_rendered_axis_labels_are_the_ports_ticks(self):
+        rng = random.Random(SEED + 2)
         cases = []
         for _ in range(120):
-            exponent = random.uniform(-1, 5)
-            scale = 10.0 ** exponent
-            values = [round(random.uniform(0.05, 1.0) * scale, 6) for _ in range(4)]
-            cases.append(values)
+            scale = 10.0 ** rng.uniform(-1, 5)
+            cases.append([round(rng.uniform(0.05, 1.0) * scale, 6) for _ in range(4)])
         os.environ["NICE_TICK_CASES"] = json.dumps(cases)
         result = run_node("""
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
@@ -125,24 +164,18 @@ for (const values of cases) {
   const props={categories:['a','b','c','d'],series:[{name:'value',values}],gridlines:true,dataLabels:false};
   try {
     const nodes=owner.render({id:'c',frame:{x:0,y:0,width:900,height:460},props}).nodes;
-    out.push(nodes.filter(n=>n.role==='axis-label').map(n=>n.text));
+    out.push(nodes.filter(n=>n.role==='axis-label').map(n=>n.data.value));
   } catch (error) { out.push({error:error.message}); }
 }
 console.log(JSON.stringify(out));
-""".strip(), )
+""".strip())
         self.assertEqual(len(result), len(cases))
         compared = 0
-        for values, labels in zip(cases, result):
-            if isinstance(labels, dict) or not labels:
+        for values, drawn in zip(cases, result):
+            if isinstance(drawn, dict) or not drawn:
                 continue  # a case the chart itself refuses is not an axis contract
-            parsed = [nt.parse_number(label) for label in labels]
-            if any(value is None for value in parsed):
-                continue
-            expected = nt.ticks(min(values), max(values), len(parsed) - 1, include_zero=True)
-            for rendered, predicted in zip(parsed, expected):
-                self.assertAlmostEqual(
-                    rendered, predicted, places=4,
-                    msg=f"values={values} rendered={labels} expected={expected}")
+            domain = nt.nice_range(values, include_zero=True)
+            self.assertEqual(drawn, nt.axis_ticks(domain["min"], domain["max"]), f"values={values}")
             compared += 1
         self.assertGreater(compared, 50, "the parity fuzz did not compare enough axes")
 

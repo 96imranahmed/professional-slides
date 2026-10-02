@@ -195,27 +195,17 @@
     {
      "id": "p01-p01-points:item:0",
      "role": "body",
-     "text": "Journeys recovered to 48.3 million in FY26 but growth slowed to 1.7%: peak trains run above 90% of their seats, so the peak cannot absorb the 11.7 million extra journeys."
+     "text": "Journeys recovered to 48.3 million in FY26 but growth slowed to 1.7%: peak trains run above 90% of their seats, off-peak trains at 38%. Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly ones, so frequency, not fares, is the main lever."
     },
     {
      "id": "p01-p01-points:item:1",
      "role": "body",
-     "text": "Off-peak trains run at 38% of their seats. Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly ones, so frequency, not fares, is the main lever."
+     "text": "Electrifying the Eastern line costs £390 million, beats bi-mode trains on cost per journey from year six and frees diesel units for the Dales line. The £640 million plan pays back in eleven years if the power upgrade lands by 2029."
     },
     {
      "id": "p01-p01-points:item:2",
      "role": "body",
-     "text": "Electrifying the Eastern line costs £390 million, beats bi-mode trains on cost per journey from year six and frees diesel units for the Dales line."
-    },
-    {
-     "id": "p01-p01-points:item:3",
-     "role": "body",
-     "text": "The £640 million plan pays back in eleven years on the central case, if the power upgrade lands by 2029 and punctuality holds at 90%."
-    },
-    {
-     "id": "p01-p01-points:item:4",
-     "role": "body",
-     "text": "Two of the seven 2027 milestones are at risk, both on the electrification path; the 5.1 million off-peak journeys depend on neither."
+     "text": "Two of the seven 2027 milestones are at risk, both on electrification; the 5.1 million off-peak journeys depend on neither. Start the timetable now and release electrification capital milestone by milestone, so a late grid connection risks the last six million journeys, not the first five."
     }
    ]
   },
@@ -223,7 +213,7 @@
    "id": "p02",
    "n": 3,
    "kind": "statement",
-   "claim": "The peak is full; the growth is in the hours between the peaks",
+   "claim": "The peak is full; growth lies in the hours between peaks",
    "settles": {
     "kind": "qualitative",
     "what": "the deck's governing observation: where spare capacity is"
@@ -253,7 +243,7 @@
    "n": 4,
    "kind": "section",
    "role": "structural",
-   "claim": "01 / Where ridership stands",
+   "claim": "Where ridership stands",
    "settles": {
     "kind": "qualitative",
     "what": "Structure of the deck"
@@ -264,7 +254,7 @@
     {
      "id": "s1-divider:title",
      "role": "title",
-     "text": "01 / Where ridership stands"
+     "text": "Where ridership stands"
     },
     {
      "id": "s1-divider:subtitle",
@@ -276,7 +266,7 @@
   {
    "id": "p03",
    "n": 5,
-   "claim": "Journeys recovered to 48 million but stalled 4 million below the FY20 peak",
+   "claim": "Journeys recovered to 48 million but stalled 4 million below peak",
    "settles": {
     "kind": "rate",
     "what": "annual journeys FY17-FY26 and the slowing of growth after FY24"
@@ -292,7 +282,7 @@
     {
      "id": "p03-chrome:title",
      "role": "title",
-     "text": "Journeys recovered to 48 million but stalled 4 million below the FY20 peak"
+     "text": "Journeys recovered to 48 million but stalled 4 million below peak"
     },
     {
      "id": "p03-chrome:source",
@@ -429,7 +419,7 @@
   {
    "id": "p03b",
    "n": 6,
-   "claim": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "claim": "Northvale's journeys recovered more slowly than all five regional peers",
    "settles": {
     "kind": "rate",
     "what": "journeys FY19-FY26 for Northvale and five regional peers, each indexed to FY19"
@@ -445,7 +435,7 @@
     {
      "id": "p03b-chrome:title",
      "role": "title",
-     "text": "Northvale's journeys have recovered more slowly than all five regional peers since FY19"
+     "text": "Northvale's journeys recovered more slowly than all five regional peers"
     },
     {
      "id": "p03b-chrome:source",
@@ -542,7 +532,7 @@
   {
    "id": "p04",
    "n": 7,
-   "claim": "Peak trains run above 90% full on every line; off-peak trains run under half",
+   "claim": "Peak trains run above 90% full; off-peak trains run under half",
    "settles": {
     "kind": "comparison",
     "what": "peak and off-peak load factor on each of the five lines"
@@ -558,7 +548,7 @@
     {
      "id": "p04-chrome:title",
      "role": "title",
-     "text": "Peak trains run above 90% full on every line; off-peak trains run under half"
+     "text": "Peak trains run above 90% full; off-peak trains run under half"
     },
     {
      "id": "p04-chrome:subtitle",
@@ -636,7 +626,7 @@
      "text": "Crowding standard 90%"
     },
     {
-     "id": "p04-p04-exhibit-0-caption:body",
+     "id": "p04-p04-exhibit-0-caption:text",
      "role": "body",
      "text": "All five lines run above the 90% crowding standard in the peak, so no line can add peak riders"
     },
@@ -701,7 +691,7 @@
      "text": "Airport"
     },
     {
-     "id": "p04-p04-exhibit-1-caption:body",
+     "id": "p04-p04-exhibit-1-caption:text",
      "role": "body",
      "text": "Between the peaks the same trains leave well over half their seats empty, even on the busiest line"
     }
@@ -718,7 +708,7 @@
    "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth",
    "highlight": [
     "27% below Westmoor",
-    "The gap is off-peak",
+    "hourly on three of its five",
     "7 million journeys"
    ],
    "textReference": {
@@ -910,39 +900,29 @@
     {
      "id": "p05-p05-col-0-header:heading",
      "role": "body",
-     "text": "Mid-table, not behind"
+     "text": "Mid-table, and the gap is off-peak"
     },
     {
      "id": "p05-p05-col-1-header:heading",
-     "role": "body",
-     "text": "The gap is off-peak"
-    },
-    {
-     "id": "p05-p05-col-2-header:heading",
      "role": "body",
      "text": "Worth 7 million journeys"
     },
     {
      "id": "p05-p05-col-0-text:text",
      "role": "body",
-     "text": "Northvale carries 104 thousand journeys per route-km, just under the peer median of 108 and 27% below Westmoor, the most intensive operator in the set."
+     "text": "Northvale carries 104 thousand journeys per route-km, just under the peer median of 108 and 27% below Westmoor, the most intensive operator in the set. Its peak intensity is close to the leaders'; the difference is between the peaks, where Westmoor and Southdown run half-hourly on most lines and Northvale runs hourly on three of its five."
     },
     {
      "id": "p05-p05-col-1-text:text",
      "role": "body",
-     "text": "Westmoor and Southdown run half-hourly off-peak services on most lines; Northvale runs hourly on three of its five, and its peak intensity is close to theirs."
-    },
-    {
-     "id": "p05-p05-col-2-text:text",
-     "role": "body",
-     "text": "Reaching the peer median off-peak intensity on the Dales and Valley lines alone would add about 7 million journeys a year on today's network."
+     "text": "Reaching the peer median off-peak intensity on the Dales and Valley lines alone would add about 7 million journeys a year on today's network, more than half of the 11.7 million the target needs, without a new route-km. The ranking is a timetable problem, and the plan starts there."
     }
    ]
   },
   {
    "id": "p06",
    "n": 9,
-   "claim": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
+   "claim": "Leisure is two thirds of off-peak travel, a seventh of the peak",
    "settles": {
     "kind": "share",
     "what": "journey purpose mix in four time bands, from the FY26 passenger survey"
@@ -963,7 +943,7 @@
     {
      "id": "p06-chrome:title",
      "role": "title",
-     "text": "Leisure is two thirds of off-peak travel but only a seventh of the peak"
+     "text": "Leisure is two thirds of off-peak travel, a seventh of the peak"
     },
     {
      "id": "p06-chrome:source",
@@ -1108,7 +1088,7 @@
     {
      "id": "p06-p06-points:item:0",
      "role": "body",
-     "text": "Commuters are 68% of peak journeys but 18% of weekday off-peak journeys, where leisure trips make up two thirds of travel and business trips only 7%."
+     "text": "Commuters are 68% of peak journeys but 18% of weekday off-peak journeys, where leisure trips make up two thirds of travel and business trips only 7%. The peak and the off-peak are different markets, and a fare built for the one does little in the other."
     },
     {
      "id": "p06-p06-points:lead:1",
@@ -1118,34 +1098,24 @@
     {
      "id": "p06-p06-points:item:1",
      "role": "body",
-     "text": "A leisure trip can go by car or not happen at all, so it responds to waiting time and reach far more than a commute does: lapsed leisure riders cite the wait twice as often as the fare."
+     "text": "A leisure trip can go by car or not happen at all, so it responds to waiting time and reach far more than a commute does: lapsed leisure riders cite the wait twice as often as the fare. Leisure is also 88% of Saturday and 92% of Sunday journeys, yet Sunday runs the thinnest timetable of the week, with no train before 09:00 on three of the five lines."
     },
     {
      "id": "p06-p06-points:lead:2",
      "role": "body",
-     "text": "Weekends are almost all leisure"
+     "text": "Sell it differently"
     },
     {
      "id": "p06-p06-points:item:2",
      "role": "body",
-     "text": "Leisure is 88% of Saturday and 92% of Sunday journeys, yet Sunday runs the thinnest timetable of the week, with no train before 09:00 on three of the five lines."
-    },
-    {
-     "id": "p06-p06-points:lead:3",
-     "role": "body",
-     "text": "Sell it differently"
-    },
-    {
-     "id": "p06-p06-points:item:3",
-     "role": "body",
-     "text": "Growth between the peaks is a leisure product: frequency, weekend service and destinations people want to reach, not a cheaper season ticket for the commuters who already travel."
+     "text": "Growth between the peaks is a leisure product: frequency, weekend service and destinations people want to reach, not a cheaper season ticket for the commuters who already travel. The plan's first money therefore goes on Sunday mornings and half-hourly Dales and Valley services, not on fares."
     }
    ]
   },
   {
    "id": "p06b",
    "n": 10,
-   "claim": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+   "claim": "Saturday Dales trains leave Leeds 97% full, fuller than the weekday peak",
    "settles": {
     "kind": "rate",
     "what": "Saturday load factor by departure hour on Dales line trains out of Leeds, FY26"
@@ -1164,7 +1134,7 @@
     {
      "id": "p06b-chrome:title",
      "role": "title",
-     "text": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak"
+     "text": "Saturday Dales trains leave Leeds 97% full, fuller than the weekday peak"
     },
     {
      "id": "p06b-chrome:source",
@@ -1309,7 +1279,7 @@
     {
      "id": "p06b-p06b-points-0-list:item:0",
      "role": "body",
-     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill."
+     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill. That demand arrives without marketing; what it lacks is seats in the morning and a train home at the hour the walkers finish."
     },
     {
      "id": "p06b-p06b-points-1-list:lead:0",
@@ -1319,14 +1289,14 @@
     {
      "id": "p06b-p06b-points-1-list:item:0",
      "role": "body",
-     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead."
+     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead, and a trip that returns by car is often made by car the next time. A later last train belongs in the weekend timetable the plan adds: it carries return journeys the morning trains already generate."
     }
    ]
   },
   {
    "id": "p07",
    "n": 11,
-   "claim": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
+   "claim": "Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly",
    "settles": {
     "kind": "comparison",
     "what": "off-peak trains per hour against off-peak journey growth at ten stations, FY23-FY26"
@@ -1334,8 +1304,8 @@
    "adds": "The points quantify the gap between half-hourly and hourly stations and rule out the obvious alternative explanation, population growth",
    "highlight": [
     "16.5% on average",
-    "2",
-    "30 trains"
+    "cannot explain",
+    "half-hourly service is the threshold"
    ],
    "textReference": {
     "task": "chart-with-commentary",
@@ -1346,7 +1316,7 @@
     {
      "id": "p07-chrome:title",
      "role": "title",
-     "text": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones"
+     "text": "Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly"
     },
     {
      "id": "p07-chrome:source",
@@ -1426,27 +1396,17 @@
     {
      "id": "p07-p07-col-1-header:heading",
      "role": "body",
-     "text": "Not population"
-    },
-    {
-     "id": "p07-p07-col-2-header:heading",
-     "role": "body",
-     "text": "The line is not straight"
+     "text": "A threshold, not a slope"
     },
     {
      "id": "p07-p07-col-0-text:text",
      "role": "body",
-     "text": "The six stations with 30 or more off-peak trains a weekday grew off-peak journeys by 16.5% on average over three years; the four stations still served hourly grew by 4.5%."
+     "text": "The six stations with 30 or more off-peak trains a weekday grew off-peak journeys by 16.5% on average over three years; the four stations still served hourly grew by 4.5%. Population grew by 2-4% around all ten stations over the same period, so it cannot explain a gap of twelve points between the two groups."
     },
     {
      "id": "p07-p07-col-1-text:text",
      "role": "body",
-     "text": "Population grew by 2-4% around all ten stations over the same period, so it cannot explain a gap of twelve points between the two groups."
-    },
-    {
-     "id": "p07-p07-col-2-text:text",
-     "role": "body",
-     "text": "Growth rises steeply up to about 30 trains a day and flattens after it: a half-hourly service is the threshold that matters, and more than that adds little off-peak demand."
+     "text": "Growth rises steeply up to about 30 trains a day and flattens after it: a half-hourly service is the threshold that matters, and more than that adds little off-peak demand. The plan brings every station up to half-hourly before it adds a train to a station that is already there."
     }
    ]
   },
@@ -1552,7 +1512,7 @@
      "text": "FY20"
     },
     {
-     "id": "p07c-p07c-exhibit-0-caption:body",
+     "id": "p07c-p07c-exhibit-0-caption:text",
      "role": "body",
      "text": "Half-hourly since 2023, the Dales ended FY26 at 4.1 million journeys, 14% above FY20"
     },
@@ -1627,7 +1587,7 @@
      "text": "FY20"
     },
     {
-     "id": "p07c-p07c-exhibit-1-caption:body",
+     "id": "p07c-p07c-exhibit-1-caption:text",
      "role": "body",
      "text": "The Valley towns reached 4.6 million after the 2023 timetable, 15% above FY20"
     },
@@ -1702,7 +1662,7 @@
      "text": "FY20"
     },
     {
-     "id": "p07c-p07c-exhibit-2-caption:body",
+     "id": "p07c-p07c-exhibit-2-caption:text",
      "role": "body",
      "text": "Still hourly between the peaks, the Eastern line stalled 9% below FY20"
     },
@@ -1777,7 +1737,7 @@
      "text": "FY20"
     },
     {
-     "id": "p07c-p07c-exhibit-3-caption:body",
+     "id": "p07c-p07c-exhibit-3-caption:text",
      "role": "body",
      "text": "The hourly Coast service has added almost nothing since FY23 and sits 8% below FY20"
     }
@@ -1786,7 +1746,7 @@
   {
    "id": "p07b",
    "n": 13,
-   "claim": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "claim": "Northvale's cost per train-km ranks ninth of twenty, £3.40 above the lowest",
    "settles": {
     "kind": "rank",
     "what": "operating cost per train-km, FY26, for all twenty regional operators"
@@ -1807,7 +1767,7 @@
     {
      "id": "p07b-chrome:title",
      "role": "title",
-     "text": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator"
+     "text": "Northvale's cost per train-km ranks ninth of twenty, £3.40 above the lowest"
     },
     {
      "id": "p07b-chrome:source",
@@ -2037,7 +1997,7 @@
     {
      "id": "p07b-p07b-points:item:0",
      "role": "body",
-     "text": "At £17.60 per train-km Northvale sits just below the field's median of £18.10, and £3.40 above Westmoor, the lowest-cost operator."
+     "text": "At £17.60 per train-km Northvale sits just below the field's median of £18.10, and £3.40 above Westmoor, the lowest-cost operator. Scale is not what separates them: Southdown carries almost as many journeys at £2.30 less per train-km, because its units run 14 hours a day against Northvale's 11."
     },
     {
      "id": "p07b-p07b-points:lead:1",
@@ -2047,34 +2007,127 @@
     {
      "id": "p07b-p07b-points:item:1",
      "role": "body",
-     "text": "Five of the six lowest-cost operators run electric trains on their busiest lines; every operator above £19.00 still runs diesel on most of its network."
+     "text": "Five of the six lowest-cost operators run electric trains on their busiest lines, and every operator above £19.00 still runs diesel on most of its network. Traction and the hours a unit works explain most of the spread, and both are choices the plan makes."
     },
     {
      "id": "p07b-p07b-points:lead:2",
      "role": "body",
-     "text": "Scale is not the reason"
+     "text": "The plan closes a third"
     },
     {
      "id": "p07b-p07b-points:item:2",
      "role": "body",
-     "text": "Southdown carries almost as many journeys as Northvale at £2.30 less per train-km, because its units run 14 hours a day against Northvale's 11."
+     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth of twenty on today's figures, level with Oakfield Link. Most of what remains is utilisation, which the off-peak timetable improves by running the same units for more of the day."
+    }
+   ]
+  },
+  {
+   "id": "p07d",
+   "n": 14,
+   "claim": "Northvale's punctuality swings more month to month than any of six peers",
+   "settles": {
+    "kind": "rank",
+    "what": "monthly punctuality by operator, FY26: lowest, middle half, median and highest month"
+   },
+   "adds": "Eight of the ten worst months were on the diesel Eastern line, so electrification narrows the range more than any timetable fix",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p07d-chrome:title",
+     "role": "title",
+     "text": "Northvale's punctuality swings more month to month than any of six peers"
     },
     {
-     "id": "p07b-p07b-points:lead:3",
-     "role": "body",
-     "text": "The plan closes a third"
+     "id": "p07d-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator"
     },
     {
-     "id": "p07b-p07b-points:item:3",
+     "id": "p07d-p07d-exhibit-heading:heading",
      "role": "body",
-     "text": "Electric trains on the Eastern line take Northvale to £16.40 by FY31, which would place it sixth of twenty on today's figures, level with Oakfield Link."
+     "text": "Monthly punctuality, FY26,"
+    },
+    {
+     "id": "p07d-p07d-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "% of trains on time"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:westmoor-trains",
+     "role": "exhibit",
+     "text": "92"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:westmoor-trains",
+     "role": "exhibit",
+     "text": "Westmoor Trains"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:southdown-rail",
+     "role": "exhibit",
+     "text": "91"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:southdown-rail",
+     "role": "exhibit",
+     "text": "Southdown Rail"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:lakeside-lines",
+     "role": "exhibit",
+     "text": "90"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:lakeside-lines",
+     "role": "exhibit",
+     "text": "Lakeside Lines"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:fenland-rail",
+     "role": "exhibit",
+     "text": "89"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:fenland-rail",
+     "role": "exhibit",
+     "text": "Fenland Rail"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:highland-link",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:highland-link",
+     "role": "exhibit",
+     "text": "Highland Link"
+    },
+    {
+     "id": "p07d-p07d-exhibit:median-label:northvale-rail",
+     "role": "exhibit",
+     "text": "89"
+    },
+    {
+     "id": "p07d-p07d-exhibit:category:northvale-rail",
+     "role": "exhibit",
+     "text": "Northvale Rail"
+    },
+    {
+     "id": "p07d-p07d-sowhat:body",
+     "role": "body",
+     "text": "Eight of the ten worst months were on the diesel Eastern line, so electrification narrows the range more than any timetable fix"
     }
    ]
   },
   {
    "id": "p08",
-   "n": 14,
-   "claim": "The Eastern line carries the most journeys at the highest cost per train-km",
+   "n": 15,
+   "claim": "The Eastern line carries most journeys at the highest cost per train-km",
    "settles": {
     "kind": "structure",
     "what": "journeys, route length, punctuality, cost and revenue for each of the five lines"
@@ -2090,7 +2143,7 @@
     {
      "id": "p08-chrome:title",
      "role": "title",
-     "text": "The Eastern line carries the most journeys at the highest cost per train-km"
+     "text": "The Eastern line carries most journeys at the highest cost per train-km"
     },
     {
      "id": "p08-chrome:source",
@@ -2371,10 +2424,10 @@
   },
   {
    "id": "s2",
-   "n": 15,
+   "n": 16,
    "kind": "section",
    "role": "structural",
-   "claim": "02 / What holds it back",
+   "claim": "What holds it back",
    "settles": {
     "kind": "qualitative",
     "what": "Structure of the deck"
@@ -2385,7 +2438,7 @@
     {
      "id": "s2-divider:title",
      "role": "title",
-     "text": "02 / What holds it back"
+     "text": "What holds it back"
     },
     {
      "id": "s2-divider:subtitle",
@@ -2396,8 +2449,8 @@
   },
   {
    "id": "p09",
-   "n": 16,
-   "claim": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
+   "n": 17,
+   "claim": "Hybrid working cost 7.1m journeys; housing and timetables won back 5.0m",
    "settles": {
     "kind": "structure",
     "what": "the five drivers that reconcile 52.4 million journeys in FY20 to 48.3 million in FY26"
@@ -2413,7 +2466,7 @@
     {
      "id": "p09-chrome:title",
      "role": "title",
-     "text": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million"
+     "text": "Hybrid working cost 7.1m journeys; housing and timetables won back 5.0m"
     },
     {
      "id": "p09-chrome:source",
@@ -2514,8 +2567,8 @@
   },
   {
    "id": "p10",
-   "n": 17,
-   "claim": "Each peak train added to the Eastern line has cost a point of punctuality",
+   "n": 18,
+   "claim": "Each extra Eastern line peak train has cost a point of punctuality",
    "settles": {
     "kind": "comparison",
     "what": "Eastern line peak trains per hour and punctuality, FY19-FY26"
@@ -2535,7 +2588,7 @@
     {
      "id": "p10-chrome:title",
      "role": "title",
-     "text": "Each peak train added to the Eastern line has cost a point of punctuality"
+     "text": "Each extra Eastern line peak train has cost a point of punctuality"
     },
     {
      "id": "p10-chrome:source",
@@ -2740,19 +2793,14 @@
     {
      "id": "p10-p10-points-1-list:item:0",
      "role": "body",
-     "text": "Off-peak trains share none of that conflict, because the single-track sections are free for most of the hour between the peaks."
-    },
-    {
-     "id": "p10-p10-points-2-list:item:0",
-     "role": "body",
-     "text": "The plan therefore holds the peak timetable where it is and adds all its new service between the peaks, where it costs no punctuality."
+     "text": "Off-peak trains share none of that conflict, because the single-track sections are free for most of the hour between the peaks. The plan therefore holds the peak timetable where it is and adds all its new service between the peaks, where it uses paths that already sit empty and costs no punctuality."
     }
    ]
   },
   {
    "id": "p10b",
-   "n": 18,
-   "claim": "Four constraints hold the peak where it is: fleet, crews, track and depot",
+   "n": 19,
+   "claim": "Four constraints cap the peak: fleet, crews, track and depot",
    "settles": {
     "kind": "count",
     "what": "units in peak service, peak shifts on overtime, single-track sections and depot sidings in use, FY26"
@@ -2777,7 +2825,7 @@
     {
      "id": "p10b-chrome:title",
      "role": "title",
-     "text": "Four constraints hold the peak where it is: fleet, crews, track and depot"
+     "text": "Four constraints cap the peak: fleet, crews, track and depot"
     },
     {
      "id": "p10b-chrome:source",
@@ -2912,9 +2960,112 @@
    ]
   },
   {
+   "id": "p03c",
+   "n": 20,
+   "claim": "The Eastern line has recovered least since the pandemic",
+   "settles": {
+    "kind": "rate",
+    "what": "journeys by line, FY19 to FY26, each against its own pre-pandemic level"
+   },
+   "adds": "The lines back above FY19 all run a half-hourly off-peak service, so the plan starts by giving the Eastern line one",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p03c-chrome:title",
+     "role": "title",
+     "text": "The Eastern line has recovered least since the pandemic"
+    },
+    {
+     "id": "p03c-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator"
+    },
+    {
+     "id": "p03c-p03c-exhibit-heading:heading",
+     "role": "body",
+     "text": "Journeys by line,"
+    },
+    {
+     "id": "p03c-p03c-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "index, FY19 = 100"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:dales-line",
+     "role": "exhibit",
+     "text": "Dales line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:dales-line",
+     "role": "exhibit",
+     "text": "111"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:valley-line",
+     "role": "exhibit",
+     "text": "Valley line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:valley-line",
+     "role": "exhibit",
+     "text": "109"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:eastern-line",
+     "role": "exhibit",
+     "text": "Eastern line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:eastern-line",
+     "role": "exhibit",
+     "text": "88"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:coastal-line",
+     "role": "exhibit",
+     "text": "Coastal line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:coastal-line",
+     "role": "exhibit",
+     "text": "104"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:western-line",
+     "role": "exhibit",
+     "text": "Western line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:western-line",
+     "role": "exhibit",
+     "text": "98"
+    },
+    {
+     "id": "p03c-p03c-exhibit:label:northern-line",
+     "role": "exhibit",
+     "text": "Northern line"
+    },
+    {
+     "id": "p03c-p03c-exhibit:value:northern-line",
+     "role": "exhibit",
+     "text": "107"
+    },
+    {
+     "id": "p03c-p03c-sowhat:body",
+     "role": "body",
+     "text": "The lines back above FY19 all run a half-hourly off-peak service, so the plan starts by giving the Eastern line one"
+    }
+   ]
+  },
+  {
    "id": "p11",
-   "n": 19,
-   "claim": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
+   "n": 21,
+   "claim": "Frequency drives a loop: shorter waits win trips that fund more trains",
    "settles": {
     "kind": "sequence",
     "what": "how an added off-peak train turns into revenue that funds the next one"
@@ -2934,7 +3085,7 @@
     {
      "id": "p11-chrome:title",
      "role": "title",
-     "text": "Frequency drives a loop: shorter waits win leisure trips that fund the next train"
+     "text": "Frequency drives a loop: shorter waits win trips that fund more trains"
     },
     {
      "id": "p11-chrome:source",
@@ -3029,7 +3180,7 @@
     {
      "id": "p11-p11-points:item:0",
      "role": "body",
-     "text": "Survey respondents who drove instead of taking the train cited the wait for the next service twice as often as the fare."
+     "text": "Survey respondents who drove instead of taking the train cited the wait for the next service twice as often as the fare, so a shorter off-peak wait wins trips a fare cut would not. Those trips are what fill the trains the new timetable adds."
     },
     {
      "id": "p11-p11-points:lead:1",
@@ -3039,7 +3190,7 @@
     {
      "id": "p11-p11-points:item:1",
      "role": "body",
-     "text": "An added off-peak train on the Dales line covers its operating cost within 26 months once it carries 40 passengers a trip, and the average off-peak Dales train already carries 31."
+     "text": "An added off-peak train on the Dales line covers its operating cost within 26 months once it carries 40 passengers a trip, and the average off-peak Dales train already carries 31. The revenue from the first added trains pays for the next, which is what keeps the loop turning."
     },
     {
      "id": "p11-p11-points:lead:2",
@@ -3049,13 +3200,13 @@
     {
      "id": "p11-p11-points:item:2",
      "role": "body",
-     "text": "It needs spare units and crews between the peaks; on the Coast line both are already committed until 2030, so the loop cannot start there before electrification releases diesel units."
+     "text": "It needs spare units and crews between the peaks; on the Coast line both are already committed until 2030, so the loop cannot start there before electrification releases diesel units. The plan starts it on the Dales and Valley lines and brings the Coast line in when the electric fleet arrives."
     }
    ]
   },
   {
    "id": "p12",
-   "n": 20,
+   "n": 22,
    "claim": "The Dales and Valley lines can grow now; the Coast line cannot",
    "settles": {
     "kind": "comparison",
@@ -3267,7 +3418,7 @@
     {
      "id": "p12-p12-exhibit:legend:rating",
      "role": "exhibit",
-     "text": "Rating: 0 = None; 1 = Weak; 2 = Partial; 3 = Strong; 4 = Full. Missing = Not available; N/A = not applicable."
+     "text": "Rating: 0 = None; 1 = Weak; 2 = Partial; 3 = Strong; 4 = Full."
     },
     {
      "id": "p12-p12-sowhat:body",
@@ -3278,8 +3429,8 @@
   },
   {
    "id": "p13",
-   "n": 21,
-   "claim": "Passengers name the wait, not the fare, as what keeps them off trains",
+   "n": 23,
+   "claim": "Passengers name the wait, not the fare, as what keeps them away",
    "settles": {
     "kind": "qualitative",
     "what": "three findings from the FY26 passenger survey and what each implies"
@@ -3295,7 +3446,7 @@
     {
      "id": "p13-chrome:title",
      "role": "title",
-     "text": "Passengers name the wait, not the fare, as what keeps them off trains"
+     "text": "Passengers name the wait, not the fare, as what keeps them away"
     },
     {
      "id": "p13-chrome:subtitle",
@@ -3426,8 +3577,8 @@
   },
   {
    "id": "p13b",
-   "n": 22,
-   "claim": "Northvale gives the smallest off-peak discount of nine operators: 18% against a 35% median",
+   "n": 24,
+   "claim": "Northvale's 18% off-peak discount is the smallest of nine operators",
    "settles": {
     "kind": "rank",
     "what": "off-peak return discount to the peak fare for all nine comparable regional operators, FY26"
@@ -3443,7 +3594,7 @@
     {
      "id": "p13b-chrome:title",
      "role": "title",
-     "text": "Northvale gives the smallest off-peak discount of nine operators: 18% against a 35% median"
+     "text": "Northvale's 18% off-peak discount is the smallest of nine operators"
     },
     {
      "id": "p13b-chrome:source",
@@ -3564,7 +3715,7 @@
   },
   {
    "id": "p14",
-   "n": 23,
+   "n": 25,
    "claim": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "settles": {
     "kind": "qualitative",
@@ -3672,7 +3823,7 @@
   },
   {
    "id": "p15",
-   "n": 24,
+   "n": 26,
    "claim": "Three corridors serve three different markets, each needing its own timetable",
    "settles": {
     "kind": "qualitative",
@@ -3735,10 +3886,10 @@
   },
   {
    "id": "s3",
-   "n": 25,
+   "n": 27,
    "kind": "section",
    "role": "structural",
-   "claim": "03 / The plan",
+   "claim": "The plan",
    "settles": {
     "kind": "qualitative",
     "what": "Structure of the deck"
@@ -3749,7 +3900,7 @@
     {
      "id": "s3-divider:title",
      "role": "title",
-     "text": "03 / The plan"
+     "text": "The plan"
     },
     {
      "id": "s3-divider:subtitle",
@@ -3760,8 +3911,8 @@
   },
   {
    "id": "p16",
-   "n": 26,
-   "claim": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
+   "n": 28,
+   "claim": "Electrification beats bi-mode trains on cost per journey from year six",
    "settles": {
     "kind": "comparison",
     "what": "electrification against bi-mode trains on capital cost, timing, cost per journey and released capacity"
@@ -3777,7 +3928,7 @@
     {
      "id": "p16-chrome:title",
      "role": "title",
-     "text": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six"
+     "text": "Electrification beats bi-mode trains on cost per journey from year six"
     },
     {
      "id": "p16-chrome:subtitle",
@@ -3858,7 +4009,7 @@
   },
   {
    "id": "p16b",
-   "n": 27,
+   "n": 29,
    "claim": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
    "settles": {
     "kind": "sequence",
@@ -3963,7 +4114,7 @@
      "text": "Leeds-Selby"
     },
     {
-     "id": "p16b-p16b-exhibit-0-caption:body",
+     "id": "p16b-p16b-exhibit-0-caption:text",
      "role": "body",
      "text": "Electric trains accelerate faster between the stops, saving 5 to 14 minutes on each of the four flows"
     },
@@ -4048,7 +4199,7 @@
      "text": "Leeds-Selby"
     },
     {
-     "id": "p16b-p16b-exhibit-1-caption:body",
+     "id": "p16b-p16b-exhibit-1-caption:text",
      "role": "body",
      "text": "Every minute saved wins 70 to 125 thousand journeys a year, two thirds of them off-peak where seats are free"
     },
@@ -4128,15 +4279,153 @@
      "text": "Electric trains enter service"
     },
     {
-     "id": "p16b-p16b-exhibit-2-caption:body",
+     "id": "p16b-p16b-exhibit-2-caption:text",
      "role": "body",
      "text": "The line reaches 18.7 million journeys by FY31, 3.8 million more once electric trains run from FY30"
     }
    ]
   },
   {
+   "id": "p16c",
+   "n": 30,
+   "claim": "Zonal fares cut short trips; distance fares cut the long ones",
+   "settles": {
+    "kind": "comparison",
+    "what": "change in the average fare paid by journey length under zonal and distance-based fares, FY30"
+   },
+   "adds": null,
+   "highlight": null,
+   "textReference": {
+    "task": "exhibit-led",
+    "floor": 55,
+    "ceiling": 335
+   },
+   "textPlan": [
+    {
+     "id": "p16c-chrome:title",
+     "role": "title",
+     "text": "Zonal fares cut short trips; distance fares cut the long ones"
+    },
+    {
+     "id": "p16c-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative fare model for a fictional operator, FY30 prices"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Zonal fares,"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "% change in average fare"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:value-label:change:under-10-km",
+     "role": "exhibit",
+     "text": "-14"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:category:under-10-km",
+     "role": "exhibit",
+     "text": "Under 10 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:value-label:change:10-25-km",
+     "role": "exhibit",
+     "text": "-6"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:category:10-25-km",
+     "role": "exhibit",
+     "text": "10-25 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:value-label:change:25-50-km",
+     "role": "exhibit",
+     "text": "3"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:category:25-50-km",
+     "role": "exhibit",
+     "text": "25-50 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:value-label:change:over-50-km",
+     "role": "exhibit",
+     "text": "9"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0:category:over-50-km",
+     "role": "exhibit",
+     "text": "Over 50 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-0-caption:text",
+     "role": "body",
+     "text": "Short trips fall 14% and the long off-peak trips the plan needs rise 9%"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1-heading:heading",
+     "role": "body",
+     "text": "Distance fares,"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1-heading:unit",
+     "role": "exhibit",
+     "text": "% change in average fare"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:value-label:change:under-10-km",
+     "role": "exhibit",
+     "text": "2"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:category:under-10-km",
+     "role": "exhibit",
+     "text": "Under 10 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:value-label:change:10-25-km",
+     "role": "exhibit",
+     "text": "-3"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:category:10-25-km",
+     "role": "exhibit",
+     "text": "10-25 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:value-label:change:25-50-km",
+     "role": "exhibit",
+     "text": "-8"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:category:25-50-km",
+     "role": "exhibit",
+     "text": "25-50 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:value-label:change:over-50-km",
+     "role": "exhibit",
+     "text": "-12"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1:category:over-50-km",
+     "role": "exhibit",
+     "text": "Over 50 km"
+    },
+    {
+     "id": "p16c-p16c-exhibit-1-caption:text",
+     "role": "body",
+     "text": "Long trips fall 12%, which is where the off-peak growth is"
+    }
+   ]
+  },
+  {
    "id": "p17",
-   "n": 28,
+   "n": 31,
    "claim": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "settles": {
     "kind": "count",
@@ -4289,8 +4578,8 @@
   },
   {
    "id": "p18",
-   "n": 29,
-   "claim": "London and Manchester send three in five of the visitors from beyond the network",
+   "n": 32,
+   "claim": "London and Manchester send three in five visitors from beyond the network",
    "settles": {
     "kind": "share",
     "what": "visitor journeys that start beyond the network, by origin city, FY26"
@@ -4311,7 +4600,7 @@
     {
      "id": "p18-chrome:title",
      "role": "title",
-     "text": "London and Manchester send three in five of the visitors from beyond the network"
+     "text": "London and Manchester send three in five visitors from beyond the network"
     },
     {
      "id": "p18-chrome:source",
@@ -4366,44 +4655,24 @@
     {
      "id": "p18-p18-points:item:0",
      "role": "body",
-     "text": "London and Manchester send 1.46 million of the 2.45 million visitor journeys a year that start beyond the network, most of them bound for the Dales and the coast."
+     "text": "London and Manchester send 1.46 million of the 2.45 million visitor journeys a year that start beyond the network, most of them bound for the Dales and the coast. Nearly all change at Leeds from an intercity train, so Leeds is the gateway: the connection there decides whether the trip continues by rail or by hire car."
     },
     {
      "id": "p18-p18-points:lead:1",
      "role": "body",
-     "text": "Leeds is the gateway"
+     "text": "Timed connections"
     },
     {
      "id": "p18-p18-points:item:1",
      "role": "body",
-     "text": "Nearly all of these visitors change at Leeds from an intercity train, so the connection there decides whether the trip continues by rail or by hire car."
-    },
-    {
-     "id": "p18-p18-points:lead:2",
-     "role": "body",
-     "text": "Timed connections"
-    },
-    {
-     "id": "p18-p18-points:item:2",
-     "role": "body",
-     "text": "Aligning the half-hourly Dales service with the London and Manchester arrivals cuts the average wait at Leeds from 31 minutes to 12."
-    },
-    {
-     "id": "p18-p18-points:lead:3",
-     "role": "body",
-     "text": "Worth 0.8 million"
-    },
-    {
-     "id": "p18-p18-points:item:3",
-     "role": "body",
-     "text": "The demand model credits through tickets and timed connections with 0.8 million of the 5.1 million journeys the off-peak timetable adds."
+     "text": "Aligning the half-hourly Dales service with the London and Manchester arrivals cuts the average wait at Leeds from 31 minutes to 12. The demand model credits through tickets and timed connections with 0.8 million of the 5.1 million journeys the off-peak timetable adds, so the timetable is written around the intercity arrivals first."
     }
    ]
   },
   {
    "id": "p19",
-   "n": 30,
-   "claim": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
+   "n": 33,
+   "claim": "The plan adds 11.7 million journeys by FY31, mostly after electrification",
    "settles": {
     "kind": "count",
     "what": "journeys added between FY26 and FY31 on the central case"
@@ -4423,7 +4692,7 @@
     {
      "id": "p19-chrome:title",
      "role": "title",
-     "text": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification"
+     "text": "The plan adds 11.7 million journeys by FY31, mostly after electrification"
     },
     {
      "id": "p19-chrome:source",
@@ -4523,23 +4792,18 @@
     {
      "id": "p19-p19-points:item:0",
      "role": "body",
-     "text": "Growth runs at 2.7% a year until FY28, while the Dales and Valley timetables bed in, and then at about 5% a year as electrified Eastern trains enter service and fare reform launches."
+     "text": "Growth runs at 2.7% a year until FY28, while the Dales and Valley timetables bed in, and then at about 5% a year as electrified Eastern trains enter service and fare reform launches. Six of the 11.7 million journeys arrive in FY30 and FY31, so the target is exposed to any slip in the power-supply upgrade due in 2029."
     },
     {
      "id": "p19-p19-points:item:1",
      "role": "body",
-     "text": "Six of the 11.7 million journeys arrive in FY30 and FY31, so the target is exposed to any slip in the power-supply upgrade due in 2029."
-    },
-    {
-     "id": "p19-p19-points:item:2",
-     "role": "body",
-     "text": "On the low case the path flattens after FY29 and ends at 56.5 million: the timetable levers still deliver, electrification does not."
+     "text": "On the low case the path flattens after FY29 and ends at 56.5 million: the timetable levers still deliver, electrification does not. The board should read 56.5 million as the floor the timetable secures, and the last 3.5 million as what a late grid connection costs."
     }
    ]
   },
   {
    "id": "p20",
-   "n": 31,
+   "n": 34,
    "claim": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "settles": {
     "kind": "rate",
@@ -4721,9 +4985,167 @@
    ]
   },
   {
+   "id": "p20b",
+   "n": 35,
+   "claim": "The central case reaches 60 million journeys by FY31, the low 56.5",
+   "settles": {
+    "kind": "rate",
+    "what": "journeys a year on the central and low cases, FY26 to FY31"
+   },
+   "adds": "The callouts say which year the target depends on and how far the low case falls short",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p20b-chrome:title",
+     "role": "title",
+     "text": "The central case reaches 60 million journeys by FY31, the low 56.5"
+    },
+    {
+     "id": "p20b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative plan cases"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0-heading:heading",
+     "role": "body",
+     "text": "Journeys a year by case,"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0-heading:unit",
+     "role": "exhibit",
+     "text": "million"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:label:0",
+     "role": "exhibit",
+     "text": "Central"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:label:1",
+     "role": "exhibit",
+     "text": "Low"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy26",
+     "role": "exhibit",
+     "text": "FY26"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy27",
+     "role": "exhibit",
+     "text": "FY27"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy28",
+     "role": "exhibit",
+     "text": "FY28"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy29",
+     "role": "exhibit",
+     "text": "FY29"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy30",
+     "role": "exhibit",
+     "text": "FY30"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:category:fy31",
+     "role": "exhibit",
+     "text": "FY31"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:annotation-text:0",
+     "role": "exhibit",
+     "text": "Electric trains enter service; the cases part"
+    },
+    {
+     "id": "p20b-p20b-exhibit-0:annotation-text:1",
+     "role": "exhibit",
+     "text": "A year's slip in electric trains leaves the low case 3.5m short of 60m"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:0:0",
+     "role": "exhibit",
+     "text": "Central"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:1:0",
+     "role": "exhibit",
+     "text": "48.3"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:2:0",
+     "role": "exhibit",
+     "text": "49.6"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:3:0",
+     "role": "exhibit",
+     "text": "51.8"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:4:0",
+     "role": "exhibit",
+     "text": "54.4"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:5:0",
+     "role": "exhibit",
+     "text": "57.3"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:0:6:0",
+     "role": "exhibit",
+     "text": "60.0"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:0:0",
+     "role": "exhibit",
+     "text": "Low"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:1:0",
+     "role": "exhibit",
+     "text": "48.3"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:2:0",
+     "role": "exhibit",
+     "text": "49.4"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:3:0",
+     "role": "exhibit",
+     "text": "51.1"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:4:0",
+     "role": "exhibit",
+     "text": "53.2"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:5:0",
+     "role": "exhibit",
+     "text": "55.0"
+    },
+    {
+     "id": "p20b-p20b-exhibit-1:cell-text:1:6:0",
+     "role": "exhibit",
+     "text": "56.5"
+    }
+   ]
+  },
+  {
    "id": "p21",
-   "n": 32,
-   "claim": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
+   "n": 36,
+   "claim": "The £640m plan peaks in FY28-FY29 and pays back in eleven years",
    "settles": {
     "kind": "structure",
     "what": "capital cost by year and by lever, and value and payback under four demand cases"
@@ -4739,7 +5161,7 @@
     {
      "id": "p21-chrome:title",
      "role": "title",
-     "text": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years"
+     "text": "The £640m plan peaks in FY28-FY29 and pays back in eleven years"
     },
     {
      "id": "p21-chrome:source",
@@ -4812,7 +5234,7 @@
      "text": "FY31"
     },
     {
-     "id": "p21-p21-exhibit-0-caption:body",
+     "id": "p21-p21-exhibit-0-caption:text",
      "role": "body",
      "text": "Nearly three fifths of the spend falls in two years, when the overhead line is built"
     },
@@ -4867,7 +5289,7 @@
      "text": "Stations"
     },
     {
-     "id": "p21-p21-exhibit-1-caption:body",
+     "id": "p21-p21-exhibit-1-caption:text",
      "role": "body",
      "text": "Electrification is 61% of the total; the timetable levers need only depot and fleet work"
     },
@@ -4972,7 +5394,7 @@
      "text": "15 years"
     },
     {
-     "id": "p21-p21-exhibit-2-caption:body",
+     "id": "p21-p21-exhibit-2-caption:text",
      "role": "body",
      "text": "Even the low case repays within the 30-year asset life, and a one-year slip costs a year of payback"
     }
@@ -4980,8 +5402,8 @@
   },
   {
    "id": "p22",
-   "n": 33,
-   "claim": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
+   "n": 37,
+   "claim": "Grant covers just over half the cost; Northvale must fund the rest",
    "settles": {
     "kind": "share",
     "what": "the four funding sources for the £640 million capital programme"
@@ -4997,7 +5419,7 @@
     {
      "id": "p22-chrome:title",
      "role": "title",
-     "text": "Grant covers just over half the cost; Northvale must borrow or earn the rest"
+     "text": "Grant covers just over half the cost; Northvale must fund the rest"
     },
     {
      "id": "p22-chrome:source",
@@ -5020,26 +5442,6 @@
      "text": "£ million"
     },
     {
-     "id": "p22-p22-exhibit-0-legend:label:0",
-     "role": "exhibit",
-     "text": "Government grant"
-    },
-    {
-     "id": "p22-p22-exhibit-0-legend:label:1",
-     "role": "exhibit",
-     "text": "Prudential borrowing"
-    },
-    {
-     "id": "p22-p22-exhibit-0-legend:label:2",
-     "role": "exhibit",
-     "text": "Developer contributions"
-    },
-    {
-     "id": "p22-p22-exhibit-0-legend:label:3",
-     "role": "exhibit",
-     "text": "Reinvested fare revenue"
-    },
-    {
      "id": "p22-p22-exhibit-0:percentage:0",
      "role": "exhibit",
      "text": "53%"
@@ -5058,13 +5460,106 @@
      "id": "p22-p22-exhibit-0:percentage:3",
      "role": "exhibit",
      "text": "9%"
+    },
+    {
+     "id": "p22-p22-exhibit-0:outside-label:0",
+     "role": "exhibit",
+     "text": "Government grant"
+    },
+    {
+     "id": "p22-p22-exhibit-0:outside-label:1",
+     "role": "exhibit",
+     "text": "Prudential borrowing"
+    },
+    {
+     "id": "p22-p22-exhibit-0:outside-label:2",
+     "role": "exhibit",
+     "text": "Developer contributions"
+    },
+    {
+     "id": "p22-p22-exhibit-0:outside-label:3",
+     "role": "exhibit",
+     "text": "Reinvested fare revenue"
+    }
+   ]
+  },
+  {
+   "id": "p22c",
+   "n": 38,
+   "claim": "Four in ten off-peak journeys are leisure trips",
+   "settles": {
+    "kind": "share",
+    "what": "shares of off-peak journeys, peak journeys and residents, FY26 survey"
+   },
+   "adds": "The growth is in how often nearby off-peak riders travel, not in the full peak, so the plan adds off-peak frequency first",
+   "highlight": null,
+   "textReference": {
+    "task": "chart-led",
+    "floor": 42,
+    "ceiling": 219
+   },
+   "textPlan": [
+    {
+     "id": "p22c-chrome:title",
+     "role": "title",
+     "text": "Four in ten off-peak journeys are leisure trips"
+    },
+    {
+     "id": "p22c-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator; FY26 passenger and household survey"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-0:label",
+     "role": "exhibit",
+     "text": "Off-peak journeys"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-0:text",
+     "role": "exhibit",
+     "text": "that are leisure trips"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-1:label",
+     "role": "exhibit",
+     "text": "Peak journeys"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-1:text",
+     "role": "exhibit",
+     "text": "that are commutes"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-2:label",
+     "role": "exhibit",
+     "text": "Residents"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-2:text",
+     "role": "exhibit",
+     "text": "within 2 km of a station"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-3:label",
+     "role": "exhibit",
+     "text": "Off-peak riders"
+    },
+    {
+     "id": "p22c-p22c-exhibit-row-3:text",
+     "role": "exhibit",
+     "text": "who travel at least weekly"
+    },
+    {
+     "id": "p22c-p22c-sowhat:body",
+     "role": "body",
+     "text": "The growth is in how often nearby off-peak riders travel, not in the full peak, so the plan adds off-peak frequency first"
     }
    ]
   },
   {
    "id": "p22b",
-   "n": 34,
-   "claim": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
+   "n": 39,
+   "claim": "Northvale should borrow the £160 million gap rather than cut the plan",
    "settles": {
     "kind": "qualitative",
     "what": "why the funding gap should be borrowed rather than cut from the programme"
@@ -5080,7 +5575,7 @@
     {
      "id": "p22b-chrome:title",
      "role": "title",
-     "text": "Northvale should borrow the £160 million gap, not cut the plan to its grant"
+     "text": "Northvale should borrow the £160 million gap rather than cut the plan"
     },
     {
      "id": "p22b-chrome:source",
@@ -5095,7 +5590,7 @@
     {
      "id": "p22b-p22b-panel:text",
      "role": "exhibit",
-     "text": "Borrow the £160 million in tranches against the electrification milestones; cutting to the grant gives up 3.8 million journeys a year."
+     "text": "Borrow the £160 million in tranches against the electrification milestones. Fares repay it within the overhead line's 30-year life even on the low case; cutting to the grant gives up 3.8 million journeys a year."
     },
     {
      "id": "p22b-p22b-doc-0-p0:text",
@@ -5121,10 +5616,10 @@
   },
   {
    "id": "s4",
-   "n": 35,
+   "n": 40,
    "kind": "section",
    "role": "structural",
-   "claim": "04 / Delivering it",
+   "claim": "Delivering it",
    "settles": {
     "kind": "qualitative",
     "what": "Structure of the deck"
@@ -5135,7 +5630,7 @@
     {
      "id": "s4-divider:title",
      "role": "title",
-     "text": "04 / Delivering it"
+     "text": "Delivering it"
     },
     {
      "id": "s4-divider:subtitle",
@@ -5146,7 +5641,7 @@
   },
   {
    "id": "p23",
-   "n": 36,
+   "n": 41,
    "claim": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "settles": {
     "kind": "sequence",
@@ -5316,19 +5811,157 @@
     {
      "id": "p23-p23-col-0-text:text",
      "role": "body",
-     "text": "The power-supply upgrade runs 30 months and nothing on the Eastern line can energise before it finishes; every six months it slips moves about 1.9 million FY31 journeys into FY32."
+     "text": "The power-supply upgrade runs 30 months and nothing on the Eastern line can energise before it finishes; every six months it slips moves about 1.9 million FY31 journeys into FY32. It is the one date on the chart that moves the target, and the one the programme board watches first."
     },
     {
      "id": "p23-p23-col-1-text:text",
      "role": "body",
-     "text": "The timetable changes need no new infrastructure beyond the depot extension, so they deliver 5.1 million journeys even if electrification is delayed."
+     "text": "The timetable changes need no new infrastructure beyond the depot extension, so they deliver 5.1 million journeys even if electrification is delayed. They start in 2027 on their own path, and the programme reports the two separately so that a late grid connection cannot hold them back."
+    }
+   ]
+  },
+  {
+   "id": "p23b",
+   "n": 42,
+   "claim": "The plan funds the timetable now and electrification next",
+   "settles": {
+    "kind": "sequence",
+    "what": "the three horizons of the plan: what each funds and when its journeys arrive"
+   },
+   "adds": "Commit the timetable and the electrification now; keep the station sites open and commit no capital until the first homes are occupied",
+   "highlight": null,
+   "textReference": {
+    "task": "diagram-led",
+    "floor": 111,
+    "ceiling": 253
+   },
+   "textPlan": [
+    {
+     "id": "p23b-chrome:title",
+     "role": "title",
+     "text": "The plan funds the timetable now and electrification next"
+    },
+    {
+     "id": "p23b-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for a fictional operator"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:title",
+     "role": "exhibit",
+     "text": "Fill the off-peak"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:timeframe",
+     "role": "exhibit",
+     "text": "FY27-FY28"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:detail-label:0",
+     "role": "exhibit",
+     "text": "Journeys:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:detail-value:0",
+     "role": "exhibit",
+     "text": "5.1m"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:detail-label:1",
+     "role": "exhibit",
+     "text": "Capital:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:detail-value:1",
+     "role": "exhibit",
+     "text": "£120m"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h1:description",
+     "role": "exhibit",
+     "text": "Half-hourly Dales and Valley services from December 2027, run with the existing fleet and forty more drivers; waits on no other lever and starts the plan's growth."
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:title",
+     "role": "exhibit",
+     "text": "Electrify the Eastern line"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:timeframe",
+     "role": "exhibit",
+     "text": "FY29-FY31"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:detail-label:0",
+     "role": "exhibit",
+     "text": "Journeys:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:detail-value:0",
+     "role": "exhibit",
+     "text": "6.6m"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:detail-label:1",
+     "role": "exhibit",
+     "text": "Capital:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:detail-value:1",
+     "role": "exhibit",
+     "text": "£475m"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h2:description",
+     "role": "exhibit",
+     "text": "Electric trains replace the diesel fleet east of Leeds, faster and twice as frequent; the power upgrade due in 2029 is the one date that can move the target."
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:title",
+     "role": "exhibit",
+     "text": "Open new stations"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:timeframe",
+     "role": "exhibit",
+     "text": "FY31 on"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:detail-label:0",
+     "role": "exhibit",
+     "text": "Journeys:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:detail-value:0",
+     "role": "exhibit",
+     "text": "After FY31"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:detail-label:1",
+     "role": "exhibit",
+     "text": "Capital:"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:detail-value:1",
+     "role": "exhibit",
+     "text": "£45m, held"
+    },
+    {
+     "id": "p23b-p23b-exhibit:h3:description",
+     "role": "exhibit",
+     "text": "Four stations on housing sites, paid for largely by developers; they add riders only once the homes are built, after the plan's FY31 target."
+    },
+    {
+     "id": "p23b-p23b-sowhat:body",
+     "role": "body",
+     "text": "Commit the timetable and the electrification now; keep the station sites open and commit no capital until the first homes are occupied"
     }
    ]
   },
   {
    "id": "p24",
-   "n": 37,
-   "claim": "Four named owners carry one lever each, reporting monthly to the managing director",
+   "n": 43,
+   "claim": "Four named owners carry one lever each and report monthly",
    "settles": {
     "kind": "structure",
     "what": "the four lever owners and what each is accountable for"
@@ -5349,7 +5982,7 @@
     {
      "id": "p24-chrome:title",
      "role": "title",
-     "text": "Four named owners carry one lever each, reporting monthly to the managing director"
+     "text": "Four named owners carry one lever each and report monthly"
     },
     {
      "id": "p24-chrome:source",
@@ -5484,44 +6117,135 @@
     {
      "id": "p24-p24-col-1-header:heading",
      "role": "body",
-     "text": "Monthly to the managing director"
+     "text": "Money follows milestones"
     },
     {
      "id": "p24-p24-col-2-header:heading",
      "role": "body",
-     "text": "Money follows milestones"
-    },
-    {
-     "id": "p24-p24-col-3-header:heading",
-     "role": "body",
-     "text": "Electrification has the risk"
+     "text": "Electrification carries the risk"
     },
     {
      "id": "p24-p24-col-0-text:text",
      "role": "body",
-     "text": "Each owner holds the journeys, the capital and the dates for one lever, so a slip has a name against it from the first month."
+     "text": "Each owner holds the journeys, the capital and the dates for one lever, so a slip has a name against it from the first month rather than a committee. The programme board meets monthly with the managing director and reviews every milestone against its due date, red rows first, so its time goes to the levers that are late."
     },
     {
      "id": "p24-p24-col-1-text:text",
      "role": "body",
-     "text": "The programme board meets monthly and reviews every milestone against its due date, red rows first."
+     "text": "Capital is released to each lever in tranches as its milestones pass, so a stalled lever cannot draw ahead of its evidence. The board can pause one lever's funding without pausing the other three, which keeps the timetable's 5.1 million journeys from waiting on the electrification programme."
     },
     {
      "id": "p24-p24-col-2-text:text",
      "role": "body",
-     "text": "Capital is released to each lever in tranches as its milestones pass, so a stalled lever cannot draw ahead of its evidence."
+     "text": "Tom Hardcastle holds both at-risk 2027 milestones, the power supply contract and the grid connection agreement, so his report opens every board until the connection is signed. The other owners report by exception while their levers stay on plan, which keeps the board on the one path that can move the FY31 target."
+    }
+   ]
+  },
+  {
+   "id": "p24c",
+   "n": 44,
+   "claim": "Northvale matches the best peer on reliability, not on frequency",
+   "settles": {
+    "kind": "comparison",
+    "what": "passenger ratings on six attributes for Northvale and the best-rated peer, FY26 survey"
+   },
+   "adds": "The points say which gaps the plan closes and which it leaves",
+   "highlight": [
+    "2.1 against 4.4",
+    "fares"
+   ],
+   "textReference": {
+    "task": "chart-with-commentary",
+    "floor": 96,
+    "ceiling": 293
+   },
+   "textPlan": [
+    {
+     "id": "p24c-chrome:title",
+     "role": "title",
+     "text": "Northvale matches the best peer on reliability, not on frequency"
     },
     {
-     "id": "p24-p24-col-3-text:text",
+     "id": "p24c-chrome:source",
+     "role": "source",
+     "text": "Source: illustrative data for fictional operators; FY26 passenger survey"
+    },
+    {
+     "id": "p24c-p24c-exhibit-heading:heading",
      "role": "body",
-     "text": "Tom Hardcastle carries both at-risk 2027 milestones; his report opens every board until the grid connection is signed."
+     "text": "Passenger ratings, FY26,"
+    },
+    {
+     "id": "p24c-p24c-exhibit-heading:unit",
+     "role": "exhibit",
+     "text": "passenger score"
+    },
+    {
+     "id": "p24c-p24c-exhibit:label:0",
+     "role": "exhibit",
+     "text": "Northvale Rail"
+    },
+    {
+     "id": "p24c-p24c-exhibit:label:1",
+     "role": "exhibit",
+     "text": "Westmoor Trains"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:reliability",
+     "role": "exhibit",
+     "text": "Reliability"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:frequency",
+     "role": "exhibit",
+     "text": "Frequency"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:journey-time",
+     "role": "exhibit",
+     "text": "Journey time"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:fares",
+     "role": "exhibit",
+     "text": "Fares"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:stations",
+     "role": "exhibit",
+     "text": "Stations"
+    },
+    {
+     "id": "p24c-p24c-exhibit:category:information",
+     "role": "exhibit",
+     "text": "Information"
+    },
+    {
+     "id": "p24c-p24c-col-0-header:heading",
+     "role": "body",
+     "text": "Frequency is the gap"
+    },
+    {
+     "id": "p24c-p24c-col-1-header:heading",
+     "role": "body",
+     "text": "Fares follow, stations wait"
+    },
+    {
+     "id": "p24c-p24c-col-0-text:text",
+     "role": "body",
+     "text": "Off-peak frequency scores 2.1 against 4.4 at Westmoor, the widest gap of the six attributes and the one the half-hourly timetable closes first. Passengers who rate frequency low travel off-peak half as often as those who rate it high, so the gap is worth journeys, not only a better score."
+    },
+    {
+     "id": "p24c-p24c-col-1-text:text",
+     "role": "body",
+     "text": "The fares gap closes with reform in 2030, after the timetable has given passengers a reason to use the cheaper tickets. Reliability already matches the best peer and stations score close to it, so the plan spends little on either before FY31 and puts its money where the profile is weakest."
     }
    ]
   },
   {
    "id": "p24b",
-   "n": 38,
-   "claim": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+   "n": 45,
+   "claim": "Two dependencies can delay the plan: the grid connection and Dales depot",
    "settles": {
     "kind": "sequence",
     "what": "journeys at risk from a later energisation date, and depot sidings in use against the extension"
@@ -5542,7 +6266,7 @@
     {
      "id": "p24b-chrome:title",
      "role": "title",
-     "text": "Two dependencies can delay the plan: the grid connection and the Dales depot"
+     "text": "Two dependencies can delay the plan: the grid connection and Dales depot"
     },
     {
      "id": "p24b-chrome:source",
@@ -5758,8 +6482,8 @@
   },
   {
    "id": "p25",
-   "n": 39,
-   "claim": "Two of seven 2027 milestones are at risk, both on the electrification path",
+   "n": 46,
+   "claim": "Two of seven 2027 milestones are at risk, both on electrification",
    "settles": {
     "kind": "count",
     "what": "status of the seven 2027 milestones"
@@ -5775,7 +6499,7 @@
     {
      "id": "p25-chrome:title",
      "role": "title",
-     "text": "Two of seven 2027 milestones are at risk, both on the electrification path"
+     "text": "Two of seven 2027 milestones are at risk, both on electrification"
     },
     {
      "id": "p25-chrome:source",
@@ -5986,8 +6710,8 @@
   },
   {
    "id": "p26",
-   "n": 40,
-   "claim": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
+   "n": 47,
+   "claim": "Service grows a fifth while punctuality holds at 90% and costs fall",
    "settles": {
     "kind": "comparison",
     "what": "train-km, punctuality floor and unit cost targets against the planned service path"
@@ -6003,7 +6727,7 @@
     {
      "id": "p26-chrome:title",
      "role": "title",
-     "text": "Service grows by a fifth while punctuality holds at 90% and unit cost falls"
+     "text": "Service grows a fifth while punctuality holds at 90% and costs fall"
     },
     {
      "id": "p26-chrome:source",
@@ -6149,7 +6873,7 @@
   },
   {
    "id": "p27",
-   "n": 41,
+   "n": 48,
    "claim": "Fare reform should follow the new timetable, not lead it",
    "settles": {
     "kind": "qualitative",
@@ -6181,7 +6905,7 @@
     {
      "id": "p27-p27-panel:text",
      "role": "exhibit",
-     "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, it adds 1.6 million journeys for the same cost."
+     "text": "Introduced first, fare reform costs £6 million a year for 0.4 million journeys; introduced second, after a year of the new timetables, it adds 1.6 million journeys for the same cost."
     },
     {
      "id": "p27-p27-doc-0-p0:text",
@@ -6207,7 +6931,7 @@
   },
   {
    "id": "p28",
-   "n": 42,
+   "n": 49,
    "kind": "takeaways",
    "claim": "Five decisions put Northvale on the path to 60 million journeys",
    "settles": {

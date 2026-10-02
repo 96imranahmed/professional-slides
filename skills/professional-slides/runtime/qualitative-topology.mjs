@@ -1,9 +1,9 @@
 import {linePrimitive,shapePrimitive,rectPrimitive,textPrimitive,stableId,token,tokenValue} from './core.mjs';
-import {measureText} from './text-layout.mjs';
+import {ENGINE_RESERVE,measureText} from './text-layout.mjs';
 export const QUALITATIVE_TOPOLOGY_TOKENS=['font.body','type.heading','type.body','color.ink','color.textSecondary','color.componentPrimary','color.componentPrimaryTint','color.surfaceMuted','color.onPrimary','color.rule','line.hairline','line.standard','space.2','space.3','space.4'];
 const val=id=>tokenValue(token(id));
 const text=(value,name)=>{if(typeof value!=='string'||!value.trim())throw new Error(`${name} requires nonempty text`);return value;};
-const measure=(value,width,bold=false)=>measureText(text(value,'Qualitative topology label'),width,{fontSize:val(bold?'type.heading':'type.body'),bold});
+const measure=(value,width,bold=false)=>measureText(text(value,'Qualitative topology label'),width,{fontSize:val(bold?'type.heading':'type.body'),bold,wrapWidthRatio:ENGINE_RESERVE});
 function label(id,role,frame,m,bold=false,color='color.ink',data={}){return textPrimitive({id,role,frame:{...frame,height:m.height},text:m.text,style:{fontFamily:token('font.body'),fontSize:token(bold?'type.heading':'type.body'),color:token(color),bold,align:'left',valign:'top',lineHeight:m.lineHeight,wrap:false},data:{...data,textLayout:m}});}
 const line=(id,x1,y1,x2,y2,data={})=>linePrimitive({id,role:'topology-connector',x1,y1,x2,y2,style:{color:token('color.rule'),lineWidth:token('line.standard')},data});
 const fillStyle=(color)=>({fill:token(color),stroke:token(color),lineWidth:token('line.hairline')});

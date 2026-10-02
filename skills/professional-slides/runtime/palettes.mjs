@@ -1,4 +1,8 @@
 // Named, versioned presentation presets.
+import { contrastRatio, mix } from "./color.mjs";
+
+export { contrastRatio };
+
 export const PALETTES = Object.freeze({
   midnight: {
     label: "Midnight",
@@ -49,7 +53,6 @@ export const PALETTES = Object.freeze({
 });
 
 export function heatScaleTokens(colors) {
-  const mix=(a,b,f)=>'#'+[0,1,2].map(i=>Math.round(parseInt(a.slice(1+i*2,3+i*2),16)*(1-f)+parseInt(b.slice(1+i*2,3+i*2),16)*f).toString(16).padStart(2,'0')).join('').toUpperCase();
   return Object.fromEntries(['theme-sequential','red-white','red-white-green','red-yellow-green'].flatMap(palette=>Array.from({length:11},(_,i)=>{
     const f=i/10,canvas=colors['color.canvas'],negative=colors['color.negative'],positive=colors['color.positive'];
     const midpoint=palette==='red-yellow-green'?'#F4E76E':canvas;
@@ -97,19 +100,7 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
 // about 30 grey levels under a white or cream page: clearly a surface, still
 // light enough for ink and secondary type at 4.5:1 or better.
 export const SURFACE_TINT_MIX = 0.86;
-export function surfaceTint(ink, canvas, share = SURFACE_TINT_MIX) {
-  const channel = (color, i) => parseInt(color.slice(1 + i * 2, 3 + i * 2), 16);
-  return "#" + [0, 1, 2].map((i) => Math.round(channel(ink, i) * (1 - share) + channel(canvas, i) * share).toString(16).padStart(2, "0")).join("").toUpperCase();
-}
-
-export function contrastRatio(a, b) {
-  const luminance = hex => {
-    const rgb = hex.replace("#", "").match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-    return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-  };
-  const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (values[0] + 0.05) / (values[1] + 0.05);
-}
+export const surfaceTint = (ink, canvas, share = SURFACE_TINT_MIX) => mix(ink, canvas, share);
 
 // Shared by full charts and in-cell charts. Return the caller's index so
 // semantic colour mappings remain under the caller's control.

@@ -27,7 +27,6 @@ const copyLayout = (value, width, bold, heading = bold) => measureText(value, wi
   fontFamily: tokenValue(token("font.body")),
   fontSize: tokenValue(token(heading ? "type.heading" : "type.body")),
   bold,
-  wrapWidthRatio: 1,
 });
 function text(
   id,

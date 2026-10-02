@@ -16,7 +16,7 @@
 // Logos (alt ending in "logo") are fetch-logos.mjs's business.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { UA, slugOf } from "./fetch-logos.mjs";
 
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
@@ -84,7 +84,7 @@ async function download(choice, file) {
 
 const recordsPath = (directory) => path.join(directory, "sources.json");
 async function readRecords(directory) {
-  return new Map((await fs.readFile(recordsPath(directory), "utf8").then(JSON.parse).catch(() => [])).map((r) => [r.alt, r]));
+  return new Map(((await readJson(recordsPath(directory), { optional: true })) ?? []).map((r) => [r.alt, r]));
 }
 
 /**
@@ -117,7 +117,7 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
       filled.push(picture.alt);
     } catch (error) { failed.push(`${picture.alt}: ${error.message}`); }
   }
-  if (records.size) { await fs.mkdir(directory, { recursive: true }); await fs.writeFile(recordsPath(directory), JSON.stringify([...records.values()], null, 2) + "\n"); }
+  if (records.size) { await fs.mkdir(directory, { recursive: true }); await writeJson(recordsPath(directory), [...records.values()]); }
   if (!write) {
     const strip = (value) => {
       if (Array.isArray(value)) { value.forEach(strip); return; }
@@ -130,21 +130,25 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
   return { filled: filled.length, failed };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [specArg, ...flags] = process.argv.slice(2);
-  if (!specArg) { console.error("Usage: fetch-pictures.mjs <id>.deck.json [--dry-run]"); process.exit(1); }
+const USAGE = "Usage: fetch-pictures.mjs <id>.deck.json [--dry-run]";
+
+async function main(argv) {
+  const { values, positionals: [specArg] } = parseCli(argv, { "dry-run": { type: "boolean" } }, { usage: USAGE });
+  if (!specArg) throw new UsageError(USAGE);
   const specPath = path.resolve(specArg);
-  const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
-  if (flags.includes("--dry-run")) {
+  const spec = await readJson(specPath);
+  if (values["dry-run"]) {
     const plan = [];
     for (const picture of picturePlaceholders(spec)) {
       const choice = await searchCommons(picture.search ?? picture.alt).catch((error) => ({ error: error.message }));
       plan.push({ alt: picture.alt, photo: choice?.page ?? null, license: choice?.license ?? null, artist: choice?.artist ?? null, ...(choice?.error ? { error: choice.error } : {}) });
     }
     console.log(JSON.stringify(plan, null, 1));
-    process.exit(0);
+    return;
   }
   const result = await autoFillPictures(spec, path.dirname(specPath), { write: true });
-  await fs.writeFile(specPath, JSON.stringify(spec, null, 1) + "\n");
+  await writeJson(specPath, spec);
   console.log(JSON.stringify(result, null, 1));
 }
+
+if (isMain(import.meta.url)) runCli(main);

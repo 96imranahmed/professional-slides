@@ -24,17 +24,16 @@ Five numbers are fitted, by grid search against the rendered measure:
 `TEXT_COVERAGE`, `BOLD_WEIGHT`, `GLYPH_SPREAD`, `HAIRLINE_WEIGHT` (a one-pixel
 rule, which the render antialiases to a pale line) and `NATIVE_WEIGHT` (the
 plot of a chart exported as a native chart object, which the renderer draws
-lighter than the scene). The first fit had only the first two and painted
-each line of type evenly, so a band of grey type on a tint flipped whole
-across the threshold: hollow fact tiles estimated 2% against 10% rendered,
-and two native line charts 11% against 8%. Refitted on 227 content pages of
-eight built decks and checked on the worked example, which the fit did not
-see (evaluation/index.md#ink-estimate records both). Everything else is
+lighter than the scene). A line of type painted evenly would flip whole
+across the threshold as a band of grey type on a tint, so the spread and the
+two weights are fitted too. Fitted on 227 content pages of eight built decks
+and checked on the worked example, which the fit did not see
+(evaluation/index.md#ink-estimate records both). Everything else is
 geometry the scene already states.
 
 Nothing here needs Pillow or numpy: the grid is 22,600 cells. What the scene
 says about colour - a style colour, its grey on the render, the page's canvas,
-where a line's glyphs sit - is read here once and imported by page_gates.py,
+where a line's glyphs sit - is read here once and imported by scene_gates.py,
 whose scene mask draws the same page for the void gates.
 """
 from __future__ import annotations
