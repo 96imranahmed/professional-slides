@@ -317,20 +317,112 @@ class InferredTreatmentTests(unittest.TestCase):
     one that differs.
     """
 
-    def test_rating_words_remain_text_without_an_authored_rubric(self):
+    def test_rating_words_on_one_ordinal_scale_are_drawn_as_harvey_balls(self):
+        # The words are the scale: every cell one word of one ordinal ladder
+        # draws its ball, with the word kept beside it. An authored rubric
+        # still wins, and words from no one scale stay words.
         run_node(r"""
 import assert from 'node:assert/strict';
 import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
 const columns=['Function','Recognition','Owner'];
 const rows=[['Finance','Full','A'],['Operations','Strong','B'],['Sales','Partial','C']];
-const neutral=styleTable({columns,rows});
-assert.equal(neutral.rows[0][1],'Full');
-assert.equal(neutral.scales,undefined);
+const inferred=styleTable({columns,rows});
+assert.deepEqual(inferred.rows.map(r=>r[1].type),['harvey','harvey','harvey']);
+assert.deepEqual(inferred.rows.map(r=>r[1].value),[4,3,2]);
+const scale=inferred.scales[inferred.rows[0][1].scale];
+assert.equal(scale.label,'Recognition');
+assert.deepEqual([scale.anchors[2],scale.anchors[3],scale.anchors[4]],['Partial','Strong','Full']);
+const lmh=styleTable({columns:['Option','Risk'],rows:[['A','Low'],['B','High'],['C','Moderate']]});
+assert.deepEqual(lmh.rows.map(r=>r[1].value),[1,3,2]);
+assert.equal(lmh.scales[lmh.rows[0][1].scale].anchors[2],'Moderate','the anchor is the word the author wrote');
+const mixed=styleTable({columns,rows:[['Finance','Full','A'],['Operations','High','B'],['Sales','Partial','C']]});
+assert.equal(mixed.rows[1][1],'High','two ladders in one column are not one scale');
 const rated=styleTable({columns:['Function',{label:'Readiness',scale:'r'},'Owner'],rows,
  scales:{r:{type:'harvey',label:'Readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}}}});
 assert.deepEqual(rated.rows.map(r=>r[1].value),[4,3,2]);
+assert.equal(rated.rows[0][1].scale,'r');
 console.log('{}');
 """)
+
+    def test_figures_take_the_treatment_their_shape_supports(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+// A matrix: three columns of exact figures in one unit share one heat scale,
+// each cell keeping its figure.
+const matrix=styleTable({columns:['Region','2023','2024','2025'],rows:[['North','12%','14%','19%'],['South','8%','9%','11%'],['East','21%','24%','30%']]});
+assert.deepEqual(matrix.rows[2].slice(1).map(c=>[c.type,c.figure,c.value]),[['heatmap','21%',3],['heatmap','24%',4],['heatmap','30%',5]]);
+assert.equal(new Set(matrix.rows.flatMap(r=>r.slice(1).map(c=>c.scale))).size,1);
+// A measure: the first column of figures with a unit carries bars.
+const measure=styleTable({columns:['Model','Score','Cost / task'],rows:[['Opus','58','$5.98'],['Fable','53','$7.63'],['Astra','53','$3.26'],['Sol','48','$1.06']]});
+assert.equal(measure.columns[1].type,'text','a score with no unit is a length without a measure');
+assert.equal(measure.columns[2].type,'bars');
+assert.deepEqual(measure.rows.map(r=>r[2].labels[0]),['$5.98','$7.63','$3.26','$1.06']);
+// A closing row that adds up the rows above it is the total band.
+const total=styleTable({columns:['Line',{label:'Journeys',unit:'million'},{label:'Punctuality',unit:'%'}],
+  rows:[['East','14.6','86.1'],['Valley','11.2','89.4'],['Dales','9.1','90.2'],['Airport','7.9','91.5'],['Network','42.8','89.0']]});
+assert.equal(total.rows.at(-1).style,'total');
+const notTotal=styleTable({columns:['Line',{label:'Journeys',unit:'million'}],rows:[['East','14.6'],['Valley','11.2'],['Dales','9.1'],['Airport','7.9'],['Coast','5.5']]});
+assert.notEqual(notTotal.rows.at(-1).style,'total');
+// A bound or an approximation is not a figure a bar can stand for; a table
+// its author treated is left as treated.
+const approx=styleTable({columns:['Firm',{label:'Revenue',unit:'$B'}],rows:[['A','~5'],['B','>2'],['C','1']]});
+assert.deepEqual(approx.rows.map(r=>r[1]),['~5','>2','1']);
+const authored=styleTable({columns:['Region',{label:'Share',unit:'%',heat:true},'Growth'],rows:[['North','3','12'],['South','2','8'],['East','5','21']],zebra:false});
+assert.deepEqual(authored.rows.map(r=>r[2]),['12','8','21']);
+// Presence answered under a header that asks: a filled or empty dot.
+const presence=styleTable({columns:['Vendor','Has an API?'],rows:[['A','Yes'],['B','No'],['C','Yes']]});
+assert.deepEqual(presence.rows.map(r=>[r[1].type,r[1].value]),[['dot',true],['dot',false],['dot',true]]);
+console.log('{}');
+""")
+
+    def test_a_labelled_table_of_figures_takes_its_bars_and_keeps_its_total(self):
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+// A filled label column styles the names, not the figures beside them.
+const pair=styleTable({columns:[{label:'Lab',type:'category'},'Committed round'],rows:[['OpenAI','$122B'],['Anthropic','$65B']]});
+assert.equal(pair.columns[1].type,'bars');
+assert.equal(pair.columns[1].unit,'$B','the currency and its scale are one unit');
+assert.deepEqual(pair.rows.map(r=>r[1].labels[0]),['$122B','$65B']);
+// Two rows of a wider table are a record, not a pair of figures.
+const record=styleTable({columns:['Place','Rent','Change'],rows:[['A','£2640.00','1250%'],['B','£2000.50','1000%']]});
+assert.equal(record.rows[0][1],'£2,640.00');
+// A measure table's computed total stays a figure in its band, not a bar off the scale.
+const measure=styleTable({total:'auto',columns:[{label:'Line',type:'category'},'Journeys (m)','Train-km (m)'],rows:[['Eastern','14.2','3.1'],['Dales','9.8','2.2'],['Valley','8.1','1.9']]});
+assert.equal(measure.columns[1].type,'bars');
+assert.deepEqual(measure.rows.at(-1),{style:'total',cells:['Total',{type:'text',text:'32.1'},'7.2']});
+// Four-figure values keep their separators beside their bars.
+const big=styleTable({columns:[{label:'City',type:'category'},'Rent, £'],rows:[['A','2640'],['B','2000'],['C','1500']]});
+assert.deepEqual(big.rows.map(r=>r[1].labels[0]),['2,640','2,000','1,500']);
+console.log('{}');
+""")
+
+    def test_inferred_bars_give_way_to_figures_in_a_narrow_panel(self):
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props=styleTable({columns:['Line','Revenue, $','Basis of the estimate and its period'],rows:[['A','1,250,000.50','Company filing for the year to March, audited'],['B','980,250.25','Press report of the private metric, unaudited'],['C','1,105,750.75','Analyst estimate from the round memo, unaudited']]});
+const nodes=(width)=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height:400},props}).nodes;
+console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow:nodes(320).some(n=>n.role==='table-bar'),
+  figures:nodes(320).filter(n=>n.role==='table-cell-text'&&n.data?.column===1).map(n=>n.text)}));
+""")
+        self.assertTrue(result["wide"])
+        self.assertFalse(result["narrow"])
+        self.assertEqual(result["figures"], ["1,250,000.50", "980,250.25", "1,105,750.75"])
+
+    def test_inferred_bars_give_way_where_their_width_would_overflow_the_frame(self):
+        # A row block's table has a fixed height: the width the bars take made
+        # the names beside them wrap past it, and the page refused to compose.
+        result = run_node(r"""
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props=styleTable({columns:[{label:'Lab',type:'category'},'Post-money, $B'],rows:[['OpenAI, March round','852'],['Anthropic, May round','965']]});
+const at=(width,height)=>{ try { return REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height},props}).nodes.some(n=>n.role==='table-bar'); } catch (e) { return e.message.slice(0,40); } };
+console.log(JSON.stringify({roomy:at(240,160),tight:at(240,100)}));
+""")
+        self.assertTrue(result["roomy"])
+        self.assertIs(result["tight"], False, "the figures stay as text rather than the page refusing")
 
     def test_cards_wrap_into_a_grid(self):
         run_node(r'''

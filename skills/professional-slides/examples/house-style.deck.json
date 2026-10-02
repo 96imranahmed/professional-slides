@@ -20,7 +20,7 @@
       "summary": "Macro risks, company priorities and the outlook"
     },
     {
-      "title": "Interest rates remain the number one macro risk; geopolitics rose most since June",
+      "title": "Interest rates remain the top macro risk; geopolitics rose most since June",
       "tag": "Oct 10–13",
       "exhibit": {
         "type": "chart.bar",
@@ -80,7 +80,6 @@
         "Liquidity and private credit remain bottom of the list",
         "Asset valuations and public debt sit mid-table and moved little"
       ],
-      "density": "pre-read",
       "highlight": "77% of top-three rankings"
     },
     {
@@ -168,7 +167,6 @@
         "Agreement is the top two boxes of a five-point scale",
         "Base: 2,140 workers across eleven markets, September 2025"
       ],
-      "density": "pre-read",
       "highlight": "one offer away from leaving"
     },
     {
@@ -197,9 +195,9 @@
       "source": "Illustrative investor survey, October 2026",
       "subtitle": "Investor preference between investing in the business and delivering EPS, 2025",
       "points": [
-        "Investors back investment over EPS by a wide margin",
-        "They now expect guidance to be met as well",
-        "The two expectations are held at once, which is new"
+        "Investors back investment over EPS by a wide margin: 88% would build capabilities at the expense of earnings, close to the series average of 89% and only three points below June.",
+        "They now expect guidance to be met as well: 86% say delivering on EPS guidance and consensus matters, near the series high of 87% and fifteen points above February.",
+        "The two expectations are held at once, which is new: a management team can no longer trade a missed quarter for investment, or protect the quarter by cutting the plan."
       ],
       "highlight": "by a wide margin"
     },
@@ -276,7 +274,7 @@
       "highlight": "already work in a start-up"
     },
     {
-      "title": "The year featured comparatively big deals, with four new entrants in the top ten",
+      "title": "The year brought big deals and four new top-ten entrants",
       "exhibit": {
         "type": "table",
         "columns": [

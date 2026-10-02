@@ -11,7 +11,7 @@ Opens the file with python-pptx (not the emitter's in-memory objects) and checks
   * hard editability facts: zero wrap="none" text boxes on content slides.
 Exit 0 on pass, 2 on findings. JSON report on stdout.
 
-Usage: readback_pptx.py scene.json deck.pptx [--tolerance 2]
+Usage: readback_pptx.py scene.json deck.pptx
 """
 from __future__ import annotations
 
@@ -148,9 +148,9 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("scene"); ap.add_argument("pptx"); ap.add_argument("--tolerance", type=float, default=2.0)
+    ap.add_argument("scene"); ap.add_argument("pptx")
     a = ap.parse_args(argv)
-    report = readback(json.loads(Path(a.scene).read_text()), Path(a.pptx), a.tolerance)
+    report = readback(json.loads(Path(a.scene).read_text()), Path(a.pptx))
     print(json.dumps(report, indent=1))
     sys.exit(0 if report["accepted"] else 2)
 

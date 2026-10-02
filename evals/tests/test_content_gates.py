@@ -168,6 +168,13 @@ class PlanningVoiceTests(unittest.TestCase):
                 self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
                 self.assertIn("Delete the label and keep the sentence", findings[0]["repair"])
 
+    def test_a_caption_under_a_panel_is_the_pages_own_sentence(self):
+        # A finding set under its panel is drawn as `insight-caption`; the gates
+        # read it with the page's commentary, not as a label on the exhibit.
+        self.assertIn("insight-caption", page_gates.COMMENTARY_ROLES)
+        findings = run(page_gates.gate_planning_voice, 8, page([text("insight-caption", "Interpretation: the cheaper line grows first.")]))
+        self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
+
     def test_the_same_words_inside_a_sentence_are_left_alone(self):
         for line in ["The interpretation a reader brings decides which version they prefer.",
                      "Its takeaway is cheaper to state than to prove.",

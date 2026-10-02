@@ -601,7 +601,9 @@ for(const categories of [['A','B'],['B','A']]) {
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);
 assert.throws(()=>render('chart.stacked-column',base),/two unstacked series/);
-assert.throws(()=>render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}),/two unstacked series/);
+// Three series or more take a named subject too: it in the primary, the peers in the comparator grey.
+const three=render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}).filter(n=>n.role==='chart-mark');
+assert.deepEqual([...new Set(three.filter(n=>n.data.series!==base.focusSeries).map(n=>n.style.fill.tokenId))],['color.chartComparator']);
 const explicit=render('chart.column',{...base,focusSeries:undefined,colorIndices:[2,4]}).filter(n=>n.role==='chart-mark');
 assert.deepEqual([...new Set(explicit.map(n=>n.style.fill.tokenId))],['color.chartSeries3','color.chartSeries5']);
 console.log(JSON.stringify({accepted:true}));

@@ -1,5 +1,5 @@
 import { token, tokenValue, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, stableId } from './core.mjs';
-import { measureText } from './text-layout.mjs';
+import { ENGINE_RESERVE, measureText } from './text-layout.mjs';
 
 export const RELATIONSHIP_NETWORK_TOKENS = Object.freeze(['font.body','type.body','color.ink','color.componentPrimary','color.surface','color.surfaceMuted','color.rule','line.standard','line.hairline','space.1','space.2','space.3','space.4','color.accent','color.onPrimary','radius.round','radius.none']);
 const t=token, v=id=>tokenValue(t(id));
@@ -7,7 +7,7 @@ const check=(condition,message)=>{if(!condition)throw new Error(`Relationship ne
 const required=(value,name)=>check(typeof value==='string'&&value.trim(),`${name} requires nonempty text`);
 const overlap=(a,b,gap=0)=>a.x < b.x+b.width+gap && a.x+a.width+gap > b.x && a.y < b.y+b.height+gap && a.y+a.height+gap > b.y;
 const center=frame=>({x:frame.x+frame.width/2,y:frame.y+frame.height/2});
-function measure(value,width,bold=false){return measureText(value,width,{fontFamily:v('font.body'),fontSize:v('type.body'),bold});}
+function measure(value,width,bold=false){return measureText(value,width,{fontFamily:v('font.body'),fontSize:v('type.body'),bold,wrapWidthRatio:ENGINE_RESERVE});}
 function normalize(props){
  check(props.variant===undefined||['hub-ring','directed-spokes'].includes(props.variant),'unsupported variant');
  check(Array.isArray(props.nodes)&&props.nodes.length>=4&&props.nodes.length<=7,'hub-ring needs a center and three to six perimeter nodes');

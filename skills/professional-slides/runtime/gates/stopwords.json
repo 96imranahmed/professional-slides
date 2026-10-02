@@ -1,0 +1,18 @@
+{
+  "$comment": "Words that carry no argument, so two sentences sharing them share nothing. `content` is the list both content-word extractors drop (text_stats.py content_words, content_gates.mjs contentWords); `title` is the shorter list TITLE_COUNT drops before it reads a capitalised word in a title as the thing the title counts.",
+  "content": [
+    "a", "an", "the", "and", "or", "but", "of", "to", "in", "on", "for", "with", "as", "is", "are",
+    "was", "were", "be", "been", "being", "it", "its", "this", "that", "these", "those", "not",
+    "no", "do", "does", "did", "can", "could", "may", "might", "will", "would", "should", "from",
+    "by", "at", "into", "than", "then", "so", "such", "other", "their", "them", "they", "our",
+    "we", "you", "your", "also", "more", "most", "each", "per", "over", "under", "between",
+    "within", "has", "have", "had", "who", "whom", "which", "what", "when", "where", "how",
+    "there", "here", "both", "either", "neither", "about", "across", "after", "before", "during",
+    "through", "while", "because", "since", "although", "however", "therefore"
+  ],
+  "title": [
+    "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "at", "by", "with",
+    "from", "this", "that", "these", "those", "it", "its", "their", "they", "we", "our", "you",
+    "your", "is", "are", "was", "were", "be", "been"
+  ]
+}

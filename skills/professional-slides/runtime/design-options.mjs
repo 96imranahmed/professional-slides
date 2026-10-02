@@ -25,6 +25,7 @@ import { DESIGN_SYSTEMS, DESIGN_NAMES } from "./design-systems.mjs";
 import { PALETTES } from "./palettes.mjs";
 import { deckKeys, DENSITIES } from "./preferences.mjs";
 import { runProcess, lastJson } from "./process.mjs";
+import { UsageError, isMain, parseCli, pythonBin, runCli, writeJson } from "./cli.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -150,6 +151,7 @@ export async function renderOption(answers, directory, python) {
   await fs.mkdir(directory, { recursive: true });
   const { deck } = composeAll(optionDeck(answers), runtime);
   const scene = path.join(directory, "scene.json"), pptx = path.join(directory, "sample.pptx"), rendered = path.join(directory, "rendered");
+  // Compact: read only by the emitter.
   await fs.writeFile(scene, JSON.stringify(deck));
   await runProcess(python, [path.join(runtime, "emit", "emit_pptx.py"), scene, pptx]);
   const result = lastJson((await runProcess(python, [path.join(runtime, "emit", "render_pptx.py"), pptx, rendered, "--dpi", String(DPI)])).stdout);
@@ -158,9 +160,9 @@ export async function renderOption(answers, directory, python) {
   return byId;
 }
 
-export async function renderSheets(outDirectory, { only, python = process.env.RUNTIME_PYTHON || "python3", ...options } = {}) {
+export async function renderSheets(outDirectory, { only, python = pythonBin(), ...options } = {}) {
   const plan = sheetPlan(options).filter((sheet) => !only || only.includes(sheet.id));
-  if (!plan.length) throw new Error(`No sheet matches --only ${only}`);
+  if (!plan.length) throw new UsageError(`No sheet matches --only ${only}`);
   await fs.mkdir(outDirectory, { recursive: true });
   const work = await fs.mkdtemp(path.join(os.tmpdir(), "design-options-"));
   try {
@@ -177,12 +179,12 @@ export async function renderSheets(outDirectory, { only, python = process.env.RU
       const out = path.join(outDirectory, `${sheet.id}.png`);
       const layout = { out, title: sheet.title, subtitle: `Each tile is the same sample built with the value it is labelled with; the deck key is ${sheet.key}.`, header: Boolean(sheet.pages[0].crop), tiles };
       const layoutPath = path.join(work, `${sheet.id}.layout.json`);
-      await fs.writeFile(layoutPath, JSON.stringify(layout));
+      await writeJson(layoutPath, layout);
       await runProcess(python, [path.join(runtime, "emit", "contact_sheet.py"), layoutPath]);
       manifest.push({ sheet: `${sheet.id}.png`, question: sheet.question, title: sheet.title, options: sheet.options.map((o) => ({ label: o.label, note: o.note, answer: o.answers[sheet.question], deckKeys: deckKeys(o.answers) })) });
     }
     const index = { density: DENSITIES, sheets: manifest };
-    await fs.writeFile(path.join(outDirectory, "options.json"), JSON.stringify(index, null, 2) + "\n");
+    await writeJson(path.join(outDirectory, "options.json"), index);
     return { outDirectory, sheets: manifest.map((m) => path.join(outDirectory, m.sheet)) };
   } finally {
     await fs.rm(work, { recursive: true, force: true });
@@ -191,17 +193,21 @@ export async function renderSheets(outDirectory, { only, python = process.env.RU
 
 export function parseBrand(value) {
   const colours = String(value).split(",").map((c) => c.trim()).filter(Boolean);
-  if (!colours.length || colours.length > 2 || colours.some((c) => !/^#[0-9A-Fa-f]{6}$/.test(c))) throw new Error("--brand takes one or two #RRGGBB colours: '#0B6E4F,#F2A900'");
+  if (!colours.length || colours.length > 2 || colours.some((c) => !/^#[0-9A-Fa-f]{6}$/.test(c))) throw new UsageError("--brand takes one or two #RRGGBB colours: '#0B6E4F,#F2A900'");
   return { primary: colours[0], ...(colours[1] ? { accent: colours[1] } : {}) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const flag = (name) => { const i = args.indexOf(name); if (i < 0) return undefined; const value = args[i + 1]; args.splice(i, 2); return value; };
-  const only = flag("--only")?.split(","), design = flag("--design") ?? "consulting", brand = flag("--brand"), wordmark = flag("--wordmark"), python = flag("--python");
-  if (!args[0]) { console.error("Usage: design-options.mjs <out-dir> [--only sheet,...] [--design name] [--brand '#hex,#hex'] [--wordmark text]"); process.exit(1); }
-  if (!DESIGN_NAMES.includes(design)) { console.error(`Unknown design ${design}; use ${DESIGN_NAMES.join(", ")}`); process.exit(1); }
-  renderSheets(path.resolve(args[0]), { only, design, brand: brand ? parseBrand(brand) : null, wordmark: wordmark ?? null, ...(python ? { python } : {}) })
-    .then((result) => console.log(JSON.stringify(result)))
-    .catch((error) => { console.error(error.message); process.exit(1); });
+const USAGE = "Usage: design-options.mjs <out-dir> [--only sheet,...] [--design name] [--brand '#hex,#hex'] [--wordmark text]";
+
+async function main(argv) {
+  const { values, positionals: [out] } = parseCli(argv, { only: { type: "string" }, design: { type: "string" }, brand: { type: "string" }, wordmark: { type: "string" },
+    python: { type: "string", valueName: "an executable" } }, { usage: USAGE });
+  if (!out) throw new UsageError(USAGE);
+  const design = values.design ?? "consulting";
+  if (!DESIGN_NAMES.includes(design)) throw new UsageError(`Unknown design ${design}; use ${DESIGN_NAMES.join(", ")}`);
+  const result = await renderSheets(path.resolve(out), { only: values.only?.split(","), design, brand: values.brand ? parseBrand(values.brand) : null, wordmark: values.wordmark ?? null,
+    ...(values.python ? { python: values.python } : {}) });
+  console.log(JSON.stringify(result));
 }
+
+if (isMain(import.meta.url)) runCli(main);

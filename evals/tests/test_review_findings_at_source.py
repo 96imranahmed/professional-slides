@@ -20,7 +20,7 @@ TIME = "./skills/professional-slides/runtime/time-axis.mjs"
 
 PAGE = """
 const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
-const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
 const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
 """
 
@@ -311,14 +311,15 @@ class VocabularyTests(unittest.TestCase):
         result = run_node(f'''
 import {{ describeTypes }} from '{KIT}';
 import {{ VARIETY_CODES }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+import {{ AUTHORING_CODES }} from './skills/professional-slides/runtime/author-deck.mjs';
 import {{ wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
-console.log(JSON.stringify({{ types: describeTypes(), codes: Object.keys(VARIETY_CODES), summary: wordBudgetOf('text-page', {{ role: 'executive-summary' }}).ceiling }}));
+console.log(JSON.stringify({{ types: describeTypes(), codes: [...Object.keys(VARIETY_CODES), ...Object.keys(AUTHORING_CODES)], summary: wordBudgetOf('text-page', {{ role: 'executive-summary' }}).ceiling }}));
 ''')
         self.assertTrue({"TOTAL_ROW_BLANK", "TABLE_PANELS_MERGE", "SHARES_IN_TILES", "MAP_COARSE"} <= raised)  # the patterns read the source
         for code in sorted(raised):
             self.assertIn(code, result["types"])
-        # Every compile refusal is in the deck's vocabulary but the title's, a page-gate code checked early.
-        self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS"})
+        # Every compile refusal is in the deck's vocabulary but the title's and the takeaway's, page-gate codes checked early.
+        self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS", "TAKEAWAY_LONG"})
         docs = (REFERENCES / "page-types.md").read_text(encoding="utf-8")
         for code in result["codes"]:
             self.assertIn(f"`{code}`", docs)
@@ -456,11 +457,13 @@ console.log(JSON.stringify({
         self.assertEqual(result["aliased"], [])  # a logo under the player's short name introduces it
 
     def test_shares_of_one_measure_in_equal_tiles_are_advised(self):
+        # The chart prints other figures than the strip: a strip that repeats its
+        # chart's labels is refused (test_design_findings).
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
 {PAGE}
 const strip = (metrics) => compilePage({{ id: 'p1', type: 'numbers', form: 'metric-strip', commentary: 'none', ...base, title: 'Claude gained web share, but ChatGPT still drew six times its visits', metrics,
-  exhibit: {{ type: 'chart.bar', heading: 'Web visit share, Aug 2026', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], series: [{{ name: 's', values: [57, 9.6, 8, 7, 6, 5, 4, 3] }}] }} }}).pageType.advisories ?? [];
+  exhibit: {{ type: 'chart.bar', heading: 'Web visit share, Aug 2026', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], series: [{{ name: 's', values: [55, 10, 8, 7, 6, 5, 4, 3] }}] }} }}).pageType.advisories ?? [];
 console.log(JSON.stringify({{
   same: strip([{{ value: '9.6%', label: 'Claude web visit share, Aug 2026' }}, {{ value: '57%', label: 'ChatGPT web visit share, Aug 2026' }}]),
   close: strip([{{ value: '41%', label: 'Claude web visit share, Aug 2026' }}, {{ value: '57%', label: 'ChatGPT web visit share, Aug 2026' }}]),

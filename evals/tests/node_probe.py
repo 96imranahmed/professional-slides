@@ -83,6 +83,66 @@ def requires_binary(*names: str):
     return unittest.skipIf(bool(missing), f"needs {', '.join(missing)} on PATH")
 
 
+_CHROMIUM_PROBE = r"""
+const fs = require('fs');
+try {
+  const { chromium } = require(require.resolve('playwright', { paths: [process.env.RUNTIME_NODE_MODULES] }));
+  const browser = process.env.PLAYWRIGHT_BROWSER_PATH || chromium.executablePath();
+  console.log(fs.existsSync(browser) ? '' : 'the Playwright Chromium build (npx playwright install chromium)');
+} catch (error) {
+  console.log('playwright (npm ci)');
+}
+"""
+
+
+def _chromium_missing() -> str:
+    """What the rendered overlap probes lack, or '' when they can launch."""
+    if not NODE:
+        return "Node.js"
+    try:
+        probe = subprocess.run([NODE, "-e", _CHROMIUM_PROBE], cwd=ROOT, capture_output=True,
+                               text=True, timeout=30, env=_probe_env())
+    except (OSError, subprocess.TimeoutExpired):
+        return "Node.js"
+    return probe.stdout.strip() if probe.returncode == 0 else "playwright (npm ci)"
+
+
+def requires_chromium(target):
+    """Skip a test or class that launches Playwright Chromium when it cannot.
+
+    Asked on first use rather than at import, so modules that never touch a
+    browser do not pay for the probe.
+    """
+    state: dict[str, str] = {}
+
+    def missing() -> str:
+        if "missing" not in state:
+            state["missing"] = _chromium_missing()
+        return state["missing"]
+
+    if isinstance(target, type):
+        original = target.setUpClass
+
+        @classmethod
+        def setUpClass(cls):
+            if missing():
+                raise unittest.SkipTest(f"needs {missing()}")
+            original.__func__(cls)
+
+        target.setUpClass = setUpClass
+        return target
+
+    import functools
+
+    @functools.wraps(target)
+    def wrapper(*args, **kwargs):
+        if missing():
+            raise unittest.SkipTest(f"needs {missing()}")
+        return target(*args, **kwargs)
+
+    return wrapper
+
+
 # LibreOffice registers under either name depending on the install.
 def _soffice() -> str | None:
     for name in ("soffice", "libreoffice"):

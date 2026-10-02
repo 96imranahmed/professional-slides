@@ -3,7 +3,7 @@
 //
 //   node runtime/fetch-places.mjs <id>.deck.json   look up, cache in assets/places.json, write coordinates into the spec
 //
-// A city marker needs its longitude and latitude; typed from memory they were
+// A city marker needs its longitude and latitude; typed from memory they are
 // wrong often enough to put Mumbai in the middle of India. A marker may give
 // `place` instead ("Riyadh", "Perth, Western Australia", "King Khalid
 // International Airport") - or only its `label`, when it has no `country` and
@@ -13,7 +13,7 @@
 // setting the marker's coordinates.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { UA } from "./fetch-logos.mjs";
 
 const API = "https://en.wikipedia.org/w/api.php";
@@ -69,7 +69,7 @@ export async function autoFillPlaces(spec, baseDir, { fetchMissing = true } = {}
   const wanted = markersToPlace(spec);
   if (!wanted.length) return { placed: 0, failed: [] };
   const cachePath = path.join(baseDir, "assets", "places.json");
-  const cache = await fs.readFile(cachePath, "utf8").then(JSON.parse).catch(() => ({}));
+  const cache = (await readJson(cachePath, { optional: true })) ?? {};
   let changed = false;
   const failed = [];
   let placed = 0;
@@ -86,16 +86,20 @@ export async function autoFillPlaces(spec, baseDir, { fetchMissing = true } = {}
     delete marker.place;
     placed += 1;
   }
-  if (changed) { await fs.mkdir(path.dirname(cachePath), { recursive: true }); await fs.writeFile(cachePath, JSON.stringify(cache, null, 2) + "\n"); }
+  if (changed) { await fs.mkdir(path.dirname(cachePath), { recursive: true }); await writeJson(cachePath, cache); }
   return { placed, failed };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const specArg = process.argv[2];
-  if (!specArg) { console.error("Usage: fetch-places.mjs <id>.deck.json"); process.exit(1); }
+const USAGE = "Usage: fetch-places.mjs <id>.deck.json";
+
+async function main(argv) {
+  const [specArg] = parseCli(argv, {}, { usage: USAGE }).positionals;
+  if (!specArg) throw new UsageError(USAGE);
   const specPath = path.resolve(specArg);
-  const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
+  const spec = await readJson(specPath);
   const result = await autoFillPlaces(spec, path.dirname(specPath));
-  await fs.writeFile(specPath, JSON.stringify(spec, null, 1) + "\n");
+  await writeJson(specPath, spec);
   console.log(JSON.stringify(result, null, 1));
 }
+
+if (isMain(import.meta.url)) runCli(main);

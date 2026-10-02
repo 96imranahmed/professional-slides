@@ -1,0 +1,145 @@
+{
+ "schema": "professional-slides.cold-run-specimen/v2",
+ "$comment": "A 50-page investor comparison that cleared every gate the skill had on 27 September 2026, passed its delivery review at 7.8 and was delivered. An independent first reader, given only the brief and the renders, rated it 6.5 and did not accept it. It is kept as inputs so today's rules score it again: a change that lets this deck through is a regression, whatever the numbers it moves.",
+ "name": "anthropic-vs-openai-2026",
+ "brief": "brief.md",
+ "ran": "2026-09-27",
+ "outcome": {
+  "delivered": true,
+  "deliveryReview": {
+   "accepted": true,
+   "rating": 7.8,
+   "blocking": 0,
+   "findings": 6
+  },
+  "independentReview": {
+   "accepted": false,
+   "rating": 6.5,
+   "dimensions": {
+    "argument": 7.5,
+    "evidence": 7,
+    "visual": 5.5,
+    "copy": 6,
+    "sequence": 5.5
+   },
+   "reader": "a fresh reader given the brief, the title spine and the renders, with no review history"
+  }
+ },
+ "expect": {
+  "accepted": false,
+  "planCodes": [
+   "PLAN_EXHIBIT_VARIETY",
+   "PLAN_TABLE_MONOTONY"
+  ],
+  "why": "A reader found the deck visually interchangeable across repeated number cards and tables, with dead space on seven pages. The build bars and the plan checks must keep saying so."
+ },
+ "foundByLooking": [
+  {
+   "pages": [
+    45,
+    46,
+    47,
+    48,
+    49
+   ],
+   "defect": "The long-run branch never chooses between the companies: four generic gates mirrored for both, no relative test for a tie or a split result, and seven market structures with no likelihood or discriminating implication.",
+   "why": "Every page is individually well-formed and sourced as analyst scenario, so no page-level check has anything to refuse; the failure is that five pages do not narrow the decision.",
+   "fix": "A storyline-critique question rather than a gate: each reversal condition needs a comparative signal, an observation period and a 'cannot rank' branch."
+  },
+  {
+   "pages": [
+    26,
+    27,
+    28,
+    29
+   ],
+   "defect": "Winner language mixes dated, non-equivalent benchmark snapshots, and page 29 claims a quality-cost frontier moved twice over a sparse chronology with no common coordinates.",
+   "why": "The claim check reads each number against its record, not whether two comparisons on neighbouring pages share a basis.",
+   "fix": "Put model version, benchmark, date and cost basis in every winner row; draw the frontier on common axes or retitle the page as a chronology."
+  },
+  {
+   "pages": [
+    15
+   ],
+   "defect": "The central run-rate chart joins company statements and press reports in one undifferentiated series, plots lower bounds as exact points, and has no legend for its evidence tiers.",
+   "why": "A scatter drawn over dates passes every chart check; nothing asks whether a time series is drawn as one, or whether a multi-series plot names its series.",
+   "fix": "A time series drawn as a line or dated points with tiers as distinct marks, lower bounds as thresholds, and a legend or direct labels."
+  },
+  {
+   "pages": [
+    7,
+    10,
+    16,
+    18,
+    26,
+    38
+   ],
+   "defect": "Three facts in full-width grey cards recur through the deck, and pages 30 to 43 repeat a row table followed by a caveat, so much of the read is visually interchangeable.",
+   "why": "Each page picks a legitimate type; the repetition only exists across the deck, and the gates that count it were advisory.",
+   "fix": "Deck-level variety checks that block rather than advise, and number pages that show the comparison the numbers belong to."
+  },
+  {
+   "pages": [
+    2,
+    11,
+    22,
+    29,
+    39,
+    41
+   ],
+   "defect": "Prominent exhibits carry too little of their claimed mechanism: a 239-word summary packed into the upper half of page 2, small flows and timelines floating in empty fields on 22, 29 and 41, a large donut given to a stale cap table on 39.",
+   "why": "The void gates measure bands the scene leaves empty, and several of these pages fill a band with a small exhibit rather than leave it empty.",
+   "fix": "Size the exhibit to the evidence and give the freed space to the comparator or limitation the claim needs."
+  }
+ ],
+ "inputs": {
+  "pages": {
+   "file": "pages.json",
+   "sha256": "b25e9f33a452793357f63a52ddef8af14bc8c5e440be68ab8b430c0dd28be224"
+  },
+  "plan": {
+   "file": "plan.json",
+   "sha256": "2b1e0e110ab3e5abbf1fa6edeef0b2da504d9b661f31554196639d415f80c43b"
+  },
+  "scene": {
+   "file": "scene.json.gz",
+   "sha256": "ed065802abdddfb178ed49ad19fe5e0ed643fc2c23f8bea0d148c73653ae2645"
+  },
+  "deck": {
+   "file": "deck.json.gz",
+   "sha256": "78f25d7ec3c680e4336ca5ef3ec40d22a28a31ee2d0f0a450c85501750eb454f"
+  }
+ },
+ "recorded": {
+  "weightSha256": "163bed8f23b6ec9effe931046609323ec7ce0caa57fefe940804d35f28f09979",
+  "stamped": "2026-09-29",
+  "verdict": {
+   "accepted": false,
+   "plan": {
+    "accepted": true,
+    "countsByCode": {
+     "PLAN_CHART_MONOTONY": 1,
+     "PLAN_EXHIBIT_MIX": 1,
+     "PLAN_EXHIBIT_VARIETY": 1,
+     "PLAN_NO_ICONS": 1,
+     "PLAN_NO_PICTURES": 1,
+     "PLAN_TABLE_DEPTH": 1,
+     "PLAN_TABLE_MONOTONY": 1
+    }
+   },
+   "build": {
+    "accepted": false,
+    "findings": [
+     {
+      "measure": "exhibitVarietyPerTen",
+      "measured": 3.81
+     },
+     {
+      "measure": "tablesTreated",
+      "measured": 0.14
+     }
+    ]
+   }
+  }
+ }
+}

@@ -14,9 +14,14 @@ class TextContractTests(unittest.TestCase):
             result=subprocess.run(command,capture_output=True,text=True)
             self.assertEqual(result.returncode,2)
             self.assertIn('TEXT_PLAN_INCOMPLETE',json.loads(result.stdout)['countsByCode'])
-            legacy=subprocess.run(command+['--legacy'],capture_output=True,text=True)
-            self.assertEqual(legacy.returncode,0)
-            self.assertEqual(json.loads(legacy.stdout)['textCoverage']['state'],'legacy-unverified')
+            # A plan that predates the text contract is audited without it.
+            legacy=run_node(f"""
+import {{readFileSync}} from 'node:fs';
+import {{runContentGates}} from './skills/professional-slides/runtime/gates/content_gates.mjs';
+console.log(JSON.stringify(runContentGates(JSON.parse(readFileSync({json.dumps(str(p))},'utf8')),{{required:false}})));
+""")
+            self.assertTrue(legacy['accepted'])
+            self.assertEqual(legacy['textCoverage']['state'],'legacy-unverified')
 
     def test_complete_copy_reference_coverage_and_loss_persist(self):
         result=run_node(r'''

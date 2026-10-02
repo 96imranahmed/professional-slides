@@ -1,18 +1,18 @@
 // The claim ledger: every checkable statement the rendered deck makes, listed
 // for the author to reproduce before the review.
 //
-// Most review rounds used to be spent on things the author could have caught
-// with the data open: a figure mistyped from the records, a superlative that a
+// A review round is wasted on what the author can catch with the data
+// open: a figure mistyped from the records, a superlative that a
 // rival quietly meets, a summary number no page shows, the same proposition
 // proved on three pages. The ledger turns those into a list the author works
 // through once, so the independent review reads a deck whose claims already
 // hold. It does not judge truth; it says what has to be checked.
 //
 //   node runtime/claims.mjs out/          writes out/claims.json
-import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { registered } from "./errors.mjs";
 
 // Text a reader takes as a statement, not a label. Data labels, table cells and
 // axes carry the evidence; the claims are made about it in these roles.
@@ -85,7 +85,7 @@ export function buildLedger(scene) {
   for (const claim of unique) {
     if (!SUMMARY_ROLES.has(scene.slides[claim.page - 1].role)) continue;
     const missing = [...new Set(numbersIn(claim.text).filter((f) => !isYear(f) && !figureShown(f, printed)).map((f) => f.raw))];
-    if (missing.length) findings.push({ code: "SUMMARY_UNPROVED", slide: claim.slide, claim: claim.id, numbers: missing,
+    if (missing.length) findings.push({ code: registered(CLAIM_CODES, "SUMMARY_UNPROVED"), slide: claim.slide, claim: claim.id, numbers: missing,
       reason: `The summary states ${missing.join(", ")}, which no other page shows`, repair: "Show the figure on the page that proves it, or cut it from the summary" });
   }
   // The title spine, in order, for the author's merge pass. Whether two titles
@@ -104,9 +104,8 @@ export function buildLedger(scene) {
 }
 
 export async function writeLedger(directory) {
-  const scene = JSON.parse(await fs.readFile(path.join(directory, "scene.json"), "utf8"));
-  const ledger = buildLedger(scene);
-  await fs.writeFile(path.join(directory, "claims.json"), JSON.stringify(ledger, null, 2) + "\n");
+  const ledger = buildLedger(await readJson(path.join(directory, "scene.json")));
+  await writeJson(path.join(directory, "claims.json"), ledger);
   return ledger;
 }
 
@@ -132,8 +131,8 @@ export function validateSelfCheck(selfCheck, ledger) {
   return errors;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const directory = path.resolve(process.argv[2] || "out");
-  const ledger = await writeLedger(directory);
+if (isMain(import.meta.url)) runCli(async (argv) => {
+  const [directory = "out"] = parseCli(argv, {}, { usage: "Usage: claims.mjs [output-directory]" }).positionals;
+  const ledger = await writeLedger(path.resolve(directory));
   console.log(JSON.stringify({ claims: ledger.counts.claims, pages: ledger.counts.pages, findings: ledger.findings.map((f) => `${findingKey(f)}: ${f.reason}`) }, null, 1));
-}
+});

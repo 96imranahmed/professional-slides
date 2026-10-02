@@ -37,7 +37,7 @@ import { compilePage, describeTypes } from './skills/professional-slides/runtime
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const S = { kind: 'comparison', what: 'The operator annual reports' };
-const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S };
+const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S, adds: 'The commentary names the mechanism the exhibit cannot show' };
 const compose = (pages) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: pages.map((p, i) => compilePage(p, i)) }, '.').deck.slides;
 const error = (fn) => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } };
 // The emphasised text of a composed page, runs joined across line breaks.
@@ -363,6 +363,11 @@ class RestatementAndCalloutTests(unittest.TestCase):
 
 
 class PlotSpanTests(unittest.TestCase):
+    # The span floor is the fill level's; another test's deck may have left
+    # the module configured for an airy deck, whose floor is off.
+    def setUp(self):
+        page_gates.configure()
+
     def test_a_bar_panel_that_spends_its_width_on_names_and_values_passes(self):
         frame = {"x": 647, "y": 152, "width": 560, "height": 465}
         marks = [{"role": "chart-mark", "frame": {"x": 900 - (40 if i == 2 else 0), "y": 250 + i * 57, "width": 40 if i == 2 else 20 + i * 25, "height": 40}} for i in range(6)]

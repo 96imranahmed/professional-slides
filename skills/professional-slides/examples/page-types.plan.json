@@ -2,6 +2,7 @@
  "schema": "professional-slides.plan/v1",
  "id": "page-types",
  "design": "consulting",
+ "workflow": "existing_deck_revision",
  "pages": [
   {
    "id": "cover",
@@ -30,7 +31,7 @@
   {
    "id": "p02",
    "n": 3,
-   "title": "The peak is full; the growth is in the hours between the peaks",
+   "title": "The peak is full; growth lies in the hours between peaks",
    "exhibit": "text",
    "architecture": "text",
    "why": "The whole plan turns on one observation, which deserves a page of its own before the evidence",
@@ -43,7 +44,7 @@
   {
    "id": "s1",
    "n": 4,
-   "title": "01 / Where ridership stands",
+   "title": "Where ridership stands",
    "kind": "section",
    "exhibit": "text",
    "architecture": "text",
@@ -52,7 +53,7 @@
   {
    "id": "p03",
    "n": 5,
-   "title": "Journeys recovered to 48 million but stalled 4 million below the FY20 peak",
+   "title": "Journeys recovered to 48 million but stalled 4 million below peak",
    "exhibit": "chart.line",
    "architecture": "evidence-only",
    "why": "The claim is the shape of the recovery - a steep rebound and then a plateau short of the FY20 peak - so the break and the stall are marked where they happen",
@@ -65,7 +66,7 @@
   {
    "id": "p03b",
    "n": 6,
-   "title": "Northvale's journeys have recovered more slowly than all five regional peers since FY19",
+   "title": "Northvale's journeys recovered more slowly than all five regional peers",
    "exhibit": "chart.line",
    "architecture": "evidence-with-commentary",
    "why": "Whether the stall is Northvale's or the market's is settled by setting its recovery against every peer's from the same base year",
@@ -78,7 +79,7 @@
   {
    "id": "p04",
    "n": 7,
-   "title": "Peak trains run above 90% full on every line; off-peak trains run under half",
+   "title": "Peak trains run above 90% full; off-peak trains run under half",
    "exhibit": "paired",
    "architecture": "paired-evidence",
    "why": "One question - how full are the trains - answered for the peak and the off-peak on the same five lines, side by side",
@@ -101,7 +102,7 @@
    "anchors": [],
    "highlight": [
     "27% below Westmoor",
-    "The gap is off-peak",
+    "hourly on three of its five",
     "7 million journeys"
    ],
    "insight": "none"
@@ -109,7 +110,7 @@
   {
    "id": "p06",
    "n": 9,
-   "title": "Leisure is two thirds of off-peak travel but only a seventh of the peak",
+   "title": "Leisure is two thirds of off-peak travel, a seventh of the peak",
    "exhibit": "chart.stacked-column",
    "architecture": "evidence-with-commentary",
    "why": "The claim is how the mix of trip purposes differs between the peak, the off-peak and the weekend, each resolving to 100%",
@@ -128,7 +129,7 @@
   {
    "id": "p06b",
    "n": 10,
-   "title": "Saturday Dales trains leave Leeds 97% full at 10:00, fuller than the weekday peak",
+   "title": "Saturday Dales trains leave Leeds 97% full, fuller than the weekday peak",
    "exhibit": "photo-backdrop",
    "architecture": "picture-led",
    "why": "The claim is about a place and the people who travel to it, so the evidence sits on the Dales themselves",
@@ -149,7 +150,7 @@
   {
    "id": "p07",
    "n": 11,
-   "title": "Half-hourly off-peak stations grew off-peak journeys 3.7 times as fast as hourly ones",
+   "title": "Half-hourly stations grew off-peak journeys 3.7 times as fast as hourly",
    "exhibit": "chart.scatter",
    "architecture": "evidence-with-commentary",
    "why": "The claim is that two measures move together across the stations - off-peak frequency and off-peak growth - so each station is one point",
@@ -159,8 +160,8 @@
    "anchors": [],
    "highlight": [
     "16.5% on average",
-    "2",
-    "30 trains"
+    "cannot explain",
+    "half-hourly service is the threshold"
    ],
    "insight": "none"
   },
@@ -180,7 +181,7 @@
   {
    "id": "p07b",
    "n": 13,
-   "title": "Northvale's cost per train-km is ninth of twenty, £3.40 above the lowest-cost operator",
+   "title": "Northvale's cost per train-km ranks ninth of twenty, £3.40 above the lowest",
    "exhibit": "chart.bar",
    "architecture": "evidence-with-commentary",
    "why": "The claim is where Northvale's unit cost sits in the whole field of regional operators, so all twenty are sorted and Northvale marked",
@@ -197,9 +198,22 @@
    "insight": "none"
   },
   {
-   "id": "p08",
+   "id": "p07d",
    "n": 14,
-   "title": "The Eastern line carries the most journeys at the highest cost per train-km",
+   "title": "Northvale's punctuality swings more month to month than any of six peers",
+   "exhibit": "chart.boxplot",
+   "architecture": "evidence-with-commentary",
+   "why": "The claim is about how far Northvale's punctuality swings month to month against its peers, which one figure per operator would hide, so each operator's spread is drawn",
+   "pageType": "ranking/boxplot",
+   "commentary": "so-what-bar",
+   "annotation": "highlight",
+   "anchors": [],
+   "insight": "band"
+  },
+  {
+   "id": "p08",
+   "n": 15,
+   "title": "The Eastern line carries most journeys at the highest cost per train-km",
    "exhibit": "table",
    "architecture": "evidence-only",
    "why": "Five measures per line are looked up and compared under their units, and no single chart would hold all five",
@@ -213,8 +227,8 @@
   },
   {
    "id": "s2",
-   "n": 15,
-   "title": "02 / What holds it back",
+   "n": 16,
+   "title": "What holds it back",
    "kind": "section",
    "exhibit": "text",
    "architecture": "text",
@@ -222,8 +236,8 @@
   },
   {
    "id": "p09",
-   "n": 16,
-   "title": "Hybrid working cost 7.1 million journeys; housing and timetable changes won back 5.0 million",
+   "n": 17,
+   "title": "Hybrid working cost 7.1m journeys; housing and timetables won back 5.0m",
    "exhibit": "chart.waterfall",
    "architecture": "reconciliation",
    "why": "The change from the FY20 peak to FY26 is made of five reconciled drivers, each of which the plan treats differently",
@@ -235,8 +249,8 @@
   },
   {
    "id": "p10",
-   "n": 17,
-   "title": "Each peak train added to the Eastern line has cost a point of punctuality",
+   "n": 18,
+   "title": "Each extra Eastern line peak train has cost a point of punctuality",
    "exhibit": "paired",
    "architecture": "paired-evidence",
    "why": "Two measures of the same line over the same years - trains added and punctuality lost - only prove the claim read together",
@@ -253,8 +267,8 @@
   },
   {
    "id": "p10b",
-   "n": 18,
-   "title": "Four constraints hold the peak where it is: fleet, crews, track and depot",
+   "n": 19,
+   "title": "Four constraints cap the peak: fleet, crews, track and depot",
    "exhibit": "text",
    "architecture": "card-grid",
    "why": "Four separate constraints each cap the peak on their own, and each needs its own evidence and its own number, so they read down the page as a diagnosis",
@@ -275,9 +289,22 @@
    "insight": "none"
   },
   {
+   "id": "p03c",
+   "n": 20,
+   "title": "The Eastern line has recovered least since the pandemic",
+   "exhibit": "chart.sparklines",
+   "architecture": "evidence-with-commentary",
+   "why": "Six lines moved differently after the pandemic, and the question is which of them recovered, so each line gets its own small plot over the same eight years",
+   "pageType": "trend/sparklines",
+   "commentary": "so-what-bar",
+   "annotation": "highlight",
+   "anchors": [],
+   "insight": "band"
+  },
+  {
    "id": "p11",
-   "n": 19,
-   "title": "Frequency drives a loop: shorter waits win leisure trips that fund the next train",
+   "n": 21,
+   "title": "Frequency drives a loop: shorter waits win trips that fund more trains",
    "exhibit": "cycle",
    "architecture": "cycle",
    "why": "Off-peak growth is a loop in which each turn funds the next, so it is drawn as a cycle rather than a list",
@@ -294,7 +321,7 @@
   },
   {
    "id": "p12",
-   "n": 20,
+   "n": 22,
    "title": "The Dales and Valley lines can grow now; the Coast line cannot",
    "exhibit": "table",
    "architecture": "matrix",
@@ -309,8 +336,8 @@
   },
   {
    "id": "p13",
-   "n": 21,
-   "title": "Passengers name the wait, not the fare, as what keeps them off trains",
+   "n": 23,
+   "title": "Passengers name the wait, not the fare, as what keeps them away",
    "exhibit": "rows",
    "architecture": "matrix",
    "why": "Three survey findings each need their evidence and their consequence for the plan, one finding to a row",
@@ -322,8 +349,8 @@
   },
   {
    "id": "p13b",
-   "n": 22,
-   "title": "Northvale gives the smallest off-peak discount of nine operators: 18% against a 35% median",
+   "n": 24,
+   "title": "Northvale's 18% off-peak discount is the smallest of nine operators",
    "exhibit": "chart.bar",
    "architecture": "evidence-with-commentary",
    "why": "Where Northvale's off-peak discount stands among all nine operators is the claim, so the whole set is ranked with Northvale marked and the implication set in a bar beneath it",
@@ -335,7 +362,7 @@
   },
   {
    "id": "p14",
-   "n": 23,
+   "n": 25,
    "title": "Lapsed riders blame the hourly service, not the fare, for driving instead",
    "exhibit": "quote-cluster",
    "architecture": "text",
@@ -348,7 +375,7 @@
   },
   {
    "id": "p15",
-   "n": 24,
+   "n": 26,
    "title": "Three corridors serve three different markets, each needing its own timetable",
    "exhibit": "picture-strip",
    "architecture": "picture-led",
@@ -371,8 +398,8 @@
   },
   {
    "id": "s3",
-   "n": 25,
-   "title": "03 / The plan",
+   "n": 27,
+   "title": "The plan",
    "kind": "section",
    "exhibit": "text",
    "architecture": "text",
@@ -380,8 +407,8 @@
   },
   {
    "id": "p16",
-   "n": 26,
-   "title": "Electrifying the Eastern line beats bi-mode trains on cost per journey from year six",
+   "n": 28,
+   "title": "Electrification beats bi-mode trains on cost per journey from year six",
    "exhibit": "compare",
    "architecture": "paired-evidence",
    "why": "The Eastern line decision is between two options compared on the same four terms: cost, timing, running cost and what each frees up",
@@ -393,7 +420,7 @@
   },
   {
    "id": "p16b",
-   "n": 27,
+   "n": 29,
    "title": "Electrification cuts 14 minutes from Leeds to Hull, adding 3.8 million journeys",
    "exhibit": "paired",
    "architecture": "paired-evidence",
@@ -405,8 +432,21 @@
    "insight": "none"
   },
   {
+   "id": "p16c",
+   "n": 30,
+   "title": "Zonal fares cut short trips; distance fares cut the long ones",
+   "exhibit": "chart.bar",
+   "architecture": "paired-evidence",
+   "why": "Fare reform is a choice between two structures, each judged by who pays more and who pays less, so the two sit side by side on the same bands",
+   "pageType": "options/two-up",
+   "commentary": "none",
+   "annotation": "highlight",
+   "anchors": [],
+   "insight": "none"
+  },
+  {
    "id": "p17",
-   "n": 28,
+   "n": 31,
    "title": "Four levers add 11.7 million journeys, led by the off-peak timetable",
    "exhibit": "cards",
    "architecture": "card-grid",
@@ -419,8 +459,8 @@
   },
   {
    "id": "p18",
-   "n": 29,
-   "title": "London and Manchester send three in five of the visitors from beyond the network",
+   "n": 32,
+   "title": "London and Manchester send three in five visitors from beyond the network",
    "exhibit": "map",
    "architecture": "evidence-with-commentary",
    "why": "Where the visitors come from is the claim, so the origin cities are drawn on the map, sized by the journeys they send, with their routes into Leeds",
@@ -438,8 +478,8 @@
   },
   {
    "id": "p19",
-   "n": 30,
-   "title": "The plan adds 11.7 million journeys a year by FY31, mostly after electrification",
+   "n": 33,
+   "title": "The plan adds 11.7 million journeys by FY31, mostly after electrification",
    "exhibit": "chart.line",
    "architecture": "hero-number-with-evidence",
    "why": "One number carries the plan - the journeys it adds - with the path to it underneath and the conditions beside it",
@@ -456,7 +496,7 @@
   },
   {
    "id": "p20",
-   "n": 31,
+   "n": 34,
    "title": "Fare revenue passes its FY20 level in FY29, carried by off-peak travel",
    "exhibit": "chart.stacked-column",
    "architecture": "evidence-only",
@@ -468,9 +508,22 @@
    "insight": "none"
   },
   {
+   "id": "p20b",
+   "n": 35,
+   "title": "The central case reaches 60 million journeys by FY31, the low 56.5",
+   "exhibit": "chart.column",
+   "architecture": "evidence-only",
+   "why": "The central case is a forecast the board will hold the plan to, so the path is read with the figures for each year under it",
+   "pageType": "trend/model",
+   "commentary": "on-exhibit",
+   "annotation": "callout",
+   "anchors": [],
+   "insight": "none"
+  },
+  {
    "id": "p21",
-   "n": 32,
-   "title": "The plan costs £640 million, mostly in FY28-FY29, and pays back in eleven years",
+   "n": 36,
+   "title": "The £640m plan peaks in FY28-FY29 and pays back in eleven years",
    "exhibit": "paired",
    "architecture": "paired-evidence",
    "why": "The cost of the plan has three parts the reader needs together - when it is spent, on what, and how quickly it pays back",
@@ -482,8 +535,8 @@
   },
   {
    "id": "p22",
-   "n": 33,
-   "title": "Grant covers just over half the cost; Northvale must borrow or earn the rest",
+   "n": 37,
+   "title": "Grant covers just over half the cost; Northvale must fund the rest",
    "exhibit": "chart.donut",
    "architecture": "evidence-with-commentary",
    "why": "The claim is what the £640 million of funding is made of, four parts of one total",
@@ -494,9 +547,22 @@
    "insight": "none"
   },
   {
+   "id": "p22c",
+   "n": 38,
+   "title": "Four in ten off-peak journeys are leisure trips",
+   "exhibit": "pictogram",
+   "architecture": "evidence-with-commentary",
+   "why": "The growth case rests on who is travelling off-peak and who lives near a station, which reads better as a count of people than as percentages",
+   "pageType": "composition/pictogram",
+   "commentary": "so-what-bar",
+   "annotation": "none",
+   "anchors": [],
+   "insight": "band"
+  },
+  {
    "id": "p22b",
-   "n": 34,
-   "title": "Northvale should borrow the £160 million gap, not cut the plan to its grant",
+   "n": 39,
+   "title": "Northvale should borrow the £160 million gap rather than cut the plan",
    "exhibit": "text",
    "architecture": "text",
    "why": "Whether to borrow or to cut is a judgement about risk and timing, which reads best as reasoning, with the recommendation held in the panel beside it",
@@ -508,8 +574,8 @@
   },
   {
    "id": "s4",
-   "n": 35,
-   "title": "04 / Delivering it",
+   "n": 40,
+   "title": "Delivering it",
    "kind": "section",
    "exhibit": "text",
    "architecture": "text",
@@ -517,7 +583,7 @@
   },
   {
    "id": "p23",
-   "n": 36,
+   "n": 41,
    "title": "Electrification sets the critical path; the off-peak timetable starts in 2027 regardless",
    "exhibit": "gantt",
    "architecture": "gantt",
@@ -533,9 +599,22 @@
    "insight": "rule"
   },
   {
+   "id": "p23b",
+   "n": 42,
+   "title": "The plan funds the timetable now and electrification next",
+   "exhibit": "chart.horizons",
+   "architecture": "timeline",
+   "why": "The board is choosing a portfolio of bets that pay at different times, and each horizon says what is funded now for the journeys it brings later",
+   "pageType": "schedule/horizons",
+   "commentary": "so-what-bar",
+   "annotation": "none",
+   "anchors": [],
+   "insight": "band"
+  },
+  {
    "id": "p24",
-   "n": 37,
-   "title": "Four named owners carry one lever each, reporting monthly to the managing director",
+   "n": 43,
+   "title": "Four named owners carry one lever each and report monthly",
    "exhibit": "people",
    "architecture": "card-grid",
    "why": "Each lever has one accountable owner, and the reader needs to know who they are and what each is on the hook for",
@@ -552,9 +631,26 @@
    "insight": "none"
   },
   {
+   "id": "p24c",
+   "n": 44,
+   "title": "Northvale matches the best peer on reliability, not on frequency",
+   "exhibit": "chart.radar",
+   "architecture": "card-grid",
+   "why": "Passengers judge an operator on six attributes at once, and the shape of Northvale's profile against the best peer is the comparison",
+   "pageType": "profiles/radar",
+   "commentary": "below",
+   "annotation": "none",
+   "anchors": [],
+   "highlight": [
+    "2.1 against 4.4",
+    "fares"
+   ],
+   "insight": "none"
+  },
+  {
    "id": "p24b",
-   "n": 38,
-   "title": "Two dependencies can delay the plan: the grid connection and the Dales depot",
+   "n": 45,
+   "title": "Two dependencies can delay the plan: the grid connection and Dales depot",
    "exhibit": "text",
    "architecture": "card-grid",
    "why": "Two dependencies can each delay a lever on their own, and each has a measured cost of delay, so they read down the page with their evidence",
@@ -572,8 +668,8 @@
   },
   {
    "id": "p25",
-   "n": 39,
-   "title": "Two of seven 2027 milestones are at risk, both on the electrification path",
+   "n": 46,
+   "title": "Two of seven 2027 milestones are at risk, both on electrification",
    "exhibit": "table",
    "architecture": "matrix",
    "why": "Seven milestones are each judged on one criterion - on track or not - and the pattern of the red ones is the finding",
@@ -586,8 +682,8 @@
   },
   {
    "id": "p26",
-   "n": 40,
-   "title": "Service grows by a fifth while punctuality holds at 90% and unit cost falls",
+   "n": 47,
+   "title": "Service grows a fifth while punctuality holds at 90% and costs fall",
    "exhibit": "chart.column",
    "architecture": "metrics-over-evidence",
    "why": "Three numbers set the operating constraint the plan must hold, over the service growth that tests it",
@@ -599,7 +695,7 @@
   },
   {
    "id": "p27",
-   "n": 41,
+   "n": 48,
    "title": "Fare reform should follow the new timetable, not lead it",
    "exhibit": "text",
    "architecture": "text",
@@ -613,7 +709,7 @@
   },
   {
    "id": "p28",
-   "n": 42,
+   "n": 49,
    "title": "Five decisions put Northvale on the path to 60 million journeys",
    "exhibit": "text",
    "architecture": "text",

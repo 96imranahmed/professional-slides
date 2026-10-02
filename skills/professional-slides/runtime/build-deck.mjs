@@ -5,11 +5,17 @@
 //
 // Vendor-neutral: node for layout, python-pptx to emit, LibreOffice to render. Writes
 // scene.json, planning.json, deck.pptx, rendered/slide-N.png, montage.png, readback.json,
-// gates.json and build-result.json into out/. Exit codes (EXIT in review-passes.mjs):
-// 0 when nothing blocks (`built`, or `built-unrendered` with --no-render; advisories
-// are counted in the result), 2 when a blocker remains (`built-with-blockers`, each
-// listed in `blockers` - the deck is still written so it can be inspected), 1 on a
-// crash. A deck whose storyline gate is not ready builds, with a warning.
+// gates.json and build-result.json into out/. Exit codes (EXIT in errors.mjs):
+// 0 when nothing blocks (`built`, or `built-unrendered` with --no-render or with no
+// renderer installed; advisories are counted in the result), 2 when a blocker remains
+// (`built-with-blockers`, each listed in `blockers` - the deck is still written so it
+// can be inspected) or when the input is refused before anything is built (a
+// RefusalError: its message is printed, without a stack), 1 on a crash. A deck whose
+// storyline gate is not ready builds, with a warning.
+//
+// Stages that do not read each other's output run side by side: the scene's gates
+// beside the emitter, the readback beside the render, and the page gates, the density
+// profile and the review sheets together on the renders.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +23,8 @@ import { composeAll } from "./compose-all.mjs";
 import { coverageFindings } from "./compose.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
+import { RefusalError, registered } from "./errors.mjs";
+import { EXIT, UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJson } from "./cli.mjs";
 
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
@@ -31,10 +39,43 @@ import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
-import { EXIT } from "./review-passes.mjs";
 import { storylineWarning } from "./storyline.mjs";
+import { sceneDesignFindings } from "./validate-overlap.mjs";
+import { applyRulesVersion } from "./weight.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
+
+/** Why the build refused its input before building: the code a RefusalError carries. */
+export const REFUSAL_CODES = Object.freeze({
+  STAGE_CONTRACT: "the spec and its content or layout plan disagree on the deck's stable pages",
+  STAGE_MISSING: "a new deck arrived without the content or layout plan it is built from",
+  CONTENT_REJECTED: "the content plan failed its gates",
+  PLAN_REJECTED: "the layout plan failed its gates",
+  VARIETY_REJECTED: "the compiled pages break the variety contract",
+  TEXT_PLAN_CHANGED: "composition changed the text the content plan records",
+  CONTENT_LOST: "composition lost authored content or visual intent",
+});
+
+const refuse = (code, message, findings = []) => new RefusalError(registered(REFUSAL_CODES, code), message, findings);
+// Stages run side by side are all awaited before a failure is thrown, so no
+// process is left writing into the output directory after the build has ended.
+async function together(...stages) {
+  const settled = await Promise.allSettled(stages);
+  const failed = settled.find((s) => s.status === "rejected");
+  if (failed) throw failed.reason;
+  return settled.map((s) => s.value);
+}
+const isBlocking = (f) => !["advisory", "info"].includes(f.severity);
+
+/** `report` (a gates report) with `findings` added: counted by code, and failed by any that blocks. */
+export function withFindings(report, findings) {
+  if (!findings.length) return report;
+  const countsByCode = { ...(report.countsByCode || {}) };
+  for (const f of findings) countsByCode[f.code] = (countsByCode[f.code] || 0) + 1;
+  const blocks = findings.some(isBlocking);
+  return { ...report, findings: [...(report.findings || []), ...findings], countsByCode,
+    ...(blocks ? { passed: false, accepted: false } : {}) };
+}
 
 // New work must retain its approved storyline through authoring. Revisions can
 // carry partial plans; they still transfer semantic fields by stable ID only.
@@ -42,30 +83,34 @@ export function validateStageContract(spec, stages) {
   if (spec.workflow !== "new_deck") return;
   const pages = [...(spec.cover ? [{...spec.cover,id:"cover",kind:"cover"}] : []), ...spec.slides, ...(spec.appendix || [])];
   if (pages.some(s => !s.id) || new Set(pages.map(s => s.id)).size !== pages.length)
-    throw new Error("New decks require unique stable slide ids before composition");
+    throw refuse("STAGE_CONTRACT", "New decks require unique stable slide ids before composition");
   for (const stage of ["content", "plan"]) {
     const expected = stage === "content" && stages.content?.textContract !== "complete" ? spec.slides.filter(s => !s.kind || s.kind === "content") : pages;
     const records = stages[stage]?.pages || [];
     const byId = new Map(records.map(r => [r.id, r]));
     if (records.some(r => !r.id) || byId.size !== records.length
         || records.some(r => !pages.some(s => s.id === r.id)))
-      throw new Error(`${stage} plan requires unique known stable slide ids`);
+      throw refuse("STAGE_CONTRACT", `${stage} plan requires unique known stable slide ids`);
     for (const slide of expected) {
       const record = byId.get(slide.id);
       if (!record || record[stage === "content" ? "claim" : "title"] !== slide.title)
-        throw new Error(`${stage} plan is missing or has a changed title for ${slide.id}; reconcile the storyline before composition`);
+        throw refuse("STAGE_CONTRACT", `${stage} plan is missing or has a changed title for ${slide.id}; reconcile the storyline before composition`);
     }
   }
   const first = spec.slides.find(s => !s.kind || s.kind === "content");
   const summary = s => s.role === "executive-summary" || s.shape === "executive-summary";
   const section = spec.slides.findIndex(s => s.kind === "section" || s.kind === "divider");
   if (!first || !summary(first) || (section >= 0 && spec.slides.indexOf(first) > section))
-    throw new Error("New decks require an opening executive summary before the first section");
+    throw refuse("STAGE_CONTRACT", "New decks require an opening executive summary before the first section");
 }
 
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = process.env.RUNTIME_PYTHON || "python3", fetchLogos = true } = {}) {
+/** The flags that tell a Python gate which rules the deck predates (weight.json rules). */
+const rulesArgs = (spec) => [...(spec.workflow ? ["--workflow", String(spec.workflow)] : []),
+  ...(Number.isFinite(Number(spec.rulesVersion)) && spec.rulesVersion !== null && spec.rulesVersion !== "" ? ["--rules-version", String(spec.rulesVersion)] : [])];
+
+export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true } = {}) {
   const started = Date.now();
-  const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
+  const spec = await readJson(specPath);
   const stem = deckStem(spec);
   const baseDir = path.dirname(path.resolve(specPath));
   // The declared players' logos load themselves: reused from assets/logos/,
@@ -79,44 +124,40 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
-  // throw. A deck that fails to compose leaves no output of its own, so whatever
-  // is on disk afterwards is the *previous* run - and a build loop that reads
-  // gates.json after the build reads a pass that belongs to a deck that no
-  // longer exists. That masked a broken example deck here for four commits.
+  // throw: a deck that fails to compose leaves no output of its own, and a
+  // report left on disk from an earlier run would read as this deck's pass.
   await clearReports(directory);
+  const timings = {};
+  const fetchedMs = Date.now() - started;
+  // Every subprocess is timed under its own name; stages that run side by side
+  // are each timed whole, so their sum can exceed the wall time.
+  const timed = async (name, work) => { const t = Date.now(); try { return await work(); } finally { timings[name] = Date.now() - t; } };
+  const py = (name, args, options = {}) => timed(name, () => runProcess(python, args, { timeoutMs, ...options }));
 
   // The stages before this one, gated - and, when they are absent, said to be
-  // absent.
-  //
-  // `content_gates.mjs` and `plan_gates.mjs` were wired into nothing: a grep for
-  // either returned one hit, a sentence in a reference file. A gate nobody runs
-  // on a file nobody writes is not a gate, and that is how a deck reached a
-  // reader with one chart in fifty pages while the gate that measures exactly
-  // that sat in the repository, passing, unrun.
-  //
-  // So the build looks for them beside the spec, runs whichever it finds, and
-  // records `absent` for whichever it does not. A deck built with no content
-  // plan is allowed - not every page of a rebuild needs one - but the build
-  // output says so, which is the difference between a stage that was skipped
-  // and a stage that does not exist.
-  const result = { status: "planned", outputDirectory: directory, timings: {}, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
+  // absent. The build looks for the content and layout plans beside the spec,
+  // runs the gates of whichever it finds, and records `absent` for whichever it
+  // does not. A deck built with no content plan is allowed - not every page of a
+  // rebuild needs one - but the build output says the stage did not happen.
+  const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
+  if (fetchedMs > 50) timings.assetsMs = fetchedMs;
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
     const at = path.join(baseDir, `${stem}${suffix}`);
-    const raw = await fs.readFile(at, "utf8").catch(() => null);
-    if (raw === null && spec.workflow === "new_deck") throw new Error(`New decks require ${at} before composition`);
-    if (raw === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
-    const parsed = JSON.parse(raw);
+    const parsed = await readJson(at, { optional: true });
+    if (parsed === null && spec.workflow === "new_deck") throw refuse("STAGE_MISSING", `New decks require ${at} before composition`);
+    if (parsed === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
     if (stage === "content" && spec.workflow === "new_deck") parsed.textContract = "complete";
-    const report = run(parsed, {required:stage === "content" && spec.workflow === "new_deck"});
+    // The deck's workflow and rules version decide which rules it predates.
+    const report = run(parsed, { required: stage === "content" && spec.workflow === "new_deck", deck: spec });
     const reportAt = path.join(directory, `${stage}-gates.json`);
-    await fs.writeFile(reportAt, JSON.stringify(report, null, 2) + "\n");
+    await writeJson(reportAt, report);
     result.stages[stage] = { state: report.accepted ? "accepted" : "rejected", report: reportAt,
                              countsByCode: report.countsByCode ?? {} };
     if (!report.accepted) {
-      throw new Error(`${stage} gates rejected ${path.basename(at)}: `
-        + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`);
+      throw refuse(stage === "content" ? "CONTENT_REJECTED" : "PLAN_REJECTED", `${stage} gates rejected ${path.basename(at)}: `
+        + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`, (report.findings || []).filter(isBlocking));
     }
     stages[stage] = parsed;
   }
@@ -126,29 +167,30 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // chosen page by page in its pages file (author-deck.mjs); this refuses a long
   // deck whose pages were never typed, whose compiled structure was edited by
   // hand, or whose choices add up to one page repeated. It is the same check
-  // the author ran, so a deck that compiled passes it here.
+  // the author ran, so a deck that compiled passes it here. A rule the deck
+  // predates is reported beside it as an advisory.
   const variety = varietyFindings(spec, { structureOf, drawnOf });
+  const varietyBlockers = variety.filter(isBlocking);
   if (variety.length) {
     const reportAt = path.join(directory, "variety-gates.json");
-    await fs.writeFile(reportAt, JSON.stringify({ accepted: false, findings: variety }, null, 2) + "\n");
-    result.stages.variety = { state: "rejected", report: reportAt };
-    throw new Error(`The variety contract rejected ${path.basename(specPath)}: ${variety.map((f) => f.code).join(", ")}. `
-      + `${variety[0].repair} See ${reportAt}.`);
+    await writeJson(reportAt, { accepted: !varietyBlockers.length, findings: variety });
+    result.stages.variety = { state: varietyBlockers.length ? "rejected" : "accepted", report: reportAt, advisories: variety.length - varietyBlockers.length };
+  } else result.stages.variety = { state: "accepted" };
+  if (varietyBlockers.length) {
+    throw refuse("VARIETY_REJECTED", `The variety contract rejected ${path.basename(specPath)}: ${varietyBlockers.map((f) => f.code).join(", ")}. `
+      + `${varietyBlockers[0].repair} See ${result.stages.variety.report}.`, varietyBlockers);
   }
-  result.stages.variety = { state: "accepted" };
 
-  // The content stage stops being a checkpoint and becomes an input.
-  //
-  // It records one highlight per page - "the phrase the reader should see
-  // first" - and the build gated the file and then discarded it, so the phrase
-  // reached nothing. A page that does not name its own highlight takes the one
-  // its content plan named, matched by stable ID so insertions cannot move emphasis to another slide.
+  // The content plan is an input as well as a checkpoint: it records one
+  // highlight per page, the phrase the reader should see first. A page that
+  // does not name its own highlight takes the one its content plan named,
+  // matched by stable ID so insertions cannot move emphasis to another slide.
   if (stages.content?.pages?.length) {
     const byId = new Map([...(spec.cover ? [{...spec.cover,id:"cover",kind:"cover"}] : []), ...spec.slides, ...(spec.appendix || [])].filter(s => s.id).map(s => [s.id, s]));
     const seen = new Set();
     for (const page of stages.content.pages) {
       if (!page.id) continue; // Legacy plans are audited but never transferred by position.
-      if (seen.has(page.id) || !byId.has(page.id)) throw new Error(`Content plan has duplicate or unknown slide id: ${page.id}`);
+      if (seen.has(page.id) || !byId.has(page.id)) throw refuse("STAGE_CONTRACT", `Content plan has duplicate or unknown slide id: ${page.id}`);
       seen.add(page.id);
       const slide = byId.get(page.id);
       const phrase = String(page.highlight ?? "").trim();
@@ -157,33 +199,38 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   }
 
   // Every failing page reported in one run (compose-all.mjs).
+  const planStarted = Date.now();
   const { deck, decisions } = composeAll(spec, baseDir);
   // An evaluation of the skill is judged on a deck long enough to show its
-  // rhythm, repetition and weakest page; a short one is a diagnostic. The rule
-  // lived in the skill's prose and nothing held a deck to it, so three
-  // evaluation decks in a row came out at twenty pages.
+  // rhythm, repetition and weakest page; a short one is a diagnostic.
   if (spec.purpose === "evaluation" && deck.slides.length < EVALUATION_MIN_PAGES) {
-    throw new Error(`EVALUATION_TOO_SHORT: an evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${deck.slides.length}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
+    // The page gates' code (gate_config.py COMPOSE_CODES), refused here before anything is emitted.
+    throw new RefusalError("EVALUATION_TOO_SHORT", `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${deck.slides.length}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
   }
   const contentAudit = auditContent(spec, deck);
-  const textAudit = auditTextPlan(stages.content || {}, deck);
-  await fs.writeFile(path.join(directory, "text-coverage.json"), JSON.stringify(textAudit, null, 2) + "\n");
-  if (!textAudit.accepted) throw new Error(`Composition changed the dot-dash text: ${JSON.stringify(textAudit.findings)}`);
-  await fs.writeFile(path.join(directory, "content-audit.json"), JSON.stringify(contentAudit, null, 2) + "\n");
-  if (!contentAudit.accepted) throw new Error(`Composition lost authored content or visual intent: ${JSON.stringify(contentAudit.findings)}`);
+  const textAudit = auditTextPlan(stages.content || {}, deck, { deck: spec });
+  await writeJson(path.join(directory, "text-coverage.json"), textAudit);
+  if (!textAudit.accepted) throw refuse("TEXT_PLAN_CHANGED", `Composition changed the dot-dash text: ${JSON.stringify(textAudit.findings)}`, textAudit.findings);
+  await writeJson(path.join(directory, "content-audit.json"), contentAudit);
+  if (!contentAudit.accepted) throw refuse("CONTENT_LOST", `Composition lost authored content or visual intent: ${JSON.stringify(contentAudit.findings)}`, contentAudit.findings);
   const scenePath = path.join(directory, "scene.json");
+  // Compact: the scene runs to megabytes and only programs read it.
   await fs.writeFile(scenePath, JSON.stringify(deck));
-  await fs.writeFile(path.join(directory, "planning.json"), JSON.stringify(decisions, null, 2) + "\n");
+  await writeJson(path.join(directory, "planning.json"), decisions);
   Object.assign(result, { scenePath, slides: deck.slides.length, metrics: metricsBackend() });
   // The claim ledger the author works through before the review (references/taste-review.md#self-check).
   result.claims = (await writeLedger(directory)).counts;
-  result.timings.planMs = Date.now() - started;
+  timings.planMs = Date.now() - planStarted;
 
-  // Story gates need only the scene (titles, words, hedges, monotony).
+  // Story gates need only the scene (titles, words, hedges, monotony), so they
+  // run beside the emitter, which needs only the scene too.
   const gates = path.join(runtime, "gates", "page_gates.py");
   const preflightReport = path.join(directory, "preflight-gates.json");
-  const pre = await runProcess(python, [gates, scenePath, "--report", preflightReport], { timeoutMs, expect: [0, 2] });
-  result.preflight = { ...(await readJson(preflightReport)), report: preflightReport, passed: pre.code === 0 };
+  const pptxPath = path.join(directory, `${stem}.pptx`);
+  const [pre, emitted] = await together(
+    py("preflightMs", [gates, scenePath, "--report", preflightReport, ...rulesArgs(spec)], { expect: [0, 2] }),
+    preflight ? null : py("emitMs", [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath]));
+  result.preflight = { ...(await readReport(preflightReport)), report: preflightReport, passed: pre.code === 0 };
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
   // Deck craft floors, read off the spec and the composed scene. A blocker
@@ -192,47 +239,60 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   if (craft.length) {
     result.preflight.findings = [...(result.preflight.findings || []), ...craft];
     for (const f of craft) result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), [f.code]: ((result.preflight.countsByCode || {})[f.code] || 0) + 1 };
-    if (craft.some((f) => f.severity === "blocker")) { result.preflight.passed = false; result.preflight.accepted = false; }
+    if (craft.some(isBlocking)) { result.preflight.passed = false; result.preflight.accepted = false; }
   }
-  await fs.writeFile(preflightReport, JSON.stringify(result.preflight, null, 2) + "\n");
-  if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory); }
+  // The scene's design checks (validate-overlap.mjs): a label a line runs
+  // through, a label on a neighbour's edge, a numeral whose descender sits on
+  // its rule, a scatter with no key. They read the composed geometry, so they
+  // are reported with the page gates before the render, and in gates.json after it.
+  const design = applyRulesVersion(sceneDesignFindings(deck), spec);
+  result.preflight = withFindings(result.preflight, design);
+  await writeJson(preflightReport, result.preflight);
+  if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
 
-  const pptxPath = path.join(directory, `${stem}.pptx`);
-  const t1 = Date.now();
-  const emitted = await runProcess(python, [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath], { timeoutMs });
   result.emit = lastJson(emitted.stdout);
   result.pptxPath = pptxPath;
-  result.timings.emitMs = Date.now() - t1;
 
-  const t2 = Date.now();
-  const readback = await runProcess(python, [path.join(runtime, "emit", "readback_pptx.py"), scenePath, pptxPath], { timeoutMs, expect: [0, 2] });
+  // The readback reads the saved file and the render converts it: neither
+  // reads the other's output.
+  const renderDirectory = path.join(directory, "rendered");
+  const [readback, rendered] = await together(
+    py("readbackMs", [path.join(runtime, "emit", "readback_pptx.py"), scenePath, pptxPath], { expect: [0, 2] }),
+    render ? py("renderMs", [path.join(runtime, "emit", "render_pptx.py"), pptxPath, renderDirectory], { expect: [0, RENDERER_MISSING] }) : null);
   result.readback = lastJson(readback.stdout);
-  await fs.writeFile(path.join(directory, "readback.json"), JSON.stringify(result.readback, null, 2) + "\n");
-  result.timings.readbackMs = Date.now() - t2;
+  await writeJson(path.join(directory, "readback.json"), result.readback);
 
-  if (render) {
-    const t3 = Date.now();
-    const renderDirectory = path.join(directory, "rendered");
-    const rendered = await runProcess(python, [path.join(runtime, "emit", "render_pptx.py"), pptxPath, renderDirectory, "--montage"], { timeoutMs });
+  if (rendered) {
     result.render = lastJson(rendered.stdout);
-    result.textCoverage = auditExportText(stages.content || {}, deck, await readJson(result.render.pageText));
-    await fs.writeFile(path.join(directory, "rendered-text-coverage.json"), JSON.stringify(result.textCoverage, null, 2) + "\n");
-    result.renderDirectory = renderDirectory;
-    result.montagePath = result.render?.montage;
-    result.timings.renderMs = Date.now() - t3;
-    const t4 = Date.now();
-    const gateReport = path.join(directory, "gates.json");
-    const gated = await runProcess(python, [gates, scenePath, renderDirectory, "--report", gateReport], { timeoutMs, expect: [0, 2] });
-    result.gates = { ...(await readJson(gateReport)), report: gateReport, passed: gated.code === 0 };
-    result.timings.gatesMs = Date.now() - t4;
-    // The density profile: the rendered pages measured against the skill's
-    // density targets. It fails nothing; the review's density pass
-    // reads it and judges every page it flags (references/taste-review.md).
-    const profileReport = path.join(directory, "density-profile.json");
-    const contentAt = path.join(baseDir, `${stem}.content.json`);
-    const withContent = result.stages.content?.state === "accepted" ? [contentAt] : [];
-    const profiled = await runProcess(python, [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport], { timeoutMs });
-    result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout) };
+    if (rendered.code === RENDERER_MISSING) {
+      // No LibreOffice or poppler: the deck is written and every scene gate
+      // has run; the pixel gates and the review sheets are skipped, and the
+      // result says what to install. Delivery still requires a rendered build.
+      result.renderSkipped = result.render?.message ?? "The deck was not rendered: the renderer is not installed.";
+    } else {
+      result.textCoverage = auditExportText(stages.content || {}, deck, await readReport(result.render.pageText), { deck: spec });
+      await writeJson(path.join(directory, "rendered-text-coverage.json"), result.textCoverage);
+      result.renderDirectory = renderDirectory;
+      // The page gates, the density profile and the review sheets each read
+      // the renders and nothing else, so they run together.
+      const gateReport = path.join(directory, "gates.json");
+      const profileReport = path.join(directory, "density-profile.json");
+      const contentAt = path.join(baseDir, `${stem}.content.json`);
+      const withContent = result.stages.content?.state === "accepted" ? [contentAt] : [];
+      const [gated, profiled, sheets] = await together(
+        py("gatesMs", [gates, scenePath, renderDirectory, "--report", gateReport, ...rulesArgs(spec)], { expect: [0, 2] }),
+        // The density profile: the rendered pages measured against the
+        // skill's density targets. A page's flags are the review's density
+        // pass to judge (references/taste-review.md); the deck's words a block
+        // across its prose pages blocks (TEXT_FRAGMENTED).
+        py("densityMs", [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport, ...rulesArgs(spec)]),
+        py("sheetsMs", [path.join(runtime, "emit", "render_pptx.py"), "--sheets", renderDirectory]));
+      result.gates = withFindings({ ...(await readReport(gateReport)), report: gateReport, passed: gated.code === 0 }, design);
+      if (design.length) { const { report: _, passed: __, ...written } = result.gates; await writeJson(gateReport, written); }
+      result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout), findings: (await readReport(profileReport)).findings ?? [] };
+      Object.assign(result.render, lastJson(sheets.stdout) ?? {});
+      result.montagePath = result.render?.montage;
+    }
   }
   // The deck's budget, in one block: what its pages carry against the
   // reference targets, so a regression is a number in the build output
@@ -250,18 +310,12 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     };
   }
   Object.assign(result, buildOutcome(result, { render }));
-  return finish(result, directory);
+  return finish(result, directory, started);
 }
 
-/**
- * The build's status, read off its blockers alone. Advisories - a thin page, a
- * flat mix, an unannotated plot - are the review's to judge: they are counted
- * beside the status, never in it. The status used to be `built-with-findings`
- * for any shortfall, and the one line the build prints listed the advisory
- * counts beside it, so a build held back by eighteen numbers lost from the
- * rendered text read as a build held back by five advisories. Every blocker
- * is now listed with its source, and only a blocker makes the build exit 2.
- */
+// render_pptx.py's exit when LibreOffice or poppler is not installed.
+const RENDERER_MISSING = 3;
+
 // The blockers the build names when a report failed without a finding of its own.
 export const BUILD_CODES = Object.freeze({
   READBACK_MISSING: "the saved file was not read back, so nothing says it matches the scene",
@@ -269,6 +323,12 @@ export const BUILD_CODES = Object.freeze({
   GATES_FAILED: "the rendered page gates failed without naming a finding",
 });
 
+/**
+ * The build's status, read off its blockers alone. Advisories - a thin page, a
+ * flat mix, an unannotated plot - are the review's to judge: they are counted
+ * beside the status, never in it. Every blocker is listed with its source, and
+ * only a blocker makes the build exit 2.
+ */
 export function buildOutcome(result, { render = true } = {}) {
   const blockers = [], seen = new Set();
   const add = (source, f) => {
@@ -284,12 +344,13 @@ export function buildOutcome(result, { render = true } = {}) {
   if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
   if (result.readback?.accepted !== true) {
     for (const f of result.readback?.findings || []) add("readback", f);
-    if (!(result.readback?.findings || []).length) add("readback", { code: "READBACK_MISSING" });
+    if (!(result.readback?.findings || []).length) add("readback", { code: registered(BUILD_CODES, "READBACK_MISSING") });
   }
   if (result.textCoverage?.accepted === false) for (const f of (result.textCoverage.findings || []).filter(blocking)) add("rendered text", f);
+  for (const f of (result.densityProfile?.findings || []).filter(blocking)) add("density profile", f);
   // A report that failed without naming a finding is still a blocker.
-  if (result.preflight?.passed === false && !(result.preflight.findings || []).some(blocking)) add("page gates", { code: "PREFLIGHT_FAILED" });
-  if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: "GATES_FAILED" });
+  if (result.preflight?.passed === false && !(result.preflight.findings || []).some(blocking)) add("page gates", { code: registered(BUILD_CODES, "PREFLIGHT_FAILED") });
+  if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: registered(BUILD_CODES, "GATES_FAILED") });
   // The scene's gates run twice, before the render and after it, so a code
   // counts as often as either run saw it, not the sum.
   const counts = (report) => (report?.findings || []).filter((f) => !blocking(f)).reduce((m, f) => ({ ...m, [f.code]: (m[f.code] || 0) + 1 }), {});
@@ -299,7 +360,9 @@ export function buildOutcome(result, { render = true } = {}) {
   return { status, blockers, advisories };
 }
 
-async function readJson(file) { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return {}; } }
+// A gate that stopped before writing its report leaves none: read as empty,
+// and its exit code decides.
+const readReport = async (file) => (await readJson(file, { optional: true })) ?? {};
 
 // The build's own outputs, in the order it writes them. Nothing else in the
 // directory is touched: the renders keep their own folder and a spec sitting
@@ -318,31 +381,35 @@ async function clearReports(directory) {
   await Promise.all(BUILD_REPORTS.map((name) => fs.rm(path.join(directory, name), { force: true })));
 }
 
-async function finish(result, directory) {
-  result.timings.totalMs = Object.values(result.timings).reduce((a, b) => a + b, 0);
-  await fs.writeFile(path.join(directory, "build-result.json"), JSON.stringify(result, null, 2) + "\n");
+async function finish(result, directory, started) {
+  // Wall time, start to finish: stages that ran side by side are timed whole,
+  // so their sum is not how long the build took.
+  result.timings.wallMs = Date.now() - started;
+  await writeJson(path.join(directory, "build-result.json"), result);
   return result;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
-  if (args.length < 2) { console.error("Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]"); process.exit(EXIT.error); }
-  try {
-    const pythonIndex = args.indexOf("--python");
-    if (pythonIndex >= 0 && (!args[pythonIndex + 1] || args[pythonIndex + 1].startsWith("--"))) throw new Error("--python requires an executable");
-    const result = await buildDeck(path.resolve(args[0]), path.resolve(args[1]), { preflight: args.includes("--preflight"), render: !args.includes("--no-render"), fetchLogos: !args.includes("--no-fetch"), python: pythonIndex < 0 ? undefined : args[pythonIndex + 1] });
-    // Blockers by name, advisories by count: the line says what stops the
-    // build and, separately, what the review will read.
-    const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
-    console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
-    // Built, but not yet through the storyline gate: said here, not enforced -
-    // delivery refuses the deck until the gate is ready, and the build is how
-    // the copy gets drafted and checked before then.
-    const story = await storylineWarning(JSON.parse(await fs.readFile(path.resolve(args[0]), "utf8")), path.resolve(args[1]));
-    if (story) console.error(story);
-    process.exit(["built", "built-unrendered", "preflight-passed"].includes(result.status) ? EXIT.ok : EXIT.refused);
-  } catch (error) {
-    console.error(error.stack || error.message);
-    process.exit(EXIT.error);
-  }
+const USAGE = "Usage: build-deck.mjs spec.json output-directory [--preflight] [--no-render] [--no-fetch]";
+
+async function main(argv) {
+  const { values, positionals } = parseCli(argv, { preflight: { type: "boolean" }, "no-render": { type: "boolean" }, "no-fetch": { type: "boolean" },
+    python: { type: "string", valueName: "an executable" } }, { usage: USAGE });
+  if (positionals.length < 2) throw new UsageError(USAGE);
+  const [specPath, outDirectory] = positionals.map((p) => path.resolve(p));
+  const result = await buildDeck(specPath, outDirectory, { preflight: values.preflight, render: !values["no-render"], fetchLogos: !values["no-fetch"], python: values.python });
+  // Blockers by name, advisories by count: the line says what stops the
+  // build and, separately, what the review will read.
+  const blockers = result.blockers?.length ? { count: result.blockers.length, byCode: result.blockers.reduce((m, b) => ({ ...m, [b.code]: (m[b.code] || 0) + 1 }), {}), first: result.blockers.slice(0, 8).map((b) => `${b.code}${b.id ?? b.slide ? ` [${b.id ?? b.slide}]` : ""} (${b.source})${b.text ? ` "${String(b.text).slice(0, 40)}"` : ""}`) } : undefined;
+  console.log(JSON.stringify({ status: result.status, ...(blockers ? { blockers } : {}), advisories: result.advisories, stages: Object.fromEntries(Object.entries(result.stages || {}).map(([k, v]) => [k, v.state])), pptx: result.pptxPath, montage: result.montagePath, ...(result.renderSkipped ? { renderSkipped: result.renderSkipped } : {}), gates: result.gates ? { passed: result.gates.passed, counts: result.gates.countsByCode } : undefined, budget: result.budget, readback: result.readback?.accepted, textCoverage: result.textCoverage?.accepted, timings: result.timings }));
+  if (result.renderSkipped) console.error(result.renderSkipped);
+  // Built, but not yet through the storyline gate: said here, not enforced -
+  // delivery refuses the deck until the gate is ready, and the build is how
+  // the copy gets drafted and checked before then.
+  const story = await storylineWarning(await readJson(specPath), outDirectory, { deckPath: specPath });
+  if (story) console.error(story);
+  return ["built", "built-unrendered", "preflight-passed"].includes(result.status) ? EXIT.ok : EXIT.refused;
 }
+
+// A refusal is the author's to repair: its message is the whole story. A crash
+// is ours, and keeps its stack (runCli).
+if (isMain(import.meta.url)) runCli(main);

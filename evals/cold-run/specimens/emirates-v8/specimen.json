@@ -1,0 +1,100 @@
+{
+ "schema": "professional-slides.cold-run-specimen/v2",
+ "$comment": "A 55-page evaluation storyline whose plan cleared every plan gate while the storyline critique rated it 5/10 with three blockers and a revise verdict. It stops at the plan - no deck was built - so it is scored on its plan alone. It is the plan gates' known blind spot kept in view: consistency of numbers across pages and a governing answer the pages do not prove are invisible to them.",
+ "name": "emirates-v8",
+ "brief": "brief.md",
+ "ran": "2026-09-26",
+ "outcome": {
+  "delivered": false,
+  "storylineReview": {
+   "verdict": "revise",
+   "rating": 5,
+   "blockers": 3,
+   "majors": 102,
+   "minors": 36
+  }
+ },
+ "foundByLooking": [
+  {
+   "pages": [
+    2,
+    53,
+    54
+   ],
+   "defect": "The answer's conditions are stated four different ways across the answer, the summary, the scorecard and the takeaway.",
+   "why": "The plan gates read page shapes and exhibit families; none compares the conditions the answer names with the ones later pages test.",
+   "fix": "One list of conditions, used verbatim wherever the deck states or tests them; a storyline-critique check."
+  },
+  {
+   "pages": [
+    8,
+    36,
+    41,
+    51
+   ],
+   "defect": "Two different load factors are both called 'load factor', so the same measure reads 64.9% on two pages and 78.4% on two others.",
+   "why": "No gate reads a named measure across pages.",
+   "fix": "Label and date each figure by its basis; a claims-level consistency check across pages."
+  },
+  {
+   "pages": [
+    37,
+    44,
+    45,
+    48,
+    53
+   ],
+   "defect": "A rival's fleet and order book differ on every page that states them.",
+   "why": "Same blind spot: numbers are checked against records one page at a time.",
+   "fix": "One reconciled figure per quantity, with its date and boundary."
+  },
+  {
+   "pages": [
+    7,
+    14,
+    16,
+    28,
+    29,
+    36,
+    37,
+    42,
+    44,
+    50,
+    51
+   ],
+   "defect": "About a dozen titles are counts or rankings with no implication, so the title spine stalls from section 02 onwards.",
+   "why": "PLAN_TITLE_LENGTH measures how long a title is, not whether it states a finding.",
+   "fix": "A title that states what the count means for the answer."
+  }
+ ],
+ "inputs": {
+  "pages": {
+   "file": "pages.json",
+   "sha256": "1eb102a4dfa01635a049ad594d1d6d6a517169caefc6f2f240496246b5aca25c"
+  },
+  "plan": {
+   "file": "plan.json",
+   "sha256": "3a67767d54422fdf702a065947e1864a1310a37f064266b5cddb651f66837a1c"
+  }
+ },
+ "recorded": {
+  "weightSha256": "163bed8f23b6ec9effe931046609323ec7ce0caa57fefe940804d35f28f09979",
+  "stamped": "2026-09-29",
+  "verdict": {
+   "accepted": true,
+   "plan": {
+    "accepted": true,
+    "countsByCode": {
+     "PLAN_CHART_MONOTONY": 1,
+     "PLAN_EXHIBIT_RUN": 1,
+     "PLAN_EXHIBIT_VARIETY": 1,
+     "PLAN_NO_ICONS": 1,
+     "PLAN_TABLE_DEPTH": 1,
+     "PLAN_TABLE_MONOTONY": 1,
+     "PLAN_TITLE_LENGTH": 1
+    }
+   },
+   "build": null
+  }
+ }
+}

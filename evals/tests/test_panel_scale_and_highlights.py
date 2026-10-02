@@ -29,7 +29,7 @@ import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs
 import { nativeChartSpec } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const S = { kind: 'comparison', what: 'The operator annual reports' };
-const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S };
+const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S, adds: 'The commentary names the mechanism the exhibit cannot show' };
 const compose = (pages) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: pages.map((p, i) => compilePage(p, i)) }, '.').deck.slides;
 const error = (fn) => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } };
 const years = ['FY17','FY18','FY19','FY20','FY21','FY22','FY23','FY24','FY25','FY26'];
@@ -152,7 +152,7 @@ class BridgeCalloutTests(unittest.TestCase):
 const notes = [{ category: 'Fares', text: 'Yield and volume lifted fare income by 2.9m' },
   { category: 'Staff', text: 'Staff costs up 11% as headcount reached 5,900' }, { category: 'Other costs', text: 'Access, energy and leasing charges rose' }];
 const page = (commentary, annotations, extra) => ({ ...base, id: 'b' + commentary + annotations.length, type: 'bridge', form: 'waterfall', commentary, ...extra,
-  title: 'Operating profit rose only GBP0.5m this year as staff and other costs absorbed gains',
+  title: 'Operating profit rose only GBP0.5m as staff and other costs absorbed gains',
   exhibit: { heading: 'Operating profit, FY25 to FY26', unit: 'm', categories: ['FY25', 'Fares', 'Energy', 'Depreciation', 'Staff', 'Other costs', 'FY26'],
     values: [22197, 2915, 1374, 1602, -2129, -3237, 22722], totals: [0, 6], annotations } });
 const rail = { rail: 'Fares, cheaper energy and longer train lives added 5.9m; staff and other costs took 5.4m of it, and staff costs will recur.' };

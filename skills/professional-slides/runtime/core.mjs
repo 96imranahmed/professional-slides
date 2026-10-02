@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import { resolvePalette, heatScaleTokens, contrastRatio } from "./palettes.mjs";
+import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
+import { contrastRatio } from "./color.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 import { lineBox, accentRuns } from "./text-layout.mjs";
@@ -55,12 +56,6 @@ export function configureChrome(overrides) {
   Object.assign(CHROME, next);
   return { ...CHROME };
 }
-// 12-column grid inside the 1160px content width: 12 × 82 + 11 × 16.
-export const GRID = Object.freeze({ columns: 12, column: 82, gutter: 16 });
-export function gridSpan(columns, start = 0) {
-  if (!Number.isInteger(columns) || columns < 1 || columns > GRID.columns || start < 0 || start + columns > GRID.columns) throw new Error(`Invalid grid span ${start}+${columns}`);
-  return { x: CHROME.left + start * (GRID.column + GRID.gutter), width: columns * GRID.column + (columns - 1) * GRID.gutter };
-}
 
 const colour = (cssVar, value, themeSlot = null) => ({ kind: "color", cssVar, value, themeSlot });
 const length = (cssVar, value) => ({ kind: "lengthPx", cssVar, value });
@@ -108,6 +103,9 @@ export const TOKENS = Object.freeze({
   "font.display": font("--font-display", "Arial"),
   "font.serif": font("--font-serif", "Georgia"),
   "type.deckTitle": point("--type-deck-title", 32),
+  // The consulting cover's title: a step over the deck title, so the cover
+  // reads as the deck's first statement rather than an action title set low.
+  "type.coverTitle": point("--type-cover-title", 40),
   "type.actionTitle": point("--type-action-title", 24),
   "type.actionTitleLong": point("--type-action-title-long", 22),
   "type.sectionTitle": point("--type-section-title", 24),
@@ -192,10 +190,9 @@ export function readableOn(color, surface, ratio = 4.5) {
 
 /**
  * The reversed white or the ink, whichever reads better on `fill` (a token or
- * a "#rrggbb" colour): type set on a mark, a tile or a band. Ten places asked
- * this with three rules - the stronger of the two, ink unless ink fell under
- * 4.5:1, white unless white did - so one fill could take white in a chart and
- * ink in the table beside it.
+ * a "#rrggbb" colour): type set on a mark, a tile or a band. One rule for every
+ * caller, so a fill never takes white in a chart and ink in the table beside
+ * it.
  */
 export function onFill(fill) {
   const value = typeof fill === "string" && fill.startsWith("#") ? fill : tokenValue(fill);
@@ -207,7 +204,7 @@ export function onFill(fill) {
  * `phrases` inside `text` as runs on a filled surface: in the accent where the
  * accent reads on `fill` at `ratio` (no fill: it always does), else by weight -
  * the sentence regular and the phrase bold, which is the emphasis reversed
- * type can carry (a red accent on a red bar dropped the phrase outright).
+ * type can carry (a red accent on a red bar loses the phrase outright).
  * `accent` says which was chosen; null when no phrase occurs.
  */
 export function emphasisRuns(text, phrases, fill = null, ratio = 4.5) {
@@ -236,7 +233,7 @@ export const DENSITY_PROFILES = Object.freeze({
   appendix: Object.freeze({ typeScale: 0.84 })
 });
 // Page chrome keeps its size at every density so hierarchy ratios survive the knob.
-const DENSITY_FIXED = new Set(["type.deckTitle", "type.actionTitle", "type.actionTitleLong", "type.sectionTitle", "type.sectionNumber", "type.source", "type.quoteMark", "type.quoteMarkHero"]);
+const DENSITY_FIXED = new Set(["type.deckTitle", "type.coverTitle", "type.actionTitle", "type.actionTitleLong", "type.sectionTitle", "type.sectionNumber", "type.source", "type.quoteMark", "type.quoteMarkHero"]);
 const snapHalfPoint = (value) => Math.round(value * 2) / 2;
 
 export function resolveDensityTokens(baseTokens, density = "executive") {
@@ -496,9 +493,8 @@ function alignPeerHeaders(children, widths, registry, group = () => 0) {
     // A heading band is shared by every peer that starts where this one does,
     // whether or not it inks a rule. A panel on a ground does its separating
     // with the ground and draws no rule; that is a decision about what is
-    // drawn, and it used to drop the panel out of the row's shared band, so a
-    // heading that wrapped beside it left the two panels' contents on
-    // different lines.
+    // drawn, not about the band: out of it, a heading that wraps beside the
+    // panel would leave the two panels' contents on different lines.
     if (!own) return node;
     const peers = headers.filter((header, i) => header && group(children[i]) === group(node) && Math.abs(header.top - own.top) < 0.01);
     const headerBandHeight = Math.max(own.height, ...peers.map(header => header.height));
@@ -637,12 +633,11 @@ function placement(node, frame) {
 /**
  * The most height a node can use at this width, or null when it can use any.
  *
- * A `fill` child took whatever its column left over, and a component with a
- * natural height - a table, a wave roadmap, a row of cards, a gantt - could not
- * use it: it drew at its size at the top of the frame and the rest became a
- * band between the exhibit and the commentary under it (the Emirates roadmap
- * page had 180px of nothing there), or a card box two-fifths empty. Stretching
- * the drawing to the frame was worse - table rows at 2.5x. So a component that
+ * A component with a natural height - a table, a wave roadmap, a row of cards,
+ * a gantt - drawn at its size at the top of a `fill` frame leaves the rest as a
+ * band between the exhibit and the commentary under it, or a card box
+ * two-fifths empty; stretching the drawing to the frame is worse - table rows
+ * at 2.5x. So a component that
  * knows how far it can grow legibly says so (`measureCeiling`: its natural
  * height plus the rhythm it can add - row padding, a type step, item spacing),
  * the column gives it that much, and the slack becomes the page's bottom
@@ -967,7 +962,7 @@ function seriesValues(props = {}) {
 
 /**
  * How a highlight with no `style` is drawn. On a one-series bar chart it is
- * the bar itself in the accent: a pale band behind a dark bar left the subject
+ * the bar itself in the accent: a pale band behind a dark bar leaves the subject
  * of a forty-member ranking - and of every column of an aligned-bars page -
  * hard to find, where the same row painted in the accent is the first thing
  * seen. Elsewhere (grouped or stacked bars and columns) the band behind the
@@ -975,7 +970,7 @@ function seriesValues(props = {}) {
  * spec below and the composer's row rules all read this one rule.
  */
 export function defaultHighlightStyle(componentId, props = {}) {
-  // Columns follow bars: a year marked by a tint behind a dark column read as
+  // Columns follow bars: a year marked by a tint behind a dark column reads as
   // the same colour as its neighbours.
   return ["chart.bar", "chart.column"].includes(componentId) && Array.isArray(props.series) && props.series.length === 1 ? "bar" : "region-tint";
 }
@@ -1033,17 +1028,17 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if (props.categoryIcons || props.seriesGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   const categories = [...(props.categories || props.labels || [])];
-  // The category labels the scene drew are the ones PowerPoint prints. A
-  // ten-year line the scene labelled FY17, FY20, FY23, FY26 came out of the
-  // native chart with all ten, rotated, and the export audit read six labels
-  // the page never planned. `tickLblSkip` says the same to PowerPoint but
-  // LibreOffice ignores it, so the labels the scene left out are blank in the
-  // chart's categories (emit_pptx.py); the values keep their rows.
+  // The category labels the scene drew are the ones PowerPoint prints: a
+  // ten-year line the scene labels FY17, FY20, FY23, FY26 would otherwise come
+  // out of the native chart with all ten, rotated. `tickLblSkip` says the same
+  // to PowerPoint but LibreOffice ignores it, so the labels the scene left out
+  // are blank in the chart's categories (emit_pptx.py); the values keep their
+  // rows.
   const drawnCategories = new Set((renderedNodes || []).filter(node => node.role === "category-label").map(node => String(node.data?.category ?? node.text)));
   const hiddenCategoryIndices = renderedNodes && drawnCategories.size && drawnCategories.size < categories.length
     ? categories.map((category, index) => drawnCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
-  // Likewise the values: a forty-row ranking labels the rows it names, and the
-  // native chart printed all forty values over one another.
+  // Likewise the values: a forty-row ranking labels the rows it names, where
+  // the native chart would print all forty values over one another.
   const labelledCategories = new Set((renderedNodes || []).filter(node => node.role === "data-label" && node.data?.category !== undefined).map(node => String(node.data.category)));
   const hiddenLabelIndices = renderedNodes && labelledCategories.size && labelledCategories.size < categories.length && Array.isArray(props.series) && props.series.length === 1
     ? categories.map((category, index) => labelledCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
@@ -1066,15 +1061,18 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // The drawn chart has already chosen one precision for its labels; the
   // native chart prints the same, rather than re-deriving it and drifting.
   const drawnLabels = (renderedNodes || []).filter(node => node.role === "data-label" && typeof node.text === "string");
-  const labelDecimals = drawnLabels.length
-    ? Math.max(...drawnLabels.map(node => node.text.match(/\d\.(\d+)/)?.[1].length ?? 0)) : null;
+  const places = drawnLabels.map(node => node.text.match(/\d\.(\d+)/)?.[1].length ?? 0);
+  // A label printed to the precision the page's copy quotes (value-format.mjs
+  // quotedDecimals) differs from its neighbours; a series carries one number
+  // format natively, so that chart stays drawn.
+  if (new Set(places).size > 1 && Array.isArray(props.quotedFigures) && props.quotedFigures.length) return null;
+  const labelDecimals = drawnLabels.length ? Math.max(...places) : null;
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   // A two-mark contrast paints one peer in the primary and the other grey, and
   // which one is the scene's decision (charts.mjs defaultFocusIndex: the named
-  // focus, else the latest period, else the first). The emitter used to grey
-  // the second series and colour the first, so a "2019 | 2024" chart drawn
-  // right in the scene came out backwards in PowerPoint. It now paints the mark
-  // the scene painted.
+  // focus, else the latest period, else the first). The emitter paints the mark
+  // the scene painted, so a "2019 | 2024" chart reads the same way round in
+  // PowerPoint.
   const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
   const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
   const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
@@ -1116,9 +1114,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
 }
 
 /**
- * Map every item, collecting every failure rather than stopping at the first.
- * A deck with six broken pages used to take six builds to learn so; now one
- * run names them all, each with its page. `label(item, index)` names the page.
+ * Map every item, collecting every failure rather than stopping at the first,
+ * so one run names every broken page, not one a build. `label(item, index)`
+ * names the page.
  */
 export function mapAll(items, fn, label = (item, index) => item?.id ?? `slide-${index + 1}`) {
   const results = [], errors = [];
@@ -1167,7 +1165,11 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
     if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
     const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
     const density = slideSpec.density ?? "executive";
-    const slideTokens = resolveDensityTokens(designTokens, density);
+    // A chart that steps its labels down (planner.mjs chartDensity) takes the
+    // chart sizes of that step; the page's other type keeps the page's.
+    const chartTokens = slideSpec.chartDensity ? resolveDensityTokens(designTokens, slideSpec.chartDensity) : null;
+    const slideTokens = Object.fromEntries(Object.entries(resolveDensityTokens(designTokens, density))
+      .map(([tokenId, definition]) => [tokenId, chartTokens && tokenId.startsWith("type.chart") ? chartTokens[tokenId] : definition]));
     return withDesignTokens(slideTokens, () => {
     if (slideSpec.palette !== undefined) throw new Error("Palette belongs to the deck, not individual slides");
     if (slideSpec.typography !== undefined) throw new Error("Typography belongs to the deck, not individual slides");

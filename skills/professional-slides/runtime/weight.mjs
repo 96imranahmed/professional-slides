@@ -4,8 +4,8 @@
  * Density is not the defect; empty is. A well-made page runs a median of about
  * 185 words of page text (title, labels, table cells, footnotes included), two
  * or three evidence elements, a commentary column that reaches the bottom of
- * its track. Our pages were running half of that, so the runtime now carries an
- * explicit weight contract and the gates measure against it.
+ * its track. The runtime carries that as an explicit weight contract, and the
+ * gates measure against it.
  *
  * The contract resolves in three steps, so one deck, one house or one template
  * can all set it and every page in that deck is judged the same way:
@@ -16,22 +16,18 @@
  *   3. the deck's `fill` level (full / balanced / airy), which follows `density`
  *
  * Every number is a floor a page must reach, never a ceiling: the ceiling on
- * prose is the WORDS gate, and it has not moved.
+ * prose is the WORDS gate.
  *
  * The numbers themselves live in weight.json, which the Python gates read too.
  * There is one copy of the contract, so a floor cannot move in the composer
  * without moving in the finding that reports it.
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readJsonSync } from "./cli.mjs";
 
-const CONTRACT = Object.freeze(JSON.parse(readFileSync(fileURLToPath(new URL("./weight.json", import.meta.url)), "utf8")));
+const CONTRACT = Object.freeze(readJsonSync(new URL("./weight.json", import.meta.url)));
 
 export const WEIGHT_KEYS = Object.freeze(Object.keys(CONTRACT.keys));
-
-/** What each key floors, in one line - the same text the docs and gates use. */
-export const WEIGHT_KEY_DOC = Object.freeze({ ...CONTRACT.keys });
 
 /**
  * Defaults by fill level. `airy` turns the floors off: a live-pitch page is
@@ -93,7 +89,70 @@ export const REFERENCE = Object.freeze({
   judged: Object.freeze({ ...CONTRACT.reference.judged, byFamily: Object.freeze({ ...CONTRACT.reference.judged.byFamily }) }),
 });
 
+/**
+ * The plan-stage thresholds (weight.json `plan`): the mix bands, the craft
+ * floors and the text form. The Node gates read them here and nowhere else, so
+ * a band moved in the file moves in every gate that reads it.
+ */
+export const PLAN = CONTRACT.plan;
+
+/** How long a deck must be before each deck-wide rule reads it (weight.json `deckLength`). */
+export const DECK_LENGTH = Object.freeze({ ...CONTRACT.deckLength });
+
+/** The rules version this runtime enforces, and the map of which rules each version introduced. */
+export const RULES_VERSION = CONTRACT.rulesVersion;
+export const RULES = CONTRACT.rules;
+
+/** The version a rule began to block in; a rule no version names is older than versioning (1). */
+export function ruleIntroduced(rule) {
+  for (const [version, rules] of Object.entries(RULES.introduced)) if (rules.includes(rule)) return Number(version);
+  return 1;
+}
+
+/**
+ * The rules a deck is not held to: for a deck revised under the revision
+ * workflow that records an older `rulesVersion`, every rule introduced after
+ * it. Empty for every other deck, including one that records no version.
+ */
+export function waivedRules(deck = {}) {
+  const version = Number(deck?.rulesVersion);
+  if (deck?.workflow !== RULES.revisionWorkflow || !Number.isFinite(version) || version >= RULES_VERSION) return new Set();
+  return new Set(Object.entries(RULES.introduced).filter(([v]) => Number(v) > version).flatMap(([, rules]) => rules));
+}
+
+/**
+ * The rule a finding breaks: its code, or `CODE.tightened` when `measured`
+ * falls between a bar a rules version lowered and the bar before it
+ * (rules.tightened; page_gates.py rule_of reads the same).
+ */
+export function ruleOf(code, measured) {
+  const tightened = RULES.tightened?.[code];
+  return tightened && typeof measured === "number" && Number.isFinite(measured) && measured <= tightened.before ? `${code}.tightened` : code;
+}
+
+/**
+ * The rule `code` (at `measured`) breaks when `deck` predates it, or null when
+ * the deck is held to it: what a compile refusal asks before it is thrown.
+ */
+export function predatedRule(deck, code, measured, waived = waivedRules(deck)) {
+  const rule = ruleOf(code, measured);
+  return waived.has(rule) || waived.has(code) ? rule : null;
+}
+
+/**
+ * `findings` with every rule the deck predates reported as an advisory, and
+ * marked with the version that introduced it. A finding names its rule as
+ * `rule` where only one variant of its code blocks, and by its code otherwise.
+ */
+export function applyRulesVersion(findings, deck = {}) {
+  const waived = waivedRules(deck);
+  if (!waived.size) return findings;
+  return findings.map((f) => {
+    const rule = f.rule ?? ruleOf(f.code, f.measured);
+    if (!(waived.has(rule) || waived.has(f.code)) || !["blocker", "blocking"].includes(f.severity)) return f;
+    return { ...f, severity: "advisory", waived: { rulesVersion: Number(deck.rulesVersion), introducedIn: ruleIntroduced(rule) } };
+  });
+}
+
 /** The page's three bands, as a reference analytical slide carries them. */
 export const REFERENCE_PAGE_BANDS = Object.freeze({ ...REFERENCE.slides.bands });
-/** Page text across analytical pages, for the distribution the DECK_FLAT gate reads. */
-export const REFERENCE_PAGE_WORDS = Object.freeze({ ...REFERENCE.benchmark });

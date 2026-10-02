@@ -175,7 +175,8 @@ const chart={{type:'chart.column',heading:'Deal value',unit:'$B',categories:['20
   series:[{{name:'PE',values:[42,37,30]}},{{name:'VC',values:[19,12,7]}}]}};
 // A model page tabulates its own chart without being asked.
 const model=composeSlide({{id:'s01',title:'T',shape:'model-page',exhibit:chart}},0);
-assert.equal(model.density,'pre-read');
+// The shape sets no size of its own: the page takes the deck's one body size.
+assert.equal(model.density,undefined);
 assert.equal(model.items.filter((i)=>i.id==='s01-exhibit').length,0,'the chart stacked over its table');
 // The page's own density still wins over the shape's default.
 assert.equal(composeSlide({{id:'s02',title:'T',shape:'model-page',density:'executive',exhibit:chart}},1).density,'executive');

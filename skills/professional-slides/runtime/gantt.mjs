@@ -10,8 +10,7 @@
 //   today?: 4.5,                              // period index (fractional) for the vertical line
 //   labelWidth?: px
 // }
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { token, tokenValue, stableId, textPrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
 import { measureAt, fillRect } from "./draw.mjs";
 
 const v = (id) => tokenValue(token(id));
@@ -76,16 +75,13 @@ function milestoneLabelSpan(L, ms, gridRight) {
 /**
  * Where a bar's own label goes, measured against everything else on its row.
  *
- * The label was set inside the bar whenever it fitted the bar's width, with
- * nothing looking at what else crossed the bar: on the Emirates 777X plan the
- * dashed Today line ran through "None in service" so that it read "Now in
- * service", and a milestone diamond or its label at the bar's end could land
- * on the text the same way. The row's marks are now obstacles - the Today
- * line, each milestone diamond and each milestone label - and the label takes
- * the first place it fits on one line clear of all of them: inside the bar
- * (white, bold) in the first clear stretch, else after the bar, else before
- * it (grey). A label with no clear place is still set inside the bar, as it
- * was, rather than dropped.
+ * The row's marks are obstacles - the Today line, each milestone diamond and
+ * each milestone label - since a mark across the label can change what it
+ * says: a dashed Today line through "None in service" reads "Now in service".
+ * The label takes the first place it fits on one line clear of all of them:
+ * inside the bar (white, bold) in the first clear stretch, else after the bar,
+ * else before it (grey). A label with no clear place is set inside the bar
+ * rather than dropped.
  */
 function barLabelPlacement(L, row, bx, bw, x0, gridRight, props) {
   const pad = v("space.2"), clear = v("space.1");
@@ -202,7 +198,7 @@ export function registerGantt(registry) {
     render: (input) => ({ nodes: ganttNodes(input) }),
     measureContent: ({ frame, props }) => ({ height: ganttLayout({ ...frame, height: Number.MAX_SAFE_INTEGER / 4 }, props).naturalHeight }),
     // Rows grow to twice their natural height and the schedule then centres
-    // in whatever is left, which under a full-width plan put the spare above
+    // in whatever is left, which under a full-width plan puts the spare above
     // and below it - a gap between the plan and its commentary. The column
     // gives it the grown height and keeps the rest as the page's margin.
     measureCeiling: ({ frame, props }) => { const L = ganttLayout(frame, props); return L.height + L.todayRow; },

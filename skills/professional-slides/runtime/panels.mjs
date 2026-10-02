@@ -3,14 +3,17 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
-const FONT = token("font.body"), DISPLAY = token("font.display");
+const FONT = token("font.body");
+// Metric values and agenda numbers are figures: the body face, bold, whose
+// digits line up (the display serif's old-style figures do not).
+const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
@@ -45,10 +48,9 @@ export function cardsLayout(frame, props, rhythm = 0) {
   const items = normalizeCards(props);
   const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
-  // Only the tones below draw one. A deck asked for four cards with an icon
-  // each under `tone: "header"`, got four cards and no icons, and nothing said
-  // so - the page looked finished and the authored intent was gone. An icon a
-  // tone cannot draw is refused here rather than dropped.
+  // Only the tones below draw one. An icon a tone cannot draw is refused here
+  // rather than dropped: a page that loses its icons silently looks finished
+  // with the authored intent gone.
   if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon)) {
     throw new Error(
       `cards tone "${tone}" does not draw icons; use ${ICON_CARD_TONES.join(" or ")} for an icon per card, `
@@ -122,10 +124,8 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   const natural = cardsLayout(frame, props);
   if (natural.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
   // Cards are as tall as their copy, at the top of their frame, the copy
-  // starting under the box's top edge. They used to grow to half as much
-  // again as they needed and centre the copy in the box, so four cards
-  // running the page's height carried 80px of air above every icon and as
-  // much under the last line: the short group centred in its region that the
+  // starting under the box's top edge: cards grown past their copy with the
+  // copy centred carry air above every icon and under the last line, which the
   // columns check reads as a hole. The room goes to the card's rhythm first -
   // the gaps between icon, title, figure and text open by up to 12px each -
   // and what is left is the frame's, below the row, for the flow to give to
@@ -175,7 +175,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       const ry = y + m.title.height + v("space.2");
       nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
       // The rule separates two columns of type, so it ends where the type
-      // does. Drawn to the card's height it ran a quarter of its length past
+      // does. Drawn to the card's height it runs a quarter of its length past
       // the last line on both sides, dividing nothing.
       if (index) {
         const written = Math.max(...L.items.map((entry) => entry.height));
@@ -288,12 +288,28 @@ function ringMetricNodes({ id, frame, props }) {
   // The value takes the largest type that fits inside the hole.
   let valueSize = "type.metric", value = null;
   for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
-    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(DISPLAY), fontSize: v(candidate), bold: true, wrapWidthRatio: 1 }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
+    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(FIGURES), fontSize: v(candidate), bold: true }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
   }
   if (!value) throw new Error("Ring metric is too small for its value; give the ring more room or shorten the value");
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
   return nodes;
+}
+
+/**
+ * The height a metric tile's value, label, sublabel and delta take at a width:
+ * what a column sizes the tile to when the number heads its points, so the
+ * first point sits under the number rather than under a fixed box's air.
+ */
+export function metricHeight(width, props) {
+  const pad = props.tone === "hero" ? 0 : v("space.3");
+  const inner = width - 2 * pad;
+  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  const gap = v("space.1");
+  const parts = [measureText(String(props.value ?? ""), inner, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true }).height,
+    ...(props.label ? [measure(props.label, inner, "type.compact").height] : []), ...(props.sublabel ? [measure(props.sublabel, inner, "type.label").height] : []),
+    ...(props.delta ? [measure(props.delta, inner, "type.label", true).height] : [])];
+  return parts.reduce((sum, h) => sum + h, 0) + gap * (parts.length - 1) + 2 * pad;
 }
 
 export function metricNodes({ id, frame, props }) {
@@ -302,6 +318,7 @@ export function metricNodes({ id, frame, props }) {
   // "ring": a share drawn as an accent arc around the value (a KPI ring).
   if (props.tone === "ring") return ringMetricNodes({ id, frame, props });
   if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
+  if (props.better !== undefined && !["up", "down"].includes(props.better)) throw new Error(`A metric's \`better\` is "up" or "down" (got ${JSON.stringify(props.better)}): the direction that is good news for the measure`);
   // "ink": a black tile with the value in the accent (a keynote stat row);
   // "rule": no tile, the value in the accent behind a hairline at the left (the
   // "51 | 443 | 39" stat row).
@@ -310,7 +327,7 @@ export function metricNodes({ id, frame, props }) {
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
   const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
-  const value = measureText(String(props.value), width, { fontFamily: tokenValue(DISPLAY), fontSize: v(valueSize), bold: true, wrapWidthRatio: 1 });
+  const value = measureText(String(props.value), width, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true });
   const labelLayout = props.label ? measure(props.label, width, "type.compact") : null;
   const sub = props.sublabel ? measure(props.sublabel, width, "type.label") : null;
   const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
@@ -321,9 +338,9 @@ export function metricNodes({ id, frame, props }) {
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
-  // No hairline before the tile. The rule was drawn as a divider between tiles
-  // - n tiles, n-1 rules - and on a row whose values are left-aligned over a
-  // label it does not read as a divider at all: it sits hard against the number
+  // No hairline before the tile. A rule drawn as a divider between tiles
+  // - n tiles, n-1 rules - on a row whose values are left-aligned over a
+  // label does not read as a divider at all: it sits hard against the number
   // that follows it and reads as a left border on that card. The tiles are
   // already a row of three peers on one baseline with a gap between them, which
   // is what makes them read as a set; a fence between them adds a device and
@@ -334,18 +351,22 @@ export function metricNodes({ id, frame, props }) {
   const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;
   const align = props.align ?? (hero || ruled ? "left" : "center");
   // Peers in a row start on one line. Centred in its own track, a tile with
-  // three lines against its neighbours' four began ten pixels lower, and three
-  // numbers read across came out as a visible step down.
+  // three lines against its neighbours' four would begin ten pixels lower, and
+  // three numbers read across would step visibly down.
   let y = hero || props.valign === "top" ? frame.y : frame.y + (frame.height - total) / 2;
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
   if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }
   if (sub) { y += gap; nodes.push(label(stableId(id, "sublabel"), "metric-sublabel", { x: frame.x + pad, y, width }, sub, text("type.label", grey, false, align))); y += sub.height; }
   if (delta) {
     y += gap;
-    const negative = /^\s*[-−▼↓]/.test(String(props.delta));
-    const positive = /^\s*[+▲↑]/.test(String(props.delta));
-    const color = dark ? WHITE : negative ? token("color.negative") : positive ? token("color.positive") : PRIMARY;
+    const falling = /^\s*[-−▼↓]/.test(String(props.delta));
+    const rising = /^\s*[+▲↑]/.test(String(props.delta));
+    // Coloured by merit, not by sign: a measure whose `better` is "down" - a
+    // cost, churn, a wait - reads its fall as the good news.
+    const better = props.better ?? "up";
+    const good = better === "up" ? rising : falling, bad = better === "up" ? falling : rising;
+    const color = dark ? WHITE : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
     nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text("type.label", color, true, align)));
   }
   return nodes;
@@ -411,7 +432,7 @@ export function agendaColumnsNodes({ id, frame, props }) {
   const measured = items.map((item, i) => {
     const active = i === props.active;
     const numeral = String(item.number ?? i + 1).padStart(2, "0");
-    const number = measureText(numeral, width, { fontFamily: tokenValue(DISPLAY), fontSize: v("type.quoteMark"), bold: true, wrapWidthRatio: 1 });
+    const number = measureText(numeral, width, { fontFamily: tokenValue(FIGURES), fontSize: v("type.quoteMark"), bold: true });
     const labelLayout = measure(item.label, width, "type.heading", active);
     const detail = item.detail ? measure(item.detail, width, "type.body") : null;
     return { numeral, number, labelLayout, detail, height: number.height + 20 + labelLayout.height + (detail ? 8 + detail.height : 0) };
@@ -424,7 +445,7 @@ export function agendaColumnsNodes({ id, frame, props }) {
     const numberColor = active ? ACCENT : dark ? token("color.chartGrid") : SECONDARY;
     const textColor = active ? (dark ? WHITE : INK) : dark ? token("color.chartGrid") : SECONDARY;
     let y = top;
-    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: DISPLAY, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
+    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: FIGURES, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
     y += number.height + 8;
     nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: x, y1: y, x2: x + width, y2: y, style: { stroke: active ? ACCENT : dark ? token("color.chartGrid") : RULE, lineWidth: token(active ? "line.standard" : "line.hairline") } }));
     y += 12;

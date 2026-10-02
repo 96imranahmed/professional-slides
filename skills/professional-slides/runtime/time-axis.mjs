@@ -1,13 +1,13 @@
 // Period labels read as dates, so a chart can space them by the time between them.
 //
-// A fifty-page deck plotted a company's run rate at Jan, Mar, Jun, Aug, Oct,
-// Dec, Feb, Apr, May and Jul - gaps of one to three months - one slot apart,
-// so the line steepened where the observations happened to bunch rather than
-// where the growth did. A line or an area is a statement about rate, and its
-// horizontal axis is elapsed time: the chart reads the labels as dates and
-// places each observation where it falls (charts.mjs); a column chart, whose
-// slots are categories, is refused irregular dates at compile unless its
-// heading says they are snapshots (page-types.mjs).
+// A run rate observed at Jan, Mar, Jun, Aug, Oct, Dec, Feb, Apr, May and Jul -
+// gaps of one to three months - and plotted one slot apart steepens where the
+// observations happen to bunch rather than where the growth does. A line or an
+// area is a statement about rate, and its horizontal axis is elapsed time: the
+// chart reads the labels as dates and places each observation where it falls
+// (charts.mjs); a column chart, whose slots are categories, is refused
+// irregular dates at compile unless its heading says they are snapshots
+// (page-types.mjs).
 //
 // Only forms that read one way are parsed: a year (2025, 2025E, FY25), a
 // quarter or half (Q1 2025, 1Q25, H2 2025), a month with its year (Jan 2025,
@@ -138,4 +138,29 @@ export function describeGaps(categories) {
   const noun = unit === 12 ? "year" : "month";
   const fmt = (v) => String(Math.round(v * 10) / 10);
   return `${fmt(lo)}-${fmt(hi)} ${noun}s`;
+}
+
+/**
+ * A year-and-month label as a reader writes it: "2025-08" is "Aug 25". The
+ * ISO form is a data key; thirteen of them under a line read as a table of
+ * codes. Any other label is returned as it came.
+ */
+export function readablePeriod(label) {
+  const m = /^((?:19|20)\d{2})[-/](0[1-9]|1[0-2])$/.exec(String(label ?? "").trim());
+  if (!m) return label;
+  const month = MONTHS[Number(m[2]) - 1];
+  return `${month[0].toUpperCase()}${month.slice(1)} ${m[1].slice(2)}`;
+}
+
+/**
+ * How many months apart a monthly axis labels its ticks: every month up to
+ * nine, a quarter up to two years, a half-year up to four, then a year. A
+ * label on each of thirteen months set them shoulder to shoulder; a quarterly
+ * tick reads the run at a glance and the line keeps every observation.
+ */
+export function monthlyLabelStep(categories) {
+  const times = periodTimes(categories);
+  if (!times || times.kind !== "month" || times.gaps.some((gap) => gap !== 1)) return 1;
+  const n = categories.length;
+  return n <= 9 ? 1 : n <= 25 ? 3 : n <= 49 ? 6 : 12;
 }

@@ -84,7 +84,7 @@ class DensityReviewTests(unittest.TestCase):
 import { validateDensityReview, reviewOutcome } from './skills/professional-slides/runtime/reviewer.mjs';
 const profile={flaggedPages:['s04','s09']};
 const deck='Blocks per page sit at the client median; words per block run light against the 56-word target.';
-const partial={accepted:true,findings:[],density:{deck,pages:[{slide:'s04',verdict:'right',reason:'A chart-led page with one line of takeaway, as the client pages set it.'}]}};
+const partial={accepted:true,rating:8.5,findings:[],density:{deck,pages:[{slide:'s04',verdict:'right',reason:'A chart-led page with one line of takeaway, as the client pages set it.'}]}};
 const full={...partial,density:{deck,pages:[...partial.density.pages,{slide:'s09',verdict:'too dense',reason:'The third point restates the title to clear the word floor.'}]}};
 console.log(JSON.stringify({missing:validateDensityReview(partial,profile),absent:validateDensityReview({accepted:true,findings:[]},profile),
   none:validateDensityReview({accepted:true,findings:[]},null), complete:validateDensityReview(full,profile),
@@ -97,6 +97,32 @@ console.log(JSON.stringify({missing:validateDensityReview(partial,profile),absen
         self.assertFalse(result["outcome"]["accepted"])
         self.assertEqual([b["code"] for b in result["outcome"]["blocking"]], ["DENSITY_MISMATCH"])
         self.assertTrue(result["passing"]["accepted"])
+
+    def test_a_right_verdict_on_a_page_outside_the_band_quotes_its_developed_point(self):
+        point = ("Four extra peak trains an hour since FY22 have coincided with a 5.1-point fall in Eastern line punctuality: "
+                 "each added train leaves less recovery time at the two single-track sections east of Selby, so one late train now delays the next three.")
+        result = run_node(f"""
+import {{ validateDensityReview, DEVELOPED_POINT_WORDS }} from './skills/professional-slides/runtime/reviewer.mjs';
+const profile = {{ flaggedPages: ['p10'], deck: {{ wordsPerBlock: {{ band: [41.3, 86.5] }} }},
+  pages: [{{ id: 'p10', task: 'chart-with-commentary', blocks: 6, wordsPerBlock: 22.5 }}, {{ id: 'p11', task: 'chart-led', blocks: 7, wordsPerBlock: 10.6 }}] }};
+const deck = 'Words per block run under the band strong prose pages keep, so the deck reads as labels in places.';
+const printed = {{ p10: 'Each extra Eastern line peak train has cost a point of punctuality\\n' + {json.dumps(point)} + '\\nOff-peak trains share none of that conflict.' }};
+const review = (entry) => ({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'right', reason: 'The first point develops the mechanism behind the fall in punctuality.', ...entry }}] }} }});
+console.log(JSON.stringify({{ words: DEVELOPED_POINT_WORDS,
+  bare: validateDensityReview(review({{}}), profile, null, printed),
+  quoted: validateDensityReview(review({{ point: {json.dumps(point)} }}), profile, null, printed),
+  invented: validateDensityReview(review({{ point: {json.dumps(point.replace("three", "four"))} }}), profile, null, printed),
+  label: validateDensityReview(review({{ point: 'Off-peak trains share none of that conflict.' }}), profile, null, printed),
+  thin: validateDensityReview({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'too thin', reason: 'Three labels and one sentence under a two-panel chart.' }}] }} }}, profile, null, printed),
+  led: validateDensityReview({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'right', reason: 'x'.repeat(30), point: {json.dumps(point)} }}, {{ slide: 'p11', verdict: 'right', reason: 'A chart-led page whose blocks are its labels.' }}] }} }}, profile, null, printed) }}));
+""")
+        self.assertEqual(result["words"], 40)
+        self.assertTrue(any("point" in e and "p10" in e for e in result["bare"]), result["bare"])
+        self.assertEqual(result["quoted"], [])
+        self.assertTrue(any("not on the page" in e for e in result["invented"]), result["invented"])
+        self.assertTrue(result["label"], "a label is not a developed point")
+        self.assertEqual(result["thin"], [], "only a verdict of right needs the point")
+        self.assertEqual(result["led"], [], "an exhibit-led page is not held to the prose band")
 
 
 class EvaluationLengthTests(unittest.TestCase):

@@ -20,19 +20,26 @@ RUNTIME = ROOT / "skills/professional-slides/runtime"
 
 class DonutLegendTests(unittest.TestCase):
     def test_a_composed_donut_names_its_categories_and_its_native_chart_keeps_the_legend(self):
+        # A composed donut names its slices at the rim by default (drawn, since
+        # PowerPoint cannot place rim labels); one that asks for a legend keeps
+        # it in the native chart.
         result = run_node("""
 import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
-const spec={schema:'professional-slides.deck/v3',id:'d',cover:{title:'x'},slides:[{title:'Two firms supply most of the judged pages',layout:'exhibit-full',
-  exhibit:{type:'chart.donut',heading:'Pages by firm',unit:'pages',labels:['BCG','McKinsey','Bain'],values:[75,52,5]}}]};
-const {deck}=planDeck(toDeckPlan(spec,'.'));
-const page=deck.slides.at(-1);
-const donut=page.componentInstances.find(c=>c.component==='chart.donut');
-console.log(JSON.stringify({variant:donut.variant,legend:page.nodes.filter(n=>n.role==='legend-label').map(n=>n.text),native:donut.nativeChart?.legend}));
+const build=(extra)=>{const spec={schema:'professional-slides.deck/v3',id:'d',cover:{title:'x'},slides:[{title:'Two firms supply most of the judged pages',layout:'exhibit-full',
+  exhibit:{type:'chart.donut',heading:'Pages by firm',unit:'pages',labels:['Firm A','Firm B','Firm C'],values:[75,52,5],...extra}}]};
+  const page=planDeck(toDeckPlan(spec,'.')).deck.slides.at(-1);
+  const donut=page.componentInstances.find(c=>c.component==='chart.donut');
+  return {variant:donut.variant,legend:page.nodes.filter(n=>n.role==='legend-label').map(n=>n.text),
+    rim:page.nodes.filter(n=>n.role==='category-label').map(n=>n.text.replace(/ \\d+%$/,'')),native:donut.nativeChart?.legend??null};};
+console.log(JSON.stringify({rim:build({}),keyed:build({legend:true})}));
 """)
-        self.assertEqual(result["variant"], "legend-top-right")
-        self.assertEqual(result["legend"], ["BCG", "McKinsey", "Bain"])
-        self.assertTrue(result["native"])
+        self.assertEqual(result["rim"]["variant"], "outside-labels")
+        self.assertEqual(result["rim"]["rim"], ["Firm A", "Firm B", "Firm C"])
+        self.assertIsNone(result["rim"]["native"])
+        self.assertEqual(result["keyed"]["variant"], "legend-top-right")
+        self.assertEqual(result["keyed"]["legend"], ["Firm A", "Firm B", "Firm C"])
+        self.assertTrue(result["keyed"]["native"])
 
 
 class HighlightWrapTests(unittest.TestCase):
@@ -100,7 +107,12 @@ console.log(JSON.stringify([3.55, -1.25, 2.345].map(v => formatValue(v, {valueFo
 class SeriesRoundingTests(unittest.TestCase):
     def test_the_native_label_format_matches_the_drawn_one(self):
         sys.path.insert(0, str(RUNTIME / "emit"))
-        from pptx import Presentation  # noqa: E402
+        # The emitter runs under this interpreter, so this interpreter is the
+        # one that needs python-pptx.
+        try:
+            from pptx import Presentation  # noqa: E402
+        except ModuleNotFoundError:
+            self.skipTest("needs python-pptx (python3 -m pip install -r requirements.txt)")
         scene = run_node("""
 import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';

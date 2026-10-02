@@ -1,65 +1,33 @@
 # Professional Slides
 
-Professional Slides is one Codex plugin for planning, creating, and revising decision-ready slide decks. Its single skill, `$professional-slides`, starts with the audience's question and the evidence needed to answer it, then carries the approved story through an editable PowerPoint file and rendered review. The repository root is the plugin root; there is no second plugin wrapper.
+Professional Slides is one plugin for planning and building decision-ready slide decks. Its single skill (`$professional-slides` in Codex, `professional-slides` in Claude Code) starts with the audience's question and the evidence needed to answer it, then carries the approved story through a new editable PowerPoint file and an independent rendered review. It also rebuilds or restructures an existing deck: the user's PPTX is imported and read, never edited, and the result is a new editable PPTX. It is a staged pipeline with checkpoints, not a quick editor: a typo, a colour or one chart in an arbitrary PPTX suits a generic pptx tool. The repository root is the plugin root; there is no second plugin wrapper.
 
 ## Use the skill
 
-Invoke `$professional-slides` with the audience, decision or learning objective, evidence and source limits, delivery context, output format, and any reference deck. The [skill entrypoint](skills/professional-slides/SKILL.md) selects one of three workflows:
+Invoke the skill with the audience, the decision or learning objective, the evidence and source limits, the delivery context and any reference deck. The [skill entrypoint](skills/professional-slides/SKILL.md) selects the workflow:
 
 | Workflow | What it does |
 | --- | --- |
-| New deck (`new_deck`) | Builds a hypothesis tree, exact title spine and complete dot-dash before layout. The authorized dot-dash becomes the content and design contract. |
-| Existing deck revision (`existing_deck_revision`) | Inventories the source deck slide by slide, then updates the affected claims and shared dependencies by stable slide ID. |
-| Individual slide revision | Edits the requested page and its dependencies while preserving unrelated slides. |
+| New deck (`new_deck`) | Builds a governing answer, MECE pillars and an exact title spine before layout, from data the skill finds and works into insights first. The approved ghost dot-dash becomes the content and design contract. |
+| Existing deck revision (`existing_deck_revision`) | Imports the user's PPTX (`runtime/import-deck.py`) into an inventory and a starter pages file with stable slide IDs, maps each slide to a page type, revises the affected claims and their dependencies, and builds a new editable PPTX. |
+| One page of a deck the skill built | Changes the page in the deck's pages file and rebuilds, preserving unrelated pages. |
 
-A new deck starts from data: the skill finds and downloads the series, peer sets, shares, geography and pipeline the question turns on before writing titles, and declares the organisations it compares as `players` so the deck introduces them, with their logos, before comparing them. For a new deck, keep `<id>.content.json`, `<id>.plan.json`, and `<id>.deck.json` together. The build checks their stable IDs, titles, visible copy, evidence design, and opening executive summary before export. An existing authorization to proceed covers work within its scope; structural changes outside that scope need an approved dot-dash. See [Storylining](skills/professional-slides/references/storylining.md) and the [template catalogue](skills/professional-slides/references/templates/index.md). Templates seed a decision architecture rather than a fixed slide layout; the registered choices are commercial due diligence, startup pitch, and project progress update.
+The pipeline - numbered steps from `node runtime/doctor.mjs` to delivery, each with its command, the condition that ends it and the reference that owns it - is in the [skill entrypoint](skills/professional-slides/SKILL.md#pipeline); this README does not repeat it. It stops for the user twice: at the design intake when answers are missing, and at the ghost dot-dash once the spine critique is ready. A deck is delivered only when its rendered gates, build bars, claim self-check and an independent review (confirmed by a fresh blind read when a verification pass accepted it) all pass; the rules live in [Taste review](skills/professional-slides/references/taste-review.md).
 
-The standard pipeline runs from the repository root (or from the installed skill with paths resolved to its `runtime/` directory):
-
-```bash
-node skills/professional-slides/runtime/build-deck.mjs path/to/deck.deck.json output/my-deck/ --preflight
-node skills/professional-slides/runtime/build-deck.mjs path/to/deck.deck.json output/my-deck/
-# Reproduce the claims in output/my-deck/claims.json against their source records,
-# then record the result in output/my-deck/self-check.json.
-node skills/professional-slides/runtime/deliver-deck.mjs path/to/deck.deck.json output/my-deck/ --skip-build
-```
-
-The build writes an editable PPTX, slide renders, saved-file readback, and gate reports. It also applies deck craft floors to what was built: a deck whose charts mostly plot two numbers, whose tables are mostly plain grids, whose charts carry no annotations, that leans on step diagrams, carries no icons, or compares players it never introduces is built for inspection but not delivered. Delivery requires passing rendered gates, a current claim self-check, and a review bound to the exact PPTX, scene, and renders. The first review inspects the whole deck; after a rejected candidate is rebuilt, verification focuses on changed and previously blocked pages. If no review backend is available, delivery writes a review packet for the calling agent to assess and submit. An accepted delivery writes `<id>-DELIVERED.pptx`; a rejection retains the build for repair without leaving a stale delivered copy. See [Production](skills/professional-slides/references/tools/production.md) and [Taste review](skills/professional-slides/references/taste-review.md).
-
-Ordinary decks follow the requested length. A reusable-skill evaluation marked `purpose: "evaluation"` requires at least 50 rendered pages unless the user explicitly overrides that evaluation length; shorter component probes remain diagnostics.
-
-## Design systems and subject identity
-
-A deck can declare a `design` to set its page grammar, not just its colors. The runtime currently offers `consulting`, `editorial`, `journal`, and `keynote`. Each sets defaults for typography, title treatment, margins, cover and section pages, takeaway placement, commentary side, and suitable page shapes. Choose the system for the reading context; use `identity` for colors that belong to the subject:
-
-| Design | Reading context and page treatment |
-| --- | --- |
-| `consulting` | Board and steering papers with a familiar consulting hierarchy and compact evidence pages. |
-| `editorial` | Narrative pre-reads with wider margins, serif titles, and commentary before the exhibit. |
-| `journal` | Chart-led briefings with a short finding below the title and full-width evidence. |
-| `keynote` | Live presentations with large statement titles, strong section pages, and simpler at-a-glance exhibits. |
-
-```json
-{
-  "design": "editorial",
-  "identity": { "primary": "#740001", "accent": "#D3A625" }
-}
-```
-
-`identity.primary` is a subject-sourced `#RRGGBB` color; `identity.accent` is optional. The runtime maps them to component and chart roles and adjusts text colors for contrast. Explicit deck `palette` (`midnight`, `evergreen`, `crimson` or `graphite`), `chrome`, and `tracker` settings can override design defaults. Before a user's first deck, the skill runs a short design intake - a reference deck to infer from, or the look, colours, tracker, title treatment, surfaces and density, each shown as a sheet of real rendered options from `skills/professional-slides/assets/design-options/` - and stores the answers per user (`runtime/preferences.mjs`), so later decks ask only what is missing. Each new deck also takes a fresh `variation` (`node skills/professional-slides/runtime/variation.mjs`), so two runs of one brief differ in their secondary styles and page shapes; reuse a seed only to reproduce a deck. See the [design reference](skills/professional-slides/references/design.md) and [theming reference](skills/professional-slides/references/theming.md).
+Templates seed a decision architecture rather than a fixed slide layout: commercial due diligence, competitive position, startup pitch and project progress update ([template catalogue](skills/professional-slides/references/templates/index.md)). Design systems (`consulting`, `editorial`, `journal`, `keynote`) set a deck's page grammar, and `identity` carries a subject's colours onto any of them ([theming](skills/professional-slides/references/theming.md)). The design intake asks once per user, with rendered option sheets from `skills/professional-slides/assets/design-options/`, and stores the answers (`runtime/preferences.mjs`).
 
 ## What the runtime produces
 
-Node composes and measures the deck; Python and `python-pptx` write and read back the PowerPoint; LibreOffice renders it for inspection. Eligible charts are native PowerPoint charts with embedded workbooks. Charts whose semantics need custom annotations, reference lines, icons, or other unsupported native features remain editable grouped shapes. Meaning-bearing text, tables, diagrams, and sources should remain separately addressable in the saved deck. See the [runtime guide](skills/professional-slides/runtime/README.md).
+Node composes and measures the deck; Python and `python-pptx` write and read back the PowerPoint; LibreOffice renders it for inspection. Eligible charts are native PowerPoint charts with embedded workbooks; charts whose semantics need custom annotations, reference lines or icons remain editable grouped shapes. Meaning-bearing text, tables, diagrams and sources remain separately addressable in the saved deck. See the [runtime guide](skills/professional-slides/runtime/README.md).
 
-Google Slides is a downstream import workflow. Verify the imported native Slides deck separately because the PowerPoint render does not establish font, wrapping, crop, chart, or object-order fidelity there.
+The output is PowerPoint. Google Slides is a downstream import the user makes; verify the imported deck separately, because the PowerPoint render does not establish font, wrapping, crop, chart or object-order fidelity there.
 
 ## Install and run
 
-This skills-only package contains the local slide runtime, references, examples and assets. It contains no MCP server or connected app. Portable, Codex and Claude Code manifests are included.
+This distribution contains one skill and its local runtime, references, examples and assets. It has no MCP server or connected app. The portable manifest is `plugin.json`; Codex and Claude Code compatibility manifests are included.
 
-Use Node 20.9 or newer and a Python environment with the packages declared in `requirements.txt`. From this plugin directory run `python3 -m pip install -r requirements.txt`. Full rendering requires LibreOffice (`soffice`) and poppler (`pdftoppm` and `pdftotext`). Set `RUNTIME_PYTHON` to the appropriate interpreter. The committed runtime uses bundled font metrics.
+Use Node 20.9 or newer. From this plugin directory, install the Python dependencies with `python3 -m pip install -r requirements.txt`. Full rendering needs LibreOffice (`soffice`) and poppler (`pdftoppm` and `pdftotext`). Run `node skills/professional-slides/runtime/doctor.mjs` and use the `RUNTIME_PYTHON` it recommends. Optional `@napi-rs/canvas` enables font measurements; bundled metrics are available without it.
 
-Resolve skill commands from `skills/professional-slides/` and write outputs outside the installed plugin. Codex and Claude reviewer command-line tools are optional; review packets allow the host to provide an independent reader. See the [production guide](skills/professional-slides/references/tools/production.md).
+Follow the [skill pipeline](skills/professional-slides/SKILL.md#pipeline), resolving its commands from the skill directory. Write deck outputs to a task-owned directory outside the installed plugin. Independent review can use the host's reviewer or review packets; Codex or Claude command-line tools are optional reviewer backends.
 
-Development tooling is in the [source repository](https://github.com/96imranahmed/professional-slides). Inspect the exact final PPTX and render; package validation does not certify deck quality or factual accuracy.
+Development tests and packaging tools are in the [source repository](https://github.com/96imranahmed/professional-slides), outside this distribution. Automated checks do not certify a deck's argument, factual accuracy or visual quality; inspect the final render and saved PPTX before accepting it.

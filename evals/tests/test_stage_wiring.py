@@ -15,7 +15,9 @@ that was skipped and a stage that does not exist.
 
 from __future__ import annotations
 
+import functools
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -23,18 +25,36 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import NODE, ROOT, requires_python_package
+from node_probe import NODE, ROOT, requires_python_package, run_node
 
 EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
 BUILD = ROOT / "skills" / "professional-slides" / "runtime" / "build-deck.mjs"
+# The interpreter `requires_python_package` asked, so a build that runs is a
+# build whose emitter can import python-pptx.
+PYTHON = os.environ.get("RUNTIME_PYTHON") or sys.executable
+
+
+@functools.lru_cache(maxsize=None)
+def user_base(python: str) -> str | None:
+    """Where `python` keeps user-installed packages, asked under the real HOME."""
+    probe = subprocess.run([python, "-c", "import site; print(site.getuserbase())"],
+                           capture_output=True, text=True)
+    return probe.stdout.strip() or None if probe.returncode == 0 else None
 
 
 def build(spec: Path, out: Path):
+    # HOME is a scratch directory so stored design preferences cannot reach the
+    # build; PYTHONUSERBASE keeps a `pip install --user` python-pptx importable.
+    home = out.parent / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    env = {"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(home),
+           "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")}
+    base = user_base(PYTHON)
+    if base:
+        env["PYTHONUSERBASE"] = base
     result = subprocess.run(
-        [NODE, str(BUILD), str(spec), str(out), "--no-render", "--python", sys.executable],
-        cwd=ROOT, capture_output=True, text=True,
-        env={"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": "/tmp",
-             "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")})
+        [NODE, str(BUILD), str(spec), str(out), "--no-render", "--python", PYTHON],
+        cwd=ROOT, capture_output=True, text=True, env=env)
     return result
 
 
@@ -120,12 +140,13 @@ class ExampleContentPlanTests(unittest.TestCase):
         self.assertTrue(plans, "at least one example deck carries its content stage")
         for plan in plans:
             with self.subTest(plan=plan.name):
-                out = subprocess.run(
-                    [NODE, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates" / "content_gates.mjs"),
-                     str(plan), "--json", "--legacy"], cwd=ROOT, capture_output=True, text=True)
-                self.assertEqual(out.returncode, 0, out.stdout[-600:])
-                report = json.loads(out.stdout)
-                self.assertTrue(report["accepted"])
+                # A plan that predates the text contract is audited without it.
+                report = run_node(f"""
+import {{ readFileSync }} from 'node:fs';
+import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
+console.log(JSON.stringify(runContentGates(JSON.parse(readFileSync({json.dumps(str(plan))}, 'utf8')), {{ required: false }})));
+""")
+                self.assertTrue(report["accepted"], report["countsByCode"])
                 # A content plan whose pages settle nothing countable is the
                 # failure this stage exists for; an example must not model it.
                 self.assertLessEqual(report["statistics"]["kinds"]["qualitative"] / report["pages"], 0.34)

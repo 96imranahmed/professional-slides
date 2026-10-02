@@ -1,55 +1,47 @@
 {
  "schema": "professional-slides.cold-run-baseline/v1",
- "$comment": "What the example decks measure, scored by the same harness that scores a cold run. These are hand-authored decks that pass every page gate, so they are the closest thing in the tree to a target - and the harness is only trustworthy if it says so. Where a deck sits under a floor, that is a finding about the deck: gallery-acceptance draws thirty charts and marks the finding on ten of them.",
- "recorded": "2026-09-18",
+ "$comment": "What the example decks measure, scored by the same harness that scores a cold run and compiled from examples/*.deck.json by baseline.mjs, so nothing has to be built first. These are hand-authored decks, so the harness is only trustworthy if it says where they stand: where one sits under a floor (`misses`), that is a finding about the deck rather than a reason to move the bar. test_cold_run.py measures them again live; `node evals/cold-run/baseline.mjs --stamp` rewrites this record with the weight.json it was taken under.",
+ "recorded": "2026-09-29",
+ "weightSha256": "163bed8f23b6ec9effe931046609323ec7ce0caa57fefe940804d35f28f09979",
  "decks": {
   "gallery-acceptance": {
-   "contentPages": 80,
-   "exhibitVarietyPerTen": 6.88,
-   "distinctExhibits": 55,
-   "tables": 14,
-   "tablesTreated": 0.79,
-   "charts": 30,
-   "chartsAnnotated": 0.33,
-   "drawingsPerPage": 22.25,
-   "reference": {
-    "exhibitVarietyPerTen": "7.1 to 8.3",
-    "tablesTreated": 0.89,
-    "chartsAnnotated": 0.63,
-    "drawingsPerPage": 32
-   }
+   "contentPages": 95,
+   "exhibitVarietyPerTen": 7.58,
+   "distinctExhibits": 72,
+   "tables": 15,
+   "tablesTreated": 0.53,
+   "charts": 38,
+   "chartsAnnotated": 0.24,
+   "drawingsPerPage": 19.23,
+   "accepted": false,
+   "misses": [
+    "tablesTreated",
+    "chartsAnnotated"
+   ]
   },
   "house-style": {
    "contentPages": 6,
-   "exhibitVarietyPerTen": 20,
-   "distinctExhibits": 12,
+   "exhibitVarietyPerTen": 16.67,
+   "distinctExhibits": 10,
    "tables": 2,
-   "tablesTreated": 0.5,
+   "tablesTreated": 0,
    "charts": 4,
    "chartsAnnotated": 0.75,
-   "drawingsPerPage": 25,
-   "reference": {
-    "exhibitVarietyPerTen": "7.1 to 8.3",
-    "tablesTreated": 0.89,
-    "chartsAnnotated": 0.63,
-    "drawingsPerPage": 32
-   }
+   "drawingsPerPage": 24.33,
+   "accepted": true,
+   "misses": []
   },
   "nyc-or-sf": {
    "contentPages": 9,
-   "exhibitVarietyPerTen": 11.11,
-   "distinctExhibits": 10,
+   "exhibitVarietyPerTen": 8.89,
+   "distinctExhibits": 8,
    "tables": 5,
-   "tablesTreated": 0.8,
+   "tablesTreated": 0.4,
    "charts": 6,
-   "chartsAnnotated": 0.67,
-   "drawingsPerPage": 26.78,
-   "reference": {
-    "exhibitVarietyPerTen": "7.1 to 8.3",
-    "tablesTreated": 0.89,
-    "chartsAnnotated": 0.63,
-    "drawingsPerPage": 32
-   }
+   "chartsAnnotated": 0.5,
+   "drawingsPerPage": 22.44,
+   "accepted": true,
+   "misses": []
   }
  }
 }

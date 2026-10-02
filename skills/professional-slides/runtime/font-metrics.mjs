@@ -2,10 +2,10 @@
 // uses bundled advance-width tables so the layout engine runs on any Node without
 // native dependencies (Claude, CI, a fresh laptop). Both paths return px widths at
 // 96 px/in for a CSS-style font string such as `bold 21.33px "Arial"`.
-import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { readJsonSync } from "./cli.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +15,7 @@ function loadTable(family) {
   const key = family.toLowerCase();
   if (TABLES.has(key)) return TABLES.get(key);
   const file = path.join(here, "fonts", `${key}-metrics.json`);
-  const table = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+  const table = readJsonSync(file, { optional: true });
   TABLES.set(key, table);
   return table;
 }

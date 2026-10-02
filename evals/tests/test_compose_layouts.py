@@ -135,6 +135,34 @@ if __name__ == '__main__':
 
 
 class ChartRuleTests(unittest.TestCase):
+    def test_the_title_names_the_mark_it_is_about(self):
+        result = run_node(r'''
+import {focusFromTitle, namedInTitle} from './skills/professional-slides/runtime/compose.mjs';
+const two={type:'chart.line',categories:['2022','2023','2024','2025'],series:[{name:'OpenAI',values:[1,2,3,4]},{name:'Anthropic',values:[1,3,5,8]}]};
+const scatter={type:'chart.scatter',points:[{name:'Opus',x:5,y:58},{name:'Astra',x:3,y:53},{name:'Sol',x:1,y:48}]};
+const years={type:'chart.column',categories:['2022','2023','2024'],series:[{name:'Revenue',values:[1,2,3]}]};
+console.log(JSON.stringify({
+  series: focusFromTitle(two,'Anthropic grows twice as fast').focusSeries ?? null,
+  both: focusFromTitle(two,'Anthropic outgrows OpenAI').focusSeries ?? null,
+  point: focusFromTitle(scatter,'Astra costs half as much per task').focus ?? null,
+  period: focusFromTitle(years,'Revenue tripled after 2022').highlights ?? null,
+  token: namedInTitle(['Direct consumer attention','Selected enterprise paid adoption','Coding monetization'],'OpenAI leads on consumer attention'),
+  shared: namedInTitle(['Enterprise API','Enterprise seats','Consumer'],'Enterprise buyers pay first'),
+  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell'),
+  // The compile counts the mark the title names: a trend whose title names one of its lines is marked.
+  compile: await (async () => { const {scaffoldPage}=await import('./skills/professional-slides/runtime/author-deck.mjs'); const {compilePage}=await import('./skills/professional-slides/runtime/page-types.mjs');
+    const p=scaffoldPage('trend'), ex=p.exhibit, series=[{name:'Eastern',values:ex.series[0].values.map(v=>v/2)},{name:'Dales',values:ex.series[0].values.map(v=>v/3)}];
+    return ['Journeys grew fastest on the Eastern line','Journeys grew on both lines'].map((title)=>{ try { compilePage({...p,title,exhibit:{type:ex.type,heading:ex.heading,unit:ex.unit,categories:ex.categories,series}},0); return 'compiled'; } catch (e) { return /marks its finding on the plot/.test(e.message) ? 'unmarked' : 'other'; } }); })() }));
+''')
+        self.assertEqual(result["series"], "Anthropic")
+        self.assertIsNone(result["both"], "a title that names both compares them")
+        self.assertEqual(result["point"], ["Astra"])
+        self.assertIsNone(result["period"], "a year in the title is its time frame, not its subject")
+        self.assertEqual(result["token"], "Direct consumer attention")
+        self.assertIsNone(result["shared"], "a word two labels carry names neither")
+        self.assertIsNone(result["plural"])
+        self.assertEqual(result["compile"], ["other", "unmarked"])
+
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
@@ -145,9 +173,14 @@ const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=i
 // Highlight the answer: the title names Hoboken, so Hoboken's bar takes the accent.
 const bar=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
 const chart=find(bar.items,i=>i.component==='chart.bar');
-assert.deepEqual(chart.props.highlights ?? [],[],'title text does not choose a chart focus');
+assert.deepEqual(chart.props.highlights,[{category:'Hoboken',style:'bar'}],'the bar the title names takes the accent');
 const spec=nativeChartSpec('chart.bar',chart.props,{x:0,y:0,width:700,height:400});
-assert.deepEqual(spec.highlightIndices,[]);
+assert.deepEqual(spec.highlightIndices,[0]);
+// A title naming two members compares them, and marks neither; an authored mark is kept.
+const pair=composeSlide({title:'Hoboken is safer than Berkeley',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
+assert.deepEqual(find(pair.items,i=>i.component==='chart.bar').props.highlights ?? [],[]);
+const authored=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}],highlights:[{category:'Berkeley',style:'bar'}]}},0);
+assert.deepEqual(find(authored.items,i=>i.component==='chart.bar').props.highlights,[{category:'Berkeley',style:'bar'}]);
 // A CAGR becomes the growth arrow with its rate in the bubble (years from the
 // category names); forecast shading is passed to the native chart when no
 // annotation forces shapes.

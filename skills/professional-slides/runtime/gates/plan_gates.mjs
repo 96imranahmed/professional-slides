@@ -10,22 +10,18 @@
  * is depicted, whether the deck is one page repeated - and all of them are
  * computable from a fifty-row table in under a second.
  *
- * Two cold-run decks made this concrete. A comic-book franchise comparison and
- * a personal relocation decision, nothing in common, came out within two points
- * of each other on every exhibit family: 31% charts, 42% and 44% tables, zero
- * images, zero icons. That is not a response to content, it is a default being
- * taken forty-five times, and every gate the skill had passed it - because
- * EVIDENCE_MIX merges charts and tables into one bucket and asks for 45% of
- * either, which an all-table deck satisfies best of all.
+ * Two decks with nothing in common that come out within two points of each
+ * other on every exhibit family are not responding to content; they are taking
+ * a default on every page. EVIDENCE_MIX merges charts and tables into one
+ * bucket and asks for 45% of either, which an all-table deck satisfies best of
+ * all, so the plan bands each family on its own.
  *
  * Exit 0 when the plan passes, 2 when it has findings, 1 on a crash.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
-const CONTRACT = JSON.parse(readFileSync(new URL("../weight.json", import.meta.url), "utf8"));
-const PLAN = CONTRACT.plan;
+import { EXIT, UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "../cli.mjs";
+import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { exhibitFamily } from "./variety_gates.mjs";
+import { textWords } from "../text-contract.mjs";
 
 /** Every code this file can emit, with the one line that says what it is about. */
 export const PLAN_CODES = Object.freeze({
@@ -56,25 +52,48 @@ const finding = (page, code, measured, threshold, repair) => {
 
 // --- reading the plan -------------------------------------------------------
 
-const TABLE_LIKE = new Set(["table", "rows", "compare", "phase-table", "matrix"]);
-const PICTURE_LIKE = new Set(["image", "photo", "picture-pair", "picture-strip", "picture-hero"]);
-const TEXT_LIKE = new Set(["text", "", undefined, null]);
+// The fields of a plan page (references/storyline-records.md#the-plan-file).
+const PLAN_FIELDS = new Set(["id", "n", "kind", "title", "exhibit", "variant", "why", "architecture", "anchors", "highlight",
+  "treatment", "annotation", "insight", "rows", "items", "shape", "series", "sourceSlide", "pageType", "commentary"]);
+// Other names a plan page may give a field. They are read into the field once,
+// as the plan is read (readPlanPages); nothing after that reads an alias. A
+// field given under both names keeps its own.
+const PLAN_ALIASES = Object.freeze({ layout: "architecture", points: "items", dataShape: "shape", exhibitVariant: "variant", reason: "why", exhibitReason: "why" });
 
-/** Which evidence family a page belongs to. One page, one family. */
+/** The plan's pages with every alias read into its field, and each field a page carries that the plan does not have. */
+function readPlanPages(pages) {
+  const unknown = [];
+  const read = pages.map((page) => {
+    const out = { ...page };
+    for (const [alias, field] of Object.entries(PLAN_ALIASES)) {
+      if (!Object.hasOwn(out, alias)) continue;
+      out[field] ??= out[alias];
+      delete out[alias];
+    }
+    for (const field of Object.keys(out)) if (!PLAN_FIELDS.has(field)) unknown.push({ page: page.id ?? page.n ?? null, field });
+    return out;
+  });
+  return { pages: read, unknown };
+}
+
+const PICTURE_SHAPES = new Set(["picture-pair", "picture-strip", "picture-hero"]);
+
+/**
+ * Which evidence family a page belongs to. One page, one family, from the
+ * exhibit the plan names (variety_gates.mjs exhibitFamily: chart, table,
+ * numbers, picture, text, mixed or diagram). The family is the author's
+ * declaration, so the plan's mix statistics only advise; the variety
+ * contract enforces the same bands on the compiled pages.
+ */
 export function family(page) {
   if (page.kind && page.kind !== "content") return null;
-  const exhibit = String(page.exhibit ?? "").trim();
   // The shape counts as well as the exhibit. A plan that writes `picture-pair`
   // in the architecture column has said the page is photographs, whatever it
   // then writes under exhibit - and the composer has three shapes that only a
   // picture page can take, so the two columns cannot disagree.
-  const shape = String(page.architecture ?? page.layout ?? "").trim();
-  if (anchorsOf(page).some(isPhoto) || PICTURE_LIKE.has(exhibit) || PICTURE_LIKE.has(shape)) return "picture";
-  if (exhibit.startsWith("chart.")) return "chart";
-  if (exhibit === "metrics") return "chart";
-  if (TABLE_LIKE.has(exhibit)) return "table";
-  if (TEXT_LIKE.has(exhibit)) return "text";
-  return "diagram";
+  const shape = String(page.architecture ?? "").trim();
+  if (anchorsOf(page).some(isPhoto) || PICTURE_SHAPES.has(shape)) return "picture";
+  return exhibitFamily(page.exhibit);
 }
 
 /** The page's anchors, where `false` means "deliberately none" and is not a list. */
@@ -83,13 +102,11 @@ const anchorsOf = (page) => (Array.isArray(page.anchors) ? page.anchors : []);
 /**
  * Does this anchor say "photograph"?
  *
- * The key is the claim. `{ photo: "the Bucharest servicing centre" }` is the
- * obvious way to write one, and it read the *value* against /^photo/ - so the
- * natural encoding, and `{ image: "skyline.jpg" }` with it, counted as no
- * photograph at all. Only a bare string or an object carrying both `kind` and
- * the matching key passed. A plan that put a photograph on all fifty pages was
- * then told it had none, which is worse than not having the gate: the deck-wide
- * device gates are exactly the ones an author reads as settled.
+ * The key is the claim: `{ photo: "the Bucharest servicing centre" }` and
+ * `{ image: "skyline.jpg" }` are photographs whatever their value says, as are
+ * a bare "photo ..." string and an object whose `kind` says so. A device gate
+ * that misses a photograph the plan declared is worse than no gate: the
+ * deck-wide device gates are exactly the ones an author reads as settled.
  */
 const isPhoto = (anchor) => {
   if (typeof anchor === "string") return /^(photo|image)\b/i.test(anchor);
@@ -105,8 +122,8 @@ const isIcon = (anchor) => {
 /**
  * The page's architecture, for the entropy count.
  *
- * The plan declares it; where it does not, the family is a coarse stand-in so a
- * plan written before this record existed still measures rather than crashing.
+ * The plan declares it; where it does not, the family is a coarse stand-in so
+ * the plan still measures rather than crashing.
  */
 const ARCHITECTURES = new Set([
   "evidence-with-commentary", "evidence-only", "paired-evidence", "evidence-stack", "evidence-grid",
@@ -125,7 +142,7 @@ const ARCHITECTURE_ALIASES = {
 
 export function architecture(page) {
   if (page.kind && page.kind !== "content") return null;
-  const shape = String(page.architecture || page.layout || `auto:${family(page)}`);
+  const shape = String(page.architecture || `auto:${family(page)}`);
   if (["exhibit-left", "exhibit-right", "exhibit-top", "evidence-with-side-commentary", "evidence-over-commentary"].includes(shape)
       || /^(?:chart|table)[- /].*(?:two|three|2|3)[- ]col/i.test(shape)) return "evidence-with-commentary";
   const normalized = ARCHITECTURE_ALIASES[shape] ?? shape;
@@ -143,7 +160,7 @@ const declaresArchitecture = (page) => architecture(page) !== null;
  * Normalised Shannon entropy over page architectures, with declared series runs
  * collapsed to one observation each.
  *
- * The share test this replaces - no architecture past 40% - cannot see a deck
+ * A share test - no architecture past 40% - cannot see a deck
  * that holds every architecture just under the cap and still reads as a
  * pattern. Entropy can: it is highest when the pages are spread evenly over the
  * repertoire and falls as any one of them dominates, which is the property the
@@ -180,7 +197,7 @@ export function styleEntropy(pages) {
 function gateTitles(pages, findings) {
   const titles = pages.filter((p) => !p.kind || p.kind === "content").map((p) => String(p.title ?? ""));
   if (!titles.length) return;
-  const words = titles.map((t) => t.trim().split(/\s+/).filter(Boolean).length);
+  const words = titles.map(textWords);
   const over = words.filter((w) => w > PLAN.titleWords.target).length;
   const share = over / words.length;
   if (share <= PLAN.titleWords.overShareMax) return;
@@ -190,7 +207,7 @@ function gateTitles(pages, findings) {
     { median: sorted[Math.floor(sorted.length / 2)], max: Math.max(...words), overTarget: over, pages: words.length },
     PLAN.titleWords.target,
     `A title of ${PLAN.titleWords.target} words or fewer sets on one line, and a one-line title is what makes the ` +
-    "title band, its rule and the content below it sit the same way on every page. The page gate's 14-word limit is " +
+    `title band, its rule and the content below it sit the same way on every page. The page gate's ${PLAN.titleWords.max}-word limit is ` +
     "a ceiling, not a target: written to, it makes two-line titles the norm. Cut to the claim.",
   ));
 }
@@ -198,13 +215,13 @@ function gateTitles(pages, findings) {
 function gateMix(pages, findings) {
   const families = pages.map(family).filter(Boolean);
   const total = families.length;
-  if (total < PLAN.from) return;
+  if (total < DECK_LENGTH.plan) return;
   const count = (name) => families.filter((f) => f === name).length;
   const share = (name) => count(name) / total;
 
-  // Charts and tables are different evidence and get different bands. Merging
-  // them is what let a deck of 43% tables and 31% charts score 74% on one
-  // combined floor and pass more comfortably than a balanced deck would.
+  // Charts and tables are different evidence and get different bands. Merged,
+  // a deck of 43% tables and 31% charts scores 74% on one combined floor and
+  // passes more comfortably than a balanced deck would.
   if (share("table") > PLAN.mix.table.max) {
     findings.push(finding(
       null, "PLAN_TABLE_SHARE",
@@ -225,15 +242,15 @@ function gateMix(pages, findings) {
     ));
   }
   for (const [name, band] of Object.entries(PLAN.mix)) {
-    if (name === "table" || name.startsWith("$")) continue; // table is reported above with its own code
+    if (name === "table" || name.startsWith("$") || typeof band !== "object") continue; // table is reported above with its own code
     const value = share(name);
     if (band.min !== undefined && value < band.min) {
       findings.push(finding(
         null, "PLAN_EXHIBIT_MIX",
         { family: name, share: round(value), pages: count(name), of: total, direction: "below",
-          target: band.observedDominant },
+          target: band.observed },
         band.min,
-        `The deck carries too few ${name} pages. Strong decks run ${pc(band.observedDominant)} ` +
+        `The deck carries too few ${name} pages. Strong decks run ${pc(band.observed)} ` +
         `${name} pages; the floor sits under that so a real deck would pass it. A family at zero is a family ` +
         "nobody considered.",
       ));
@@ -242,13 +259,14 @@ function gateMix(pages, findings) {
       findings.push(finding(
         null, "PLAN_EXHIBIT_MIX",
         { family: name, share: round(value), pages: count(name), of: total, direction: "above",
-          target: band.observedDominant },
+          target: band.observed },
         band.max,
         name === "text"
           ? `${count(name)} of ${total} pages carry no exhibit at all. Strong decks run ` +
-            `${pc(band.observedDominant)} pages of type alone - that is a real page, not a failure - but past ` +
+            `${pc(band.observed)} pages of type alone - that is a real page, not a failure - but past ` +
             "this the deck is an essay with a template around it. Give the argument something to stand on."
-          : `The deck leans on ${name} pages. Strong decks run ${pc(band.observedDominant)}.`,
+          : `The deck leans on ${name === "numbers" ? "metric tiles, fact grids and cards" : `${name} pages`}` +
+            `${band.observed === undefined ? "" : `; strong decks run ${pc(band.observed)}`}.`,
       ));
     }
   }
@@ -282,18 +300,18 @@ function gateRuns(pages, findings) {
 
 function gateEntropy(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
-  const unknown = content.filter(p => (p.architecture || p.layout) && !declaresArchitecture(p));
+  const unknown = content.filter(p => p.architecture && !declaresArchitecture(p));
   if (unknown.length) {
     findings.push(finding(null, "PLAN_STYLE_ENTROPY",
       { entropy: null, reason: "unrecognized architecture", pages: unknown.map(p => p.id ?? p.n),
-        names: [...new Set(unknown.map(p => p.architecture || p.layout))] },
+        names: [...new Set(unknown.map(p => p.architecture))] },
       [...ARCHITECTURES],
       "Classify the actual reading relationship using the normalized Design vocabulary. Keep task-specific " +
       "names and mechanisms in `why`. A table of explanations beside a chart is evidence-with-commentary; " +
       "table borders and new labels do not create an independent evidence relationship."));
     return;
   }
-  if (content.length < PLAN.from) return;
+  if (content.length < DECK_LENGTH.plan) return;
   const entropy = styleEntropy(content);
   // Without a declared architecture per page the only thing left to count is
   // the evidence family, which has four or five values against the composer's
@@ -344,7 +362,7 @@ function gateEntropy(pages, findings) {
 function gateAnchors(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
   for (const page of content) {
-    const items = Number(page.items ?? page.points ?? 0);
+    const items = Number(page.items ?? 0);
     const enumerated = items >= PLAN.anchor.itemsFrom && items <= PLAN.anchor.itemsTo;
     if (!enumerated) continue;
     if (family(page) === "chart") continue; // the marks are the anchor
@@ -368,18 +386,13 @@ function gateAnchors(pages, findings) {
  * The craft gates: what the plan records about how a page is *made*, not which
  * family its evidence belongs to.
  *
- * A generated 50-page deck passed every gate above - 44% charts, 22% tables,
- * 0.888 entropy, nine architectures, pictures and icons and insights all
- * present - and still read as dry. Measured against the example decks: its ten
- * tables ran a median of three rows against six and carried not one treatment
- * among them against 47%; its eighteen charts carried not one annotation
- * against 36%; its thirty-five point lists named not one highlighted phrase;
- * and it drew on thirteen distinct exhibits across forty-five pages, 2.9 per
- * ten, against seven to eight.
+ * A deck can pass every gate above and still read as dry. The example decks'
+ * tables run a median of six rows and 47% of them carry a treatment; 36% of
+ * their charts carry an annotation; their point lists name a highlighted
+ * phrase; and they draw on seven to eight distinct exhibits per ten pages.
  *
- * None of that was a failure of judgement. None of it was written down, so none
- * of it was ever chosen - the same mechanism, one level finer, as the mix that
- * made every page a table.
+ * None of that is a matter of judgement alone: what is not written down is
+ * not chosen - the same mechanism, one level finer, as the exhibit mix.
  */
 const CRAFT = PLAN.craft;
 const tablePages = (pages) => pages.filter((p) => family(p) === "table");
@@ -387,7 +400,7 @@ const chartPages = (pages) => pages.filter((p) => family(p) === "chart");
 /** The rows a page says its table carries: `rows: 8`, or "8x4" in `shape`. */
 function plannedRows(page) {
   if (Number.isFinite(page.rows)) return page.rows;
-  const shape = String(page.shape ?? page.dataShape ?? "");
+  const shape = String(page.shape ?? "");
   const match = shape.match(/(\d+)\s*[x\u00d7]\s*\d+/i);
   return match ? Number(match[1]) : null;
 }
@@ -401,32 +414,33 @@ const ANNOTATIONS = /\b(annotat\w*|callout|bracket|flag|reference|baseline|targe
  * is. Where the plan records the variant it counts, and where it does not the
  * type stands alone - which means recording variants can only ever raise the
  * measured variety, never lower it, and a plan that records none is judged
- * exactly as it was before.
+ * on its types alone.
  */
 const exhibitKey = (page) => {
   const type = String(page.exhibit ?? "").trim();
   if (!type) return "";
-  const variant = String(page.variant ?? page.exhibitVariant ?? "").trim().toLowerCase();
+  const variant = String(page.variant ?? "").trim().toLowerCase();
   return variant ? `${type}/${variant}` : type;
 };
 
 /**
  * The exhibits a plan reaches for when it has not decided anything.
  *
- * Measured on the generated deck: 8 column charts, 7 bars, 5 tables, 5
- * staircases - 25 of 45 pages on four shapes. These are all fine exhibits and
- * often the right one; the point is that choosing one of them is where a
- * default hides, so it is the one place worth making the plan say why.
+ * These are all fine exhibits and often the right one; the point is that
+ * choosing one of them is where a default hides - a plan that has decided
+ * nothing puts over half its pages on four of them - so it is the one place
+ * worth making the plan say why.
  */
 const DEFAULT_EXHIBITS = new Set(["table", "chart.column", "chart.bar", "steps", "bullet-list", "text", "rows"]);
-const reasoned = (page) => String(page.why ?? page.reason ?? page.exhibitReason ?? "").trim().length >= 12;
+const reasoned = (page) => String(page.why ?? "").trim().length >= 12;
 
-const treated = (page) => TREATMENTS.test(String(page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
-const annotated = (page) => ANNOTATIONS.test(String(page.annotation ?? page.treatment ?? page.variant ?? page.exhibitVariant ?? ""));
+// A treatment or an annotation named outright, else read off what the page does record.
+const treated = (page) => TREATMENTS.test(String(page.treatment ?? page.variant ?? ""));
+const annotated = (page) => ANNOTATIONS.test(String(page.annotation ?? page.treatment ?? page.variant ?? ""));
 
 function gateCraft(pages, findings) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
-  if (content.length < PLAN.from) return;
+  if (content.length < DECK_LENGTH.plan) return;
   const tables = tablePages(content), charts = chartPages(content);
 
   if (tables.length) {
@@ -472,9 +486,7 @@ function gateCraft(pages, findings) {
 
   // Variety, counted as distinct exhibits per ten pages rather than as entropy.
   // Entropy normalises by the number of exhibits used, so a deck that runs the
-  // same three shapes evenly scores as well as one that runs twenty: this deck
-  // measured 0.908 against the examples' 0.93-0.97 and looked fine, while using
-  // a third as many exhibits per page.
+  // same three shapes evenly scores as well as one that runs twenty.
   const kinds = new Set(content.map(exhibitKey).filter(Boolean));
   const perTen = content.length ? (kinds.size / content.length) * 10 : 0;
   if (kinds.size && perTen < CRAFT.exhibitVarietyPerTen.min) {
@@ -527,22 +539,26 @@ function gateCraft(pages, findings) {
 }
 
 /**
- * The deck-wide devices, and the one honest way out of the first of them.
- *
- * `noPictures` is a sentence saying why this deck carries none - the subjects
- * are trademarked, the site is confidential, there is nothing to photograph. A
- * deck that has a reason states it once and is not asked again. A deck that has
- * none is asked, because the alternative to asking is what the cold run did:
- * an author who could not photograph Marvel characters drew an empty gradient
- * rectangle, and wrote beside it that the frame stands in for a specimen image.
- * A placeholder with an apology beside it is worse than a page of type.
+ * `noPictures`: the one honest way out of carrying photographs, and the only
+ * thing it waives. It is a sentence saying why this deck carries none - the
+ * subjects are trademarked, the site is confidential, there is nothing to
+ * photograph - and a deck that has a reason states it once and is not asked
+ * again (PLAN_NO_PICTURES here, CRAFT_NO_PICTURES on the built deck). It does
+ * not waive logos, which identify the players a deck compares
+ * (CRAFT_PLAYERS_UNINTRODUCED, PLAYERS_UNMARKED, PROFILE_UNPICTURED), nor
+ * icons, which mark categories (PLAN_NO_ICONS, CRAFT_NO_ICONS): a deck with
+ * nothing to photograph still has names and categories to mark. A deck with no
+ * reason is asked, because the alternative to asking is a placeholder - an
+ * empty gradient rectangle with a note that it stands in for a specimen image -
+ * and a placeholder with an apology beside it is worse than a page of type.
  */
+export const photographsWaived = (deck) => textWords(deck?.noPictures) >= 3;
+
 function gateDeckWideDevices(pages, findings, plan = {}) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
-  if (content.length < PLAN.from) return;
+  if (content.length < DECK_LENGTH.plan) return;
   const anchors = content.flatMap(anchorsOf);
-  const excused = String(plan.noPictures ?? "").trim().split(/\s+/).filter(Boolean).length >= 3;
-  if (!anchors.some(isPhoto) && !excused) {
+  if (!anchors.some(isPhoto) && !photographsWaived(plan)) {
     findings.push(finding(
       null, "PLAN_NO_PICTURES",
       { pages: content.length, photographs: 0 }, 1,
@@ -590,14 +606,17 @@ const round = (n) => Math.round(n * 1000) / 1000;
 
 // --- driver -----------------------------------------------------------------
 
-export function runPlanGates(plan) {
+export function runPlanGates(plan, { deck } = {}) {
   const findings = [];
   if (!plan || typeof plan !== "object" || !Array.isArray(plan.pages)) {
     findings.push(finding(null, "PLAN_SCHEMA", "absent", "professional-slides.plan/v1",
       "The plan needs a `pages` array, one row per page, each naming its exhibit, architecture and anchors."));
-    return report(plan, findings, []);
+    return report(plan, findings, [], deck);
   }
-  const pages = plan.pages;
+  const { pages, unknown } = readPlanPages(plan.pages);
+  if (unknown.length) findings.push(finding(null, "PLAN_SCHEMA", { unknownFields: unknown }, [...PLAN_FIELDS],
+    `A plan page carries fields the plan does not have (${unknown.slice(0, 6).map((u) => `\`${u.field}\`${u.page === null ? "" : ` on ${u.page}`}`).join(", ")}${unknown.length > 6 ? ", ..." : ""}); ` +
+    "nothing reads them. Record the page under the plan's own fields (references/storyline-records.md#the-plan-file)."));
   gateTitles(pages, findings);
   gateMix(pages, findings);
   gateRuns(pages, findings);
@@ -605,10 +624,14 @@ export function runPlanGates(plan) {
   gateAnchors(pages, findings);
   gateCraft(pages, findings);
   gateDeckWideDevices(pages, findings, plan);
-  return report(plan, findings, pages);
+  return report(plan, findings, pages, deck);
 }
 
-function report(plan, findings, pages) {
+// The plan's blocking codes. Everything else it reports rests on labels the
+// author declared, which can be wrong, and so advises.
+const PLAN_BLOCKING = new Set(["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"]);
+
+function report(plan, findings, pages, deck = plan) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
   const families = content.map(family).filter(Boolean);
   const total = families.length || 1;
@@ -619,44 +642,39 @@ function report(plan, findings, pages) {
     const n = findings.filter((f) => f.code === code).length;
     if (n) counts[code] = n;
   }
+  const reported = applyRulesVersion(findings.map((f) => ({ ...f, severity: PLAN_BLOCKING.has(f.code) ? "blocker" : "advisory" })), deck ?? {});
   return {
     schema: "professional-slides.plan-gates/v1",
     id: plan?.id ?? null,
     pages: pages.length,
     contentPages: content.length,
     statistics: {
-      mix: { chart: shareOf("chart"), table: shareOf("table"), diagram: shareOf("diagram"),
-             picture: shareOf("picture"), text: shareOf("text") },
+      mix: { chart: shareOf("chart"), table: shareOf("table"), diagram: shareOf("diagram"), numbers: shareOf("numbers"),
+             mixed: shareOf("mixed"), picture: shareOf("picture"), text: shareOf("text") },
       styleEntropy: entropy.declared ? round(entropy.value) : null,
       architectures: entropy.declared ? entropy.distinct : null,
       exhibitVarietyPerTen: content.length ? round((new Set(content.map(exhibitKey).filter(Boolean)).size / content.length) * 10) : 0,
-      variantsRecorded: content.filter((p) => String(p.variant ?? p.exhibitVariant ?? "").trim()).length,
+      variantsRecorded: content.filter((p) => String(p.variant ?? "").trim()).length,
       reasonsRecorded: content.filter(reasoned).length,
       tablesTreated: tablePages(content).length ? round(tablePages(content).filter(treated).length / tablePages(content).length) : null,
       chartsAnnotated: chartPages(content).length ? round(chartPages(content).filter(annotated).length / chartPages(content).length) : null,
       anchoredPages: content.filter((p) => Array.isArray(p.anchors) && p.anchors.length).length,
       insightPages: content.filter((p) => p.insight && p.insight !== "none").length,
     },
-    reference: { mix: Object.fromEntries(Object.entries(PLAN.mix).map(([k, v]) => [k, v])),
+    reference: { mix: Object.fromEntries(Object.entries(PLAN.mix).filter(([k]) => !k.startsWith("$"))),
                  styleEntropy: PLAN.entropyMin, observed: PLAN.entropyObserved, craft: PLAN.craft },
-    accepted: findings.every(f => !["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"].includes(f.code)),
+    accepted: reported.every((f) => f.severity !== "blocker"),
     countsByCode: counts,
-    findings: findings.map(f => ({ ...f, severity: ["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"].includes(f.code) ? "blocker" : "advisory" })),
+    findings: reported,
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const file = args[0];
-  if (!file) { console.error("Usage: plan_gates.mjs deck.plan.json [--report out.json]"); process.exit(1); }
-  try {
-    const result = runPlanGates(JSON.parse(readFileSync(file, "utf8")));
-    const at = args.indexOf("--report");
-    if (at >= 0 && args[at + 1]) writeFileSync(args[at + 1], JSON.stringify(result, null, 2) + "\n");
-    console.log(JSON.stringify(result, null, 2));
-    process.exit(result.accepted ? 0 : 2);
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-}
+if (isMain(import.meta.url)) runCli((argv) => {
+  const usage = "Usage: plan_gates.mjs deck.plan.json [--report out.json]";
+  const { values, positionals: [file] } = parseCli(argv, { report: { type: "string" } }, { usage });
+  if (!file) throw new UsageError(usage);
+  const result = runPlanGates(readJsonSync(file));
+  if (values.report) writeJsonSync(values.report, result);
+  console.log(JSON.stringify(result, null, 2));
+  return result.accepted ? EXIT.ok : EXIT.refused;
+});

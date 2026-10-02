@@ -87,7 +87,7 @@ export function measurePhaseWorkstreams({ frame, props }) {
   const pad = tokenValue('space.1'), gap = tokenValue('space.1'), inset = tokenValue('space.2');
   const itemGap = 0, productPad = 0, bulletWidth = tokenValue('space.3');
   const body = token('type.compact'), heading = token('type.heading');
-  const measure = (text, width, bold = false, size = body) => measureText(text, width, { fontFamily: tokenValue('font.body'), fontSize: tokenValue(size), bold, wrapWidthRatio: 1 });
+  const measure = (text, width, bold = false, size = body) => measureText(text, width, { fontFamily: tokenValue('font.body'), fontSize: tokenValue(size), bold });
   const bulletLayout = measure('•', bulletWidth);
   const phaseWidth = frame.width / model.phases.length;
   const columns = [];
@@ -106,7 +106,7 @@ export function measurePhaseWorkstreams({ frame, props }) {
   const flatten = (products, depth = 0, parentId = null) => products.flatMap(p => [{ ...p, depth, parentId }, ...flatten(p.children, depth + 1, p.id)]);
   for (const c of columns) {
     c.heading = measure(c.ws.label, c.innerWidth, true);
-    c.activities = c.ws.activities.map(a => ({ ...a, layout: a.lead === undefined ? measure(a.text, c.innerWidth - bulletWidth) : measureTextRuns([{text:a.lead,bold:true},{text:a.text.slice(a.lead.length),bold:false}], c.innerWidth - bulletWidth, {fontFamily:tokenValue('font.body'),fontSize:tokenValue(body),wrapWidthRatio:1}) }));
+    c.activities = c.ws.activities.map(a => ({ ...a, layout: a.lead === undefined ? measure(a.text, c.innerWidth - bulletWidth) : measureTextRuns([{text:a.lead,bold:true},{text:a.text.slice(a.lead.length),bold:false}], c.innerWidth - bulletWidth, {fontFamily:tokenValue('font.body'),fontSize:tokenValue(body)}) }));
     c.products = flatten(c.phase.products.filter(p => p.workstreamId === c.ws.id)).map(p => ({ ...p, layout: measure(`${p.label}${p.additionalPlanned ? '*' : ''}`, c.innerWidth - p.depth * inset - 2 * productPad) }));
   }
   const stackHeight = entries => entries.reduce((h,a) => h + a.layout.height, 0) + Math.max(0, entries.length - 1) * itemGap;
@@ -199,7 +199,7 @@ export function renderPhaseWorkstreams({ id, frame, props }) {
   let legendX=m.inset;
   ['Products',...m.owners.map(o=>o.label)].forEach((label,i)=>{
     const key=i===0?'products-heading':`provider-${m.owners[i-1].id}`;
-    const layout=measureText(label,m.legendWidths[i],{fontFamily:tokenValue('font.body'),fontSize:tokenValue('type.compact'),bold:true,wrapWidthRatio:1});
+    const layout=measureText(label,m.legendWidths[i],{fontFamily:tokenValue('font.body'),fontSize:tokenValue('type.compact'),bold:true});
     if(i) surface(`${key}-swatch`,'roadmap-provider-key',legendX,m.bands.productsHeading.y+m.pad,m.inset,layout.height,i===2?'color.surfaceMuted':'color.surface',{dependencies:[nid(key)]});
     text(key,i?'roadmap-provider-label':'roadmap-products-label',label,legendX+(i?m.inset+m.pad:0),m.bands.productsHeading.y+m.pad,m.legendWidths[i]-(i?m.inset+m.pad:0),layout,i?data(m.owners[i-1]):{},true);
     legendX+=m.legendWidths[i];

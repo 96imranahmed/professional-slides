@@ -2,35 +2,76 @@
 
 Verification for `skills/professional-slides` covers content and plan contracts,
 composition, export, readback, rendered geometry and delivery-review bindings.
-Passing these checks does not establish editorial or visual taste.
+Passing these checks does not establish editorial or visual taste. The pipeline
+the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#pipeline);
+none of it is repeated here.
+
+## Quality eval
+
+`quality/` is the end-to-end measurement the unit suite cannot make: a headless
+agent given a brief and nothing else, the deck it delivers judged blind from
+its renders, and a pairwise comparison with the previous skill version on the
+same brief. Results accumulate in `quality/results.jsonl`, keyed by skill
+version, judge model, brief and run. Development briefs are the cold-run
+briefs; `quality/briefs/heldout/` is never used for tuning. See
+`quality/README.md`.
+
+Each run packages this checkout, gives a headless agent the brief in an empty
+workspace, judges the delivered deck blind from its renders against
+`quality/rubric.md`, and compares it pairwise with the latest stored deck of a
+different skill version (the git tree hash of `skills/`) on the same brief.
+`quality/anchors/` holds pages with a known place on the rating scale for
+checking the judge; its scores are provisional until a person has scored them.
+`quality/defects.json` labels the defects people found on the stored specimens
+with the gate that should catch each, and `gate-validity.mjs` replays them.
+
+```bash
+node evals/quality/run.mjs --set dev --runs 3 [--agent claude] [--judge claude] [--dry-run]
+node evals/quality/run.mjs --report                # the summary for this skill version
+node evals/quality/gate-validity.mjs               # per-gate recall and precision on labelled defects
+```
 
 ## Cold runs
 
 `cold-run/` is the review loop as a command. A cold run is the skill used the
-way a stranger uses it — a brief, no context, no corrections — and every defect
-found here over two days of review was found by a person opening a PDF
-afterwards. `cold-run/score.mjs` scores the plan and the build separately and
-refuses to average them, because a plan that passes while its deck does not is a
-different problem from the reverse. See `cold-run/README.md`.
+way a stranger uses it — a brief, no context, no corrections. `cold-run/score.mjs`
+scores the plan and the build separately and refuses to average them, because a
+plan that passes while its deck does not is a different problem from the
+reverse. Recorded runs are kept as inputs under `cold-run/specimens/<name>/` and
+scored again, live, under today's rules. See `cold-run/README.md`.
 
 ```bash
 node evals/cold-run/score.mjs out/deck.plan.json out/
+node evals/cold-run/specimens.mjs [--stamp]   # the stored runs under today's rules; --stamp records new verdicts
+node evals/cold-run/baseline.mjs [--stamp]    # the example decks, compiled and scored
 ```
+
+## Calibration
+
+`calibration/` re-derives the targets in `runtime/reading-tasks.json` and
+`runtime/weight.json` from a calibration set kept outside the repository and
+found through the `PS_CALIBRATION_CORPUS` environment variable. It holds
+tooling only: no data file that could name the set's documents sits in the
+repository, and the shipped targets are numbers. See `calibration/README.md`.
 
 ## Commands
 
 ```bash
-# everything: unit tests, content-stage and cold-run numbers for the example decks
+# everything: unit tests, the example decks' content stage and build bars,
+# the stored specimens and gate validity
 evals/run.sh
 
-# plus the LibreOffice end-to-end render (~10 s, skipped without soffice)
+# plus the LibreOffice end-to-end render (test_end_to_end_render.py, ~5 s)
 evals/run.sh --slow
 
-# unit tests only
+# unit tests only: parallel, with a dependency preflight and a skip report.
+# --jobs N workers (default: CPUs, at most 8); --serial one worker; --strict fails
+# on a test skipped for a missing dependency; --slow adds the opt-in LibreOffice
+# end-to-end tests (PS_RUN_SLOW=1); --pattern GLOB picks modules; --verbose
+node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
-node evals/scripts/run_tests.mjs
 
-# deterministic page gates on any scene + render (item 11)
+# deterministic page gates on any scene + render
 python3 skills/professional-slides/runtime/gates/page_gates.py \
     scene.json render_dir/ [--report out.json] \
     [--profile executive|pre-read|live-pitch] [--only CODE,CODE]

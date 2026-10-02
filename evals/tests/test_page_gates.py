@@ -243,8 +243,10 @@ class SyntheticGoodPageTests(unittest.TestCase):
         report = page_gates.run_gates(scene, render_dir=None)
         self.assertTrue(report["findings"])
         for item in report["findings"]:
-            self.assertEqual(
-                sorted(item), ["code", "measured", "repair", "severity", "slide", "threshold"])
+            # A void past its blocking bar also names the bar (blockAbove); a
+            # rule the deck predates says so (waived).
+            self.assertLessEqual({"code", "measured", "repair", "severity", "slide", "threshold"}, set(item))
+            self.assertLessEqual(set(item) - {"code", "measured", "repair", "severity", "slide", "threshold"}, {"blockAbove", "waived"})
             self.assertGreaterEqual(len(item["repair"]), 40, item)
             self.assertIn(" ", item["repair"].strip())
 

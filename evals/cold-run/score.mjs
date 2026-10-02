@@ -26,53 +26,14 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { runPlanGates } from "../../skills/professional-slides/runtime/gates/plan_gates.mjs";
-import { designStatistics } from "../../skills/professional-slides/runtime/reviewer.mjs";
+import { BUILD_BARS, BUILD_CEILINGS, scoreBuild } from "../../skills/professional-slides/runtime/build-bars.mjs";
+import { isMain } from "../../skills/professional-slides/runtime/cli.mjs";
 
-const CONTRACT = JSON.parse(readFileSync(new URL("../../skills/professional-slides/runtime/weight.json", import.meta.url), "utf8"));
-const CRAFT = CONTRACT.plan.craft;
-
-/**
- * The bars a built deck has to clear, as measured off its own scene.
- *
- * These are the same numbers the plan gates use, applied to what was actually
- * drawn rather than to what was promised. `drawings` is the corpus figure: a
- * published analytical page carries a median of 32 primitives that are not
- * type, and a page of rules and paragraphs carries a fraction of that.
- */
-export const BUILD_BARS = Object.freeze({
-  exhibitVarietyPerTen: { min: CRAFT.exhibitVarietyPerTen.min, reference: CRAFT.exhibitVarietyPerTen.observed },
-  tablesTreated: { min: CRAFT.tableTreated.min, reference: CRAFT.tableTreated.observed },
-  chartsAnnotated: { min: CRAFT.chartAnnotated.min, reference: CRAFT.chartAnnotated.observed },
-  drawingsPerPage: { min: 12, reference: CONTRACT.reference.slides.drawings },
-});
-
-/**
- * Bars that are a count of something that should not be there at all, rather
- * than a floor something has to reach. A cold run shipped two empty picture
- * frames and passed everything, because a frame counts as a picture everywhere
- * a picture is counted.
- */
-export const BUILD_CEILINGS = Object.freeze({
-  unsourcedPictures: { max: 0 },
-});
-
-export function scoreBuild(scene) {
-  const statistics = designStatistics(scene);
-  const findings = [];
-  for (const [key, bar] of Object.entries(BUILD_BARS)) {
-    const measured = statistics[key];
-    // A deck with no tables cannot fail a bar about tables.
-    if (measured === null || measured === undefined) continue;
-    if (measured < bar.min) findings.push({ measure: key, measured, floor: bar.min, reference: bar.reference });
-  }
-  for (const [key, bar] of Object.entries(BUILD_CEILINGS)) {
-    const measured = statistics[key];
-    if (measured > bar.max) findings.push({ measure: key, measured, ceiling: bar.max });
-  }
-  return { statistics, findings, accepted: findings.length === 0 };
-}
+// The bars a built deck has to clear live with delivery, which refuses a deck
+// that misses one (runtime/build-bars.mjs); the harness scores a cold run by
+// the same bars rather than a copy of them.
+export { BUILD_BARS, BUILD_CEILINGS, scoreBuild };
 
 export function scoreRun({ plan = null, scene = null }) {
   const planReport = plan ? runPlanGates(plan) : null;
@@ -124,7 +85,7 @@ export function report(result) {
   return out.join("\n");
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2).filter((a) => a !== "--json");
   const asJson = process.argv.includes("--json");
   if (!args.length) { console.error("Usage: score.mjs <plan.json> [build-directory] [--json]"); process.exit(1); }

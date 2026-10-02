@@ -30,13 +30,13 @@ are required. JSON-schema and portal validation are separate from these local
 checks; a successful package build does not certify complete deck behavior or
 review approval.
 
-## Source versus prepared Library archive
+## Source and prepared Library archive
 
-This commit packages the committed runtime. The previously delivered Library
-archive used the newer, uncommitted working-tree runtime; its exact contents
-cannot be regenerated from this commit alone. Those runtime revisions remain
-local and are outside this manifest PR. The committed listing and distribution
-README retain the committed workflow, without claiming its newer environment
-checker, explicit existing-deck importer, competitive-position template or blind
-confirmation review. Version remains 0.0.1 under the existing fixed-version
-instruction. No public published release was established during preparation.
+This PR includes the latest slide skill and runtime, references, examples,
+updated icon, evaluation tools, recorded regression specimens and tests alongside
+the manifest and packaging source. The generator packages that source and
+regenerates its hash inventory. ZIP container timestamps may differ between
+builds; compare archive file contents or the inventory when checking parity.
+Version remains 0.0.1 under the existing fixed-version instruction. No approved
+public release was established during preparation. The earlier delivered Library
+ZIP is retained as a separate artifact and is not overwritten by this PR.

@@ -1,7 +1,7 @@
 {
   "name": "professional-slides",
   "version": "0.0.1",
-  "description": "Plan and build decision-ready, editable PowerPoint decks with answer-first storylining, templates, and rendered QA.",
+  "description": "Plan and build decision-ready, editable PowerPoint decks, or rebuild an existing deck as a new one, with answer-first storylining, templates, and rendered, independently reviewed QA.",
   "author": {
     "name": "Professional Slides"
   }

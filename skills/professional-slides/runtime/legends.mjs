@@ -27,7 +27,7 @@ export function quantitativeLegendNodes({id,frame,props}) {
   if (props.items!==undefined) throw new Error('Quantitative scale legend uses a domain rather than categorical items');
   const scale=normalizeQuantitativeScale(props.scale), size=tokenValue(token('type.chartLabel'));
   const labels=scale.domain.map((v,i)=>`${scale.semantics==='relative-level'?(i?'High ':'Low '):''}${withUnit(v.toFixed(scale.decimals), scale.unit)}`);
-  const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size,wrapWidthRatio:1}));
+  const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size}));
   const height=Math.max(...measurements.map(m=>m.height));
   if (measurements.some(m=>m.lines.length!==1)||measurements.reduce((s,m)=>s+m.width,0)+16>frame.width || height+20>frame.height) throw new Error('Quantitative legend does not fit its allocated frame; widen the legend region or shorten the unit and end labels');
   const data={legendVariant:'quantitative-scale',domain:scale.domain,unit:scale.unit,palette:scale.palette,scaleSemantics:scale.semantics??null,bins:11};
@@ -53,7 +53,7 @@ function packLegendRows(widths, maxWidth, gap) {
 /** How many rows a horizontal legend of these items needs at this width. */
 export function legendRowCount(items, width) {
   const keyGap = tokenValue(token("space.2")), itemGap = tokenValue(token("space.4"));
-  const widths = items.map((item) => 12 + keyGap + measureText(typeof item === "string" ? item : item.label, width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
+  const widths = items.map((item) => 12 + keyGap + measureText(typeof item === "string" ? item : item.label, width, { fontSize: tokenValue(token("type.chartLabel")) }).width);
   return packLegendRows(widths, width, itemGap).length;
 }
 
@@ -73,7 +73,7 @@ export function legendNodes({ id, frame, props }) {
     if (!Number.isFinite(markerSize) || markerSize < 8 || markerSize > 20) throw new Error("Legend marker size must be between eight and twenty pixels");
     return variant === "line" ? defaultKeyWidth : Math.max(defaultKeyWidth, markerSize);
   });
-  const widths = items.map((item, index) => keyWidths[index] + keyGap + measureText(item.label, frame.width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
+  const widths = items.map((item, index) => keyWidths[index] + keyGap + measureText(item.label, frame.width, { fontSize: tokenValue(token("type.chartLabel")) }).width);
   const vertical = placement === "right";
   // A horizontal legend wraps onto further rows when its items outrun the frame.
   const rows = vertical ? items.map((_, i) => [i]) : packLegendRows(widths, frame.width, itemGap);

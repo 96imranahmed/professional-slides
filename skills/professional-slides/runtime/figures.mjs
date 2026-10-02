@@ -1,14 +1,14 @@
 // Seventeen figure families that well-made decks use and the skill could not
 // otherwise draw.
 //
-// These are diagram and statistic styles that had no component: a column of large statistics, a
+// These are diagram and statistic styles no other component draws: a column of large statistics, a
 // flowchart, spectrum sliders, a layer stack, items placed into category
 // columns, a rank table across periods, a two-sided flow, an icon array, rows
 // carried by arrows and a row of capsule pillars. Each is drawn from the
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted } from "./core.mjs";
+import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
@@ -18,6 +18,10 @@ const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"),
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
 const MUTED = token("color.surfaceMuted"), TINT = token("color.accentTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
+// Figures are set in the body face, bold: a display serif sets its digits as
+// old-style figures of uneven height, and a column of "25.8%", "45%" and
+// "14pp" reads as three sizes of number. Titles keep the display face.
+const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
@@ -59,7 +63,7 @@ export function statListLayout(frame, props) {
   const columns = props.variant === "grid" ? 2 : 1;
   const gap = v("space.5"), colGap = v("space.6");
   const colWidth = (frame.width - colGap * (columns - 1)) / columns;
-  const values = items.map((item) => measure(item.value, colWidth, "type.metric", true, DISPLAY));
+  const values = items.map((item) => measure(item.value, colWidth, "type.metric", true, FIGURES));
   const valueWidth = Math.min(colWidth * 0.42, Math.max(...values.map((m) => m.width)) + v("space.2"));
   const textWidth = colWidth - valueWidth - v("space.4");
   if (textWidth < 120) throw new Error("A stat list is too narrow for its sentences; widen it or shorten the values");
@@ -91,7 +95,7 @@ export function statListNodes({ id, frame, props }) {
     rows.forEach((r, i) => {
       const rid = stableId(id, "stat", c * L.perColumn + i);
       nodes.push(label(stableId(rid, "value"), "stat-value", { x, y, width: L.valueWidth }, r.value,
-        style("type.metric", dark ? WHITE : ACCENT, true, "left", DISPLAY)));
+        style("type.metric", dark ? WHITE : ACCENT, true, "left", FIGURES)));
       nodes.push(label(stableId(rid, "text"), "stat-text", { x: x + L.valueWidth + v("space.4"), y: y + Math.max(0, (r.value.height - r.text.height) / 2), width: L.textWidth }, r.text,
         style("type.body", dark ? WHITE : INK)));
       y += r.height;
@@ -133,12 +137,27 @@ function normalizeFlow(props) {
   return { nodes, edges, layer };
 }
 
+// A labelled arrow's gutter: wide enough for its label on one or two lines,
+// between the plain gutter and a limit that still leaves the steps their width.
+const FLOW_GAP = 56, FLOW_LABEL_GAP_MAX = 150;
+// How far a step grows past its measured height, and the gap between steps
+// past the plain one, when the frame has the room: the flow is the exhibit,
+// and a two-row flow drawn at its natural size in a 470px frame is a strip
+// with 150px of air above it and below it.
+const FLOW_STEP_GROWTH = 2.2, FLOW_GAP_GROWTH = 4;
+
 export function flowLayout(frame, props) {
   const { nodes, edges, layer } = normalizeFlow(props);
   const layers = Math.max(...layer.values()) + 1;
   if (layers < 2) throw new Error("A flow needs at least two stages");
-  const colGap = 56, rowGap = v("space.4");
-  const colWidth = (frame.width - colGap * (layers - 1)) / layers;
+  const rowGap = v("space.4");
+  // A label sits in the gutter it names, clear of both steps' frames, so the
+  // gutter is measured on the widest label (up to two lines of it).
+  const labelled = edges.filter((e) => e.label).map((e) => Math.ceil(measure(e.label, 1000, "type.label").width) + 2 * v("space.2"));
+  const wanted = labelled.length ? Math.min(FLOW_LABEL_GAP_MAX, Math.max(FLOW_GAP, Math.max(...labelled) / (Math.max(...labelled) > FLOW_LABEL_GAP_MAX ? 2 : 1))) : FLOW_GAP;
+  const widthAt = (gap) => (frame.width - gap * (layers - 1)) / layers;
+  const colGap = widthAt(wanted) >= 120 ? wanted : FLOW_GAP;
+  const colWidth = widthAt(colGap);
   if (colWidth < 120) throw new Error("A flow this deep is too narrow to label; split it or use fewer stages");
   const inner = colWidth - 2 * v("space.3");
   const columns = Array.from({ length: layers }, () => []);
@@ -166,37 +185,105 @@ export function flowLayout(frame, props) {
     measured.forEach((m) => boxes.set(m.node.id, { ...m, column: c }));
     columns[c] = measured;
   });
-  return { nodes, edges, columns, boxes, colWidth, colGap, rowGap, inner, height: tallest };
+  // The steps and the gaps between them grow together to fill the frame's
+  // height, up to FLOW_STEP_GROWTH and FLOW_GAP_GROWTH: the deepest column
+  // sets the scale and every step takes it, so boxes stay one family.
+  const deepest = columns.reduce((a, b) => (b.length > a.length ? b : a));
+  const natural = deepest.reduce((s, m) => s + m.height, 0);
+  const gaps = deepest.length - 1;
+  const room = Number.isFinite(frame.height) ? frame.height : tallest;
+  const scale = Math.max(1, Math.min(FLOW_STEP_GROWTH, (room - rowGap * gaps) / Math.max(1, natural)));
+  const gap = gaps ? Math.max(rowGap, Math.min(rowGap * FLOW_GAP_GROWTH, (room - natural * scale) / gaps)) : rowGap;
+  const grown = columns.map((col) => col.map((m) => m.height * scale));
+  const height = Math.max(tallest, ...grown.map((hs) => hs.reduce((s, h) => s + h, 0) + gap * (hs.length - 1)));
+  return { nodes, edges, columns, boxes, colWidth, colGap, rowGap, gap, scale, inner, natural: tallest, height: Math.min(height, Math.max(tallest, room)) };
+}
+
+/**
+ * Where an arrow's label goes: beside the arrow, pushed off the line along its
+ * normal by half the label's extent, nearer the source than the head, and
+ * clamped into the gutter so it never meets a step's frame. Of the two sides
+ * it takes the first whose box no arrow crosses and no placed label touches:
+ * a label centred on the line is struck through by it, a label set just
+ * above a diagonal sits on its arrowhead, and two labels inside the wedge of a
+ * branch sit on each other.
+ */
+function arrowLabelFrame(arrow, layout, gutter, arrows, taken) {
+  const { x1, y1, x2, y2 } = arrow;
+  const w = Math.min(gutter.width, Math.ceil(layout.width) + 2), h = layout.height;
+  const dx = x2 - x1, dy = y2 - y1, length = Math.hypot(dx, dy) || 1;
+  let nx = dy / length, ny = -dx / length;
+  if (ny > 0) { nx = -nx; ny = -ny; }
+  const reach = Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2 + 4;
+  const crosses = (box, seg) => {
+    const steps = Math.max(2, Math.ceil(Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1) / 2));
+    for (let i = 0; i <= steps; i++) {
+      const px = seg.x1 + (seg.x2 - seg.x1) * i / steps, py = seg.y1 + (seg.y2 - seg.y1) * i / steps;
+      if (px > box.x - 2 && px < box.x + box.width + 2 && py > box.y - 2 && py < box.y + box.height + 2) return true;
+    }
+    return false;
+  };
+  const touches = (box, other) => box.x < other.x + other.width + 2 && other.x < box.x + box.width + 2 && box.y < other.y + other.height + 2 && other.y < box.y + box.height + 2;
+  const at = (t, side) => {
+    const cx = x1 + dx * t + side * nx * reach, cy = y1 + dy * t + side * ny * reach;
+    return { x: Math.max(gutter.x, Math.min(gutter.x + gutter.width - w, cx - w / 2)), y: cy - h / 2, width: w, height: h };
+  };
+  // Centred in the gutter, clear of the line over the label's whole width:
+  // above it or below it. The side away from the arrows that share this
+  // one's source or head comes first, so a branch's labels sit outside its
+  // wedge rather than on each other inside it.
+  const yAt = (o, px) => o.y1 + (o.y2 - o.y1) * (px - o.x1) / ((o.x2 - o.x1) || 1);
+  const left = gutter.x + (gutter.width - w) / 2, ends = [yAt(arrow, left - 4), yAt(arrow, left + w + 4)];
+  const above = { x: left, y: Math.min(...ends) - h - 5, width: w, height: h };
+  const below = { x: left, y: Math.max(...ends) + 5, width: w, height: h };
+  const mid = (x1 + x2) / 2;
+  const siblings = arrows.filter((o) => o !== arrow && ((o.x1 === x1 && o.y1 === y1) || (o.x2 === x2 && o.y2 === y2)));
+  const siblingsBelow = siblings.length && siblings.reduce((sum, o) => sum + yAt(o, mid), 0) / siblings.length > yAt(arrow, mid);
+  const candidates = [...(siblings.length && !siblingsBelow ? [below, above] : [above, below]), ...[0.4, 0.3, 0.5, 0.2, 0.6].flatMap((t) => [at(t, 1), at(t, -1)])];
+  const free = candidates.find((box) => arrows.every((seg) => !crosses(box, seg)) && taken.every((other) => !touches(box, other)));
+  return free ?? candidates[0];
 }
 
 export function flowNodes({ id, frame, props }) {
   const L = flowLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`The flow needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; drop the step descriptions or split the flow`);
+  if (L.natural > frame.height + 0.01) throw new Error(`The flow needs ${Math.ceil(L.natural)}px and has ${Math.floor(frame.height)}px; drop the step descriptions or split the flow`);
   const out = [], placed = new Map();
+  // The flow starts at the top of its frame. A column with fewer steps than
+  // the deepest centres on the deepest column's span, so a merge sits level
+  // with the pair that feeds it; the whole flow never floats in its frame.
+  const span = Math.min(L.height, frame.height);
   L.columns.forEach((col, c) => {
     const x = frame.x + c * (L.colWidth + L.colGap);
-    const used = col.reduce((s, m) => s + m.height, 0);
-    const gap = col.length > 1 ? Math.min((frame.height - used) / (col.length - 1), L.rowGap * 3) : 0;
-    let y = frame.y + (frame.height - used - gap * (col.length - 1)) / 2;
+    const used = col.reduce((s, m) => s + m.height * L.scale, 0) + L.gap * (col.length - 1);
+    let y = frame.y + Math.max(0, (span - used) / 2);
     for (const m of col) {
-      const box = { x, y, width: L.colWidth, height: m.height };
+      const h = m.height * L.scale;
+      const box = { x, y, width: L.colWidth, height: h };
       placed.set(m.node.id, box);
       const tone = m.node.tone === "accent" ? ACCENT : m.node.tone === "muted" ? MUTED : PRIMARY;
       const ink = m.node.tone === "muted" ? INK : WHITE;
       out.push(fillRect(stableId(id, "step", m.node.id), "flow-step", box, tone, { radius: "radius.small" }));
-      const top = y + v("space.3");
+      // The copy centres in a step that grew.
+      const top = y + v("space.3") + (h - m.height) / 2;
       out.push(label(stableId(id, "label", m.node.id), "flow-step-label", { x: x + v("space.3"), y: top, width: L.inner }, m.title, style("type.body", ink, true, "center")));
       if (m.body) out.push(label(stableId(id, "text", m.node.id), "flow-step-text", { x: x + v("space.3"), y: top + m.title.height + v("space.1"), width: L.inner }, m.body, style("type.compact", ink, false, "center")));
-      y += m.height + gap;
+      y += h + L.gap;
     }
   });
-  L.edges.forEach((e, i) => {
+  const arrows = L.edges.map((e) => {
     const a = placed.get(e.from), b = placed.get(e.to);
-    const x1 = a.x + a.width, y1 = a.y + a.height / 2, x2 = b.x - 2, y2 = b.y + b.height / 2;
+    return { a, b, x1: a.x + a.width, y1: a.y + a.height / 2, x2: b.x - 2, y2: b.y + b.height / 2 };
+  });
+  const taken = [];
+  L.edges.forEach((e, i) => {
+    const arrow = arrows[i], { a, b, x1, y1, x2, y2 } = arrow;
     out.push(line(stableId(id, "arrow", i), "flow-arrow", x1, y1, x2, y2, SECONDARY, "line.standard", { endArrow: true }));
     if (e.label) {
-      const m = measure(e.label, L.colGap + 40, "type.label");
-      out.push(label(stableId(id, "arrow-label", i), "flow-arrow-label", { x: (x1 + x2) / 2 - (L.colGap + 40) / 2, y: (y1 + y2) / 2 - m.height - 2, width: L.colGap + 40 }, m, style("type.label", SECONDARY, false, "center")));
+      const gutter = { x: a.x + a.width + 4, width: Math.max(1, b.x - a.x - a.width - 8) };
+      const m = measure(e.label, gutter.width, "type.label");
+      const box = arrowLabelFrame(arrow, m, gutter, arrows, taken);
+      taken.push(box);
+      out.push(label(stableId(id, "arrow-label", i), "flow-arrow-label", box, m, style("type.label", SECONDARY, false, "center")));
     }
   });
   return out;
@@ -678,11 +765,17 @@ function normalizeFacts(props) {
 
 // How far a single row of fact tiles grows past its natural height.
 const FACT_ROW_GROWTH = 1.35;
+// The widest a tile is set against its widest line of copy.
+const FACT_TILE_SPAN = 4;
+// The widest frame a single column of tiles reads as a column rather than as
+// bands across the page.
+const FACT_COLUMN_MAX = 600;
 
 /** The most height a fact grid uses: a single row stops at FACT_ROW_GROWTH; two rows or more take the frame. */
+
 export function factGridCeiling(frame, props) {
   const L = factGridLayout(frame, props);
-  return L.rows > 1 ? null : L.height * FACT_ROW_GROWTH;
+  return L.columns === 1 && frame.width > FACT_COLUMN_MAX ? L.height : L.rows > 1 ? null : L.height * FACT_ROW_GROWTH;
 }
 
 export function factGridLayout(frame, props) {
@@ -691,6 +784,14 @@ export function factGridLayout(frame, props) {
   const innerAt = (n) => (frame.width - gap * (n - 1)) / n - 2 * pad;
   if (props.columns !== undefined && !(Number.isInteger(props.columns) && props.columns >= 1 && props.columns <= Math.min(4, items.length)))
     throw new Error(`A fact grid's \`columns\` is how many tiles run across: a whole number from 1 to 4, and no more than its ${items.length} facts`);
+  // One tile across the page is a grey band holding a figure and a label at
+  // its left end: three of them stacked made a page that measured a quarter
+  // full. A single column across a wide frame earns its width only when each
+  // tile carries its sentence (`text`); otherwise the facts run across. The
+  // compiler refuses the choice (page-types NUMBER_CARDS); a deck compiled
+  // before that draws them across rather than failing. In a column of the
+  // page (FACT_COLUMN_MAX wide or less) one tile a row is a stat column.
+  if (props.columns === 1 && frame.width > FACT_COLUMN_MAX && items.some((item) => !item.text)) props = { ...props, columns: undefined };
   // Four tiles in a row fit the page's width but not a column beside
   // commentary; there the grid wraps to two rows rather than failing a page
   // whose choice of placement was sound.
@@ -700,7 +801,7 @@ export function factGridLayout(frame, props) {
     const rows = Math.ceil(items.length / n);
     const width = (frame.width - gap * (n - 1)) / n, inner = width - 2 * pad;
     const tiles = items.map((item) => {
-      const value = measure(item.value, inner, "type.metric", true, DISPLAY);
+      const value = measure(item.value, inner, "type.metric", true, FIGURES);
       const label = measure(item.label, inner, "type.body", true);
       const text = item.text ? measure(item.text, inner, "type.compact") : null;
       const top = item.icon ? 28 + v("space.2") : 0;
@@ -712,13 +813,26 @@ export function factGridLayout(frame, props) {
   let layout = at(columns);
   // A single row of four or more that would leave more than a fifth of a
   // given frame empty, even grown, wraps to two rows, which take the frame:
-  // four tiles in one row across a 500px body were a strip at the top with the
+  // four tiles in one row across a 500px body are a strip at the top with the
   // rest of the page under it. An author's `columns` is kept.
   if (props.columns === undefined && layout.rows === 1 && items.length >= 4 && Number.isFinite(frame.height) && layout.height * FACT_ROW_GROWTH < frame.height * 0.8) {
     const wrapped = at(Math.ceil(items.length / 2));
     if (wrapped.height <= frame.height) layout = wrapped;
   }
   if (layout.inner < 110) throw new Error("A fact grid this wide is too narrow per tile; use fewer columns");
+  // A tile is as wide as its copy wants, give or take: past FACT_TILE_SPAN
+  // times its widest line (the figure, or the label on one line) it is a box
+  // of air around a number. The author's columns are refused there; the
+  // chosen ones step up to the most the width allows.
+  const content = Math.max(...layout.tiles.map((t) => Math.max(t.value.width, measure(t.item.label, 10000, "type.body", true).width)));
+  const spanOf = (L) => L.inner / Math.max(1, content);
+  if (!layout.tiles.some((t) => t.text) && spanOf(layout) > FACT_TILE_SPAN) {
+    if (props.columns !== undefined) throw new Error(`A fact grid's tiles would be ${Math.round(layout.width)}px wide for copy ${Math.round(content)}px wide; set more \`columns\` so each tile fits its fact`);
+    for (let n = layout.columns + 1; n <= Math.min(4, items.length) && spanOf(layout) > FACT_TILE_SPAN; n++) {
+      const wider = at(n);
+      if (wider.inner >= 110 && (!Number.isFinite(frame.height) || wider.height <= frame.height)) layout = wider;
+    }
+  }
   return layout;
 }
 
@@ -733,15 +847,18 @@ export function factGridNodes({ id, frame, props }) {
   const surface = dark ? PRIMARY : cardMuted();
   const valueColor = dark ? WHITE : readableOn(ACCENT, surface, 3), textColor = dark ? WHITE : readableOn(SECONDARY, surface);
   // A grid of two rows or more takes the height its frame gives it: the tiles
-  // are the exhibit, and four tiles two by two beside the commentary grew by a
-  // third and then sat centred with a band of air above and below the grid.
+  // are the exhibit, and four tiles two by two beside the commentary, grown by
+  // a third and centred, leave a band of air above and below the grid.
   // A single row still grows by a third at most - a row of tiles as tall as
   // the page is a row of empty boxes - and sits at the top of its frame, the
   // rest going to what follows (measureCeiling). Copy in a tile that grew is
   // centred in it - a tile holds one fact, where a card's copy starts at its
   // top to line up with its neighbours' - and a gauge stays on the tile's foot.
+  // A single column across the page never stretches: its rows are bands, and
+  // grown they are bands of air. In a column of the page it is a stat column
+  // and takes its height like any grid of rows.
   const fit = (frame.height - L.gap * (L.rows - 1)) / (L.height - L.gap * (L.rows - 1));
-  const stretch = L.rows > 1 ? Math.max(1, fit) : Math.min(FACT_ROW_GROWTH, fit);
+  const stretch = L.columns === 1 && frame.width > FACT_COLUMN_MAX ? 1 : L.rows > 1 ? Math.max(1, fit) : Math.min(FACT_ROW_GROWTH, fit);
   let y = frame.y;
   for (let r = 0; r < L.rows; r++) {
     const h = L.rowHeights[r] * stretch;
@@ -752,7 +869,7 @@ export function factGridNodes({ id, frame, props }) {
       // copy centres in what is above it by the same half of the growth.
       let ty = y + L.pad + Math.max(0, h - t.height) / 2;
       if (t.item.icon) { out.push(...iconMarker({ id: stableId(tid, "icon"), role: "fact-icon", x: x + L.pad, y: ty, size: 28, icon: t.item.icon, tone: dark ? "inverse" : "accent" })); ty += 28 + v("space.2"); }
-      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", valueColor, true, "left", DISPLAY)));
+      out.push(label(stableId(tid, "value"), "fact-value", { x: x + L.pad, y: ty, width: L.inner }, t.value, style("type.metric", valueColor, true, "left", FIGURES)));
       ty += t.value.height + v("space.1");
       out.push(label(stableId(tid, "label"), "fact-label", { x: x + L.pad, y: ty, width: L.inner }, t.label, style("type.body", dark ? WHITE : INK, true)));
       ty += t.label.height;
@@ -978,19 +1095,19 @@ export function speechNodes({ id, frame, props }) {
 //
 // The statement keeps a heading's measure, about 45 characters, however wide
 // the panel: beside a short memo the panel takes the width the prose leaves,
-// and a 700px statement ran as two long lines across it.
+// and a 700px statement runs as two long lines across it.
 const STATEMENT_MEASURE = 440;
 const sideFill = (tone) => (tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK);
-// `highlight`: the page's phrase inside the statement. A rail carried it and
-// drew it plain, so the one claim the page sets large had no emphasis while
-// the points on the page beside it did. The accent where it reads on the panel
-// at large-type contrast (3:1), else by weight (emphasisRuns).
+// `highlight`: the page's phrase inside the statement, so the one claim the
+// page sets large is emphasised as the points beside it are. The accent where
+// it reads on the panel at large-type contrast (3:1), else by weight
+// (emphasisRuns).
 const statementRuns = (props) => emphasisRuns(props.text.trim(), [props.highlight ?? []].flat().filter((p) => typeof p === "string"), sideFill(props.tone ?? "dark"), 3);
 export function sideStatementLayout(frame, props) {
   if (!clean(props.text)) throw new Error("A side statement needs its text");
   const inner = Math.min(frame.width - 2 * v("space.5"), STATEMENT_MEASURE);
   const emphasis = statementRuns(props);
-  const text = emphasis ? measureTextRuns(emphasis.runs, inner, { fontFamily: v("font.display"), fontSize: v("type.heading"), wrapWidthRatio: 1 })
+  const text = emphasis ? measureTextRuns(emphasis.runs, inner, { fontFamily: v("font.display"), fontSize: v("type.heading") })
     : measure(props.text, inner, "type.heading", true, DISPLAY);
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
   const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
@@ -1155,8 +1272,6 @@ const RENDER = {
   "side-statement": [sideStatementNodes, sideStatementLayout, { width: 380, height: 508 }],
   "radial-bars": [radialBarsNodes, radialBarsLayout, { width: 760, height: 420 }],
 };
-
-export const FIGURE_IDS = Object.freeze(Object.keys(RENDER));
 
 export function registerFigures(registry) {
   for (const [id, [nodes, layout, preferredSize]] of Object.entries(RENDER)) {

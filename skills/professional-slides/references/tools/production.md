@@ -2,17 +2,32 @@
 
 ## Commands
 
+The pipeline, in order, with each step's stop condition, is in [SKILL.md](../../SKILL.md#pipeline); follow it rather than calling the build directly. The flags of every command and the exit codes (0 done, 1 crash, 2 refused, 3 waiting on a reviewer) are in the [runtime guide](../../runtime/README.md#commands).
+
+`build-deck.mjs` composes the deck/v3 spec, lays it out against measured text, emits an editable PPTX with python-pptx, renders it with LibreOffice, reads the saved file back and runs the page gates and the density profile. Only a blocker fails the build: exit 0 with status `built` (or `built-unrendered` under `--no-render`) when nothing blocks, with the advisories counted for the review; exit 2 with `built-with-blockers` and every blocker listed with its source (the deck is still written for inspection), or `Refused (CODE): ...` when the input breaks a stage contract before anything is built. `--preflight` runs the plan and story gates without export; it is a check, not a step toward delivery. A new deck is built from the full compile's deck, content and plan: a draft's content plan does not meet the text contract the build holds a new deck to ([Planning contract](../storyline-records.md#planning-contract)).
+
+`deliver-deck.mjs` hands over `out/<id>-DELIVERED.pptx` only when, in this order:
+
+- a rendered build's gates and readback pass (`MISSING_RENDERED_GATES`);
+- the deck carries its verbatim `request` and any `waivers` are well formed (`REQUEST_MISSING`, `WAIVERS_INVALID`);
+- the storyline critique is `ready` for the deck's current spine (`STORYLINE_UNREVIEWED`; [Storylining](../storylining.md#stress-test-the-storyline));
+- every build bar passes, or the deck's `waivers` name it (`BAR_EXHIBIT_VARIETY` and its siblings in `runtime/build-bars.mjs`, measured once the deck has 12 analytical pages; an empty picture frame always counts);
+- `out/self-check.json` covers the build's claim ledger (`SELF_CHECK_INCOMPLETE`);
+- the review loop accepts, and confirms each waiver ([Taste review](../taste-review.md#acceptance-confirmation-and-build-bars) owns the passes, the confirmation read, the caps and the lineage).
+
+A rejection writes `out/REJECTED.md` and `delivery.json` with the blockers and removes any earlier deliverable. A packet waiting for a reader leaves `delivery.json` with `review.status: "pending"`, the staged packet's path and a `note` saying which prompt to give and where to save the answer.
+
+## Environment
+
+Run `node runtime/doctor.mjs` first (pipeline step 0). It checks Node 20.9 or newer; finds a Python that imports python-pptx, lxml, Pillow, numpy and pypdf, trying `RUNTIME_PYTHON`, `python3`, `/usr/bin/python3` and `/opt/homebrew/bin/python3`, and prints the `export RUNTIME_PYTHON=...` line when the one it finds is not the default; checks `soffice` (LibreOffice), `pdftoppm` and `pdftotext` (poppler); and reports the optional `@napi-rs/canvas`. Each missing piece gets an install line for the platform. It exits 0 when ready and 2 when not; `--no-render` checks for authoring and unrendered builds only, and `--json` prints the result as one object.
+
 ```bash
-node runtime/build-deck.mjs deck.json out/ --preflight     # plan + story gates, no export
-node runtime/build-deck.mjs deck.json out/ [--no-render]   # scene.json, <id>.pptx, rendered/, readback.json, gates.json
-node runtime/deliver-deck.mjs deck.json out/ [--reviewer auto|codex|claude|packet] [--model m] [--review review.json|parts-dir] [--skip-build] [--full-review] [--max-passes n]
+python3 -m pip install -r requirements.txt          # python-pptx, lxml, Pillow, numpy, pypdf
+brew install --cask libreoffice && brew install poppler                  # macOS
+sudo apt-get install -y libreoffice-impress poppler-utils                # Debian, Ubuntu
 ```
 
-Every command exits the same way (EXIT in `runtime/review-passes.mjs`): 0 done - built, accepted, ready or merged; 2 refused - blockers, a rejection, a critique or review that does not validate, a loop at its cap; 3 waiting on a reviewer - a packet was written for one; 1 a crash or bad usage. `storyline.mjs` and `reviewer.mjs merge` follow it too.
-
-`build-deck.mjs` composes the deck/v3 spec into a plan, lays it out against measured text (bundled Arial-compatible metrics; no native dependencies), emits an editable PPTX with python-pptx, renders it with LibreOffice, reads the saved file back and runs the page gates. Only a blocker fails the build: exit 0 with status `built` (or `built-unrendered` under `--no-render`) when nothing blocks, with the advisories counted in `advisories` for the review; exit 2 with `built-with-blockers` and every blocker listed in `blockers` with its source - page gates, readback, or text lost from the rendered pages (the deck is still written for inspection); 1 on a crash. `deliver-deck.mjs` builds, requires the gates and readback to pass (`MISSING_RENDERED_GATES` without a rendered build), runs the review through the selected backend, and copies `out/<id>-DELIVERED.pptx` only when the review accepts; a rejection writes `out/REJECTED.md` and `delivery.json` with the blockers and removes any earlier deliverable. Before any review, delivery requires the storyline gate to be ready for the deck's current title spine (`STORYLINE_UNREVIEWED`; [Storylining](../storylining.md#stress-test-the-storyline)) and `out/self-check.json` to cover the build's claim ledger (`claims.json`, `SELF_CHECK_INCOMPLETE` otherwise). A review that does not validate is refused as `INVALID_REVIEW`. Each validated review is kept in `out/review-history/`; after one exists, the next review is a verification scoped to changed and previously blocked pages (`--full-review` forces a whole-deck reading), and the loop stops at three passes (`REVIEW_PASS_CAP`; `--max-passes` when the user asks for another). With `--reviewer packet` delivery writes `out/review-packet/` and exits 3; the calling agent reviews it and reruns with `--review out/review.json`. `auto` runs the `codex` CLI, else the `claude` CLI, and writes the packet only when neither is on the path, so an agent session that reviews with its own subagents passes `--reviewer packet`.
-
-Environment: `python3` with `python-pptx`, Pillow and `pypdf`, LibreOffice (`soffice`) and `pdftoppm` on the path; `RUNTIME_PYTHON` overrides the interpreter. No Codex runtime, no `@napi-rs/canvas`, no PptxGenJS.
+Set `RUNTIME_PYTHON` when the packages live in an environment of their own. No Codex runtime and no PptxGenJS are needed; `@napi-rs/canvas`, when installed, measures text against the real fonts instead of the bundled metrics.
 
 ## Rendering
 
@@ -22,11 +37,12 @@ The exported file is the candidate of record. Keep meaning-bearing content nativ
 
 Inspect every rendered slide for title wrapping, overflow, font substitution, chart labels and number formats, image crops, master furniture and source notes, connector routing, tracker states and page numbers. After a structural repair, render the whole deck again.
 
-Google Slides is a downstream import: finish and verify the PPTX, import it, then verify the native deck separately. Import can change fonts, wrapping, crops, connectors, line weights, charts and object order, so parity stays unverified until the native render is inspected.
+The skill writes PowerPoint only. Google Slides is a downstream import the user makes: finish and verify the PPTX, import it, then verify the native deck separately. Import can change fonts, wrapping, crops, connectors, line weights, charts and object order, so parity stays unverified until the native render is inspected.
 
 ## What the gates check
 
-The canonical code and thresholds live in `runtime/gates/page_gates.py`; the
+The thresholds live in `runtime/gates/gate_config.py` and `runtime/weight.json`,
+and `runtime/gates/page_gates.py` is the command that runs the gates; the
 code catalogue is in [Evaluation](../evaluation/index.md). Reports distinguish
 blocking findings from advisory distribution, whitespace and decoration counts.
 Do not add content or visual devices to satisfy advisory percentages. Review the
@@ -38,13 +54,13 @@ annotation diagnostics are additional review prompts; they do not replace that
 contract or justify padding a page. Name the missing reasoning before adding
 text, and preserve complete compact comparisons when no premise is missing.
 
-For new work, `workflow: "new_deck"` requires content and design sidecars, stable
-IDs, title parity and an executive summary before the first section. Revisions
-may use partial plans. Content transfers by ID rather than by page position.
+What a new deck and a rebuilt deck must carry - the workflow, stable IDs, title
+parity, the executive summary before the first section - is the
+[planning contract](../storyline-records.md#planning-contract).
 
 ## What delivery refuses
 
-Delivery hands over a deck when blocking page gates pass and the review accepts the exact current PPTX, scene and renders. The review hash and its page coverage are required; every rebuild invalidates the previous review. When either fails, the findings are the result: `REJECTED.md` and `delivery.json` report the blocking findings and no `*-DELIVERED.pptx` remains. The build artifact is retained for inspection.
+Delivery hands over a deck only when the checks under [Commands](#commands) pass for the exact current PPTX, scene and renders; every rebuild invalidates the previous review, and the next pass verifies the changed pages. When a check fails, the findings are the result: `REJECTED.md` and `delivery.json` report the blocking findings and no `*-DELIVERED.pptx` remains. The build artifact is retained for inspection.
 
 Blocking findings are factual errors, unsupported claims, misleading comparisons, missing evidence on a ranked criterion, missing argument, unreadable text, overflow, broken geometry, broken dependencies and provenance failures; editorial preferences are advisory. A missing-argument finding names the absent premise and a concrete repair, because blank space or a low word count on its own is a diagnostic.
 

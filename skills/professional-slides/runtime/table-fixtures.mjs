@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { WORDMARK_RECORDS, sampleImage } from "./media.mjs";
+import { TABLE_VARIANT_NAMES } from "./table-variants.mjs";
 // Representative contracts, not a taxonomy for selecting business slide layouts.
 const size={width:1160,height:580};
 const bullets=(...items)=>({type:'bullets',items});
@@ -23,11 +24,10 @@ const competitorBars={columns:[text('Competitor',.16,'category'),text('Positioni
  ['Company B',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[347,55]},'12%','16%'],
  ['Company C',bullets('(Insert positioning point 1)','(Insert positioning point 2)'),{values:[289,45]},'6%','16%']
 ]};
-const logoRecords=JSON.parse(readFileSync(new URL('../assets/simple-icons/treatments.json',import.meta.url),'utf8'));
-const tableLogos=['visa','cisco'].map(name=>{const r=logoRecords.find(r=>r.name===name);return {dataUri:'data:image/png;base64,'+readFileSync(new URL('../assets/simple-icons/'+name+'-grayscale.png',import.meta.url)).toString('base64'),width:r.width,height:r.height,alt:name,authorization:'Simple Icons CC0; editorial identification'};});
+const tableLogos=['visa','cisco'].map(name=>{const r=WORDMARK_RECORDS.find(r=>r.name===name);return sampleImage('simple-icons/'+name+'-grayscale.png',{width:r.width,height:r.height,alt:name,authorization:'Simple Icons CC0; editorial identification'});});
 // A photograph leading each row: a component table often sets a
 // thumbnail of the thing the row describes.
-const tablePhoto={dataUri:'data:image/png;base64,'+readFileSync(new URL('../assets/pexels/category.png',import.meta.url)).toString('base64'),width:480,height:480,alt:'(Insert what the photograph shows)',authorization:'User-selected Pexels image; assets/pexels/source.json'};
+const tablePhoto=sampleImage('pexels/category.png',{width:480,height:480,alt:'(Insert what the photograph shows)',authorization:'User-selected Pexels image; assets/pexels/source.json'});
 export const TABLE_VARIANTS={
  'status-report':{preferredSize:size,props:{treatment:'standard',columns:[text('Workstream',.2),text('Status',.16,'rag'),text('Health',.13,'lights'),text('Complete',.16,'progress'),text('Gate',.11,'dot'),text('Signed off',.12,'check'),text('Outlook',.12,'trend')],rows:[['Stream Alpha',{value:'at-risk'},{value:'red'},{value:40},{value:true},{value:'no'},{value:'down'}],['Stream Beta',{value:'behind'},{value:'amber'},{value:65},{value:false},{value:'no'},{value:'flat'}],['Stream Gamma',{value:'on-track'},{value:'green'},{value:80},{value:true},{value:'yes'},{value:'up'}],{style:'total',cells:['Programme',{value:'behind'},{value:'amber'},{value:62},{value:true},{value:'no'},{value:'flat'}]}]}},
  'photo-rows':{preferredSize:size,props:{treatment:'standard',columns:[text('Component',.25,'category'),{label:'',type:'photo',width:{px:110}},text('What it does',.5)],rows:[[category('(Insert component 1)'),{media:tablePhoto},'(Insert what it does)'],[category('(Insert component 2)'),{media:tablePhoto},'(Insert what it does)']]}},
@@ -70,3 +70,4 @@ export const TABLE_VARIANTS={
  ['Area C',bullets('(Insert observed condition 1)','(Insert observed condition 2)'),{},'(Insert implication)']
  ]}}
 };
+if (Object.keys(TABLE_VARIANTS).join() !== TABLE_VARIANT_NAMES.join()) throw new Error('TABLE_VARIANTS must hold one sample per table-variants.mjs name, in its order');

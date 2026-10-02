@@ -291,8 +291,8 @@ export const ICONS = Object.freeze({
   "cross": { label: "Cross", paths: [line(0.16, 0.16, 0.84, 0.84), line(0.84, 0.16, 0.16, 0.84)] },
   "arrow-right": { label: "Arrow right", paths: [line(0.08, 0.50, 0.90, 0.50), poly([0.60, 0.20], [0.90, 0.50], [0.60, 0.80])] },
   "plus": { label: "Plus", paths: [line(0.50, 0.10, 0.50, 0.90), line(0.10, 0.50, 0.90, 0.50)] },
-  // Transport, places and sectors: a deck about an airline asked for "plane"
-  // and had only a truck, a globe and a map pin to choose from.
+  // Transport, places and sectors: a deck about an airline needs a plane, not
+  // a truck, a globe or a map pin.
   "plane": { label: "Plane", paths: [shape([0.50, 0.06], [0.56, 0.14], [0.56, 0.40], [0.92, 0.58], [0.92, 0.66], [0.56, 0.56], [0.56, 0.78],
     [0.70, 0.88], [0.70, 0.94], [0.50, 0.88], [0.30, 0.94], [0.30, 0.88], [0.44, 0.78], [0.44, 0.56], [0.08, 0.66], [0.08, 0.58], [0.44, 0.40], [0.44, 0.14])] },
   "ship": { label: "Ship", paths: [
@@ -376,16 +376,4 @@ export function nearestIcons(name, count = 3) {
 export function unknownIcon(name, what = "icon") {
   const near = nearestIcons(name);
   return `Unknown ${what}: ${String(name)}; ${near.length ? `the nearest are ${near.join(", ")}; ` : ""}\`author-deck.mjs --icons\` lists all ${ICON_NAMES.length}`;
-}
-
-// SVG path data for an icon mapped into an absolute frame {x, y, width, height}.
-export function iconSvgPaths(name, frame) {
-  const def = iconDefinition(name);
-  if (!def) return "";
-  const { x = 0, y = 0, width = 1, height = 1 } = frame ?? {};
-  const fmt = (v) => String(Math.round(v * 1000) / 1000);
-  return def.paths.map((path) => {
-    const cmds = path.points.map(([px, py], i) => `${i === 0 ? "M" : "L"}${fmt(x + px * width)} ${fmt(y + py * height)}`);
-    return cmds.join(" ") + (path.closed ? " Z" : "");
-  }).join(" ");
 }

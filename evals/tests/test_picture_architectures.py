@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from node_probe import run_node
 
@@ -26,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+import render_gates  # noqa: E402
 
 BASE = "./skills/professional-slides"
 PHOTO = "examples/assets/hills.jpg"
@@ -187,17 +189,14 @@ class PictureWordFloorTests(unittest.TestCase):
         page_gates.gate_thin_page(1, {"nodes": []}, plain := [])
         self.assertTrue(plain, "a page with no picture and no words is still thin")
         findings = []
-        original = page_gates.body_bands
-        page_gates.body_bands = lambda _slide: (words, 0, 0)
-        try:
+        # The thin-page gate reads the band count where it is defined.
+        with mock.patch.object(render_gates, "body_bands", lambda _slide: (words, 0, 0)):
             page_gates.gate_thin_page(1, slide, findings)
             self.assertEqual(findings, [], "a picture page is held to the body the picture left it")
             bare = []
             page_gates.gate_thin_page(1, {"nodes": [], "contentFrame": page_gates.content_frame({})}, bare)
             self.assertEqual([f["code"] for f in bare], ["THIN_PAGE"])
             self.assertEqual(bare[0]["threshold"], floor)
-        finally:
-            page_gates.body_bands = original
 
 
 if __name__ == "__main__":

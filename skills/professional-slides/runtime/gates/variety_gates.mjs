@@ -12,15 +12,21 @@
 // decks measure, so a well-made deck passes them with room: there the commonest page
 // type is 23% of pages, the commonest commentary placement 27%, a closing
 // line 9%, pages with two or more exhibits 24%, and 80% of chart pages mark
-// something on the plot. The deck that prompted them ran 100% closing lines
-// and about 95% bullets under the exhibit.
+// something on the plot.
 //
-// Placement and repetition are measured on the page as drawn. A later deck
-// passed every rule with two pages in five drawn as one exhibit with a text
-// column beside it - strong decks draw 13% that way - because the rules counted
-// declared choices: "beside" and "beside-left" were two placements, and a trend
-// beside its points and a stat list beside its points were two signatures. The
-// reader sees one page each time, so the contract now counts one.
+// Placement and repetition are measured on the page as drawn, not on the
+// declared choices: "beside" and "beside-left" draw one placement, and a trend
+// beside its points and a stat list beside its points draw one signature. The
+// reader sees one page each time, so the contract counts one.
+//
+// The deck's exhibit mix and range are read here too, on the compiled pages,
+// where each page's family is the exhibit it draws. The plan gates read the
+// same bands off the families the author declared, which can be wrong, and so
+// only advise; here the count is exact, and it blocks.
+
+import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { calloutCapacity, countInWords } from "../chart-annotations.mjs";
+import { isTable, rowCells } from "../evidence.mjs";
 
 export const VARIETY_CODES = Object.freeze({
   PAGE_TYPE_UNDECLARED: "the deck's pages were not authored as page types, so nothing chose their structure",
@@ -34,6 +40,8 @@ export const VARIETY_CODES = Object.freeze({
   VARIETY_COLUMN: "too many pages are one exhibit with a text column beside it",
   VARIETY_SIGNATURE: "one drawn page - layout, exhibits, text column and close - repeats across the deck",
   EVIDENCE_DEPTH: "the deck's chart pages plot too few values: the median chart page is thinner than strong decks'",
+  VARIETY_EXHIBIT_MIX: "one evidence family is outside its band across the deck's compiled pages",
+  VARIETY_EXHIBIT_RANGE: "the deck draws too few kinds of exhibit for its length",
   // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
   PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Raised by author-deck.mjs: the page's type refused its choices.
@@ -60,18 +68,16 @@ export const VARIETY_CODES = Object.freeze({
 });
 
 export const VARIETY = Object.freeze({
-  from: 12,                 // content pages; shorter decks are probes
+  from: DECK_LENGTH.variety, // content pages; shorter decks are probes
   typeShareMax: 0.25,       // strong decks: commonest type 23%
-  // Strong decks: commonest placement 27%, so the cap sits just outside it. At
-  // 40% it let two pages in five put their explanation in a column beside the
-  // exhibit; the worked example's commonest placement is under a quarter.
+  // Strong decks: commonest placement 27%, so the cap sits just outside it;
+  // the worked example's commonest placement is under a quarter.
   commentaryShareMax: 0.3,
   takeawayShareMax: 0.25,   // strong decks: 9% of pages close on a line or band; a so-what bar is a close
   // Structure, counted on the page as drawn (page-types.mjs drawnOf), from
   // fifteen pages. Strong decks carry two or more exhibits on a quarter to a
   // third of their pages and draw one exhibit beside a text column on about
-  // one in eight; a generated deck that passed every other rule drew them at
-  // 14% and 33%. The floor sits under strong decks' lowest share, so a deck
+  // one in eight. The floor sits under strong decks' lowest share, so a deck
   // that chose its pages passes with room, and it counts every way a page
   // carries two bodies of evidence - panels, a sequence, a metric strip over
   // its chart, row blocks with an exhibit each, a photograph under an exhibit.
@@ -83,17 +89,16 @@ export const VARIETY = Object.freeze({
   columnShareMax: 0.2,
   // Keyed on the drawn skeleton, not the declared type. The commonest skeleton
   // in strong decks is a full-width chart carrying its own callouts, about 16%
-  // of pages (declared, their commonest combination was 10%, under the old
-  // 15% cap); one exhibit beside a column is 13%.
+  // of pages; one exhibit beside a column is 13%.
   signatureShareMax: 0.2,
   runMax: 2,                // three in a row of one type reads as one page repeated
   // Evidence depth: strong decks' chart pages plot a median of about 22 values
-  // (the middle half 10 to 48); a generated fifty-page deck's plotted 5. Each
-  // page is floored at 8 when it compiles (page-types.mjs EVIDENCE_FLOOR), and
-  // a deck of pages that all sit on the floor is still thin: the median chart
-  // page has to reach 15, between strong decks' lower quartile and median, so
-  // half the charts carry a peer set, a second series or a longer window. Read
-  // from eight chart pages, where a median means something.
+  // (the middle half 10 to 48). Each page is floored at 8 when it compiles
+  // (page-types.mjs EVIDENCE_FLOOR), and a deck of pages that all sit on the
+  // floor is still thin: the median chart page has to reach 15, between strong
+  // decks' lower quartile and median, so half the charts carry a peer set, a
+  // second series or a longer window. Read from eight chart pages, where a
+  // median means something.
   evidenceFrom: 8,
   evidenceMedianMin: 15,
 });
@@ -101,14 +106,13 @@ export const VARIETY = Object.freeze({
 // The pages a deck of one exhibit and a column is usually hiding: what the
 // column was holding, the page that draws it, and whether that page carries
 // two or more exhibits (a string says on what condition). Every structure
-// repair is built from this one list, and page-types.md prints it as a table
-// (a test holds the two together): kept as four hand-written lists, the
-// panels repair offered pages the column repair did not, and the docs a third set.
+// repair is built from this one list, so no repair offers a page another does
+// not, and page-types.md prints it as a table (a test holds the two together).
 export const REDRAWS = Object.freeze([
   { holding: "a second cut of the same evidence - another measure, another member, the other period", draw: "two or more panels, each headed, its finding under it as a `caption`",
     choice: "`panels`, form `row`, `grid` or `stack`, commentary `captions`", multi: true },
   { holding: "the three numbers that carry the claim", draw: "the exhibit under a strip of them", choice: "`numbers`, form `metric-strip`, commentary `none`", multi: true },
-  { holding: "notes on particular marks", draw: "callouts on the plot", choice: "commentary `on-exhibit`, three at most, about twelve words each", multi: false },
+  { holding: "notes on particular marks", draw: "callouts on the plot", choice: `commentary \`on-exhibit\`, three at most, about ${countInWords(calloutCapacity())} words each`, multi: false },
   { holding: "one implication", draw: "a so-what bar under the exhibit", choice: "commentary `so-what-bar`", multi: false },
   { holding: "a point per area, each with its own evidence", draw: "labelled row blocks, a number or a small exhibit at the right of each", choice: "`parallel`, form `labelled-rows`",
     multi: "with a small `exhibit` on each row" },
@@ -151,8 +155,8 @@ export function evidenceDepth(slides) {
 /**
  * The types in page order, a run of one type folded to its ends ("p4-p6
  * panels x3"): printed in the author's summary and in a run's finding, so the
- * two read alike. A split into panels made three panels pages in a row, and a
- * count of types could not show where.
+ * two read alike: a count of types cannot show where a run of three panels
+ * pages sits.
  */
 export function typeSequence(slides) {
   return slides.filter((s) => s.pageType).reduce((runs, s) => {
@@ -181,6 +185,84 @@ export function structureMix(slides, { drawnOf } = {}) {
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
 const share = (n, of) => Math.round((n / of) * 100) / 100;
 
+// The evidence families, by exhibit type. One vocabulary for the plan, which
+// names an exhibit per page (plan_gates.mjs family), and for the compiled
+// deck, which draws it. Numbers and cards are families of their own, so
+// diagram is not everything that is not a chart, a table or text.
+const CHART_LIKE = new Set(["metrics", "chart-group", "funnel", "sankey", "rank-flow", "pictogram", "radial-bars", "horizons"]);
+const TABLE_LIKE = new Set(["table", "rows", "compare", "phase-table", "matrix", "comparison-table", "heatmap", "trend-rows",
+  "insight-tree-table", "scorecard", "worksheet", "zone-matrix", "status-list"]);
+const NUMBERS_LIKE = new Set(["fact-grid", "metric-strip", "stat-list", "kpi", "cards", "capsules", "highlight-strip",
+  "labelled-rows", "logos", "people"]);
+const PICTURE_LIKE = new Set(["image", "photo", "picture", "picture-pair", "picture-strip", "picture-hero", "device-frame"]);
+const TEXT_LIKE = new Set(["", "text", "bullet-list", "quote-cluster", "speech"]);
+// A page the plan records as two exhibits side by side is a structure, not a family.
+const MIXED_LIKE = new Set(["paired", "panels", "two-up", "two-up-contrast"]);
+
+/**
+ * The evidence family of an exhibit type: chart, table, numbers (metric
+ * tiles, fact grids, cards, labelled rows), picture, text, mixed (a plan's
+ * paired pages) or diagram (flows, steps, cycles, maps, frameworks - every
+ * drawn structure).
+ */
+export function exhibitFamily(type) {
+  const t = String(type ?? "").trim();
+  if (t.startsWith("chart.") || CHART_LIKE.has(t)) return "chart";
+  if (TABLE_LIKE.has(t)) return "table";
+  if (NUMBERS_LIKE.has(t)) return "numbers";
+  if (PICTURE_LIKE.has(t)) return "picture";
+  if (TEXT_LIKE.has(t)) return "text";
+  if (MIXED_LIKE.has(t)) return "mixed";
+  return "diagram";
+}
+
+// The family a page type sets when its page draws no exhibit of its own: a
+// findings matrix is its table, labelled rows and profiles their cards, a
+// picture page its photographs, prose its text.
+const TYPE_FAMILY = { trend: "chart", ranking: "chart", composition: "chart", relationship: "chart", bridge: "chart",
+  scorecard: "table", lookup: "table", matrix: "table", mechanism: "diagram", schedule: "diagram", place: "diagram",
+  numbers: "numbers", parallel: "numbers", profiles: "numbers", picture: "picture", panels: "mixed", options: "mixed",
+  argument: "text", statement: "text", summary: "text" };
+
+/** A compiled page's family: the first exhibit it draws, or what its type sets when it draws none. */
+export function pageFamily(slide) {
+  const [first] = exhibitsOf(slide);
+  if (first) return exhibitFamily(first.type);
+  if (slide.photo || slide.image) return "picture";
+  if (slide.shape === "findings-matrix") return "table";
+  return TYPE_FAMILY[slide.pageType?.type] ?? "text";
+}
+
+/** What a compiled page draws, at the grain VARIETY_EXHIBIT_RANGE counts: each exhibit type, or its type and form when it draws none. */
+export const exhibitKinds = (slide) => {
+  const types = exhibitsOf(slide).map((ex) => String(ex.type ?? "")).filter(Boolean);
+  return types.length ? types : [`${slide.pageType?.type ?? "page"}/${slide.pageType?.form ?? "default"}`];
+};
+
+/**
+ * The deck's exhibit mix and range on its compiled pages: each family's share,
+ * the pages in it, and the distinct exhibits per ten pages. Printed in the
+ * author's summary and read by the two rules below.
+ */
+export function exhibitMix(slides) {
+  const content = slides.filter(isContent);
+  const families = {};
+  for (const s of content) (families[pageFamily(s)] ??= []).push(s.id ?? null);
+  const kinds = new Set(content.flatMap(exhibitKinds));
+  return { pages: content.length, families: Object.fromEntries(Object.entries(families).map(([f, ids]) => [f, { pages: ids.length, share: share(ids.length, content.length || 1), ids }])),
+    distinct: kinds.size, perTen: content.length ? Math.round((kinds.size / content.length) * 1000) / 100 : 0, kinds: [...kinds].sort() };
+}
+
+// What a page in an over-full family can become, by family.
+const MIX_REPAIR = {
+  chart: "Find the pages whose claim is a quantity - a ranking, a change over time, a share, a gap to a benchmark - and draw the series or the peer set behind it (`trend`, `ranking`, `composition`, `bridge`, `relationship`). Where the data stops, that is a research task, not a styling one",
+  table: "Keep the tables that are genuine look-ups; draw the rest as what they show - a ranking as bars, a change as a trend, verdicts as a coded `scorecard`, a sequence as a `schedule`",
+  diagram: "Keep the diagrams that draw a real mechanism; set a list of parallel points as `parallel` labelled rows and a measured claim as a chart",
+  numbers: "Give the numbers their series: a fact grid or a card set whose figures compare members or periods is a `ranking` or a `trend`, and a metric strip belongs over the exhibit it summarises",
+  picture: "Keep the photographs where the subject is the evidence; the rest of the page's argument wants its exhibit",
+  text: "Give the argument something to stand on: the chart, table or diagram the prose describes",
+};
+
 /**
  * Findings for a deck's content slides. `structureOf` is passed in so the
  * gate and the compiler share one definition without a circular import.
@@ -188,7 +270,12 @@ const share = (n, of) => Math.round((n / of) * 100) / 100;
 // Words are not this file's business: the text contract holds every page to
 // the floor for its reading task, on the text of the composed page
 // (derive-content.mjs), and the rendered deck's empty space is DECK_THIN_PAGES.
-export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
+export function varietyFindings(spec, options = {}) {
+  // A deck revised under older rules hears the rules introduced since as advisories.
+  return applyRulesVersion(contractFindings(spec, options), spec);
+}
+
+function contractFindings(spec, { structureOf, drawnOf } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
@@ -231,9 +318,8 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
   }
 
   // Runs: a declared series (one template on purpose) counts once. The repair
-  // names the page to change and what to: splitting one page into panels made
-  // three panels pages in a row, and "change the middle page" left the author
-  // to find which one and to guess a type its evidence could carry.
+  // names the page to change and what to: "change the middle page" leaves the
+  // author to find which one and to guess a type its evidence could carry.
   let run = [], at = 0;
   const flush = () => {
     if (run.length > VARIETY.runMax && !(run[0].pageType.series && run.every((s) => s.pageType.series === run[0].pageType.series))) {
@@ -318,22 +404,51 @@ export function varietyFindings(spec, { structureOf, drawnOf } = {}) {
       "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
       `${redraws()}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
+  findings.push(...mixFindings(slides));
   findings.push(...reviewedDeckFindings(spec, slides));
   return findings;
 }
 
-// Deck-level defects a whole-deck review found, read from the compiled pages.
+/**
+ * VARIETY_EXHIBIT_MIX and VARIETY_EXHIBIT_RANGE: the bands weight.json
+ * `plan.mixEnforced` names, and the exhibit range floor, on the compiled
+ * pages. The deck is already long enough to judge (VARIETY.from).
+ */
+function mixFindings(slides) {
+  const findings = [];
+  const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
+  const mix = exhibitMix(slides);
+  for (const band of PLAN.mixEnforced.bands) {
+    const [family, side] = band.split(".");
+    const limit = PLAN.mix[family]?.[side];
+    if (limit === undefined) continue;
+    const got = mix.families[family] ?? { pages: 0, share: 0, ids: [] };
+    const exact = got.pages / mix.pages;
+    if (side === "min" ? exact >= limit : exact <= limit) continue;
+    const shares = Object.fromEntries(Object.entries(mix.families).map(([f, v]) => [f, v.share]));
+    block("VARIETY_EXHIBIT_MIX", { family, share: got.share, pages: got.pages, of: mix.pages, direction: side === "min" ? "below" : "above", mix: shares, ids: got.ids }, limit,
+      side === "min"
+        ? `${got.pages} of ${mix.pages} pages are carried by a ${family} (${Math.round(exact * 100)}%); a deck this long carries at least ${Math.round(limit * 100)}%. ${MIX_REPAIR[family]}.`
+        : `${got.pages} of ${mix.pages} pages are carried by ${family === "numbers" ? "numbers or cards" : `a ${family}`} (${Math.round(exact * 100)}%, ${got.ids.slice(0, 12).join(", ")}); at most ${Math.round(limit * 100)}%. ${MIX_REPAIR[family]}.`,
+      side === "min" ? null : got.ids);
+  }
+  const floor = PLAN.craft.exhibitVarietyPerTen.min;
+  if ((mix.distinct / mix.pages) * 10 < floor) {
+    block("VARIETY_EXHIBIT_RANGE", { perTen: mix.perTen, distinct: mix.distinct, pages: mix.pages, kinds: mix.kinds }, floor,
+      `This deck draws ${mix.distinct} kinds of exhibit across ${mix.pages} pages - ${mix.perTen} per ten, against a floor of ${floor} and ` +
+      `${PLAN.craft.exhibitVarietyPerTen.observed.join(", ")} in the example decks. It uses ${mix.kinds.join(", ")}. Ask what each page's evidence ` +
+      "actually is before reaching for the shape the last page used: a sequence can be a timeline or a gantt, a composition a marimekko or a " +
+      "waffle, a ranking a lollipop, a distribution a boxplot or a dumbbell, two measures on one category a combo, a mechanism a flow or a cycle.");
+  }
+  return findings;
+}
+
+// Deck-level defects that show only across the whole deck, read from the compiled pages.
 export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3, titleShare: 0.2, titleNames: 2 });
 
-// The table vocabulary the compiler (page-types.mjs) and these rules both
+// The coded-cell vocabulary the compiler (page-types.mjs) and these rules both
 // read, kept here because the compiler imports this module and not the other
-// way round. Three definitions of "a table" and two of "a coded cell" had
-// drifted: a number column counted as coded in one and not the other.
-const TABLE_TYPES = new Set(["table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table"]);
-/** Is this exhibit a grid of rows the table checks read? */
-export const isTable = (ex) => TABLE_TYPES.has(String(ex?.type ?? "")) && Array.isArray(ex.rows);
-/** A table row's cells: a row is an array, or `{ cells, label?, style? }`. */
-export const rowCells = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);
+// way round; a table and its rows are evidence.mjs's `isTable` and `rowCells`.
 /** Column and cell types the composer draws as a code - a mark, a pill, a bar, a number badge, a logo - rather than as text. */
 export const CODED = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "number", "logo", "photo"]);
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
@@ -342,9 +457,9 @@ const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter(
  * The deck's players by every name a page may use for them - the name, its
  * `short` and its `aliases`, lower-cased - each mapped to the player's name.
  * A table cell naming a player is drawn as its logo, a panel headed by one is
- * that player's panel, and an early logo under a short name introduces it:
- * read three ways, a player declared as "Southgate Labs" with short
- * "Southgate" was marked in its table cells and still reported unmarked.
+ * that player's panel, and an early logo under a short name introduces it.
+ * All three read this one map, so a player declared as "Southgate Labs" with
+ * short "Southgate" is the same player to each.
  */
 export function playerNames(players) {
   const names = new Map();
@@ -360,10 +475,10 @@ export function playerNames(players) {
 /**
  * How a page's table reads before a word of it is read: the first column
  * filled or open, cells coded or all text, a short grid or a long one, and a
- * band across its foot or none. A fifty-page deck set sixteen of its pages as
- * dark first-column text grids closed by a grey strip, eight of them in ten
- * consecutive pages on its capital structure - funding stages, commitments and
- * verdicts all in one grammar - and the reviewer read them as one page.
+ * band across its foot or none. Tables of one grammar close together read as
+ * one page repeated, however different what they hold: funding stages,
+ * commitments and verdicts all set as dark first-column text grids closed by a
+ * grey strip.
  */
 export function tableConstruction(slide) {
   const table = exhibitsOf(slide).find(isTable);

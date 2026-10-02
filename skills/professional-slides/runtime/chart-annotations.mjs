@@ -53,7 +53,9 @@ const EVIDENCE_PAD_X = 16;
 const EVIDENCE_PAD_Y = 14;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
-const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
+// An axis title is ink a callout box or its leader must clear - the y title
+// set above a scatter's plot among them.
+const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label", "axis-title"]);
 
 // An annotation centres on the mark it points at, and its bold face is the
 // annotation face rather than the body bold. Over the shared builder.
@@ -104,7 +106,7 @@ function normalizeEvidenceAnnotations(props = {}) {
 
 // A callout the chart has already moved beside its mark (or into a right-hand
 // rail) on an earlier pass holds no band above the plot: reserving 88px for a
-// box that is not there left an empty stripe over every such chart.
+// box that is not there would leave an empty stripe over the chart.
 const RELEASED_PLACEMENTS = new Set(["beside", "rail", "on-bar", "plot"]);
 const holdsBand = (annotation) => (annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal") && !RELEASED_PLACEMENTS.has(annotation._placement);
 
@@ -140,8 +142,7 @@ function bandBoxY(plot, props, bandIndex, height) {
 
 // A callout with no `series` on a chart of several series (a stacked or
 // grouped chart keys its marks by series) points at the category as a whole:
-// the top of the stack, or the category's largest mark. It used to fail as an
-// unknown category though the category was on the chart.
+// the top of the stack, or the category's largest mark.
 function resolveEvidenceAnchor(pointMap, annotation, id) {
   const target = pointMap.get(`${annotation.series || "value"}:${annotation.category}`)
     ?? (annotation.series ? null : pointMap.get(`category:${annotation.category}`));
@@ -173,7 +174,7 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
     if (node.type !== "text") return node;
     // Text allocations often span a whole bar/category. Collision routing uses
     // the measured ink box rather than treating its empty margins as ink.
-    const measured = measureText(node.text, node.frame.width, { fontFamily: tokenValue(node.style.fontFamily), fontSize: tokenValue(node.style.fontSize), bold: node.style.bold, wrapWidthRatio: 1 });
+    const measured = measureText(node.text, node.frame.width, { fontFamily: tokenValue(node.style.fontFamily), fontSize: tokenValue(node.style.fontSize), bold: node.style.bold });
     const x = node.frame.x + (node.style.align === "center" ? (node.frame.width - measured.width) / 2 : node.style.align === "right" ? node.frame.width - measured.width : 0);
     const y = node.frame.y + (node.style.valign === "mid" ? (node.frame.height - measured.height) / 2 : node.style.valign === "bottom" ? node.frame.height - measured.height : 0);
     return { ...node, frame: { x, y, width: measured.width, height: measured.height } };
@@ -181,10 +182,10 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
 }
 
 // Two boxes keep the compact band's gap apart, not more: at 10px, two compact
-// boxes that overlapped across - a bridge's staff-cost and other-cost notes,
-// neighbours on the axis, stacked 8px apart by their bands - failed each
-// other by two pixels, and the second went to a rail that squeezed the
-// category labels off the page.
+// boxes that overlap across - a bridge's staff-cost and other-cost notes,
+// neighbours on the axis, stacked 8px apart by their bands - fail each other
+// by two pixels, and the second goes to a rail that squeezes the category
+// labels off the page.
 function clearSurface(frame, obstacles, placements) {
   return obstacles.every((node) => !meets(node, frame, 6))
     && placements.every((placement) => !overlaps(frame, placement.frame, COMPACT_BAND_GAP));
@@ -192,7 +193,7 @@ function clearSurface(frame, obstacles, placements) {
 
 // A line's segment is read as the segment, not its box: a callout placed in
 // the plot sits above or beside a rising line, inside the box its diagonal
-// spans; read as a box, every such place was refused.
+// spans; read as a box, every such place would be refused.
 function meets(node, frame, pad) {
   const d = node.type === "line" ? node.data : null;
   if (!d || ![d.x1, d.y1, d.x2, d.y2].every(Number.isFinite)) return overlaps(frame, node.frame, pad);
@@ -215,19 +216,18 @@ function measureEvidenceText(annotation) {
   return measureText(annotation.text, EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   });
 }
 
 /**
  * The box is the size of what it says.
  *
- * 260x56 was the size of every callout whatever it carried, so "$46m, 11-month
- * filing" - one short line - arrived as a rectangle two and a half times its
- * own text with a leader dropping out of the empty half. A reader reads that as
- * an unfinished box, not as a note. The width now closes on the longest laid
- * line and the height on the lines themselves; 260 is the cap it wraps at, and
+ * At a fixed 260x56, "$46m, 11-month filing" - one short line - would arrive as
+ * a rectangle two and a half times its own text with a leader dropping out of
+ * the empty half, which a reader reads as an unfinished box, not as a note. The
+ * width closes on the longest laid line and the height on the lines
+ * themselves; 260 is the cap it wraps at, and
  * `EVIDENCE_BOX_MIN_WIDTH` keeps a two-word note from shrinking to a stamp.
  */
 function evidenceBoxSize(annotation) {
@@ -303,8 +303,8 @@ function ownLabel(target, annotation, obstacles) {
  *
  * On a horizontal bar chart a callout on any bar but the first drops its
  * leader from the band through every longer bar above it, and the orthogonal
- * treatment put its box 28px from the bar end - on top of the value label
- * printed there. Each treatment's error suggested the other. A designer sets
+ * treatment puts its box 28px from the bar end - on top of the value label
+ * printed there. A designer sets
  * the note level with its bar, just past the value, and that is the first
  * candidate here; then the other side, then the same two nudged half a box up
  * or down, then directly above or below the mark. The leader runs from the
@@ -328,9 +328,9 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
     candidates.push({ side: "left", frame: { x: beyond.left - ORTHOGONAL_GAP + reach - width, y, width, height }, leader: { x1: beyond.left - ORTHOGONAL_GAP + reach, y1: mid, x2: beyond.left, y2: target.y } });
   }
   // A bar below zero leaves its row empty past the axis: the note goes there,
-  // in the bar's own row, its leader to the bar's foot. Tried beside the
-  // value end only, the box met the bar itself and the "only region that
-  // shrank" could not be pointed at.
+  // in the bar's own row, its leader to the bar's foot. Beside the value end
+  // alone, the box would meet the bar itself and a note on the "only region
+  // that shrank" would have nowhere to go.
   const bar = obstacles.find((node) => node.role === "chart-mark" && node.data?.category === annotation.category
     && (!annotation.series || !node.data?.series || node.data.series === annotation.series) && node.frame.width > node.frame.height);
   if (bar && label && label.frame.x + label.frame.width <= bar.frame.x + 2) {
@@ -342,8 +342,8 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
   candidates.push({ side: "above", frame: { x: centred, y: above - ORTHOGONAL_GAP - height, width, height }, leader: { x1: leaderX, y1: above - ORTHOGONAL_GAP, x2: target.x, y2: above } });
   // Above a short mark among taller ones: the box clears the tallest thing
   // under its width, the leader drops to the mark. A pandemic-year column
-  // between two tall years had empty plot over it and no place, because the
-  // box set just above the mark met its neighbours.
+  // between two tall years has empty plot over it, but a box set just above
+  // the mark meets its neighbours.
   // Slid sideways, over the lowest neighbours, it finds the empty corner
   // between two tall ones.
   for (const shift of [0, -0.25, 0.25, -0.5, 0.5, -0.75, 0.75]) {
@@ -387,14 +387,14 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
   // The note alone, reversed out of the bar at its end. The longest bar of a
   // six-bar panel is about 34px thick and 300px long: too thin for the boxed
   // note (32px plus its margins), too long to leave room past its end, and a
-  // rail took the panel's plot below its minimum - so the bar the page is
-  // about was the one bar that could not be annotated. A line or two of the
+  // rail can take the panel's plot below its minimum - yet it is often the bar
+  // the page is about. A line or two of the
   // annotation face fits along it, set without a box: it sits on its mark.
   // It is the last resort, after the rail (`_placement: "on-bar"`, set by the
   // chart's render loop when the rail left the plot too narrow): a boxed note
   // reads louder, and a chart with width to spare keeps it. A column's segment
   // can be wider than tall too; the note must fit its words on the mark.
-  const text = annotation._placement === "on-bar" && f.width > f.height ? (() => { try { return measureText(annotation.text, Math.max(1, f.width - 2 * pad), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 }); } catch { return null; } })() : null;
+  const text = annotation._placement === "on-bar" && f.width > f.height ? (() => { try { return measureText(annotation.text, Math.max(1, f.width - 2 * pad), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true }); } catch { return null; } })() : null;
   if (text) {
     const w = Math.ceil(text.width) + 2, h = text.height;
     const frame = { x: f.x + f.width - pad - w, y: f.y + (f.height - h) / 2, width: w, height: h };
@@ -408,14 +408,12 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
  * Where a callout's leader lands: the mark's centre on the category axis, at
  * its value end - the top-centre of a column, the end-centre of a bar.
  *
- * Column points used to carry `leaderX` at the bar's right edge (and bars
- * `leaderY` at their top edge), which kept the leader clear of the value label
- * centred on the column but landed the dot on a corner: on a page of six
- * columns the reader followed it to the gap between two bars, not to the one
- * the note is about. The target is the point itself now, and the leader stops
- * short of the mark's own value label instead - the label sits on the same
- * centre line directly above the mark, so ending the leader at its top keeps
- * the dot on the mark's axis without striking through the number. The label is
+ * The target is the point itself, not a corner of the bar: on a page of six
+ * columns a dot on a corner leads the reader to the gap between two bars, not
+ * to the one the note is about. The leader stops short of the mark's own value
+ * label - the label sits on the same centre line directly above the mark, so
+ * ending the leader at its top keeps the dot on the mark's axis without
+ * striking through the number. The label is
  * found by its category, not only by sitting on the mark: a reference line
  * through a label lifts it clear of the line, and a lifted label is still the
  * one the leader would strike. A negative
@@ -430,7 +428,7 @@ function leaderTarget(target, obstacles, annotation) {
     && Math.abs(node.frame.y + node.frame.height - target.y) <= 1 && node.frame.height > 2);
   if (hanging) return { x, y: hanging.frame.y };
   // A range band prints its high value four pixels past its end, level with
-  // the centre, so a dot on the end-centre sat on the number. When the mark's
+  // the centre, so a dot on the end-centre sits on the number. When the mark's
   // own label is closer to the end than the dot's radius, the dot steps back
   // inside the bar by its radius and a gap - still the end of the bar, clear
   // of the figure. (A bar's label keeps a wider gap and needs no step.)
@@ -496,7 +494,7 @@ function speechNodes(id, placement, data) {
   const minX = Math.min(...xs), minY = Math.min(...ys);
   const width = Math.max(1, Math.max(...xs) - minX), height = Math.max(1, Math.max(...ys) - minY);
   const measured = measureText(placement.annotation.text, frame.width - 16, {
-    fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1,
+    fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true,
   });
   return [
     tailed
@@ -533,7 +531,7 @@ function speechNodes(id, placement, data) {
 }
 
 function evidenceTextNode(id, index, frame, text, data) {
-  const measured = measureText(text, Math.min(EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, Math.max(frame.width - 16, 1)), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(text, Math.min(EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, Math.max(frame.width - 16, 1)), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   const width = Math.max(frame.width - 16, Math.ceil(measured.width) + 2);
   return textPrimitive({
     id: stableId(id, "annotation-text", index),
@@ -631,7 +629,7 @@ export function renderChartCallout({ id, frame, props }) {
     right: { x1: frame.x + frame.width, y1: cy, x2: frame.x + frame.width + 24, y2: cy }
   };
   if (!Object.hasOwn(leaders, direction)) throw new Error(`Unknown callout direction: ${direction}`);
-  const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   // The box's 7px vertical padding closes to a 4px floor before the note is
   // refused; past that the frame cannot hold the note at the annotation size.
   if (measured.height > frame.height - 8) throw new Error(`Chart callout text needs ${Math.ceil(measured.height + 8)}px and its frame has ${Math.floor(frame.height)}px; give the callout more height or shorten the note`);
@@ -812,7 +810,7 @@ export function normalizeAnnotationRail(props = {}) {
     if (row.label !== undefined) {
       if (typeof row.label !== "string" || !row.label.trim() || labels.has(row.label)) throw new Error("Annotation rail measure labels must be non-empty and unique");
       labels.add(row.label);
-      const measured = measureText(row.label, 160, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+      const measured = measureText(row.label, 160, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
       if (measured.height > 30) throw new Error("Shorten the annotation rail measure label to one line");
       labelWidth = Math.ceil(measured.width) + 4;
     }
@@ -841,7 +839,7 @@ export function chartAnnotationBands(props = {}) {
 
 function measureIntervalLabel(annotation, width) {
   const measured = measureText(annotation.text.trim() + (annotation.showQualification ? `\n${annotation.qualification.trim()}` : ""), width, {
-    fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(ANNOTATION), wrapWidthRatio: 1
+    fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(ANNOTATION)
   });
   if (measured.lines.length > 3) throw new Error("Qualitative interval label exceeds three measured lines; shorten its text or qualification");
   return measured;
@@ -865,7 +863,7 @@ function resolveAnchor(pointMap, anchor, id) {
 
 /** A compact change label: the text alone, no bubble, for step brackets on small multiples. */
 function compactLabelFrame(text, centerX, centerY, plot) {
-  const measured = measureText(text, 120, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(text, 120, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   const width = Math.ceil(measured.width) + 6, height = 20;
   return { x: Math.max(plot.x - 10, Math.min(plot.x + plot.width + 10 - width, centerX - width / 2)), y: centerY - height / 2, width, height };
 }
@@ -874,16 +872,14 @@ function labelFrame(text, centerX, centerY, plot) {
   const measured = measureText(text, 168, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   });
   const width = Math.max(66, Math.min(180, Math.ceil(measured.width) + 24));
   const height = 34;
   if (measureText(text, width - 20, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   }).height > 24) throw new Error("Chart change annotation text is too long for its body-sized label; shorten it or use an evidence callout");
   return {
     x: Math.max(plot.x, Math.min(plot.x + plot.width - width, centerX - width / 2)),
@@ -1122,8 +1118,7 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
     const measured = measureText(item.text, Math.max(32, labelSpan - 20), {
       fontFamily: tokenValue(token("font.bodySemibold")),
       fontSize: tokenValue(ANNOTATION),
-      bold: true,
-      wrapWidthRatio: 1
+      bold: true
     });
     const width = Math.min(labelSpan - 10, Math.max(52, Math.ceil(measured.width) + 20));
     if (width < 48 || measured.height > annotationRailLineHeight()) throw new Error(`Annotation rail text for ${item.category} does not fit its category span; shorten the value or show fewer categories`);
@@ -1162,3 +1157,22 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
 export function calloutFits(text) {
   return measureEvidenceText({ text: String(text ?? "") }).height <= EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y;
 }
+
+// The prose `calloutCapacity` fills a box with: ordinary words of ordinary length.
+const CAPACITY_WORDS = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
+/**
+ * How many words of ordinary prose a chart callout holds, by the renderer's
+ * own measure. Every message that tells an author how long a callout may run
+ * reads this number, so the catalogue, the compile refusal and the variety
+ * repairs cannot drift from the box.
+ */
+export function calloutCapacity() {
+  let n = 1;
+  while (n < 40 && calloutFits(Array.from({ length: n + 1 }, (_, i) => CAPACITY_WORDS[i % CAPACITY_WORDS.length]).join(" "))) n += 1;
+  return n;
+}
+
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+/** A small count as a page prints it in prose: "ten", past twenty the figure. */
+export const countInWords = (n) => NUMBER_WORDS[n] ?? String(n);

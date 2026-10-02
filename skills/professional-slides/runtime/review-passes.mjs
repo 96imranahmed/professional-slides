@@ -12,22 +12,41 @@
 // converge keeps finding more to say. The passes are capped; acceptance is read
 // off the ledger of every pass, not off the last reviewer's mood.
 //
+// A verification pass can only close or keep what it is shown, so it cannot
+// ratchet a deck toward acceptance: it is never told an earlier rating, a
+// "partly fixed" finding keeps its severity unless a measured check now passes,
+// and both loops keep their history beside the deck file, keyed by deck id, so
+// a new output directory is not a new lineage with a fresh cap.
+//
 // Everything the two loops do alike lives here, so a fix to one is a fix to
 // both: scoping the next pass, splitting a long first pass across parallel
-// readers and joining their parts, calling a fresh reviewer, and recording each
-// pass. The two copies this replaced had drifted - the storyline never cut a
-// long section, its merge did not refuse a page read twice, its reviewer ran
-// without the deck's flags, and the deck's merge read a backend's raw output
-// as a second copy of a part.
+// readers and joining their parts, staging and calling a fresh reviewer, and
+// recording each pass.
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { runProcess } from "./process.mjs";
+import { readJson, readJsonSync, writeJson } from "./cli.mjs";
+import { textWords } from "./text-contract.mjs";
+import { registered } from "./errors.mjs";
+import { deckStem } from "./artifact-path.mjs";
+import { waiverErrors } from "./build-bars.mjs";
 
 export const SEVERITIES = Object.freeze(["none", "minor", "major", "blocker"]);
 export const PAGE_VERDICTS = Object.freeze(["ok", "minor", "major", "blocker"]);
 export const STATUSES = Object.freeze(["fixed", "partly fixed", "not fixed", "regressed"]);
+// A status that closes an entry. `unavailable` is the storyline's: a missing
+// analysis searched for and not found, with the search log to show it.
+export const CLOSED = Object.freeze(["fixed", "unavailable"]);
 export const MAX_PASSES = 3;
+// The rating a deck review must give for the deck to be accepted: 7 is "useful,
+// with substantial work still needed" (references/taste-review.md#benchmark-and-score).
+export const ACCEPT_RATING = 8;
+// Fresh, blind reads of the final artifact a lineage may spend after a
+// verification pass accepts; each pass the user adds beyond the cap adds one.
+export const MAX_CONFIRMATIONS = 1;
 
 // Calibrated, so two reviewers put the same defect at the same level and the
 // acceptance rule means the same thing on every deck.
@@ -42,7 +61,7 @@ export const SEVERITY_DEFINITIONS = Object.freeze({
 export const NEW_BASES = Object.freeze({
   changed: "on a page the rebuild changed (or beside a deleted page), read now for the first time in this form",
   regression: "a defect the rebuild introduced, on or caused by a changed page",
-  missed: "a blocker the first pass demonstrably missed; the justification says why it was not visible then",
+  missed: "a major or blocker the earlier passes missed on an unchanged page; `evidence` quotes it from the page and the justification says why it was not seen then",
 });
 
 export const BLOCKING = new Set(["major", "blocker"]);
@@ -50,26 +69,180 @@ const rank = (severity) => Math.max(0, SEVERITIES.indexOf(severity === "ok" ? "n
 export const worst = (list) => list.reduce((a, b) => (rank(b) > rank(a) ? b : a), "none");
 export const verdictOf = (severity) => (severity === "none" ? "ok" : severity);
 
-// One exit-code scheme for every command of the pipeline (build-deck,
-// deliver-deck, storyline, reviewer merge; runtime/README.md#exit-codes), so a
-// calling agent reads any step's status the same way: 0 done, 1 a crash or a
-// usage error, 2 refused (blockers, a rejection, an invalid answer, a capped
-// loop), 3 waiting on a reviewer - a packet was written for one.
-export const EXIT = Object.freeze({ ok: 0, error: 1, refused: 2, waiting: 3 });
 
 function hasCli(name) { return spawnSync("sh", ["-c", `command -v ${name}`], { stdio: "ignore" }).status === 0; }
 
-// `auto` runs a fresh reviewer through the first CLI on the path (codex, then
-// claude) and writes a packet only when neither is installed. An agent session
-// that reviews with its own fresh subagents asks for `packet` (the flag, or
-// PS_REVIEWER=packet): a CLI being installed does not make it the reviewer.
-export function detectBackend(preferred = "auto") {
-  if (preferred !== "auto") return preferred;
-  if (process.env.PS_REVIEWER) return process.env.PS_REVIEWER;
-  if (hasCli("codex")) return "codex";
-  if (hasCli("claude")) return "claude";
-  return "packet";
+/** The agent CLI this process runs inside, when it runs inside one. */
+export function hostCli(env = process.env) {
+  if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return "claude";
+  if (env.CODEX_SANDBOX || env.CODEX_SANDBOX_NETWORK_DISABLED || env.CODEX_THREAD_ID || env.CODEX_MANAGED_BY_NPM) return "codex";
+  return null;
 }
+
+// `auto` runs a fresh reviewer through the host's own CLI first (claude inside
+// Claude Code, codex inside Codex: the one known to be logged in), then the
+// other CLI on the path, and writes a packet only when neither is installed. An
+// agent session that reviews with its own fresh subagents asks for `packet`
+// (the flag, or PS_REVIEWER=packet): a CLI being installed does not make it the
+// reviewer.
+export function detectBackend(preferred = "auto", { env = process.env, has = hasCli } = {}) {
+  if (preferred !== "auto") return preferred;
+  if (env.PS_REVIEWER) return env.PS_REVIEWER;
+  const host = hostCli(env);
+  const order = host === "claude" ? ["claude", "codex"] : ["codex", "claude"];
+  return order.find((name) => has(name)) ?? "packet";
+}
+
+// A CLI that is installed but not signed in fails every call the same way; the
+// loop falls back to a packet for the calling agent rather than crashing.
+const AUTH_FAILURE = /not logged in|log ?in (?:first|required)|please (?:run )?\S*\s*login|unauthori[sz]ed|authenticat\w* (?:failed|required|error)|invalid api key|api key (?:is )?(?:missing|not set)|\b401\b/i;
+export const isAuthFailure = (error) => AUTH_FAILURE.test(`${error?.message ?? ""}\n${error?.stderr ?? ""}\n${error?.stdout ?? ""}`);
+
+// The reviewer models the evaluation rules name (references/evaluation/rules.json
+// `reviewer`): the codex model and reasoning effort a review runs with unless
+// the caller names another. The claude CLI keeps its own default.
+const RULES = readJsonSync(new URL("../references/evaluation/rules.json", import.meta.url));
+export const REVIEWER_CONFIG = Object.freeze({ ...(RULES.reviewer || {}) });
+export function reviewerModel(which, model) {
+  if (model) return model;
+  return which === "codex" ? REVIEWER_CONFIG.defaultModel ?? null : null;
+}
+
+export const sha256 = (text) => createHash("sha256").update(String(text)).digest("hex");
+
+/**
+ * The user's request, verbatim: the yardstick both reviews judge against. The
+ * authoring agent carries it unchanged from pages.json to deck.json; the
+ * question and brief are the author's paraphrase and never stand in for it.
+ */
+export const requestOf = (spec) => (typeof spec?.request === "string" && textWords(spec.request) >= 3 ? spec.request : null);
+export const requestHash = (spec) => (requestOf(spec) ? sha256(requestOf(spec)) : null);
+
+// The deck's own statements both reviews rest on: the user's request, word for
+// word, and the build bars it says it is right to miss. Checked where the deck
+// is written (author-deck) and again where it is judged (storyline, delivery),
+// from this one definition.
+export const DECK_STATEMENT_CODES = Object.freeze({
+  REQUEST_MISSING: "a new deck carries no verbatim `request`, so the reviews would judge it against the author's paraphrase",
+  WAIVERS_INVALID: "a build-bar waiver that names no build bar, names one twice, or gives no reason the reviewer can check",
+});
+export function deckStatementFindings(deck) {
+  const out = [];
+  if (deck?.workflow === "new_deck" && !requestOf(deck)) out.push({ code: registered(DECK_STATEMENT_CODES, "REQUEST_MISSING"), severity: "blocker",
+    repair: "A new deck records the user's request verbatim as `request` on `deck`: the storyline critic and the reviewers judge the deck against what was asked, not against the author's restatement of it" });
+  const waivers = waiverErrors(deck?.waivers);
+  if (waivers.length) out.push({ code: registered(DECK_STATEMENT_CODES, "WAIVERS_INVALID"), severity: "blocker", repair: waivers.join("; ") });
+  return out;
+}
+/** Why a deck cannot be reviewed without its request: a new deck must carry it. */
+export const requestErrors = (spec) => deckStatementFindings({ workflow: spec?.workflow, request: spec?.request }).map((f) => f.repair);
+
+export const REVISION = "existing_deck_revision";
+/** A revision's inventory of the deck it was imported from (runtime/import-deck.py), beside the deck file; null for new work. */
+export async function readInventory(spec, deckPath) {
+  if (spec?.workflow !== REVISION || typeof spec.inventory !== "string" || !deckPath) return null;
+  return readJson(path.resolve(path.dirname(deckPath), spec.inventory), { optional: true });
+}
+
+const normalTitle = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").replace(/^[\s\W]+|[\s\W]+$/g, "");
+// Every string and number an object holds, bar the keys that record how a page
+// is built rather than what it says.
+const QUIET = new Set(["id", "pageType", "layout", "kind", "source", "highlight", "arrange", "style", "icon", "path", "alt", "frame", "sourceSlide"]);
+function said(value, out = []) {
+  if (typeof value === "string" || typeof value === "number") out.push(String(value));
+  else if (Array.isArray(value)) for (const v of value) said(v, out);
+  else if (value && typeof value === "object") for (const [key, v] of Object.entries(value)) if (!QUIET.has(key)) said(v, out);
+  return out;
+}
+const wordsOf = (texts) => new Set(texts.join(" ").toLowerCase().match(/[a-z][a-z'-]{2,}/g) || []);
+const numbersOf = (texts) => (texts.join(" ").match(/\d+(?:[.,]\d+)*/g) || []).map((n) => n.replace(/,/g, "")).sort().join(" ");
+function sameContent(slide, source) {
+  const page = said({ ...slide, title: undefined });
+  const before = said({ subtitle: source.subtitle, paragraphs: (source.paragraphs || []).map((p) => p.text), tables: source.tables, charts: source.charts });
+  const [a, b] = [wordsOf(page), wordsOf(before)];
+  const shared = [...a].filter((w) => b.has(w)).length;
+  const jaccard = a.size || b.size ? shared / (a.size + b.size - shared) : 1;
+  return jaccard >= 0.8 && numbersOf(page) === numbersOf(before);
+}
+
+/**
+ * What a revision changed, against the deck it was imported from: `spine`,
+ * the content pages whose title changed, that are new or moved, or that sit
+ * beside a cut slide - what the storyline critique reads; `content`, those
+ * plus the pages whose words or numbers changed - what the deck review's
+ * first pass reads. A revision whose spine is unchanged needs no storyline
+ * critique. Null for new work.
+ */
+export function revisionChanges(spec, inventory) {
+  if (spec?.workflow !== REVISION || !Array.isArray(inventory?.slides)) return null;
+  const bySource = new Map(inventory.slides.map((s) => [s.index, s]));
+  const pages = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s?.pageType);
+  const sourceOf = (s) => s.pageType.sourceSlide ?? s.sourceSlide;
+  const spine = new Set(), content = new Set(), used = new Set();
+  let furthest = 0;
+  for (const s of pages) {
+    const from = sourceOf(s);
+    const source = bySource.get(from);
+    if (!source) { spine.add(s.id); content.add(s.id); continue; }
+    used.add(from);
+    if (normalTitle(s.title ?? s.text) !== normalTitle(source.title) || from < furthest) spine.add(s.id);
+    furthest = Math.max(furthest, from);
+    if (spine.has(s.id) || !sameContent(s, source)) content.add(s.id);
+  }
+  for (const s of [...(spec.slides || []), ...(spec.appendix || [])]) if (s?.sourceSlide !== undefined) used.add(s.sourceSlide);
+  // A source slide with body content that no page carries was cut: the pages either side of the gap changed with it.
+  const dropped = inventory.slides.filter((s) => !used.has(s.index) && !s.hidden && ((s.paragraphs || []).length || (s.tables || []).length || (s.charts || []).length)
+    && !(s.index === 1 && spec.cover)).map((s) => s.index);
+  for (const index of dropped) {
+    const before = pages.filter((s) => (sourceOf(s) ?? Infinity) < index).at(-1);
+    const after = pages.find((s) => (sourceOf(s) ?? -Infinity) > index);
+    for (const s of [before, after]) if (s) { spine.add(s.id); content.add(s.id); }
+  }
+  const ids = pages.map((s) => s.id);
+  return { spine: ids.filter((id) => spine.has(id)), content: ids.filter((id) => content.has(id)), dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0 };
+}
+
+/**
+ * Keys a schema with `additionalProperties: false` does not name, at every
+ * level: a review or critique carries what its schema asks for and nothing
+ * else (an `authorResponse` rebutting the reviewer is not part of a review).
+ */
+export function unknownKeyErrors(value, schema, at) {
+  if (!schema || value === null || typeof value !== "object") return [];
+  if (Array.isArray(value)) return schema.items ? value.flatMap((item, i) => unknownKeyErrors(item, schema.items, `${at}[${i}]`)) : [];
+  const errors = [];
+  const properties = schema.properties || {};
+  if (schema.additionalProperties === false) {
+    const extra = Object.keys(value).filter((key) => !(key in properties));
+    if (extra.length) errors.push(`${at} carries ${extra.map((k) => `\`${k}\``).join(", ")}, which the schema does not allow: return exactly the schema's fields`);
+  }
+  for (const [key, sub] of Object.entries(properties)) if (value[key] !== undefined) errors.push(...unknownKeyErrors(value[key], sub, `${at}.${key}`));
+  return errors;
+}
+
+/**
+ * Who wrote an answer: the backend (a CLI the loop ran, or the calling agent's
+ * subagent), the model, and the hash of the prompt it answered, echoed from the
+ * packet. An answer that does not echo the packet's hash answers no packet the
+ * loop wrote.
+ */
+export const PROVENANCE_BACKENDS = Object.freeze(["codex", "claude", "subagent"]);
+export const PROVENANCE_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["backend", "model", "promptHash"],
+  properties: { backend: { type: "string", enum: PROVENANCE_BACKENDS }, model: { type: "string", minLength: 2 }, promptHash: { type: "string", pattern: "^[a-f0-9]{64}$" } },
+};
+export function provenanceErrors(answer, promptHash) {
+  const p = answer?.provenance;
+  if (!p || typeof p !== "object") return ["provenance is missing: an answer says { backend, model, promptHash } - the promptHash printed at the end of the prompt it answered"];
+  const errors = [];
+  if (!PROVENANCE_BACKENDS.includes(p.backend)) errors.push(`provenance.backend must be one of ${PROVENANCE_BACKENDS.join(", ")}`);
+  if (typeof p.model !== "string" || p.model.trim().length < 2) errors.push("provenance.model must name the model that wrote the answer");
+  if (!promptHash) errors.push("no packet was written for this answer: request the review through the loop, which writes the packet and its prompt hash");
+  else if (p.promptHash !== promptHash) errors.push("provenance.promptHash does not match the packet's prompt: the answer was written for another prompt");
+  return errors;
+}
+/** The closing line of every prompt: the hash the answer echoes, over the prompt text above it. */
+export const provenanceLine = (hash, backend = "subagent") => `\n\nPROVENANCE. Set \`provenance\` to { "backend": "${backend}", "model": "<the model id you are running as>", "promptHash": "${hash}" }.`;
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -137,23 +310,38 @@ export function pageListErrors(at, { scope, pages, text, ids, deckScope = "deck"
 }
 
 /**
+ * Whether a status may set an entry's severity. A regression may raise it. A
+ * lower severity is the reviewer's opinion that a finding is now smaller, and
+ * opinion alone would walk a deck to acceptance pass by pass: only a partly
+ * fixed deck finding whose deterministic measure now passes
+ * (`downgrade(entry)`, supplied by the loop that can measure) may drop.
+ */
+export function severityChange(entry, status, downgrade = () => false) {
+  if (!status?.severity || !SEVERITIES.includes(status.severity) || status.severity === entry.severity) return null;
+  if (rank(status.severity) > rank(entry.severity)) return status.status === "regressed" ? status.severity : null;
+  return status.status === "partly fixed" && downgrade(entry) ? status.severity : null;
+}
+
+/**
  * The ledger: every finding any pass raised, with its latest status and
  * severity. Pass one opens it; each later pass applies its statuses and appends
  * its new findings. `items` is the review's findings in ledger form
  * ({ id, code, severity, pages, reason, repair }).
  */
-export function advanceLedger(prior, review, items) {
+export function advanceLedger(prior, review, items, { downgrade = () => false } = {}) {
   const pass = review?.pass ?? 1;
   const ledger = (prior || []).map((entry) => ({ ...entry }));
   const byId = new Map(ledger.map((entry) => [entry.id, entry]));
   for (const s of review?.statuses || []) {
     const entry = byId.get(s.finding);
     if (!entry) continue;
+    const severity = severityChange(entry, s, downgrade);
     entry.status = s.status;
-    if (s.severity && SEVERITIES.includes(s.severity)) entry.severity = s.severity;
+    if (severity) entry.severity = severity;
     const pages = s.pages ?? s.slides;
     if (Array.isArray(pages) && pages.length) entry.pages = pages;
     entry.evidence = s.evidence ?? null;
+    if (s.searchLog) entry.searchLog = s.searchLog;
     entry.updatedIn = pass;
   }
   for (const item of items || []) {
@@ -165,8 +353,12 @@ export function advanceLedger(prior, review, items) {
   return ledger;
 }
 
-export const openEntries = (ledger) => (ledger || []).filter((e) => e.status !== "fixed" && e.severity !== "none");
+export const openEntries = (ledger) => (ledger || []).filter((e) => !CLOSED.includes(e.status) && e.severity !== "none");
 export const openBlocking = (ledger) => openEntries(ledger).filter((e) => BLOCKING.has(e.severity));
+
+const normalizeText = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim();
+/** Whether a quoted piece of evidence is printed on one of the pages it names. */
+export const quotedOn = (quote, pages, pageText) => pages.some((id) => normalizeText(pageText?.[id]).includes(normalizeText(quote)));
 
 /** The worst open severity naming each page: what that page's verdict must say. */
 export function expectedVerdicts(ledger) {
@@ -179,9 +371,11 @@ export function expectedVerdicts(ledger) {
  * A later pass, checked against the ledger it verifies: the pass number and
  * lineage, one status for every open finding, and new findings that are
  * additive. `changed` is every page the rebuild changed plus the neighbours of
- * deleted pages; `ids` is the current page list.
+ * deleted pages; `ids` is the current page list. `downgrade(entry)` says which
+ * entries' measured checks now pass (severityChange); `pageText` maps a page
+ * to its text, against which a missed finding's quoted evidence is checked.
  */
-export function verificationErrors(review, { scope, ledger, items, ids, pageKey = "slide", deckScope = "deck", automatic = () => false }) {
+export function verificationErrors(review, { scope, ledger, items, ids, pageKey = "slide", deckScope = "deck", automatic = () => false, statuses: allowed = STATUSES, downgrade = () => false, pageText = null }) {
   const errors = [];
   if (review.pass !== scope.pass) errors.push(`pass must be ${scope.pass}: this review verifies pass ${scope.pass - 1}`);
   if (review.verifies !== scope.verifies) errors.push(`verifies must be ${scope.verifies}, the binding of the pass it verifies`);
@@ -197,16 +391,17 @@ export function verificationErrors(review, { scope, ledger, items, ids, pageKey 
     if (!openIds.has(s?.finding)) { errors.push(`${at}: ${s?.finding} is not an open finding of the earlier passes`); continue; }
     if (seen.has(s.finding)) errors.push(`${at}: ${s.finding} has two statuses`);
     seen.add(s.finding);
-    if (!STATUSES.includes(s.status)) errors.push(`${at}: status must be one of ${STATUSES.join(", ")}`);
+    if (!allowed.includes(s.status)) errors.push(`${at}: status must be one of ${allowed.join(", ")}`);
     if (typeof s.evidence !== "string" || s.evidence.trim().length < 20) errors.push(`${at}: give the evidence on the page for the status`);
     const entry = open.find((e) => e.id === s.finding);
-    if (s.severity !== undefined && s.severity !== null) {
+    if (!CLOSED.includes(s.status) && s.severity !== undefined && s.severity !== null && s.severity !== entry.severity) {
       if (!SEVERITIES.includes(s.severity)) errors.push(`${at}: unknown severity ${s.severity}`);
-      else if (s.status !== "regressed" && rank(s.severity) > rank(entry.severity)) errors.push(`${at}: a residual severity cannot exceed the finding's ${entry.severity} unless it regressed`);
+      else if (rank(s.severity) > rank(entry.severity)) { if (s.status !== "regressed") errors.push(`${at}: a residual severity cannot exceed the finding's ${entry.severity} unless it regressed`); }
+      else if (!severityChange(entry, s, downgrade)) errors.push(`${at}: ${s.finding} keeps its ${entry.severity} severity - a partly fixed finding is lowered only when it is a ${deckScope} finding whose measured check now passes (the packet marks those); report it as not fixed, partly fixed at ${entry.severity}, or fixed`);
     }
   }
   const missing = open.filter((e) => !seen.has(e.id)).map((e) => e.id);
-  if (missing.length) errors.push(`statuses: every open finding needs a status (fixed, partly fixed, not fixed or regressed); missing ${missing.join(", ")}`);
+  if (missing.length) errors.push(`statuses: every open finding needs a status (${allowed.join(", ")}); missing ${missing.join(", ")}`);
 
   const changed = new Set(scope.changed || []);
   const priorIds = new Set((ledger || []).map((e) => e.id));
@@ -224,8 +419,12 @@ export function verificationErrors(review, { scope, ledger, items, ids, pageKey 
       if (typeof item.justification !== "string" || item.justification.trim().length < 40) errors.push(`${at}: say what the rebuild changed that introduced it`);
     }
     if (item.basis === "missed") {
-      if (item.severity !== "blocker") errors.push(`${at}: only a blocker the earlier passes missed may be added on unchanged pages; a missed major is not reopened`);
       if (typeof item.justification !== "string" || item.justification.trim().length < 60) errors.push(`${at}: justify why the earlier pass could not see it (what was hidden, or what only this pass could check)`);
+      // A missed finding is admitted on the page's own words: a quote a reader
+      // can find on the page, not a recollection of it.
+      const quote = typeof item.evidence === "string" ? item.evidence.trim() : "";
+      if (quote.length < 8) errors.push(`${at}: a missed finding quotes the evidence on the page in \`evidence\` (at least a few words, exactly as printed)`);
+      else if (pageText && !quotedOn(quote, pages, pageText)) errors.push(`${at}: the quoted evidence "${quote.slice(0, 80)}" is not printed on ${pages.join(", ")}; quote the page exactly`);
     }
     const repeat = open.find((e) => e.code === item.code && (e.pages || []).some((id) => pages.includes(id)));
     if (repeat) errors.push(`${at}: ${item.code} on ${pages.filter((id) => (repeat.pages || []).includes(id)).join(", ")} is already ${repeat.id}; report it as that finding's status`);
@@ -334,24 +533,25 @@ export function uniqueIds(parts, listOf) {
 }
 
 /**
- * What the next pass is, or null when the prior record cannot scope one (no
- * record, or a deletion with no neighbour left): its number, the review it
- * verifies, the pages it must read - every page whose hash changed, the
- * neighbours of deleted pages, and every page an open major or blocker names -
- * and the open findings it must give a status. The changed pages are also the
- * only ones a new major finding may be raised on. `ids` is the pages a pass
+ * What the next pass is, or null when there is no prior record: its number,
+ * the review it verifies, the pages it must read - every page whose hash
+ * changed, the neighbours of deleted pages, and every page an open major or
+ * blocker names - and the open findings it must give a status. The changed
+ * pages are also the only ones a new major finding may be raised on. A rebuild
+ * that deleted every earlier page is read as all changed: the loop continues
+ * under its cap rather than silently starting again. `ids` is the pages a pass
  * reads (the storyline reads content pages only); `capped` says the pass would
- * exceed the loop's cap.
+ * exceed the loop's cap. The scope carries no earlier rating: a verifier that
+ * knows the last score is anchored to it.
  */
 export function nextPassScope(prior, current, { ledger, ids = Object.keys(current), maxPasses = MAX_PASSES }) {
   if (!prior?.pageHashes || !prior.review) return null;
-  const moved = changedPages(prior.pageHashes, current);
-  if (!moved) return null;
+  const moved = changedPages(prior.pageHashes, current) ?? { changed: Object.keys(current), deleted: Object.keys(prior.pageHashes), neighbours: [] };
   const named = new Set(openBlocking(ledger).flatMap((e) => e.pages || []));
   const changed = [...new Set([...moved.changed, ...moved.neighbours])];
   const pass = (prior.pass ?? prior.review.pass ?? 1) + 1;
   return { pass, verifies: prior.binding, maxPasses, capped: pass > maxPasses, changed, deleted: moved.deleted,
-    mustInspect: ids.filter((id) => changed.includes(id) || named.has(id)), open: openEntries(ledger), ledger, priorRating: prior.review.rating };
+    mustInspect: ids.filter((id) => changed.includes(id) || named.has(id)), open: openEntries(ledger), ledger };
 }
 
 /**
@@ -422,12 +622,12 @@ export function joinParts(parts, ids, ledger, { pageKey, dimensions, dimKey }) {
 /**
  * The saved answers of a split first pass: every <id>.json in the parts
  * folder. A backend's raw output (<id>.last-message.json) is written beside
- * them and is not a part - read as one, every part counted twice and the
- * merge refused its own run.
+ * them and is not a part - read as one, every part would count twice and the
+ * merge would refuse its own run.
  */
 export async function readParts(dir) {
   const files = (await fs.readdir(dir).catch(() => [])).filter((f) => f.endsWith(".json") && !f.endsWith(".last-message.json")).sort();
-  return { files, parts: await Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), "utf8")))) };
+  return { files, parts: await Promise.all(files.map((f) => readJson(path.join(dir, f)))) };
 }
 
 /** A reviewer's JSON answer, from whatever the backend printed around it. */
@@ -437,22 +637,31 @@ function parseAnswer(raw) {
 }
 
 /**
- * One fresh reviewer, with none of the author's context: codex with the
- * schema and the page images, or claude reading the images itself. Both loops
- * call it with the same flags.
+ * One fresh reviewer, with none of the author's context, working in `cwd` - a
+ * staging directory holding only the packet, the prompt, the schema and the
+ * renders (stageReview), so earlier reviews in the output directory are not
+ * within its reach: codex with the schema and the page images, or claude
+ * reading the images itself. Both loops call it with the same flags. The
+ * answer's provenance is the harness's to write: the backend it ran, the
+ * model, and the packet's prompt hash.
  */
-export async function callReviewer(which, { prompt, schemaPath, images = [], outPath, model, timeoutMs }) {
+export async function callReviewer(which, { prompt, schemaPath, images = [], outPath, model, timeoutMs, cwd, promptHash = null }) {
+  const chosen = reviewerModel(which, model);
+  let answer, used = chosen;
   if (which === "codex") {
-    await runProcess("codex", ["exec", ...(model ? ["--model", model] : []), "--sandbox", "read-only", "--ephemeral", "--output-schema", schemaPath,
-      "--output-last-message", outPath, ...images.flatMap((image) => ["--image", image]), "-"], { input: prompt, timeoutMs });
-    return parseAnswer(await fs.readFile(outPath, "utf8"));
-  }
-  if (which === "claude") {
-    const res = await runProcess("claude", ["-p", "--output-format", "json", "--allowedTools", "Read", ...(model ? ["--model", model] : [])], { input: prompt, timeoutMs });
+    await runProcess("codex", ["exec", ...(chosen ? ["--model", chosen] : []),
+      ...(REVIEWER_CONFIG.defaultReasoningEffort ? ["-c", `model_reasoning_effort="${REVIEWER_CONFIG.defaultReasoningEffort}"`] : []),
+      "--sandbox", "read-only", "--ephemeral", "--skip-git-repo-check", ...(cwd ? ["--cd", cwd] : []), "--output-schema", schemaPath,
+      "--output-last-message", outPath, ...images.flatMap((image) => ["--image", image]), "-"], { input: prompt, timeoutMs, cwd });
+    answer = parseAnswer(await fs.readFile(outPath, "utf8"));
+  } else if (which === "claude") {
+    const res = await runProcess("claude", ["-p", "--output-format", "json", "--allowedTools", "Read", ...(chosen ? ["--model", chosen] : [])], { input: prompt, timeoutMs, cwd });
     const envelope = JSON.parse(res.stdout);
-    return parseAnswer(typeof envelope.result === "string" ? envelope.result : JSON.stringify(envelope.result ?? envelope));
-  }
-  throw new Error(`Unknown reviewer backend: ${which}`);
+    answer = parseAnswer(typeof envelope.result === "string" ? envelope.result : JSON.stringify(envelope.result ?? envelope));
+    used = chosen ?? Object.keys(envelope.modelUsage ?? {})[0] ?? envelope.model ?? "claude (CLI default)";
+  } else throw new Error(`Unknown reviewer backend: ${which}`);
+  if (answer && typeof answer === "object" && promptHash) answer.provenance = { backend: which, model: used ?? `${which} (CLI default)`, promptHash };
+  return answer;
 }
 
 /**
@@ -460,13 +669,76 @@ export async function callReviewer(which, { prompt, schemaPath, images = [], out
  * each saved as parts/<id>.json, so a failed merge can be rerun on the saved
  * answers without calling anyone again.
  */
-export async function reviewParts(which, jobs, { partsDir, schemaPath, model, timeoutMs }) {
+export async function reviewParts(which, jobs, { partsDir, schemaPath, model, timeoutMs, cwd, promptHash }) {
   await fs.mkdir(partsDir, { recursive: true });
   return Promise.all(jobs.map(async (job) => {
-    const part = await callReviewer(which, { prompt: job.prompt, schemaPath, images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs });
-    await fs.writeFile(path.join(partsDir, `${job.id}.json`), JSON.stringify(part, null, 2) + "\n");
+    const part = await callReviewer(which, { prompt: job.prompt, schemaPath, images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs, cwd, promptHash });
+    await writeJson(path.join(partsDir, `${job.id}.json`), part);
     return part;
   }));
+}
+
+const STAGING_PREFIX = "professional-slides-";
+
+/**
+ * A clean staging directory for one packet: a fresh folder under the system
+ * temp directory holding only what the reviewer is given - the packet, the
+ * prompts, the schemas and copies of the renders (`files`, { to: from }) - so
+ * a reviewer working there, or handed its path, can reach nothing else the
+ * loop wrote. The previous staging directory of the same loop is removed.
+ */
+export async function stageReview(kind, files = {}, { previous = null } = {}) {
+  const tmp = await fs.realpath(os.tmpdir());
+  if (previous && path.dirname(previous) === tmp && path.basename(previous).startsWith(STAGING_PREFIX)) await fs.rm(previous, { recursive: true, force: true });
+  const dir = await fs.mkdtemp(path.join(tmp, `${STAGING_PREFIX}${kind}-`));
+  for (const [to, from] of Object.entries(files)) {
+    await fs.mkdir(path.dirname(path.join(dir, to)), { recursive: true });
+    await fs.copyFile(from, path.join(dir, to)).catch((error) => { if (error.code !== "ENOENT") throw error; });
+  }
+  return dir;
+}
+
+/**
+ * Where a deck's review lineages live: beside the deck file, keyed by deck id
+ * (<dir of deck.json>/.reviews/<id>/), so a rebuild into another output
+ * directory continues the same lineages and caps. With no deck path the deck
+ * file is looked for beside or inside the output directory.
+ */
+export async function lineageStore(spec, directory, deckPath = null) {
+  const deck = await locateDeck(spec, directory, deckPath);
+  return path.join(deck ? path.dirname(deck) : path.resolve(directory), ".reviews", deckStem(spec));
+}
+/** The deck file: the path given, or <id>.deck.json beside or inside the output directory. */
+export async function locateDeck(spec, directory, deckPath = null) {
+  if (deckPath) return path.resolve(deckPath);
+  const stem = deckStem(spec);
+  const exists = (file) => fs.access(file).then(() => true, () => false);
+  if (directory) for (const candidate of [path.join(path.dirname(path.resolve(directory)), `${stem}.deck.json`), path.join(path.resolve(directory), `${stem}.deck.json`)]) if (await exists(candidate)) return candidate;
+  return null;
+}
+
+const LINEAGE = "lineage.json";
+export const readLineage = async (historyDir) => (await readJson(path.join(historyDir, LINEAGE), { optional: true })) ?? { restarts: [] };
+
+/**
+ * Start a new lineage: the current passes move to lineage-<n>/ and the restart
+ * is logged with its reason. A restart needs a reason; a second restart needs
+ * the user's explicit approval, because restarting is how a capped loop would
+ * otherwise begin again at pass one. A lineage with no recorded pass has
+ * nothing to restart, and the call is a no-op.
+ */
+export async function restartLineage(historyDir, { reason, userApproved = false, flag = "--full-review" } = {}) {
+  const files = (await fs.readdir(historyDir).catch(() => [])).filter((f) => /^(pass|confirmation)-\d+\.json$/.test(f));
+  if (!files.some((f) => PASS_FILE.test(f))) return { restarted: false, errors: [] };
+  const lineage = await readLineage(historyDir);
+  if (typeof reason !== "string" || reason.trim().length < 10) return { restarted: false, errors: [`${flag} starts a new lineage and needs --reason "<why the argument itself changed>", which is logged`] };
+  if (lineage.restarts.length >= 1 && !userApproved) return { restarted: false, errors: [`this lineage has restarted ${lineage.restarts.length} time${lineage.restarts.length === 1 ? "" : "s"} already (${lineage.restarts.map((r) => `"${r.reason}"`).join("; ")}); another restart runs only when the user asks for it: rerun with --user-approved`] };
+  const archived = `lineage-${lineage.restarts.length + 1}`;
+  await fs.mkdir(path.join(historyDir, archived), { recursive: true });
+  for (const f of files) await fs.rename(path.join(historyDir, f), path.join(historyDir, archived, f));
+  lineage.restarts.push({ at: new Date().toISOString(), reason: reason.trim(), userApproved: Boolean(userApproved), archived, passes: files.filter((f) => PASS_FILE.test(f)).length });
+  await writeJson(path.join(historyDir, LINEAGE), lineage);
+  return { restarted: true, errors: [], archived };
 }
 
 const PASS_FILE = /^pass-(\d+)\.json$/;
@@ -474,19 +746,34 @@ const PASS_FILE = /^pass-(\d+)\.json$/;
 /** Every recorded pass of a loop's history folder, in order. */
 export async function readPasses(dir) {
   const files = (await fs.readdir(dir).catch(() => [])).filter((f) => PASS_FILE.test(f)).sort((a, b) => Number(a.match(PASS_FILE)[1]) - Number(b.match(PASS_FILE)[1]));
-  return Promise.all(files.map(async (f) => JSON.parse(await fs.readFile(path.join(dir, f), "utf8"))));
+  return Promise.all(files.map((f) => readJson(path.join(dir, f))));
 }
 
 /**
  * Record a validated pass as <dir>/pass-N.json, in the one format both loops
  * read: the review, its binding, pass and lineage, the page hashes it read
  * (what the next pass is scoped against) and the ledger after it (what
- * acceptance is read off).
+ * acceptance is read off). `extra` carries what a loop adds (its mode, the
+ * outcome it reached).
  */
-export async function recordPass(dir, { review, pageHashes, ledger }) {
+export async function recordPass(dir, { review, pageHashes, ledger, ...extra }) {
   await fs.mkdir(dir, { recursive: true });
   const file = path.join(dir, `pass-${(await readPasses(dir)).length + 1}.json`);
-  const record = { review, binding: review.binding, pass: review.pass ?? 1, verifies: review.verifies ?? null, pageHashes, ledger, recordedAt: new Date().toISOString() };
-  await fs.writeFile(file, JSON.stringify(record, null, 2) + "\n");
+  const record = { review, binding: review.binding, pass: review.pass ?? 1, verifies: review.verifies ?? null, pageHashes, ledger, ...extra, recordedAt: new Date().toISOString() };
+  await writeJson(file, record);
   return { file, record };
+}
+
+const CONFIRMATION_FILE = /^confirmation-(\d+)\.json$/;
+/** Every recorded confirmation read of a lineage, in order. */
+export async function readConfirmations(dir) {
+  const files = (await fs.readdir(dir).catch(() => [])).filter((f) => CONFIRMATION_FILE.test(f)).sort((a, b) => Number(a.match(CONFIRMATION_FILE)[1]) - Number(b.match(CONFIRMATION_FILE)[1]));
+  return Promise.all(files.map((f) => readJson(path.join(dir, f))));
+}
+/** Record a validated confirmation read as <dir>/confirmation-N.json beside the passes it confirms. */
+export async function recordConfirmation(dir, record) {
+  await fs.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `confirmation-${(await readConfirmations(dir)).length + 1}.json`);
+  await writeJson(file, { ...record, recordedAt: new Date().toISOString() });
+  return file;
 }

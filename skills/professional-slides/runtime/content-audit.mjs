@@ -1,3 +1,5 @@
+import { registered } from "./errors.mjs";
+
 // Verify explicit content and visual choices survive composition before export.
 // Layout selection must not turn supplied commentary into a silent no-op.
 export const AUDIT_CODES = Object.freeze({
@@ -18,7 +20,7 @@ export function auditContent(spec, scene) {
     const rendered = normalize(pages.flatMap((page) => page.nodes.filter((n) => n.type === "text")
       .map((n) => n.data?.textLayout?.source ?? n.text)).join(" "));
     const nodes = pages.flatMap(page => page.nodes);
-    const missingIntent = (kind, value) => findings.push({ title, code: "MISSING_VISUAL_INTENT", kind, value });
+    const missingIntent = (kind, value) => findings.push({ title, code: registered(AUDIT_CODES, "MISSING_VISUAL_INTENT"), kind, value });
     // Check explicit choices only. Meaning and useful omissions remain the
     // author/reviewer's responsibility; no keyword-driven styling is inferred.
     if (["icon-lead", "icon-framed"].includes(slide.pointsStyle)) {
@@ -32,8 +34,7 @@ export function auditContent(spec, scene) {
     if (slide.evidenceStatus && !nodes.some(node => node.type === "text" && normalize(node.data?.textLayout?.source ?? node.text).includes(normalize(slide.evidenceStatus))))
       missingIntent("evidence-status", slide.evidenceStatus);
     // A page given a photograph draws it, or the build says it did not: a
-    // hero-number page dropped its `photo` without a word, and a poster the
-    // author had cleared never reached the deck.
+    // supplied `photo` never drops out of the deck without a word.
     const pictures = [slide.photo, slide.image].filter((picture) => picture && typeof picture === "object");
     if (pictures.length && !nodes.some((node) => node.type === "image" || /image-frame|image-placeholder/.test(String(node.role ?? ""))))
       missingIntent("photo", pictures[0].alt ?? pictures[0].path ?? "photo");
@@ -78,7 +79,7 @@ export function auditContent(spec, scene) {
       const pattern = t.split(/\{\{page:[^}]+\}\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\d+(?:[–-]\\d+)?");
       return new RegExp(pattern).test(rendered);
     };
-    for (const text of prose) if (!present(text)) findings.push({ title, text, code: "MISSING_AUTHORED_CONTENT" });
+    for (const text of prose) if (!present(text)) findings.push({ title, text, code: registered(AUDIT_CODES, "MISSING_AUTHORED_CONTENT") });
   }
   return { accepted: findings.length === 0, findings };
 }

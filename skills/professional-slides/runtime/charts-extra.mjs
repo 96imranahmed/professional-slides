@@ -3,8 +3,7 @@
 // shapes (never a native chart), shares the plot frame, axes, legend and label
 // helpers of charts.mjs, and answers measureContent from its layout so a hug
 // measurement responds to width.
-import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, tokenValue, onFill } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./charts.mjs";
 import { TOKENS } from "./core.mjs";

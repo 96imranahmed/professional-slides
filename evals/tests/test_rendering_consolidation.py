@@ -66,7 +66,7 @@ console.log(JSON.stringify(Object.fromEntries(deck.slides.map((s)=>[s.id,lit(s.n
 """)
         roles = lambda page: {role for role, text, _ in result[page] if text.lower() == "only one of five"}
         self.assertEqual(roles("a"), {"list-item", "insight-body"}, "a point and the so-what bar")
-        self.assertIn("insight-body", roles("b"), "the caption under its panel")
+        self.assertIn("insight-caption", roles("b"), "the caption under its panel, set as text rather than a box")
         self.assertEqual(roles("c"), {"side-panel-text", "paragraph"}, "the rail's statement and the memo's prose")
         # Cut from the text as written, never from the phrase as offered.
         self.assertTrue(all(text in ("only one of five", "Only one of five") for page in result.values() for _, text, _ in page if text.lower() == "only one of five"))

@@ -1,8 +1,9 @@
 import unittest
-from node_probe import run_node
+from node_probe import requires_chromium, run_node
 
 
 class OverlapTests(unittest.TestCase):
+    @requires_chromium
     def test_rendered_collision_gate_rejects_bad_cases_and_accepts_declared_layers(self):
         results = run_node(r'''
 import { createRequire } from 'node:module';

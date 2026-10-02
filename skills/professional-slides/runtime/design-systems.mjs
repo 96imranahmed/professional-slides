@@ -1,19 +1,17 @@
 // Design systems: the page frame a deck is built in, not only its colours.
 //
-// Two decks on unrelated subjects used to come out with the same cover, the
-// same numbered chapter pages, the same title in the same place, the same
-// commentary rail on the right and the same grey takeaway band at the foot of
-// half their pages - only the accent differed. A design system sets all of
-// that at once: canvas and typefaces, title size and treatment, margins, where
-// the takeaway goes, which side the commentary takes, and how the cover and
-// chapter pages are built. `identity` then takes the colours from the subject.
+// A design system sets the whole frame at once, so two decks on unrelated
+// subjects differ in more than their accent: canvas and typefaces, title size
+// and treatment, margins, where the takeaway goes, which side the commentary
+// takes, and how the cover and chapter pages are built. `identity` then takes
+// the colours from the subject.
 //
 //   { "design": "editorial", "identity": { "primary": "#740001", "accent": "#D3A625" } }
 //
 // Everything resolves to things the pipeline already reads: a palette object
 // (colour, `style.*`, `font.*` and `type.*` tokens), `chrome`, `tracker`, the
 // cover layout, and two composition choices (`takeaway`, `commentary`).
-import { contrastRatio } from "./palettes.mjs";
+import { contrastRatio, mix } from "./color.mjs";
 
 export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
@@ -84,8 +82,8 @@ export const DESIGN_NAMES = Object.freeze(Object.keys(DESIGN_SYSTEMS));
 // Surface treatments. Pages drawn as type on the canvas with hairlines - a
 // table with an open header and no label column, white cards outlined on a
 // cream page, one thin line across an empty plot, roadmap dots on a rail -
-// carried a median of 0.18 of their body as ink where strong analytical decks
-// carry about 0.26, at the same word count: the gap was surfaces, not words.
+// carry a median of 0.18 of their body as ink where strong analytical decks
+// carry about 0.26, at the same word count: the gap is surfaces, not words.
 // `reference` is that weight and every system's default; `open` is the light
 // construction, kept for a house whose own pages are drawn that way. A system
 // may still take single treatments from `open` (its `surfaces` overrides).
@@ -104,8 +102,6 @@ export function surfaceTokens(name, set = "reference") {
 }
 
 const hex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
-const channels = (color) => [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-export const mix = (a, b, f) => "#" + channels(a).map((c, i) => Math.round(c * (1 - f) + channels(b)[i] * f).toString(16).padStart(2, "0")).join("").toUpperCase();
 /** Darken a colour toward ink until it reads at `ratio` against `ground`. */
 export function readable(color, ground, ratio = 4.5) {
   let out = color;
@@ -126,11 +122,10 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
   // Emphasis is the subject's own colour. A chart marks the bar the title is
-  // about in `color.accent` and draws the rest in series 1; with the brand red
-  // as series 1 and a soft secondary as the accent, an Emirates deck drew every
-  // rival bar in Emirates red and Emirates itself in tan - the emphasis upside
-  // down. Series 1 is now a dark neutral warmed by the brand, the accent is the
-  // brand colour, and the secondary colour is the second series.
+  // about in `color.accent` and draws the rest in series 1, so series 1 is a
+  // dark neutral warmed by the brand, the accent is the brand colour, and the
+  // secondary colour is the second series - with the brand as series 1, every
+  // rival bar would take the brand colour and the subject a soft secondary.
   const base = mix("#3A3A3A", identity.primary, 0.08);
   return {
     "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
@@ -141,7 +136,7 @@ export function identityColors(identity, canvas = "#FFFFFF") {
 }
 
 // Run-to-run variation. The runtime is deterministic, so the same brief
-// planned twice came out with the same shapes in the same order and the same
+// planned twice comes out with the same shapes in the same order and the same
 // secondary styles. `variation` (any string or number; a new deck takes a fresh
 // one) draws, once per deck and reproducibly, from choices the system allows:
 // list markers, table rows, the tracker, the contents page, how lead-in points

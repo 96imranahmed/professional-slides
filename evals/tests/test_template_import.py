@@ -26,7 +26,10 @@ class TemplateImportTests(unittest.TestCase):
                 "slides": [{"title": "Revenue grew nine percent while costs held flat across every region", "exhibit": {"type": "chart.column", "heading": "Revenue by year", "unit": "$m", "categories": ["2023", "2024", "2025"], "series": [{"name": "Revenue", "values": [40, 46, 52]}]}, "points": ["Growth came from the core", "Costs held flat", "Margin widened three points"]},
                            {"title": "Three regions carry the growth while two are flat", "points": ["North grew 12%", "South grew 9%", "East grew 8%", "West flat", "Central flat"]}]}
         (cls.tmp / "tpl.deck.json").write_text(json.dumps(spec))
-        subprocess.run([NODE, str(RUNTIME / "build-deck.mjs"), str(cls.tmp / "tpl.deck.json"), str(cls.tmp / "out"), "--no-render"], check=True, capture_output=True, cwd=ROOT, timeout=300)
+        # The probe's pages are sparse on purpose, so the build lists their
+        # empty bands as blockers (exit 2); the deck is written either way.
+        built = subprocess.run([NODE, str(RUNTIME / "build-deck.mjs"), str(cls.tmp / "tpl.deck.json"), str(cls.tmp / "out"), "--no-render"], capture_output=True, text=True, cwd=ROOT, timeout=300)
+        assert built.returncode in (0, 2), built.stderr
         cls.pptx = cls.tmp / "out" / "tpl.pptx"
         result = subprocess.run([sys.executable, str(RUNTIME / "import-template.py"), str(cls.pptx), "--base", "midnight", "--out", str(cls.tmp / "house.json")], check=True, capture_output=True, text=True, cwd=ROOT, timeout=120)
         cls.summary = json.loads(result.stdout)

@@ -31,14 +31,3 @@ export const SLIDE_TYPE_GUIDANCE = Object.freeze({
   "tracker-page": entry("orienting the audience across at least three meaningful sections", "a full tracker makes the approved sequence and current position explicit", "use a neutral navigation heading such as Contents or the parent section name"),
   "slide-chrome": entry("assembling an analytical page with the shared title, source and footer system", "consistent page furniture protects hierarchy and provenance across the deck", "state the evidence-backed answer the body of the slide proves")
 });
-
-
-export function assertParentheticalTemplateCopy(slides) {
-  const findings = [];
-  for (const slide of slides) {
-    for (const node of slide.nodes || []) if (typeof node.text === "string" && /\[|\]/.test(node.text)) findings.push({ slide: slide.id, role: node.role, text: node.text });
-    if (typeof slide.notes === "string" && /\[|\]/.test(slide.notes)) findings.push({ slide: slide.id, role: "notes", text: slide.notes });
-  }
-  if (findings.length) throw new Error(`Square-bracket template copy is not allowed: ${JSON.stringify(findings)}`);
-  return true;
-}
