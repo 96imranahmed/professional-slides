@@ -1,0 +1,241 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "o-response",
+   "finding": "Mean response time rose from 8.9 to 12.2 minutes in two years",
+   "shape": "series",
+   "calculation": "mean category-two response time by quarter",
+   "sources": [
+    "sources/o-response.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "response": {
+     "unit": "minutes",
+     "population": "Riverside ambulance service",
+     "periods": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      8.9,
+      9.4,
+      9.8,
+      10.6,
+      10.1,
+      10.9,
+      11.4,
+      12.2
+     ],
+     "better": "down"
+    }
+   },
+   "cite": [
+    "ras-board"
+   ]
+  },
+  {
+   "id": "o-demand",
+   "finding": "Calls rose 21% while crews on shift fell 3%",
+   "shape": "series",
+   "calculation": "calls answered and crews on shift by quarter",
+   "sources": [
+    "sources/o-demand.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "calls": {
+     "unit": "thousand calls",
+     "population": "Riverside ambulance service",
+     "periods": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      41.2,
+      42.0,
+      43.1,
+      45.6,
+      44.8,
+      46.0,
+      47.3,
+      49.9
+     ]
+    },
+    "crews": {
+     "unit": "crews on shift",
+     "population": "Riverside ambulance service",
+     "periods": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      118,
+      118,
+      117,
+      116,
+      116,
+      115,
+      114,
+      114
+     ]
+    }
+   },
+   "cite": [
+    "ras-board"
+   ]
+  },
+  {
+   "id": "o-handover",
+   "finding": "Hospital handover delay doubled to 44 minutes",
+   "shape": "series",
+   "calculation": "mean handover time at emergency departments by quarter",
+   "sources": [
+    "sources/o-handover.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "handover": {
+     "unit": "minutes",
+     "population": "Riverside ambulance service",
+     "periods": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      21,
+      24,
+      26,
+      33,
+      30,
+      35,
+      38,
+      44
+     ],
+     "better": "down"
+    }
+   },
+   "cite": [
+    "ras-board"
+   ]
+  },
+  {
+   "id": "o-districts",
+   "finding": "Response time ranges from 9.8 to 16.1 minutes across eight districts",
+   "shape": "peer-set",
+   "calculation": "mean response time by district, latest quarter",
+   "sources": [
+    "sources/o-districts.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "members": 8
+   },
+   "measures": {
+    "response": {
+     "unit": "minutes",
+     "population": "Riverside districts",
+     "period": "2024 Q4",
+     "members": [
+      "North",
+      "Central",
+      "Harbourside",
+      "East",
+      "Valley",
+      "Uplands",
+      "South",
+      "Riverbend"
+     ],
+     "values": [
+      9.8,
+      13.9,
+      12.6,
+      11.2,
+      14.8,
+      16.1,
+      10.4,
+      12.0
+     ],
+     "better": "down"
+    }
+   },
+   "cite": [
+    "ras-board"
+   ]
+  },
+  {
+   "id": "o-standard",
+   "finding": "The national standard for a category-two response is 18 minutes",
+   "shape": "fact",
+   "calculation": "published standard",
+   "sources": [
+    "sources/o-standard.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "context",
+   "measures": {
+    "standard": {
+     "unit": "minutes",
+     "population": "national standard",
+     "period": "2024",
+     "value": 18
+    }
+   },
+   "cite": [
+    "national-standard"
+   ]
+  },
+  {
+   "id": "o-mechanism",
+   "finding": "Crews held at hospital doors cannot answer the next call",
+   "shape": "qualitative",
+   "calculation": "interviews with dispatch and crew leads",
+   "sources": [
+    "sources/o-mechanism.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "supporting"
+  }
+ ]
+}

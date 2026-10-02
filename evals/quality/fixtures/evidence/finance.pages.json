@@ -1,0 +1,414 @@
+{
+ "deck": {
+  "id": "finance",
+  "workflow": "new_deck",
+  "request": "Is Harbour Credit Union growing safely, and how does it compare with its regional peers?",
+  "answer": "Harbour is growing faster than its peers on thinner liquidity, so funding comes before further lending.",
+  "players": [
+   "Harbour",
+   "Northgate",
+   "Millrace",
+   "Castlefield",
+   "Dunmore",
+   "Eastbank",
+   "Ferrybridge",
+   "Greyfriars"
+  ]
+ },
+ "sources": {
+  "harbour-ar": {
+   "name": "Harbour Credit Union annual report 2026",
+   "status": "illustrative"
+  },
+  "regulator-returns": {
+   "name": "Regional regulator annual returns 2026",
+   "status": "illustrative"
+  }
+ },
+ "pages": [
+  {
+   "id": "f1",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Loans grew 57% in seven years to 648 million",
+   "why": "The growth of the book over time is the claim, so the series is drawn",
+   "evidence": [
+    "i-loans"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "loan book at year end FY19 to FY26",
+    "measures": [
+     "i-loans/loans"
+    ]
+   },
+   "exhibit": {
+    "heading": "Loan book at year end",
+    "unit": "GBP m",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Loans",
+      "values": [
+       412,
+       438,
+       451,
+       476,
+       520,
+       566,
+       601,
+       648
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "i-loans/loans"
+     ],
+     "role": "proof"
+    },
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   },
+   "bar": "A book this much larger needs funding and capital that grew at the same pace"
+  },
+  {
+   "id": "f2",
+   "type": "numbers",
+   "form": "metric-strip",
+   "commentary": "none",
+   "title": "Profit rose again while operating cash flow fell 21%",
+   "why": "Two year-on-year movements set against the cash series that produced one of them",
+   "evidence": [
+    "i-cash",
+    "i-earn",
+    "A-ocf",
+    "A-earn"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "profit after tax and operating cash flow, FY25 to FY26",
+    "measures": [
+     "i-cash/ocf",
+     "i-earn/pat"
+    ]
+   },
+   "metrics": [
+    {
+     "value": "+4.3%",
+     "label": "Profit after tax",
+     "sublabel": "47 to 49",
+     "basis": {
+      "measures": [
+       "A-earn/percent"
+      ]
+     }
+    },
+    {
+     "value": "-21.4%",
+     "label": "Operating cash flow",
+     "sublabel": "84 to 66",
+     "basis": {
+      "measures": [
+       "A-ocf/percent"
+      ]
+     }
+    }
+   ],
+   "exhibit": {
+    "heading": "Operating cash flow",
+    "unit": "GBP m",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Operating cash flow",
+      "values": [
+       58,
+       61,
+       49,
+       66,
+       72,
+       81,
+       84,
+       66
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "i-cash/ocf"
+     ],
+     "role": "proof"
+    },
+    "type": "chart.column",
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   }
+  },
+  {
+   "id": "f3",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "The liquidity cushion narrowed from 41 million to 8 million",
+   "why": "The gap between two series in one unit is the claim, so both are drawn on one scale",
+   "evidence": [
+    "i-liquidity",
+    "A-cushion",
+    "A-floor"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "liquid assets and short-term liabilities at year end",
+    "measures": [
+     "i-liquidity/liquid",
+     "i-liquidity/short-liabilities"
+    ],
+    "relation": {
+     "kind": "gap"
+    }
+   },
+   "exhibit": {
+    "heading": "Liquid assets and liabilities due within a year",
+    "unit": "GBP m",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Liquid assets",
+      "values": [
+       120,
+       131,
+       150,
+       162,
+       158,
+       171,
+       180,
+       196
+      ]
+     },
+     {
+      "name": "Short-term liabilities",
+      "values": [
+       96,
+       104,
+       118,
+       121,
+       139,
+       160,
+       172,
+       188
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "i-liquidity/liquid",
+      "i-liquidity/short-liabilities"
+     ],
+     "role": "proof"
+    },
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   },
+   "bar": "Another year of lending at this pace would take liquid cover below liabilities"
+  },
+  {
+   "id": "f4",
+   "type": "panels",
+   "form": "row",
+   "commentary": "captions",
+   "title": "Costs fell nine points without closing branches",
+   "why": "A ratio and a count in different units, each read on its own panel",
+   "evidence": [
+    "i-efficiency"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "cost-to-income and branches open",
+    "measures": [
+     "i-efficiency/cost-income"
+    ]
+   },
+   "adds": "The captions say the efficiency gain did not come from shrinking the network",
+   "exhibits": [
+    {
+     "heading": "Cost-to-income ratio",
+     "unit": "%",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Cost-to-income",
+       "values": [
+        71,
+        70,
+        74,
+        69,
+        67,
+        65,
+        63,
+        62
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "i-efficiency/cost-income"
+      ],
+      "role": "proof"
+     },
+     "type": "chart.line",
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "The ratio fell from 71 to 62 percent over seven years of rising income"
+    },
+    {
+     "heading": "Branches open at year end",
+     "unit": "branches",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Branches",
+       "values": [
+        42,
+        42,
+        41,
+        41,
+        40,
+        40,
+        40,
+        40
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "i-efficiency/branches"
+      ],
+      "role": "context",
+      "relevance": "It rules out branch closures as the source of the cost saving"
+     },
+     "type": "chart.column",
+     "caption": "The network lost two branches in seven years, far too few to explain the saving"
+    }
+   ]
+  },
+  {
+   "id": "f5",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "so-what-bar",
+   "title": "Harbour ranks fourth of eight on net interest margin",
+   "why": "The whole peer set on one measure, with the subject marked",
+   "evidence": [
+    "i-peers",
+    "A-peers"
+   ],
+   "settles": {
+    "kind": "rank",
+    "what": "net interest margin across eight credit unions, FY26",
+    "measures": [
+     "A-peers/margin"
+    ]
+   },
+   "exhibit": {
+    "heading": "Net interest margin, FY26",
+    "unit": "%",
+    "categories": [
+     "Northgate",
+     "Castlefield",
+     "Ferrybridge",
+     "Harbour",
+     "Eastbank",
+     "Millrace",
+     "Greyfriars",
+     "Dunmore"
+    ],
+    "series": [
+     {
+      "name": "Margin",
+      "values": [
+       3.4,
+       3.1,
+       3.0,
+       2.9,
+       2.8,
+       2.6,
+       2.4,
+       2.2
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Harbour"
+     }
+    ],
+    "basis": {
+     "measures": [
+      "A-peers/margin"
+     ],
+     "role": "proof"
+    }
+   },
+   "bar": "Growth, not margin, is where Harbour leads, so the plan protects funding cost first"
+  }
+ ]
+}

@@ -1,0 +1,374 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "i-loans",
+   "finding": "Loans grew from 412 to 648 between FY19 and FY26",
+   "shape": "series",
+   "calculation": "loan book at year end, FY19-FY26",
+   "sources": [
+    "sources/i-loans.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "loans": {
+     "unit": "GBP m",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      412,
+      438,
+      451,
+      476,
+      520,
+      566,
+      601,
+      648
+     ]
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
+  },
+  {
+   "id": "i-cash",
+   "finding": "Operating cash flow fell from 84 to 66 in FY26 after six years of growth",
+   "shape": "series",
+   "calculation": "operating cash flow by year",
+   "sources": [
+    "sources/i-cash.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "ocf": {
+     "unit": "GBP m",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      58,
+      61,
+      49,
+      66,
+      72,
+      81,
+      84,
+      66
+     ]
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
+  },
+  {
+   "id": "i-earn",
+   "finding": "Profit after tax rose every year since FY21",
+   "shape": "series",
+   "calculation": "profit after tax by year",
+   "sources": [
+    "sources/i-earn.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "pat": {
+     "unit": "GBP m",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      31,
+      33,
+      22,
+      35,
+      39,
+      44,
+      47,
+      49
+     ]
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
+  },
+  {
+   "id": "i-liquidity",
+   "finding": "Liquid assets stay above short-term liabilities but the cushion narrows",
+   "shape": "series",
+   "calculation": "liquid assets and liabilities due within a year, year end",
+   "sources": [
+    "sources/i-liquidity.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "liquid": {
+     "unit": "GBP m",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      120,
+      131,
+      150,
+      162,
+      158,
+      171,
+      180,
+      196
+     ]
+    },
+    "short-liabilities": {
+     "unit": "GBP m",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      96,
+      104,
+      118,
+      121,
+      139,
+      160,
+      172,
+      188
+     ]
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
+  },
+  {
+   "id": "i-efficiency",
+   "finding": "Cost-to-income fell nine points with the branch network almost unchanged",
+   "shape": "series",
+   "calculation": "operating cost over income; branches open at year end",
+   "sources": [
+    "sources/i-efficiency.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "cost-income": {
+     "unit": "%",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      71,
+      70,
+      74,
+      69,
+      67,
+      65,
+      63,
+      62
+     ],
+     "better": "down"
+    },
+    "branches": {
+     "unit": "branches",
+     "population": "Harbour Credit Union",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      42,
+      42,
+      41,
+      41,
+      40,
+      40,
+      40,
+      40
+     ]
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
+  },
+  {
+   "id": "i-peers",
+   "finding": "Harbour is mid-table on margin and second on loan growth among eight credit unions",
+   "shape": "peer-set",
+   "calculation": "net interest margin, loan growth and capital ratio, latest year",
+   "sources": [
+    "sources/i-peers.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "members": 8
+   },
+   "measures": {
+    "margin": {
+     "unit": "%",
+     "population": "regional credit unions",
+     "period": "FY26",
+     "members": [
+      "Harbour",
+      "Northgate",
+      "Millrace",
+      "Castlefield",
+      "Dunmore",
+      "Eastbank",
+      "Ferrybridge",
+      "Greyfriars"
+     ],
+     "values": [
+      2.9,
+      3.4,
+      2.6,
+      3.1,
+      2.2,
+      2.8,
+      3.0,
+      2.4
+     ]
+    },
+    "loan-growth": {
+     "unit": "% a year",
+     "population": "regional credit unions",
+     "period": "FY26",
+     "members": [
+      "Harbour",
+      "Northgate",
+      "Millrace",
+      "Castlefield",
+      "Dunmore",
+      "Eastbank",
+      "Ferrybridge",
+      "Greyfriars"
+     ],
+     "values": [
+      7.8,
+      5.1,
+      6.3,
+      4.4,
+      8.9,
+      3.9,
+      5.6,
+      6.0
+     ]
+    },
+    "capital": {
+     "unit": "% of risk-weighted assets",
+     "population": "regional credit unions",
+     "period": "FY26",
+     "members": [
+      "Harbour",
+      "Northgate",
+      "Millrace",
+      "Castlefield",
+      "Dunmore",
+      "Eastbank",
+      "Ferrybridge",
+      "Greyfriars"
+     ],
+     "values": [
+      14.2,
+      16.8,
+      13.1,
+      15.5,
+      12.4,
+      null,
+      15.0,
+      13.8
+     ],
+     "unavailable": {
+      "Eastbank": "does not publish a capital ratio"
+     },
+     "boundaries": {
+      "Dunmore": "calendar year, not fiscal"
+     }
+    }
+   },
+   "cite": [
+    "regulator-returns"
+   ]
+  }
+ ]
+}

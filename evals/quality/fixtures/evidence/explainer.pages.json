@@ -1,0 +1,145 @@
+{
+ "deck": {
+  "id": "explainer",
+  "workflow": "new_deck",
+  "request": "Explain how the tram signalling upgrade works and what it has delivered so far.",
+  "answer": "Moving blocks shorten the gap between trams, and the first section already shows two thirds fewer faults."
+ },
+ "sources": {
+  "tram-ops": {
+   "name": "Tram operations fault log, 2023-2024",
+   "status": "illustrative"
+  }
+ },
+ "pages": [
+  {
+   "id": "x1",
+   "type": "mechanism",
+   "form": "process",
+   "commentary": "so-what-bar",
+   "title": "Moving blocks let trams follow each other more closely",
+   "why": "How the system works is a sequence, drawn as steps",
+   "evidence": [
+    "x-how"
+   ],
+   "settles": {
+    "kind": "structure",
+    "what": "how a moving block replaces a fixed one"
+   },
+   "exhibit": {
+    "items": [
+     {
+      "label": "Tram reports its position"
+     },
+     {
+      "label": "Control computes safe distance"
+     },
+     {
+      "label": "Following tram gets its limit"
+     },
+     {
+      "label": "Boundary moves with the tram"
+     }
+    ]
+   },
+   "bar": "Capacity rises without new track because the gap between trams shrinks"
+  },
+  {
+   "id": "x2",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Faults on the converted section fell by two thirds",
+   "why": "The fall over time is the claim, so the quarterly series is drawn",
+   "evidence": [
+    "x-faults"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "signal faults by quarter",
+    "measures": [
+     "x-faults/faults"
+    ]
+   },
+   "exhibit": {
+    "heading": "Signal faults on the converted section",
+    "unit": "faults a quarter",
+    "categories": [
+     "2023 Q1",
+     "2023 Q2",
+     "2023 Q3",
+     "2023 Q4",
+     "2024 Q1",
+     "2024 Q2",
+     "2024 Q3",
+     "2024 Q4"
+    ],
+    "series": [
+     {
+      "name": "Faults",
+      "values": [
+       61,
+       58,
+       49,
+       44,
+       31,
+       26,
+       22,
+       19
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "x-faults/faults"
+     ]
+    },
+    "highlights": [
+     {
+      "category": "2024 Q4"
+     }
+    ]
+   },
+   "bar": "Reliability, not only capacity, is what the first section has already delivered"
+  },
+  {
+   "id": "x3",
+   "type": "schedule",
+   "form": "roadmap",
+   "commentary": "none",
+   "title": "Conversion reaches the whole line in three years",
+   "why": "Dated phases of one programme, in order",
+   "evidence": [
+    "x-plan"
+   ],
+   "settles": {
+    "kind": "sequence",
+    "what": "the phases of the conversion programme"
+   },
+   "exhibit": {
+    "items": [
+     {
+      "label": "Section A",
+      "period": "2024",
+      "detail": "Converted and in service"
+     },
+     {
+      "label": "Section B",
+      "period": "2025",
+      "detail": "Trackside equipment installed"
+     },
+     {
+      "label": "Section C",
+      "period": "2026",
+      "detail": "Fleet fitted with new units"
+     },
+     {
+      "label": "Whole line",
+      "period": "2027",
+      "detail": "Fixed blocks withdrawn"
+     }
+    ]
+   }
+  }
+ ]
+}

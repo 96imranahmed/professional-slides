@@ -1,0 +1,72 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "x-faults",
+   "finding": "Signal faults fell from 61 to 19 a quarter on the converted section",
+   "shape": "series",
+   "calculation": "signal faults by quarter on the converted section",
+   "sources": [
+    "sources/x-faults.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   },
+   "measures": {
+    "faults": {
+     "unit": "faults a quarter",
+     "population": "Line 2, converted section",
+     "periods": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      61,
+      58,
+      49,
+      44,
+      31,
+      26,
+      22,
+      19
+     ],
+     "better": "down"
+    }
+   },
+   "cite": [
+    "tram-ops"
+   ]
+  },
+  {
+   "id": "x-how",
+   "finding": "The new system moves the block boundary with the tram rather than fixing it to the track",
+   "shape": "qualitative",
+   "calculation": "engineering description",
+   "sources": [
+    "sources/x-how.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong"
+  },
+  {
+   "id": "x-plan",
+   "finding": "Conversion runs section by section over three years",
+   "shape": "schedule",
+   "calculation": "programme plan",
+   "sources": [
+    "sources/x-plan.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "supporting"
+  }
+ ]
+}

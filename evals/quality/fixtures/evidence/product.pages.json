@@ -1,0 +1,271 @@
+{
+ "deck": {
+  "id": "product",
+  "workflow": "new_deck",
+  "request": "Where should Lumen invest next to hold its lead over Quill and Paperly?",
+  "answer": "Lumen leads only on retention, so it invests there and in conversion rather than matching integrations.",
+  "players": [
+   "Lumen",
+   "Quill",
+   "Paperly"
+  ]
+ },
+ "sources": {
+  "lumen-analytics": {
+   "name": "Lumen product analytics, March 2026",
+   "status": "illustrative"
+  },
+  "public-pricing": {
+   "name": "Published pricing and integration pages, March 2026",
+   "status": "illustrative"
+  }
+ },
+ "pages": [
+  {
+   "id": "p1",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "The new onboarding retains 15 points more by March",
+   "why": "Two cohorts in one unit on one scale, so the gap is read off the chart",
+   "evidence": [
+    "p-retention",
+    "C-lift"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "share of the August cohort active each month, by onboarding version",
+    "measures": [
+     "p-retention/new-onboarding",
+     "p-retention/old-onboarding"
+    ],
+    "relation": {
+     "kind": "gap"
+    }
+   },
+   "exhibit": {
+    "heading": "Share of August signups still active",
+    "unit": "% of cohort",
+    "categories": [
+     "Aug 2025",
+     "Sep 2025",
+     "Oct 2025",
+     "Nov 2025",
+     "Dec 2025",
+     "Jan 2026",
+     "Feb 2026",
+     "Mar 2026"
+    ],
+    "series": [
+     {
+      "name": "New onboarding",
+      "values": [
+       100,
+       62,
+       51,
+       45,
+       41,
+       39,
+       38,
+       37
+      ]
+     },
+     {
+      "name": "Old onboarding",
+      "values": [
+       100,
+       55,
+       41,
+       33,
+       28,
+       25,
+       23,
+       22
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "p-retention/new-onboarding",
+      "p-retention/old-onboarding"
+     ]
+    },
+    "highlights": [
+     {
+      "category": "Mar 2026"
+     }
+    ]
+   },
+   "bar": "Retention is where the product changed, so the plan invests there first"
+  },
+  {
+   "id": "p2",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Paying users doubled as a share of actives",
+   "why": "The ratio of two records, computed and drawn over time",
+   "evidence": [
+    "p-paid",
+    "C-paid"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "paying users as a share of active users by month",
+    "measures": [
+     "C-paid/result"
+    ]
+   },
+   "exhibit": {
+    "heading": "Paying users as a share of active users",
+    "unit": "%",
+    "categories": [
+     "Aug 2025",
+     "Sep 2025",
+     "Oct 2025",
+     "Nov 2025",
+     "Dec 2025",
+     "Jan 2026",
+     "Feb 2026",
+     "Mar 2026"
+    ],
+    "series": [
+     {
+      "name": "Paid share",
+      "values": [
+       3.974359,
+       4.534884,
+       5.052632,
+       5.784314,
+       6.545455,
+       7.179487,
+       7.983871,
+       8.992248
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "C-paid/result"
+     ]
+    },
+    "highlights": [
+     {
+      "category": "Mar 2026"
+     }
+    ]
+   },
+   "bar": "Conversion, not signups, is now the faster route to revenue"
+  },
+  {
+   "id": "p3",
+   "type": "scorecard",
+   "form": "heatmap",
+   "commentary": "so-what-bar",
+   "title": "Lumen leads on retention and trails on price and integrations",
+   "why": "Three products on three common measures, the undisclosed cell kept as n/a",
+   "evidence": [
+    "p-rivals",
+    "C-rivals"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "retention, price and integrations for three products",
+    "measures": [
+     "C-rivals/retention",
+     "C-rivals/price",
+     "C-rivals/integrations"
+    ]
+   },
+   "exhibit": {
+    "columns": [
+     {
+      "label": "Product",
+      "type": "category"
+     },
+     {
+      "label": "Month-eight retention, %",
+      "heat": true
+     },
+     {
+      "label": "Price, USD a month",
+      "heat": true
+     },
+     {
+      "label": "Integrations",
+      "heat": true
+     }
+    ],
+    "rows": [
+     [
+      "Lumen",
+      37,
+      12,
+      14
+     ],
+     [
+      "Quill",
+      31,
+      8,
+      41
+     ],
+     [
+      "Paperly",
+      "n/a",
+      10,
+      26
+     ]
+    ],
+    "basis": {
+     "measures": [
+      "C-rivals/retention",
+      "C-rivals/price",
+      "C-rivals/integrations"
+     ]
+    }
+   },
+   "bar": "The lead is real on one measure only, so the strategy defends retention"
+  },
+  {
+   "id": "p4",
+   "type": "composition",
+   "form": "donut",
+   "commentary": "so-what-bar",
+   "title": "Capture and search are 73% of sessions",
+   "why": "The parts of one whole, four of them",
+   "evidence": [
+    "p-usage",
+    "C-mix"
+   ],
+   "settles": {
+    "kind": "share",
+    "what": "sessions by first feature used, March 2026",
+    "measures": [
+     "p-usage/sessions"
+    ]
+   },
+   "exhibit": {
+    "labels": [
+     "Capture",
+     "Search",
+     "Sharing",
+     "Templates"
+    ],
+    "values": [
+     46,
+     27,
+     18,
+     9
+    ],
+    "unit": "% of sessions",
+    "heading": "Sessions by first feature used, March 2026",
+    "basis": {
+     "measures": [
+      "p-usage/sessions"
+     ]
+    }
+   },
+   "bar": "Sharing and templates are where a second habit would have to be built"
+  }
+ ]
+}

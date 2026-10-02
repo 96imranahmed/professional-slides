@@ -51,7 +51,7 @@ import {
   changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
   callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, requestHash, requestErrors, stageReview, lineageStore, restartLineage, isAuthFailure,
-  readInventory, revisionChanges, locateDeck, REQUEST_PROVENANCES, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
+  readInventory, revisionChanges, locateDeck, requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
 } from "./review-passes.mjs";
 import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
 import { dependencyNotes } from "./gates/dependency_gates.mjs";
@@ -537,19 +537,11 @@ const marked = (packet, line, p) => `${line}${packet.revision?.changed?.includes
 
 /** The request and the answer, as the critic reads them. */
 function requestLines(packet) {
-  const provenance = packet.requestProvenance ?? "verbatim";
-  const label = provenance === "verbatim" ? "verbatim - the yardstick; judge the storyline against it, not against the team's framing"
-    : `${provenance}: ${REQUEST_PROVENANCES[provenance]} - not the user's own words. It is the yardstick as far as it goes: judge the storyline against what it asks, do not hold the team to its exact wording or to an answer its phrasing presumes, and say in the summary where it leaves the request open`;
+  const said = requestStatement(packet, "storyline");
   const request = packet.request
-    ? `THE USER'S REQUEST (${label}):\n"""\n${packet.request}\n"""`
+    ? `THE USER'S REQUEST (${said.label ?? "verbatim - the yardstick; judge the storyline against it, not against the team's framing"}):\n"""\n${packet.request}\n"""`
     : `THE USER'S REQUEST: not recorded. Judge against the team's question and say so in the summary. THE TEAM'S QUESTION: ${packet.question || "(not stated)"}`;
-  const scope = packet.evidenceScope?.retrieval === "closed"
-    ? `\nEVIDENCE SCOPE: closed - the team may use only the evidence supplied${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}. An analysis that needs other data has remedy "retrieval": the team cannot run it. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
-    : "";
-  const offered = packet.answerStatus?.status === "provisional"
-    ? `\nTHE ANSWER IS OFFERED AS PROVISIONAL. It says it leaves open: ${packet.answerStatus.limits.map((limit) => `"${limit}"`).join("; ")}. Judge whether those are the decisive gaps, and whether everything else the evidence allows has been done.`
-    : "";
-  return `${request}${scope}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${offered}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
+  return `${request}${said.scope ? `\n${said.scope}` : ""}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${said.offered ? `\n${said.offered}` : ""}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
 }
 
 const sectionsLine = (packet) => {
@@ -1072,6 +1064,18 @@ export async function storylineGate(spec, directory, { deckPath = null } = {}) {
   if (latest) return validateStorylineReview(latest.review, spec, { record: latest });
   if (review) return [`storyline-review.json answers no packet this deck's storyline loop wrote and is in no recorded pass: run node runtime/storyline.mjs <id>.deck.json out/, give its prompt to a fresh critic and save that answer - a critique that did not answer the packet is not a gate`];
   return validateStorylineReview(null, spec);
+}
+
+/**
+ * How the storyline loop stands for delivery to record: `provisional` with the
+ * open items the evidence scope forbids and the limits the answer declares, so
+ * a deck delivered on a provisional storyline says so; otherwise the latest
+ * verdict alone.
+ */
+export async function storylineOutcome(spec, directory, { deckPath = null } = {}) {
+  const latest = (await readStorylineHistory(await lineageStore(spec, directory, deckPath))).at(-1);
+  if (latest?.review?.verdict !== "provisional") return { verdict: latest?.review?.verdict ?? null };
+  return { verdict: "provisional", open: openBlocking(latest.ledger).map((e) => ({ id: e.id, severity: e.severity, reason: e.reason })), answerLimits: answerStatusOf(spec).limits };
 }
 
 // A revision that leaves the user's spine as it was - every page's title,

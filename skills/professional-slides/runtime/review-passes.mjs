@@ -136,6 +136,24 @@ export const requestProvenanceOf = (spec) => (Object.hasOwn(REQUEST_PROVENANCES,
 export const evidenceScopeOf = (spec) => ({ retrieval: spec?.evidenceScope?.retrieval === "closed" ? "closed" : "open", note: typeof spec?.evidenceScope?.note === "string" ? spec.evidenceScope.note.trim() : "" });
 /** Whether the deck offers its answer as final or as provisional, and what a provisional one leaves open. */
 export const answerStatusOf = (spec) => ({ status: spec?.answerStatus === "provisional" ? "provisional" : "final", limits: Array.isArray(spec?.answerLimits) ? spec.answerLimits.filter((limit) => typeof limit === "string" && limit.trim()) : [] });
+/**
+ * What a critic or reviewer is told about the request, the evidence scope and
+ * the answer's status, as the three parts of its prompt: `label` (how the
+ * request is to be read as a yardstick), `scope` and `offered` (each "" when
+ * there is nothing to say). `subject` is what is being judged: "storyline" or
+ * "deck". One wording for both reviews, so they cannot be told different things.
+ */
+export function requestStatement(packet, subject) {
+  const provenance = Object.hasOwn(REQUEST_PROVENANCES, packet?.requestProvenance) ? packet.requestProvenance : "verbatim";
+  const label = provenance === "verbatim" ? null
+    : `${provenance}: ${REQUEST_PROVENANCES[provenance]} - not the user's own words. It is the yardstick as far as it goes: judge the ${subject} against what it asks, do not hold it to the exact wording or to an answer the phrasing presumes, and say in the summary where it leaves the request open`;
+  const scope = packet?.evidenceScope?.retrieval === "closed"
+    ? `EVIDENCE SCOPE: closed - only the evidence supplied may be used${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}. An analysis that needs other data cannot be run. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
+    : "";
+  const limits = packet?.answerStatus?.status === "provisional" ? packet.answerStatus.limits || [] : null;
+  const offered = limits ? `THE ANSWER IS OFFERED AS PROVISIONAL. It says it leaves open: ${limits.map((limit) => `"${limit}"`).join("; ")}. Judge whether those are the decisive gaps, and whether everything else the evidence allows has been done.` : "";
+  return { label, scope, offered };
+}
 // The request's hash covers what the reviews are told about it: a deck that
 // says nothing of provenance or scope keeps the hash of its words alone.
 export const requestHash = (spec) => {

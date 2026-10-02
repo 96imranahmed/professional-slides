@@ -53,7 +53,7 @@ import {
 } from "./reviewer.mjs";
 import { capMessage, deckStatementFindings, requestOf, provenanceErrors, lineageStore, restartLineage, readConfirmations, recordConfirmation, readInventory, revisionChanges } from "./review-passes.mjs";
 import { writeLedger, validateSelfCheck, CLAIM_CODES } from "./claims.mjs";
-import { storylineGate } from "./storyline.mjs";
+import { storylineGate, storylineOutcome } from "./storyline.mjs";
 
 // Delivery's own findings: why a deck was refused around its review, as
 // opposed to a defect a gate or the reviewer found on a page. A review that
@@ -127,6 +127,12 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   const storyErrors = await storylineGate(spec, directory, { deckPath: specPath });
   if (storyErrors.length) return refuse("storyline", storyErrors.map((reason) => ({ slide: null, code: "STORYLINE_UNREVIEWED", severity: "blocker", reason,
     repair: "Run node runtime/storyline.mjs on the deck, give its prompt to a fresh critic, save the JSON as out/storyline-review.json and rerun until it says ready for the current spine; then request the deck review" })));
+
+  // A storyline that passed as provisional is delivered as provisional: the
+  // record keeps the items the evidence scope left open and the limits the
+  // answer declares, so an accepted deck is never read as a settled answer.
+  const story = await storylineOutcome(spec, directory, { deckPath: specPath });
+  if (story.verdict === "provisional") report.provisional = { open: story.open, answerLimits: story.answerLimits };
 
   // What was drawn, against the bars the plan promised: a miss is refused here,
   // before a review is spent on it, unless the deck waives the bar - and then

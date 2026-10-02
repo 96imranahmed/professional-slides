@@ -1,0 +1,62 @@
+{
+ "schema": "professional-slides.analysis/v1",
+ "analyses": [
+  {
+   "id": "A-ocf",
+   "op": "growth",
+   "inputs": [
+    "i-cash/ocf"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Cash generation fell while profit rose",
+   "strength": "strong"
+  },
+  {
+   "id": "A-earn",
+   "op": "growth",
+   "inputs": [
+    "i-earn/pat"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Profit growth continued through the cash decline",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-cushion",
+   "op": "gap",
+   "inputs": [
+    "i-liquidity/liquid",
+    "i-liquidity/short-liabilities"
+   ],
+   "soWhat": "The liquidity cushion has narrowed to a third of its peak",
+   "strength": "strong"
+  },
+  {
+   "id": "A-peers",
+   "op": "compare",
+   "inputs": [
+    "i-peers/margin",
+    "i-peers/loan-growth",
+    "i-peers/capital"
+   ],
+   "soWhat": "No union leads on all three measures, so the ranking depends on priority",
+   "strength": "strong"
+  },
+  {
+   "id": "A-floor",
+   "op": "threshold",
+   "inputs": [
+    "A-cushion/result"
+   ],
+   "threshold": {
+    "value": 0,
+    "unit": "GBP m",
+    "rationale": "liquid assets must cover liabilities due within a year"
+   },
+   "soWhat": "Eight million of headroom remains above the cover floor",
+   "strength": "supporting"
+  }
+ ]
+}

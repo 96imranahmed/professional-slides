@@ -38,6 +38,7 @@ import {
   pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
   uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, deckStatementFindings, unknownKeyErrors, stageReview, lineageStore, isAuthFailure, readConfirmations,
+  requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
 } from "./review-passes.mjs";
 
 export { MAX_PASSES, MAX_CONFIRMATIONS, designStatistics };
@@ -930,7 +931,7 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
   const binding = await reviewBinding(dir, { request: requestOf(spec) });
   const packet = { binding, kind: confirmation ? "confirmation" : scope ? "verification" : "review", pass: confirmation ? null : scope ? scope.pass : 1,
     verifies: scope ? scope.verifies : null, confirms: confirmation?.confirms ?? null, maxPasses: scope?.maxPasses ?? MAX_PASSES,
-    scope: shown, sections, craft, statistics, density, request: requestOf(spec), question: spec.question ?? null, answer: spec.answer ?? spec.context?.governingAnswer ?? "",
+    scope: shown, sections, craft, statistics, density, request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec), question: spec.question ?? null, answer: spec.answer ?? spec.context?.governingAnswer ?? "",
     waivers, storyline, revision: !scope && !confirmation && revision ? { changed: revision.changed } : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
     titles: slides.map((s) => `${s.index}. [${s.id}] ${s.title}`), slides, rubric: RUBRIC, severities: SEVERITY_DEFINITIONS, codes: CODES, schema };
   const main = confirmation ? confirmationPrompt(packet) : scope ? verificationPrompt(packet) : reviewPrompt(packet);
@@ -1006,7 +1007,9 @@ const pageLine = (s) => `- [${s.id}] page ${s.index}: ${s.title || "(no title)"}
 /** The user's request, verbatim, as the yardstick; the deck's answer beside it as the author's. */
 export function requestPrompt(packet) {
   const answer = `THE DECK'S GOVERNING ANSWER (the author's): ${packet.answer || "(not stated)"}`;
-  if (packet.request) return `THE USER'S REQUEST (verbatim - the yardstick: judge the deck against it, not against the deck's own framing):\n"""\n${packet.request}\n"""\n${answer}`;
+  // What the deck says of its request, its evidence and its answer, in the storyline critic's words (review-passes.mjs requestStatement).
+  const said = requestStatement(packet, "deck");
+  if (packet.request) return `THE USER'S REQUEST (${said.label ?? "verbatim - the yardstick: judge the deck against it, not against the deck's own framing"}):\n"""\n${packet.request}\n"""${said.scope ? `\n${said.scope}` : ""}\n${answer}${said.offered ? `\n${said.offered}` : ""}`;
   return `THE USER'S REQUEST: not recorded. Judge the deck against its own question and say in the summary that no verbatim request was supplied. THE DECK'S QUESTION (the author's): ${packet.question || "(not stated)"}\n${answer}`;
 }
 

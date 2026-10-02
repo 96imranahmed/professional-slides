@@ -1,0 +1,85 @@
+{
+ "schema": "professional-slides.analysis/v1",
+ "analyses": [
+  {
+   "id": "B-per-crew",
+   "op": "ratio",
+   "inputs": [
+    "o-demand/calls",
+    "o-demand/crews"
+   ],
+   "soWhat": "Each crew now answers a quarter more calls than two years ago",
+   "strength": "strong"
+  },
+  {
+   "id": "B-headroom",
+   "op": "threshold",
+   "inputs": [
+    "o-response/response"
+   ],
+   "threshold": {
+    "ref": "o-standard/standard"
+   },
+   "safe": "below",
+   "soWhat": "Under six minutes of headroom to the national standard remains",
+   "strength": "strong"
+  },
+  {
+   "id": "B-path",
+   "op": "scenario",
+   "inputs": [
+    "o-response/response"
+   ],
+   "method": "linear",
+   "assumptions": [
+    {
+     "name": "quarterly rise",
+     "value": 0.5,
+     "unit": "minutes",
+     "rationale": "the mean quarterly rise over the last eight quarters continues"
+    }
+   ],
+   "horizon": [
+    "2025 Q1",
+    "2025 Q2",
+    "2025 Q3",
+    "2025 Q4",
+    "2026 Q1",
+    "2026 Q2",
+    "2026 Q3",
+    "2026 Q4",
+    "2027 Q1",
+    "2027 Q2",
+    "2027 Q3",
+    "2027 Q4"
+   ],
+   "threshold": {
+    "ref": "o-standard/standard"
+   },
+   "soWhat": "On the recent trend the service breaches the standard within three years",
+   "strength": "supporting"
+  },
+  {
+   "id": "B-districts",
+   "op": "rank",
+   "inputs": [
+    "o-districts/response"
+   ],
+   "soWhat": "Uplands and Valley are furthest from the standard and take the first crews",
+   "strength": "strong"
+  },
+  {
+   "id": "B-vehicles",
+   "op": "gap",
+   "inputs": [
+    "o-demand/crews",
+    "o-fleet/vehicles"
+   ],
+   "missing": [
+    "vehicles available by quarter: the fleet register was not supplied"
+   ],
+   "soWhat": "Whether vehicles or crews bind cannot be settled without the fleet register",
+   "strength": "context"
+  }
+ ]
+}
