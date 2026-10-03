@@ -253,9 +253,13 @@ export function deckSpineFindings(doc, insights = null) {
     const alternatives = alternativesOf(deck);
     const results = insights.analysis?.results ?? [];
     if (alternatives.length >= 2 && hasMeasures(insights)) {
-      const covers = (r) => r.op === "compare" && r.status !== "unavailable" && alternatives.every((name) => r.table.members.includes(name));
-      if (!results.some(covers)) out.push({ code: "ANALYSIS_REQUIRED", severity: "blocker", measured: { players: alternatives, compared: results.filter((r) => r.op === "compare").map((r) => r.id) },
-        repair: `The deck declares ${alternatives.length} players to compare (${alternatives.join(", ")}) and no computed analysis sets them all on common measures. Before the outline, write \`<id>.analysis.json\` with a \`compare\` over the measures the answer turns on - ${ANALYSIS_OPS.compare.does} - and run \`node runtime/analysis.mjs <id>.pages.json\`: a player with no record takes its row with n/a, which is a finding, and the result says who leads under each priority. Pages then rest on the result by its id (references/storylining.md#run-the-analyses-before-the-outline)` });
+      // A player is placed when a compared measure holds its number, or records why it has none;
+      // a row of "not in this record" is a player the comparison never looked at.
+      const placed = (r, name) => r.table.columns.some((c) => c.cells[name] && (c.cells[name].value !== null || c.cells[name].unavailable !== "not in this record"));
+      const common = (r) => r.table.columns.some((c) => alternatives.filter((name) => c.cells[name]?.value !== null && c.cells[name]?.value !== undefined).length >= 2);
+      const covers = (r) => r.op === "compare" && r.status !== "unavailable" && alternatives.every((name) => placed(r, name)) && common(r);
+      if (!results.some(covers)) out.push({ code: "ANALYSIS_REQUIRED", severity: "blocker", measured: { players: alternatives, compared: results.filter((r) => r.op === "compare").map((r) => r.id), unplaced: [...new Set(results.filter((r) => r.op === "compare" && r.status !== "unavailable").flatMap((r) => alternatives.filter((name) => !placed(r, name))))] },
+        repair: `The deck declares ${alternatives.length} players to compare (${alternatives.join(", ")}) and no computed analysis sets them all on common measures. Before the outline, write \`<id>.analysis.json\` with a \`compare\` over the measures the answer turns on - ${ANALYSIS_OPS.compare.does} - and run \`node runtime/analysis.mjs <id>.pages.json\`: each player is a member of a compared measure, with its number or with null and the reason in \`unavailable\` (a disclosed gap is a finding), at least two of them have a number on one measure, and the result says who leads under each priority. Pages then rest on the result by its id (references/storylining.md#run-the-analyses-before-the-outline)` });
     }
     const named = new Set([...doc.pages, ...(doc.appendix || [])].flatMap((p) => (Array.isArray(p?.evidence) ? p.evidence : [])));
     const unrested = results.filter((r) => r.status !== "unavailable" && !named.has(r.id)).map((r) => r.id);

@@ -29,8 +29,8 @@ import * as P from './skills/professional-slides/runtime/review-passes.mjs';
 import {{ compileDeck, readInsights }} from './skills/professional-slides/runtime/author-deck.mjs';
 import {{ alternativesOf }} from './skills/professional-slides/runtime/analysis.mjs';
 const FIX = '{FIXTURES}';
-// A held-out fixture deck staged as a task folder: its spine compiled, its insight log and analysis plan beside it.
-async function stage(name, deckPatch = {{}}) {{
+// A fixture deck staged as a task folder: its spine compiled, its insight log and analysis plan beside it.
+async function stage(name, deckPatch = {{}}, initial = null) {{
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'closure-'));
   const out = path.join(dir, 'out'); await fs.mkdir(out);
   for (const file of [`${{name}}.insights.json`, `${{name}}.analysis.json`]) await fs.copyFile(path.join(FIX, file), path.join(dir, file)).catch(() => {{}});
@@ -39,10 +39,13 @@ async function stage(name, deckPatch = {{}}) {{
   for (const item of log.insights) for (const file of item.sources) await fs.writeFile(path.join(dir, file), 'illustrative');
   const doc = JSON.parse(await fs.readFile(path.join(FIX, `${{name}}.pages.json`), 'utf8'));
   const specPath = path.join(dir, `${{name}}.deck.json`);
-  const write = async (patch = {{}}) => {{
-    const deck = {{ ...doc.deck, ...deckPatch, ...patch }};
+  // `mutate` edits a copy of the pages document before it is compiled: how a test moves the storyline between passes.
+  const write = async (patch = {{}}, mutate = initial) => {{
+    const edited = structuredClone(doc);
+    if (mutate) mutate(edited);
+    const deck = {{ ...edited.deck, ...deckPatch, ...patch }};
     const insights = await readInsights(dir, name, {{ alternatives: alternativesOf(deck) }});
-    const {{ spec }} = compileDeck({{ ...doc, deck }}, {{ insights, draft: true, partial: true }});
+    const {{ spec }} = compileDeck({{ ...edited, deck }}, {{ insights, draft: true, partial: true }});
     await fs.writeFile(specPath, JSON.stringify(spec));
     return spec;
   }};
@@ -74,7 +77,9 @@ const clear = async (deck) => {{ const packet = JSON.parse(await fs.readFile(pat
 class ClosureTests(unittest.TestCase):
     def test_a_missing_analysis_closes_on_its_artifact_and_a_forbidden_one_stays_open(self):
         result = run_node(LOOP + '''
-const deck = await stage('public-ops');
+// At the first pass no page rests on the headroom analysis; the team's repair is to rest the page on it.
+const unrest = (d) => { for (const page of d.pages) if (Array.isArray(page.evidence)) page.evidence = page.evidence.filter((id) => id !== 'B-headroom'); };
+const deck = await stage('public-ops', {}, unrest);
 const one = await S.prepareStoryline(deck.specPath, deck.out);
 const p1 = await packetOf(one);
 const prompt = await fs.readFile(path.join(one.dir, 'prompt.md'), 'utf8');
@@ -83,7 +88,7 @@ const critique = first(p1, ids, [missing('M1', 'computable', 'speculative'), mis
 const revise = await answer(deck, critique);
 // The team narrows what it offers: the answer is now provisional, and says what it leaves open.
 await deck.write({ answer: 'On the board papers alone, demand per crew and handover drive the rise; Uplands and Valley take the first crews, provisionally.',
-  answerStatus: 'provisional', answerLimits: ['Whether vehicles rather than crews bind cannot be settled without the fleet register'] });
+  answerStatus: 'provisional', answerLimits: ['Whether vehicles rather than crews bind cannot be settled without the fleet register'] }, null);
 const two = await S.prepareStoryline(deck.specPath, deck.out);
 const p2 = await packetOf(two);
 const prompt2 = await fs.readFile(path.join(two.dir, 'prompt.md'), 'utf8');
@@ -107,7 +112,20 @@ const outcome = await S.storylineOutcome(spec, deck.out, { deckPath: deck.specPa
 const final = { ...spec }; delete final.answerStatus; delete final.answerLimits;
 const finalGate = await S.storylineGate(final, deck.out, { deckPath: deck.specPath });
 await clear(deck);
+// A second deck where the analysis was computed and rested on from the start, and the only thing
+// that moves between the passes is the last page's title: nothing an open item can close on.
+const still = await stage('public-ops');
+const s1 = await packetOf(await S.prepareStoryline(still.specPath, still.out));
+const sids = s1.pages.filter((p) => p.kind === 'content').map((p) => p.id);
+const filed = first(s1, sids, [missing('M1', 'computable', 'speculative')], { findings: [{ id: 'F1', scope: 'page', pages: [sids[0]], check: 'claim', severity: 'major', problem: 'The title states a topic, not what the series shows.', fix: 'State the rise and its size in the title.' }],
+  completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: ['missing', 'claim'].includes(check) ? 'findings' : 'clean', note: ['missing', 'claim'].includes(check) ? `Filed an item under ${check}.` : `Checked ${check} across the spine and found nothing to raise.` })) });
+await answer(still, filed);
+await still.write({}, (d) => { d.pages.at(-1).title = `${d.pages.at(-1).title} now`; });
+const s2 = await packetOf(await S.prepareStoryline(still.specPath, still.out));
+const unmoved = await answer(still, verification(s2, filed.binding, [status('F1', 'fixed'), status('M1', 'fixed', { artifact: 'B-headroom' })]));
+await clear(still);
 console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.status, p2.scope.answerChanged],
+  unmoved: [unmoved.status, said(unmoved, 'already computed and rested on, unchanged'), said(unmoved, 'does not close on a storyline that did not move'), s2.scope.changed.includes(sids[0])],
   told: [prompt.includes('EVIDENCE SCOPE: closed'), prompt.includes('only the board papers supplied by the service may be used'), prompt.includes('B-vehicles [gap, unavailable]'), prompt.includes('B-path [scenario, assumed]')],
   told2: [prompt2.includes('THE ANSWER IS OFFERED AS PROVISIONAL'), prompt2.includes('THE ANSWER HAS CHANGED')],
   analyses: p1.analyses.map((a) => [a.id, a.status]),
@@ -130,6 +148,8 @@ console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.s
         self.assertEqual(result["notRun"], ["invalid", True])
         self.assertEqual(result["handWritten"], ["invalid", True])
         self.assertEqual(result["unrested"], ["invalid", True])
+        # Nor does an item close on what already stood when it was filed, or on a page that did not move.
+        self.assertEqual(result["unmoved"], ["invalid", True, True, False])
         self.assertEqual(result["searched"], ["invalid", True])  # nothing could be searched
         # The forbidden retrieval stays open at its severity: not ready, not sufficient, not lowered.
         self.assertEqual(result["ready"], ["invalid", True, True])
@@ -235,3 +255,23 @@ await clear(verbatim); await clear(rebuilt); await clear(bad);
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScopeTests(unittest.TestCase):
+    def test_the_author_cannot_close_the_evidence_scope_on_a_request_that_does_not_say_so(self):
+        result = run_node(LOOP + '''
+const note = 'only what the team already has on file';
+const tried = async (patch) => { const deck = await stage('explainer', patch); const step = await S.prepareStoryline(deck.specPath, deck.out); await clear(deck); return [step.status, (step.errors || []).join(' ')]; };
+const request = 'Explain how the signalling upgrade works. Use only the documents in the project folder.';
+console.log(JSON.stringify({
+  unquoted: await tried({ evidenceScope: { retrieval: 'closed', note } }),
+  invented: await tried({ evidenceScope: { retrieval: 'closed', note, quote: 'use nothing but the papers supplied' } }),
+  paraphrased: await tried({ request, requestProvenance: 'paraphrased', evidenceScope: { retrieval: 'closed', note, quote: 'Use only the documents in the project folder' } }),
+  quoted: await tried({ request, evidenceScope: { retrieval: 'closed', note, quote: 'Use only the documents in the project folder' } }) }));
+''')
+        self.assertEqual(result["unquoted"][0], "refused")
+        self.assertIn("quotes, in `quote`, the words of the `request`", result["unquoted"][1])
+        self.assertEqual(result["invented"][0], "refused")  # words the request does not contain
+        self.assertEqual(result["paraphrased"][0], "refused")
+        self.assertIn("rests on the user's own words", result["paraphrased"][1])
+        self.assertEqual(result["quoted"][0], "packet-written")

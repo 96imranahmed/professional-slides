@@ -403,6 +403,8 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     // What the runtime computed before the outline, and what it could not: a missing analysis closes on one of these, not on a qualification.
     analyses: analysis.results.map((r) => ({ id: r.id, op: r.op, status: r.status, line: analysisLine(r), missing: r.missing ?? [], assumptions: (r.assumptions || []).length })),
     analysisProblems: analysis.problems,
+    // Each analysis result and insight by the hash of its content: what a later pass compares to say an item closed on something that changed.
+    artifacts: Object.fromEntries([...analysis.results.map((r) => [r.id, r.hash]), ...(log?.insights || []).filter((item) => item?.id && !item.derived).map((item) => [item.id, sha256(JSON.stringify(item))])]),
     question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
   const schema = schemaFor(mode, scope);
@@ -863,8 +865,10 @@ function answerErrors(review, ledger) {
  * rests on - never on a qualification; `narrowed` needs an answer that changed;
  * `scope-limited` is a retrieval the closed scope forbids, and stays open.
  */
-function closureErrors(review, ledger, { analyses = [], insightIds = null, rested = new Set(), evidenceScope = null, answerChanged = false } = {}) {
+function closureErrors(review, ledger, { analyses = [], insightIds = null, rested = new Set(), evidenceScope = null, answerChanged = false, artifacts = null, prior = null, moved = null } = {}) {
   const errors = [];
+  // What stood, unchanged, at the pass that left the item open cannot be what closes it.
+  const stale = (id) => Boolean(prior?.artifacts && prior?.rested && artifacts && prior.rested.includes(id) && prior.artifacts[id] !== undefined && prior.artifacts[id] === artifacts[id]);
   const computed = new Map((analyses || []).map((a) => [a.id, a]));
   for (const [i, s] of (review.statuses || []).entries()) {
     const entry = (ledger || []).find((e) => e.id === s?.finding);
@@ -878,6 +882,13 @@ function closureErrors(review, ledger, { analyses = [], insightIds = null, reste
       else if (run && run.status === "unavailable") errors.push(`${at}: ${artifact} could not be run (${(run.missing || []).join(", ") || "an input is missing"}): the analysis is still missing`);
       else if (!run && insightIds && !insightIds.has(artifact)) errors.push(`${at}: ${artifact} is neither a computed analysis nor an insight in the packet`);
       else if (!rested.has(artifact)) errors.push(`${at}: no page rests on ${artifact}; an analysis that reaches no page has not changed the storyline`);
+      else if (stale(artifact)) errors.push(`${at}: ${artifact} was already computed and rested on, unchanged, at the pass that left ${s.finding} open; an item closes on something that changed - a new analysis, a changed one, or a page that now rests on it`);
+    }
+    if (s.status === "fixed" && entry.code !== "MISSING_ANALYSIS" && moved) {
+      // A finding is fixed where the storyline moved: on a page it names, on the page the status names in `artifact`, or in the answer.
+      const where = [...(entry.pages || []), ...(typeof s.artifact === "string" && s.artifact.trim() ? [s.artifact.trim()] : [])];
+      const touched = where.some((id) => moved.changed.includes(id) || moved.deleted.includes(id)) || (!(entry.pages || []).length && (moved.changed.length > 0 || moved.deleted.length > 0));
+      if (!touched && !answerChanged) errors.push(`${at}: fixed, and ${(entry.pages || []).length ? `${entry.pages.join(", ")} ${entry.pages.length === 1 ? "is" : "are"}` : "the spine is"} as ${(entry.pages || []).length === 1 ? "it was" : "they were"} at the pass that filed ${s.finding}; where another page carries the repair, name it in \`artifact\` - a finding does not close on a storyline that did not move`);
     }
     if (s.status === "narrowed" && !answerChanged) errors.push(`${at}: narrowed closes an item the answer no longer needs because it now claims less; the answer has not changed since the pass this verifies`);
     if (s.status === "scope-limited") {
@@ -953,7 +964,7 @@ function unavailableErrors(review, ledger, sources) {
  * against and `promptHash` the packet's (its provenance is checked when given).
  */
 export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null,
-  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null } = {}) {
+  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
@@ -965,7 +976,8 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
   if (scope) {
     errors.push(...verificationErrors(review, { scope: mode === "full" ? scope : { ...scope, mustInspect: [] }, ledger, items, ids, pageKey: "page", deckScope: "spine", statuses: STORYLINE_STATUSES, pageText }));
     errors.push(...unavailableErrors(review, ledger, sources));
-    errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged) }));
+    errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged), artifacts, prior: scope.prior ?? null,
+      moved: Array.isArray(scope.changed) && Array.isArray(scope.deleted) ? { changed: scope.changed, deleted: scope.deleted } : null }));
   } else {
     if (mode === "full") errors.push(...coverageErrors(review.pages, revision ? revision.changed : contentIds, "page"));
     if (revision) errors.push(...revisionItemErrors(items, revision.changed));
@@ -998,7 +1010,7 @@ const packetContext = (packet) => ({
   insightIds: packet.insights?.present ? new Set(packet.insights.items.map((i) => i.id)) : null, mode: packet.mode ?? "full", sources: packet.sources ?? [],
   pageText: packetPageText(packet), promptHash: packet.promptHash ?? null, revision: packet.revision ?? null,
   analyses: packet.analyses ?? [], rested: new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id))),
-  evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null,
+  evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null, artifacts: packet.artifacts ?? null,
 });
 
 /**
@@ -1125,7 +1137,8 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
     const errors = validateStorylineRecord(review, packetContext(packet));
     if (errors.length) return { status: "invalid", errors };
-    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? "") })).record);
+    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
+      artifacts: packet.artifacts ?? null, rested: [...new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id)))] })).record);
   }
   const lineageMode = history.at(-1)?.mode ?? (history.length ? "full" : null);
   const wanted = mode ?? lineageMode ?? "spine";
@@ -1153,6 +1166,8 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
   if (scope && wanted === "spine") scope.mustInspect = [];
   // Whether the answer moved since the pass being verified: what `narrowed` rests on.
   if (scope) scope.answerChanged = typeof latest.answerHash === "string" && latest.answerHash !== sha256(spec.answer ?? "");
+  // The artifacts as they stood at that pass, and which of them a page rested on: what `fixed` is held against.
+  if (scope && latest.artifacts && Array.isArray(latest.rested)) scope.prior = { artifacts: latest.artifacts, rested: latest.rested };
   if (scope?.capped) return { status: "capped", pass: scope.pass, message: capMessage("storyline critique", scope.pass, maxPasses, latest.ledger) };
   const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes });
   return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0,

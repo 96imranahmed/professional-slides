@@ -16,7 +16,7 @@
  *   to a fresh critic `--repeats` times. The spread of those ratings is the
  *   critic's own noise: a later change in a deck's rating smaller than it is
  *   not a result.
- * - Anchors. The held-out fixture decks under fixtures/evidence/ as they are
+ * - Anchors. The fixture decks under fixtures/evidence/ as they are
  *   (clean), and each with one defect of argument planted that a critic must
  *   find: an answer that declines the request, the comparison its players need
  *   cut, an exhibit about something else kept as "context", a page that

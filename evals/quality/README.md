@@ -122,12 +122,14 @@ lists what fired on those pages, which is where a new gate starts.
 
 ## Evidence validity
 
-`fixtures/evidence/` holds four held-out decks on different subjects - a credit
+`fixtures/evidence/` holds four fixture decks on different subjects - a credit
 union with eight declared players, an ambulance service under a closed evidence
 scope, a note-taking app against two rivals, and an explanation that compares
 nothing - each a pages file, an insight log with measures and an analysis plan
-(`make_fixtures.py` wrote them). None is a deck the evidence contract was
-written after. `evidence-validity.mjs` measures the contract on them twice:
+(`make_fixtures.py` wrote them). They are not the deck whose failure prompted
+the contract, but they were written with it, by the same hand: they show the
+rules fire and stay quiet where intended, not how the contract fares on decks
+it has never seen. `evidence-validity.mjs` measures the contract on them:
 
 ```bash
 node evals/quality/evidence-validity.mjs           # the table; exit 2 unless everything seeded is caught and nothing clean is flagged
@@ -137,13 +139,25 @@ node evals/quality/evidence-validity.mjs           # the table; exit 2 unless ev
   carry the cases a careless rule would refuse: a context exhibit with its
   relevance, two same-unit series read separately with the reason, a metric
   strip over a chart, a deck with no comparison because it compares nothing.
-  Any finding is a false positive.
-- **Recall.** Fourteen seeded defects are planted on every page each applies
+  Any finding is a false positive. Zero here is by construction: the fixtures
+  were written to pass.
+- **Seeded defects.** Seventeen defects are planted on every page each applies
   to, one at a time: an exhibit copied from another page with its evidence id
   appended and the citation left alone, the same copy relabelled as the claim's
-  measure, a unit, a period or a number changed, a dependency left undeclared,
-  a citation dropped, a context exhibit unexplained, a relation split across
-  panels. A defect is caught when the finding it should raise names the page.
+  measure or listed beside it, numbers rounded to one figure, a metric's printed
+  number changed, a unit, a period or a number changed, a dependency left
+  undeclared, a citation dropped, a context exhibit unexplained, a relation
+  split across panels. A defect is caught when the finding it should raise
+  names the page. Each defect is planted in the terms a rule reads, so a full
+  catch says each rule fires on its own trigger across four decks; it is not a
+  recall estimate against an author who errs in ways nobody listed.
+- **Known limits.** Two defects the contract does not read are planted the same
+  way and reported, uncounted: one cell of a table changed (a table is held
+  only to showing a number of each measure it names), and a number changed in
+  a sentence (titles, points and so-what bars are not traced to measures). A
+  page with no plotted exhibit and no declaration is not checked at all, and
+  the contract runs at authoring: a `deck.json` edited after the compile is not
+  re-checked against the log.
 
 ## Critic calibration
 

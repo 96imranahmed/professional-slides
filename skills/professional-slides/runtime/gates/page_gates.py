@@ -192,18 +192,42 @@ VOID_KINDS = {"internal": ("internalVoid", "internal_void_max"), "dead": ("deadB
 VOID_KIND_OF = {"INTERNAL_VOID": "internal", "DEAD_BAND": "dead", "COLUMN_VOID": "column"}
 
 
-def void_origins(slide_no, scene_bands, render_bands):
+def lost_text(slide, grey):
+    """The text the scene draws and the render shows nothing of: [{node, text,
+    box}]. `grey` is the decoded render (load_grey). A text box with no dark
+    pixel in it on the render is text that did not reach the page - a shape
+    not emitted, a font the renderer could not set. Text on a dark fill cannot
+    be told this way (the fill is ink), and is not reported."""
+    if grey is None:
+        return []
+    ink = ink_matrix(grey)
+    lost = []
+    for node, (x, y, w, h) in scene_text_boxes(slide):
+        x0, x1 = max(0, int(x) - 1), min(CANVAS_W, int(x + w) + 2)
+        y0, y1 = max(0, int(y) - 1), min(FOOTER_TOP, int(y + h) + 2)
+        if x1 - x0 < 4 or y1 - y0 < 4:
+            continue
+        if not ink[y0:y1, x0:x1].any():
+            lost.append({"node": node.get("id"), "text": " ".join(str(source_text(node)).split())[:60], "box": [x0, y0, x1 - x0, y1 - y0]})
+    return lost
+
+
+def void_origins(slide_no, scene_bands, render_bands, lost=()):
     """Where each empty band of a rendered page comes from: `{slide, bands}`,
     `bands` one record a kind (internal, dead) whose scene or render measure is
-    past its bar - `{scene, render, origin}`.
+    past its bar - `{scene, render, origin}`. `lost` is the scene's text the
+    render does not show (lost_text).
 
     `authored`: the scene draws the band and the render shows it. The page was
     composed that way, so the repair is the page's - its content or its
     composition - and stretching what is drawn would only move the band.
-    `render`: the render shows a band the scene does not draw. Something the
-    scene holds did not reach the page (a shape not emitted, text set smaller
-    or wrapped differently by the renderer), so the repair is the export's and
-    no change to the page's content will close it.
+    `inside-object`: the render shows a band the scene's estimate does not,
+    and everything the scene holds reached the page. The air is inside
+    something the scene counts as drawn - a chart whose marks sit in a corner
+    of its plot, a card deeper than its text - so it is authored too, and the
+    repair is that object's size or content.
+    `render`: the render shows a band the scene does not, and text the scene
+    holds is missing from the render (`lost`). The repair is the export's.
     `scene-estimate`: the scene's estimate shows a band the render does not.
     The page as rendered is not empty there; the scene finding is the estimate
     reading a drawn surface as blank.
@@ -213,9 +237,10 @@ def void_origins(slide_no, scene_bands, render_bands):
         scene, render = scene_bands[key], render_bands[key]
         if max(scene, render) <= THRESHOLDS[bar]:
             continue
-        origin = "authored" if abs(render - scene) <= VOID_AGREEMENT or min(scene, render) > THRESHOLDS[bar] else "render" if render > scene else "scene-estimate"
+        origin = ("authored" if abs(render - scene) <= VOID_AGREEMENT or min(scene, render) > THRESHOLDS[bar]
+                  else ("render" if lost else "inside-object") if render > scene else "scene-estimate")
         bands[kind] = {"scene": round(scene, 4), "render": round(render, 4), "origin": origin}
-    return {"slide": slide_no, "bands": bands}
+    return {"slide": slide_no, "bands": bands, **({"lost": list(lost)} if lost else {})}
 
 
 def void_causes(findings, origins):
@@ -267,16 +292,18 @@ def empty_page_gates(run, slide_no, slide, render_dir):
         else:
             measured = {}
             empty += pixel_gates(slide_no, slide, path, grey, rows, empty, measured)
-            origin = void_origins(slide_no, scene_void(slide)[0], measured["bands"])
+            origin = void_origins(slide_no, scene_void(slide)[0], measured["bands"], lost_text(slide, grey))
             run.origins.append(origin)
             drifted = {kind: band for kind, band in origin["bands"].items() if band["origin"] == "render"}
             if drifted and run.wanted("RENDER_DRIFT"):
+                missing = origin["lost"]
                 run.findings.append(finding(
-                    slide_no, "RENDER_DRIFT", drifted, VOID_AGREEMENT,
-                    "The render shows an empty band the scene does not draw, so something the scene holds did not reach "
-                    "the page: compare the page's render with its scene (a shape not emitted, text the renderer set "
-                    "smaller or wrapped differently, a missing font). The repair is the export's; adding or stretching "
-                    "content on the page will not close it."))
+                    slide_no, "RENDER_DRIFT", {"bands": drifted, "lost": missing}, VOID_AGREEMENT,
+                    "The render shows an empty band the scene does not draw, and %d run%s of text the scene holds %s "
+                    "missing from the render (%s): compare the page's render with its scene (a shape not emitted, a "
+                    "font the renderer could not set). The repair is the export's; adding or stretching content on "
+                    "the page will not close it." % (len(missing), "" if len(missing) == 1 else "s", "is" if len(missing) == 1 else "are",
+                                                      "; ".join('"%s"' % item["text"] for item in missing[:3]))))
     if run.wanted("THIN_PAGE") or run.habit:
         gate_thin_page(slide_no, slide, empty)
     if run.wanted("SCENE_VOID") or run.habit:

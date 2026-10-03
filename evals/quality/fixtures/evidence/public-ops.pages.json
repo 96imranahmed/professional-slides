@@ -3,11 +3,12 @@
   "schema": "professional-slides.deck/v3",
   "id": "public-ops",
   "workflow": "new_deck",
-  "request": "Why are ambulance response times rising, and where should the first new crews go?",
+  "request": "Why are ambulance response times rising, and where should the first new crews go? Use only the board papers we have sent you.",
   "answer": "Demand per crew and hospital handover drive the rise; Uplands and Valley take the first crews.",
   "evidenceScope": {
    "retrieval": "closed",
-   "note": "only the board papers supplied by the service may be used"
+   "note": "only the board papers supplied by the service may be used",
+   "quote": "Use only the board papers we have sent you"
   },
   "design": "consulting",
   "density": "executive"

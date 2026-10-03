@@ -3,7 +3,7 @@
 // A page names the insights it rests on (`evidence`), and until now that was
 // the whole dependency: a list of ids on the page. Nothing said which measure
 // the claim is about or which measure each exhibit plots, so an exhibit copied
-// from another page - a fleet-age chart under a title about cash flow, its id
+// from another page - a chart of one measure under a title about another, its id
 // appended to `evidence`, the citation left as it was - passed every check
 // that reads the page's structure. With measures in the insight log
 // (measures.mjs) the dependency is declared and checked:
@@ -74,12 +74,38 @@ function lineage(ref, registry, seen = new Set()) {
 const bearsOn = (shown, claimed, registry) => shown === claimed || lineage(shown, registry).has(claimed) || lineage(claimed, registry).has(shown);
 
 // A plotted number matches a recorded one when it is that number at the
-// precision the page prints: 54.9 plots 54.93, and 55 plots 54.9.
+// precision the page prints, and the page prints it to two significant
+// figures or more: 54.9 plots 54.93 and 55 plots 54.9, but 3 does not plot 3.4.
 function matches(plotted, recorded) {
   if (recorded === null || recorded === undefined) return false;
   const decimals = (String(plotted).split(".")[1] || "").length;
-  return Math.abs(plotted - recorded) <= 0.5 * 10 ** -decimals + 1e-9;
+  const printed = 0.5 * 10 ** -decimals;
+  const twoFigures = recorded === 0 ? printed : 0.5 * 10 ** (Math.floor(Math.log10(Math.abs(recorded))) - 1);
+  return Math.abs(plotted - recorded) <= Math.min(printed, twoFigures) + 1e-9;
 }
+
+// The numbers a printed string states: "+4.3%" is 4.3, "GBP 1.2bn" is 1.2 (and
+// 1200 against a record kept in millions), "84 to 66" is 84 and 66.
+function printedNumbers(text) {
+  const out = [];
+  for (const hit of String(text ?? "").matchAll(/([-\u2212]?)\s?[^\d\s-]{0,3}?(\d[\d,]*(?:\.\d+)?)\s?(k|m|bn|b)?\b/gi)) {
+    const literal = hit[2].replace(/,/g, "");
+    const n = Number(literal) * (hit[1] ? -1 : 1);
+    if (Number.isFinite(n)) out.push({ n, literal, scaled: Boolean(hit[3]) });
+  }
+  return out;
+}
+/** Does a printed number state a recorded value: at its printed precision, in either sign's wording, or in the next scale of thousands. */
+function states(printed, recorded) {
+  if (recorded === null || recorded === undefined) return false;
+  const decimals = (printed.literal.split(".")[1] || "").length;
+  const near = (x) => matches(Number(Math.abs(printed.n).toFixed(decimals)), Math.abs(x));
+  return near(recorded) || (printed.scaled && (near(recorded / 1000) || near(recorded * 1000)));
+}
+/** Is the measure among what the series plot: a series of its values (a scalar, one plotted value). */
+const plotsMeasure = (plotted, measure) => (axisOf(measure).kind === "scalar"
+  ? plotted.series.some((s) => s.values.some((v) => typeof v === "number" && matches(v, valuesOf(measure)[0])))
+  : plotted.series.some((s) => s.values.some((v) => typeof v === "number") && !strayValue(plotted.categories, s.values, measure)));
 
 /** The series an exhibit plots against its categories: [{ name, values }], or null where it plots no such thing. */
 function plottedSeries(ex) {
@@ -116,7 +142,19 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots }) {
   if (!measures.length) return out;
   if (roleOf(basis) === "context" && words(basis.relevance) < RELEVANCE_WORDS)
     add("CONTEXT_UNEXPLAINED", `${what} is context, not proof of the claim: say in \`basis.relevance\` what it tells the reader about this claim (${RELEVANCE_WORDS} words or more); the reviewer judges it on that sentence`);
-  if (!plots) return out;
+  if (!plots) {
+    // A metric states one number of the measure it names.
+    const printed = printedNumbers(item.value);
+    if (printed.length && !printed.some((number) => measures.some((m) => valuesOf(m).some((v) => states(number, v)))))
+      add("BASIS_VALUES", `${what} prints ${item.value}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} no such number (${measures.flatMap((m) => valuesOf(m)).filter((v) => v !== null).slice(-4).join(", ")}): print the recorded or computed value, or name the measure this is`, { printed: item.value, recorded: measures.flatMap((m) => valuesOf(m)).filter((v) => v !== null).slice(-4) });
+    return out;
+  }
+  if (Array.isArray(item.rows)) {
+    // A table shows every measure it names: one of its cells states a number of each.
+    const cells = item.rows.flatMap((row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : [])).flatMap((cell) => printedNumbers(typeof cell === "object" && cell ? cell.text ?? cell.value : cell));
+    const unshown = measures.filter((m) => !cells.some((number) => valuesOf(m).some((v) => states(number, v)))).map((m) => m.ref);
+    if (unshown.length) add("BASIS_VALUES", `${what} names ${unshown.join(", ")} and no cell of the table states a number of ${unshown.length === 1 ? "it" : "theirs"}: a basis lists the measures the exhibit shows, not ones it would like to be about`, { unshown });
+  }
   if (typeof item.unit === "string" && item.unit.trim() && !measures.some((m) => normalUnit(m.unit) === normalUnit(item.unit)))
     add("BASIS_UNIT", `${what} is drawn in ${item.unit}, and the measure${measures.length === 1 ? "" : "s"} it names ${measures.length === 1 ? "is" : "are"} in ${[...new Set(measures.map((m) => m.unit))].join(", ")} (${refs.join(", ")}): the exhibit plots something other than what it says it plots`, { exhibit: item.unit, measures: measures.map((m) => m.unit) });
   const plotted = plottedSeries(item);
@@ -124,13 +162,19 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots }) {
   const axes = measures.map(axisOf).filter((axis) => axis.kind !== "scalar");
   const outside = axes.length ? plotted.categories.filter((label) => !axes.some((axis) => axis.labels.includes(label))) : [];
   if (outside.length) { add("BASIS_AXIS", `${what} plots ${outside.slice(0, 6).join(", ")}${outside.length > 6 ? ", ..." : ""}, which ${refs.join(", ")} ${measures.length === 1 ? "does" : "do"} not run over (${[...new Set(axes.flatMap((axis) => axis.labels))].slice(0, 12).join(", ")})`, outside); return out; }
+  let strayed = false;
   for (const series of plotted.series) {
     const strays = measures.map((m) => strayValue(plotted.categories, series.values, m));
     if (strays.every(Boolean)) {
+      strayed = true;
       const nearest = strays.reduce((a, b) => (b.recorded !== undefined && a.recorded === undefined ? b : a));
-      add("BASIS_VALUES", `${what} plots ${series.name} = ${nearest.value} at ${nearest.label}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} ${nearest.recorded === undefined ? "no value there" : nearest.recorded}: the numbers drawn are not the measure's - plot the recorded values, or name the measure these are`, { series: series.name, label: nearest.label, plotted: nearest.value, recorded: nearest.recorded ?? null });
+      add("BASIS_VALUES", `${what} plots ${series.name} = ${nearest.value} at ${nearest.label}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} ${nearest.recorded === undefined ? "no value there" : nearest.recorded}: the numbers drawn are not the measure's - plot the recorded values (rounded to two significant figures or more), or name the measure these are`, { series: series.name, label: nearest.label, plotted: nearest.value, recorded: nearest.recorded ?? null });
     }
   }
+  // Every measure the basis names is one the exhibit draws: a claim's measure
+  // listed beside the one actually plotted would otherwise pass as its proof.
+  const undrawn = measures.filter((m) => !plotsMeasure(plotted, m)).map((m) => m.ref);
+  if (undrawn.length && !strayed) add("BASIS_VALUES", `${what} names ${undrawn.join(", ")} and draws no series of ${undrawn.length === 1 ? "it" : "them"}: a basis lists the measures the exhibit plots - name only those, and plot the claim's measure where this exhibit is its proof`, { undrawn });
   return out;
 }
 
@@ -251,8 +295,10 @@ export function dependencyNotes(page) {
 /**
  * One exhibit showing a split pair on one basis, built from the page's own
  * exhibits: the two series on one scale where they share a unit. Every plotted
- * number, category, heading and caption of the originals is kept (`kept` says
- * so, number for number); null where the page has no pair this can merge.
+ * number, category, heading, caption and highlight of the originals is kept
+ * (`kept` compares the numbers before and after); null where the page has no
+ * pair this can merge. It is offered to the author to paste, with a `note` on
+ * what the page then needs; nothing is rewritten for them.
  */
 export function relationRepair(page, insights) {
   const registry = measureRegistry(insights);
@@ -263,10 +309,17 @@ export function relationRepair(page, insights) {
   if (plotted.some((p) => !p)) return null;
   const categories = [...plotted[0].categories, ...plotted[1].categories.filter((label) => !plotted[0].categories.includes(label))];
   const series = holders.flatMap((ex, i) => plotted[i].series.map((s) => ({ name: plotted[i].series.length === 1 && ex.heading ? ex.heading : s.name, values: categories.map((label) => { const at = plotted[i].categories.indexOf(label); return at < 0 ? null : s.values[at]; }) })));
-  const exhibit = { type: "chart.line", heading: holders.map((ex) => ex.heading).filter(Boolean).join(" and "), unit: registry.get(pair.a).unit, categories, series,
-    caption: holders.map((ex) => ex.caption).filter(Boolean).join(" "), basis: { measures: [...new Set(holders.flatMap((ex) => refsOf(ex.basis)))], role: "proof" } };
+  // A series over periods is a line; members side by side are bars. Each caption stays a sentence, and what was marked stays marked.
+  const sentence = (text) => (/[.!?]$/.test(String(text).trim()) ? String(text).trim() : `${String(text).trim()}.`);
+  const captions = holders.map((ex) => ex.caption).filter(Boolean);
+  const highlights = [...new Map(holders.flatMap((ex) => (Array.isArray(ex.highlights) ? ex.highlights : [])).map((h) => [JSON.stringify(h), h])).values()];
+  const exhibit = { type: axisOf(registry.get(pair.a)).kind === "periods" ? "chart.line" : "chart.bar", heading: holders.map((ex) => ex.heading).filter(Boolean).join(" and "), unit: registry.get(pair.a).unit, categories, series,
+    ...(captions.length ? { caption: captions.map(sentence).join(" ") } : {}), ...(highlights.length ? { highlights } : {}), basis: { measures: [...new Set(holders.flatMap((ex) => refsOf(ex.basis)))], role: "proof" } };
+  const remaining = exhibitsOf(page).length - 1;
   const numbers = (list) => list.flatMap((s) => s.values).filter((v) => typeof v === "number").sort((a, b) => a - b);
   const before = numbers(plotted.flatMap((p) => p.series)), after = numbers(series);
-  return { pair: [pair.a, pair.b], replaces: holders.map((ex) => exhibitsOf(page).indexOf(ex)), exhibit,
+  return { pair: [pair.a, pair.b], replaces: holders.map((ex) => exhibitsOf(page).indexOf(ex)), exhibit, remaining,
+    // The merge is offered, not applied: a page left with one exhibit is no longer a page of panels, and which type it becomes is the author's reading of the claim.
+    note: remaining < 2 ? `the page is left with ${remaining} exhibit${remaining === 1 ? "" : "s"}: retype it for one exhibit (its \`type\`, \`form\` and \`commentary\`) and keep the title, \`evidence\` and \`settles\`` : `the page keeps ${remaining} exhibits: replace the two listed in \`replaces\` with this one`,
     kept: { numbers: before.length === after.length && before.every((v, i) => v === after[i]), categories: plotted.every((p) => p.categories.every((label) => categories.includes(label))) } };
 }

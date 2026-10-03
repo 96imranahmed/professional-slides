@@ -6,7 +6,7 @@
  *                                                       every finding raised on a clean deck
  *   node evals/quality/evidence-validity.mjs --json     the same as JSON
  *
- * The fixtures under fixtures/evidence/ are held-out decks on four different
+ * The fixtures under fixtures/evidence/ are decks on four different
  * subjects - a credit union, an ambulance service, a note-taking app and an
  * explanation of a signalling upgrade - each declaring what its claims and
  * exhibits rest on. None is the deck the contract was written after. Two
@@ -25,7 +25,8 @@
  * an exhibit copied from another page with its evidence id appended and the
  * citation left as it was (how a repair for variety put a fleet-age chart on
  * a cash-flow page), the same copy relabelled as the claim's measure, a unit,
- * a period or a number changed, a dependency left undeclared, a citation
+ * a period or a number changed or rounded away, a copy listed beside the
+ * claim's own measure, a dependency left undeclared, a citation
  * dropped, a context exhibit unexplained, and a relation split across panels.
  *
  * Exit 0 when every seeded defect was caught on every page it was planted on
@@ -85,6 +86,36 @@ export const SEEDED = Object.freeze({
       Object.assign(own, structuredClone(donor), { basis });
       return true;
     },
+  },
+  "copied exhibit listed beside the claim's measure": {
+    // The copy again, its `basis` naming the claim's measure and the one actually drawn.
+    expect: ["BASIS_VALUES"],
+    plant(page, doc) {
+      const own = exhibitsOf(page).find((ex) => proof(ex) && charted(ex));
+      if (!own) return false;
+      const named = own.basis.measures;
+      const donor = doc.pages.flatMap((other) => (other.id === page.id ? [] : exhibitsOf(other))).find((ex) => proof(ex) && charted(ex)
+        && ex.basis.measures.every((ref) => !named.includes(ref)) && JSON.stringify(ex.series.map((s) => s.values)) !== JSON.stringify(own.series.map((s) => s.values)));
+      if (!donor) return false;
+      for (const key of Object.keys(own)) delete own[key];
+      Object.assign(own, structuredClone(donor), { basis: { measures: [...named, ...donor.basis.measures], role: "proof" } });
+      page.evidence = [...(page.evidence || []), ...ownersOf(donor)];
+      return true;
+    },
+  },
+  "plotted numbers rounded to one figure": {
+    expect: ["BASIS_VALUES"],
+    plant(page) {
+      const ex = exhibitsOf(page).find((e) => e.basis && charted(e));
+      if (!ex) return false;
+      const before = JSON.stringify(ex.series);
+      for (const s of ex.series) s.values = s.values.map((v) => (typeof v === "number" ? Number(v.toPrecision(1)) : v));
+      return JSON.stringify(ex.series) !== before;
+    },
+  },
+  "a metric's printed number changed": {
+    expect: ["BASIS_VALUES"],
+    plant(page) { const metric = (page.metrics || []).find((m) => m.basis && /\d/.test(String(m.value))); if (!metric) return false; metric.value = String(metric.value).replace(/\d[\d.,]*/, "907.3"); return true; },
   },
   "basis left undeclared": {
     expect: ["BASIS_MISSING"],
@@ -146,6 +177,33 @@ export const SEEDED = Object.freeze({
   },
 });
 
+/**
+ * Defects the contract is known NOT to read, planted the same way and reported
+ * beside the others so the measure says what it leaves out. They do not count
+ * towards acceptance; one that starts being caught is reported as such.
+ */
+export const KNOWN_LIMITS = Object.freeze({
+  "one cell of a table changed": {
+    plant(page) {
+      const table = exhibitsOf(page).find((e) => e.basis && Array.isArray(e.rows));
+      const row = table?.rows.find((r) => Array.isArray(r) && r.some((cell) => /^\d/.test(String(cell))));
+      if (!row) return false;
+      const at = row.findIndex((cell) => /^\d/.test(String(cell)));
+      row[at] = String(row[at]).replace(/\d+/, (n) => String(Number(n) + 37));
+      return true;
+    },
+  },
+  "a number in a sentence changed": {
+    plant(page) {
+      const key = ["bar", "takeaway", "title"].find((k) => /\d/.test(String(page[k] ?? ""))) ?? (Array.isArray(page.points) && page.points.some((pt) => /\d/.test(String(pt))) ? "points" : null);
+      if (!key) return false;
+      const swap = (text) => String(text).replace(/\d+/, (n) => String(Number(n) + 37));
+      if (key === "points") { const i = page.points.findIndex((pt) => /\d/.test(String(pt))); page.points[i] = swap(page.points[i]); } else page[key] = swap(page[key]);
+      return true;
+    },
+  },
+});
+
 const decks = () => fs.readdirSync(FIXTURES).filter((f) => f.endsWith(".pages.json")).sort().map((f) => f.replace(/\.pages\.json$/, ""));
 
 async function check(name, doc) {
@@ -157,6 +215,7 @@ async function check(name, doc) {
 /** `{ clean, seeded, accepted }`: every finding on a clean deck, and each seeded defect's catches over its plantings. */
 export async function measure() {
   const clean = [], seeded = Object.fromEntries(Object.keys(SEEDED).map((name) => [name, { planted: 0, caught: 0, missed: [] }]));
+  const limits = Object.fromEntries(Object.keys(KNOWN_LIMITS).map((name) => [name, { planted: 0, caught: 0 }]));
   for (const name of decks()) {
     const doc = JSON.parse(fs.readFileSync(path.join(FIXTURES, `${name}.pages.json`), "utf8"));
     const base = await check(name, doc);
@@ -173,8 +232,17 @@ export async function measure() {
       }
     }
   }
+  for (const name of decks()) {
+    const doc = JSON.parse(fs.readFileSync(path.join(FIXTURES, `${name}.pages.json`), "utf8"));
+    for (const [limit, { plant }] of Object.entries(KNOWN_LIMITS)) for (const [index, page] of doc.pages.entries()) {
+      const mutated = structuredClone(doc);
+      if (!page.type || !plant(mutated.pages[index], mutated)) continue;
+      limits[limit].planted += 1;
+      if ((await check(name, mutated)).dependencies.some((f) => f.id === page.id)) limits[limit].caught += 1;
+    }
+  }
   const accepted = clean.every((deck) => !deck.findings.length) && Object.values(seeded).every((d) => d.planted > 0 && d.caught === d.planted);
-  return { clean, seeded, accepted };
+  return { clean, seeded, limits, accepted };
 }
 
 async function main(argv) {
@@ -186,6 +254,8 @@ async function main(argv) {
     for (const deck of result.clean) console.log(`  ${deck.deck.padEnd(12)} ${deck.pages} pages, ${deck.analyses.length} analyses  ${deck.findings.length ? `${deck.findings.length} FINDINGS\n    ${deck.findings.join("\n    ")}` : "clean"}`);
     console.log("\nSeeded defects (caught / planted):");
     for (const [name, d] of Object.entries(result.seeded)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}${d.missed.length ? `\n    missed: ${d.missed.join("\n    missed: ")}` : ""}${d.planted ? "" : "  (never planted: no fixture page takes it)"}`);
+    console.log("\nKnown limits (planted, not read by the contract; not counted):");
+    for (const [name, d] of Object.entries(result.limits)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}`);
     console.log(`\n${result.accepted ? "accepted" : "NOT accepted"}`);
   }
   return result.accepted ? EXIT.ok : EXIT.refused;

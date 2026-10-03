@@ -286,9 +286,9 @@ Where the insight log records `measures`, every page with numbers on it says wha
 
 ```json
 "settles": { "kind": "comparison", "what": "...", "measures": ["i-results/ocf", "i-results/pat"], "relation": { "kind": "gap" } },
-"exhibit": { "type": "chart.line", "unit": "AED bn", "categories": ["FY24", "FY25", "FY26"], "series": [{ "name": "Operating cash flow", "values": [38.1, 40.8, 32.0] }],
+"exhibit": { "type": "chart.line", "unit": "GBP m", "categories": ["FY24", "FY25", "FY26"], "series": [{ "name": "Operating cash flow", "values": [81, 84, 66] }],
              "basis": { "measures": ["i-results/ocf"], "role": "proof" } },
-"metrics": [{ "value": "-21.6%", "label": "Operating cash flow", "basis": { "measures": ["A-ocf/percent"] } }]
+"metrics": [{ "value": "-21.4%", "label": "Operating cash flow", "basis": { "measures": ["A-ocf/percent"] } }]
 ```
 
 `settles.measures` are the measures the claim is about. `basis` on an exhibit, a block's exhibit or a metric names the measures it plots and its `role`: `"proof"` of the claim (the default), or `"context"` beside it with the `relevance` a reviewer judges. A measure is named `<insight id>/<measure>`, or `<analysis id>/<measure>` for a result the runtime computed. `settles.relation` says what the reader reads between two of the claim's measures: `gap`, `ratio`, `levels`, `index`, or `separate` with its `reason`. A page that writes no `source` takes its citation from the `cite` keys of the insights it plots.

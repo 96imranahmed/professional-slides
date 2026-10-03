@@ -3,7 +3,7 @@
 //
 // An insight's `finding` and `calculation` are sentences. A sentence cannot be
 // checked against the chart drawn from it, joined to another record, or
-// subtracted from one: a page titled on cash flow can carry a fleet-age chart
+// subtracted from one: a page titled on one measure can carry a chart of another
 // and every check that reads sentences passes it. A measure is the same
 // evidence as data - `unit`, `population`, the `periods` or `members` it runs
 // over, and its `values` - so the runtime can compute with it (analysis.mjs)
@@ -11,8 +11,8 @@
 // (gates/dependency_gates.mjs).
 //
 //   "measures": {
-//     "cash":   { "unit": "AED bn", "population": "Emirates airline", "periods": ["FY24", "FY25", "FY26"], "values": [42.9, 49.7, 54.9] },
-//     "margin": { "unit": "%", "population": "Gulf carriers", "period": "latest reported year", "members": ["A", "B"], "values": [15.0, null],
+//     "cash":   { "unit": "GBP m", "population": "the subject", "periods": ["FY24", "FY25", "FY26"], "values": [42.9, 49.7, 54.9] },
+//     "margin": { "unit": "%", "population": "the peer set", "period": "latest reported year", "members": ["A", "B"], "values": [15.0, null],
 //                 "unavailable": { "B": "reports in another currency at group level" }, "boundaries": { "A": "fiscal year to March" } }
 //   }
 //
@@ -53,11 +53,14 @@ export function measureProblems(insight) {
   if (measures === undefined) return [];
   if (!measures || typeof measures !== "object" || Array.isArray(measures)) return [`${id}: \`measures\` is { name: { unit, population, periods | members | period, values | value } }`];
   const problems = [];
+  // What a measure is computed from is the runtime's to say (analysis.mjs), never the log's.
+  if (insight.derived !== undefined || insight.inputs !== undefined) problems.push(`${id}: \`derived\` and \`inputs\` belong to analyses the runtime computed; a recorded insight carries neither`);
   for (const [name, m] of Object.entries(measures)) {
     const at = `${id}/${name}`;
+    if (m && typeof m === "object" && m.from !== undefined) problems.push(`${at}: \`from\` is set by the runtime on a computed measure; a recorded measure carries none`);
     if (!NAME.test(name)) problems.push(`${at}: a measure's name is letters, digits, dots, dashes and underscores, starting with a letter`);
     if (!m || typeof m !== "object" || Array.isArray(m)) { problems.push(`${at}: a measure is { unit, population, periods | members | period, values | value }`); continue; }
-    if (typeof m.unit !== "string" || !m.unit.trim()) problems.push(`${at}: say the \`unit\` the numbers are in ("AED bn", "%", "months", "passengers m")`);
+    if (typeof m.unit !== "string" || !m.unit.trim()) problems.push(`${at}: say the \`unit\` the numbers are in ("GBP m", "%", "months", "journeys m")`);
     if (typeof m.population !== "string" || !m.population.trim()) problems.push(`${at}: say the \`population\` measured - the entity, set or scope the numbers describe`);
     if (Array.isArray(m.periods) && Array.isArray(m.members)) problems.push(`${at}: a measure runs over \`periods\` or over \`members\`, not both - record the second axis as another measure`);
     const axis = axisOf(m);
@@ -101,7 +104,7 @@ export function measureRegistry(insights) {
     for (const [name, m] of Object.entries(item.measures)) {
       if (!m || typeof m !== "object") continue;
       registry.set(`${item.id}/${name}`, { ...m, ref: `${item.id}/${name}`, owner: item.id, name,
-        sources: m.sources ?? item.sources ?? [], cite: m.cite ?? item.cite ?? [], inputs: item.inputs ?? [], derived: Boolean(item.derived), assumed: Boolean(m.assumed || item.status === "assumed") });
+        sources: m.sources ?? item.sources ?? [], cite: m.cite ?? item.cite ?? [], inputs: item.derived ? (Array.isArray(m.from) ? m.from : item.inputs ?? []) : [], derived: Boolean(item.derived), assumed: Boolean(m.assumed || item.status === "assumed") });
     }
   }
   return registry;

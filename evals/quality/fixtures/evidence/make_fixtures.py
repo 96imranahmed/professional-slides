@@ -1,4 +1,4 @@
-"""Writes the held-out evidence fixtures under evals/quality/fixtures/evidence/.
+"""Writes the evidence fixtures under evals/quality/fixtures/evidence/.
 
 Four small decks on fictional subjects, none of them the benchmark's: a credit
 union (finance, eight declared players), an ambulance service (public
@@ -234,9 +234,9 @@ pub_pages = [
      'bar': 'Releasing crews at the door returns capacity faster than hiring does'},
 ]
 write('public-ops', {'id': 'public-ops', 'workflow': 'new_deck',
-                     'request': 'Why are ambulance response times rising, and where should the first new crews go?',
+                     'request': 'Why are ambulance response times rising, and where should the first new crews go? Use only the board papers we have sent you.',
                      'answer': 'Demand per crew and hospital handover drive the rise; Uplands and Valley take the first crews.',
-                     'evidenceScope': {'retrieval': 'closed', 'note': 'only the board papers supplied by the service may be used'}},
+                     'evidenceScope': {'retrieval': 'closed', 'note': 'only the board papers supplied by the service may be used', 'quote': 'Use only the board papers we have sent you'}},
       pub_pages, pub_ins, pub_an,
       {'ras-board': {'name': 'Riverside ambulance service board papers, 2023-2024', 'status': 'illustrative'},
        'national-standard': {'name': 'National response standards 2024', 'status': 'illustrative'}})

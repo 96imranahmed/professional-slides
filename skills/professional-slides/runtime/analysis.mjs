@@ -77,14 +77,18 @@ function pairwise(inputs, plan, compute, unit, sign) {
   const values = axis.labels.map((label) => {
     const [x, y] = [cell(a, axis, label), cell(b, axis, label)];
     if (x === null || y === null) { gaps[label] = whyNull(x === null ? a : b, label) ?? "an input is undisclosed"; return null; }
-    return round(compute(x, y));
+    const out = compute(x, y);
+    if (!Number.isFinite(out)) { gaps[label] = `${b.ref} is zero here, so nothing is divided by it`; return null; }
+    return round(out);
   });
   const shown = values.filter((v) => v !== null);
-  if (!shown.length) unavailable(`no ${axis.kind === "periods" ? "period" : "label"} has both ${a.ref} and ${b.ref}`);
+  if (!shown.length) unavailable(Object.values(gaps).some((why) => /is zero here/.test(why)) ? `${b.ref} is zero wherever ${a.ref} has a value` : `no ${axis.kind === "periods" ? "period" : "label"} has both ${a.ref} and ${b.ref}`);
+  // Two records for different periods can be subtracted, and the reader is told they were.
+  const periods = axis.kind !== "periods" && a.period && b.period && a.period !== b.period ? [`${a.ref} is for ${a.period} and ${b.ref} for ${b.period}: the two are not one period`] : [];
   const first = axis.labels[values.findIndex((v) => v !== null)], last = axis.labels[values.length - 1 - [...values].reverse().findIndex((v) => v !== null)];
   return {
     measures: { result: { unit, population: populationOf([a, b]), ...axisFields(axis, a), ...(axis.kind === "scalar" ? { value: values[0] } : { values }), ...(Object.keys(gaps).length ? { unavailable: gaps } : {}) } },
-    boundaries: [...axis.dropped, ...boundariesOf([a, b], axis.labels)],
+    boundaries: [...axis.dropped, ...periods, ...boundariesOf([a, b], axis.labels)],
     finding: axis.kind === "scalar" ? `${a.ref} ${sign} ${b.ref} is ${show(values[0])} ${unit}`
       : `${a.ref} ${sign} ${b.ref} runs from ${show(at({ ...axisFields(axis, a), values }, first))} (${first}) to ${show(at({ ...axisFields(axis, a), values }, last))} (${last}) ${unit}`,
     calculation: `${plan.op}(${a.ref}, ${b.ref}): ${a.ref} ${sign} ${b.ref} for each of ${axis.labels.length} ${axis.kind === "scalar" ? "value" : axis.kind}, computed by the runtime`,
@@ -113,7 +117,7 @@ const OPS = {
       if (axisOf(m).kind !== "periods") unavailable(`${m.ref} is not a series`);
       const anchor = at(m, base);
       if (anchor === null || anchor === 0) unavailable(`${m.ref} has no value at the base period ${base}`);
-      measures[m.name in measures ? `${m.owner}.${m.name}` : m.name] = { unit: `index, ${base} = 100`, population: m.population, periods: labels, values: labels.map((label) => { const v = at(m, label); return v === null ? null : round(100 * v / anchor); }),
+      measures[m.name in measures ? `${m.owner}.${m.name}` : m.name] = { from: [m.ref], unit: `index, ${base} = 100`, population: m.population, periods: labels, values: labels.map((label) => { const v = at(m, label); return v === null ? null : round(100 * v / anchor); }),
         ...(labels.some((label) => at(m, label) === null) ? { unavailable: Object.fromEntries(labels.filter((label) => at(m, label) === null).map((label) => [label, whyNull(m, label) ?? "undisclosed"])) } : {}) };
     }
     const last = labels.at(-1);
@@ -155,6 +159,7 @@ const OPS = {
     if (axis.kind !== "members") unavailable(`${m.ref} does not run over members: a share splits a whole into its parts`);
     const values = axis.labels.map((label) => at(m, label));
     if (values.some((v) => v === null)) unavailable(`${m.ref} has an undisclosed part (${axis.labels.filter((label) => at(m, label) === null).join(", ")}): the whole cannot be shared out`);
+    if (values.some((v) => v < 0)) unavailable(`${m.ref} has a negative part (${axis.labels.filter((label) => at(m, label) < 0).join(", ")}): parts of a whole are not negative`);
     const total = values.reduce((sum, v) => sum + v, 0);
     if (!(total > 0)) unavailable(`${m.ref} sums to ${total}`);
     const shares = values.map((v) => round(100 * v / total));
@@ -183,7 +188,7 @@ const OPS = {
       leadsOn: Object.fromEntries(members.map((label) => [label, leadsOn[label].length])), mostLeads: front.length === 1 ? front[0] : null,
       holdsUnderEveryPriority: front.length === 1 && most === columns.length };
     const measures = {};
-    for (const [i, m] of inputs.entries()) measures[m.name in measures ? `${m.owner}.${m.name}` : m.name] = { unit: m.unit, population: m.population, period: m.period, members, values: members.map((label) => columns[i].cells[label].value),
+    for (const [i, m] of inputs.entries()) measures[m.name in measures ? `${m.owner}.${m.name}` : m.name] = { from: [m.ref], unit: m.unit, population: m.population, period: m.period, members, values: members.map((label) => columns[i].cells[label].value),
       ...(m.better ? { better: m.better } : {}),
       ...(members.some((label) => columns[i].cells[label].value === null) ? { unavailable: Object.fromEntries(members.filter((label) => columns[i].cells[label].value === null).map((label) => [label, columns[i].cells[label].unavailable])) } : {}),
       ...(members.some((label) => columns[i].cells[label].boundary) ? { boundaries: Object.fromEntries(members.filter((label) => columns[i].cells[label].boundary).map((label) => [label, columns[i].cells[label].boundary])) } : {}) };
@@ -245,20 +250,28 @@ const OPS = {
     const unknown = drivers.filter((name) => !assumptions.some((a) => a.name === name));
     if (unknown.length) unavailable(`the drivers ${unknown.join(", ")} are not among the stated assumptions`);
     const applied = assumptions.filter((a) => drivers.includes(a.name));
+    const off = applied.find((a) => a.unit !== undefined && (method === "linear" ? normalUnit(String(a.unit).replace(/\s+(a|per)\s+\w+$/i, "")) !== normalUnit(m.unit) : !/%/.test(String(a.unit))));
+    if (off) unavailable(`the driver ${off.name} is in ${off.unit}; a ${method} scenario on ${m.ref} takes drivers in ${method === "linear" ? `${m.unit} a period` : "% a period"}`);
     let current = base;
     const values = horizon.map(() => { current = method === "linear" ? current + applied.reduce((sum, a) => sum + a.value, 0) : current * applied.reduce((f, a) => f * (1 + a.value / 100), 1); return round(current); });
     let crossing = null, limit = null;
     if (plan.threshold && typeof plan.threshold === "object") {
       const t = plan.threshold;
-      if (t.ref) { const tested = context.registry.get(t.ref); if (!tested) { const error = new Unavailable(`the threshold ${t.ref} is not a recorded measure`); error.missing = [t.ref]; throw error; } limit = valuesOf(tested).at(-1) ?? null; }
-      else limit = typeof t.value === "number" ? t.value : null;
+      if (t.ref) { const tested = context.registry.get(t.ref); if (!tested) { const error = new Unavailable(`the threshold ${t.ref} is not a recorded measure`); error.missing = [t.ref]; throw error; }
+        if (!sameUnit(m, tested)) unavailable(`${m.ref} is in ${m.unit} and the threshold ${t.ref} in ${tested.unit}`);
+        limit = valuesOf(tested).at(-1) ?? null; }
+      else {
+        if (words(t.rationale) < 4) unavailable("a threshold that is not a recorded measure is an assumption: say why that number in `rationale`");
+        if (t.unit !== undefined && normalUnit(t.unit) !== normalUnit(m.unit)) unavailable(`${m.ref} is in ${m.unit} and the threshold in ${t.unit}`);
+        limit = typeof t.value === "number" ? t.value : null;
+      }
       if (limit === null) unavailable("the scenario's threshold has no value");
       const below = base >= limit;
       const index = values.findIndex((v) => (below ? v < limit : v > limit));
       crossing = index < 0 ? null : horizon[index];
     }
     const listed = [...assumptions.map((a) => ({ name: a.name, value: a.value, unit: a.unit ?? m.unit, rationale: String(a.rationale).trim() })),
-      ...(plan.threshold && !plan.threshold.ref ? [{ name: plan.threshold.name ?? "threshold", value: limit, unit: plan.threshold.unit ?? m.unit, rationale: String(plan.threshold.rationale ?? "stated threshold").trim() }] : [])];
+      ...(plan.threshold && !plan.threshold.ref ? [{ name: plan.threshold.name ?? "threshold", value: limit, unit: plan.threshold.unit ?? m.unit, rationale: String(plan.threshold.rationale).trim() }] : [])];
     return { assumptions: listed, boundaries: boundariesOf([m], start ? [start] : []), crossesAt: crossing,
       measures: { path: { unit: m.unit, population: m.population, periods: [start ?? "base", ...horizon], values: [base, ...values], assumed: true, rationale: `${method} path under ${applied.map((a) => `${a.name} = ${a.value}`).join(", ")}` } },
       finding: `From ${show(base)} ${m.unit}${start ? ` at ${start}` : ""}, ${method === "linear" ? "adding" : "compounding"} ${applied.map((a) => `${a.name} (${a.value}${method === "compound" ? "%" : ""})`).join(" and ")} each period gives ${show(values.at(-1))} by ${horizon.at(-1)}` +
@@ -334,7 +347,7 @@ export function runAnalyses(plan, insights, { alternatives = [] } = {}) {
     result.hash = hashOf({ op: a.op, inputs: a.inputs.map((ref) => registry.get(ref) ?? ref), plan: a, measures: result.measures ?? null });
     results.push(result);
     // A computed result is a record later analyses can read.
-    if (result.measures) for (const [name, m] of Object.entries(result.measures)) registry.set(`${a.id}/${name}`, { ...m, ref: `${a.id}/${name}`, owner: a.id, name, sources: result.sources, cite: result.cite, inputs: result.inputs, derived: true, assumed: result.status === "assumed" || Boolean(m.assumed) });
+    if (result.measures) for (const [name, m] of Object.entries(result.measures)) registry.set(`${a.id}/${name}`, { ...m, ref: `${a.id}/${name}`, owner: a.id, name, sources: result.sources, cite: result.cite, inputs: Array.isArray(m.from) ? m.from : result.inputs, derived: true, assumed: result.status === "assumed" || Boolean(m.assumed) });
   }
   return { results, problems: [] };
 }

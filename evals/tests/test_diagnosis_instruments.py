@@ -41,8 +41,14 @@ class VoidOriginTests(unittest.TestCase):
         # Both past the bar by different amounts is still the page as composed.
         both = page_gates.void_origins(4, {"internalVoid": 0.0, "deadBand": 0.20}, {"internalVoid": 0.0, "deadBand": 0.31})
         self.assertEqual(both["bands"]["dead"]["origin"], "authored")
-        lost = page_gates.void_origins(4, {"internalVoid": 0.01, "deadBand": 0.02}, {"internalVoid": 0.19, "deadBand": 0.24})
+        # A band only the render shows is the export's when text the scene holds is missing from the render ...
+        gone = [{"node": "n1", "text": "A paragraph the render does not show", "box": [80, 300, 400, 60]}]
+        lost = page_gates.void_origins(4, {"internalVoid": 0.01, "deadBand": 0.02}, {"internalVoid": 0.19, "deadBand": 0.24}, gone)
         self.assertEqual({k: v["origin"] for k, v in lost["bands"].items()}, {"internal": "render", "dead": "render"})
+        self.assertEqual(lost["lost"], gone)
+        # ... and air inside something the scene counts as drawn when everything reached the page.
+        inside = page_gates.void_origins(4, {"internalVoid": 0.01, "deadBand": 0.02}, {"internalVoid": 0.19, "deadBand": 0.24})
+        self.assertEqual({k: v["origin"] for k, v in inside["bands"].items()}, {"internal": "inside-object", "dead": "inside-object"})
         estimate = page_gates.void_origins(4, {"internalVoid": 0.21, "deadBand": 0.02}, {"internalVoid": 0.02, "deadBand": 0.03})
         self.assertEqual({k: v["origin"] for k, v in estimate["bands"].items()}, {"internal": "scene-estimate"})
         # Under the bar on both instruments there is no band to explain.
@@ -89,31 +95,42 @@ class RenderedOriginTests(unittest.TestCase):
     """The same page read off a render that shows what the scene draws, and off one that lost it."""
 
     def render(self, directory, slides, painted):
-        from PIL import Image
+        """`painted`: True draws everything the scene does, "text" only its text, False nothing."""
+        from PIL import Image, ImageDraw
         for number, slide in enumerate(slides, start=1):
             image = Image.new("L", (1280, 720), 255)
-            if painted:
+            if painted is True:
                 pixels = image.load()
                 for y, row in enumerate(page_gates.scene_mask(slide)):
                     for x, cell in enumerate(row):
                         if cell:
                             pixels[x, y] = 0
+            elif painted == "text":
+                draw = ImageDraw.Draw(image)
+                for _, (x, y, w, h) in page_gates.scene_text_boxes(slide):
+                    draw.rectangle([x, y, x + w, y + h], fill=0)
             image.save(Path(directory) / f"slide-{number}.png")
 
     def test_a_render_that_lost_what_the_scene_draws_is_named_as_drift(self):
         scene = copy.deepcopy(example_scene("nyc-or-sf"))
         scene["slides"] = scene["slides"][:4]
-        with tempfile.TemporaryDirectory() as faithful, tempfile.TemporaryDirectory() as blank:
+        with tempfile.TemporaryDirectory() as faithful, tempfile.TemporaryDirectory() as blank, tempfile.TemporaryDirectory() as hollow:
             self.render(faithful, scene["slides"], painted=True)
             self.render(blank, scene["slides"], painted=False)
+            self.render(hollow, scene["slides"], painted="text")
             kept = page_gates.run_gates(scene, render_dir=faithful)
             lost = page_gates.run_gates(scene, render_dir=blank)
+            aired = page_gates.run_gates(scene, render_dir=hollow)
+        # Every run of text reached the page: whatever air the render shows is not the export's.
+        self.assertNotIn("RENDER_DRIFT", {f["code"] for f in aired["findings"]})
+        self.assertNotIn("render", {c.get("origin") for c in aired["voidCauses"]})
         self.assertNotIn("RENDER_DRIFT", {f["code"] for f in kept["findings"]})
         self.assertTrue(all(c.get("origin") in (None, "authored") for c in kept["voidCauses"]), kept["voidCauses"])
         drift = [f for f in lost["findings"] if f["code"] == "RENDER_DRIFT"]
         self.assertTrue(drift)
         self.assertEqual({f["severity"] for f in drift}, {"advisory"})  # it names where to look; the band itself is what blocks
         self.assertIn("The repair is the export's", drift[0]["repair"])
+        self.assertTrue(drift[0]["measured"]["lost"])  # it names the text that is missing
         blocked = [c for c in lost["voidCauses"] if c["kind"] == "dead" and c["slide"] == drift[0]["slide"]]
         self.assertEqual([c["origin"] for c in blocked], ["render"])
         self.assertIn("DEAD_BAND", blocked[0]["codes"])
@@ -186,7 +203,7 @@ if __name__ == "__main__":
 @unittest.skipUnless(NODE and shutil.which("soffice") and shutil.which("pdftoppm"), "needs Node.js, LibreOffice (soffice) and pdftoppm on PATH")
 @requires_python_package("pptx", "PIL", "numpy")
 class HeldOutBuildTests(unittest.TestCase):
-    """A held-out deck with declared measures goes through the whole path: compile, emit, render, gates."""
+    """A fixture deck with declared measures goes through the whole path: compile, emit, render, gates."""
 
     def test_the_finance_fixture_builds_and_its_dependencies_reach_the_deck(self):
         runtime = ROOT / "skills" / "professional-slides" / "runtime"

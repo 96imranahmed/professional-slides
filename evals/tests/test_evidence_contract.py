@@ -138,6 +138,39 @@ console.log(JSON.stringify({ bad: planProblems({ analyses: [{ id: 'A1', op: 'ave
         self.assertEqual(result["scenario"]["status"], "unavailable")
         self.assertIn("rationale", result["scenario"]["reason"])
 
+    def test_what_cannot_be_computed_honestly_is_unavailable_or_carries_its_boundary(self):
+        result = run_node("""
+import { runAnalyses } from './skills/professional-slides/runtime/analysis.mjs';
+import { measureRegistry } from './skills/professional-slides/runtime/measures.mjs';
+const base = { finding: 'f', shape: 'series', calculation: 'c', sources: ['s.csv'], soWhat: 'It bears on the decision at hand', strength: 'strong' };
+const log = [
+  { ...base, id: 'a', measures: { parts: { unit: 'GBP m', population: 'p', period: 'FY26', members: ['x', 'y'], values: [15, -5] },
+      now: { unit: 'GBP m', population: 'p', period: 'FY24', members: ['x', 'y'], values: [4, 6] }, then: { unit: 'GBP m', population: 'q', period: 'FY19', members: ['x', 'y'], values: [1, 0] },
+      s1: { unit: 'GBP m', population: 'p', periods: ['FY24', 'FY25'], values: [10, 12] }, s2: { unit: 'staff', population: 'p', periods: ['FY24', 'FY25'], values: [5, 5] } } }];
+const an = (o) => ({ soWhat: 'It bears on the decision at hand', strength: 'supporting', ...o });
+const { results } = runAnalyses({ analyses: [
+  an({ id: 'share', op: 'share', inputs: ['a/parts'] }),
+  an({ id: 'gap', op: 'gap', inputs: ['a/now', 'a/then'] }),
+  an({ id: 'ratio', op: 'ratio', inputs: ['a/now', 'a/then'] }),
+  an({ id: 'index', op: 'index', inputs: ['a/s1', 'a/s2'] }),
+  an({ id: 'bare', op: 'scenario', inputs: ['a/s1'], assumptions: [{ name: 'growth', value: 2, rationale: 'the last year repeated each year' }], horizon: ['FY26'], threshold: { value: 20 } }),
+  an({ id: 'units', op: 'scenario', inputs: ['a/s1'], assumptions: [{ name: 'hires', value: 2, unit: 'staff', rationale: 'the last year repeated each year' }], horizon: ['FY26'] }),
+] }, log);
+const by = Object.fromEntries(results.map((r) => [r.id, r]));
+const registry = measureRegistry([...log, ...results.filter((r) => r.measures).map((r) => ({ id: r.id, derived: true, inputs: r.inputs, measures: r.measures }))]);
+console.log(JSON.stringify({ share: [by.share.status, by.share.reason], gap: [by.gap.status, by.gap.boundaries.some((b) => b.includes('not one period'))],
+  ratio: [by.ratio.measures.result.values, Object.keys(by.ratio.measures.result.unavailable)], bare: [by.bare.status, by.bare.reason.includes('rationale')], units: [by.units.status, by.units.reason.includes('GBP m a period')],
+  lineage: [registry.get('index/s1').inputs, registry.get('index/s2').inputs, registry.get('gap/result').inputs, registry.get('a/s1').inputs] }));
+""")
+        self.assertEqual(result["share"][0], "unavailable")  # a negative part is not a share of a whole
+        self.assertIn("negative part", result["share"][1])
+        self.assertEqual(result["gap"], ["computed", True])  # two records for different years, said beside the result
+        self.assertEqual(result["ratio"], [[4, None], ["y"]])  # nothing is divided by zero, and the gap says why
+        self.assertEqual(result["bare"], ["unavailable", True])  # a threshold nobody recorded needs its reason
+        self.assertEqual(result["units"], ["unavailable", True])  # staff a year do not add to GBP m
+        # Each indexed series comes from its own input; a gap from both; a record from nothing.
+        self.assertEqual(result["lineage"], [["a/s1"], ["a/s2"], ["a/now", "a/then"], []])
+
     def test_the_cli_writes_the_results_beside_the_pages_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             for name in ("finance.pages.json", "finance.insights.json", "finance.analysis.json"):
@@ -179,16 +212,24 @@ const prose = compileDeck(finance, {{ insights: await readInsights(dir, 'finance
 stage('finance', {{ analysis: false }});
 const older = compileDeck({{ ...finance, deck: {{ ...finance.deck, workflow: 'existing_deck_revision', rulesVersion: 3, inventory: 'x.inventory.json' }} }},
   {{ insights: await readInsights(dir, 'finance', {{ alternatives: alternativesOf(finance.deck) }}), draft: true, partial: true }}).spineFindings;
+// A comparison over a measure that holds none of the declared players has not compared them.
+const junk = load('finance.insights.json');
+junk.insights.push({{ id: 'i-junk', finding: 'Two others differ on a count', shape: 'fact', calculation: 'a count for two others', sources: ['sources/i-junk.csv'], soWhat: 'It bears directly on nothing the deck decides', strength: 'context',
+  measures: {{ count: {{ unit: 'items', population: 'two others', period: 'FY26', members: ['Zed', 'Why'], values: [1, 2] }} }} }});
+fs.writeFileSync(path.join(dir, 'finance.insights.json'), JSON.stringify(junk));
+fs.writeFileSync(path.join(dir, 'finance.analysis.json'), JSON.stringify({{ analyses: [{{ id: 'A-junk', op: 'compare', inputs: ['i-junk/count'], soWhat: 'Two others set side by side', strength: 'context' }}] }}));
+const unplaced = compileDeck(finance, {{ insights: await readInsights(dir, 'finance', {{ alternatives: alternativesOf(finance.deck) }}), draft: true, partial: true }}).spineFindings.filter((f) => f.code === 'ANALYSIS_REQUIRED');
 stage('finance');
 const derived = await readInsights(dir, 'finance', {{ alternatives: alternativesOf(finance.deck) }});
 console.log(JSON.stringify({{ clean: await spine('finance'), noAnalysis: await spine('finance', {{ analysis: false }}), prose: prose.map((f) => [f.code, f.pages?.length ?? 0]),
-  proseRepair: prose[0].repair, older: older.filter((f) => f.code === 'ANALYSIS_REQUIRED').map((f) => [f.severity, f.waived]),
+  proseRepair: prose[0].repair, unplaced: unplaced.map((f) => [f.severity, f.measured.compared, f.measured.unplaced.length]), older: older.filter((f) => f.code === 'ANALYSIS_REQUIRED').map((f) => [f.severity, f.waived]),
   explainer: await spine('explainer'), ops: await spine('public-ops'), derived: [derived.get('A-peers').shape, derived.get('A-peers').derived, derived.analysis.results.length] }}));
 fs.rmSync(dir, {{ recursive: true, force: true }});
 ''')
         self.assertEqual(result["clean"], [])
         # Eight declared players and no computed comparison: refused before the outline.
         self.assertEqual(result["noAnalysis"], [["ANALYSIS_REQUIRED", "blocker"]])
+        self.assertEqual(result["unplaced"], [["blocker", ["A-junk"], 8]])  # run, and none of the eight players is in it
         self.assertEqual(result["prose"], [["MEASURES_MISSING", 6]])
         self.assertIn("as data", result["proseRepair"])
         self.assertEqual(result["older"], [["advisory", {"rulesVersion": 3, "introducedIn": 4}]])
@@ -199,7 +240,7 @@ fs.rmSync(dir, {{ recursive: true, force: true }});
 
 
 class DependencyTests(unittest.TestCase):
-    def test_seeded_defects_are_caught_on_held_out_decks_and_clean_decks_raise_nothing(self):
+    def test_seeded_defects_are_caught_on_the_fixture_decks_and_clean_decks_raise_nothing(self):
         result = run_node('''
 import { measure, SEEDED } from './evals/quality/evidence-validity.mjs';
 const out = await measure();
@@ -208,29 +249,50 @@ console.log(JSON.stringify({ accepted: out.accepted, clean: out.clean.map((d) =>
         self.assertEqual([deck for deck, _, _ in result["clean"]], ["explainer", "finance", "product", "public-ops"])
         for deck, pages, findings in result["clean"]:
             self.assertEqual(findings, [], f"{deck} is a clean deck: a finding on it is a false positive")
-        self.assertEqual(result["defects"], 14)
+        self.assertEqual(result["defects"], 17)
         for name, planted, caught, missed in result["seeded"]:
             with self.subTest(defect=name):
                 self.assertGreater(planted, 0, "no fixture page takes this defect")
                 self.assertEqual(caught, planted, missed)
         self.assertTrue(result["accepted"])
 
-    def test_a_chart_copied_onto_another_claim_is_refused_however_it_is_dressed(self):
-        # The benchmark's defect, step by step, on a held-out deck: the copy, then
+    def test_a_chart_copied_onto_another_claim_is_refused_in_each_dress_the_contract_reads(self):
+        # The benchmark's defect, step by step, on a fixture deck of another subject: the copy, then
         # each way an author might try to make the copy pass.
         result = run_node(f'''
-import fs from 'node:fs'; import path from 'node:path';
+import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os';
 import {{ readInsights }} from './skills/professional-slides/runtime/author-deck.mjs';
+import {{ measureProblems }} from './skills/professional-slides/runtime/measures.mjs';
 import {{ dependencyFindings }} from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
 import {{ alternativesOf }} from './skills/professional-slides/runtime/analysis.mjs';
 const doc = JSON.parse(fs.readFileSync(path.join('{FIXTURES}', 'finance.pages.json'), 'utf8'));
 const insights = await readInsights('{FIXTURES}', 'finance', {{ alternatives: alternativesOf(doc.deck) }});
 const codes = (mutate) => {{ const d = structuredClone(doc); mutate(d.pages.find((p) => p.id === 'f2'), d); return dependencyFindings(d, insights).filter((f) => f.id === 'f2').map((f) => f.code); }};
 const branches = (d) => structuredClone(d.pages.find((p) => p.id === 'f4').exhibits[1]);
+// The same deck with one more analysis in its plan: branches indexed beside cash flow, to try the index's output as proof of a cash-flow claim.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'launder-'));
+for (const file of ['finance.insights.json', 'finance.analysis.json']) fs.copyFileSync(path.join('{FIXTURES}', file), path.join(tmp, file));
+const plan = JSON.parse(fs.readFileSync(path.join(tmp, 'finance.analysis.json'), 'utf8'));
+plan.analyses.push({{ id: 'A-x', op: 'index', inputs: ['i-efficiency/branches', 'i-cash/ocf'], soWhat: 'Branches and cash flow on one base', strength: 'context' }});
+fs.writeFileSync(path.join(tmp, 'finance.analysis.json'), JSON.stringify(plan));
+const widened = await readInsights(tmp, 'finance', {{ alternatives: alternativesOf(doc.deck) }});
+const indexed = widened.get('A-x').measures.branches;
+const laundered = (() => {{ const d = structuredClone(doc); const p = d.pages.find((x) => x.id === 'f2');
+  p.exhibit = {{ heading: 'Branches, indexed', unit: indexed.unit, categories: indexed.periods, series: [{{ name: 'Branches', values: indexed.values }}], basis: {{ measures: ['A-x/branches'], role: 'proof' }} }};
+  p.evidence.push('A-x'); return dependencyFindings(d, widened).filter((f) => f.id === 'f2').map((f) => f.code); }})();
+fs.rmSync(tmp, {{ recursive: true, force: true }});
+const onPage = (id, mutate) => {{ const d = structuredClone(doc); mutate(d.pages.find((p) => p.id === id), d); return dependencyFindings(d, insights).filter((f) => f.id === id).map((f) => f.code); }};
 console.log(JSON.stringify({{
   clean: codes(() => {{}}),
   copied: codes((p, d) => {{ p.exhibit = {{ ...branches(d), basis: {{ measures: ['i-efficiency/branches'], role: 'proof' }} }}; p.evidence.push('i-efficiency'); }}),
   relabelled: codes((p, d) => {{ p.exhibit = {{ ...branches(d), basis: {{ measures: ['i-cash/ocf'], role: 'proof' }} }}; }}),
+  beside: codes((p, d) => {{ p.exhibit = {{ ...branches(d), basis: {{ measures: ['i-cash/ocf', 'i-efficiency/branches'], role: 'proof' }} }}; p.evidence.push('i-efficiency'); }}),
+  laundered,
+  handLineage: measureProblems({{ id: 'i-x', inputs: ['i-cash/ocf'], measures: {{ m: {{ unit: 'GBP m', population: 'p', period: 'FY26', value: 1 }} }} }}).length,
+  metric: codes((p) => {{ p.metrics[0].value = '+43%'; }}),
+  rounded: onPage('f5', (p) => {{ p.exhibit.series[0].values = p.exhibit.series[0].values.map((v) => Math.round(v)); }}),
+  tableUnshown: onPage('f0', (p) => {{ p.exhibit.basis.measures.push('i-peers/loan-growth'); }}),
+  tableCell: onPage('f0', (p) => {{ p.exhibit.rows[0][2] = '999m'; }}),
   undeclared: codes((p, d) => {{ p.exhibit = branches(d); delete p.exhibit.basis; p.evidence.push('i-efficiency'); }}),
   asContext: codes((p, d) => {{ p.exhibit = branches(d); p.evidence.push('i-efficiency'); }}),
   contextNoMetrics: codes((p, d) => {{ p.exhibit = branches(d); p.evidence.push('i-efficiency'); for (const m of p.metrics) delete m.basis; }}),
@@ -241,7 +303,17 @@ console.log(JSON.stringify({{
         self.assertEqual(result["clean"], [])
         self.assertEqual(result["copied"], ["PROOF_OFF_CLAIM"])
         self.assertIn("the claim is about i-cash/ocf, i-earn/pat", result["message"])
-        self.assertEqual(result["relabelled"], ["BASIS_UNIT", "BASIS_VALUES"])  # branches are not GBP m, nor the cash-flow numbers, whatever the basis says
+        self.assertEqual(sorted(set(result["relabelled"])), ["BASIS_UNIT", "BASIS_VALUES"])  # branches are not GBP m, nor the cash-flow numbers, whatever the basis says
+        # Naming the claim's measure beside the one drawn does not make the chart its proof.
+        self.assertEqual(result["beside"], ["BASIS_VALUES"])
+        # An index of branches computed beside cash flow is still about branches.
+        self.assertEqual(result["laundered"], ["PROOF_OFF_CLAIM"])
+        self.assertEqual(result["handLineage"], 1)  # the log cannot say what a measure is computed from
+        self.assertEqual(result["metric"], ["BASIS_VALUES"])  # a metric prints a number of its measure
+        self.assertEqual(result["rounded"], ["BASIS_VALUES"])  # 3.4 drawn as 3
+        self.assertEqual(result["tableUnshown"], ["BASIS_VALUES"])  # a table names only the measures it shows
+        # What the contract does not read, said as a limit: one changed cell of a table.
+        self.assertEqual(result["tableCell"], [])
         self.assertEqual(result["undeclared"], ["BASIS_MISSING"])
         # As declared context it stays, with its reason, for the reviewer to judge: the metrics still prove the claim.
         self.assertEqual(result["asContext"], [])
@@ -313,7 +385,7 @@ console.log(JSON.stringify({ undeclared: codes(page({})), split: codes(page({ re
         self.assertEqual(result["unknown"], ["RELATION_UNDECLARED"])
         self.assertEqual(result["merged"], [])  # both on one scale: the gap is on the page
         self.assertEqual(result["repair"], [["i-bal/cash", "i-bal/debt"], [0, 1], ["Cash", "Debt"], "GBP m", {"numbers": True, "categories": True}])
-        self.assertEqual(result["caption"], "Cash at each year end Debt at each year end")  # nothing the page said is dropped
+        self.assertEqual(result["caption"], "Cash at each year end. Debt at each year end.")  # nothing the page said is dropped
         # Different units are not compared by default; an index is asked for by name.
         self.assertEqual(result["differentUnits"], [])
         self.assertEqual(result["indexAsked"], ["RELATION_SPLIT"])

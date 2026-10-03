@@ -210,6 +210,29 @@ def scene_mask(slide):
     return rows
 
 
+def scene_text_boxes(slide):
+    """The text the scene draws in the page's own ink, each with the box its
+    glyphs take: [(node, (x, y, w, h))]. What a render is checked against node
+    by node (page_gates.lost_text): a run of text the scene holds and the
+    render shows nothing of did not reach the page."""
+    background = grey_of(canvas_of(slide))
+    margin = 255 - SURFACE_LUMINANCE
+    out = []
+    for node in slide.get("nodes", []):
+        if node.get("type") != "text" or not node.get("frame") or not word_count(source_text(node)):
+            continue
+        style = node.get("style") or {}
+        color = color_of(style.get("color") or "#000000")
+        opacity = style.get("opacity", 1.0)
+        opacity = opacity if isinstance(opacity, (int, float)) else 1.0
+        if color is None:
+            continue
+        grey = background + (grey_of(color) - background) * opacity
+        if grey < background - margin if background >= 128 else grey > background + margin:
+            out.append((node, _text_box(node)))
+    return out
+
+
 def scene_void(slide, mask=None):
     """The band of the page's body the scene leaves empty: (bands, void).
 

@@ -133,7 +133,8 @@ export const REQUEST_PROVENANCES = Object.freeze({
 /** How the deck's `request` came to be: verbatim unless the deck says otherwise. */
 export const requestProvenanceOf = (spec) => (Object.hasOwn(REQUEST_PROVENANCES, spec?.requestProvenance) ? spec.requestProvenance : "verbatim");
 /** Whether the author may fetch evidence beyond what was supplied: `{ retrieval: "open" | "closed", note }`. */
-export const evidenceScopeOf = (spec) => ({ retrieval: spec?.evidenceScope?.retrieval === "closed" ? "closed" : "open", note: typeof spec?.evidenceScope?.note === "string" ? spec.evidenceScope.note.trim() : "" });
+export const evidenceScopeOf = (spec) => ({ retrieval: spec?.evidenceScope?.retrieval === "closed" ? "closed" : "open", note: typeof spec?.evidenceScope?.note === "string" ? spec.evidenceScope.note.trim() : "",
+  ...(spec?.evidenceScope?.retrieval === "closed" && typeof spec.evidenceScope.quote === "string" ? { quote: spec.evidenceScope.quote.trim() } : {}) });
 /** Whether the deck offers its answer as final or as provisional, and what a provisional one leaves open. */
 export const answerStatusOf = (spec) => ({ status: spec?.answerStatus === "provisional" ? "provisional" : "final", limits: Array.isArray(spec?.answerLimits) ? spec.answerLimits.filter((limit) => typeof limit === "string" && limit.trim()) : [] });
 /**
@@ -148,7 +149,7 @@ export function requestStatement(packet, subject) {
   const label = provenance === "verbatim" ? null
     : `${provenance}: ${REQUEST_PROVENANCES[provenance]} - not the user's own words. It is the yardstick as far as it goes: judge the ${subject} against what it asks, do not hold it to the exact wording or to an answer the phrasing presumes, and say in the summary where it leaves the request open`;
   const scope = packet?.evidenceScope?.retrieval === "closed"
-    ? `EVIDENCE SCOPE: closed - only the evidence supplied may be used${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}. An analysis that needs other data cannot be run. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
+    ? `EVIDENCE SCOPE: closed - only the evidence supplied may be used${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}${packet.evidenceScope.quote ? `; the request sets the limit in these words: "${packet.evidenceScope.quote}"` : ""}. An analysis that needs other data cannot be run. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
     : "";
   const limits = packet?.answerStatus?.status === "provisional" ? packet.answerStatus.limits || [] : null;
   const offered = limits ? `THE ANSWER IS OFFERED AS PROVISIONAL. It says it leaves open: ${limits.map((limit) => `"${limit}"`).join("; ")}. Judge whether those are the decisive gaps, and whether everything else the evidence allows has been done.` : "";
@@ -182,7 +183,15 @@ export function deckStatementFindings(deck) {
     statements.push(`\`requestProvenance\` is one of ${Object.entries(REQUEST_PROVENANCES).map(([key, about]) => `${key} (${about})`).join("; ")}`);
   const scope = deck?.evidenceScope;
   if (scope !== undefined && (!scope || typeof scope !== "object" || !["open", "closed"].includes(scope.retrieval) || (scope.retrieval === "closed" && textWords(scope.note) < 4)))
-    statements.push("`evidenceScope` is { retrieval: \"open\" | \"closed\", note }: closed when the author may use only the evidence supplied, with a `note` saying what was supplied and who set the limit");
+    statements.push("`evidenceScope` is { retrieval: \"open\" | \"closed\", note, quote }: closed when the author may use only the evidence supplied, with a `note` saying what was supplied and who set the limit");
+  else if (scope?.retrieval === "closed") {
+    // The limit is the user's to set, so it is shown in the user's words: the
+    // author cannot close the scope on a request that does not say so.
+    const flat = (text) => String(text ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    if (requestProvenanceOf(deck) !== "verbatim") statements.push("a closed `evidenceScope` rests on the user's own words; a request that is reconstructed or paraphrased cannot close it - record the request verbatim, or leave the scope open");
+    else if (textWords(scope.quote) < 4 || !flat(requestOf(deck)).includes(flat(scope.quote)))
+      statements.push("a closed `evidenceScope` quotes, in `quote`, the words of the `request` that set the limit (four words or more, as they appear there): the scope is the user's to close, not the author's");
+  }
   if (deck?.answerStatus !== undefined && !["final", "provisional"].includes(deck.answerStatus)) statements.push("`answerStatus` is \"final\" or \"provisional\"");
   if (deck?.answerStatus === "provisional" && !answerStatusOf(deck).limits.some((limit) => textWords(limit) >= 4))
     statements.push("a provisional answer says what it leaves open in `answerLimits` - a sentence for each decisive thing the evidence in scope cannot settle");
