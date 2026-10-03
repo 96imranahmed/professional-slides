@@ -193,11 +193,14 @@ VOID_KIND_OF = {"INTERNAL_VOID": "internal", "DEAD_BAND": "dead", "COLUMN_VOID":
 
 
 def lost_text(slide, grey):
-    """The text the scene draws and the render shows nothing of: [{node, text,
-    box}]. `grey` is the decoded render (load_grey). A text box with no dark
-    pixel in it on the render is text that did not reach the page - a shape
-    not emitted, a font the renderer could not set. Text on a dark fill cannot
-    be told this way (the fill is ink), and is not reported."""
+    """The text the scene draws that the render does not show where the scene
+    put it: [{node, text, box}]. `grey` is the decoded render (load_grey). A
+    text box with no dark pixel in it on the render is text that is missing
+    from the page - a shape not emitted, a font the renderer could not set -
+    or drawn somewhere else, as when the renderer lays a native chart out
+    differently from the scene. Either way the render is not the scene. Text
+    on a dark fill, or with other ink across its box, cannot be told this way
+    and is not reported."""
     if grey is None:
         return []
     ink = ink_matrix(grey)
@@ -227,7 +230,8 @@ def void_origins(slide_no, scene_bands, render_bands, lost=()):
     of its plot, a card deeper than its text - so it is authored too, and the
     repair is that object's size or content.
     `render`: the render shows a band the scene does not, and text the scene
-    holds is missing from the render (`lost`). The repair is the export's.
+    holds is not where the scene put it in the render (`lost`): missing, or
+    laid out differently by the renderer. The repair is the export's.
     `scene-estimate`: the scene's estimate shows a band the render does not.
     The page as rendered is not empty there; the scene finding is the estimate
     reading a drawn surface as blank.
@@ -300,10 +304,12 @@ def empty_page_gates(run, slide_no, slide, render_dir):
                 run.findings.append(finding(
                     slide_no, "RENDER_DRIFT", {"bands": drifted, "lost": missing}, VOID_AGREEMENT,
                     "The render shows an empty band the scene does not draw, and %d run%s of text the scene holds %s "
-                    "missing from the render (%s): compare the page's render with its scene (a shape not emitted, a "
-                    "font the renderer could not set). The repair is the export's; adding or stretching content on "
-                    "the page will not close it." % (len(missing), "" if len(missing) == 1 else "s", "is" if len(missing) == 1 else "are",
-                                                      "; ".join('"%s"' % item["text"] for item in missing[:3]))))
+                    "no ink in the render where the scene put %s (%s): missing, or drawn elsewhere - a shape not emitted, "
+                    "a font the renderer could not set, a native chart laid out differently. Compare the page's render "
+                    "with its scene. The repair is the export's; adding or stretching content on the page will not "
+                    "close it." % (len(missing), "" if len(missing) == 1 else "s", "has" if len(missing) == 1 else "have",
+                                   "it" if len(missing) == 1 else "them",
+                                   "; ".join('"%s"' % item["text"] for item in missing[:3]))))
     if run.wanted("THIN_PAGE") or run.habit:
         gate_thin_page(slide_no, slide, empty)
     if run.wanted("SCENE_VOID") or run.habit:

@@ -17,8 +17,8 @@
 //       { "id": "A-peers", "op": "compare", "inputs": ["i-profit/pat", "i-traffic/passengers"], "strength": "strong",
 //         "soWhat": "The lead holds on three of four measures and reverses only on margin" },
 //       { "id": "A-net-debt", "op": "gap", "inputs": ["i-balance/liabilities", "i-balance/cash"], ... },
-//       { "id": "A-renewal", "op": "scenario", "inputs": ["i-fleet/aircraft"], "method": "linear", "drivers": ["net retirements a year"],
-//         "assumptions": [{ "name": "net retirements a year", "value": -8, "unit": "aircraft", "rationale": "..." }], "horizon": ["FY27", "FY28"], ... } ] }
+//       { "id": "A-crews", "op": "scenario", "inputs": ["i-crews/on-shift"], "method": "linear", "drivers": ["net leavers a year"],
+//         "assumptions": [{ "name": "net leavers a year", "value": -8, "unit": "crews a year", "rationale": "..." }], "horizon": ["FY27", "FY28"], ... } ] }
 //
 // Every result says what it is: `computed` from records, `assumed` where an
 // assumption entered it (each one listed, with its rationale), or `unavailable`

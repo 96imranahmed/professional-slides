@@ -1,7 +1,7 @@
 """The evidence contract: measures, computed analyses, and what each page rests on.
 
-A fifty-page evaluation deck carried a fleet-age chart on a page titled on
-cash flow. A repair for variety had copied the chart from another page,
+A fifty-page evaluation deck carried a chart of one measure on a page titled
+on another. A repair for variety had copied the chart from another page,
 appended its insight id to `evidence` and left the citation as it was, and
 every check passed it: they read the page's structure, and an insight was a
 sentence nothing could be computed from or checked against. The same deck
@@ -78,7 +78,7 @@ const { results, problems } = runAnalyses(plan([
     horizon: ['FY27', 'FY28', 'FY29'], threshold: { value: 25, rationale: 'the minimum liquidity the board is assumed to hold' } },
   { id: 'A-mixed', op: 'gap', inputs: ['i-bal/cash', 'i-bal/staff'] },
   { id: 'A-index', op: 'index', inputs: ['i-bal/cash', 'i-bal/staff'] },
-  { id: 'A-absent', op: 'gap', inputs: ['i-bal/cash', 'i-fleet/retirements'], missing: ['retirement schedule by year: not in the records'] },
+  { id: 'A-absent', op: 'gap', inputs: ['i-bal/cash', 'i-plan/retirements'], missing: ['retirement schedule by year: not in the records'] },
   { id: 'A-peers', op: 'compare', inputs: ['i-peers/profit', 'i-peers/margin'] },
   { id: 'A-growth', op: 'growth', inputs: ['i-bal/cash'] },
 ]), insights, { alternatives: ['Alpha', 'Beta', 'Epsilon'] });
@@ -100,7 +100,7 @@ console.log(JSON.stringify({ problems, status: Object.fromEntries(results.map((r
         self.assertEqual(result["floor"], [19, 1])  # a threshold nobody recorded is an assumption, listed as one
         self.assertEqual(result["path"], [[55, 43, 31, 19], "FY29", ["annual cash use", "threshold"]])
         self.assertIn("a gap needs one unit", result["mixed"])  # GBP m less people is not a number
-        self.assertEqual(result["absent"], [["i-fleet/retirements", "retirement schedule by year: not in the records"], False])  # an analysis that cannot run carries no page
+        self.assertEqual(result["absent"], [["i-plan/retirements", "retirement schedule by year: not in the records"], False])  # an analysis that cannot run carries no page
         self.assertEqual(round(result["index"], 1), 366.7)
         self.assertEqual(round(result["growth"], 1), 266.7)
         # Every alternative takes its row, with n/a kept and the boundary carried.
@@ -290,6 +290,11 @@ console.log(JSON.stringify({{
   laundered,
   handLineage: measureProblems({{ id: 'i-x', inputs: ['i-cash/ocf'], measures: {{ m: {{ unit: 'GBP m', population: 'p', period: 'FY26', value: 1 }} }} }}).length,
   metric: codes((p) => {{ p.metrics[0].value = '+43%'; }}),
+  // One point of the claim's measure added to the copied chart, and the two measures on one scale in two units.
+  onePoint: onPage('f1', (p, d) => {{ const b = branches(d); p.exhibit = {{ ...b, series: [...b.series, {{ name: 'Loans', values: [null, null, null, null, null, null, null, 648] }}], basis: {{ measures: ['i-loans/loans', 'i-efficiency/branches'], role: 'proof' }} }}; p.evidence.push('i-efficiency'); }}),
+  twoUnits: onPage('f1', (p, d) => {{ const b = branches(d); p.exhibit = {{ ...p.exhibit, series: [...p.exhibit.series, ...b.series], basis: {{ measures: ['i-loans/loans', 'i-efficiency/branches'], role: 'proof' }} }}; p.evidence.push('i-efficiency'); }}),
+  // What a metric prints: a unit letter is read, a sign is held, the first number is the one stated, a label is not a number.
+  metrics: Object.fromEntries(['4.3pp', '+4.3%', '-4.3%', '999x', '+900% (FY25: 47)', 'FY26', '4.26'].map((value) => [value, codes((p) => {{ p.metrics[0].value = value; }})])),
   rounded: onPage('f5', (p) => {{ p.exhibit.series[0].values = p.exhibit.series[0].values.map((v) => Math.round(v)); }}),
   tableUnshown: onPage('f0', (p) => {{ p.exhibit.basis.measures.push('i-peers/loan-growth'); }}),
   tableCell: onPage('f0', (p) => {{ p.exhibit.rows[0][2] = '999m'; }}),
@@ -305,11 +310,15 @@ console.log(JSON.stringify({{
         self.assertIn("the claim is about i-cash/ocf, i-earn/pat", result["message"])
         self.assertEqual(sorted(set(result["relabelled"])), ["BASIS_UNIT", "BASIS_VALUES"])  # branches are not GBP m, nor the cash-flow numbers, whatever the basis says
         # Naming the claim's measure beside the one drawn does not make the chart its proof.
-        self.assertEqual(result["beside"], ["BASIS_VALUES"])
+        self.assertEqual(result["beside"], ["BASIS_UNIT", "BASIS_VALUES"])
         # An index of branches computed beside cash flow is still about branches.
         self.assertEqual(result["laundered"], ["PROOF_OFF_CLAIM"])
         self.assertEqual(result["handLineage"], 1)  # the log cannot say what a measure is computed from
         self.assertEqual(result["metric"], ["BASIS_VALUES"])  # a metric prints a number of its measure
+        self.assertEqual(result["onePoint"], ["BASIS_UNIT", "BASIS_VALUES"])  # one point of the claim's measure is not the measure drawn
+        self.assertEqual(result["twoUnits"], ["BASIS_UNIT"])  # one scale, one unit
+        self.assertEqual(result["metrics"], {"4.3pp": [], "+4.3%": [], "4.26": [], "FY26": [],
+                                             "-4.3%": ["BASIS_VALUES"], "999x": ["BASIS_VALUES"], "+900% (FY25: 47)": ["BASIS_VALUES"]})
         self.assertEqual(result["rounded"], ["BASIS_VALUES"])  # 3.4 drawn as 3
         self.assertEqual(result["tableUnshown"], ["BASIS_VALUES"])  # a table names only the measures it shows
         # What the contract does not read, said as a limit: one changed cell of a table.

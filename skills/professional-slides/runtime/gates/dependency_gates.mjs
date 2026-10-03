@@ -84,28 +84,43 @@ function matches(plotted, recorded) {
   return Math.abs(plotted - recorded) <= Math.min(printed, twoFigures) + 1e-9;
 }
 
-// The numbers a printed string states: "+4.3%" is 4.3, "GBP 1.2bn" is 1.2 (and
-// 1200 against a record kept in millions), "84 to 66" is 84 and 66.
+// The numbers a printed string states, in order: "+4.3%" is 4.3, "2.9x" is
+// 2.9, "GBP 1.2bn" is 1.2 (and 1200 against a record kept in millions). A
+// number that is part of a label ("FY26", "Q3") is not one.
 function printedNumbers(text) {
   const out = [];
-  for (const hit of String(text ?? "").matchAll(/([-\u2212]?)\s?[^\d\s-]{0,3}?(\d[\d,]*(?:\.\d+)?)\s?(k|m|bn|b)?\b/gi)) {
+  for (const hit of String(text ?? "").matchAll(/(?<![A-Za-z\d.,])([+\-\u2212\u2013]?)\s?(?:[^\w\s+\-]{1,3})?(\d[\d,]*(?:\.\d+)?)(?![\d.])\s?(k|mn|m|bn|b)?(?![A-Za-z])/gi)) {
     const literal = hit[2].replace(/,/g, "");
-    const n = Number(literal) * (hit[1] ? -1 : 1);
-    if (Number.isFinite(n)) out.push({ n, literal, scaled: Boolean(hit[3]) });
+    const n = Number(literal);
+    if (Number.isFinite(n)) out.push({ n, literal, sign: hit[1] === "+" ? 1 : hit[1] ? -1 : 0, scaled: Boolean(hit[3]) });
+  }
+  // A unit letter straight after the digits ("2.9x", "4.3pp") is a number too.
+  if (!out.length) for (const hit of String(text ?? "").matchAll(/(?<![A-Za-z\d.,])([+\-\u2212\u2013]?)\s?(\d[\d,]*(?:\.\d+)?)(?![\d.])/g)) {
+    const literal = hit[2].replace(/,/g, "");
+    out.push({ n: Number(literal), literal, sign: hit[1] === "+" ? 1 : hit[1] ? -1 : 0, scaled: false });
   }
   return out;
 }
-/** Does a printed number state a recorded value: at its printed precision, in either sign's wording, or in the next scale of thousands. */
+/** Does a printed number state a recorded value: at its printed precision, with the sign it prints (an unsigned one states either), or in the next scale of thousands. */
 function states(printed, recorded) {
   if (recorded === null || recorded === undefined) return false;
+  if (printed.sign && recorded !== 0 && Math.sign(recorded) !== printed.sign) return false;
   const decimals = (printed.literal.split(".")[1] || "").length;
-  const near = (x) => matches(Number(Math.abs(printed.n).toFixed(decimals)), Math.abs(x));
+  const near = (x) => matches(Number(printed.n.toFixed(decimals)), Math.abs(x));
   return near(recorded) || (printed.scaled && (near(recorded / 1000) || near(recorded * 1000)));
 }
-/** Is the measure among what the series plot: a series of its values (a scalar, one plotted value). */
-const plotsMeasure = (plotted, measure) => (axisOf(measure).kind === "scalar"
-  ? plotted.series.some((s) => s.values.some((v) => typeof v === "number" && matches(v, valuesOf(measure)[0])))
-  : plotted.series.some((s) => s.values.some((v) => typeof v === "number") && !strayValue(plotted.categories, s.values, measure)));
+// A series draws a measure when, at every category the exhibit plots that the
+// measure has a number for, the series shows that number: one point of the
+// claim's measure beside another chart is not the claim's measure drawn. A
+// measure with no axis is drawn by a series that shows nothing else (a rule
+// across the plot), not by a chance equal value.
+function drawsMeasure(categories, values, measure) {
+  const axis = axisOf(measure), recorded = valuesOf(measure);
+  if (axis.kind === "scalar") { const shown = values.filter((v) => typeof v === "number"); return shown.length > 0 && shown.every((v) => matches(v, recorded[0])); }
+  const held = categories.map((label, i) => [axis.labels.indexOf(label), values[i]]).filter(([at]) => at >= 0 && recorded[at] !== null && recorded[at] !== undefined);
+  return held.length > 0 && held.every(([at, value]) => typeof value === "number" && matches(value, recorded[at]));
+}
+const plotsMeasure = (plotted, measure) => plotted.series.some((s) => drawsMeasure(plotted.categories, s.values, measure));
 
 /** The series an exhibit plots against its categories: [{ name, values }], or null where it plots no such thing. */
 function plottedSeries(ex) {
@@ -144,7 +159,8 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots }) {
     add("CONTEXT_UNEXPLAINED", `${what} is context, not proof of the claim: say in \`basis.relevance\` what it tells the reader about this claim (${RELEVANCE_WORDS} words or more); the reviewer judges it on that sentence`);
   if (!plots) {
     // A metric states one number of the measure it names.
-    const printed = printedNumbers(item.value);
+    // The first number a metric prints is the one it states; what follows it is commentary.
+    const printed = printedNumbers(item.value).slice(0, 1);
     if (printed.length && !printed.some((number) => measures.some((m) => valuesOf(m).some((v) => states(number, v)))))
       add("BASIS_VALUES", `${what} prints ${item.value}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} no such number (${measures.flatMap((m) => valuesOf(m)).filter((v) => v !== null).slice(-4).join(", ")}): print the recorded or computed value, or name the measure this is`, { printed: item.value, recorded: measures.flatMap((m) => valuesOf(m)).filter((v) => v !== null).slice(-4) });
     return out;
@@ -155,7 +171,9 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots }) {
     const unshown = measures.filter((m) => !cells.some((number) => valuesOf(m).some((v) => states(number, v)))).map((m) => m.ref);
     if (unshown.length) add("BASIS_VALUES", `${what} names ${unshown.join(", ")} and no cell of the table states a number of ${unshown.length === 1 ? "it" : "theirs"}: a basis lists the measures the exhibit shows, not ones it would like to be about`, { unshown });
   }
-  if (typeof item.unit === "string" && item.unit.trim() && !measures.some((m) => normalUnit(m.unit) === normalUnit(item.unit)))
+  // One scale, one unit: every measure a chart names is in the unit it is drawn in (a combo's second axis has its own).
+  const drawnUnits = [item.unit, item.secondaryUnit].filter((unit) => typeof unit === "string" && unit.trim()).map(normalUnit);
+  if (drawnUnits.length && !Array.isArray(item.rows) && measures.some((m) => !drawnUnits.includes(normalUnit(m.unit))))
     add("BASIS_UNIT", `${what} is drawn in ${item.unit}, and the measure${measures.length === 1 ? "" : "s"} it names ${measures.length === 1 ? "is" : "are"} in ${[...new Set(measures.map((m) => m.unit))].join(", ")} (${refs.join(", ")}): the exhibit plots something other than what it says it plots`, { exhibit: item.unit, measures: measures.map((m) => m.unit) });
   const plotted = plottedSeries(item);
   if (!plotted) return out;
@@ -168,13 +186,13 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots }) {
     if (strays.every(Boolean)) {
       strayed = true;
       const nearest = strays.reduce((a, b) => (b.recorded !== undefined && a.recorded === undefined ? b : a));
-      add("BASIS_VALUES", `${what} plots ${series.name} = ${nearest.value} at ${nearest.label}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} ${nearest.recorded === undefined ? "no value there" : nearest.recorded}: the numbers drawn are not the measure's - plot the recorded values (rounded to two significant figures or more), or name the measure these are`, { series: series.name, label: nearest.label, plotted: nearest.value, recorded: nearest.recorded ?? null });
+      add("BASIS_VALUES", `${what} plots ${series.name} = ${nearest.value} at ${nearest.label}, and ${refs.join(", ")} record${measures.length === 1 ? "s" : ""} ${nearest.recorded === undefined ? "no value there" : nearest.recorded}: the numbers drawn are not the measure's - plot the recorded values at the precision the exhibit prints, two significant figures or more, or name the measure these are`, { series: series.name, label: nearest.label, plotted: nearest.value, recorded: nearest.recorded ?? null });
     }
   }
   // Every measure the basis names is one the exhibit draws: a claim's measure
   // listed beside the one actually plotted would otherwise pass as its proof.
   const undrawn = measures.filter((m) => !plotsMeasure(plotted, m)).map((m) => m.ref);
-  if (undrawn.length && !strayed) add("BASIS_VALUES", `${what} names ${undrawn.join(", ")} and draws no series of ${undrawn.length === 1 ? "it" : "them"}: a basis lists the measures the exhibit plots - name only those, and plot the claim's measure where this exhibit is its proof`, { undrawn });
+  if (undrawn.length && !strayed) add("BASIS_VALUES", `${what} names ${undrawn.join(", ")} and no series shows ${undrawn.length === 1 ? "it" : "them"} at every category drawn: a basis lists the measures the exhibit plots - name only those, and plot the claim's measure where this exhibit is its proof`, { undrawn });
   return out;
 }
 

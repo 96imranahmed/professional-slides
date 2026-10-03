@@ -23,8 +23,8 @@
  *
  * The seeded defects are the ways an exhibit comes to disagree with its page:
  * an exhibit copied from another page with its evidence id appended and the
- * citation left as it was (how a repair for variety put a fleet-age chart on
- * a cash-flow page), the same copy relabelled as the claim's measure, a unit,
+ * citation left as it was (how a repair for variety put a chart of one
+ * measure on a page about another), the same copy relabelled as the claim's measure, a unit,
  * a period or a number changed or rounded away, a copy listed beside the
  * claim's own measure, a dependency left undeclared, a citation
  * dropped, a context exhibit unexplained, and a relation split across panels.

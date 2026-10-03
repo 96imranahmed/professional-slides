@@ -111,11 +111,11 @@ An insight log is a list of records, and a storyline written from it record by r
 ```json
 { "schema": "professional-slides.analysis/v1",
   "analyses": [
-    { "id": "A-peers", "op": "compare", "inputs": ["i-profit/pat", "i-traffic/passengers", "i-product/rank"],
+    { "id": "A-peers", "op": "compare", "inputs": ["i-profit/pat", "i-volume/customers", "i-product/rank"],
       "soWhat": "The lead holds on two of three measures and reverses on the third", "strength": "strong" },
     { "id": "A-net-debt", "op": "gap", "inputs": ["i-balance/liabilities", "i-balance/cash"], "soWhat": "...", "strength": "strong" },
-    { "id": "A-renewal", "op": "scenario", "inputs": ["i-crews/on-shift"], "method": "linear", "horizon": ["FY27", "FY28", "FY29"],
-      "assumptions": [{ "name": "net retirements a year", "value": -8, "unit": "aircraft", "rationale": "the oldest type leaves at its stated pace and deliveries slip a year" }],
+    { "id": "A-crews", "op": "scenario", "inputs": ["i-crews/on-shift"], "method": "linear", "horizon": ["FY27", "FY28", "FY29"],
+      "assumptions": [{ "name": "net leavers a year", "value": -8, "unit": "crews a year", "rationale": "leavers continue at the last two years' pace and recruitment stays frozen" }],
       "soWhat": "...", "strength": "supporting" } ] }
 ```
 
@@ -168,7 +168,7 @@ The critic holds the deck to the request: every sub-question answered with a lea
 
 ### What the reviews are told
 
-The critic and the deck's reviewer judge against the request, so they are told what it is. `requestProvenance` on the deck says how the `request` came to be - `verbatim` (the default), `reconstructed` or `paraphrased` - and a request that is not the user's own words is read for what it asks, not held to its wording or to an answer its phrasing presumes. `evidenceScope: { retrieval: "closed", note, quote }` says the author may use only the evidence supplied: a missing analysis that needs other data then keeps its severity and cannot be asked of the team. The limit is the user's to set, so `quote` gives the words of a verbatim `request` that set it (checked against the request; a reconstructed or paraphrased request cannot close the scope), and the critic is shown them. A provisional pass is a pass the earlier rules did not have: a storyline with a decisive retrieval open can reach the deck review, as provisional, where before it was sent back or closed on a search log. `answerStatus: "provisional"` with `answerLimits` offers the answer as provisional and says what it leaves open; delivery records a deck accepted on a provisional storyline as provisional, with the items left open.
+The critic and the deck's reviewer judge against the request, so they are told what it is. `requestProvenance` on the deck says how the `request` came to be - `verbatim` (the default), `reconstructed` or `paraphrased` - and a request that is not the user's own words is read for what it asks, not held to its wording or to an answer its phrasing presumes. `evidenceScope: { retrieval: "closed", note, quote }` says the author may use only the evidence supplied: a missing analysis that needs other data then keeps its severity and cannot be asked of the team. The limit is the user's to set, so `quote` gives the words of a verbatim `request` that set it (the runtime checks only that the words are in the request - a reconstructed or paraphrased request cannot close the scope - and the critic, shown them, says whether they set a limit). A provisional pass is a pass the earlier rules did not have: a storyline with a decisive retrieval open can reach the deck review, as provisional, where before it was sent back or closed on a search log. `answerStatus: "provisional"` with `answerLimits` offers the answer as provisional and says what it leaves open; delivery records a deck accepted on a provisional storyline as provisional, with the items left open.
 
 The critique returns two judgements beside its verdict, held to its own ledger: `compliance` (has the team done everything the evidence in scope allows - `complete` only when nothing it could still act on is open) and `sufficiency` (does the evidence support the answer as stated - `sufficient` only when nothing is open at all). A team can comply and the answer still not be sufficient. The rating is on one anchored scale, capped at 5 with a blocker open and 7 with a major open, so a number means the same thing on every pass.
 
