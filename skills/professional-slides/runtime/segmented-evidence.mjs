@@ -92,7 +92,13 @@ function band(id, frame, heading, items, fill) {
   ];
 }
 export function registerSegmentedEvidence(registry) {
-  const tree = registry.get("tree");
+  asDecisionTree(registry.get("tree"));
+  withSegmentImplications(registry.get("chart.column"));
+  return registry;
+}
+
+/** The tree as a decision tree: a root question, two branches and their conclusions, and the overall conclusion under them. */
+function asDecisionTree(tree) {
   tree.tokens = [...new Set([...tree.tokens, ...TOKENS])];
   tree.variants = {
     "decision-conclusions": {
@@ -131,162 +137,172 @@ export function registerSegmentedEvidence(registry) {
       throw new Error("Decision trees require multiple levels: root, decision branches and terminal conclusions");
     return v;
   };
-  tree.render = (input) => {
-    const { id, frame, props } = input;
-    tree.resolveVariant(props);
-    const branches = props.branches;
-    if (
-      !props.root ||
-      !props.conclusion ||
-      !Array.isArray(branches) ||
-      branches.length !== 2
-    )
-      throw new Error(
-        "Decision tree requires a root, two branches and overall conclusion",
-      );
-    const ids = [];
-    for (const b of branches) {
-      ids.push(b.id);
-      if (
-        !b.label ||
-        !Array.isArray(b.conclusions) ||
-        b.conclusions.length < 1 ||
-        b.conclusions.length > 3
-      )
-        throw new Error("Each branch needs one to three conclusions");
-      for (const c of b.conclusions) {
-        ids.push(c.id);
-        if (!c.text) throw new Error("Empty conclusion");
-      }
-    }
-    if (
-      ids.some((v) => typeof v !== "string" || !v.trim()) ||
-      new Set(ids).size !== ids.length
-    )
-      throw new Error("Decision IDs must be unique and nonempty");
-    if (frame.width < 900 || frame.height < 440)
-      throw new Error("Decision tree requires 900 by 440");
-    const width = (frame.width - 40) / 2;
-    const rootWidth = Math.min(600, frame.width / 2);
-    const branchWidth = Math.min(440, width - 20);
-    const nodeHeight = (value, width, bold) => copyLayout(value, width - 24, bold).height + 16;
-    const rootHeight = Math.max(70, nodeHeight(props.root, rootWidth, true));
-    const branchHeight = Math.max(70, ...branches.map(b => nodeHeight(b.label, branchWidth, true)));
-    const leafHeight = Math.max(80, ...branches.flatMap(b => {
-      const leafWidth = (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
-      return b.conclusions.map(c => nodeHeight(c.text, leafWidth, false));
-    }));
-    const conclusionHeight = Math.max(64, copyLayout(props.conclusion, frame.width - 32, true).height + 16);
-    const gap = (frame.height - rootHeight - branchHeight - leafHeight - conclusionHeight) / 3;
-    if (gap < 16) throw new Error(`${id} decision tree needs more room for its complete node text and tier gaps`);
-    const branchY = frame.y + rootHeight + gap;
-    const leafY = branchY + branchHeight + gap;
-    const nodes = [],
-      root = {
-        x: frame.x + (frame.width - rootWidth) / 2,
-        y: frame.y,
-        width: rootWidth,
-        height: rootHeight,
-      };
-    const nodeBox = (key, f, value, fill, bold = true) =>
-      nodes.push(
-        box(`${key}-box`, f, fill, "decision-box"),
-        text(
-          `${key}-text`,
-          {
-            x: f.x + 12,
-            y: f.y + 8,
-            width: f.width - 24,
-            height: f.height - 16,
-          },
-          value,
-          { white: whiteOn(fill), bold, role: "decision-label" },
-        ),
-      );
-    const connect = (key, x1, y1, x2, y2, from, to) =>
-      nodes.push(
-        linePrimitive({
-          id: key,
-          role: "decision-connector",
-          x1,
-          y1,
-          x2,
-          y2,
-          style: {
-            stroke: token("color.rule"),
-            lineWidth: token("line.hairline"),
-          },
-          data: { endArrow: true, dependencies: [from, to] },
-        }),
-      );
-    nodeBox(`${id}-root`, root, props.root, "color.ink");
-    branches.forEach((b, i) => {
-      const x = frame.x + i * (width + 40),
-        fill = "color.surfaceMuted",
-        center = x + width / 2;
-      connect(
-        stableId(id, b.id, "link"),
-        frame.x + frame.width / 2,
-        frame.y + rootHeight,
-        center,
-        branchY,
-        `${id}-root-box`, `${stableId(id,b.id)}-box`,
-      );
-      nodeBox(
-        stableId(id, b.id),
-        { x: center - branchWidth / 2, y: branchY, width: branchWidth, height: branchHeight },
-        b.label,
-        fill,
-      );
-      const leafWidth =
-        (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
-      b.conclusions.forEach((c, j) => {
-        const lx = x + j * (leafWidth + 20);
-        connect(
-          stableId(id, c.id, "link"),
-          center,
-          branchY + branchHeight,
-          lx + leafWidth / 2,
-          leafY,
-          `${stableId(id,b.id)}-box`, `${stableId(id,c.id)}-box`,
-        );
-        nodeBox(
-          stableId(id, c.id),
-          { x: lx, y: leafY, width: leafWidth, height: leafHeight },
-          c.text,
-          fill,
-          false,
-        );
-      });
-    });
-    const f = {
-      x: frame.x,
-      y: frame.y + frame.height - conclusionHeight,
-      width: frame.width,
-      height: conclusionHeight,
+  tree.render = (input) => renderDecisionTree(tree, input);
+}
+
+function renderDecisionTree(tree, input) {
+  const { id, frame, props } = input;
+  tree.resolveVariant(props);
+  const branches = props.branches;
+  assertDecisionBranches(props, frame, branches);
+  const width = (frame.width - 40) / 2;
+  const rootWidth = Math.min(600, frame.width / 2);
+  const branchWidth = Math.min(440, width - 20);
+  const nodeHeight = (value, width, bold) => copyLayout(value, width - 24, bold).height + 16;
+  const rootHeight = Math.max(70, nodeHeight(props.root, rootWidth, true));
+  const branchHeight = Math.max(70, ...branches.map(b => nodeHeight(b.label, branchWidth, true)));
+  const leafHeight = Math.max(80, ...branches.flatMap(b => {
+    const leafWidth = (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
+    return b.conclusions.map(c => nodeHeight(c.text, leafWidth, false));
+  }));
+  const conclusionHeight = Math.max(64, copyLayout(props.conclusion, frame.width - 32, true).height + 16);
+  const gap = (frame.height - rootHeight - branchHeight - leafHeight - conclusionHeight) / 3;
+  if (gap < 16) throw new Error(`${id} decision tree needs more room for its complete node text and tier gaps`);
+  const branchY = frame.y + rootHeight + gap;
+  const leafY = branchY + branchHeight + gap;
+  const nodes = [],
+    root = {
+      x: frame.x + (frame.width - rootWidth) / 2,
+      y: frame.y,
+      width: rootWidth,
+      height: rootHeight,
     };
+  const nodeBox = (key, f, value, fill, bold = true) =>
     nodes.push(
-      box(
-        `${id}-conclusion-surface`,
-        f,
-        "color.surfaceMuted",
-        "decision-conclusion-surface",
-      ),
+      box(`${key}-box`, f, fill, "decision-box"),
       text(
-        `${id}-conclusion`,
-        { ...f, x: f.x + 16, width: f.width - 32 },
-        props.conclusion,
-        { bold: true, role: "decision-conclusion" },
+        `${key}-text`,
+        {
+          x: f.x + 12,
+          y: f.y + 8,
+          width: f.width - 24,
+          height: f.height - 16,
+        },
+        value,
+        { white: whiteOn(fill), bold, role: "decision-label" },
       ),
     );
-    for (const node of nodes) {
-      if (node.role === 'decision-label') node.data.dependencies = [node.id.replace(/-text$/, '-box')];
-      if (node.role === 'decision-box') node.data.dependencies = [node.id.replace(/-box$/, '-text')];
-    }
-    return { nodes };
+  const connect = (key, x1, y1, x2, y2, from, to) =>
+    nodes.push(
+      linePrimitive({
+        id: key,
+        role: "decision-connector",
+        x1,
+        y1,
+        x2,
+        y2,
+        style: {
+          stroke: token("color.rule"),
+          lineWidth: token("line.hairline"),
+        },
+        data: { endArrow: true, dependencies: [from, to] },
+      }),
+    );
+  nodeBox(`${id}-root`, root, props.root, "color.ink");
+  branches.forEach((b, i) => {
+    const x = frame.x + i * (width + 40),
+      fill = "color.surfaceMuted",
+      center = x + width / 2;
+    connect(
+      stableId(id, b.id, "link"),
+      frame.x + frame.width / 2,
+      frame.y + rootHeight,
+      center,
+      branchY,
+      `${id}-root-box`, `${stableId(id,b.id)}-box`,
+    );
+    nodeBox(
+      stableId(id, b.id),
+      { x: center - branchWidth / 2, y: branchY, width: branchWidth, height: branchHeight },
+      b.label,
+      fill,
+    );
+    const leafWidth =
+      (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
+    b.conclusions.forEach((c, j) => {
+      const lx = x + j * (leafWidth + 20);
+      connect(
+        stableId(id, c.id, "link"),
+        center,
+        branchY + branchHeight,
+        lx + leafWidth / 2,
+        leafY,
+        `${stableId(id,b.id)}-box`, `${stableId(id,c.id)}-box`,
+      );
+      nodeBox(
+        stableId(id, c.id),
+        { x: lx, y: leafY, width: leafWidth, height: leafHeight },
+        c.text,
+        fill,
+        false,
+      );
+    });
+  });
+  const f = {
+    x: frame.x,
+    y: frame.y + frame.height - conclusionHeight,
+    width: frame.width,
+    height: conclusionHeight,
   };
-  const chart = registry.get("chart.column"),
-    render = chart.render;
+  nodes.push(
+    box(
+      `${id}-conclusion-surface`,
+      f,
+      "color.surfaceMuted",
+      "decision-conclusion-surface",
+    ),
+    text(
+      `${id}-conclusion`,
+      { ...f, x: f.x + 16, width: f.width - 32 },
+      props.conclusion,
+      { bold: true, role: "decision-conclusion" },
+    ),
+  );
+  for (const node of nodes) {
+    if (node.role === 'decision-label') node.data.dependencies = [node.id.replace(/-text$/, '-box')];
+    if (node.role === 'decision-box') node.data.dependencies = [node.id.replace(/-box$/, '-text')];
+  }
+  return { nodes };
+}
+
+/** A root, two branches of one to three conclusions each, unique ids, an overall conclusion, and a frame of at least 900 by 440. */
+function assertDecisionBranches(props, frame, branches) {
+  if (
+    !props.root ||
+    !props.conclusion ||
+    !Array.isArray(branches) ||
+    branches.length !== 2
+  )
+    throw new Error(
+      "Decision tree requires a root, two branches and overall conclusion",
+    );
+  const ids = [];
+  for (const b of branches) {
+    ids.push(b.id);
+    if (
+      !b.label ||
+      !Array.isArray(b.conclusions) ||
+      b.conclusions.length < 1 ||
+      b.conclusions.length > 3
+    )
+      throw new Error("Each branch needs one to three conclusions");
+    for (const c of b.conclusions) {
+      ids.push(c.id);
+      if (!c.text) throw new Error("Empty conclusion");
+    }
+  }
+  if (
+    ids.some((v) => typeof v !== "string" || !v.trim()) ||
+    new Set(ids).size !== ids.length
+  )
+    throw new Error("Decision IDs must be unique and nonempty");
+  if (frame.width < 900 || frame.height < 440)
+    throw new Error("Decision tree requires 900 by 440");
+}
+
+/** The column chart's segment-implications variant: `segments` over the columns, each with what it implies. */
+function withSegmentImplications(chart) {
+  const render = chart.render;
   chart.tokens = [...new Set([...chart.tokens, ...TOKENS])];
   chart.examples = {
     ...chart.examples,
@@ -332,100 +348,101 @@ export function registerSegmentedEvidence(registry) {
       throw new Error("Column variant must match segment inputs");
     return v;
   };
-  chart.render = (input) => {
-    const { props, frame, id } = input;
-    chart.resolveVariant(props);
-    if (!props.segments) return render(input);
-    const segments = props.segments;
-    if (
-      !Array.isArray(segments) ||
-      segments.length < 2 ||
-      segments.length > 3 ||
-      new Set(segments.map((s) => s.id)).size !== segments.length ||
-      segments.some(
-        (s) =>
-          !s.id ||
-          !s.label ||
-          !Array.isArray(s.categories) ||
-          !s.categories.length,
-      )
+  chart.render = (input) => renderSegmentImplications(chart, render, input);
+}
+
+function renderSegmentImplications(chart, render, input) {
+  const { props, frame, id } = input;
+  chart.resolveVariant(props);
+  if (!props.segments) return render(input);
+  const segments = props.segments;
+  if (
+    !Array.isArray(segments) ||
+    segments.length < 2 ||
+    segments.length > 3 ||
+    new Set(segments.map((s) => s.id)).size !== segments.length ||
+    segments.some(
+      (s) =>
+        !s.id ||
+        !s.label ||
+        !Array.isArray(s.categories) ||
+        !s.categories.length,
     )
-      throw new Error("Segmented columns need two or three identified groups");
-    if (
-      JSON.stringify(segments.flatMap((s) => s.categories)) !==
-      JSON.stringify(props.categories)
-    )
-      throw new Error(
-        "Segments must partition every category exactly once in plot order",
-      );
-    if (props.series?.length !== 1 || props.highlights?.length)
-      throw new Error(
-        "Segment colour requires one measure and no competing highlights",
-      );
-    if (frame.height < 450)
-      throw new Error("Segment implications need at least 450 height");
-    const { segments: _, ...chartProps } = props;
-    const result = render({
-      ...input,
-      frame: { ...frame, y: frame.y + 36, height: frame.height - 236 },
-      props: { ...chartProps, legend: false },
-    });
-    const marks = result.nodes.filter((n) => n.role === "chart-mark");
-    segments.forEach((s, i) => {
-      const fill =
-        segments.length === 2 ? ["color.ink", "color.chartSeries3"][i] : ["color.ink", "color.chartSeries2", "color.chartSeries3"][i];
-      const group = marks.filter((n) => s.categories.includes(n.data.category));
-      if (group.length !== s.categories.length)
-        throw new Error("Cannot align segment to chart marks");
-      for (const n of group) {
-        n.style.fill = token(fill);
-        n.data.segmentId = s.id;
-      }
-      const left = Math.min(...group.map((n) => n.frame.x)),
-        right = Math.max(...group.map((n) => n.frame.x + n.frame.width));
+  )
+    throw new Error("Segmented columns need two or three identified groups");
+  if (
+    JSON.stringify(segments.flatMap((s) => s.categories)) !==
+    JSON.stringify(props.categories)
+  )
+    throw new Error(
+      "Segments must partition every category exactly once in plot order",
+    );
+  if (props.series?.length !== 1 || props.highlights?.length)
+    throw new Error(
+      "Segment colour requires one measure and no competing highlights",
+    );
+  if (frame.height < 450)
+    throw new Error("Segment implications need at least 450 height");
+  const { segments: _, ...chartProps } = props;
+  const result = render({
+    ...input,
+    frame: { ...frame, y: frame.y + 36, height: frame.height - 236 },
+    props: { ...chartProps, legend: false },
+  });
+  const marks = result.nodes.filter((n) => n.role === "chart-mark");
+  segments.forEach((s, i) => {
+    const fill =
+      segments.length === 2 ? ["color.ink", "color.chartSeries3"][i] : ["color.ink", "color.chartSeries2", "color.chartSeries3"][i];
+    const group = marks.filter((n) => s.categories.includes(n.data.category));
+    if (group.length !== s.categories.length)
+      throw new Error("Cannot align segment to chart marks");
+    for (const n of group) {
+      n.style.fill = token(fill);
+      n.data.segmentId = s.id;
+    }
+    const left = Math.min(...group.map((n) => n.frame.x)),
+      right = Math.max(...group.map((n) => n.frame.x + n.frame.width));
+    result.nodes.push(
+      text(
+        stableId(id, s.id, "label"),
+        { x: left, y: frame.y, width: right - left, height: 32 },
+        s.label,
+        { bold: true },
+      ),
+    );
+    const gap = 12,
+      x =
+        frame.x +
+        (frame.width * props.categories.indexOf(s.categories[0])) /
+          props.categories.length;
+    const width =
+      (frame.width * s.categories.length) / props.categories.length -
+      (i < segments.length - 1 ? gap : 0);
+    result.nodes.push(
+      ...band(
+        stableId(id, s.id),
+        { x, y: frame.y + frame.height - 172, width, height: 172 },
+        s.heading,
+        s.items,
+        fill,
+      ),
+    );
+    if (i)
       result.nodes.push(
-        text(
-          stableId(id, s.id, "label"),
-          { x: left, y: frame.y, width: right - left, height: 32 },
-          s.label,
-          { bold: true },
-        ),
+        linePrimitive({
+          id: stableId(id, s.id, "divider"),
+          role: "segment-divider",
+          x1: left - 8,
+          y1: frame.y + 36,
+          x2: left - 8,
+          y2: frame.y + frame.height - 206,
+          style: {
+            stroke: token("color.rule"),
+            lineWidth: token("line.hairline"),
+            dash: "dash",
+          },
+        }),
       );
-      const gap = 12,
-        x =
-          frame.x +
-          (frame.width * props.categories.indexOf(s.categories[0])) /
-            props.categories.length;
-      const width =
-        (frame.width * s.categories.length) / props.categories.length -
-        (i < segments.length - 1 ? gap : 0);
-      result.nodes.push(
-        ...band(
-          stableId(id, s.id),
-          { x, y: frame.y + frame.height - 172, width, height: 172 },
-          s.heading,
-          s.items,
-          fill,
-        ),
-      );
-      if (i)
-        result.nodes.push(
-          linePrimitive({
-            id: stableId(id, s.id, "divider"),
-            role: "segment-divider",
-            x1: left - 8,
-            y1: frame.y + 36,
-            x2: left - 8,
-            y2: frame.y + frame.height - 206,
-            style: {
-              stroke: token("color.rule"),
-              lineWidth: token("line.hairline"),
-              dash: "dash",
-            },
-          }),
-        );
-    });
-    return result;
-  };
-  return registry;
+  });
+  return result;
 }

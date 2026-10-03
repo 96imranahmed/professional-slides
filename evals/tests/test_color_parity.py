@@ -75,9 +75,11 @@ console.log(JSON.stringify({
             self.skipTest("python-pptx is not installed")
         self.assertIs(module.luminance, color.luminance)
         self.assertIs(module.contrast, color.contrast)
-        source = (RUNTIME / "emit" / "emit_pptx.py").read_text(encoding="utf-8")
-        self.assertNotIn("12.92", source)
-        self.assertIn("from color import on_fill", source)
+        # The emitter's label colour is the module's rule, not a copy of it.
+        import emit_pptx
+        self.assertIs(emit_pptx.on_fill, color.on_fill)
+        for name in ("luminance", "channel", "contrast"):
+            self.assertIs(getattr(emit_pptx, name, getattr(color, name)), getattr(color, name), name)
 
 
 if __name__ == "__main__":

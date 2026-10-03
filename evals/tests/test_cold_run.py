@@ -255,11 +255,20 @@ console.log(JSON.stringify(measureBaseline()));
         # A brief nobody can say the purpose of is a brief that gets run once.
         briefs = sorted((COLD / "briefs").glob("*.md"))
         self.assertGreaterEqual(len(briefs), 3)
-        for brief in briefs:
+        # Read through the harness: the agent is handed the request alone, and
+        # what the brief is there to catch is the note the harness keeps back.
+        split = run_node(f"""
+import fs from 'node:fs';
+import {{ briefRequest }} from './evals/quality/lib.mjs';
+console.log(JSON.stringify({json.dumps([str(b) for b in briefs])}.map((file) => {{
+  const text = fs.readFileSync(file, 'utf8'), request = briefRequest(text);
+  return {{ request: request.trim().length, note: text.slice(request.trim().length).trim().length }};
+}})));
+""")
+        for brief, parts in zip(briefs, split):
             with self.subTest(brief=brief.name):
-                text = brief.read_text(encoding="utf-8")
-                self.assertIn("Why this brief is in the suite", text)
-                self.assertIn("Audience", text)
+                self.assertGreater(parts["request"], 0, "the brief asks for nothing")
+                self.assertGreater(parts["note"], 0, "the brief does not say what it is in the suite to catch")
 
 
 SCORED_SPECIMENS = '''

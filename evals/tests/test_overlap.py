@@ -1,5 +1,15 @@
+"""Collisions (runtime/validate-overlap.mjs): the rendered overlap audit in a browser,
+the scene checks the build and authoring run without one, and routed connectors.
+"""
+import json
+import subprocess
+import tempfile
 import unittest
-from node_probe import requires_chromium, run_node
+from pathlib import Path
+
+from node_probe import NODE, ROOT, requires_chromium, run_node
+
+RUNTIME = "./skills/professional-slides/runtime"
 
 
 class OverlapTests(unittest.TestCase):
@@ -82,6 +92,135 @@ const interiorCrossing=path.slice(1).some((p,i)=>{const a=path[i];return a.x===p
 console.log(JSON.stringify({interiorCrossing,orthogonal:path.slice(1).every((p,i)=>p.x===path[i].x || p.y===path[i].y)}));
 ''')
         self.assertEqual(result, {"interiorCrossing": False, "orthogonal": True})
+
+
+class SceneCollisionTests(unittest.TestCase):
+    """A label is read by its glyphs, and a line through them is found before the render."""
+
+    def test_scene_collisions_find_a_struck_label_and_a_descending_numeral(self):
+        """Fifty-page audit: arrow labels struck through by their arrows, display-serif numerals descending into a rule."""
+        result = run_node(f"""
+import {{ sceneCollisions }} from '{RUNTIME}/validate-overlap.mjs';
+const text = (id, role, frame, extra = {{}}) => ({{ id, type: 'text', role, text: 'label 35', frame, style: {{ align: 'left', valign: 'top', fontFamily: {{ tokenId: 'font.body' }}, fontSize: {{ value: 10 }} }}, data: {{ textLayout: {{ width: frame.width, height: frame.height }} }}, ...extra }});
+const line = (id, role, x1, y1, x2, y2) => ({{ id, type: 'line', role, frame: {{ x: x1, y: Math.min(y1, y2), width: x2 - x1, height: Math.abs(y2 - y1) }}, data: {{ x1, y1, x2, y2 }} }});
+const numeral = (font) => ({{ id: 'n', type: 'text', role: 'divider-number', text: '3', frame: {{ x: 60, y: 100, width: 200, height: 200 }}, style: {{ valign: 'bottom', fontFamily: {{ tokenId: font }}, fontSize: {{ value: 170 }} }}, data: {{}} }});
+const bar = {{ id: 'b', type: 'rect', role: 'divider-accent', frame: {{ x: 60, y: 320, width: 64, height: 4 }} }};
+console.log(JSON.stringify({{
+  struck: sceneCollisions({{ id: 's', nodes: [text('t', 'flow-arrow-label', {{ x: 100, y: 100, width: 60, height: 14 }}), line('l', 'flow-arrow', 80, 107, 200, 107)] }}).map((f) => f.code),
+  clear: sceneCollisions({{ id: 's', nodes: [text('t', 'flow-arrow-label', {{ x: 100, y: 80, width: 60, height: 14 }}), line('l', 'flow-arrow', 80, 107, 200, 107)] }}).length,
+  serif: sceneCollisions({{ id: 's', nodes: [numeral('font.display'), bar] }}).map((f) => f.code),
+  lining: sceneCollisions({{ id: 's', nodes: [numeral('font.body'), bar] }}).length,
+}}));
+""")
+        self.assertEqual(result["struck"], ["TEXT_ON_LINE"])
+        self.assertEqual(result["clear"], 0)
+        self.assertEqual(result["serif"], ["DESCENDER_ON_RULE"])
+        self.assertEqual(result["lining"], 0)
+
+    def test_a_label_is_read_by_its_glyphs_not_the_slot_it_is_set_in(self):
+        """Fifty-page audit: read as its 60px slot, a value label had its own series' segments through it."""
+        # A line chart's value label is a 60px slot round four figures. Read as
+        # ink, the slot put the series' own segments through every label.
+        result = run_node(f"""
+import {{ sceneCollisions, inkBox }} from '{RUNTIME}/validate-overlap.mjs';
+const label = {{ id: 'v', type: 'text', role: 'data-label', text: '91.2', frame: {{ x: 872.9, y: 331.9, width: 60, height: 24 }},
+  style: {{ align: 'center', valign: 'mid', bold: true, fontFamily: {{ value: 'Arial' }}, fontSize: {{ value: 10 }} }}, data: {{}} }};
+const line = (x1, y1, x2, y2) => ({{ id: 'l', type: 'line', role: 'chart-line', frame: {{ x: x1, y: Math.min(y1, y2), width: x2 - x1, height: Math.abs(y2 - y1) }}, data: {{ x1, y1, x2, y2 }} }});
+const ink = inkBox(label);
+console.log(JSON.stringify({{ ink,
+  beside: sceneCollisions({{ id: 's', nodes: [label, line(902.9, 325.9, 965.1, 362.7)] }}).length,
+  through: sceneCollisions({{ id: 's', nodes: [label, line(850, 344, 960, 344)] }}).map((f) => f.code) }}));
+""")
+        self.assertLess(result["ink"]["width"], 30)
+        self.assertLess(result["ink"]["height"], 12)
+        self.assertEqual(result["beside"], 0, "the segment leaving the point passes the slot's corner, not the figures")
+        self.assertEqual(result["through"], ["TEXT_ON_LINE"])
+
+    def test_a_reference_label_is_set_clear_of_the_series_it_crosses(self):
+        """Fifty-page audit: a break-even label took the first free corner and the series ran through it."""
+        # A break-even line at zero, crossed by a joined series near the
+        # plot's right end: the label took the first free corner of the marks
+        # and the series ran through it.
+        result = run_node(f"""
+import {{ REGISTRY }} from '{RUNTIME}/registry.mjs';
+import {{ sceneCollisions }} from '{RUNTIME}/validate-overlap.mjs';
+const costs = [0, 20, 40, 55, 60, 80, 85, 100];
+const points = [15, 45].flatMap((take) => costs.map((x) => ({{ name: `${{take}}% take, $${{x}} cost`, x, y: 100 - take - x, series: `${{take}}% take`, showLabel: false }})));
+const nodes = REGISTRY.get('chart.scatter').render({{ id: 'c', frame: {{ x: 60, y: 160, width: 780, height: 460 }}, props: {{ points, connect: true,
+  xLabel: 'Serving cost, $', yLabel: 'Contribution, $', xScale: {{ min: 0, max: 100, step: 25 }}, yScale: {{ min: -50, max: 100, step: 25 }},
+  referenceLines: [{{ value: 0, label: 'Break-even: $55 at 45% take, $85 at 15%' }}], annotations: [], highlights: [] }} }}).nodes;
+console.log(JSON.stringify(sceneCollisions({{ id: 's', nodes }}).map((f) => f.code)));
+""")
+        self.assertEqual(result, [])
+
+
+class SceneDesignFindingTests(unittest.TestCase):
+    """The scene checks are gate findings, and the build and authoring both read them."""
+
+    def test_the_scene_checks_are_gate_findings_the_build_reports(self):
+        """Fifty-page audit: the scene checks reach the build as findings with a severity each."""
+        result = run_node(f"""
+import {{ sceneDesignFindings, OVERLAP_CODES, OVERLAP_SEVERITY }} from '{RUNTIME}/validate-overlap.mjs';
+import {{ withFindings, buildOutcome }} from '{RUNTIME}/build-deck.mjs';
+import {{ applyRulesVersion }} from '{RUNTIME}/weight.mjs';
+const text = (id, frame) => ({{ id, type: 'text', role: 'flow-arrow-label', text: 'agent role', frame, style: {{ align: 'left', valign: 'top', fontSize: {{ value: 10 }} }}, data: {{}} }});
+const arrow = {{ id: 'a', type: 'line', role: 'flow-arrow', frame: {{ x: 80, y: 107, width: 120, height: 0 }}, data: {{ x1: 80, y1: 107, x2: 200, y2: 107 }} }};
+const box = {{ id: 'b', type: 'rect', role: 'flow-step', frame: {{ x: 300, y: 80, width: 100, height: 60 }} }};
+const scene = {{ slides: [{{ id: 'cover', nodes: [] }}, {{ id: 'p1', nodes: [text('t', {{ x: 100, y: 100, width: 60, height: 14 }}), arrow] }}, {{ id: 'p2', nodes: [text('e', {{ x: 240, y: 100, width: 59, height: 14 }}), box] }}] }};
+const found = sceneDesignFindings(scene);
+const outcome = (findings) => buildOutcome({{ preflight: withFindings({{ passed: true, findings: [] }}, findings), readback: {{ accepted: true }} }}, {{ render: false }});
+const older = applyRulesVersion(found, {{ workflow: 'existing_deck_revision', rulesVersion: 2 }});
+console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.severity]), codes: Object.keys(OVERLAP_CODES).sort(), held: Object.keys(OVERLAP_SEVERITY).sort(),
+  status: outcome(found).status, blockers: outcome(found).blockers.map((b) => b.code), edgeOnly: outcome(found.filter((f) => f.code === 'TEXT_ON_EDGE')).status,
+  older: outcome(older).status }}));
+""")
+        self.assertEqual(result["codes"], result["held"], "every scene check has a severity")
+        self.assertIn([2, "p1", "TEXT_ON_LINE", "blocker"], result["found"])
+        self.assertIn([3, "p2", "TEXT_ON_EDGE", "advisory"], result["found"])
+        self.assertEqual(result["status"], "built-with-blockers")
+        self.assertEqual(result["blockers"], ["TEXT_ON_LINE"])
+        self.assertEqual(result["edgeOnly"], "built-unrendered")
+        self.assertEqual(result["older"], "built-unrendered", "a revision under older rules hears it as advice")
+
+    def test_the_build_and_authoring_run_the_scene_checks(self):
+        """Fifty-page audit: the checks shipped unwired, imported by the eval suite alone."""
+        # A loader hook stands in for validate-overlap.mjs wherever the runtime
+        # imports it, adding one planted finding to what the real checks find.
+        # The build's preflight report and the author's findings must carry it.
+        planted = {"slide": 1, "id": "planted", "code": "TEXT_ON_LINE", "severity": "blocker",
+                   "measured": {"planted": True}, "threshold": "no contact", "repair": "Planted by the test."}
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            real = (ROOT / "skills/professional-slides/runtime/validate-overlap.mjs").as_uri()
+            (tmp / "shim.mjs").write_text(
+                f"export * from {json.dumps(real)};\n"
+                f"import {{ sceneDesignFindings as real }} from {json.dumps(real)};\n"
+                f"export function sceneDesignFindings(scene) {{ return [...real(scene), {json.dumps(planted)}]; }}\n")
+            (tmp / "hooks.mjs").write_text(
+                "const SHIM = new URL('./shim.mjs', import.meta.url).href;\n"
+                "export async function resolve(specifier, context, next) {\n"
+                "  const found = await next(specifier, context);\n"
+                "  return found.url.endsWith('/runtime/validate-overlap.mjs') && context.parentURL !== SHIM ? { ...found, url: SHIM, shortCircuit: true } : found;\n"
+                "}\n")
+            (tmp / "register.mjs").write_text("import { register } from 'node:module';\nregister('./hooks.mjs', import.meta.url);\n")
+            hooked = [NODE, "--import", (tmp / "register.mjs").as_uri()]
+            spec = {"schema": "professional-slides.deck/v3", "id": "probe", "cover": {"title": "A probe deck"},
+                    "slides": [{"title": "A page that states one finding in a sentence", "layout": "text",
+                                "points": ["A point that says something about the finding and why it matters."]}]}
+            (tmp / "probe.deck.json").write_text(json.dumps(spec))
+            build = subprocess.run([*hooked, str(ROOT / "skills/professional-slides/runtime/build-deck.mjs"), str(tmp / "probe.deck.json"), str(tmp / "out"), "--preflight"],
+                                   cwd=ROOT, capture_output=True, text=True, timeout=300)
+            self.assertIn(build.returncode, (0, 2), build.stderr)
+            preflight = json.loads((tmp / "out" / "preflight-gates.json").read_text())
+            self.assertIn("planted", [f.get("id") for f in preflight["findings"]], "the build does not report the scene checks")
+            authored = subprocess.run([*hooked, "--input-type=module", "--eval", f"""
+import {{ authorDeck, scaffoldPage }} from {json.dumps((ROOT / "skills/professional-slides/runtime/author-deck.mjs").as_uri())};
+const doc = {{ deck: {{ schema: 'professional-slides.deck/v3', id: 'probe' }}, pages: [scaffoldPage('trend', {{ id: 'p01' }})] }};
+const out = await authorDeck(doc, {{ baseDir: {json.dumps(str(tmp))} }});
+console.log(JSON.stringify([...out.findings, ...out.pageGateAdvisories].map((f) => f.id ?? null)));
+"""], cwd=ROOT, capture_output=True, text=True, timeout=300)
+            self.assertEqual(authored.returncode, 0, authored.stderr)
+            self.assertIn("planted", json.loads(authored.stdout.strip().splitlines()[-1]), "authoring does not read the scene checks")
 
 
 if __name__ == "__main__":

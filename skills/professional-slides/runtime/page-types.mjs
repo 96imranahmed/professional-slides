@@ -22,13 +22,15 @@
 //   node runtime/author-deck.mjs --types          the catalogue, for the author
 //   node runtime/author-deck.mjs <id>.pages.json  compile, gate, write the deck and plan
 
-import { REGISTRY, measureInsight } from "./registry.mjs";
+import { REGISTRY } from "./registry.mjs";
+import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
 import { SCALAR_FIGURE as NUMERIC } from "./value-format.mjs";
 import { timePositions, describeGaps, isPeriodLabel, readablePeriod } from "./time-axis.mjs";
-import { verdictCell, focusFromTitle } from "./compose.mjs";
+import { verdictCell } from "./compose-tables.mjs";
+import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
 import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
@@ -657,7 +659,7 @@ const printRules = (rules) => rules.map(([code, rule, repair]) => `${rule} (${co
 
 /**
  * A total row with nothing in it: a "Total" label over blank result cells.
- * compose.mjs totalRow adds a total only where a column sums, and a row the
+ * compose-tables.mjs totalRow adds a total only where a column sums, and a row the
  * author writes is held to the same: labelled a total, it carries one.
  */
 function blankTotal(rows) {
@@ -1271,7 +1273,16 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     catch (error) { return deferredSlide(page, id, type, { settles, evidence, titleAdvisories: [...titleAdvisories, ...waivedAdvisories], deferred: error.message }); }
   }
   if (page.adds !== undefined && page.adds !== null && typeof page.adds !== "string") throw new Error(`${id}: \`adds\` is what the commentary says that the exhibit cannot - a sentence, or null`);
+  const { slide, target, exhibits, setType, primary } = typedSlide(page, id, type, players);
+  checkExhibitData({ page, id, slide, exhibits, primary });
+  const { values, isChart } = checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories });
+  const { points, unmarkedPoints } = checkCommentary({ page, id, slide, exhibits, primary, draft, rules, waived, waivedAdvisories });
+  layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points });
+  return withPageType({ page, slide, exhibits, primary, values, isChart, unmarkedPoints, waivedAdvisories, settles, evidence, titleAdvisories });
+}
 
+/** The slide a page compiles to: its own keys less the choices, its exhibits typed by the form, the players' cells marked, and the primary exhibit. */
+function typedSlide(page, id, type, players) {
   const slide = {};
   for (const [key, value] of Object.entries(page)) if (!CHOICE_KEYS.includes(key)) slide[key] = value;
   const target = type.forms[page.form];
@@ -1323,6 +1334,11 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   if (players) markPlayerCells(slide, players);
   for (const ex of exhibitsOf(slide)) readableCategories(ex);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
+  return { slide, target, exhibits, setType, primary };
+}
+
+/** The exhibits' data: the keys each one's form reads, the limits on its marks and on the form's, and the minimum its type needs. */
+function checkExhibitData({ page, id, slide, exhibits, primary }) {
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of exhibitsOf(slide)) {
     const keys = CONSTRUCTION_DATA[ex.type] ? [] : dataKeys(ex.type);
@@ -1372,12 +1388,20 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     const flat = exhibits.filter((ex) => trivialChart(ex));
     if (flat.length) throw new Error(`${id}: ${flat.length} panel${flat.length === 1 ? " plots" : "s plot"} two numbers of one series; two numbers are a metric pair - set them as a numbers page, or give each panel the whole set or the series over time`);
   }
+}
+
+/**
+ * The evidence the type holds to: the shape a review would send to another
+ * page, a marked subject, periods, members and the floor on the values, the
+ * chart's form, and the table or rows the type is built from.
+ */
+function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }) {
   const held = { waived, rules, advisories: waivedAdvisories };
   const reshape = unwaived((skip) => reshapeDefect(page, id, exhibits, players, skip), held);
   if (reshape) throw new Error(reshape);
 
   // Evidence checks the type makes.
-  // A title that names one series or bar marks it (compose.mjs focusFromTitle).
+  // A title that names one series or bar marks it (compose-charts.mjs focusFromTitle).
   if (type.marked && !markedChart(primary) && !markedChart(focusFromTitle(primary, page.title)))
     throw new Error(`${id}: a ${page.type} chart marks its finding on the plot - an annotation, a highlight, a reference line or the rate of change. A bare chart is a picture of the data, not evidence for the title.`);
   // Small multiples carry their periods in each item's values (formExhibit).
@@ -1424,6 +1448,11 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     slide.shape = "findings-matrix";
   }
 
+  return { values, isChart };
+}
+
+/** The commentary the page carries, against what its `commentary` choice says it carries. */
+function checkCommentary({ page, id, slide, exhibits, primary, draft, rules, waived, waivedAdvisories }) {
   // Commentary: where the explanation lives decides the layout.
   const points = (page.points || []).length;
   const textless = ["on-exhibit", "in-exhibit", "captions", "none"].includes(page.commentary);
@@ -1533,6 +1562,11 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     const what = page.commentary === "captions" ? "captions" : page.commentary === "on-exhibit" ? "callouts" : "points";
     throw new Error(`${id}: say in \`adds\` what the ${what} say that the exhibit cannot - one sentence${page.adds === null ? "; `adds: null` says they add nothing, and then the page's commentary is \"none\" (or \"in-exhibit\") and the exhibit takes the room" : ""}`);
   }
+  return { points, unmarkedPoints };
+}
+
+/** The layout the commentary and the form ask for, and each type's own arrangement of the slide. */
+function layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points }) {
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
   if (page.type === "panels") {
     if (page.form === "grid" && exhibits.length < 3) throw new Error(`${id}: a grid of panels holds three or four; two sit in a row`);
@@ -1568,7 +1602,7 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
     if (page.form === "memo" && (page.paragraphs || []).length && !page.panel)
       throw new Error(`${id}: a memo sets its prose at a readable measure with a \`panel\` beside it - { text, kicker } carrying the conclusion or the figures the reader keeps - which takes the width the prose leaves`);
     // That width is over half the page: prose that reaches the foot does so
-    // at a reading measure (compose.mjs proseBeside), whatever the panel
+    // at a reading measure (compose-points.mjs proseBeside), whatever the panel
     // holds. A sentence of a statement set in it is a column of tint that is
     // mostly empty, so under PANEL_WORDS_MIN the panel is refused here, where
     // its words are cheap to change - not widened, nor the prose thinned to
@@ -1594,6 +1628,10 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
 
   // A statement or takeaways page has no title band to hang a standfirst in.
   if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
+}
+
+/** The page's advisories and its `pageType` record: the choices, and the structure, skeleton and drawn shape the variety contract counts. */
+function withPageType({ page, slide, exhibits, primary, values, isChart, unmarkedPoints, waivedAdvisories, settles, evidence, titleAdvisories }) {
   // Advisories the compiler can see and the author should: they do not block.
   const advisories = [...titleAdvisories, ...waivedAdvisories];
   if (unmarkedPoints.length) advisories.push(`POINT_UNMARKED: point${unmarkedPoints.length === 1 ? "" : "s"} ${unmarkedPoints.join(", ")} carr${unmarkedPoints.length === 1 ? "ies" : "y"} no figure to mark and no \`highlight\`; name the phrase the reader should see first, on the point or in the page's \`highlight\` list`);
@@ -1741,7 +1779,7 @@ export function railCapacity() {
  * the panel's width until a name no longer fits its column. Period labels
  * (FY17, 2019, Q1 2025) are not counted - the chart labels every second or
  * third when they crowd - but a name is never dropped. The widths are the
- * composer's (compose.mjs peerExhibitsRow).
+ * composer's (compose-arrangements.mjs peerExhibitsRow).
  */
 export function panelColumnCapacity() {
   const names = ["Northern", "Southern", "Atlantic", "Pacifica", "Midlands", "Highland", "Lowlands", "Eastward", "Westward", "Frontier", "Lakeside", "Seaboard", "Downtown", "Hillside"];

@@ -164,12 +164,31 @@ console.log(JSON.stringify(cases));
         self.assertEqual(on_fill("#051C2C", "#FFFFFF", "#051C2C"), "#FFFFFF")
 
     def test_one_rule_serves_both_label_sites(self):
-        source = (EMIT / "emit_pptx.py").read_text(encoding="utf-8")
-        self.assertNotIn("< 0.45", source)
-        self.assertEqual(source.count("on_fill("), 2)  # the stacked segments and the pie slices
         import color
         import emit_pptx
+        from pptx import Presentation
         self.assertIs(emit_pptx.on_fill, color.on_fill)  # one definition (color.py)
+        # Both sites, read off the saved file: a stacked segment's label and a
+        # pie slice's share on the mid-tone green take the ink, as the scene does,
+        # where the old luminance cut gave both white at 2.3:1.
+        frame = {"x": 60, "y": 160, "width": 1000, "height": 460}
+        tokens = {"color.chartSeries1": {"kind": "color", "value": "#86BC25"}, "color.chartSeries2": {"kind": "color", "value": "#86BC25"},
+                  "color.onPrimary": {"kind": "color", "value": "#FFFFFF"}, "color.ink": {"kind": "color", "value": "#000000"}}
+        specs = {"stacked-bar": {"type": "stacked-bar", "frame": frame, "categories": ["X", "Y"], "dataLabels": True,
+                                 "series": [{"name": "A", "values": [3, 5]}, {"name": "B", "values": [2, 4]}]},
+                 "pie": {"type": "pie", "frame": frame, "categories": ["X", "Y"], "dataLabels": True, "series": [{"name": "Share", "values": [60, 40]}]}}
+        scene = {"typography": {"body": "Arial", "display": "Arial"}, "tokens": tokens, "slides": [
+            {"id": kind, "tokens": {}, "componentInstances": [{"instanceId": kind, "component": "chart", "frame": frame, "nativeChart": spec}],
+             "nodes": [{"id": f"{kind}-plot", "type": "rect", "role": "chart-mark", "frame": frame, "data": {"componentInstance": kind}, "style": {"fill": "#000000"}}]}
+            for kind, spec in specs.items()]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "labels.pptx"
+            emit_pptx.Emitter(scene).run(path)
+            stacked, pie = [next(shape.chart for shape in slide.shapes if shape.has_chart) for slide in Presentation(path).slides]
+            segment = str(stacked.series[0].data_labels.font.color.rgb)
+            share = str(pie.series[0].points[0].data_label.font.color.rgb)
+        self.assertEqual(segment, "000000")
+        self.assertEqual(share, "000000")
 
 
 @requires_python_package("pptx")

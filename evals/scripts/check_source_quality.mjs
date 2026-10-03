@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
 import { deadExports } from "./dead_exports.mjs";
 
@@ -30,6 +31,25 @@ function run(command, args) {
   });
 }
 
+/** Run quietly: the exit code and what the command wrote to stderr. */
+function capture(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: root, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", chunk => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", code => resolve({ code, stderr }));
+  });
+}
+
+/** Run `task` over `items`, `limit` at a time. */
+async function inPool(items, limit, task) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await task(queue.shift());
+  }));
+}
+
 const files = (await Promise.all(sourceRoots.map(walk))).flat();
 const textual = files.filter(file => /\.(?:mjs|js|py|md|json)$/.test(file) && !file.endsWith("natural-earth-map-data.mjs"));
 const whitespaceErrors = [];
@@ -40,6 +60,24 @@ for (const file of textual) {
 if (whitespaceErrors.length) throw new Error(`Trailing whitespace:\n${whitespaceErrors.join("\n")}`);
 for (const file of files.filter(file => /\.(?:mjs|js)$/.test(file))) await run(runtimeNode, ["--check", file]);
 await run(runtimePython, ["-m", "compileall", "-q", "evals", "skills/professional-slides/runtime"]);
+
+// Every runtime module imports on its own, in a fresh process. An import cycle
+// whose modules read each other's bindings while they load ("Cannot access 'X'
+// before initialization") fails only when the cycle is entered from one side,
+// and the order in which the suite and the CLIs happen to import can hide that
+// side; a module imported first and alone cannot.
+const runtimeModules = files.filter(file => file.startsWith(`${sourceRoots[0]}/`) && file.endsWith(".mjs"));
+const isolatedImportErrors = [];
+await inPool(runtimeModules, os.availableParallelism?.() ?? os.cpus().length, async (file) => {
+  const url = pathToFileURL(path.join(root, file)).href;
+  const { code, stderr } = await capture(runtimeNode, ["--input-type=module", "-e", `await import(${JSON.stringify(url)});`]);
+  if (code === 0) return;
+  const lines = stderr.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  isolatedImportErrors.push(`${file}: ${lines.find(line => /^[A-Za-z]*Error\b/.test(line)) ?? lines.at(-1) ?? `exited ${code}`}`);
+});
+if (isolatedImportErrors.length) {
+  throw new Error(`Runtime modules that do not import on their own (an import cycle read before its module ran):\n${isolatedImportErrors.sort().join("\n")}`);
+}
 
 // An export nothing imports and its own module never uses is code nothing
 // runs (evals/scripts/dead_exports.mjs). One kept for callers outside the
@@ -97,4 +135,4 @@ if (probeErrors.length) {
   throw new Error(`Embedded run_node probes do not parse as JavaScript:\n${probeErrors.join("\n")}`);
 }
 
-console.log(JSON.stringify({ accepted: true, javascriptFiles: files.filter(file => /\.(?:mjs|js)$/.test(file)).length, embeddedProbes: probes, deadExports: 0, pythonRoot: "evals" }));
+console.log(JSON.stringify({ accepted: true, javascriptFiles: files.filter(file => /\.(?:mjs|js)$/.test(file)).length, isolatedImports: runtimeModules.length, embeddedProbes: probes, deadExports: 0, pythonRoot: "evals" }));

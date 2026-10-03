@@ -157,7 +157,14 @@ export function runContentGates(content, options = {}) {
   const pages = content.pages;
   const textCheck = checkTextPlan(content, options);
   findings.push(...textCheck.findings);
+  checkPages(findings, pages);
+  checkDeckSpread(findings, pages);
+  checkAnswerCarried(findings, content, pages);
+  return {...report(content, findings, pages, options.deck), textCoverage: textCheck};
+}
 
+/** Each page's own content: its claim, what settles it, what its commentary adds, its highlight. */
+function checkPages(findings, pages) {
   for (const page of pages) {
     const at = page.n ?? null;
     if (page.role === "structural") continue; // still subject to complete-copy/reference checks
@@ -204,7 +211,10 @@ export function runContentGates(content, options = {}) {
       }
     }
   }
+}
 
+/** Across a deck long enough to judge: the share of pages that settle nothing measurable, the highlights, and claims that repeat. */
+function checkDeckSpread(findings, pages) {
   if (pages.length >= CONTENT_THRESHOLDS.from) {
     const kinds = pages.map((p) => String(p.settles?.kind ?? "qualitative"));
     const qualitative = kinds.filter((k) => k === "qualitative").length;
@@ -243,13 +253,16 @@ export function runContentGates(content, options = {}) {
       }
     }
   }
-  // The one question no page gate asks: does the deck deliver its own answer?
-  //
-  // Every other gate here judges a page. This judges the deck: a governing
-  // answer is written at the top of the file, and unless the claims carry it,
-  // the reader gets twenty proofs of things nobody promised. It is also the
-  // cheapest place to catch it - before a page exists, against two fields the
-  // author has already written.
+}
+
+// The one question no page gate asks: does the deck deliver its own answer?
+//
+// Every other gate here judges a page. This judges the deck: a governing
+// answer is written at the top of the file, and unless the claims carry it,
+// the reader gets twenty proofs of things nobody promised. It is also the
+// cheapest place to catch it - before a page exists, against two fields the
+// author has already written.
+function checkAnswerCarried(findings, content, pages) {
   const answer = String(content.answer ?? "").trim();
   const question = String(content.question ?? "").trim();
   if (!answer || !question) {
@@ -302,8 +315,6 @@ export function runContentGates(content, options = {}) {
         + "the closing takeaway, not left for page 45 to reveal."));
     }
   }
-
-  return {...report(content, findings, pages, options.deck), textCoverage: textCheck};
 }
 
 function report(content, findings, pages, deck = content) {

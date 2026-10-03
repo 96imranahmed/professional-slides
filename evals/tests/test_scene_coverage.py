@@ -405,12 +405,11 @@ console.log(JSON.stringify({ rendered: rendered.blockers.map((b) => b.code), sce
         report = page_gates.run_gates(self.deck(5, 9), gates={"DECK_SCENE_VOID"})
         self.assertEqual([f["code"] for f in report["findings"]], ["DECK_SCENE_VOID"])
 
-    def test_the_codes_are_registered(self):
-        self.assertIn("SCENE_VOID", page_gates.GATE_CODES)
-        self.assertIn("DECK_SCENE_VOID", page_gates.GATE_CODES)
+    def test_a_void_page_advises_and_a_deck_of_them_blocks(self):
+        # Registration and documentation are held for every gate code at once
+        # (test_weight_contract.GateVocabularyTests); this is the severity.
         self.assertIn("SCENE_VOID", page_gates.ADVISORY_CODES)
         self.assertNotIn("DECK_SCENE_VOID", page_gates.ADVISORY_CODES)
-        self.assertLessEqual({"SCENE_VOID", "DECK_SCENE_VOID"}, page_gates.emitted_codes())
 
 
 def instance(ident, component, x, y, width, height):
@@ -567,13 +566,11 @@ class ColumnVoidTests(unittest.TestCase):
         deck = [f for f in report["findings"] if f["code"] == "DECK_SCENE_VOID"]
         self.assertEqual([f["measured"] for f in deck], [5])
 
-    def test_the_code_is_registered_and_advisory(self):
-        self.assertIn("COLUMN_VOID", page_gates.GATE_CODES)
+    def test_the_code_is_advisory_and_its_bar_sits_in_the_corpus_tail(self):
+        # Registration and documentation are held for every gate code at once
+        # (test_weight_contract.GateVocabularyTests); this is the severity and the bar.
         self.assertIn("COLUMN_VOID", page_gates.ADVISORY_CODES)
-        self.assertIn("COLUMN_VOID", page_gates.emitted_codes())
         self.assertIn("COLUMN_VOID", page_gates.EMPTY_PAGE_CODES)
-        index = (ROOT / "skills" / "professional-slides" / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
-        self.assertIn("`COLUMN_VOID`", index)
         # The column's trailing bar moves with fill and sits in the corpus's tail.
         levels = page_gates.FILL_LEVELS
         exceed = page_gates.REFERENCE_PAGE["exceedance"]["columnVoidAbove"]

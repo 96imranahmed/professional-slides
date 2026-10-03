@@ -30,7 +30,7 @@ import { PALETTES } from "./palettes.mjs";
 
 export const PREFERENCES_SCHEMA = "professional-slides.preferences/v1";
 
-// Mirrors compose.mjs TRACKER_NAMES; kept literal so this module loads without
+// Mirrors compose-deck.mjs TRACKER_NAMES; kept literal so this module loads without
 // the composer (the CLI runs before any deck exists).
 const TRACKERS = ["pills", "label", "breadcrumb", "number-strip"];
 const PALETTE_NAMES = Object.keys(PALETTES).filter((name) => name !== "toolkit");

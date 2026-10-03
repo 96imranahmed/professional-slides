@@ -159,12 +159,25 @@ class DefinitionTests(unittest.TestCase):
     def test_the_list_lives_in_one_file(self):
         lists = json.loads((GATES / "table-treatments.json").read_text(encoding="utf-8"))["treatments"]
         self.assertEqual(deck_gates.TABLE_TREATMENTS, lists)
-        # No measure keeps a list of its own.
-        for path in (GATES.parent / "build-bars.mjs", GATES / "craft_gates.mjs"):
-            self.assertNotIn("const TREATMENT", path.read_text(encoding="utf-8"), path.name)
-        self.assertNotIn("TREATED_ROLE", (GATES / "deck_gates.py").read_text(encoding="utf-8"))
-        self.assertIn("table-treatments.json", (GATES.parent / "build-bars.mjs").read_text(encoding="utf-8"))
-        self.assertIn("tableStatistics", (GATES / "craft_gates.mjs").read_text(encoding="utf-8"))
+        # No measure keeps a list of its own: a page per treatment the file
+        # names, and one of zebra rows, are counted alike by all three.
+        nodes = []
+        for name, rule in sorted(lists.items()):
+            if rule.get("rolePrefixes"):
+                nodes.append({"role": rule["rolePrefixes"][0] + "mark"})
+            elif rule.get("cellTypes"):
+                nodes.append({"role": "table-cell", "data": {"cellType": rule["cellTypes"][0]}})
+            else:
+                nodes.append({"role": "table-row-band", "data": {"rowStyle": rule["rowBands"][0]}})
+        cover = {"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []}
+        slides = [dict(DefinitionTests.page(node), id=f"p{i}") for i, node in enumerate([*nodes, {"role": "table-zebra-band"}])]
+        scene = {"slides": [cover, *slides]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "scene.json"
+            path.write_text(json.dumps(scene), encoding="utf-8")
+            node = measures_in_node(path)
+        self.assertEqual(python_counts(scene), (len(nodes) + 1, len(nodes)))
+        OneCountTests.assert_one_count(self, scene, node)
 
 
 class ChartDataTableTests(unittest.TestCase):

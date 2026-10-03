@@ -121,7 +121,9 @@ console.log(JSON.stringify({{message}}));
     def test_the_references_list_exactly_the_accepted_values(self):
         names = set(self.implications())
         prose = (REFERENCES / "composition.md").read_text(encoding="utf-8")
-        listed = set(re.findall(r'`"([a-z-]+)"`', prose.split("`implication` names the mark")[1].split("\n")[0]))
+        # The line that defines the key starts with it.
+        line = next(line for line in prose.splitlines() if line.startswith("`implication`"))
+        listed = set(re.findall(r'`"([a-z-]+)"`', line))
         self.assertEqual(
             listed, names,
             "composition.md and the composer disagree about what `implication` accepts")

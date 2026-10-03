@@ -20,7 +20,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { composeAll } from "./compose-all.mjs";
-import { coverageFindings } from "./compose.mjs";
+import { coverageFindings } from "./compose-deck.mjs";
 import { metricsBackend } from "./font-metrics.mjs";
 import { runProcess, lastJson } from "./process.mjs";
 import { RefusalError, registered } from "./errors.mjs";
@@ -141,6 +141,21 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // rebuild needs one - but the build output says the stage did not happen.
   const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
   if (fetchedMs > 50) timings.assetsMs = fetchedMs;
+  const stages = await gateStages({ spec, stem, baseDir, directory, result });
+  validateStageContract(spec, stages);
+  await checkVariety({ spec, specPath, directory, result });
+  transferHighlights(spec, stages);
+  const { deck, scenePath } = await composeScene({ spec, baseDir, directory, timings, result, stages });
+  const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, spec, stem, directory, py, result, deck, scenePath });
+  if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
+  await readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design });
+  withBudget(result);
+  Object.assign(result, buildOutcome(result, { render }));
+  return finish(result, directory, started);
+}
+
+/** Each stage plan found beside the spec, gated with its report written and refused when rejected; returns the stages that were found. */
+async function gateStages({ spec, stem, baseDir, directory, result }) {
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
@@ -161,14 +176,16 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     }
     stages[stage] = parsed;
   }
-  validateStageContract(spec, stages);
+  return stages;
+}
 
-  // The variety contract, before anything is composed. A deck's structure is
-  // chosen page by page in its pages file (author-deck.mjs); this refuses a long
-  // deck whose pages were never typed, whose compiled structure was edited by
-  // hand, or whose choices add up to one page repeated. It is the same check
-  // the author ran, so a deck that compiled passes it here. A rule the deck
-  // predates is reported beside it as an advisory.
+// The variety contract, before anything is composed. A deck's structure is
+// chosen page by page in its pages file (author-deck.mjs); this refuses a long
+// deck whose pages were never typed, whose compiled structure was edited by
+// hand, or whose choices add up to one page repeated. It is the same check
+// the author ran, so a deck that compiled passes it here. A rule the deck
+// predates is reported beside it as an advisory.
+async function checkVariety({ spec, specPath, directory, result }) {
   const variety = varietyFindings(spec, { structureOf, drawnOf });
   const varietyBlockers = variety.filter(isBlocking);
   if (variety.length) {
@@ -180,11 +197,13 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
     throw refuse("VARIETY_REJECTED", `The variety contract rejected ${path.basename(specPath)}: ${varietyBlockers.map((f) => f.code).join(", ")}. `
       + `${varietyBlockers[0].repair} See ${result.stages.variety.report}.`, varietyBlockers);
   }
+}
 
-  // The content plan is an input as well as a checkpoint: it records one
-  // highlight per page, the phrase the reader should see first. A page that
-  // does not name its own highlight takes the one its content plan named,
-  // matched by stable ID so insertions cannot move emphasis to another slide.
+// The content plan is an input as well as a checkpoint: it records one
+// highlight per page, the phrase the reader should see first. A page that
+// does not name its own highlight takes the one its content plan named,
+// matched by stable ID so insertions cannot move emphasis to another slide.
+function transferHighlights(spec, stages) {
   if (stages.content?.pages?.length) {
     const byId = new Map([...(spec.cover ? [{...spec.cover,id:"cover",kind:"cover"}] : []), ...spec.slides, ...(spec.appendix || [])].filter(s => s.id).map(s => [s.id, s]));
     const seen = new Set();
@@ -197,7 +216,10 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       if (phrase && slide.highlight === undefined) slide.highlight = phrase;
     }
   }
+}
 
+/** Every page composed, audited against the spec and the content plan's text, and written as the scene and its planning record, with the claim ledger. */
+async function composeScene({ spec, baseDir, directory, timings, result, stages }) {
   // Every failing page reported in one run (compose-all.mjs).
   const planStarted = Date.now();
   const { deck, decisions } = composeAll(spec, baseDir);
@@ -221,7 +243,11 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // The claim ledger the author works through before the review (references/taste-review.md#self-check).
   result.claims = (await writeLedger(directory)).counts;
   timings.planMs = Date.now() - planStarted;
+  return { deck, scenePath };
+}
 
+/** The story gates beside the emitter, then the coverage, craft and design findings folded into the preflight report. */
+async function preflightScene({ preflight, spec, stem, directory, py, result, deck, scenePath }) {
   // Story gates need only the scene (titles, words, hedges, monotony), so they
   // run beside the emitter, which needs only the scene too.
   const gates = path.join(runtime, "gates", "page_gates.py");
@@ -248,8 +274,11 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   const design = applyRulesVersion(sceneDesignFindings(deck), spec);
   result.preflight = withFindings(result.preflight, design);
   await writeJson(preflightReport, result.preflight);
-  if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
+  return { gates, pptxPath, emitted, design };
+}
 
+/** The emitted file read back beside its render; with a renderer, the page gates, density profile and review sheets on the renders. */
+async function readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design }) {
   result.emit = lastJson(emitted.stdout);
   result.pptxPath = pptxPath;
 
@@ -294,9 +323,12 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       result.montagePath = result.render?.montage;
     }
   }
-  // The deck's budget, in one block: what its pages carry against the
-  // reference targets, so a regression is a number in the build output
-  // rather than a screenshot somebody notices later.
+}
+
+// The deck's budget, in one block: what its pages carry against the
+// reference targets, so a regression is a number in the build output
+// rather than a screenshot somebody notices later.
+function withBudget(result) {
   const density = result.gates?.density;
   if (density) {
     result.budget = {
@@ -309,8 +341,6 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
       plotSpan: density.plotSpan?.median ?? null,
     };
   }
-  Object.assign(result, buildOutcome(result, { render }));
-  return finish(result, directory, started);
 }
 
 // render_pptx.py's exit when LibreOffice or poppler is not installed.

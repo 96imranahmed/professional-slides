@@ -33,6 +33,14 @@ except ImportError:  # pragma: no cover - environment without python-pptx
     pptx = None
 
 
+sys.path.insert(0, str(EMIT))
+try:
+    from pptx import Presentation
+    from emit_pptx import Emitter
+except ImportError:  # pragma: no cover - environment without python-pptx
+    Presentation = Emitter = None
+
+
 def requires_pptx(test):
     return unittest.skipIf(pptx is None, "python-pptx is not installed")(test)
 
@@ -118,6 +126,30 @@ class ReadbackTests(unittest.TestCase):
                     f"slide {index + 1} shape {shape.name}")
                 compared += 1
         self.assertGreater(compared, 200, "the readback compared too few shapes")
+
+
+@requires_pptx
+class CanvasReadbackTests(unittest.TestCase):
+    def test_canvas_survives_export_and_readback_rejects_drift(self):
+        """PR #4 review: a warm or inverse canvas was saved white, and readback did not notice."""
+        from readback_pptx import readback
+        from pptx.dml.color import RGBColor
+        scene = {'tokens': {'color.canvas': {'kind': 'color', 'value': '#FFF9F0'}}, 'slides': [
+            {'id': 'warm', 'tokens': {}, 'nodes': []},
+            {'id': 'inverse', 'tokens': {'color.canvas': {'kind': 'color', 'value': '#18212B'}}, 'nodes': []}
+        ]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'canvas.pptx'
+            Emitter(scene).run(path)
+            saved = Presentation(path)
+            self.assertEqual(str(saved.slides[0].background.fill.fore_color.rgb), 'FFF9F0')
+            self.assertEqual(str(saved.slides[1].background.fill.fore_color.rgb), '18212B')
+            self.assertTrue(readback(scene, path)['accepted'])
+            saved.slides[0].background.fill.fore_color.rgb = RGBColor(255, 255, 255)
+            saved.save(path)
+            report = readback(scene, path)
+            self.assertFalse(report['accepted'])
+            self.assertEqual(report['findings'][0]['code'], 'CANVAS_COLOR')
 
 
 if __name__ == "__main__":

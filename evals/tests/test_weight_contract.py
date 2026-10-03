@@ -12,6 +12,7 @@ exactly one vocabulary, every emitted code registered, every documented one real
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 import sys
@@ -141,15 +142,43 @@ import { CONTENT_THRESHOLDS } from './skills/professional-slides/runtime/gates/c
 console.log(JSON.stringify({ variety: VARIETY.from, content: CONTENT_THRESHOLDS.from }));
 ''')
         self.assertEqual(result, {"variety": lengths["variety"], "content": lengths["content"]})
-        # No Node gate keeps its own copy of the contract: it reads weight.mjs.
-        for name in ("plan_gates.mjs", "craft_gates.mjs", "variety_gates.mjs", "content_gates.mjs"):
-            code = "\n".join(line for line in (GATES / name).read_text(encoding="utf-8").splitlines()
-                             if not line.strip().startswith(("//", "*", "/*")))
-            self.assertNotIn('"../weight.json"', code, name)
-            self.assertNotIn("readFileSync(new URL", code, name)
-        craft = (GATES / "craft_gates.mjs").read_text(encoding="utf-8")
-        for literal in ("< 0.5", "< 0.3", ">= 20", "FROM_PAGES = 12"):
-            self.assertNotIn(literal, craft)
+        # The craft floors hold at the contract's own numbers, read off what they
+        # find either side of each: the deck length they read from, the treated-
+        # table and annotated-chart shares they block under, and the length the
+        # device floors (icons) start at.
+        craft = CONTRACT["plan"]["craft"]
+        tables, charts = craft["tableTreated"], craft["chartAnnotated"]
+        n = max(lengths["craft"], tables["blockFrom"], charts["blockFrom"])
+        cases = {
+            "short": ("table", lengths["craft"] - 1, 0),
+            "tablesUnder": ("table", n, math.ceil(tables["blockBelow"] * n) - 1),
+            "tablesAt": ("table", n, math.ceil(tables["blockBelow"] * n)),
+            "chartsUnder": ("chart", n, math.ceil(charts["blockBelow"] * n) - 1),
+            "chartsAt": ("chart", n, math.ceil(charts["blockBelow"] * n)),
+            "devicesUnder": ("table", lengths["craftDevices"] - 1, lengths["craftDevices"] - 1),
+            "devicesAt": ("table", lengths["craftDevices"], lengths["craftDevices"]),
+        }
+        found = run_node(f'''
+import {{ craftFindings }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
+const trend = {{ type: 'chart.line', categories: ['2020', '2021', '2022', '2023', '2024'], series: [{{ name: 'Revenue', values: [1, 2, 3, 4, 5] }}] }};
+const table = {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }};
+const deck = ([kind, pages, marked]) => {{
+  const spec = {{ slides: Array.from({{ length: pages }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i, exhibit: kind === 'chart' ? trend : table }})) }};
+  const scene = {{ slides: [{{ id: 'cover', componentInstances: [{{ component: 'cover' }}], nodes: [] }}, ...Array.from({{ length: pages }}, (_, i) => ({{ id: 'p' + i,
+    componentInstances: [{{ component: kind === 'chart' ? 'chart.line' : 'table' }}],
+    nodes: [{{ role: 'action-title' }}, {{ role: kind === 'chart' ? 'chart-mark' : 'table-cell' }},
+      ...(i < marked ? [{{ role: kind === 'chart' ? 'chart-bracket' : 'table-harvey-ball' }}] : [])] }}))] }};
+  return craftFindings(spec, scene).map((f) => f.code);
+}};
+console.log(JSON.stringify(Object.fromEntries(Object.entries({json.dumps(cases)}).map(([name, c]) => [name, deck(c)]))));
+''')
+        self.assertEqual(found["short"], [], "a deck under the craft length is a probe, not a deck")
+        self.assertIn("CRAFT_TABLES_PLAIN", found["tablesUnder"])
+        self.assertNotIn("CRAFT_TABLES_PLAIN", found["tablesAt"])
+        self.assertIn("CRAFT_CHARTS_BARE", found["chartsUnder"])
+        self.assertNotIn("CRAFT_CHARTS_BARE", found["chartsAt"])
+        self.assertNotIn("CRAFT_NO_ICONS", found["devicesUnder"])
+        self.assertIn("CRAFT_NO_ICONS", found["devicesAt"])
 
     def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):
         """A floor that most published pages fail is a preference, not a floor.
@@ -232,6 +261,8 @@ class GateVocabularyTests(unittest.TestCase):
 
     def test_the_emitted_codes_are_the_documented_codes(self):
         self.assertEqual(sorted(page_gates.GATE_CODES), sorted(page_gates.emitted_codes()))
+        # Each says what it is about: a code with an empty line is registered in name only.
+        self.assertEqual([code for code, about in page_gates.GATE_CODES.items() if not str(about).strip()], [])
 
     def test_the_vocabularies_are_read_from_their_modules(self):
         # The parse above is what the other tests stand on: it must find the

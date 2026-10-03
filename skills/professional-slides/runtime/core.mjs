@@ -1001,7 +1001,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // native line. Preserve their spacing and selected labels as editable shapes.
   if (type === "line" && (props.xAxis !== undefined || props.series?.some(item => item.points !== undefined))) return null;
   // Dated observations at uneven gaps are drawn where they fall in time
-  // (charts.mjs, time-axis.mjs). PowerPoint's category axis would set them one
+  // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
   // External stack labels and their leaders use measured scene coordinates;
@@ -1043,7 +1043,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const hiddenLabelIndices = renderedNodes && labelledCategories.size && labelledCategories.size < categories.length && Array.isArray(props.series) && props.series.length === 1
     ? categories.map((category, index) => labelledCategories.has(String(category)) ? -1 : index).filter(index => index >= 0) : [];
   // The size the scene set its row names at, when crowding took it under the
-  // chart's 10pt (charts.mjs ROW_LABEL_MIN): the native chart prints the same.
+  // chart's 10pt (chart-categorical.mjs ROW_LABEL_MIN): the native chart prints the same.
   const labelPt = Math.min(10, ...(renderedNodes || []).filter(node => node.role === "category-label").map(node => Number(node.style?.fontSize?.value)).filter(Number.isFinite));
   const series = type === "range"
     ? [{ name: "low", values: [...(props.low || [])], hidden: true }, { name: "range", values: (props.high || []).map((h, i) => h - (props.low || [])[i]) }]
@@ -1069,7 +1069,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const labelDecimals = drawnLabels.length ? Math.max(...places) : null;
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   // A two-mark contrast paints one peer in the primary and the other grey, and
-  // which one is the scene's decision (charts.mjs defaultFocusIndex: the named
+  // which one is the scene's decision (chart-categorical.mjs defaultFocusIndex: the named
   // focus, else the latest period, else the first). The emitter paints the mark
   // the scene painted, so a "2019 | 2024" chart reads the same way round in
   // PowerPoint.
@@ -1160,193 +1160,232 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   const typography = resolveTypography(deckSpec.typography, designTokens);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
-  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => {
-    const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
-    if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
-    const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
-    const density = slideSpec.density ?? "executive";
-    // A chart that steps its labels down (planner.mjs chartDensity) takes the
-    // chart sizes of that step; the page's other type keeps the page's.
-    const chartTokens = slideSpec.chartDensity ? resolveDensityTokens(designTokens, slideSpec.chartDensity) : null;
-    const slideTokens = Object.fromEntries(Object.entries(resolveDensityTokens(designTokens, density))
-      .map(([tokenId, definition]) => [tokenId, chartTokens && tokenId.startsWith("type.chart") ? chartTokens[tokenId] : definition]));
-    return withDesignTokens(slideTokens, () => {
-    if (slideSpec.palette !== undefined) throw new Error("Palette belongs to the deck, not individual slides");
-    if (slideSpec.typography !== undefined) throw new Error("Typography belongs to the deck, not individual slides");
-    const nodes = [];
-    const componentInstances = [];
-    const templatePlacements = [];
-    // Page furniture belongs to the deck's visual system. Evidence density
-    // may change by slide without resizing titles, trackers or footers.
-    const chromeOwners = new Set();
-    let contentFrame = CONTENT_FRAME;
-    let resolvedPageTemplate;
-    if (slideSpec.chrome) {
-      const chromeDefinition = registry.get("slide-chrome");
-      if (!chromeDefinition) throw new Error("The component registry must define slide-chrome");
-      const chromeId = stableId(slideId, "chrome");
-      chromeOwners.add(chromeId);
-      const chromeProps = { ...slideSpec.chrome, pageTemplate: { ...pageTemplate, ...slideSpec.chrome.pageTemplate }, pageNumber: slideSpec.chrome.pageNumber ?? slideIndex + 1 };
-      const rendered = withDesignTokens(designTokens, () => chromeDefinition.render({
-        id: chromeId,
-        tokens: designTokens,
-        frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-        props: chromeProps
-      }));
-      contentFrame = rendered.contentFrame;
-      resolvedPageTemplate = rendered.pageTemplate;
-      templatePlacements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [chromeId] })));
-      assertDeclaredComponentTokens(chromeDefinition, rendered.nodes, chromeId);
-      rendered.nodes.forEach((item) => { item.data.componentInstance = chromeId; });
-      nodes.push(...rendered.nodes);
-      componentInstances.push({
-        id: "chrome",
-        instanceId: chromeId,
-        component: "slide-chrome",
-        version: chromeDefinition.version,
-        category: chromeDefinition.category,
-        role: chromeDefinition.role,
-        variant: chromeDefinition.resolveVariant?.(slideSpec.chrome),
-        frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-        tokens: chromeDefinition.tokens
-      });
-    }
-    const placements = [...templatePlacements, ...resolveLayout(slideSpec.composition, slideSpec.frame || contentFrame, registry)];
-    const headerBandHeight = (placement) => {
-      const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
-      const own = measure(placement);
-      if (!own) return undefined;
-      // Peers sharing a top guide share a bottom-aligned text band, whether or
-      // not they ink a rule: a panel on a ground separates with the ground, and
-      // it is still a panel in the row. Longer headings increase the band;
-      // neither adapter may shrink or invent wraps.
-      const peers = placements.map(measure).filter((peer) => peer && Math.abs(peer.top - own.top) < 0.01);
-      return Math.max(own.height, ...peers.map((peer) => peer.height));
-    };
-    const sharedTableRows = (placement) => {
-      const alignment = placement.node.props?.rowAlignment;
-      if (placement.node.component !== "table" || !alignment) return undefined;
-      const peers = placements.filter(({ node }) => node.component === "table" && node.props?.rowAlignment?.group === alignment.group);
-      if (peers.length < 2) throw new Error(`Table rowAlignment group ${alignment.group} needs at least two peers`);
-      if (peers.some(({ node }) => JSON.stringify(node.props.rowAlignment.keys) !== JSON.stringify(alignment.keys)))
-        throw new Error(`Table rowAlignment group ${alignment.group} must use identical ordered row keys`);
-      const measured = peers.map(peer => ({ ...peer, measurement: registry.get("table").measureContent({
-        frame: { ...peer.frame, height: Infinity },
-        props: { ...peer.node.props, fillHeight: false, headerBandHeight: headerBandHeight(peer) }
-      }) }));
-      const bodyTop = measured[0].frame.y + measured[0].measurement.headerHeight;
-      if (measured.some(peer => Math.abs(peer.frame.y + peer.measurement.headerHeight - bodyTop) > 0.01))
-        throw new Error(`Table rowAlignment group ${alignment.group} requires a shared body-start anchor`);
-      const heights = alignment.keys.map((_, r) => Math.max(...measured.map(peer => peer.measurement.heights[r])));
-      const total = heights.reduce((sum, height) => sum + height, 0);
-      const capacity = Math.min(...measured.map(({ frame, measurement: m }) => frame.height - (m.height - m.heights.reduce((sum, height) => sum + height, 0))));
-      if (total > capacity + 0.01)
-        throw new Error(`Table rowAlignment group ${alignment.group} needs ${total.toFixed(1)}px of body space; only ${capacity.toFixed(1)}px is available`);
-      if (peers.every(({ node }) => node.props.fillHeight === true) && Number.isFinite(capacity) && heights.length) {
-        const extra = Math.min(capacity - total, total * 1.5) / heights.length;
-        heights.forEach((height, r) => { heights[r] = height + Math.max(0, extra); });
-      }
-      return heights;
-    };
-    for (const { node, frame, ancestors = [], inRow: inRowPlacement = false } of placements) {
-      if (node.nodeType === "section") {
-        const sectionDefinition = registry.get("section");
-        if (!sectionDefinition) throw new Error("The component registry must define section");
-        const instanceId = stableId(slideId, node.id);
-        const rendered = sectionDefinition.render({
-          id: instanceId,
-          tokens: slideTokens,
-          frame,
-          props: { ...placementProps(node), headerBandHeight: headerBandHeight({ node, frame }) }
-        });
-        assertDeclaredComponentTokens(sectionDefinition, rendered.nodes, node.id);
-        rendered.nodes.forEach((item) => {
-          item.data.componentInstance = instanceId;
-          item.data.componentAncestors = [...ancestors];
-        });
-        nodes.push(...rendered.nodes);
-        componentInstances.push({
-          id: node.id,
-          instanceId,
-          component: "section",
-          version: sectionDefinition.version,
-          variant: sectionDefinition.resolveVariant?.(placementProps(node)),
-          role: "section",
-          frame,
-          tokens: sectionDefinition.tokens
-        });
-        if (node.composition || node.children.length) {
-          const nestedRoot = node.composition || flow({
-            id: `${node.id}-content`,
-            direction: "column",
-            gap: token("space.3"),
-            children: node.children
-          });
-          const nestedPlacements = resolveLayout(nestedRoot, rendered.contentFrame, registry, { inRow: inRowPlacement });
-          placements.push(...nestedPlacements.map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
-        }
-        continue;
-      }
-      const definition = registry.get(node.component);
-      if (!definition) throw new Error(`Unknown component: ${node.component}`);
-      const instanceId = stableId(slideId, node.id || node.component);
-      const chromePlacement = ["page-template", "slide-chrome"].includes(node.component) || ancestors.some(owner => chromeOwners.has(owner));
-      if (chromePlacement) chromeOwners.add(instanceId);
-      const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
-      const sharedRows = sharedTableRows({ node, frame });
-      if (sharedRows) props._sharedRowHeights = sharedRows;
-      if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
-      let rendered;
-      try {
-        const placementTokens = chromePlacement ? designTokens : slideTokens;
-        rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
-      } catch (error) {
-        throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
-      }
-      placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
-      assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
-      // A chart the emitter writes as a native, workbook-backed chart keeps
-      // its data editable, and that is worth more than a lone line's area
-      // (charts.mjs markWeight), which PowerPoint's line chart cannot carry. The
-      // scene drops the area too, so the scene and the file agree.
-      const native = String(definition.id).startsWith("chart.") ? nativeChartSpec(definition.id, props, frame, rendered.nodes) : null;
-      if (native) rendered.nodes = rendered.nodes.filter((item) => !(item.role === "chart-area" && item.data?.lone));
-      rendered.nodes.forEach((item) => {
-        item.data.componentInstance = instanceId;
-        item.data.componentAncestors = [...ancestors];
-      });
-      nodes.push(...rendered.nodes);
-      componentInstances.push({
-        id: node.id || instanceId,
-        instanceId,
-        component: definition.id,
-        version: definition.version,
-        category: definition.category,
-        role: node.role || definition.role,
-        ...(props.semantic ? {relationships: props.semantic} : {}),
-        variant: definition.resolveVariant?.(props),
-        frame,
-        ...componentGeometry(rendered.nodes),
-        tokens: definition.tokens,
-        // Chart data travels with the instance so an emitter can write a native,
-        // workbook-backed chart object in this frame instead of loose shapes.
-        ...(String(definition.id).startsWith("chart.") ? { nativeChart: native } : {})
-      });
-    }
-    assertUniqueIds(nodes);
-    for (const node of nodes) {
-      const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
-      node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
-        isTokenReference(value) ? { tokenId: value.tokenId, ...nodeTokens[value.tokenId] } : value]));
-    }
-    assertStyleProvenance(nodes);
-    assertSceneBounds(nodes);
-    const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
-    if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
-    slideCache?.set(cacheKey,structuredClone(compiled));
-    return compiled;
-    });
+  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => compileSlide(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }));
+  const templateSequences = templateSequencesOf(slides);
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
+  deck.manifest = buildManifest(deck);
+  return deck;
   });
+}
+
+/**
+ * One slide spec compiled to its scene slide, under its density's tokens: the
+ * chrome, then every placement the layout resolves - a section places its
+ * children as it renders, so the list grows while it is walked - then the
+ * nodes' tokens resolved and the scene's invariants asserted. A slide found in
+ * `slideCache` is returned as a copy.
+ */
+function compileSlide(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }) {
+  const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
+  if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
+  const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
+  const density = slideSpec.density ?? "executive";
+  // A chart that steps its labels down (planner.mjs chartDensity) takes the
+  // chart sizes of that step; the page's other type keeps the page's.
+  const chartTokens = slideSpec.chartDensity ? resolveDensityTokens(designTokens, slideSpec.chartDensity) : null;
+  const slideTokens = Object.fromEntries(Object.entries(resolveDensityTokens(designTokens, density))
+    .map(([tokenId, definition]) => [tokenId, chartTokens && tokenId.startsWith("type.chart") ? chartTokens[tokenId] : definition]));
+  return withDesignTokens(slideTokens, () => {
+  if (slideSpec.palette !== undefined) throw new Error("Palette belongs to the deck, not individual slides");
+  if (slideSpec.typography !== undefined) throw new Error("Typography belongs to the deck, not individual slides");
+  const nodes = [];
+  const componentInstances = [];
+  const templatePlacements = [];
+  // Page furniture belongs to the deck's visual system. Evidence density
+  // may change by slide without resizing titles, trackers or footers.
+  const chromeOwners = new Set();
+  let contentFrame = CONTENT_FRAME;
+  let resolvedPageTemplate;
+  if (slideSpec.chrome) {
+    const rendered = renderSlideChrome({ slideSpec, slideIndex, slideId, registry, pageTemplate, designTokens, nodes, componentInstances, templatePlacements, chromeOwners });
+    contentFrame = rendered.contentFrame;
+    resolvedPageTemplate = rendered.pageTemplate;
+  }
+  const placements = [...templatePlacements, ...resolveLayout(slideSpec.composition, slideSpec.frame || contentFrame, registry)];
+  const headerBandHeight = (placement) => {
+    const measure = ({ node, frame }) => registry.get(node.nodeType === "section" ? "section" : node.component)?.measureHeader?.({ frame, props: placementProps(node) });
+    const own = measure(placement);
+    if (!own) return undefined;
+    // Peers sharing a top guide share a bottom-aligned text band, whether or
+    // not they ink a rule: a panel on a ground separates with the ground, and
+    // it is still a panel in the row. Longer headings increase the band;
+    // neither adapter may shrink or invent wraps.
+    const peers = placements.map(measure).filter((peer) => peer && Math.abs(peer.top - own.top) < 0.01);
+    return Math.max(own.height, ...peers.map((peer) => peer.height));
+  };
+  const sharedTableRows = (placement) => {
+    const alignment = placement.node.props?.rowAlignment;
+    if (placement.node.component !== "table" || !alignment) return undefined;
+    const peers = placements.filter(({ node }) => node.component === "table" && node.props?.rowAlignment?.group === alignment.group);
+    if (peers.length < 2) throw new Error(`Table rowAlignment group ${alignment.group} needs at least two peers`);
+    if (peers.some(({ node }) => JSON.stringify(node.props.rowAlignment.keys) !== JSON.stringify(alignment.keys)))
+      throw new Error(`Table rowAlignment group ${alignment.group} must use identical ordered row keys`);
+    const measured = peers.map(peer => ({ ...peer, measurement: registry.get("table").measureContent({
+      frame: { ...peer.frame, height: Infinity },
+      props: { ...peer.node.props, fillHeight: false, headerBandHeight: headerBandHeight(peer) }
+    }) }));
+    const bodyTop = measured[0].frame.y + measured[0].measurement.headerHeight;
+    if (measured.some(peer => Math.abs(peer.frame.y + peer.measurement.headerHeight - bodyTop) > 0.01))
+      throw new Error(`Table rowAlignment group ${alignment.group} requires a shared body-start anchor`);
+    const heights = alignment.keys.map((_, r) => Math.max(...measured.map(peer => peer.measurement.heights[r])));
+    const total = heights.reduce((sum, height) => sum + height, 0);
+    const capacity = Math.min(...measured.map(({ frame, measurement: m }) => frame.height - (m.height - m.heights.reduce((sum, height) => sum + height, 0))));
+    if (total > capacity + 0.01)
+      throw new Error(`Table rowAlignment group ${alignment.group} needs ${total.toFixed(1)}px of body space; only ${capacity.toFixed(1)}px is available`);
+    if (peers.every(({ node }) => node.props.fillHeight === true) && Number.isFinite(capacity) && heights.length) {
+      const extra = Math.min(capacity - total, total * 1.5) / heights.length;
+      heights.forEach((height, r) => { heights[r] = height + Math.max(0, extra); });
+    }
+    return heights;
+  };
+  const scene = { slideId, registry, pageTemplate, designTokens, slideTokens, nodes, componentInstances, chromeOwners, placements, headerBandHeight, sharedTableRows };
+  for (const { node, frame, ancestors = [], inRow: inRowPlacement = false } of placements) {
+    if (node.nodeType === "section") {
+      placeSection(scene, { node, frame, ancestors, inRowPlacement });
+      continue;
+    }
+    placeComponent(scene, { node, frame, ancestors });
+  }
+  assertUniqueIds(nodes);
+  for (const node of nodes) {
+    const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
+    node.style = Object.fromEntries(Object.entries(node.style).map(([key, value]) => [key,
+      isTokenReference(value) ? { tokenId: value.tokenId, ...nodeTokens[value.tokenId] } : value]));
+  }
+  assertStyleProvenance(nodes);
+  assertSceneBounds(nodes);
+  const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+  if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
+  slideCache?.set(cacheKey,structuredClone(compiled));
+  return compiled;
+  });
+}
+
+/** The slide chrome rendered over the whole slide, its nodes and instance recorded; returns it, with the content frame and page template it resolves. */
+function renderSlideChrome({ slideSpec, slideIndex, slideId, registry, pageTemplate, designTokens, nodes, componentInstances, templatePlacements, chromeOwners }) {
+  const chromeDefinition = registry.get("slide-chrome");
+  if (!chromeDefinition) throw new Error("The component registry must define slide-chrome");
+  const chromeId = stableId(slideId, "chrome");
+  chromeOwners.add(chromeId);
+  const chromeProps = { ...slideSpec.chrome, pageTemplate: { ...pageTemplate, ...slideSpec.chrome.pageTemplate }, pageNumber: slideSpec.chrome.pageNumber ?? slideIndex + 1 };
+  const rendered = withDesignTokens(designTokens, () => chromeDefinition.render({
+    id: chromeId,
+    tokens: designTokens,
+    frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+    props: chromeProps
+  }));
+  templatePlacements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [chromeId] })));
+  assertDeclaredComponentTokens(chromeDefinition, rendered.nodes, chromeId);
+  rendered.nodes.forEach((item) => { item.data.componentInstance = chromeId; });
+  nodes.push(...rendered.nodes);
+  componentInstances.push({
+    id: "chrome",
+    instanceId: chromeId,
+    component: "slide-chrome",
+    version: chromeDefinition.version,
+    category: chromeDefinition.category,
+    role: chromeDefinition.role,
+    variant: chromeDefinition.resolveVariant?.(slideSpec.chrome),
+    frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+    tokens: chromeDefinition.tokens
+  });
+  return rendered;
+}
+
+/** A section placement: the section drawn with its shared header band, and its children's placements added to the slide's. */
+function placeSection({ slideId, registry, slideTokens, nodes, componentInstances, placements, headerBandHeight }, { node, frame, ancestors, inRowPlacement }) {
+  const sectionDefinition = registry.get("section");
+  if (!sectionDefinition) throw new Error("The component registry must define section");
+  const instanceId = stableId(slideId, node.id);
+  const rendered = sectionDefinition.render({
+    id: instanceId,
+    tokens: slideTokens,
+    frame,
+    props: { ...placementProps(node), headerBandHeight: headerBandHeight({ node, frame }) }
+  });
+  assertDeclaredComponentTokens(sectionDefinition, rendered.nodes, node.id);
+  rendered.nodes.forEach((item) => {
+    item.data.componentInstance = instanceId;
+    item.data.componentAncestors = [...ancestors];
+  });
+  nodes.push(...rendered.nodes);
+  componentInstances.push({
+    id: node.id,
+    instanceId,
+    component: "section",
+    version: sectionDefinition.version,
+    variant: sectionDefinition.resolveVariant?.(placementProps(node)),
+    role: "section",
+    frame,
+    tokens: sectionDefinition.tokens
+  });
+  if (node.composition || node.children.length) {
+    const nestedRoot = node.composition || flow({
+      id: `${node.id}-content`,
+      direction: "column",
+      gap: token("space.3"),
+      children: node.children
+    });
+    const nestedPlacements = resolveLayout(nestedRoot, rendered.contentFrame, registry, { inRow: inRowPlacement });
+    placements.push(...nestedPlacements.map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
+  }
+}
+
+/**
+ * A component placement: rendered under the chrome's or the slide's tokens,
+ * with its shared header band and table rows, its nested placements added, and
+ * its instance recorded (with its native chart spec, for a chart).
+ */
+function placeComponent({ slideId, registry, pageTemplate, designTokens, slideTokens, nodes, componentInstances, chromeOwners, placements, headerBandHeight, sharedTableRows }, { node, frame, ancestors }) {
+  const definition = registry.get(node.component);
+  if (!definition) throw new Error(`Unknown component: ${node.component}`);
+  const instanceId = stableId(slideId, node.id || node.component);
+  const chromePlacement = ["page-template", "slide-chrome"].includes(node.component) || ancestors.some(owner => chromeOwners.has(owner));
+  if (chromePlacement) chromeOwners.add(instanceId);
+  const props = { ...node.props, headerBandHeight: headerBandHeight({ node, frame }) };
+  const sharedRows = sharedTableRows({ node, frame });
+  if (sharedRows) props._sharedRowHeights = sharedRows;
+  if (["page-template", "slide-chrome", "section-divider"].includes(node.component)) props.pageTemplate = { ...pageTemplate, ...node.props?.pageTemplate };
+  let rendered;
+  try {
+    const placementTokens = chromePlacement ? designTokens : slideTokens;
+    rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
+  } catch (error) {
+    throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
+  }
+  placements.push(...(rendered.placements || []).map(placement => ({ ...placement, ancestors: [...ancestors, instanceId] })));
+  assertDeclaredComponentTokens(definition, rendered.nodes, instanceId);
+  // A chart the emitter writes as a native, workbook-backed chart keeps
+  // its data editable, and that is worth more than a lone line's area
+  // (chart-axes.mjs markWeight), which PowerPoint's line chart cannot carry. The
+  // scene drops the area too, so the scene and the file agree.
+  const native = String(definition.id).startsWith("chart.") ? nativeChartSpec(definition.id, props, frame, rendered.nodes) : null;
+  if (native) rendered.nodes = rendered.nodes.filter((item) => !(item.role === "chart-area" && item.data?.lone));
+  rendered.nodes.forEach((item) => {
+    item.data.componentInstance = instanceId;
+    item.data.componentAncestors = [...ancestors];
+  });
+  nodes.push(...rendered.nodes);
+  componentInstances.push({
+    id: node.id || instanceId,
+    instanceId,
+    component: definition.id,
+    version: definition.version,
+    category: definition.category,
+    role: node.role || definition.role,
+    ...(props.semantic ? {relationships: props.semantic} : {}),
+    variant: definition.resolveVariant?.(props),
+    frame,
+    ...componentGeometry(rendered.nodes),
+    tokens: definition.tokens,
+    // Chart data travels with the instance so an emitter can write a native,
+    // workbook-backed chart object in this frame instead of loose shapes.
+    ...(String(definition.id).startsWith("chart.") ? { nativeChart: native } : {})
+  });
+}
+
+/** The template sequences the slides declare, checked contiguous and structurally identical; each slide's reference gains its structural hash. */
+function templateSequencesOf(slides) {
   const templateSequences = [];
   const closed = new Set();
   let active = null;
@@ -1383,8 +1422,5 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   for (const sequence of templateSequences) {
     if (sequence.slides.length !== sequence.total) throw new Error(`Template sequence ${sequence.id} declares ${sequence.total} slides but contains ${sequence.slides.length}`);
   }
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
-  deck.manifest = buildManifest(deck);
-  return deck;
-  });
+  return templateSequences;
 }

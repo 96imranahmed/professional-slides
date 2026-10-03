@@ -14,6 +14,7 @@ import copy
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -462,6 +463,114 @@ class CliTests(unittest.TestCase):
                 [sys.executable, str(GATES / "page_gates.py"), str(scene)],
                 capture_output=True, text=True, cwd=str(ROOT))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+class FootnoteAndRenderTests(unittest.TestCase):
+    def test_density_footnotes_and_missing_renders(self):
+        """PR #4 review: footnotes were counted as page words, and a missing render was not reported."""
+        slide=good_slide()
+        slide['componentInstances']=[{'component':'slide-chrome'}]
+        paragraph=next(n for n in slide['nodes'] if n['id']=='p')
+        # 140 words: over `live-pitch` (127, the corpus p25) and under
+        # `pre-read` (282, the corpus p75). It was 110 against a bare ceiling of
+        # 100 - which sat below the corpus p25, so the gate taxed pages for
+        # carrying what the reference decks carry.
+        paragraph['data']['textLayout']['source']=' '.join(['word']*140)
+        paragraph['text']=paragraph['data']['textLayout']['source']
+        slide['density']='live-pitch'
+        self.assertIn('WORDS',page_gates.run_gates({'slides':[slide]},gates={'WORDS'})['countsByCode'])
+        self.assertNotIn('WORDS',page_gates.run_gates({'slides':[slide]},profile='pre-read',gates={'WORDS'})['countsByCode'])
+        note=copy.deepcopy(paragraph);note['id']='note';note['role']='footnote-text'
+        note['style']['fontSize']['value']=20
+        slide['nodes']=[note]
+        report=page_gates.run_gates({'slides':[slide]},gates={'WORDS','TYPE_RANGE'})
+        self.assertNotIn('WORDS',report['countsByCode']);self.assertIn('TYPE_RANGE',report['countsByCode'])
+        # The lexical-hedge half of this test went with `HEDGED_TITLE`: it
+        # asserted that "Some growth creates value" hedges and "Awesome growth
+        # creates value" does not, which is a claim about two words rather than
+        # about whether a title commits to a finding.
+        slide=good_slide()
+        with tempfile.TemporaryDirectory() as directory:
+            report=page_gates.run_gates({'slides':[slide,{'nodes':[],'componentInstances':[{'component':'cover'}]}]},directory,gates={'WORDS'})
+            self.assertEqual(report['countsByCode']['MISSING_RENDER'],2)
+
+
+class CplTests(unittest.TestCase):
+    def test_cpl_reads_points_that_run_too_wide(self):
+        """Fifty-six-page re-author: points under a row of panels ran 150 characters a line and CPL passed them."""
+        wide = {"type": "text", "role": "list-item", "text": "x" * 140, "data": {"textLayout": {"lines": ["word " * 28]}}}
+        narrow_card = {"type": "text", "role": "list-item", "text": "a\nb", "data": {"textLayout": {"lines": ["A short", "bullet"]}}}
+        findings = []
+        page_gates.gate_cpl(1, {"nodes": [wide, narrow_card]}, findings)
+        self.assertEqual([f["code"] for f in findings], ["CPL"])
+        self.assertIn("columns", findings[0]["repair"])
+
+
+class RestatementGateTests(unittest.TestCase):
+    @staticmethod
+    def node(role, text):
+        return {"type": "text", "role": role, "text": text, "data": {"textLayout": {"lines": [text]}}}
+
+    def page(self, callout=None):
+        names = ["Europe", "East Asia & Australasia", "Americas", "West Asia & Indian Ocean", "Africa", "Middle East",
+                 "North Atlantic routes", "Southern Cone routes"]
+        nodes = [self.node("category-label", n) for n in names]
+        nodes += [self.node("panel-caption", "Europe and East Asia with Australasia earn 59% of revenue; the Middle East only 7%")]
+        if callout:
+            nodes.append(self.node("annotation-text", callout))
+        return {"nodes": nodes, "componentInstances": []}
+
+    def test_naming_the_members_is_not_restating_the_chart(self):
+        """Fifty-six-page re-author: naming a chart's members was read as restating it."""
+        findings = []
+        page_gates.gate_restatement(1, self.page("Europe and East Asia earn 59% of all revenue"), findings)
+        self.assertEqual(findings, [], "the names are the subject; the callout alone is too short to be a pattern")
+
+    def test_a_caption_that_repeats_the_callout_is_told_so(self):
+        """Fifty-six-page re-author: a caption became a restatement the moment a callout was added."""
+        slide = self.page()
+        slide["nodes"] += [self.node("annotation-text", "Premium cabins earn the widest yield on long routes"),
+                           self.node("annotation-text", "Cargo bellies lift network margin through the winter season")]
+        slide["nodes"] = [n for n in slide["nodes"] if n["role"] != "panel-caption"] + [
+            self.node("panel-caption", "Premium cabins earn the widest yield and cargo bellies lift winter margin")]
+        findings = []
+        page_gates.gate_restatement(1, slide, findings)
+        self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
+        self.assertIn("callout", findings[0]["measured"])
+        self.assertIn("callout", findings[0]["repair"])
+
+
+class PlotSpanTests(unittest.TestCase):
+    # The span floor is the fill level's; another test's deck may have left
+    # the module configured for an airy deck, whose floor is off.
+    def setUp(self):
+        page_gates.configure()
+
+    def test_a_bar_panel_that_spends_its_width_on_names_and_values_passes(self):
+        """Fifty-six-page re-author: PLOT_SPAN failed a bar panel whose width went on its names."""
+        frame = {"x": 647, "y": 152, "width": 560, "height": 465}
+        marks = [{"role": "chart-mark", "frame": {"x": 900 - (40 if i == 2 else 0), "y": 250 + i * 57, "width": 40 if i == 2 else 20 + i * 25, "height": 40}} for i in range(6)]
+        names = [{"role": "category-label", "type": "text", "frame": {"x": 655, "y": 250 + i * 57, "width": 168, "height": 40}} for i in range(6)]
+        values = [{"role": "data-label", "type": "text", "frame": {"x": 1030, "y": 250 + i * 57, "width": 50, "height": 40}} for i in range(6)]
+        slide = {"componentInstances": [{"component": "chart.bar", "frame": frame}], "nodes": marks + names + values}
+        findings = []
+        page_gates.gate_plot_span(1, slide, findings)
+        self.assertEqual(findings, [])
+        # The bars alone would have been measured short.
+        findings = []
+        page_gates.gate_plot_span(1, dict(slide, nodes=marks), findings)
+        self.assertEqual([f["code"] for f in findings], ["PLOT_SPAN"])
+
+
+class DeckThinPagesTests(unittest.TestCase):
+    def test_a_deck_of_thin_pages_blocks(self):
+        """Emirates deck at 8/10: a deck of thin pages blocks, a few do not."""
+        findings = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 8)]
+        page_gates.gate_deck_empty_pages(list(range(20)), findings, rendered=True)
+        self.assertEqual(findings[-1]['code'], 'DECK_THIN_PAGES')
+        few = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 6)]
+        page_gates.gate_deck_empty_pages(list(range(20)), few, rendered=True)
+        self.assertNotIn('DECK_THIN_PAGES', [f['code'] for f in few])
 
 
 if __name__ == "__main__":

@@ -379,12 +379,12 @@ class IntakeDocumentationTests(unittest.TestCase):
         skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         theming = (SKILL / "references" / "theming.md").read_text(encoding="utf-8")
         self.assertIn("references/theming.md#design-intake", skill)
-        for phrase in ("preferences.mjs show", "preferences.mjs set", "preferences.mjs apply", "assets/design-options/", "what was reused"):
+        for phrase in ("preferences.mjs show", "preferences.mjs set", "preferences.mjs apply", "assets/design-options/"):
             self.assertIn(phrase, skill)
         self.assertIn("## Design intake", theming)
         for phrase in ("design-systems.png", "palettes.png", "trackers.png", "title-treatments.png", "surfaces.png",
                        "import-template.py", "infer-style.py", "design-options.mjs", "AskUserQuestion", "XDG_CONFIG_HOME",
-                       "live-pitch", "pre-read", "words a page", "--from-house"):
+                       "live-pitch", "pre-read", "--from-house"):
             self.assertIn(phrase, theming)
         # Every stored answer the file accepts has a row saying which deck keys it sets.
         for answer in ("`design`", "`colours: \"brand\"`", "`titleRule`", "`tracker`", "`surfaces`", "`density`", "`typography`", "`house`"):

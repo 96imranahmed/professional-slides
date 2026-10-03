@@ -118,11 +118,17 @@ class OneDefinitionTests(unittest.TestCase):
         self.assertEqual(text_stats.STOPWORDS, frozenset(lists["content"]))
         self.assertEqual(text_stats.TITLE_STOPWORDS, frozenset(lists["title"]))
         self.assertTrue(text_stats.TITLE_STOPWORDS <= text_stats.STOPWORDS)
-        # Neither side keeps a copy of the list in its source.
-        for path in (GATES / "content_gates.mjs", GATES / "semantic_gates.py", GATES / "scene_gates.py"):
-            source = path.read_text(encoding="utf-8")
-            self.assertNotIn("however therefore", source, path.name)
-            self.assertNotIn("were be been", source, path.name)
+        # Every reader takes the file's list rather than a copy: the Python
+        # gates hold the very objects, and the Node gate drops every listed word.
+        import scene_gates
+        import semantic_gates
+        self.assertIs(scene_gates.TITLE_STOPWORDS, text_stats.TITLE_STOPWORDS)
+        self.assertIs(semantic_gates.content_words, text_stats.content_words)
+        kept = run_node(f"""
+import {{ contentWords }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
+console.log(JSON.stringify([...contentWords({json.dumps(" ".join(sorted(lists["content"])) + " revenue")})]));
+""")
+        self.assertEqual(kept, ["revenue"])
 
 
 if __name__ == "__main__":

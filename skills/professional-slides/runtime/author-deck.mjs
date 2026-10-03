@@ -50,7 +50,7 @@ import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
-import { SLIDE_KEYS } from "./compose.mjs";
+import { SLIDE_KEYS } from "./compose-page.mjs";
 import { composeAll } from "./compose-all.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
@@ -467,47 +467,8 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
-  if (values.types) { say(describeTypes()); return 0; }
-  if (values.schema !== undefined) {
-    try { say(JSON.stringify(pageSchema(values.schema || null), null, 2)); return 0; } catch (error) { console.error(error.message); return 1; }
-  }
-  // The icon vocabulary, and the other words each name answers to.
-  if (values.icons) {
-    const aliases = Object.entries(ICON_ALIASES).reduce((m, [alias, icon]) => m.set(icon, [...(m.get(icon) || []), alias]), new Map());
-    say(ICON_NAMES.map((name) => `${name.padEnd(12)} ${ICONS[name].label}${aliases.has(name) ? ` (also: ${aliases.get(name).join(", ")})` : ""}`).join("\n"));
-    return 0;
-  }
-  // The worked example of one type, to copy the shape of rather than learn it from errors.
-  if (values.example !== undefined) {
-    // `<type>` prints every worked page of the type; `<type>/<form>` the page of one form.
-    const [type, form] = values.example.split("/");
-    const example = readJsonSync(EXAMPLES);
-    const pages = [...example.pages, ...(example.appendix || [])].filter((p) => p.type === type && (!form || p.form === form));
-    if (!pages.length) {
-      const forms = [...new Set([...example.pages, ...(example.appendix || [])].filter((p) => p.type === type).map((p) => p.form))];
-      console.error(form && forms.length ? `No worked example of "${type}/${form}"; ${type}'s worked forms: ${forms.join(", ")}`
-        : `No worked example of "${type}"; types: ${[...new Set(example.pages.map((p) => p.type).filter(Boolean))].join(", ")}`);
-      return 1;
-    }
-    say(JSON.stringify(pages, null, 1)); return 0;
-  }
-  if (values.scaffold !== undefined) {
-    const type = values.scaffold, evidence = values.evidence;
-    let insight = null;
-    if (evidence) {
-      const dir = file ? path.dirname(path.resolve(file)) : process.cwd();
-      const stem = file ? ((await readJson(path.resolve(file))).deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "")) : null;
-      const log = stem ? await readInsights(dir, stem).catch((error) => { console.error(error.message); return null; }) : null;
-      insight = log?.get(evidence) ?? { id: evidence };
-      if (!log?.get(evidence)) console.error(`${evidence} is not in ${stem ? `${stem}.insights.json` : "an insight log (name the pages file to read the log beside it)"}; the scaffold names it as its evidence without its data`);
-    }
-    let page;
-    try { page = scaffoldPage(type, { id: values.id ?? "p00", insight }); } catch (error) { console.error(error.message); return 1; }
-    say(JSON.stringify(page, null, 1));
-    try { compilePage(page, 0, { insights: insight?.shape ? new Map([[insight.id, insight]]) : null }); }
-    catch (error) { console.error(`The scaffold does not compile yet: ${error.message}`); return 2; }
-    return 0;
-  }
+  const listed = await catalogueCommand(values, file, say);
+  if (listed !== undefined) return listed;
   if (!file) throw new UsageError(USAGE);
   const doc = await readJson(path.resolve(file));
   const dir = path.dirname(path.resolve(file));
@@ -549,13 +510,93 @@ async function main(argv) {
   // The page gates are the build's; when they cannot run here the author is
   // told so, rather than handed a clean run that checked nothing.
   if (!pageGatesRan) console.error(`page gates did not run: ${pageGatesError || "no reason given"}\n  (the build runs them; \`node runtime/doctor.mjs\` finds a Python that can)\n`);
-  // One line per analytical page: body words against floor and ceiling, the
-  // footer's share, and any band of the page the render will call empty (the
-  // build's INTERNAL_VOID and DEAD_BAND, measured on the scene); "!" marks a
-  // line to act on. A number with no bar beside it is read past.
-  // A page the scene says will read light (SCENE_INK) carries its estimated
-  // ink on its line, only then: the number is a prompt to give the exhibit its
-  // surfaces, not a target to write toward.
+  const ledger = pageBudgetLedger(budget, pageGateAdvisories, spec);
+  const content = deriveContent(spec, deck);
+  // A page that did not compose has no text to plan; its composition error is its finding.
+  // The deck's workflow and rules version decide which content rules it predates.
+  const contentReport = runContentGates({ ...content, pages: content.pages.filter((p) => !failedIds.has(p.id)) }, { required: true, deck: spec });
+  // A draft is the spine: the content plan's rules on claims and the answer
+  // hold, and its rules on the copy - words, blocks, what the commentary adds -
+  // are reported rather than enforced.
+  const held = (f) => (f.severity === "blocker" || f.severity === "blocking") && !(draft && COPY_CODES.test(f.code));
+  const blocking = [...findings, ...(contentReport.findings || []).filter(held)];
+  // The message is kept, so `--log` can say which limit keeps coming back.
+  await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), ...(f.repair ?? f.reason ? { message: String(f.repair ?? f.reason).slice(0, 300) } : {}) })) });
+  if (blocking.length) {
+    console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)}:\n${report(blocking)}${ledger.length ? `\n\nPage budgets:\n${ledger.join("\n")}` : ""}`);
+    return 2;
+  }
+  const summary = deckSummary({ values, draft, insights, spec, pageGateAdvisories, pageGatesRan, pageGatesError, contentReport, held });
+  if (draft) content.textContract = "draft";
+  if (ledger.length && (values.check || draft)) console.error(`Page budgets:\n${ledger.join("\n")}\n`);
+  if (values.check) { say(JSON.stringify({ ok: true, ...summary }, null, 1)); return 0; }
+  await writeJson(path.join(dir, `${stem}.deck.json`), spec);
+  await writeJson(path.join(dir, `${stem}.plan.json`), planOf(spec));
+  await writeJson(path.join(dir, `${stem}.content.json`), content);
+  if (insights?.analysis?.plan) await writeJson(path.join(dir, `${stem}.analysis-results.json`), { schema: "professional-slides.analysis-results/v1", id: stem, results: insights.analysis.results });
+  say(JSON.stringify({ deck: `${stem}.deck.json`, plan: `${stem}.plan.json`, content: `${stem}.content.json`, ...summary }, null, 1));
+  // The full copy belongs after the storyline gate: said on every full compile
+  // while the gate is not ready (out/ beside the pages file, or --out), never enforced here.
+  if (!draft) {
+    const story = await storylineWarning(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`) });
+    if (story) console.error(story);
+  }
+  return 0;
+}
+
+/** The catalogue commands - --types, --schema, --icons, --example, --scaffold - each answered with its exit code; undefined when none was asked for. */
+async function catalogueCommand(values, file, say) {
+  if (values.types) { say(describeTypes()); return 0; }
+  if (values.schema !== undefined) {
+    try { say(JSON.stringify(pageSchema(values.schema || null), null, 2)); return 0; } catch (error) { console.error(error.message); return 1; }
+  }
+  // The icon vocabulary, and the other words each name answers to.
+  if (values.icons) {
+    const aliases = Object.entries(ICON_ALIASES).reduce((m, [alias, icon]) => m.set(icon, [...(m.get(icon) || []), alias]), new Map());
+    say(ICON_NAMES.map((name) => `${name.padEnd(12)} ${ICONS[name].label}${aliases.has(name) ? ` (also: ${aliases.get(name).join(", ")})` : ""}`).join("\n"));
+    return 0;
+  }
+  // The worked example of one type, to copy the shape of rather than learn it from errors.
+  if (values.example !== undefined) {
+    // `<type>` prints every worked page of the type; `<type>/<form>` the page of one form.
+    const [type, form] = values.example.split("/");
+    const example = readJsonSync(EXAMPLES);
+    const pages = [...example.pages, ...(example.appendix || [])].filter((p) => p.type === type && (!form || p.form === form));
+    if (!pages.length) {
+      const forms = [...new Set([...example.pages, ...(example.appendix || [])].filter((p) => p.type === type).map((p) => p.form))];
+      console.error(form && forms.length ? `No worked example of "${type}/${form}"; ${type}'s worked forms: ${forms.join(", ")}`
+        : `No worked example of "${type}"; types: ${[...new Set(example.pages.map((p) => p.type).filter(Boolean))].join(", ")}`);
+      return 1;
+    }
+    say(JSON.stringify(pages, null, 1)); return 0;
+  }
+  if (values.scaffold !== undefined) {
+    const type = values.scaffold, evidence = values.evidence;
+    let insight = null;
+    if (evidence) {
+      const dir = file ? path.dirname(path.resolve(file)) : process.cwd();
+      const stem = file ? ((await readJson(path.resolve(file))).deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "")) : null;
+      const log = stem ? await readInsights(dir, stem).catch((error) => { console.error(error.message); return null; }) : null;
+      insight = log?.get(evidence) ?? { id: evidence };
+      if (!log?.get(evidence)) console.error(`${evidence} is not in ${stem ? `${stem}.insights.json` : "an insight log (name the pages file to read the log beside it)"}; the scaffold names it as its evidence without its data`);
+    }
+    let page;
+    try { page = scaffoldPage(type, { id: values.id ?? "p00", insight }); } catch (error) { console.error(error.message); return 1; }
+    say(JSON.stringify(page, null, 1));
+    try { compilePage(page, 0, { insights: insight?.shape ? new Map([[insight.id, insight]]) : null }); }
+    catch (error) { console.error(`The scaffold does not compile yet: ${error.message}`); return 2; }
+    return 0;
+  }
+}
+
+// One line per analytical page: body words against floor and ceiling, the
+// footer's share, and any band of the page the render will call empty (the
+// build's INTERNAL_VOID and DEAD_BAND, measured on the scene); "!" marks a
+// line to act on. A number with no bar beside it is read past.
+// A page the scene says will read light (SCENE_INK) carries its estimated
+// ink on its line, only then: the number is a prompt to give the exhibit its
+// surfaces, not a target to write toward.
+function pageBudgetLedger(budget, pageGateAdvisories, spec) {
   const light = new Map(pageGateAdvisories.filter((f) => f.code === "SCENE_INK" && f.id).map((f) => [String(f.id), f]));
   const ledger = budget.filter((b) => b.floor).map((b) => {
     const ink = light.get(String(b.id ?? ""));
@@ -582,21 +623,11 @@ async function main(argv) {
       `${b.footer ? `, footer ${Math.round((b.footerRatio ?? 0) * 100)}%` : ""}${band}${room}` +
       `${ink ? `, light: ink ~${(ink.measured * 100).toFixed(1)}% of the body (floor ${Math.round(ink.threshold * 100)}%) - keep the house surfaces on, set loose text as a table or cards, or pair the lone chart; not more words` : ""}`;
   });
-  const content = deriveContent(spec, deck);
-  // A page that did not compose has no text to plan; its composition error is its finding.
-  // The deck's workflow and rules version decide which content rules it predates.
-  const contentReport = runContentGates({ ...content, pages: content.pages.filter((p) => !failedIds.has(p.id)) }, { required: true, deck: spec });
-  // A draft is the spine: the content plan's rules on claims and the answer
-  // hold, and its rules on the copy - words, blocks, what the commentary adds -
-  // are reported rather than enforced.
-  const held = (f) => (f.severity === "blocker" || f.severity === "blocking") && !(draft && COPY_CODES.test(f.code));
-  const blocking = [...findings, ...(contentReport.findings || []).filter(held)];
-  // The message is kept, so `--log` can say which limit keeps coming back.
-  await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), ...(f.repair ?? f.reason ? { message: String(f.repair ?? f.reason).slice(0, 300) } : {}) })) });
-  if (blocking.length) {
-    console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)}:\n${report(blocking)}${ledger.length ? `\n\nPage budgets:\n${ledger.join("\n")}` : ""}`);
-    return 2;
-  }
+  return ledger;
+}
+
+/** What a run reports of the deck it compiled: the type and commentary mix, the sequence, the structure drawn, the evidence plotted, and the advisories. */
+function deckSummary({ values, draft, insights, spec, pageGateAdvisories, pageGatesRan, pageGatesError, contentReport, held }) {
   const typed = spec.slides.filter((s) => s.pageType);
   const mix = (key) => Object.fromEntries([...typed.reduce((m, s) => m.set(s.pageType[key], (m.get(s.pageType[key]) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]));
   // What the chart pages plot, against strong decks' ~22 a page: the numbers
@@ -622,21 +653,7 @@ async function main(argv) {
     advisories: [...(contentReport.findings || []).filter((f) => !held(f)), ...pageGateAdvisories]
       .map((f) => `${f.code}${f.id ? ` [${f.id}]` : ""}`)
       .concat(typed.flatMap((s) => (s.pageType.advisories || []).map((a) => `${a.split(":")[0]} [${s.id}]: ${a.slice(a.indexOf(":") + 2)}`))) };
-  if (draft) content.textContract = "draft";
-  if (ledger.length && (values.check || draft)) console.error(`Page budgets:\n${ledger.join("\n")}\n`);
-  if (values.check) { say(JSON.stringify({ ok: true, ...summary }, null, 1)); return 0; }
-  await writeJson(path.join(dir, `${stem}.deck.json`), spec);
-  await writeJson(path.join(dir, `${stem}.plan.json`), planOf(spec));
-  await writeJson(path.join(dir, `${stem}.content.json`), content);
-  if (insights?.analysis?.plan) await writeJson(path.join(dir, `${stem}.analysis-results.json`), { schema: "professional-slides.analysis-results/v1", id: stem, results: insights.analysis.results });
-  say(JSON.stringify({ deck: `${stem}.deck.json`, plan: `${stem}.plan.json`, content: `${stem}.content.json`, ...summary }, null, 1));
-  // The full copy belongs after the storyline gate: said on every full compile
-  // while the gate is not ready (out/ beside the pages file, or --out), never enforced here.
-  if (!draft) {
-    const story = await storylineWarning(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`) });
-    if (story) console.error(story);
-  }
-  return 0;
+  return summary;
 }
 
 if (isMain(import.meta.url)) runCli(main);

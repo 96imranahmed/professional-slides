@@ -23,6 +23,12 @@ KIT = "./skills/professional-slides/runtime/page-types.mjs"
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
 EXAMPLE = ROOT / "skills" / "professional-slides" / "examples" / "page-types.pages.json"
 
+PAGE = """
+const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+"""
+
 PAGES = f"""
 import fs from 'node:fs';
 import {{ compilePage, pageSchema }} from '{KIT}';
@@ -202,7 +208,7 @@ console.log(JSON.stringify({ out, evidence: scaffold.evidence, settles: compiled
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")
-class RevisionTests(unittest.TestCase):
+class RevisionAuthoringTests(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
         example = json.loads(EXAMPLE.read_text(encoding="utf-8"))
@@ -273,6 +279,64 @@ console.log(JSON.stringify({ pitch: Math.max(...tasks.map((t) => wordBudgetOf(t,
         self.assertEqual(result["preRead"], 42)
 
 
+class DeckFindingTests(unittest.TestCase):
+    """What authoring reads across the deck: table monotony and players never shown."""
+
+    def deck(self, extra):
+        return run_node(f'''
+import {{ compileDeck }} from '{AUTHOR}';
+{PAGE}
+const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
+const chart = {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: {{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}, {{ name: 'y', values: [2, 3, 4, 5, 6, 7, 8, 9] }}],
+  annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}] }} }};
+const table = {{ type: 'lookup', form: 'table', commentary: 'none', exhibit: {{ columns: [{{ label: 'Item', type: 'category' }}, 'OpenAI', 'Anthropic'], rows: [['A', 'x', 'y'], ['B', 'x', 'y'], ['C', 'x', 'y']] }} }};
+const coded = {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }};
+const logos = {{ type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', exhibit: {{ columns: [{{ label: '', type: 'logo' }}, 'Firm', 'Users'],
+  rows: [[{{ media: {{ alt: 'OpenAI logo' }} }}, 'OpenAI', '1bn'], [{{ media: {{ alt: 'Anthropic logo' }} }}, 'Anthropic', 'n/a'], [{{ media: {{ alt: 'Google logo' }} }}, 'Google', 'n/a']] }} }};
+const cards = {{ type: 'profiles', form: 'cards', commentary: 'none', exhibit: {{ items: [{{ title: 'ChatGPT', text: 'The consumer assistant' }}, {{ title: 'Claude', text: 'The enterprise assistant' }}] }} }};
+const make = (kinds, titles = []) => kinds.map((k, i) => ({{ id: 'c' + i, ...base, title: titles[i] ?? 'Finding number ' + i + ' of the deck', ...structuredClone(k) }}));
+{extra}
+''')
+
+    def test_table_monotony_is_found_in_a_window_and_a_mixed_deck_passes(self):
+        """Fifty-page review: sixteen pages of one table construction."""
+        result = self.deck('''
+const run = [chart, table, table, table, chart, table, table, table, chart, chart, coded, chart];
+const mixed = [chart, table, chart, coded, table, chart, coded, table, chart, coded, table, chart];
+const find = (kinds) => compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages: make(kinds) }).findings.find((f) => f.code === 'VARIETY_TABLES') ?? null;
+console.log(JSON.stringify({ run: find(run), mixed: find(mixed) }));
+''')
+        self.assertEqual(result["run"]["measured"]["pages"], 6)
+        self.assertEqual(result["run"]["measured"]["construction"], "filled first column · text cells · short · open foot")
+        self.assertIn("bridge", result["run"]["repair"])
+        self.assertIsNone(result["mixed"])
+
+    def test_named_players_need_their_marks_early(self):
+        """Fifty-page review: two named players with no logo anywhere near the front."""
+        result = self.deck('''
+const kinds = [chart, coded, chart, coded, chart, coded, chart, coded, chart, coded, chart, coded];
+const players = [{ name: 'OpenAI' }, { name: 'Anthropic' }];
+const codes = (deck, pages) => compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd', ...deck }, pages }).findings.filter((f) => ['PLAYERS_UNMARKED', 'PROFILE_UNPICTURED'].includes(f.code));
+const titled = make(kinds, kinds.map((_, i) => i % 2 ? 'OpenAI leads reach on measure ' + i : 'Anthropic leads spend on measure ' + i));
+console.log(JSON.stringify({
+  declared: codes({ players }, make(kinds)).map((f) => f.code),
+  introduced: codes({ players }, make([chart, logos, ...kinds.slice(2)])).map((f) => f.code),
+  late: codes({ players }, make([...kinds.slice(0, 6), logos, ...kinds.slice(7)])).map((f) => f.code),
+  titles: codes({}, titled).map((f) => f.measured.players ?? f.code),
+  unnamed: codes({}, make(kinds)).length,
+  cards: codes({ players }, make([chart, logos, cards, ...kinds.slice(3)])).map((f) => f.code),
+  aliased: codes({ players: [{ name: 'OpenAI Group', short: 'OpenAI' }, { name: 'Anthropic' }] }, make([chart, logos, ...kinds.slice(2)])).map((f) => f.code),
+}));
+''')
+        self.assertEqual(result["declared"], ["PLAYERS_UNMARKED"])
+        self.assertEqual(result["introduced"], [])
+        self.assertEqual(result["late"], ["PLAYERS_UNMARKED"])
+        self.assertEqual(sorted(result["titles"][0]), ["Anthropic", "OpenAI"])
+        self.assertEqual(result["unnamed"], 0)
+        self.assertEqual(result["cards"], ["PROFILE_UNPICTURED"])
+        self.assertEqual(result["aliased"], [])  # a logo under the player's short name introduces it
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -301,8 +365,10 @@ class InstructionsTests(unittest.TestCase):
         self.assertLessEqual(len(description), 600)
         self.assertLessEqual(len(text.splitlines()), 120)
         self.assertIn("runtime/doctor.mjs", text)  # step 0
-        self.assertIn("STOP (a)", text)
-        self.assertIn("STOP (b)", text)
+        # Every runtime command the pipeline names is a file the skill ships.
+        for command in sorted(set(re.findall(r"\bruntime/[\w./-]+\.(?:mjs|py)\b", text))):
+            with self.subTest(command=command):
+                self.assertTrue((SKILL_DIR / command).is_file(), command)
         for target, anchor in re.findall(r"\]\((references/[^)#]+)(?:#([^)]+))?\)", text):
             with self.subTest(link=f"{target}#{anchor}"):
                 path = SKILL_DIR / target
@@ -310,6 +376,7 @@ class InstructionsTests(unittest.TestCase):
                 if anchor:
                     self.assertIn(anchor, anchors(path))
         # README and Production point at the one pipeline rather than restating it.
+        self.assertIn("pipeline", anchors(SKILL_DIR / "SKILL.md"))
         for doc in (ROOT / "README.md", SKILL_DIR / "references" / "tools" / "production.md"):
             self.assertIn("SKILL.md#pipeline", doc.read_text(encoding="utf-8"))
             self.assertNotIn("--preflight\nnode", doc.read_text(encoding="utf-8"))

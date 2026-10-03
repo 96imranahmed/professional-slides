@@ -22,7 +22,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from node_probe import HAS_RENDERER, NODE, requires_python_package
+from node_probe import HAS_RENDERER, NODE, requires_python_package, run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "skills" / "professional-slides" / "runtime"
@@ -73,11 +73,14 @@ class RefusalTests(unittest.TestCase):
         self.assertIn("SyntaxError", run.stderr)
 
     def test_the_refusal_codes_are_registered(self):
-        source = BUILD.read_text(encoding="utf-8")
-        table = source[source.index("export const REFUSAL_CODES"):source.index("});", source.index("export const REFUSAL_CODES"))]
+        # Read off the module's exported table, not its source; that a refusal
+        # exits refused rather than crashing is the tests above.
+        codes = run_node("""
+import { REFUSAL_CODES } from './skills/professional-slides/runtime/build-deck.mjs';
+console.log(JSON.stringify(Object.fromEntries(Object.entries(REFUSAL_CODES).map(([code, about]) => [code, String(about).trim().length > 0]))));
+""")
         for code in ("CONTENT_REJECTED", "PLAN_REJECTED", "VARIETY_REJECTED", "STAGE_CONTRACT", "STAGE_MISSING", "TEXT_PLAN_CHANGED", "CONTENT_LOST"):
-            self.assertIn(f"{code}:", table)
-        self.assertNotIn("throw new Error(", source.split("export async function buildDeck")[1].split("async function readJson")[0])
+            self.assertTrue(codes.get(code), code)
 
 
 @requires_python_package("pptx")
@@ -174,6 +177,59 @@ class RenderCanvasTests(unittest.TestCase):
             self.assertEqual(len(sheets["spreads"]), 1)
             with Image.open(sheets["montage"]) as montage:
                 self.assertEqual(montage.size, (4 * 640 + 5 * 12, 360 + 2 * 12))
+
+
+class OutcomeTests(unittest.TestCase):
+    def test_only_blockers_fail_a_build_and_each_is_named(self):
+        """PR #4 review: advisories failed a build, and a build held back named no blocker."""
+        # Advisory-only builds are `built`; a build held back by text lost from
+        # the rendered pages says so, rather than showing the advisory counts.
+        result = run_node('''
+import {buildOutcome} from './skills/professional-slides/runtime/build-deck.mjs';
+const advisory = {code:'UNANNOTATED',severity:'advisory',slide:4};
+const passed = {passed:true,findings:[advisory,{code:'DECK_CRAFT',severity:'advisory'}]};
+const clean = buildOutcome({preflight:passed,gates:passed,readback:{accepted:true},textCoverage:{accepted:true,findings:[]}},{render:true});
+const lost = buildOutcome({preflight:passed,gates:passed,readback:{accepted:true},textCoverage:{accepted:false,findings:[{id:'p13',code:'TEXT_EXPORT_LOST',text:'787',severity:'blocking'}]}},{render:true});
+const gated = buildOutcome({preflight:{passed:false,findings:[{code:'TITLE_WORDS',severity:'blocker',slide:3},advisory]},gates:{passed:false,findings:[{code:'TITLE_WORDS',severity:'blocker',slide:3},advisory]},readback:{accepted:true}},{render:true});
+const unrendered = buildOutcome({preflight:passed,readback:{accepted:true}},{render:false});
+console.log(JSON.stringify({clean,lost,gated,unrendered}));
+''')
+        self.assertEqual(result['clean'], {'status': 'built', 'blockers': [], 'advisories': {'DECK_CRAFT': 1, 'UNANNOTATED': 1}})
+        self.assertEqual(result['lost']['status'], 'built-with-blockers')
+        self.assertEqual([(b['source'], b['code'], b['id']) for b in result['lost']['blockers']], [('rendered text', 'TEXT_EXPORT_LOST', 'p13')])
+        self.assertEqual(result['gated']['status'], 'built-with-blockers')
+        self.assertEqual([b['code'] for b in result['gated']['blockers']], ['TITLE_WORDS'])
+        self.assertEqual(result['gated']['advisories'], {'UNANNOTATED': 1})
+        self.assertEqual(result['unrendered']['status'], 'built-unrendered')
+
+
+@requires_python_package("pptx")
+class CoverageRefusalTests(unittest.TestCase):
+    def test_coverage_blocks_build_and_delivery_and_python_option_is_used(self):
+        """PR #4 review: a deck missing evidence for a criterion built and delivered, and --python lost to RUNTIME_PYTHON."""
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);spec=root/'spec.json';out=root/'out'
+            spec.write_text(json.dumps({'schema':'professional-slides.deck/v3','id':'coverage','cover':{'title':'Decision'},'criteria':['housing'],'slides':[]}))
+            command=[NODE,str(RUNTIME/'build-deck.mjs'),str(spec),str(out),'--python',sys.executable]
+            # Explicit interpreter must win over an unusable default.
+            env={**os.environ,'RUNTIME_PYTHON':'/does-not-exist'}
+            pre=subprocess.run(command+['--preflight'],capture_output=True,text=True,env=env)
+            self.assertEqual(pre.returncode,2,pre.stderr)
+            self.assertEqual(json.loads(pre.stdout)['status'],'preflight-findings')
+            build=subprocess.run(command+['--no-render'],capture_output=True,text=True,env=env)
+            self.assertEqual(build.returncode,2,build.stderr)
+            self.assertEqual(json.loads(build.stdout)['status'],'built-with-blockers')
+            self.assertIn('MISSING_EVIDENCE',json.loads(build.stdout)['blockers']['byCode'])
+            report=json.loads((out/'preflight-gates.json').read_text())
+            self.assertEqual(report['countsByCode']['MISSING_EVIDENCE'],1)
+            review=root/'review.json';review.write_text(json.dumps({'accepted':True,'summary':'Accepted for the purpose of proving gates cannot be bypassed.','findings':[]}))
+            delivered=subprocess.run([NODE,str(RUNTIME/'deliver-deck.mjs'),str(spec),str(out),'--skip-build','--review',str(review)],capture_output=True,text=True)
+            self.assertEqual(delivered.returncode,2,delivered.stderr)
+            self.assertFalse((out/'coverage-DELIVERED.pptx').exists())
+            self.assertIn('MISSING_EVIDENCE',[x['code'] for x in json.loads(delivered.stdout)['blockers']])
+            invalid=subprocess.run(command[:-2]+['--python'],capture_output=True,text=True)
+            self.assertEqual(invalid.returncode,1)
+            self.assertIn('--python requires an executable',invalid.stderr)
 
 
 if __name__ == "__main__":

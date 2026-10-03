@@ -24,7 +24,7 @@ sys.path.insert(0, str(SKILL / "runtime" / "gates"))
 import page_gates  # noqa: E402
 
 
-class PageShapeTests(unittest.TestCase):
+class PageShapeRepertoireTests(unittest.TestCase):
     def test_a_page_composed_alone_keeps_its_established_shape(self):
         # Scoring must not change what a single page does: with no history the
         # order is best fit, then the declared order, and exhibit-left is first.
@@ -192,19 +192,13 @@ console.log(JSON.stringify({gaps: items.slice(1).map((n,i)=>Math.round(n.frame.y
             self.assertLessEqual(gap, 80, f"the messages are adrift: {result['gaps']}")
 
 
-class GateVocabularyTests(unittest.TestCase):
+class PageArchitectureTests(unittest.TestCase):
     def test_calendar_and_network_evidence_remain_in_architecture_mix(self):
         for component in ("gantt", "relationship-network"):
             diagram = {"component": component, "frame": {"x": 60, "y": 140, "width": 550, "height": 400}}
             self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram]}), component)
             chart = {"component": "chart.bar", "frame": {"x": 650, "y": 140, "width": 550, "height": 400}}
             self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram, chart]}), "paired-evidence")
-
-    def test_the_new_deck_gates_are_registered_and_documented(self):
-        index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
-        for code in ("PAGE_SHAPE_FLAT", "COLUMN_MONOTONY", "NO_CONTENTS", "NO_SUMMARY"):
-            self.assertIn(code, page_gates.GATE_CODES, code)
-            self.assertIn(f"`{code}`", index, f"{code} is not in the evaluation table")
 
     def test_chart_plus_process_counts_as_composite_evidence(self):
         chart = {"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 1160, "height": 220}}

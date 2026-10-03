@@ -288,19 +288,5 @@ class ContradictedShareTests(unittest.TestCase):
         self.assertEqual(run(page_gates.gate_contradicted_share, 1, mixed), [])
 
 
-class FalsifiabilityTests(unittest.TestCase):
-    """A content gate that fires on good work is one that gets switched off."""
-
-    CONTENT_CODES = {"RESTATEMENT", "PLANNING_VOICE", "CAVEAT_HEAVY", "TWIN_CELLS",
-                     "TABLE_SCHEMA_FLAT", "CONTRADICTED_SHARE"}
-
-
-    def test_every_content_code_is_registered_and_documented(self):
-        for code in self.CONTENT_CODES:
-            with self.subTest(code=code):
-                self.assertIn(code, page_gates.GATE_CODES)
-                self.assertTrue(page_gates.GATE_CODES[code].strip())
-
-
 if __name__ == "__main__":
     unittest.main()

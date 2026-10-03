@@ -172,9 +172,58 @@ console.log(JSON.stringify({ codes: auditExportText(content, scene, ['Breakeven 
         import shutil
         if not shutil.which("pdftotext"):
             self.skipTest("poppler is not installed")
-        source = (Path(ROOT) / "skills/professional-slides/runtime/emit/render_pptx.py").read_text(encoding="utf-8")
-        self.assertIn('["pdftotext", "-raw"', source)
+        import importlib.util
+        if importlib.util.find_spec("pypdf") is None:
+            self.skipTest("needs pypdf (python3 -m pip install -r requirements.txt)")
+        import sys
+        sys.path.insert(0, str(Path(ROOT) / "skills/professional-slides/runtime/emit"))
+        import render_pptx
+        # A page drawn as PowerPoint draws it: a bar's value and the next bar's
+        # label as two text objects, and a label broken at a hyphen.
+        content = (b"BT /F1 12 Tf 72 700 Td (235777) Tj ET BT /F1 12 Tf 130 700 Td (-9) Tj ET "
+                   b"BT /F1 12 Tf 72 660 Td (like-for-) Tj ET BT /F1 12 Tf 72 646 Td (like) Tj ET")
+        objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+                   b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+                   b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+                   b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+        pdf, offsets = b"%PDF-1.4\n", []
+        for number, body in enumerate(objects, 1):
+            offsets.append(len(pdf))
+            pdf += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+        xref = len(pdf)
+        pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1) + b"".join(b"%010d 00000 n \n" % at for at in offsets)
+        pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "page.pdf"
+            path.write_bytes(pdf)
+            pages = render_pptx.page_texts(path)
+        self.assertEqual(len(pages), 1)
+        self.assertRegex(pages[0], r"235777\s+-9", "the value and the next label are read as two words")
+        self.assertRegex(pages[0], r"like-for-\s*\n\s*like", "the line-end hyphen is kept as drawn")
 
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class BlockLengthTests(unittest.TestCase):
+    def test_the_summary_ceiling_and_the_block_a_reader_meets(self):
+        """Fifty-page review: an executive summary half as long again as a dense one; the ceiling is the text page's upper quartile."""
+        result = run_node('''
+import { wordBudgetOf } from './skills/professional-slides/runtime/derive-content.mjs';
+import { checkTextPlan } from './skills/professional-slides/runtime/text-contract.mjs';
+const w = (n) => Array.from({ length: n }, () => 'word').join(' ');
+const page = (textPlan) => ({ pages: [{ id: 'p1', n: 1, textReference: { task: 'chart-with-commentary' }, textPlan }] });
+const long = (plan) => checkTextPlan(page(plan), { required: true }).findings.some((f) => f.code === 'TEXT_BLOCK_TOO_LONG');
+console.log(JSON.stringify({
+  summary: wordBudgetOf('text-page', { role: 'executive-summary' }).ceiling, text: wordBudgetOf('text-page', {}).ceiling,
+  leadAndItem: long([{ id: 'x:points:lead:0', role: 'body', text: w(40) }, { id: 'x:points:item:0', role: 'body', text: w(131) }, { id: 'x:points:item:1', role: 'body', text: w(30) }]),
+  twoPoints: long([{ id: 'x:points:item:0', role: 'body', text: w(100) }, { id: 'x:points:item:1', role: 'body', text: w(100) }]),
+  card: long([{ id: 'x:card-text:0', role: 'exhibit', text: w(160) }]),
+}));
+''')
+        self.assertEqual(result["summary"], 204)  # the text page's upper quartile
+        self.assertEqual(result["text"], 329)  # other text pages keep the fence
+        self.assertTrue(result["leadAndItem"])
+        self.assertFalse(result["twoPoints"])
+        self.assertTrue(result["card"])

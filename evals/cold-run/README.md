@@ -85,7 +85,7 @@ The older `*.json` specimens beside them are records of numbers from runs whose
 inputs were not kept (the first Marvel plan was 118KB and was not stored). They
 are kept for what they say, and `foundByLooking` in each is a claim the suite
 keeps: every entry of `2026-09-18-network-rollout.json` has a test in
-`evals/tests/test_cold_run_defects.py`. `evals/quality/defects.json` labels all
+the composition and table tests (`evals/tests/test_compose_text.py`, `test_compose_layouts.py`, `test_compose_tables.py`, `test_tables.py`, `test_chart_annotations.py`). `evals/quality/defects.json` labels all
 of these findings with the gate that should catch them, and
 `evals/quality/gate-validity.mjs` measures how many the gates do.
 

@@ -1,5 +1,15 @@
+"""Tables as drawn (runtime/tables.mjs): typed cells, rating discs, the implication
+rule, header bands, logos, legends and trend marks, read off the rendered nodes.
+
+How the composer chooses a table's treatment from its content is
+test_compose_tables.py; what a typed page refuses about a table is
+test_page_type_refusals.py.
+"""
 import unittest
+
 from node_probe import run_node
+
+RUNTIME = "./skills/professional-slides/runtime"
 
 
 class TypedTableTests(unittest.TestCase):
@@ -315,3 +325,189 @@ assert.throws(()=>formatValue(10,{valueFormat:{grouping:'yes'}}),/must be boolea
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class RatingDiscTests(unittest.TestCase):
+    def test_the_disc_is_the_size_the_table_measured_for_it(self):
+        """First cold run: a dense table reserved the small rating disc and drew the medium one on top of its word."""
+        # A dense table reserves the small marker; the cell drew the medium one,
+        # so on the twelve-row scorecard the disc sat on top of its own word.
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const words=['Full','Strong','Partial','Weak','Full','Strong','Partial','Weak','Full','Strong','Partial','Weak'];
+const ex=styleTable({columns:['Market',{label:'Data readiness'},'Cost to serve'],
+  rows:words.map((w,i)=>[`Market ${i+1}`,w,String(20+i)])});
+const nodes=REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width:820,height:400},
+  props:{density:'dense',columns:ex.columns,rows:ex.rows,scales:ex.scales}}).nodes;
+const discs=nodes.filter(n=>n.type==='ellipse');
+assert.ok(discs.length>=12,'a disc per rated row');
+const labels=nodes.filter(n=>n.type==='text'&&words.includes(n.text));
+assert.ok(labels.length>=12,'every rated cell prints its anchor word, not "3/4"');
+for(const label of labels){
+  const beside=discs.filter(d=>Math.abs((d.frame.y+d.frame.height/2)-(label.frame.y+label.frame.height/2))<6);
+  assert.ok(beside.length,'each word has its disc on the same line');
+  for(const disc of beside) assert.ok(disc.frame.x+disc.frame.width<=label.frame.x+0.5,
+    'and the disc ends before the word begins');
+}
+console.log('{}');
+''')
+
+
+class ImplicationRuleTests(unittest.TestCase):
+    def test_the_rule_spans_the_evidence_and_stops_above_a_total(self):
+        """First cold run: the gutter's hairline crossed the dark total band and its disc came to rest a row low."""
+        # Drawn to the foot of the table the hairline crossed the dark total
+        # band, and the disc came to rest one row low.
+        run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const columns=['Wave',{label:'',type:'implication',width:{px:52},divider:true},'Decision'];
+const blank={type:'implication',relation:'implies',draw:false};
+const body=Array.from({length:6},(_,i)=>[`Wave ${i+1}`,blank,'Approve today']);
+const render=rows=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width:900,height:400},props:{columns,rows}}).nodes
+  .filter(n=>n.role==='table-implication');
+const dashed=nodes=>nodes.filter(n=>n.type==='line'&&n.style.dash==='dash');
+const span=rules=>[Math.min(...rules.map(r=>r.frame.y)),Math.max(...rules.map(r=>r.frame.y+r.frame.height))];
+// With no row emphasised there is nothing for the disc to be about: centred,
+// it came to rest between two rows it was not about, and a reader meeting it
+// on a quarter of the deck reads it as furniture. The dashed rule carries the
+// boundary on its own.
+const plain=render(body), rules=dashed(plain);
+assert.equal(plain.filter(n=>n.type==='ellipse').length,1,'explicit table inference has one centred disc');
+assert.equal(rules.length,2,'the rule runs above and below the disc');
+const [top,foot]=span(rules);
+// Emphasise a row and the disc sits on it, with the rule broken around it.
+const marked=[...body]; marked[1]={cells:body[1],style:'accented'};
+const withMark=render(marked), disc=withMark.find(n=>n.type==='ellipse');
+assert.equal(withMark.filter(n=>n.type==='ellipse').length,1,'one disc, on the marked row');
+assert.equal(dashed(withMark).length,2,'the rule runs above and below it');
+const centre=disc.frame.y+disc.frame.height/2;
+assert.ok(Math.abs(centre-(top+foot)/2)<0.01,'row emphasis does not move the table-wide disc');
+// Add a total and the span shortens: a total is the same rows added up.
+const withTotal=render([...body,{cells:['Total',blank,'26'],style:'total'}]);
+const [,footWithTotal]=span(dashed(withTotal));
+assert.ok(Math.abs(footWithTotal-foot)<1,'the total row is outside the rule');
+console.log('{}');
+''')
+
+
+class HeaderBandTests(unittest.TestCase):
+    def test_shared_header_band_does_not_create_headerless_or_chevron_rules(self):
+        """Fifty-page read: a shared header band gave a headerless or chevron table a rule under nothing."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const table=REGISTRY.get('table'),frame={x:0,y:0,width:600,height:400};
+const blank={columns:['',''],rows:[['One','Two']]};
+assert.equal(table.measureHeader({frame,props:blank}),null);
+assert.equal(table.measureContent({frame,props:{...blank,headerBandHeight:120}}).headerHeight,0);
+const chevron={columns:['First','Then'],rows:[['Read','Decide']],headerShape:'chevron',treatment:'standard'};
+assert.equal(table.measureHeader({frame,props:chevron}),null);
+const natural=table.measureContent({frame,props:chevron});
+assert.equal(table.measureContent({frame,props:{...chevron,headerBandHeight:120}}).headerHeight,natural.headerHeight);
+assert.ok(!table.render({id:'c',frame,props:chevron}).nodes.some(n=>n.id.includes(':header-rule:')));
+console.log('{}');
+''')
+
+
+class CellAlignmentTests(unittest.TestCase):
+    def test_a_row_led_by_a_filled_label_centres_its_values(self):
+        """Fifty-page audit: one-line values hung from the top beside a centred label block."""
+        result = run_node(f"""
+import {{ REGISTRY }} from '{RUNTIME}/registry.mjs';
+const props = {{ treatment: 'categories', columns: [{{ label: 'Route', type: 'category' }}, 'Evidence', 'Limit'],
+  rows: [['Consumer', 'One line', 'A limit that runs long enough to wrap onto a second and a third line in its narrow column'], ['Business', 'One line', 'Short']],
+  columnWidths: [0.25, 0.5, 0.25] }};
+const nodes = REGISTRY.get('table').render({{ id: 't', frame: {{ x: 0, y: 0, width: 800, height: 400 }}, props }}).nodes;
+const cells = nodes.filter((n) => n.role === 'table-cell-text' && n.data.row === 0);
+const band = nodes.find((n) => n.role === 'table-cell' && n.data.row === 0 && n.data.column === 0);
+const oneLine = cells.find((n) => n.data.column === 1);
+console.log(JSON.stringify({{ centre: oneLine.frame.y + oneLine.frame.height / 2, band: band.frame.y + band.frame.height / 2 }}));
+""")
+        self.assertAlmostEqual(result["centre"], result["band"], delta=3)
+
+
+class TableLogoTests(unittest.TestCase):
+    def test_logos_share_an_area_and_fractional_widths_are_shares(self):
+        """Emirates deck: table logos were held to one body line, so square marks became specks."""
+        result = run_node("""
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
+const base=TABLE_VARIANTS['category-logo-comparison'].props;
+const frame={x:60,y:60,width:1160,height:580};
+// The composer weights text columns by measured width (84-444); the author's
+// logo column says 0.3 - a share of the table, not a weight of 0.3 among them.
+const props={...base,columns:base.columns.map((c,i)=>({...c,width:i===1?0.3:[120,0,300][i]}))};
+const nodes=renderTable({id:'t',frame,props}).nodes;
+const logos=nodes.filter(n=>n.role==='table-logo').map(n=>({frame:n.frame,cellHeight:n.data.cellHeight,aspect:n.data.width/n.data.height}));
+const cells=nodes.filter(n=>n.data?.column===1&&n.role==='table-rule').map(n=>n.frame.width);
+let narrow=null;
+try { renderTable({id:'n',frame,props:{...base,columns:base.columns.map((c,i)=>i===1?{...c,label:'ID'}:c),columnWidths:[.4,.05,.55]}}); } catch (error) { narrow=error.message; }
+console.log(JSON.stringify({logos,cells,narrow}));
+""")
+        logos = result['logos']
+        self.assertEqual(len(logos), 2)
+        areas = [l['frame']['width'] * l['frame']['height'] for l in logos]
+        # Two lines of cell, not one: the tallest mark stands at least 30px.
+        self.assertGreaterEqual(min(l['cellHeight'] for l in logos), 40)
+        self.assertGreaterEqual(max(l['frame']['height'] for l in logos), 30)
+        self.assertLess(abs(areas[0] - areas[1]) / max(areas), 0.1)
+        for logo in logos:
+            self.assertAlmostEqual(logo['frame']['width'] / logo['frame']['height'], logo['aspect'], places=3)
+        # 0.3 of a 1160px table, not a one-pixel column.
+        self.assertTrue(result['cells'])
+        self.assertAlmostEqual(result['cells'][0], 0.3 * 1160, delta=16)
+        self.assertRegex(result['narrow'], r'Logo column is too narrow')
+
+
+class TableLegendTests(unittest.TestCase):
+    def test_typed_comparison_and_wrapping_body_sized_legends(self):
+        """Review regression: a typed cell printed "[object Object]" and a wrapping bar legend lost its body size."""
+        run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {renderTable,measureTable} from './skills/professional-slides/runtime/tables.mjs';
+const frame={x:0,y:0,width:400,height:1600};
+const nodes=REGISTRY.get('comparison-table').render({id:'c',frame,props:{columns:['Metric','Value'],rows:[{cells:['Growth',{type:'number',value:8}]}],selectedColumn:1}}).nodes;
+assert.ok(nodes.some(n=>n.text==='8'));assert.ok(!nodes.some(n=>n.text==='[object Object]'));
+const props={density:'body',columns:[{label:'Metric',type:'bars',scale:'s'}],rows:[[{values:[1,2,3]}]],scales:{s:{type:'bars',label:'Revenue',unit:'USD',min:0,max:4,series:['Enterprise revenue','Consumer revenue','Other revenue']}}};
+const m=measureTable({frame,props});assert.ok(m.legends[0].entries.at(-1).y>0);
+const result=renderTable({id:'t',frame,props});
+assert.ok(result.nodes.filter(n=>n.role==='table-legend').every(n=>n.style.fontSize.tokenId==='type.body'));
+console.log(JSON.stringify({accepted:true}));
+""")
+
+
+class PolarityTests(unittest.TestCase):
+    """A delta and a trend arrow are coloured by merit, not by sign."""
+
+    def test_a_rising_cost_is_the_bad_state(self):
+        """Rebuilt fifty-page deck: a rising cost was coloured as good news."""
+        result = run_node('''
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const metric = (props) => REGISTRY.get('metric').render({ id: 'm', frame: { x: 0, y: 0, width: 300, height: 160 }, props }).nodes.find((n) => n.role === 'metric-delta').style.color.tokenId;
+const table = REGISTRY.get('table').render({ id: 't', frame: { x: 0, y: 0, width: 700, height: 300 }, props: {
+  columns: ['Measure', { label: 'Trend', type: 'trend' }, { label: 'Queue', type: 'trend', better: 'down' }],
+  rows: [['Revenue', { type: 'trend', value: 'up' }, { type: 'trend', value: 'up' }],
+         { better: 'down', cells: ['Unit cost', { type: 'trend', value: 'up' }, { type: 'trend', value: 'down' }] },
+         ['Churn', { type: 'trend', value: 'down', better: 'down' }, { type: 'trend', value: 'flat' }]] } }).nodes;
+const rings = table.filter((n) => n.role === 'table-trend').map((n) => n.style.stroke.tokenId);
+let refused = null;
+try { metric({ value: '4.1%', label: 'Churn', delta: '+0.3 pts', better: 'lower' }); } catch (e) { refused = e.message; }
+console.log(JSON.stringify({
+  revenueUp: metric({ value: '$4.1B', label: 'Revenue', delta: '+8%' }),
+  costUp: metric({ value: '$1.2B', label: 'Cost to serve', delta: '+8%', better: 'down' }),
+  costDown: metric({ value: '$1.0B', label: 'Cost to serve', delta: '-6%', better: 'down' }),
+  rings, refused }));
+''')
+        self.assertEqual(result['revenueUp'], 'color.positive')
+        self.assertEqual(result['costUp'], 'color.negative')
+        self.assertEqual(result['costDown'], 'color.positive')
+        # Row by row: revenue up (good), a queue up (bad: the column says down);
+        # a cost row rising (bad) and its queue falling (good); churn falling (good), flat (grey).
+        self.assertEqual(result['rings'], ['color.positive', 'color.negative', 'color.negative', 'color.positive', 'color.positive', 'color.textSecondary'])
+        self.assertIn('"up" or "down"', result['refused'])

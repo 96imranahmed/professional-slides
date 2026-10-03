@@ -101,23 +101,6 @@ console.log(JSON.stringify(await measure()));
             self.assertEqual(gates[code]["caught"], gates[code]["labelled"], code)
         self.assertNotIn("number-cards", result["ungated"])
 
-    @requires_chromium
-    def test_the_overlap_audit_is_measured_when_chromium_is_there(self):
-        result = run_node('''
-import {overlapFindings} from './evals/quality/gate-validity.mjs';
-import {loadSpecimen} from './evals/cold-run/specimens.mjs';
-const findings=await overlapFindings(loadSpecimen('anthropic-vs-openai-2026').scene);
-console.log(JSON.stringify(findings.map(f=>[f.code,f.slide])));
-''')
-        self.assertTrue(result)
-        self.assertEqual({code for code, _ in result}, {"RENDERED_OVERLAP"})
-        self.assertTrue(all(1 <= slide <= 50 for _, slide in result))
-        # The collisions on this build are labelled with the scene checks that
-        # read them without a browser (validate-overlap sceneCollisions).
-        labelled = {d["pages"][0]: d["expectedGate"] for d in DEFECTS if d["class"] == "collision"
-                    and d["specimen"] == "anthropic-vs-openai-2026" and d.get("revision") != "earlier"}
-        self.assertEqual(labelled, {22: "TEXT_ON_LINE", 26: "DESCENDER_ON_RULE", 44: "DESCENDER_ON_RULE", 48: "TEXT_ON_LINE"})
-
     def test_recall_and_precision_arithmetic(self):
         result = run_node('''
 import {validity,pageResolver} from './evals/quality/gate-validity.mjs';
@@ -142,6 +125,27 @@ console.log(JSON.stringify({gates:r.gates,ungated:r.ungated,notReplayed:r.notRep
         self.assertEqual(result["ids"], [1, 3])
         self.assertEqual(result["planN"], [3])
         self.assertEqual(result["slide"], [3])
+
+
+class OverlapReplayTests(unittest.TestCase):
+    """The rendered overlap audit, apart from the scene replay: it launches a browser."""
+
+    @requires_chromium
+    def test_the_overlap_audit_is_measured_when_chromium_is_there(self):
+        result = run_node('''
+import {overlapFindings} from './evals/quality/gate-validity.mjs';
+import {loadSpecimen} from './evals/cold-run/specimens.mjs';
+const findings=await overlapFindings(loadSpecimen('anthropic-vs-openai-2026').scene);
+console.log(JSON.stringify(findings.map(f=>[f.code,f.slide])));
+''')
+        self.assertTrue(result)
+        self.assertEqual({code for code, _ in result}, {"RENDERED_OVERLAP"})
+        self.assertTrue(all(1 <= slide <= 50 for _, slide in result))
+        # The collisions on this build are labelled with the scene checks that
+        # read them without a browser (validate-overlap sceneCollisions).
+        labelled = {d["pages"][0]: d["expectedGate"] for d in DEFECTS if d["class"] == "collision"
+                    and d["specimen"] == "anthropic-vs-openai-2026" and d.get("revision") != "earlier"}
+        self.assertEqual(labelled, {22: "TEXT_ON_LINE", 26: "DESCENDER_ON_RULE", 44: "DESCENDER_ON_RULE", 48: "TEXT_ON_LINE"})
 
 
 if __name__ == "__main__":

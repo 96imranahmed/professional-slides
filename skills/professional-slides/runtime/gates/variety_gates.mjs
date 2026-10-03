@@ -49,7 +49,7 @@ export const VARIETY_CODES = Object.freeze({
   // Advisory, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   MAP_COARSE: "a regional map drawn on the built-in 1:110m coastline, which is coarse at that scale",
   // Found by a whole-deck review and refused where the page is written
-  // (page-types.mjs reviewedDefect, compose.mjs totalRow); the author sees
+  // (page-types.mjs reviewedDefect, compose-tables.mjs totalRow); the author sees
   // them as COMPILE or PAGE_DOES_NOT_COMPOSE findings carrying these codes.
   TOTAL_ROW_BLANK: "a table row labelled as a total with no value in any of its result cells",
   TABLE_TOO_SHORT: "a table of fewer than three body rows, where two or three figures are a numbers page",

@@ -3,6 +3,20 @@ weights from content, and two tables on one page only when they read as one."""
 import unittest
 from node_probe import run_node
 
+AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
+
+PAGE = """
+const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+"""
+
+PLANNED = '''
+import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
+'''
+
 
 class ComposeTableTests(unittest.TestCase):
     def test_bar_focus_survives_composition_without_changing_scale_or_peer_marks(self):
@@ -658,3 +672,132 @@ console.log(JSON.stringify({ logos: logos.length, icons: marked.filter((n) => n.
         self.assertEqual(result["icons"], 0, "the mark replaces the icon")
         self.assertLess(result["ratio"], 1.3, "two marks of different shapes read at one weight")
         self.assertGreaterEqual(result["pendingIcons"], 1, "a mark with no file keeps the icon")
+
+
+class RatingColumnTests(unittest.TestCase):
+    """"Open" is not zero, and a column that says so is still a rating."""
+
+    def test_a_rating_column_survives_a_minority_of_honest_unknowns(self):
+        """First cold run: two honest "Open" cells in twelve kept a rating column plain text, so the ten rated rows lost their scale."""
+        # The brief asked for exactly this: ten markets rated on a four-point
+        # scale and two with no local data, which had to "stay visible as open
+        # rather than being scored as zero". Every cell had to be a scale word,
+        # so the column stayed plain text and the ten that were rated lost their
+        # scale - the deck's densest table drew no treatment at all.
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
+const markets=['Netherlands','Ireland','Sweden','Poland','Germany','France','Spain','Italy','Portugal','Czechia','Romania','Greece'];
+const ratings=['Full','Full','Full','Strong','Strong','Partial','Strong','Partial','Partial','Weak','Open','Open'];
+const ex={columns:['Market',{label:'Data readiness',unit:'four-point assessment'},'Cost to serve'],
+  rows:markets.map((m,i)=>[m,ratings[i],String(20+i)])};
+const out=styleTable(ex);
+const cells=out.rows.map(r=>r[1]);
+assert.equal(cells.filter(c=>c&&c.type==='harvey').length,10);
+// The two unknowns keep the word the author wrote, beside the discs.
+assert.deepEqual(cells.slice(10).map(c=>c.text),['Open','Open']);
+assert.equal(out.rows[0][1].value,4); assert.equal(out.rows[9][1].value,1);
+assert.equal(out.scales.readiness.anchors['4'],'Full','the disc prints its anchor word, not "4/4"');
+console.log('{}');
+''')
+
+    def test_a_column_of_mostly_unknowns_is_not_a_rating(self):
+        """First cold run: only known anchors become marks; a column mostly unknown stays words."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
+const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
+const rows=[['A','Full','1'],['B','Open','2'],['C','Open','3'],['D','N/A','4'],['E','Strong','5'],['F','TBD','6']];
+const out=styleTable({columns:['Market',{label:'Data readiness'},'Cost'],rows});
+assert.equal(out.rows.filter(r=>r[1].type==='harvey').length,2,'only known authored anchors become marks');
+console.log('{}');
+''')
+
+
+class ImplicationGutterTests(unittest.TestCase):
+    """At five rows or more the gutter is one device, not a mark on a row."""
+
+    def test_a_long_table_draws_the_gutter_once_down_its_own_column(self):
+        """First cold run: a single chevron on the France row of a twelve-market scorecard read as a verdict on France."""
+        # On the twelve-market scorecard the single chevron landed on the
+        # France row and read as a verdict on France.
+        run_node('''
+import assert from 'node:assert/strict';
+import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+// Prizes that do not add up: a closing row equal to the sum of the rows above
+// is a total, which an implication gutter no longer stops the composer reading.
+const rows=Array.from({length:12},(_,i)=>[`Market ${i+1}`,`${10+i}`,`Wave ${i%3+1}`]);
+const long=styleTable({columns:['Market','Prize',{label:'Decision',implication:true}],rows});
+const at=long.columns.findIndex(c=>c.type==='implication');
+assert.equal(long.columns[at].divider,true);
+assert.ok(long.rows.every(r=>r[at].draw===false),'no row carries its own chevron');
+// Four rows or fewer, the eye follows each line across and every row keeps one.
+const short=styleTable({columns:['Market','Prize',{label:'Decision',implication:true}],rows:rows.slice(0,4)});
+const shortAt=short.columns.findIndex(c=>c.type==='implication');
+assert.equal(short.columns[shortAt].divider,undefined);
+assert.ok(short.rows.every(r=>r[shortAt].draw===undefined));
+console.log('{}');
+''')
+
+
+class TableSplitTests(unittest.TestCase):
+    def test_styled_table_rows_participate_in_weight(self):
+        """PR #4 review: styled total rows were left out of the weight that decides when tables split."""
+        result=run_node('''
+import assert from 'node:assert/strict';
+import {splitTables} from './skills/professional-slides/runtime/compose.mjs';
+const table={type:'table',treatment:'standard',columns:['Item','Value'],rows:[{style:'total',cells:['Total','10']}]};
+assert.equal(splitTables({title:'Totals',exhibits:[table,table]}).length,1);
+const heavy={...table,rows:[{style:'total',cells:['A'.repeat(70),'10']}]};
+assert.equal(splitTables({title:'Totals',exhibits:[table,heavy]}).length,2);
+console.log(JSON.stringify({accepted:true}));
+''')
+        self.assertTrue(result['accepted'])
+
+
+class MeasureTableTests(unittest.TestCase):
+    def test_a_measure_table_of_text_composes_without_a_total_row(self):
+        """Fifty-page review: the measure-table preset asked every table for a total, and four came out blank."""
+        # The four blank total rows came from the measure-table preset, which
+        # asked every table for a total; composed, a text table now has none.
+        result = run_node(f'''
+import {{ compileDeck }} from '{AUTHOR}';
+import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.mjs';
+{PAGE}
+const measure = (id, columns, rows) => ({{ id, type: 'lookup', form: 'measure-table', commentary: 'none', ...base, title: 'Controls and volumes differ between the two platforms', exhibit: {{ columns, rows }} }});
+const pages = [measure('t1', [{{ label: 'Control', type: 'category' }}, 'OpenAI', 'Anthropic'], [['Residency', 'US only', 'Varies by route'], ['Retention', 'Not eligible', 'Eligible routes'], ['Partners', 'AWS, Azure', 'AWS, Google, Azure']]),
+  measure('t2', [{{ label: 'Line', type: 'category' }}, 'Journeys (m)', 'Train-km (m)'], [['Eastern', '14.2', '3.1'], ['Dales', '9.8', '2.2'], ['Valley', '8.1', '1.9']])];
+const {{ deck }} = composeAll(compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages }}).spec, '.');
+const cells = (id) => deck.slides.find((s) => s.id === id).nodes.filter((n) => n.role === 'table-cell-text').map((n) => n.text);
+console.log(JSON.stringify({{ text: cells('t1').includes('Total'), counts: cells('t2').slice(-3) }}));
+''')
+        self.assertFalse(result["text"])
+        self.assertEqual(result["counts"], ["Total", "32.1", "7.2"])
+
+
+class RowTableTests(unittest.TestCase):
+    def test_row_tables_on_one_page_share_a_treatment(self):
+        """Rebuilt fifty-page deck: one page's row tables mixed in-cell bars with plain figures and stepped their type apart."""
+        result = run_node(PLANNED.format() + '''
+const block = (label, head, rows) => ({ label, points: ['A point that says what the row shows and why it matters here.', 'A second point with the qualification.'],
+  exhibit: { type: 'table', columns: [{ label: head, type: 'category' }, 'Count'], rows } });
+const deck = plan([{ id: 's', title: 'Three measures of the account base', layout: 'labelled-rows', blocks: [
+  block('Large accounts', 'Accounts above $1M', [['Two years earlier', '~12'], ['February 2026', '>500']]),
+  block('Enterprise breadth', 'Fortune 10', [['Customers', '8'], ['Not disclosed', '2']]),
+  block('Coding dollars', 'Claude Code', [['Revenue', '2,500'], ['Enterprise share', '50']]) ] }]);
+const sizes = (d) => [...new Set(d.slides[0].nodes.filter((n) => ['table-cell-text', 'table-header-text'].includes(n.role)).map((n) => n.style.fontSize.value))];
+// A unit line under one table's header costs it the height, and its type steps down: the page's tables step together.
+const units = plan([{ id: 't', title: 'Three measures of the account base', layout: 'labelled-rows', blocks: [
+  block('Large accounts', 'Accounts above $1M', [['Two years earlier', '~12'], ['February 2026', '>500']]),
+  { ...block('Enterprise breadth', 'Fortune 10', []), exhibit: { type: 'table', columns: [{ label: 'Fortune 10', type: 'category' }, { label: 'Companies', unit: 'of 10' }], rows: [['Claude customers', '8'], ['Not disclosed as customers', '2']] } },
+  block('Coding dollars', 'Claude Code', [['Annualized revenue', '>$2.5B'], ['Share from enterprises', '>50%']]) ] }]);
+console.log(JSON.stringify({ bars: deck.slides[0].nodes.filter((n) => n.role === 'table-bar').length, sizes: sizes(deck), unitSizes: sizes(units) }));
+''')
+        # Two tables of exact figures could take bars; the bounds in the first cannot, so none does.
+        self.assertEqual(result['bars'], 0)
+        # And one type size across the page's tables.
+        self.assertEqual(len(result['sizes']), 1)
+        self.assertEqual(len(result['unitSizes']), 1)

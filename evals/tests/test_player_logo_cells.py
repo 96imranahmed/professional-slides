@@ -9,6 +9,13 @@ import unittest
 from node_probe import run_node
 
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
+KIT = "./skills/professional-slides/runtime/page-types.mjs"
+
+PAGE = """
+const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+"""
 
 
 class PlayerLogoCellTests(unittest.TestCase):
@@ -54,3 +61,30 @@ console.log(JSON.stringify({{ cells, offline: await compose(false), fetched: awa
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PlayerColumnTests(unittest.TestCase):
+    def test_players_mark_their_columns_and_verdicts_and_colour_stays_for_states(self):
+        """Fifty-page audit: recognisable players were plain text in their own columns and verdicts."""
+        result = run_node(f"""
+import {{ compilePage, markPlayerCells }} from '{KIT}';
+{PAGE}
+const slide = {{ exhibit: {{ type: 'table', columns: [{{ label: 'Route', type: 'category' }}, 'Anthropic result', 'OpenAI result', 'Edge'],
+  rows: [['Reach', 'x', 'y', {{ type: 'rag', text: 'OpenAI leads', value: 'won' }}], ['Paid', 'x', 'y', 'Anthropic ahead'], ['Cash', 'x', 'y', 'Split']] }} }};
+markPlayerCells(slide, [{{ name: 'Anthropic' }}, {{ name: 'OpenAI' }}]);
+const table = (columns, cells) => ({{ ...base, id: 'p1', type: 'lookup', form: 'table', commentary: 'in-exhibit', title: 'The routes split between the two firms on reach and pay',
+  exhibit: {{ columns, rows: [['Reach', 'a', cells[0]], ['Paid', 'b', cells[1]], ['Cash', 'c', cells[2]]] }} }});
+console.log(JSON.stringify({{ columns: slide.exhibit.columns.map((c) => c.logo?.alt ?? null), edge: slide.exhibit.rows.map((r) => r[3]),
+  gutter: error(() => compilePage(table(['Route', 'Evidence', {{ label: 'Conversion known?', implication: true }}], ['yes', 'no', 'no']))),
+  inferred: error(() => compilePage(table(['Route', 'Evidence', {{ label: 'Implication', implication: true }}], ['Scale it', 'Hold', 'Test']))),
+  amber: error(() => compilePage(table(['Route', 'Evidence', {{ label: 'Status', type: 'rag' }}], [{{ type: 'rag', value: 'on-track', text: 'On track' }}, {{ type: 'rag', value: 'behind', text: 'Split' }}, {{ type: 'rag', value: 'at-risk', text: 'At risk' }}]))),
+}}));
+""")
+        self.assertEqual(result["columns"], [None, "Anthropic logo", "OpenAI logo", None])
+        self.assertEqual(result["edge"][0]["type"], "logo")
+        self.assertEqual(result["edge"][0]["text"], "OpenAI leads")
+        self.assertEqual(result["edge"][1]["player"], "Anthropic")
+        self.assertEqual(result["edge"][2], "Split")
+        self.assertIn("names another fact", result["gutter"])
+        self.assertNotIn("names another fact", result["inferred"] or "")
+        self.assertIn('value: "neutral"', result["amber"])

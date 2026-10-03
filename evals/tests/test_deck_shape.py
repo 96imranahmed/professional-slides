@@ -202,18 +202,40 @@ class OutsideLabelTests(unittest.TestCase):
         self.assertGreater(emit_pptx.LABEL_HEADROOM, 1.0)
         for largest in (0.37, 4.2, 58, 619, 902, 4119):
             self.assertGreaterEqual(emit_pptx.headroom_stop(largest), largest * emit_pptx.LABEL_HEADROOM)
-        source = (ROOT / "skills" / "professional-slides" / "runtime" / "emit" / "emit_pptx.py").read_text()
-        inside = [line for line in source.splitlines() if "INSIDE_END" in line]
-        # Only a floating range band keeps an inside label: it has no outside.
-        self.assertEqual(len(inside), 1)
-        self.assertIn("lab.position = XL_LABEL_POSITION.INSIDE_END", inside[0])
+        # Read off the saved charts: no bar, column, stack, line or area label
+        # sits inside its mark's end. Only a floating range band keeps an
+        # inside label: it has no outside.
+        import re
+        import tempfile
+        from pptx import Presentation
+        frame = {"x": 60, "y": 160, "width": 1000, "height": 460}
+        two = [{"name": "A", "values": [3, 5]}, {"name": "B", "values": [2, 4]}]
+        specs = {kind: {"type": kind, "frame": frame, "categories": ["X", "Y"], "series": two if kind.startswith("stacked") else two[:1], "dataLabels": True}
+                 for kind in ("column", "bar", "stacked-column", "stacked-bar", "line", "area")}
+        specs["range"] = {"type": "range", "frame": frame, "categories": ["X", "Y"], "dataLabels": True,
+                          "series": [{"name": "Low", "values": [1, 2]}, {"name": "Range", "values": [3, 3]}], "low": [1, 2], "high": [4, 5]}
+        colours = {f"color.chartSeries{i}": {"kind": "color", "value": value} for i, value in enumerate(["#06202E", "#2F6F8F", "#86BC25"], 1)}
+        scene = {"typography": {"body": "Arial", "display": "Arial"}, "tokens": colours, "slides": [
+            {"id": kind, "tokens": {}, "componentInstances": [{"instanceId": kind, "component": "chart", "frame": frame, "nativeChart": spec}],
+             # The chart is painted where the scene drew its marks.
+             "nodes": [{"id": f"{kind}-plot", "type": "rect", "role": "chart-mark", "frame": frame, "data": {"componentInstance": kind}, "style": {"fill": "#000000"}}]}
+            for kind, spec in specs.items()]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "labels.pptx"
+            emit_pptx.Emitter(scene).run(path)
+            charts = [next(shape.chart for shape in slide.shapes if shape.has_chart) for slide in Presentation(path).slides]
+        positions = {kind: set(re.findall(r'<c:dLblPos val="(\w+)"/>', chart._chartSpace.xml)) for kind, chart in zip(specs, charts)}
+        self.assertEqual(positions["column"], {"outEnd"})  # labelled, and past the end of the bar
+        for kind, found in positions.items():
+            with self.subTest(kind=kind):
+                (self.assertIn if kind == "range" else self.assertNotIn)("inEnd", found)
 
 
 if __name__ == "__main__":
     unittest.main()
 
 
-class WeightContractTests(unittest.TestCase):
+class DensityFloorGateTests(unittest.TestCase):
     """The density floors a deck (or its template) sets, and the gates that read
     them. Density is not the defect the gates exist for; empty is."""
 

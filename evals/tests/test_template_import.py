@@ -13,6 +13,18 @@ from node_probe import ROOT, RUNTIME, NODE, run_node, requires_python_package
 
 SKILL = ROOT / "skills" / "professional-slides"
 
+# python-pptx is optional at test time (see requirements.txt); the importer
+# imports it itself, so it is loaded only when present and its class skips otherwise.
+try:
+    import importlib.util
+    from pptx import Presentation
+    from pptx.util import Inches
+    _spec = importlib.util.spec_from_file_location('template_importer', RUNTIME / 'import-template.py')
+    importer = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(importer)
+except ImportError:  # pragma: no cover - exercised only without python-pptx
+    Presentation = Inches = importer = None
+
 
 @requires_python_package('pptx')
 class TemplateImportTests(unittest.TestCase):
@@ -94,6 +106,62 @@ configureChrome(null);assert.equal(CHROME.left,60);assert.equal(CHROME.sourceTop
 console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])
+
+
+class HouseFooterTests(unittest.TestCase):
+    def cli(self, *args):
+        return subprocess.run([NODE, *map(str, args)], capture_output=True, text=True,
+                              env={**os.environ, 'RUNTIME_PYTHON': sys.executable}, cwd=ROOT, timeout=120)
+
+    def test_empty_footer_overrides_house_and_raw_planner_compilation_still_works(self):
+        """PR #4 follow-up: an empty footer could not override the house's, and raw planner specs stopped compiling."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            house = root / 'house.json'
+            house.write_text(json.dumps({'schema': 'professional-slides.house/v1', 'footer': 'House name'}))
+            run_node(f'''
+import assert from 'node:assert/strict';
+import {{applyTemplate,toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+const spec={{schema:'professional-slides.deck/v3',template:'house.json',slides:[{{title:'Growth funds expansion',points:['Evidence supports the decision']}}]}};
+const base={json.dumps(str(root))};
+assert.equal(applyTemplate(spec,base).footer,'House name');
+assert.equal(applyTemplate({{...spec,footer:''}},base).footer,'');
+assert.equal(applyTemplate({{...spec,footer:'Custom'}},base).footer,'Custom');
+console.log(JSON.stringify({{ok:true}}));
+''')
+            plan = {'id': 'raw', 'slides': [{'id': 'one', 'title': 'Growth funds expansion', 'items': [{'id': 'body', 'component': 'paragraph', 'props': {'text': 'Evidence supports expansion.'}}]}]}
+            file = root / 'spec.json'; file.write_text(json.dumps(plan))
+            result = self.cli(ROOT / 'evals/scripts/compile_scene.mjs', file, root / 'scene.json')
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+
+@requires_python_package('pptx')
+class AspectRatioTests(unittest.TestCase):
+    def test_template_coordinates_match_across_aspect_ratios(self):
+        """PR #4 follow-up: a template's chrome was read in different coordinates at 4:3, 16:9 and 9:16."""
+        with tempfile.TemporaryDirectory() as tmp:
+            profiles = []
+            for width, height in [(10, 7.5), (16, 9), (9, 16)]:
+                prs = Presentation()
+                slide = prs.slides.add_slide(prs.slide_layouts[1])
+                slide.shapes.title.text = 'Growth funds expansion'
+                slide.placeholders[1].text = 'Evidence supports expansion across three regions.'
+                sx, sy = Inches(width) / prs.slide_width, Inches(height) / prs.slide_height
+                surfaces = [*prs.slide_masters, *prs.slide_layouts, *prs.slides]
+                # Snapshot inherited placeholder geometry before changing its
+                # master; otherwise later placeholders are scaled twice.
+                frames = [(shape, shape.left, shape.top, shape.width, shape.height)
+                          for surface in surfaces for shape in surface.shapes]
+                for shape, left, top, shape_width, shape_height in frames:
+                    shape.left = round(left * sx); shape.width = round(shape_width * sx)
+                    shape.top = round(top * sy); shape.height = round(shape_height * sy)
+                prs.slide_width, prs.slide_height = Inches(width), Inches(height)
+                file = Path(tmp) / f'{width}-{height}.pptx'; prs.save(file)
+                profiles.append(importer.analyse(file, 'midnight'))
+            for profile in profiles[1:]:
+                self.assertEqual(profile['chrome'], profiles[0]['chrome'])
+                self.assertEqual(profile['stats']['medianBodyCoverage'], profiles[0]['stats']['medianBodyCoverage'])
+            self.assertLess(profiles[0]['chrome']['footerTop'], 690)
 
 
 if __name__ == "__main__":

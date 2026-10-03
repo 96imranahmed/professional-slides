@@ -58,9 +58,9 @@ def build(spec: Path, out: Path):
     return result
 
 
-# A full build runs the emitter, so it needs python-pptx (requirements.txt).
-@requires_python_package('pptx')
-class StageWiringTests(unittest.TestCase):
+class StageFixture:
+    """A scratch copy of an example deck for a full build to run against."""
+
     def setUp(self):
         if not NODE:
             self.skipTest("Node.js is not available")
@@ -79,6 +79,11 @@ class StageWiringTests(unittest.TestCase):
             (work / f"{name}.plan.json").write_text(json.dumps(plan), encoding="utf-8")
         return work / f"{name}.deck.json"
 
+
+# A full build runs the emitter, so it needs python-pptx (requirements.txt).
+# Each class runs its own builds, so the parallel runner can share them out.
+@requires_python_package('pptx')
+class StageWiringTests(StageFixture, unittest.TestCase):
     def test_a_build_with_no_stage_files_says_the_stages_are_absent(self):
         """Allowed, and recorded. Silence is what let the gates go unrun."""
         spec = self.stage_spec("house-style")
@@ -89,18 +94,6 @@ class StageWiringTests(unittest.TestCase):
         self.assertEqual(stages["content"]["state"], "absent")
         self.assertEqual(stages["plan"]["state"], "absent")
         self.assertTrue(stages["content"]["expectedAt"].endswith("house-style.content.json"))
-
-    def test_a_content_plan_beside_the_spec_is_gated_and_reported(self):
-        spec = self.stage_spec("house-style", content=json.loads(
-            (EXAMPLES / "nyc-or-sf.content.json").read_text(encoding="utf-8")))
-        out = self.tmp / "out" / "output"
-        result = build(spec, out)
-        self.assertEqual(result.returncode, 0, result.stderr[-800:])
-        stages = json.loads((out / "build-result.json").read_text())["stages"]
-        self.assertEqual(stages["content"]["state"], "accepted")
-        report = json.loads((out / "content-gates.json").read_text())
-        self.assertTrue(report["accepted"])
-        self.assertEqual(report["statistics"]["kinds"]["qualitative"], 0)
 
     def test_a_content_plan_that_fails_stops_the_build(self):
         """Before a page is drawn, which is the whole reason for the stage."""
@@ -118,6 +111,21 @@ class StageWiringTests(unittest.TestCase):
         self.assertIn("CONTENT_NO_CLAIM", report["countsByCode"])
         # The deck is not built: the stage runs before anything is composed.
         self.assertFalse((out / "scene.json").exists())
+
+
+@requires_python_package('pptx')
+class StagePlanWiringTests(StageFixture, unittest.TestCase):
+    def test_a_content_plan_beside_the_spec_is_gated_and_reported(self):
+        spec = self.stage_spec("house-style", content=json.loads(
+            (EXAMPLES / "nyc-or-sf.content.json").read_text(encoding="utf-8")))
+        out = self.tmp / "out" / "output"
+        result = build(spec, out)
+        self.assertEqual(result.returncode, 0, result.stderr[-800:])
+        stages = json.loads((out / "build-result.json").read_text())["stages"]
+        self.assertEqual(stages["content"]["state"], "accepted")
+        report = json.loads((out / "content-gates.json").read_text())
+        self.assertTrue(report["accepted"])
+        self.assertEqual(report["statistics"]["kinds"]["qualitative"], 0)
 
     def test_a_plan_beside_the_spec_is_gated_too(self):
         bad = {"schema": "professional-slides.plan/v1", "id": "x",

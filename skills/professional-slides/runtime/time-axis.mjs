@@ -5,7 +5,7 @@
 // observations happen to bunch rather than where the growth does. A line or an
 // area is a statement about rate, and its horizontal axis is elapsed time: the
 // chart reads the labels as dates and places each observation where it falls
-// (charts.mjs); a column chart, whose slots are categories, is refused
+// (chart-line.mjs); a column chart, whose slots are categories, is refused
 // irregular dates at compile unless its heading says they are snapshots
 // (page-types.mjs).
 //

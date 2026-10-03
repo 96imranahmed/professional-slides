@@ -7,7 +7,7 @@
 // failures (core.mjs mapAll); this runs the stages, sets aside the pages that
 // failed, and composes the rest, so a page that fails later is reported in the
 // same run as one that failed earlier.
-import { toDeckPlan } from "./compose.mjs";
+import { toDeckPlan } from "./compose-deck.mjs";
 import { planDeck } from "./planner.mjs";
 import { readingTaskOf, bodyWordsOf, wordBudgetOf } from "./derive-content.mjs";
 

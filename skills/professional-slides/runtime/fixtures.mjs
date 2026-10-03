@@ -239,6 +239,54 @@ export function layoutFixtureSpecs() {
   })) });
   return [
     ...useCaseSequence.map(plan => ({ ...planSlide(plan).spec, target: "layout.template-sequence-use-case-grid", kind: "layout" })),
+    ...plannedLayoutFixtures(),
+    {
+      id: "fixture-layout-context-panel", target: "layout.context-panel", kind: "layout",
+      frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+      composition: absolute({ id: "context-example", children: [
+        component({ id: "chart", component: "chart.column", props: REGISTRY.get("chart.column").sample, frame: { x: 60, y: 150, width: 650, height: 440 } }),
+        section({ id: "context", treatment: "muted", frame: { x: 760, y: 150, width: 460, height: 440 }, composition: absolute({ id: "sections", children: [
+          ...[
+            ["(Insert context heading 1)", "(Insert the first context point needed to interpret the exhibit.)"],
+            ["(Insert context heading 2)", "(Insert the second context point needed to interpret the exhibit.)"],
+            ["(Insert context heading 3)", "(Insert the condition that would change the conclusion.)"]
+          ].flatMap(([heading, text], index) => [
+            component({ id: `heading-${index}`, component: "section-heading", props: { heading, rule: false }, frame: { x: 0, y: index * 140, width: 428, height: 28 } }),
+            component({ id: `body-${index}`, component: "paragraph", props: { text }, frame: { x: 0, y: index * 140 + 36, width: 428, height: 88 } }),
+            ...(index < 2 ? [component({ id: `separator-${index}`, component: "section-boundary", props: { variant: "subsection" }, frame: { x: 0, y: index * 140 + 124, width: 428, height: 8 } })] : [])
+          ])
+        ] }) })
+      ] })
+    },
+    ...["none", "bottom", "top-and-bottom"].map(rules => ({
+      ...planSlide({ id: `fixture-page-template-${rules}-composition`, title: "(Insert action title)", source: "Source: (Insert source)", pageNumber: 7,
+        pageTemplate: { rules, branding: "top-right-logo", logo: { component: "paragraph", props: { text: "(Insert company name)" } } },
+        items: [{ id: "mix", job: "Show the composition", component: "chart.pie", props: { heading: "(Insert chart title)", labels: ["Category A", "Category B", "Category C"], values: [50, 30, 20] } }]
+      }).spec,
+      target: "page-template", kind: "layout"
+    })),
+    ...[...REGISTRY.values()].flatMap(definition => Object.entries(definition.examples || {}).map(([name, example]) => ({
+      id: `fixture-${definition.id}-${name}`, target: definition.id, kind: "layout", example: name,
+      ...((definition.guidance || SLIDE_TYPE_GUIDANCE[definition.id]) ? { notes: guidanceNote(definition.guidance || SLIDE_TYPE_GUIDANCE[definition.id]) } : {}),
+      frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
+      composition: absolute({ id: "example-root", children: [component({ id: definition.id, component: definition.id, props: { ...definition.sample, ...example.props }, frame: centeredFrame(example.preferredSize || definition.preferredSize) })] })
+    }))),
+    ...layoutPrimitiveFixtures(),
+    {
+      id: planned.spec.id,
+      target: "planner.auto",
+      kind: "layout",
+      frame: planned.spec.frame,
+      chrome: planned.spec.chrome,
+      composition: planned.spec.composition
+    },
+    ...networkAndTitleFixtures()
+  ];
+}
+
+/** Layouts the planner lays out from a slide plan: the half-and-half section split and the four-branch insight tree table. */
+function plannedLayoutFixtures() {
+  return [
     {
       ...planSlide({
         id: "fixture-layout-section-split-50-50",
@@ -291,37 +339,12 @@ export function layoutFixtureSpecs() {
       target: "insight-tree-table",
       kind: "layout"
     },
-    {
-      id: "fixture-layout-context-panel", target: "layout.context-panel", kind: "layout",
-      frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-      composition: absolute({ id: "context-example", children: [
-        component({ id: "chart", component: "chart.column", props: REGISTRY.get("chart.column").sample, frame: { x: 60, y: 150, width: 650, height: 440 } }),
-        section({ id: "context", treatment: "muted", frame: { x: 760, y: 150, width: 460, height: 440 }, composition: absolute({ id: "sections", children: [
-          ...[
-            ["(Insert context heading 1)", "(Insert the first context point needed to interpret the exhibit.)"],
-            ["(Insert context heading 2)", "(Insert the second context point needed to interpret the exhibit.)"],
-            ["(Insert context heading 3)", "(Insert the condition that would change the conclusion.)"]
-          ].flatMap(([heading, text], index) => [
-            component({ id: `heading-${index}`, component: "section-heading", props: { heading, rule: false }, frame: { x: 0, y: index * 140, width: 428, height: 28 } }),
-            component({ id: `body-${index}`, component: "paragraph", props: { text }, frame: { x: 0, y: index * 140 + 36, width: 428, height: 88 } }),
-            ...(index < 2 ? [component({ id: `separator-${index}`, component: "section-boundary", props: { variant: "subsection" }, frame: { x: 0, y: index * 140 + 124, width: 428, height: 8 } })] : [])
-          ])
-        ] }) })
-      ] })
-    },
-    ...["none", "bottom", "top-and-bottom"].map(rules => ({
-      ...planSlide({ id: `fixture-page-template-${rules}-composition`, title: "(Insert action title)", source: "Source: (Insert source)", pageNumber: 7,
-        pageTemplate: { rules, branding: "top-right-logo", logo: { component: "paragraph", props: { text: "(Insert company name)" } } },
-        items: [{ id: "mix", job: "Show the composition", component: "chart.pie", props: { heading: "(Insert chart title)", labels: ["Category A", "Category B", "Category C"], values: [50, 30, 20] } }]
-      }).spec,
-      target: "page-template", kind: "layout"
-    })),
-    ...[...REGISTRY.values()].flatMap(definition => Object.entries(definition.examples || {}).map(([name, example]) => ({
-      id: `fixture-${definition.id}-${name}`, target: definition.id, kind: "layout", example: name,
-      ...((definition.guidance || SLIDE_TYPE_GUIDANCE[definition.id]) ? { notes: guidanceNote(definition.guidance || SLIDE_TYPE_GUIDANCE[definition.id]) } : {}),
-      frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-      composition: absolute({ id: "example-root", children: [component({ id: definition.id, component: definition.id, props: { ...definition.sample, ...example.props }, frame: centeredFrame(example.preferredSize || definition.preferredSize) })] })
-    }))),
+  ];
+}
+
+/** The layout primitives - row, column, grid, overlay, absolute, nested sections - and wrapped section headings. */
+function layoutPrimitiveFixtures() {
+  return [
     {
       id: "fixture-layout-wrapped-headings",
       target: "layout.wrapped-headings",
@@ -375,14 +398,12 @@ export function layoutFixtureSpecs() {
       frame: CONTENT_FRAME,
       composition: flow({ id: "sections", direction: "row", gap: token("space.5"), children: [section({ id: "narrative", treatment: "open", heading: "(Insert section heading 1)", size: { width: { fr: 1 }, height: "fill" }, children: [component({ id: "paragraph", component: "paragraph", props: REGISTRY.get("paragraph").sample, size: { width: "fill", height: "fill" } })] }), section({ id: "status", treatment: "muted", heading: "(Insert section heading 2)", size: { width: { fr: 1 }, height: "fill" }, children: [component({ id: "status-list", component: "status-list", props: REGISTRY.get("status-list").sample, size: { width: "fill", height: "fill" } })] })] })
     },
-    {
-      id: planned.spec.id,
-      target: "planner.auto",
-      kind: "layout",
-      frame: planned.spec.frame,
-      chrome: planned.spec.chrome,
-      composition: planned.spec.composition
-    },
+  ];
+}
+
+/** A relationship network laid out under its heading, and the wrapped action and section titles. */
+function networkAndTitleFixtures() {
+  return [
     {
       id: "fixture-layout-relationship-network",
       target: "layout.relationship-network",

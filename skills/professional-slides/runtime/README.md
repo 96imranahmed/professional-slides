@@ -54,11 +54,17 @@ page-types.mjs     the page types: required choices, the structure they compile 
 author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run (AUTHORING_CODES); stamps `rulesVersion`
 compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
 derive-content.mjs the content plan and text plan read off the composed pages; each page's word floor and ceiling
-compose.mjs        deck/v3 spec -> planner items: layouts, exhibit aliases, table treatment, pagination and splitting, metrics strips, agenda pages, chart rules
+compose.mjs        the composer's entry point, kept for the tests that import it; the work is in compose-*.mjs:
+                   compose-deck (deck/v3 spec -> planner items, design layout), compose-page (one page: which arrangement), compose-arrangements, compose-layouts,
+                   compose-exhibits, compose-charts (chart rules), compose-tables (table treatment, inferred treatments), compose-metrics (metric strips),
+                   compose-points, compose-body, compose-text-pages, compose-pictures, compose-picture-pages, compose-passes (pagination and splitting)
 planner.mjs        items -> composition tree; density; section headings; dividers, covers, page chrome
 core.mjs           tokens (modular type scale, 12-column grid, 4px baseline), the composition solver, compileDeck -> scene
 text-layout.mjs    wrap-once measurement; font-metrics.mjs uses @napi-rs/canvas when installed, bundled Arial/Georgia metrics otherwise
-registry.mjs       components (charts.mjs, charts-extra.mjs, tables.mjs, trackers.mjs, panels.mjs, gantt.mjs, extras.mjs, framework.mjs, maps.mjs, figures.mjs, ...); fitText ladder
+registry.mjs       builds the component registry from its families: registry-chrome, registry-text, registry-data, registry-media, registry-process,
+                   registry-diagrams, registry-connectors, registry-chart-title, registry-shared (tokens, fitText ladder), and charts.mjs, charts-extra.mjs,
+                   tables.mjs, trackers.mjs, panels.mjs, gantt.mjs, extras.mjs, framework.mjs, maps.mjs, figures.mjs, ...
+charts.mjs         registers the charts; they are drawn in chart-categorical, chart-line, chart-scatter-pie, chart-specialty, on chart-axes, with chart-decorations
 marks.mjs          the shared marker vocabulary: numberMarker, iconMarker, stateMarker (lists, cards, table cells, map pins, agenda)
 icons.mjs          56 named icons as path data, emitted as editable freeforms; `author-deck.mjs --icons` lists them with their aliases
 fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
@@ -101,4 +107,4 @@ The review loop's rules - passes, confirmation, caps, lineage, provenance - are 
 
 Component contract: `render({ id, frame, props }) → { nodes }` with frames in canvas px (1280×720); `measureContent({ frame, props })` returns the natural height at a width - components without it fall back to `preferredSize`, and `evals/tests/test_measure_vs_preferred.py` reports the list. Chart components expose `nativeChart` on their instance so the emitter can write a workbook-backed chart; charts with reference lines, annotations or highlights stay as grouped shapes.
 
-Adding a component: register it in `registry.mjs` with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the component and measurement tests pick it up.
+Adding a component: register it in the `registry-*.mjs` family it belongs to (a new family is added to the families list in `registry.mjs`) with `tokens`, `preferredSize`, `sample`, `render` and `measureContent`; the component and measurement tests pick it up.

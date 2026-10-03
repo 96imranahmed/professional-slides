@@ -59,7 +59,7 @@ class CorpusLocationTests(unittest.TestCase):
         self.assertEqual(constants["FOOTER_TOP"], module.FOOTER_TOP)
 
 
-class ReadingTaskTests(unittest.TestCase):
+class CalibrationReadingTaskTests(unittest.TestCase):
     def test_the_builder_writes_numbers_in_the_shape_the_runtime_reads(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -99,7 +99,7 @@ class ReadingTaskTests(unittest.TestCase):
         self.assertNotIn("diagram-led", tasks)
 
 
-class TextFormTests(unittest.TestCase):
+class CalibrationTextFormTests(unittest.TestCase):
     def test_blocks_are_runs_of_lines_without_the_title_labels_or_sources(self):
         measure = load("measure_text_form")
         page = "\n".join([

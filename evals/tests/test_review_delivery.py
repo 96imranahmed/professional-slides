@@ -11,11 +11,12 @@ answer the staged prompt, `--review` the answer - on a small prebuilt deck
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import run_node, ROOT, RUNTIME, NODE
+from node_probe import run_node, ROOT, RUNTIME, NODE, requires_python_package
 
 
 FIXTURES = '''
@@ -645,7 +646,6 @@ await done({{ dir: {json.dumps(made['dir'])}, store: {json.dumps(made['store'])}
 console.log(JSON.stringify({{ ok: true }}));
 ''')
 
-    @unittest.skipUnless('RefusalError' in (RUNTIME / 'build-deck.mjs').read_text(encoding='utf-8'), 'build-deck does not raise RefusalError yet')
     def test_a_build_refusal_is_a_rejection_with_its_findings_not_a_crash(self):
         with tempfile.TemporaryDirectory() as tmp:
             spec = Path(tmp) / 'short-eval.deck.json'
@@ -660,3 +660,29 @@ console.log(JSON.stringify({{ ok: true }}));
 
 if __name__ == '__main__':
     unittest.main()
+
+
+@requires_python_package('pptx')
+class DeliveryGateTests(unittest.TestCase):
+    def cli(self, *args):
+        return subprocess.run([NODE, *map(str, args)], capture_output=True, text=True,
+                              env={**os.environ, 'RUNTIME_PYTHON': sys.executable}, cwd=ROOT, timeout=120)
+
+    def test_unrendered_build_cannot_be_delivered_even_with_old_built_status(self):
+        """PR #4 follow-up: an unrendered build edited to say "built" was delivered without its rendered gates."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); out = root / 'out'; spec = root / 'spec.json'
+            spec.write_text(json.dumps({'schema': 'professional-slides.deck/v3', 'id': 'safe', 'cover': {'title': 'Decision'}, 'slides': []}))
+            result = self.cli(RUNTIME / 'build-deck.mjs', spec, out, '--no-render')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)['status'], 'built-unrendered')
+            review = root / 'accepted.json'
+            review.write_text(json.dumps({'accepted': True, 'summary': 'Accepted to verify that rendered gates cannot be bypassed.', 'findings': []}))
+            for status in ['built-unrendered', 'built']:
+                build = json.loads((out / 'build-result.json').read_text()); build['status'] = status
+                (out / 'build-result.json').write_text(json.dumps(build))
+                delivered = out / 'safe-DELIVERED.pptx'; delivered.write_text('stale')
+                result = self.cli(RUNTIME / 'deliver-deck.mjs', spec, out, '--skip-build', '--review', review)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn('MISSING_RENDERED_GATES', [f['code'] for f in json.loads(result.stdout)['blockers']])
+                self.assertFalse(delivered.exists())

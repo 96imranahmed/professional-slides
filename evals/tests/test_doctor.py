@@ -49,11 +49,16 @@ def doctor(*args: str, env=None):
     return subprocess.run([NODE, str(DOCTOR), *args], capture_output=True, text=True, cwd=ROOT, timeout=60, env={**os.environ, **(env or {})})
 
 
-@unittest.skipUnless(NODE, "Node.js is not available")
-class DoctorReportTests(unittest.TestCase):
+class DoctorFolder:
+    """A scratch folder for the stand-in interpreters and binaries a check is run against."""
+
     def setUp(self):
         self.folder = Path(tempfile.mkdtemp())
 
+
+# The checks are classes of their own so the parallel runner can share them out.
+@unittest.skipUnless(NODE, "Node.js is not available")
+class DoctorReportTests(DoctorFolder, unittest.TestCase):
     def test_the_json_report_covers_node_python_binaries_and_the_optional_canvas(self):
         result = doctor("--json")
         report = json.loads(result.stdout)
@@ -74,6 +79,12 @@ class DoctorReportTests(unittest.TestCase):
         self.assertIs(canvas["required"], False, "the native canvas is never required")
         self.assertIsInstance(report["install"], list)
 
+    def test_unknown_options_are_refused(self):
+        self.assertEqual(doctor("--jsn").returncode, 1)
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class DoctorPythonTests(DoctorFolder, unittest.TestCase):
     def test_a_failing_runtime_python_is_reported_and_a_complete_one_is_chosen(self):
         if not COMPLETE:
             self.skipTest("needs a Python with python-pptx, lxml, Pillow, numpy and pypdf")
@@ -100,6 +111,9 @@ class DoctorReportTests(unittest.TestCase):
                 self.assertIn(report["python"]["export"], report["install"])
                 self.assertIn("export RUNTIME_PYTHON=", doctor(env=env).stdout, "the advice names RUNTIME_PYTHON")
 
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class DoctorBinaryTests(DoctorFolder, unittest.TestCase):
     def test_missing_binaries_fail_the_check_and_print_their_install_lines(self):
         bin_dir = self.folder / "bin"
         bin_dir.mkdir()
@@ -130,9 +144,6 @@ class DoctorReportTests(unittest.TestCase):
         report = json.loads(relaxed.stdout)
         self.assertEqual((report["ready"], report["render"]), (True, False))
         self.assertIn("unrendered builds only", doctor("--no-render", env=env).stdout)
-
-    def test_unknown_options_are_refused(self):
-        self.assertEqual(doctor("--jsn").returncode, 1)
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")

@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from node_probe import NODE, ROOT, run_node
 
@@ -39,7 +42,9 @@ console.log(JSON.stringify({has:has.chosen.missing,lacks:lacks.chosen.missing,ch
         result = run_node('''
 import {units,schedule} from './evals/scripts/run_tests.mjs';
 const u=units(['test_run_tests','test_plugin_distribution']);
-console.log(JSON.stringify({u,s:schedule(u,{'test_plugin_distribution.ShippedPackageTests':9,'test_run_tests.RunnerUnitTests':0.1})}));
+// Every other class a second, so the order does not hang on these modules' other classes.
+const timings={...Object.fromEntries(u.map((unit)=>[unit,1])),'test_plugin_distribution.ShippedPackageTests':9,'test_run_tests.RunnerUnitTests':0.1};
+console.log(JSON.stringify({u,s:schedule(u,timings)}));
 ''')
         self.assertIn("test_run_tests.RunnerUnitTests", result["u"])
         self.assertIn("test_plugin_distribution.ShippedPackageTests", result["u"])
@@ -95,6 +100,32 @@ class RunnerCommandTests(unittest.TestCase):
         out = self.run_runner("--jobs", "0")
         self.assertNotEqual(out.returncode, 0)
         self.assertIn("Usage: run_tests.mjs", out.stderr)
+
+
+class RunnerUsageTests(unittest.TestCase):
+    def cli(self, *args):
+        return subprocess.run([NODE, *map(str, args)], capture_output=True, text=True,
+                              env={**os.environ, 'RUNTIME_PYTHON': sys.executable}, cwd=ROOT, timeout=120)
+
+    def test_removed_dependency_route_has_explicit_usage_error(self):
+        """PR #4 follow-up: a removed --dependencies flag crashed with MODULE_NOT_FOUND instead of printing the usage."""
+        result = self.cli(ROOT / 'evals/scripts/run_tests.mjs', '--dependencies')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Usage: run_tests.mjs', result.stderr)
+        self.assertNotIn('MODULE_NOT_FOUND', result.stderr)
+
+
+class ShellSuiteTests(unittest.TestCase):
+    def test_shell_suite_returns_success_and_preserves_unit_failure(self):
+        """PR #4 review: evals/run.sh hid a unit failure's exit code and tripped on an unbound variable."""
+        with tempfile.TemporaryDirectory() as directory:
+            stub=Path(directory)/'runner'
+            stub.write_text('#!'+sys.executable+'\nimport os,sys\nif sys.argv[1:3] == ["-m","unittest"]: sys.exit(int(os.environ.get("TEST_SUITE_EXIT","0")))\nsys.exit(0)\n')
+            stub.chmod(0o755)
+            for code in [0,3]:
+                result=subprocess.run(['bash',str(ROOT/'evals/run.sh')],env={**os.environ,'RUNTIME_NODE':str(stub),'RUNTIME_PYTHON':str(stub),'TEST_SUITE_EXIT':str(code)},capture_output=True,text=True)
+                self.assertEqual(result.returncode,code,result.stderr)
+                self.assertNotIn('unbound variable',result.stderr)
 
 
 if __name__ == "__main__":

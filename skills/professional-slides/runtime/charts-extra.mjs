@@ -1,11 +1,13 @@
 // The wider chart catalogue: slope, lollipop, dumbbell, bullet, treemap, radar,
 // box plot, stacked area and a sparkline grid. Every chart here is drawn as
 // shapes (never a native chart), shares the plot frame, axes, legend and label
-// helpers of charts.mjs, and answers measureContent from its layout so a hug
-// measurement responds to width.
+// helpers of chart-axes.mjs and the decorations of chart-decorations.mjs, and
+// answers measureContent from its layout so a hug measurement responds to width.
 import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle, labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, withDecorations, withReferenceValues } from "./charts.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle,
+  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./chart-axes.mjs";
+import { withDecorations, withReferenceValues } from "./chart-decorations.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
 import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
@@ -156,7 +158,7 @@ export function dumbbellChart({ id, frame, props }) {
   assertHighlighted(id, props, categories, "the rows a dumbbell draws");
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const nodes = props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })), variant: "marker" }) : [];
-  // Mark weight (charts.mjs markWeight): the dots a quarter larger and the bar
+  // Mark weight (chart-axes.mjs markWeight): the dots a quarter larger and the bar
   // between them a visible rule rather than a grid-grey hairline, so a change
   // of two ranks still shows as a bar; alternate rows on a muted band carry
   // the eye from a label across the empty half of the plot to its dots.
@@ -185,7 +187,7 @@ export function dumbbellChart({ id, frame, props }) {
       nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - r - 5 - valueWidth : xAt(v) + r + 5, y: y - 10, width: valueWidth, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
     });
   });
-  // Callouts and reference lines are the shared chart decorations (charts.mjs):
+  // Callouts and reference lines are the shared chart decorations (chart-decorations.mjs):
   // authored on a dumbbell they were dropped unseen. The subject's row is drawn
   // above, so highlights are not drawn twice.
   return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, categoryMap, xScale: xAt, allowAnnotationRail: false });

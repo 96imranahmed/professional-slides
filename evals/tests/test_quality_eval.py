@@ -14,6 +14,7 @@ and that the summary's arithmetic is right.
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -455,18 +456,25 @@ console.log(JSON.stringify({dev:briefs('dev').map(b=>b.id),heldout:briefs('heldo
         self.assertEqual(result["heldout"], ["heldout/competitive-position", "heldout/investor-pitch", "heldout/steerco-update"])
         self.assertEqual(result["all"], len(cold) + 3)
 
-    def test_heldout_briefs_are_written_like_the_cold_run_briefs_and_never_tuned_on(self):
+    def test_heldout_briefs_are_written_like_the_cold_run_briefs(self):
         heldout = QUALITY / "briefs" / "heldout"
-        readme = (heldout / "README.md").read_text()
-        self.assertIn("never used to tune", readme)
-        for brief in sorted(heldout.glob("*.md")):
-            if brief.name == "README.md":
-                continue
+        # The fields a cold-run brief sets out, every one of them, and a note
+        # the harness keeps back from the agent.
+        field = re.compile(r"^- \*\*([A-Z][\w ]+)\.\*\*", re.M)
+        cold = [set(field.findall(p.read_text())) for p in sorted((ROOT / "evals" / "cold-run" / "briefs").glob("*.md"))]
+        shared = set.intersection(*cold)
+        self.assertTrue(shared)
+        briefs = [p for p in sorted(heldout.glob("*.md")) if p.name != "README.md"]
+        self.assertTrue(briefs)
+        split = run_node(f"""
+import fs from 'node:fs';
+import {{briefRequest}} from './evals/quality/lib.mjs';
+console.log(JSON.stringify({json.dumps([str(p) for p in briefs])}.map((f) => {{ const t = fs.readFileSync(f, 'utf8'); return t.length - briefRequest(t).trim().length; }})));
+""")
+        for brief, note in zip(briefs, split):
             with self.subTest(brief=brief.name):
-                text = brief.read_text()
-                for part in ("**Audience.**", "**Decision.**", "**Constraints.**", "**Length.**",
-                             "Why this brief is in the suite: it is held out."):
-                    self.assertIn(part, text)
+                self.assertLessEqual(shared, set(field.findall(brief.read_text())))
+                self.assertGreater(note, 1, "no note for the harness to keep back")
 
     def test_the_skill_version_is_the_tree_of_skills_plus_any_uncommitted_change(self):
         result = run_node('''

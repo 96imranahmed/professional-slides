@@ -13,6 +13,27 @@ from node_probe import REFERENCES, RUNTIME, run_node
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
 
+PRELUDE = """
+import assert from 'node:assert/strict';
+import { compilePage, describeTypes } from './skills/professional-slides/runtime/page-types.mjs';
+import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const S = { kind: 'comparison', what: 'The operator annual reports' };
+const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S, adds: 'The commentary names the mechanism the exhibit cannot show' };
+const compose = (pages) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: pages.map((p, i) => compilePage(p, i)) }, '.').deck.slides;
+const error = (fn) => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } };
+// The emphasised text of a composed page, runs joined across line breaks.
+const lit = (slide) => slide.nodes.map((n) => (n.runs || []).map((r) => (r.text === '\\n' ? ' ' : r.accent || r.bold ? r.text.replace(/\\n/g, ' ') : ' | ')).join('')).join(' | ');
+const years = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'];
+const regions = ['Europe', 'East Asia & Australasia', 'Americas', 'West Asia & Indian Ocean', 'Africa', 'Middle East'];
+"""
+
+DECK = """
+import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const build=(slides, extra={})=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides,...extra},'.')).deck;
+"""
+
 
 class CompileTests(unittest.TestCase):
     def test_every_choice_is_required_and_sets_the_structure(self):
@@ -891,3 +912,154 @@ console.log(JSON.stringify({{ limits: TEXT_LIMITS, twelve: error(page(words(12))
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PublishedCatalogueTests(unittest.TestCase):
+    """`--types` publishes the limits an author would otherwise learn from errors."""
+
+    def test_types_publishes_floors_icons_and_label_thinning(self):
+        """Fifty-six-page re-author: word floors, icon names and label thinning were learnt from errors."""
+        result = run_node(PRELUDE + """
+console.log(JSON.stringify({ types: describeTypes() }));
+""")
+        types = result["types"]
+        self.assertIn("Word floors follow the reading task", types)
+        self.assertIn("chart pages 42 words led, 96 with points", types)
+        self.assertIn("plane", types)
+        self.assertIn("names every member while its rows hold a line", types)
+
+    def test_an_unknown_icon_is_refused_at_compile_with_the_nearest(self):
+        """Fifty-six-page re-author: an unknown icon name was learnt from a render error, not refused with the nearest names."""
+        result = run_node(PRELUDE + """
+import { nearestIcons, iconDefinition } from './skills/professional-slides/runtime/icons.mjs';
+const page = (icon) => ({ ...base, id: 'p', type: 'parallel', form: 'cards', commentary: 'none', title: 'Three levers carry the plan through to the end of the decade',
+  exhibit: { items: ['Fleet', 'Network', 'Product'].map((title) => ({ title, icon, text: 'A lever the plan pulls in each of the next three years, with its own owner.' })) } });
+console.log(JSON.stringify({ refused: error(() => compilePage(page('aeroplanes'))), alias: Boolean(iconDefinition('aircraft')), plane: Boolean(iconDefinition('plane')), near: nearestIcons('ships') }));
+""")
+        self.assertIn("plane", result["refused"])
+        self.assertIn("--icons", result["refused"])
+        self.assertTrue(result["alias"] and result["plane"])
+        self.assertEqual(result["near"][0], "ship")
+
+
+class TypeRunTests(unittest.TestCase):
+    def test_the_run_names_the_page_to_change_and_to_what(self):
+        """Fifty-six-page re-author: a run of three panels pages named no page to change."""
+        result = run_node(PRELUDE + """
+import { varietyFindings } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+const types = ['trend', 'ranking', 'numbers', 'panels', 'panels', 'panels', 'trend', 'composition', 'ranking', 'matrix', 'numbers', 'scorecard', 'bridge', 'lookup'];
+const slides = types.map((type, i) => ({ id: 'p' + (i + 1), title: 'T', pageType: { type, form: 'x', commentary: ['beside', 'below', 'rail', 'none', 'captions'][i % 5], takeaway: false } }));
+const run = varietyFindings({ slides }).find((f) => f.code === 'VARIETY_TYPE_RUN');
+console.log(JSON.stringify(run));
+""")
+        self.assertEqual(result["measured"]["pages"], ["p4", "p5", "p6"])
+        self.assertIn("Change p5", result["repair"])
+        self.assertIn("trade places with", result["repair"])
+        # The run and its neighbours, folded as the author's summary folds them.
+        self.assertIn("p3 numbers | p4-p6 panels x3 | p7 trend", result["measured"]["sequence"])
+
+
+class CatalogueRouteTests(unittest.TestCase):
+    """Every chart and preset the composer can draw is reached by a page type, or says why not."""
+
+    def test_every_preset_is_routed_or_marked_internal(self):
+        """Rebuilt fifty-page deck: forms the renderer could draw had no page type that reached them."""
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ PRESET_ROUTES, compilePage, PAGE_TYPES }} from '{KIT}';
+import {{ SHAPE_NAMES, PAGE_SHAPE_NAMES, composeSlide }} from './skills/professional-slides/runtime/compose.mjs';
+const example = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
+const pages = [...example.pages, ...(example.appendix || [])];
+const out = {{ missing: [], unreached: [] }};
+for (const [group, names] of [['shapes', SHAPE_NAMES], ['layouts', PAGE_SHAPE_NAMES]]) for (const name of names) {{
+  const route = PRESET_ROUTES[group][name];
+  if (!route) {{ out.missing.push(name); continue; }}
+  if (route.internal) continue;
+  if (route.type && !PAGE_TYPES[route.type]?.forms[route.form ?? Object.keys(PAGE_TYPES[route.type].forms)[0]]) {{ out.unreached.push(`${{name}}: ${{route.type}}/${{route.form}} is not a form`); continue; }}
+  if (route.commentary && route.type && !(PAGE_TYPES[route.type].commentary.includes(route.commentary))) {{ out.unreached.push(`${{name}}: ${{route.type}} takes no ${{route.commentary}}`); continue; }}
+  // Composed from the worked page of the route where the example deck has one.
+  const page = pages.find((p) => p.type && (!route.type || p.type === route.type) && (!route.form || p.form === route.form) && (!route.commentary || p.commentary === route.commentary));
+  if (!page) continue;
+  const slide = compilePage(page, 0);
+  if (group === 'shapes') {{ if (slide.shape !== name && slide.role !== name) out.unreached.push(`${{name}}: ${{page.id}} writes ${{slide.shape ?? slide.role}}`); continue; }}
+  const recent = [];
+  try {{ composeSlide(slide, 0, './skills/professional-slides/examples', 'balanced', 1, recent); }} catch (e) {{ out.unreached.push(`${{name}}: ${{e.message}}`); continue; }}
+  if (recent[0] !== name) out.unreached.push(`${{name}}: ${{page.id}} composes as ${{recent[0]}}`);
+}}
+console.log(JSON.stringify(out));
+''')
+        self.assertEqual(result['missing'], [])
+        self.assertEqual(result['unreached'], [])
+
+    def test_the_panel_only_charts_are_forms_with_worked_pages(self):
+        """Rebuilt fifty-page deck: the panel-only charts became forms, each with a worked page."""
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ PAGE_TYPES, compilePage, pageSchema }} from '{KIT}';
+const example = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
+const forms = {{ 'ranking/boxplot': 'chart.boxplot', 'trend/sparklines': 'chart.sparklines', 'composition/pictogram': 'pictogram',
+  'profiles/radar': 'chart.radar', 'schedule/horizons': 'chart.horizons', 'trend/model': 'model-page' }};
+const out = {{}};
+for (const [key, target] of Object.entries(forms)) {{
+  const [type, form] = key.split('/');
+  const page = example.pages.find((p) => p.type === type && p.form === form);
+  const slide = page ? compilePage(page, 0) : null;
+  out[key] = {{ catalogue: PAGE_TYPES[type].forms[form] === target, worked: Boolean(page),
+    drawn: slide ? [slide.exhibit?.type, ...(slide.exhibits || []).map((e) => e.type), slide.shape, slide.layout].filter(Boolean) : [] }};
+}}
+const radar = pageSchema('profiles').allOf.find((r) => r.if.properties.form.const === 'radar');
+console.log(JSON.stringify({{ out, radar: radar?.then.properties.commentary.enum }}));
+''')
+        for key, entry in result['out'].items():
+            self.assertTrue(entry['catalogue'], key)
+            self.assertTrue(entry['worked'], f'{key} has no worked page for --example')
+        self.assertIn('chart.boxplot', result['out']['ranking/boxplot']['drawn'])
+        self.assertIn('model-page', result['out']['trend/model']['drawn'])
+        self.assertEqual(result['radar'], ['below', 'none'])
+
+    def test_a_form_refuses_what_it_cannot_draw(self):
+        """Rebuilt fifty-page deck: a form refuses what it cannot draw."""
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+const base = {{ takeaway: false, why: 'The spread of each member is the claim here', settles: {{ kind: 'rank', what: 'Monthly punctuality by operator' }}, adds: 'The points say where the bad months come from' }};
+const box = (extra) => ({{ ...base, id: 'b', type: 'ranking', form: 'boxplot', commentary: 'below', title: 'One operator swings more than its five peers',
+  points: ['The median month is on the peer median at 89%.', 'The range runs 17 points, from 77% to 94%.'],
+  exhibit: {{ categories: ['A', 'B', 'C', 'D'], boxes: [1, 2, 3, 4].map((i) => ({{ min: 80 + i, q1: 84 + i, median: 88, q3: 90, max: 94 }})), ...extra }} }});
+const spark = (items) => ({{ ...base, id: 's', type: 'trend', form: 'sparklines', commentary: 'so-what-bar', bar: 'The lines that run a train every half hour recovered and the others did not',
+  settles: {{ kind: 'rate', what: 'Journeys by line against FY19' }}, adds: null, title: 'Two of four lines are back above their FY19 level', exhibit: {{ items, highlights: [{{ category: 'East' }}] }} }});
+const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+console.log(JSON.stringify({{
+  unmarked: error(() => compilePage(box({{}}))),
+  marked: error(() => compilePage(box({{ highlights: [{{ category: 'D' }}] }}))),
+  onExhibit: error(() => compilePage({{ ...box({{ highlights: [{{ category: 'D' }}] }}), commentary: 'on-exhibit' }})),
+  short: error(() => compilePage(spark([{{ label: 'East', values: [1, 2, 3] }}, {{ label: 'West', values: [1, 2, 3] }}]))),
+  fine: error(() => compilePage(spark(['East', 'West', 'North', 'South'].map((label, i) => ({{ label, values: [100, 60 + i, 80 + i, 95 + i] }}))))) }}));
+''')
+        self.assertIn('marks its subject', result['unmarked'])
+        self.assertIsNone(result['marked'])
+        self.assertIn('choose `commentary`', result['onExhibit'])
+        self.assertIn('four or more periods', result['short'])
+        self.assertIsNone(result['fine'])
+
+
+class SectionPageTests(unittest.TestCase):
+    def test_a_section_is_numbered_once_and_the_closing_bolds_only_its_leads(self):
+        """Fifty-page audit: sections were numbered three ways and closing messages were set wholly in bold."""
+        result = run_node(f"""
+import {{ compilePage }} from '{KIT}';
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+{DECK}
+const deck = build([compilePage({{ id: 's1', kind: 'section', title: '01 / Demand and market position', summary: 'Audience and spend' }}), {{ id: 'p', title: 'A page', points: ['One point.'] }},
+  compilePage({{ id: 's2', kind: 'section', title: '02 / Revenue', summary: 'Scale' }}), {{ id: 'q', title: 'Another page', points: ['One point.'] }}]);
+const divider = deck.slides.find((s) => s.nodes.some((n) => n.role === 'divider-title'));
+const out = REGISTRY.get('takeaways').render({{ id: 't', frame: {{ x: 0, y: 0, width: 1280, height: 720 }}, props: {{ items: ['Short run: OpenAI is better placed for attention and distribution across its billion weekly users.', 'Capital: the larger raise and the higher mark belong to different firms.'] }} }}).nodes;
+const item = out.find((n) => n.role === 'takeaways-item');
+console.log(JSON.stringify({{ compiled: compilePage({{ id: 's1', kind: 'section', title: '01 / Demand' }}).title,
+  title: divider.nodes.find((n) => n.role === 'divider-title').text, numeral: divider.nodes.find((n) => n.role === 'divider-number')?.style.fontFamily.tokenId ?? null,
+  runs: item.runs.map((r) => r.bold), bold: item.style.bold }}));
+""")
+        self.assertEqual(result["compiled"], "Demand")
+        self.assertEqual(result["title"], "Demand and market position")
+        self.assertIn(result["numeral"], (None, "font.body"))
+        self.assertEqual(result["runs"], [True, False])
+        self.assertFalse(result["bold"])

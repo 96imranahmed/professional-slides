@@ -1,6 +1,6 @@
 # Components
 
-Every reusable slide element is a registered component in `runtime/registry.mjs`. Components own their internal geometry and consume theme tokens; the composition tree owns where they sit. Give each one a clear audience job, and use one shared definition wherever it repeats.
+Every reusable slide element is a registered component: `runtime/registry.mjs` builds the registry from the component families in `runtime/registry-*.mjs` and the chart, table and exhibit modules. Components own their internal geometry and consume theme tokens; the composition tree owns where they sit. Give each one a clear audience job, and use one shared definition wherever it repeats.
 
 An author reaches a component through a page type: the page's `form` picks it ([Design](design.md#pick-the-page-type-from-what-the-page-says), `author-deck.mjs --types`), and this reference is the lookup for the props its `exhibit` carries when a finding names one.
 

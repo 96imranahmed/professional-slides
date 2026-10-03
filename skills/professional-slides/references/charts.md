@@ -174,7 +174,7 @@ Cell types: `text`; `bullets`; `category` (primary fill with contrasting text, o
 | `bubble: true` | Every value in a filled pill (`surface: "bubble"`) | - the table's counterpart to the chart's change bubble |
 | `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest; columns that measure the same thing set one `barScale` name and share one scale, so a row reads across them. The header prints the unit, so no key line is added under the table, and a header that already ends in its unit (`Revenue, $M`, `Share (%)`) takes no unit line under it either | `label` and `unit` on the column, both set; one unit per `barScale` |
 
-**Inferred treatments.** A table with no treatment of its own is given the one its cells already imply (`inferredTreatments` in `runtime/compose.mjs`). Nothing is inferred on a table that carries any treatment, and a bound, range or approximation (`~5`, `>$1B`, `3-5`) is not a figure, so its column stays as written.
+**Inferred treatments.** A table with no treatment of its own is given the one its cells already imply (`inferredTreatments` in `runtime/compose-tables.mjs`). Nothing is inferred on a table that carries any treatment, and a bound, range or approximation (`~5`, `>$1B`, `3-5`) is not a figure, so its column stays as written.
 
 | The cells hold | Drawn as |
 | --- | --- |
