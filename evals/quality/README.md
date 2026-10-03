@@ -120,6 +120,58 @@ node evals/quality/gate-validity.mjs --renders anthropic-vs-openai-2026=path/to/
 A defect with `expectedGate: null` is one no gate measures yet; the report
 lists what fired on those pages, which is where a new gate starts.
 
+## Evidence validity
+
+`fixtures/evidence/` holds four held-out decks on different subjects - a credit
+union with eight declared players, an ambulance service under a closed evidence
+scope, a note-taking app against two rivals, and an explanation that compares
+nothing - each a pages file, an insight log with measures and an analysis plan
+(`make_fixtures.py` wrote them). None is a deck the evidence contract was
+written after. `evidence-validity.mjs` measures the contract on them twice:
+
+```bash
+node evals/quality/evidence-validity.mjs           # the table; exit 2 unless everything seeded is caught and nothing clean is flagged
+```
+
+- **False positives.** Each deck is compiled and checked as it stands. They
+  carry the cases a careless rule would refuse: a context exhibit with its
+  relevance, two same-unit series read separately with the reason, a metric
+  strip over a chart, a deck with no comparison because it compares nothing.
+  Any finding is a false positive.
+- **Recall.** Fourteen seeded defects are planted on every page each applies
+  to, one at a time: an exhibit copied from another page with its evidence id
+  appended and the citation left alone, the same copy relabelled as the claim's
+  measure, a unit, a period or a number changed, a dependency left undeclared,
+  a citation dropped, a context exhibit unexplained, a relation split across
+  panels. A defect is caught when the finding it should raise names the page.
+
+## Critic calibration
+
+A storyline rated 5, then 4, then 6.2 across three different packets says
+nothing about the critic. `critic-calibration.mjs` measures it on packets that
+do not change:
+
+```bash
+node evals/quality/critic-calibration.mjs --list                # the anchors, and what each plants
+node evals/quality/critic-calibration.mjs --repeats 5 --dry-run
+node evals/quality/critic-calibration.mjs --repeats 5 [--anchors finance,finance:declined-answer] [--judge claude]
+```
+
+- **Repeats.** Each frozen packet is answered `--repeats` times by a fresh
+  critic (the judge command; `{packet}` is the staged packet directory). The
+  median spread of those ratings is the noise floor: a deck's rating moving by
+  less than it between two critiques is not a result.
+- **Anchors.** The four fixture decks clean, and each with one defect of
+  argument planted - an answer that declines the request, the players'
+  comparison cut, a chart about something else kept as context, a page that
+  restates its neighbour. A critic is calibrated when every planted anchor is
+  rated below its clean deck by more than the spread, sent back, and caught
+  under the check that was planted.
+
+Every answer is validated as the storyline loop validates it; one the loop
+would refuse is counted as invalid, not rated. A run costs `anchors x repeats`
+critic calls and is written to `runs/critic-calibration/`.
+
 ## Tests
 
 `evals/tests/test_quality_eval.py` runs the whole loop with
@@ -128,3 +180,6 @@ checks blinding (the fake agent writes author files carrying a marker, and the
 fake judge reports any packet file carrying it), pairing through the shuffled
 order, results keying and the summary's arithmetic.
 `evals/tests/test_gate_validity.py` covers the replay.
+`evals/tests/test_evidence_contract.py` runs the evidence measurement and
+`evals/tests/test_diagnosis_instruments.py` the calibration, with
+`fixtures/fake-critic.mjs` standing in for the critic.

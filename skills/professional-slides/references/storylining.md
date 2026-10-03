@@ -81,7 +81,8 @@ Data is not yet a finding. Work each dataset the way an analyst would and record
       "shape": "series",
       "breadth": { "periods": 16, "series": 5 },
       "calculation": "routes in service by month since first timetabled service, per operator",
-      "sources": ["sources/northvale-routes-2026-09.csv", "sources/peer-routes-2004-2012.csv"],
+      "measures": { "northvale": { "unit": "routes", "population": "Northvale Rail", "periods": ["M1", "M4", "M8", "M12", "M16"], "values": [2, 5, 8, 11, 14] } },
+      "sources": ["sources/northvale-routes-2026-09.csv", "sources/peer-routes-2004-2012.csv"], "cite": ["northvale-timetable"],
       "soWhat": "the ramp, not the size, is the evidence that the entrant is gaining ground",
       "strength": "strong",
       "exhibit": "trend: routes by month since launch, five operators, Northvale highlighted" } ] }
@@ -99,7 +100,30 @@ Ask of every dataset:
 
 Keep the insights that are specific, surprising or decisive. Each records its `shape` - `series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `geography`, `schedule`, `roster`, `fact` or `qualitative` - which decides the [page types](page-types.md#evidence-shapes) it can carry, and the `breadth` of its data. The log is refused when an insight is ungraded (`strength` is `strong`, `supporting` or `context`), has no `soWhat`, or is too narrow for its shape: a series under six periods (four with peers beside it), a peer set under six members. Widen the dataset while it is still research.
 
+An insight whose evidence is numbers records them as `measures` as well as in its sentence: `{ name: { unit, population, periods | members | period, values | value } }`, with `better: "down"` where less is good news, `boundaries: { label: "..." }` where a member's period or entity differs, and `null` with its reason in `unavailable` where a value is undisclosed. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it; a measure can, and the compile holds each exhibit to the measure it says it plots ([The evidence contract](page-types.md#the-evidence-contract)). `cite` names the `sources` registry keys the insight is cited to, so a page's citation is written from what it plots. A log that leaves a number-bearing insight as a sentence is refused (`MEASURES_MISSING`).
+
 Write the titles from the insights. Every analytical page names the insights it rests on in `evidence`, and each pillar rests on at least one `strong` insight (`PILLAR_UNSUPPORTED` otherwise). An insight with no page is either cut or missing a page; a page with no insight is either cut or missing its analysis. `author-deck.mjs --draft` prints, for each insight, the page types its shape can carry.
+
+## Run the analyses before the outline
+
+An insight log is a list of records, and a storyline written from it record by record is a walk through them: each page restates one, and the findings that need two - every alternative on the same measures, the gap between two series, the headroom to a threshold - have no record, so they get no page. Before the titles are written, say which analyses the answer turns on in `<id>.analysis.json` and let the runtime compute them over the log's measures:
+
+```json
+{ "schema": "professional-slides.analysis/v1",
+  "analyses": [
+    { "id": "A-peers", "op": "compare", "inputs": ["i-profit/pat", "i-traffic/passengers", "i-product/rank"],
+      "soWhat": "The lead holds on two of three measures and reverses on the third", "strength": "strong" },
+    { "id": "A-net-debt", "op": "gap", "inputs": ["i-balance/liabilities", "i-balance/cash"], "soWhat": "...", "strength": "strong" },
+    { "id": "A-renewal", "op": "scenario", "inputs": ["i-fleet/aircraft"], "method": "linear", "horizon": ["FY27", "FY28", "FY29"],
+      "assumptions": [{ "name": "net retirements a year", "value": -8, "unit": "aircraft", "rationale": "the oldest type leaves at its stated pace and deliveries slip a year" }],
+      "soWhat": "...", "strength": "supporting" } ] }
+```
+
+`node runtime/analysis.mjs <id>.pages.json` runs the plan and writes `<id>.analysis-results.json`; the compile runs it again on every pass, so a result is never typed and never stale. The operations are `compare` (members by measures, n/a kept where a member is undisclosed, the rank and leader on each measure, and who leads when each measure in turn is the priority - no weights are invented), `gap`, `ratio`, `index`, `growth`, `rank`, `share`, `threshold` (the headroom between a value and a recorded or stated limit) and `scenario` (a value carried over a horizon under stated assumptions, and where it crosses a threshold).
+
+Every result says what it is. `computed` rests on records alone. `assumed` rests on an assumption, each listed with its value and rationale: a number nobody recorded is said as one. `unavailable` names the input the records do not hold - list what is needed in the analysis's `missing` where no measure exists to point at - and carries no page; the critic is shown it as the gap it is. A computed or assumed result joins the log as a derived insight under its id: a page names it in `evidence`, and an exhibit plots its measure (`A-net-debt/result`).
+
+A deck that declares two or more `players` compares them: without a `compare` covering every declared player on common measures, the spine is refused (`ANALYSIS_REQUIRED`). A player with no record takes its row with n/a, which is a finding. A deck that compares nothing is asked for no matrix.
 
 ## Prove the governing answer
 
@@ -134,13 +158,19 @@ Before any copy is written, the spine goes through a mock problem-solving sessio
 
 1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude`. Give it only the path to the printed `prompt.md`. A critic that knows what the author meant forgives what the page fails to show.
 2. **Save** its JSON as `out/storyline-review.json` and run `storyline.mjs` again: it validates the critique against the packet it answered and records it under `<deck dir>/.reviews/<id>/storyline-history/`.
-3. **Revise at the root.** A missing analysis means more research, not a new sentence. A two-number chart becomes the whole peer set or the trend; an unranked question becomes a lean with its confidence and reversal trigger; an obvious page is cut or merged.
+3. **Revise at the root.** A missing analysis means the analysis, not a new sentence: each one names its `remedy` - `computable` from the measures already in the log, runnable under a stated `assumption`, or needing `retrieval` of data the packet does not hold - and closes only on its artifact, the computed analysis or insight a page now rests on. A page that says what the evidence does not establish has qualified the gap, not closed it. A two-number chart becomes the whole peer set or the trend; an unranked question becomes a lean with its confidence and reversal trigger; an obvious page is cut or merged.
 4. **Verify.** With the spine changed, `storyline.mjs` writes a verification packet: the critic gives every open item a status and may add only a major or blocker item that the revision introduced.
-5. **Stop at `ready` (exit 0), or at three passes.** A storyline still sent back after the third pass goes to the user with its open items.
+5. **Stop at `ready` (exit 0), or at three passes.** A storyline still sent back after the third pass goes to the user with its open items. Where the evidence scope is closed, a retrieval the team may not make is `scope-limited`: it stays open at its severity, and the loop can end as `provisional` (also exit 0) only when nothing else is open and the deck offers its answer as provisional. An item the answer no longer needs, because the answer now claims less, closes as `narrowed`.
 
 The loop's rules - exhaustive first pass, verification passes, the cap, lineage, provenance, and restarts with `--reason` (switching between the spine and `--full` is one) - are the deck review's, owned by [Taste review](taste-review.md#order-of-the-reviews).
 
 The critic holds the deck to the request: every sub-question answered with a lean, pillars MECE with their counter-arguments, pages carrying evidence a reader could not assemble in five minutes. The gate binds to the spine only - titles, claims, page types and plotted numbers - so copy edits do not re-open it; changing what a page argues or shows does. No deck review is prepared, and no deck delivered (`STORYLINE_UNREVIEWED`), until the gate is `ready` for the current spine. A revision whose titles, order and source slides are unchanged needs no critique. Set `targetPages` on the deck when the user asked for a length; the appendix counts toward it.
+
+### What the reviews are told
+
+The critic and the deck's reviewer judge against the request, so they are told what it is. `requestProvenance` on the deck says how the `request` came to be - `verbatim` (the default), `reconstructed` or `paraphrased` - and a request that is not the user's own words is read for what it asks, not held to its wording or to an answer its phrasing presumes. `evidenceScope: { retrieval: "closed", note }` says the author may use only the evidence supplied: a missing analysis that needs other data then keeps its severity and cannot be asked of the team. `answerStatus: "provisional"` with `answerLimits` offers the answer as provisional and says what it leaves open; delivery records a deck accepted on a provisional storyline as provisional, with the items left open.
+
+The critique returns two judgements beside its verdict, held to its own ledger: `compliance` (has the team done everything the evidence in scope allows - `complete` only when nothing it could still act on is open) and `sufficiency` (does the evidence support the answer as stated - `sufficient` only when nothing is open at all). A team can comply and the answer still not be sufficient. The rating is on one anchored scale, capped at 5 with a blocker open and 7 with a major open, so a number means the same thing on every pass.
 
 ## Reconcile evidence before design
 

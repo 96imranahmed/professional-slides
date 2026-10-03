@@ -330,10 +330,20 @@ export const BUILD_CODES = Object.freeze({
  * only a blocker makes the build exit 2.
  */
 export function buildOutcome(result, { render = true } = {}) {
-  const blockers = [], seen = new Set();
+  const blockers = [], seen = new Set(), causes = new Map();
   const add = (source, f) => {
+    // One empty band is one blocker, however many instruments measured it
+    // (page_gates.py void_causes): the scene's gate and the render's report
+    // the same band, and listed apiece they read as that many defects. The
+    // blocker keeps every code that reported it, and where the band came from.
+    if (f.cause && causes.has(f.cause)) { const first = causes.get(f.cause); if (!first.codes.includes(f.code)) first.codes.push(f.code); if (f.origin && !first.origin) first.origin = f.origin; return; }
     const key = `${source}|${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? f.text ?? f.shape ?? "")}`;
-    if (!seen.has(key)) { seen.add(key); blockers.push({ source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}) }); }
+    if (seen.has(key)) return;
+    seen.add(key);
+    const blocker = { source, code: f.code, ...(f.slide != null ? { slide: f.slide } : {}), ...(f.id ? { id: f.id } : {}), ...(f.text || f.shape ? { text: f.text ?? f.shape } : {}), ...(f.repair ? { repair: f.repair } : {}),
+      ...(f.cause ? { cause: f.cause, codes: [f.code], ...(f.origin ? { origin: f.origin } : {}) } : {}) };
+    if (f.cause) causes.set(f.cause, blocker);
+    blockers.push(blocker);
   };
   const blocking = (f) => !["advisory", "info"].includes(f.severity);
   // The half-empty habit is counted on the render once there is one

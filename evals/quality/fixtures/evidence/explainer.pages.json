@@ -1,9 +1,12 @@
 {
  "deck": {
+  "schema": "professional-slides.deck/v3",
   "id": "explainer",
   "workflow": "new_deck",
   "request": "Explain how the tram signalling upgrade works and what it has delivered so far.",
-  "answer": "Moving blocks shorten the gap between trams, and the first section already shows two thirds fewer faults."
+  "answer": "Moving blocks shorten the gap between trams, and the first section already shows two thirds fewer faults.",
+  "design": "consulting",
+  "density": "executive"
  },
  "sources": {
   "tram-ops": {

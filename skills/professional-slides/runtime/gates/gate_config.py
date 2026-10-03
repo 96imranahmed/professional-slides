@@ -396,6 +396,7 @@ GATE_CODES = {
     # Read off the composed scene, so they run at authoring as well as at the
     # build: the render's band gates only run once there is a render.
     "SCENE_VOID": "a band of the page's body, measured on the scene, that nothing crosses",
+    "RENDER_DRIFT": "the render shows an empty band the scene does not draw: something the scene holds did not reach the page",
     "DECK_SCENE_VOID": "nearly a third or more of the deck's pages leave a band of their body empty",
     # The page's visual weight, estimated from the scene (scene_ink.py).
     "SCENE_INK": "a page with an exhibit that will ink too little of its body to read as weighted at a glance",
@@ -410,7 +411,7 @@ ADVISORY_CODES = {
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
     "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
-    "SCENE_VOID", "SCENE_INK", "DECK_INK",
+    "SCENE_VOID", "SCENE_INK", "DECK_INK", "RENDER_DRIFT",
 }
 
 # The void findings are questions at mild values and block past the fill's

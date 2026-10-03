@@ -78,8 +78,8 @@
   }
  },
  "recorded": {
-  "weightSha256": "163bed8f23b6ec9effe931046609323ec7ce0caa57fefe940804d35f28f09979",
-  "stamped": "2026-10-02",
+  "weightSha256": "513b43d73e9f593bc74dff4a6b28aa8f108907fc429a55c7fb6dd9d251f064d3",
+  "stamped": "2026-10-03",
   "verdict": {
    "accepted": true,
    "plan": {

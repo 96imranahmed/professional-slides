@@ -261,9 +261,10 @@ const insights = await readInsights('{FIXTURES}', 'finance', {{ alternatives: al
 const spec = (d) => compileDeck(d, {{ insights, partial: true }}).spec;
 const base = spec(doc);
 const f4 = base.slides.find((s) => s.id === 'f4'), f2 = base.slides.find((s) => s.id === 'f2');
-const reworded = structuredClone(doc); reworded.pages[3].exhibits[1].caption = 'A different caption of eight words or more, reworded only';
-const rebased = structuredClone(doc); rebased.pages[3].exhibits[1].basis.role = 'proof'; delete rebased.pages[3].exhibits[1].basis.relevance;
-const bare = structuredClone(doc.pages[0]); bare.settles = {{ measures: ['i-loans/loans'] }};
+const pageOf = (d, id) => d.pages.find((p) => p.id === id);
+const reworded = structuredClone(doc); pageOf(reworded, 'f4').exhibits[1].caption = 'A different caption of eight words or more, reworded only';
+const rebased = structuredClone(doc); pageOf(rebased, 'f4').exhibits[1].basis.role = 'proof'; delete pageOf(rebased, 'f4').exhibits[1].basis.relevance;
+const bare = structuredClone(pageOf(doc, 'f1')); bare.settles = {{ measures: ['i-loans/loans'] }};
 const stripped = withoutDependencies(bare);
 console.log(JSON.stringify({{ leaked: JSON.stringify(base.slides).includes('"basis"') && !JSON.stringify(base.slides.map((s) => ({{ ...s, pageType: null }}))).includes('"basis"'),
   inSlide: JSON.stringify(base.slides.map((s) => ({{ ...s, pageType: null }}))).includes('"basis"'),

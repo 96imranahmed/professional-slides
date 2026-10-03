@@ -1,5 +1,6 @@
 {
  "deck": {
+  "schema": "professional-slides.deck/v3",
   "id": "product",
   "workflow": "new_deck",
   "request": "Where should Lumen invest next to hold its lead over Quill and Paperly?",
@@ -8,7 +9,9 @@
    "Lumen",
    "Quill",
    "Paperly"
-  ]
+  ],
+  "design": "consulting",
+  "density": "executive"
  },
  "sources": {
   "lumen-analytics": {

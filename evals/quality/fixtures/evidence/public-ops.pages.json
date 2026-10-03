@@ -1,5 +1,6 @@
 {
  "deck": {
+  "schema": "professional-slides.deck/v3",
   "id": "public-ops",
   "workflow": "new_deck",
   "request": "Why are ambulance response times rising, and where should the first new crews go?",
@@ -7,7 +8,9 @@
   "evidenceScope": {
    "retrieval": "closed",
    "note": "only the board papers supplied by the service may be used"
-  }
+  },
+  "design": "consulting",
+  "density": "executive"
  },
  "sources": {
   "ras-board": {

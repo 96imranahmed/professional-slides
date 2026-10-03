@@ -104,6 +104,10 @@ class GateRun:
         self.skipped_pixel_gates = set()
         # SCENE_INK and DECK_INK read the same estimate; it is drawn once a page.
         self.inks = {}
+        # Each rendered page's bands as the scene draws them and as the render
+        # shows them (void_origins): what says whether an empty band was
+        # authored or appeared in the export.
+        self.origins = []
 
     def wanted(self, code):
         return not self.selected or code in self.selected
@@ -159,7 +163,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
     by_code = {}
     for item in run.findings:
         by_code[item["code"]] = by_code.get(item["code"], 0) + 1
-    reported = [{**f, **severity(f)} for f in run.findings]
+    reported, causes = void_causes([{**f, **severity(f)} for f in run.findings], run.origins)
     return {
         "schema": "professional-slides.page-gates/v1",
         "profile": profile,
@@ -173,8 +177,74 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
         **({"rulesVersion": RULES_OF_DECK.get("rulesVersion"), "waivedRules": sorted(WAIVED)} if WAIVED else {}),
         "accepted": not any(f["severity"] == "blocker" for f in reported),
         "countsByCode": dict(sorted(by_code.items())),
+        # Each empty band once, however many instruments reported it, and on a rendered page where it came from.
+        "voidCauses": causes,
         "findings": reported,
     }
+
+
+# How far a band measured on the render may sit from the same band measured
+# on the scene before the two disagree. The scene's mask is an estimate of
+# what will be drawn (scene_gates.scene_mask) and the render a count of ink, so
+# a few rows either way is the instruments, not the page.
+VOID_AGREEMENT = 0.04
+VOID_KINDS = {"internal": ("internalVoid", "internal_void_max"), "dead": ("deadBand", "dead_band_max")}
+VOID_KIND_OF = {"INTERNAL_VOID": "internal", "DEAD_BAND": "dead", "COLUMN_VOID": "column"}
+
+
+def void_origins(slide_no, scene_bands, render_bands):
+    """Where each empty band of a rendered page comes from: `{slide, bands}`,
+    `bands` one record a kind (internal, dead) whose scene or render measure is
+    past its bar - `{scene, render, origin}`.
+
+    `authored`: the scene draws the band and the render shows it. The page was
+    composed that way, so the repair is the page's - its content or its
+    composition - and stretching what is drawn would only move the band.
+    `render`: the render shows a band the scene does not draw. Something the
+    scene holds did not reach the page (a shape not emitted, text set smaller
+    or wrapped differently by the renderer), so the repair is the export's and
+    no change to the page's content will close it.
+    `scene-estimate`: the scene's estimate shows a band the render does not.
+    The page as rendered is not empty there; the scene finding is the estimate
+    reading a drawn surface as blank.
+    """
+    bands = {}
+    for kind, (key, bar) in VOID_KINDS.items():
+        scene, render = scene_bands[key], render_bands[key]
+        if max(scene, render) <= THRESHOLDS[bar]:
+            continue
+        origin = "authored" if abs(render - scene) <= VOID_AGREEMENT or min(scene, render) > THRESHOLDS[bar] else "render" if render > scene else "scene-estimate"
+        bands[kind] = {"scene": round(scene, 4), "render": round(render, 4), "origin": origin}
+    return {"slide": slide_no, "bands": bands}
+
+
+def void_causes(findings, origins):
+    """The void findings grouped by what they measure: `(findings, causes)`.
+
+    The scene's gate and the render's gates read one band with two instruments
+    (gate_scene_void), so a half-empty page is reported two or three times - a
+    count that reads as that many defects. Every finding is kept, with the
+    `cause` it shares (`<slide>:<kind>`) and, on a rendered page, its `origin`
+    (void_origins); `causes` lists each band once, with the codes that report
+    it and the worst of their severities.
+    """
+    by_slide = {o["slide"]: o["bands"] for o in origins}
+    marked, causes = [], {}
+    for f in findings:
+        kind = VOID_KIND_OF.get(f["code"]) or (f["measured"].get("kind") if f["code"] == "SCENE_VOID" and isinstance(f.get("measured"), dict) else None)
+        if kind is None:
+            marked.append(f)
+            continue
+        column = f["measured"].get("column") if isinstance(f.get("measured"), dict) else None
+        key = "{}:{}".format(f["slide"], "column:{}".format(column) if kind == "column" else kind)
+        origin = (by_slide.get(f["slide"], {}).get(kind) or {}).get("origin")
+        marked.append({**f, "cause": key, **({"origin": origin} if origin else {})})
+        cause = causes.setdefault(key, {"cause": key, "slide": f["slide"], "kind": kind, "codes": [], "severity": "advisory",
+                                         **({"column": column} if column else {}), **(by_slide.get(f["slide"], {}).get(kind) or {})})
+        cause["codes"].append(f["code"])
+        if f.get("severity") == "blocker":
+            cause["severity"] = "blocker"
+    return marked, sorted(causes.values(), key=lambda c: (c["slide"], c["kind"]))
 
 
 def empty_page_gates(run, slide_no, slide, render_dir):
@@ -195,7 +265,18 @@ def empty_page_gates(run, slide_no, slide, render_dir):
         if rows is None:
             run.skipped_pixel_gates.add(slide_no)
         else:
-            empty += pixel_gates(slide_no, slide, path, grey, rows, empty)
+            measured = {}
+            empty += pixel_gates(slide_no, slide, path, grey, rows, empty, measured)
+            origin = void_origins(slide_no, scene_void(slide)[0], measured["bands"])
+            run.origins.append(origin)
+            drifted = {kind: band for kind, band in origin["bands"].items() if band["origin"] == "render"}
+            if drifted and run.wanted("RENDER_DRIFT"):
+                run.findings.append(finding(
+                    slide_no, "RENDER_DRIFT", drifted, VOID_AGREEMENT,
+                    "The render shows an empty band the scene does not draw, so something the scene holds did not reach "
+                    "the page: compare the page's render with its scene (a shape not emitted, text the renderer set "
+                    "smaller or wrapped differently, a missing font). The repair is the export's; adding or stretching "
+                    "content on the page will not close it."))
     if run.wanted("THIN_PAGE") or run.habit:
         gate_thin_page(slide_no, slide, empty)
     if run.wanted("SCENE_VOID") or run.habit:
@@ -204,17 +285,22 @@ def empty_page_gates(run, slide_no, slide, render_dir):
     run.report(empty)
 
 
-def pixel_gates(slide_no, slide, path, grey, rows, hero):
+def pixel_gates(slide_no, slide, path, grey, rows, hero, measured=None):
     """INK_COVERAGE, DEAD_BAND, INTERNAL_VOID and COLUMN_VOID off the render.
     `rows` is its ink by row, `grey` the decoded render (None when only `path`
-    can be read), `hero` the page's HERO_EXHIBIT findings."""
+    can be read), `hero` the page's HERO_EXHIBIT findings. `measured`, when
+    given, takes the render's `bands` (void_bands) for the scene to be set
+    against (void_origins)."""
     # A page with no exhibit is held to the type floor: the ink its own word
     # floor puts on the canvas, not the ink a chart page shows.
     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
     pixels = []
     surface = ink_matrix(grey, SURFACE_LUMINANCE) if grey is not None else None
     occupied = surface.sum(axis=1).tolist() if surface is not None else load_ink_rows(path, SURFACE_LUMINANCE)
-    gate_ink_and_dead_band(slide_no, without_title_rule(rows, slide), pixels, occupied, text_page=text_page)
+    inked = without_title_rule(rows, slide)
+    if measured is not None:
+        measured["bands"] = void_bands((occupied or inked)[:FOOTER_TOP])
+    gate_ink_and_dead_band(slide_no, inked, pixels, occupied, text_page=text_page)
     gate_column_void(slide_no, slide, surface if surface is not None else load_ink_matrix(path, SURFACE_LUMINANCE), pixels)
     # A page carried by a qualifying hero exhibit is not empty, however thin
     # its marks (a line chart, a map): INK_COVERAGE then defers to the hero

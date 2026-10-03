@@ -47,7 +47,7 @@ def write(name, deck, pages, insights, analyses, sources):
         with open(f'{OUT}/{file}', 'w') as out:
             json.dump(value, out, indent=1)
             out.write('\n')
-    dump({'deck': deck, 'sources': sources, 'pages': pages}, f'{name}.pages.json')
+    dump({'deck': {'schema': 'professional-slides.deck/v3', **deck, 'design': 'consulting', 'density': 'executive'}, 'sources': sources, 'pages': pages}, f'{name}.pages.json')
     dump({'schema': 'professional-slides.insights/v1', 'insights': insights}, f'{name}.insights.json')
     if analyses is not None:
         dump({'schema': 'professional-slides.analysis/v1', 'analyses': analyses}, f'{name}.analysis.json')
@@ -94,24 +94,48 @@ fin_an = [
      'soWhat': 'Eight million of headroom remains above the cover floor', 'strength': 'supporting'},
 ]
 fin_pages = [
+    {'id': 'f0', 'type': 'summary', 'form': 'executive-summary', 'commentary': 'none', 'takeaway': False,
+     'title': 'Harbour is growing faster than its peers on thinner liquidity',
+     'why': 'The opening states the answer and the three findings behind it, each with what it means for the plan',
+     'evidence': ['i-loans', 'i-cash', 'i-earn', 'i-liquidity', 'i-efficiency', 'i-peers', 'A-ocf', 'A-cushion', 'A-peers'],
+     'settles': {'kind': 'comparison', 'what': 'growth, cash generation and liquidity cover against seven regional peers',
+                 'measures': ['i-loans/loans', 'i-cash/ocf', 'i-earn/pat', 'i-efficiency/cost-income', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result', 'A-peers/margin']},
+     'adds': 'Each point carries what its finding means for the plan, which the table does not show',
+     'exhibit': {'type': 'table', 'treatment': 'dimensions', 'columns': ['Measure', 'FY25', 'FY26', 'Read'],
+                 'rows': [['Loan book', '601m', '648m', 'Up 8%'],
+                          ['Profit after tax', '47m', '49m', 'Up 4%'],
+                          ['Operating cash flow', '84m', '66m', 'Down 21%'],
+                          ['Liquid assets', '180m', '196m', 'Up 16m'],
+                          ['Short-term liabilities', '172m', '188m', 'Up 16m'],
+                          ['Liquidity cushion', '8m', '8m', 'Peak 41m'],
+                          ['Cost-to-income ratio', '63%', '62%', 'FY19 71%'],
+                          ['Net interest margin', 'n/a', '2.9%', 'Fourth of eight']],
+                 'basis': {'measures': ['i-loans/loans', 'i-cash/ocf', 'i-earn/pat', 'i-efficiency/cost-income', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result', 'A-peers/margin'], 'role': 'proof'}},
+     'highlight': 'funding comes before further lending',
+     'points': [
+         'Lending is outrunning the funding behind it. Earnings no longer pay for the growth, so each new loan now draws on wholesale money or on the liquid assets that cover what falls due within a year.',
+         'One more year at this pace, funded the same way, breaches the cover floor. The board therefore has to choose between slowing lending and raising term deposits before the next budget, and funding comes before further lending.',
+         'The efficiency gain is real and did not come from shrinking the network, so there is no case for closures. Against its peers Harbour leads on growth, not on margin, which makes the price of new funding the number to protect.',
+         'The peer comparison rests on one year of regulatory returns, and one union publishes no capital ratio, so the ranking is a guide to position rather than a forecast.']},
     {'id': 'f1', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'Loans grew 57% in seven years to 648 million',
      'why': 'The growth of the book over time is the claim, so the series is drawn', 'evidence': ['i-loans'],
      'settles': {'kind': 'rate', 'what': 'loan book at year end FY19 to FY26', 'measures': ['i-loans/loans']},
      'exhibit': chart('Loan book at year end', 'GBP m', FY, [('Loans', loans)], {'measures': ['i-loans/loans'], 'role': 'proof'}, highlights=[{'category': 'FY26'}]),
-     'bar': 'A book this much larger needs funding and capital that grew at the same pace'},
+     'bar': 'A loan book this much larger needs deposits, wholesale funding and regulatory capital that have grown at the same pace, which the next pages test'},
     {'id': 'f2', 'type': 'numbers', 'form': 'metric-strip', 'commentary': 'none', 'title': 'Profit rose again while operating cash flow fell 21%',
      'why': 'Two year-on-year movements set against the cash series that produced one of them', 'evidence': ['i-cash', 'i-earn', 'A-ocf', 'A-earn'],
      'settles': {'kind': 'comparison', 'what': 'profit after tax and operating cash flow, FY25 to FY26', 'measures': ['i-cash/ocf', 'i-earn/pat']},
      'metrics': [{'value': '+4.3%', 'label': 'Profit after tax', 'sublabel': '47 to 49', 'basis': {'measures': ['A-earn/percent']}},
                  {'value': '-21.4%', 'label': 'Operating cash flow', 'sublabel': '84 to 66', 'basis': {'measures': ['A-ocf/percent']}}],
-     'exhibit': chart('Operating cash flow', 'GBP m', FY, [('Operating cash flow', ocf)], {'measures': ['i-cash/ocf'], 'role': 'proof'}, type='chart.column', highlights=[{'category': 'FY26'}])},
+     'exhibit': chart('Operating cash flow', 'GBP m', FY, [('Operating cash flow', ocf)], {'measures': ['i-cash/ocf'], 'role': 'proof'}, type='chart.column', highlights=[{'category': 'FY26'}],
+                      caption='Operating cash flow fell to 66 million in FY26, the first decline in five years, while profit after tax rose to 49 million: growth in lending absorbed the cash that earnings produced')},
     {'id': 'f3', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'The liquidity cushion narrowed from 41 million to 8 million',
      'why': 'The gap between two series in one unit is the claim, so both are drawn on one scale', 'evidence': ['i-liquidity', 'A-cushion', 'A-floor'],
      'settles': {'kind': 'comparison', 'what': 'liquid assets and short-term liabilities at year end',
                  'measures': ['i-liquidity/liquid', 'i-liquidity/short-liabilities'], 'relation': {'kind': 'gap'}},
      'exhibit': chart('Liquid assets and liabilities due within a year', 'GBP m', FY, [('Liquid assets', liquid), ('Short-term liabilities', shortl)],
                       {'measures': ['i-liquidity/liquid', 'i-liquidity/short-liabilities'], 'role': 'proof'}, highlights=[{'category': 'FY26'}]),
-     'bar': 'Another year of lending at this pace would take liquid cover below liabilities'},
+     'bar': 'Another year of lending at this pace, funded the same way, would take liquid assets below the liabilities that fall due within a year'},
     {'id': 'f4', 'type': 'panels', 'form': 'row', 'commentary': 'captions', 'title': 'Costs fell nine points without closing branches',
      'why': 'A ratio and a count in different units, each read on its own panel', 'evidence': ['i-efficiency'],
      'settles': {'kind': 'comparison', 'what': 'cost-to-income and branches open', 'measures': ['i-efficiency/cost-income']},
@@ -129,10 +153,11 @@ fin_pages = [
                      categories=['Northgate', 'Castlefield', 'Ferrybridge', 'Harbour', 'Eastbank', 'Millrace', 'Greyfriars', 'Dunmore'],
                      series=[{'name': 'Margin', 'values': [3.4, 3.1, 3.0, 2.9, 2.8, 2.6, 2.4, 2.2]}], highlights=[{'category': 'Harbour'}],
                      basis={'measures': ['A-peers/margin'], 'role': 'proof'}),
-     'bar': 'Growth, not margin, is where Harbour leads, so the plan protects funding cost first'},
+     'bar': 'Loan growth, not margin, is where Harbour leads its seven regional peers, so the plan protects the cost of funding before it adds lending'},
 ]
 write('finance', {'id': 'finance', 'workflow': 'new_deck',
                   'request': 'Is Harbour Credit Union growing safely, and how does it compare with its regional peers?',
+                  'brief': 'Is Harbour Credit Union growing safely against its regional peers?',
                   'answer': 'Harbour is growing faster than its peers on thinner liquidity, so funding comes before further lending.', 'players': P},
       fin_pages, fin_ins, fin_an,
       {'harbour-ar': {'name': 'Harbour Credit Union annual report 2026', 'status': 'illustrative'},

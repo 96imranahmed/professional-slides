@@ -291,7 +291,9 @@ class SyntheticGoodPageTests(unittest.TestCase):
             # A void past its blocking bar also names the bar (blockAbove); a
             # rule the deck predates says so (waived).
             self.assertLessEqual({"code", "measured", "repair", "severity", "slide", "threshold"}, set(item))
-            self.assertLessEqual(set(item) - {"code", "measured", "repair", "severity", "slide", "threshold"}, {"blockAbove", "waived"})
+            # A void finding names the band it shares with the other instruments (cause) and,
+            # on a rendered page, where the band came from (origin).
+            self.assertLessEqual(set(item) - {"code", "measured", "repair", "severity", "slide", "threshold"}, {"blockAbove", "waived", "cause", "origin"})
             self.assertGreaterEqual(len(item["repair"]), 40, item)
             self.assertIn(" ", item["repair"].strip())
 
