@@ -19,7 +19,7 @@ import re
 from gate_config import (
     ARGUMENT_COMPONENTS, DATA_COMPONENTS, DECK_HABIT, FOOTER_TOP, GENERATED_PAGE, SOURCE_ROLES,
     THRESHOLDS, TITLE_ROLES, WEIGHT, all_components, finding, font_size, is_cover, is_exhibit,
-    layout_of, photo_nodes, source_text, text_nodes, top_level_instances,
+    layout_of, photo_nodes, source_text, standing, text_nodes, top_level_instances,
 )
 from ink import CANVAS_W, SURFACE_LUMINANCE
 from render_gates import (
@@ -345,11 +345,12 @@ def gate_deck_ink(slides, content_indexes, findings, estimate=scene_ink_estimate
     deck is a construction habit. Advisory rather than blocking, because the
     remedy is a design choice the author makes page by page, and a bar that
     blocks invites fills drawn to pass it. `estimate` reads one page's ink."""
-    inks = [estimate(slides[index]) for index in content_indexes if analytical(slides[index], index)]
-    if len(inks) < DECK_HABIT["from"]:
-        return
-    median = sorted(inks)[len(inks) // 2]
-    if median >= SCENE_INK_THRESHOLDS["deck_median"]:
+    each = {index + 1: round(estimate(slides[index]), 3) for index in content_indexes if analytical(slides[index], index)}
+    inks = list(each.values())
+    median = sorted(inks)[len(inks) // 2] if inks else 0
+    standing("DECK_INK", "median analytical page's estimated ink share of its body", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"], "min",
+             unit="share", applies=len(inks) >= DECK_HABIT["from"], each=each)
+    if len(inks) < DECK_HABIT["from"] or median >= SCENE_INK_THRESHOLDS["deck_median"]:
         return
     findings.append(finding(
         None, "DECK_INK", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"],
@@ -796,8 +797,10 @@ def gate_missing_argument(slide_no, slide, findings):
         {"photos": len(photos), "panels": len(exhibits)},
         "one insight, so-what or points column",
         "State the missing interpretation or decision consequence in the "
-        "existing argument region, using `soWhat`, `insight` or developed "
-        "`points` as appropriate. Explain the comparison's result without "
+        "existing argument region: the page's `takeaway` (a closing sentence), "
+        "its `bar` under commentary \"so-what-bar\", or developed `points` "
+        "under commentary \"beside\" or \"below\" (a deck spec written by "
+        "hand: `soWhat` or an `insight`). Explain the comparison's result without "
         "inventing a winner or adding a fixed number of commentary blocks.",
     ))
 

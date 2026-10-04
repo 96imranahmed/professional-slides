@@ -64,6 +64,8 @@ parity, the executive summary before the first section - is the
 
 Delivery hands over a deck only when the checks under [Commands](#commands) pass for the exact current PPTX, scene and renders; every rebuild invalidates the previous review, and the next pass verifies the changed pages. When a check fails, the findings are the result: `REJECTED.md` and `delivery.json` report the blocking findings and no `*-DELIVERED.pptx` remains. The build artifact is retained for inspection.
 
+A finding has one severity, given by the gate that raised it under the deck's rules version, and delivery reports it unchanged. `REJECTED.md` keeps three lists apart: **blockers**; **build bars missed**, each with its measure, its floor and the waiver that would cover it ([build bars](../taste-review.md#acceptance-confirmation-and-build-bars)); and, on a refusal at the page gates or the build bars, the build's **advisories**, which never block and are in `delivery.json` as `advisories`, not `blockers`. A build with advisories only and no missed bar goes on to the deck review.
+
 Blocking findings are factual errors, unsupported claims, misleading comparisons, missing evidence on a ranked criterion, missing argument, unreadable text, overflow, broken geometry, broken dependencies and provenance failures; editorial preferences are advisory. A missing-argument finding names the absent premise and a concrete repair, because blank space or a low word count on its own is a diagnostic.
 
 ## Repairs

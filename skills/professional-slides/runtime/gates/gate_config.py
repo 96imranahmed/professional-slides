@@ -42,6 +42,20 @@ NON_BODY_ROLES = SOURCE_ROLES | CHART_FURNITURE_ROLES | TITLE_ROLES | {
     "tracker-compact-label", "tracker-compact-marker-label", "category-note",
     "chart-heading", "chart-title", "metric-value", "metric-label", "metric-sublabel",
 }
+# The one piece of text on a page that a reference deck's pages do not carry:
+# the runtime's section tracker, a strip of section labels or marker numbers
+# repeated on every page. The text-form band (weight.json plan.textForm) was
+# measured on reference PDFs as pdftotext reads them - chart headings, units,
+# axis rows, category and data labels and legends included, since a PDF's text
+# does not say which words are a chart's - so the measure of our pages
+# (density_profile.py) takes out the tracker and nothing else. Taking the
+# chart's scaffolding out too raised our pages' median words a block by about
+# ten against a band that had counted it, which lowered the floor by as much.
+def is_tracker(node):
+    """Whether a text node is the runtime's section tracker."""
+    return str(node.get("role") or "").startswith("tracker")
+
+
 PROSE_ROLES = {"paragraph", "body", "body-text"}
 LIST_PROSE_ROLES = {"list-item"}
 # Table text is a lookup value, so it may be set one step below body type when
@@ -520,6 +534,37 @@ def configure(fill=None, declared=None):
             if key in WEIGHT and isinstance(value, (int, float)):
                 WEIGHT[key] = value
     return fill
+
+
+# Where the deck stands against each deck-level rule, recorded on every run
+# whether or not the rule is broken: a deck-level refusal should never be the
+# first time its rule is mentioned, so the author's report prints the value,
+# the bar and the room left (author-deck.mjs). `run_gates` clears the list
+# and writes it into the report as `standings`.
+STANDINGS = []
+
+
+# How PAGE_SHAPE_FLAT counts a rail, said on its standing line: one claim beside the exhibit is a close, not commentary
+# (deck-structure.mjs says the same on the line it prints before a deck composes; a test holds the two to one sentence).
+RAIL_AS_CLOSE = ("a rail, a so-what bar and a takeaway are one claim each and leave a page evidence-only; "
+                 "points, paragraphs, captions and cards make it evidence-with-commentary")
+
+
+def standing(code, what, value, bar, side, count=None, of=None, unit=None, applies=True, pages=None, each=None, key=None, note=None):
+    """Record the deck's standing against the rule `code`.
+
+    `note` says how the rule reads a page where its name does not (printed
+    at the end of the standing's line). `what` names the quantity; `value` is held to `bar` on `side` ("max": at
+    most, "min": at least). A share carries its `count` of `of` pages, so the
+    room left is counted in pages. `applies` is False while the deck is too
+    short for the rule to be read. `pages` are the slides counted, and `each`
+    maps a slide number to its own contribution to a measured aggregate."""
+    if code not in GATE_CODES:
+        raise KeyError(f"{code} is not in the gate vocabulary")
+    STANDINGS.append({k: v for k, v in {
+        "code": code, "key": key, "what": what, "value": value, "bar": bar, "side": side, "count": count, "of": of,
+        "unit": unit, "applies": bool(applies), "blocks": code not in ADVISORY_CODES, "pages": pages, "each": each, "note": note,
+    }.items() if v is not None})
 
 
 # The half-empty page, counted across the deck. Each finding it counts is

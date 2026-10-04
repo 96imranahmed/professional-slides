@@ -42,6 +42,8 @@ import { compileDeck, readInsights } from "../../skills/professional-slides/runt
 import { alternativesOf } from "../../skills/professional-slides/runtime/analysis.mjs";
 import { prepareStoryline, validateStorylineRecord, storylineItems } from "../../skills/professional-slides/runtime/storyline.mjs";
 import { BLOCKING } from "../../skills/professional-slides/runtime/review-passes.mjs";
+import { readPagesFileSync } from "../../skills/professional-slides/runtime/pages-file.mjs";
+import { readInsightLog } from "../../skills/professional-slides/runtime/measures.mjs";
 import { QUALITY, fillTemplate, parseJudgeOutput, skillSha, spread } from "./lib.mjs";
 
 const FIXTURES = path.join(QUALITY, "fixtures", "evidence");
@@ -90,8 +92,10 @@ export async function freeze(anchor, root) {
   const dir = path.join(root, anchor.id.replace(/[^A-Za-z0-9._-]+/g, "_"));
   const out = path.join(dir, "out");
   fs.mkdirSync(out, { recursive: true });
-  const doc = readJson(path.join(FIXTURES, `${anchor.deck}.pages.json`));
-  const files = { insights: readJson(path.join(FIXTURES, `${anchor.deck}.insights.json`)), analysis: readJson(path.join(FIXTURES, `${anchor.deck}.analysis.json`)) };
+  const doc = readPagesFileSync(path.join(FIXTURES, `${anchor.deck}.pages.json`));
+  // The log with its parts merged (measures.mjs), staged as one file: a part's path would not resolve in the task folder.
+  const { include: _include, parts: _parts, ...recorded } = await readInsightLog(FIXTURES, anchor.deck);
+  const files = { insights: recorded, analysis: readJson(path.join(FIXTURES, `${anchor.deck}.analysis.json`)) };
   if (anchor.planted) PLANTED[anchor.planted].plant(doc, files);
   fs.writeFileSync(path.join(dir, `${anchor.deck}.insights.json`), JSON.stringify(files.insights));
   if (files.analysis) fs.writeFileSync(path.join(dir, `${anchor.deck}.analysis.json`), JSON.stringify(files.analysis));

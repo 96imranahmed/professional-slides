@@ -46,8 +46,12 @@
     "i-efficiency",
     "i-peers",
     "A-ocf",
+    "A-earn",
     "A-cushion",
-    "A-peers"
+    "A-peers",
+    "A-loans-year",
+    "A-liquid-year",
+    "A-short-year"
    ],
    "settles": {
     "kind": "comparison",
@@ -76,38 +80,38 @@
     "rows": [
      [
       "Loan book",
-      "601m",
-      "648m",
-      "Up 8%"
+      "{{i-loans/loans@FY25 | 0m}}",
+      "{{i-loans/loans@FY26 | 0m}}",
+      "Up {{A-loans-year/percent | 0.0%}}"
      ],
      [
       "Profit after tax",
-      "47m",
-      "49m",
-      "Up 4%"
+      "{{i-earn/pat@FY25 | 0m}}",
+      "{{i-earn/pat@FY26 | 0m}}",
+      "Up {{A-earn/percent | 0.0%}}"
      ],
      [
       "Operating cash flow",
-      "84m",
-      "66m",
-      "Down 21%"
+      "{{i-cash/ocf@FY25 | 0m}}",
+      "{{i-cash/ocf@FY26 | 0m}}",
+      "Down {{A-ocf/percent | 0% | abs}}"
      ],
      [
       "Liquid assets",
-      "180m",
-      "196m",
-      "Up 16m"
+      "{{i-liquidity/liquid@FY25 | 0m}}",
+      "{{i-liquidity/liquid@FY26 | 0m}}",
+      "Up {{A-liquid-year/change | 0m}}"
      ],
      [
       "Short-term liabilities",
-      "172m",
-      "188m",
-      "Up 16m"
+      "{{i-liquidity/short-liabilities@FY25 | 0m}}",
+      "{{i-liquidity/short-liabilities@FY26 | 0m}}",
+      "Up {{A-short-year/change | 0m}}"
      ],
      [
       "Liquidity cushion",
-      "8m",
-      "8m",
+      "{{A-cushion/result@FY25 | 0m}}",
+      "{{A-cushion/result@FY26 | 0m}}",
       "Peak 41m"
      ],
      [
@@ -150,10 +154,11 @@
    "type": "trend",
    "form": "line",
    "commentary": "so-what-bar",
-   "title": "Loans grew 57% in seven years to 648 million",
+   "title": "Loans grew {{A-loans/percent | 0%}} in seven years to {{i-loans/loans@FY26}} million",
    "why": "The growth of the book over time is the claim, so the series is drawn",
    "evidence": [
-    "i-loans"
+    "i-loans",
+    "A-loans"
    ],
    "settles": {
     "kind": "rate",
@@ -237,14 +242,10 @@
      }
     },
     {
-     "value": "-21.4%",
+     "measure": "A-ocf/percent",
+     "format": "+0.0%",
      "label": "Operating cash flow",
-     "sublabel": "84 to 66",
-     "basis": {
-      "measures": [
-       "A-ocf/percent"
-      ]
-     }
+     "sublabel": "84 to 66"
     }
    ],
    "exhibit": {
@@ -315,52 +316,17 @@
    },
    "exhibit": {
     "heading": "Liquid assets and liabilities due within a year",
-    "unit": "GBP m",
-    "categories": [
-     "FY19",
-     "FY20",
-     "FY21",
-     "FY22",
-     "FY23",
-     "FY24",
-     "FY25",
-     "FY26"
-    ],
     "series": [
      {
-      "name": "Liquid assets",
-      "values": [
-       120,
-       131,
-       150,
-       162,
-       158,
-       171,
-       180,
-       196
-      ]
+      "measure": "i-liquidity/liquid",
+      "name": "Liquid assets"
      },
      {
-      "name": "Short-term liabilities",
-      "values": [
-       96,
-       104,
-       118,
-       121,
-       139,
-       160,
-       172,
-       188
-      ]
+      "measure": "i-liquidity/short-liabilities",
+      "name": "Short-term liabilities"
      }
     ],
-    "basis": {
-     "measures": [
-      "i-liquidity/liquid",
-      "i-liquidity/short-liabilities"
-     ],
-     "role": "proof"
-    },
+    "role": "proof",
     "highlights": [
      {
       "category": "FY26"
@@ -529,6 +495,53 @@
     }
    },
    "bar": "Loan growth, not margin, is where Harbour leads its seven regional peers, so the plan protects the cost of funding before it adds lending"
+  },
+  {
+   "id": "f6",
+   "type": "trend",
+   "form": "indexed",
+   "commentary": "so-what-bar",
+   "title": "Cash flow alone has not kept pace with lending",
+   "why": "Four measures in one unit but of very different size, compared on growth since FY19, so each is rebased to 100",
+   "evidence": [
+    "A-index"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "loans, liquid assets, profit and operating cash flow, FY19 to FY26, each indexed to FY19",
+    "measures": [
+     "A-index/loans",
+     "A-index/liquid",
+     "A-index/pat",
+     "A-index/ocf"
+    ],
+    "relation": {
+     "kind": "index"
+    }
+   },
+   "exhibit": {
+    "heading": "Growth since FY19",
+    "series": [
+     {
+      "measure": "A-index/loans",
+      "name": "Loans"
+     },
+     {
+      "measure": "A-index/liquid",
+      "name": "Liquid assets"
+     },
+     {
+      "measure": "A-index/pat",
+      "name": "Profit after tax"
+     },
+     {
+      "measure": "A-index/ocf",
+      "name": "Operating cash flow"
+     }
+    ],
+    "subject": "Operating cash flow"
+   },
+   "bar": "Earnings and liquid assets have grown with the loan book; the cash the business generates has not, which is why the growth now draws on liquidity"
   }
  ]
 }

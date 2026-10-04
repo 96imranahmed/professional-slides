@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from gate_config import THRESHOLDS, finding, lines_of, source_text, text_nodes
+from gate_config import THRESHOLDS, finding, lines_of, source_text, standing, text_nodes
 # Two sentences share what they say in their content words (stopwords.json).
 from text_stats import content_words
 
@@ -309,7 +309,11 @@ def gate_table_schema_flat(slides, content_indexes, findings):
         key = " | ".join(headers[c] for c in sorted(headers) if headers[c])
         if key:
             schemas.setdefault(key, []).append(index + 1)
-    if len(schemas) == 0 or sum(len(v) for v in schemas.values()) < THRESHOLDS["schema_from"]:
+    tables = sum(len(v) for v in schemas.values())
+    commonest = max(schemas.values(), key=len) if schemas else []
+    standing("TABLE_SCHEMA_FLAT", "tables opening on the same column headers", len(commonest), THRESHOLDS["schema_repeat_max"], "max",
+             unit="tables", applies=tables >= THRESHOLDS["schema_from"], pages=list(commonest))
+    if len(schemas) == 0 or tables < THRESHOLDS["schema_from"]:
         return
     for key, pages in sorted(schemas.items(), key=lambda kv: -len(kv[1])):
         if len(pages) <= THRESHOLDS["schema_repeat_max"]:

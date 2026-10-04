@@ -66,6 +66,7 @@ from deck_gates import *  # noqa: E402,F401,F403
 # caller can substitute either for a run.
 from ink import ink_matrix, ink_rows, load_grey, load_ink_matrix, load_ink_rows, render_path  # noqa: E402
 from scene_ink import estimate as scene_ink_estimate  # noqa: E402
+from density_profile import scene_blocks, scene_fragmentation, prose_task  # noqa: E402
 
 GATE_MODULES = (gate_config, render_gates, scene_gates, semantic_gates, deck_gates)
 
@@ -131,6 +132,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
         raise ValueError(f"Unknown density profile: {profile}")
     fill = configure(scene.get("fill"), scene.get("weight"))
     configure_rules(deck if deck is not None else scene)
+    STANDINGS.clear()
     slides = scene.get("slides", [])
     run = GateRun(gates)
     content_indexes = []
@@ -180,6 +182,13 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
         # Each empty band once, however many instruments reported it, and on a rendered page where it came from.
         "voidCauses": causes,
         "findings": reported,
+        # Where the deck stands against every deck-level rule, broken or not (gate_config.standing). The one rule only a
+        # render measures on the page's text - the words a block (density_profile.py) - is estimated from the scene
+        # until there is a render, and says so.
+        "standings": [*STANDINGS, *([] if render_dir else scene_fragmentation(scene)["standings"])],
+        # Each content page's architecture as PAGE_SHAPE_FLAT reads it, for the author's deck-structure report.
+        "architectures": [{"slide": index + 1, "id": slides[index].get("sourceSlideId") or slides[index].get("id"),
+                           "architecture": page_architecture(slides[index])} for index in content_indexes],
     }
 
 
@@ -548,6 +557,10 @@ def page_budget(scene, profile=None):
             "slide": index + 1,
             "id": slide.get("id"),
             "readingTask": slide.get("readingTask"),
+            # The page's text blocks as the render will read them, estimated from the scene (density_profile.scene_blocks):
+            # what the page adds to the deck's median words a block (TEXT_FRAGMENTED), and whether its reading task is prose.
+            "blocks": (lambda blocks: {"count": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
+                                       "prose": prose_task(slide.get("readingTask"))})(scene_blocks(slide)),
             "body": body_words(slide),
             "floor": body_floor(slide),
             "ceiling": words_limit(slide, slide_profile),

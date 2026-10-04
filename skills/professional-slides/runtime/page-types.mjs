@@ -38,6 +38,7 @@ import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
 import { POLARITIES } from "./tables.mjs";
 import { waivedRules, predatedRule, ruleIntroduced } from "./weight.mjs";
 import { textWordList, textWords } from "./text-contract.mjs";
+import { deckSchema } from "./deck-keys.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing, and checked at
@@ -88,7 +89,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { line: CHART("line"), column: CHART("column"), "stacked-column": CHART("stacked-column"), area: CHART("area"),
       "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope"), indexed: CHART("line"),
       sparklines: CHART("sparklines"), model: "model-page" },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, periods: true,
+    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, periods: 4,
   },
   ranking: {
     task: "where every member of the set stands on one measure, the subject marked",
@@ -243,6 +244,19 @@ export const FORM_COMMENTARY = Object.freeze({
   "profiles/radar": ["below", "none"], "trend/model": ["beside", "on-exhibit"],
 });
 const commentaryOf = (type, form) => FORM_COMMENTARY[`${type}/${form}`] ?? PAGE_TYPES[type]?.commentary ?? [];
+/**
+ * The commentary placements a page of `type` and `form` compiles with: the
+ * form's list, less the placements a later compile check refuses for that
+ * form - row blocks carry their commentary in their bullets, a metric strip
+ * leaves no room for points, aligned bars take no callouts.
+ */
+export function placementsOf(type, form) {
+  const all = commentaryOf(type, form);
+  if (form === "labelled-rows") return all.filter((c) => ["in-exhibit", "so-what-bar"].includes(c));
+  if (type === "numbers" && form === "metric-strip") return all.filter((c) => c === "none");
+  if (type === "ranking" && form === "aligned-bars") return all.filter((c) => c !== "on-exhibit");
+  return all;
+}
 
 // What kind of evidence settles a claim (the content plan's vocabulary), and
 // the shape of the data behind it (the insight log's). A page type can only be
@@ -264,16 +278,26 @@ export const familyOf = (type, form) => (type === "profiles" && form === "logo-t
 const OWNED = ["layout", "shape", "arrange", "soWhat", "pageType"];
 // Keys of a typed page that are choices or authoring notes, not slide keys.
 // `draft` and `sourceSlide` are a revision's: the imported slide's old copy
-// and its position in the source deck (runtime/import-deck.py).
-const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "bar", "settles", "adds", "evidence", "draft", "sourceSlide"];
+// and its position in the source deck (runtime/import-deck.py). `limits` is
+// the note `--scaffold` and `--example` print on a page - the countable
+// limits it is held to (limits.mjs) - which the compiler reads past, so a
+// scaffold pasted whole still compiles.
+const CHOICE_KEYS = ["type", "form", "commentary", "takeaway", "why", "series", "rail", "bar", "settles", "adds", "evidence", "draft", "sourceSlide", "limits"];
 
 const exhibitsOf = (page) => [page.exhibit, ...(page.exhibits || [])].filter((e) => e && typeof e === "object");
+
+// The charts that draw `targets` (charts-extra.mjs bulletChart): one target line on every row.
+const TARGET_CHARTS = new Set(["chart.bullet"]);
 
 /** Does a chart mark anything on the plot: a callout, a highlight, a reference, a rate? */
 export function markedChart(ex) {
   // Only what the chart renderers draw: a key they ignore would pass here and
   // leave the plot bare.
-  const lists = ["annotations", "highlights", "referenceLines", "events", "changeAnnotations"];
+  // A bullet chart's mark is the target it sets each measure against
+  // (`targets`): it draws no callout or highlight, and the target line on
+  // every row is the comparison a ranking is asked to mark. Only there: every
+  // other chart ignores the key, and a bare bar chart is not marked by it.
+  const lists = ["annotations", "highlights", "referenceLines", "events", "changeAnnotations", ...(TARGET_CHARTS.has(ex?.type) ? ["targets"] : [])];
   return lists.some((key) => Array.isArray(ex?.[key]) && ex[key].length > 0)
     || ["change", "cagr", "growth", "focusSeries"].some((key) => ex?.[key] !== undefined && ex[key] !== false);
 }
@@ -337,7 +361,7 @@ export const LIMITS = Object.freeze({
   pictogram: { key: "rows", min: 1, max: 5 }, "chart.horizons": { key: "horizons", min: 2, max: 5 },
 });
 /** The limit a page's primary exhibit is held to: its form's, else its component's. */
-const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMITS[target];
+export const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMITS[target];
 // Callouts a chart carries before the plot runs out of clear corridors: past
 // three, the fourth note is commentary and belongs beside the chart.
 export const CALLOUTS_MAX = 3;
@@ -357,6 +381,13 @@ export const takeawayLines = (text) => measureInsight({ x: 0, y: 0, width: BAR_W
 // A row block's label is a name set bold on the house colour, not a sentence:
 // it has to read at a glance down the left edge.
 const BLOCK_LABEL_WORDS = 5, BLOCK_CHART_ROWS = 2;
+// The countable limits on a page's copy that the compile holds and nothing
+// else names: the fewest words a rail, a so-what bar, a caption and a chart's
+// callouts between them carry before they are a label rather than a claim,
+// and how many points a labelled row sets beside its label. Named once here
+// so the check and the published limit (limits.mjs) are one number.
+export const COPY_LIMITS = Object.freeze({ railWordsMin: 10, barWordsMin: 8, captionWordsMin: 8, calloutWordsMin: 10,
+  blockPoints: Object.freeze({ min: 2, max: 4 }), blockLabelWords: BLOCK_LABEL_WORDS, panelWordsMin: PANEL_WORDS_MIN });
 
 // The least a page of each type carries to be worth a page. Below it the type
 // was chosen for less evidence than it needs: a three-phase roadmap, a two-part
@@ -370,9 +401,12 @@ const MINIMUM = Object.freeze({
     ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
     : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
   schedule: (ex, form) => form === "gantt" ? true : form === "horizons" ? (ex.horizons || []).length >= 2 || "the horizons are two to five bets, each { label, title, description } in the order they pay"
-    : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items, or pair it with the evidence behind them as panels",
+    : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items ({ date | period, label, text }), or pair it with the evidence behind them as panels",
   parallel: (ex) => (ex.items || []).length >= 3 || "three or more parallel ideas",
-  mechanism: (ex) => ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3) || "a mechanism has three or more parts",
+  // A decision tree holds exactly two branches (its renderer's limit), so its
+  // parts are the conclusions under them; a rank flow's are its `entities`.
+  mechanism: (ex, form) => (form === "tree" ? (ex.branches || []).flatMap((b) => b?.conclusions || []).length >= 3
+    : ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows", "entities"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3)) || "a mechanism has three or more parts",
   relationship: (ex) => (ex.points || ex.rows || []).length >= 5 || "a relationship needs five or more members to show one",
   bridge: (ex) => (ex.categories || []).length >= 4 || "a bridge has a start, two or more steps and an end",
 });
@@ -401,7 +435,22 @@ const FORM_DATA = {
   "composition/pictogram": ["rows (1 to 5, each { label, value, text } - the figures filled out of `of`)", "of (10 or 20)", "icon (the figure: person by default)"],
   "profiles/radar": ["categories (3 to 8 attributes)", "series (1 to 4 players, one value per attribute)", "max (the scale's top)", "focusSeries (the subject)"],
   "schedule/horizons": ["horizons (2 to 5, each { label, title, description })", "variant (curves, stepped, stepped-minimal, stepped-bands)"],
+  "schedule/timeline": ["items (4 or more, each { date, label, text }: when, what happens, and a sentence on it, set at reading size and counted as the page's words)", "orientation (across or down; absent, the frame decides - rows where the page has the height, columns over commentary below)"],
+  "schedule/roadmap": ["items (4 or more, each { label, period, text }: the stage, when it runs, and what it delivers)", "orientation (across or down; absent, the frame decides)"],
 };
+/**
+ * The forms a plan can give a page of `type` before the page is written
+ * (deck-structure.mjs allocateStructure): the type's first form, and every
+ * other form that is not built for particular data. An indexed trend, a
+ * distribution, small multiples, a radar (FORM_DATA), and a page construction
+ * among a type's chart or component forms - aligned bars, labelled rows, a
+ * table in halves - are chosen by an author who holds that data.
+ */
+export function plannableForms(type) {
+  const forms = Object.entries(PAGE_TYPES[type]?.forms ?? {});
+  const built = ([, target]) => Boolean(CONSTRUCTION_DATA[target]);
+  return forms.filter((entry, at) => at === 0 || !(FORM_DATA[`${type}/${entry[0]}`] || (built(entry) && !built(forms[0])))).map(([form]) => form);
+}
 export function dataKeys(exhibitType, { type, form } = {}) {
   if (FORM_DATA[`${type}/${form}`]) return FORM_DATA[`${type}/${form}`];
   if (CONSTRUCTION_DATA[exhibitType]) return CONSTRUCTION_DATA[exhibitType];
@@ -554,7 +603,11 @@ export function skeletonOf(slide) {
  * The column is the page strong decks draw about one time in eight: a column
  * of points or a rail beside a single exhibit, on either side, and a hero
  * number with its points in the column beside its proof, which reads the same
- * way.
+ * way. A rail is a column here because this reads how the page is drawn - the
+ * exhibit at two thirds of the width beside a side panel. PAGE_SHAPE_FLAT
+ * reads what the page argues with, and counts the same rail as the page's
+ * close, not commentary (deck-structure.mjs declaredArchitecture): the two
+ * rules differ on a rail by design, and each says so on its standing line.
  */
 export function drawnOf(slide) {
   const exhibits = exhibitsOf(slide);
@@ -581,7 +634,7 @@ function checkBlocks(page, id, exhibits) {
     const where = `${id}: block ${at + 1}`;
     if (!block || typeof block !== "object" || typeof block.label !== "string" || !block.label.trim()) throw new Error(`${where} needs its \`label\``);
     if (words(block.label).length > BLOCK_LABEL_WORDS) throw new Error(`${where}: the label "${block.label}" is a sentence; a row's label names the area in ${BLOCK_LABEL_WORDS} words or fewer and its bullets say what happened there`);
-    if (!Array.isArray(block.points) || block.points.length < 2 || block.points.length > 4) throw new Error(`${where} carries two to four \`points\` beside its label; it has ${Array.isArray(block.points) ? block.points.length : 0}`);
+    if (!Array.isArray(block.points) || block.points.length < COPY_LIMITS.blockPoints.min || block.points.length > COPY_LIMITS.blockPoints.max) throw new Error(`${where} carries two to four \`points\` beside its label; it has ${Array.isArray(block.points) ? block.points.length : 0}`);
     const keys = Object.keys(block).filter((key) => !["label", "points", "metric", "exhibit"].includes(key));
     if (keys.length) throw new Error(`${where}: unknown key${keys.length === 1 ? "" : "s"} ${keys.map((k) => `\`${k}\``).join(", ")} - a block is { label, points, metric | exhibit }`);
     if (block.metric && block.exhibit) throw new Error(`${where} carries a \`metric\` or an \`exhibit\` at its right, not both`);
@@ -1109,8 +1162,28 @@ export function citationOf(source, registry, id = "page") {
   if (!registry || typeof registry !== "object") throw new Error(`${id}: \`source\` lists registry keys (${source.join(", ")}), but the pages file has no \`sources\` registry - add \`sources: { key: { name, url, status } }\` beside \`deck\` and \`pages\`, or write the citation as text`);
   const unknown = source.filter((key) => !registry[key]);
   if (unknown.length) throw new Error(`${id}: \`source\` names ${unknown.map((k) => `"${k}"`).join(", ")}, which the \`sources\` registry does not hold; its keys are ${Object.keys(registry).join(", ")}`);
-  const names = source.map((key) => (registry[key].status ? `${registry[key].name} (${registry[key].status})` : registry[key].name));
-  return `${names.length > 1 ? "Sources" : "Source"}: ${names.join("; ")}`;
+  return citationForms(source, registry)[0];
+}
+
+/**
+ * The ways the runtime may set a citation it wrote itself from registry keys,
+ * fullest first: every source by name with its status; by its `short` name
+ * where the registry gives one; without the statuses; then the leading names
+ * with the rest counted ("+3 more"), down to the count alone. The footer
+ * shows the first that fits its lines and the words it has room for under the
+ * note bar (page-template.mjs, core.mjs compileSlide), so a page that rests on
+ * many records is never refused for the citation the runtime derived, and
+ * whatever the footer leaves out is kept whole in the speaker notes. A citation typed as text has one form, the author's.
+ */
+export function citationForms(keys, registry) {
+  const entries = keys.map((key) => registry[key]);
+  const label = entries.length > 1 ? "Sources" : "Source";
+  const line = (names) => `${label}: ${names.join("; ")}`;
+  const named = (short, status) => entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name; return status && e.status ? `${name} (${e.status})` : name; });
+  const brief = named(true, false);
+  const counted = Array.from({ length: Math.max(0, entries.length - 1) }, (_, i) => entries.length - 1 - i)
+    .map((shown) => `${line(brief.slice(0, shown))}; +${entries.length - shown} more in the notes`);
+  return [...new Set([line(named(false, true)), line(named(true, true)), line(brief), ...counted, `${label}: ${entries.length} ${entries.length === 1 ? "record" : "records"}, listed in the notes`])];
 }
 
 /**
@@ -1171,7 +1244,12 @@ function spineOf(page, id, { insights = null, sources = null, rules = null, waiv
   seek(page, "");
   const wrong = polarity.find(([, v]) => !POLARITIES.includes(v));
   if (wrong) throw new Error(`${id}: \`better\` on ${wrong[0] || "the page"} is ${JSON.stringify(wrong[1])}; it names the direction that is good news for the measure - "up" (the default: revenue, share, retention) or "down" (a cost, churn, a wait) - so a delta or trend arrow is coloured by merit, not by sign`);
-  if (page.source !== undefined) page.source = citationOf(page.source, sources, id);
+  if (page.sourceForms !== undefined) throw new Error(`${id}: \`sourceForms\` is written by the compiler from the \`sources\` registry; cite with \`source\` - registry keys, or the citation as text`);
+  if (page.source !== undefined) {
+    const keys = Array.isArray(page.source) ? page.source : null;
+    page.source = citationOf(page.source, sources, id);
+    if (keys) page.sourceForms = citationForms(keys, sources);
+  }
 
   // The content decisions, made before the layout ones and checked first:
   // what settles the claim, and what the commentary adds. With an insight log
@@ -1214,27 +1292,151 @@ function spineOf(page, id, { insights = null, sources = null, rules = null, waiv
  * spine can be critiqued before the copy exists, and the full compile refuses
  * the page until the refusal is met.
  */
-function deferredSlide(page, id, type, { settles, evidence, titleAdvisories, deferred }) {
+function deferredSlide(page, id, type, { settles, evidence, titleAdvisories, deferred, stage = null }) {
   const slide = {};
   for (const [key, value] of Object.entries(page)) if (!CHOICE_KEYS.includes(key)) slide[key] = value;
   const target = type.forms[page.form];
   const exhibits = exhibitsOf(slide);
-  if (exhibits.length && !exhibits[0].type && /^chart\./.test(target)) exhibits[0].type = target;
+  // The exhibit takes the type its form draws, as the full compile sets it - a chart form's own, a ranking's aligned bars as
+  // the chart group they compile to - so the storyline critique reads the same class of exhibit before the copy as after.
+  const draws = formDraws(page.type, page.form);
+  if (exhibits.length && !exhibits[0].type && typeof draws === "string" && draws.startsWith("chart")) exhibits[0].type = draws;
   if (page.type === "panels") { slide.arrange = page.form; if (slide.exhibit) { slide.exhibits = [slide.exhibit, ...(slide.exhibits || [])]; delete slide.exhibit; } }
+  // The kind a form gives the page is the page's from the spine on, as the full compile sets it: the storyline critique is
+  // bound to it, and a page that changed kind when its copy arrived would read as a changed argument.
+  if (page.type === "statement" && page.form === "statement") slide.kind = "statement";
+  if (page.type === "summary") { if (page.form === "takeaways") slide.kind = "takeaways"; else slide.role = "executive-summary"; }
   if (page.commentary === "rail") slide.panel = { text: String(page.rail ?? "").trim() || String(page.title ?? "") };
   if (page.commentary === "so-what-bar" && typeof page.bar === "string" && page.bar.trim()) slide.soWhat = { text: page.bar.trim(), style: "bar" };
   if (typeof page.takeaway === "string") slide.soWhat = page.takeaway.trim();
   const values = plottedValues(exhibits);
+  // An exhibit the spine has not drawn plots nothing yet, which is not a count of zero: the page's depth is read once it is drawn.
   slide.pageType = { type: page.type, form: page.form, commentary: page.commentary, takeaway: typeof page.takeaway === "string",
     ...(page.series ? { series: String(page.series) } : {}), why: page.why.trim(), family: familyOf(page.type, page.form),
-    ...(exhibits.length ? { values } : {}), ...(chartPage(page.type, exhibits) ? { chart: true } : {}),
+    ...(exhibits.length && !exhibits.some(undrawnExhibit) ? { values } : {}), ...(chartPage(page.type, exhibits) ? { chart: true } : {}),
     ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}),
-    advisories: [...titleAdvisories, `deferred to the full compile: ${deferred.replace(`${id}: `, "")}`], deferred,
+    advisories: [...titleAdvisories, `deferred to the full compile: ${deferred.replace(`${id}: `, "")}`], deferred, ...(stage ? { deferredStage: stage } : {}),
     content: { claim: String(page.title ?? page.text ?? "").trim(), ...(settles ? { settles } : {}), adds: page.adds ?? null, ...(evidence.length ? { evidence } : {}) } };
   slide.pageType.structure = structureOf(slide);
   slide.pageType.skeleton = skeletonOf(slide);
   slide.pageType.drawn = drawnOf(slide);
   return slide;
+}
+
+// The exhibit a form draws when the form itself sets its type, or null where
+// the author names it (a hero number's proof, a panel, a row block's exhibit).
+const formDraws = (type, form) => {
+  const target = PAGE_TYPES[type]?.forms[form];
+  if (!target) return null;
+  if (target.startsWith("chart.")) return target;
+  if (target === "aligned-bars") return "chart-group";
+  if (target === "model-page") return CHART("column");
+  if (PAGE_TYPES[type].table || (type === "profiles" && form === "logo-table")) return "table";
+  if (["mechanism", "schedule", "composition", "profiles"].includes(type)) return target;
+  if (type === "parallel" && form !== "labelled-rows") return target;
+  if (type === "numbers" && ["fact-grid", "stat-list"].includes(form)) return target;
+  return type === "place" ? "map" : type === "statement" && form === "quotes" ? "quote-cluster" : type === "options" && form === "compare" ? "compare" : null;
+};
+// How many exhibits a page of each construction carries when its own are not written yet.
+const declaredExhibits = (type, form) => (type === "panels" || (type === "options" && form !== "compare") ? 2
+  : type === "picture" ? (form === "photo-backdrop" ? 1 : 0) : ["argument", "summary", "matrix"].includes(type) || form === "labelled-rows" || form === "statement" ? 0 : 1);
+
+/** An exhibit a spine declares and has not drawn: nothing but its `basis`, its `type`, or neither. */
+export const undrawnExhibit = (ex) => Boolean(ex) && typeof ex === "object" && Object.keys(ex).every((key) => key === "type" || key === "basis");
+
+// An exhibit that names the measures the runtime is to write its numbers from, and carries none yet.
+const unfilledExhibit = (ex) => plottedValues(ex) === 0 && /"measure"\s*:/.test(JSON.stringify(ex));
+
+/**
+ * A page as its declared choices alone describe it: the slide its `type`,
+ * `form` and `commentary` would compile to, with the record the variety
+ * contract counts (`pageType`), and nothing checked. It stands in for a page
+ * that does not compile, and for a page of a plan whose exhibit is not
+ * written yet, so the rules that read a deck's structure are evaluated on
+ * every page on every run (deck-structure.mjs); `pageType.declared` marks it
+ * as provisional. The page's own exhibits are kept where it has them;
+ * otherwise it carries as many as its form draws, typed by the form or, where
+ * the author names the exhibit, by `exhibitType` (the kind its evidence takes,
+ * or a list of kinds, one for each exhibit in turn);
+ * an unwritten profiles page carries the deck's `players`. An exhibit the
+ * page declares with a `basis` stub and has not drawn is read as the stub
+ * declares it (`stubs`, deck-structure.mjs stubsOf): its kind where the form
+ * leaves it open, and the values its measures hold - or no count at all where
+ * it names none, since an undrawn exhibit plots nothing yet rather than zero.
+ * Null for a page with no known type; a form or placement the type does not
+ * offer is left out of the record.
+ */
+export function declaredSlide(pageIn, index = 0, { exhibitType = "table", players = null, stubs = null } = {}) {
+  const page = pageIn && typeof pageIn === "object" ? pageIn : {};
+  const type = PAGE_TYPES[page.type];
+  if (!type) return null;
+  const form = Object.hasOwn(type.forms, page.form ?? "") ? page.form : null;
+  const commentary = form && commentaryOf(page.type, form).includes(page.commentary) ? page.commentary : type.commentary.includes(page.commentary) ? page.commentary : null;
+  const target = form ? type.forms[form] : null;
+  const draws = formDraws(page.type, form);
+  const own = exhibitsOf(page).map((ex) => ({ ...ex }));
+  // An exhibit the spine declares and has not drawn (a `basis` stub) is read as what it declares, never as one drawn with nothing in it.
+  const written = own.filter((ex) => !undrawnExhibit(ex));
+  const exhibits = own.length ? own : Array.from({ length: form ? declaredExhibits(page.type, form) : 0 }, () => ({}));
+  const estimate = (at) => (Array.isArray(exhibitType) ? exhibitType[at % exhibitType.length] ?? "table" : exhibitType);
+  exhibits.forEach((ex, at) => { if (!ex.type) ex.type = at === 0 && draws ? draws : draws && page.type !== "numbers" ? draws : stubs?.kinds?.[at] ?? estimate(at); });
+  if (target === "aligned-bars" && exhibits[0]) exhibits[0].aligned = true;
+  // A profiles page not yet written will introduce the deck's players by their marks.
+  if (page.type === "profiles" && !written.length && exhibits[0] && form !== "radar" && Array.isArray(players))
+    exhibits[0].items = players.map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean).map((name) => ({ name, logo: { alt: `${name} logo` } }));
+  const slide = { id: page.id ?? `page-${index + 1}`, title: page.title ?? "" };
+  const text = ["beside", "beside-left", "below"].includes(commentary);
+  if (Array.isArray(page.points) ? page.points.length : text || form === "executive-summary") slide.points = Array.isArray(page.points) ? page.points : [""];
+  for (const key of ["blocks", "rows", "metrics", "kpi", "photo", "pictures", "paragraphs"]) if (page[key] !== undefined) slide[key] = page[key];
+  if (exhibits.length === 1 && page.type !== "panels") slide.exhibit = exhibits[0]; else if (exhibits.length) slide.exhibits = exhibits;
+  // The layout each choice sets, as layOutPage sets it on a page that compiles.
+  const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
+  if (page.type === "panels") slide.arrange = form ?? "row";
+  else if (page.type === "numbers") {
+    slide.layout = form === "hero-number" ? "hero-number" : form === "metric-strip" ? "metrics-over-exhibit" : layoutFor[commentary] ?? "exhibit-full";
+    if (form === "metric-strip" && !slide.metrics) slide.metrics = [{}];
+  } else if (page.type === "picture" || form === "labelled-rows" || page.type === "argument" || (page.type === "options" && form !== "compare")) { if (target) slide.layout = target; }
+  else if (page.type === "statement") { if (form === "statement") slide.kind = "statement"; }
+  else if (page.type === "summary") { if (form === "takeaways") slide.kind = "takeaways"; else slide.role = "executive-summary"; }
+  else if (target === "model-page") { slide.shape = "model-page"; slide.layout = "stack"; }
+  else if (page.type === "options") { /* a comparison table sets no layout */ }
+  else if (!type.rows && form !== "measure-table") slide.layout = layoutFor[commentary] ?? "exhibit-full";
+  else if (layoutFor[commentary]) slide.layout = layoutFor[commentary];
+  if (type.rows) slide.shape = "findings-matrix";
+  if (form === "measure-table") slide.shape = "measure-table";
+  if (form === "photo-backdrop" && !slide.photo) slide.photo = {};
+  // An argument's prose sets beside its panel in either form.
+  if (page.type === "argument") slide.panel = page.panel ?? { text: "" };
+  if (commentary === "rail") slide.panel = { text: String(page.rail ?? page.title ?? "") };
+  if (commentary === "so-what-bar") slide.soWhat = { text: String(page.bar ?? ""), style: "bar" };
+  if (typeof page.takeaway === "string" && page.takeaway.trim()) slide.soWhat = page.takeaway.trim();
+  const drawn = exhibitsOf(slide);
+  slide.pageType = { type: page.type, ...(form ? { form } : {}), ...(commentary ? { commentary } : {}), takeaway: typeof page.takeaway === "string" && Boolean(page.takeaway.trim()),
+    ...(page.series ? { series: String(page.series) } : {}), why: String(page.why ?? "").trim(), family: familyOf(page.type, form),
+    // What the page plots: its drawn exhibits' values and, for its stubs, the values their measures hold - unread where a stub names none.
+    // An exhibit that names its measures and has not been filled from them is as undrawn as a stub: its depth is not read as zero.
+    ...(own.length && !written.some(unfilledExhibit) && (written.length === own.length || Number.isFinite(stubs?.values)) ? { values: plottedValues(written) + (written.length === own.length ? 0 : stubs.values) } : {}),
+    ...(chartPage(page.type, drawn) ? { chart: true } : {}), declared: true,
+    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(page.settles && typeof page.settles === "object" ? { settles: page.settles } : {}), adds: page.adds ?? null,
+      ...(Array.isArray(page.evidence) && page.evidence.length ? { evidence: page.evidence } : {}) } };
+  slide.pageType.structure = structureOf(slide);
+  slide.pageType.skeleton = skeletonOf(slide);
+  slide.pageType.drawn = drawnOf(slide);
+  return slide;
+}
+
+/**
+ * `page` with another `form` and `commentary` chosen and its content left as
+ * written, for the fit search to compile (fit-search.mjs). An exhibit `type`
+ * the page wrote only to repeat what its form draws is dropped, so the new
+ * form sets it; any other type stays, and the compiler says so if the form
+ * cannot draw it.
+ */
+export function withChoice(page, form, commentary) {
+  const out = structuredClone(page);
+  const first = out.exhibit ?? out.exhibits?.[0];
+  if (form !== page.form && first && typeof first === "object" && first.type !== undefined && first.type === formDraws(page.type, page.form)) delete first.type;
+  return Object.assign(out, { form, commentary });
 }
 
 /**
@@ -1256,8 +1458,11 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   if (!page.type) {
     // A section's number is the divider's numeral and the tracker's marker;
     // "01 / " written into its title as well numbers it three ways.
-    if (page.kind === "section" && typeof page.title === "string" && /^\s*\d{1,2}\s*[/|.:)\-–—]/.test(page.title)) return { ...page, title: page.title.replace(/^\s*(?:section\s+)?\d{1,2}\s*(?:[/|.:)\-–—]\s*)+/i, "").trim() || page.title };
-    if (page.kind && ["section", "divider", "agenda", "cover"].includes(page.kind)) return { ...page };
+    // A structural page written without an id is given one from its kind and its place, here, once: every later stage
+    // - the content plan, the composition, the build - then names it the same way, where each would otherwise number it by its own count.
+    const named = { ...page, id: page.id ?? `${page.kind}-${index + 1}` };
+    if (page.kind === "section" && typeof page.title === "string" && /^\s*\d{1,2}\s*[/|.:)\-–—]/.test(page.title)) return { ...named, title: page.title.replace(/^\s*(?:section\s+)?\d{1,2}\s*(?:[/|.:)\-–—]\s*)+/i, "").trim() || page.title };
+    if (page.kind && ["section", "divider", "agenda", "cover"].includes(page.kind)) return named;
     throw new Error(`${id}: give the page a \`type\` - one of ${Object.keys(PAGE_TYPES).join(", ")} - or a structural \`kind\` (section, agenda). Run \`node runtime/author-deck.mjs --types\` for what each is for.`);
   }
   // `rules` is the deck's { workflow, rulesVersion }: a revision recorded
@@ -1270,14 +1475,18 @@ export function compilePage(pageIn, index = 0, { insights = null, draft = false,
   // draft is written before its copy exists.
   if (spine) {
     try { return compilePage(pageIn, index, { insights, draft: true, players, sources, rules }); }
-    catch (error) { return deferredSlide(page, id, type, { settles, evidence, titleAdvisories: [...titleAdvisories, ...waivedAdvisories], deferred: error.message }); }
+    catch (error) { return deferredSlide(page, id, type, { settles, evidence, titleAdvisories: [...titleAdvisories, ...waivedAdvisories], deferred: error.message, stage: error.stage }); }
   }
   if (page.adds !== undefined && page.adds !== null && typeof page.adds !== "string") throw new Error(`${id}: \`adds\` is what the commentary says that the exhibit cannot - a sentence, or null`);
-  const { slide, target, exhibits, setType, primary } = typedSlide(page, id, type, players);
-  checkExhibitData({ page, id, slide, exhibits, primary });
-  const { values, isChart } = checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories });
-  const { points, unmarkedPoints } = checkCommentary({ page, id, slide, exhibits, primary, draft, rules, waived, waivedAdvisories });
-  layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points });
+  // Each refusal says which step made it (`stage` on the error): the page's shape - the exhibits its form carries and their
+  // types - the evidence those exhibits hold under the type and form, the copy, or the layout. A draft reads it to tell a
+  // refusal the copy or the layout mends from one about what the spine says the page shows (spine-exhibits.mjs).
+  const staged = (stage, run) => { try { return run(); } catch (error) { if (error && typeof error === "object" && error.stage === undefined) error.stage = stage; throw error; } };
+  const { slide, target, exhibits, setType, primary } = staged("shape", () => typedSlide(page, id, type, players));
+  staged("evidence", () => checkExhibitData({ page, id, slide, exhibits, primary }));
+  const { values, isChart } = staged("evidence", () => checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }));
+  const { points, unmarkedPoints } = staged("copy", () => checkCommentary({ page, id, slide, exhibits, primary, draft, rules, waived, waivedAdvisories }));
+  staged("layout", () => layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points }));
   return withPageType({ page, slide, exhibits, primary, values, isChart, unmarkedPoints, waivedAdvisories, settles, evidence, titleAdvisories });
 }
 
@@ -1407,7 +1616,7 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
   // Small multiples carry their periods in each item's values (formExhibit).
   if (type.periods && !["slope", "sparklines"].includes(page.form)) {
     const cats = (primary.categories || []).map(String);
-    if (cats.length < 4 || cats.filter(isPeriodLabel).length < Math.ceil(cats.length * 0.75))
+    if (cats.length < type.periods || cats.filter(isPeriodLabel).length < Math.ceil(cats.length * 0.75))
       throw new Error(`${id}: a trend runs over four or more periods (years, quarters, months); this one has ${cats.length} categories. Two or three periods are a comparison: use numbers or ranking.`);
   }
   if (type.minCategories && (primary.categories || primary.rows || []).length < type.minCategories)
@@ -1520,7 +1729,7 @@ function checkCommentary({ page, id, slide, exhibits, primary, draft, rules, wai
   }
   if (!draft && page.commentary === "captions" && page.type !== "picture") {
     for (const ex of exhibits) {
-      if (words(ex.caption).length < 8) throw new Error(`${id}: a caption is the panel's finding in a sentence - eight words or more, not a label ("${ex.caption}")`);
+      if (words(ex.caption).length < COPY_LIMITS.captionWordsMin) throw new Error(`${id}: a caption is the panel's finding in a sentence - eight words or more, not a label ("${ex.caption}")`);
       if (overlap(`${page.title} ${ex.heading ?? ""}`, ex.caption) > 0.7) throw new Error(`${id}: the caption "${ex.caption}" repeats the title or the panel heading; say what this panel shows that the others do not`);
     }
   }
@@ -1530,17 +1739,17 @@ function checkCommentary({ page, id, slide, exhibits, primary, draft, rules, wai
     const long = (primary.annotations || []).filter((a) => !calloutFits(a.text));
     if (long.length) throw new Error(`${id}: ${long.length} callout${long.length === 1 ? " is" : "s are"} too long for the chart's callout box ("${long[0].text}"); a callout holds about ${countInWords(calloutCapacity())} words - split it, or choose "beside" for the argument`);
     const said = (primary.annotations || []).reduce((n, a) => n + words(a.text).length, 0);
-    if (said < 10) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
+    if (said < COPY_LIMITS.calloutWordsMin) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
   }
   if (page.commentary === "rail") {
-    if (!draft && (typeof page.rail !== "string" || words(page.rail).length < 10)) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
+    if (!draft && (typeof page.rail !== "string" || words(page.rail).length < COPY_LIMITS.railWordsMin)) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
     if (typeof page.rail === "string" && !railFits(page.rail)) throw new Error(`${id}: the rail runs past its eight lines (about ${railCapacity()} words); it is the page's one claim - cut it, or choose "beside" for an argument`);
     slide.panel = { text: String(page.rail ?? "").trim() || page.title };
   }
   if (page.commentary === "so-what-bar") {
     // The bar is the implication the exhibit leads to, so it is written as one:
     // a sentence long enough to say what follows, short enough for two lines.
-    if (!draft && (typeof page.bar !== "string" || words(page.bar).length < 8))
+    if (!draft && (typeof page.bar !== "string" || words(page.bar).length < COPY_LIMITS.barWordsMin))
       throw new Error(`${id}: commentary "so-what-bar" closes the page on the implication - write it as \`bar\`, a sentence of eight words or more`);
     if (typeof page.bar === "string" && !barFits(page.bar))
       throw new Error(`${id}: the so-what bar runs past its two lines; it is one implication - cut it, or choose "beside" for an argument`);
@@ -1744,7 +1953,13 @@ export function markPlayerCells(slide, players) {
   }
 }
 
-/** The normalized plan-gate architecture a compiled page type stands for. */
+/**
+ * The normalized plan-gate architecture a compiled page type stands for. The
+ * plan record reads the declared placement, so a rail is declared here as
+ * commentary beside its evidence (PLAN_STYLE_ENTROPY counts it so);
+ * PAGE_SHAPE_FLAT, read on the composed page, counts a rail as the close of an
+ * evidence-only page.
+ */
 export function architectureOf(slide) {
   const t = slide.pageType;
   if (!t) return null;
@@ -1830,9 +2045,10 @@ export function describeTypes() {
     "`bar` - with commentary `so-what-bar`, the implication set in a filled bar across the foot of the exhibit: a sentence of eight words or more that fits two lines. The bar is the page's close, so `takeaway` is `false`, and it counts toward the closing share.", "",
     "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log (then `settles` is derived from them). A chart or table page is settled by a count, share, rank, rate, sequence, comparison or structure, never `qualitative`.", "",
-    "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, url, status } }` beside `deck` and `pages`), set as \"Source: name (status); name\".", "",
+    "Numbers by reference - where the insight log records measures, a page names the measure and the runtime writes the number: an exhibit's `series: [{ measure: \"<insight id>/<measure>\", name }]` takes its categories, values, unit and basis from the measures (`select: { from, to }`, `{ periods }` or `{ members, order }` narrows the axis; a series naming a recorded measure and then a scenario's path is one line with the assumed run bracketed); a metric, a `kpi`, a row block's `metric` or a fact-grid item is `{ measure, format, label }` (`format` \"+0.0%\", \"CHF 0.0bn | /1000\"); and `{{<insight id>/<measure>@<period or member> | 0.0}}` in any text prints that number. A series that is context beside the claim's own says so itself (`{ measure, role: \"context\", relevance }`); a table whose every measurement is a token, or a grid whose every figure is bound, needs no `basis`. Typed numbers stay allowed: an exhibit's with its `basis`, checked against the measure, and a number typed into text is traced to the measures the page rests on (NUMBER_UNTRACED, advised).", "",
+    "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, short, url, status } }` beside `deck` and `pages`), set as \"Source: name (status); name\". A citation written from keys is fitted by the runtime to the footer's lines and to the words the footer has room for under NOTE_HEAVY, which counts the footer as drawn - `short` names, then the statuses dropped, then the leading names and \"+k more in the notes\", then the count alone, the full list kept in the speaker notes; a citation typed as text is the author's and is held to the footer's lines.", "",
     `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
-    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type> [--evidence <insight-id>]` prints a page of that type that compiles, with the insight's data in its exhibit, to fill in.", "",
+    "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type> [--evidence <insight-id>]` prints a page of that type that compiles, with the insight's measures named in its exhibit, to fill in.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). A point left unmarked is marked on its own figure (its first percentage, amount or count); a point with no figure is named in the advisories (POINT_UNMARKED). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",
     "`better` - on a metric (a strip's `metrics`, a hero's `kpi`, a row block's `metric`), a table column, a table row or one trend cell: the direction that is good news for the measure, \"up\" (the default) or \"down\" (a cost, churn, a wait). A delta and a trend arrow are coloured by it - a rising cost is red - not by their sign.", "",
     `Refused at compile, because a review found each on a finished deck: ${printRules(REVIEW_RULES)}. Advised: ${printRules(ADVISED_RULES)}. Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
@@ -1869,7 +2085,9 @@ export function describeTypes() {
 // Which way a measure is good news: a delta or a trend arrow is coloured by
 // it. On a metric, a table column (every trend cell under it), a row, or a cell.
 const POLARITY_SCHEMA = { enum: [...POLARITIES], default: "up", description: "the direction that is good news for this measure: \"up\" (revenue, share, retention) or \"down\" (a cost, churn, a wait); a delta or trend arrow is coloured by it, not by its sign" };
-const METRIC_SCHEMA = { type: "object", required: ["value"], properties: { value: { type: ["string", "number"] }, label: { type: "string" }, sublabel: { type: "string" },
+const METRIC_SCHEMA = { type: "object", anyOf: [{ required: ["value"] }, { required: ["measure"] }], properties: { value: { type: ["string", "number"] }, label: { type: "string" }, sublabel: { type: "string" },
+  measure: { type: "string", description: "in place of `value`: the number to print, by reference - \"<insight id>/<measure>\", with \"@<period or member>\" for one value of a longer measure; the runtime writes `value` in the `format`" },
+  format: { type: "string", description: "how a `measure` is printed: the digits as 0, 0.0 or 0,0 with what is printed round them (\"+0.0%\", \"CHF 0.0bn\"), then `| abs`, `| /1000` or `| x100`" },
   delta: { type: "string", description: "the signed change, \"+8 pts\" or \"-3%\"; green or red by `better`" }, better: POLARITY_SCHEMA } };
 
 // The exhibit each many-value form reads, for a harness that generates to the schema.
@@ -1905,7 +2123,7 @@ export function pageSchema(only = null) {
       ...(t.forms["labelled-rows"] ? { blocks: { type: "array", minItems: 2, maxItems: 5, description: "form labelled-rows: the rows down the page", items: {
         type: "object", required: ["label", "points"], additionalProperties: false,
         properties: { label: { type: "string" }, points: { type: "array", minItems: 2, maxItems: 4 },
-          metric: { ...METRIC_SCHEMA, required: ["value", "label"] }, exhibit: { type: "object", required: ["type"] } } } } } : {}),
+          metric: { ...METRIC_SCHEMA, required: ["label"] }, exhibit: { type: "object", required: ["type"] } } } } } : {}),
       ...(name === "numbers" ? { metrics: { type: "array", items: METRIC_SCHEMA, description: "form metric-strip: the figures across the top" }, kpi: { ...METRIC_SCHEMA, description: "form hero-number: the one figure" } } : {}),
       ...(t.table ? { exhibit: { type: "object", properties: {
         columns: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object", properties: { better: POLARITY_SCHEMA } }] } },
@@ -1927,11 +2145,12 @@ export function pageSchema(only = null) {
   if (only !== null) return { $schema: "https://json-schema.org/draft/2020-12/schema", $id: `professional-slides.pages/v1#${only}`, ...typed[0] };
   const structural = { type: "object", required: ["kind"], properties: { kind: { enum: ["section", "agenda"] }, hidden } };
   const source = { type: "object", required: ["name"], additionalProperties: false,
-    properties: { name: { type: "string" }, url: { type: "string" }, status: { type: "string", description: "how far the source can be relied on, printed after its name: audited, company-reported, press report, estimate, survey" } } };
+    properties: { name: { type: "string" }, short: { type: "string", description: "the name the footer falls back to when a page's full citation does not fit its lines; the full names stay in the speaker notes" }, url: { type: "string" }, status: { type: "string", description: "how far the source can be relied on, printed after its name: audited, company-reported, press report, estimate, survey" } } };
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema", $id: "professional-slides.pages/v1",
     type: "object", required: ["deck", "pages"],
-    properties: { deck: { type: "object", description: "the deck-level keys of the deck spec (schema, id, workflow, request, design, identity, cover, players, waivers, ...), without slides" },
+    // The deck-level keys are the table the compile holds `deck` to (deck-keys.mjs).
+    properties: { deck: (({ $schema: _schema, $id: _id, ...keys }) => keys)(deckSchema()),
       sources: { type: "object", additionalProperties: source, description: "the source registry: each source once, cited from a page's `source` by key" },
       pages: { type: "array", items: { oneOf: [...typed, structural] } }, appendix: { type: "array", items: { oneOf: typed } } },
   };

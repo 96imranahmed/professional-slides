@@ -338,6 +338,113 @@ console.log(JSON.stringify({ unwaived: [unwaived.rejectedAt, unwaived.blockers.m
         self.assertEqual(result['confirmed'], [True, 8.5])
         self.assertEqual(result['invalid'], ['waivers', ['WAIVERS_INVALID']])
 
+    def test_delivery_keeps_the_severity_the_build_gave_each_finding(self):
+        # A build with one blocker and sixteen advisories was refused with
+        # seventeen "blocking ... major" findings, two of them "measured
+        # [object Object]": delivery relabelled every finding of a failed
+        # report. A finding has the severity its gate gave it; delivery blocks
+        # on blockers and on an unwaived build bar, and lists the rest as advisories.
+        result = run_node(FIXTURES + '''
+const advisories = [
+  { slide: 3, code: 'UNANNOTATED', severity: 'advisory', measured: 0, threshold: 'one annotation on the chart', repair: 'Check whether a decisive comparator is missing at its mark.' },
+  { slide: 4, code: 'SCENE_VOID', severity: 'advisory', measured: { kind: 'column', band: 0.1356, from: 202, to: 285, column: 'left' }, threshold: 0.13, repair: 'Set the group at the top of its column.' },
+  { slide: null, code: 'DECK_CRAFT', severity: 'advisory', measured: { highlight: 0.19, tablesTreated: 0.64 }, threshold: { highlight: 0.35, tablesTreated: 0.75 }, repair: 'Review whether the decisive comparison needs emphasis.' }];
+const blocker = { slide: null, code: 'CRAFT_PLAYERS_UNINTRODUCED', severity: 'blocker', measured: { players: 5, logoPages: 0 }, threshold: 1, repair: 'Introduce the players early on one page.' };
+// The build's result as build-deck writes it: the scene gates' findings before the render (preflight) and after it (gates).
+const built = async (d, { preflight = [], gates = [] }) => {
+  const blocks = (list) => list.some((f) => f.severity === 'blocker');
+  await fs.writeFile(path.join(d.out, 'build-result.json'), JSON.stringify({ status: blocks([...preflight, ...gates]) ? 'built-with-blockers' : 'built', pptxPath: path.join(d.out, 'deck.pptx'),
+    preflight: { passed: !blocks(preflight), findings: preflight }, gates: { passed: !blocks(gates), findings: gates }, readback: { accepted: true, findings: [] } }));
+};
+const blocked = await prebuilt();
+await storylineReady(blocked);
+await built(blocked, { preflight: [...advisories, blocker], gates: advisories });
+const refused = await deliver(blocked, { reviewer: 'packet' });
+const note = await fs.readFile(path.join(blocked.out, 'REJECTED.md'), 'utf8');
+await done(blocked);
+// Advisories alone, and no bar missed: the deck reaches the deck review.
+const advised = await prebuilt();
+await storylineReady(advised);
+await built(advised, { preflight: advisories, gates: advisories });
+const reviewed = await deliver(advised, { reviewer: 'packet' });
+const noNote = !(await exists(path.join(advised.out, 'REJECTED.md')));
+await done(advised);
+// A missed build bar is named as one, with the bar it misses and how it is waived; the advisories stay advisories beside it.
+const plain = await prebuilt({ count: 12, rich: false });
+await storylineReady(plain);
+await built(plain, { preflight: advisories, gates: advisories });
+const barred = await deliver(plain, { reviewer: 'packet' });
+const barNote = await fs.readFile(path.join(plain.out, 'REJECTED.md'), 'utf8');
+await done(plain);
+const section = (text, heading) => (text.split('## ').find((part) => part.startsWith(heading)) ?? '').split('\\n').filter((l) => l.startsWith('- '));
+console.log(JSON.stringify({
+  refused: [refused.rejectedAt, refused.blockers.map((b) => [b.code, b.severity]), refused.advisories.map((b) => [b.code, b.severity])],
+  note: { head: note.split('\\n')[2], blockers: section(note, 'Blockers'), advisories: section(note, 'Advisories (not blocking)'), object: note.includes('[object Object]'), major: / · major:/.test(note),
+    measured: [note.includes('measured players 5, logoPages 0, threshold 1'), note.includes('measured kind column, band 0.1356, from 202, to 285, column left, threshold 0.13'), note.includes('threshold highlight 0.35, tablesTreated 0.75')] },
+  reviewed: [reviewed.accepted, reviewed.rejectedAt ?? null, reviewed.review?.status, noNote],
+  barred: [barred.rejectedAt, [...new Set(barred.blockers.map((b) => `${b.kind}/${b.severity}`))], barred.blockers.map((b) => b.code).sort(), barred.advisories.length],
+  barNote: { head: barNote.split('\\n')[2], bars: section(barNote, 'Build bars missed (waivable)'), blockers: section(barNote, 'Blockers').length, advisories: section(barNote, 'Advisories (not blocking)').length },
+}));
+''')
+        self.assertEqual(result['refused'], ['page gates', [['CRAFT_PLAYERS_UNINTRODUCED', 'blocker']], [['UNANNOTATED', 'advisory'], ['SCENE_VOID', 'advisory'], ['DECK_CRAFT', 'advisory']]])
+        note = result['note']
+        self.assertEqual(note['head'], '1 blocking finding(s); 3 advisories, which do not block. No deliverable was written.')
+        self.assertEqual(len(note['blockers']), 1)
+        self.assertIn('· CRAFT_PLAYERS_UNINTRODUCED · blocker:', note['blockers'][0])
+        # Each advisory once, though both runs of the scene's gates reported it, and under its own severity.
+        self.assertEqual(len(note['advisories']), 3)
+        self.assertTrue(all(' · advisory: ' in line for line in note['advisories']), note['advisories'])
+        self.assertEqual([note['object'], note['major']], [False, False])
+        self.assertEqual(note['measured'], [True, True, True])  # a structured measure is printed by its parts
+        self.assertEqual(result['reviewed'], [False, None, 'pending', True])
+        self.assertEqual(result['barred'][:2], ['build bars', ['build bar/blocker']])
+        self.assertIn('BAR_EXHIBIT_VARIETY', result['barred'][2])
+        self.assertEqual(result['barred'][3], 3)
+        bars = result['barNote']
+        self.assertIn('of them a build bar missed; 3 advisories, which do not block', bars['head'])
+        self.assertEqual([bars['blockers'], bars['advisories']], [0, 3])
+        variety = next(line for line in bars['bars'] if 'BAR_EXHIBIT_VARIETY' in line)
+        self.assertIn('· BAR_EXHIBIT_VARIETY · build bar missed: exhibitVarietyPerTen measured', variety)
+        self.assertIn('against a floor of', variety)
+        self.assertIn('or waive it: if the deck is right to miss this bar, record `waivers: [{ "code": "BAR_EXHIBIT_VARIETY", "reason": "<a sentence saying why>" }]` on `deck` in <id>.pages.json', variety)
+        self.assertIn('the reviewer is shown the waiver and must confirm it', variety)
+
+    def test_an_offline_build_says_so_to_the_reviewer_and_in_the_delivery_record(self):
+        # A deck built without the network declares it (asset-needs.mjs): the
+        # build records which files were not available, and the reviewer's
+        # packet and delivery.json carry the declaration and its reason. It is
+        # shown to the reviewer, who still judges the pages.
+        result = run_node(FIXTURES + '''
+const reason = 'The build machine has no network access and the client supplied no logo files';
+const assets = { fetch: 'none', reason, notAvailable: { logos: ['North Rail', 'Harbour'], pictures: [], places: [] } };
+const d = await prebuilt({ deck: { assets: { fetch: 'none', reason } } });
+await storylineReady(d);
+const build = JSON.parse(await fs.readFile(path.join(d.out, 'build-result.json'), 'utf8'));
+await fs.writeFile(path.join(d.out, 'build-result.json'), JSON.stringify({ ...build, assets }));
+const pending = await deliver(d, { reviewer: 'packet' });
+const rec = await record(d);
+const prompt = await fs.readFile(path.join(rec.staging, 'prompt.md'), 'utf8');
+const packet = JSON.parse(await fs.readFile(path.join(rec.staging, 'packet.json'), 'utf8'));
+const accepted = await deliver(d, { reviewFile: await write(d, 'review.json', firstPass(rec, d.ids)) });
+const recorded = JSON.parse(await fs.readFile(path.join(d.out, 'delivery.json'), 'utf8'));
+await done(d);
+// A build that says nothing of its assets adds nothing to the packet.
+const plain = await prebuilt();
+await storylineReady(plain);
+await deliver(plain, { reviewer: 'packet' });
+const plainPrompt = await fs.readFile(path.join((await record(plain)).staging, 'prompt.md'), 'utf8');
+await done(plain);
+console.log(JSON.stringify({ pending: [pending.review?.status, pending.assets], packet: packet.assets,
+  prompt: ['ASSETS NOT AVAILABLE', `its reason: "${reason}"`, 'the logos of North Rail, Harbour', 'introduced by name', 'do file one where a page does not work without its marks'].map((said) => prompt.includes(said)),
+  accepted: [accepted.accepted, recorded.assets], plain: plainPrompt.includes('ASSETS NOT AVAILABLE') }));
+''')
+        assets = {'fetch': 'none', 'reason': 'The build machine has no network access and the client supplied no logo files', 'notAvailable': {'logos': ['North Rail', 'Harbour'], 'pictures': [], 'places': []}}
+        self.assertEqual(result['pending'], ['pending', assets])
+        self.assertEqual(result['packet'], assets)
+        self.assertEqual(result['prompt'], [True] * 5)
+        self.assertEqual(result['accepted'], [True, assets])
+        self.assertFalse(result['plain'])
+
     def test_a_waiver_takes_exactly_one_verdict(self):
         result = run_node(FIXTURES + '''
 const reason = 'A lookup deck: every page is the same register of facilities, and a reader compares rows, not devices.';

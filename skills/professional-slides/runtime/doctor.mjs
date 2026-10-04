@@ -106,6 +106,9 @@ function binaryCheck(env, platform) {
   };
 }
 
+/** Whether this machine can render: LibreOffice and poppler found. The author's final check renders where it can (author-deck.mjs --check --render). */
+export const rendererInstalled = (env = process.env, platform = process.platform) => Object.values(binaryCheck(env, platform)).every((binary) => binary.found);
+
 // font-metrics.mjs's lookup: RUNTIME_NODE_MODULES first, else this checkout.
 async function canvasCheck(env) {
   try {
@@ -164,7 +167,7 @@ export function describe(report) {
   const todo = report.install.filter((line) => line !== report.python.export);
   if (todo.length) lines.push("", "To install:", ...todo.map((line) => `  ${line}`));
   lines.push("", !report.ready ? "Not ready: install the missing pieces above and run the doctor again."
-    : report.render ? "Ready for a full rendered build."
+    : report.render ? "Ready for a full rendered build. Make the final check before each build with the render: node runtime/author-deck.mjs <id>.pages.json --check --render."
       : "Ready for authoring and unrendered builds only (--no-render); a rendered build also needs soffice, pdftoppm and pdftotext.");
   return lines;
 }

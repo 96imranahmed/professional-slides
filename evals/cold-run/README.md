@@ -17,6 +17,14 @@ node evals/cold-run/score.mjs out/deck.plan.json out/ --json
 
 Exit 0 when the run clears every bar, 2 when it does not.
 
+Where the author's run log is beside the plan or the build directory
+(`<id>.author-log.jsonl`, which `author-deck.mjs` appends to on every run), the
+report also carries what the run cost - `cost`: compile runs and refused runs
+by mode (draft, check, full), runs a page, refusals by code and by page, and
+the longest streak of refused runs on one page. The numbers are counted from
+the log (`runtime/run-log.mjs`), never estimated, and reported, never scored:
+a run that kept no log has no `cost`, and a deck is not accepted for being cheap.
+
 ## Why it scores two things and refuses to average them
 
 - **The plan** — the dot-dash, through `plan_gates.mjs`. What the deck was going
@@ -67,6 +75,9 @@ as what it wrote:
 | --- | --- | --- |
 | `anthropic-vs-openai-2026/` | pages, plan, scene (gzipped), compiled deck | Delivered on 27 September after passing every gate and its delivery review (7.8); an independent reader rated it 6.5 and did not accept it. Today's rules must refuse it. |
 | `emirates-v8/` | pages, plan | A storyline the critique rated 5/10 with three blockers while every plan gate passed: the plan gates' blind spot, kept in view. |
+
+A specimen that kept its author log as `author-log.jsonl` has its cost
+counted from it and recorded with the stamp (`recorded.cost`).
 
 `specimen.json` in each says what is known from outside the gates (delivery,
 reviews, `foundByLooking`), the verdict today's rules must still reach

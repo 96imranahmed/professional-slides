@@ -175,7 +175,11 @@ export function ganttNodes({ id, frame, props }) {
         const lm = measure(ms.label, L.cell * 2, "type.label", false);
         const fits = mx + size / 2 + v("space.1") + lm.width <= gridRight;
         const lx2 = fits ? mx + size / 2 + v("space.1") : mx - size / 2 - v("space.1") - L.cell * 2;
-        nodes.push(text(rid + `:milestone-label-${k}`, "gantt-milestone-label", { x: lx2, y: mid - lm.height / 2, width: L.cell * 2 }, lm, style("type.label", GREY, false, fits ? "left" : "right"), { row: r }));
+        // A label set after its diamond takes the room up to the grid's
+        // edge and no more: on the last period two cells' width ran its box
+        // off the slide though the words themselves fitted.
+        const width = fits ? Math.min(L.cell * 2, gridRight - lx2) : L.cell * 2;
+        nodes.push(text(rid + `:milestone-label-${k}`, "gantt-milestone-label", { x: lx2, y: mid - lm.height / 2, width }, lm, style("type.label", GREY, false, fits ? "left" : "right"), { row: r }));
       }
     });
     nodes.push(rule(rid + ":rule", lx, y + h, gridRight, y + h));

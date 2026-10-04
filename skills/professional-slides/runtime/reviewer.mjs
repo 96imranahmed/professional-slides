@@ -33,12 +33,14 @@ import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from 
 import { normalizeText, textWords } from "./text-contract.mjs";
 import { storylineGate, readStorylineHistory, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
 import { designStatistics, measurePasses, DOWNGRADE_MEASURES } from "./build-bars.mjs";
+import { assetsPrompt } from "./asset-needs.mjs";
+import { dependencyNotes } from "./gates/dependency_gates.mjs";
 import {
   SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, ACCEPT_RATING, MAX_CONFIRMATIONS,
   pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
   uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, deckStatementFindings, unknownKeyErrors, stageReview, lineageStore, isAuthFailure, readConfirmations,
-  requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
+  requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf,
 } from "./review-passes.mjs";
 
 export { MAX_PASSES, MAX_CONFIRMATIONS, designStatistics };
@@ -156,7 +158,9 @@ const STATUS = {
     // The residual severity of a partly fixed finding, when it is now less.
     severity: { type: "string", enum: SEVERITIES },
     // Where a partly fixed deck finding still stands.
-    slides: { type: "array", items: { type: "string" } }
+    slides: { type: "array", items: { type: "string" } },
+    // One answer for each statement of a finding that others were folded into (review-passes.mjs statementsOf).
+    answers: ANSWERS_SCHEMA
   }
 };
 const DENSITY = {
@@ -320,7 +324,7 @@ export function deckLedger(priorLedger, review, { downgrade = () => false } = {}
   const items = deckItems(review);
   if (!priorLedger?.length) return advanceLedger([], review, items);
   // A later pass's density item for a page that stays wrong is the same item, not a new one.
-  return advanceLedger(priorLedger, withDensityStatuses(review, priorLedger), items, { downgrade });
+  return advanceLedger(priorLedger, withDensityStatuses(review, priorLedger), items, { downgrade, automatic: isDensity });
 }
 
 /**
@@ -783,8 +787,8 @@ const proseTask = (task) => Boolean(task) && (String(task).includes("commentary"
 const squash = (text) => normalizeText(text).toLowerCase();
 
 /**
- * A verdict of right on a prose page whose blocks average outside the band
- * strong pages keep says the page is right as it stands, against the measure.
+ * A verdict of right on a prose page whose blocks average outside the middle
+ * half of the reference pages' says the page is right as it stands, against the measure.
  * It holds only on a developed point the page prints: `point` quotes it, word
  * for word, at DEVELOPED_POINT_WORDS or more. A page that has no such point to
  * quote is fragmented or a slab, and its verdict is not right.
@@ -833,7 +837,7 @@ function acceptanceBlockers(review, waivers = []) {
 export function reviewOutcome(review, priorLedger = [], { waivers = [], downgrade = () => false } = {}) {
   const ledger = deckLedger(review?.pass > 1 ? priorLedger : [], review, { downgrade });
   const blocking = openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity,
-    reason: e.status === "open" ? e.reason : `${e.status} (pass ${e.updatedIn}): ${e.reason}`, repair: e.repair }));
+    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair }));
   const held = acceptanceBlockers(review, waivers);
   const newBlockers = ledger.filter((e) => e.raisedIn === (review?.pass ?? 1) && e.severity === "blocker" && e.status === "open");
   return { accepted: review?.accepted === true && blocking.length === 0 && held.length === 0, blocking: [...blocking, ...held], ledger, newBlockers: newBlockers.length };
@@ -908,6 +912,8 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
     ...Object.fromEntries(spreadFiles.map((f) => [`rendered/${f}`, path.join(dir, "rendered", f)])) };
   const previous = await readPacketRecord(store);
   const packetDir = await stageReview("review", staged, { previous: previous?.staging });
+  const specSlides = new Map([...(spec.slides || []), ...(spec.appendix || [])].map((slide) => [slide.id, slide]));
+  const statedNotes = (slide) => { const stated = slide?.pageType?.content?.settles?.stated; return stated ? dependencyNotes({ settles: { stated } }) : []; };
   const slides = scene.slides.map((s, i) => ({
     id: s.id, index: i + 1,
     title: s.nodes.find((n) => n.role === "action-title" || n.role === "cover-title")?.text?.replace(/\n/g, " ") ?? "",
@@ -916,6 +922,8 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
     gateFindings: (gates.findings || []).filter((f) => f.slide === s.id || f.slide === i + 1),
     image: path.join(packetDir, "rendered", `slide-${i + 1}.png`),
     ...checklistOf(s),
+    // What the compile recorded as stated from an assumption, or printed without its sign: the reviewer judges whether the page says so.
+    stated: statedNotes(specSlides.get(s.id)),
   }));
   const statistics = designStatistics(scene);
   const density = confirmation ? null : await readJson(path.join(dir, "density-profile.json"), { optional: true });
@@ -932,7 +940,7 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
   const packet = { binding, kind: confirmation ? "confirmation" : scope ? "verification" : "review", pass: confirmation ? null : scope ? scope.pass : 1,
     verifies: scope ? scope.verifies : null, confirms: confirmation?.confirms ?? null, maxPasses: scope?.maxPasses ?? MAX_PASSES,
     scope: shown, sections, craft, statistics, density, request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec), question: spec.question ?? null, answer: spec.answer ?? spec.context?.governingAnswer ?? "",
-    waivers, storyline, revision: !scope && !confirmation && revision ? { changed: revision.changed } : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
+    waivers, storyline, assets: (await readJson(path.join(dir, "build-result.json"), { optional: true }))?.assets ?? null, revision: !scope && !confirmation && revision ? { changed: revision.changed } : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
     titles: slides.map((s) => `${s.index}. [${s.id}] ${s.title}`), slides, rubric: RUBRIC, severities: SEVERITY_DEFINITIONS, codes: CODES, schema };
   const main = confirmation ? confirmationPrompt(packet) : scope ? verificationPrompt(packet) : reviewPrompt(packet);
   const parts = sections ? [...sections.map((section) => [section.id, sectionPrompt(packet, section)]), ["spine", spinePrompt(packet)]] : [];
@@ -956,13 +964,14 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
 }
 
 // The storyline critique's open items on the pages a deck verification pass
-// rereads: the storyline gate binds only the spine, so a copy change to such a
-// page is checked for its storyline items here rather than by a new critique.
+// rereads: the storyline gate binds only the argument, so a layout or copy
+// change to such a page is checked for its storyline items here rather than
+// by a new critique.
 async function storylineOnChanged(store, changed = []) {
   const latest = (await readStorylineHistory(store)).at(-1);
   const on = new Set(changed);
   const items = openEntries(latest?.ledger || []).filter((e) => (e.pages || []).some((id) => on.has(id)))
-    .map((e) => ({ id: e.id, check: e.dimension, severity: e.severity, pages: e.pages, problem: e.reason }));
+    .map((e) => ({ id: e.id, check: e.dimension, severity: e.severity, pages: e.pages, problem: reasonOf(e) }));
   return { checks: Object.fromEntries(STORYLINE_PAGE_CHECKS.map((c) => [c, STORYLINE_CHECKS[c].checks])), items };
 }
 
@@ -1002,15 +1011,17 @@ const OPENED = (which) => `OPENED. List in \`opened\` the id of every page you a
 const codesPrompt = (packet) => `${Object.entries(packet.codes || CODES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 A defect a build check already names keeps that check's code: a gate finding's own code, MISSING_EVIDENCE for a ranked criterion with no comparative exhibit, LAYOUT_MONOTONY for one construction across most of the deck.`;
 
-const pageLine = (s) => `- [${s.id}] page ${s.index}: ${s.title || "(no title)"} - ${s.image}${s.exhibits?.length ? `; exhibits: ${s.exhibits.map((e) => e.component).join(", ")}` : ""}${s.absent?.length ? `; n/a: ${s.absent.join(", ")}` : ""}`;
+const pageLine = (s) => `- [${s.id}] page ${s.index}: ${s.title || "(no title)"} - ${s.image}${s.exhibits?.length ? `; exhibits: ${s.exhibits.map((e) => e.component).join(", ")}` : ""}${s.absent?.length ? `; n/a: ${s.absent.join(", ")}` : ""}${s.stated?.length ? `; declared: ${s.stated.join("; ")}` : ""}`;
 
 /** The user's request, verbatim, as the yardstick; the deck's answer beside it as the author's. */
 export function requestPrompt(packet) {
   const answer = `THE DECK'S GOVERNING ANSWER (the author's): ${packet.answer || "(not stated)"}`;
   // What the deck says of its request, its evidence and its answer, in the storyline critic's words (review-passes.mjs requestStatement).
   const said = requestStatement(packet, "deck");
-  if (packet.request) return `THE USER'S REQUEST (${said.label ?? "verbatim - the yardstick: judge the deck against it, not against the deck's own framing"}):\n"""\n${packet.request}\n"""${said.scope ? `\n${said.scope}` : ""}\n${answer}${said.offered ? `\n${said.offered}` : ""}`;
-  return `THE USER'S REQUEST: not recorded. Judge the deck against its own question and say in the summary that no verbatim request was supplied. THE DECK'S QUESTION (the author's): ${packet.question || "(not stated)"}\n${answer}`;
+  // What the build could not obtain, and whether the deck declared it would be built without the network (asset-needs.mjs).
+  const assets = assetsPrompt(packet.assets);
+  if (packet.request) return `THE USER'S REQUEST (${said.label ?? "verbatim - the yardstick: judge the deck against it, not against the deck's own framing"}):\n"""\n${packet.request}\n"""${said.scope ? `\n${said.scope}` : ""}\n${answer}${said.offered ? `\n${said.offered}` : ""}${assets ? `\n${assets}` : ""}`;
+  return `THE USER'S REQUEST: not recorded. Judge the deck against its own question and say in the summary that no verbatim request was supplied. THE DECK'S QUESTION (the author's): ${packet.question || "(not stated)"}\n${answer}${assets ? `\n${assets}` : ""}`;
 }
 
 /** The build bars the deck misses and says it is right to, for the reviewer to confirm or refuse. */
@@ -1206,7 +1217,7 @@ export function verificationPrompt(packet) {
 ${requestPrompt(packet)}
 
 OPEN FINDINGS (give every one a status; an open density finding takes its status from the density verdict below):
-${(scope.open || []).filter((f) => !isDensity(f)).map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${(f.pages || []).join(", ") || "deck"}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}${f.downgradable ? ` [measured check now passes (${f.downgradable}): may drop if partly fixed]` : ""}`).join("\n") || "- none"}
+${(scope.open || []).filter((f) => !isDensity(f)).map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${(f.pages || []).join(", ") || "deck"}: ${itemLines(f)}${f.downgradable ? ` [measured check now passes (${f.downgradable}): may drop if partly fixed]` : ""}`).join("\n") || "- none"}
 
 PAGES TO READ at full size (${scope.changed?.length ?? 0} changed since that pass or beside a deleted page, the rest named by an open major or blocker):
 ${pages.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- none"}
@@ -1215,18 +1226,18 @@ Montage, for the sequence: ${packet.montage}
 TITLES ALONE, to check the repaired pages still fit the argument:
 ${(packet.titles || []).join("\n")}
 ${story ? `
-STORYLINE CHECKS ON CHANGED PAGES. The storyline critique binds only the spine, so a copy change to a page is checked here: on every changed page, the claim still ${story.checks.claim}; the shape, sourcing, restatement and consequence still hold as the critique read them. A change that breaks one is a new finding with basis "changed" (dimension argument).${story.items?.length ? ` The critique's open items on these pages:\n${story.items.map((e) => `- ${e.id} · ${e.check} · ${e.severity} · ${(e.pages || []).join(", ")}: ${e.problem}`).join("\n")}` : ""}
+STORYLINE CHECKS ON CHANGED PAGES. The storyline critique binds only the argument, so a layout or copy change to a page is checked here: on every changed page, the claim still ${story.checks.claim}; the shape, sourcing, restatement and consequence still hold as the critique read them. A change that breaks one is a new finding with basis "changed" (dimension argument).${story.items?.length ? ` The critique's open items on these pages:\n${story.items.map((e) => `- ${e.id} · ${e.check} · ${e.severity} · ${(e.pages || []).join(", ")}: ${e.problem}`).join("\n")}` : ""}
 ` : ""}
 ${rubricPrompt()}
 
 ${STANDARDS}
 
 Do three things.
-1. STATUSES. For every open finding, one entry in \`statuses\`: fixed, partly fixed, not fixed or regressed, with the evidence you saw on the page. A partly fixed finding keeps its severity: only a finding marked [measured check now passes] may carry a lower residual \`severity\`, and a deck finding may carry the \`slides\` where it still stands. Do not re-file an open finding as new.
+1. STATUSES. For every open finding, one entry in \`statuses\`: fixed, partly fixed, not fixed or regressed, with the evidence you saw on the page. A partly fixed finding keeps its severity: only a finding marked [measured check now passes] may carry a lower residual \`severity\`, and a deck finding may carry the \`slides\` where it still stands. Do not re-file an open finding as new. ${ANSWERS_RULE}
 2. PAGES. Read every listed page on every page dimension and record it in \`pages\` exactly as the first pass did (verdict and a note per dimension). A page's verdict is the worst open finding naming it, counting the open findings above. ${OPENED("every page listed above")}
 3. NEW FINDINGS, only if additive. A new finding must be major or blocker, and its \`basis\` must be one of:
 ${Object.entries(NEW_BASES).map(([k, v]) => `   - ${k}: ${v}`).join("\n")}
-   Validation refuses a new minor finding, a new finding on a page that did not change unless it is a missed major or blocker that quotes the page in \`evidence\` exactly as printed and justifies why the earlier passes could not see it, and a repeat of an open finding. Give new findings ids no earlier pass used, a \`justification\` ("" is fine for basis changed) and \`evidence\` ("" is fine except for basis missed). The deck is not re-reviewed: stop when these three are done, or the loop never converges.
+   Validation refuses a new minor finding, a new finding on a page that did not change unless it is a missed major or blocker that quotes the page in \`evidence\` exactly as printed and justifies why the earlier passes could not see it. A defect an open finding already names is that finding's status, not a new finding: a new finding with an open finding's code on a page it names is folded into the open one, which stays open, and is refused only where you also call the open one fixed. Give new findings ids no earlier pass used, a \`justification\` ("" is fine for basis changed) and \`evidence\` ("" is fine except for basis missed). The deck is not re-reviewed: stop when these three are done, or the loop never converges.
 
 ${FINDING_RULES}
 

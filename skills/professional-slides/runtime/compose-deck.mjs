@@ -11,10 +11,11 @@ import { readJsonSync } from "./cli.mjs";
 import { applyDesign } from "./design-systems.mjs";
 import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight } from "./compose-tables.mjs";
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
-import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDesignLayout } from "./compose-body.mjs";
+import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
 import { pointsPerRow, resolveFill } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
+import { AGENDA_LIMITS, agendaStyleFor } from "./panels.mjs";
 
 const V3 = "professional-slides.deck/v3";
 
@@ -244,11 +245,43 @@ export function sectionTabs(slidesIn, mode = "pills") {
   });
 }
 
+/** Whether the deck draws a contents page: `contents` where the deck sets it, otherwise from `agenda`, otherwise once it has two sections. */
+const contentsModeOf = (spec) => spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : (spec.slides || []).filter((s) => s?.kind === "section").length >= 2);
+
+/**
+ * Why the deck's contents page cannot hold its sections, or null: the style
+ * the deck names (`agendaStyle`) holds fewer, or the deck has more sections
+ * than any style lists. Read where the deck is authored, so a style the
+ * author chose is refused before a page is composed; a style the deck did
+ * not name is the runtime's to fit (`agendaStyleFor`). The appendix opens
+ * behind a divider of its own, which the contents page lists too.
+ */
+export function contentsProblem(spec) {
+  const room = contentsRoom(spec);
+  return room && room.sections > room.max ? room : null;
+}
+
+/**
+ * Where the deck stands against its contents page, or null when it has none:
+ * its sections (the appendix divider is one), the style it is held to - the
+ * one the deck names, otherwise the list, which holds the most - and what
+ * that style holds.
+ */
+export function contentsRoom(spec) {
+  const sections = (spec.slides || []).filter((s) => s?.kind === "section").length + (Array.isArray(spec.appendix) && spec.appendix.length ? 1 : 0);
+  if (!contentsModeOf(spec) || sections < AGENDA_LIMITS.list.min) return null;
+  const style = spec.agendaStyle === "columns" ? "columns" : "list";
+  return { sections, style, ...AGENDA_LIMITS[style] };
+}
+
 export function agendaPages(slidesIn, agenda, agendaStyle) {
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (!agenda || sections.length < 2) return slidesIn;
   const numbered = new Map(sections.map((s, i) => [s, s.number ?? i + 1]));
   const items = sections.map((s) => ({ label: s.title, ...(s.summary ? { detail: s.summary } : {}) }));
+  // The style the section count fits: columns drawn for a deck of seven
+  // sections are set as the list, since the page is the runtime's to fit.
+  const style = agendaStyleFor(agendaStyle, items.length);
   const out = [];
   let seen = 0;
   for (const slide of slidesIn) {
@@ -261,7 +294,7 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
       const repeats = agenda !== "once";
       if (seen === 0 || repeats) {
         out.push({ kind: "agenda", id: `agenda-${seen + 1}`, title: seen === 0 ? "Contents" : "Agenda",
-                   items, ...(repeats ? { active: seen } : {}), ...(agendaStyle ? { style: agendaStyle } : {}) });
+                   items, ...(repeats ? { active: seen } : {}), ...(style === "columns" ? { style } : {}) });
       }
       // The divider carries the same list, the band one row lower each time:
       // the contents page the reader met at the front, kept up to date. A
@@ -276,7 +309,7 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
 
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
-  return withDesignLayout(spec.designLayout, () => composeDeckWith(spec, baseDir));
+  return withDesignLayout(spec.designLayout, () => withDeckDensity(spec.density, () => composeDeckWith(spec, baseDir)));
 }
 
 function composeDeckWith(spec, baseDir) {
@@ -332,7 +365,7 @@ function composeDeckWith(spec, baseDir) {
     : sections >= 4 && longestSection > 10 ? "number-strip" : "pills";
   const trackerMode = spec.tracker ?? (spec.sectionTabs === false ? false
     : spec.agenda && spec.agenda !== "once" ? "repeat-contents" : defaultTracker);
-  const contentsMode = spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : sections >= 2);
+  const contentsMode = contentsModeOf(spec);
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
   // `appendix: [...]`: the source pages behind the story - the model grid, the
   // full table, the survey instrument - set at `density: "appendix"` behind an

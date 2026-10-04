@@ -8,7 +8,7 @@ For a rejected candidate, find the earliest failed handoff in the [pipeline](../
 
 Keep each rule at one owner and link to it. Use instructions and contrasting examples for judgment, and code for deterministic behaviour; a rule the author meets only by failing belongs in the catalogue (`author-deck.mjs --types`) or in a better message. Test a changed principle on another, materially different case and on its counterexample. Keep the candidate and report history: a rebuild invalidates its review, and the next one verifies the changed pages. Do not tell an independent reviewer the score to produce.
 
-`author-deck.mjs <id>.pages.json --log` lists the findings that came back run after run. Each recurring finding names a limit the author could not see or a message that did not say what to do; fix it at the source - a published budget, a scaffold, a better repair message - rather than in the next deck.
+`author-deck.mjs <id>.pages.json --log` counts what authoring cost - compile runs and refused runs by mode, the plan runs beside them, refusals by code and by page, the longest streak of refused runs on one page - and lists the findings that came back run after run. It counts only what is logged, and says so (`counted`): the catalogue commands, the analysis, the critique, the build and delivery are not, so a session's command count is larger; `evals/cold-run/score.mjs` records the same numbers for a run it scores. Each recurring finding names a limit the author could not see or a message that did not say what to do; fix it at the source - a published budget, a scaffold, a better repair message - rather than in the next deck.
 
 ## Evaluating the skill
 

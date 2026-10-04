@@ -5,6 +5,11 @@
 //                                              [--review review.json|confirmation.json|parts-dir] [--skip-build]
 //                                              [--full-review --reason "<why>" [--user-approved]] [--max-passes n]
 //
+// A finding keeps the severity its gate gave it. Delivery blocks on the
+// build's blockers and on a missed build bar the deck has not waived, and says
+// which is which; the build's advisories are listed as advisories and never
+// block. REJECTED.md and delivery.json keep the three apart.
+//
 // The order is fixed. The build and its page gates; the deck's verbatim
 // `request` (a new deck must carry it) and its build-bar waivers; the storyline
 // critique ready for the deck's current spine; the build bars measured on the
@@ -42,7 +47,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
-import { buildDeck } from "./build-deck.mjs";
+import { buildDeck, isBlocking } from "./build-deck.mjs";
 import { isRefusal, registered } from "./errors.mjs";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { barOutcome } from "./build-bars.mjs";
@@ -70,11 +75,41 @@ export const DELIVERY_CODES = Object.freeze({
   LINEAGE_RESTART: "a new review lineage asked for without a reason, or a second one without the user's approval",
 });
 
+// What a gate measured, or the bar it measured against, in words: a number or
+// a phrase as it is, and a structured value by its parts ("players 5,
+// logoPages 0") rather than as "[object Object]".
+function measuredText(value) {
+  if (value === null || value === undefined) return "?";
+  if (Array.isArray(value)) return value.map(measuredText).join(", ");
+  if (typeof value === "object") return Object.entries(value).map(([key, part]) => `${key} ${part !== null && typeof part === "object" ? `(${measuredText(part)})` : measuredText(part)}`).join(", ");
+  return String(value);
+}
+
 // A refusal's findings as delivery blockers: the build refused the deck for a
 // rule the author can repair, and REJECTED.md says which.
 const refusalBlockers = (error) => (error.findings?.length ? error.findings : [{ code: error.code, reason: error.message }]).map((f) => ({
   slide: f.slide ?? null, code: f.code ?? error.code, severity: "blocker",
-  reason: f.reason ?? f.message ?? `${f.code}: measured ${f.measured ?? "?"}, threshold ${f.threshold ?? "?"}`, repair: f.repair ?? "" }));
+  reason: f.reason ?? f.message ?? `${f.code}: measured ${measuredText(f.measured)}, threshold ${measuredText(f.threshold)}`, repair: f.repair ?? "" }));
+
+/**
+ * The build's gate findings as delivery reads them: each with the severity its
+ * gate gave it, once - the scene's gates run before the render and again after
+ * it, and report the same finding twice. `blockers` are those that block
+ * (build-deck.mjs isBlocking), from a report that failed; `advisories` are the
+ * rest, which delivery lists and never blocks on.
+ */
+function gateFindings(build) {
+  const seen = new Set(), blockers = [], advisories = [];
+  for (const [stage, report] of [["gate", build.gates], ["preflight", build.preflight]]) for (const f of report?.findings || []) {
+    const key = `${f.code}|${f.slide ?? f.id ?? ""}|${JSON.stringify(f.measured ?? "")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const finding = { slide: f.slide ?? null, code: f.code, severity: f.severity ?? "blocker", reason: f.reason || `${stage} ${f.code}: measured ${measuredText(f.measured)}, threshold ${measuredText(f.threshold)}`, repair: f.repair || "" };
+    if (!isBlocking(f)) advisories.push(finding);
+    else if (report.passed === false) blockers.push(finding);
+  }
+  return { blockers, advisories };
+}
 
 export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto", model, reviewFile, skipBuild = false, fullReview = false, reason, userApproved = false, maxPasses = MAX_PASSES } = {}) {
   const directory = await assertOutputDirectory(outputDirectory);
@@ -85,7 +120,8 @@ export async function deliverDeck(specPath, outputDirectory, { reviewer = "auto"
   const delivered = path.join(directory, `${stem}-DELIVERED.pptx`);
   const rejectedNote = path.join(directory, "REJECTED.md");
   const report = { accepted: false, stage: "build" };
-  const context = { specPath, spec, directory, delivered, rejectedNote, report };
+  // `advisories` are the build's, set once it is read: a refusal at the page gates or the build bars lists them beside what blocks.
+  const context = { specPath, spec, directory, delivered, rejectedNote, report, advisories: [] };
   try {
     return await deliverSteps(context, { reviewer, model, reviewFile, skipBuild, fullReview, reason, userApproved, maxPasses });
   } catch (error) {
@@ -99,14 +135,18 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   const refuse = (stage, blockers) => reject(context, stage, blockers);
   const build = skipBuild ? await readJson(path.join(directory, "build-result.json")) : await buildDeck(specPath, directory);
   report.build = { status: build.status, pptx: build.pptxPath, montage: build.montagePath };
+  // What the build could not obtain, and the deck's declaration that it was built without the network (asset-needs.mjs): the delivery record says so.
+  if (build.assets) report.assets = build.assets;
   const blockers = [];
   if (build.gates?.passed !== true) blockers.push({ slide: null, code: "MISSING_RENDERED_GATES", severity: "blocker", reason: "Delivery requires passing rendered page gates", repair: "Rebuild with rendering enabled before delivery" });
   if (build.readback && build.readback.accepted !== true) blockers.push(...(build.readback.findings || []).slice(0, 20).map((f) => ({ slide: f.slide ?? null, code: "BROKEN_GEOMETRY", severity: "blocker", reason: `readback ${f.code} on ${f.shape || ""}`, repair: "Fix the emitter or the scene so the saved file matches the scene" })));
-  if (build.gates && build.gates.passed === false) blockers.push(...(build.gates.findings || []).map((f) => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: `gate ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
-  if (build.preflight?.passed === false) blockers.push(...(build.preflight.findings || []).map(f => ({ slide: f.slide ?? null, code: f.code, severity: "major", reason: f.reason || `preflight ${f.code}: measured ${f.measured}, threshold ${f.threshold}`, repair: f.repair || "" })));
+  // The gates' findings at the severity each gate gave them: only a blocker blocks here, and the advisories are carried as advisories.
+  const gated = gateFindings(build);
+  context.advisories = gated.advisories;
+  blockers.push(...gated.blockers);
   // The build names what else held it back - text lost from the rendered
   // pages, most often - rather than leaving "not complete" to be diagnosed.
-  if (build.status !== "built" && !blockers.length) blockers.push(...(build.blockers || []).filter((b) => b.source !== "page gates" && b.source !== "readback").slice(0, 20)
+  if (build.status !== "built" && !blockers.length) blockers.push(...(build.blockers || []).slice(0, 20)
     .map((b) => ({ slide: b.slide ?? null, code: b.code, severity: "blocker", reason: `${b.source} ${b.code}${b.id ? ` on ${b.id}` : ""}${b.text ? `: "${b.text}"` : ""}`, repair: b.repair || "Fix the page so the saved deck carries every planned text, then rebuild" })));
   if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return refuse("page gates", blockers);
@@ -141,9 +181,10 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   const scene = await readJson(path.join(directory, "scene.json"));
   const bars = barOutcome(scene, spec.waivers || [], { purpose: spec.purpose ?? null });
   report.bars = { statistics: bars.statistics, misses: bars.misses.map((f) => f.code), waived: bars.waived.map((f) => f.code) };
-  if (bars.unwaived.length) return refuse("build bars", bars.unwaived.map((f) => ({ slide: null, code: f.code, severity: "blocker",
+  if (bars.unwaived.length) return refuse("build bars", bars.unwaived.map((f) => ({ slide: null, code: f.code, severity: "blocker", kind: BUILD_BAR,
     reason: `${f.measure} measured ${f.measured} against ${f.floor !== undefined ? `a floor of ${f.floor}` : `a ceiling of ${f.ceiling}`} (strong decks: ${JSON.stringify(f.reference ?? null)})`,
-    repair: "Rework the pages that hold the measure down and rebuild; if the deck is right to miss this bar, record a waiver { code, reason } in <id>.pages.json - the reviewer must confirm it" })));
+    repair: "Rework the pages that hold the measure down and rebuild",
+    waiver: `if the deck is right to miss this bar, record \`waivers: [{ "code": "${f.code}", "reason": "<a sentence saying why>" }]\` on \`deck\` in <id>.pages.json, recompile and rebuild - the reviewer is shown the waiver and must confirm it` })));
   const waivers = bars.waived;
 
   // The author reproduces every claim before anyone reviews the deck: a review
@@ -327,12 +368,26 @@ async function pending({ report, directory, delivered, rejectedNote, maxPasses }
   return report;
 }
 
-async function reject({ report, directory, delivered, rejectedNote }, stage, blockers) {
+// What a refusal lists, kept apart: a blocker (a gate's, a stage's or the
+// review's finding at the severity it was given), a build bar the deck misses
+// and has not waived, and the build's advisories, which do not block.
+const BUILD_BAR = "build bar";
+// The stages whose repair is to the pages as drawn: a refusal there lists the build's advisories too, since they are repaired in the same pass.
+const DRAWN_STAGES = ["page gates", "build bars"];
+
+async function reject({ report, directory, delivered, rejectedNote, advisories = [] }, stage, blockers) {
   await fs.rm(delivered, { force: true });
+  const listed = DRAWN_STAGES.includes(stage) ? advisories : [];
   report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
-  const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s). No deliverable was written.`, ""];
-  for (const b of blockers) lines.push(`- slide ${b.slide ?? "deck"} · ${b.code} · ${b.severity}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}`);
-  await fs.writeFile(rejectedNote, lines.join("\n") + "\n");
+  if (listed.length) report.advisories = listed;
+  const where = (b) => ((b.slides || []).length > 1 ? `slides ${b.slides.join(", ")}` : `slide ${b.slide ?? "deck"}`);
+  const line = (b, label = b.severity) => `- ${where(b)} · ${b.code} · ${label}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}`;
+  const bars = blockers.filter((b) => b.kind === BUILD_BAR), blocking = blockers.filter((b) => b.kind !== BUILD_BAR);
+  const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s)${bars.length ? `, ${bars.length} of them a build bar missed` : ""}${listed.length ? `; ${listed.length} advisor${listed.length === 1 ? "y" : "ies"}, which do not block` : ""}. No deliverable was written.`, ""];
+  if (blocking.length) lines.push("## Blockers", "", ...blocking.map((b) => line(b)), "");
+  if (bars.length) lines.push("## Build bars missed (waivable)", "", ...bars.map((b) => `${line(b, "build bar missed")}; or waive it: ${b.waiver}`), "");
+  if (listed.length) lines.push("## Advisories (not blocking)", "", "The build raised these as advisories and delivery does not block on them; the reviewer may still judge the pages.", "", ...listed.map((b) => line(b)), "");
+  await fs.writeFile(rejectedNote, lines.join("\n"));
   await writeJson(path.join(directory, "delivery.json"), report);
   return report;
 }

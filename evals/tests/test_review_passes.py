@@ -191,11 +191,158 @@ console.log(JSON.stringify({
         self.assertTrue(any('not printed on p05' in e for e in result['missedMisquoted']), result['missedMisquoted'])
         self.assertEqual(result['missedQuoted'], [])
         self.assertEqual(result['missedBlocker'], [])
-        self.assertTrue(any('already F1' in e for e in result['repeat']))
+        # A new finding that restates the open one beside its "not fixed" is that finding again, folded in rather than refused
+        # (test_a_new_finding_that_restates_an_open_one_is_folded_into_it).
+        self.assertEqual(result['repeat'], [])
         self.assertTrue(any('already in the ledger' in e for e in result['reusedId']))
         self.assertTrue(any('pass must be 2' in e for e in result['wrongPass']))
         self.assertTrue(any('verifies' in e for e in result['wrongLineage']))
         self.assertTrue(any('p04' in e for e in result['unread']))
+
+    def test_a_fold_never_loses_what_the_folded_finding_said(self):
+        # A new blocker with an open minor item's code and page was folded into
+        # it: the item kept its first reason, the blocker's text survived only
+        # in `folded`, which no later prompt printed, and the next pass closed
+        # the item on evidence about the first statement alone.
+        result = run_node('''
+import * as P from './skills/professional-slides/runtime/review-passes.mjs';
+import { storylineVerificationPrompt, STORYLINE_VERIFICATION_SCHEMA } from './skills/professional-slides/runtime/storyline.mjs';
+import { reviewOutcome } from './skills/professional-slides/runtime/reviewer.mjs';
+const prior = [{ id: 'F1', code: 'STORY_SHAPE', dimension: 'shape', severity: 'minor', pages: ['p3'], reason: 'The chart could show the whole peer set', repair: 'Add the peers', status: 'open', raisedIn: 1, updatedIn: 1 }];
+const second = { pass: 2, verifies: 'b1', statuses: [{ finding: 'F1', status: 'partly fixed', evidence: 'Four of the seven peers are on the chart now.' }] };
+const item = { id: 'N1', code: 'STORY_SHAPE', severity: 'blocker', pages: ['p3'], basis: 'changed', reason: 'The page now plots a forecast as if it were a record', repair: 'Mark the forecast years' };
+const ledger = P.advanceLedger(prior, second, [item]);
+const scope = { pass: 3, verifies: 'b2', maxPasses: 3, changed: ['p3'], deleted: [], mustInspect: [], open: P.openEntries(ledger), ledger };
+const check = (statuses) => P.verificationErrors({ pass: 3, verifies: 'b2', statuses, findings: [] }, { scope, ledger, items: [], ids: ['p3'] });
+const first = { finding: 'F1', evidence: 'All seven peers are on the chart on page three now.' };
+const both = [{ statement: 'F1', evidence: 'All seven peers are on the chart on page three now.' }, { statement: 'N1', evidence: 'The forecast years are hatched and labelled as a plan.' }];
+const after = (statuses) => P.advanceLedger(ledger, { pass: 3, statuses }, []).map((e) => [e.id, e.status, e.severity, P.openBlocking([e]).length]);
+const prompt = storylineVerificationPrompt({ mode: 'spine', binding: 'b3', pages: [], sources: [], analyses: [], request: 'Which of the two should the board back, and why?', answer: 'The first.', scope });
+console.log(JSON.stringify({
+  entry: ledger.map((e) => [e.id, e.severity, e.status, e.reason]), statements: P.statementsOf(ledger[0]).map((f) => [f.id, f.pass]), reason: P.reasonOf(ledger[0]), lines: P.itemLines(ledger[0]).split('\\n'),
+  listed: prompt.split('\\n').filter((l) => l.includes('F1') || l.includes('N1')).slice(0, 2), rule: prompt.includes('holds every one of those statements'),
+  schema: Object.keys(STORYLINE_VERIFICATION_SCHEMA.properties.statuses.items.properties).includes('answers'),
+  refused: { fixed: check([{ ...first, status: 'fixed' }]), partly: check([{ ...first, status: 'partly fixed' }]), half: check([{ ...first, status: 'fixed', answers: both.slice(0, 1) }]),
+    thin: check([{ ...first, status: 'fixed', answers: [both[0], { statement: 'N1', evidence: 'ok' }] }]), stranger: check([{ ...first, status: 'not fixed', answers: [{ statement: 'N7', evidence: 'A statement this item never held.' }] }]) },
+  allowed: { notFixed: check([{ ...first, status: 'not fixed' }]), fixed: check([{ ...first, status: 'fixed', answers: both }]) },
+  ledgers: { silent: after([{ ...first, status: 'fixed' }]), answered: after([{ ...first, status: 'fixed', answers: both }]) },
+  outcome: reviewOutcome({ pass: 3, accepted: true, statuses: [{ ...first, status: 'not fixed' }], findings: [] }, ledger).blocking.filter((b) => b.id === 'F1').map((b) => b.reason),
+}));
+''')
+        # The entry keeps its first reason and takes the worse severity; the folded statement is one of its statements.
+        self.assertEqual(result['entry'], [['F1', 'blocker', 'partly fixed', 'The chart could show the whole peer set']])
+        self.assertEqual(result['statements'], [['F1', 1], ['N1', 2]])
+        # Every later packet prints it under the item, with the pass it was made in, and so does a refusal.
+        self.assertEqual(result['lines'], ['The chart could show the whole peer set → Add the peers',
+                                           '    also, from pass 2 (filed as N1, blocker, on p3): The page now plots a forecast as if it were a record → Mark the forecast years'])
+        self.assertIn('F1 · shape · blocker · p3: The chart could show the whole peer set', result['listed'][0])
+        self.assertIn('also, from pass 2 (filed as N1, blocker, on p3): The page now plots a forecast as if it were a record', result['listed'][1])
+        self.assertTrue(result['rule'] and result['schema'])
+        self.assertIn('also, from pass 2 (filed as N1, blocker, on p3): The page now plots a forecast', result['reason'])
+        self.assertTrue(all('The page now plots a forecast' in reason for reason in result['outcome']) and len(result['outcome']) == 1)
+        # A status that says the item moved answers every statement it holds, or is refused.
+        for case in ['fixed', 'partly', 'half', 'thin']:
+            self.assertEqual(len(result['refused'][case]), 1, case)
+            self.assertIn('without answering', result['refused'][case][0])
+        for unanswered in ('F1 (it has no answer', 'N1 (it has no answer'):
+            self.assertIn(unanswered, result['refused']['fixed'][0])
+        self.assertIn('N1 (it has no answer', result['refused']['half'][0])
+        self.assertNotIn('F1 (it', result['refused']['half'][0].split('without answering')[1])
+        self.assertIn('N7, which F1 does not hold', result['refused']['stranger'][0])
+        self.assertEqual(result['allowed'], {'notFixed': [], 'fixed': []})
+        # And the ledger itself never closes the item on a status that is silent on a folded statement.
+        self.assertEqual(result['ledgers'], {'silent': [['F1', 'not fixed', 'blocker', 1]], 'answered': [['F1', 'fixed', 'blocker', 0]]})
+
+    def test_an_answer_to_a_folded_statement_is_about_that_statement(self):
+        # The answers were checked for length alone: "n/a n/a n/a n/a n/a n/a"
+        # under every statement closed the item. An answer is its own - not
+        # another's, not the statement given back - says something, and is
+        # about its statement: one of its terms, or the page or artifact that changed.
+        result = run_node('''
+import * as P from './skills/professional-slides/runtime/review-passes.mjs';
+const prior = [{ id: 'F1', code: 'STORY_SHAPE', dimension: 'shape', severity: 'minor', pages: ['p3'], reason: 'The chart could show the whole peer set', repair: 'Add the peers', status: 'open', raisedIn: 1, updatedIn: 1 }];
+const item = { id: 'N1', code: 'STORY_SHAPE', severity: 'blocker', pages: ['p3'], basis: 'changed', reason: 'The page now plots a forecast as if it were a record', repair: 'Mark the forecast years' };
+const ledger = P.advanceLedger(prior, { pass: 2, verifies: 'b1', statuses: [{ finding: 'F1', status: 'partly fixed', evidence: 'Four of the seven peers are on the chart now.' }] }, [item]);
+const scope = { pass: 3, verifies: 'b2', maxPasses: 3, changed: ['p3'], deleted: [], mustInspect: [], open: P.openEntries(ledger), ledger };
+const status = (f1, n1, extra = {}) => [{ finding: 'F1', status: 'fixed', evidence: 'All seven peers are on the chart on page three now.', answers: [{ statement: 'F1', evidence: f1 }, { statement: 'N1', evidence: n1 }], ...extra }];
+const check = (...args) => P.verificationErrors({ pass: 3, verifies: 'b2', statuses: status(...args), findings: [] }, { scope, ledger, items: [], ids: ['p3'] });
+const after = (...args) => P.advanceLedger(ledger, { pass: 3, statuses: status(...args) }, []).map((e) => [e.id, e.status, P.openBlocking([e]).length]);
+const peers = 'All seven peers are on the chart on page three now.', forecast = 'The forecast years are hatched and labelled as a plan.';
+console.log(JSON.stringify({
+  good: check(peers, forecast),
+  filler: check('n/a n/a n/a n/a n/a n/a', 'n/a n/a n/a n/a n/a n/a'), fillerApart: check('n/a n/a n/a n/a n/a n/a 1', 'n/a n/a n/a n/a n/a n/a 2'), done: check(peers, 'done done done done done done'),
+  same: check(peers, peers), echoed: check(peers, 'The page now plots a forecast as if it were a record'), echoedWhole: check('The chart could show the whole peer set - add the peers.', forecast),
+  unrelated: check(peers, 'Everything raised was addressed properly and completely.'),
+  page: check(peers, 'On p3 everything after 2026 is hatched and keyed as planned.'), artifact: check(peers, 'The revised appendix-table carries hatching after 2026 throughout.', { artifact: 'appendix-table' }),
+  otherPage: check(peers, 'On p9 everything after 2026 is hatched and keyed as planned.'),
+  ledgers: { filler: after('n/a n/a n/a n/a n/a n/a', 'n/a n/a n/a n/a n/a n/a'), good: after(peers, forecast) }, rule: P.ANSWERS_RULE }));
+''')
+        self.assertEqual([result['good'], result['page'], result['artifact']], [[], [], []])
+        why = {'filler': 'is answered with filler', 'fillerApart': 'is answered with filler', 'done': 'N1 (it is answered with filler', 'same': 'is given the same answer as another statement',
+               'echoed': 'N1 (it is answered with its own words', 'echoedWhole': 'F1 (it is answered with its own words', 'unrelated': 'N1 (it is answered without a word of what it says',
+               'otherPage': 'N1 (it is answered without a word of what it says'}
+        for case, said in why.items():
+            self.assertEqual(len(result[case]), 1, case)
+            self.assertIn(said, result[case][0], case)
+            self.assertIn('different from every other answer and from the statement itself', result[case][0])
+        # Filler under both statements names both; and the ledger keeps the item open on it.
+        self.assertIn('F1 (it is answered with filler', result['filler'][0])
+        self.assertIn('N1 (it is answered with filler', result['filler'][0])
+        self.assertEqual(result['ledgers'], {'filler': [['F1', 'not fixed', 1]], 'good': [['F1', 'fixed', 0]]})
+        self.assertIn('differs from the others and from the statement it answers', result['rule'])
+
+    def test_a_new_finding_that_restates_an_open_one_is_folded_into_it(self):
+        # A verifier filed the defect it still saw as a new finding, on pages an
+        # open finding of the same code already named, and the whole answer was
+        # refused ("is already F2; report it as that finding's status"): a round
+        # trip spent on form. The two are one finding, and are folded into one.
+        result = run_node(self.PRIOR + '''
+const again = (o = {}) => added({ id: 'F9', slides: ['p02'], reason: 'The gaps between the monthly observations are still drawn as equal steps.', ...o });
+const pages = [pageEntry('p02', 'major'), pageEntry('p04')];
+const open = (o = {}) => verify({ accepted: false, rating: 7, pages, ...o });
+const ledgerOf = (review) => R.deckLedger(scope.ledger, review).map((e) => ({ id: e.id, status: e.status, severity: e.severity, pages: e.pages, evidence: e.evidence, folded: (e.folded || []).map((f) => [f.id, f.pass]) }));
+const unstated = open({ statuses: [], findings: [again()] });
+const stated = open({ statuses: [status({ status: 'partly fixed', evidence: 'The axis is now dated but two gaps are still drawn as equal steps.' })], findings: [again()] });
+const closed = open({ statuses: [status()], findings: [again()] });
+const graver = open({ statuses: [], pages: [pageEntry('p02', 'blocker'), pageEntry('p04')], findings: [again({ severity: 'blocker' })] });
+const lighter = open({ statuses: [], findings: [again({ severity: 'minor' })] });
+const wider = open({ statuses: [], pages: [pageEntry('p02', 'major'), pageEntry('p04', 'major')], findings: [again({ scope: 'deck', slides: ['p02', 'p04'] })] });
+const other = open({ statuses: [status({ status: 'not fixed', evidence: 'The months are still drawn at equal spacing on the axis.' })], pages: [pageEntry('p02', 'major'), pageEntry('p04', 'major')],
+  findings: [added({ id: 'F9', slides: ['p04'], dimension: 'table', code: 'UNFINISHED_TOTAL_ROW', reason: 'The rebuilt table ends with a Total label and a blank result row.', repair: 'Fill the total row with the column sums or cut the row.' })] });
+// The shared ledger, directly: a fold beside a lowered status does not lower, and a closing status beside it leaves the entry open.
+const entry = { id: 'F1', code: 'X', severity: 'major', pages: ['p1'], status: 'open', raisedIn: 1 };
+const item = { id: 'N1', code: 'X', severity: 'minor', pages: ['p1', 'p2'], reason: 'It is still there.', repair: 'Remove it.' };
+const direct = (statuses, o = {}) => P.advanceLedger([entry], { pass: 2, statuses }, [item], o).map((e) => [e.id, e.status, e.severity, e.pages, (e.folded || []).length]);
+console.log(JSON.stringify({
+  unstated: [check(unstated), ledgerOf(unstated)], stated: [check(stated), ledgerOf(stated)], closed: check(closed), closedLedger: ledgerOf(closed).map((e) => [e.id, e.status]),
+  graver: [check(graver), ledgerOf(graver).map((e) => [e.id, e.severity])], lighter: [check(lighter), ledgerOf(lighter).map((e) => [e.id, e.severity])],
+  wider: [check(wider), ledgerOf(wider).map((e) => [e.id, e.pages])], other: [check(other), ledgerOf(other).map((e) => e.id)],
+  lowered: direct([{ finding: 'F1', status: 'partly fixed', severity: 'minor', evidence: 'Half of it was removed from the page.' }], { downgrade: () => true }),
+  loweredAlone: P.advanceLedger([entry], { pass: 2, statuses: [{ finding: 'F1', status: 'partly fixed', severity: 'minor', evidence: 'Half of it was removed from the page.' }] }, [], { downgrade: () => true }).map((e) => e.severity),
+  automatic: direct([], { automatic: () => true }).map((e) => e[0]),
+}));
+''')
+        # No status given: the open finding is "not fixed", on the new finding's words, and is still one entry.
+        self.assertEqual(result['unstated'][0], [])
+        self.assertEqual(result['unstated'][1], [{'id': 'F1', 'status': 'not fixed', 'severity': 'major', 'pages': ['p02'], 'folded': [['F9', 2]],
+                                                 'evidence': 'The gaps between the monthly observations are still drawn as equal steps. → Replot the line on a true time axis so the gaps show as gaps.'}])
+        # A status that keeps it open stands, with the fold recorded beside it.
+        self.assertEqual(result['stated'][0], [])
+        self.assertEqual([(e['id'], e['status'], e['folded']) for e in result['stated'][1]], [('F1', 'partly fixed', [['F9', 2]])])
+        # A status that closes it contradicts the new finding: refused, naming both statements.
+        self.assertEqual(len(result['closed']), 1, result['closed'])
+        for said in ['findings[0] (F9)', 'two statements conflict', 'statuses says F1 is fixed', 'MISLEADING_TIME_AXIS still stands on p02', 'give F1 the status "not fixed"']:
+            self.assertIn(said, result['closed'][0])
+        self.assertEqual(result['closedLedger'], [['F1', 'not fixed']])  # and the entry is never closed by it
+        # Severity through a fold: it rises with the new finding and never falls.
+        self.assertEqual(result['graver'], [[], [['F1', 'blocker']]])
+        self.assertEqual(result['lighter'], [[], [['F1', 'major']]])
+        self.assertEqual(result['lowered'], [['F1', 'partly fixed', 'major', ['p1', 'p2'], 1]])
+        self.assertEqual(result['loweredAlone'], ['minor'])  # the downgrade the fold cancelled is otherwise allowed
+        self.assertEqual(result['wider'], [[], [['F1', ['p02', 'p04']]]])  # the pages the new finding adds are kept
+        # Another code on another page is a new finding, as before.
+        self.assertEqual(result['other'], [[], ['F1', 'F9']])
+        self.assertEqual(result['automatic'], ['F1', 'N1'])  # nothing folds into an entry the pass settles by other means
 
     def test_acceptance_is_read_off_every_pass_and_the_loop_is_capped(self):
         result = run_node(self.PRIOR + '''
@@ -371,6 +518,38 @@ console.log(JSON.stringify({ sizes: packet.sections.map((s) => s.pages.length), 
 
 
 class StorylineBeforeDeckReviewTests(unittest.TestCase):
+    def test_the_reviewer_is_shown_what_a_page_states_from_an_assumption_or_without_its_sign(self):
+        # The compile records, with what settles a page's claim, each assumed
+        # measure the page shows and each negative value it prints without its
+        # sign (bind.mjs). The deck reviewer reads rendered pages, which show
+        # neither fact: the page's line in the prompt carries them.
+        result = run_node(FIXTURES + '''
+const dir = await builtDeck();
+const spec = specOf();
+spec.slides[1].pageType = { type: 'trend', form: 'line', commentary: 'below', content: { claim: spec.slides[1].title, evidence: [],
+  settles: { kind: 'rate', what: 'revenue against the ceiling, four years', measures: [],
+    stated: { assumed: [{ ref: 'i2/cap', said: "the page's note", rationale: 'an estimate made by the team' }, { ref: 'i2/plan', said: null, rationale: 'the plan the board approved in March' }],
+      unsigned: [{ ref: 'i1/margin', shown: '0.9%', recorded: -0.86 }] } } } };
+const specPath = path.join(dir, 'fixture.deck.json');
+await fs.writeFile(specPath, JSON.stringify(spec));
+const { dir: staging } = await S.buildStorylinePacket(specPath, dir);
+await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { provenance: prov(await hashOf(staging)) })));
+const { packetDir } = await R.buildReviewPacket({ outputDirectory: dir, spec, deckPath: specPath });
+const prompt = await fs.readFile(path.join(packetDir, 'prompt.md'), 'utf8');
+const packet = JSON.parse(await fs.readFile(path.join(packetDir, 'packet.json'), 'utf8'));
+await cleanup(dir);
+const line = (id) => prompt.split('\\n').find((l) => l.startsWith(`- [${id}] `)) ?? null;
+console.log(JSON.stringify({ stated: packet.slides.map((s) => s.stated), marked: line(spec.slides[1].id), plain: line(spec.slides[0].id) }));
+''')
+        notes = ['i2/cap is assumed, not recorded ("an estimate made by the team") - said on the page by the page\'s note',
+                 'i2/plan is assumed, not recorded ("the plan the board approved in March") - printed in the page\'s text, where nothing marks it as an assumption',
+                 'i1/margin is printed without its sign: "0.9%" for a recorded -0.86']
+        self.assertEqual(result['stated'][1], notes)
+        self.assertTrue(all(stated == [] for i, stated in enumerate(result['stated']) if i != 1), result['stated'])
+        # On the page's own line, after its exhibits, so the reviewer reads it with the page.
+        self.assertTrue(result['marked'].endswith('; declared: ' + '; '.join(notes)), result['marked'])
+        self.assertNotIn('declared:', result['plain'])
+
     def test_the_deck_review_packet_waits_for_a_ready_storyline_on_the_current_spine(self):
         result = run_node(FIXTURES + '''
 const dir = await builtDeck();
@@ -471,7 +650,7 @@ console.log(JSON.stringify({ ok: S.validateStorylineReview(storyFull(spec), spec
         self.assertTrue(any('verdict is ready while F1' in e for e in result['readyWithMajor']))
 
     def test_the_spine_critique_answers_the_request_in_ten_items_or_fewer(self):
-        # The first Emirates critique returned 141 items from 272 KB of prompts,
+        # One first critique returned 141 items from 272 KB of prompts,
         # and the Anthropic deck answered two of its three questions "unranked".
         # The spine critique returns at most ten items; its answer check fails
         # an answer that declines part of the request; and only data known to
@@ -533,6 +712,14 @@ await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verif
 const ready = await S.prepareStoryline(specPath, out);
 const gate = await S.storylineGate(revised, out, { deckPath: specPath });
 const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out, { deckPath: specPath });
+// The verifier files the defect it still sees as a new item on the page F1 names: folded into F1, which stays open.
+const restate = { id: 'N1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The rewritten title still reports a count and no implication.', fix: 'State what the faster rate means for the decision.', basis: 'changed', justification: '', evidence: '' };
+const sentBack = { verdict: 'revise', rating: 6, compliance: { verdict: 'incomplete', note: 'The claim item is still within reach.' }, sufficiency: { verdict: 'insufficient', note: 'The page does not yet support the answer.' }, topFixes: ['Rewrite p02'] };
+const foldCheck = (o) => S.validateStorylineRecord(verification({ ...sentBack, ...o }), { ids, contentIds: ids, scope: packet.scope, ledger: critique.ledgerFor, mode: 'spine', promptHash: packet.promptHash });
+critique.ledgerFor = S.storylineLedger([], critique);
+const folded = foldCheck({ statuses: [], findings: [restate] });
+const conflict = foldCheck({ findings: [restate] });
+const foldedLedger = S.storylineLedger(critique.ledgerFor, verification({ ...sentBack, statuses: [], findings: [restate] })).map((e) => [e.id, e.status, e.severity, (e.folded || []).map((f) => f.id)]);
 const capped = P.nextPassScope({ pass: 3, binding: 'b'.repeat(64), pageHashes: S.storylinePageHashes(revised), review: critique }, { ...S.storylinePageHashes(revised), p03: 'x' }, { ids, ledger: [] });
 // Switching to the page-level critique is a new lineage: it needs a reason.
 const switched = await S.prepareStoryline(specPath, out, { mode: 'full' });
@@ -540,7 +727,7 @@ const withReason = await S.prepareStoryline(specPath, out, { mode: 'full', reaso
 await cleanup(dir);
 console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect, 'ledger' in packet.scope, 'priorRating' in packet.scope],
   nit: [nit.status, nit.errors?.some((e) => e.includes('not additive'))], forged: [forged.status, forged.errors?.some((e) => e.includes('promptHash'))], ready: ready.status, gate, moved, capped: capped.capped,
-  switched, withReason: [withReason.status, withReason.mode, withReason.pass] }));
+  switched, withReason: [withReason.status, withReason.mode, withReason.pass], folded, conflict, foldedLedger }));
 ''')
         self.assertEqual(result['one'], ['packet-written', 1, 'spine'])
         self.assertEqual(result['revise'], 'revise')  # the spine has not changed since the critique
@@ -556,6 +743,11 @@ console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revi
         self.assertEqual(result['switched']['status'], 'refused')
         self.assertTrue(any('--reason' in e for e in result['switched']['errors']))
         self.assertEqual(result['withReason'], ['packet-written', 'full', 1])
+        # The storyline loop shares the rule: the restated item is folded into F1, and refused only beside "fixed".
+        self.assertEqual(result['folded'], [])
+        self.assertEqual(result['foldedLedger'], [['F1', 'not fixed', 'major', ['N1']]])
+        self.assertEqual(len(result['conflict']), 1, result['conflict'])
+        self.assertIn('two statements conflict - statuses says F1 is fixed, and this finding says STORY_CLAIM still stands on p02', result['conflict'][0])
 
 
 

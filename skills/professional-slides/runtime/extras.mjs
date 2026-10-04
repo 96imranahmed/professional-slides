@@ -258,9 +258,9 @@ function normalizePeople(props) {
 
 const initials = (name) => name.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join("") || "?";
 
-export function peopleLayout(frame, props) {
+export function peopleLayout(frame, props, rhythm = 0) {
   const items = normalizePeople(props);
-  const gap = v("space.4"), pad = v("space.4");
+  const gap = v("space.4"), pad = v("space.4") + rhythm;
   const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad;
   if (inner < PORTRAIT + 16) throw new Error("Profile cards are too narrow; use fewer people");
   const nameGap = v("space.3"), roleGap = v("space.1"), pointsGap = v("space.3"), pointGap = v("space.1");
@@ -276,13 +276,31 @@ export function peopleLayout(frame, props) {
   return { items: measured, gap, pad, width, inner, nameGap, roleGap, pointsGap, pointGap, headHeight, height: Math.max(...measured.map((m) => m.height - m.head + headHeight)) };
 }
 
+/**
+ * The profile cards as the frame lets them be drawn: as tall as their copy,
+ * with the padding the frame allows (a step or two more, never the frame's
+ * whole height). A card drawn to a taller frame than its copy is a box a third
+ * empty under the last point; drawn to its copy, the commentary under the row
+ * sits against it. `peopleNodes` draws this and the ceiling reports it.
+ */
+function grownPeople(frame, props) {
+  const natural = peopleLayout(frame, props);
+  if (!Number.isFinite(frame.height)) return natural;
+  for (const rhythm of [v("space.3"), v("space.2"), v("space.1")]) {
+    const grown = peopleLayout(frame, props, rhythm);
+    if (grown.height <= frame.height + 0.01) return grown;
+  }
+  return natural;
+}
+
 export function peopleNodes({ id, frame, props }) {
-  const L = peopleLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`Profile cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the points or use fewer people`);
+  const natural = peopleLayout(frame, props);
+  if (natural.height > frame.height + 0.01) throw new Error(`Profile cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the points or use fewer people`);
+  const L = grownPeople(frame, props);
   const nodes = [];
   L.items.forEach((m, i) => {
     const x = frame.x + i * (L.width + L.gap), pid = stableId(id, "person", i), cx = x + L.pad;
-    nodes.push(rect(stableId(pid, "surface"), "person-surface", { x, y: frame.y, width: L.width, height: frame.height }, SURFACE, RULE, "radius.small"));
+    nodes.push(rect(stableId(pid, "surface"), "person-surface", { x, y: frame.y, width: L.width, height: L.height }, SURFACE, RULE, "radius.small"));
     let y = frame.y + L.pad;
     const px = x + (L.width - PORTRAIT) / 2, portrait = { x: px, y, width: PORTRAIT, height: PORTRAIT };
     if (m.item.image) {
@@ -373,7 +391,7 @@ export function logosNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- register */
 
 export function registerExtras(registry) {
-  const define = (id, category, preferredSize, sample, render, measureContent, guidance) => registry.set(id, { id, version: "1.0.0", category, role: id, tokens: [...EXTRA_TOKENS], preferredSize, sample, render, measureContent, guidance });
+  const define = (id, category, preferredSize, sample, render, measureContent, guidance, measureCeiling) => registry.set(id, { id, version: "1.0.0", category, role: id, tokens: [...EXTRA_TOKENS], preferredSize, sample, render, measureContent, guidance, ...(measureCeiling ? { measureCeiling } : {}) });
   define("cycle", "diagram", { width: 1160, height: 460 },
     { items: [1, 2, 3, 4, 5].map((i) => ({ label: `(Insert step ${i})`, text: "(Insert one-line description)" })), center: "(Insert loop name)" },
     (input) => ({ nodes: cycleNodes(input) }),
@@ -388,7 +406,8 @@ export function registerExtras(registry) {
     { items: [1, 2, 3, 4].map((i) => ({ name: `(Insert name ${i})`, role: "(Insert role)", points: ["(Insert relevant experience)", "(Insert responsibility)"] })) },
     (input) => ({ nodes: peopleNodes(input) }),
     ({ frame, props }) => peopleLayout(frame, props),
-    { useWhen: "introducing two to five people (a team, a steering group, interviewees) with a role and a line or two each", why: "equal cards with a portrait make the group read as a unit; centred content keeps the cards calm", actionTitle: "state why this group is the right one for the work" });
+    { useWhen: "introducing two to five people (a team, a steering group, interviewees) with a role and a line or two each", why: "equal cards with a portrait make the group read as a unit; centred content keeps the cards calm", actionTitle: "state why this group is the right one for the work" },
+    ({ frame, props }) => grownPeople(frame, props).height);
   define("logos", "media", { width: 1160, height: 300 },
     { items: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => ({ name: `(Insert logo ${i})`, caption: i % 2 ? "(Insert segment)" : null })) },
     (input) => ({ nodes: logosNodes(input) }),

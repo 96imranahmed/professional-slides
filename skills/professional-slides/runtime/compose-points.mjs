@@ -2,7 +2,7 @@
 // styles (`pointsItem`, `resolvePointsStyle`), points set in rows, prose and
 // document columns, the summary ledger, the side column's tone and the bridge
 // drawn to it, the so-what close, and how full a page should read (`fill`).
-import { resolveDensityTokens, TOKENS } from "./core.mjs";
+import { resolveDensityTokens, TOKENS, token, tokenValue } from "./core.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { textWords } from "./text-contract.mjs";
 import { measureProse, proseMeasure, measureList } from "./registry-text.mjs";
@@ -73,10 +73,8 @@ function balancedColumns(paragraphs, count) {
 
 // The depth prose may reach: the body less a line, so a two-line title (a
 // body some 14px shorter) still takes it; and the depth that reads as a full
-// column, some 70px above the foot, well inside the column check's bar. The
-// gaps are the document columns' own (space.4 between paragraphs, space.6
-// between columns).
-const PROSE_DEPTH = 488, PROSE_FULL = 440, PROSE_PARAGRAPH_GAP = 16, PROSE_COLUMN_GAP = 32;
+// column, some 70px above the foot, well inside the column check's bar.
+const PROSE_DEPTH = 488, PROSE_FULL = 440;
 
 /**
  * Prose beside a panel, in one column or two, each as narrow as lets the
@@ -91,8 +89,44 @@ const PROSE_DEPTH = 488, PROSE_FULL = 440, PROSE_PARAGRAPH_GAP = 16, PROSE_COLUM
  * 330 words fill the page: one column from the measure's floor (45
  * characters) to its cap (80), and two when one at the cap runs past the foot.
  */
-export function proseBeside(paragraphs, id, room, highlight) {
+export function proseBeside(paragraphs, id, room, highlight, density) {
+  return atDensity(density, () => proseBesideAt(paragraphs, id, room, highlight));
+}
+
+/**
+ * `measure` run at a page's density: a pre-read or appendix page sets its
+ * type and its gaps a step smaller than the deck's tokens say, and what is
+ * sized by measuring text - a list's depth, a column of prose - has to be
+ * measured at the size it will be drawn at, or it stops short of the foot.
+ */
+const atDensity = (density, measure) => (density && density !== "executive" ? withDesignTokens(resolveDensityTokens(activeDesignTokens() ?? TOKENS, density), measure) : measure());
+
+function proseBesideAt(paragraphs, id, room, highlight) {
+  const { columns, width, columnGap } = proseFit(paragraphs, room);
+  const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
+    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, highlight)) });
+  return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
+    size: { width: columns.length * width + columnGap * (columns.length - 1), height: "fill" }, items: columns.map(column) };
+}
+
+/**
+ * The columns prose beside a panel is set in, at the density in force:
+ * `{ columns, width, reach, columnGap }` - the paragraphs of each column, the
+ * width each takes, and how far down the body the deepest runs (`reach`,
+ * absent where the prose is longer than two columns at the measure hold).
+ *
+ * One column is kept for as long as it fits at the measure's cap, so the
+ * choice turns at one length only: where a column at the cap would run past
+ * the foot. There two columns at the measure's floor hold the same words at
+ * nine tenths of the depth (two lines of 45 characters against one of 80), so
+ * the pair opens within a line or two of full and never as two short columns:
+ * a few words either side of the turn change which layout is drawn, not
+ * whether it fills.
+ */
+function proseFit(paragraphs, room) {
   const { widest, narrowest } = proseMeasure();
+  // The document columns' own gaps, at the density in force: space.4 between paragraphs, space.6 between columns.
+  const PROSE_PARAGRAPH_GAP = tokenValue(token("space.4")), PROSE_COLUMN_GAP = tokenValue(token("space.6"));
   const depth = (texts, width) => texts.reduce((sum, text) => sum + measureProse(text, width), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
   // One column, or two broken where the deeper of them is shallowest at that
   // width: between paragraphs, or inside one at a sentence, as a column of
@@ -128,11 +162,36 @@ export function proseBeside(paragraphs, id, room, highlight) {
   // Longer than two columns at the measure hold: the widest, and the overflow
   // is the layout's to report.
   if (!chosen) chosen = { columns: split(counts.at(-1), most(counts.at(-1))), width: most(counts.at(-1)) };
-  const { columns, width } = chosen;
-  const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
-    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, highlight)) });
-  return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
-    size: { width: columns.length * width + PROSE_COLUMN_GAP * (columns.length - 1), height: "fill" }, items: columns.map(column) };
+  return { ...chosen, columnGap: PROSE_COLUMN_GAP };
+}
+
+/**
+ * How many words of prose fill the layout `proseBeside` sets them in:
+ * `{ words, columns, min, max }` - the words the prose runs to, the columns
+ * it is set in, and the range of lengths at which prose written like this
+ * page's own reaches the foot of its column without running past it. It is
+ * read off the same measurement that chooses the layout (proseFit), on the
+ * page's own words run shorter and longer in its own paragraphs, so the range
+ * is the one the composer will fill: an author told a column stands empty is
+ * told how long the prose has to be, not left to find it a run at a time.
+ * `most` caps the search (the page's word ceiling, as words of prose).
+ */
+export function proseFillRange(paragraphs, room, density, most = 600) {
+  const words = paragraphs.flatMap((text) => String(text).trim().split(/\s+/).filter(Boolean));
+  const shares = paragraphs.map((text) => textWords(text) / Math.max(1, words.length));
+  // The page's own prose at `n` words: its words in order, cycled where it has to run longer, cut into its own paragraphs' proportions.
+  const proseOf = (n) => { const run = Array.from({ length: n }, (_, i) => words[i % words.length]); let at = 0;
+    return shares.map((share, p) => { const take = p === shares.length - 1 ? n - at : Math.round(n * share); const text = run.slice(at, at + take).join(" "); at += take; return text; }).filter(Boolean).map((text) => (/[.!?]$/.test(text) ? text : `${text}.`)); };
+  return atDensity(density, () => {
+    const fills = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.reach >= PROSE_FULL; };
+    const fitsOne = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.columns.length === 1; };
+    const first = (lo, hi, test) => { while (lo < hi) { const mid = Math.floor((lo + hi) / 2); if (test(mid)) hi = mid; else lo = mid + 1; } return lo; };
+    // The shortest prose that fills one column at the measure's floor; a column deepens with every word.
+    const min = first(1, most, (n) => fills(n) || !fitsOne(n));
+    // The longest that still fills: the cap where it fills there, otherwise the longest one column holds.
+    const max = fills(most) ? most : first(min, most, (n) => !fitsOne(n)) - 1;
+    return { words: words.length, columns: proseFit(paragraphs, room).columns.length, min, max: Math.max(min, max) };
+  });
 }
 
 /**
@@ -182,8 +241,7 @@ const LIST_BODY_PX = 14, LIST_ITEM_GAP = 16, LIST_LEAD_GAP = 4, LIST_MARKER_OFFS
  * enough and stops a fifth of the page short of its foot.
  */
 export function listDepth(list, width, density) {
-  const measure = () => { try { return measureList({ x: 0, y: 0, width, height: BODY_HEIGHT }, list.props); } catch { return pointsHeight(list.props.items, width); } };
-  return density && density !== "executive" ? withDesignTokens(resolveDensityTokens(activeDesignTokens() ?? TOKENS, density), measure) : measure();
+  return atDensity(density, () => { try { return measureList({ x: 0, y: 0, width, height: BODY_HEIGHT }, list.props); } catch { return pointsHeight(list.props.items, width); } });
 }
 
 /** The height a points list wants at a given column width. */

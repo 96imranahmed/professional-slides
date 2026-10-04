@@ -15,6 +15,8 @@ import { photographsWaived } from "./plan_gates.mjs";
 import { tableStatistics } from "../build-bars.mjs";
 import { trivialChart, trendChart } from "../evidence.mjs";
 import { registered } from "../errors.mjs";
+import { assetsDeclaration } from "../asset-needs.mjs";
+import { playerNames } from "./variety_gates.mjs";
 
 export { trivialChart, trendChart };
 
@@ -56,17 +58,27 @@ export function shareAsBars(ex) {
 }
 
 
-export function craftFindings(spec, scene) {
+/**
+ * The deck's craft findings. `standings`, when given, takes where the deck
+ * stands against each floor, broken or not (the record variety_gates.mjs and
+ * gate_config.py write), for the author's report.
+ */
+export function craftFindings(spec, scene, { standings = [], picturesSupplied = 0 } = {}) {
   // A deck revised under older rules hears the rules introduced since as advisories.
-  return applyRulesVersion(floorFindings(spec, scene), spec);
+  return applyRulesVersion(floorFindings(spec, scene, standings, picturesSupplied), spec);
 }
 
-function floorFindings(spec, scene) {
+function floorFindings(spec, scene, standings, picturesSupplied) {
   // A catalogue shows each component in its plain form so it can be copied;
   // it makes no argument, and the floors are about decks that do.
   if (spec.purpose === "catalogue") return [];
   const content = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => (!s.kind || s.kind === "content") && s.title);
-  if (content.length < DECK_LENGTH.craft) return [];
+  const stand = (code, what, value, bar, side, more = {}) => standings.push({ code: registered(CRAFT_CODES, code), what, value, bar, side, applies: true, blocks: true, ...more });
+  if (content.length < DECK_LENGTH.craft) {
+    stand("CRAFT_EXHIBIT_VARIETY", "content pages (the craft floors are read from this many)", content.length, DECK_LENGTH.craft, "min", { unit: "pages", applies: false });
+    return [];
+  }
+  const long = content.length >= DECK_LENGTH.craftDevices;
   const findings = [];
   const block = (code, measured, threshold, repair, slides = null) => findings.push({ slide: slides, code: registered(CRAFT_CODES, code), severity: "blocker", measured, threshold, repair });
   const advise = (code, measured, threshold, repair) => findings.push({ slide: null, code: registered(CRAFT_CODES, code), severity: "advisory", measured, threshold, repair });
@@ -76,6 +88,10 @@ function floorFindings(spec, scene) {
   // A share drawn as two bars (cargo 12, everything else 88) is never the right
   // chart, however few there are: it is a number, or one segment of a whole.
   const shares = trivial.filter(({ ex }) => shareAsBars(ex));
+  // The rule blocks at a fifth of the charts, so the most it allows is one fewer than that.
+  stand("CRAFT_TRIVIAL_CHARTS", "charts plotting two numbers of one series", trivial.length, Math.max(0, Math.ceil(0.2 * charts.length - 1e-9) - 1), "max",
+    { unit: "charts", applies: charts.length >= 4, pages: trivial.map(({ slide }) => slide.id ?? null) });
+  stand("CRAFT_NO_TREND", "charts running over time", charts.filter(({ ex }) => trendChart(ex)).length, 1, "min", { unit: "charts", applies: charts.length >= 8, blocks: false });
   if (charts.length >= 4 && (trivial.length / charts.length >= 0.2 || shares.length)) {
     block("CRAFT_TRIVIAL_CHARTS", { trivial: trivial.length, of: charts.length, pages: trivial.map(({ slide }) => slide.id ?? null) }, 0.2,
       `${trivial.length} of ${charts.length} charts plot two numbers of one series. Two numbers are a metric pair: set them as metrics with ` +
@@ -86,7 +102,7 @@ function floorFindings(spec, scene) {
   }
   if (charts.length >= 8 && !charts.some(({ ex }) => trendChart(ex))) {
     advise("CRAFT_NO_TREND", { charts: charts.length, overTime: 0 }, 1,
-      "Not one of the deck's charts runs over time. Most strategic questions have a history - revenue, volume, share, fleet, users - and a " +
+      "Not one of the deck's charts runs over time. Most strategic questions have a history - revenue, volume, share, capacity, users - and a " +
       "series over five or more periods with its growth rate marked is often the page that makes the case. Find the public series (annual " +
       "reports, regulators, industry bodies) before settling for a snapshot.");
   }
@@ -95,6 +111,9 @@ function floorFindings(spec, scene) {
   // (weight.json plan.craft: `min` asks the plan, `blockBelow` stops the deck).
   const stats = sceneStatistics(scene);
   const treated = CRAFT.tableTreated, annotated = CRAFT.chartAnnotated;
+  const rate = (n, of) => (of ? Math.round((n / of) * 1000) / 1000 : 0);
+  stand("CRAFT_TABLES_PLAIN", "tables carrying a treatment", rate(stats.tablesTreated, stats.tables), treated.blockBelow, "min", { unit: "share", applies: stats.tables >= treated.blockFrom });
+  stand("CRAFT_CHARTS_BARE", "charts marking something on the plot", rate(stats.chartsAnnotated, stats.charts), annotated.blockBelow, "min", { unit: "share", applies: stats.charts >= annotated.blockFrom });
   if (stats.tables >= treated.blockFrom && stats.tablesTreated / stats.tables < treated.blockBelow) {
     block("CRAFT_TABLES_PLAIN", { treated: stats.tablesTreated, of: stats.tables }, treated.blockBelow,
       `${stats.tablesTreated} of ${stats.tables} tables carry a treatment. A table that compares options on criteria wants Harvey balls or ` +
@@ -110,6 +129,7 @@ function floorFindings(spec, scene) {
 
   const steps = content.filter((slide) => exhibitsOf(slide).some((ex) => STEP_TYPES.has(ex.type)));
   const stepMax = Math.max(2, Math.ceil(content.length / 25));
+  stand("CRAFT_STEP_OVERUSE", "step or process diagram pages", steps.length, stepMax, "max", { unit: "pages", pages: steps.map((s) => s.id ?? null) });
   if (steps.length > stepMax) {
     block("CRAFT_STEP_OVERUSE", { pages: steps.length, of: content.length, ids: steps.map((s) => s.id ?? null) }, stepMax,
       `${steps.length} pages are step or process diagrams, against ${stepMax} for a deck of this length. Most of them are not sequences a ` +
@@ -117,30 +137,56 @@ function floorFindings(spec, scene) {
       "are icon cards, a path with gates is a roadmap, conditions are a checklist. Keep the steps diagram for the one page that is a genuine procedure.");
   }
 
+  stand("CRAFT_NO_ICONS", "icons drawn", stats.icons, 1, "min", { unit: "icons", applies: long });
+  // A deck that declares it is built without the network (asset-needs.mjs) and was supplied no photograph has none to
+  // show: the floor on photographs is advised, not held, as the floor on logos is, and the reviews are told. `noPictures`
+  // keeps its own meaning - a subject with nothing to look at - and is not what an offline build writes.
+  const unpictured = assetsDeclaration(spec).fetch === "none" && !picturesSupplied;
+  stand("CRAFT_NO_PICTURES", "photographs drawn", stats.pictures, 1, "min", { unit: "pictures", applies: long && !photographsWaived(spec), blocks: !unpictured });
   if (content.length >= DECK_LENGTH.craftDevices && stats.icons === 0) {
     block("CRAFT_NO_ICONS", { pages: content.length, icons: 0 }, 1,
       "No page carries an icon. The pages that list parallel categories - the three pillars of a case, the risks, the levers, the " +
       "segments - read faster with an icon per point (`pointsStyle: \"icon-lead\"`) or as icon cards.");
   }
 
-  // Pictures: a deck about airlines, films, products or places with no
+  // Pictures: a deck about companies, films, products or places with no
   // photograph reads as a spreadsheet. Logos do not count - they identify, they
   // do not show. `noPictures` states in a sentence why a deck has none, and
   // waives this alone (plan_gates.mjs photographsWaived).
-  if (content.length >= DECK_LENGTH.craftDevices && stats.pictures === 0 && !photographsWaived(spec)) {
+  if (content.length >= DECK_LENGTH.craftDevices && stats.pictures === 0 && !photographsWaived(spec) && unpictured) {
+    advise("CRAFT_NO_PICTURES", { pages: content.length, pictures: 0, assets: "none" }, 1,
+      `No page carries a photograph: the deck declares it is built without the network ("${assetsDeclaration(spec).reason}") and no photograph is supplied in assets/pictures/, ` +
+      "so none is expected and the reviewers are told. To carry photographs, put each file in assets/pictures/ beside the pages file (or give a picture its own `path` and `credit`) " +
+      "and plan it on the cover, a divider or the page about its subject. A photograph a page still plans as `{ alt }` stays an empty frame, which delivery refuses (`BAR_UNSOURCED_PICTURES`).");
+  } else if (content.length >= DECK_LENGTH.craftDevices && stats.pictures === 0 && !photographsWaived(spec)) {
     block("CRAFT_NO_PICTURES", { pages: content.length, pictures: 0 }, 1,
-      "No page carries a photograph. The cover, the section dividers and the pages about a recognisable subject - an aircraft, a cabin, " +
-      "a hub, a city, a product - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Plan each " +
+      "No page carries a photograph. The cover, the section dividers and the pages about a recognisable subject - a product, a site, " +
+      "a building, a city, a team - want one: `cover.image`, a divider `image`, `photo` on a page, or a photo column in a table. Plan each " +
       "as `{ alt, search }`: the build fetches a freely licensed photograph from Wikimedia Commons and credits it on a generated last " +
-      "page; mark `fetch: false` on one that must come from the client. `noPictures` is for a deck whose subject has nothing to look at, stated in a sentence.");
+      "page; mark `fetch: false` on one that must come from the client. `noPictures` is for a deck whose subject has nothing to look at, stated in a sentence; " +
+      "a deck built with no network and no photograph supplied declares that instead (`assets: { fetch: \"none\", reason }`).");
   }
 
   const players = Array.isArray(spec.players) ? spec.players.filter((p) => p && (typeof p === "string" || p.name)) : [];
+  // A deck that declares it is built without the network (asset-needs.mjs)
+  // cannot show a mark it has no file for: it introduces its players by
+  // name, and the missing logos are said - here, in the build result and to
+  // the reviewer - rather than blocking a deck that could never clear them.
+  const offline = assetsDeclaration(spec).fetch === "none";
+  const unnamed = offline && players.length >= 3 && stats.logos === 0 ? unnamedPlayers(spec, scene) : [];
+  // Where the deck stands says the same: under the declaration the floor advises once every player is named on a page.
+  stand("CRAFT_PLAYERS_UNINTRODUCED", "player logos drawn", stats.logos, 1, "min", { unit: "logos", applies: players.length >= 3, blocks: !offline || unnamed.length > 0 });
   if (players.length >= 3 && stats.logos === 0) {
-    block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0 }, 1,
-      `The deck compares ${players.length} named players and never shows their marks. Introduce them early on one page: each player's ` +
+    if (offline && !unnamed.length) advise("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, assets: "none" }, 1,
+      `The deck compares ${players.length} named players and shows none of their marks: it declares it is built without the network ("${assetsDeclaration(spec).reason}"), ` +
+      "so they are introduced by name. The reviewer is told the logos were not available. To show the marks, put each player's logo in assets/logos/ beside the pages file and rebuild.");
+    else block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, ...(offline ? { assets: "none", unnamed } : {}) }, 1,
+      offline ? `The deck is built without the network, so its players are introduced by name, and ${unnamed.join(", ")} ${unnamed.length === 1 ? "is" : "are"} named on no page. Introduce every player early on one page: ` +
+        "a `logo` cell that names its `player` (it prints the name while no file is there), with what the player is and the numbers the deck will compare."
+      : `The deck compares ${players.length} named players and never shows their marks. Introduce them early on one page: each player's ` +
       "logo, what it is and the two or three numbers the deck will compare (a `logos` exhibit, or a table with a `logo` column). Later " +
-      "pages can then name a player without the reader having to remember who it is. Plan each logo as `{ alt: \"<Name> logo\" }`: the build fetches it from the player's Wikipedia infobox.");
+      "pages can then name a player without the reader having to remember who it is. Plan each logo as `{ alt: \"<Name> logo\" }`: the build fetches it from the player's Wikipedia infobox. " +
+      "With no network at the build, either put each logo in assets/logos/ beside the pages file (the compile lists the file names) or declare `assets: { fetch: \"none\", reason }` on the deck, under which the players are introduced by name.");
   }
 
   // One coded source is one too many, so this is a count, not a share.
@@ -148,12 +194,13 @@ function floorFindings(spec, scene) {
   if (coded.length) {
     block("CRAFT_SOURCE_CODES", { pages: coded.length, example: String(coded[0].source ?? "").slice(0, 80) }, 0,
       `${coded.length} source line${coded.length === 1 ? "" : "s"} cite ledger codes ("${String(coded[0].source ?? "").slice(0, 60)}"). ` +
-      "The reader has no ledger. Name each source as it would be cited: publisher, document, date - \"Emirates Group Annual Report 2025-26; " +
-      "Dubai Airports, traffic release, Feb 2026\". Keep the URLs in sources.md.", coded.map((slide) => slide.id ?? null));
+      "The reader has no ledger. Name each source as it would be cited: publisher, document, date - \"Northvale Rail Annual Report 2025-26; " +
+      "Office of Rail Statistics, quarterly release, Feb 2026\". Keep the URLs in sources.md.", coded.map((slide) => slide.id ?? null));
   }
 
   const perTen = content.length ? (stats.distinctExhibits / content.length) * 10 : 0;
   const sceneMin = CRAFT.exhibitVarietyPerTen.sceneMin;
+  stand("CRAFT_EXHIBIT_VARIETY", `kinds of exhibit composed (${sceneMin} per ten pages)`, stats.distinctExhibits, Math.ceil((sceneMin * content.length) / 10 - 1e-9), "min", { unit: "kinds", applies: long });
   if (content.length >= DECK_LENGTH.craftDevices && perTen < sceneMin) {
     block("CRAFT_EXHIBIT_VARIETY", { distinct: stats.distinctExhibits, pages: content.length, perTen: Math.round(perTen * 10) / 10 }, sceneMin,
       `${stats.distinctExhibits} kinds of exhibit across ${content.length} pages. Go back through the pages and ask what each has to show: a ` +
@@ -161,6 +208,31 @@ function floorFindings(spec, scene) {
       "The catalogue has sixty exhibits; a deck of this length that uses a handful has chosen by habit.");
   }
   return findings;
+}
+
+// What is not a page's content when asking whether it names a player: the
+// citation, the footer and its notes, picture credits, and the runtime's own
+// navigation furniture, which repeats section titles on every page. A player
+// named only in a source line has been cited, not introduced.
+const NOT_CONTENT = /^(?:page-number|footer|source|footnote|note|tracker|agenda|divider-contents|picture-credit|image-credit)/;
+// A name is printed where it stands as whole words: "Rus" is not named by "Russia", nor "Alder" by "Alderney".
+const namedIn = (text, alias) => {
+  for (let at = text.indexOf(alias); at >= 0; at = text.indexOf(alias, at + 1))
+    if (!/[\p{L}\p{N}]/u.test(text[at - 1] ?? "") && !/[\p{L}\p{N}]/u.test(text[at + alias.length] ?? "")) return true;
+  return false;
+};
+
+/**
+ * The declared players no page of the scene names, by any of their names:
+ * under an offline declaration a name is the introduction. A name counts
+ * where a page's content prints it as whole words - its title, its exhibit's
+ * cells and labels, its body - and not in a source line, a footer or a note.
+ */
+function unnamedPlayers(spec, scene) {
+  // A composed text node holds its lines as set: a name wrapped over two lines in a narrow cell is still the name.
+  const printed = (scene?.slides || []).flatMap((slide) => (slide.nodes || []).filter((n) => n.type === "text" && !NOT_CONTENT.test(String(n.role ?? ""))).map((n) => String(n.text ?? "").replace(/\s+/g, " "))).join(" \n ").toLowerCase();
+  const aliases = [...playerNames(spec.players)];
+  return [...new Set(aliases.map(([, name]) => name))].filter((name) => !aliases.some(([alias, owner]) => owner === name && namedIn(printed, alias)));
 }
 
 /** What the built scene draws: its tables and how many carry a treatment, its charts and how many mark the finding, its anchors. */

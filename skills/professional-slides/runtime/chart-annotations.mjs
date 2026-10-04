@@ -755,6 +755,21 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
     let placement = null;
     for (const attempt of chain) if ((placement = attempt())) break;
     if (!placement) {
+      // Where a note of this size does have a clear position, with the callouts already placed: the other marks of the same
+      // series, each tried as this one was. Said with the refusal, so the author moves the note or cuts one, not guesses.
+      const where = () => {
+        const prefix = `${annotation.series || "value"}:`, own = [...pointMap.keys()].filter((key) => key.startsWith(prefix));
+        const keys = own.length ? own : [...pointMap.keys()].filter((key) => key.startsWith("category:"));
+        const taken = new Set(annotations.map((item) => String(item.category)));
+        const free = keys.map((key) => key.slice(key.indexOf(":") + 1)).filter((category) => !taken.has(String(category))).filter((category) => {
+          const moved = { ...annotation, category };
+          const at = { ...context, annotation: moved, target: resolveEvidenceAnchor(pointMap, moved, id) };
+          return Boolean(standardPlacement(at) ?? besidePlacement({ ...at, bounds: besideBounds, obstacles: besideObstacles }));
+        });
+        const placed = placements.length, of = annotations.length;
+        return free.length ? ` - with ${placed} of the ${of} callouts placed, a note of this size has a clear position at ${free.slice(0, 8).join(", ")}${free.length > 8 ? ", ..." : ""}`
+          : ` - no other mark has a clear position for a note of this size either: the plot has room for ${placed ? `no more than the ${placed} of its ${of} callouts already placed` : "no callout of this size"}`;
+      };
       // No room in the plot: this callout takes its band above it after all,
       // and the chart renders again with the plot that much shorter.
       if (annotation._placement === "plot") {
@@ -772,11 +787,11 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
       }
       if (annotation._placement !== "rail" && annotation._placement !== "on-bar") {
         const all = props.annotations;
-        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`), {
+        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot${where()}; shorten the note, move it to a position that is free, annotate fewer marks, or enlarge the exhibit`), {
           retry: (current) => ({ ...current, annotations: (current.annotations || all).map((item, at) => at === index || item?._placement === "rail" ? { ...item, _placement: "rail" } : item) })
         });
       }
-      throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`);
+      throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot${where()}; shorten the note, move it to a position that is free, annotate fewer marks, or enlarge the exhibit`);
     }
     placements.push({ ...placement, released: banded && placement.placement === "beside" });
   });

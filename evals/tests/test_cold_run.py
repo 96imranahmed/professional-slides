@@ -178,6 +178,110 @@ console.log(JSON.stringify({ok:true}));
         self.assertTrue(result["ok"])
 
 
+# Six author runs as author-deck.mjs logs them: a page refused four runs in a
+# row under three codes (the form tried one at a time), then a clean run.
+AUTHOR_LOG = [
+    {"run": 1, "v": 2, "mode": "draft", "pages": 12, "ok": True, "findings": []},
+    {"run": 2, "v": 2, "mode": "check", "pages": 12, "ok": False, "findings": [{"code": "SCENE_VOID", "id": "p4"}, {"code": "WORDS", "id": "p2"}, {"code": "PAGE_SHAPE_FLAT"}]},
+    {"run": 3, "v": 2, "mode": "check", "pages": 12, "ok": False, "findings": [{"code": "SCENE_VOID", "id": "p4"}]},
+    {"run": 4, "v": 2, "mode": "check", "pages": 12, "ok": False, "findings": [{"code": "PAGE_DOES_NOT_COMPOSE", "id": "p4"}]},
+    {"run": 5, "v": 2, "mode": "full", "pages": 12, "ok": False, "findings": [{"code": "TEXT_COVERAGE_LOW", "id": "p4"}, {"code": "WORDS", "id": "p9"}]},
+    {"run": 6, "v": 2, "mode": "full", "pages": 12, "ok": True, "findings": []},
+]
+
+
+class RunCostTests(unittest.TestCase):
+    """What a run cost, counted from the author's log: thirty-three runs were only visible because an author kept a log by hand."""
+
+    def write_log(self, directory, stem="t", entries=AUTHOR_LOG):
+        (Path(directory) / f"{stem}.author-log.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
+
+    def test_the_cost_is_counted_from_the_log_and_nothing_is_estimated(self):
+        result = run_node(f"""
+import {{ runCost }} from './skills/professional-slides/runtime/run-log.mjs';
+const runs = {json.dumps(AUTHOR_LOG)};
+const old = runs.map(({{ v, pages, mode, ...run }}) => ({{ ...run, mode: mode === 'check' ? 'full' : mode }}));
+console.log(JSON.stringify({{ cost: runCost(runs), old: runCost(old), none: runCost([]) }}));
+""")
+        cost = result["cost"]
+        self.assertEqual([cost["runs"], cost["clean"], cost["refused"]], [6, 2, 4])
+        self.assertEqual(cost["modes"], {"draft": {"runs": 1, "refused": 0}, "check": {"runs": 3, "refused": 3}, "full": {"runs": 2, "refused": 1}})
+        self.assertEqual([cost["pages"], cost["runsPerPage"]], [12, 0.5])
+        self.assertEqual(cost["refusalsByCode"]["SCENE_VOID"], {"findings": 2, "runs": 2})
+        self.assertEqual(cost["refusalsByCode"]["WORDS"], {"findings": 2, "runs": 2})
+        self.assertEqual(cost["refusalsByPage"]["p4"], {"findings": 4, "runs": 4})
+        self.assertEqual(sorted(cost["refusalsByPage"]), ["p2", "p4", "p9"])  # a deck-level finding is no page's
+        # One page refused in four runs in a row, each time under another code: the page fixed one finding at a time.
+        self.assertEqual(cost["longestStreak"], {"page": "p4", "runs": 4, "fromRun": 2, "toRun": 5, "codes": ["SCENE_VOID", "PAGE_DOES_NOT_COMPOSE", "TEXT_COVERAGE_LOW"]})
+        self.assertEqual(cost["recurring"], {"SCENE_VOID [p4]": 2})
+        self.assertNotIn("note", cost)
+        # A log written before checks were told apart says so, and reports no page count it was never given.
+        self.assertEqual(result["old"]["modes"], {"draft": {"runs": 1, "refused": 0}, "full": {"runs": 5, "refused": 4}})
+        self.assertNotIn("pages", result["old"])
+        self.assertIn("6 runs were logged before a check was told apart", result["old"]["note"])
+        self.assertEqual([result["none"]["runs"], result["none"]["longestStreak"]], [0, None])
+
+    def test_author_deck_logs_each_run_s_mode_and_reports_the_cost(self):
+        import tempfile
+        author = ROOT / "skills" / "professional-slides" / "runtime" / "author-deck.mjs"
+        fixtures = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ("explainer.pages.json", "explainer.insights.json"):
+                (Path(tmp) / name).write_text((fixtures / name).read_text(encoding="utf-8"), encoding="utf-8")
+            pages = Path(tmp) / "explainer.pages.json"
+            for flag in ("--draft", "--check"):
+                subprocess.run(["node", str(author), str(pages), flag], capture_output=True, text=True, cwd=ROOT)
+            entries = [json.loads(line) for line in (Path(tmp) / "explainer.author-log.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([(e["run"], e["mode"], e["v"]) for e in entries], [(1, "draft", 2), (2, "check", 2)])
+            self.assertTrue(all(e["pages"] == len(json.loads(pages.read_text(encoding="utf-8"))["pages"]) for e in entries))
+            out = subprocess.run(["node", str(author), str(pages), "--log"], capture_output=True, text=True, cwd=ROOT)
+            cost = json.loads(out.stdout)
+            self.assertEqual(cost["runs"], 2)
+            self.assertEqual(sorted(cost["modes"]), ["check", "draft"])
+            self.assertEqual(cost["refused"], sum(1 for e in entries if not e["ok"]))
+            for key in ("refusalsByCode", "refusalsByPage", "longestStreak", "recurring"):
+                self.assertIn(key, cost)
+
+    def test_the_harness_records_the_cost_of_the_run_it_scores(self):
+        import tempfile
+        page = {"id": "s", "nodes": [{"role": "action-title", "type": "text"}] + [{"role": "m", "type": "rect"}] * 20, "componentInstances": [{"component": "table"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "out").mkdir()
+            (root / "out" / "scene.json").write_text(json.dumps({"id": "t", "purpose": "catalogue", "slides": [page] * 6}), encoding="utf-8")
+            bare, _ = score("-", str(root / "out"))
+            self.assertNotIn("cost", bare, "a run that kept no log has no cost recorded, not a cost of zero")
+            self.write_log(root)
+            scored, code = score("-", str(root / "out"))
+            self.assertEqual([scored["cost"]["runs"], scored["cost"]["refused"], scored["cost"]["longestStreak"]["runs"]], [6, 4, 4])
+            self.assertEqual(code, 0, "the cost is reported, never scored")
+            text = subprocess.run(["node", str(SCORE), "-", str(root / "out")], capture_output=True, text=True, cwd=ROOT).stdout
+            self.assertIn("6 compile runs, 4 refused, 0.5 runs a page over 12 pages", text)
+            self.assertIn("longest streak on one page: p4, refused in 4 runs in a row", text)
+
+    def test_a_specimen_that_kept_its_log_is_stamped_with_its_cost(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ("kept", "bare"):
+                (Path(tmp) / name).mkdir()
+                (Path(tmp) / name / "plan.json").write_text(json.dumps({"schema": "professional-slides.plan/v1", "id": name, "pages": []}), encoding="utf-8")
+                (Path(tmp) / name / "specimen.json").write_text(json.dumps({"name": name}), encoding="utf-8")
+            (Path(tmp) / "kept" / "author-log.jsonl").write_text("".join(json.dumps(e) + "\n" for e in AUTHOR_LOG), encoding="utf-8")
+            result = run_node(f"""
+import fs from 'node:fs';
+import {{ stamp, scoreSpecimen, loadSpecimen }} from './evals/cold-run/specimens.mjs';
+const root = {json.dumps(tmp)};
+stamp('kept', root, '2026-10-03'); stamp('bare', root, '2026-10-03');
+const read = (name) => JSON.parse(fs.readFileSync(`${{root}}/${{name}}/specimen.json`, 'utf8')).recorded;
+console.log(JSON.stringify({{ kept: read('kept'), bare: read('bare'), live: scoreSpecimen(loadSpecimen('kept', root)).result.cost.runs }}));
+""")
+        self.assertEqual([result["kept"]["cost"]["runs"], result["kept"]["cost"]["refused"]], [6, 4])
+        self.assertEqual(result["kept"]["cost"]["longestStreak"]["page"], "p4")
+        self.assertEqual(result["live"], 6)
+        self.assertNotIn("cost", result["bare"])
+        self.assertIn("verdict", result["bare"])
+
+
 class SpecimenTests(unittest.TestCase):
     """The runs on record kept as numbers, and what they are for."""
 

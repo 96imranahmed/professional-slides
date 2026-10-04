@@ -1,0 +1,3899 @@
+{
+ "deck": {
+  "schema": "professional-slides.deck/v3",
+  "id": "page-forms",
+  "design": "consulting",
+  "request": "Show one worked page of every form the worked deck does not use: can Northvale Rail reach 60 million journeys a year by FY31, and how?",
+  "brief": "One worked page for each page-type form that examples/page-types.pages.json does not draw, on the same fictional regional rail operator, Northvale Rail. Each page stands alone - it compiles, composes and passes the page gates as the only page of a deck - and is printed by `author-deck.mjs --example <type>/<form>`. The file is a catalogue, not a deck to build. Every number is illustrative.",
+  "question": "Can Northvale Rail grow from 48 million to 60 million journeys a year by FY31, and how?",
+  "answer": "Northvale can reach 60 million journeys by FY31 by filling the off-peak rather than the full peak: add off-peak frequency first, electrify the Eastern line next and reform fares last.",
+  "footer": "Northvale Rail growth plan (illustrative)"
+ },
+ "pages": [
+  {
+   "id": "f-trend-column",
+   "type": "trend",
+   "form": "column",
+   "commentary": "so-what-bar",
+   "takeaway": false,
+   "why": "One measure over eight years, where each year's level matters as much as the path, so the years stand as columns with the threshold drawn across them",
+   "settles": {
+    "kind": "rate",
+    "what": "off-peak journeys a year FY19-FY26 against the 22 million the plan needs by FY31"
+   },
+   "title": "Off-peak journeys passed their FY20 level in FY25 and kept growing",
+   "exhibit": {
+    "heading": "Off-peak journeys",
+    "unit": "million",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Off-peak journeys",
+      "values": [
+       15.8,
+       16.1,
+       5.2,
+       10.9,
+       14.6,
+       15.9,
+       16.8,
+       17.4
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ],
+    "annotations": [
+     {
+      "category": "FY21",
+      "text": "Pandemic low of 5.2m"
+     },
+     {
+      "category": "FY25",
+      "text": "First year above the FY20 level of 16.1m"
+     }
+    ]
+   },
+   "bar": "Off-peak demand is already growing on an hourly timetable, so the half-hourly service adds to a rising base rather than reviving a falling one.",
+   "source": "Source: illustrative data for a fictional operator; ticket sales by time of travel"
+  },
+  {
+   "id": "f-trend-area",
+   "type": "trend",
+   "form": "area",
+   "commentary": "on-exhibit",
+   "takeaway": false,
+   "why": "The claim is the volume built up over the period, one series whose filled area is the journeys carried, with the two breaks marked on it",
+   "settles": {
+    "kind": "rate",
+    "what": "weekend journeys a year FY19-FY26"
+   },
+   "adds": "The callouts name what restarted weekend travel and why it now outruns the weekday",
+   "title": "Weekend journeys doubled from FY22 and now exceed their pre-pandemic level",
+   "exhibit": {
+    "heading": "Weekend journeys",
+    "unit": "million",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Weekend journeys",
+      "values": [
+       8.1,
+       8.3,
+       2.4,
+       4.6,
+       7.2,
+       8.6,
+       9.3,
+       9.9
+      ]
+     }
+    ],
+    "annotations": [
+     {
+      "category": "FY21",
+      "text": "2.4m in the pandemic year, a third of FY20"
+     },
+     {
+      "category": "FY23",
+      "text": "Leisure travel returned first, a year before commuting did"
+     },
+     {
+      "category": "FY26",
+      "text": "9.9m, a fifth above FY20, on the same Saturday timetable"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-trend-stacked-area",
+   "type": "trend",
+   "form": "stacked-area",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "The total and its mix both moved over the period, so the ticket types are stacked to show which layer the growth came from",
+   "settles": {
+    "kind": "share",
+    "what": "journeys a year by ticket type, FY21-FY26"
+   },
+   "title": "Season tickets never came back; day tickets carry the recovery",
+   "rail": "Season tickets carried 21.5 million journeys in FY20 and 12.4 million in FY26. Day and advance tickets filled the gap, so the revenue now depends on trips people choose week by week, which a better off-peak timetable can win and a poor one can lose.",
+   "exhibit": {
+    "heading": "Journeys by ticket type",
+    "unit": "million",
+    "categories": [
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Season",
+      "values": [
+       5.1,
+       9.2,
+       11.6,
+       12.1,
+       12.3,
+       12.4
+      ]
+     },
+     {
+      "name": "Day return",
+      "values": [
+       6.3,
+       14.1,
+       19.8,
+       21.4,
+       22.2,
+       22.6
+      ]
+     },
+     {
+      "name": "Advance",
+      "values": [
+       3.5,
+       8.3,
+       11.4,
+       12.6,
+       13.0,
+       13.3
+      ]
+     }
+    ],
+    "annotations": [
+     {
+      "series": "Day return",
+      "category": "FY26",
+      "text": "Day returns are now 47% of journeys"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; ticket sales by product"
+  },
+  {
+   "id": "f-trend-combo",
+   "type": "trend",
+   "form": "combo",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Two measures on one time axis - the service run and the punctuality it achieved - where the claim is that the second fell as the first rose",
+   "settles": {
+    "kind": "rate",
+    "what": "train-km operated and punctuality, FY21-FY26"
+   },
+   "adds": "The points say why punctuality fell with the added service and where the plan gets the margin back",
+   "title": "Punctuality slipped three points as train-km returned to its peak",
+   "highlight": [
+    "three points",
+    "86.1%"
+   ],
+   "exhibit": {
+    "heading": "Service operated and punctuality",
+    "unit": "million train-km; % on time",
+    "categories": [
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Train-km",
+      "values": [
+       11.2,
+       15.4,
+       17.1,
+       17.8,
+       18.0,
+       18.2
+      ]
+     },
+     {
+      "name": "Punctuality",
+      "values": [
+       93.6,
+       92.1,
+       90.7,
+       89.9,
+       89.2,
+       88.8
+      ]
+     }
+    ],
+    "annotations": [
+     {
+      "series": "Punctuality",
+      "category": "FY26",
+      "text": "88.8% on time, under the 90% floor"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The network fills before it fails",
+     "text": "Punctuality fell three points while train-km rose from 15.4 million to 18.2 million, because the added trains share the same two-track approach into Leeds. Each late train now delays the one behind it, which did not happen when the timetable had gaps."
+    },
+    {
+     "lead": "Where the margin returns",
+     "text": "The Eastern line runs at 86.1%, the weakest on the network, and its diesel units account for half of all fleet failures. Electric trains from 2030 remove those failures, which is how the plan adds a fifth more service and still holds the 90% floor."
+    },
+    {
+     "lead": "What the plan must not do",
+     "text": "Adding off-peak trains before the depot extension opens would park units on running lines overnight and cost another point. The timetable change therefore waits for the twelve new sidings in December 2027."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; performance reports"
+  },
+  {
+   "id": "f-trend-slope",
+   "type": "trend",
+   "form": "slope",
+   "commentary": "so-what-bar",
+   "takeaway": false,
+   "why": "Only the start and the end matter here - which lines gained and which lost between two years - so each line is one slope",
+   "settles": {
+    "kind": "rate",
+    "what": "off-peak journeys by line, FY23 and FY26"
+   },
+   "title": "Dales and Valley gained off-peak journeys while the Coast line lost them",
+   "exhibit": {
+    "heading": "Off-peak journeys by line",
+    "unit": "million",
+    "categories": [
+     "FY23",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "City",
+      "values": [
+       5.9,
+       6.4
+      ]
+     },
+     {
+      "name": "Valley",
+      "values": [
+       3.4,
+       4.3
+      ]
+     },
+     {
+      "name": "Dales",
+      "values": [
+       2.6,
+       3.5
+      ]
+     },
+     {
+      "name": "Eastern",
+      "values": [
+       1.9,
+       2.2
+      ]
+     },
+     {
+      "name": "Coast",
+      "values": [
+       1.1,
+       1.0
+      ]
+     }
+    ],
+    "focusSeries": "Coast"
+   },
+   "bar": "The two lines that gained most are the two with half-hourly stations, and the one that lost is hourly throughout: frequency, not the market, separates them.",
+   "source": "Source: illustrative data for a fictional operator; ticket sales by line"
+  },
+  {
+   "id": "f-ranking-column",
+   "type": "ranking",
+   "form": "column",
+   "commentary": "on-exhibit",
+   "takeaway": false,
+   "why": "Eight operators on one measure with Northvale marked, set as columns because the names are short and the order is the finding",
+   "settles": {
+    "kind": "rank",
+    "what": "off-peak share of journeys at eight regional operators, FY26"
+   },
+   "adds": "The callouts say what the leaders have that Northvale lacks",
+   "title": "Northvale ranks sixth of eight operators on off-peak share of journeys",
+   "exhibit": {
+    "heading": "Off-peak share of journeys, FY26",
+    "unit": "%",
+    "categories": [
+     "Westmoor",
+     "Tideway",
+     "Pennine",
+     "Fenland",
+     "Lakeside",
+     "Northvale",
+     "Marches",
+     "Wolds"
+    ],
+    "series": [
+     {
+      "name": "Off-peak share",
+      "values": [
+       48,
+       46,
+       44,
+       41,
+       39,
+       36,
+       33,
+       31
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale"
+     }
+    ],
+    "annotations": [
+     {
+      "category": "Westmoor",
+      "text": "Half-hourly off-peak on every line since 2022"
+     },
+     {
+      "category": "Fenland",
+      "text": "The median operator carries 40% off-peak"
+     },
+     {
+      "category": "Northvale",
+      "text": "36%: still hourly on three of its five lines"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-ranking-lollipop",
+   "type": "ranking",
+   "form": "lollipop",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "Ten stations ranked on one measure where the values sit in a narrow band, so a dot on a stem reads more cleanly than ten heavy bars",
+   "settles": {
+    "kind": "rank",
+    "what": "average off-peak wait at ten stations, FY26 timetable"
+   },
+   "title": "Coast line stations wait twice as long off-peak as the Dales",
+   "rail": "The four stations with the longest waits are the four still served hourly. Their passengers wait 30 minutes on average for a train, against 15 at the half-hourly stations, and that wait is the reason drivers give most often for not taking the train.",
+   "exhibit": {
+    "heading": "Average off-peak wait for a train",
+    "unit": "minutes",
+    "categories": [
+     "Goole",
+     "Malton",
+     "Selby",
+     "Scarborough",
+     "Halifax",
+     "Skipton",
+     "Knaresborough",
+     "Huddersfield",
+     "Harrogate",
+     "Keighley"
+    ],
+    "series": [
+     {
+      "name": "Wait",
+      "values": [
+       31,
+       30,
+       30,
+       29,
+       16,
+       15,
+       15,
+       14,
+       14,
+       13
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Goole"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; FY26 timetable"
+  },
+  {
+   "id": "f-ranking-dumbbell",
+   "type": "ranking",
+   "form": "dumbbell",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Each line has two values - before and after the timetable trial - and the gap between them is the finding, so each row joins its two dots",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak journeys per weekday on six routes, before and after the half-hourly trial"
+   },
+   "adds": "The points say how much of the gain is new travel and what the trial did not test",
+   "title": "Every trial route gained off-peak journeys; Skipton gained most",
+   "highlight": [
+    "41%",
+    "one journey in five"
+   ],
+   "exhibit": {
+    "heading": "Off-peak journeys per weekday",
+    "unit": "thousand",
+    "categories": [
+     "Leeds-Skipton",
+     "Leeds-Halifax",
+     "Leeds-Harrogate",
+     "York-Harrogate",
+     "Leeds-Huddersfield",
+     "Leeds-Keighley"
+    ],
+    "series": [
+     {
+      "name": "Hourly, FY24",
+      "values": [
+       3.4,
+       4.1,
+       3.8,
+       2.2,
+       5.6,
+       4.4
+      ]
+     },
+     {
+      "name": "Half-hourly, FY26",
+      "values": [
+       4.8,
+       5.2,
+       4.7,
+       2.9,
+       6.5,
+       5.3
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Leeds-Skipton"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Gains on every route",
+     "text": "The six routes that moved to a half-hourly off-peak service gained between 16% and 41% in two years, and Leeds to Skipton gained most because its hourly train had been the fullest. No trial route lost journeys, and the hourly routes beside them grew by 4% over the same period."
+    },
+    {
+     "lead": "Mostly new travel",
+     "text": "Surveys on the trial trains found that one journey in five had moved from the peak; the rest were trips not made by rail before. The trial ran on lines with spare units, so it says nothing about the Coast line, where the fleet is committed until 2030."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; timetable trial, FY24 to FY26"
+  },
+  {
+   "id": "f-ranking-bullet",
+   "type": "ranking",
+   "form": "bullet",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Each measure is read against its own target and its own bands of poor, fair and good, which a plain bar cannot show",
+   "settles": {
+    "kind": "comparison",
+    "what": "eight operating measures against their FY26 targets, as a percentage of target"
+   },
+   "adds": "The points say which misses matter for the plan and which do not",
+   "title": "Five of eight operating measures missed target in FY26, punctuality furthest",
+   "highlight": [
+    "Five of the eight",
+    "fleet availability"
+   ],
+   "exhibit": {
+    "heading": "Operating measures, FY26",
+    "unit": "% of target",
+    "categories": [
+     "Punctuality",
+     "Fleet availability",
+     "Crew availability",
+     "Off-peak load",
+     "Cancellations",
+     "Customer score",
+     "Cost per train-km",
+     "Revenue per journey"
+    ],
+    "series": [
+     {
+      "name": "Actual",
+      "values": [
+       86,
+       91,
+       97,
+       88,
+       93,
+       102,
+       104,
+       99
+      ]
+     }
+    ],
+    "targets": [
+     100,
+     100,
+     100,
+     100,
+     100,
+     100,
+     100,
+     100
+    ],
+    "ranges": [
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ],
+     [
+      80,
+      95,
+      110
+     ]
+    ]
+   },
+   "points": [
+    {
+     "lead": "Two misses share a cause",
+     "text": "Five of the eight measures fell short, and punctuality and fleet availability, the two furthest from target, share one cause: the Eastern line diesel units, which fail three times as often as the rest of the fleet."
+    },
+    {
+     "lead": "The money measures hold",
+     "text": "Cost per train-km and the customer score beat target, and revenue per journey is within a point of it. The plan therefore starts from an operation that is short of trains that work, not short of money or goodwill."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; FY26 scorecard"
+  },
+  {
+   "id": "f-composition-stacked-bar",
+   "type": "composition",
+   "form": "stacked-bar",
+   "commentary": "so-what-bar",
+   "takeaway": false,
+   "why": "The claim is how the mix of trip purposes differs between the five lines, so each line is one bar split the same way",
+   "settles": {
+    "kind": "share",
+    "what": "journeys by purpose on each of the five lines, FY26 survey"
+   },
+   "title": "Commuting is half of City line journeys, a fifth of the Coast's",
+   "exhibit": {
+    "heading": "Journeys by purpose, FY26",
+    "unit": "% of journeys",
+    "categories": [
+     "City",
+     "Valley",
+     "Eastern",
+     "Dales",
+     "Coast"
+    ],
+    "series": [
+     {
+      "name": "Commuting",
+      "values": [
+       52,
+       44,
+       41,
+       27,
+       21
+      ]
+     },
+     {
+      "name": "Leisure",
+      "values": [
+       26,
+       31,
+       30,
+       52,
+       58
+      ]
+     },
+     {
+      "name": "Education",
+      "values": [
+       14,
+       16,
+       18,
+       12,
+       11
+      ]
+     },
+     {
+      "name": "Business",
+      "values": [
+       8,
+       9,
+       11,
+       9,
+       10
+      ]
+     }
+    ]
+   },
+   "bar": "The lines with the most leisure travel are the ones with the fewest off-peak trains, so the timetable is thinnest where demand is most elastic.",
+   "source": "Source: illustrative data for a fictional operator; FY26 passenger survey"
+  },
+  {
+   "id": "f-composition-marimekko",
+   "type": "composition",
+   "form": "marimekko",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Both the size of each line and its split between peak and off-peak matter, so the columns are as wide as the line is large",
+   "settles": {
+    "kind": "share",
+    "what": "journeys by line and time of travel, FY26"
+   },
+   "adds": "The points turn the areas into the journeys the plan can win on each line",
+   "title": "The City line is two fifths of journeys and the most peak-heavy",
+   "highlight": [
+    "19.6 million",
+    "two thirds"
+   ],
+   "exhibit": {
+    "heading": "Journeys by line and time of travel, FY26",
+    "unit": "million",
+    "categories": [
+     "City",
+     "Valley",
+     "Eastern",
+     "Dales",
+     "Coast"
+    ],
+    "series": [
+     {
+      "name": "Peak",
+      "values": [
+       13.2,
+       6.1,
+       5.4,
+       3.3,
+       2.9
+      ]
+     },
+     {
+      "name": "Off-peak",
+      "values": [
+       6.4,
+       4.3,
+       2.2,
+       3.5,
+       1.0
+      ]
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Size and mix together",
+     "text": "The City line carries 19.6 million of the 48.3 million journeys, and two thirds of them in the peak, where its trains are full. Growth there needs longer trains or more track, which the plan does not buy before FY31."
+    },
+    {
+     "lead": "Where off-peak is thin",
+     "text": "The Eastern and Coast lines together carry 3.2 million off-peak journeys on 11.5 million in total, the thinnest off-peak share on the network. Those two lines are where a half-hourly timetable has the most empty seats to fill."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; ticket sales by line and time of travel"
+  },
+  {
+   "id": "f-composition-waffle",
+   "type": "composition",
+   "form": "waffle",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "A count of respondents out of a hundred, where each square is one person and the reader should see the parts as people rather than as a percentage",
+   "settles": {
+    "kind": "count",
+    "what": "main reason given by 100 surveyed drivers for not taking the train, FY26"
+   },
+   "title": "Forty-two of a hundred drivers name the wait, not the fare",
+   "rail": "The wait for the next train is named by 42 of the 100 drivers surveyed and the fare by 21. A timetable change addresses twice as many of them as a fare cut would, and it costs the operator less for each trip it wins.",
+   "exhibit": {
+    "heading": "Main reason for driving instead",
+    "unit": "respondents",
+    "categories": [
+     "Wait for the next train",
+     "Fare",
+     "Journey time",
+     "Getting to the station",
+     "Other"
+    ],
+    "series": [
+     {
+      "name": "Respondents",
+      "values": [
+       42,
+       21,
+       17,
+       12,
+       8
+      ]
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; FY26 survey of 100 drivers in the Dales corridor"
+  },
+  {
+   "id": "f-composition-treemap",
+   "type": "composition",
+   "form": "treemap",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "One total split into many parts of very different size, where the reader should see at once which few parts are most of it",
+   "settles": {
+    "kind": "share",
+    "what": "the capital programme of 640 million pounds by work package"
+   },
+   "adds": "The points say which packages are committed and which can be cut without stopping the plan",
+   "title": "Three packages take four fifths of the capital programme",
+   "highlight": [
+    "£520 million",
+    "£45 million"
+   ],
+   "exhibit": {
+    "heading": "Capital programme by work package",
+    "unit": "£ million",
+    "items": [
+     {
+      "label": "Overhead wires",
+      "value": 245
+     },
+     {
+      "label": "Depot and fleet",
+      "value": 205
+     },
+     {
+      "label": "Power supply",
+      "value": 70
+     },
+     {
+      "label": "Stations",
+      "value": 45
+     },
+     {
+      "label": "Signalling",
+      "value": 40
+     },
+     {
+      "label": "Fares systems",
+      "value": 20
+     },
+     {
+      "label": "Contingency",
+      "value": 15
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Three packages dominate",
+     "text": "Overhead wires, the depot and fleet, and the power supply come to £520 million of the £640 million. Two of the three belong to electrification, which is why its dates decide when most of the money is spent."
+    },
+    {
+     "lead": "What can flex",
+     "text": "Stations work of £45 million follows the housing sites and can slip a year without touching the timetable. The depot cannot: the half-hourly service needs its twelve sidings before the first added train runs in December 2027."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; capital plan, September 2026"
+  },
+  {
+   "id": "f-composition-pie",
+   "type": "composition",
+   "form": "pie",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Four parts of one whole with one part much the largest, which is all a pie can show and all this claim needs",
+   "settles": {
+    "kind": "share",
+    "what": "off-peak seat-km by how full the train is, FY26"
+   },
+   "adds": "The points say what the empty seats cost and why they are the cheapest capacity the operator has",
+   "title": "Over half of off-peak seats run empty across the network",
+   "highlight": [
+    "54%",
+    "nothing extra"
+   ],
+   "exhibit": {
+    "heading": "Off-peak seat-km by use, FY26",
+    "unit": "% of seat-km",
+    "labels": [
+     "Empty",
+     "Leisure trips",
+     "Commuter trips",
+     "Education trips"
+    ],
+    "values": [
+     54,
+     24,
+     14,
+     8
+    ]
+   },
+   "points": [
+    {
+     "lead": "More empty than full",
+     "text": "Off-peak trains ran with 54% of their seat-km empty in FY26. The track, the crew and the fuel were paid for whether or not the seats were used, so a passenger in one of them costs nothing extra to carry."
+    },
+    {
+     "lead": "Why it is the first lever",
+     "text": "Filling a tenth of those seats adds 1.9 million journeys with no new train. That is why the plan starts with the off-peak timetable and leaves the full peak for the electric fleet."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; seat-km from the FY26 timetable, loads from ticket sales"
+  },
+  {
+   "id": "f-relationship-bubble",
+   "type": "relationship",
+   "form": "bubble",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Three measures for each station - how often trains call, how fast journeys grew and how many it carries - where size shows which points matter",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak trains per weekday, off-peak growth and annual journeys at ten stations"
+   },
+   "adds": "The points say which of the large stations sit below the threshold and what moving them is worth",
+   "title": "The largest hourly stations are where a half-hourly service pays most",
+   "highlight": [
+    "1.9 million",
+    "six stations"
+   ],
+   "exhibit": {
+    "heading": "Off-peak service, growth and size, FY23-FY26",
+    "xLabel": "Off-peak trains per weekday",
+    "yLabel": "Off-peak journey growth, %",
+    "points": [
+     {
+      "name": "Keighley",
+      "x": 58,
+      "y": 19,
+      "size": 2.1
+     },
+     {
+      "name": "Harrogate",
+      "x": 36,
+      "y": 18,
+      "size": 2.6
+     },
+     {
+      "name": "Huddersfield",
+      "x": 54,
+      "y": 17,
+      "size": 3.4
+     },
+     {
+      "name": "Knaresborough",
+      "x": 34,
+      "y": 16,
+      "size": 0.9
+     },
+     {
+      "name": "Skipton",
+      "x": 32,
+      "y": 15,
+      "size": 1.6
+     },
+     {
+      "name": "Halifax",
+      "x": 38,
+      "y": 14,
+      "size": 2.2
+     },
+     {
+      "name": "Scarborough",
+      "x": 16,
+      "y": 6,
+      "size": 1.9
+     },
+     {
+      "name": "Selby",
+      "x": 18,
+      "y": 5,
+      "size": 1.2
+     },
+     {
+      "name": "Malton",
+      "x": 14,
+      "y": 4,
+      "size": 0.6
+     },
+     {
+      "name": "Goole",
+      "x": 12,
+      "y": 3,
+      "size": 0.4
+     }
+    ],
+    "xScale": {
+     "min": 0,
+     "max": 60,
+     "step": 20
+    },
+    "yScale": {
+     "min": 0,
+     "max": 20,
+     "step": 5
+    }
+   },
+   "points": [
+    {
+     "lead": "Size decides the order",
+     "text": "Scarborough carries 1.9 million journeys a year on an hourly service and grew 6%, a third of the rate of stations its size with a train every half hour. Moving it and Selby to half-hourly reaches more passengers than moving Malton and Goole together."
+    },
+    {
+     "lead": "The threshold holds at every size",
+     "text": "All six stations above 30 trains a day grew by 14% or more, whether they carry 0.9 million journeys or 3.4 million. Size changes how much a faster timetable is worth, not whether it works."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator; ticket sales by origin station"
+  },
+  {
+   "id": "f-relationship-bubble-grid",
+   "type": "relationship",
+   "form": "bubble-grid",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "Two categories cross - the line and the hour of day - and the size of each cell is the finding, so the cells are bubbles on a grid",
+   "settles": {
+    "kind": "comparison",
+    "what": "empty seats per weekday by line and time band, FY26"
+   },
+   "title": "Empty seats cluster between the peaks on the Valley and City lines",
+   "rail": "The interpeak hours hold 61 thousand empty seats a weekday on the City and Valley lines alone, more than every other band on every other line together. The evening is emptier still on the Dales, where the last train leaves before walkers finish.",
+   "exhibit": {
+    "heading": "Empty seats per weekday, FY26",
+    "unit": "thousand seats",
+    "rows": [
+     "City",
+     "Valley",
+     "Eastern",
+     "Dales",
+     "Coast"
+    ],
+    "columns": [
+     "Morning peak",
+     "Interpeak",
+     "Evening peak",
+     "Evening"
+    ],
+    "values": [
+     [
+      2,
+      34,
+      3,
+      12
+     ],
+     [
+      4,
+      27,
+      5,
+      9
+     ],
+     [
+      6,
+      14,
+      7,
+      6
+     ],
+     [
+      5,
+      9,
+      6,
+      11
+     ],
+     [
+      3,
+      8,
+      4,
+      5
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; seats from the FY26 timetable, loads from ticket sales"
+  },
+  {
+   "id": "f-panels-grid",
+   "type": "panels",
+   "form": "grid",
+   "commentary": "captions",
+   "takeaway": false,
+   "why": "One question - what happened on each line after its timetable changed - answered for four lines, two by two",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak journeys a year on four lines, FY21-FY26"
+   },
+   "adds": "Each caption names what its line's timetable did, which the columns alone do not show",
+   "title": "Off-peak journeys grew fastest on the two half-hourly lines",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Dales line",
+     "unit": "million",
+     "categories": [
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        1.0,
+        2.2,
+        2.6,
+        3.0,
+        3.3,
+        3.5
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "Half-hourly since 2023, the Dales line added 0.9 million off-peak journeys in three years"
+    },
+    {
+     "type": "chart.column",
+     "heading": "Valley line",
+     "unit": "million",
+     "categories": [
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        1.2,
+        2.9,
+        3.4,
+        3.8,
+        4.1,
+        4.3
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "The Valley towns gained the same 0.9 million after their timetable changed in May 2023"
+    },
+    {
+     "type": "chart.column",
+     "heading": "Eastern line",
+     "unit": "million",
+     "categories": [
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        0.7,
+        1.7,
+        1.9,
+        2.0,
+        2.1,
+        2.2
+       ]
+      }
+     ],
+     "caption": "Still hourly between the peaks, the Eastern line added a third as much over the same years"
+    },
+    {
+     "type": "chart.column",
+     "heading": "Coast line",
+     "unit": "million",
+     "categories": [
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        0.4,
+        0.9,
+        1.1,
+        1.1,
+        1.0,
+        1.0
+       ]
+      }
+     ],
+     "caption": "The hourly Coast service has lost journeys since FY23 and ended below where it began"
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; ticket sales by line"
+  },
+  {
+   "id": "f-panels-stack",
+   "type": "panels",
+   "form": "stack",
+   "commentary": "captions",
+   "takeaway": false,
+   "why": "Two series on the same years read one above the other, so the eye runs down from the service added to the journeys won",
+   "settles": {
+    "kind": "comparison",
+    "what": "off-peak trains per weekday and off-peak journeys on the Dales line, FY19-FY26"
+   },
+   "adds": "Each caption says what its panel shows about the timing: the journeys followed the trains by a year",
+   "title": "Dales journeys rose a year after its off-peak trains doubled",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Dales line off-peak trains",
+     "unit": "trains per weekday",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak trains",
+       "values": [
+        16,
+        16,
+        12,
+        16,
+        32,
+        32,
+        32,
+        32
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY23"
+      }
+     ],
+     "caption": "The off-peak service doubled in one step in FY23, from an hourly train to one every half hour"
+    },
+    {
+     "type": "chart.line",
+     "heading": "Dales line off-peak journeys",
+     "unit": "million",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Off-peak journeys",
+       "values": [
+        3.0,
+        3.1,
+        1.0,
+        2.2,
+        2.6,
+        3.0,
+        3.3,
+        3.5
+       ]
+      }
+     ],
+     "annotations": [
+      {
+       "category": "FY24",
+       "text": "Back to the FY20 level a year after the change"
+      }
+     ],
+     "caption": "Journeys passed their FY20 level in FY25 and have grown by 0.2 to 0.4 million a year since"
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; timetable and ticket sales"
+  },
+  {
+   "id": "f-scorecard-heatmap",
+   "type": "scorecard",
+   "form": "heatmap",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Six lines are scored across four time bands on one scale, and the pattern of light and dark cells is the finding",
+   "settles": {
+    "kind": "comparison",
+    "what": "headroom score by line and time band, weekdays, FY26, from 1 (trains full) to 5 (most seats empty)"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Off-peak headroom is widest between the peaks on every line",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "Morning peak",
+      "heat": true
+     },
+     {
+      "label": "Interpeak",
+      "heat": true
+     },
+     {
+      "label": "Evening peak",
+      "heat": true
+     },
+     {
+      "label": "Evening",
+      "heat": true
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      1,
+      4,
+      1,
+      5,
+      "Interpeak and evening seats are the room the half-hourly timetable fills first, from December 2027"
+     ],
+     [
+      "Valley",
+      1,
+      5,
+      1,
+      4,
+      "The emptiest interpeak on the network, in the largest town-to-town market the operator serves"
+     ],
+     [
+      "Eastern",
+      1,
+      4,
+      1,
+      4,
+      "Full in both peaks; it can grow only between them until the electric fleet arrives in 2030"
+     ],
+     [
+      "City",
+      1,
+      3,
+      1,
+      3,
+      "The fullest off-peak already, so it has the least to gain from running more trains"
+     ],
+     [
+      "Airport",
+      2,
+      3,
+      1,
+      3,
+      "Short and frequent; its timetable is held and its units are lent to the Dales"
+     ],
+     [
+      "Coast",
+      2,
+      4,
+      2,
+      5,
+      "Empty in the evening, but there are no spare units to run more trains before 2030"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator",
+   "note": "Scores 1-5 from the share of seats empty: 1 under 10%, 2 under 25%, 3 under 45%, 4 under 60%, 5 above."
+  },
+  {
+   "id": "f-scorecard-lights",
+   "type": "scorecard",
+   "form": "lights",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Each line gets one judgement on each of three conditions, and a lamp reads faster than a word across eighteen cells",
+   "settles": {
+    "kind": "comparison",
+    "what": "readiness of each line on fleet, crew and depot capacity for the December 2027 timetable"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Three of six lines are ready for a half-hourly off-peak timetable",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "Fleet",
+      "type": "lights"
+     },
+     {
+      "label": "Crew",
+      "type": "lights"
+     },
+     {
+      "label": "Depot",
+      "type": "lights"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      "green",
+      "green",
+      "green",
+      "Ready now: the units, the crews and the sidings are all in place for the December 2027 timetable"
+     ],
+     [
+      "Valley",
+      "green",
+      "green",
+      "amber",
+      "Ready once the Halifax sidings are extended, which is due in May 2028"
+     ],
+     [
+      "Airport",
+      "green",
+      "green",
+      "green",
+      "Ready, but already the most frequent line, so its spare units go to the Dales instead"
+     ],
+     [
+      "City",
+      "green",
+      "amber",
+      "green",
+      "Needs twelve more drivers trained before it can run more trains; recruitment opens in January 2027"
+     ],
+     [
+      "Eastern",
+      "red",
+      "amber",
+      "amber",
+      "Has no spare diesel units until the electric trains arrive in the second half of 2030"
+     ],
+     [
+      "Coast",
+      "red",
+      "red",
+      "amber",
+      "Fleet and crews are committed to the summer timetable until 2030, so it grows last"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-check",
+   "type": "scorecard",
+   "form": "check",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Each condition is either met or not, and the reader looks for the rows that are all ticks",
+   "settles": {
+    "kind": "comparison",
+    "what": "which of four conditions each line meets for added off-peak service"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Only the Dales line meets all four conditions for more off-peak trains",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "Spare units",
+      "type": "check"
+     },
+     {
+      "label": "Spare crews",
+      "type": "check"
+     },
+     {
+      "label": "Depot space",
+      "type": "check"
+     },
+     {
+      "label": "Free paths",
+      "type": "check"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      true,
+      true,
+      true,
+      true,
+      "Meets every condition, so its timetable is the first to change, in December 2027"
+     ],
+     [
+      "Airport",
+      true,
+      true,
+      true,
+      false,
+      "Has the trains and crews but no free paths into Leeds; its spare units move to the Dales"
+     ],
+     [
+      "Valley",
+      true,
+      true,
+      false,
+      true,
+      "Short of sidings only; it follows when the Halifax depot is extended in May 2028"
+     ],
+     [
+      "City",
+      true,
+      false,
+      true,
+      true,
+      "Short of drivers only; twelve more are needed before it can run a half-hourly service"
+     ],
+     [
+      "Eastern",
+      false,
+      false,
+      true,
+      true,
+      "Units and crews are tied up until the electric fleet is delivered in 2030"
+     ],
+     [
+      "Coast",
+      false,
+      false,
+      false,
+      true,
+      "Has the track capacity and nothing else, so it grows last, after 2030"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-bars",
+   "type": "scorecard",
+   "form": "bars",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "One measure per line shown as a bar inside the table, beside the numbers a reader will also want to look up",
+   "settles": {
+    "kind": "comparison",
+    "what": "empty off-peak seats per weekday, off-peak journeys and trains by line, FY26"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "The City and Valley lines have the most empty off-peak seats",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "Empty off-peak seats",
+      "unit": "thousand a weekday",
+      "bar": true
+     },
+     {
+      "label": "Off-peak journeys",
+      "unit": "million"
+     },
+     {
+      "label": "Off-peak trains",
+      "unit": "per weekday"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "City",
+      49,
+      "6.4",
+      "58",
+      "Has the most seats and the most trains already, so it gains little from running more"
+     ],
+     [
+      "Valley",
+      41,
+      "4.3",
+      "36",
+      "The largest pool of empty seats in towns that a half-hourly train would join up"
+     ],
+     [
+      "Eastern",
+      27,
+      "2.2",
+      "24",
+      "The seats are there but the units are not, until the electric fleet arrives"
+     ],
+     [
+      "Dales",
+      25,
+      "3.5",
+      "32",
+      "Fewer empty seats, but the leisure market that responds fastest to a better timetable"
+     ],
+     [
+      "Coast",
+      20,
+      "1.0",
+      "16",
+      "The smallest pool and the least frequent service, so it grows last"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-progress",
+   "type": "scorecard",
+   "form": "progress",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Each workstream is a share of its work complete, and a bar with its percentage shows who is ahead and who is behind",
+   "settles": {
+    "kind": "comparison",
+    "what": "share of each 2027 workstream complete at September 2026"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "The depot design is furthest ahead; the power contract has barely begun",
+   "exhibit": {
+    "columns": [
+     "Workstream",
+     "Owner",
+     {
+      "label": "% complete",
+      "type": "progress"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Depot extension design",
+      "D. Moss",
+      80,
+      "The design is nearly done; planning consent in July 2027 is the next gate"
+     ],
+     [
+      "Crew recruitment, Dales",
+      "P. Shah",
+      65,
+      "Two of three intakes are trained and the third starts in January 2027"
+     ],
+     [
+      "Dales timetable bid",
+      "P. Shah",
+      50,
+      "Paths are agreed with the infrastructure manager; the bid goes in June 2027"
+     ],
+     [
+      "Housing site agreements",
+      "D. Moss",
+      40,
+      "Two of four sites are signed; the other two wait on planning decisions"
+     ],
+     [
+      "Fare reform design",
+      "A. Karim",
+      25,
+      "Product design only so far; the consultation is not due until October 2027"
+     ],
+     [
+      "Power supply contract",
+      "T. Hardcastle",
+      10,
+      "Waiting on the network study, now six weeks late, before it can go to tender"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-dot",
+   "type": "scorecard",
+   "form": "dot",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Each station either has a half-hourly service in a given year or does not, and the filled dots show the rollout",
+   "settles": {
+    "kind": "comparison",
+    "what": "which of seven stations have a half-hourly off-peak service in FY26, FY28 and FY31"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Half-hourly service reaches every large station by FY31",
+   "exhibit": {
+    "columns": [
+     "Station",
+     {
+      "label": "FY26",
+      "type": "dot"
+     },
+     {
+      "label": "FY28",
+      "type": "dot"
+     },
+     {
+      "label": "FY31",
+      "type": "dot"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Keighley",
+      true,
+      true,
+      true,
+      "Half-hourly since 2023 and the model for the rest of the Dales line; gains a later last train"
+     ],
+     [
+      "Halifax",
+      true,
+      true,
+      true,
+      "Already half-hourly by day; it gains evening trains in the May 2028 timetable"
+     ],
+     [
+      "Harrogate",
+      true,
+      true,
+      true,
+      "Holds its present service; nothing changes before the electric fleet arrives"
+     ],
+     [
+      "Skipton",
+      false,
+      true,
+      true,
+      "Moves to a full half-hourly pattern in December 2027 with the Dales timetable"
+     ],
+     [
+      "Huddersfield",
+      false,
+      true,
+      true,
+      "Moves in May 2028, once the Halifax sidings give the Valley line its units"
+     ],
+     [
+      "Selby",
+      false,
+      false,
+      true,
+      "Waits for the electric trains in 2030 to release the diesel units it needs"
+     ],
+     [
+      "Scarborough",
+      false,
+      false,
+      true,
+      "The last to move: the Coast line has no spare units before 2030"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-trend",
+   "type": "scorecard",
+   "form": "trend",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The direction of each measure on each line is the finding, and an arrow states a direction without a number to misread",
+   "settles": {
+    "kind": "comparison",
+    "what": "direction of off-peak journeys, punctuality and cost per train-km by line, FY24 to FY26"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Off-peak journeys are rising on four lines and falling on one",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "Off-peak journeys",
+      "type": "trend"
+     },
+     {
+      "label": "Punctuality",
+      "type": "trend"
+     },
+     {
+      "label": "Cost per train-km",
+      "type": "trend",
+      "better": "down"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      "up",
+      "flat",
+      "down",
+      "Growing, on time and getting cheaper to run: the line to add trains to first"
+     ],
+     [
+      "Valley",
+      "up",
+      "flat",
+      "flat",
+      "Growing steadily, and it holds its costs once the depot is extended in 2028"
+     ],
+     [
+      "Airport",
+      "up",
+      "up",
+      "flat",
+      "Small, frequent and improving; it needs nothing from the plan before FY31"
+     ],
+     [
+      "City",
+      "up",
+      "down",
+      "flat",
+      "Growing, but losing punctuality as the two-track approach to Leeds fills up"
+     ],
+     [
+      "Eastern",
+      "flat",
+      "down",
+      "up",
+      "Stalled and getting costlier to run as the diesel fleet ages"
+     ],
+     [
+      "Coast",
+      "down",
+      "flat",
+      "up",
+      "Losing journeys on an hourly timetable that has not changed since FY23"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-scorecard-binary",
+   "type": "scorecard",
+   "form": "binary",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Four options are held to the same four yes-or-no tests, and the option with no cross is the answer",
+   "settles": {
+    "kind": "comparison",
+    "what": "whether each Eastern line option meets four tests: cost, emissions, capacity and timing"
+   },
+   "adds": "The last column says what each row's pattern means for the order of the plan",
+   "title": "Electrification is the one option that meets every test",
+   "exhibit": {
+    "columns": [
+     "Option",
+     {
+      "label": "Cheaper over 30 years?"
+     },
+     {
+      "label": "Ends diesel running?"
+     },
+     {
+      "label": "Frees units for other lines?"
+     },
+     {
+      "label": "In service by 2030?"
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Electrify the whole line",
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      "Meets all four tests, provided the 2029 power upgrade is delivered on time"
+     ],
+     [
+      "Electrify to Selby only",
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      "Frees six units but keeps diesel running east of Selby for another decade"
+     ],
+     [
+      "Buy bi-mode trains",
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      "In service soonest, but it still burns diesel and costs more from year six"
+     ],
+     [
+      "Refurbish the diesel fleet",
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "positive"
+      },
+      "The cheapest to start and the dearest to run; it buys five years and no growth"
+     ],
+     [
+      "Do nothing",
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      {
+       "type": "binary",
+       "value": "negative"
+      },
+      "The fleet reaches the end of its life in 2031 with nothing ordered to replace it"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-lookup-table",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a station and reads across four facts about it; nothing here is ranked or plotted",
+   "settles": {
+    "kind": "structure",
+    "what": "off-peak service, journeys, growth and planned change at eight stations"
+   },
+   "adds": "The last column says what the plan does at each station and when",
+   "title": "Four hourly stations move to a half-hourly service by FY31",
+   "exhibit": {
+    "columns": [
+     "Station",
+     "Line",
+     "Off-peak trains a weekday",
+     "Journeys, million",
+     "Growth FY23-FY26",
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Keighley",
+      "Dales",
+      "58",
+      "2.1",
+      "19%",
+      "Holds its half-hourly service and gains a later last train from December 2027"
+     ],
+     [
+      "Huddersfield",
+      "Valley",
+      "54",
+      "3.4",
+      "17%",
+      "Holds its service; platform work in FY28 allows longer trains"
+     ],
+     [
+      "Halifax",
+      "Valley",
+      "38",
+      "2.2",
+      "14%",
+      "Gains evening trains when the sidings are extended in May 2028"
+     ],
+     [
+      "Harrogate",
+      "City",
+      "36",
+      "2.6",
+      "18%",
+      "Holds its service; no change before the electric fleet arrives"
+     ],
+     [
+      "Skipton",
+      "Dales",
+      "32",
+      "1.6",
+      "15%",
+      "Moves to a full half-hourly pattern in December 2027"
+     ],
+     [
+      "Selby",
+      "Eastern",
+      "18",
+      "1.2",
+      "5%",
+      "Moves from hourly to half-hourly when electric trains start in 2030"
+     ],
+     [
+      "Scarborough",
+      "Coast",
+      "16",
+      "1.9",
+      "6%",
+      "Moves to half-hourly in FY31, the last large station to do so"
+     ],
+     [
+      "Malton",
+      "Coast",
+      "14",
+      "0.6",
+      "4%",
+      "Follows Scarborough in FY31 on the same Coast line timetable"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; FY26 timetable and ticket sales"
+  },
+  {
+   "id": "f-mechanism-flow",
+   "type": "mechanism",
+   "form": "flow",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The approvals branch and rejoin, so the dependency between them is drawn as a flow rather than listed",
+   "settles": {
+    "kind": "sequence",
+    "what": "the approvals a timetable change passes through, and which run in parallel"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "A timetable change needs four approvals, two of them in parallel",
+   "exhibit": {
+    "nodes": [
+     {
+      "id": "bid",
+      "label": "Timetable bid",
+      "text": "Lodged by June 2027"
+     },
+     {
+      "id": "paths",
+      "label": "Path offer",
+      "text": "Infrastructure manager, 14 weeks"
+     },
+     {
+      "id": "crew",
+      "label": "Crew plan",
+      "text": "Rosters and training, 14 weeks"
+     },
+     {
+      "id": "safety",
+      "label": "Safety case",
+      "text": "Regulator, 10 weeks"
+     },
+     {
+      "id": "publish",
+      "label": "Publication",
+      "text": "12 weeks before the change"
+     },
+     {
+      "id": "live",
+      "label": "Timetable live",
+      "text": "December 2027"
+     }
+    ],
+    "edges": [
+     {
+      "from": "bid",
+      "to": "paths"
+     },
+     {
+      "from": "bid",
+      "to": "crew"
+     },
+     {
+      "from": "paths",
+      "to": "safety"
+     },
+     {
+      "from": "crew",
+      "to": "safety"
+     },
+     {
+      "from": "safety",
+      "to": "publish"
+     },
+     {
+      "from": "publish",
+      "to": "live"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Two branches, one clock",
+     "text": "The path offer and the crew plan start from the same bid and run side by side for about fourteen weeks. Whichever finishes later sets the date of the safety case, and so far it has been the crew plan on every change."
+    },
+    {
+     "lead": "The bid is the deadline",
+     "text": "A bid lodged after June 2027 misses the December 2027 timetable and waits for May 2028. Every other date in the Dales plan is set backwards from that bid."
+    },
+    {
+     "lead": "Where it stalls",
+     "text": "The safety case cannot start until both branches report, so a late crew plan delays a path offer that was ready. Starting the crew plan four weeks before the bid removes that wait."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-tree",
+   "type": "mechanism",
+   "form": "tree",
+   "commentary": "so-what-bar",
+   "takeaway": false,
+   "why": "The question divides into branches that each end in a conclusion, and the reader should see how the answer is built from them",
+   "settles": {
+    "kind": "structure",
+    "what": "how the question of reaching 60 million journeys divides into capacity and demand"
+   },
+   "title": "The growth question splits into capacity and demand, and both say off-peak",
+   "exhibit": {
+    "root": "Can Northvale reach 60 million journeys a year by FY31, and where does the growth come from?",
+    "branches": [
+     {
+      "id": "cap",
+      "label": "Where is there capacity to carry more passengers?",
+      "conclusions": [
+       {
+        "id": "c1",
+        "text": "Not in the peak: trains run above 90% full on all five lines"
+       },
+       {
+        "id": "c2",
+        "text": "Between the peaks: over half of off-peak seats run empty"
+       }
+      ]
+     },
+     {
+      "id": "dem",
+      "label": "Where is there demand that the railway is not serving?",
+      "conclusions": [
+       {
+        "id": "d1",
+        "text": "Half-hourly stations grew off-peak journeys 16.5% in three years"
+       },
+       {
+        "id": "d2",
+        "text": "Drivers name the wait for a train twice as often as the fare"
+       }
+      ]
+     }
+    ],
+    "conclusion": "Yes: fill the off-peak first with a half-hourly timetable, then electrify"
+   },
+   "source": "Source: illustrative data for a fictional operator",
+   "bar": "Both branches point the same way: the growth is between the peaks, where the seats are empty and a shorter wait is what passengers ask for, so the half-hourly off-peak timetable goes first."
+  },
+  {
+   "id": "f-mechanism-steps",
+   "type": "mechanism",
+   "form": "steps",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The change happens in a fixed order where each step makes the next possible, so it is drawn as steps rising to the result",
+   "settles": {
+    "kind": "sequence",
+    "what": "the four steps of the Dales timetable change and what is true after each"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Four steps take the Dales line from hourly to half-hourly",
+   "exhibit": {
+    "items": [
+     {
+      "label": "Recruit crews",
+      "text": "36 drivers and guards in post by March 2027"
+     },
+     {
+      "label": "Extend the depot",
+      "text": "Twelve sidings open by November 2027"
+     },
+     {
+      "label": "Win the paths",
+      "text": "Timetable bid accepted in the June 2027 round"
+     },
+     {
+      "label": "Run the service",
+      "text": "Half-hourly off-peak from December 2027"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Crews come first",
+     "text": "Training a driver takes eleven months, longer than any other step, so recruitment started in 2026. Two of the three intakes are already in post and the third begins in January 2027."
+    },
+    {
+     "lead": "The depot is the constraint",
+     "text": "The added trains need somewhere to stand overnight. Without the twelve new sidings, units would be stabled on running lines and the first morning trains would start late."
+    },
+    {
+     "lead": "The bid fixes the date",
+     "text": "Paths are allocated twice a year. A bid accepted in June 2027 puts the service in the December timetable; one that misses it waits until May 2028 and costs 0.9 million journeys."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-framework",
+   "type": "mechanism",
+   "form": "framework",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The ambition, the levers that deliver it and what they stand on are a structure, and the reader should see which part carries which",
+   "settles": {
+    "kind": "structure",
+    "what": "how the ambition, the three levers and the enabling programme fit together"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "The plan rests on three levers and one enabling programme",
+   "exhibit": {
+    "variant": "house",
+    "roof": "60 million journeys a year by FY31",
+    "pillars": [
+     {
+      "title": "Off-peak timetable",
+      "points": [
+       "Half-hourly on the Dales and Valley lines",
+       "Later last trains from Skipton",
+       "Units and crews released from the peak",
+       "Adds 5.1 million journeys"
+      ]
+     },
+     {
+      "title": "Electrification",
+      "points": [
+       "Overhead wires from Leeds to Hull",
+       "Fourteen electric trains in 2030",
+       "Eleven diesel units freed for other lines",
+       "Adds 3.8 million journeys"
+      ]
+     },
+     {
+      "title": "Fares and housing",
+      "points": [
+       "Flexible part-time season tickets",
+       "Off-peak day returns on every line",
+       "Four station sites with 9,800 homes",
+       "Adds 2.8 million journeys"
+      ]
+     }
+    ],
+    "foundation": "Depot extension, 36 more crew and the 2029 power upgrade"
+   },
+   "points": [
+    {
+     "lead": "Three levers, one total",
+     "text": "The timetable adds 5.1 million journeys, electrification 3.8 million and fares with housing 2.8 million. Together they take 48.3 million journeys to 60 million, and the timetable alone delivers over two fifths of the gain, which is why it carries the first two years of the plan."
+    },
+    {
+     "lead": "What they stand on",
+     "text": "None of the levers works without the foundation: the depot holds the added trains overnight, the crews run them and the power upgrade feeds the wires. A slip in the foundation moves every date above it, so the programme board reviews those three items first each month."
+    },
+    {
+     "lead": "Why this order",
+     "text": "The timetable needs only the depot and the crews, so it starts in December 2027. Electrification waits for the power upgrade in 2029, and fare reform follows once a year of the new timetable has shown how people travel and which tickets they buy."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-layers",
+   "type": "mechanism",
+   "form": "layers",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The costs stack from fixed to variable, and which layer a decision touches is the point, so they are drawn as layers",
+   "settles": {
+    "kind": "structure",
+    "what": "the four layers of operating cost per train-km and what moves each"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Four layers of cost sit under every train-km operated",
+   "exhibit": {
+    "layers": [
+     {
+      "label": "Variable: fuel and crew hours",
+      "text": "£6.10 per train-km; the only layer an added off-peak train incurs, and the one electric traction cuts by 40%"
+     },
+     {
+      "label": "Semi-fixed: fleet and maintenance",
+      "text": "£4.20 per train-km; set by how many units are owned, so it falls when the diesel fleet is retired"
+     },
+     {
+      "label": "Fixed: track access",
+      "text": "£4.10 per train-km; charged by the infrastructure manager whether or not the paths are used"
+     },
+     {
+      "label": "Fixed: stations and overheads",
+      "text": "£3.20 per train-km; staff, buildings and systems that every journey shares"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Off-peak trains touch one layer",
+     "text": "An added off-peak train uses units and track that are already paid for, so it adds only the variable layer of £6.10 a train-km. That is a third of the average cost of £17.60, which is why it pays back within 26 months."
+    },
+    {
+     "lead": "Electrification changes two",
+     "text": "Electric trains cut fuel by 40% and need less maintenance, so the top two layers both fall on the Eastern line, from £21.40 a train-km to £15.80. Spreading the fixed layers over a fifth more train-km takes the network average to £16.40."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-relationship-network",
+   "type": "mechanism",
+   "form": "relationship-network",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The parties depend on each other in a ring around one coordinator, and the reader should see who has to agree with whom",
+   "settles": {
+    "kind": "structure",
+    "what": "who coordinates with whom to change the timetable"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Four bodies share the timetable; the infrastructure manager sits between them",
+   "exhibit": {
+    "variant": "hub-ring",
+    "centerId": "im",
+    "ringOrder": [
+     "op",
+     "reg",
+     "auth",
+     "frt"
+    ],
+    "nodes": [
+     {
+      "id": "im",
+      "label": "Infrastructure manager",
+      "body": "Allocates the paths"
+     },
+     {
+      "id": "op",
+      "label": "Northvale Rail",
+      "body": "Bids for paths and runs trains"
+     },
+     {
+      "id": "reg",
+      "label": "Regulator",
+      "body": "Approves access rights"
+     },
+     {
+      "id": "auth",
+      "label": "Transport authority",
+      "body": "Funds the service"
+     },
+     {
+      "id": "frt",
+      "label": "Freight operators",
+      "body": "Hold competing paths"
+     }
+    ],
+    "edges": [
+     {
+      "id": "im-op",
+      "from": "im",
+      "to": "op",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "im-reg",
+      "from": "im",
+      "to": "reg",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "im-auth",
+      "from": "im",
+      "to": "auth",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "im-frt",
+      "from": "im",
+      "to": "frt",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "op-reg",
+      "from": "op",
+      "to": "reg",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "reg-auth",
+      "from": "reg",
+      "to": "auth",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "auth-frt",
+      "from": "auth",
+      "to": "frt",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     },
+     {
+      "id": "frt-op",
+      "from": "frt",
+      "to": "op",
+      "direction": "bidirectional",
+      "relation": "coordinates-with"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Every path goes through one body",
+     "text": "The infrastructure manager allocates paths to passenger and freight operators alike, so a half-hourly Dales service is a request to it, not a decision Northvale can take alone."
+    },
+    {
+     "lead": "Freight holds the off-peak",
+     "text": "Six freight paths a day cross the Dales line between the peaks. Two have not been used since 2024, and the bid asks for those two rather than for new capacity."
+    },
+    {
+     "lead": "Funding and rights move together",
+     "text": "The regulator approves access rights only for services the transport authority has agreed to fund, so the two approvals are sought in one submission in March 2027."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-funnel",
+   "type": "mechanism",
+   "form": "funnel",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Each stage removes trips that cannot switch, and how much is lost at each stage is the finding, so it narrows as a funnel",
+   "settles": {
+    "kind": "count",
+    "what": "how many of 100 corridor car trips survive each condition for switching to rail"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Of 100 car trips in the corridor, eleven could move to rail",
+   "exhibit": {
+    "stages": [
+     {
+      "label": "Car trips in the corridor",
+      "value": 100
+     },
+     {
+      "label": "Start and end near a station",
+      "value": 46
+     },
+     {
+      "label": "Made between the peaks",
+      "value": 29
+     },
+     {
+      "label": "Wait under 20 minutes",
+      "value": 14
+     },
+     {
+      "label": "Would switch at today's fare",
+      "value": 11
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Geography halves the market",
+     "text": "Only 46 of every 100 car trips in the Dales corridor start and end within a mile of a station. The other 54 are out of reach of any timetable and are not counted in the plan."
+    },
+    {
+     "lead": "The wait is the largest loss the plan controls",
+     "text": "Of 29 off-peak trips near stations, only 14 would face a wait under 20 minutes today. A half-hourly service brings that to 27, nearly doubling the trips that can switch."
+    },
+    {
+     "lead": "Fares are the smallest filter",
+     "text": "Eleven of the 14 would switch at the present fare, so price removes three trips where the wait removes fifteen. The fare reform is therefore sequenced last."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-sankey",
+   "type": "mechanism",
+   "form": "sankey",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The journeys flow from where they came from to where they went, and the width of each flow is the finding",
+   "settles": {
+    "kind": "share",
+    "what": "where the added off-peak journeys on trial routes came from, by ticket type bought"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Most new off-peak journeys come from the car, not from the peak",
+   "exhibit": {
+    "left": [
+     {
+      "id": "car",
+      "label": "Former car trips"
+     },
+     {
+      "id": "peak",
+      "label": "Moved from the peak"
+     },
+     {
+      "id": "new",
+      "label": "Trips not made before"
+     }
+    ],
+    "right": [
+     {
+      "id": "day",
+      "label": "Day returns"
+     },
+     {
+      "id": "adv",
+      "label": "Advance tickets"
+     },
+     {
+      "id": "flex",
+      "label": "Flexible seasons"
+     }
+    ],
+    "flows": [
+     {
+      "from": "car",
+      "to": "day",
+      "value": 34
+     },
+     {
+      "from": "car",
+      "to": "adv",
+      "value": 14
+     },
+     {
+      "from": "peak",
+      "to": "flex",
+      "value": 15
+     },
+     {
+      "from": "peak",
+      "to": "day",
+      "value": 5
+     },
+     {
+      "from": "new",
+      "to": "day",
+      "value": 19
+     },
+     {
+      "from": "new",
+      "to": "adv",
+      "value": 13
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Half came out of cars",
+     "text": "Of every 100 journeys the trial added, 48 replaced a car trip and 32 were trips nobody made before. Only 20 moved from the peak, so the trial grew the market rather than rearranging it."
+    },
+    {
+     "lead": "Day returns carry it",
+     "text": "Day returns took 58 of the 100, most of them bought by former drivers on the day of travel. That is the ticket a walk-up half-hourly service suits, and it earns the highest fare per journey."
+    },
+    {
+     "lead": "The peak shift is useful too",
+     "text": "The 20 journeys that left the peak freed seats on the fullest trains and went mostly to flexible seasons, the product the 2030 fare reform extends to every line."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-quadrants",
+   "type": "mechanism",
+   "form": "quadrants",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Four groups of factors, inside and outside the operator and for and against the plan, read as four quadrants",
+   "settles": {
+    "kind": "structure",
+    "what": "the strengths, weaknesses, opportunities and threats that bear on the growth plan"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "The plan plays to two strengths and has to cover two exposures",
+   "exhibit": {
+    "quadrants": [
+     {
+      "title": "Strengths",
+      "points": [
+       "Half the off-peak seats are empty",
+       "Dales units and crews are in place",
+       "Punctuality holds between the peaks",
+       "Day tickets are already 47% of journeys"
+      ]
+     },
+     {
+      "title": "Weaknesses",
+      "points": [
+       "Eastern diesel fleet fails three times as often",
+       "No spare units on the Coast line",
+       "Depot is full overnight",
+       "Peak trains are above 90% full"
+      ]
+     },
+     {
+      "title": "Opportunities",
+      "points": [
+       "9,800 homes planned beside stations",
+       "Two unused freight paths on the Dales",
+       "£340m grant already committed",
+       "Drivers name the wait, not the fare"
+      ]
+     },
+     {
+      "title": "Threats",
+      "points": [
+       "Power upgrade could slip past 2029",
+       "Borrowing covenant tests FY29 revenue",
+       "Driver training takes eleven months",
+       "Freight could reclaim its paths"
+      ]
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Start where the strengths are",
+     "text": "The empty off-peak seats and the Dales crews are both in hand today, which is why the first lever needs no new trains and no outside approval beyond the timetable bid."
+    },
+    {
+     "lead": "The weaknesses are one problem",
+     "text": "The Eastern fleet's failures and the Coast line's missing units have the same cure: electric trains in 2030 release eleven diesel units, enough to cover both."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-matrix",
+   "type": "mechanism",
+   "form": "matrix",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Each lever sits somewhere on two scales at once - how much it adds and how soon - and its position is the argument",
+   "settles": {
+    "kind": "comparison",
+    "what": "where each of five levers sits on journeys added and time to deliver"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "The timetable is the one lever that is both large and quick",
+   "exhibit": {
+    "xAxis": {
+     "label": "Time to deliver",
+     "minLabel": "Slow",
+     "maxLabel": "Fast"
+    },
+    "yAxis": {
+     "label": "Journeys added",
+     "minLabel": "Few",
+     "maxLabel": "Many"
+    },
+    "points": [
+     {
+      "label": "Off-peak timetable",
+      "x": 0.82,
+      "y": 0.86
+     },
+     {
+      "label": "Electrification",
+      "x": 0.2,
+      "y": 0.68
+     },
+     {
+      "label": "Fare reform",
+      "x": 0.42,
+      "y": 0.3
+     },
+     {
+      "label": "New housing",
+      "x": 0.3,
+      "y": 0.22
+     },
+     {
+      "label": "Later last trains",
+      "x": 0.9,
+      "y": 0.14
+     }
+    ],
+    "highlight": 0
+   },
+   "points": [
+    {
+     "lead": "One lever in the top right",
+     "text": "The off-peak timetable adds 5.1 million journeys and starts in December 2027, eighteen months before anything else of its size. No other lever is both large and quick."
+    },
+    {
+     "lead": "Electrification is large and slow",
+     "text": "It adds 3.8 million journeys but not before the second half of 2030, and it is the only lever that depends on someone else's work, the 2029 power upgrade."
+    },
+    {
+     "lead": "The small levers still pay",
+     "text": "Later last trains add 0.3 million journeys within a year for almost no capital. They ride on the timetable change and are bid for in the same round."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-spectrum",
+   "type": "mechanism",
+   "form": "spectrum",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Each dimension runs between two poles and the operator's position on each is the finding, with no numeric scale to invent",
+   "settles": {
+    "kind": "qualitative",
+    "what": "where the operator sits between two poles on four dimensions of its service"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Northvale sits nearer a commuter railway than the plan needs",
+   "exhibit": {
+    "items": [
+     {
+      "left": "Built for the peak",
+      "right": "Built for all day",
+      "value": 0.25
+     },
+     {
+      "left": "Season tickets",
+      "right": "Pay as you go",
+      "value": 0.6
+     },
+     {
+      "left": "Hourly",
+      "right": "Turn up and go",
+      "value": 0.35
+     },
+     {
+      "left": "Diesel",
+      "right": "Electric",
+      "value": 0.2
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The timetable lags the market",
+     "text": "Ticket sales have already moved most of the way to pay-as-you-go, with day and advance tickets now 74% of journeys. The timetable has not followed: it is still built around two peaks."
+    },
+    {
+     "lead": "Frequency is the gap to close",
+     "text": "Three of five lines run hourly between the peaks. Moving them to half-hourly shifts the operator past the midpoint on frequency, the dimension passengers score lowest."
+    },
+    {
+     "lead": "Traction moves last",
+     "text": "Only the City line is electric today. The Eastern line joins it in 2030, which takes electric running from a fifth of train-km to a half."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-process",
+   "type": "mechanism",
+   "form": "process",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "A fixed sequence of named steps with the current one marked, which is all a process strip shows and all this claim needs",
+   "settles": {
+    "kind": "sequence",
+    "what": "the five steps of the timetable bid and which one is current"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "The timetable bid is at step three of five and on schedule",
+   "exhibit": {
+    "items": [
+     "Draft timetable",
+     "Crew and fleet plan",
+     "Path request",
+     "Safety case",
+     "Publish"
+    ],
+    "active": 2
+   },
+   "points": [
+    {
+     "lead": "Two steps are done",
+     "text": "The draft timetable was agreed in March 2026 and the crew and fleet plan in August, both on their dates. The plan shows the Dales service needs 36 crew and no extra units."
+    },
+    {
+     "lead": "The path request is the live step",
+     "text": "The request goes to the infrastructure manager in the June 2027 round. It asks for two unused freight paths, which is why it is expected to be granted without a capacity study."
+    },
+    {
+     "lead": "What follows is fixed",
+     "text": "The safety case takes ten weeks once paths are offered, and the timetable is published twelve weeks before it starts. Neither can be shortened, so the request date sets the start date."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-chevron-process",
+   "type": "mechanism",
+   "form": "chevron-process",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The phases follow one another and each has its own activities, so they are drawn as chevrons with the work under each",
+   "settles": {
+    "kind": "sequence",
+    "what": "the four phases of the plan and the activities in each"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Four phases deliver the plan, each funded by the one before",
+   "exhibit": {
+    "items": [
+     {
+      "heading": "FY27",
+      "label": "Prepare",
+      "details": [
+       "Train 36 drivers and guards in three intakes",
+       "Extend the depot by twelve sidings",
+       "Lodge the Dales timetable bid in June",
+       "Award the power supply contract"
+      ]
+     },
+     {
+      "heading": "FY28",
+      "label": "Fill the off-peak",
+      "details": [
+       "Half-hourly Dales service from December 2027",
+       "Half-hourly Valley service from May 2028",
+       "Later last trains from Skipton",
+       "Adds 5.1 million journeys by FY31"
+      ]
+     },
+     {
+      "heading": "FY29-FY30",
+      "label": "Electrify the Eastern line",
+      "details": [
+       "Power upgrade delivered in 2029",
+       "Wires energised in the second half of 2030",
+       "Eleven diesel units move to the Coast line",
+       "Adds 3.8 million journeys by FY31"
+      ]
+     },
+     {
+      "heading": "FY30-FY31",
+      "label": "Reform fares, serve new homes",
+      "details": [
+       "Flexible season tickets on every line",
+       "Off-peak day returns priced by distance",
+       "Four station sites with 9,800 homes",
+       "Adds 2.8 million journeys by FY31"
+      ]
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The first two phases need no one else",
+     "text": "Preparing and filling the off-peak depend only on the depot, the crews and a timetable bid, all within the operator's control. Their added trains pay back within 26 months, which supports the borrowing for electrification."
+    },
+    {
+     "lead": "Phase three is the large bet",
+     "text": "Electrification takes £390 million and depends on a power upgrade outside the operator's control. It is sequenced third so that a slip delays a third of the journeys, not all of them."
+    },
+    {
+     "lead": "Phase four needs a year of data",
+     "text": "Fare reform waits until the new timetable has run for twelve months, because the products are designed around how people then travel. The housing sites open in the same years and are served by trains already running."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-zone-matrix",
+   "type": "mechanism",
+   "form": "zone-matrix",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Each line is placed on readiness and headroom, and the zone it falls in says what to do with it",
+   "settles": {
+    "kind": "comparison",
+    "what": "where each of five lines sits on readiness to grow and off-peak headroom"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Two lines are ready and worth growing; one is neither",
+   "exhibit": {
+    "xAxis": {
+     "label": "Ready to add trains"
+    },
+    "yAxis": {
+     "label": "Empty seats"
+    },
+    "points": [
+     {
+      "label": "Dales",
+      "x": 0.85,
+      "y": 0.75
+     },
+     {
+      "label": "Valley",
+      "x": 0.7,
+      "y": 0.85
+     },
+     {
+      "label": "Eastern",
+      "x": 0.25,
+      "y": 0.7
+     },
+     {
+      "label": "City",
+      "x": 0.75,
+      "y": 0.3
+     },
+     {
+      "label": "Coast",
+      "x": 0.15,
+      "y": 0.55
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Top right goes first",
+     "text": "The Dales and Valley lines have both the empty seats and the units, crews and paths to fill them. Their timetables change in December 2027 and May 2028."
+    },
+    {
+     "lead": "Top left waits for trains",
+     "text": "The Eastern and Coast lines have the headroom but not the fleet. Electric trains in 2030 release the eleven diesel units that move them to the right."
+    },
+    {
+     "lead": "Bottom right is held",
+     "text": "The City line is ready but has the least headroom, since its off-peak trains are already the fullest. Its timetable is left as it is until FY31."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-rank-flow",
+   "type": "mechanism",
+   "form": "rank-flow",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The order of the lines changed from year to year, and the crossing of the lines shows who rose and who fell",
+   "settles": {
+    "kind": "rank",
+    "what": "rank of eight stations on off-peak journey growth in FY23, FY24, FY25 and FY26"
+   },
+   "adds": "The points put a number on each part and say where the mechanism breaks",
+   "title": "Halifax and Huddersfield rose to the top on off-peak growth",
+   "exhibit": {
+    "periods": [
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "entities": [
+     {
+      "name": "Halifax",
+      "ranks": [
+       5,
+       3,
+       1,
+       1
+      ]
+     },
+     {
+      "name": "Skipton",
+      "ranks": [
+       1,
+       1,
+       2,
+       2
+      ]
+     },
+     {
+      "name": "Huddersfield",
+      "ranks": [
+       6,
+       4,
+       3,
+       3
+      ]
+     },
+     {
+      "name": "Harrogate",
+      "ranks": [
+       2,
+       2,
+       4,
+       4
+      ]
+     },
+     {
+      "name": "York",
+      "ranks": [
+       3,
+       5,
+       5,
+       5
+      ]
+     },
+     {
+      "name": "Selby",
+      "ranks": [
+       4,
+       6,
+       6,
+       6
+      ]
+     },
+     {
+      "name": "Scarborough",
+      "ranks": [
+       7,
+       7,
+       7,
+       8
+      ]
+     },
+     {
+      "name": "Hull",
+      "ranks": [
+       8,
+       8,
+       8,
+       7
+      ]
+     }
+    ],
+    "highlight": [
+     "Halifax",
+     "Huddersfield"
+    ]
+   },
+   "points": [
+    {
+     "lead": "The timetable moved the Valley",
+     "text": "Halifax ranked fifth on off-peak growth in FY23 and first by FY25, and Huddersfield rose from sixth to third. Both followed the Valley line's half-hourly timetable, introduced in May 2023, by one year."
+    },
+    {
+     "lead": "The Dales held its place",
+     "text": "Half-hourly since early 2023, Skipton led for two years and ranks second since. The three stations at the top are the three with a train every half hour between the peaks."
+    },
+    {
+     "lead": "The bottom has not moved",
+     "text": "Scarborough and Hull, the ends of the Coast and Eastern lines, have ranked seventh and eighth in all four years, on hourly timetables that have not changed since FY23 and with no spare units to change them before 2030."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-schedule-timeline",
+   "type": "schedule",
+   "form": "timeline",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The plan is five dated events in order, and the reader needs each date with what happens on it, so they are set on one line of time",
+   "settles": {
+    "kind": "sequence",
+    "what": "the five dated milestones from crew recruitment to electric trains, 2027 to 2030"
+   },
+   "adds": "The points say which dates the operator controls and what a slip in each one costs",
+   "title": "Five dates carry the plan; only the power upgrade is not ours",
+   "highlight": [
+    "six months",
+    "a third of the plan"
+   ],
+   "exhibit": {
+    "items": [
+     {
+      "date": "Mar 2027",
+      "label": "Crews recruited",
+      "text": "Thirty-six drivers and guards are in post after three training intakes, enough to run a train every half hour."
+     },
+     {
+      "date": "Jun 2027",
+      "label": "Timetable bid lodged",
+      "text": "The bid asks for two unused freight paths between the peaks, so it needs no capacity study."
+     },
+     {
+      "date": "Dec 2027",
+      "label": "Dales service starts",
+      "text": "A half-hourly off-peak service runs from Leeds to Skipton, with a later last train home."
+     },
+     {
+      "date": "2029",
+      "label": "Power upgrade delivered",
+      "text": "The network operator energises the grid connection for the Eastern line."
+     },
+     {
+      "date": "H2 2030",
+      "label": "Electric trains run",
+      "text": "Fourteen electric trains replace the diesel fleet between Leeds and Hull and free eleven units."
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Three dates are the operator's own",
+     "text": "The crews, the bid and the Dales service depend on nobody else, and each has a named owner. A slip in any of them moves the start by one timetable round, which is six months."
+    },
+    {
+     "lead": "One date is exposed",
+     "text": "The grid connection is the only milestone the plan cannot recover by working faster. A year's delay costs a third of the plan, so the bi-mode order is held as the fallback."
+    },
+    {
+     "lead": "What each date is worth",
+     "text": "The Dales service adds 2.4 million journeys a year and the electric trains 3.8 million, so a missed bid costs far less than late wires."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; programme plan, September 2026"
+  },
+  {
+   "id": "f-schedule-roadmap",
+   "type": "schedule",
+   "form": "roadmap",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The plan moves through six stages, each a period with its own work, and the reader needs the order and what each stage delivers",
+   "settles": {
+    "kind": "sequence",
+    "what": "the six stages of the plan, FY27 to FY31, and what each delivers"
+   },
+   "adds": "The points say why the stages come in this order and which one carries the risk",
+   "title": "Six stages take the plan from recruitment to 60 million journeys",
+   "highlight": [
+    "26 months",
+    "£390 million"
+   ],
+   "exhibit": {
+    "items": [
+     {
+      "label": "Prepare",
+      "period": "FY27",
+      "text": "Train 36 crew, extend the depot by twelve sidings and lodge the Dales timetable bid."
+     },
+     {
+      "label": "Fill the Dales",
+      "period": "FY28",
+      "text": "Run a half-hourly off-peak service from December 2027, with a later last train from Skipton."
+     },
+     {
+      "label": "Fill the Valley",
+      "period": "FY29",
+      "text": "Bring Halifax and Huddersfield to the same pattern once the Halifax sidings are extended."
+     },
+     {
+      "label": "Electrify",
+      "period": "FY29-FY30",
+      "text": "Energise the Eastern line after the 2029 power upgrade and replace its diesel fleet."
+     },
+     {
+      "label": "Reform fares",
+      "period": "FY30",
+      "text": "Launch flexible season tickets and off-peak day returns on every line."
+     },
+     {
+      "label": "Serve new homes",
+      "period": "FY31",
+      "text": "Open the four station housing sites, served by trains already running."
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Cheapest first",
+     "text": "The first three stages need only crews, sidings and a timetable bid, all within the operator's control, and their added trains pay back within 26 months. That revenue is what supports the borrowing for the fourth stage."
+    },
+    {
+     "lead": "The fourth stage is the bet",
+     "text": "Electrification takes £390 million and waits on a power upgrade the operator does not control. Placed fourth, a slip delays a third of the journeys and leaves the timetable gains untouched."
+    },
+    {
+     "lead": "Fares come late",
+     "text": "Fare reform follows a full year of the new timetable, because the products are designed around how people then travel. Launched earlier, it would price a service that passengers had not yet seen."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator; programme plan, September 2026"
+  },
+  {
+   "id": "f-numbers-fact-grid",
+   "type": "numbers",
+   "form": "fact-grid",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Six measured facts set the scale of the operator before any argument is made, each a number with what it counts",
+   "settles": {
+    "kind": "count",
+    "what": "six operating facts for FY26"
+   },
+   "adds": "The points say which of the six the plan changes and which it leaves alone",
+   "title": "Northvale carries 48 million journeys on five lines and 96 units",
+   "highlight": [
+    "54%",
+    "eleven"
+   ],
+   "exhibit": {
+    "columns": 3,
+    "items": [
+     {
+      "value": "48.3m",
+      "label": "journeys a year",
+      "text": "4.1 million below the FY20 peak"
+     },
+     {
+      "value": "5",
+      "label": "lines",
+      "text": "302 route-km, 61 stations"
+     },
+     {
+      "value": "96",
+      "label": "units in the fleet",
+      "text": "58 diesel, 38 electric"
+     },
+     {
+      "value": "88.8%",
+      "label": "of trains on time",
+      "text": "Against a floor of 90%",
+      "gauge": 0.888
+     },
+     {
+      "value": "54%",
+      "label": "of off-peak seats empty",
+      "text": "Over the whole network",
+      "gauge": 0.54
+     },
+     {
+      "value": "£17.60",
+      "label": "cost per train-km",
+      "text": "£21.40 on the Eastern line"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "What the plan changes",
+     "text": "The plan fills the 54% of off-peak seats that run empty, and it does so with the fleet it has: the half-hourly timetable uses units that stand idle between the peaks. Journeys rise to 60 million without the unit count changing before 2030."
+    },
+    {
+     "lead": "What it replaces",
+     "text": "Electric trains then replace the oldest diesel units on the Eastern line, which frees eleven for the Coast line and takes the cost of a train-km down to £16.40. Punctuality is held at its 90% floor throughout, because the added trains run when the track is free."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; FY26 annual report"
+  },
+  {
+   "id": "f-numbers-stat-list",
+   "type": "numbers",
+   "form": "stat-list",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Four statistics from one survey carry the claim, each needing the sentence that says what it counts",
+   "settles": {
+    "kind": "share",
+    "what": "four results of the FY26 survey of 1,200 drivers in the Dales corridor"
+   },
+   "adds": "The points say what the four numbers mean together for the order of the levers",
+   "title": "Drivers name the wait twice as often as the fare",
+   "highlight": [
+    "twice as many",
+    "one in four"
+   ],
+   "exhibit": {
+    "items": [
+     {
+      "value": "42%",
+      "text": "name the wait for the next train as their main reason for driving"
+     },
+     {
+      "value": "21%",
+      "text": "name the fare as their main reason"
+     },
+     {
+      "value": "1 in 4",
+      "text": "would take the train weekly with a service every half hour"
+     },
+     {
+      "value": "68%",
+      "text": "did not know their station's off-peak fare"
+     },
+     {
+      "value": "9 min",
+      "text": "is the longest wait most would accept without checking a timetable"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The wait outweighs the fare",
+     "text": "The wait is named by twice as many drivers as the fare, so a timetable change addresses more of them than a fare cut and costs less for each trip it wins. That is why the half-hourly service comes first and fare reform last."
+    },
+    {
+     "lead": "The demand is stated, not assumed",
+     "text": "One in four drivers says a half-hourly train would get them out of the car once a week. Applied to the corridor's off-peak car trips, that is 1.4 million journeys a year, close to what the trial stations added."
+    },
+    {
+     "lead": "Fares need explaining first",
+     "text": "Two thirds did not know the off-peak fare, so a cut would go unnoticed by most of the people it is aimed at. The 2030 reform therefore starts with simpler products rather than lower prices, and it is measured on how many drivers can name the fare a year later."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative data for a fictional operator; FY26 survey of 1,200 drivers"
+  },
+  {
+   "id": "f-parallel-capsules",
+   "type": "parallel",
+   "form": "capsules",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Four priorities of equal standing, each a name and the sentence that defines it, with no order among them",
+   "settles": {
+    "kind": "structure",
+    "what": "the four priorities the programme board holds every decision to"
+   },
+   "adds": "The points say how the priorities settle a conflict between two levers",
+   "title": "Four priorities decide every trade-off in the plan",
+   "exhibit": {
+    "items": [
+     {
+      "title": "Fill before build",
+      "text": "Use the seats and paths that exist before buying new ones"
+     },
+     {
+      "title": "Hold the 90% floor",
+      "text": "No added train may cost the network its punctuality"
+     },
+     {
+      "title": "Fund from fares",
+      "text": "Each phase is paid for by the revenue of the one before"
+     },
+     {
+      "title": "One owner per lever",
+      "text": "Every milestone has a name against it from the first month"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "They rank the levers",
+     "text": "Fill before build puts the off-peak timetable ahead of electrification: it sells seats that already run empty, while the wires need £390 million before they carry a passenger. Holding the punctuality floor keeps the peak timetable as it is, since every train added there has cost a point."
+    },
+    {
+     "lead": "They settle conflicts",
+     "text": "When the depot extension and the station works competed for the FY27 budget, funding from fares decided it: the depot unlocks 5.1 million journeys within a year and the stations do not. The owner of each lever accepted the order because the rule was agreed before the budget was."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; programme board terms of reference"
+  },
+  {
+   "id": "f-parallel-arrow-rows",
+   "type": "parallel",
+   "form": "arrow-rows",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Four scenarios each lead to a consequence, and the arrow between them is the argument: if this, then that",
+   "settles": {
+    "kind": "comparison",
+    "what": "four ways the plan could go and what follows from each for FY31 journeys"
+   },
+   "adds": "Each row states the consequence in journeys and what the operator does about it",
+   "title": "Only a late power upgrade puts the 60 million target at risk",
+   "exhibit": {
+    "items": [
+     {
+      "label": "Power upgrade slips a year",
+      "text": "Electric trains start in 2031, not 2030. Journeys reach 56.2 million in FY31 and 60 million a year later; the bi-mode order is placed as the fallback."
+     },
+     {
+      "label": "Timetable bid misses June 2027",
+      "text": "The Dales service starts in May 2028 instead of December 2027. The plan loses 0.9 million journeys in FY28 and recovers them by FY30."
+     },
+     {
+      "label": "Housing sites are delayed",
+      "text": "Two of four sites open after FY31. The plan loses 0.6 million journeys and £40 million of developer contributions, covered by contingency."
+     },
+     {
+      "label": "Off-peak demand beats the trial",
+      "text": "Stations gain 20% rather than 16.5%. Journeys reach 62 million, and the Valley line needs longer trains two years early."
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; demand model scenarios"
+  },
+  {
+   "id": "f-profiles-logos",
+   "type": "profiles",
+   "form": "logos",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The peer set is introduced by name before it is compared, each operator with the one fact that makes it a peer",
+   "settles": {
+    "kind": "structure",
+    "what": "the eight regional operators the deck compares and what each is a peer for"
+   },
+   "adds": "The points say why these eight were chosen and which two the plan learns most from",
+   "title": "Eight regional operators form the peer set; two already run half-hourly",
+   "exhibit": {
+    "items": [
+     {
+      "name": "Westmoor Trains",
+      "caption": "Half-hourly off-peak since 2022"
+     },
+     {
+      "name": "Tideway Rail",
+      "caption": "Half-hourly on four of six lines"
+     },
+     {
+      "name": "Pennine Link",
+      "caption": "Similar size, mixed traction"
+     },
+     {
+      "name": "Fenland Rail",
+      "caption": "Electrified in 2021"
+     },
+     {
+      "name": "Lakeside Railway",
+      "caption": "Leisure-led, hourly"
+     },
+     {
+      "name": "Northvale Rail",
+      "caption": "The subject: hourly on three lines"
+     },
+     {
+      "name": "Marches Line",
+      "caption": "Diesel, hourly throughout"
+     },
+     {
+      "name": "Wolds Rail",
+      "caption": "Smallest peer, hourly"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Chosen for likeness",
+     "text": "All eight are regional operators carrying 20 to 70 million journeys a year on mixed commuter and leisure routes, so differences in their off-peak share are not differences of scale or market. Northvale sits sixth of the eight on that share, at 36%."
+    },
+    {
+     "lead": "Two to learn from",
+     "text": "Westmoor and Tideway moved to a half-hourly off-peak timetable in 2022 and now carry 48% and 46% of their journeys off-peak. Fenland is the peer for electrification: its unit costs fell 24% in the three years after its wires were energised."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; fictional peer operators"
+  },
+  {
+   "id": "f-profiles-logo-table",
+   "type": "profiles",
+   "form": "logo-table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Five operators are introduced by their marks with the four numbers the deck goes on to compare them on",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys, off-peak share, punctuality and traction at five regional operators, FY26"
+   },
+   "adds": "The last column says what each operator is in the deck to show",
+   "title": "Northvale is mid-sized, but last of five peers on off-peak share",
+   "exhibit": {
+    "columns": [
+     {
+      "label": "Operator",
+      "type": "logo"
+     },
+     "Journeys, million",
+     "Off-peak share",
+     "On time",
+     "Traction",
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      {
+       "type": "logo",
+       "media": {
+        "path": "assets/logos/westmoor-trains.png",
+        "alt": "Westmoor Trains logo",
+        "credit": "examples/assets, a fictional mark"
+       }
+      },
+      "66.0",
+      "48%",
+      "91.2%",
+      "70% electric",
+      "The leader on off-peak share: it has run half-hourly on every line since 2022"
+     ],
+     [
+      {
+       "type": "logo",
+       "media": {
+        "path": "assets/logos/tideway-rail.png",
+        "alt": "Tideway Rail logo",
+        "credit": "examples/assets, a fictional mark"
+       }
+      },
+      "52.4",
+      "46%",
+      "90.4%",
+      "55% electric",
+      "Shows the same result on a network of Northvale's size and mix of commuter and leisure travel"
+     ],
+     [
+      {
+       "type": "logo",
+       "media": {
+        "path": "assets/logos/pennine-link.png",
+        "alt": "Pennine Link logo",
+        "credit": "examples/assets, a fictional mark"
+       }
+      },
+      "44.1",
+      "44%",
+      "89.7%",
+      "30% electric",
+      "Half-hourly on a diesel fleet, which shows that frequency does not have to wait for the wires"
+     ],
+     [
+      {
+       "type": "logo",
+       "media": {
+        "path": "assets/logos/fenland-rail.png",
+        "alt": "Fenland Rail logo",
+        "credit": "examples/assets, a fictional mark"
+       }
+      },
+      "31.5",
+      "41%",
+      "92.6%",
+      "100% electric",
+      "The electrification peer: its cost per train-km fell 24% in the three years after its wires went live"
+     ],
+     [
+      {
+       "type": "logo",
+       "media": {
+        "path": "assets/logos/northvale-rail.png",
+        "alt": "Northvale Rail logo",
+        "credit": "examples/assets, a fictional mark"
+       }
+      },
+      "48.3",
+      "36%",
+      "88.8%",
+      "20% electric",
+      "The subject of this deck: still hourly between the peaks on three of its five lines"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; fictional peer operators, FY26"
+  },
+  {
+   "id": "f-profiles-cards",
+   "type": "profiles",
+   "form": "cards",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Three peers are each introduced on a card with what they did and what it did for them, before the deck compares them",
+   "settles": {
+    "kind": "comparison",
+    "what": "what three peer operators changed and the off-peak share each reached"
+   },
+   "adds": "The points say what the three have in common and how far behind them Northvale starts",
+   "points": [
+    {
+     "lead": "The same move three times",
+     "text": "Each of the three added off-peak trains before it changed a fare, and each gained between five and nine points of off-peak share within three years. None of them bought a train to do it: the units already stood idle between the peaks."
+    },
+    {
+     "lead": "Where Northvale starts",
+     "text": "Northvale's 36% off-peak share is where Westmoor's was in 2021, on a network of similar size and with the same spare units between the peaks. The plan assumes it gains what Tideway gained, seven points, and treats Westmoor's nine as the upside."
+    }
+   ],
+   "title": "Three peers raised off-peak share by adding trains, not cutting fares",
+   "exhibit": {
+    "tone": "outline",
+    "items": [
+     {
+      "title": "Westmoor Trains",
+      "value": "48%",
+      "text": "Moved every line to a half-hourly off-peak service in 2022 and raised its off-peak share from 39% in three years, with the fleet it already had.",
+      "points": [
+       "66 million journeys a year",
+       "Half-hourly on all six lines",
+       "Fares unchanged until 2025",
+       "Northvale takes: the whole-network timetable"
+      ],
+      "image": {
+       "path": "assets/logos/westmoor-trains.png",
+       "alt": "Westmoor Trains logo",
+       "credit": "examples/assets, a fictional mark"
+      }
+     },
+     {
+      "title": "Tideway Rail",
+      "value": "46%",
+      "text": "Changed four of its six lines, starting with those that had spare units between the peaks, and gained seven points of off-peak share.",
+      "points": [
+       "52 million journeys a year",
+       "Half-hourly on four lines",
+       "Started where units were spare",
+       "Northvale takes: the order of the lines"
+      ],
+      "image": {
+       "path": "assets/logos/tideway-rail.png",
+       "alt": "Tideway Rail logo",
+       "credit": "examples/assets, a fictional mark"
+      }
+     },
+     {
+      "title": "Pennine Link",
+      "value": "44%",
+      "text": "Runs a half-hourly service on a mostly diesel fleet, which shows that frequency does not have to wait for electrification.",
+      "points": [
+       "44 million journeys a year",
+       "Half-hourly on three lines",
+       "Only 30% electric",
+       "Northvale takes: diesel lines can go first"
+      ],
+      "image": {
+       "path": "assets/logos/pennine-link.png",
+       "alt": "Pennine Link logo",
+       "credit": "examples/assets, a fictional mark"
+      }
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; fictional peer operators"
+  },
+  {
+   "id": "f-picture-picture-hero",
+   "type": "picture",
+   "form": "picture-hero",
+   "commentary": "below",
+   "takeaway": "A later last train costs one crew shift and carries the return half of trips the morning trains already sell.",
+   "why": "The claim is about one place and what a visitor finds there, so the place fills the page and the argument sits under it",
+   "settles": {
+    "kind": "qualitative",
+    "what": "what the Dales corridor beyond Skipton is and who travels to it"
+   },
+   "adds": "The points say what the landscape means for demand and for the timetable",
+   "title": "The Dales draw walkers who decide the day before they travel",
+   "pictures": [
+    {
+     "path": "assets/hills.jpg",
+     "alt": "Illustration of layered hills",
+     "credit": "examples/assets"
+    }
+   ],
+   "points": [
+    {
+     "lead": "A leisure market",
+     "text": "Four in five Saturday passengers on the Dales line are making a leisure trip, most of them to walk. They choose the day when the forecast is known, so they buy on the day and cannot be won with advance fares."
+    },
+    {
+     "lead": "What they need",
+     "text": "A train every half hour out in the morning and a later one home: the last train leaves Skipton at 18:40, before most walks finish, and a trip that returns by car is often made by car the next time."
+    },
+    {
+     "lead": "What the trains carry now",
+     "text": "Saturday departures from Leeds between 09:00 and 11:00 run 88% to 97% full, fuller than the weekday peak, while the trains after 16:00 leave three quarters of their seats empty in both directions."
+    },
+    {
+     "lead": "Why it matters to the plan",
+     "text": "The Dales line is the first to move to a half-hourly timetable, in December 2027. Its leisure market responds fastest to frequency, and it is the one line where the units, the crews and the paths are all already in hand."
+    }
+   ],
+   "source": "Illustration: examples/assets; survey data illustrative"
+  },
+  {
+   "id": "f-picture-picture-pair",
+   "type": "picture",
+   "form": "picture-pair",
+   "commentary": "captions",
+   "why": "Two places are set side by side because the contrast between them is the argument: one timetable cannot serve both",
+   "settles": {
+    "kind": "qualitative",
+    "what": "what the city and valley-town corridors look like and who travels on each"
+   },
+   "adds": "Each caption names the market its corridor serves and the timetable that market needs",
+   "title": "The city and the valley towns need two different timetables",
+   "takeaway": "One network, two markets: the plan spends its first two years on the one that is short of trains.",
+   "pictures": [
+    {
+     "path": "assets/harbour.jpg",
+     "alt": "Illustration of a city skyline on the water",
+     "label": "City: Leeds and York",
+     "text": "Commuters in the peak, shoppers and visitors between. The peak is full and cannot grow before the electric fleet arrives; the off-peak is half empty and already has a train every twenty minutes.",
+     "credit": "examples/assets"
+    },
+    {
+     "path": "assets/terraces.jpg",
+     "alt": "Illustration of a row of terraced houses",
+     "label": "Valley towns: Halifax and Huddersfield",
+     "text": "Town-to-town trips decided within the hour, for work, college and shopping. They need a train every half hour all day so that nobody has to look up a time, which is what the May 2028 timetable gives them.",
+     "credit": "examples/assets"
+    }
+   ],
+   "source": "Illustrations: examples/assets"
+  },
+  {
+   "id": "f-options-table-halves",
+   "type": "options",
+   "form": "table-halves",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "Two options are held to the same twelve terms, more rows than one column of a page reads well, so the table runs in two halves side by side",
+   "settles": {
+    "kind": "comparison",
+    "what": "starting the half-hourly timetable on the Dales line or on the Coast line, on twelve terms"
+   },
+   "adds": "Each row states both options on one term, so the verdict can be read off row by row",
+   "title": "Starting on the Dales line beats the Coast line on every term",
+   "exhibit": {
+    "type": "table",
+    "columns": [
+     "Term",
+     "Start on the Dales line",
+     "Start on the Coast line"
+    ],
+    "rows": [
+     [
+      "Spare units",
+      "Six stand idle between the peaks",
+      "None until electric trains arrive in 2030"
+     ],
+     [
+      "Crews",
+      "36 drivers and guards in post by March 2027",
+      "Committed to the summer timetable"
+     ],
+     [
+      "Depot space",
+      "Twelve sidings open in November 2027",
+      "Scarborough depot is full overnight"
+     ],
+     [
+      "Free paths",
+      "Two unused freight paths between the peaks",
+      "Paths are free all day"
+     ],
+     [
+      "Off-peak seats empty",
+      "25 thousand a weekday",
+      "20 thousand a weekday"
+     ],
+     [
+      "Market",
+      "Leisure trips decided the day before",
+      "Seaside trips concentrated in summer"
+     ],
+     [
+      "Journeys added by FY31",
+      "2.4 million",
+      "0.7 million"
+     ],
+     [
+      "Capital needed",
+      "£85 million of depot work",
+      "£120 million, mostly fleet"
+     ],
+     [
+      "Payback of an added train",
+      "26 months",
+      "Over five years"
+     ],
+     [
+      "Punctuality risk",
+      "None: the track is free off-peak",
+      "Single track east of Malton"
+     ],
+     [
+      "Outside approvals",
+      "One timetable bid",
+      "A bid and a fleet order"
+     ],
+     [
+      "Earliest start",
+      "December 2027",
+      "FY31"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; fleet and crew plans, September 2026"
+  }
+ ]
+}

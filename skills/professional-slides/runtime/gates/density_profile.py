@@ -12,7 +12,13 @@ So this reads the rendered PDF itself: pdftotext -layout over the whole
 document, split into pages at its form feeds, the first non-empty line
 dropped as the title, page numbers and Source/Note lines dropped, a block
 being a run of non-empty lines between blank ones, blocks under three words
-dropped as labels. It writes, for the deck and for each analytic page, these
+dropped as labels. That is how the targets were measured on the reference
+decks' PDFs, and a page here is measured the same way: a chart's heading,
+unit, axis rows, category and data labels and legend are counted as the
+blocks pdftotext sets them in, because the reference pages' were. One thing
+is taken out, by the role of the scene node that drew it: the runtime's own
+section tracker, a strip repeated on every page that a reference page does
+not carry. It writes, for the deck and for each analytic page, these
 numbers beside the skill's targets, and flags every page outside the target
 band.
 
@@ -37,13 +43,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from gate_config import CONTRACT, is_cover, waived_rules  # noqa: E402
+from gate_config import CONTRACT, is_cover, is_tracker, waived_rules  # noqa: E402
 from text_stats import printed_words  # noqa: E402
 TEXT_FORM = CONTRACT["plan"]["textForm"]
 DECK_LENGTH = CONTRACT["deckLength"]
 
 DENSITY_CODES = {
-    "TEXT_FRAGMENTED": "the deck's prose pages set their words in blocks outside the band strong pages keep",
+    "TEXT_FRAGMENTED": "the deck's prose pages set their words in blocks whose median size is outside the middle half of the reference pages' (weight.json plan.textForm)",
 }
 SOURCE_LINE = re.compile(r"^\s*(source|sources|note|notes|footnote)\b[:\s]", re.I)
 PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
@@ -79,8 +85,50 @@ def strip_header(lines: list[str], header: set[str] | None) -> list[str]:
     return out
 
 
-def page_blocks(text: str, header: set[str] | None = None) -> list[int]:
-    """Words per text block, the title, page numbers and source lines removed."""
+def furniture_runs(slide: dict) -> set[tuple[str, ...]]:
+    """The runtime's section tracker as the page sets it, each printed line as
+    its words (gate_config.is_tracker): the one thing on our pages that the
+    reference pages the band was measured on do not carry."""
+    runs = set()
+    for node in slide.get("nodes", []):
+        if node.get("type") == "text" and is_tracker(node):
+            runs |= {tuple(line.split()) for line in str(node.get("text", "")).split("\n") if line.strip()}
+    return runs
+
+
+def is_furniture_run(tokens: list[str], runs: set[tuple[str, ...]]) -> bool:
+    """Whether `tokens` are tracker furniture and nothing else: its labels or
+    marker numbers set one after another ("1 2 3 4 5 6 7")."""
+    longest = max((len(run) for run in runs), default=0)
+    reach = {0}
+    for start in range(len(tokens)):
+        if start in reach:
+            reach |= {start + n for n in range(1, min(longest, len(tokens) - start) + 1) if tuple(tokens[start:start + n]) in runs}
+    return bool(tokens) and len(tokens) in reach
+
+
+def without_furniture(line: str, runs: set[tuple[str, ...]] | None) -> str:
+    """The line with the tracker taken out: empty when the whole line is the
+    tracker; otherwise the line less the stretches of it (pdftotext sets
+    separate text boxes on one row wide apart) that are a tracker label. A
+    bare marker number beside other text stays: on a shared row it could as
+    well be an axis value or a cell, which the measure counts."""
+    if not runs or not line.strip():
+        return line
+    if is_furniture_run(line.split(), runs):
+        return ""
+    stretches = re.split(r"\s{2,}", line.strip())
+    kept = [part for part in stretches if not (re.search(r"[^\W\d_]", part) and is_furniture_run(part.split(), runs))]
+    return line if len(kept) == len(stretches) else "  ".join(kept)
+
+
+def page_blocks(text: str, header: set[str] | None = None, furniture: set[tuple[str, ...]] | None = None) -> list[int]:
+    """Words per text block, the title, page numbers and source lines removed,
+    and with them the tracker the runtime set (`furniture`, the page's
+    `furniture_runs`). Everything else pdftotext reads on the page is counted
+    as the reference pages' was: a chart's heading, its axis row and its
+    labels are blocks where they run to three words. The tracker is taken out
+    of the run it stood in and the run is left whole."""
     kept = []
     for line in strip_header(text.split("\n"), header):
         if not line.strip():
@@ -88,7 +136,9 @@ def page_blocks(text: str, header: set[str] | None = None) -> list[int]:
             continue
         if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
             continue
-        kept.append(line)
+        rest = without_furniture(line, furniture)
+        if rest.strip():
+            kept.append(rest)
     out, run = [], 0
     for line in kept:
         if line.strip():
@@ -99,6 +149,102 @@ def page_blocks(text: str, header: set[str] | None = None) -> list[int]:
     if run:
         out.append(run)
     return [n for n in out if n >= 3]
+
+
+# The same reading on a composed scene, before anything is rendered.
+#
+# pdftotext sets every text box on the page's rows and leaves a blank line
+# where the page has a band with no text on it; a block is a run of rows with
+# no blank line between them. On the scene the rows are the lines of the text
+# nodes, each at the height it is set at, and two consecutive rows are one
+# block while the gap between them is under SCENE_ROW_GAP - the gap at which
+# pdftotext starts a new block on our rendered pages, set between a body
+# line's pitch and the space the composer leaves between two points. Measured
+# against the rendered profile of two finished decks (about a hundred pages),
+# the half of the pages nearest came within a word, and each deck's median
+# within four: an estimate of where the render will stand, never the measure.
+SCENE_ROW_GAP = 26.0
+# How far the scene's estimate of a deck's median stood from the rendered one on those decks, in words a block.
+SCENE_TOLERANCE = 4.0
+# Two lines within this of each other are one printed row (a label and the value beside it).
+SCENE_ROW_JOIN = 4.0
+
+
+def scene_text_nodes(node, out=None):
+    out = [] if out is None else out
+    if isinstance(node, dict):
+        if node.get("type") == "text":
+            out.append(node)
+        for value in node.values():
+            scene_text_nodes(value, out)
+    elif isinstance(node, list):
+        for value in node:
+            scene_text_nodes(value, out)
+    return out
+
+
+def scene_blocks(slide: dict) -> list[int]:
+    """Words per text block as `page_blocks` will read the rendered page,
+    estimated from the composed scene: the title, its kicker, the tracker, the
+    page number and the source and note lines left out, as there."""
+    raw = []
+    for node in scene_text_nodes(slide.get("nodes", [])):
+        if str(node.get("role", "")) in HEADER_ROLES or is_tracker(node):
+            continue
+        frame = node.get("frame") or {}
+        lines = str(node.get("text", "")).split("\n")
+        set_height = ((node.get("data") or {}).get("textLayout") or {}).get("lineHeight")
+        height = set_height or (frame.get("height", 0) / max(1, len(lines)))
+        # A node set by the composer starts at its frame's top; a label with no layout sits in the middle of its frame.
+        top = frame.get("y", 0) if set_height else frame.get("y", 0) + (frame.get("height", 0) - height * len(lines)) / 2
+        raw.extend((top + (i + 0.5) * height, frame.get("x", 0), line) for i, line in enumerate(lines) if line.strip())
+    rows = []
+    for y, x, line in sorted(raw):
+        if rows and y - rows[-1][0] <= SCENE_ROW_JOIN:
+            rows[-1][1].append((x, line))
+        else:
+            rows.append([y, [(x, line)]])
+    out, run, last = [], 0, None
+    for y, parts in rows:
+        line = "  ".join(text for _, text in sorted(parts))
+        if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
+            continue
+        if last is not None and y - last > SCENE_ROW_GAP and run:
+            out.append(run)
+            run = 0
+        run += words(line)
+        last = y
+    if run:
+        out.append(run)
+    return [n for n in out if n >= 3]
+
+
+def scene_fragmentation(scene: dict) -> dict:
+    """Where the deck will stand on TEXT_FRAGMENTED, estimated from the scene
+    (scene_blocks): `pages`, each content page's blocks and words a block with
+    whether its reading task is prose, and `standings`, the deck's estimated
+    median against the band - marked `estimated`, and never blocking: the rule
+    is the render's to measure."""
+    pages = []
+    for index, slide in enumerate(scene.get("slides", [])):
+        if is_cover(slide, index) or re.match(r"^(agenda-\d+|picture-credits(?:-\d+)?)$", str(slide.get("id") or "")):
+            continue
+        task = slide.get("readingTask")
+        if task in STRUCTURAL_TASKS or not task:
+            continue
+        blocks = scene_blocks(slide)
+        pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_task(task), "blocks": len(blocks),
+                      "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0})
+    prose = [p for p in pages if p["blocks"] and p["prose"]]
+    if not prose:
+        return {"pages": pages, "standings": []}
+    value = round(st.median([p["wordsPerBlock"] for p in prose]), 1)
+    low, high = TEXT_FORM["wordsPerBlock"]["q1"], TEXT_FORM["wordsPerBlock"]["q3"]
+    each = {str(p["slide"]): p["wordsPerBlock"] for p in prose}
+    return {"pages": pages, "standings": [
+        {"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": value, "bar": bar, "side": side, "unit": "words",
+         "applies": len(prose) >= DECK_LENGTH["density"], "blocks": False, "estimated": True, "tolerance": SCENE_TOLERANCE, "each": each}
+        for key, bar, side in (("floor", low, "min"), ("ceiling", high, "max"))]}
 
 
 def body_words(text: str, header: set[str] | None = None) -> int:
@@ -165,7 +311,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
             continue
         text = texts[index - 1] if index - 1 < len(texts) else ""
         header = header_lines(slide) or None
-        blocks = page_blocks(text, header)
+        blocks = page_blocks(text, header, furniture_runs(slide))
         body = body_words(text, header)
         entry = {"page": index, "id": slide.get("id"), "task": task, "bodyWords": body,
                  "blocks": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
@@ -229,6 +375,14 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
     waived = waived_rules(rules or {})
     findings = [{**f, "severity": "advisory", "waived": {"rulesVersion": (rules or {}).get("rulesVersion"), "introducedIn": waived[f["code"]]}}
                 if f["code"] in waived else f for f in findings]
+    # Where the deck stands against the band, broken or not, in the record
+    # every deck-level rule writes (gate_config.standing), with each prose
+    # page's own figure: the author's check prints it (author-deck.mjs --render).
+    words, limits = deck["wordsPerBlock"], deck["wordsPerBlock"]["band"]
+    each = {str(p["id"]): p["wordsPerBlock"] for p in prose}
+    standings = [{"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": words["measured"] or 0, "bar": bar,
+                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "blocks": "TEXT_FRAGMENTED" not in waived, "each": each}
+                 for key, bar, side in (("floor", limits[0], "min"), ("ceiling", limits[1], "max"))]
     return {
         "schema": "professional-slides.density-profile/v1",
         "$comment": ("Rendered pages measured with pdftotext -layout; targets from weight.json plan.textForm "
@@ -237,6 +391,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
         "deck": deck,
         "accepted": not any(f["severity"] == "blocker" for f in findings),
         "findings": findings,
+        "standings": standings,
         "flaggedPages": [p["id"] for p in pages if p["flags"]],
         "pages": pages,
     }

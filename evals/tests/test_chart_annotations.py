@@ -301,5 +301,36 @@ console.log(JSON.stringify({{label,right,lineEnd:line.x2,explicit}}));
         self.assertIn('outside-end', result['explicit'])
 
 
+class CalloutPositionTests(unittest.TestCase):
+    def test_a_callout_with_no_clear_position_is_told_where_one_fits_or_that_none_does(self):
+        # "No clear position for the callout at FY19" named the callout and not where one would fit: three compile runs
+        # went on moving it by trial. The refusal says the marks at which a note of this size has a clear position, with
+        # the callouts already placed - and they are the ones where it then composes - or that none has, and how many the
+        # plot holds.
+        result = run_node("""
+import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
+const cats = ['FY17', 'FY18', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'];
+const note = 'Passengers fell by half in the first pandemic year';
+const headings = ['Passengers by route group', 'Passengers by cabin', 'Passengers by region'];
+const deck = (annotations, panels, type, lines) => ({ schema: 'professional-slides.deck/v3', id: 't', design: 'consulting', cover: { title: 'T' },
+  slides: [{ id: 'p1', title: 'Passengers recovered to a new peak after the pandemic trough', arrange: 'row', exhibits: Array.from({ length: panels }, (_, k) => ({ type, heading: headings[k], unit: 'm', categories: cats,
+    series: Array.from({ length: lines }, (_, s) => ({ name: `Series ${s}`, values: cats.map((_, i) => (i < 5 ? 10 + s * 22 + ((i * 7 + s * 3) % 9) : 8 + s * 3 + i)) })), annotations })) }] });
+const refusal = (spec) => { try { return (composeAll(spec, '.', { partial: true }).pageErrors ?? [])[0] ?? null; } catch (error) { return (error.pageErrors ?? [error.message])[0]; } };
+const at = (category, panels, type, lines, series = 'Series 0') => refusal(deck([{ category, series, text: note }], panels, type, lines));
+// Three bar panels: a note of this size has room beside the two shortest bars and nowhere else.
+const bars = cats.map((category) => at(category, 3, 'chart.bar', 1));
+const said = [...new Set(bars.filter(Boolean).map((message) => message.match(/clear position at ([^:;]*)/)?.[1]?.trim()))];
+// Two line panels of three series: the lowest line has no clear position at any mark.
+const lines = cats.map((category) => at(category, 2, 'chart.line', 3));
+console.log(JSON.stringify({ composes: cats.filter((_, i) => bars[i] === null), said, first: bars.find(Boolean), none: [...new Set(lines.filter(Boolean).map((message) => /no other mark has a clear position for a note of this size either: the plot has room for no callout of this size/.test(message)))], everywhere: lines.every(Boolean) }));
+""")
+        self.assertTrue(result["composes"])                                    # the note does fit at some marks
+        self.assertLess(len(result["composes"]), 10)                           # and not at others
+        self.assertEqual(result["said"], [", ".join(result["composes"])])      # the refusal names exactly the marks where it then composes
+        self.assertIn("with 0 of the 1 callouts placed, a note of this size has a clear position at", result["first"])
+        self.assertTrue(result["everywhere"])
+        self.assertEqual(result["none"], [True])
+
+
 if __name__ == "__main__":
     unittest.main()

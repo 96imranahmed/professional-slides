@@ -35,7 +35,7 @@ import page_gates  # noqa: E402
 
 FRAME = {"x": 72, "y": 162, "width": 1136, "height": 506}
 BUDGET_KEYS = {"slide", "id", "readingTask", "body", "floor", "ceiling", "footer",
-               "footerRatio", "internalVoid", "deadBand", "void", "columnVoid", "line", "columns"}
+               "footerRatio", "internalVoid", "deadBand", "void", "columnVoid", "line", "columns", "blocks"}
 
 
 def bands(slide):

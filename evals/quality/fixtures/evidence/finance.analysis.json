@@ -57,6 +57,60 @@
    },
    "soWhat": "Eight million of headroom remains above the cover floor",
    "strength": "supporting"
+  },
+  {
+   "id": "A-loans",
+   "op": "growth",
+   "inputs": [
+    "i-loans/loans"
+   ],
+   "soWhat": "The book grew by more than half in seven years",
+   "strength": "strong"
+  },
+  {
+   "id": "A-loans-year",
+   "op": "growth",
+   "inputs": [
+    "i-loans/loans"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Lending grew faster in the latest year than profit did",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-liquid-year",
+   "op": "growth",
+   "inputs": [
+    "i-liquidity/liquid"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Liquid assets rose in the latest year",
+   "strength": "context"
+  },
+  {
+   "id": "A-index",
+   "op": "index",
+   "inputs": [
+    "i-loans/loans",
+    "i-liquidity/liquid",
+    "i-earn/pat",
+    "i-cash/ocf"
+   ],
+   "soWhat": "Lending and profit grew by more than half while cash flow ended barely above where it began",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-short-year",
+   "op": "growth",
+   "inputs": [
+    "i-liquidity/short-liabilities"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Liabilities due within a year rose by as much as liquid assets did",
+   "strength": "context"
   }
  ]
 }

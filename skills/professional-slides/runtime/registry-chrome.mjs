@@ -502,6 +502,25 @@ function defineCover() {
   });
 }
 
+// A section's title is set large on its divider and holds two lines there
+// (three in the narrow panel beside a photograph). The limit is the divider's,
+// published for the author by limits.mjs.
+export const SECTION_TITLE_LINES = 2;
+const SECTION_TITLE_PANEL_LINES = 3;
+
+/**
+ * How many words of ordinary prose a section title holds, by the divider's
+ * own measure: the divider drawn with the deck's contents beside it - its
+ * narrowest title column - until the title no longer fits its lines.
+ */
+export function sectionTitleCapacity() {
+  const words = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
+  const fits = (n) => { try { renderSectionDivider({ id: "capacity", frame: { x: 0, y: 0, ...SLIDE }, props: { title: Array.from({ length: n }, (_, i) => words[i % words.length]).join(" "), contents: ["One", "Two", "Three"], contentsActive: 0 } }); return true; } catch { return false; } };
+  let n = 1;
+  while (n < 40 && fits(n + 1)) n += 1;
+  return n;
+}
+
 /** The section divider page: its surface, part label, numeral, title, summary and the contents beside it, in the house's divider layout. */
 function renderSectionDivider({ id, frame, props }) {
   if (typeof props.title !== "string" || !props.title.trim()) throw new Error("Section divider requires a section title");
@@ -537,7 +556,7 @@ function renderSectionDivider({ id, frame, props }) {
     : panelWidth ? panelWidth - CHROME.left - 24 : dividerStyle === "numbered" ? frame.width * 0.58 - CHROME.left : frame.width - CHROME.left - CHROME.right;
   const titleBold = dividerLayout !== "editorial";
   const title = measureText(props.title, width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")), bold: titleBold });
-  if (title.lines.length > (panelWidth ? 3 : 2) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space; shorten the section title");
+  if (title.lines.length > (panelWidth ? SECTION_TITLE_PANEL_LINES : SECTION_TITLE_LINES) || title.height > frame.height - 2 * CHROME.bodyTop) throw new Error("Section divider title exceeds its allocated space; shorten the section title");
   const background = dividerLayout === "keynote" ? PRIMARY : inverse ? INK : token("color.canvas"), foreground = inverse ? WHITE : INK;
   if (contrastRatio(tokenValue(background), tokenValue(foreground)) < 4.5) throw new Error("Section divider title contrast must be at least 4.5:1");
   // A short accent rule above the title and the section's one-line summary

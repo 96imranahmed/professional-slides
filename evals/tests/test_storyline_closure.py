@@ -275,3 +275,100 @@ console.log(JSON.stringify({
         self.assertEqual(result["paraphrased"][0], "refused")
         self.assertIn("rests on the user's own words", result["paraphrased"][1])
         self.assertEqual(result["quoted"][0], "packet-written")
+
+
+class LayoutOnceTests(unittest.TestCase):
+    """Argument first, layout once: a ready critique survives the layout and not a changed argument."""
+
+    def test_a_ready_critique_holds_through_the_layout_and_breaks_on_the_argument(self):
+        # An author used to lay the whole deck out before each critique pass,
+        # because the binding held every exhibit's type and drawn numbers and
+        # any layout repair reopened it. The critique is now brought to ready
+        # on the spine alone - titles, types, what settles each claim, the
+        # insights and the measures each page will show - and the pages are
+        # laid out once, afterwards. What a page will show of a measure is the
+        # argument's too: a page not drawn is read as showing each measure
+        # whole, so a page that will show a window of it, or a table, carries
+        # that exhibit at the spine.
+        result = run_node(LOOP + '''
+// The spine as it is critiqued: no exhibit drawn, no copy written. A page says what it will show by its claim's
+// measures, and by a `basis` on an exhibit or metric still to be drawn where it shows more than those.
+const SPINE_KEYS = ['id', 'kind', 'type', 'form', 'commentary', 'takeaway', 'why', 'title', 'settles', 'evidence', 'adds'];
+// An item the layout will bind (bind.mjs: a series or a metric naming its `measure`) is stubbed by the basis the runtime will write for it.
+const boundRefs = (item) => [...(Array.isArray(item?.series) ? item.series.flatMap((s) => [].concat(s?.measure ?? [])) : []), ...(item?.measure !== undefined ? [item.measure] : [])].map((ref) => String(ref).split('@')[0]);
+const stub = (item) => (item?.basis ? { basis: item.basis } : boundRefs(item).length ? { basis: { measures: [...new Set(boundRefs(item))], role: item.role ?? 'proof' } } : null);
+// `tables` keeps a table as written: the summary's table shows two years of each series, which is what the critic must be shown.
+const bare = (tables) => (d) => { d.pages = d.pages.map((page) => page.type ? { ...Object.fromEntries(SPINE_KEYS.filter((key) => page[key] !== undefined).map((key) => [key, page[key]])),
+  ...(page.exhibit ? { exhibit: tables && page.exhibit.type === 'table' ? page.exhibit : stub(page.exhibit) } : {}), ...(page.exhibits ? { exhibits: page.exhibits.map(stub).filter(Boolean) } : {}), ...(page.metrics?.some(stub) ? { metrics: page.metrics.map(stub).filter(Boolean) } : {}) } : page); };
+const critiqued = async (deck) => {
+  const one = await S.prepareStoryline(deck.specPath, deck.out);
+  const p1 = await packetOf(one);
+  const ids = p1.pages.filter((p) => p.kind === 'content').map((p) => p.id);
+  const ready = await answer(deck, first(p1, ids, [], { verdict: 'ready', rating: 8, ...judged(true, 'sufficient'), summary: 'The answer is sharp and the pillars hold on the evidence the spine names.', topFixes: ['None material'],
+    pillars: [{ pillar: 'Growth on thinner liquidity', pages: ids, verdict: 'holds', overlap: 'One pillar; nothing overlaps.', strongestCounter: 'The cushion may rebuild as loans season.', reversal: 'Liquid assets above short-term liabilities by the old margin.', answered: true }],
+    completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })) }));
+  return { one, p1, ready };
+};
+// A spine that does not say the summary will tabulate two years of each series: laying it out shows the critic's reader something the critique did not read.
+const blind = await stage('finance', {}, bare(false));
+const blindReady = (await critiqued(blind)).ready.status;
+const blindLine = (await fs.readFile(path.join(blind.out, '..', '.reviews', 'finance', 'storyline-packet.json'), 'utf8').then(JSON.parse)).pages.find((p) => p.id === 'f0').measures[0].line;
+const blindLayout = await S.storylineGate(await blind.write({}, null), blind.out, { deckPath: blind.specPath });
+await clear(blind);
+const deck = await stage('finance', {}, bare(true));
+const drawnAtSpine = deck.spec.slides.filter((s) => s.pageType && !s.pageType.deferred).map((s) => s.id);
+const { one, p1, ready } = await critiqued(deck);
+const gate = async (spec) => S.storylineGate(spec, deck.out, { deckPath: deck.specPath });
+const page = (d, id) => d.pages.find((p) => p.id === id);
+// The one layout pass: every exhibit drawn, every sentence written.
+const laidOut = await deck.write({}, null);
+const afterLayout = [laidOut.slides.filter((s) => s.pageType?.deferred).length, await gate(laidOut), (await S.prepareStoryline(deck.specPath, deck.out)).status];
+// Then layout repairs: another form, another chart type, the commentary moved, a caption and the points rewritten.
+const refit = await deck.write({}, (d) => { const f4 = page(d, 'f4'); f4.form = 'stack'; f4.exhibits[1].type = 'chart.bar'; f4.exhibits[0].caption = 'A caption rewritten after the critique, eight words or more';
+  const f5 = page(d, 'f5'); f5.form = 'lollipop'; });
+const afterRefit = [refit.slides.find((s) => s.id === 'f4').pageType.form, refit.slides.find((s) => s.id === 'f5').pageType.form, await gate(refit), (await S.prepareStoryline(deck.specPath, deck.out)).status];
+// A changed claim breaks it, and the loop writes the verification pass for that page alone.
+const reclaimed = await deck.write({}, (d) => { page(d, 'f1').title = 'Loans grew 57% in seven years, twice the pace of deposits'; });
+const claimGate = await gate(reclaimed);
+const two = await S.prepareStoryline(deck.specPath, deck.out);
+const p2 = await packetOf(two);
+// So does a changed evidence list, a measure the spine did not say the page would show, and a changed measure in the log.
+const rested = await gate(await deck.write({}, (d) => { page(d, 'f3').evidence = page(d, 'f3').evidence.filter((id) => id !== 'A-floor'); }));
+const undeclared = await gate(await deck.write({}, (d) => { page(d, 'f4').exhibits[1].basis = { measures: ['i-efficiency/cost-income', 'i-efficiency/branches'], role: 'proof' }; }));
+const logPath = path.join(deck.dir, 'finance.insights.json');
+const log = JSON.parse(await fs.readFile(logPath, 'utf8'));
+const loans = log.insights.find((item) => item.id === 'i-loans').measures.loans;
+await fs.writeFile(logPath, JSON.stringify({ ...log, insights: log.insights.map((item) => item.id === 'i-loans' ? { ...item, measures: { ...item.measures, loans: { ...loans, values: [...loans.values].reverse() } } } : item) }));
+const remeasured = await gate(await deck.write({}, null));
+await fs.writeFile(logPath, JSON.stringify(log));
+const restored = await gate(await deck.write({}, null));
+await clear(deck);
+console.log(JSON.stringify({ drawnAtSpine, blind: [blindReady, blindLine, blindLayout], summaryLine: p1.pages.find((p) => p.id === 'f0').measures[0].line, one: one.status, ready: [ready.status, ready.note], afterLayout, afterRefit, claimGate, two: [two.status, p2.scope.changed, p2.scope.mustInspect],
+  rested, undeclared, remeasured, restored, shown: p1.pages.find((p) => p.id === 'f4').measures.map((m) => [m.ref, m.role]) }));
+''')
+        self.assertEqual(result["drawnAtSpine"], [])  # nothing was laid out when the critique read it
+        self.assertEqual(result["one"], "packet-written")
+        self.assertEqual(result["ready"][0], "ready")
+        self.assertIn("lay the pages out now, once", result["ready"][1])
+        self.assertEqual(result["afterLayout"], [0, [], "ready"])  # the full layout of every page keeps the ready critique
+        # The critic was shown what the summary's table shows of each series, since the spine carried it.
+        self.assertIn("[the page shows it tabulated, 2 of its 8 periods: FY25, FY26]", result["summaryLine"])
+        # A spine that left the table out was read as showing each series whole; the table then drawn shows two years of
+        # eight, so the layout reopens that page, and only that page.
+        self.assertEqual(result["blind"][0], "ready")
+        self.assertIn("[not drawn yet: critiqued as plotted, every one of its 8 periods]", result["blind"][1])
+        self.assertEqual(len(result["blind"][2]), 1)
+        self.assertIn("the spine changed after the storyline critique (f0: a title,", result["blind"][2][0])
+        self.assertEqual(result["afterRefit"], ["stack", "lollipop", [], "ready"])  # and so does a form, chart-type or copy repair
+        self.assertEqual(len(result["claimGate"]), 1)
+        self.assertIn("the spine changed after the storyline critique (f1:", result["claimGate"][0])
+        self.assertIn("Copy edits and a chart redrawn in another chart form do not change the spine", result["claimGate"][0])
+        self.assertEqual(result["two"], ["packet-written", ["f1"], []])
+        # The summary page shows the loan book too, and the indexed trend is bound to an index computed from it,
+        # so a changed loan series moves every page that shows it.
+        for moved, page in [("rested", "f3"), ("undeclared", "f4"), ("remeasured", "f0, f1, f6")]:
+            self.assertEqual(len(result[moved]), 1, moved)
+            self.assertIn(f"the spine changed after the storyline critique ({page}: a title,", result[moved][0], moved)
+        self.assertEqual(result["restored"], [])  # the measure put back as it was recorded, the critique holds again
+        # The spine said what the page would show, before anything was drawn.
+        self.assertEqual(result["shown"], [["i-efficiency/cost-income", "proof"], ["i-efficiency/branches", "context"]])

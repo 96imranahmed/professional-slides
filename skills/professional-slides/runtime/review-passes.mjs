@@ -30,9 +30,11 @@ import { spawnSync } from "node:child_process";
 import { runProcess } from "./process.mjs";
 import { readJson, readJsonSync, writeJson } from "./cli.mjs";
 import { textWords } from "./text-contract.mjs";
+import { contentWords } from "./gates/content_gates.mjs";
 import { registered } from "./errors.mjs";
 import { deckStem } from "./artifact-path.mjs";
 import { waiverErrors } from "./build-bars.mjs";
+import { assetsDeclarationErrors } from "./asset-needs.mjs";
 
 export const SEVERITIES = Object.freeze(["none", "minor", "major", "blocker"]);
 export const PAGE_VERDICTS = Object.freeze(["ok", "minor", "major", "blocker"]);
@@ -170,7 +172,7 @@ export const requestHash = (spec) => {
 export const DECK_STATEMENT_CODES = Object.freeze({
   REQUEST_MISSING: "a new deck carries no verbatim `request`, so the reviews would judge it against the author's paraphrase",
   WAIVERS_INVALID: "a build-bar waiver that names no build bar, names one twice, or gives no reason the reviewer can check",
-  STATEMENT_INVALID: "what the deck says of its request, its evidence scope or its answer's status is not in the form the reviews read",
+  STATEMENT_INVALID: "what the deck says of its request, its evidence scope, its answer's status or its assets is not in the form the reviews read",
 });
 export function deckStatementFindings(deck) {
   const out = [];
@@ -195,6 +197,8 @@ export function deckStatementFindings(deck) {
   if (deck?.answerStatus !== undefined && !["final", "provisional"].includes(deck.answerStatus)) statements.push("`answerStatus` is \"final\" or \"provisional\"");
   if (deck?.answerStatus === "provisional" && !answerStatusOf(deck).limits.some((limit) => textWords(limit) >= 4))
     statements.push("a provisional answer says what it leaves open in `answerLimits` - a sentence for each decisive thing the evidence in scope cannot settle");
+  // Whether the deck is built without the network is a statement the reviewer is shown too (asset-needs.mjs).
+  statements.push(...assetsDeclarationErrors(deck));
   if (statements.length) out.push({ code: registered(DECK_STATEMENT_CODES, "STATEMENT_INVALID"), severity: "blocker", repair: statements.join("; ") });
   return out;
 }
@@ -459,30 +463,111 @@ export function severityChange(entry, status, downgrade = () => false) {
   return status.status === "partly fixed" && downgrade(entry) ? status.severity : null;
 }
 
+// The open finding a later pass's new finding restates: the same code on a
+// page the open one already names. A reviewer verifying one item at a time
+// files the defect it still sees without looking up which open item it is, so
+// the two are one finding and are folded into one (advanceLedger) rather than
+// counted twice or refused.
+const restated = (open, item) => open.find((e) => e.code === item.code && (e.pages || []).some((id) => (item.pages || []).includes(id))) ?? null;
+const sharedPages = (entry, item) => (item.pages || []).filter((id) => (entry.pages || []).includes(id));
+
+/**
+ * Every statement an entry holds: its own, and each one a later pass folded
+ * into it (advanceLedger), with the pass it was made in. A fold keeps the
+ * entry's first reason, so the folded statements are part of what the entry
+ * says wherever it is shown, and of what a status that closes it must answer.
+ */
+export const statementsOf = (entry) => [{ id: entry.id, pass: entry.raisedIn ?? 1, text: `${entry.reason ?? ""}${entry.repair ? ` → ${entry.repair}` : ""}` },
+  ...(entry.folded || []).map((f) => ({ id: f.id, pass: f.pass, severity: f.severity, pages: f.pages || [], text: f.reason }))];
+const alsoLine = (f) => `also, from pass ${f.pass} (filed as ${f.id}, ${f.severity}${(f.pages || []).length ? `, on ${f.pages.join(", ")}` : ""}): ${f.text}`;
+/** An entry's reason and repair in one line, with every statement folded into it: what a report or a refusal prints. */
+export const reasonOf = (entry) => statementsOf(entry).map((f, i) => (i === 0 ? entry.reason ?? "" : alsoLine(f))).join(" | ");
+/** The same for a verification prompt: the entry's own statement, then each folded one on its own line beneath it, which the status must answer. */
+export const itemLines = (entry) => { const [own, ...folded] = statementsOf(entry); return [own.text, ...folded.map((f) => `    ${alsoLine(f)}`)].join("\n"); };
+// The statuses that say an item moved: a closing one, or "partly fixed".
+const MOVED = new Set([...CLOSED, "partly fixed"]);
+// What an answer to one statement has to be. A status that closes an item
+// holding several statements answers each; an answer checked for length alone
+// could be the same filler under every one ("n/a n/a n/a n/a n/a n/a"). So an
+// answer is evidence about its own statement: it says something (three
+// distinct content words or more), in words of its own (not the statement's
+// text, or a part of it, given back), that no other answer of the status
+// gives, and it is about that statement - it uses one of the statement's
+// content words, or names a page the statement is on or the artifact the
+// status says changed.
+const ANSWER_CHARS_MIN = 20, ANSWER_WORDS_MIN = 3;
+const plain = (text) => String(text ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const namesId = (text, id) => { const at = plain(text).split(" "); const want = plain(id).split(" "); return want.length > 0 && want[0] !== "" && at.some((_, i) => want.every((word, k) => at[i + k] === word)); };
+/** Why `answer` does not answer `statement` of `entry` (statementsOf), in words; null where it does. */
+function answerFault(answer, statement, entry, status) {
+  if (!answer || typeof answer.evidence !== "string" || answer.evidence.trim().length < ANSWER_CHARS_MIN) return `has no answer of ${ANSWER_CHARS_MIN} characters or more`;
+  const evidence = plain(answer.evidence), words = contentWords(answer.evidence);
+  if (words.size < ANSWER_WORDS_MIN) return "is answered with filler: an answer says what you saw, in three words of substance or more";
+  if ((status.answers || []).some((other) => other !== answer && plain(other?.evidence) === evidence)) return "is given the same answer as another statement: each is answered for itself";
+  if (plain(statement.text).includes(evidence)) return "is answered with its own words: say what the page or the spine shows now, not what the statement said";
+  const about = [...contentWords(statement.text)].some((word) => words.has(word))
+    || [...(statement.pages ?? entry.pages ?? []), ...(entry.pages || []), status.artifact].filter((id) => typeof id === "string" && id.trim()).some((id) => namesId(answer.evidence, id));
+  return about ? null : "is answered without a word of what it says: use the statement's own terms, or name the page or artifact that changed";
+}
+/** The statements of an entry a status leaves unanswered, each `{ id, why }`: every one of them, the entry's own included, needs its `answers` entry once another is folded in. */
+const unanswered = (entry, status) => ((entry.folded || []).length && MOVED.has(status?.status)
+  ? statementsOf(entry).map((f) => ({ id: f.id, why: answerFault((status.answers || []).find((a) => a?.statement === f.id), f, entry, status) })).filter((f) => f.why) : []);
+/** What a prompt tells a verifier about items that hold several statements. */
+export const ANSWERS_RULE = 'An item with lines beginning "also" beneath it holds every one of those statements: an earlier pass filed them as new and they were folded into it. Call it fixed, partly fixed or otherwise closed only with `answers`: one { statement, evidence } for the item\'s own id and for each id an "also" line names, saying what you saw for that statement. Each answer is its own: it differs from the others and from the statement it answers, says something (three words of substance or more), and uses a term of its statement or names the page or artifact that changed. It is fixed only when every statement is; validation refuses a status that answers the first statement alone, or answers them with filler.';
+/** The schema of a status's `answers`, for the loops' status schemas. */
+export const ANSWERS_SCHEMA = { type: "array", items: { type: "object", additionalProperties: false, required: ["statement", "evidence"], properties: { statement: { type: "string" }, evidence: { type: "string", minLength: ANSWER_CHARS_MIN } } } };
+
 /**
  * The ledger: every finding any pass raised, with its latest status and
  * severity. Pass one opens it; each later pass applies its statuses and appends
  * its new findings. `items` is the review's findings in ledger form
  * ({ id, code, severity, pages, reason, repair }).
+ *
+ * A new finding that restates an open one (`restated`) is folded into it, not
+ * appended: the open entry stays open - "not fixed" with the new finding's
+ * text as its evidence where the pass gave it no status - names the new
+ * finding's pages as well, and records the fold in `folded`. Its severity is
+ * the worst of what it was before the pass, what the pass made it and what
+ * the new finding says: a fold never lowers one. Nor does it lose what the
+ * new finding said: the entry holds that statement from then on
+ * (statementsOf), every later packet prints it under the entry, and a status
+ * that closes the entry without answering it leaves the entry open.
+ * `automatic(entry)` marks the entries a pass gives a status by other means,
+ * which nothing folds into.
  */
-export function advanceLedger(prior, review, items, { downgrade = () => false } = {}) {
+export function advanceLedger(prior, review, items, { downgrade = () => false, automatic = () => false } = {}) {
   const pass = review?.pass ?? 1;
   const ledger = (prior || []).map((entry) => ({ ...entry }));
   const byId = new Map(ledger.map((entry) => [entry.id, entry]));
+  const open = openEntries(prior).filter((e) => !automatic(e)).map((e) => ({ ...e }));
+  const judged = new Set((review?.statuses || []).map((s) => s?.finding));
   for (const s of review?.statuses || []) {
     const entry = byId.get(s.finding);
     if (!entry) continue;
     const severity = severityChange(entry, s, downgrade);
-    entry.status = s.status;
+    // The validator refuses a status that moves an item without answering each statement folded into it; here such an item stays where it was.
+    const silent = unanswered(entry, s);
+    entry.status = silent.length ? "not fixed" : s.status;
     if (severity) entry.severity = severity;
     const pages = s.pages ?? s.slides;
     if (Array.isArray(pages) && pages.length) entry.pages = pages;
-    entry.evidence = s.evidence ?? null;
+    entry.evidence = silent.length ? `${s.evidence ?? ""} [kept open: the status says ${s.status} and answers no statement ${silent.map((f) => f.id).join(", ")}]`.trim() : s.evidence ?? null;
+    if (Array.isArray(s.answers) && !silent.length) entry.answers = s.answers;
     if (s.searchLog) entry.searchLog = s.searchLog;
     entry.updatedIn = pass;
   }
   for (const item of items || []) {
     if (byId.has(item.id)) continue;
+    const was = restated(open, item);
+    if (was) {
+      const kept = byId.get(was.id);
+      const said = `${item.reason ?? ""}${item.repair ? ` → ${item.repair}` : ""}`.trim();
+      // A closing status beside a finding that restates the item is a contradiction the validator refuses; here the item stays open.
+      if (!judged.has(was.id) || CLOSED.includes(kept.status)) Object.assign(kept, { status: "not fixed", evidence: said });
+      Object.assign(kept, { severity: worst([was.severity, kept.severity, item.severity]), pages: [...new Set([...(kept.pages || []), ...(item.pages || [])])],
+        folded: [...(kept.folded || []), { id: item.id, pass, severity: item.severity, pages: item.pages || [], reason: said }], updatedIn: pass });
+      continue;
+    }
     const entry = { ...item, status: "open", raisedIn: pass, updatedIn: pass };
     ledger.push(entry);
     byId.set(item.id, entry);
@@ -507,7 +592,9 @@ export function expectedVerdicts(ledger) {
 /**
  * A later pass, checked against the ledger it verifies: the pass number and
  * lineage, one status for every open finding, and new findings that are
- * additive. `changed` is every page the rebuild changed plus the neighbours of
+ * additive. A new finding that restates an open one is not a new finding: it
+ * is that finding's status (advanceLedger folds it in), and is refused only
+ * where the pass also says the open finding is closed. `changed` is every page the rebuild changed plus the neighbours of
  * deleted pages; `ids` is the current page list. `downgrade(entry)` says which
  * entries' measured checks now pass (severityChange); `pageText` maps a page
  * to its text, against which a missed finding's quoted evidence is checked.
@@ -536,15 +623,28 @@ export function verificationErrors(review, { scope, ledger, items, ids, pageKey 
       else if (rank(s.severity) > rank(entry.severity)) { if (s.status !== "regressed") errors.push(`${at}: a residual severity cannot exceed the finding's ${entry.severity} unless it regressed`); }
       else if (!severityChange(entry, s, downgrade)) errors.push(`${at}: ${s.finding} keeps its ${entry.severity} severity - a partly fixed finding is lowered only when it is a ${deckScope} finding whose measured check now passes (the packet marks those); report it as not fixed, partly fixed at ${entry.severity}, or fixed`);
     }
+    // An item other statements were folded into is closed, or called partly fixed, statement by statement.
+    const silent = unanswered(entry, s);
+    if (silent.length) errors.push(`${at}: ${s.finding} holds ${statementsOf(entry).length} statements (${statementsOf(entry).map((f) => `${f.id}, pass ${f.pass}`).join("; ")}) and the status says ${s.status} without answering ${silent.map((f) => `${f.id} (it ${f.why})`).join("; ")}. Give \`answers\` one { statement, evidence } for each, with what the page shows for that statement: ${ANSWER_CHARS_MIN} characters or more, different from every other answer and from the statement itself, using a term of the statement or naming the page or artifact that changed - or report the item not fixed`);
+    const strangers = (s.answers || []).map((a) => a?.statement).filter((id) => !statementsOf(entry).some((f) => f.id === id));
+    if (strangers.length) errors.push(`${at}: \`answers\` names ${strangers.join(", ")}, which ${s.finding} does not hold (${statementsOf(entry).map((f) => f.id).join(", ")})`);
   }
-  const missing = open.filter((e) => !seen.has(e.id)).map((e) => e.id);
-  if (missing.length) errors.push(`statuses: every open finding needs a status (${allowed.join(", ")}); missing ${missing.join(", ")}`);
-
   const changed = new Set(scope.changed || []);
   const priorIds = new Set((ledger || []).map((e) => e.id));
+  // An open finding a new one restates takes that as its status (advanceLedger folds the two).
+  const folded = new Set();
   for (const [i, item] of (items || []).entries()) {
     const at = `findings[${i}] (${item.id})`;
     if (priorIds.has(item.id)) errors.push(`${at}: the id is already in the ledger; give a new finding a new id`);
+    const was = priorIds.has(item.id) ? null : restated(open, item);
+    if (was) {
+      // The open finding restated: it is folded into that finding and kept open, so the rules for a new finding do not apply to it.
+      // Only a status that closes the same finding cannot stand beside it.
+      const given = statuses.find((s) => s?.finding === was.id);
+      if (given && CLOSED.includes(given.status)) errors.push(`${at}: two statements conflict - statuses says ${was.id} is ${given.status}, and this finding says ${item.code} still stands on ${sharedPages(was, item).join(", ")}, which is ${was.id}. If the defect remains, give ${was.id} the status "not fixed" or "partly fixed" and leave this finding out; if ${was.id} is ${given.status} and this is another defect, file it under the code that names it`);
+      folded.add(was.id);
+      continue;
+    }
     if (!BLOCKING.has(item.severity)) { errors.push(`${at}: a later pass adds only major or blocker findings; a ${item.severity} point on this pass is not additive - leave it out`); continue; }
     if (!NEW_BASES[item.basis]) { errors.push(`${at}: say why it is additive - basis one of ${Object.keys(NEW_BASES).join(", ")}`); continue; }
     const pages = item.pages || [];
@@ -563,9 +663,9 @@ export function verificationErrors(review, { scope, ledger, items, ids, pageKey 
       if (quote.length < 8) errors.push(`${at}: a missed finding quotes the evidence on the page in \`evidence\` (at least a few words, exactly as printed)`);
       else if (pageText && !quotedOn(quote, pages, pageText)) errors.push(`${at}: the quoted evidence "${quote.slice(0, 80)}" is not printed on ${pages.join(", ")}; quote the page exactly`);
     }
-    const repeat = open.find((e) => e.code === item.code && (e.pages || []).some((id) => pages.includes(id)));
-    if (repeat) errors.push(`${at}: ${item.code} on ${pages.filter((id) => (repeat.pages || []).includes(id)).join(", ")} is already ${repeat.id}; report it as that finding's status`);
   }
+  const missing = open.filter((e) => !seen.has(e.id) && !folded.has(e.id)).map((e) => e.id);
+  if (missing.length) errors.push(`statuses: every open finding needs a status (${allowed.join(", ")}); missing ${missing.join(", ")}`);
 
   const covered = new Set((review.pages || []).map((p) => p?.[pageKey]));
   const unread = (scope.mustInspect || []).filter((id) => !covered.has(id));
@@ -877,6 +977,70 @@ export async function restartLineage(historyDir, { reason, userApproved = false,
   await writeJson(path.join(historyDir, LINEAGE), lineage);
   return { restarted: true, errors: [], archived };
 }
+
+/**
+ * Retire a lineage whose record can no longer be read against the deck - it
+ * was recorded under an older definition of what a pass is bound to. Its
+ * passes, and `files` beside them (a waiting packet, an unrecorded answer),
+ * move to retired-<n>/ and the retirement is logged with `note`. It is not a
+ * restart: nobody chose it, so it needs no reason, counts against no restart
+ * allowance, and the loop begins again at pass one. What was open in it is not
+ * dropped with it: `open` is its blocking items still open, which the log
+ * keeps (`carried`, how many; `open`, the items) until the new lineage's first
+ * pass has said of each whether it still stands (carriedItems, settleCarried).
+ * Returns the folder's name.
+ */
+export async function retireLineage(historyDir, { note, files = [], open = [] } = {}) {
+  const lineage = await readLineage(historyDir);
+  const passes = (await fs.readdir(historyDir).catch(() => [])).filter((f) => /^(pass|confirmation)-\d+\.json$/.test(f));
+  const archived = `retired-${(lineage.retired || []).length + 1}`;
+  await fs.mkdir(path.join(historyDir, archived), { recursive: true });
+  for (const f of passes) await fs.rename(path.join(historyDir, f), path.join(historyDir, archived, f));
+  for (const file of files) await fs.rename(file, path.join(historyDir, archived, path.basename(file))).catch((error) => { if (error.code !== "ENOENT") throw error; });
+  await writeJson(path.join(historyDir, LINEAGE), { ...lineage, retired: [...(lineage.retired || []), { at: new Date().toISOString(), note, archived, passes: passes.filter((f) => PASS_FILE.test(f)).length,
+    carried: open.length, ...(open.length ? { open } : {}) }] });
+  return archived;
+}
+
+/** The blocking items a retired lineage left open that no first pass has answered yet: what the next pass-one packet carries. */
+export async function carriedItems(historyDir) {
+  const last = ((await readLineage(historyDir)).retired || []).at(-1);
+  return last && Array.isArray(last.open) && !last.settledIn ? last.open : [];
+}
+
+/** Log that the carried items were answered, by the first pass recorded under `binding`: they are that lineage's findings, or its critic's reasons, from here on. */
+export async function settleCarried(historyDir, binding) {
+  const lineage = await readLineage(historyDir);
+  const last = (lineage.retired || []).at(-1);
+  if (!last || !Array.isArray(last.open) || last.settledIn) return;
+  await writeJson(path.join(historyDir, LINEAGE), { ...lineage, retired: [...lineage.retired.slice(0, -1), { ...last, settledIn: binding }] });
+}
+
+/**
+ * What a first pass owes the items carried from a retired lineage (`carried`:
+ * `{ id, ... }` each), as errors: one `{ item, stands, evidence }` for each,
+ * and for one that still stands, the id of the item of this pass (`ids`) it is
+ * filed as. The carried items are not statuses - the retired record cannot be
+ * compared with the deck - so the critic judges each afresh, and none is lost
+ * without a reason on the record.
+ */
+export function carriedErrors(review, carried, ids) {
+  if (!carried?.length) return (review.carried || []).length ? ["`carried` answers items carried from a retired lineage, and this packet carries none"] : [];
+  const answers = Array.isArray(review.carried) ? review.carried : [];
+  const errors = [];
+  for (const item of carried) {
+    const given = answers.filter((a) => a?.item === item.id);
+    if (given.length !== 1) { errors.push(`carried: ${item.id} was open when the earlier lineage was retired and ${given.length ? "is answered more than once" : "is not answered"}: give \`carried\` one { item, stands, evidence } for it${given.length ? "" : ", saying whether it still stands on the spine as it is now"}`); continue; }
+    const [answer] = given;
+    if (answer.stands === true && !ids.includes(answer.finding)) errors.push(`carried: ${item.id} still stands, so it is an item of this pass: file it as a finding, a missing analysis or a cut and name that item's id in \`finding\`${answer.finding ? ` (${answer.finding} is not an item of this critique)` : ""}`);
+  }
+  const strangers = answers.map((a) => a?.item).filter((id) => !carried.some((item) => item.id === id));
+  if (strangers.length) errors.push(`carried: ${strangers.join(", ")} ${strangers.length === 1 ? "is" : "are"} not among the carried items (${carried.map((item) => item.id).join(", ")})`);
+  return errors;
+}
+/** The schema of a first pass's `carried`, for the loops' schemas. */
+export const CARRIED_SCHEMA = { type: "array", items: { type: "object", additionalProperties: false, required: ["item", "stands", "evidence"],
+  properties: { item: { type: "string" }, stands: { type: "boolean" }, evidence: { type: "string", minLength: 20 }, finding: { type: "string" } } } };
 
 const PASS_FILE = /^pass-(\d+)\.json$/;
 

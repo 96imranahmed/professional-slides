@@ -5,6 +5,7 @@ import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 import { lineBox, accentRuns } from "./text-layout.mjs";
 import { timePositions } from "./time-axis.mjs";
+import { citationRoomOf } from "./derive-content.mjs";
 
 export const DESIGN_SYSTEM_VERSION = "2.0.0";
 export const SCENE_SCHEMA = "professional-slides.scene/v1";
@@ -1169,13 +1170,35 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
 }
 
 /**
+ * One slide spec compiled to its scene slide, with the citation the runtime
+ * derived fitted to its footer. The footer as drawn counts toward the note bar
+ * (`NOTE_HEAVY`), and a citation written from registry keys is the runtime's
+ * to fit under it: once the page is composed its words are counted
+ * (derive-content.mjs citationRoomOf), and a derived citation with more words
+ * than the footer has room for is set again in the fullest form that has
+ * (page-template.mjs). The room is recounted after each fit, since a shorter
+ * footer can move the body; a fit that finds no more room stops.
+ */
+function compileSlide(slideSpec, slideIndex, context) {
+  let compiled = compileSlideAsWritten(slideSpec, slideIndex, context);
+  let room = Infinity;
+  for (let fit = 0; fit < 3; fit += 1) {
+    const next = citationRoomOf(compiled);
+    if (next === null || next >= room) break;
+    room = next;
+    compiled = compileSlideAsWritten({ ...slideSpec, chrome: { ...slideSpec.chrome, sourceWordsMax: room } }, slideIndex, context);
+  }
+  return compiled;
+}
+
+/**
  * One slide spec compiled to its scene slide, under its density's tokens: the
  * chrome, then every placement the layout resolves - a section places its
  * children as it renders, so the list grows while it is walked - then the
  * nodes' tokens resolved and the scene's invariants asserted. A slide found in
  * `slideCache` is returned as a copy.
  */
-function compileSlide(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }) {
+function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }) {
   const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
   if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
   const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
@@ -1254,7 +1277,10 @@ function compileSlide(slideSpec, slideIndex, { registry, designTokens, typograph
   }
   assertStyleProvenance(nodes);
   assertSceneBounds(nodes);
-  const compiled = { id: slideId, notes: slideSpec.notes || "", nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+  // A derived citation the footer set in a shorter form is kept whole in the
+  // speaker notes, so no source a page rests on is lost to the fit.
+  const fullCitation = nodes.find((node) => node.data?.fullCitation)?.data.fullCitation;
+  const compiled = { id: slideId, notes: [slideSpec.notes, fullCitation].filter(Boolean).join("\n\n"), nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
   if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
   slideCache?.set(cacheKey,structuredClone(compiled));
   return compiled;

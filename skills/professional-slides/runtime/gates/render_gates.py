@@ -881,7 +881,11 @@ def footer_share(slide):
     the page the words sit in, and the plan counts a numbered footnote as
     qualification in the body - measured that way a page could never be
     footer-heavy on the strength of its footnotes, which is the case the gate
-    is for. The ratio is None on a page with no words in either band."""
+    is for. The footer is the footer as drawn, whoever wrote it: a citation
+    the runtime derived from the source registry counts like one the author
+    typed, and the runtime fits its own line to the room this bar leaves
+    (core.mjs compileSlide, derive-content.mjs citationRoomOf). The ratio is
+    None on a page with no words in either band."""
     body, footer, _band = body_bands(slide)
     if not footer and not body:
         return body, footer, None

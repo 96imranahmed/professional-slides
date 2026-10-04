@@ -69,7 +69,7 @@ The skill's targets for an analytic page (the numbers live in `runtime/weight.js
 | | Typical well-made page | Write to |
 | --- | --- | --- |
 | Text blocks per page | median 4 (quartiles 2 and 5) | two or three, more when the evidence has that many findings |
-| Words per block | median 56 (quartiles 41 and 86) | 41-86, the band `TEXT_FRAGMENTED` holds the prose pages' median to |
+| Words per block | median 56 (quartiles 41 and 86) | 41-86, the band `TEXT_FRAGMENTED` holds the prose pages' median to; a chart's heading and label rows count as blocks, as they did on the reference pages |
 | Longest block on a page | median 128, third quartile 152 | never past 152 |
 | Pages with a single block | about one in seven | rare, and only when one finding is the whole page |
 

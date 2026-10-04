@@ -10,15 +10,16 @@ findings list, and appends deck findings (slide None).
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter
 from pathlib import Path
 from typing import NamedTuple, Optional
 
 from gate_config import (
-    CONTRACT, DECK_HABIT, DECK_LENGTH, REFERENCE_JUDGED, REFERENCE_PAGE, REFERENCE_PAGE_WORDS,
+    CONTRACT, DECK_HABIT, DECK_LENGTH, RAIL_AS_CLOSE, REFERENCE_JUDGED, REFERENCE_PAGE, REFERENCE_PAGE_WORDS,
     SOURCE_ROLES, THRESHOLDS, all_components, finding, is_exhibit, page_family, photo_nodes,
-    source_text, top_level_instances,
+    source_text, standing, top_level_instances,
 )
 from render_gates import page_text_words, thin_remedy
 from semantic_gates import COMMENTARY_ROLES
@@ -29,11 +30,14 @@ def gate_image_budget(slides, analytical, findings):
     not argue. A deck where most pages are pictures has stopped making a case,
     and a run of them reads as a gallery."""
     total = len(analytical)
-    if total < 6:
-        return
     flags = [bool(photo_nodes(slides[index])) for index in analytical]
     pages = [analytical[i] + 1 for i, has in enumerate(flags) if has]
-    share = len(pages) / float(total)
+    share = len(pages) / float(total) if total else 0.0
+    standing("IMAGE_BUDGET", "pages carrying a photograph", round(share, 4), THRESHOLDS["image_pages_max"], "max",
+             count=len(pages), of=total, applies=total >= 6, pages=pages)
+    if total < 6:
+        standing("IMAGE_RUN", "consecutive pages carrying photographs", 0, THRESHOLDS["image_run_max"], "max", unit="pages", applies=False)
+        return
     if share > THRESHOLDS["image_pages_max"]:
         findings.append(finding(
             None, "IMAGE_BUDGET", {"imagePages": pages, "share": round(share, 4)},
@@ -52,6 +56,7 @@ def gate_image_budget(slides, analytical, findings):
                 longest, best = run, list(member)
         else:
             run, member = 0, []
+    standing("IMAGE_RUN", "consecutive pages carrying photographs", longest, THRESHOLDS["image_run_max"], "max", unit="pages", pages=best)
     if longest > THRESHOLDS["image_run_max"]:
         findings.append(finding(
             None, "IMAGE_RUN", {"slides": best, "run": longest}, THRESHOLDS["image_run_max"],
@@ -336,6 +341,7 @@ def gate_deck_craft(slides, analytical, findings):
     """
     craft = CONTRACT["plan"]["craft"]
     if len(analytical) < craft["from"]["min"]:
+        standing("DECK_CRAFT", "craft rates across the analytical pages", len(analytical), craft["from"]["min"], "min", unit="pages", applies=False)
         return
     rates = craft_rates([slides[i] for i in analytical])
     measured = {"highlight": round(rates.highlighted, 3), "source": round(rates.sourced, 3),
@@ -349,6 +355,16 @@ def gate_deck_craft(slides, analytical, findings):
             "tablesTreated": craft["tableTreated"]["min"], "chartsAnnotated": craft["chartAnnotated"]["min"],
             "commonestTableDevice": craft["tableDevice"]["shareMax"],
             "drawnBridges": craft["drawnBridge"]["shareMax"]}
+    # Each rate against its own bar: a rate read from too few tables or joined
+    # pages (tableDevice.from, drawnBridge.from) is not yet held.
+    held = {"commonestTableDevice": len(rates.tables) >= craft["tableDevice"]["from"], "drawnBridges": len(rates.joined) >= craft["drawnBridge"]["from"]}
+    names = {"highlight": "pages emphasising a phrase", "source": "pages carrying a source line", "marksPerPage": "drawn marks a page",
+             "tablesTreated": "tables carrying a treatment", "chartsAnnotated": "charts marking their finding",
+             "commonestTableDevice": "tables on the commonest device", "drawnBridges": "exhibit-and-commentary pages drawing a gutter mark"}
+    for key, value in measured.items():
+        if value is not None:
+            standing("DECK_CRAFT", names[key], value, want[key], "max" if key in ("commonestTableDevice", "drawnBridges") else "min",
+                     unit="marks" if key == "marksPerPage" else "share", applies=held.get(key, True), key=key)
     short = craft_shortfalls(rates, want, craft)
     if not short:
         return
@@ -394,14 +410,13 @@ def gate_deck_vocabulary(slides, analytical, findings):
     page by page and reads as one page reprinted.
     """
     rule = CONTRACT["plan"]["craft"]["vocabulary"]
-    if len(analytical) < rule["from"]:
-        return
     pages = [slides[index] for index in analytical]
     present = {n.get("role") or "" for slide in pages for n in slide.get("nodes", [])}
     used = sorted(name for name, pattern in DEVICE_FAMILIES.items()
                   if any(pattern.match(role) for role in present))
     absent = sorted(set(DEVICE_FAMILIES) - set(used))
-    if len(used) >= rule["familiesMin"]:
+    standing("DECK_VOCABULARY", "device families drawn", len(used), rule["familiesMin"], "min", unit="families", applies=len(analytical) >= rule["from"])
+    if len(analytical) < rule["from"] or len(used) >= rule["familiesMin"]:
         return
     findings.append(finding(
         None, "DECK_VOCABULARY",
@@ -422,11 +437,15 @@ def gate_evidence_mix(slides, analytical, findings):
     measurement, and a deck of any length should be built from more than one
     kind of page."""
     total = len(analytical)
-    if total < DECK_LENGTH["evidenceMix"]:
-        return
     families = [page_family(slides[index]) for index in analytical]
     data = sum(1 for family in families if family in ("chart", "table", "metrics"))
-    share = data / float(total)
+    share = data / float(total) if total else 0.0
+    standing("EVIDENCE_MIX", "pages carrying a chart, a table or measured tiles", round(share, 4), THRESHOLDS["data_pages_min"], "min",
+             count=data, of=total, applies=total >= DECK_LENGTH["evidenceMix"])
+    standing("PAGE_VARIETY", "page families", len(set(families)), THRESHOLDS["families_min"], "min", unit="families",
+             applies=total >= DECK_LENGTH["pageVariety"])
+    if total < DECK_LENGTH["evidenceMix"]:
+        return
     if share < THRESHOLDS["data_pages_min"]:
         findings.append(finding(
             None, "EVIDENCE_MIX",
@@ -451,6 +470,7 @@ def gate_deck_structure(slides, analytical, findings):
     """NO_SECTIONS, deck level. Past a dozen pages the reader needs to know where
     they are: sections, and a tracker that says which one is open."""
     if len(analytical) < THRESHOLDS["sections_from"]:
+        standing("NO_SECTIONS", "sections and a tracker", len(analytical), THRESHOLDS["sections_from"], "min", unit="pages", applies=False)
         return
     components = {component for slide in slides for component in all_components(slide)}
     roles = {str(node.get("role")) for slide in slides for node in slide.get("nodes", [])}
@@ -484,6 +504,7 @@ def gate_deck_structure(slides, analytical, findings):
     tracker = bool(components & {"agenda", "tracker-page"}) or bool(roles & {
         "tracker-label", "tracker-pill-label", "tracker-compact-label", "tracker-compact-marker-label",
     })
+    standing("NO_SECTIONS", "sections and a tracker", int(bool(sections and tracker)), 1, "min", unit="present")
     if sections and tracker:
         return
     findings.append(finding(
@@ -506,12 +527,13 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
     """
     # Density does not exempt a long analytical deck from its opening answer.
     if len(analytical) < THRESHOLDS["front_matter_from"]:
+        for code, what in (("NO_CONTENTS", "a contents page"), ("NO_SUMMARY", "an opening executive summary")):
+            standing(code, what, len(analytical), THRESHOLDS["front_matter_from"], "min", unit="pages", applies=False)
         return
     kinds = [str(s.get("kind") or "") for s in slides]
-    if "divider" in kinds and not any(
-        any(str(c.get("component") or "") == "agenda" for c in s.get("componentInstances", []))
-        for s in slides
-    ):
+    contents = any(any(str(c.get("component") or "") == "agenda" for c in s.get("componentInstances", [])) for s in slides)
+    standing("NO_CONTENTS", "a contents page", int(contents or "divider" not in kinds), 1, "min", unit="present")
+    if "divider" in kinds and not contents:
         findings.append(finding(
             None, "NO_CONTENTS", 0, "a contents page",
             "The deck has sections and never says what they are. Set "
@@ -522,7 +544,9 @@ def gate_deck_front_matter(slides, analytical, findings, fill):
     first = slides[analytical[0]] if analytical else None
     summary_indices = [i for i, slide in enumerate(slides) if slide.get("role") == "executive-summary"]
     first_section = next((i for i, slide in enumerate(slides) if slide.get("kind") == "divider"), len(slides))
-    if first is not None and (first.get("role") != "executive-summary" or not summary_indices or summary_indices[0] > first_section):
+    opens = first is None or not (first.get("role") != "executive-summary" or not summary_indices or summary_indices[0] > first_section)
+    standing("NO_SUMMARY", "an opening executive summary", int(opens), 1, "min", unit="present")
+    if not opens:
         findings.append(finding(None, "NO_SUMMARY", len(summary_indices), "an opening executive summary",
             'Put the answer, its proof, consequence and action before the first section; declare role: "executive-summary". Metrics are optional and do not establish the role.'))
 
@@ -534,16 +558,23 @@ def gate_deck_shape(slides, analytical, findings, fill):
     pages all weigh the same has not decided which pages matter - and the way to
     fix it is a page that carries the detail (a findings matrix, a deep measure
     table), not a sentence added to every page."""
-    if fill == "airy" or len(analytical) < THRESHOLDS["deck_shape_from"]:
-        return
-    counts = sorted(page_text_words(slides[index]) for index in analytical)
+    words = {index + 1: page_text_words(slides[index]) for index in analytical}
+    counts = sorted(words.values())
     if not counts:
         return
     middle = len(counts) // 2
     median = counts[middle] if len(counts) % 2 else (counts[middle - 1] + counts[middle]) / 2
     top = counts[int(round(0.8 * (len(counts) - 1)))]
     heavy = sum(1 for value in counts if value >= REFERENCE_PAGE_WORDS["p75"])
-    if heavy or (median and top / median >= 1.35):
+    # One heavy page settles it; without one the spread has to: p80 a third above the median.
+    held = fill != "airy" and len(analytical) >= THRESHOLDS["deck_shape_from"]
+    if heavy:
+        standing("DECK_FLAT", "pages at {}+ words of page text".format(REFERENCE_PAGE_WORDS["p75"]), heavy, 1, "min", unit="pages", applies=held,
+                 pages=[n for n, count in words.items() if count >= REFERENCE_PAGE_WORDS["p75"]])
+    else:
+        standing("DECK_FLAT", "heaviest fifth's words over the median page's (no page at {}+ words)".format(REFERENCE_PAGE_WORDS["p75"]),
+                 round(top / median, 2) if median else 0, 1.35, "min", unit="ratio", applies=held)
+    if not held or heavy or (median and top / median >= 1.35):
         return
     findings.append(finding(
         None, "DECK_FLAT",
@@ -645,6 +676,13 @@ def page_architecture(slide):
     Two/three commentary columns, cards/prose, and an optional closing insight
     are the same architecture. Relative geometry survives subtitle removal and
     density changes, where absolute y bands would not.
+
+    Commentary is developed text - a paragraph, a bullet list, cards, a
+    callout block. One claim set beside or under the exhibit is the page's
+    close: a rail's side statement, like a so-what bar or a takeaway, is not
+    among the commentary components, so a page with a rail and nothing else
+    is evidence-only here. VARIETY_COLUMN (variety_gates.mjs) counts the same
+    page as a column page, since it reads how the page is drawn.
     """
     instances = slide.get("componentInstances", [])
     evidence = [c for c in instances if str(c.get("component", "")).startswith("chart.")
@@ -735,7 +773,7 @@ def gate_column_monotony(slides, content_indexes, findings):
     # what this gate is about; THIN_COLUMN and POINT_DEPTH cover thin columns.
     marked = {"numbered", "icon", "lettered"}
     run, start, previous = 0, None, None
-    worst = None
+    worst, longest = None, 0
     for index in content_indexes:
         shape = column_shape(slides[index])
         if shape not in marked:
@@ -745,8 +783,11 @@ def gate_column_monotony(slides, content_indexes, findings):
         else:
             run, start = 1, index
         previous = shape
+        longest = max(longest, run if shape else 0)
         if shape and run >= THRESHOLDS["column_run_max"] and (worst is None or run > worst[0]):
             worst = (run, shape, start)
+    standing("COLUMN_MONOTONY", "consecutive pages marking their commentary column one way", longest,
+             THRESHOLDS["column_run_max"] - 1, "max", unit="pages")
     if not worst:
         return
     run, shape, start = worst
@@ -762,6 +803,23 @@ def gate_column_monotony(slides, content_indexes, findings):
     ))
 
 
+def shape_variety(shapes):
+    """`(per_ten, commonest, count)` for a deck's page architectures in page
+    order: the distinct architectures per ten pages and the commonest one.
+    Local variety is measured in ten-page windows, so a long deck is not held
+    to more architectures than a ten-page deck with the same repertoire. The
+    author's plan reads the same figures off declared pages (deck-structure.mjs
+    shapeVariety); a test holds the two to one answer."""
+    counts = {}
+    for shape in shapes:
+        counts[shape] = counts.get(shape, 0) + 1
+    window = min(10, len(shapes))
+    per_ten = sum(len(set(shapes[i:i + window])) * 10.0 / window
+                  for i in range(len(shapes) - window + 1)) / (len(shapes) - window + 1)
+    top_shape, top_count = max(counts.items(), key=lambda kv: kv[1])
+    return per_ten, top_shape, top_count
+
+
 def gate_page_shape_flat(slides, content_indexes, findings, fill):
     """PAGE_SHAPE_FLAT, deck level.
 
@@ -775,19 +833,17 @@ def gate_page_shape_flat(slides, content_indexes, findings, fill):
         return
     shapes = [page_architecture(slides[i]) for i in content_indexes]
     shapes = [s for s in shapes if s]
-    if len(shapes) < THRESHOLDS["shape_variety_from"]:
+    held = len(shapes) >= THRESHOLDS["shape_variety_from"]
+    if not shapes:
         return
-    counts = {}
-    for shape in shapes:
-        counts[shape] = counts.get(shape, 0) + 1
-    # Measure local variety in ten-page windows, so a long deck is not held to
-    # more architectures than a ten-page deck with the same repertoire.
-    window = min(10, len(shapes))
-    per_ten = sum(len(set(shapes[i:i + window])) * 10.0 / window
-                  for i in range(len(shapes) - window + 1)) / (len(shapes) - window + 1)
-    top_shape, top_count = max(counts.items(), key=lambda kv: kv[1])
+    per_ten, top_shape, top_count = shape_variety(shapes)
     top_share = top_count / float(len(shapes))
-    if per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]:
+    standing("PAGE_SHAPE_FLAT", "pages on the commonest architecture ({})".format(top_shape), round(top_share, 4), THRESHOLDS["shape_share_max"], "max",
+             count=top_count, of=len(shapes), applies=held, key="share",
+             pages=[i + 1 for i in content_indexes if page_architecture(slides[i]) == top_shape], note=RAIL_AS_CLOSE)
+    standing("PAGE_SHAPE_FLAT", "distinct architectures per ten pages", round(per_ten, 1), THRESHOLDS["shapes_per_ten_min"], "min",
+             unit="per ten", applies=held, key="perTen")
+    if not held or (per_ten >= THRESHOLDS["shapes_per_ten_min"] and top_share <= THRESHOLDS["shape_share_max"]):
         return
     constrained = [i + 1 for i in content_indexes if shape_constrained(slides[i])]
     remedy = (
@@ -817,6 +873,10 @@ def gate_layout_monotony(slides, content_indexes, findings):
             continue
         counts.setdefault(signature, []).append(index + 1)
     total = sum(len(v) for v in counts.values())
+    if total:
+        top = max(counts.values(), key=len)
+        standing("LAYOUT_MONOTONY", "pages on the commonest layout signature", round(len(top) / float(total), 4), THRESHOLDS["monotony_max"], "max",
+                 count=len(top), of=total, applies=total >= 3, pages=top)
     if total < 3:
         return
     for signature, members in sorted(counts.items(), key=lambda kv: -len(kv[1])):
@@ -846,6 +906,9 @@ def gate_deck_empty_pages(content_indexes, findings, rendered, counted=None):
     code, codes = DECK_EMPTY[bool(rendered)]
     pages = len(content_indexes)
     flagged = sorted({f["slide"] for f in (findings if counted is None else counted) if f.get("code") in codes and f.get("slide")})
+    # The habit blocks at a share of the pages and at least `pages_min` of them: the bar, in pages, is the larger.
+    standing(code, "pages thin or leaving a band of their body empty", len(flagged), max(DECK_HABIT["pages_min"], math.ceil(pages * DECK_HABIT["share"])) - 1,
+             "max", unit="pages", applies=pages >= DECK_HABIT["from"], pages=flagged)
     if pages < DECK_HABIT["from"] or len(flagged) < DECK_HABIT["pages_min"] or len(flagged) / pages < DECK_HABIT["share"]:
         return
     findings.append(finding(

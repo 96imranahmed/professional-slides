@@ -89,16 +89,33 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result['accepted'])
 
     def test_roadmap_bands_contain_and_do_not_overpaint_complete_labels(self):
+        # Stages that carry their period are set as dated stages
+        # (schedule-stages.mjs): each label inside its phase block, painted
+        # over it, and the period drawn whole - in columns in a shallow frame
+        # and in rows in a tall one. Bare labels keep the strip and its bands.
         result = run_node("""
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const items=[{label:'Diagnose',period:'Five months'},{label:'Select',period:'1–2 months'},{label:'Design',period:'3–6 months'},{label:'Execute',period:'24–36 months'}];
-const {nodes}=REGISTRY.get('roadmap').render({id:'stages',frame:{x:0,y:0,width:1160,height:215},props:{items,active:1}});
-const labels=nodes.filter(n=>n.role==='process-label'),bands=nodes.filter(n=>n.role==='roadmap-phase');
-console.log(JSON.stringify({text:labels.map(n=>n.text),contained:labels.every((n,i)=>n.frame.x>=bands[i].frame.x && n.frame.y>=bands[i].frame.y && n.frame.x+n.frame.width<=bands[i].frame.x+bands[i].frame.width && n.frame.y+n.frame.height<=bands[i].frame.y+bands[i].frame.height),paintOrder:labels.every((n,i)=>nodes.indexOf(n)>nodes.indexOf(bands[i]))}));
+const inside=(n,b)=>n.frame.x>=b.frame.x && n.frame.y>=b.frame.y && n.frame.x+n.frame.width<=b.frame.x+b.frame.width+0.01 && n.frame.y+n.frame.height<=b.frame.y+b.frame.height+0.01;
+const drawn=(frame,props)=>{const {nodes}=REGISTRY.get('roadmap').render({id:'stages',frame,props});
+  const labels=nodes.filter(n=>n.role==='roadmap-label'),blocks=nodes.filter(n=>n.role==='roadmap-phase-surface'),whens=nodes.filter(n=>n.role==='roadmap-when');
+  return {labels:labels.map(n=>n.text),periods:whens.map(n=>n.text),blocks:blocks.length,contained:labels.every((n,i)=>inside(n,blocks[i])),paintOrder:labels.every((n,i)=>nodes.indexOf(n)>nodes.indexOf(blocks[i])),
+    onFrame:nodes.every(n=>!n.frame||n.frame.y+(n.frame.height||0)<=frame.y+frame.height+0.01)};};
+const strip=REGISTRY.get('roadmap').render({id:'strip',frame:{x:0,y:0,width:1160,height:215},props:{items:items.map(i=>i.label),active:1}}).nodes;
+const stripLabels=strip.filter(n=>n.role==='process-label'),bands=strip.filter(n=>n.role==='roadmap-phase');
+console.log(JSON.stringify({across:drawn({x:0,y:0,width:1160,height:120},{items,active:1}),down:drawn({x:0,y:0,width:1160,height:400},{items,active:1}),
+  strip:{labels:stripLabels.length,contained:stripLabels.every((n,i)=>inside(n,bands[i])),paintOrder:stripLabels.every((n,i)=>strip.indexOf(n)>strip.indexOf(bands[i]))}}));
 """)
-        self.assertTrue(result["contained"])
-        self.assertTrue(result["paintOrder"])
-        self.assertIn("24–36 months", result["text"][3])
+        for name in ("across", "down"):
+            with self.subTest(arrangement=name):
+                drawn = result[name]
+                self.assertEqual(drawn["labels"], ["Diagnose", "Select", "Design", "Execute"])
+                self.assertEqual(drawn["blocks"], 4)
+                self.assertTrue(drawn["contained"])
+                self.assertTrue(drawn["paintOrder"])
+                self.assertTrue(drawn["onFrame"])
+                self.assertIn("24–36 months", drawn["periods"][3])
+        self.assertEqual(result["strip"], {"labels": 4, "contained": True, "paintOrder": True})
 
     def test_process_detail_is_visible_and_overflow_rejects(self):
         result = run_node("""

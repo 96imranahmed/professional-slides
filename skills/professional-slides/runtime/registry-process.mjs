@@ -8,6 +8,7 @@ import { routeConnector } from "./routing.mjs";
 import { renderPhaseWorkstreams, measurePhaseWorkstreams, PHASE_WORKSTREAM_TOKENS, PHASE_WORKSTREAM_VARIANTS } from "./phase-workstreams.mjs";
 import { renderPhaseHierarchy, QUALITATIVE_TOPOLOGY_TOKENS, PHASE_HIERARCHY_SAMPLE } from "./qualitative-topology.mjs";
 import { timeGrid, datedLanes, SCHEDULE_TOKENS, SCHEDULE_VARIANTS } from "./schedules.mjs";
+import { detailedStages, stagesLayout, stagesNodes, STAGE_TOKENS } from "./schedule-stages.mjs";
 import { FONT, COMPACT, INK, SECONDARY, PRIMARY, SURFACE, MUTED_SURFACE, RULE, WHITE, HAIRLINE, STANDARD, SMALL_RADIUS, LABEL, textStyle,
   boxStyle, openLine, PRIMARY_TINT, component, simpleList, refineVariantAxes } from "./registry-shared.mjs";
 
@@ -377,9 +378,13 @@ function defineRoadmap() {
     ],
     preferredSize: { width: 980, height: 360 },
     sample: { items: ["(Insert stage 1)", "(Insert stage 2)", "(Insert stage 3)", "(Insert stage 4)"], active: 1 },
+    // Stages that carry their period or their detail are set at reading size
+    // and sized to their content (schedule-stages.mjs); a row of bare labels
+    // stays the strip it is.
     render: ({ id, frame, props }) => ({
       nodes: props.variant === "wave-columns"
         ? waveRoadmapNodes({ id, frame, props })
+        : detailedStages(props.items) ? stagesNodes({ id, frame, props, roadmap: true })
         : processNodes({
           id,
           frame,
@@ -401,8 +406,11 @@ function defineTimeline() {
     ],
     preferredSize: { width: 920, height: 250 },
     sample: { items: ["Q1", "Q2", "Q3", "Q4"], active: 2 },
+    // Dated stages are set at reading size and sized to their content
+    // (schedule-stages.mjs); bare labels stay a numbered strip.
     render: ({ id, frame, props }) => ({
-      nodes: processNodes({ id, frame, props: { ...props, items: props.items.map((label) => ({ label })) } })
+      nodes: detailedStages(props.items) ? stagesNodes({ id, frame, props })
+        : processNodes({ id, frame, props: { ...props, items: props.items.map((label) => (typeof label === "string" ? { label } : label)) } })
     })
   });
 }
@@ -491,12 +499,16 @@ export function registerProcessFamily(registry) {
       const render = definition.render;
       const schedule = input => definition.resolveVariant(input.props) === "phase-hierarchy" ? renderPhaseHierarchy(input) : definition.resolveVariant(input.props) === "time-grid" ? timeGrid(input) : datedLanes(input);
       definition.render = input => definition.resolveVariant(input.props) === "process" ? render(input) : schedule(input);
-      definition.measureIntrinsic = input => definition.resolveVariant(input.props) === "process" ? null : schedule({ ...input, id: input.id ?? "measure", frame: { ...input.frame, height: input.frame.height ?? Number.MAX_SAFE_INTEGER } });
+      const staged = input => definition.resolveVariant(input.props) === "process" && detailedStages(input.props.items);
+      definition.tokens = [...new Set([...definition.tokens, ...STAGE_TOKENS])];
+      definition.measureIntrinsic = input => staged(input) ? { height: stagesLayout({ ...input.frame, height: undefined }, input.props, { id: input.id }).natural }
+        : definition.resolveVariant(input.props) === "process" ? null : schedule({ ...input, id: input.id ?? "measure", frame: { ...input.frame, height: input.frame.height ?? Number.MAX_SAFE_INTEGER } });
       // A dated schedule is drawn at its natural height from the top of its
       // frame, so that height is its ceiling - any frame beyond it would be a
       // gap before the commentary; the process variant keeps its proportional
       // ceiling.
-      definition.measureCeiling = input => definition.resolveVariant(input.props) === "process"
+      definition.measureCeiling = input => staged(input) ? stagesLayout(input.frame, input.props).ceiling
+        : definition.resolveVariant(input.props) === "process"
         ? processCeiling(input.frame, input.props, false, 250)
         : schedule({ ...input, id: "ceiling", frame: { ...input.frame, height: Number.MAX_SAFE_INTEGER } }).height;
     }
@@ -511,8 +523,12 @@ export function registerProcessFamily(registry) {
       definition.resolveVariant = props => props?.variant === "phase-workstreams" ? "phase-workstreams" : priorResolve(props);
       const priorRender = definition.render;
       definition.render = input => definition.resolveVariant(input.props) === "phase-workstreams" ? renderPhaseWorkstreams(input) : priorRender(input);
-      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? { height: waveRoadmapLayout({ ...frame, height: undefined }, props).naturalHeight } : null;
-      definition.measureCeiling = ({ frame, props }) => definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout({ ...frame, height: undefined }, props).ceiling : definition.resolveVariant(props) === "process" ? processCeiling(frame, props, true) : null;
+      const staged = (props) => definition.resolveVariant(props) === "process" && detailedStages(props.items);
+      definition.tokens = [...new Set([...definition.tokens, ...STAGE_TOKENS])];
+      definition.measureIntrinsic = ({ frame, props }) => definition.resolveVariant(props) === "phase-workstreams" ? measurePhaseWorkstreams({frame,props}) : definition.resolveVariant(props) === "wave-columns" ? { height: waveRoadmapLayout({ ...frame, height: undefined }, props).naturalHeight }
+        : staged(props) ? { height: stagesLayout({ ...frame, height: undefined }, props, { roadmap: true }).natural } : null;
+      definition.measureCeiling = ({ frame, props }) => definition.resolveVariant(props) === "wave-columns" ? waveRoadmapLayout({ ...frame, height: undefined }, props).ceiling
+        : staged(props) ? stagesLayout(frame, props, { roadmap: true }).ceiling : definition.resolveVariant(props) === "process" ? processCeiling(frame, props, true) : null;
     }
     registry.set(definition.id, definition);
   }

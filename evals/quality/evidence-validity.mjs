@@ -28,9 +28,28 @@
  * a period or a number changed or rounded away, a copy listed beside the
  * claim's own measure, a dependency left undeclared, a citation
  * dropped, a context exhibit unexplained, and a relation split across panels.
+ * Then the numbers outside the exhibits: one typed cell of a table changed and
+ * one number in a sentence changed, which the trace of typed numbers reports
+ * (an advisory, `NUMBER_UNTRACED`); and the references a page writes its
+ * numbers by: a bound exhibit naming a measure the log does not hold, and a
+ * token whose measure comes from an insight the page does not rest on.
+ *
+ * A defect whose finding is an advisory - reported to the author, blocking
+ * nothing - is labelled "(advisory)" in the table: it is caught, not refused.
+ *
+ * Known limits. A changed number is caught when it is no value of any measure
+ * the page rests on, and only where it is written as a measurement. Three
+ * defects the trace does not claim to catch are planted the same way and
+ * reported beside the others, caught over planted, so the measure says what it
+ * leaves out: a bare whole number in a sentence changed ("8 branches" is a
+ * count or a name as often as a measurement, and is not traced), a year
+ * changed (a year is a period label), and a number changed into another
+ * recorded value of the measure it stated (the trace asks whether a number was
+ * recorded, not which record the sentence meant). They do not count towards
+ * acceptance.
  *
  * Exit 0 when every seeded defect was caught on every page it was planted on
- * and no clean deck raised a finding; 2 otherwise.
+ * and no clean deck raised a finding, advisories included; 2 otherwise.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -40,6 +59,10 @@ import { compileDeck, readInsights } from "../../skills/professional-slides/runt
 import { alternativesOf } from "../../skills/professional-slides/runtime/analysis.mjs";
 import { dependencyFindings } from "../../skills/professional-slides/runtime/gates/dependency_gates.mjs";
 import { plottedValues } from "../../skills/professional-slides/runtime/evidence.mjs";
+import { readPagesFileSync } from "../../skills/professional-slides/runtime/pages-file.mjs";
+import { decimalsNeeded, printedNumbers, states } from "../../skills/professional-slides/runtime/printed-numbers.mjs";
+import { isPercentUnit, measureRegistry, valuesOf } from "../../skills/professional-slides/runtime/measures.mjs";
+import { withoutTokens } from "../../skills/professional-slides/runtime/bind.mjs";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "evidence");
 
@@ -142,7 +165,8 @@ export const SEEDED = Object.freeze({
     plant(page) { const ex = exhibitsOf(page).find((e) => e.basis?.measures?.length); if (!ex) return false; ex.basis.measures = ["no-such-insight/no-such-measure"]; return true; },
   },
   "insight not named in evidence": {
-    expect: ["BASIS_UNKNOWN"],
+    // A page that prints the insight's numbers through tokens is refused when they are bound, before its bases are read.
+    expect: ["BASIS_UNKNOWN", "BINDING_UNRESOLVED"],
     plant(page) {
       const ex = exhibitsOf(page).find((e) => e.basis?.measures?.length);
       if (!ex || !(page.evidence || []).length) return false;
@@ -175,15 +199,8 @@ export const SEEDED = Object.freeze({
     expect: ["RELATION_SPLIT"],
     plant(page) { if (page.settles?.relation?.kind !== "separate") return false; page.settles.relation = { kind: "gap" }; return true; },
   },
-});
-
-/**
- * Defects the contract is known NOT to read, planted the same way and reported
- * beside the others so the measure says what it leaves out. They do not count
- * towards acceptance; one that starts being caught is reported as such.
- */
-export const KNOWN_LIMITS = Object.freeze({
-  "one cell of a table changed": {
+  "one typed cell of a table changed": {
+    expect: ["NUMBER_UNTRACED"],
     plant(page) {
       const table = exhibitsOf(page).find((e) => e.basis && Array.isArray(e.rows));
       const row = table?.rows.find((r) => Array.isArray(r) && r.some((cell) => /^\d/.test(String(cell))));
@@ -193,12 +210,92 @@ export const KNOWN_LIMITS = Object.freeze({
       return true;
     },
   },
-  "a number in a sentence changed": {
+  "a typed number in a sentence changed": {
+    // The first number the page's title, closing line or commentary writes as a measurement - "57%", "12.2 minutes", "41 million" - moved by 37.
+    expect: ["NUMBER_UNTRACED"],
     plant(page) {
-      const key = ["bar", "takeaway", "title"].find((k) => /\d/.test(String(page[k] ?? ""))) ?? (Array.isArray(page.points) && page.points.some((pt) => /\d/.test(String(pt))) ? "points" : null);
-      if (!key) return false;
-      const swap = (text) => String(text).replace(/\d+/, (n) => String(Number(n) + 37));
-      if (key === "points") { const i = page.points.findIndex((pt) => /\d/.test(String(pt))); page.points[i] = swap(page.points[i]); } else page[key] = swap(page[key]);
+      const typed = typedNumber((number) => number.kind === "measure");
+      const sentence = sentenceOf(page, typed);
+      if (!sentence) return false;
+      const number = typed(sentence.get());
+      sentence.set(digitsSwapped(sentence.get(), number, (number.n + 37).toFixed(number.decimals)));
+      return true;
+    },
+  },
+  "bound exhibit names a measure the log does not hold": {
+    expect: ["BINDING_UNRESOLVED"],
+    plant(page) { const ex = exhibitsOf(page).find((e) => Array.isArray(e.series) && e.series.some((s) => s.measure)); if (!ex) return false; ex.series.find((s) => s.measure).measure = "no-such-insight/no-such-measure"; return true; },
+  },
+  "token of an insight the page does not rest on": {
+    expect: ["BINDING_UNRESOLVED"],
+    plant(page) {
+      const token = /\{\{\s*([^/{}]+)\//.exec(JSON.stringify(page));
+      if (!token || !(page.evidence || []).includes(token[1])) return false;
+      page.evidence = page.evidence.filter((id) => id !== token[1]);
+      return true;
+    },
+  },
+});
+
+// The sentences of a page a number is typed into: its closing line, its title, and its points.
+const sentenceOf = (page, has) => {
+  const key = ["bar", "takeaway", "title"].find((k) => typeof page[k] === "string" && has(page[k]));
+  if (key) return { get: () => page[key], set: (text) => { page[key] = text; } };
+  const at = Array.isArray(page.points) ? page.points.findIndex((pt) => typeof pt === "string" && has(pt)) : -1;
+  return at < 0 ? null : { get: () => page.points[at], set: (text) => { page.points[at] = text; } };
+};
+const typedNumber = (kind) => (text) => printedNumbers(withoutTokens(text)).find(kind);
+const digitsSwapped = (text, number, digits) => text.replace(number.shown, number.shown.replace(/\d[\d,]*(?:\.\d+)?/, digits));
+
+/**
+ * Defects the trace of typed numbers is known NOT to catch, planted the same
+ * way and reported beside the others so the measure says what it leaves out.
+ * `plant(page, doc, registry)` as above, `registry` the measures of the deck's
+ * insight log. They do not count towards acceptance; one that starts being
+ * caught shows in its count.
+ */
+export const KNOWN_LIMITS = Object.freeze({
+  "a bare whole number in a sentence changed": {
+    // "retains 15 points more" becomes "52 points more": a whole number with no mark of a measurement is not traced.
+    plant(page) {
+      const bare = typedNumber((number) => number.kind === "integer");
+      const sentence = sentenceOf(page, bare);
+      if (!sentence) return false;
+      const number = bare(sentence.get());
+      sentence.set(digitsSwapped(sentence.get(), number, String(number.n + 37)));
+      return true;
+    },
+  },
+  "a year changed": {
+    // "than in 2023" becomes "than in 2024": a year is read as a period label, not a number.
+    plant(page) {
+      const year = typedNumber((number) => number.kind === "period" && number.n >= 1900);
+      const sentence = sentenceOf(page, year);
+      if (!sentence) return false;
+      const number = year(sentence.get());
+      sentence.set(digitsSwapped(sentence.get(), number, String(number.n + 1)));
+      return true;
+    },
+  },
+  "a number changed into another value of the same measure": {
+    // The first measurement a sentence types that states a value of a measure the page rests on, replaced by that
+    // measure's value at another period or member: still a recorded number, of the wrong record.
+    plant(page, doc, registry) {
+      const rested = [...registry.values()].filter((m) => (page.evidence || []).includes(m.owner));
+      const swapFor = (number) => {
+        for (const m of rested) {
+          const values = valuesOf(m).filter((v) => typeof v === "number");
+          if (!values.some((v) => states(number, v, { unit: m.unit }))) continue;
+          const other = values.find((v) => !states(number, v, { unit: m.unit }) && Math.sign(v) >= 0);
+          if (other !== undefined) return Math.abs(other).toFixed(decimalsNeeded(other, { percent: isPercentUnit(m.unit) }));
+        }
+        return null;
+      };
+      const stated = typedNumber((number) => number.kind === "measure" && !number.scaled && swapFor(number) !== null);
+      const sentence = sentenceOf(page, stated);
+      if (!sentence) return false;
+      const number = stated(sentence.get());
+      sentence.set(digitsSwapped(sentence.get(), number, swapFor(number)));
       return true;
     },
   },
@@ -209,15 +306,19 @@ const decks = () => fs.readdirSync(FIXTURES).filter((f) => f.endsWith(".pages.js
 async function check(name, doc) {
   const insights = await readInsights(FIXTURES, name, { alternatives: alternativesOf(doc.deck) });
   const { compileErrors, spineFindings } = compileDeck(doc, { insights, partial: true });
-  return { compileErrors, spine: spineFindings.filter((f) => f.severity !== "advisory"), dependencies: dependencyFindings(doc, insights), analyses: insights.analysis?.results ?? [] };
+  return { compileErrors, spine: spineFindings.filter((f) => f.severity !== "advisory"), dependencies: dependencyFindings(doc, insights), analyses: insights.analysis?.results ?? [], registry: measureRegistry(insights) };
 }
 
-/** `{ clean, seeded, accepted }`: every finding on a clean deck, and each seeded defect's catches over its plantings. */
+/**
+ * `{ clean, seeded, limits, accepted }`: every finding on a clean deck, each
+ * seeded defect's catches over its plantings (`advisory` where what caught it
+ * blocks nothing), and the same count for each known limit.
+ */
 export async function measure() {
-  const clean = [], seeded = Object.fromEntries(Object.keys(SEEDED).map((name) => [name, { planted: 0, caught: 0, missed: [] }]));
+  const clean = [], seeded = Object.fromEntries(Object.keys(SEEDED).map((name) => [name, { planted: 0, caught: 0, advisory: false, missed: [] }]));
   const limits = Object.fromEntries(Object.keys(KNOWN_LIMITS).map((name) => [name, { planted: 0, caught: 0 }]));
   for (const name of decks()) {
-    const doc = JSON.parse(fs.readFileSync(path.join(FIXTURES, `${name}.pages.json`), "utf8"));
+    const doc = readPagesFileSync(path.join(FIXTURES, `${name}.pages.json`));
     const base = await check(name, doc);
     clean.push({ deck: name, pages: doc.pages.length, analyses: base.analyses.map((r) => `${r.id}:${r.status}`),
       findings: [...base.compileErrors.map((message) => `COMPILE ${message}`), ...base.spine.map((f) => `${f.code} ${f.repair}`), ...base.dependencies.map((f) => `${f.code} ${f.repair}`)] });
@@ -226,19 +327,19 @@ export async function measure() {
         const mutated = structuredClone(doc);
         if (!page.type || !plant(mutated.pages[index], mutated)) continue;
         seeded[defect].planted += 1;
-        const found = (await check(name, mutated)).dependencies.filter((f) => f.id === page.id).map((f) => f.code);
-        if (found.some((code) => expect.includes(code))) seeded[defect].caught += 1;
-        else seeded[defect].missed.push(`${name}/${page.id}: raised ${found.join(", ") || "nothing"}; expected ${expect.join(" or ")}`);
+        const found = (await check(name, mutated)).dependencies.filter((f) => f.id === page.id);
+        const hits = found.filter((f) => expect.includes(f.code));
+        if (hits.length) { seeded[defect].caught += 1; if (hits.every((f) => f.severity === "advisory")) seeded[defect].advisory = true; }
+        else seeded[defect].missed.push(`${name}/${page.id}: raised ${found.map((f) => f.code).join(", ") || "nothing"}; expected ${expect.join(" or ")}`);
       }
     }
-  }
-  for (const name of decks()) {
-    const doc = JSON.parse(fs.readFileSync(path.join(FIXTURES, `${name}.pages.json`), "utf8"));
+    // A limit is caught when the planting raises a finding on its page that the clean deck did not.
+    const before = new Set(base.dependencies.map((f) => `${f.id}|${f.code}|${JSON.stringify(f.measured ?? null)}`));
     for (const [limit, { plant }] of Object.entries(KNOWN_LIMITS)) for (const [index, page] of doc.pages.entries()) {
       const mutated = structuredClone(doc);
-      if (!page.type || !plant(mutated.pages[index], mutated)) continue;
+      if (!page.type || !plant(mutated.pages[index], mutated, base.registry)) continue;
       limits[limit].planted += 1;
-      if ((await check(name, mutated)).dependencies.some((f) => f.id === page.id)) limits[limit].caught += 1;
+      if ((await check(name, mutated)).dependencies.some((f) => f.id === page.id && !before.has(`${f.id}|${f.code}|${JSON.stringify(f.measured ?? null)}`))) limits[limit].caught += 1;
     }
   }
   const accepted = clean.every((deck) => !deck.findings.length) && Object.values(seeded).every((d) => d.planted > 0 && d.caught === d.planted);
@@ -253,9 +354,9 @@ async function main(argv) {
     console.log("Clean decks (any finding is a false positive):");
     for (const deck of result.clean) console.log(`  ${deck.deck.padEnd(12)} ${deck.pages} pages, ${deck.analyses.length} analyses  ${deck.findings.length ? `${deck.findings.length} FINDINGS\n    ${deck.findings.join("\n    ")}` : "clean"}`);
     console.log("\nSeeded defects (caught / planted):");
-    for (const [name, d] of Object.entries(result.seeded)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}${d.missed.length ? `\n    missed: ${d.missed.join("\n    missed: ")}` : ""}${d.planted ? "" : "  (never planted: no fixture page takes it)"}`);
-    console.log("\nKnown limits (planted, not read by the contract; not counted):");
-    for (const [name, d] of Object.entries(result.limits)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}`);
+    for (const [name, d] of Object.entries(result.seeded)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}${d.advisory ? " (advisory)" : ""}${d.missed.length ? `\n    missed: ${d.missed.join("\n    missed: ")}` : ""}${d.planted ? "" : "  (never planted: no fixture page takes it)"}`);
+    console.log("\nKnown limits (planted, not counted): what the trace of typed numbers does not claim to catch");
+    for (const [name, d] of Object.entries(result.limits)) console.log(`  ${`${d.caught}/${d.planted}`.padEnd(7)} ${name}${d.planted ? "" : "  (never planted: no fixture page takes it)"}`);
     console.log(`\n${result.accepted ? "accepted" : "NOT accepted"}`);
   }
   return result.accepted ? EXIT.ok : EXIT.refused;

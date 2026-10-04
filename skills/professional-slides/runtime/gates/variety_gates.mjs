@@ -166,6 +166,9 @@ export function typeSequence(slides) {
   }, []).map(({ type, ids }) => (ids.length === 1 ? `${ids[0]} ${type}` : `${ids[0]}-${ids.at(-1)} ${type} x${ids.length}`)).join(" | ");
 }
 
+// How VARIETY_COLUMN counts a rail, said on its standing line: the two rules that read a page's commentary read a rail differently, each for what it measures.
+const RAIL_AS_COLUMN = "a rail counts here: it is a column beside the exhibit, as points beside it are";
+
 /**
  * The deck's structure as drawn: the skeletons and how often each is drawn,
  * and the two shares the contract holds - pages carrying two or more exhibits,
@@ -275,14 +278,25 @@ export function varietyFindings(spec, options = {}) {
   return applyRulesVersion(contractFindings(spec, options), spec);
 }
 
-function contractFindings(spec, { structureOf, drawnOf } = {}) {
+// `standings`, when given, takes where the deck stands against each rule of
+// the contract, broken or not: `{ code, key?, what, value, bar, side, count?,
+// of?, unit?, applies, blocks, pages?, each? }`, the record the page gates
+// write too (gate_config.py `standing`). The author's report prints one line
+// a rule from it on every run, so a refusal is never the first time its rule
+// is mentioned.
+function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
   const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
-  if (slides.length < VARIETY.from) return findings;
+  const stand = (code, what, value, bar, side, more = {}) => standings.push({ code, what, value, bar, side, applies: true, blocks: true, ...more });
+  if (slides.length < VARIETY.from) {
+    stand("VARIETY_TYPE_RANGE", "content pages (the variety contract is read from this many)", slides.length, VARIETY.from, "min", { unit: "pages", applies: false });
+    return findings;
+  }
 
   const untyped = slides.filter((s) => !s.pageType?.type);
+  stand("PAGE_TYPE_UNDECLARED", "content pages with no page type", untyped.length, 0, "max", { unit: "pages" });
   if (untyped.length) {
     block("PAGE_TYPE_UNDECLARED", { pages: untyped.length, of: slides.length, ids: untyped.slice(0, 12).map((s) => s.id ?? null) }, 0,
       `${untyped.length} of ${slides.length} content pages carry no page type. Author the deck as \`<id>.pages.json\` - every page a ` +
@@ -293,6 +307,7 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
   }
   if (structureOf) {
     const edited = slides.filter((s) => s.pageType.structure && s.pageType.structure !== structureOf(s));
+    stand("PAGE_TYPE_EDITED", "pages whose structure was edited after compiling", edited.length, 0, "max", { unit: "pages" });
     if (edited.length) block("PAGE_TYPE_EDITED", { pages: edited.map((s) => s.id ?? null) }, 0,
       "These pages' layout, exhibit type, arrangement or closing line no longer match the choices they were compiled from. Change the " +
       "choice in the pages file and recompile; an edit to the compiled spec is overwritten by the next compile and bypasses the contract.",
@@ -302,7 +317,10 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
   const n = slides.length;
   const tally = (key) => { const m = new Map(); for (const s of slides) { const k = key(s); m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); };
 
+  const idsWhere = (test) => slides.filter(test).map((s) => s.id ?? null);
   const types = tally((s) => s.pageType.type);
+  stand("VARIETY_TYPE_SHARE", `pages of the commonest type (${types[0][0]})`, share(types[0][1], n), VARIETY.typeShareMax, "max",
+    { count: types[0][1], of: n, pages: idsWhere((s) => s.pageType.type === types[0][0]) });
   if (types[0][1] / n > VARIETY.typeShareMax) {
     block("VARIETY_TYPE_SHARE", { type: types[0][0], pages: types[0][1], of: n, share: share(types[0][1], n) }, VARIETY.typeShareMax,
       `${types[0][1]} of ${n} pages are ${types[0][0]} pages. Go back to the claims those pages make and ask what each has to show: ` +
@@ -310,6 +328,7 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
       "the claim; a deck where one type carries a quarter of the pages has stopped asking.");
   }
   const need = Math.min(8, Math.ceil(n / 5));
+  stand("VARIETY_TYPE_RANGE", "page types used", types.length, need, "min", { unit: "types" });
   if (types.length < need) {
     block("VARIETY_TYPE_RANGE", { types: types.length, pages: n, used: types.map(([t]) => t) }, need,
       `${types.length} page types across ${n} pages; a deck this long uses at least ${need}. Strong decks draw on eleven families - ` +
@@ -320,9 +339,11 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
   // Runs: a declared series (one template on purpose) counts once. The repair
   // names the page to change and what to: "change the middle page" leaves the
   // author to find which one and to guess a type its evidence could carry.
-  let run = [], at = 0;
+  let run = [], at = 0, longest = [];
   const flush = () => {
-    if (run.length > VARIETY.runMax && !(run[0].pageType.series && run.every((s) => s.pageType.series === run[0].pageType.series))) {
+    const series = run[0]?.pageType.series && run.every((s) => s.pageType.series === run[0].pageType.series);
+    if (!series && run.length > longest.length) longest = run;
+    if (run.length > VARIETY.runMax && !series) {
       const type = run[0].pageType.type, ids = run.map((s) => s.id ?? null);
       const middle = run[Math.floor(run.length / 2)];
       const start = at - run.length;
@@ -346,10 +367,14 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
     at += 1;
   }
   flush();
+  stand("VARIETY_TYPE_RUN", `pages of one type in a row${longest.length ? ` (${longest[0].pageType.type})` : ""}`, longest.length, VARIETY.runMax, "max",
+    { unit: "pages", pages: longest.map((s) => s.id ?? null) });
 
   // A column on the left and a column on the right are one placement to a reader.
   const placement = (s) => (s.pageType.commentary === "beside-left" ? "beside" : s.pageType.commentary);
   const commentary = tally(placement);
+  stand("VARIETY_COMMENTARY", `pages on the commonest commentary placement (${commentary[0][0]})`, share(commentary[0][1], n), VARIETY.commentaryShareMax, "max",
+    { count: commentary[0][1], of: n, pages: idsWhere((s) => placement(s) === commentary[0][0]) });
   if (commentary[0][1] / n > VARIETY.commentaryShareMax) {
     const [top, count] = commentary[0];
     block("VARIETY_COMMENTARY", { commentary: top, pages: count, of: n, share: share(count, n),
@@ -363,6 +388,8 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
   // A so-what bar is a close as much as a closing line is: counted apart, a
   // deck could close every page by moving the line into a bar.
   const closes = slides.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length;
+  stand("VARIETY_TAKEAWAY", "pages closing on a takeaway line or a so-what bar", share(closes, n), VARIETY.takeawayShareMax, "max",
+    { count: closes, of: n, pages: idsWhere((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar") });
   if (closes / n > VARIETY.takeawayShareMax) {
     block("VARIETY_TAKEAWAY", { pages: closes, of: n, share: share(closes, n) }, VARIETY.takeawayShareMax,
       `${closes} of ${n} pages close on a takeaway line or a so-what bar. The title is the page's message; a close that restates it on every page ` +
@@ -370,6 +397,12 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
       "and let the rest end on their evidence.");
   }
   const mix = structureMix(slides, { drawnOf });
+  stand("VARIETY_PANELS", "pages carrying two or more exhibits", mix.multi.share, VARIETY.multiShareMin, "min",
+    { count: mix.multi.pages, of: mix.pages, applies: mix.pages >= VARIETY.structureFrom });
+  // This rule reads how the page is drawn, so a rail is a column here: the exhibit keeps two thirds of the width beside a side
+  // panel, as it does beside points. PAGE_SHAPE_FLAT reads what the page argues with, and there a rail is one claim, not commentary.
+  stand("VARIETY_COLUMN", "pages of one exhibit beside a text column", mix.column.share, VARIETY.columnShareMax, "max",
+    { count: mix.column.pages, of: mix.pages, applies: mix.pages >= VARIETY.structureFrom, pages: mix.column.ids, note: RAIL_AS_COLUMN });
   if (mix.pages >= VARIETY.structureFrom && mix.multi.share < VARIETY.multiShareMin) {
     block("VARIETY_PANELS", { pages: mix.multi.pages, of: mix.pages, share: mix.multi.share }, VARIETY.multiShareMin,
       `${mix.multi.pages} of ${mix.pages} pages carry two or more exhibits; a deck this long needs ${Math.ceil(VARIETY.multiShareMin * mix.pages)}, and strong decks ` +
@@ -385,6 +418,8 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
       mix.column.ids);
   }
   const depth = evidenceDepth(slides);
+  stand("EVIDENCE_DEPTH", "values the median chart page plots", depth.median, VARIETY.evidenceMedianMin, "min", { unit: "values", applies: depth.chartPages >= VARIETY.evidenceFrom,
+    each: Object.fromEntries(slides.filter((s) => s.pageType?.chart && Number.isFinite(s.pageType.values)).map((s) => [s.id ?? "?", s.pageType.values])) });
   if (depth.chartPages >= VARIETY.evidenceFrom && depth.median < VARIETY.evidenceMedianMin) {
     block("EVIDENCE_DEPTH", depth, VARIETY.evidenceMedianMin,
       `The median chart page plots ${depth.median} values across ${depth.chartPages} chart pages; strong decks' chart pages plot about 22 ` +
@@ -397,6 +432,8 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
   // deck compiled before it was recorded falls back to its declared choices.
   const signatureOf = (s) => s.pageType.skeleton ?? `${s.pageType.type} · ${s.pageType.commentary} · ${s.pageType.takeaway ? "close" : "open"}`;
   const signature = tally(signatureOf);
+  stand("VARIETY_SIGNATURE", `pages drawn as the commonest skeleton (${signature[0][0]})`, share(signature[0][1], n), VARIETY.signatureShareMax, "max",
+    { count: signature[0][1], of: n, pages: idsWhere((s) => signatureOf(s) === signature[0][0]) });
   if (signature[0][1] / n > VARIETY.signatureShareMax) {
     const ids = slides.filter((s) => signatureOf(s) === signature[0][0]).map((s) => s.id ?? null);
     block("VARIETY_SIGNATURE", { signature: signature[0][0], pages: signature[0][1], of: n, ids }, VARIETY.signatureShareMax,
@@ -404,8 +441,8 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
       "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
       `${redraws()}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
-  findings.push(...mixFindings(slides));
-  findings.push(...reviewedDeckFindings(spec, slides));
+  findings.push(...mixFindings(slides, stand));
+  findings.push(...reviewedDeckFindings(spec, slides, stand));
   return findings;
 }
 
@@ -414,7 +451,7 @@ function contractFindings(spec, { structureOf, drawnOf } = {}) {
  * `plan.mixEnforced` names, and the exhibit range floor, on the compiled
  * pages. The deck is already long enough to judge (VARIETY.from).
  */
-function mixFindings(slides) {
+function mixFindings(slides, stand) {
   const findings = [];
   const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
   const mix = exhibitMix(slides);
@@ -424,6 +461,7 @@ function mixFindings(slides) {
     if (limit === undefined) continue;
     const got = mix.families[family] ?? { pages: 0, share: 0, ids: [] };
     const exact = got.pages / mix.pages;
+    stand("VARIETY_EXHIBIT_MIX", `pages carried by ${family === "numbers" ? "numbers or cards" : family === "text" ? "text" : `a ${family}`}`, got.share, limit, side, { key: band, count: got.pages, of: mix.pages, pages: got.ids });
     if (side === "min" ? exact >= limit : exact <= limit) continue;
     const shares = Object.fromEntries(Object.entries(mix.families).map(([f, v]) => [f, v.share]));
     block("VARIETY_EXHIBIT_MIX", { family, share: got.share, pages: got.pages, of: mix.pages, direction: side === "min" ? "below" : "above", mix: shares, ids: got.ids }, limit,
@@ -433,6 +471,8 @@ function mixFindings(slides) {
       side === "min" ? null : got.ids);
   }
   const floor = PLAN.craft.exhibitVarietyPerTen.min;
+  // The floor is a rate per ten pages; in kinds, it is the fewest this deck's length allows.
+  stand("VARIETY_EXHIBIT_RANGE", `kinds of exhibit drawn (${floor} per ten pages)`, mix.distinct, Math.ceil((floor * mix.pages) / 10 - 1e-9), "min", { unit: "kinds" });
   if ((mix.distinct / mix.pages) * 10 < floor) {
     block("VARIETY_EXHIBIT_RANGE", { perTen: mix.perTen, distinct: mix.distinct, pages: mix.pages, kinds: mix.kinds }, floor,
       `This deck draws ${mix.distinct} kinds of exhibit across ${mix.pages} pages - ${mix.perTen} per ten, against a floor of ${floor} and ` +
@@ -492,17 +532,21 @@ export function tableConstruction(slide) {
   return [first, coded ? "coded cells" : "text cells", rows.length > 8 ? "long" : "short", slide.soWhat ? "a band at the foot" : "open foot"].join(" · ");
 }
 
-function reviewedDeckFindings(spec, slides) {
+function reviewedDeckFindings(spec, slides, stand) {
   const findings = [];
   const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
   const analytical = slides.filter((s) => s.pageType && !["statement", "summary"].includes(s.pageType.type));
   // Table monotony: the worst window of ten analytical pages.
-  let worst = null;
+  let worst = null, most = [];
   for (let at = 0; at + REVIEWED.tableWindow <= Math.max(analytical.length, REVIEWED.tableWindow); at += 1) {
     const window = analytical.slice(at, at + REVIEWED.tableWindow), tally = new Map();
     for (const s of window) { const key = tableConstruction(s); if (key) tally.set(key, [...(tally.get(key) || []), s.id ?? null]); }
-    for (const [key, ids] of tally) if (ids.length > REVIEWED.tableRunMax && (!worst || ids.length > worst.ids.length)) worst = { key, ids, from: window[0]?.id ?? null, to: window.at(-1)?.id ?? null };
+    for (const [key, ids] of tally) {
+      if (ids.length > most.length) most = ids;
+      if (ids.length > REVIEWED.tableRunMax && (!worst || ids.length > worst.ids.length)) worst = { key, ids, from: window[0]?.id ?? null, to: window.at(-1)?.id ?? null };
+    }
   }
+  stand("VARIETY_TABLES", `pages of one table construction in any ${REVIEWED.tableWindow} consecutive analytical pages`, most.length, REVIEWED.tableRunMax, "max", { unit: "pages", pages: most });
   if (worst) block("VARIETY_TABLES", { construction: worst.key, pages: worst.ids.length, window: [worst.from, worst.to], ids: worst.ids }, REVIEWED.tableRunMax,
     `${worst.ids.length} of the ${REVIEWED.tableWindow} analytical pages from ${worst.from} to ${worst.to} are the same table - ${worst.key} (${worst.ids.join(", ")}). ` +
     "A reader stops telling them apart, and the differences in the evidence go with them. Draw each as what its evidence is: funding stages or a " +
@@ -518,11 +562,14 @@ function reviewedDeckFindings(spec, slides) {
     const marks = early.flatMap(logoTexts).join(" \n ").toLowerCase();
     // A logo under any of the player's names introduces it.
     const unmarked = named.filter((name) => ![name.toLowerCase(), ...[...aliases].filter(([, n]) => n === name).map(([alias]) => alias)].some((alias) => marks.includes(alias)));
+    stand("PLAYERS_UNMARKED", `compared players with no logo on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
     if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked, pages: early.map((p) => p.id ?? "cover") }, 0,
       `The deck compares ${named.join(", ")}${players.length >= 2 ? "" : " (named in its titles again and again)"}, and neither the cover nor the first ${REVIEWED.earlyPages} pages ` +
       `shows ${unmarked.length === named.length ? "their logos" : `the logo of ${unmarked.join(", ")}`}. Introduce them by their marks before the evidence starts: a \`profiles\` page ` +
-      "(form `logos`, or `logo-table` with each player's numbers), or a `logo` column in an early table. Write each as `{ alt: \"<Name> logo\" }` - " +
-      `the build fetches it from the player's Wikipedia infobox${players.length >= 2 ? "" : "; declare them in the deck's `players` so it can"}.`,
+      "(form `logos`, or `logo-table` with each player's numbers), or a `logo` column in an early table. " +
+      // A deck that declares it is built without the network (asset-needs.mjs) fetches nothing: the cell that names its player prints the name.
+      (spec.assets?.fetch === "none" ? "Write each as a `logo` cell that names its `player`: the deck declares it is built without the network, so the cell prints the name where the mark would be."
+        : `Write each as \`{ alt: "<Name> logo" }\` - the build fetches it from the player's Wikipedia infobox${players.length >= 2 ? "" : "; declare them in the deck's `players` so it can"}.`),
       early.map((p) => p.id ?? "cover"));
   }
   // A page that introduces players or products as cards is about what they look like as much as what they do.

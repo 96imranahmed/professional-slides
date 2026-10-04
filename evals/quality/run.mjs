@@ -47,6 +47,7 @@ import {
   validatePreference, validateVerdict,
 } from "./lib.mjs";
 import { scoreRun } from "../cold-run/score.mjs";
+import { readRunLog, runCost } from "../../skills/professional-slides/runtime/run-log.mjs";
 import { isMain, pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
 
 const USAGE = "Usage: run.mjs --set dev|heldout|all [--runs N] [--agent NAME] [--judge NAME] [--dry-run] (see the header for every option)";
@@ -257,6 +258,9 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
           ...(kept.missing ? { missing: kept.missing } : {}),
         };
         Object.assign(row, (({ plan, build, slides }) => ({ plan, build, deckSlides: slides }))(scoreStored(keep, kept)));
+        // What the run cost, counted from the author's own log where it kept one: the numbers, never the log.
+        const authorRuns = artifacts.authorLog ? readRunLog(artifacts.authorLog) : [];
+        if (authorRuns.length) row.cost = runCost(authorRuns);
         if (!pages.length) {
           row.status = agentOut.code === 0 ? "no-deck" : "agent-failed";
         } else {

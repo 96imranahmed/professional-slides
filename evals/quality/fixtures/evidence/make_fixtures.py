@@ -5,8 +5,12 @@ union (finance, eight declared players), an ambulance service (public
 operations, a closed evidence scope, a scenario and an analysis that cannot
 run), a note-taking app (product strategy, three declared players) and an
 explanation of a signalling upgrade (nothing compared, so no matrix is asked
-for). Each page declares what its claim and exhibits rest on. Run from the
-repository root; the fixtures are committed, this script is how they were made.
+for). Each page declares what its claim and exhibits rest on. Most exhibits
+type their values beside a `basis`; the finance deck also writes numbers by
+reference - a bound chart, a bound metric, and `{{...}}` tokens in a title and
+in table cells - so both ways of putting a number on a page stay exercised.
+Run from the repository root; the fixtures are committed, this script is how
+they were made.
 """
 import json
 import os
@@ -39,6 +43,11 @@ def peers(unit, pop, period, members, vals, **k):
 
 def chart(heading, unit, cats, sers, basis, **k):
     return dict(heading=heading, unit=unit, categories=cats, series=[{'name': n, 'values': v} for n, v in sers], basis=basis, **k)
+
+
+def bound(heading, sers, **k):
+    """A chart that names its measures; the runtime writes its categories, values, unit and basis."""
+    return dict(heading=heading, series=[{'measure': ref, 'name': n} for n, ref in sers], **k)
 
 
 def write(name, deck, pages, insights, analyses, sources):
@@ -92,22 +101,30 @@ fin_an = [
     {'id': 'A-floor', 'op': 'threshold', 'inputs': ['A-cushion/result'],
      'threshold': {'value': 0, 'unit': 'GBP m', 'rationale': 'liquid assets must cover liabilities due within a year'},
      'soWhat': 'Eight million of headroom remains above the cover floor', 'strength': 'supporting'},
+    {'id': 'A-loans', 'op': 'growth', 'inputs': ['i-loans/loans'], 'soWhat': 'The book grew by more than half in seven years', 'strength': 'strong'},
+    {'id': 'A-loans-year', 'op': 'growth', 'inputs': ['i-loans/loans'], 'from': 'FY25', 'to': 'FY26', 'soWhat': 'Lending grew faster in the latest year than profit did', 'strength': 'supporting'},
+    {'id': 'A-liquid-year', 'op': 'growth', 'inputs': ['i-liquidity/liquid'], 'from': 'FY25', 'to': 'FY26', 'soWhat': 'Liquid assets rose in the latest year', 'strength': 'context'},
+    {'id': 'A-index', 'op': 'index', 'inputs': ['i-loans/loans', 'i-liquidity/liquid', 'i-earn/pat', 'i-cash/ocf'],
+     'soWhat': 'Lending and profit grew by more than half while cash flow ended barely above where it began', 'strength': 'supporting'},
+    {'id': 'A-short-year', 'op': 'growth', 'inputs': ['i-liquidity/short-liabilities'], 'from': 'FY25', 'to': 'FY26',
+     'soWhat': 'Liabilities due within a year rose by as much as liquid assets did', 'strength': 'context'},
 ]
 fin_pages = [
     {'id': 'f0', 'type': 'summary', 'form': 'executive-summary', 'commentary': 'none', 'takeaway': False,
      'title': 'Harbour is growing faster than its peers on thinner liquidity',
      'why': 'The opening states the answer and the three findings behind it, each with what it means for the plan',
-     'evidence': ['i-loans', 'i-cash', 'i-earn', 'i-liquidity', 'i-efficiency', 'i-peers', 'A-ocf', 'A-cushion', 'A-peers'],
+     'evidence': ['i-loans', 'i-cash', 'i-earn', 'i-liquidity', 'i-efficiency', 'i-peers', 'A-ocf', 'A-earn', 'A-cushion', 'A-peers', 'A-loans-year', 'A-liquid-year', 'A-short-year'],
      'settles': {'kind': 'comparison', 'what': 'growth, cash generation and liquidity cover against seven regional peers',
                  'measures': ['i-loans/loans', 'i-cash/ocf', 'i-earn/pat', 'i-efficiency/cost-income', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result', 'A-peers/margin']},
      'adds': 'Each point carries what its finding means for the plan, which the table does not show',
      'exhibit': {'type': 'table', 'treatment': 'dimensions', 'columns': ['Measure', 'FY25', 'FY26', 'Read'],
-                 'rows': [['Loan book', '601m', '648m', 'Up 8%'],
-                          ['Profit after tax', '47m', '49m', 'Up 4%'],
-                          ['Operating cash flow', '84m', '66m', 'Down 21%'],
-                          ['Liquid assets', '180m', '196m', 'Up 16m'],
-                          ['Short-term liabilities', '172m', '188m', 'Up 16m'],
-                          ['Liquidity cushion', '8m', '8m', 'Peak 41m'],
+                 # The first six rows print their numbers by reference; the last two are typed, and traced.
+                 'rows': [['Loan book', '{{i-loans/loans@FY25 | 0m}}', '{{i-loans/loans@FY26 | 0m}}', 'Up {{A-loans-year/percent | 0.0%}}'],
+                          ['Profit after tax', '{{i-earn/pat@FY25 | 0m}}', '{{i-earn/pat@FY26 | 0m}}', 'Up {{A-earn/percent | 0.0%}}'],
+                          ['Operating cash flow', '{{i-cash/ocf@FY25 | 0m}}', '{{i-cash/ocf@FY26 | 0m}}', 'Down {{A-ocf/percent | 0% | abs}}'],
+                          ['Liquid assets', '{{i-liquidity/liquid@FY25 | 0m}}', '{{i-liquidity/liquid@FY26 | 0m}}', 'Up {{A-liquid-year/change | 0m}}'],
+                          ['Short-term liabilities', '{{i-liquidity/short-liabilities@FY25 | 0m}}', '{{i-liquidity/short-liabilities@FY26 | 0m}}', 'Up {{A-short-year/change | 0m}}'],
+                          ['Liquidity cushion', '{{A-cushion/result@FY25 | 0m}}', '{{A-cushion/result@FY26 | 0m}}', 'Peak 41m'],
                           ['Cost-to-income ratio', '63%', '62%', 'FY19 71%'],
                           ['Net interest margin', 'n/a', '2.9%', 'Fourth of eight']],
                  'basis': {'measures': ['i-loans/loans', 'i-cash/ocf', 'i-earn/pat', 'i-efficiency/cost-income', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result', 'A-peers/margin'], 'role': 'proof'}},
@@ -117,8 +134,8 @@ fin_pages = [
          'One more year at this pace, funded the same way, breaches the cover floor. The board therefore has to choose between slowing lending and raising term deposits before the next budget, and funding comes before further lending.',
          'The efficiency gain is real and did not come from shrinking the network, so there is no case for closures. Against its peers Harbour leads on growth, not on margin, which makes the price of new funding the number to protect.',
          'The peer comparison rests on one year of regulatory returns, and one union publishes no capital ratio, so the ranking is a guide to position rather than a forecast.']},
-    {'id': 'f1', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'Loans grew 57% in seven years to 648 million',
-     'why': 'The growth of the book over time is the claim, so the series is drawn', 'evidence': ['i-loans'],
+    {'id': 'f1', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'Loans grew {{A-loans/percent | 0%}} in seven years to {{i-loans/loans@FY26}} million',
+     'why': 'The growth of the book over time is the claim, so the series is drawn', 'evidence': ['i-loans', 'A-loans'],
      'settles': {'kind': 'rate', 'what': 'loan book at year end FY19 to FY26', 'measures': ['i-loans/loans']},
      'exhibit': chart('Loan book at year end', 'GBP m', FY, [('Loans', loans)], {'measures': ['i-loans/loans'], 'role': 'proof'}, highlights=[{'category': 'FY26'}]),
      'bar': 'A loan book this much larger needs deposits, wholesale funding and regulatory capital that have grown at the same pace, which the next pages test'},
@@ -126,15 +143,15 @@ fin_pages = [
      'why': 'Two year-on-year movements set against the cash series that produced one of them', 'evidence': ['i-cash', 'i-earn', 'A-ocf', 'A-earn'],
      'settles': {'kind': 'comparison', 'what': 'profit after tax and operating cash flow, FY25 to FY26', 'measures': ['i-cash/ocf', 'i-earn/pat']},
      'metrics': [{'value': '+4.3%', 'label': 'Profit after tax', 'sublabel': '47 to 49', 'basis': {'measures': ['A-earn/percent']}},
-                 {'value': '-21.4%', 'label': 'Operating cash flow', 'sublabel': '84 to 66', 'basis': {'measures': ['A-ocf/percent']}}],
+                 {'measure': 'A-ocf/percent', 'format': '+0.0%', 'label': 'Operating cash flow', 'sublabel': '84 to 66'}],
      'exhibit': chart('Operating cash flow', 'GBP m', FY, [('Operating cash flow', ocf)], {'measures': ['i-cash/ocf'], 'role': 'proof'}, type='chart.column', highlights=[{'category': 'FY26'}],
                       caption='Operating cash flow fell to 66 million in FY26, the first decline in five years, while profit after tax rose to 49 million: growth in lending absorbed the cash that earnings produced')},
     {'id': 'f3', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'The liquidity cushion narrowed from 41 million to 8 million',
      'why': 'The gap between two series in one unit is the claim, so both are drawn on one scale', 'evidence': ['i-liquidity', 'A-cushion', 'A-floor'],
      'settles': {'kind': 'comparison', 'what': 'liquid assets and short-term liabilities at year end',
                  'measures': ['i-liquidity/liquid', 'i-liquidity/short-liabilities'], 'relation': {'kind': 'gap'}},
-     'exhibit': chart('Liquid assets and liabilities due within a year', 'GBP m', FY, [('Liquid assets', liquid), ('Short-term liabilities', shortl)],
-                      {'measures': ['i-liquidity/liquid', 'i-liquidity/short-liabilities'], 'role': 'proof'}, highlights=[{'category': 'FY26'}]),
+     'exhibit': bound('Liquid assets and liabilities due within a year', [('Liquid assets', 'i-liquidity/liquid'), ('Short-term liabilities', 'i-liquidity/short-liabilities')],
+                      role='proof', highlights=[{'category': 'FY26'}]),
      'bar': 'Another year of lending at this pace, funded the same way, would take liquid assets below the liabilities that fall due within a year'},
     {'id': 'f4', 'type': 'panels', 'form': 'row', 'commentary': 'captions', 'title': 'Costs fell nine points without closing branches',
      'why': 'A ratio and a count in different units, each read on its own panel', 'evidence': ['i-efficiency'],
@@ -154,6 +171,14 @@ fin_pages = [
                      series=[{'name': 'Margin', 'values': [3.4, 3.1, 3.0, 2.9, 2.8, 2.6, 2.4, 2.2]}], highlights=[{'category': 'Harbour'}],
                      basis={'measures': ['A-peers/margin'], 'role': 'proof'}),
      'bar': 'Loan growth, not margin, is where Harbour leads its seven regional peers, so the plan protects the cost of funding before it adds lending'},
+    # An indexed trend from references alone: the series are an index analysis's measures, and the base comes with them.
+    {'id': 'f6', 'type': 'trend', 'form': 'indexed', 'commentary': 'so-what-bar', 'title': 'Cash flow alone has not kept pace with lending',
+     'why': 'Four measures in one unit but of very different size, compared on growth since FY19, so each is rebased to 100', 'evidence': ['A-index'],
+     'settles': {'kind': 'rate', 'what': 'loans, liquid assets, profit and operating cash flow, FY19 to FY26, each indexed to FY19',
+                 'measures': ['A-index/loans', 'A-index/liquid', 'A-index/pat', 'A-index/ocf'], 'relation': {'kind': 'index'}},
+     'exhibit': bound('Growth since FY19', [('Loans', 'A-index/loans'), ('Liquid assets', 'A-index/liquid'), ('Profit after tax', 'A-index/pat'), ('Operating cash flow', 'A-index/ocf')],
+                      subject='Operating cash flow'),
+     'bar': 'Earnings and liquid assets have grown with the loan book; the cash the business generates has not, which is why the growth now draws on liquidity'},
 ]
 write('finance', {'id': 'finance', 'workflow': 'new_deck',
                   'request': 'Is Harbour Credit Union growing safely, and how does it compare with its regional peers?',
@@ -195,12 +220,13 @@ pub_an = [
      'horizon': HORIZON, 'threshold': {'ref': 'o-standard/standard'},
      'soWhat': 'On the recent trend the service breaches the standard within three years', 'strength': 'supporting'},
     {'id': 'B-districts', 'op': 'rank', 'inputs': ['o-districts/response'], 'soWhat': 'Uplands and Valley are furthest from the standard and take the first crews', 'strength': 'strong'},
+    {'id': 'B-rise', 'op': 'growth', 'inputs': ['o-response/response'], 'soWhat': 'Response time rose by more than a third in two years', 'strength': 'strong'},
     {'id': 'B-vehicles', 'op': 'gap', 'inputs': ['o-demand/crews', 'o-fleet/vehicles'], 'missing': ['vehicles available by quarter: the fleet register was not supplied'],
      'soWhat': 'Whether vehicles or crews bind cannot be settled without the fleet register', 'strength': 'context'},
 ]
 pub_pages = [
     {'id': 'o1', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'Response time rose 37% in two years to 12.2 minutes',
-     'why': 'The rise over time is the claim, so the quarterly series is drawn', 'evidence': ['o-response', 'B-headroom', 'B-path'],
+     'why': 'The rise over time is the claim, so the quarterly series is drawn', 'evidence': ['o-response', 'B-headroom', 'B-path', 'B-rise'],
      'settles': {'kind': 'rate', 'what': 'mean response time by quarter', 'measures': ['o-response/response']},
      'exhibit': chart('Mean category-two response time', 'minutes', Q, [('Response time', resp)], {'measures': ['o-response/response']}, highlights=[{'category': '2024 Q4'}]),
      'bar': 'At this rate the service loses the headroom it has to the national standard'},
@@ -232,6 +258,14 @@ pub_pages = [
      'settles': {'kind': 'structure', 'what': 'how handover delay becomes response delay'},
      'exhibit': {'items': [{'label': 'Crew arrives at hospital'}, {'label': 'Handover waits for a bay'}, {'label': 'Crew unavailable to dispatch'}, {'label': 'Next call waits longer'}]},
      'bar': 'Releasing crews at the door returns capacity faster than hiring does'},
+    # A recorded series and then a scenario's path, drawn as one line from references: the runtime brackets the assumed run.
+    {'id': 'o6', 'type': 'trend', 'form': 'line', 'commentary': 'so-what-bar', 'title': 'On the recent trend the standard is breached within three years',
+     'why': 'The recorded quarters and the assumed path are one line, so the reader sees where the assumption begins and where it crosses the standard',
+     'evidence': ['o-response', 'B-path', 'o-standard'],
+     'settles': {'kind': 'rate', 'what': 'mean response time by quarter, recorded and then carried forward at the recent quarterly rise', 'measures': ['o-response/response', 'B-path/path']},
+     'exhibit': bound('Mean category-two response time, recorded and assumed', [('Response time', ['o-response/response', 'B-path/path']), ('National standard', 'o-standard/standard')],
+                      select={'from': '2024 Q1'}),
+     'bar': 'The path is an assumption, not a forecast: it says how long the service has if nothing changes'},
 ]
 write('public-ops', {'id': 'public-ops', 'workflow': 'new_deck',
                      'request': 'Why are ambulance response times rising, and where should the first new crews go? Use only the board papers we have sent you.',
@@ -294,7 +328,7 @@ pr_pages = [
                  'rows': [['Lumen', 37, 12, 14], ['Quill', 31, 8, 41], ['Paperly', 'n/a', 10, 26]],
                  'basis': {'measures': ['C-rivals/retention', 'C-rivals/price', 'C-rivals/integrations']}},
      'bar': 'The lead is real on one measure only, so the strategy defends retention'},
-    {'id': 'p4', 'type': 'composition', 'form': 'donut', 'commentary': 'so-what-bar', 'title': 'Capture and search are 73% of sessions',
+    {'id': 'p4', 'type': 'composition', 'form': 'donut', 'commentary': 'so-what-bar', 'title': 'Capture is 46% of sessions and search another 27%',
      'why': 'The parts of one whole, four of them', 'evidence': ['p-usage', 'C-mix'],
      'settles': {'kind': 'share', 'what': 'sessions by first feature used, March 2026', 'measures': ['p-usage/sessions']},
      'exhibit': {'labels': feat, 'values': use, 'unit': '% of sessions', 'heading': 'Sessions by first feature used, March 2026', 'basis': {'measures': ['p-usage/sessions']}},

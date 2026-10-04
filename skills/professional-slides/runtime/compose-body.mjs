@@ -42,3 +42,15 @@ export function withDesignLayout(layout, compose) {
   LAYOUT = layout ?? CONSULTING_LAYOUT;
   try { return compose(); } finally { LAYOUT = CONSULTING_LAYOUT; }
 }
+
+// The density the deck being composed sets for every page that names none of
+// its own. The planner applies it after a page is composed, so a builder that
+// sizes a column by measuring its text reads it here, to measure at the size
+// the text will be drawn at. Null outside a composition; withDeckDensity is
+// its only writer.
+let deckDensityInForce = null;
+export const deckDensity = () => deckDensityInForce;
+export function withDeckDensity(density, compose) {
+  deckDensityInForce = density ?? null;
+  try { return compose(); } finally { deckDensityInForce = null; }
+}

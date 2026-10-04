@@ -29,7 +29,7 @@ with the gate that should catch each, and `gate-validity.mjs` replays them.
 node evals/quality/run.mjs --set dev --runs 3 [--agent claude] [--judge claude] [--dry-run]
 node evals/quality/run.mjs --report                # the summary for this skill version
 node evals/quality/gate-validity.mjs               # per-gate recall and precision on labelled defects
-node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught, clean fixture decks clear, known limits listed
+node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught (typed, bound and traced numbers), clean fixture decks clear
 node evals/quality/critic-calibration.mjs --repeats 5 [--dry-run]   # the storyline critic on frozen packets: its spread, and planted anchors
 ```
 

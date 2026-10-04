@@ -20,8 +20,8 @@ const ids = content.map((p) => p.id);
 const blind = process.env.FAKE_CRITIC_BLIND === "1";
 const titles = content.map((p) => p.title);
 const repeated = content.filter((p, i) => titles.indexOf(p.title) !== i);
-// A page all of whose exhibits are declared context: nothing drawn on it proves its claim.
-const context = content.filter((p) => (p.exhibits || []).length > 0 && (p.declared || []).filter((line) => line.startsWith("context exhibit")).length === p.exhibits.length);
+// A page that declares context and nothing as proof: nothing it shows proves its claim.
+const context = content.filter((p) => (p.measures || []).some((m) => m.role === "context") && !(p.measures || []).some((m) => m.role === "proof"));
 const compared = (packet.analyses || []).some((a) => a.op === "compare" && a.status !== "unavailable");
 
 const findings = [], missingAnalyses = [], cutOrMerge = [];

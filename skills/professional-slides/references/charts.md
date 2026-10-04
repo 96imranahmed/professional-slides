@@ -170,7 +170,7 @@ Cell types: `text`; `bullets`; `category` (primary fill with contrasting text, o
 | Flag | What it writes | What it needs |
 | --- | --- | --- |
 | `implication: true` | Names the column that concludes from the columns before it, and inserts a gutter of `implication` chevrons in front of it | Cannot be the first column: the gutter carries the argument's direction |
-| `heat: true` | Every cell `type: "heatmap"` | The shared sequential scale |
+| `heat: true` | Every cell `type: "heatmap"`. Whole scores from 1 to 5 are shaded as they stand, on the scale the key names Lowest to Highest. Any other figures are recorded values: each cell keeps its figure and is shaded by where it sits between the column's lowest and highest, in five steps, the key a ramp between the two | Numbers in every cell; a missing figure is written "n/a" or "not disclosed" and takes no shade. `domain: [low, high]` shades across a declared range instead of the column's own (a share out of 100), and a figure outside it is refused. Everything wrong with a column is said in one refusal |
 | `bubble: true` | Every value in a filled pill (`surface: "bubble"`) | - the table's counterpart to the chart's change bubble |
 | `bar: true` | Every cell `type: "bars"`, over a scale derived from the column's own numbers - zero (or the lowest negative, rounded down) to a round number above the largest; columns that measure the same thing set one `barScale` name and share one scale, so a row reads across them. The header prints the unit, so no key line is added under the table, and a header that already ends in its unit (`Revenue, $M`, `Share (%)`) takes no unit line under it either | `label` and `unit` on the column, both set; one unit per `barScale` |
 

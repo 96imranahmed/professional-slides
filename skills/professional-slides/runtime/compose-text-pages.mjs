@@ -3,9 +3,25 @@
 // as a ledger, in columns or in rows, a memo's prose beside its panel, or a
 // document's columns of prose.
 import { textWords } from "./text-contract.mjs";
-import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG } from "./compose-body.mjs";
-import { proseOf, proseBeside, pointsItem, documentItem, summaryLedger, sideTreatment } from "./compose-points.mjs";
+import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG, deckDensity } from "./compose-body.mjs";
+import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
+
+// The width prose beside a panel may take at most: the body less the gap and the least the panel keeps.
+const PROSE_ROOM = BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH;
+
+/**
+ * For a page that is prose beside its panel and nothing else - a memo, or a
+ * rail page of paragraphs - the words of prose that fill the column the
+ * composer sets them in (compose-points.mjs proseFillRange), at the page's
+ * `density`, or null for any other page. `most` is the most words of prose
+ * the page's word ceiling leaves it.
+ */
+export function proseFill(slide, density, most) {
+  const paragraphs = (slide?.paragraphs || []).filter((text) => typeof text === "string" && text.trim());
+  const beside = typeof slide?.panel?.text === "string" && slide.panel.text.trim() && paragraphs.length && !(slide.points || []).length && !slide.exhibit && !(slide.exhibits || []).length;
+  return beside ? proseFillRange(paragraphs, PROSE_ROOM, density, most) : null;
+}
 
 // A side panel carrying the page's statement, the content beside it: a
 // strong deck sets a question, a claim or a headline figure in a dark panel down
@@ -30,7 +46,7 @@ export function sidebarPage(items, { id, slide, exhibits, baseDir, fill, pointsS
   // row it would stop at the measure, 165px short of its column's edge.
   const proseOnly = !exhibits.length && !slide.points?.length;
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
-    proseOnly ? proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH, slide.highlight)
+    proseOnly ? proseBeside(slide.paragraphs, id, PROSE_ROOM, slide.highlight, slide.density ?? deckDensity())
       : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
 }
 
@@ -99,7 +115,7 @@ export function textPage(items, { id, slide, fill, pointsStyle }) {
     const tone = panel.tone ?? "tint";
     if (!["dark", "primary", "muted", "tint"].includes(tone)) throw new Error(`${id}: panel.tone is dark, primary, muted or tint`);
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [
-      proseBeside(slide.paragraphs, id, BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH, slide.highlight),
+      proseBeside(slide.paragraphs, id, PROSE_ROOM, slide.highlight, slide.density ?? deckDensity()),
       { id: `${id}-panel`, component: "side-statement", props: { text: panel.text.trim(), tone, ...(panel.kicker ? { kicker: panel.kicker } : {}), ...(panel.highlight ? { highlight: panel.highlight } : {}) },
         size: { width: { fr: 1 }, height: "fill" } }] });
   }

@@ -204,6 +204,8 @@ export function collectArtifacts(workspace) {
     plan: found.plan ?? null,
     pages: found.pages ?? null,
     deck: found.deck ?? null,
+    // The author's run log sits beside the plan under the same stem (author-deck.mjs); null when the run kept none.
+    authorLog: [found.plan && found.plan.replace(/\.plan\.json$/, ".author-log.jsonl")].find((f) => f && existsSync(f)) ?? null,
     missing,
     slides: inRendered(/^slide-\d+\.png$/),
     sheets: inRendered(/^spread-\d+\.png$/),

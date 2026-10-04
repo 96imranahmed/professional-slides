@@ -29,7 +29,7 @@
  */
 import { EXIT, UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "../cli.mjs";
 import { checkTextPlan, textWords } from "../text-contract.mjs";
-import { DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { DECK_LENGTH, PLAN, applyRulesVersion, waivedRules } from "../weight.mjs";
 
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
@@ -46,7 +46,7 @@ export const CONTENT_CODES = Object.freeze({
   CONTENT_NO_HIGHLIGHT: "no page names the phrase its reader should see first",
   CONTENT_CLAIM_REPEATS: "two pages make the same claim",
   CONTENT_LAYOUT_LEAK: "the content file decides how a page looks",
-  CONTENT_ANSWER_UNCARRIED: "the deck's own answer is not carried by any of its claims",
+  CONTENT_ANSWER_UNCARRIED: "the deck's own answer is not proved by its claims, or not stated up front on its opening page",
   CONTENT_ANSWER_CONTRADICTED: "a page recommends something the deck's unconditional answer rules out",
 });
 
@@ -89,14 +89,42 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   claimWordsMin: 6,       // "Origins" is a topic; a claim is a sentence
   claimOverlapMax: 0.7,   // two pages proving the same thing
   highlightMin: 1,
-  // The answer gate. `coverage` is the share of the answer's own content words
-  // that appear somewhere in the claims; `carried` is the best single claim's
-  // share of them. An answer nothing claims is a promise the deck does not
-  // keep, and an answer spread thinly over twenty pages with no page stating
-  // it is a deck with no lead. Measured on the example content plans, which
-  // run 0.75/0.55 and 0.80/0.44.
+  // The answer gate, three measures on the answer's own content words.
+  // `coverage` is the share of them that appear somewhere in the claims: an
+  // answer nothing claims is a promise the deck does not keep. The other two,
+  // with the opening title's own share of the whole answer (`titleContentShare`
+  // below), hold the answer up front, on the opening answer page (the executive
+  // summary, or the first analytical page of a deck without one): `upFront`
+  // is the share of the answer the page carries as a whole - its title, its
+  // points, its highlight and its exhibit's cells - and is the same share the
+  // whole deck is held to, since the page that states the answer must hold
+  // what the deck must prove; `lead` is the share of the answer's leading
+  // clause (its verdict, before the reasons) that the page's title carries.
+  // A title holds twelve words, so it is asked for the verdict and the page
+  // for the reasons, the rivals and the thresholds a reasoned answer names.
   answerCoverageMin: 0.6,
+  answerUpFrontMin: 0.6,
+  answerLeadMin: 0.5,
+  // The rule the up-front measures replaced, kept for the decks it was the
+  // rule for: a revision recorded under a rules version before the up-front
+  // rule hears that rule as an advisory, and is held instead to this - the
+  // best single title carries this share of the whole answer's content words -
+  // so no deck is held to neither.
   answerCarriedMin: 0.35,
+  // What a title can hold. A lead can be a clause that states no verdict
+  // ("The board has a clear decision ahead: ..."), and a title that repeats it
+  // then leads with nothing; so the opening page's title is also asked for a
+  // share of the whole answer, as every deck's best title once was
+  // (`answerCarriedMin`) - up to the content words a full-length title holds,
+  // so that a long answer is not asked for more than a title can say. A title
+  // runs to `plan.titleWords.max` words (weight.json), and this share of a
+  // title's words are content words: the median over the example decks'
+  // titles, so a full-length title written as a sentence holds seven of them
+  // (test_answer_up_front.py measures the examples against it).
+  titleContentShare: 0.6,
+  // The fewest content words a leading clause has: under them it is a name or
+  // an opener, not a verdict, and the next clause is read with it (answerLead).
+  answerLeadWordsMin: 3,
 });
 
 // The words a recommendation is made in, and the words that make one
@@ -154,13 +182,19 @@ export function runContentGates(content, options = {}) {
       + "`settles` (with a `kind` and a `what`), `adds` and `highlight`."));
     return report(content, findings, []);
   }
-  const pages = content.pages;
-  const textCheck = checkTextPlan(content, options);
+  // A page that did not compose (`options.uncomposed`, its ids) has no text to
+  // plan, and its composition error is its finding; its claim and its declared
+  // content are still the deck's, so every other rule reads every page.
+  const pages = content.pages.map((p) => (options.uncomposed?.has(p.id) || options.uncomposed?.has(String(p.id)) ? { ...p, uncomposed: true } : p));
+  const textCheck = checkTextPlan({ ...content, pages: pages.filter((p) => !p.uncomposed) }, options);
   findings.push(...textCheck.findings);
+  // Where the deck stands against each deck-wide content rule, broken or not
+  // (the record variety_gates.mjs writes), for the author's report.
+  const standings = [];
   checkPages(findings, pages);
-  checkDeckSpread(findings, pages);
-  checkAnswerCarried(findings, content, pages);
-  return {...report(content, findings, pages, options.deck), textCoverage: textCheck};
+  checkDeckSpread(findings, pages, standings);
+  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content);
+  return {...report(content, findings, pages, options.deck), textCoverage: textCheck, standings};
 }
 
 /** Each page's own content: its claim, what settles it, what its commentary adds, its highlight. */
@@ -214,7 +248,12 @@ function checkPages(findings, pages) {
 }
 
 /** Across a deck long enough to judge: the share of pages that settle nothing measurable, the highlights, and claims that repeat. */
-function checkDeckSpread(findings, pages) {
+function checkDeckSpread(findings, pages, standings = []) {
+  const applies = pages.length >= CONTENT_THRESHOLDS.from;
+  const unmeasured = pages.filter((p) => String(p.settles?.kind ?? "qualitative") === "qualitative");
+  if (pages.length) standings.push({ code: "CONTENT_UNMEASURED", what: "pages declaring their evidence qualitative", value: round(unmeasured.length / pages.length), bar: CONTENT_THRESHOLDS.qualitativeBlock, side: "max",
+    count: unmeasured.length, of: pages.length, applies, blocks: true, pages: unmeasured.map((p) => p.id ?? p.n).filter((x) => x != null) },
+  { code: "CONTENT_NO_HIGHLIGHT", what: "pages naming a highlight", value: pages.filter((p) => String(p.highlight ?? "").trim()).length, bar: CONTENT_THRESHOLDS.highlightMin, side: "min", unit: "pages", applies, blocks: false });
   if (pages.length >= CONTENT_THRESHOLDS.from) {
     const kinds = pages.map((p) => String(p.settles?.kind ?? "qualitative"));
     const qualitative = kinds.filter((k) => k === "qualitative").length;
@@ -255,6 +294,93 @@ function checkDeckSpread(findings, pages) {
   }
 }
 
+// The clause an answer leads with: its verdict, before the reasons and the
+// conditions. It ends at the first sentence end, colon, semicolon or dash, or
+// at the conjunction that opens a reason or a condition; an opener with no
+// content of its own ("Yes.") is passed over.
+//
+// The lead is a clause with a verdict in it, not the subject it is about. An
+// answer that opens "Subject: verdict" would otherwise lead with the subject
+// alone, and a title that only names the subject would carry all of it. So
+// the text before a break is read on with the next clause where it is too
+// short to say anything (under `answerLeadWordsMin` content words), and the
+// text before a colon - a label by construction - wherever it is just a noun
+// phrase naming what the answer is about: "Northfield: expand in the north"
+// leads with both halves, "The northern lead is narrow: ..." with the first.
+//
+// Whether the text before a colon says something of its subject is read off
+// its shape, not off a list of verbs - verbs are an open class, and a list of
+// them read "Harbour remains the region's strongest lender: ..." as a
+// label because "remains" was not on it. A noun phrase is one determiner and
+// what it governs; a clause carries a predicate, which shows as one of three
+// things only a predicate brings, each told by closed-class words:
+//   - an auxiliary, a copula, a modal or a negation ("is", "should", "not"),
+//     or the "than" of a comparison;
+//   - a second noun phrase opening inside it - a determiner, possessive or
+//     quantifier that is not its first word and that no preposition or
+//     conjunction governs: the object or complement of a verb ("remains THE
+//     strongest", "keeps ITS lead", "leads EVERY rival");
+//   - the next clause taking its subject up with a pronoun ("...: it leads
+//     every rival"), which a label is never followed by.
+// A clause that shows none of them - a bare verb over a bare noun, "Alder
+// beats Birch: ..." - is read on with the next clause, the stricter reading.
+const CLAUSE_END = /[.!?;:](?=\s|$)|\s[—–-]\s|,?\s+(?:because|unless|although|though|whereas|provided|given that|so that|as long as|only if|if)\b/i;
+const PREDICATE_WORD = /\b(?:is|are|was|were|be|been|has|have|had|will|would|can|cannot|could|should|must|may|might|shall|does|did|do|not|never|than)(?:n't)?\b/i;
+const DETERMINERS = new Set(["the", "a", "an", "its", "their", "his", "her", "our", "your", "my", "this", "that", "these", "those", "every", "each", "all", "both", "no", "any", "some", "most", "more", "fewer", "less", "neither", "either", "another"]);
+const GOVERNORS = new Set(["of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "onto", "over", "under", "across", "between", "among", "through", "during", "against", "within",
+  "without", "about", "above", "below", "behind", "beyond", "per", "via", "as", "and", "or", "nor", "but", "than"]);
+const TAKES_UP = /^\s*(?:it|they|this|these|those|both|each|its|their)\b/i;
+/** Does `text` say something of its subject - is it a clause, not just a noun phrase naming one (see above). `next` is the text after the colon that ends it. */
+function predicates(text, next = "") {
+  if (PREDICATE_WORD.test(text) || TAKES_UP.test(next)) return true;
+  const words = String(text).toLowerCase().match(/[a-z][a-z']*/g) ?? [];
+  return words.some((word, at) => at > 0 && DETERMINERS.has(word) && !GOVERNORS.has(words[at - 1]) && !DETERMINERS.has(words[at - 1]));
+}
+export function answerLead(answer) {
+  const whole = String(answer ?? "").trim();
+  let from = 0, at = 0;
+  while (at < whole.length) {
+    const end = CLAUSE_END.exec(whole.slice(at));
+    const stop = end ? at + end.index : whole.length;
+    const lead = whole.slice(from, stop).trim();
+    const words = contentWords(lead).size;
+    // An opener with nothing in it is passed over; a clause that has begun is kept and read on.
+    if (!words) from = end ? stop + end[0].length : stop;
+    else if (!end || (words >= CONTENT_THRESHOLDS.answerLeadWordsMin && !(end[0].startsWith(":") && !predicates(lead, whole.slice(stop + end[0].length))))) return lead;
+    if (!end) break;
+    at = stop + end[0].length;
+  }
+  return whole;
+}
+
+/** The content words a full-length title can hold: the title word limit, at the content-word share of a title's words. */
+export const titleContentWords = () => Math.floor(PLAN.titleWords.max * CONTENT_THRESHOLDS.titleContentShare);
+
+/** The share of `words` (a set) that `text` carries, and the ones it does not. */
+function carriedBy(words, text) {
+  const has = contentWords(text);
+  const missing = [...words].filter((w) => !has.has(w));
+  return { share: words.size ? (words.size - missing.length) / words.size : 0, missing };
+}
+
+/**
+ * The page a deck states its answer on: the executive summary where the deck
+ * has one, otherwise its first analytical page. `whole` is everything the
+ * page says to its reader - the claim, the highlight and every planned block
+ * but the source line and the runtime's furniture - or null when the page's
+ * copy is not there to read yet (a plan that lists no copy, a draft's deferred
+ * page, a page that did not compose), where only its title can be held.
+ */
+function openingPage(pages) {
+  const analytical = pages.filter((p) => p.role !== "structural" && !p.kind);
+  const page = analytical.find((p) => p.role === "executive-summary") ?? analytical[0];
+  if (!page) return null;
+  const blocks = (page.textPlan ?? []).filter((b) => !["source", "furniture"].includes(b.role));
+  const written = Array.isArray(page.textPlan) && !page.deferred && !page.uncomposed;
+  return { page, id: page.id ?? page.n, summary: page.role === "executive-summary", title: String(page.claim ?? ""),
+    whole: written ? [page.claim, page.highlight, ...blocks.map((b) => b.text)].flat().filter(Boolean).join(" \n ") : null };
+}
+
 // The one question no page gate asks: does the deck deliver its own answer?
 //
 // Every other gate here judges a page. This judges the deck: a governing
@@ -262,47 +388,76 @@ function checkDeckSpread(findings, pages) {
 // the reader gets twenty proofs of things nobody promised. It is also the
 // cheapest place to catch it - before a page exists, against two fields the
 // author has already written.
-function checkAnswerCarried(findings, content, pages) {
+function checkAnswerCarried(findings, content, pages, standings = [], deck = content) {
   const answer = String(content.answer ?? "").trim();
   const question = String(content.question ?? "").trim();
   if (!answer || !question) {
     findings.push(finding(null, "CONTENT_ANSWER_UNCARRIED", { question: Boolean(question), answer: Boolean(answer) },
-      "both", "The file needs the `question` the deck is asked and the `answer` it gives, in "
-      + "one sentence each. Without them there is nothing for the claims to add up to, and "
-      + "nothing to check them against."));
+      "both", `The deck needs ${[!question && "the question it is asked", !answer && "the answer it gives"].filter(Boolean).join(" and ")}: `
+      + "in a pages file, `question` (or `brief`) and `answer` on `deck`; in a content plan written by hand, `question` and `answer` at the top. "
+      + "Without them there is nothing for the claims to add up to, and nothing to check them against."));
   } else if (pages.length) {
     const claims = pages.map((p) => String(p.claim ?? ""));
     const answerWords = contentWords(answer);
-    const union = new Set();
-    for (const claim of claims) for (const w of contentWords(claim)) union.add(w);
-    let covered = 0;
-    for (const w of answerWords) if (union.has(w)) covered += 1;
-    const coverage = answerWords.size ? covered / answerWords.size : 0;
-    const carried = Math.max(0, ...claims.map((c) => overlap(answer, c)));
-    if (coverage < CONTENT_THRESHOLDS.answerCoverageMin || carried < CONTENT_THRESHOLDS.answerCarriedMin) {
-      const missing = [...answerWords].filter((w) => !union.has(w));
-      // Where to say it, and how close the deck already is: the executive
-      // summary's title (the first analytical page) is where a deck states its
-      // answer, so the finding names that title rather than leaving the author
-      // to guess which one the rule wants.
-      const best = pages.map((p) => ({ id: p.id ?? p.n, claim: String(p.claim ?? ""), score: overlap(answer, String(p.claim ?? "")) })).sort((a, b) => b.score - a.score)[0];
-      const opener = pages.find((p) => p.role !== "structural" && !p.kind);
-      const where = ` State it in the title of ${opener ? `\`${opener.id ?? opener.n}\` (the opening page)` : "the opening page"}; the closest title now is ${best ? `\`${best.id}\`: "${best.claim.slice(0, 90)}"` : "none"}.`;
-      // Blocks once the deck is long enough to judge: a deck whose claims do
-      // not deliver its own answer is not finished, however good its pages.
-      // As an advisory it is read and shipped past. A probe of a few pages
-      // hears it as a question.
-      findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.coverage", severity: pages.length >= CONTENT_THRESHOLDS.from ? "blocking" : "advisory", ...finding(null, "CONTENT_ANSWER_UNCARRIED",
-        { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) },
-        { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
-        coverage < CONTENT_THRESHOLDS.answerCoverageMin
-          ? "The answer promises something no page proves. Either a page has to claim it - "
-            + `nothing in this deck claims ${missing.slice(0, 4).map((w) => `"${w}"`).join(", ")} - `
-            + "or the answer is wider than the evidence and should be narrowed to what the "
-            + "deck can actually settle." + where
-          : "No single page states the answer. The claims between them cover it, which means "
-            + "the reader can assemble it - but a deck leads with its answer rather than "
-            + "leaving it to be inferred from twenty pages. Write the page that says it." + where) });
+    const { share: coverage, missing } = carriedBy(answerWords, claims.join(" \n "));
+    const opening = openingPage(pages);
+    const named = opening ? `\`${opening.id}\` (${opening.summary ? "the executive summary" : "the opening page"})` : "the opening page";
+    const lead = answerLead(answer);
+    const titled = carriedBy(contentWords(lead), opening?.title ?? "");
+    const upFront = opening?.whole === null ? null : carriedBy(answerWords, opening?.whole ?? "");
+    // The opening title's own share of the whole answer, and the share it is held to: `answerCarriedMin`, or what a full-length title can hold where that is less.
+    const inTitle = carriedBy(answerWords, opening?.title ?? "");
+    const titleBar = answerWords.size ? Math.min(CONTENT_THRESHOLDS.answerCarriedMin, titleContentWords() / answerWords.size) : 0;
+    // Blocks once the deck is long enough to judge: a deck whose claims do
+    // not deliver its own answer is not finished, however good its pages.
+    // As an advisory it is read and shipped past. A probe of a few pages
+    // hears it as a question.
+    const severity = pages.length >= CONTENT_THRESHOLDS.from ? "blocking" : "advisory";
+    // Where the deck stands against each bar of the answer rule, broken or
+    // not: the titles' coverage, the opening title's share of the leading
+    // clause, and the opening page's share of the whole answer once its copy
+    // is there to read.
+    const blocks = severity === "blocking";
+    standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "coverage", what: "the answer's content words some claim carries", value: round(coverage), bar: CONTENT_THRESHOLDS.answerCoverageMin, side: "min", unit: "share", applies: true, blocks });
+    if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "lead", what: "the answer's leading clause the opening title carries", value: round(titled.share), bar: CONTENT_THRESHOLDS.answerLeadMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
+    if (opening && upFront) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "upfront", what: "the answer's content words the opening page carries", value: round(upFront.share), bar: CONTENT_THRESHOLDS.answerUpFrontMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
+    if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "title", what: "the answer's content words the opening title carries", value: round(inTitle.share), bar: round(titleBar), side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
+    const quoted = (words) => words.slice(0, 6).map((w) => `"${w}"`).join(", ");
+    if (coverage < CONTENT_THRESHOLDS.answerCoverageMin)
+      findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.coverage", severity, ...finding(null, "CONTENT_ANSWER_UNCARRIED",
+        { coverage: round(coverage), unclaimed: missing.slice(0, 8) }, { coverage: CONTENT_THRESHOLDS.answerCoverageMin },
+        `The answer promises something no page proves: the page titles between them carry ${Math.round(coverage * 100)}% of the answer's words and the deck is held to ${Math.round(CONTENT_THRESHOLDS.answerCoverageMin * 100)}%. `
+        + `Either a page has to claim it - no title in this deck says ${quoted(missing)} - `
+        + `or the answer is wider than the evidence and should be narrowed to what the deck can actually settle. State the answer on ${named}, and give each reason it names a page whose title claims it.`) });
+    // The answer up front. The title is asked for the verdict and the page
+    // for the rest, so an answer with its reasons and thresholds is carried
+    // by a summary that states them, whatever its length.
+    const short = titled.share < CONTENT_THRESHOLDS.answerLeadMin;
+    const thin = upFront !== null && upFront.share < CONTENT_THRESHOLDS.answerUpFrontMin;
+    // Compared as counts, so the bar is exact: the title carries `answerCarriedMin` of the answer's words, or as many as a full-length title holds.
+    const titleNeeds = Math.min(CONTENT_THRESHOLDS.answerCarriedMin * answerWords.size, titleContentWords());
+    const bare = answerWords.size - inTitle.missing.length < titleNeeds - 1e-9;
+    if (opening && (short || thin || bare))
+      findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.upfront", severity, id: opening.id, ...finding(opening.page.n ?? null, "CONTENT_ANSWER_UNCARRIED",
+        { page: opening.id, lead: round(titled.share), title: round(inTitle.share), ...(upFront ? { upFront: round(upFront.share) } : {}), ...(short ? { leadMissing: titled.missing.slice(0, 8) } : {}), ...(bare ? { titleMissing: inTitle.missing.slice(0, 8) } : {}), ...(thin ? { pageMissing: upFront.missing.slice(0, 8) } : {}) },
+        { lead: CONTENT_THRESHOLDS.answerLeadMin, title: round(titleBar), upFront: CONTENT_THRESHOLDS.answerUpFrontMin },
+        `The deck does not lead with its answer on ${named}. `
+        + (short ? `Its title ("${opening.title.slice(0, 90)}") carries ${Math.round(titled.share * 100)}% of the answer's leading clause ("${lead.slice(0, 110)}") and is held to ${Math.round(CONTENT_THRESHOLDS.answerLeadMin * 100)}%: write the verdict in the title in the answer's own words (missing: ${quoted(titled.missing)}). ` : "")
+        + (bare ? `Its title carries ${answerWords.size - inTitle.missing.length} of the answer's ${answerWords.size} content words and is held to ${Math.ceil(titleNeeds - 1e-9)} - ${Math.round(CONTENT_THRESHOLDS.answerCarriedMin * 100)}% of them, or the ${titleContentWords()} a full-length title holds where that is fewer: a title that repeats an opening clause which states no verdict leads with nothing, so write what the answer concludes in the title, in the answer's own words (missing: ${quoted(inTitle.missing)}). ` : "")
+        + (thin ? `The page as a whole - title, points, highlight and exhibit cells - carries ${Math.round(upFront.share * 100)}% of the answer's words and is held to ${Math.round(CONTENT_THRESHOLDS.answerUpFrontMin * 100)}%: state the answer's reasons, rivals and thresholds in the page's points, in the answer's own words (missing: ${quoted(upFront.missing)}). ` : "")
+        + `The answer itself may be as long as its reasons need: the title is asked for its leading clause and for no more of the whole than ${titleContentWords()} of its words. If the answer says something the summary should not, narrow the answer.`) });
+    // A revision recorded before the up-front rule hears it as an advisory (report: applyRulesVersion), and is held to the rule it was
+    // recorded under instead: one title carries a share of the whole answer. It is the version-3 answer rule, under that rule's name.
+    if (waivedRules(deck ?? {}).has("CONTENT_ANSWER_UNCARRIED.upfront")) {
+      const best = pages.map((p) => ({ id: p.id ?? p.n, claim: String(p.claim ?? ""), share: overlap(answer, String(p.claim ?? "")) })).sort((a, b) => b.share - a.share)[0];
+      const carried = best?.share ?? 0;
+      standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "carried", what: "the answer's content words the best single title carries (the rule this revision was recorded under)", value: round(carried), bar: CONTENT_THRESHOLDS.answerCarriedMin, side: "min", unit: "share", applies: true, blocks, ...(best ? { pages: [best.id] } : {}) });
+      if (carried < CONTENT_THRESHOLDS.answerCarriedMin && coverage >= CONTENT_THRESHOLDS.answerCoverageMin)
+        findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.coverage", severity, ...finding(null, "CONTENT_ANSWER_UNCARRIED",
+          { coverage: round(coverage), carried: round(carried), unclaimed: missing.slice(0, 8) }, { coverage: CONTENT_THRESHOLDS.answerCoverageMin, carried: CONTENT_THRESHOLDS.answerCarriedMin },
+          `No single page states the answer: the closest title${best ? ` (\`${best.id}\`: "${best.claim.slice(0, 90)}")` : ""} carries ${Math.round(carried * 100)}% of the answer's words and this deck, revised under rules version ${Number(deck?.rulesVersion)}, is held to ${Math.round(CONTENT_THRESHOLDS.answerCarriedMin * 100)}%. `
+          + `The claims between them cover it, which means the reader can assemble it - but a deck leads with its answer rather than leaving it to be inferred. State it in the title of ${named}. `
+          + "(A deck recorded under the current rules is held to the answer up front on its opening page instead; this deck hears that rule as an advisory.)") });
     }
     const against = contradictions(answer, pages);
     if (against.length) {

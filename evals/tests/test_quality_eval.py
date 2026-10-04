@@ -229,6 +229,9 @@ class ResultsTests(Harness, unittest.TestCase):
         self.assertEqual(len(json.loads((kept / "plan.json").read_text())["pages"]), 4)
         self.assertEqual(row["deckSlides"], 4)
         self.assertEqual(row["deck"]["deliveryStage"], "delivered")
+        # What the run cost is counted from the author's own log: the numbers are recorded, the log is not kept.
+        self.assertEqual([row["cost"]["runs"], row["cost"]["refused"], row["cost"]["modes"]["check"]], [2, 1, {"runs": 1, "refused": 1}])
+        self.assertEqual(row["cost"]["longestStreak"]["page"], "p1")
         self.assertEqual(sorted(p.name for p in kept.iterdir() if p.is_file()),
                          ["agent.stderr.txt", "agent.stdout.txt", "deck.json", "delivery.json", "kept.json",
                           "pages.json", "plan.json", "scene.json.gz"])

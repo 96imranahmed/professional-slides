@@ -13,6 +13,10 @@
  * about the run from outside the gates: whether it was delivered, what a reader
  * made of it, and the verdict today's rules must still reach (`expect`).
  *
+ * A specimen that kept the author's run log (`author-log.jsonl`) has what the
+ * run cost counted from it - compile runs, refused runs, refusals per code and
+ * per page, the longest streak on one page - and recorded with the stamp.
+ *
  * `recorded` is the stamp: the verdict the rules returned and the sha256 of the
  * weight.json they were read from. Scored again under the same weight.json the
  * verdict must come back unchanged; under a different one the verdict may move,
@@ -25,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { scoreRun } from "./score.mjs";
 import { isMain } from "../../skills/professional-slides/runtime/cli.mjs";
+import { readRunLog } from "../../skills/professional-slides/runtime/run-log.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SPECIMENS = path.join(HERE, "specimens");
@@ -38,6 +43,9 @@ export const INPUTS = Object.freeze({
   scene: ["scene.json.gz", "scene.json"],
   deck: ["deck.json.gz", "deck.json"],
 });
+
+/** The author's run log, where a specimen kept it: counted, never gated. */
+const RUN_LOG = "author-log.jsonl";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export const weightSha = () => sha256(readFileSync(WEIGHT));
@@ -69,7 +77,8 @@ export function loadSpecimen(name, root = SPECIMENS) {
   const meta = JSON.parse(readFileSync(path.join(dir, "specimen.json"), "utf8"));
   const files = inputFiles(dir);
   const inputs = Object.fromEntries(Object.entries(files).map(([role, file]) => [role, readJsonFile(path.join(dir, file))]));
-  return { name, dir, meta, files, ...inputs };
+  const runs = existsSync(path.join(dir, RUN_LOG)) ? readRunLog(path.join(dir, RUN_LOG)) : null;
+  return { name, dir, meta, files, ...inputs, runs };
 }
 
 /** What the recorded verdict is compared on: decisions, not every statistic. */
@@ -91,7 +100,7 @@ export function verdictOf(result) {
 }
 
 export function scoreSpecimen(specimen) {
-  const result = scoreRun({ plan: specimen.plan ?? null, scene: specimen.scene ?? null });
+  const result = scoreRun({ plan: specimen.plan ?? null, scene: specimen.scene ?? null, runs: specimen.runs ?? null });
   return { name: specimen.name, weightSha256: weightSha(), result, verdict: verdictOf(result) };
 }
 
@@ -108,7 +117,7 @@ export function stamp(name, root = SPECIMENS, today = new Date().toISOString().s
     ...specimen.meta,
     schema: SCHEMA,
     inputs: inputHashes(specimen.dir, specimen.files),
-    recorded: { weightSha256: scored.weightSha256, stamped: today, verdict: scored.verdict },
+    recorded: { weightSha256: scored.weightSha256, stamped: today, verdict: scored.verdict, ...(scored.result.cost ? { cost: scored.result.cost } : {}) },
   };
   writeFileSync(path.join(specimen.dir, "specimen.json"), JSON.stringify(meta, null, 1) + "\n");
   return { name, previous: specimen.meta.recorded?.verdict ?? null, verdict: scored.verdict };
@@ -120,7 +129,9 @@ function line(name, scored, meta) {
   const build = v.build ? `build ${v.build.accepted ? "pass" : "FAIL"} [${v.build.findings.map((f) => `${f.measure} ${f.measured}`).join(", ") || "clean"}]` : "build -";
   const expected = typeof meta.expect?.accepted === "boolean" ? (meta.expect.accepted === v.accepted ? " as expected" : " UNEXPECTED") : "";
   const rules = meta.recorded?.weightSha256 === scored.weightSha256 ? "" : " (weight.json changed since the stamp)";
-  return `${name.padEnd(28)} ${v.accepted ? "ACCEPTED" : "NOT ACCEPTED"}${expected}${rules}\n  ${plan}\n  ${build}`;
+  const c = scored.result.cost;
+  const cost = c ? `\n  cost ${c.runs} compile runs, ${c.refused} refused${c.longestStreak ? `, longest streak ${c.longestStreak.runs} on ${c.longestStreak.page}` : ""}` : "";
+  return `${name.padEnd(28)} ${v.accepted ? "ACCEPTED" : "NOT ACCEPTED"}${expected}${rules}\n  ${plan}\n  ${build}${cost}`;
 }
 
 if (isMain(import.meta.url)) {

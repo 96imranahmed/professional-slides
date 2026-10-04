@@ -126,7 +126,12 @@ lists what fired on those pages, which is where a new gate starts.
 union with eight declared players, an ambulance service under a closed evidence
 scope, a note-taking app against two rivals, and an explanation that compares
 nothing - each a pages file, an insight log with measures and an analysis plan
-(`make_fixtures.py` wrote them). They are not the deck whose failure prompted
+(`make_fixtures.py` wrote them). Most exhibits type their values beside a
+`basis`; the credit union also writes numbers by reference - a bound chart, an
+indexed trend bound to an index analysis, a bound metric, tokens in a title and
+in table cells - and the ambulance service draws a recorded series and a
+scenario's path as one bound line, so both ways of putting a number on a page
+are measured. They are not the deck whose failure prompted
 the contract, but they were written with it, by the same hand: they show the
 rules fire and stay quiet where intended, not how the contract fares on decks
 it has never seen. `evidence-validity.mjs` measures the contract on them:
@@ -139,25 +144,37 @@ node evals/quality/evidence-validity.mjs           # the table; exit 2 unless ev
   carry the cases a careless rule would refuse: a context exhibit with its
   relevance, two same-unit series read separately with the reason, a metric
   strip over a chart, a deck with no comparison because it compares nothing.
-  Any finding is a false positive. Zero here is by construction: the fixtures
+  Any finding is a false positive, the advisory on untraced numbers
+  (`NUMBER_UNTRACED`) included. Zero here is by construction: the fixtures
   were written to pass.
-- **Seeded defects.** Seventeen defects are planted on every page each applies
+- **Seeded defects.** Twenty-one defects are planted on every page each applies
   to, one at a time: an exhibit copied from another page with its evidence id
   appended and the citation left alone, the same copy relabelled as the claim's
   measure or listed beside it, numbers rounded to one figure, a metric's printed
   number changed, a unit, a period or a number changed, a dependency left
   undeclared, a citation dropped, a context exhibit unexplained, a relation
-  split across panels. A defect is caught when the finding it should raise
+  split across panels; one typed cell of a table changed and one typed number
+  in a sentence changed - a number written as a measurement, such as "57%" or
+  "12.2 minutes" - which the trace of typed numbers reports as an advisory
+  (the table labels these two "(advisory)": they are reported, and block
+  nothing); and two references that cannot be bound - a bound exhibit naming a
+  measure the log does not hold, and a token of an insight the page does not
+  rest on. A defect is caught when the finding it should raise
   names the page. Each defect is planted in the terms a rule reads, so a full
   catch says each rule fires on its own trigger across four decks; it is not a
   recall estimate against an author who errs in ways nobody listed.
-- **Known limits.** Two defects the contract does not read are planted the same
-  way and reported, uncounted: one cell of a table changed (a table is held
-  only to showing a number of each measure it names), and a number changed in
-  a sentence (titles, points and so-what bars are not traced to measures). A
-  page with no plotted exhibit and no declaration is not checked at all, and
-  the contract runs at authoring: a `deck.json` edited after the compile is not
-  re-checked against the log.
+- **Known limits (planted, not counted).** The table closes on three defects
+  the trace does not claim to catch, planted the same way and reported caught
+  over planted: a bare whole number in a sentence changed ("8 branches" is a
+  count or a name as often as a measurement, and is not traced), a year changed
+  (a year is read as a period label), and a number changed into another
+  recorded value of the measure it stated (the trace asks whether a typed
+  number is a value of some measure the page rests on, not which record the
+  sentence meant - so one that happens to equal a value of another measure in
+  a compatible unit passes too). They do not count towards acceptance; a count
+  above zero means the trace has started to read that case. The contract runs
+  at authoring: a `deck.json` edited after the compile is not re-checked
+  against the log.
 
 ## Critic calibration
 

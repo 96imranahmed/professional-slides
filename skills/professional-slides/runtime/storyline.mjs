@@ -33,13 +33,23 @@
 // serious and additive, at most three passes. The deck review waits for this
 // gate: `storylineGate` is ready only for the spine the critique read.
 //
-// The critique is bound to the spine only - the request, the answer, each
-// page's title, claim and what it settles, its page and exhibit types, and the
-// numbers it plots - so rewording, commentary and table-cell edits carry over,
-// and changing what a page argues or shows does not. Its passes live beside the
-// deck file, keyed by deck id (review-passes.mjs lineageStore), so a new output
-// directory continues the lineage rather than restarting it.
-import { SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, trendChart } from "./evidence.mjs";
+// The critique is bound to the argument, not to how it is drawn: the request,
+// the answer and its status, the sections and pages in order, and per page its
+// title, its claim, its page type, what settles the claim, the insights and
+// analyses it rests on, the measures it declares it shows with their recorded
+// values, and what the page shows of each: which of its periods or members,
+// and whether plotted, tabulated or stated as a figure (storyStructure). A
+// table - any exhibit with no axis to read - shows a period or member where it
+// names it and states its recorded number there, and the values it types are
+// bound as themselves. An exhibit that names no recorded measure is bound by
+// the numbers it draws. A
+// chart's form within its class, where the commentary sits, captions,
+// highlights and copy are the layout, which is done once, after the critique
+// is ready, and leaves it valid. Its passes live beside the deck file, keyed by
+// deck id (review-passes.mjs lineageStore), so a new output directory continues
+// the lineage rather than restarting it.
+import { SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, trendChart, isTable, cellText, rowCells, rowLabel } from "./evidence.mjs";
+import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
@@ -51,10 +61,13 @@ import {
   changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
   callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, requestHash, requestErrors, stageReview, lineageStore, restartLineage, isAuthFailure,
-  readInventory, revisionChanges, locateDeck, requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf,
+  readInventory, revisionChanges, locateDeck, requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, retireLineage, carriedItems, settleCarried, carriedErrors, CARRIED_SCHEMA,
+  ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf,
 } from "./review-passes.mjs";
 import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
-import { dependencyNotes } from "./gates/dependency_gates.mjs";
+import { readInsightLog } from "./measures.mjs";
+import { VIEW_CLASSES, declaredLabels, declaresView, dependencyNotes, metricsOf, refsOf, roleFor } from "./gates/dependency_gates.mjs";
+import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
 // scope allows and whose answer is offered as provisional: the decisive gaps
@@ -106,7 +119,7 @@ export const STORYLINE_CODES = Object.freeze({
  */
 export const STORYLINE_CHECKS = Object.freeze({
   claim: { scope: "page", checks: "the page's claim is a finding with an implication, not a count, a fact or a two-number comparison" },
-  shape: { scope: "page", checks: "the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the benchmark gap, the map, the judging table - not a two-number chart or a plain grid; a comparison sets every member on the same measures, n/a where one is undisclosed, not a different metric per member" },
+  shape: { scope: "page", checks: "the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the benchmark gap, the map, the judging table - not two numbers or an unjudged list; a comparison sets every member on the same measures, n/a where one is undisclosed, not a different metric per member" },
   sourcing: { scope: "page", checks: "the claim traces to insights in the log, each with its calculation and source files: supported, partly supported or unsupported, naming the insight ids" },
   restatement: { scope: "page", checks: "the page moves the argument on from the page before it; it does not restate it or re-prove another page's proposition" },
   consequence: { scope: "page", checks: "the page says what follows for the decision, not only what is true" },
@@ -163,7 +176,7 @@ const CUT = { type: "object", additionalProperties: false, required: ["id", "pag
   properties: { id: ITEM_PROPERTIES.id, pages: ITEM_PROPERTIES.pages, action: { type: "string", enum: ["cut", "merge"] }, freedUse: STR(10), severity: ITEM_PROPERTIES.severity } };
 const STATUS = { type: "object", additionalProperties: false, required: ["finding", "status", "evidence"],
   properties: { finding: { type: "string" }, status: { type: "string", enum: STORYLINE_STATUSES }, evidence: STR(20), severity: { type: "string", enum: SEVERITIES },
-    pages: { type: "array", items: { type: "string" } }, searchLog: { type: "string" }, artifact: { type: "string" } } };
+    pages: { type: "array", items: { type: "string" } }, searchLog: { type: "string" }, artifact: { type: "string" }, answers: ANSWERS_SCHEMA } };
 const COMPLETENESS = { type: "array", items: { type: "object", additionalProperties: false, required: ["check", "result", "note"],
   properties: { check: { type: "string", enum: STORYLINE_DIMENSIONS }, result: { type: "string", enum: ["findings", "clean"] }, note: { type: "string" } } } };
 const ANSWER_PARTS = { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["part", "verdict", "missingEvidence"],
@@ -188,6 +201,8 @@ export const STORYLINE_SCHEMA = {
     topFixes: { type: "array", items: { type: "string" }, minItems: 1 },
     completeness: COMPLETENESS,
     mergedFrom: { type: "array", items: { type: "string" } },
+    // One answer for each blocking item a retired lineage left open (review-passes.mjs carriedErrors); absent where the packet carries none.
+    carried: CARRIED_SCHEMA,
   }
 };
 
@@ -262,11 +277,11 @@ export function describeExhibit(ex) {
   return parts.join("; ");
 }
 
-// The data an exhibit plots, as numbers: what a reversed trend or a reordered
-// ranking changes. Typed values only - a number written into a label or a
-// table cell's text is wording, and editing it keeps the critique.
+// The numbers an exhibit draws: what an exhibit that names no recorded measure
+// is bound by, and the line that shows a critic a drafted exhibit. Typed values
+// only - a number written into a label or a table cell's text is wording.
 const DATA_KEYS = new Set(["series", "values", "value", "points", "rows", "cells", "markers", "items", "charts", "props", "low", "high", "boxes", "targets", "data", "x", "y", "min", "q1", "median", "q3", "max"]);
-export function plottedNumbers(node, out = []) {
+function plottedNumbers(node, out = []) {
   if (typeof node === "number") { if (Number.isFinite(node)) out.push(node); return out; }
   if (Array.isArray(node)) { for (const v of node) plottedNumbers(v, out); return out; }
   if (node && typeof node === "object") for (const [key, value] of Object.entries(node)) if (DATA_KEYS.has(key)) plottedNumbers(value, out);
@@ -274,41 +289,298 @@ export function plottedNumbers(node, out = []) {
 }
 
 /**
- * The spine: what the critique is bound to. Per page its id, kind, title,
- * claim and what it settles, its page type, and each exhibit's type and the
- * numbers it plots. Commentary, labels and cell text are left out, so copy
- * edits after the critique carry over; a page checked for them is checked by
- * the deck review's verification pass.
+ * The measures a page declares it shows, each as `role:ref`, sorted: the
+ * claim's own measures (`settles.measures`) are proof by definition, and an
+ * exhibit, block or metric adds to the list where its `basis` names a measure
+ * the claim does not, or names one as context - the role is each measure's
+ * own (dependency_gates.mjs roleFor), so one chart can show the claim's
+ * measure as proof and another beside it as context. Which exhibit draws a measure,
+ * and in what form, is the layout's; that the page shows it is the argument's.
  */
-export function storyStructure(spec) {
-  const pages = [...(spec.slides || []), ...(spec.appendix || [])];
-  return pages.map((s, i) => ({
-    id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", title: String(s.title ?? s.text ?? ""),
-    claim: s.pageType?.content?.claim ?? s.claim ?? null, settles: s.pageType?.content?.settles ?? s.settles ?? null,
-    type: s.pageType ? `${s.pageType.type ?? ""}/${s.pageType.form ?? ""}` : null,
-    // What each exhibit says it plots and why it is on the page: an exhibit
-    // moved onto another claim is a different argument, whatever its numbers.
-    exhibits: exhibitsOf(s).map((ex, at) => ({ type: ex.type ?? null, values: plottedNumbers(ex), ...(s.pageType?.dependencies?.exhibits?.[at] ? { basis: s.pageType.dependencies.exhibits[at] } : {}) })),
+export function shownMeasures(slide) {
+  const shown = new Set(claimMeasures(slide).map((ref) => `proof:${ref}`));
+  for (const basis of declaredBases(slide)) for (const ref of refsOf(basis)) shown.add(`${roleFor(basis, ref).role}:${ref}`);
+  return [...shown].sort();
+}
+// Every `basis` a page declares, on its exhibits, blocks and metrics (author-deck.mjs withoutDependencies), and the measures its claim is about.
+const declaredBases = (slide) => { const declared = slide?.pageType?.dependencies ?? {}; return [declared.exhibits, declared.blocks, declared.metrics].flatMap((list) => list || []).filter(Boolean); };
+const claimMeasures = (slide) => { const settles = slide?.pageType?.content?.settles ?? slide?.settles; return (Array.isArray(settles?.measures) ? settles.measures : []).filter((ref) => typeof ref === "string"); };
+
+/**
+ * The same measures as a critic is shown them, the claim's first: `proof`
+ * where an exhibit or metric is declared to show the measure as proof,
+ * `claim` where the claim is about it and nothing is declared to show it (a
+ * spine not yet laid out, or a page that shows only context), and `context`.
+ */
+function measureRoles(slide) {
+  const claimed = claimMeasures(slide), drawn = new Map();
+  for (const basis of declaredBases(slide)) for (const ref of refsOf(basis)) if (drawn.get(ref) !== "proof") drawn.set(ref, roleFor(basis, ref).role);
+  return [...claimed.map((ref) => ({ ref, role: drawn.get(ref) === "proof" ? "proof" : "claim" })), ...[...drawn].filter(([ref]) => !claimed.includes(ref)).sort(([a], [b]) => a.localeCompare(b)).map(([ref, role]) => ({ ref, role }))];
+}
+
+/**
+ * Every measure of an insight log as the binding reads it, keyed `owner/name`:
+ * the hash of what it records - its unit, the periods or members it runs over
+ * and its values - with that axis and those values, from which what a page
+ * shows of the measure is read off its exhibits (shownOf). `insights` is the
+ * log with the computed analyses joined to it. A measure whose recorded
+ * numbers change is a changed argument on every page that shows it, however
+ * the page is drawn.
+ */
+export function recordedMeasures(insights) {
+  return Object.fromEntries([...measureRegistry(insights)].map(([ref, m]) => {
+    const unit = m.unit ?? null, axis = axisOf(m), values = valuesOf(m);
+    return [ref, { hash: sha256(JSON.stringify({ unit, axis, values })), unit, axis, values }];
   }));
 }
 
-/** The critique's binding: the spine, the governing answer and the user's request. */
-export function storylineBinding(spec) {
-  const offered = answerStatusOf(spec);
-  return sha256(JSON.stringify({ request: requestHash(spec), answer: spec.answer ?? null, ...(offered.status === "provisional" ? { answerStatus: offered } : {}), pages: storyStructure(spec) }));
+// How an exhibit shows a measure: plotted (any chart, whatever its form),
+// tabulated, or stated as a figure (a metric, a hero figure, a fact grid or a
+// stat list). A line redrawn as columns is the same class; a chart swapped for
+// a table, or for one figure, is not.
+const FIGURE_EXHIBITS = new Set(["fact-grid", "stat-list"]);
+const classOf = (ex) => { const type = String(ex?.type ?? ""); return type.startsWith("chart") ? "chart" : type === "table" || isTable(ex) ? "table" : FIGURE_EXHIBITS.has(type) ? "figure" : type || "exhibit"; };
+const WHOLE = "all";
+/**
+ * The class a page not yet drawn is taken to show a measure in: a figure for a
+ * measure of one value, a table on a page type whose exhibit is a table,
+ * otherwise a chart. It follows from the page type and the measure, both of
+ * which the critique is bound to, never from the form, which is the layout's.
+ * The table types are page-types.mjs's (familyOf of the type alone), listed
+ * here so the critique does not load the layout engine; a test holds the two
+ * together.
+ */
+const TABLE_TYPES = new Set(["scorecard", "lookup", "matrix", "options"]);
+const naturalClass = (type, measure) => (measure.axis.kind === "scalar" ? "figure" : TABLE_TYPES.has(type) ? "table" : "chart");
+
+const stringsIn = (node, out = []) => {
+  if (typeof node === "string") out.push(node);
+  else if (node && typeof node === "object") for (const value of Object.values(node)) stringsIn(value, out);
+  return out;
+};
+const names = (text, label) => { const at = text.indexOf(label); return at >= 0 && !/[\p{L}\p{N}]/u.test(text[at - 1] ?? "") && !/[\p{L}\p{N}]/u.test(text[at + label.length] ?? ""); };
+// The periods or members of a measure whose recorded value one of `numbers` states (printed-numbers.mjs).
+const statedLabels = (numbers, measure) => {
+  const reading = { unit: measure.unit, percent: percentUnit(measure.unit) };
+  return measure.axis.labels.filter((_, at) => typeof measure.values[at] === "number" && numbers.some((number) => states(number, measure.values[at], reading)));
+};
+const firstNumber = (text) => printedNumbers(String(text ?? "")).slice(0, 1);
+// A typed value read as a printed number: its own digits and its own sign.
+const typedNumber = (value) => ({ n: Math.abs(value), decimals: (String(value).split(".")[1] || "").length, sign: value < 0 ? -1 : 1, scale: null, scaled: false, percent: false });
+
+// A chart's category axis, or null where it has none to read (a scatter's
+// points, a map's markers).
+function categoryAxis(ex) {
+  if (classOf(ex) !== "chart") return null;
+  const group = ex.type === "chart-group" && Array.isArray(ex.charts) ? ex.charts.flatMap((c) => c?.props?.categories || []) : null;
+  const axis = ex.categories ?? ex.labels ?? group;
+  return Array.isArray(axis) ? new Set(axis.map(String)) : null;
 }
 
-/** One hash per page of the spine: what a verification pass compares. */
-export function storylinePageHashes(spec) {
-  return Object.fromEntries(storyStructure(spec).map((p) => [p.id, sha256(JSON.stringify(p))]));
+// Where an exhibit with no axis states its numbers. A table states them cell
+// by cell, each under its column header and beside its row label, so a number
+// is read against the period or member its header or its row names; any other
+// exhibit is one place. `typed` are the values it draws from (a bar cell's
+// `value`, a point's `x`), `printed` the numbers its text prints.
+function placesOf(ex) {
+  if (!isTable(ex)) return [{ texts: stringsIn(ex), typed: plottedNumbers(ex), printed: stringsIn(ex).flatMap((text) => printedNumbers(text)) }];
+  const headers = (ex.columns || []).map(cellText);
+  return ex.rows.flatMap((row) => { const label = cellText(rowLabel(row)); return rowCells(row).map((cell, at) => ({ texts: [label, headers[at] ?? ""],
+    typed: typeof cell === "number" ? [cell] : plottedNumbers({ cells: cell && typeof cell === "object" ? cell : null }), printed: printedNumbers(cellText(cell)) })); });
+}
+
+/**
+ * What an exhibit with no axis to read shows of the measures it names: for
+ * each, in order, the periods or members shown (null for a measure of one
+ * value). A period or member is shown where the exhibit names it - in a
+ * table, in a column header or a row label; what a cell says in passing is
+ * copy - and, where the exhibit states numbers, a number in that place states
+ * its recorded value (printed-numbers.mjs): a header kept over other numbers
+ * shows nothing of it. Where the exhibit names none, the ones whose recorded
+ * value it states are shown. So the numbers the exhibit states of a measure
+ * are bound through the record, and wording that leaves them alone is copy.
+ * The values such an exhibit types (a bar cell's `value`, a point's `x`) are
+ * bound as themselves besides (shownOf).
+ */
+function statedViews(ex, measureList) {
+  const places = placesOf(ex);
+  const anyNumber = places.some((place) => place.typed.length || place.printed.length);
+  const readings = measureList.map((measure) => ({ unit: measure.unit, percent: percentUnit(measure.unit) }));
+  // The periods or members of each measure a place can be stating: the ones its texts name, or any where they name none.
+  const candidates = places.map((place) => measureList.map((measure) => { const named = measure.axis.labels.filter((label) => place.texts.some((text) => names(text, label))); return named.length ? named : measure.axis.labels; }));
+  const valueAt = (measure, label) => (measure.axis.kind === "scalar" ? measure.values[0] : measure.values[measure.axis.labels.indexOf(label)]);
+  const statesAt = (number, m, label) => typeof valueAt(measureList[m], label) === "number" && states(number, valueAt(measureList[m], label), readings[m]);
+  const labels = measureList.map((measure, m) => {
+    if (measure.axis.kind === "scalar") return null;
+    const texts = isTable(ex) ? [...(ex.columns || []).map(cellText), ...ex.rows.map((row) => cellText(rowLabel(row)))] : places[0].texts;
+    const named = measure.axis.labels.filter((label) => texts.some((text) => names(text, label)));
+    const stated = measure.axis.labels.filter((label) => places.some((place, at) => candidates[at][m].includes(label) && [...place.printed, ...place.typed.map(typedNumber)].some((number) => statesAt(number, m, label))));
+    return named.length ? (anyNumber ? named.filter((label) => stated.includes(label)) : named) : isTable(ex) ? stated : named;
+  });
+  return labels;
+}
+
+// One view of a measure: the class it is shown in and which of its periods or
+// members, `WHOLE` for all of them - all a chart's axis can carry, and all that
+// hold a number where the class states numbers; `drawn` is added where none of
+// them can be read off the exhibit, which is then held to the numbers or the
+// figure it draws.
+const wholeOf = (kind, measure) => (kind === "chart" ? measure.axis.labels : measure.axis.labels.filter((_, at) => typeof measure.values[at] === "number"));
+const viewOf = (kind, labels, measure, drawn = null) => [kind, labels === null || labels.length === wholeOf(kind, measure).length ? WHOLE : labels, ...(drawn && labels !== null && !labels.length ? [drawn] : [])];
+
+/**
+ * The view of `measure` a `basis` declares for an exhibit or a figure not
+ * drawn yet (dependency_gates.mjs declaresView: `as`, `labels`, `members`),
+ * read exactly as an exhibit drawn to show it would be: `[class, labels]`, the
+ * class `fallback` where the basis names none. A measure the declared labels
+ * do not run over is shown whole.
+ */
+function declaredView(basis, ref, measure, fallback) {
+  const kind = VIEW_CLASSES.includes(basis.as) ? basis.as : fallback;
+  if (measure.axis.kind === "scalar") return viewOf(kind, null, measure);
+  const labels = declaredLabels(basis, ref, measure.axis) ?? measure.axis.labels;
+  return viewOf(kind, kind === "chart" ? labels : labels.filter((label) => wholeOf(kind, measure).includes(label)), measure);
+}
+
+/**
+ * What a page's exhibits and figures show, read off the compiled page.
+ * `views`: for each recorded measure an exhibit, a block's exhibit or a figure
+ * names in its `basis`, the views of it on the page (viewOf), one per exhibit
+ * or figure that shows it - read off the exhibit where it is drawn, and off
+ * the view its `basis` declares where it is not (declaredView). `drawn`: for
+ * each exhibit that names no recorded measure and draws numbers - every
+ * numeric exhibit of a deck with no log - its class and those numbers, since
+ * nothing else says what it shows - and for each exhibit with no category
+ * axis that types values, whatever it names: a chart's axis is held to the
+ * record by the dependency gates, value by value; a table's bar cell or a
+ * scatter's point is held by nothing else.
+ */
+function shownOf(slide, measures) {
+  const declared = slide?.pageType?.dependencies ?? {};
+  const recorded = (basis) => (measures ? refsOf(basis).filter((ref) => measures[ref] !== undefined) : []);
+  const views = new Map(), drawn = [], undrawn = new Set(), read = new Set();
+  const add = (ref, view, declaredOnly = false) => { views.set(ref, [...(views.get(ref) ?? []), view]); (declaredOnly ? undrawn : read).add(ref); };
+  const type = slide?.pageType?.type;
+  // A spine not laid out yet keeps an exhibit's place with its type alone, or with nothing (author-deck.mjs --draft): declared, not drawn.
+  const drawnYet = (ex) => ex && typeof ex === "object" && Object.keys(ex).some((key) => key !== "type");
+  const exhibits = [...exhibitsOf(slide).map((ex, at) => [ex, declared.exhibits?.[at]]),
+    ...(Array.isArray(slide?.blocks) ? slide.blocks : []).map((block, at) => [block?.exhibit, declared.blocks?.[at]])];
+  for (const [ex, basis] of exhibits) {
+    if (!drawnYet(ex)) {
+      // Declared and not drawn: the view the basis states is the one the critic reads, and the one the drawn exhibit is held to.
+      if (declaresView(basis)) for (const ref of recorded(basis)) add(ref, declaredView(basis, ref, measures[ref], naturalClass(type, measures[ref])), true);
+      continue;
+    }
+    const refs = recorded(basis), numbers = plottedNumbers(ex);
+    if (!refs.length) { if (numbers.length) drawn.push({ class: classOf(ex), values: numbers }); continue; }
+    // A chart's category axis says which periods or members it shows, and the dependency gates hold the values it plots there to the record;
+    // an exhibit with no axis - a table, a figure grid, a scatter - is read by what it names and states (statedViews).
+    const axis = categoryAxis(ex);
+    const stated = axis ? null : statedViews(ex, refs.map((ref) => measures[ref]));
+    const shown = refs.map((ref, at) => [ref, measures[ref].axis.kind === "scalar" ? null : axis ? measures[ref].axis.labels.filter((label) => axis.has(label)) : stated[at]]);
+    if (!axis && numbers.length) drawn.push({ class: classOf(ex), values: numbers });
+    // One measure of the exhibit unread is the exhibit unread: its numbers stand for what it shows of each.
+    const unread = shown.some(([, labels]) => labels !== null && !labels.length);
+    for (const [ref, labels] of shown) add(ref, viewOf(classOf(ex), unread && labels !== null ? [] : labels, measures[ref], numbers));
+  }
+  // The figures a page prints, in the order their bases were declared (dependency_gates.mjs metricsOf); past them, a fact grid's or a stat list's items.
+  const figures = metricsOf(slide ?? {});
+  const items = exhibits.filter(([ex]) => drawnYet(ex) && FIGURE_EXHIBITS.has(ex.type)).flatMap(([ex]) => (Array.isArray(ex.items) ? ex.items : [])).map((item) => item?.value);
+  (declared.metrics || []).forEach((basis, at) => {
+    const printed = (figures[at] ? [figures[at].value] : items).filter((value) => value !== undefined && value !== null);
+    // Declared and not drawn yet: the view the basis states, or nothing to read.
+    if (!printed.length) { if (declaresView(basis)) for (const ref of recorded(basis)) add(ref, declaredView(basis, ref, measures[ref], "figure"), true); return; }
+    for (const ref of recorded(basis)) add(ref, viewOf("figure", measures[ref].axis.kind === "scalar" ? null : statedLabels(printed.flatMap(firstNumber), measures[ref]), measures[ref], printed.map(String)));
+  });
+  // `declared`: the measures whose every view on the page is a declared one - nothing drawn shows them yet.
+  return { views, drawn, declared: new Set([...undrawn].filter((ref) => !read.has(ref))) };
+}
+
+/**
+ * The argument: what the critique is bound to. Every page in order - the
+ * sections among them, so their order is bound too - with its id, kind and
+ * title, and for a page that argues its claim, its page type (the reading
+ * task), what settles the claim (`kind`, `what`, `measures`, `relation`), the
+ * insights and analyses it rests on and the measures it declares it shows
+ * (shownMeasures). `measures` is the log's measures (recordedMeasures), which
+ * adds, where the deck has a log, each shown measure's recorded values
+ * (`measures`) and what the page shows of it (`views`): per exhibit or figure
+ * that shows it, its class and the periods or members it shows. A measure no
+ * exhibit shows yet - a spine critiqued before it is laid out - has the view
+ * its `basis` declares (declaredView) and, with none declared, the one view
+ * the critic is told it is taken to have: whole, in its natural class
+ * (naturalClass). So laying a page out to the view the critic read keeps the
+ * critique, and another window, a dropped period or member, or another class
+ * does not. `drawn` holds, with its class, the numbers of each exhibit that
+ * names no recorded measure, and the typed values of each table or other
+ * exhibit with no category axis.
+ *
+ * Left out, because the layout decides them after the critique is ready: the
+ * page's form and where its commentary sits, a chart's form within its class,
+ * the numbers a chart plots on its axis for a measure it names (the dependency
+ * gates hold those to the record), captions, highlights, points and every
+ * other piece of copy - a table cell's wording among it, so long as the cell
+ * still states the recorded number its header and row name. The deck review judges those on the rendered pages.
+ */
+export function storyStructure(spec, measures = null) {
+  const pages = [...(spec.slides || []), ...(spec.appendix || [])];
+  return pages.map((s, i) => {
+    const content = s.pageType?.content ?? {};
+    const settles = content.settles ?? s.settles ?? null;
+    const shows = shownMeasures(s);
+    const recorded = measures ? shows.map((entry) => entry.slice(entry.indexOf(":") + 1)).filter((ref, at, all) => measures[ref] !== undefined && all.indexOf(ref) === at) : [];
+    const { views, drawn } = shownOf(s, measures);
+    const viewed = (ref) => (views.get(ref) ?? [[naturalClass(s.pageType?.type, measures[ref]), WHOLE]]).map((view) => JSON.stringify(view)).filter((view, at, all) => all.indexOf(view) === at).sort();
+    return { id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", title: String(s.title ?? s.text ?? ""),
+      claim: content.claim ?? s.claim ?? null, type: s.pageType?.type ?? null,
+      settles: settles && typeof settles === "object" ? { kind: settles.kind ?? null, what: settles.what ?? null, measures: Array.isArray(settles.measures) ? settles.measures : [], relation: settles.relation ?? null } : null,
+      rests: [...new Set(Array.isArray(content.evidence) ? content.evidence : [])].sort(), shows,
+      ...(recorded.length ? { measures: Object.fromEntries(recorded.map((ref) => [ref, measures[ref].hash])), views: Object.fromEntries(recorded.map((ref) => [ref, viewed(ref)])) } : {}),
+      ...(drawn.length ? { drawn } : {}) };
+  });
+}
+
+/**
+ * The fields of a pages file the binding reads - what storyStructure and
+ * storylineBinding hash - each with what it holds. A repair that writes one
+ * of them changes the argument, so a spine is held to everything such a
+ * repair would mend before the critique reads it (author-deck.mjs --draft,
+ * gates/gate_classes.mjs REPAIRS); what a repair mends without writing any of
+ * them is the layout's, and waits. A test moves each field on a fixture and
+ * holds this list to the binding: every field here changes it, and the
+ * layout's fields do not.
+ */
+export const BOUND_FIELDS = Object.freeze({
+  request: "the user's request, its provenance and the evidence scope",
+  answer: "the governing answer and its status",
+  pages: "the pages and sections, in order: one added, cut or moved",
+  title: "a page's title, which is its claim, and a section's title",
+  type: "a page's type, the reading task",
+  settles: "what settles the claim: `settles.kind`, `what`, `measures` and `relation`",
+  evidence: "the insights and analyses a page rests on",
+  basis: "the measures a page shows and each one's role: every `basis` on an exhibit, block or metric, and the measure a bound series or figure names",
+  view: "what a page shows of each measure: which of its periods or members, and whether plotted, tabulated or stated as a figure; and the numbers an exhibit with no recorded measure draws",
+  record: "the recorded values, unit and periods or members of a measure a page shows",
+});
+
+/** The critique's binding: the argument (storyStructure), the governing answer and its status, and the user's request. */
+export function storylineBinding(spec, measures = null) {
+  const offered = answerStatusOf(spec);
+  return sha256(JSON.stringify({ request: requestHash(spec), answer: spec.answer ?? null, ...(offered.status === "provisional" ? { answerStatus: offered } : {}), pages: storyStructure(spec, measures) }));
+}
+
+/** One hash per page of the argument: what a verification pass compares to say which pages moved. */
+export function storylinePageHashes(spec, measures = null) {
+  return Object.fromEntries(storyStructure(spec, measures).map((p) => [p.id, sha256(JSON.stringify(p))]));
 }
 
 const isContent = (p) => !p.kind || p.kind === "content";
 
-// The numbers a page turns on, in a line: each series from its first to its
-// last value, or the first plotted values.
+// The numbers a drafted exhibit draws, in a line: each series from its first
+// to its last value, or the first values. Shown in the page-level packet
+// only, with the drafted exhibit and said to be a draft.
 const fmt = (n) => (Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString("en-US");
-function keyNumbers(exhibits) {
+function draftedNumbers(exhibits) {
   const out = [];
   for (const ex of exhibits) {
     const unit = ex.unit ? ` ${ex.unit}` : "";
@@ -325,21 +597,102 @@ function keyNumbers(exhibits) {
   return out.slice(0, 5).join("; ");
 }
 
+// A measure as the critic reads it: what it runs over and its recorded values,
+// which are the numbers every page that shows it turns on. A series longer
+// than `max` periods is given by its ends and its length.
+function measureLine(ref, label, registry, max) {
+  const m = registry.get(ref);
+  if (!m) return `${label}: NOT IN THE LOG`;
+  const axis = axisOf(m), values = valuesOf(m), unit = m.unit ? ` ${m.unit}` : "";
+  const show = (v) => (typeof v === "number" && Number.isFinite(v) ? fmt(v) : "n/a");
+  if (axis.kind === "scalar") return `${label}: ${show(values[0])}${unit}`;
+  if (axis.kind === "periods" && values.length > max) return `${label}: ${axis.labels[0]} ${show(values[0])} to ${axis.labels.at(-1)} ${show(values.at(-1))}${unit}, ${values.length} periods`;
+  return `${label}: ${axis.labels.slice(0, max).map((name, i) => `${name} ${show(values[i])}`).join(", ")}${axis.labels.length > max ? `, ... (${axis.labels.length} ${axis.kind})` : ""}${unit}`;
+}
+
+// What a page shows of a measure, as the critic reads it and the critique is
+// bound to it (storyStructure `views`): the class of each exhibit or figure
+// that shows it and which of its periods or members. `views` is null for a
+// measure nothing on the page shows yet.
+const CLASS_WORDS = { chart: "plotted", table: "tabulated", figure: "stated as a figure" };
+// One view in words: "tabulated, 2 of its 8 periods: FY25, FY26".
+function viewWords([kind, labels], measure) {
+  const all = measure.axis.labels;
+  const window = (shown) => {
+    const at = shown.map((label) => all.indexOf(label)), run = measure.axis.kind === "periods" && shown.length > 2 && at.every((index, i) => i === 0 || index === at[i - 1] + 1);
+    return `${shown.length} of its ${all.length} ${measure.axis.kind}: ${run ? `${shown[0]} to ${shown.at(-1)}` : `${shown.slice(0, 8).join(", ")}${shown.length > 8 ? ", ..." : ""}`}`;
+  };
+  return `${CLASS_WORDS[kind] ?? `shown in a ${kind}`}${measure.axis.kind === "scalar" ? "" : labels === WHOLE ? ", whole" : labels.length ? `, ${window(labels)}` : `, none of its ${measure.axis.kind} named`}`;
+}
+const naturalWords = (type, measure) => `${CLASS_WORDS[naturalClass(type, measure)]}${measure.axis.kind === "scalar" ? "" : `, every one of its ${measure.axis.labels.length} ${measure.axis.kind}`}`;
+function viewsLine(views, measure, type) {
+  if (!measure) return "";
+  if (!views) return ` [not drawn yet: critiqued as ${naturalWords(type, measure)}]`;
+  return ` [the page shows it ${[...new Set(views.map((view) => viewWords(view, measure)))].join("; and ")}]`;
+}
+
 /**
- * The pages the critique reads, with what each rests on: its claim, what
- * settles it, its exhibits, its commentary, and the insights it names with
- * their calculation and sources, so sourcing is judged page by page rather
- * than found by accident.
+ * How the critique reads each measure a page shows and has not drawn, one
+ * entry a page: `{ id, measures: [{ ref, reading, declared }] }`. A measure
+ * nothing on the page draws is read in the view its `basis` declares
+ * (`declared`), and with none declared as shown whole in its natural class -
+ * and the layout is held to that reading. Said at the spine (author-deck.mjs
+ * --draft, --plan), before the critique is staged, so a page that will show a
+ * window, a subset, a table or one figure says so first. Pages that draw
+ * every measure they show are left out. `views` holds each reading as data -
+ * `[{ class, labels }]` - which a draft proves drawable (spine-exhibits.mjs).
  */
-async function storyPages(spec, base, stem) {
-  const content = await readJson(path.join(base, `${stem}.content.json`), { optional: true });
-  const byId = new Map((content?.pages || []).map((p) => [p.id, p]));
-  const recorded = await readJson(path.join(base, `${stem}.insights.json`), { optional: true });
+export function spineReadings(spec, measures) {
+  if (!measures) return [];
+  return [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s.pageType).flatMap((s) => {
+    const { views, declared } = shownOf(s, measures);
+    const refs = shownMeasures(s).map((entry) => entry.slice(entry.indexOf(":") + 1)).filter((ref, at, all) => measures[ref] !== undefined && all.indexOf(ref) === at);
+    // Each reading with the views it is of, as data: the class, and the periods or members shown (null for a measure of one value).
+    const listed = (ref, [kind, labels]) => ({ class: kind, labels: measures[ref].axis.kind === "scalar" ? null : labels === WHOLE ? wholeOf(kind, measures[ref]) : labels });
+    const undrawn = refs.filter((ref) => !views.has(ref) || declared.has(ref)).map((ref) => ({ ref, declared: declared.has(ref),
+      views: (declared.has(ref) ? views.get(ref) : [[naturalClass(s.pageType.type, measures[ref]), WHOLE]]).map((view) => listed(ref, view)),
+      reading: declared.has(ref) ? [...new Set(views.get(ref).map((view) => viewWords(view, measures[ref])))].join("; and ") : naturalWords(s.pageType.type, measures[ref]) }));
+    return undrawn.length ? [{ id: String(s.id), measures: undrawn }] : [];
+  });
+}
+
+const stemOf = (specPath) => path.basename(specPath).replace(/\.deck\.json$/, "");
+
+/**
+ * The evidence beside a deck file: its insight log with the analyses the
+ * runtime computes over it joined in (`log`, null where the deck has none),
+ * the analysis run, and the log's measures as the binding reads them
+ * (recordedMeasures) - what it holds each page's shown measures to.
+ */
+async function readEvidence(spec, specPath) {
+  const base = path.dirname(specPath), stem = stemOf(specPath);
+  // The log with its parts merged (measures.mjs readInsightLog): a log extracted by several workers is one log here.
+  const recorded = await readInsightLog(base, stem);
   // The analyses the runtime computed from the log's measures stand beside
   // its insights: a page rests on either by id.
   const analysis = recorded ? await readAnalysis(base, stem, recorded, { alternatives: alternativesOf(spec) }) : { plan: null, results: [], problems: [] };
   const log = recorded ? { ...recorded, insights: [...(recorded.insights || []), ...analysisInsights(analysis.results)] } : null;
+  return { log, analysis, measures: log ? recordedMeasures(log.insights) : null };
+}
+/** The recorded measures of a deck whose file is at `deckPath`; null where the deck file, or its log, is not there. */
+const readMeasures = async (spec, deckPath) => (deckPath ? (await readEvidence(spec, deckPath)).measures : null);
+
+/**
+ * The pages the critique reads, with what each rests on: its claim, its page
+ * type, what settles it, the measures it declares it shows with their recorded
+ * values, and the insights it names with their calculation and sources, so
+ * sourcing is judged page by page rather than found by accident. `drafted`,
+ * `draftedNumbers` and `commentary` are whatever exhibits and copy the author
+ * has sketched: the layout follows the critique, so they are shown as a draft
+ * and the critique is not bound to them. `max` is how many values of a
+ * measure a line lists.
+ */
+async function storyPages(spec, specPath, { max }) {
+  const content = await readJson(path.join(path.dirname(specPath), `${stemOf(specPath)}.content.json`), { optional: true });
+  const byId = new Map((content?.pages || []).map((p) => [p.id, p]));
+  const { log, analysis, measures } = await readEvidence(spec, specPath);
   const insights = new Map((log?.insights || []).map((i) => [i.id, i]));
+  const registry = measureRegistry(log?.insights || []);
   let section = null;
   const pages = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
     if (s.kind === "section") section = String(s.title ?? s.text ?? "");
@@ -348,13 +701,16 @@ async function storyPages(spec, base, stem) {
     const evidence = planned.evidence ?? s.pageType?.content?.evidence ?? [];
     const exhibits = exhibitsOf(s);
     return { n: i + 1, id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", section, title: s.title ?? s.text ?? "", claim: planned.claim ?? s.pageType?.content?.claim ?? null,
-      settles: planned.settles ?? s.pageType?.content?.settles ?? null, exhibits: exhibits.map(describeExhibit), keyNumbers: keyNumbers(exhibits), commentary: body.slice(0, 6), source: s.source ?? null,
-      // The context exhibits and the relation the claim asserts, for the critic to judge: declared by the author, never inferred.
-      declared: dependencyNotes({ exhibits: exhibits.map((ex, at) => ({ ...ex, basis: s.pageType?.dependencies?.exhibits?.[at] })), settles: s.pageType?.content?.settles }),
+      settles: planned.settles ?? s.pageType?.content?.settles ?? null,
+      // Each measure with its recorded values and what the page shows of it: the windows and classes the critique is bound to.
+      measures: (({ views }) => measureRoles(s).map(({ ref, role }) => ({ ref, role, line: `${measureLine(ref, `${ref}${role === "context" ? " (context)" : role === "claim" && declaredBases(s).length ? " (the claim's; nothing declared as its proof)" : ""}`, registry, max)}${viewsLine(views.get(ref) ?? null, measures?.[ref], s.pageType?.type)}` })))(shownOf(s, measures)),
+      drafted: exhibits.map(describeExhibit), draftedNumbers: draftedNumbers(exhibits), commentary: body.slice(0, 6), source: s.source ?? null,
+      // The context measures and the relation the claim asserts, for the critic to judge: declared by the author, never inferred.
+      declared: dependencyNotes({ bases: declaredBases(s), settles: s.pageType?.content?.settles }),
       evidence: evidence.map((id) => { const item = insights.get(id); return item ? { id, finding: item.finding, calculation: item.calculation ?? null, sources: item.sources ?? [], strength: item.strength ?? null } : { id, missing: true }; }),
-      ...(s.pageType ? { type: `${s.pageType.type}/${s.pageType.form}`, page: `${s.pageType.type}/${s.pageType.form}, explanation ${s.pageType.commentary}${s.pageType.takeaway ? ", closes on a line" : ""}` } : {}) };
+      ...(s.pageType ? { type: s.pageType.type } : {}) };
   });
-  return { pages, content, log, analysis };
+  return { pages, content, log, analysis, measures };
 }
 
 // A spine past this many content pages is critiqued page by page (--full) by
@@ -364,7 +720,21 @@ async function storyPages(spec, base, stem) {
 export const STORYLINE_SECTION_THRESHOLD = 30;
 export const STORYLINE_SECTION_MAX = 16;
 
+// How many values of a measure a page's line lists before it is given by its ends.
+const SPINE_MEASURE_VALUES = 4;
+// And how many measures a page's line in the spine packet gives in full; the rest are named.
+const SPINE_MEASURES = 4;
+const FULL_MEASURE_VALUES = 12;
+
 const HISTORY = "storyline-history";
+// What a ready critique leaves the author to do, said where it is reached: the one layout pass.
+const READY_NOTE = "The argument is settled: lay the pages out now, once - exhibits, forms, commentary and copy (author-deck.mjs without --draft). Layout and copy edits keep this critique, a chart redrawn in another chart form among them; changing a title, a page type, what settles a claim, the insights or measures a page rests on, which periods or members of a measure a page shows, whether it is plotted, tabulated or stated as a figure, the pages or the answer needs a verification pass. A page not drawn when the critique read it was read in the view its `basis` declared (`as`, `labels`) and, with none declared, as showing each measure whole: laid out so, it keeps the critique";
+// The version of what the binding holds (storyStructure). A pass recorded
+// under another version hashed its pages differently, so nothing can say which
+// of them changed since: its lineage is retired and the critique begins again
+// (prepareStoryline), not read as a deck in which every page moved.
+const BINDING_VERSION = 3;
+const bindingVersionOf = (record) => record?.bindingVersion ?? 1;
 const PACKET_RECORD = "storyline-packet.json";
 
 /** The recorded passes of a deck's storyline lineage, from its lineage store (lineageStore). */
@@ -384,11 +754,12 @@ export const declinesIn = (text) => String(text ?? "").split(/(?<=[.;!?])\s+/).f
  * prompt, the schema, the packet); its record, which the answer is validated
  * against, is kept in the deck's lineage store.
  */
-export async function buildStorylinePacket(specPath, outputDirectory, { scope = null, mode = "spine", revision = null } = {}) {
+export async function buildStorylinePacket(specPath, outputDirectory, { scope = null, mode = "spine", revision = null, carried = [] } = {}) {
   const spec = await readJson(specPath);
-  const base = path.dirname(specPath), stem = path.basename(specPath).replace(/\.deck\.json$/, "");
+  const base = path.dirname(specPath);
   const store = await lineageStore(spec, outputDirectory, specPath);
-  const { pages, content, log, analysis } = await storyPages(spec, base, stem);
+  // The spine packet gives a measure in a few values; the page-level packet gives the series.
+  const { pages, content, log, analysis, measures } = await storyPages(spec, specPath, { max: mode === "full" ? FULL_MEASURE_VALUES : SPINE_MEASURE_VALUES });
   // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
   const sources = await fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f))).catch(() => []);
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
@@ -397,7 +768,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const sections = mode === "full" && !scope && !revision && contentPages > STORYLINE_SECTION_THRESHOLD
     ? splitSections(pages.map((p) => ({ id: p.id, title: p.title, opens: p.kind === "section", counted: isContent(p) })), { max: STORYLINE_SECTION_MAX }) : null;
   const answer = spec.answer ?? content?.answer ?? "";
-  const packet = { mode, binding: storylineBinding(spec), pageHashes: storylinePageHashes(spec), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
+  const packet = { mode, binding: storylineBinding(spec, measures), bindingVersion: BINDING_VERSION, pageHashes: storylinePageHashes(spec, measures), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
     maxPasses: scope?.maxPasses ?? MAX_PASSES, scope, sections, deck: path.resolve(specPath), revision: !scope && revision ? { changed: revision.spine, dropped: revision.dropped } : null,
     request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec),
     // What the runtime computed before the outline, and what it could not: a missing analysis closes on one of these, not on a qualification.
@@ -406,6 +777,8 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     // Each analysis result and insight by the hash of its content: what a later pass compares to say an item closed on something that changed.
     artifacts: Object.fromEntries([...analysis.results.map((r) => [r.id, r.hash]), ...(log?.insights || []).filter((item) => item?.id && !item.derived).map((item) => [item.id, sha256(JSON.stringify(item))])]),
     question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
+    // The blocking items open when an earlier lineage was retired: a first pass says of each whether it still stands.
+    ...(!scope && carried.length ? { carried } : {}),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
   const schema = schemaFor(mode, scope);
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
@@ -485,18 +858,25 @@ export function checkInsights(log, sources = [], pages = null) {
   return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, shape: i.shape ?? null, breadth: breadthOf(i), strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
 }
 
+// What settles a page's claim, and the measures it declares it shows: the part of a page's line the critique is bound to.
+const settlesLine = (p) => (p.settles?.kind ? `${p.settles.kind}${p.settles.what ? `: ${p.settles.what}` : ""}` : null);
+// The measures a page shows, each with its recorded values; past `max` of them the rest are named.
+const shownLine = (measures, join, max = measures.length) => `${measures.slice(0, max).map((m) => m.line).join(join)}${measures.length > max ? `${join}and ${measures.slice(max).map((m) => m.ref).join(", ")}` : ""}`;
+const restsLine = (p) => (p.evidence?.length ? p.evidence.map((e) => e.missing ? `${e.id} (NOT IN THE LOG)` : `${e.id} "${e.finding}" (calc: ${e.calculation ?? "none"}; sources: ${e.sources.join(", ") || "none"})`).join("; ") : "no insight named");
 const spineLine = (p) => isContent(p)
-  ? `${p.n}. [${p.id}] ${p.title}${p.page ? `\n     page: ${p.page}` : ""}\n     shows: ${p.exhibits.join(" + ") || "text only"}${(p.declared || []).length ? `\n     declared: ${p.declared.join(" / ")}` : ""}${p.commentary.length ? `\n     says: ${p.commentary.join(" / ").slice(0, 400)}` : ""}${p.evidence?.length ? `\n     rests on: ${p.evidence.map((e) => e.missing ? `${e.id} (NOT IN THE LOG)` : `${e.id} "${e.finding}" (calc: ${e.calculation ?? "none"}; sources: ${e.sources.join(", ") || "none"})`).join("; ")}` : "\n     rests on: no insight named"}`
+  ? `${p.n}. [${p.id}] ${p.title}${p.type ? `\n     page type: ${p.type}` : ""}${settlesLine(p) ? `\n     settled by: ${settlesLine(p)}` : ""}\n     shows: ${shownLine(p.measures || [], " / ") || "no measure declared"}${(p.declared || []).length ? `\n     declared: ${p.declared.join(" / ")}` : ""}\n     rests on: ${restsLine(p)}${(p.drafted || []).length ? `\n     drafted exhibits (not settled): ${p.drafted.join(" + ")}${p.draftedNumbers ? `; drawing ${p.draftedNumbers}` : ""}` : ""}${(p.commentary || []).length ? `\n     drafted copy (not settled): ${p.commentary.join(" / ").slice(0, 400)}` : ""}`
   : `${p.n}. -- ${p.kind}: ${p.title}`;
 
 // One line per page for the spine critique: title, claim where it differs,
-// page type, the numbers it turns on and the insight ids it rests on.
+// page type and what kind of evidence settles it, the measures it shows with
+// their recorded values, and the insight ids it rests on - only what the
+// critique is bound to. A drafted exhibit's numbers are not in it.
 const compactLine = (p) => isContent(p)
-  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}` : ""}${p.keyNumbers ? ` | ${p.keyNumbers}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}${(p.declared || []).length ? ` | declared: ${p.declared.join(" / ")}` : ""}`
+  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}${p.settles?.kind ? `, settled by ${p.settles.kind}` : ""}` : ""}${(p.measures || []).length ? ` | shows: ${shownLine(p.measures, "; ", SPINE_MEASURES)}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}${(p.declared || []).length ? ` | declared: ${p.declared.join(" / ")}` : ""}`
   : `${p.n}. -- ${p.kind}: ${p.title}`;
 
 // The text of a page as the packet shows it: what a missed item's quoted evidence is checked against.
-const packetPageText = (packet) => Object.fromEntries(packet.pages.map((p) => [p.id, [p.title, p.claim, p.type, p.keyNumbers, ...(p.exhibits || []), ...(p.commentary || []), ...(p.evidence || []).map((e) => `${e.id} ${e.finding ?? ""}`)].filter(Boolean).join("\n")]));
+const packetPageText = (packet) => Object.fromEntries(packet.pages.map((p) => [p.id, [p.title, p.claim, p.type, settlesLine(p), ...(p.measures || []).map((m) => m.line), p.draftedNumbers, ...(p.drafted || []), ...(p.declared || []), ...(p.commentary || []), ...(p.evidence || []).map((e) => `${e.id} ${e.finding ?? ""}`)].filter(Boolean).join("\n")]));
 
 // What the runtime computed from the insight log's measures before the outline was written.
 const analysesLines = (packet) => `COMPUTED ANALYSES (run by the runtime over the log's measures; a page rests on one by its id):
@@ -507,8 +887,13 @@ function checksPrompt() {
 ${STORYLINE_DIMENSIONS.map((d) => `- ${d} (${STORYLINE_CHECKS[d].scope}): ${STORYLINE_CHECKS[d].checks}`).join("\n")}
 
 SEVERITY:
-${["blocker", "major", "minor", "none"].map((s) => `- ${s}: ${s === "blocker" ? "the answer does not follow, a decisive claim is unsupported or contradicted, or a number conflicts across pages" : s === "major" ? "a page or pillar a partner would send back: an obvious or unsourced claim, the wrong evidence shape, a restated page, a missing countercase, a missing analysis that would change the answer" : SEVERITY_DEFINITIONS[s]}`).join("\n")}`;
+${["blocker", "major", "minor", "none"].map((s) => `- ${s}: ${s === "blocker" ? "the answer does not follow, a decisive claim is unsupported or contradicted, or a number conflicts across pages" : s === "major" ? "a page or pillar a partner would send back: an obvious or unsourced claim, the wrong evidence shape, a restated page, a missing countercase, a missing analysis that would change the answer" : s === "minor" ? "a weakness that does not change whether the answer follows: a claim that could be sharper, a page better placed" : SEVERITY_DEFINITIONS[s]}`).join("\n")}`;
 }
+
+// What the critique settles and what it leaves to the layout, said to every
+// critic: the gate is bound to the argument, so an item only a redrawn exhibit
+// or a reworded sentence would fix could never be closed here.
+const ARGUMENT_RULES = `the pages are laid out once, after this critique is ready. Settled here: each page's claim, page type, what settles it, the insights it rests on, the measures it shows - with, in brackets after each, which of its periods or members the page shows and whether plotted, tabulated or stated as a figure (a page not drawn yet is read in the view it declares, or as showing the measure whole) - the page order and the answer. A chart's form, commentary placement, captions and copy are not: anything marked a draft is the author's sketch. File no item that only a redrawn or reworded page would fix; the deck review judges the pages as drawn.`;
 
 /** The storylining standard, condensed, so a critic needs no other file. */
 export const CRITIC_STANDARDS = `THE STANDARD. You need no other file: this is the skill's storylining guidance, condensed.
@@ -518,7 +903,7 @@ export const CRITIC_STANDARDS = `THE STANDARD. You need no other file: this is t
 - Each page moves the argument on: none restates, previews or re-proves another. The summary states what the body proves, with its numbers, and the close agrees with it.
 - A missing analysis names why it would change the answer, the data behind it and its \`remedy\`: ${Object.entries(REMEDIES).map(([key, about]) => `"${key}" (${about})`).join(", ")}. Ask first whether the packet's own measures would settle it. Mark \`public: "known"\` only when you can name the public source that publishes the data; otherwise "speculative", and a speculative retrieval is never major. You are not searching the web: say what you know is published. An analysis is met by the analysis, never by a caveat saying what the evidence does not establish.
 - The requested length counts the appendix: recommend cutting weak or repetitive body pages freely, and move surplus pages that still earn a lookup to the appendix, which keeps the total at the requested length; give the freed body pages to a missing analysis.
-- Judge the argument, not the wording: the copy is written later.`;
+- Judge the argument, not the drawing or the wording: ${ARGUMENT_RULES}`;
 
 const ITEM_RULES = `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A page finding names its one page; a spine finding lists EVERY page it concerns (for the answer, the summary and closing pages) - never a sample, never "e.g.", "such as" or "etc.". Validation refuses a sampled page list and a finding whose text names a page its list leaves out.`;
 
@@ -534,6 +919,11 @@ const ANSWER_RULES = `THE ANSWER, PART BY PART. In \`answerParts\` list each par
 // user's deck as it stands, there for context.
 const revisionLines = (packet) => (packet.revision ? `
 THIS IS A REVISION of the user's existing deck. The pages marked [changed] are the revision's${packet.revision.dropped?.length ? `, and ${packet.revision.dropped.length} slide${packet.revision.dropped.length === 1 ? " was" : "s were"} cut from the source deck (the pages either side are marked)` : ""}; the others are the user's deck as it stands, shown for context. File items only where the revision is involved: a page item names a changed page, and a spine item or a cut lists at least one. A missing analysis is in scope only where a changed page needs it.
+` : "");
+/** The blocking items a retired lineage left open, as a first pass is asked about them. */
+const carriedLines = (packet) => (packet.carried?.length ? `
+OPEN WHEN THE EARLIER LINEAGE WAS RETIRED: an earlier critique of this storyline, recorded before the critique was bound to what it is bound to now, left ${packet.carried.length} blocking item${packet.carried.length === 1 ? "" : "s"} open. That record cannot be compared with this spine, so ${packet.carried.length === 1 ? "it is not a status" : "they are not statuses"} to verify; but ${packet.carried.length === 1 ? "it is" : "each is"} a serious problem a critic saw, and none is dropped unread. For each, say in \`carried\` whether it still stands on the spine as it is now - one { item, stands, evidence } - and where it stands, file it as an item of this pass (a finding, a missing analysis or a cut) and name that item's id in \`finding\`. Validation refuses a critique that leaves one unanswered.
+${packet.carried.map((item) => `- ${item.id} · ${item.dimension ?? item.code ?? "item"} · ${item.severity} · ${(item.pages || []).join(", ") || "the spine"}: ${item.text}`).join("\n")}
 ` : "");
 const marked = (packet, line, p) => `${line}${packet.revision?.changed?.includes(p.id) ? "  [changed]" : ""}`;
 
@@ -555,12 +945,14 @@ const sectionsLine = (packet) => {
   return groups.map((g) => `- ${g.title}: ${g.ids.length ? `${g.ids[0]}-${g.ids.at(-1)} (${g.ids.length} pages)` : "no pages"}`).join("\n");
 };
 
+const SPINE_HEADING = "THE SPINE (title | claim where it differs | page type, settled by | measures shown, as recorded [and what the page shows of each] | insights it rests on):";
+
 /** The spine critique: the request, the answer, the sections and a line per page - small, and at most ten items back. */
 export function spinePrompt(packet) {
-  return `You are a senior partner reviewing a team's storyline before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and plots. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
+  return `You are a senior partner reviewing a team's storyline before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and shows. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
 
 This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return at most ${SPINE_ITEM_MAX} items - findings, missing analyses and cuts together - the ones that most change whether the deck answers the request. Later passes only verify them, and may add only a serious new problem on a part the team changed.
-${revisionLines(packet)}
+${revisionLines(packet)}${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
@@ -571,7 +963,7 @@ ${analysesLines(packet)}
 SECTIONS (the pillars as drawn):
 ${sectionsLine(packet)}
 
-THE SPINE (title | claim where it differs | page type | the numbers it plots | the insights it rests on):
+${SPINE_HEADING}
 ${packet.pages.map((p) => marked(packet, compactLine(p), p)).join("\n")}
 
 ${CRITIC_STANDARDS}
@@ -582,7 +974,7 @@ Work through it in this order.
 1. The spine alone: does it tell the story? Write \`spine\`.
 2. The answer: is it an answer to the request, or a restatement or refusal of it? Sharp enough to be wrong? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
 3. The pillars: a MECE set of reasons that together prove the answer? For each in \`pillars\`: its pages, your verdict, overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
-4. The pages, from their lines: a claim that is a count or a fact, a page type or plotted numbers too thin for the claim, a page with no insight behind it, a page that restates another, a page with no consequence - each as a finding on its pages.
+4. The pages, from their lines: a claim that is a count or a fact, a page type or measures too thin for the claim, a page with no insight behind it, a page that restates another, a page with no consequence - each as a finding on its pages.
 5. \`numbers\`, \`sectionFlow\` and \`execSummary\`, in a sentence or two each.
 6. Missing analyses, each with \`public\` known or speculative; cut or merge.
 7. Completeness: one entry per check in \`completeness\` - "findings" when you filed any under it, "clean" with what you checked when you did not.
@@ -604,7 +996,7 @@ THIS STORYLINE IS LONG (${packet.contentPages} content pages), so critique it in
   return `You are a senior partner reviewing a team's storyline before a single slide is drawn - the problem-solving session where a weak story gets taken apart. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
 
 This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}, and it is exhaustive: every ${packet.revision ? "changed" : "content"} page gets a verdict on every page check, and every spine check gets an answer. Later passes only verify your items and may add only a serious new problem on a page the team changed, so what you leave out now is not raised again.
-${split}${revisionLines(packet)}
+${split}${revisionLines(packet)}${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify(packet.players)}
 DATA THEY FOUND (files under sources/): ${packet.sources.length ? packet.sources.join(", ") : "none"}
@@ -614,7 +1006,7 @@ INSIGHT LOG (what the team extracted from the data before writing titles):
 ${packet.insights?.present ? packet.insights.items.map((i) => `- [${i.id}] (${i.strength ?? "ungraded"}) ${i.finding} — calc: ${i.calculation ?? "none"}; sources: ${i.sources.join(", ") || "none"}`).join("\n") || "- empty" : "- none recorded"}${packet.insights?.problems?.length ? `\nINSIGHT LOG PROBLEMS: ${packet.insights.problems.join("; ")}` : ""}
 ${analysesLines(packet)}
 
-THE STORYLINE (title, what each page shows, what it says, the insights it rests on):
+THE STORYLINE (title, page type, what settles the claim, the measures it shows with their recorded values, the insights it rests on; drafted exhibits and copy are the author's sketch):
 ${packet.pages.map((p) => marked(packet, spineLine(p), p)).join("\n")}
 
 ${CRITIC_STANDARDS}
@@ -626,7 +1018,7 @@ Work through it in this order.
 1. The spine alone. Read the titles without the pages: does it tell the story? Write \`spine\`.
 2. The answer. Is it an answer to the request, or a restatement or refusal of it? Sharp enough to be wrong? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
 3. The pillars. Do they form a MECE set of reasons that together prove the answer? For each pillar in \`pillars\`: its pages, your verdict (holds, weak, fails), the overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
-4. Every page, in order. The bar is a deck that feels important: every page carries evidence a reader could not have assembled in five minutes. Check the claim, the evidence shape (TWO-NUMBER charts, PLAIN GRID tables, two or three categories where the whole set exists), its sourcing against the insight log (the insight ids, their calculations, their sources), whether it restates the page before, and whether it states a consequence. Where pages carry a "page:" line, judge whether the page type is the claim's reading task. Say what each weak page should show instead.
+4. Every page, in order. The bar is a deck that feels important: every page carries evidence a reader could not have assembled in five minutes. Check the claim, the evidence shape (a measure of two values where the series exists, two or three members where the whole set exists, statements where a measure is needed), its sourcing against the insight log (the insight ids, their calculations, their sources), whether it restates the page before, and whether it states a consequence. Where pages carry a "page type:" line, judge whether the page type is the claim's reading task. Say what evidence each weak page should rest on and show instead.
 5. Numbers across pages: the same figure with the same unit, base and period everywhere, totals that reconcile (\`numbers\`).
 6. Section flow (\`sectionFlow\`) and the executive summary against the body and the close (\`execSummary\`).
 7. Missing analyses: what a strong team would have run, why it matters to the answer, the public data behind it, and whether that data is \`public\` known or speculative.
@@ -673,7 +1065,7 @@ Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMA)}`
 /** The spine critic of a long page-level critique: the compact spine, not the whole page listing again. */
 export function storylineSpinePrompt(packet) {
   return `You are the spine critic of a long storyline read in parallel, before anything is drawn: section critics give every page its verdict. Be adversarial and specific; judge from this packet alone: do not search the web or open other files.
-
+${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
@@ -683,7 +1075,7 @@ ${analysesLines(packet)}
 SECTIONS:
 ${sectionsLine(packet)}
 
-THE SPINE (title | claim where it differs | page type | the numbers it plots | the insights it rests on):
+${SPINE_HEADING}
 ${packet.pages.map(compactLine).join("\n")}
 
 ${CRITIC_STANDARDS}
@@ -712,13 +1104,13 @@ export function storylineVerificationPrompt(packet) {
 ${requestLines(packet)}
 
 OPEN ITEMS (give every one a status):
-${scope.open.map((e) => `- ${e.id} · ${e.dimension} · ${e.severity} · ${(e.pages || []).join(", ") || "spine"}: ${e.reason}${e.repair ? ` → ${e.repair}` : ""}`).join("\n") || "- none"}
+${scope.open.map((e) => `- ${e.id} · ${e.dimension} · ${e.severity} · ${(e.pages || []).join(", ") || "spine"}: ${itemLines(e)}`).join("\n") || "- none"}
 
 ${full ? `THE TITLE SPINE NOW:
 ${packet.pages.map((p) => `${p.n}. [${p.id}] ${p.title}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}
 
-PAGES TO READ (changed since that pass, or named by an open major or blocker):
-${read.map(spineLine).join("\n") || "- none"}` : `THE SPINE NOW ([changed] marks a page changed since that pass):
+PAGES TO READ (their argument changed since that pass, or an open major or blocker names them):
+${read.map(spineLine).join("\n") || "- none"}` : `THE SPINE NOW ([changed] marks a page whose argument changed since that pass):
 ${packet.pages.map((p) => `${compactLine(p)}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}`}
 DATA FOUND: ${packet.sources.length} files under sources/${packet.sources.length ? ` (${packet.sources.slice(0, 60).join(", ")}${packet.sources.length > 60 ? ", ..." : ""})` : ""}
 ${analysesLines(packet)}
@@ -730,12 +1122,14 @@ ${checksPrompt()}
 
 Do three things.
 1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed, narrowed, or - for a missing analysis only - unavailable or scope-limited, with the evidence in the packet. A partly fixed item keeps its severity.
+   - ${ANSWERS_RULE}
+   - A finding is "fixed" only where the argument moved: a claim, a page type, what settles a claim, the insights or measures a page rests on and shows, which periods or members of a measure it shows and in what class of exhibit, the pages or their order, or the answer. A chart redrawn in another form or reworded copy on an unchanged argument closes nothing here.
    - A missing analysis is "fixed" only on its artifact: set \`artifact\` to the id of the computed analysis (listed above) or the insight that supplies it, which a page must rest on. A qualification on the page is not the analysis: where the page only says what the evidence does not establish, the item is not fixed.
    - "narrowed" closes an item the answer no longer needs because the answer now claims less; it is allowed only where the answer has changed, and its evidence quotes the narrower answer.
    - "unavailable" closes a missing analysis the team searched for and could not find, and needs \`searchLog\`: the path of the search log under sources/ (listed above) that shows the search. It is not available where the evidence scope is closed: nothing could be searched.
    - "scope-limited" is for a missing analysis whose remedy is retrieval while the evidence scope is closed: the team may not fetch the data. The item stays open at its severity. It does not count against compliance; it does count against sufficiency.
 2. ${full ? "PAGES: a full page entry for every page listed above, as the first pass wrote them." : "THE ANSWER: if the answer or the request changed, judge it again in `answerParts`."}
-3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it), and a repeat of an open item are refused. New ids must be new; \`evidence\` is "" except for basis missed. Then stop: the storyline is not re-critiqued.
+3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it) are refused. An open item that still stands is that item's status, not a new item: a new item under an open item's check on a page it names is folded into the open item, which stays open, and is refused only where you also call that item fixed. New ids must be new; \`evidence\` is "" except for basis missed. Then stop: the storyline is not re-critiqued.
 
 ${full ? PAGE_RULES : ""}
 
@@ -885,10 +1279,10 @@ function closureErrors(review, ledger, { analyses = [], insightIds = null, reste
       else if (stale(artifact)) errors.push(`${at}: ${artifact} was already computed and rested on, unchanged, at the pass that left ${s.finding} open; an item closes on something that changed - a new analysis, a changed one, or a page that now rests on it`);
     }
     if (s.status === "fixed" && entry.code !== "MISSING_ANALYSIS" && moved) {
-      // A finding is fixed where the storyline moved: on a page it names, on the page the status names in `artifact`, or in the answer.
+      // A finding is fixed where the argument moved (storyStructure): on a page it names, on the page the status names in `artifact`, or in the answer. A page redrawn or reworded has not moved.
       const where = [...(entry.pages || []), ...(typeof s.artifact === "string" && s.artifact.trim() ? [s.artifact.trim()] : [])];
       const touched = where.some((id) => moved.changed.includes(id) || moved.deleted.includes(id)) || (!(entry.pages || []).length && (moved.changed.length > 0 || moved.deleted.length > 0));
-      if (!touched && !answerChanged) errors.push(`${at}: fixed, and ${(entry.pages || []).length ? `${entry.pages.join(", ")} ${entry.pages.length === 1 ? "is" : "are"}` : "the spine is"} as ${(entry.pages || []).length === 1 ? "it was" : "they were"} at the pass that filed ${s.finding}; where another page carries the repair, name it in \`artifact\` - a finding does not close on a storyline that did not move`);
+      if (!touched && !answerChanged) errors.push(`${at}: fixed, and ${(entry.pages || []).length ? `${entry.pages.join(", ")} ${entry.pages.length === 1 ? "is" : "are"}` : "the spine is"} as ${(entry.pages || []).length === 1 ? "it was" : "they were"} at the pass that filed ${s.finding}; where another page carries the repair, name it in \`artifact\` - a finding does not close on a storyline that did not move, and a page moves when its claim, its page type, what settles it, or the insights and measures it rests on change, not when it is redrawn or reworded`);
     }
     if (s.status === "narrowed" && !answerChanged) errors.push(`${at}: narrowed closes an item the answer no longer needs because it now claims less; the answer has not changed since the pass this verifies`);
     if (s.status === "scope-limited") {
@@ -957,14 +1351,14 @@ function unavailableErrors(review, ledger, sources) {
 }
 
 /**
- * Validate a critique against the spine it read: `ids` every page of that
+ * Validate a critique against the argument it read: `ids` every page of that
  * spine, `contentIds` the pages the first pass must cover, `scope` and
  * `ledger` for a later pass, `mode` spine or full, `sources` the files under
  * the deck's sources/, `pageText` what a missed item's quote is checked
  * against and `promptHash` the packet's (its provenance is checked when given).
  */
 export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null,
-  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null } = {}) {
+  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null, carried = [] } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
@@ -982,6 +1376,7 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
     if (mode === "full") errors.push(...coverageErrors(review.pages, revision ? revision.changed : contentIds, "page"));
     if (revision) errors.push(...revisionItemErrors(items, revision.changed));
     errors.push(...completenessErrors(review.completeness, STORYLINE_DIMENSIONS, items, "check"));
+    errors.push(...carriedErrors(review, carried, items.map((item) => item.id)));
     for (const [i, pillar] of review.pillars.entries()) {
       const unknown = pillar.pages.filter((id) => !ids.includes(id));
       if (unknown.length) errors.push(`pillars[${i}]: unknown page${unknown.length === 1 ? "" : "s"} ${unknown.join(", ")}`);
@@ -1010,12 +1405,13 @@ const packetContext = (packet) => ({
   insightIds: packet.insights?.present ? new Set(packet.insights.items.map((i) => i.id)) : null, mode: packet.mode ?? "full", sources: packet.sources ?? [],
   pageText: packetPageText(packet), promptHash: packet.promptHash ?? null, revision: packet.revision ?? null,
   analyses: packet.analyses ?? [], rested: new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id))),
-  evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null, artifacts: packet.artifacts ?? null,
+  evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null, artifacts: packet.artifacts ?? null, carried: packet.carried ?? [],
 });
 
 /**
  * The storyline gate's judgement of a critique for a spec: it validates
- * against where it came from, is bound to the spine as it stands now, and says
+ * against where it came from, is bound to the argument as it stands now
+ * (`measures`: the log's recorded measures, where the deck has a log), and says
  * ready with no major or blocker item open across its passes. `record` is its
  * recorded pass in the lineage store, which was validated when it was recorded
  * and whose review and ledger - not the editable file - say what it
@@ -1023,17 +1419,18 @@ const packetContext = (packet) => ({
  * as a first pass over the spec (the pure check the tests use; the gate never
  * passes a critique that has neither), in the mode its shape says.
  */
-export function validateStorylineReview(review, spec, { record = null, packet = null } = {}) {
+export function validateStorylineReview(review, spec, { record = null, packet = null, measures = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) and bring it to ready before the deck review"];
   const structure = storyStructure(spec);
   const judged = record?.review ?? review;
   const errors = record ? [] : validateStorylineRecord(review, packet ? packetContext(packet)
     : { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id), mode: Array.isArray(review.pages) ? "full" : "spine" });
-  if (judged.binding !== storylineBinding(spec)) {
+  if (judged.binding !== storylineBinding(spec, measures)) {
     const was = record?.pageHashes ?? packet?.pageHashes;
-    const moved = was ? changedPages(was, storylinePageHashes(spec)) : null;
+    const moved = was ? changedPages(was, storylinePageHashes(spec, measures)) : null;
     const which = moved ? [...moved.changed, ...moved.deleted.map((id) => `${id} deleted`)] : [];
-    errors.push(`the spine changed after the storyline critique${which.length ? ` (${which.join(", ")})` : " (the answer or the request)"}: re-run the storyline critique first - node runtime/storyline.mjs <id>.deck.json out/ writes the verification pass for what changed - and bring it back to ready before the deck review`);
+    // The binding holds the argument only, so this is never a layout or copy edit: say so, since the author's next step differs.
+    errors.push(`the spine changed after the storyline critique${which.length ? ` (${which.join(", ")}: a title, a page type, what settles a claim, the insights and measures a page rests on and shows, or which periods or members of a measure the page shows and whether it plots, tabulates or states them)` : " (the answer, the request or the order of the pages)"}: re-run the storyline critique first - node runtime/storyline.mjs <id>.deck.json out/ writes the verification pass for what changed - and bring it back to ready before the deck review. Copy edits and a chart redrawn in another chart form do not change the spine`);
   }
   if (judged.verdict === "provisional") {
     // A provisional storyline passes the gate as provisional, never as ready:
@@ -1055,9 +1452,10 @@ export function validateStorylineReview(review, spec, { record = null, packet = 
  * reads the deck's lineage store: the latest recorded pass, or a critique in
  * out/storyline-review.json that answers the latest packet and is not yet
  * recorded. A storyline-review.json written by hand answers neither, and
- * accepting it would also reset the loop's pass cap. A spine edited after the
- * critique names its changed pages and sends the author back to the critique
- * before any deck review is prepared or accepted. `deckPath` locates the store
+ * accepting it would also reset the loop's pass cap. An argument edited after
+ * the critique names its changed pages and sends the author back to the
+ * critique before any deck review is prepared or accepted; a page laid out,
+ * redrawn or reworded on the same argument passes. `deckPath` locates the store
  * beside the deck file; without it the deck is looked for beside `directory`.
  */
 export async function storylineGate(spec, directory, { deckPath = null } = {}) {
@@ -1066,14 +1464,17 @@ export async function storylineGate(spec, directory, { deckPath = null } = {}) {
   if (request.length) return request;
   const store = await lineageStore(spec, directory, deckPath);
   const history = await readStorylineHistory(store);
-  if (!history.length && (await unchangedRevision(spec, await locateDeck(spec, directory, deckPath)))) return [];
+  const deck = await locateDeck(spec, directory, deckPath);
+  if (!history.length && (await unchangedRevision(spec, deck))) return [];
+  const measures = await readMeasures(spec, deck);
   const packet = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const { review, invalid } = await readCritique(path.join(directory, "storyline-review.json"));
   if (invalid) return [invalid];
   const recorded = review ? history.find((h) => h.binding === review.binding && h.pass === review.pass) : null;
-  if (review && !recorded && packet && packet.binding === review.binding && packet.pass === review.pass) return validateStorylineReview(review, spec, { packet });
+  if (review && !recorded && packet && bindingVersionOf(packet) === BINDING_VERSION && packet.binding === review.binding && packet.pass === review.pass) return validateStorylineReview(review, spec, { packet, measures });
   const latest = history.at(-1);
-  if (latest) return validateStorylineReview(latest.review, spec, { record: latest });
+  if (latest && bindingVersionOf(latest) !== BINDING_VERSION) return [staleLineage(latest, history.length)];
+  if (latest) return validateStorylineReview(latest.review, spec, { record: latest, measures });
   if (review) return [`storyline-review.json answers no packet this deck's storyline loop wrote and is in no recorded pass: run node runtime/storyline.mjs <id>.deck.json out/, give its prompt to a fresh critic and save that answer - a critique that did not answer the packet is not a gate`];
   return validateStorylineReview(null, spec);
 }
@@ -1087,8 +1488,11 @@ export async function storylineGate(spec, directory, { deckPath = null } = {}) {
 export async function storylineOutcome(spec, directory, { deckPath = null } = {}) {
   const latest = (await readStorylineHistory(await lineageStore(spec, directory, deckPath))).at(-1);
   if (latest?.review?.verdict !== "provisional") return { verdict: latest?.review?.verdict ?? null };
-  return { verdict: "provisional", open: openBlocking(latest.ledger).map((e) => ({ id: e.id, severity: e.severity, reason: e.reason })), answerLimits: answerStatusOf(spec).limits };
+  return { verdict: "provisional", open: openBlocking(latest.ledger).map((e) => ({ id: e.id, severity: e.severity, reason: reasonOf(e) })), answerLimits: answerStatusOf(spec).limits };
 }
+
+// What is said of a lineage recorded under another binding version, by the gate and by the loop that retires it.
+const staleLineage = (latest, passes) => `the storyline critique on record (${passes} pass${passes === 1 ? "" : "es"}, the last one ${latest.review?.verdict ?? "unreadable"}) was recorded under binding version ${bindingVersionOf(latest)}, and the critique is now bound to more of what a page shows (version ${BINDING_VERSION}), so it cannot say which pages changed since: run node runtime/storyline.mjs <id>.deck.json out/, which archives that lineage and writes a first pass - not a restart, and not counted against the pass cap`;
 
 // A revision that leaves the user's spine as it was - every page's title,
 // order and source slide - needs no storyline critique: the argument is the
@@ -1129,16 +1533,32 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
   const store = await lineageStore(spec, out, specPath);
   const historyDir = path.join(store, HISTORY);
   let history = await readPasses(historyDir);
-  const { review, invalid } = await readCritique(path.join(out, "storyline-review.json"));
-  if (invalid) return { status: "invalid", errors: [invalid] };
-  const packet = await readJson(path.join(store, PACKET_RECORD), { optional: true });
+  const { review: answered, invalid } = await readCritique(path.join(out, "storyline-review.json"));
+  let packet = await readJson(path.join(store, PACKET_RECORD), { optional: true });
+  // A lineage recorded under another binding version is retired whole - its passes, its waiting packet and the critique
+  // in the output directory - and the loop begins again at pass one: its page hashes cannot be compared with today's.
+  let retired = null;
+  const stale = history.length ? bindingVersionOf(history.at(-1)) !== BINDING_VERSION : Boolean(packet) && bindingVersionOf(packet) !== BINDING_VERSION;
+  if (stale) {
+    const note = history.length ? staleLineage(history.at(-1), history.length) : `a packet written under binding version ${bindingVersionOf(packet)} was waiting for its critique; the binding is now version ${BINDING_VERSION}`;
+    // What was open and blocking in it goes to the new first pass, which says of each whether it still stands.
+    const last = history.at(-1);
+    const open = last ? openBlocking(last.ledger ?? storylineLedger([], last.review)).map((e) => ({ id: e.id, code: e.code ?? null, dimension: e.dimension ?? null, severity: e.severity, pages: e.pages || [], text: itemLines(e).replace(/\n\s*/g, " | ") })) : [];
+    const archived = await retireLineage(historyDir, { note, files: [path.join(store, PACKET_RECORD), path.join(out, "storyline-review.json")], open });
+    retired = `The earlier storyline lineage (${history.length} pass${history.length === 1 ? "" : "es"}) was recorded under binding version ${bindingVersionOf(history.at(-1) ?? packet)} and is archived in ${path.join(historyDir, archived)}: the critique is now bound to which periods or members of each measure a page shows and in what class of exhibit, which that record does not hold. This is a clean first pass, not a restart, and nothing of the old lineage counts against the pass cap${open.length ? `. Its ${open.length} open blocking item${open.length === 1 ? " is" : "s are"} carried into the new packet (${open.map((e) => e.id).join(", ")}): the critic says of each whether it still stands` : ""}`;
+    history = [];
+    packet = null;
+  }
+  if (invalid && !stale) return { status: "invalid", errors: [invalid] };
+  const review = stale ? null : answered;
   if (review && !history.some((h) => h.binding === review.binding && h.pass === review.pass)) {
     if (!packet || packet.binding !== review.binding || packet.pass !== review.pass)
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
     const errors = validateStorylineRecord(review, packetContext(packet));
     if (errors.length) return { status: "invalid", errors };
-    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
+    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, bindingVersion: BINDING_VERSION, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
       artifacts: packet.artifacts ?? null, rested: [...new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id)))] })).record);
+    if (packet.carried?.length) await settleCarried(historyDir, review.binding);
   }
   const lineageMode = history.at(-1)?.mode ?? (history.length ? "full" : null);
   const wanted = mode ?? lineageMode ?? "spine";
@@ -1147,30 +1567,32 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
     if (restart.errors.length) return { status: "refused", errors: restart.errors };
     history = [];
   }
-  const binding = storylineBinding(spec);
+  const measures = await readMeasures(spec, specPath);
+  const binding = storylineBinding(spec, measures);
   const latest = history.at(-1);
   const changes = latest ? null : revisionChanges(spec, await readInventory(spec, specPath));
   if (changes && !changes.spineChanged) return { status: "ready", pass: 0, mode: wanted, binding, note: "A revision that leaves the user's spine unchanged - every title, its order and its source slide - needs no storyline critique" };
-  const brief = (e) => `${e.id} ${e.dimension} (${e.severity}) on ${(e.pages || []).join(", ") || "the spine"}`;
+  // An open item a later pass restated under a new id is one item (review-passes.mjs advanceLedger): named by its first id, with the ids folded into it.
+  const brief = (e) => `${e.id} ${e.dimension} (${e.severity}) on ${(e.pages || []).join(", ") || "the spine"}${(e.folded || []).length ? ` (restated as ${e.folded.map((f) => f.id).join(", ")})` : ""}`;
   if (latest && latest.binding === binding) {
     const open = openBlocking(latest.ledger);
-    if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding };
+    if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding, note: READY_NOTE };
     // Provisional: the team has done what the evidence in scope allows, the
     // answer is offered as provisional, and what stays open is recorded with it.
     if (latest.review.verdict === "provisional" && open.length && open.every(limitedBy(evidenceScopeOf(spec))) && answerStatusOf(spec).status === "provisional")
       return { status: "provisional", pass: latest.pass, mode: wanted, binding, limits: open.map(brief), note: "The storyline is provisional, not ready: every open item needs evidence the scope forbids. The deck review may start; delivery records the deck as provisional with these limits" };
-    return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), note: "Revise the storyline at the root for the open items, then run this again: it writes the verification pass for what you changed" };
+    return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), note: "Revise the argument at the root for the open items - a claim, what settles it, the insights and measures a page rests on and what it shows of them, the pages or the answer; a chart redrawn in another form or reworded copy is not a revision - then run this again: it writes the verification pass for what you changed" };
   }
   const ids = storyStructure(spec).filter(isContent).map((p) => p.id);
-  const scope = latest ? nextPassScope(latest, storylinePageHashes(spec), { ids, ledger: latest.ledger ?? storylineLedger([], latest.review), maxPasses }) : null;
+  const scope = latest ? nextPassScope(latest, storylinePageHashes(spec, measures), { ids, ledger: latest.ledger ?? storylineLedger([], latest.review), maxPasses }) : null;
   if (scope && wanted === "spine") scope.mustInspect = [];
   // Whether the answer moved since the pass being verified: what `narrowed` rests on.
   if (scope) scope.answerChanged = typeof latest.answerHash === "string" && latest.answerHash !== sha256(spec.answer ?? "");
   // The artifacts as they stood at that pass, and which of them a page rested on: what `fixed` is held against.
   if (scope && latest.artifacts && Array.isArray(latest.rested)) scope.prior = { artifacts: latest.artifacts, rested: latest.rested };
   if (scope?.capped) return { status: "capped", pass: scope.pass, message: capMessage("storyline critique", scope.pass, maxPasses, latest.ledger) };
-  const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes });
-  return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0,
+  const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes, carried: scope ? [] : await carriedItems(historyDir) });
+  return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0, ...(retired ? { retired } : {}),
     note: next.sections ? `Give each prompt in ${path.join(dir, "sections")} to its own fresh critic in parallel (no other context), save each answer as ${path.join(dir, "parts", "<id>.json")}, then run storyline.mjs merge` : `Give ${path.join(dir, "prompt.md")} to a fresh critic (no other context) and save its JSON as ${path.join(out, "storyline-review.json")}, then run this again` };
 }
 
@@ -1205,6 +1627,8 @@ export function mergeStorylineParts(parts, packet) {
     spine: lead.spine, answer: lead.answer, answerParts: lead.answerParts, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
+    // The spine critic answers the carried items; an item it files one as is renamed with its other items.
+    ...(lead.carried ? { carried: lead.carried.map((answer) => (answer.finding ? { ...answer, finding: rename(lead, answer.finding) } : answer)) } : {}),
   };
   const ledger = storylineLedger([], merged);
   const joined = joinParts(parts, contentIds, ledger, { pageKey: "page", dimensions: STORYLINE_DIMENSIONS, dimKey: "check" });

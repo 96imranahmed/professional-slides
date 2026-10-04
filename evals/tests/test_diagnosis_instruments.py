@@ -215,7 +215,7 @@ class HeldOutBuildTests(unittest.TestCase):
             deck = json.loads(Path(tmp, "finance.deck.json").read_text())
             declared = [slide.get("pageType", {}).get("dependencies") for slide in deck["slides"]]
             self.assertTrue(all(declared), declared)
-            self.assertEqual(len(json.loads(Path(tmp, "finance.analysis-results.json").read_text())["results"]), 5)
+            self.assertEqual(len(json.loads(Path(tmp, "finance.analysis-results.json").read_text())["results"]), 10)
             out = os.path.join(tmp, "out")
             env = {**os.environ, "PROFESSIONAL_SLIDES_HOME": os.path.join(tmp, "home"), "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")}
             built = subprocess.run([NODE, str(runtime / "build-deck.mjs"), os.path.join(tmp, "finance.deck.json"), out, "--no-fetch"], cwd=ROOT, capture_output=True, text=True, env=env, timeout=300)

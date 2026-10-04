@@ -216,6 +216,21 @@ def _is_chart(exhibit) -> bool:
     return any(key in exhibit for key in ("series", "values", "items", "low"))
 
 
+def _with_parts(pages: list, base: Path) -> list:
+    """The pages with every `{ "include": "<part file>" }` entry replaced by that
+    part's pages, as runtime/pages-file.mjs splices them (paths relative to the
+    file that names them)."""
+    out = []
+    for page in pages:
+        if isinstance(page, dict) and isinstance(page.get("include"), str):
+            target = base / page["include"]
+            part = json.loads(target.read_text())
+            out.extend(_with_parts(part if isinstance(part, list) else part.get("pages", []), target.parent))
+        elif isinstance(page, dict):
+            out.append(page)
+    return out
+
+
 def pages_file_values(pages_path: Path) -> dict[str, int]:
     """Plotted values per chart page, keyed by page id, from a deck pages file.
 
@@ -225,7 +240,7 @@ def pages_file_values(pages_path: Path) -> dict[str, int]:
     data = json.loads(Path(pages_path).read_text())
     pages = data.get("pages", data.get("slides", [])) if isinstance(data, dict) else data
     out = {}
-    for page in pages:
+    for page in _with_parts(pages, Path(pages_path).parent):
         exhibits = [page.get("exhibit")] if page.get("exhibit") else list(page.get("exhibits") or [])
         charts = [e for e in exhibits if _is_chart(e)]
         if charts and page.get("id"):

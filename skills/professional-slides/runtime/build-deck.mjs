@@ -37,6 +37,7 @@ import { structureOf, drawnOf } from "./page-types.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
+import { assetReport, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
 import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
 import { storylineWarning } from "./storyline.mjs";
@@ -65,7 +66,13 @@ async function together(...stages) {
   if (failed) throw failed.reason;
   return settled.map((s) => s.value);
 }
-const isBlocking = (f) => !["advisory", "info"].includes(f.severity);
+/**
+ * Whether a finding blocks: every severity a gate gives but `advisory` and
+ * `info`. A finding has the one severity its gate gave it (under the deck's
+ * rules version); the build and delivery both read it through this test, so
+ * neither can call blocking what the other called an advisory.
+ */
+export const isBlocking = (f) => !["advisory", "info"].includes(f.severity);
 
 /** `report` (a gates report) with `findings` added: counted by code, and failed by any that blocks. */
 export function withFindings(report, findings) {
@@ -108,19 +115,38 @@ export function validateStageContract(spec, stages) {
 const rulesArgs = (spec) => [...(spec.workflow ? ["--workflow", String(spec.workflow)] : []),
   ...(Number.isFinite(Number(spec.rulesVersion)) && spec.rulesVersion !== null && spec.rulesVersion !== "" ? ["--rules-version", String(spec.rulesVersion)] : [])];
 
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true } = {}) {
+/**
+ * Build the deck at `specPath` into `outputDirectory`.
+ *
+ * `source` builds a deck held in memory instead - `{ spec, baseDir, content,
+ * plan }`, the compiled deck, the folder its assets resolve from and its two
+ * stage plans - which is how the author's final check runs this same
+ * pipeline before anything is written (author-deck.mjs --check --render), so
+ * the check and the build cannot disagree. `only` (a set of page ids) keeps
+ * those pages of the composed deck for the emit, the render and the gates: a
+ * one-page check renders one page. The deck is still composed whole, so each
+ * page keeps its place, its tracker and its number; what the gates say of the
+ * deck as a whole is then about a part of it, and the caller reads the page
+ * findings alone.
+ */
+export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null } = {}) {
   const started = Date.now();
-  const spec = await readJson(specPath);
+  const spec = source ? structuredClone(source.spec) : await readJson(specPath);
   const stem = deckStem(spec);
-  const baseDir = path.dirname(path.resolve(specPath));
+  const baseDir = source?.baseDir ?? path.dirname(path.resolve(specPath));
   // The declared players' logos load themselves: reused from assets/logos/,
   // fetched when missing, left as placeholders only when that fails.
-  const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing: fetchLogos });
+  // A deck that declares it is built without the network (asset-needs.mjs) is
+  // taken at its word: nothing is fetched, and what is not on disk is recorded.
+  const fetchMissing = fetchLogos && assetsDeclaration(spec).fetch !== "none";
+  const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing });
   // Photographs planned as `{ alt }` come the same way, from Wikimedia Commons
   // under a free licence, credited on a generated last page; map markers that
   // name a place get its coordinates.
-  const pictures = await autoFillPictures(spec, baseDir, { fetchMissing: fetchLogos });
-  const places = await autoFillPlaces(spec, baseDir, { fetchMissing: fetchLogos });
+  const pictures = await autoFillPictures(spec, baseDir, { fetchMissing });
+  const places = await autoFillPlaces(spec, baseDir, { fetchMissing });
+  // What the deck still lacks once the fetch has run or been declined: read by the reviewer's packet and delivery.
+  const assets = await assetReport(spec, baseDir, { fetched: fetchMissing });
   const directory = await assertOutputDirectory(outputDirectory);
   await fs.mkdir(directory, { recursive: true });
   // Every report this build is about to write, removed before anything that can
@@ -139,28 +165,30 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   // runs the gates of whichever it finds, and records `absent` for whichever it
   // does not. A deck built with no content plan is allowed - not every page of a
   // rebuild needs one - but the build output says the stage did not happen.
-  const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}) };
+  const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}), ...(assets ? { assets } : {}) };
   if (fetchedMs > 50) timings.assetsMs = fetchedMs;
-  const stages = await gateStages({ spec, stem, baseDir, directory, result });
+  const stages = await gateStages({ spec, stem, baseDir, directory, result, source });
   validateStageContract(spec, stages);
   await checkVariety({ spec, specPath, directory, result });
   transferHighlights(spec, stages);
   const { deck, scenePath } = await composeScene({ spec, baseDir, directory, timings, result, stages });
-  const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, spec, stem, directory, py, result, deck, scenePath });
+  if (only) await keepPages({ deck, stages, scenePath, result, only });
+  const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath });
   if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
-  await readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design });
+  await readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design, fromMemory: Boolean(source) });
   withBudget(result);
   Object.assign(result, buildOutcome(result, { render }));
   return finish(result, directory, started);
 }
 
 /** Each stage plan found beside the spec, gated with its report written and refused when rejected; returns the stages that were found. */
-async function gateStages({ spec, stem, baseDir, directory, result }) {
+async function gateStages({ spec, stem, baseDir, directory, result, source = null }) {
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
     const at = path.join(baseDir, `${stem}${suffix}`);
-    const parsed = await readJson(at, { optional: true });
+    // A deck held in memory brings its stage plans with it.
+    const parsed = source ? (source[stage] ? structuredClone(source[stage]) : null) : await readJson(at, { optional: true });
     if (parsed === null && spec.workflow === "new_deck") throw refuse("STAGE_MISSING", `New decks require ${at} before composition`);
     if (parsed === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
     if (stage === "content" && spec.workflow === "new_deck") parsed.textContract = "complete";
@@ -197,6 +225,15 @@ async function checkVariety({ spec, specPath, directory, result }) {
     throw refuse("VARIETY_REJECTED", `The variety contract rejected ${path.basename(specPath)}: ${varietyBlockers.map((f) => f.code).join(", ")}. `
       + `${varietyBlockers[0].repair} See ${result.stages.variety.report}.`, varietyBlockers);
   }
+}
+
+/** The composed deck cut to the pages `only` names, with its scene rewritten and its content plan cut to match. */
+async function keepPages({ deck, stages, scenePath, result, only }) {
+  const kept = (id) => only.has(String(id));
+  deck.slides = deck.slides.filter((slide) => kept(slide.sourceSlideId ?? slide.id));
+  if (stages.content?.pages) stages.content.pages = stages.content.pages.filter((page) => kept(page.id));
+  await fs.writeFile(scenePath, JSON.stringify(deck));
+  Object.assign(result, { slides: deck.slides.length, partial: [...only] });
 }
 
 // The content plan is an input as well as a checkpoint: it records one
@@ -247,7 +284,7 @@ async function composeScene({ spec, baseDir, directory, timings, result, stages 
 }
 
 /** The story gates beside the emitter, then the coverage, craft and design findings folded into the preflight report. */
-async function preflightScene({ preflight, spec, stem, directory, py, result, deck, scenePath }) {
+async function preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath }) {
   // Story gates need only the scene (titles, words, hedges, monotony), so they
   // run beside the emitter, which needs only the scene too.
   const gates = path.join(runtime, "gates", "page_gates.py");
@@ -261,7 +298,7 @@ async function preflightScene({ preflight, spec, stem, directory, py, result, de
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
   // Deck craft floors, read off the spec and the composed scene. A blocker
   // fails the preflight, so the deck is built for inspection but never delivered.
-  const craft = craftFindings(spec, deck);
+  const craft = craftFindings(spec, deck, { picturesSupplied: await suppliedPictures(baseDir) });
   if (craft.length) {
     result.preflight.findings = [...(result.preflight.findings || []), ...craft];
     for (const f of craft) result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), [f.code]: ((result.preflight.countsByCode || {})[f.code] || 0) + 1 };
@@ -278,7 +315,7 @@ async function preflightScene({ preflight, spec, stem, directory, py, result, de
 }
 
 /** The emitted file read back beside its render; with a renderer, the page gates, density profile and review sheets on the renders. */
-async function readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design }) {
+async function readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design, fromMemory = false }) {
   result.emit = lastJson(emitted.stdout);
   result.pptxPath = pptxPath;
 
@@ -306,7 +343,9 @@ async function readBackAndRender({ render, spec, stem, baseDir, directory, py, r
       // the renders and nothing else, so they run together.
       const gateReport = path.join(directory, "gates.json");
       const profileReport = path.join(directory, "density-profile.json");
-      const contentAt = path.join(baseDir, `${stem}.content.json`);
+      // The density profile reads the content plan from a file: the one beside the spec, or, for a deck held in memory, a copy written with the reports.
+      const contentAt = fromMemory ? path.join(directory, "content-plan.json") : path.join(baseDir, `${stem}.content.json`);
+      if (fromMemory && stages.content) await writeJson(contentAt, stages.content);
       const withContent = result.stages.content?.state === "accepted" ? [contentAt] : [];
       const [gated, profiled, sheets] = await together(
         py("gatesMs", [gates, scenePath, renderDirectory, "--report", gateReport, ...rulesArgs(spec)], { expect: [0, 2] }),
@@ -375,7 +414,7 @@ export function buildOutcome(result, { render = true } = {}) {
     if (f.cause) causes.set(f.cause, blocker);
     blockers.push(blocker);
   };
-  const blocking = (f) => !["advisory", "info"].includes(f.severity);
+  const blocking = isBlocking;
   // The half-empty habit is counted on the render once there is one
   // (page_gates.py gate_deck_empty_pages): the scene's count before the render
   // is the same habit, and is not a second blocker beside the render's.

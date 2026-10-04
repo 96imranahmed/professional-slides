@@ -404,8 +404,26 @@ export function metricNodes({ id, frame, props }) {
  * active section on a tinted band in bold, an optional detail per item.
  * props: { items: [{ label, detail?, number? }], active?: index }
  */
+// How many sections each contents style holds: a list down the page, or
+// equal columns across it. The composer reads this to pick the style a deck's
+// section count fits (`agendaStyleFor`), the authoring check to refuse a named
+// style that cannot (compose-deck.mjs contentsProblem), and `--limits` to
+// publish it.
+export const AGENDA_LIMITS = Object.freeze({ list: Object.freeze({ min: 2, max: 10 }), columns: Object.freeze({ min: 2, max: 6 }) });
+
+/**
+ * The contents style that holds `count` sections: the one asked for where it
+ * fits, otherwise the list, which holds the most. The contents page is the
+ * runtime's own furniture, so a style drawn by the deck's variation is
+ * switched for one that fits rather than refused at composition.
+ */
+export function agendaStyleFor(style, count) {
+  const asked = style === "columns" ? "columns" : "list";
+  return count >= AGENDA_LIMITS[asked].min && count <= AGENDA_LIMITS[asked].max ? asked : "list";
+}
+
 export function agendaLayout(frame, props) {
-  if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 10) throw new Error("Agenda takes two to ten items");
+  if (!Array.isArray(props.items) || props.items.length < AGENDA_LIMITS.list.min || props.items.length > AGENDA_LIMITS.list.max) throw new Error("Agenda takes two to ten items");
   const disc = markerSize(), gap = v("space.3"), pad = v("space.2");
   const hasDetail = props.items.some((i) => i.detail);
   const labelWidth = hasDetail ? Math.min(frame.width * 0.42, 460) : frame.width - disc - gap - 2 * pad;
@@ -421,9 +439,21 @@ export function agendaLayout(frame, props) {
   return { items, disc, gap, pad, labelWidth, detailWidth, hasDetail, rowGap, height: natural };
 }
 
+/**
+ * The list as the page can hold it: with each section's detail where the rows
+ * fit the frame, and as the labels alone where they do not. The details are
+ * the sections' own summaries, which their dividers carry, so the contents
+ * page gives them up before it fails to compose.
+ */
+function fittedAgenda(frame, props) {
+  const full = agendaLayout(frame, props);
+  if (full.height <= frame.height + 0.01 || !full.hasDetail) return full;
+  return agendaLayout(frame, { ...props, items: props.items.map((item) => ({ ...item, detail: undefined })) });
+}
+
 export function agendaNodes({ id, frame, props }) {
-  const L = agendaLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error("Agenda items exceed the page; shorten the details or split the agenda");
+  const L = fittedAgenda(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error("Agenda items exceed the page; shorten the section titles or split the agenda");
   // Rows spread over the frame when it is taller than the list, up to a generous cap.
   const spare = Math.max(0, frame.height - L.height);
   const extra = Math.min(spare / L.items.length, v("space.5"));
@@ -449,7 +479,7 @@ export function agendaNodes({ id, frame, props }) {
  */
 export function agendaColumnsNodes({ id, frame, props }) {
   const items = Array.isArray(props.items) ? props.items : [];
-  if (items.length < 2 || items.length > 6) throw new Error("Column agenda takes two to six sections");
+  if (items.length < AGENDA_LIMITS.columns.min || items.length > AGENDA_LIMITS.columns.max) throw new Error("Column agenda takes two to six sections");
   const dark = props.tone === "dark";
   const gap = v("space.5"), width = (frame.width - gap * (items.length - 1)) / items.length;
   const nodes = [];
@@ -488,7 +518,7 @@ export function registerPanels(registry) {
     variants: { list: {}, columns: { props: { variant: "columns" } } }, defaultVariant: "list",
     resolveVariant: (props = {}) => props.variant === "columns" ? "columns" : "list",
     render: (input) => ({ nodes: input.props.variant === "columns" ? agendaColumnsNodes(input) : agendaNodes(input) }),
-    measureContent: ({ frame, props }) => props.variant === "columns" ? { height: frame.height } : agendaLayout(frame, props),
+    measureContent: ({ frame, props }) => props.variant === "columns" ? { height: frame.height } : fittedAgenda(frame, props),
     guidance: { useWhen: "the contents page and the tracker page before each section", why: "readers orient by the numbered list; the tinted band says where they are", actionTitle: "'Contents' or 'Agenda'; the sections carry the claims" }
   });
   registry.set("cards", {

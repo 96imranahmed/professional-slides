@@ -38,6 +38,55 @@ export function bodyWordsOf(sceneSlides) {
   return words;
 }
 
+// The bands of a composed page as the page gates split them (gates/render_gates.py
+// page_bands): role first, position second. The runtime reads its own page
+// with the gate's eyes here for one purpose - to fit the citation it derived
+// to the room the footer has under the note bar - and a test holds the two
+// counts to each other on real scenes (test_runtime_owned_furniture.py).
+const FOOTER_BAND_ROLES = new Set(["source-text", "source", "footnote", "footnote-text", "page-number", "footer-right", "footer-left", "notes"]);
+const TITLE_BAND_ROLES = new Set(["action-title", "kicker", "page-tag", "page-tag-pill", "tracker-label", "tracker-pill-label", "tracker-compact-label", "tracker-compact-marker-label", "action-subtitle"]);
+const BODY_ANYWHERE_ROLES = /^(insight|takeaway|so-?what|closing)|^(category-label|category-note|axis-label|axis-title|data-label)$/;
+const BAND = Object.freeze({ top: 0.18, bottom: 0.88, canvasHeight: 720 });
+// The footer may carry under this share of the page's text (render_gates.py NOTE_HEAVY_SHARE).
+export const NOTE_SHARE_MAX = 0.3;
+
+/** `{ body, footer, titleBand }`: a composed page's words by band, as `NOTE_HEAVY` counts them. */
+export function pageBandsOf(slide) {
+  const bands = { body: 0, footer: 0, titleBand: 0 };
+  for (const node of slide.nodes || []) {
+    if (node.type !== "text") continue;
+    const layout = node.data?.textLayout ?? {};
+    const words = textWords([layout.source, layout.text].find((text) => typeof text === "string" && text.trim()) ?? node.text ?? "");
+    if (!words) continue;
+    const role = String(node.role ?? "");
+    const top = node.frame?.height ? Number(node.frame.y ?? 0) / BAND.canvasHeight : null;
+    if (FOOTER_BAND_ROLES.has(role)) bands.footer += words;
+    else if (TITLE_BAND_ROLES.has(role)) bands.titleBand += words;
+    else if (BODY_ANYWHERE_ROLES.test(role) || top === null) bands.body += words;
+    else if (top > BAND.bottom) bands.footer += words;
+    else if (top < BAND.top) bands.titleBand += words;
+    else bands.body += words;
+  }
+  return bands;
+}
+
+/**
+ * The words a derived citation may run to on this page, or null when the
+ * footer as drawn is within the note bar (or the page derived no citation).
+ * The footer's room is what the bar leaves beside the body's words; what the
+ * author wrote there - a note, footnotes, the company line - is taken out of
+ * it first, so the runtime shortens only its own line and an author's note
+ * still counts in full.
+ */
+export function citationRoomOf(slide) {
+  const citation = (slide.nodes || []).find((node) => node.type === "text" && node.role === "source-text" && node.data?.derived === true);
+  if (!citation) return null;
+  const { body, footer } = pageBandsOf(slide);
+  if (!body || !footer || footer / (body + footer) <= NOTE_SHARE_MAX) return null;
+  const drawn = textWords(citation.data?.textLayout?.source ?? citation.text);
+  return Math.max(0, Math.floor(body * NOTE_SHARE_MAX / (1 - NOTE_SHARE_MAX) + 1e-9) - (footer - drawn));
+}
+
 const COMMENTARY_ROLES = new Set(["list-item", "list-lead", "paragraph"]);
 
 /** The text-plan role of a composed text node, or null for text the runtime generates. */
@@ -122,7 +171,11 @@ export function deriveContent(spec, deck) {
     const t = page.pageType;
     const content = t?.content ?? {};
     records.push({
-      id: page.id, n: index + 1, ...(page.kind ? { kind: page.kind } : {}), ...(t ? {} : { role: "structural" }),
+      // The executive summary is the page the deck states its answer on, and a
+      // page whose copy waits for the full compile is marked, so the answer
+      // gate (content_gates.mjs) knows which page to read and how far.
+      id: page.id, n: index + 1, ...(page.kind ? { kind: page.kind } : {}), ...(t ? (t.type === "summary" && t.form === "executive-summary" ? { role: "executive-summary" } : {}) : { role: "structural" }),
+      ...(t?.deferred ? { deferred: true } : {}),
       claim: content.claim || String(page.title ?? page.text ?? ""),
       settles: content.settles ?? { kind: "qualitative", what: page.kind ? "Structure of the deck" : String(page.title ?? "") },
       adds: content.adds ?? null,
@@ -135,5 +188,5 @@ export function deriveContent(spec, deck) {
       textPlan: blocks,
     });
   });
-  return { schema: "professional-slides.content/v1", id: spec.id, question: spec.brief ?? null, answer: spec.answer ?? null, textContract: "complete", derivedFrom: "pages", pages: records };
+  return { schema: "professional-slides.content/v1", id: spec.id, question: spec.question ?? spec.brief ?? null, answer: spec.answer ?? null, textContract: "complete", derivedFrom: "pages", pages: records };
 }

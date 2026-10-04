@@ -34,7 +34,9 @@ if (slides > 0) {
   writeFileSync(path.join(deck, "fake.pages.json"), JSON.stringify({ deck: { id: "fake", brief: AUTHOR_MARK }, pages }));
   writeFileSync(path.join(deck, "fake.plan.json"), JSON.stringify({ schema: "professional-slides.plan/v1", id: "fake", pages }));
   writeFileSync(path.join(deck, "fake.deck.json"), JSON.stringify({ schema: "professional-slides.deck/v3", id: "fake", note: AUTHOR_MARK, slides: [] }));
-  writeFileSync(path.join(deck, "fake.author-log.jsonl"), JSON.stringify({ note: AUTHOR_MARK }) + "\n");
+  // Two author runs, as author-deck.mjs logs them: one refused on a page, then a clean one.
+  writeFileSync(path.join(deck, "fake.author-log.jsonl"), [{ run: 1, v: 2, mode: "check", pages: slides, ok: false, findings: [{ code: "WORDS", id: "p1", message: AUTHOR_MARK }] },
+    { run: 2, v: 2, mode: "full", pages: slides, ok: true, findings: [], note: AUTHOR_MARK }].map((entry) => JSON.stringify(entry)).join("\n") + "\n");
   writeFileSync(path.join(deck, "storyline-review.json"), JSON.stringify({ verdict: "ready", note: AUTHOR_MARK }));
   const scene = { slides: pages.map((p) => ({ id: p.id, nodes: [{ role: "action-title", type: "text", text: p.title },
     ...Array.from({ length: 20 }, () => ({ role: "mark", type: "rect" }))], componentInstances: [{ component: p.exhibit === "table" ? "table" : "chart.column" }] })) };

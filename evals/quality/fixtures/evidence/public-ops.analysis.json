@@ -69,6 +69,15 @@
    "strength": "strong"
   },
   {
+   "id": "B-rise",
+   "op": "growth",
+   "inputs": [
+    "o-response/response"
+   ],
+   "soWhat": "Response time rose by more than a third in two years",
+   "strength": "strong"
+  },
+  {
    "id": "B-vehicles",
    "op": "gap",
    "inputs": [

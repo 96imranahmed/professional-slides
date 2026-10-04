@@ -1,8 +1,8 @@
 """Deck craft floors (runtime/gates/craft_gates.mjs).
 
 A 62-page deck shipped with eleven of sixteen charts plotting two numbers, no
-table treated, five step diagrams and six airlines compared and never
-introduced; an Emirates deck coded its sources and spent its brand colour on
+table treated, five step diagrams and six rivals compared and never
+introduced; another deck coded its sources and spent its brand colour on
 every bar. The floors read the spec and the built scene, and block.
 """
 import unittest
@@ -15,7 +15,7 @@ class CraftFloorTests(unittest.TestCase):
         """62-page deck: eleven of sixteen charts plotted two numbers, five step diagrams, players never introduced."""
         result = run_node('''
 import { craftFindings, trivialChart, trendChart } from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-const pair = { type: 'chart.column', categories: ['A', 'B'], series: [{ name: 'Fleet', values: [30, 120] }] };
+const pair = { type: 'chart.column', categories: ['A', 'B'], series: [{ name: 'Depots', values: [30, 120] }] };
 const trend = { type: 'chart.line', categories: ['2020','2021','2022','2023','2024'], series: [{ name: 'Revenue', values: [1,2,3,4,5] }] };
 const page = (i, exhibit) => ({ id: 'p' + i, title: 'A finding on page ' + i, exhibit });
 const slides = [...Array.from({ length: 8 }, (_, i) => page(i, pair)), ...Array.from({ length: 4 }, (_, i) => page(10 + i, { type: 'steps', steps: [] })), page(20, trend)];
@@ -47,17 +47,17 @@ console.log(JSON.stringify({ zebra: codes('table-zebra-band'), harvey: codes('ta
 
 
 class CraftFinishTests(unittest.TestCase):
-    """An Emirates deck delivered at 8/10 that a reader called ugly on sight."""
+    """A deck delivered at 8/10 that a reader called ugly on sight."""
 
     def test_shares_as_bars_coded_sources_and_brand_emphasis(self):
-        """Emirates deck: a share drawn as two bars, sources written as codes, and the brand colour spent on every bar."""
+        """That deck: a share drawn as two bars, sources written as codes, and the brand colour spent on every bar."""
         result = run_node('''
 import { craftFindings, shareAsBars, codedSource } from './skills/professional-slides/runtime/gates/craft_gates.mjs';
 import { identityColors } from './skills/professional-slides/runtime/design-systems.mjs';
 const share = { type: 'chart.bar', categories: ['Cargo', 'Other'], series: [{ name: 'Share', values: [12, 88] }] };
 const pair = { type: 'chart.bar', categories: ['2025', '2030 target'], series: [{ name: 'Pax', values: [141, 330] }] };
 const trend = { type: 'chart.line', categories: ['2020','2021','2022','2023','2024'], series: [{ name: 'Revenue', values: [1,2,3,4,5] }] };
-const slides = [share, trend, trend, trend, trend, trend, trend, trend].map((exhibit, i) => ({ id: 'p' + i, title: 'A finding on page ' + i, exhibit, source: 'Source: Emirates Group Annual Report 2025-26' }))
+const slides = [share, trend, trend, trend, trend, trend, trend, trend].map((exhibit, i) => ({ id: 'p' + i, title: 'A finding on page ' + i, exhibit, source: 'Source: Northvale Rail Annual Report 2025-26' }))
   .concat(Array.from({ length: 6 }, (_, i) => ({ id: 'q' + i, title: 'Text page ' + i, source: i ? 'Source: IATA' : 'Source: E26+DXB+SKY; exact URL in source ledger' })));
 const codes = craftFindings({ slides }, { slides: [] }).filter(f => f.severity === 'blocker').map(f => f.code).sort();
 const c = identityColors({ primary: '#C8102E', accent: '#C49A6C' });

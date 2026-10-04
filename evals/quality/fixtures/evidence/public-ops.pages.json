@@ -34,7 +34,8 @@
    "evidence": [
     "o-response",
     "B-headroom",
-    "B-path"
+    "B-path",
+    "B-rise"
    ],
    "settles": {
     "kind": "rate",
@@ -346,6 +347,47 @@
     ]
    },
    "bar": "Releasing crews at the door returns capacity faster than hiring does"
+  },
+  {
+   "id": "o6",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "On the recent trend the standard is breached within three years",
+   "why": "The recorded quarters and the assumed path are one line, so the reader sees where the assumption begins and where it crosses the standard",
+   "evidence": [
+    "o-response",
+    "B-path",
+    "o-standard"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "mean response time by quarter, recorded and then carried forward at the recent quarterly rise",
+    "measures": [
+     "o-response/response",
+     "B-path/path"
+    ]
+   },
+   "exhibit": {
+    "heading": "Mean category-two response time, recorded and assumed",
+    "series": [
+     {
+      "measure": [
+       "o-response/response",
+       "B-path/path"
+      ],
+      "name": "Response time"
+     },
+     {
+      "measure": "o-standard/standard",
+      "name": "National standard"
+     }
+    ],
+    "select": {
+     "from": "2024 Q1"
+    }
+   },
+   "bar": "The path is an assumption, not a forecast: it says how long the service has if nothing changes"
   }
  ]
 }

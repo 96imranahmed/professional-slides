@@ -8,9 +8,11 @@ Node lays the page out; Python writes and checks the file. No vendor runtime. Th
 node runtime/doctor.mjs [--json] [--no-render]
 $RUNTIME_PYTHON runtime/import-deck.py deck.pptx out/ [--id <id>] [--force]
 node runtime/preferences.mjs show | get [key] | set key=value ... | clear [key] | deck-keys | apply <id>.pages.json | path
-node runtime/author-deck.mjs <id>.pages.json [--draft | --check | --log]
-node runtime/author-deck.mjs --types | --schema [<type>] | --example <type>[/<form>] | --icons
-node runtime/author-deck.mjs [<id>.pages.json] --scaffold <type> [--evidence <insight-id>] [--id <page-id>]
+node runtime/author-deck.mjs <id>.pages.json [--draft | --check [--render] | --plan | --log] [--page <id>[,<id>...]] [--fit-cap <n>]
+node runtime/author-deck.mjs --types | --schema [<type> | deck] | --example <type>[/<form>] | --icons
+node runtime/author-deck.mjs [<id>.pages.json] --scaffold <type>[/<form>] [--evidence <insight-id>] [--id <page-id>]
+node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
+node runtime/analysis.mjs <id>.pages.json [--catalogue]
 node runtime/storyline.mjs [merge] <id>.deck.json out/ [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]
 node runtime/build-deck.mjs <id>.deck.json out/ [--no-fetch] [--no-render] [--preflight]
 node runtime/deliver-deck.mjs <id>.deck.json out/ [--reviewer auto|codex|claude|packet] [--model m]
@@ -51,7 +53,15 @@ design-options.mjs one labelled contact sheet per intake question, each tile bui
 import-template.py a template deck -> house profile (palette, faces, chrome, density); infer-style.py the same from a PDF or screenshots
 variation.mjs      a deck's variation seed and draw
 page-types.mjs     the page types: required choices, the structure they compile to, evidence shapes and breadth, the values each page plots, the chart-form refusals (CHART_FORM_CODES)
-author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run (AUTHORING_CODES); stamps `rulesVersion`
+author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run, in class order (AUTHORING_CODES); stamps `rulesVersion`
+deck-structure.mjs the deck's structure read off declared choices: a page's architecture before it composes, the page-shape rule, and `--plan`'s allocation of forms and placements
+fit-search.mjs     for a page that does not fit: its type's other forms and placements compiled from the page as written, composed and gated; one that fits only by dropping a field the page wrote is listed apart, and one is called verified only once `--check --render` has rendered it
+deck-report.mjs    the author's report: findings in class order, where the deck stands against each structure and aggregate rule, each page's part in the aggregates
+pages-file.mjs     the pages file read whole: `{ "include": ... }` entries spliced in, ids unique across the parts, the part each page came from
+limits.mjs         every countable limit a page or a deck is held to, read from the constants the checks read (`--limits`, a scaffold's `limits` block)
+spine-fit.mjs      the titles the storyline critique binds, composed where the deck's design sets them on every run, a draft and a plan too, with the room each has (SPINE_FIT_CODES)
+spine-exhibits.mjs the exhibits a spine fully determines - a bound or typed chart, a stub's view, a measure read whole, the executive summary's table - composed with placeholder copy in a draft and a plan, and refused where none can be drawn or the summary cannot fill its page (SPINE_EXHIBIT_CODES)
+deck-keys.mjs      the deck-level keys `deck` takes, each with its type: what `--schema deck` prints and the compile holds `deck` to
 compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
 derive-content.mjs the content plan and text plan read off the composed pages; each page's word floor and ceiling
 compose.mjs        the composer's entry point, kept for the tests that import it; the work is in compose-*.mjs:
@@ -64,6 +74,7 @@ text-layout.mjs    wrap-once measurement; font-metrics.mjs uses @napi-rs/canvas 
 registry.mjs       builds the component registry from its families: registry-chrome, registry-text, registry-data, registry-media, registry-process,
                    registry-diagrams, registry-connectors, registry-chart-title, registry-shared (tokens, fitText ladder), and charts.mjs, charts-extra.mjs,
                    tables.mjs, trackers.mjs, panels.mjs, gantt.mjs, extras.mjs, framework.mjs, maps.mjs, figures.mjs, ...
+schedule-stages.mjs a timeline's or roadmap's dated stages: date, label and detail at reading size, in columns or rows as the frame allows
 charts.mjs         registers the charts; they are drawn in chart-categorical, chart-line, chart-scatter-pie, chart-specialty, on chart-axes, with chart-decorations
 marks.mjs          the shared marker vocabulary: numberMarker, iconMarker, stateMarker (lists, cards, table cells, map pins, agenda)
 icons.mjs          56 named icons as path data, emitted as editable freeforms; `author-deck.mjs --icons` lists them with their aliases
@@ -78,6 +89,10 @@ cli.mjs            the plumbing every command shares: isMain, parseCli on util.p
 color.mjs          colour arithmetic on #RRGGBB: mix, relative luminance, WCAG contrast (emit/color.py ports it)
 nice-numbers.mjs   the values an axis, a shared scale or a size legend may land on (gates/nice_ticks.py ports it)
 evidence.mjs       the evidence a page rests on, without the layout engine: SHAPES and breadth, the table vocabulary, plottedValues - so storyline.mjs and reviewer.mjs load about a dozen modules rather than fifty-five
+bind.mjs           numbers by reference: a bound exhibit, a bound figure and `{{...}}` tokens written out from the insight log's measures before the compile (BINDING_CODES)
+printed-numbers.mjs the numbers a page's text prints, read apart from its labels, and when a printed number states a recorded one
+run-log.mjs        what authoring a deck cost, counted from `<id>.author-log.jsonl`: compile and plan runs and refusals by mode, code and page, and what the log does not count (`--log`)
+asset-needs.mjs    what the build would fetch for a deck, the choices, and the deck's declaration that it is built without the network (ASSET_CODES)
 table-variants.mjs the table variants a deck may name, in the component gallery's order
 claims.mjs         the claim ledger (claims.json) for the author's self-check, and its validation
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
@@ -89,6 +104,7 @@ gates/deck_gates.py     the deck-wide gates: photographs, craft rates, device vo
 gates/text_stats.py     the one word count (text-contract.mjs textWords, ported), printed words for the density profile, content words; stopwords.json the shared stopword lists
 gates/density_profile.py  words as a reader meets them on the rendered PDF; TEXT_FRAGMENTED
 gates/variety_gates.mjs, gates/content_gates.mjs, gates/plan_gates.mjs, gates/craft_gates.mjs  the variety contract, the content plan, the plan record, the craft floors
+gates/gate_classes.mjs  the class of every finding code (deck structure, page-local, deck aggregate, review), the layout codes the fit search answers, and a standing as one line
 build-bars.mjs     the bars delivery measures on the built scene (BUILD_BAR_CODES) and the measures that let a partly fixed deck finding drop (DOWNGRADE_MEASURES)
 storyline.mjs      the storyline critique: spine or full packet, validation, the gate the deck review and delivery wait for
 reviewer.mjs       the deck review: rubric, pass-one, verification and confirmation schemas, section split and merge; backends codex | claude | packet
