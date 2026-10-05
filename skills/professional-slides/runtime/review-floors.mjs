@@ -82,7 +82,9 @@ export function titleErrors(text, limits, at, { section = false, sectionFits = n
   for (const match of source.matchAll(PROPOSED)) {
     // "Retitle the s2 divider" names a section as surely as "the section title" does.
     const { max, what, rule } = bar(match[2] || /\b(?:section|divider)\b/i.test(match[3]));
-    const proposed = match[4] ?? match[5] ?? match[6] ?? match[7], words = titleWords(proposed);
+    // "Replace the title "<old>" with "<new>"": the title proposed is the one after `with`, not the one replaced.
+    const instead = /^\s*(?:with|by|to|for)\s+(?:"([^"]{8,})"|“([^”]{8,})”)/i.exec(source.slice(match.index + match[0].length));
+    const proposed = instead ? instead[1] ?? instead[2] : match[4] ?? match[5] ?? match[6] ?? match[7], words = titleWords(proposed);
     if (words > max) errors.push(`${at}: the title it proposes runs to ${words} words ("${proposed.length > 70 ? `${proposed.slice(0, 67)}...` : proposed}") and the build refuses ${what} past ${max} (${rule}): propose one of ${max} words or fewer - the finding and its comparator, with the period, the population and the scope left to the subtitle`);
     // A section title within the most its divider holds is composed on the divider where the caller can (`sectionFits`): a count
     // of words bounds what fits and does not decide it.
@@ -90,6 +92,8 @@ export function titleErrors(text, limits, at, { section = false, sectionFits = n
       errors.push(`${at}: the section title it proposes ("${proposed.length > 70 ? `${proposed.slice(0, 67)}...` : proposed}", ${words} words, ${proposed.length} characters) does not fit its divider as this deck draws it (SPINE_UNFIT): its words are long for the room${limits.sectionTitle.sure !== undefined ? ` - ${limits.sectionTitle.sure} words or fewer always fit` : ""}; propose a shorter one, with the detail left to the section's summary`);
   }
   for (const match of source.matchAll(TITLE_LENGTH)) {
+    // "from 24 words to 12" states the length it has, not the one it asks for.
+    if (/\bfrom\s+\d/i.test(match[0])) continue;
     const { max, what, rule } = bar(match[1]);
     const low = Number(match[2]);
     if (low > max) errors.push(`${at}: it asks for a title of ${match[3] ? `${match[2]}-${match[3]}` : match[2]} words and the build refuses ${what} past ${max} (${rule}): ask for ${max} words or fewer`);

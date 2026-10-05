@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { planDeck } from "../../skills/professional-slides/runtime/planner.mjs";
-import { toDeckPlan } from "../../skills/professional-slides/runtime/compose.mjs";
+import { toDeckPlan } from "../support/compose.mjs";
 import { metricsBackend } from "../../skills/professional-slides/runtime/font-metrics.mjs";
 import { isMain, parseCli, readJsonSync, runCli } from "../../skills/professional-slides/runtime/cli.mjs";
 

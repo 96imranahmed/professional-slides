@@ -138,14 +138,16 @@ class RulesVersionTests(unittest.TestCase):
                 self.assertEqual(next(f for f in report["findings"] if f["code"] == "SCENE_VOID")["severity"], "blocker")
 
     def test_a_lowered_bar_is_new_only_between_the_old_bar_and_the_new(self):
-        # Titles went from fourteen words to twelve and takeaways from three
-        # lines to two: a revision under older rules is held to the old bar,
-        # not waived past it.
+        # Takeaways went from three lines to two: a revision under older rules
+        # is held to the old bar, not waived past it. (Titles went from fourteen
+        # words to twelve and since to fifteen, past the old bar, so no version
+        # lowered the bar a title is held to now.)
         tightened = CONTRACT["rules"]["tightened"]
-        self.assertEqual(tightened["TITLE_WORDS"]["before"], 14)
+        self.assertNotIn("TITLE_WORDS", tightened)
+        self.assertEqual(tightened["TAKEAWAY_LONG"]["before"], 3)
         self.assertEqual(page_gates.THRESHOLDS["title_words_max"], CONTRACT["plan"]["titleWords"]["max"])
         self.assertEqual(page_gates.TAKEAWAY_LINES_MAX, 2)
-        cases = [("TITLE_WORDS", 13, "advisory"), ("TITLE_WORDS", 15, "blocker"), ("TAKEAWAY_LONG", 3, "advisory"), ("TAKEAWAY_LONG", 4, "blocker")]
+        cases = [("TITLE_WORDS", 16, "blocker"), ("TAKEAWAY_LONG", 3, "advisory"), ("TAKEAWAY_LONG", 4, "blocker")]
         for code, measured, older in cases:
             with self.subTest(code=code, measured=measured):
                 page_gates.configure_rules()
@@ -310,14 +312,13 @@ console.log(JSON.stringify({{ now: run(null), v1: run(revision(1)), v2: run(revi
         for held in ("v2", "v3", "fresh"):
             self.assertFalse(result[held]["ok"], held)
 
-    def test_a_lowered_title_bar_holds_the_revision_to_the_old_bar(self):
+    def test_a_title_past_fifteen_words_is_refused_whatever_version_the_revision_records(self):
+        # Version 3 lowered the title from fourteen words to twelve; it is fifteen now, past the old bar, so a title
+        # inside it compiles under every version and one past it is refused as the rule always was.
         thirteen = self.compile("(p) => ({ ...p, title: 'The Eastern line costs a third more to run than the electric lines' })")
-        self.assertFalse(thirteen["now"]["ok"])
-        self.assertTrue(thirteen["v2"]["ok"])
-        self.assertIn("TITLE_WORDS", thirteen["v2"]["advisories"])
-        self.assertFalse(thirteen["v3"]["ok"])
-        fifteen = self.compile("(p) => ({ ...p, title: 'The Eastern line costs a third more to run than the three electric lines do' })")
-        self.assertFalse(fifteen["v2"]["ok"], "past the old bar the rule is as it always was")
+        self.assertTrue(all(thirteen[v]["ok"] for v in ("now", "v2", "v3")), thirteen)
+        seventeen = self.compile("(p) => ({ ...p, title: 'The Eastern line costs a third more to run than the three electric lines do every year' })")
+        self.assertFalse(any(seventeen[v]["ok"] for v in ("now", "v1", "v2", "v3")), seventeen)
 
     def test_a_chart_form_refusal_is_versioned_like_the_rest(self):
         result = self.compile("(p) => { p.exhibit.columns = p.exhibit.columns.map((c) => (c && c.implication ? { label: 'Depot plans', implication: true } : c)); return p; }")

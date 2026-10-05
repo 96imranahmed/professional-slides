@@ -49,8 +49,6 @@ class SubmissionPackageTests(unittest.TestCase):
         self.assertEqual((self.package / 'README.md').read_bytes(),
                          (ROOT / 'submission/README-DISTRIBUTION.md').read_bytes())
         self.assertNotIn('](evals/', (self.package / 'README.md').read_text())
-        production = self.package / 'skills/professional-slides/references/tools/production.md'
-        self.assertIn('pip install -r ../../requirements.txt', production.read_text())
         for excluded in ['.app.json', 'mcp.json', '.mcp.json', 'package.json', 'package-lock.json', 'evals', 'submission']:
             self.assertFalse((self.package / excluded).exists(), excluded)
 

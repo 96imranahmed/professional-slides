@@ -32,9 +32,8 @@ are counted, which can disagree with the compiler.
 `--reference` takes another PDF (measured the same way) or a census JSON: this
 script's own `--out`, or a bare list of per-page rows with `words`, `nums`,
 `ink` and `occ`. A reference with no text layer (a scan) reports its word
-counts as unavailable rather than as zero. `evals/reference_census.json` is a
-numbers-only census of a sample of strong consulting pages to pass as
-`--reference`; the sample itself lives outside the repository.
+counts as unavailable rather than as zero. The reference sample of strong
+consulting pages lives outside the repository; pass its PDF or its census.
 
 Rendering uses PyMuPDF when it is installed and poppler's pdftoppm/pdftotext
 otherwise; numpy and Pillow are required either way. The pixel measures keep

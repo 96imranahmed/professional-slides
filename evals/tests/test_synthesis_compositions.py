@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {planDeck, planSlide} from './skills/professional-slides/runtime/planner.mjs';
 import {token} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
+import {renderSlideHtml} from './evals/support/html.mjs';
 const hug={width:'fill',height:'hug'};
 const text=(id,value,size=hug)=>({id,job:'Preserve the authored claim or qualification',component:'paragraph',props:{text:value},size});
 const group=(id,items,layout='flow.column',size=hug)=>({id,job:'Keep dependent evidence together',layout,gap:'space.2',padding:0,size,items});

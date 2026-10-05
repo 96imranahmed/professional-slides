@@ -103,16 +103,20 @@ export function carriedProblem(page, { revision = true } = {}) {
  * (`carried` on the spec): each with the slide it carries, its title and
  * edits as authored, and `after` - the id of the composed page it follows in
  * the pages file, null where it comes before every one - which is all the
- * build needs to set the carried slides among the composed ones.
+ * build needs to set the carried slides among the composed ones. A page
+ * written without an id is named as the compile names it (compilePage: a
+ * section is `section-<place>`), so a divider set among carried slides keeps
+ * its place. `skip(page, index)` leaves a page out without moving the places.
  */
-export function carriedEntries(pages) {
+export function carriedEntries(pages, { skip = () => false } = {}) {
   const out = [];
   let after = null;
-  for (const page of pages) {
-    if (!isCarried(page)) { if (page && typeof page === "object" && page.id !== undefined && !(page.draft !== undefined && !page.type && !page.kind)) after = String(page.id); continue; }
+  pages.forEach((page, index) => {
+    if (skip(page, index) || !page || typeof page !== "object") return;
+    if (!isCarried(page)) { if (!(page.draft !== undefined && !page.type && !page.kind)) after = String(page.id ?? `${page.kind ?? "page"}-${index + 1}`); return; }
     out.push({ id: String(page.id), sourceSlide: page.sourceSlide, title: page.title ?? "", after,
       ...(page.hidden !== undefined ? { hidden: page.hidden } : {}), ...(Array.isArray(page.replace) && page.replace.length ? { replace: page.replace } : {}) });
-  }
+  });
   return out;
 }
 
@@ -358,6 +362,8 @@ export function carriedFindings(spec, inventory, baseDir, { python = pythonBin()
   if (!missing && !findings.some((f) => f.code === "REVISION_CARRY_INVALID")) {
     const byIndex = new Map(carried.map((entry) => [entry.sourceSlide, entry.id]));
     const refused = tryCarried(assemblyOrder(spec, inventory, []), source, python);
+    // An edit nobody could try is not an edit that passed: the build would meet it first.
+    if (refused === null) invalid(null, `The carried slides' edits could not be tried on ${path.basename(source)}: emit/assemble_pptx.py --check did not run under ${python}. Run node runtime/doctor.mjs and set RUNTIME_PYTHON to the interpreter it names`);
     for (const refusal of refused ?? []) invalid(byIndex.get(refusal.slide) ?? null, `${byIndex.get(refusal.slide) ?? `slide ${refusal.slide}`}: ${refusal.message}`);
   }
   return findings;
@@ -457,6 +463,7 @@ export function changesMade(revision, spec) {
     else if (change.old !== undefined) lines.push({ page: idOf.get(edit.slide) ?? null, slide: edit.slide, kind: "replaced", old: change.old, new: change.new, count: change.count,
       text: `${where}: "${change.old}" replaced by "${change.new}"${change.count > 1 ? `, in ${change.count} places` : ""}${edit.notes ? " (its speaker notes among them, where they printed it)" : ""}` });
     else if (change.hidden !== undefined) lines.push({ page: idOf.get(edit.slide) ?? null, slide: edit.slide, kind: change.hidden ? "hidden" : "shown", text: `${where}: ${change.hidden ? "hidden from" : "put back into"} the slide show` });
+    else if (change.unlinked) lines.push({ page: idOf.get(edit.slide) ?? null, slide: edit.slide, kind: "unlinked", parts: change.unlinked, text: `${where}: its link${change.unlinked.length === 1 ? "" : "s"} to ${change.unlinked.join(", ")} taken out, since the revision cuts ${change.unlinked.length === 1 ? "that slide" : "those slides"} (the linked words stay)` });
   }
   for (const item of (revision.order || []).filter((entry) => entry.composed)) { const from = stands.get(String(item.id));
     lines.push({ page: item.id, slide: from ?? null, kind: from === undefined ? "added" : "redrawn", text: from === undefined ? `page ${item.id}: added, composed by the runtime` : `slide ${from} (${item.id}): redrawn - composed by the runtime in the slide's place` }); }

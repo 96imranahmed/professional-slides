@@ -39,7 +39,7 @@ def pptx_shapes() -> set[str]:
 def html_draws(names) -> dict:
     """Whether the HTML adapter draws each geometry (it throws on one it does not know)."""
     return run_node(f"""
-import {{ renderSlideHtml }} from './skills/professional-slides/runtime/adapters/html.mjs';
+import {{ renderSlideHtml }} from './evals/support/html.mjs';
 const draws = (geometry) => {{ try {{
   renderSlideHtml({{ id: 's', nodes: [{{ id: 'n', type: 'shape', role: 'shape', frame: {{ x: 10, y: 10, width: 80, height: 40 }},
     style: {{ fill: '#000000' }}, data: {{ geometry }} }}] }});
@@ -53,7 +53,7 @@ def emitted_geometries() -> set[str]:
     return set(run_node("""
 import fs from 'node:fs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const found = new Set(), frame = { x: 60, y: 140, width: 1160, height: 520 };
 const collect = (nodes) => { for (const node of nodes || []) if (node.data?.geometry) found.add(node.data.geometry); };

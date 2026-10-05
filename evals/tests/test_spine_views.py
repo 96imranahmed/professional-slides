@@ -236,7 +236,7 @@ class SpineReadingReportTests(unittest.TestCase):
         self.assertEqual(set(by_page), {"f0", "f1", "f2", "f3", "f4", "f5", "f6"})
         self.assertIn("i-loans/loans: read as plotted, every one of its 8 periods", by_page["f1"])
         self.assertIn("A-ocf/percent: read as stated as a figure", by_page["f2"])
-        self.assertIn("A-cushion/result: read as tabulated, 2 of its 8 periods: FY25, FY26 (declared)", by_page["f0"])
+        self.assertIn("A-cover/result: read as tabulated, 2 of its 8 periods: FY25, FY26 (declared)", by_page["f0"])
         # The human-readable report carries the same lines and says what to do about them.
         self.assertIn("How the storyline critique will read each measure a page shows and does not draw yet", run.stderr)
         self.assertIn("`as: \"chart\" | \"table\" | \"figure\"`", run.stderr)
@@ -257,7 +257,7 @@ class SpineReadingReportTests(unittest.TestCase):
         run = self.run_cli({"f0": {"as": "table", "labels": {"from": "FY25", "to": "FY26"}, "members": ["Harbour"]}}, "--draft")
         self.assertEqual(run.returncode, 0, run.stderr[-2000:])
         line = next(line for line in json.loads(run.stdout)["readings"] if line.startswith("f0 "))
-        self.assertIn("A-cushion/result: read as tabulated, 2 of its 8 periods: FY25, FY26 (declared)", line)
+        self.assertIn("A-cover/result: read as tabulated, 2 of its 8 periods: FY25, FY26 (declared)", line)
         self.assertIn("A-peers/margin: read as tabulated, 1 of its 8 members: Harbour (declared)", line)
 
     def test_a_plan_includes_each_page_s_reading(self):

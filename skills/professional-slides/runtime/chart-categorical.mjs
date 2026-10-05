@@ -135,7 +135,7 @@ function periodKey(name) {
  * otherwise the first stays the subject, as peers are written subject first
  * ("Emirates", "Qatar"). An explicit
  * `focusSeries` always wins. The change bracket reads focus minus the other,
- * so it follows the same choice (compose.mjs).
+ * so it follows the same choice (compose-charts.mjs).
  */
 export function defaultFocusIndex(names, focus) {
   if (focus !== undefined) return names.indexOf(focus);

@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "ga
 import page_gates  # noqa: E402
 
 DECK = r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const chart=(heading,extra={})=>({type:'chart.column',heading,unit:'%',categories:['2022','2023','2024'],series:[{name:'s',values:[1,2,3]}],...extra});
 const build=(slides)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides})).deck;

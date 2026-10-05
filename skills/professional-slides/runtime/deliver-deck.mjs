@@ -352,7 +352,10 @@ async function confirm(shared, accepted) {
     if (run.status === "packet-written") return pending(shared, run, { mode: "confirmation", pass: accepted.pass, pages: slideIds.length });
     review = run.review;
   }
-  const errors = [...validateConfirmation(review, slideIds, { confirms: accepted.binding, waivers }), ...await validateReviewBinding(review, directory, { request })];
+  // The pages the revision left as they were: a confirmation's finding about them alone is the user's, as a first pass's is.
+  const revised = revisionChanges(spec, await readInventory(spec, specPath));
+  const imported = revised && !revised.restyle ? revised.pages.filter((id) => !revised.content.includes(id)) : [];
+  const errors = [...validateConfirmation(review, slideIds, { confirms: accepted.binding, waivers, imported }), ...await validateReviewBinding(review, directory, { request })];
   if (errors.length) return refuse("invalid confirmation", errors.map((e) => ({ slide: null, code: "INVALID_REVIEW", severity: "blocker", reason: `confirmation record invalid: ${e}`, repair: "Return a confirmation that matches the schema; this is a transport problem, not a deck defect" })));
   const unproven = await answerProvenance(store, review, { kind: "confirmation" });
   if (unproven.length) return refuse("confirmation provenance", unproven.map((reason) => ({ slide: null, code: "REVIEW_PROVENANCE", severity: "blocker", reason,

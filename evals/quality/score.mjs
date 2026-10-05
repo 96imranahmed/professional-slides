@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * Score a cold run.
+ * Score a run: the plan an agent wrote and the deck it built.
  *
- *   node evals/cold-run/score.mjs <plan.json> [build-directory] [--json]
+ *   node evals/quality/score.mjs <plan.json> [build-directory] [--json]
  *
- * A cold run is the skill used the way a stranger uses it: a brief, no context,
- * no corrections. Every defect found in this repository over two days of review
- * was found by a person opening a PDF and looking at it, which is a loop that
- * runs once per person per afternoon. This is the same loop as a command.
+ * The quality eval (run.mjs) scores every deck it collects with this, and it
+ * scores a run made by hand the same way.
  *
  * It scores two artefacts and refuses to average them:
  *
@@ -39,15 +37,15 @@ import { isMain } from "../../skills/professional-slides/runtime/cli.mjs";
 import { readRunLog, runCost } from "../../skills/professional-slides/runtime/run-log.mjs";
 
 // The bars a built deck has to clear live with delivery, which refuses a deck
-// that misses one (runtime/build-bars.mjs); the harness scores a cold run by
-// the same bars rather than a copy of them.
+// that misses one (runtime/build-bars.mjs); the harness scores a run by the
+// same bars rather than a copy of them.
 export { BUILD_BARS, BUILD_CEILINGS, scoreBuild };
 
 export function scoreRun({ plan = null, scene = null, purpose = null, runs = null }) {
   const planReport = plan ? runPlanGates(plan) : null;
   const buildReport = scene ? scoreBuild(scene, { purpose }) : null;
   return {
-    schema: "professional-slides.cold-run/v1",
+    schema: "professional-slides.run-score/v1",
     plan: planReport && {
       accepted: planReport.accepted,
       countsByCode: planReport.countsByCode,

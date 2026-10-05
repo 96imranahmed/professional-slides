@@ -382,15 +382,14 @@ class DeckRulesBesideACarriedSlideTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.home, ignore_errors=True)
 
-    def deck(self, change=None, revision=True):
+    def deck(self, change=None):
         work = Path(tempfile.mkdtemp(prefix="deck-", dir=self.home))
         shutil.copytree(self.bed, work, dirs_exist_ok=True)
         shutil.copytree(EXAMPLE / "assets", work / "assets", dirs_exist_ok=True)
         doc = copy.deepcopy(self.example)
         doc["deck"]["id"] = "one"
-        if revision:
-            doc["deck"].update(workflow="existing_deck_revision", inventory="one.inventory.json", rulesVersion=json.loads((RUNTIME / "weight.json").read_text())["rulesVersion"])
-            doc["pages"] = [*doc["pages"], *copy.deepcopy(self.carried)]
+        doc["deck"].update(workflow="existing_deck_revision", inventory="one.inventory.json", rulesVersion=json.loads((RUNTIME / "weight.json").read_text())["rulesVersion"])
+        doc["pages"] = [*doc["pages"], *copy.deepcopy(self.carried)]
         if change:
             change(doc)
         (work / "one.pages.json").write_text(json.dumps(doc, indent=1, ensure_ascii=False))
@@ -405,10 +404,8 @@ class DeckRulesBesideACarriedSlideTests(unittest.TestCase):
         return sh(NODE, AUTHOR, work / "one.pages.json", "--check"), {f["code"] for f in judged(work, "one")["blocking"]}
 
     def test_one_carried_slide_does_not_change_what_a_deck_of_composed_pages_is_held_to(self):
-        done, fresh = self.blocked(self.deck(self.headless, revision=False))
-        self.assertEqual(done.returncode, 2)
-        self.assertLessEqual({"NO_SUMMARY", "NO_SECTIONS"}, fresh)
-        # The same pages with one slide carried beside them: refused for the same deck rules.
+        # The worked deck without its opening summary and its sections, with one slide carried beside it: refused for the
+        # deck rules a new deck of the same pages is refused for.
         done, carrying = self.blocked(self.deck(self.headless))
         self.assertEqual(done.returncode, 2, done.stderr[:1500])
         self.assertLessEqual({"NO_SUMMARY", "NO_SECTIONS"}, carrying)
@@ -508,7 +505,7 @@ class ImportedDeckFindingsTests(RevisedDeck):
     def answer(self, work, packet, finding=None):
         critique = json.loads(json.loads(sh(NODE, self.FAKE_CRITIC, cwd=packet).stdout)["result"])
         if finding:
-            critique["findings"].append({"id": "F9", "scope": "spine", "check": "numbers", "problem": "The new title on slide 4 says the Valley sells the most; the summary on slide 2 says the Coast does.",
+            critique["findings"].append({"id": "F9", "scope": "spine", "check": "numbers", "ifUnfixed": "The committee would act on a sales leader the user's own summary contradicts.", "problem": "The new title on slide 4 says the Valley sells the most; the summary on slide 2 says the Coast does.",
                                          "fix": "The user decides which is meant, and the summary or the title follows.", **finding})
             critique["completeness"] = [{**entry, "result": "findings", "note": "Filed an item under numbers."} if entry["check"] == "numbers" else entry for entry in critique["completeness"]]
             if finding["severity"] in ("major", "blocker") and finding.get("aboutImported") is False:

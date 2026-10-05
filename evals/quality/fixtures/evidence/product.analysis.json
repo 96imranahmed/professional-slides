@@ -32,15 +32,6 @@
    "percent": true,
    "soWhat": "Conversion to paid has more than doubled",
    "strength": "strong"
-  },
-  {
-   "id": "C-mix",
-   "op": "share",
-   "inputs": [
-    "p-usage/sessions"
-   ],
-   "soWhat": "Two features carry three quarters of use",
-   "strength": "supporting"
   }
  ]
 }

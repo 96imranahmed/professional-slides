@@ -32,7 +32,10 @@ const revalued = structuredClone(spec); revalued.slides[0].exhibit.series[0].val
 console.log(JSON.stringify({
   same: storylineBinding(reworded) === binding, changed: storylineBinding(retitled) !== binding,
   ok: validateStorylineReview(ready, reworded), stale: validateStorylineReview(ready, retitled).length,
-  revise: validateStorylineReview({ ...ready, verdict: 'revise' }, spec).length, missing: validateStorylineReview(null, spec).length,
+  // The verdict is read off the items: a critic's "revise" with nothing open is ready, and an open major sends it back.
+  revise: validateStorylineReview({ ...ready, verdict: 'revise', findings: [{ id: 'F1', scope: 'page', pages: ['a'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would back a plan on a count, not the rate it needs.',
+    problem: 'The title states a count, not the rate the claim rests on.', fix: 'State the rate of opening against the plan.' }] }, spec).length,
+  saidRevise: validateStorylineReview({ ...ready, verdict: 'revise' }, spec).length, missing: validateStorylineReview(null, spec).length,
   bare: validateStorylineReview({ verdict: 'ready', binding }, spec), revalued: storylineBinding(revalued) !== binding,
   twoNumber: describeExhibit({ type: 'chart.column', categories: ['A', 'B'], series: [{ name: 'x', values: [1, 2] }] }),
   plainTable: describeExhibit({ type: 'table', columns: ['Operator', 'Note'], rows: [['A', 'words'], ['B', 'more words']] }),
@@ -49,6 +52,7 @@ console.log(JSON.stringify({
         self.assertEqual(result['ok'], [])
         self.assertEqual(result['stale'], 1)
         self.assertEqual(result['revise'], 1)
+        self.assertEqual(result['saidRevise'], 0)
         self.assertEqual(result['missing'], 1)
         self.assertTrue(any('summary' in e for e in result['bare']))  # a verdict alone is not a critique
         # An exhibit that names no recorded measure is bound by the numbers it draws: a trend that reverses is a different story.
@@ -169,7 +173,7 @@ console.log(JSON.stringify({
         for edit, kept in result['layout'].items():
             self.assertTrue(kept, edit)
         for edit, pages in result['argument'].items():
-            self.assertEqual(pages, {'cut': True, 'added': ['p03b'], 'cellValue': ['p04']}.get(edit, ['p03']), edit)
+            self.assertEqual(pages, {'cut': True, 'added': ['p03b', 's2'], 'cellValue': ['p04']}.get(edit, ['p03']), edit)
         for edit, kept in result['deck'].items():
             self.assertFalse(kept, edit)
         self.assertTrue(result['otherMeasure'])
@@ -226,7 +230,7 @@ console.log(JSON.stringify({
         spine = result['spine']
         self.assertIn('| trend, settled by rate |', spine['line'])
         # The critic is shown what the page shows of each measure: the drafted chart's window of two periods, not the six recorded.
-        self.assertIn('shows: i-spend/subject: 2020 5 to 2025 40 %, 6 periods [the page shows it plotted, 2 of its 6 periods: 2024, 2025]; i-spend/rival (context): North 30, South 27 % [the page shows it plotted, whole]', spine['line'])
+        self.assertIn('shows: i-spend/subject: 2020 5, 2021 7, 2022 9, 2023 12, 2024 24, 2025 40 % [the page shows it plotted, 2 of its 6 periods: 2024, 2025]; i-spend/rival (context): North 30, South 27 % [the page shows it plotted, whole]', spine['line'])
         self.assertIn('declared: context i-spend/rival - relevance claimed: "The rival shows the base the subject took share from"', spine['line'])
         self.assertIn('rests on: i-spend', spine['line'])
         self.assertEqual([spine['form'], spine['drafted'], spine['copy'], spine['rule']], [False, False, False, True])
@@ -335,7 +339,7 @@ console.log(JSON.stringify({ gate, step: [step.status, step.pass, step.retired],
         self.assertEqual(result['step'][:2], ['packet-written', 1])
         self.assertIn('archived in', result['step'][2])
         self.assertIsNone(result['scope'])
-        self.assertEqual(result['version'], 4)
+        self.assertEqual(result['version'], 5)
         self.assertEqual(result['archived'], ['pass-1.json', 'pass-2.json', 'pass-3.json', 'storyline-review.json'])
         self.assertEqual([result['left'], result['answer']], [[], False])
         # Logged as a retirement with why, and not as a restart, which a second time would need the user's approval.
@@ -474,7 +478,7 @@ const first = { pass: 1, verifies: null, verdict: 'revise', rating: 6, binding: 
   answer: 'The subject is winning on growth and must show retention to be winning overall.', answerParts: [{ part: 'Is the subject winning', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Growth', pages: ['p01', 'p02'], verdict: 'holds', overlap: 'A single pillar here.', strongestCounter: 'Growth bought with discounts.', reversal: 'Retention below peers.', answered: false }],
   numbers: 'The two pages print no shared figure.', sectionFlow: 'One section opens and closes in the order a reader follows.', execSummary: 'No summary page in this probe; the title carries the answer.',
-  missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides whether growth is winning.', data: 'Company filings cohort tables', public: 'known', remedy: 'retrieval', severity: 'major' }],
+  missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides whether growth is winning.', data: 'Company filings cohort tables', public: 'known', remedy: 'retrieval', severity: 'major', ifUnfixed: 'The committee would back growth that retention may not support.' }],
   cutOrMerge: [], findings: [], topFixes: ['Run cohort retention'], completeness: S.STORYLINE_DIMENSIONS.map(clean) };
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(first));
 await S.prepareStoryline(specPath, out);

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 
-from gate_config import THRESHOLDS, finding, lines_of, source_text, standing, text_nodes
+from gate_config import DECK_HABIT, THRESHOLDS, finding, lines_of, source_text, standing, text_nodes
+from render_gates import FOOTER_ROLES
+from scene_gates import analytical
 # Two sentences share what they say in their content words (stopwords.json).
 from text_stats import content_words
 
@@ -161,6 +163,38 @@ def gate_caveat_heavy(slide_no, slide, findings):
         "Keep one statement of what this evidence does not settle, in the note or "
         "the insight, and give the commentary back to what it does settle. A page "
         "that qualifies itself three times reads as a page with nothing to say.",
+    ))
+
+
+# The words a sentence states a limit in: a negation, or what the evidence
+# leaves unverified, undisclosed or unproven.
+CAVEAT_WORD_RE = re.compile(r"^(?:not|cannot|neither|nor|\w+n't|unverified|undisclosed|unproven|unconfirmed|unpublished|unknown|unclear|uncertain|"
+                            r"inconclusive|insufficient)$", re.I)
+
+
+def gate_caveat_dense(slides, content_indexes, findings):
+    """CAVEAT_DENSE. Advisory. The deck's caveat words for each hundred words
+    its pages print above the footer. Strong decks state findings in the
+    body and keep their qualifications to numbered footnotes, source notes
+    and stamps ("Preliminary", "Illustrative"): their median deck sets 0.27
+    caveat words in a hundred, nine in ten under `caveat_words_max`. A deck
+    past that argues with itself on every page, though no one page is
+    CAVEAT_HEAVY. A footnote's words are not counted: that is where a
+    qualification goes. Read, as DECK_INK is, from DECK_HABIT `from` pages."""
+    pages = [slides[index] for index in content_indexes if analytical(slides[index], index)]
+    said = [w for slide in pages for node in text_nodes(slide) if str(node.get("role") or "") not in FOOTER_ROLES for w in str(source_text(node)).split()]
+    if not said:
+        return
+    rate = round(100 * sum(1 for w in said if CAVEAT_WORD_RE.match(w.strip(".,;:()\"'"))) / len(said), 2)
+    standing("CAVEAT_DENSE", "caveat words a hundred words above the footer", rate, THRESHOLDS["caveat_words_max"], "max", unit="words",
+             applies=len(pages) >= DECK_HABIT["from"])
+    if len(pages) < DECK_HABIT["from"] or rate <= THRESHOLDS["caveat_words_max"]:
+        return
+    findings.append(finding(
+        None, "CAVEAT_DENSE", rate, THRESHOLDS["caveat_words_max"],
+        "The pages state their limits in the argument. Let the title and the body say what the evidence shows, "
+        "and move each qualification - what is undisclosed, unverified or not like for like - to a numbered "
+        "`footnotes` entry on its page or the source note, where strong decks keep them.",
     ))
 
 

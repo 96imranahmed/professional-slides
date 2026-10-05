@@ -40,7 +40,7 @@ def shipped(relative):
     if area == 'references':
         return relative.suffix in {'.md', '.json'}
     if area == 'runtime':
-        return relative.suffix in {'.mjs', '.py', '.json', '.md'} and relative.name != 'fixtures.mjs'
+        return relative.suffix in {'.mjs', '.py', '.json', '.md'}
     if area == 'examples':
         return (len(parts) > 4 and parts[3] == 'assets' and relative.suffix in IMAGES) or (
             len(parts) == 4 and relative.suffix == '.json' and relative.name != 'gallery-acceptance.deck.json')

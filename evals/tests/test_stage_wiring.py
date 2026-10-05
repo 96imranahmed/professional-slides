@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from node_probe import NODE, ROOT, requires_python_package, run_node
+from node_probe import NODE, ROOT, authored_example, requires_python_package, run_node
 
 EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
 BUILD = ROOT / "skills" / "professional-slides" / "runtime" / "build-deck.mjs"
@@ -140,11 +140,16 @@ class StagePlanWiringTests(StageFixture, unittest.TestCase):
         self.assertIn("PLAN_EXHIBIT_VARIETY", json.loads((out / "plan-gates.json").read_text())["countsByCode"])
 
 
+def example_content_plans():
+    """The content plans shipped beside a deck spec, and the one author-deck.mjs writes for the worked example."""
+    return sorted(EXAMPLES.glob("*.content.json")) + [authored_example("page-types") / "page-types.content.json"]
+
+
 class ExampleContentPlanTests(unittest.TestCase):
     """The worked example is a real deck, not a fixture."""
 
     def test_historical_example_content_plans_pass_explicit_legacy_audit(self):
-        plans = sorted(EXAMPLES.glob("*.content.json"))
+        plans = example_content_plans()
         self.assertTrue(plans, "at least one example deck carries its content stage")
         for plan in plans:
             with self.subTest(plan=plan.name):
@@ -161,10 +166,10 @@ console.log(JSON.stringify(runContentGates(JSON.parse(readFileSync({json.dumps(s
 
     def test_the_content_plan_matches_its_deck_page_for_page(self):
         """A plan that has drifted from its deck teaches the wrong thing."""
-        for plan_path in sorted(EXAMPLES.glob("*.content.json")):
+        for plan_path in example_content_plans():
             with self.subTest(plan=plan_path.name):
                 name = plan_path.name.replace(".content.json", "")
-                deck = json.loads((EXAMPLES / f"{name}.deck.json").read_text(encoding="utf-8"))
+                deck = json.loads((plan_path.parent / f"{name}.deck.json").read_text(encoding="utf-8"))
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
                 if plan.get("derivedFrom") == "pages":
                     # Derived by author-deck.mjs: every page of the deck, cover and

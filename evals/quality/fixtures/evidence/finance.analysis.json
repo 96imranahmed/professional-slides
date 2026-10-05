@@ -39,24 +39,34 @@
    "inputs": [
     "i-peers/margin",
     "i-peers/loan-growth",
-    "i-peers/capital"
+    "i-peers/capital",
+    "i-peers/liquidity-cover"
    ],
-   "soWhat": "No union leads on all three measures, so the ranking depends on priority",
+   "soWhat": "No union leads on all four measures, and the two fastest lenders hold the thinnest liquidity",
+   "strength": "strong"
+  },
+  {
+   "id": "A-cover",
+   "op": "ratio",
+   "inputs": [
+    "i-liquidity/liquid",
+    "i-liquidity/short-liabilities"
+   ],
+   "percent": true,
+   "soWhat": "Liquid assets have covered a smaller share of the liabilities due within a year every year since FY22",
    "strength": "strong"
   },
   {
    "id": "A-floor",
    "op": "threshold",
    "inputs": [
-    "A-cushion/result"
+    "A-cover/result"
    ],
    "threshold": {
-    "value": 0,
-    "unit": "GBP m",
-    "rationale": "liquid assets must cover liabilities due within a year"
+    "ref": "i-rule/minimum"
    },
-   "soWhat": "Eight million of headroom remains above the cover floor",
-   "strength": "supporting"
+   "soWhat": "Four points of cover remain above the regulatory minimum",
+   "strength": "strong"
   },
   {
    "id": "A-loans",
@@ -95,10 +105,10 @@
    "inputs": [
     "i-loans/loans",
     "i-liquidity/liquid",
-    "i-earn/pat",
+    "i-liquidity/short-liabilities",
     "i-cash/ocf"
    ],
-   "soWhat": "Lending and profit grew by more than half while cash flow ended barely above where it began",
+   "soWhat": "Liabilities due within a year nearly doubled while loans, liquid assets and cash flow grew far less",
    "strength": "supporting"
   },
   {

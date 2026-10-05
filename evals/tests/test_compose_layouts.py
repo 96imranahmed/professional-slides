@@ -4,7 +4,6 @@ import unittest
 from node_probe import run_node
 
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
-RUNTIME = "./skills/professional-slides/runtime"
 
 PAGE = """
 const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
@@ -13,13 +12,13 @@ const error = (fn) => { try { fn(); return null; } catch (e) { return e.message;
 """
 
 DECK = """
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const build=(slides, extra={})=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides,...extra},'.')).deck;
 """
 
 PLANNED = '''
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
 const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
 '''
@@ -29,7 +28,7 @@ class ComposeLayoutTests(unittest.TestCase):
     def test_single_bottom_implication_runs_the_exhibit_width_without_widening_peers(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const text='The model retains the same service boundary. Additional capacity changes one constraint but does not establish permission, funding or readiness. Those conditions must be verified together before the later commitment.';
 const build=count=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'bottom',tracker:false,slides:[{id:'s',title:'One implication uses the region below its evidence',layout:'exhibit-top',pointsHeading:false,exhibit:{type:'table',columns:['Case','Value'],rows:[['A',10],['B',20]]},points:Array.from({length:count},(_,i)=>({lead:`Finding ${i+1}`,text}))}]})).deck;
@@ -54,7 +53,7 @@ console.log('{}');
     def test_a_short_text_page_uses_its_body_track_without_losing_content(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 const points=['The first finding establishes the premise.','The second finding explains its consequence.'];
 const page=composeSlide({title:'Two findings support the decision',layout:'text',points},0);
@@ -77,7 +76,7 @@ console.log(JSON.stringify({ok:true}));
     def test_aliases_and_layouts_resolve_to_components(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const cards=composeSlide({title:'T',exhibit:{type:'cards',items:[{icon:'target',title:'A',text:'a'},{icon:'rocket',title:'B',text:'b'}]}},0);
 // Icon cards hug their copy at the top of the body; centred, they carried as
@@ -164,7 +163,7 @@ class MetricStripTests(unittest.TestCase):
         # column beside them; bars, which grow into the height, and a longer
         # set of rows keep the strip over the exhibit.
         result = run_node('''
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const metrics=[{value:'5.9x',label:'ChatGPT visits per Claude visit'},{value:'+7.6pp',label:'Claude visit share gained in a year'},{value:'-21pp',label:'ChatGPT visit share lost in a year'}];
 const rows=(n)=>Array.from({length:n},(_,i)=>'Row '+(i+1));
@@ -187,7 +186,7 @@ console.log(JSON.stringify({four:place(dumbbell(4)),six:place(dumbbell(6)),bar:p
 class ChartRuleTests(unittest.TestCase):
     def test_the_title_names_the_mark_it_is_about(self):
         result = run_node(r'''
-import {focusFromTitle, namedInTitle} from './skills/professional-slides/runtime/compose.mjs';
+import {focusFromTitle, namedInTitle} from './evals/support/compose.mjs';
 const two={type:'chart.line',categories:['2022','2023','2024','2025'],series:[{name:'OpenAI',values:[1,2,3,4]},{name:'Anthropic',values:[1,3,5,8]}]};
 const scatter={type:'chart.scatter',points:[{name:'Opus',x:5,y:58},{name:'Astra',x:3,y:53},{name:'Sol',x:1,y:48}]};
 const years={type:'chart.column',categories:['2022','2023','2024'],series:[{name:'Revenue',values:[1,2,3]}]};
@@ -216,7 +215,7 @@ console.log(JSON.stringify({
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
@@ -284,7 +283,7 @@ class TextPageColumnTests(unittest.TestCase):
     def test_a_split_list_keeps_one_run_of_numbers_and_the_page_style(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const points = ['one','two','three','four','five'].map((n, i) => ({lead: `Finding ${n}`, text: `what the ${n} finding rests on, in a sentence long enough to wrap`}));
 // `layout: "text"` is what the executive-summary shape sets; points with
 // leads and no layout become a ledger table instead, which is a different page.
@@ -321,7 +320,7 @@ console.log(JSON.stringify({ok:true}));
         """
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {splitReadingModes} from './skills/professional-slides/runtime/compose.mjs';
+import {splitReadingModes} from './evals/support/compose.mjs';
 const steps={type:'steps',items:[{label:'Introduce',text:'Earn attachment'},{label:'Connect',text:'Carry it forward'},{label:'Pay off',text:'Spend it'}]};
 const table={type:'table',columns:['Model','Reward','Cost'],rows:[['Connected','Accumulation','Homework'],['Standalone','Concentration','Reintroduction']]};
 const chart={type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]};
@@ -358,7 +357,7 @@ class HeroNumberTests(unittest.TestCase):
         """First cold run: a hero number's explanation dropped to the slide foot, and the number sat centred below a band of air."""
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 for (const count of [1,2]) {
  const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'hero',slides:[{id:'s',title:'Rent parity is a boundary rather than a recommendation',layout:'hero-number',kpi:{value:'$7,858',label:'Monthly rent at cash parity'},pointsStyle:'prose',points:Array.from({length:count},(_,i)=>({lead:'Condition '+i,text:'Keep the verified package and the financial boundary together.'})),exhibit:{type:'table',columns:['Input','Amount'],rows:[['Net pay','$189k'],['Target','$62k'],['Other costs','$33k']]}}]}));
@@ -404,7 +403,7 @@ class PanelRowCompositionTests(unittest.TestCase):
         # was the left half - an alternation, not a decision about the content.
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const panel=(heading,caption,rows)=>({type:'table',heading,caption,columns:['Trait','Reading'],rows});
 const spec={schema:'professional-slides.deck/v3',id:'order-and-chaos',slides:[{
@@ -432,7 +431,7 @@ console.log('{}');
         # read down, not across, so the row rule leaves its ground alone.
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'rail',slides:[{
   title:'The rail keeps the ground the page asked for',
@@ -451,7 +450,7 @@ console.log('{}');
         """Fifty-page read: a table beside a chart sat under a fabricated heading band."""
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const make=(heading)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'mixed',slides:[{id:'s',title:'Read quantities and permissions together',layout:'two-up',exhibits:[
  {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['Scope'],series:[{name:'Amount',values:[31]}]},
@@ -471,7 +470,7 @@ console.log('{}');
         """Fifty-page read: a table arrived under a rule with nothing above it."""
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const table=(rows)=>({type:'table',columns:['Trait','Reading'],rows});
 const spec={schema:'professional-slides.deck/v3',id:'unheaded',slides:[{
@@ -492,7 +491,7 @@ class CommentaryPlacementTests(unittest.TestCase):
         """Fifty-page audit: a commentary rail ended halfway down beside a full-height chart."""
         result = run_node(f"""
 import {{ compilePage }} from '{KIT}';
-import {{ composeSlide }} from '{RUNTIME}/compose.mjs';
+import {{ composeSlide }} from './evals/support/compose.mjs';
 {PAGE}
 const exhibit = {{ heading: 'Contribution after costs', unit: '$', categories: ['2019', '2020', '2021', '2022', '2023', '2024'],
   series: [{{ name: 'Firm A', values: [3, 5, 8, 9, 12, 15] }}, {{ name: 'Firm B', values: [4, 5, 6, 7, 7, 8] }}], highlights: [{{ category: '2024' }}] }};
@@ -548,7 +547,7 @@ class StaircaseTests(unittest.TestCase):
         import json
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
 const page = compilePage({{ id: 'm', type: 'mechanism', form: 'steps', commentary: 'below', takeaway: false, why: 'Four stages show how the standard spread',
   settles: {{ kind: 'sequence', what: 'The dated stages of the protocol' }}, title: 'The protocol spread from one lab to the field in four steps',
@@ -603,7 +602,7 @@ class PictureCreditsTests(unittest.TestCase):
     def test_attributed_pictures_get_a_generated_credits_page(self):
         """62-page deck: fetched photographs need their credits on a page the composer writes."""
         result = run_node('''
-import { pictureCredits } from './skills/professional-slides/runtime/compose.mjs';
+import { pictureCredits } from './evals/support/compose.mjs';
 const spec = { cover: { image: { alt: 'Hub', path: 'a.jpg', credit: 'Photo: A, CC BY-SA 4.0, via Wikimedia Commons' } },
   slides: [{ id: 'fleet', photo: { alt: 'Cabin', path: 'b.jpg', credit: 'Photo: B, CC BY 4.0, via Wikimedia Commons' } }, { id: 'own', photo: { alt: 'Office', path: 'c.jpg', credit: 'Client photograph' } }] };
 const pages = pictureCredits(spec);
@@ -612,3 +611,21 @@ console.log(JSON.stringify({ n: pages.length, id: pages[0]?.id, rows: pages[0]?.
         self.assertEqual(result['id'], 'picture-credits')
         self.assertEqual(result['rows'], [['Cover', 'Hub', 'A, CC BY-SA 4.0, via Wikimedia Commons'], ['{{page:fleet}}', 'Cabin', 'B, CC BY 4.0, via Wikimedia Commons']])
         self.assertEqual(result['none'], 0)
+
+
+class RailWidthTests(unittest.TestCase):
+    def test_a_rail_takes_a_quarter_of_the_row_where_its_statement_fits_there(self):
+        # A claim of twenty-odd words in a third of the page left a dark band of air beside an exhibit that wanted the width.
+        result = run_node(r'''
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const chart = {type:'chart.line',categories:['FY19','FY20','FY21','FY22','FY23','FY24'],series:[{name:'Journeys',values:[40,12,30,41,44,46]}]};
+const slide = (id, text) => ({id, title:'Journeys recovered more slowly than every regional peer', layout:'sidebar', panel:{text}, exhibit:chart});
+const short = 'The two peers back above FY19 added off-peak trains in FY23; Northvale kept its hourly timetable.';
+const long = short + ' Its recovery flattened a year later, and the gap to the peers has widened every year since the timetable stopped changing.';
+const {deck} = planDeck(toDeckPlan({schema:'professional-slides.deck/v3', id:'d', tracker:false, slides:[slide('a', short), slide('b', long)]}));
+console.log(JSON.stringify(deck.slides.map((s) => Math.round(s.componentInstances.find((c) => c.component === 'side-statement').frame.width))));
+''')
+        quarter, third = result
+        self.assertLess(quarter, 300)
+        self.assertGreater(third, 360)

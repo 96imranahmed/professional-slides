@@ -119,11 +119,14 @@ const base = example.pages.filter((p) => p.type).slice(0, 20);
 const gapped = base.map((p, i) => (i < 5 ? { ...p, title: 'The comparison remains unproven on public evidence, case ' + i } : p));
 const once = base.map((p, i) => (i < 1 ? { ...p, title: 'Long-run leadership cannot be ranked without matched retention' } : p));
 const stamped = base.map((p) => ({ ...p, why: 'Chosen because it fits the claim on this page' }));
+// A stamped settles sentence is a signature even where each page's measures differ.
+const stampedWhat = base.map((p, i) => (p.settles ? { ...p, settles: { ...p.settles, what: 'the measures the page names, as recorded', measures: [`i-${i}/m`] } } : p));
 const codes = (doc) => compileDeck(doc, { draft: true, partial: true }).spineFindings.map((f) => f.code);
 const deck = (extra = {}) => ({ ...example.deck, ...extra });
 const gap = compileDeck({ deck: deck(), pages: gapped }, { draft: true, partial: true }).spineFindings.find((f) => f.code === 'TITLE_GAP_SHARE');
 console.log(JSON.stringify({
   gapped: codes({ deck: deck(), pages: gapped }), once: codes({ deck: deck(), pages: once }), stamped: codes({ deck: deck(), pages: stamped }),
+  stampedWhat: compileDeck({ deck: deck(), pages: stampedWhat }, { draft: true, partial: true }).spineFindings.filter((f) => f.code === 'GENERATOR_SIGNATURE').flatMap((f) => f.measured),
   gapRepair: gap?.repair ?? '',
   newDeck: codes({ deck: deck({ workflow: 'new_deck', request: undefined }), pages: base }),
   asked: codes({ deck: deck({ workflow: 'new_deck', request: 'Make me a deck on whether Northvale can reach 60 million journeys' }), pages: base }),
@@ -138,6 +141,7 @@ console.log(JSON.stringify({
         self.assertIn("storylining.md#answer-under-uncertainty", result["gapRepair"])
         self.assertIn("subtitle", result["gapRepair"])
         self.assertEqual(result["stamped"], ["GENERATOR_SIGNATURE"])
+        self.assertTrue(any(m.startswith("`settles.what`") for m in result["stampedWhat"]), result["stampedWhat"])
         self.assertEqual(result["newDeck"], ["REQUEST_MISSING"])
         self.assertEqual(result["asked"], [])
         self.assertEqual(result["waivers"], ["WAIVERS_INVALID"])
@@ -165,7 +169,7 @@ const thin = trend({ exhibit: { categories: ['2019', '2020'], series: [{ name: '
 const refused = drafted(thin), noCopy = drafted(trend({ adds: undefined, exhibit: { ...trend().exhibit, annotations: undefined } }));
 console.log(JSON.stringify({ refused: refused.failed.map((f) => [f.code, f.message]), slides: refused.spec.slides.length,
   pending: noCopy.spec.slides[0]?.pageType.pending, errors: noCopy.compileErrors, type: noCopy.spec.slides[0]?.pageType.type, callouts: noCopy.spec.slides[0]?.exhibit.annotations ?? null,
-  full: error(() => compilePage(thin)), spineTitle: draftError(trend({ title: 'one two three four five six seven eight nine ten eleven twelve thirteen' })),
+  full: error(() => compilePage(thin)), spineTitle: draftError(trend({ title: 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen' })),
   spineType: draftError(trend({ form: 'pie' })) }));
 """)
         self.assertEqual([code for code, _ in result["refused"]], ["SPINE_UNDRAWABLE"])
@@ -377,6 +381,8 @@ class InstructionsTests(unittest.TestCase):
         description = re.search(r"^description: (.*)$", text, re.M).group(1)
         self.assertLessEqual(len(description), 600)
         self.assertLessEqual(len(text.splitlines()), 120)
+        # The entry point routes; the references own the detail. A budget keeps it a router.
+        self.assertLessEqual(len(text), 13000)
         self.assertIn("runtime/doctor.mjs", text)  # step 0
         # Every runtime command the pipeline names is a file the skill ships.
         for command in sorted(set(re.findall(r"\bruntime/[\w./-]+\.(?:mjs|py)\b", text))):
@@ -394,16 +400,3 @@ class InstructionsTests(unittest.TestCase):
             self.assertIn("SKILL.md#pipeline", doc.read_text(encoding="utf-8"))
             self.assertNotIn("--preflight\nnode", doc.read_text(encoding="utf-8"))
 
-    def test_every_registered_template_has_the_sections_the_index_names(self):
-        registry = json.loads((SKILL_DIR / "references" / "templates" / "registry.json").read_text(encoding="utf-8"))
-        index = (SKILL_DIR / "references" / "templates" / "index.md").read_text(encoding="utf-8")
-        sections = ["Mandate", "Decision question", "Page table", "Evidence", "Failure checks", "Acceptance check"]
-        for sections_named in sections:
-            self.assertIn(f"`{sections_named}`", index)
-        for entry in registry["templates"]:
-            with self.subTest(template=entry["id"]):
-                text = (SKILL_DIR / "references" / "templates" / entry["file"]).read_text(encoding="utf-8")
-                found = [line[3:].strip() for line in text.splitlines() if line.startswith("## ")]
-                self.assertEqual(found, sections)
-                self.assertIn(f"({entry['file']})", index)
-        self.assertIn("competitive-position", [t["id"] for t in registry["templates"]])

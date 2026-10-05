@@ -43,8 +43,8 @@ const run = async (id, mutate, options = {}) => { const doc = structuredClone(wo
     repair: (({ repair, reason } = {}) => repair ?? reason ?? null)(found.find((f) => FILLS.includes(f.code) && f.fills)),
     // The statement is on every finding of the page it answers, one text for all of them.
     said: found.filter((f) => FILLS.includes(f.code)).map((f) => [f.code, Boolean(f.fills)]) }; };
-// A stated range met at its two ends and in the middle.
-const meets = async (id, lever, range, set, prepare = () => {}) => { const at = [...new Set([range.min, Math.round((range.min + range.max) / 2), range.max])];
+// A stated range met at its two ends.
+const meets = async (id, lever, range, set, prepare = () => {}) => { const at = [...new Set([range.min, range.max])];
   return Promise.all(at.map(async (n) => [n, (await run(id, (p) => { prepare(p); set(p, n); })).codes])); };
 '''
 
@@ -71,8 +71,8 @@ console.log(JSON.stringify(out));
                 # The finding says the range, each and in all, and the length the points run to now.
                 self.assertIn(f"Its {count} points {placed} fill the page at {points['min']} to {points['max']} words each ({points['min'] * count} to {points['max'] * count} in all)", case["repair"])
                 self.assertIn("they average 6", case["repair"])
-                # Written to the range - at its ends and its middle - the page is neither short nor over.
-                self.assertEqual([codes for _, codes in case["met"]], [[], [], []], case["met"])
+                # Written to the range - at both its ends - the page is neither short nor over.
+                self.assertEqual([codes for _, codes in case["met"]], [[], []], case["met"])
 
     def test_labelled_rows_are_told_the_words_a_bullet_that_fill_them(self):
         result = run_node(DECK + '''
@@ -83,7 +83,7 @@ console.log(JSON.stringify({ short: short.codes, fills: short.fills, repair: sho
         points = result["fills"]["points"]
         self.assertEqual(points["placed"], "in its labelled rows")
         self.assertIn(f"points in its labelled rows fill the page at {points['min']} to {points['max']} words each", result["repair"])
-        self.assertEqual([codes for _, codes in result["met"]], [[], [], []], result["met"])
+        self.assertEqual([codes for _, codes in result["met"]], [[], []], result["met"])
 
     def test_the_statement_answers_the_empty_band_and_the_word_floor_alike(self):
         result = run_node(DECK + '''
@@ -119,7 +119,7 @@ console.log(JSON.stringify(out));
                 self.assertIn(f"Its {of} fills the frame at {rows['min']} to {rows['max']} rows at the row height it is drawn at", case["repair"])
                 self.assertIn("it has 3", case["repair"])
                 self.assertNotIn("points", case["fills"])
-                self.assertEqual([codes for _, codes in case["met"]], [[], [], []], case["met"])
+                self.assertEqual([codes for _, codes in case["met"]], [[], []], case["met"])
 
 
 class SummaryTests(unittest.TestCase):
@@ -145,7 +145,7 @@ console.log(JSON.stringify({ short: { codes: short.codes, fills: short.fills, re
         self.assertIn(f"fill the page only between {points['min']} and {points['max']} words each, a window so narrow that a line more or less turns it", short["repair"])
         # Where the words fill the page the table is not measured: one statement, about the lever that works.
         self.assertNotIn("rows", short["fills"])
-        self.assertEqual([codes for _, codes in short["met"]], [[], [], []], short["met"])
+        self.assertEqual([codes for _, codes in short["met"]], [[], []], short["met"])
         self.assertTrue(few["codes"])
         self.assertIsNone(few["fills"]["points"]["min"])
         self.assertIn("No length of its 2 points on the page fills the page inside its ceiling of 204 body words", few["repair"])

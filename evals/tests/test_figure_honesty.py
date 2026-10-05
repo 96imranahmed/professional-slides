@@ -95,7 +95,7 @@ class SplitTableScaleTests(unittest.TestCase):
     def test_both_halves_of_a_split_table_share_one_bar_scale(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {paginateTable, styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {paginateTable, styleTable} from './evals/support/compose.mjs';
 const rows = [];
 for (let i = 0; i < 24; i += 1) rows.push([`Film ${i + 1} with a title long enough to wrap`, String(1200 - i * 40)]);
 const pages = paginateTable({id: 's1', title: 'Box office', exhibit: {type: 'table',
@@ -111,7 +111,7 @@ console.log(JSON.stringify(scales[0]));
     def test_an_unsplit_table_still_reads_its_scale_off_its_own_column(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const table = styleTable({type: 'table', columns: ['Film', {label: 'Gross', unit: '$m', bar: true}],
   rows: [['A', '41'], ['B', '33'], ['C', '30']]});
 console.log(JSON.stringify(table.scales['gross-bar']));

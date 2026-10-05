@@ -140,7 +140,7 @@ function readNumber(source, hit) {
   // "5-year", "20-minute": a count inside a compound word.
   const compound = /^-[A-Za-z]/.test(after);
   const suffix = (scale ?? percent ?? unit)?.[0] ?? "";
-  return { n, decimals, sign: signChar === "+" ? 1 : signChar ? -1 : 0, scaled: Boolean(scale), scale: scale ? SCALE_OF[scale[1].toLowerCase()] : null, percent: Boolean(percent), currency: Boolean(currency),
+  return { n, decimals, sign: signChar === "+" ? 1 : signChar ? -1 : 0, scaled: Boolean(scale), scale: scale ? SCALE_OF[scale[1].toLowerCase()] : null, percent: Boolean(percent), currency: Boolean(currency), ...(currency ? { currencyMark: currency } : {}),
     kind: year || day ? "period" : marked && !compound ? "measure" : "integer",
     shown: `${signChar}${currency}${hit[0]}${suffix}`.trim(), start: start - signChar.length - currency.length, end: end + suffix.length };
 }

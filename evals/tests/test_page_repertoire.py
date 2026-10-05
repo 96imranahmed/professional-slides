@@ -18,7 +18,7 @@ from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "professional-slides"
-COMPOSE = "./skills/professional-slides/runtime/compose.mjs"
+COMPOSE = "./evals/support/compose.mjs"
 
 sys.path.insert(0, str(SKILL / "runtime" / "gates"))
 import page_gates  # noqa: E402
@@ -83,7 +83,7 @@ class ColumnShapeTests(unittest.TestCase):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {POINT_STYLE_NAMES} from './skills/professional-slides/runtime/compose.mjs';
+import {POINT_STYLE_NAMES} from './evals/support/compose.mjs';
 const R=createRegistry();
 const items=[{lead:'Renewals',text:'held at 91%, four points above plan',icon:'check'},
              {lead:'Pipeline',text:'is 3.1x against a 3.5x target'}];
@@ -296,7 +296,7 @@ class TableHalvesTests(unittest.TestCase):
     def test_a_long_narrow_ranking_halves_and_everything_else_does_not(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows = (n) => Array.from({length: n}, (_, i) => [String(i+1), `Segment ${i+1}`, String(1240 - i*90)]);
 const page = (exhibit, extra = {}) => composeSlide({id:'s1', title:'Twelve segments ranked by the pool they carry', exhibit, ...extra}, 0);
 // Several shapes build an `s1-row`; only this one builds the two halves.

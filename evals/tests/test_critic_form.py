@@ -26,7 +26,7 @@ SECTIONED = LOOP + '''
 const sectioned = (d) => { const at = (id) => d.pages.findIndex((p) => p.id === id);
   d.pages.splice(at('f1'), 0, { id: 's1', kind: 'section', title: 'Growth and what paid for it' });
   d.pages.splice(at('f3'), 0, { id: 's2', kind: 'section', title: 'Liquidity under the growth' }); };
-const finding = (id, pages, problem, o = {}) => ({ id, scope: 'spine', pages, check: 'answer', severity: 'major', problem, fix: 'State the condition the answer depends on in the summary and the close.', ...o });
+const finding = (id, pages, problem, o = {}) => ({ id, scope: 'spine', pages, check: 'answer', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem, fix: 'State the condition the answer depends on in the summary and the close.', ...o });
 const withFindings = (packet, ids, findings, o = {}) => first(packet, ids, [], { findings, topFixes: ['Mend the answer'],
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'answer' && findings.length ? 'findings' : 'clean', note: check === 'answer' && findings.length ? 'Filed the items on the answer.' : `Checked ${check} across the spine and found nothing to raise.` })), ...o });
 const reviewPath = (deck) => path.join(deck.out, 'storyline-review.json');

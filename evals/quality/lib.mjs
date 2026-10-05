@@ -2,7 +2,7 @@
  * The quality eval's moving parts, kept apart from the command line so the
  * suite can test them without calling a model.
  *
- *   briefs          which briefs a set holds (dev = the cold-run briefs,
+ *   briefs          which briefs a set holds (dev = the development briefs,
  *                   heldout = briefs never used for tuning)
  *   skillSha        the version under test: the git tree of skills/, plus a
  *                   digest of any uncommitted change to it
@@ -30,7 +30,7 @@ export const DIMENSIONS = Object.freeze(["argument", "evidence", "visual", "copy
 // --- briefs -------------------------------------------------------------------
 
 export const BRIEF_SETS = Object.freeze({
-  dev: path.join(ROOT, "evals", "cold-run", "briefs"),
+  dev: path.join(QUALITY, "briefs", "dev"),
   heldout: path.join(QUALITY, "briefs", "heldout"),
 });
 
@@ -258,7 +258,6 @@ export function storeArtifacts(artifacts, dir) {
 export const RUBRIC = path.join(QUALITY, "rubric.md");
 export const JUDGE_SCHEMA = path.join(QUALITY, "judge-schema.json");
 export const PAIRWISE_SCHEMA = path.join(QUALITY, "pairwise-schema.json");
-export const ANCHOR_SCHEMA = path.join(QUALITY, "anchor-judge-schema.json");
 
 /**
  * The pages a judge reads for one stored deck: its review sheets (four pages
@@ -289,9 +288,6 @@ const PAIR_PROMPT = `You are comparing two slide decks written for the same requ
 Read the brief and the rubric, then every sheet of both decks. Use nothing else, and do not search for other files.
 Return only a JSON object: {"preference": "deck-1" | "deck-2" | "tie", "margin": "slight" | "clear" | "decisive", "reasons": ["one sentence each"]}`;
 
-const ANCHOR_PROMPT = `You are scoring one rendered slide on the page scale in rubric.md. Read rubric.md, then the page image (page.jpg or page.png) in this directory. Use nothing else.
-Return only a JSON object: {"rating": number 1-10}`;
-
 /**
  * A single-deck packet: the brief as the user wrote it, the condensed rubric
  * and the rendered pages. Never the pages file, the plan, the scene, reviews,
@@ -317,13 +313,6 @@ export function buildPairPacket(dir, { briefText, current, previous, swap }) {
   const decks = { current, previous };
   order.forEach((who, i) => copyPages(decks[who], path.join(dir, `deck-${i + 1}`)));
   return { dir, prompt: PAIR_PROMPT, schema: readFileSync(PAIRWISE_SCHEMA, "utf8"), order };
-}
-
-export function buildAnchorPacket(dir, { image }) {
-  mkdirSync(dir, { recursive: true });
-  copyFileSync(RUBRIC, path.join(dir, "rubric.md"));
-  copyFileSync(image, path.join(dir, `page${path.extname(image)}`));
-  return { dir, prompt: ANCHOR_PROMPT, schema: readFileSync(ANCHOR_SCHEMA, "utf8") };
 }
 
 /** Deterministic presentation order for a pair, so a rerun shows the same order. */
@@ -401,11 +390,10 @@ export function identityOf(row) {
            prompt: key.prompt ?? row?.prompt ?? DEFAULT_TREATMENT.prompt, brief: key.brief };
 }
 
-/** Rows of the measurement `want` names, compared on `fields` (all of IDENTITY by default). Anchor rows are no measurement. */
+/** Rows of the measurement `want` names, compared on `fields` (all of IDENTITY by default). */
 function sameAs(want, fields = IDENTITY) {
   const target = identityOf({ key: want });
   return (row) => {
-    if (row.kind === "anchors") return false;
     const id = identityOf(row);
     return fields.every((f) => id[f] === target[f]);
   };
@@ -428,8 +416,8 @@ export function readResults(file) {
   return readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
 }
 
-/** Is this row's key already recorded among `rows`? Anchor rows carry no key. */
-export const isRecorded = (rows, row) => row.kind !== "anchors" && rows.some((r) => r.kind !== "anchors" && keyOf(r) === keyOf(row));
+/** Is this row's key already recorded among `rows`? */
+export const isRecorded = (rows, row) => rows.some((r) => keyOf(r) === keyOf(row));
 
 /**
  * Append one row; a row whose key is already recorded is refused rather than
@@ -543,9 +531,3 @@ export function formatSummary(summary) {
   return lines.join("\n");
 }
 
-/** Mean absolute error of the judge against the anchors a person has scored. */
-export function anchorError(scored) {
-  const pairs = scored.filter((a) => typeof a.humanScore === "number" && typeof a.judgeScore === "number");
-  if (!pairs.length) return null;
-  return round(pairs.reduce((sum, a) => sum + Math.abs(a.judgeScore - a.humanScore), 0) / pairs.length);
-}

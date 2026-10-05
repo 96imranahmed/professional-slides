@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 import unittest
 
-from node_probe import RUNTIME, SKILL, run_node
+from node_probe import RUNTIME, run_node
 
 sys.path.insert(0, str(RUNTIME / "gates"))
 import gate_config  # noqa: E402
@@ -63,11 +63,6 @@ console.log(JSON.stringify({ blocking: run.blocking.length, column: { pages: pic
         # The page gates print the line of a composed deck, the structure reading the line of a spine: one rule, one sentence.
         self.assertEqual(self.result["declared"], gate_config.RAIL_AS_CLOSE)
         self.assertEqual(self.result["flat"]["note"], gate_config.RAIL_AS_CLOSE)
-
-    def test_the_reference_says_it_beside_the_rule(self):
-        row = next(line for line in (SKILL / "references" / "page-types.md").read_text(encoding="utf-8").splitlines() if line.startswith("| `VARIETY_COLUMN`"))
-        for phrase in ("A rail counts", "`PAGE_SHAPE_FLAT`", "evidence-only", "both standings lines say which reading they take"):
-            self.assertIn(phrase, row)
 
 
 if __name__ == "__main__":

@@ -150,7 +150,7 @@ console.log(JSON.stringify({accepted:true}));
 import assert from 'node:assert/strict';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
+import {renderSlideHtml} from './evals/support/html.mjs';
 const slide={id:'growth',title:'Growth follows demand',source:'Source: Company data',items:[{id:'text',job:'State the constraint',component:'paragraph',props:{text:'Demand exceeds available capacity.'}}]};
 const pageTemplate={rules:'bottom',branding:'top-right-logo',logo:{component:'paragraph',props:{text:'Company name'}}};
 const {deck}=planDeck({id:'company',pageTemplate,slides:[slide,{...slide,id:'next'}]});

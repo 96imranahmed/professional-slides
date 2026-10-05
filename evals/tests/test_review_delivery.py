@@ -635,7 +635,7 @@ const critique = (findings) => ({ pass: 1, verifies: null, verdict: 'revise', ra
   numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.', execSummary: 'The summary states the answer the body proves.',
   missingAnalyses: [], cutOrMerge: [], findings, topFixes: ['Pull the claim back to the evidence'],
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'claim' ? 'findings' : 'clean', note: check === 'claim' ? 'Filed F1 on the claim.' : `Checked ${check} and found nothing to raise.` })) });
-const item = (page) => ({ id: 'F1', scope: 'page', pages: [page], check: 'claim', severity: 'major', problem: 'The title claims more than its evidence shows on this page.', fix: 'Pull the title back to the finding the evidence supports.' });
+const item = (page) => ({ id: 'F1', scope: 'page', pages: [page], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title claims more than its evidence shows on this page.', fix: 'Pull the title back to the finding the evidence supports.' });
 await fs.writeFile(path.join(moved.out, 'storyline-review.json'), JSON.stringify(critique([item('p02')])));
 const unchangedItem = await S.prepareStoryline(moved.specPath, moved.out);
 await fs.writeFile(path.join(moved.out, 'storyline-review.json'), JSON.stringify(critique([item('p03')])));

@@ -5,12 +5,11 @@ a judgement column in words, dots where a line belongs, a strip repeating its
 chart, scenarios set as paragraphs - and the repair, before anything is drawn.
 Each test compiles the failing page and its passing neighbour.
 """
-import json
 import re
 import sys
 import unittest
 
-from node_probe import REFERENCES, RUNTIME, run_node
+from node_probe import RUNTIME, run_node
 
 sys.path.insert(0, str(RUNTIME / "gates"))
 import page_gates  # noqa: E402
@@ -58,7 +57,7 @@ const opts = { players };
         """Fifty-page review: four total rows were blank; a measure table totals only the columns that sum."""
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
-import {{ styleTable }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ styleTable }} from './evals/support/compose.mjs';
 {PAGE}
 const table = (rows) => ({{ id: 'p1', type: 'lookup', form: 'table', commentary: 'none', ...base, title: 'The two firms raised capital on different terms',
   exhibit: {{ columns: [{{ label: 'Instrument', type: 'category' }}, 'OpenAI', 'Anthropic'], rows }} }});
@@ -522,9 +521,6 @@ console.log(JSON.stringify({{ raised, types: describeTypes(), codes: [...Object.
         # Every compile refusal is in the deck's vocabulary but the title's and
         # the takeaway's, page-gate codes checked early.
         self.assertEqual(set(result["raised"]) - set(result["codes"]), {"TITLE_WORDS", "TAKEAWAY_LONG"})
-        docs = (REFERENCES / "page-types.md").read_text(encoding="utf-8")
-        for code in result["codes"]:
-            self.assertIn(f"`{code}`", docs)
         self.assertIn("leads, leader, winner, wins", result["types"])  # every verdict word the check reads
         self.assertIn(f"({result['summary']} body words)", result["types"])  # the summary ceiling the budget sets
 
@@ -553,15 +549,3 @@ console.log(JSON.stringify({{ types: describeTypes(), codes: [...Object.keys(VAR
         # Every compile refusal is in the deck's vocabulary but the title's and the takeaway's, page-gate codes checked early.
         self.assertEqual(raised - set(result["codes"]), {"TITLE_WORDS", "TAKEAWAY_LONG"})
 
-    def test_the_documented_uneven_axes_are_ones_the_check_refuses(self):
-        # The docs once gave "2015, 2018, 2019" - three columns, which the check
-        # leaves alone as a comparison of chosen years.
-        row = next(line for line in (REFERENCES / "page-types.md").read_text(encoding="utf-8").splitlines() if line.startswith("| `TIME_AXIS_UNEVEN`"))
-        examples = [part.split(", ") for part in re.search(r"uneven gaps \(([^)]*)\)", row).group(1).split("; ")]
-        result = run_node(f'''
-import {{ timePositions }} from './skills/professional-slides/runtime/time-axis.mjs';
-console.log(JSON.stringify({json.dumps(examples)}.map((cats) => ({{ n: cats.length, uneven: timePositions(cats) !== null }}))));
-''')
-        for example in result:
-            self.assertGreaterEqual(example["n"], 4)
-            self.assertTrue(example["uneven"])

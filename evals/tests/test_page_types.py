@@ -8,7 +8,7 @@ anything is drawn.
 """
 import unittest
 
-from node_probe import REFERENCES, RUNTIME, run_node
+from node_probe import RUNTIME, run_node
 
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
@@ -29,7 +29,7 @@ const regions = ['Europe', 'East Asia & Australasia', 'Americas', 'West Asia & I
 """
 
 DECK = """
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const build=(slides, extra={})=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides,...extra},'.')).deck;
 """
@@ -91,7 +91,7 @@ const kinds = [
   {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
   {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
   {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }},
-  {{ type: 'mechanism', form: 'flow', commentary: 'below', points: ['a', 'b'], highlight: ['a', 'b'], exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
+  {{ type: 'mechanism', form: 'flow', commentary: 'rail', rail: 'Capacity is lost at the junction before the trains reach the platform', exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
   {{ type: 'numbers', form: 'hero-number', commentary: 'none', kpi: {{ value: '5', label: 'x' }}, exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
   {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps: what the argument settles, the condition it rests on, and the evidence that would reverse it before the next review of the plan.' }} }},
 ];
@@ -103,8 +103,9 @@ console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), u
   edited: varietyFindings(edited, {{ structureOf }}).map((f) => f.code) }}));
 ''')
         # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin
-        # too; and fourteen line charts are one kind of exhibit (VARIETY_EXHIBIT_RANGE).
-        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_EXHIBIT_RANGE', 'VARIETY_SIGNATURE',
+        # too; fourteen line charts are one kind of exhibit (VARIETY_EXHIBIT_RANGE); and points under every exhibit
+        # break both the commonest placement's cap and the cap on points below.
+        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_COMMENTARY', 'VARIETY_EXHIBIT_RANGE', 'VARIETY_SIGNATURE',
                                              'VARIETY_TAKEAWAY', 'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
         # A hero number with its points beside its proof is drawn as the ranking
         # beside its points, so the chosen deck's hero numbers stand alone.
@@ -285,7 +286,7 @@ const steps = compilePage({{ ...base, id: 'm', type: 'mechanism', form: 'steps',
 const full = compilePage({{ ...base, id: 'f', type: 'trend', form: 'line', commentary: 'on-exhibit', title: 'Traffic recovered',
   exhibit: {{ categories: years, series: [{{ name: 'x', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }}] }} }});
 // Synthetic decks of fourteen pages, each spreading its types so only the rule under test fires.
-const TYPES = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'mechanism', 'scorecard', 'lookup', 'panels', 'schedule', 'numbers', 'parallel', 'place', 'options'];
+const TYPES = ['trend', 'ranking', 'composition', 'relationship', 'bridge', 'mechanism', 'scorecard', 'lookup', 'panels', 'schedule', 'numbers', 'matrix', 'place', 'options'];
 const page = (i, choice) => ({{ id: 'p' + i, title: 'Page ' + i, pageType: {{ type: TYPES[i], commentary: ['none', 'in-exhibit', 'captions', 'on-exhibit'][i % 4], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', skeleton: 'skeleton ' + i, ...choice }} }});
 const deck = (choices) => ({{ slides: Array.from({{ length: 14 }}, (_, i) => page(i, choices(i))) }});
 const codes = (spec) => varietyFindings(spec).map((f) => f.code);
@@ -383,7 +384,7 @@ console.log(JSON.stringify({{ pages: slides.length, apart: slides.filter(({{ pag
         self.assertGreater(result['pages'], 20)
         self.assertEqual(result['apart'], [])
 
-    def test_every_redraw_is_documented_and_offered_where_it_fits(self):
+    def test_every_redraw_is_offered_where_it_fits(self):
         result = run_node('''
 import { varietyFindings, REDRAWS } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 const deck = (multi, column) => ({ slides: Array.from({ length: 15 }, (_, i) => ({ id: 'p' + i, title: 'Page ' + i,
@@ -391,10 +392,7 @@ const deck = (multi, column) => ({ slides: Array.from({ length: 15 }, (_, i) => 
 const repair = (spec, code) => varietyFindings(spec).find((f) => f.code === code).repair;
 console.log(JSON.stringify({ redraws: REDRAWS, column: repair(deck(3, 4), 'VARIETY_COLUMN'), panels: repair(deck(2, 0), 'VARIETY_PANELS') }));
 ''')
-        docs = (REFERENCES / 'page-types.md').read_text(encoding='utf-8')
         for r in result['redraws']:
-            multi = 'yes' if r['multi'] is True else r['multi'] or 'no'
-            self.assertIn(f"| {r['holding']} | {r['draw']} ({r['choice']}) | {multi} |", docs)
             self.assertIn(r['choice'], result['column'])
             # The panels repair offers only the pages that carry two exhibits.
             (self.assertIn if r['multi'] else self.assertNotIn)(r['choice'], result['panels'])
@@ -431,35 +429,50 @@ console.log(JSON.stringify({{
         self.assertIn('under 5%', result['sliver'])
         self.assertIn('highlightRow', result['unknownKey'])
 
-    def test_callouts_are_measured_and_the_content_plan_is_derived(self):
+    def test_callouts_are_measured_and_a_broken_page_leaves_the_rest_composed_gated_and_derived(self):
         result = run_node(f'''
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import {{ compilePage }} from '{KIT}';
 import {{ authorDeck }} from '{AUTHOR}';
-import {{ deriveContent }} from './skills/professional-slides/runtime/derive-content.mjs';
+import {{ deriveContent, wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
 import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
-const S = {{ kind: 'rate', what: 'The operator annual reports, five years' }};
+const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
 const long = 'Traffic fell to a fifth when the network was grounded and recovered only as aircraft returned from storage in stages';
-const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim here', settles: S,
+const trend = {{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim here', settles: {{ kind: 'rate', what: 'The operator annual reports, five years' }},
   title: 'Traffic fell and recovered', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: long }}] }} }};
 const strip = {{ id: 'm', type: 'numbers', form: 'metric-strip', commentary: 'below', points: ['a'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Three numbers carry this claim', settles: S,
   title: 'Three numbers', metrics: [{{ value: '1', label: 'a' }}], exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }};
-// A short argument page: its content plan is derived from the composed page and held to the text-page floor.
+// One run of three pages: a table whose first row is short a cell (it compiles and does not compose), a trend of two years
+// (it does not compile), and a short argument page - composed, gated, budgeted and its content plan derived all the same.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test',
-  settles: {{ kind: 'comparison', what: 'The operator statement of its plan' }}, adds: null, title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
-const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [memo] }}, {{ baseDir: dir }});
+const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The measures are looked up here', settles: S,
+  title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x'], ['y', '2'], ['z', '3']] }} }};
+const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: S, title: 'Two years',
+  exhibit: {{ categories: ['2019', '2020'], series: [{{ name: 'x', values: [1, 2] }}] }} }};
+const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
+  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
+const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, bad, memo] }}, {{ baseDir: dir }});
 const content = deriveContent(out.spec, out.deck);
 const page = content.pages.find((p) => p.id === 'm1');
+const slide = out.deck.slides.find((s) => s.id === 'm1');
 const gates = runContentGates(content, {{ required: true }});
 console.log(JSON.stringify({{ long: error(() => compilePage(trend)), strip: error(() => compilePage(strip)),
+  failed: [...out.failedIds].sort(), composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')),
+  floor: slide?.wordFloor ?? null, ceiling: slide?.wordCeiling ?? null, budget: wordBudgetOf('text-page'),
   task: page.textReference.task, claim: page.claim, planned: page.textPlan.some((b) => b.text === 'One short sentence.'),
   low: gates.findings.some((f) => f.code === 'TEXT_COVERAGE_LOW' && f.id === 'm1') }}));
 ''')
         self.assertIn('callout box', result['long'])
         self.assertIn('metric strip', result['strip'])
+        # Neither the page that does not compile nor the one that does not compose hides the rest of the deck.
+        self.assertEqual(result['failed'], ['b', 'bad'])
+        self.assertIn('COMPILE:bad', result['codes'])
+        self.assertIn('PAGE_DOES_NOT_COMPOSE:b', result['codes'])
+        self.assertIn('m1', result['composed'])  # the page that compiled was composed and gated in the same run
+        self.assertEqual(result['floor'], result['budget']['floor'])  # the text page's floor, the one floor every check reads
+        self.assertGreater(result['ceiling'], result['floor'])
         self.assertEqual(result['task'], 'text-page')
         self.assertEqual(result['claim'], 'The plan rests on three commitments made this year')  # the claim is the title
         self.assertTrue(result['planned'])  # the text plan is the page as composed
@@ -504,33 +517,6 @@ console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']
         page_gates.gate_thin_page(1, {**words(60), 'readingTask': 'table-with-commentary'}, table_commentary)
         self.assertEqual(chart_led, [])  # 60 words is a full chart page carrying its own callouts
         self.assertEqual(table_commentary[0]['code'], 'THIN_PAGE')
-
-    def test_a_regional_map_on_the_coarse_coastline_is_advised(self):
-        result = run_node(f'''
-import {{ compilePage }} from '{KIT}';
-const markers = [{{ label: 'Leeds', longitude: -1.55, latitude: 53.8 }}, {{ label: 'York', longitude: -1.08, latitude: 53.96 }}, {{ label: 'Hull', longitude: -0.34, latitude: 53.74 }}];
-const page = compilePage({{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points: ['A point.'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Where the network runs is the claim',
-  settles: {{ kind: 'structure', what: 'The operator route map' }}, title: 'The network is three cities', exhibit: {{ geography: 'europe', crop: 'fit', markers }} }});
-console.log(JSON.stringify({{ advisories: page.pageType.advisories ?? [] }}));
-''')
-        self.assertTrue(any(a.startswith('MAP_COARSE') for a in result['advisories']))
-
-    def test_a_broken_page_does_not_hide_the_others(self):
-        result = run_node(f'''
-import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {{ authorDeck }} from '{AUTHOR}';
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
-const broken = {{ id: 'b', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The measures are looked up here', settles: S,
-  title: 'The measures sit in one table', exhibit: {{ columns: ['A', 'B'], rows: [['x'], ['y', '2'], ['z', '3']] }} }};
-const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
-const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, memo] }}, {{ baseDir: dir }});
-console.log(JSON.stringify({{ failed: [...out.failedIds], composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code) }}));
-''')
-        self.assertEqual(result['failed'], ['b'])
-        self.assertIn('m', result['composed'])  # the rest of the deck is still composed and checked
-        self.assertIn('PAGE_DOES_NOT_COMPOSE', result['codes'])
 
 
 class PublishedLimitsTests(unittest.TestCase):
@@ -617,25 +603,6 @@ console.log(JSON.stringify({{
         self.assertGreater(result['capacity'], 20)
         for published in ('3 callouts', 'rail about', 'values 10 characters'):
             self.assertIn(published, result['catalogue'])
-
-    def test_one_compile_error_leaves_the_rest_gated_and_budgeted(self):
-        result = run_node(f'''
-import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-import {{ authorDeck }} from '{AUTHOR}';
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'author-'));
-const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
-const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: S, title: 'Two years',
-  exhibit: {{ categories: ['2019', '2020'], series: [{{ name: 'x', values: [1, 2] }}] }} }};
-const memo = {{ id: 'm', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
-  title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
-const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [bad, memo] }}, {{ baseDir: dir }});
-console.log(JSON.stringify({{ codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')), composed: out.deck.slides.map((s) => s.id),
-  floor: out.deck.slides.find((s) => s.id === 'm')?.wordFloor ?? null, ceiling: out.deck.slides.find((s) => s.id === 'm')?.wordCeiling ?? null }}));
-''')
-        self.assertIn('COMPILE:bad', result['codes'])
-        self.assertIn('m', result['composed'])  # the page that compiled was composed and gated in the same run
-        self.assertEqual(result['floor'], 121)  # text-page q1 (120.5), the one floor every check reads
-        self.assertGreater(result['ceiling'], result['floor'])
 
     def test_a_column_page_budget_counts_the_room_in_each_column(self):
         # A hero number with points beside its exhibit went from a band left
@@ -875,8 +842,25 @@ console.log(JSON.stringify({{ pageErrors, line: pages[0].exhibit, group: pages[2
             self.assertIn(published, result['catalogue'])
         self.assertIn('aligned-bars', result['schema'])
 
+    def test_a_number_mark_carries_the_commentary_on_the_plot(self):
+        # Strong decks mark a chart with a number - a growth rate, a change, a total - far more often than with a
+        # sentence, so commentary "on-exhibit" is met by a number mark alone and a label beside it is not refused.
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
+const page = (marks) => ({{ id: 'p1', type: 'trend', form: 'line', commentary: 'on-exhibit', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The break is the claim and sits where it happens', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }},
+  title: 'Traffic grew by a fifth a year once the network reopened', exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], ...marks }} }});
+const error = (p) => {{ try {{ compilePage(p, 0); return null; }} catch (e) {{ return e.message; }} }};
+const cagr = {{ cagr: {{ from: '2021', to: '2026' }} }}, label = [{{ category: '2020', text: 'Grounded' }}];
+console.log(JSON.stringify({{ bare: error(page({{}})), cagr: error(page(cagr)), labelled: error(page({{ ...cagr, annotations: label }})), label: error(page({{ annotations: label }})) }}));
+''')
+        self.assertIn('the rate of change', result['bare'])
+        self.assertIsNone(result['cagr'])
+        self.assertIsNone(result['labelled'])
+        self.assertIn('10 or more words', result['label'])  # a label alone is not the explanation
+
     def test_title_limits_are_published_and_the_word_limit_is_checked_at_compile(self):
-        # A title sets on one line at twelve words; past them it carries the
+        # A title sets on two lines at fifteen words; past them it carries the
         # period or scope the subtitle is for. The limit is the gate's own,
         # refused in the first run, and so is the takeaway's two lines.
         result = run_node(f'''
@@ -887,8 +871,8 @@ const page = (title) => ({{ id: 'p1', type: 'trend', form: 'line', commentary: '
 const error = (p, draft = false) => {{ try {{ compilePage(p, 0, {{ draft }}); return null; }} catch (e) {{ return e.message; }} }};
 const words = (n) => Array.from({{ length: n }}, (_, i) => 'word' + i).join(' ');
 const long = 'Close on what follows: ' + Array.from({{ length: 60 }}, () => 'the plan').join(' ');
-console.log(JSON.stringify({{ limits: TEXT_LIMITS, twelve: error(page(words(12))), thirteen: error(page(words(13))), draft: error(page(words(13)), true),
-  continued: error(page(words(12) + ' (2/3)')), longTakeaway: error({{ ...page(words(8)), takeaway: long }}),
+console.log(JSON.stringify({{ limits: TEXT_LIMITS, fifteen: error(page(words(15))), sixteen: error(page(words(16))), draft: error(page(words(16)), true),
+  continued: error(page(words(15) + ' (2/3)')), longTakeaway: error({{ ...page(words(8)), takeaway: long }}),
   shortTakeaway: error({{ ...page(words(8)), takeaway: 'Electrify first: the Eastern line carries the most journeys at the highest cost' }}), catalogue: describeTypes() }}));
 ''')
         import sys
@@ -897,17 +881,17 @@ console.log(JSON.stringify({{ limits: TEXT_LIMITS, twelve: error(page(words(12))
         self.assertEqual(result['limits']['titleWords'], page_gates.THRESHOLDS['title_words_max'])
         self.assertEqual(result['limits']['titleLines'], page_gates.THRESHOLDS['title_lines_max'])
         self.assertEqual(result['limits']['takeawayLines'], page_gates.TAKEAWAY_LINES_MAX)
-        self.assertEqual(result['limits']['titleWords'], 12)
+        self.assertEqual(result['limits']['titleWords'], 15)
         self.assertEqual(result['limits']['takeawayLines'], 2)
-        self.assertIsNone(result['twelve'])
+        self.assertIsNone(result['fifteen'])
         self.assertIsNone(result['continued'])
-        self.assertIn('TITLE_WORDS', result['thirteen'])
-        self.assertIn('13 words', result['thirteen'])
-        self.assertIn('`subtitle`', result['thirteen'])  # the repair names where the period and scope go
+        self.assertIn('TITLE_WORDS', result['sixteen'])
+        self.assertIn('16 words', result['sixteen'])
+        self.assertIn('`subtitle`', result['sixteen'])  # the repair names where the period and scope go
         self.assertIn('TITLE_WORDS', result['draft'])
         self.assertIn('TAKEAWAY_LONG', result['longTakeaway'])
         self.assertIsNone(result['shortTakeaway'])
-        for published in ('title of 12 words at most', 'TITLE_LINES', 'HEADING_WRAPS', 'TAKEAWAY_LONG', 'TITLE_GAP_SHARE', 'rank, 1 = best', 'top 40'):
+        for published in ('title of 15 words at most', 'TITLE_LINES', 'HEADING_WRAPS', 'TAKEAWAY_LONG', 'TITLE_GAP_SHARE', 'rank, 1 = best', 'top 40'):
             self.assertIn(published, result['catalogue'])
 
 
@@ -968,7 +952,7 @@ class CatalogueRouteTests(unittest.TestCase):
         result = run_node(f'''
 import fs from 'node:fs';
 import {{ PRESET_ROUTES, compilePage, PAGE_TYPES }} from '{KIT}';
-import {{ SHAPE_NAMES, PAGE_SHAPE_NAMES, composeSlide }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ SHAPE_NAMES, PAGE_SHAPE_NAMES, composeSlide }} from './evals/support/compose.mjs';
 const example = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
 const pages = [...example.pages, ...(example.appendix || [])];
 const out = {{ missing: [], unreached: [] }};

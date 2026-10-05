@@ -8,7 +8,7 @@ class EmbeddedImageTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
+import { renderSlideHtml } from './evals/support/html.mjs';
 const frame={x:0,y:0,width:400,height:200};
 const render=props=>compileDeck({slides:[{id:'photo',frame,composition:component({id:'image',component:'image-frame',frame,props})}]},REGISTRY).slides[0];
 const props={dataUri:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',alt:'Film still',authorization:'User supplied image'};
@@ -43,3 +43,22 @@ for(const props of [MEDIA_SAMPLE,{...MEDIA_SAMPLE,dataUri:'data:image/jpeg;base6
 assert.throws(()=>bitmapDimensions('data:image/png;base64,iVBORw0KGgo='));
 assert.throws(()=>bitmapDimensions('data:image/jpeg;base64,/9g='));console.log('{}');
 """)
+
+
+class PlannedPictureTests(unittest.TestCase):
+    def test_a_cover_and_divider_picture_planned_for_the_build_compose_without_it_until_fetched(self):
+        # A photograph planned as { alt, search } is fetched by the build; before then the cover and the divider compose
+        # as they would without one, rather than every page failing on a file path that does not exist yet.
+        result = run_node('''
+import { composeDeck } from './skills/professional-slides/runtime/compose-deck.mjs';
+const planned = { alt: 'The Midtown Manhattan skyline', search: 'Midtown Manhattan skyline' };
+const spec = { schema: 'professional-slides.deck/v3', id: 'planned', title: 'Planned pictures', cover: { title: 'Manhattan real estate', image: planned, layout: 'full' },
+  slides: [{ kind: 'section', title: 'Demand has recovered', image: { alt: 'Grand Central Terminal', search: 'Grand Central Terminal' } },
+    { title: 'A page', points: ['One point that says what the page is for, at reading length.'] },
+    { title: 'A page with its photograph planned', points: ['One point beside the photograph, at reading length.'], photo: { alt: 'Fifth Avenue', search: 'Fifth Avenue shops' } }] };
+let error = null, deck = null;
+try { deck = composeDeck(spec); } catch (e) { error = e.message; }
+console.log(JSON.stringify({ error, slides: deck ? (deck.slides || deck).length : 0 }));
+''')
+        self.assertIsNone(result["error"])
+        self.assertGreaterEqual(result["slides"], 4)

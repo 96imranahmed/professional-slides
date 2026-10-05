@@ -396,8 +396,8 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
  * long, thick bar has plain area past its start, and a note set there needs no
  * leader - it is on the thing it describes. Only its own mark (same category
  * and series), fully inside with a margin, clear of its value label and every
- * other obstacle; the overlap audit accepts exactly this construction and
- * nothing looser (overlap-policy.mjs).
+ * other obstacle; the suite's rendered overlap audit accepts exactly this
+ * construction and nothing looser (evals/support/overlap-policy.mjs).
  */
 function insidePlacement({ annotation, index, target, marks, obstacles, placements }) {
   if (annotation.treatment === "speech") return null; // a speech bubble points with its tail

@@ -8,7 +8,7 @@
 // here and every stage reads it (barOutcome): the compile and the build
 // (gates/craft_gates.mjs, which `--check --render` runs too) and delivery
 // (deliver-deck.mjs), so a deck is never refused at delivery for a number its
-// first compile did not print. The cold-run scorer (evals/cold-run/score.mjs)
+// first compile did not print. The quality eval's scorer (evals/quality/score.mjs)
 // re-exports them, so the harness and delivery hold a deck to one set of bars.
 //
 // A miss blocks unless the deck carries a waiver for that bar (deck-level
@@ -146,8 +146,10 @@ const chartCarried = (slide) => componentsOf(slide).some((c) => c.startsWith("ch
 /** A page's chart carries an annotation or a recoloured mark; null when the page has no chart. */
 export const pageChartAnnotated = (slide) => (chartCarried(slide)
   // A recoloured category draws no node of its own - the mark keeps its role
-  // and carries `highlighted` - and it is the commonest mark there is.
-  ? (slide.nodes || []).some((n) => n.data?.highlighted) || rolesOf(slide).some((r) => ANNOTATION.test(r)) : null);
+  // and carries `highlighted` - and it is the commonest mark there is. A
+  // stack's total is a data label anchored over the stack: a number mark, as
+  // a change or a bracketed gap is.
+  ? (slide.nodes || []).some((n) => n.data?.highlighted || n.data?.anchor === "stack-total") || rolesOf(slide).some((r) => ANNOTATION.test(r)) : null);
 /** Every chart page among the analytical pages, and how many mark their finding: the one count behind BAR_CHARTS_ANNOTATED and CRAFT_CHARTS_BARE. */
 export function chartStatistics(scene) {
   let charts = 0, annotated = 0;

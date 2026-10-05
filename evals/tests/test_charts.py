@@ -213,6 +213,18 @@ console.log(JSON.stringify({ squeezed, roomyRise: rise(roomy) }));
         self.assertIn("panels", result["squeezed"])
         self.assertGreaterEqual(result["roomyRise"], 48)
 
+    def test_a_word_unit_on_the_second_scale_is_set_off_by_a_space(self):
+        result = run_node(PRELUDE + """
+const props = (secondaryUnit) => ({ categories: ['2019','2020','2021','2022','2023','2024'], secondaryAxis: true, secondaryUnit, dataLabels: true,
+  series: [{ name: 'Asking rent', values: [3457, 3236, 3033, 4062, 4287, 4328] }, { name: 'Listings', values: [18017, 26846, 21336, 13273, 16559, 15994] }],
+  highlights: [], referenceLines: [], annotations: [] });
+const texts = (unit) => REGISTRY.get('chart.combo').render({ id: 'c', frame: { x: 0, y: 0, width: 760, height: 430 }, props: props(unit) }).nodes.map((n) => n.text).filter(Boolean);
+console.log(JSON.stringify({ word: texts('listings'), symbol: texts('%') }));
+""")
+        self.assertTrue(any(t.endswith(" listings") for t in result["word"]), result["word"])
+        self.assertFalse(any(t.endswith("0listings") for t in result["word"]))
+        self.assertFalse(any(t.endswith(" %") for t in result["symbol"]))
+
 
 class LabelThinningTests(unittest.TestCase):
     def test_a_distribution_names_every_member_at_8pt_before_it_thins_and_always_the_called_out(self):
@@ -242,7 +254,7 @@ class ScatterTests(unittest.TestCase):
         """Fifty-page audit: dots coloured by series carried no key."""
         result = run_node(f"""
 import {{ REGISTRY }} from '{RUNTIME}/registry.mjs';
-import {{ toDeckPlan }} from '{RUNTIME}/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from '{RUNTIME}/planner.mjs';
 {PAGE}
 const points = [['a', 1, 3, 'East'], ['b', 2, 5, 'East'], ['c', 3, 2, 'West'], ['d', 4, 6, 'West'], ['e', 5, 4, 'East']].map(([name, x, y, series]) => ({{ name, x, y, series }}));
@@ -337,3 +349,34 @@ console.log(JSON.stringify({ wide, square, tall, ratio: (square.width * square.h
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LollipopNegativeTests(unittest.TestCase):
+    def test_a_negative_value_is_labelled_left_of_its_dot_clear_of_the_stem_and_the_names(self):
+        result = run_node(PRELUDE + """
+const props = { categories: ['A','B','C','D','E','F','G','H'], series: [{ name: 'Change', values: [12, 8, 4, 1, -3, -9, -15, -25] }], highlights: [{ category: 'H' }], annotations: [], referenceLines: [] };
+const nodes = REGISTRY.get('chart.lollipop').render({ id: 'l', frame: { x: 0, y: 0, width: 760, height: 430 }, props }).nodes;
+const dot = (c) => nodes.find((n) => n.id.includes('dot') && n.data.category === c).frame;
+const name = (c) => nodes.find((n) => n.role === 'category-label' && n.text === c).frame;
+console.log(JSON.stringify(nodes.filter((n) => n.role === 'data-label').map((n) => ({ c: n.data.category, v: Number(n.text),
+  left: n.frame.x + n.frame.width <= dot(n.data.category).x, right: n.frame.x >= dot(n.data.category).x + dot(n.data.category).width, clear: n.frame.x >= name(n.data.category).x + name(n.data.category).width }))));
+""")
+        for label in result:
+            self.assertTrue(label["left"] if label["v"] < 0 else label["right"], label)
+            self.assertTrue(label["clear"], label)
+
+
+class ComboLabelPlacementTests(unittest.TestCase):
+    def test_a_line_label_moves_under_its_point_when_the_steep_segment_before_it_runs_through_the_box_above(self):
+        result = run_node(PRELUDE + """
+const props = { categories: ['2019','2020','2021','2022','2023','2024','1H2025'], secondaryAxis: true, dataLabels: true,
+  series: [{ name: 'Cap rate', values: [3.98, 4.58, 4.56, 4.36, 5.24, 6.23, 6.62] }, { name: 'Price per unit', values: [758217, 490607, 452380, 525856, 510046, 441514, 441957] }],
+  valueFormat: { decimals: 1, suffix: '%' }, secondaryValueFormat: { prefix: '$', compactUnit: 'k', decimals: 0 }, highlights: [], referenceLines: [], annotations: [] };
+const nodes = REGISTRY.get('chart.combo').render({ id: 'c', frame: { x: 0, y: 0, width: 760, height: 430 }, props }).nodes;
+const label = (c) => nodes.find((n) => n.role === 'data-label' && n.data?.series === 'Price per unit' && n.data.category === c).frame;
+const point = (c) => nodes.find((n) => n.role === 'chart-marker' && n.id === `c:point:price-per-unit:${c}`);
+console.log(JSON.stringify({ first: label('2019').y, second: label('2020').y, point2020: point('2020')?.frame?.y ?? null }));
+""")
+        # 2019 tops the line, so its label sits above; 2020 sits under the steep fall from it, so its label goes under the point.
+        self.assertIsNotNone(result["point2020"])
+        self.assertGreater(result["second"], result["point2020"])

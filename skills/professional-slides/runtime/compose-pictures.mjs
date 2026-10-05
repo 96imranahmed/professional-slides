@@ -21,7 +21,13 @@ function imageDimensions(buffer) {
   throw new Error("Only PNG and JPEG images are supported");
 }
 
+/** Whether a picture reference names a file or carries its data: one planned as `{ alt, search }` waits for the build to fetch it. */
+export const sourcedPicture = (ref) => typeof ref === "string" || Boolean(ref && typeof ref === "object" && (ref.path || ref.dataUri));
+
 export function imageProps(ref, baseDir) {
+  // A picture planned as `{ alt, search }` and not fetched yet composes as the frame carrying its alt line (pictureFrame);
+  // the build fetches it (fetch-pictures.mjs). The cover and a divider, which draw only an embedded photograph, wait for it.
+  if (!sourcedPicture(ref)) return { alt: ref?.alt };
   const file = path.resolve(baseDir, typeof ref === "string" ? ref : ref.path);
   let buffer;
   try {
@@ -37,6 +43,7 @@ export function imageProps(ref, baseDir) {
   const { width, height, mime } = imageDimensions(buffer);
   return { dataUri: `data:${mime};base64,${buffer.toString("base64")}`, width, height, alt: (typeof ref === "object" && ref.alt) || path.basename(file), ...(typeof ref === "object" && ref.credit ? { authorization: ref.credit } : {}) };
 }
+
 
 /** The declared players' logos that exist on disk, as embedded images, in the order the deck names them. */
 export function playerMarks(spec, baseDir) {

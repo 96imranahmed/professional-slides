@@ -434,6 +434,8 @@ def deck_level_gates(run, slides, content_indexes, fill, rendered):
         run.report(deck)
     if wanted("DECK_INK"):
         gate_deck_ink(slides, content_indexes, findings, run.ink_of)
+    if wanted("CAVEAT_DENSE"):
+        gate_caveat_dense(slides, content_indexes, findings)
 
 
 def median(values):
@@ -644,6 +646,7 @@ def thresholds_markdown():
             THRESHOLDS["restatement_words_min"], THRESHOLDS["restatement_block_words_min"]),
          "{}; {}".format(_share(THRESHOLDS["restatement_max"]), _share(THRESHOLDS["restatement_block_max"]))),
         ("CAVEAT_HEAVY", "caveat lines a page, at most", str(THRESHOLDS["caveats_max"])),
+        ("CAVEAT_DENSE", "caveat words a hundred above the footer, deck-wide, advisory over (from {} pages)".format(DECK_HABIT["from"]), str(THRESHOLDS["caveat_words_max"])),
         ("TABLE_SCHEMA_FLAT", "tables opening on the same headers, at most (from {} tables)".format(THRESHOLDS["schema_from"]), str(THRESHOLDS["schema_repeat_max"])),
         ("DECK_CRAFT", "advisory rates across analytical pages (from {} pages), at least: a phrase emphasised; a source line; drawn marks a page; "
          "tables treated; charts annotated".format(CRAFT["from"]["min"]),

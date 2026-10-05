@@ -76,7 +76,7 @@ const run = async (deckPatch) => {
   const p2 = two.dir ? await packetOf(two) : null;
   const prompt = two.dir ? await fs.readFile(path.join(two.dir, 'prompt.md'), 'utf8') : '';
   // An item on a page the pass does not read is refused; a verdict on the page it reads is taken.
-  const stray = await answer(t.deck, verification(p2, t.binding, [], { verdict: 'revise', rating: 6, ...judged(false, 'insufficient'), findings: [{ id: 'N1', scope: 'page', pages: ['f1'], check: 'claim', severity: 'major',
+  const stray = await answer(t.deck, verification(p2, t.binding, [], { verdict: 'revise', rating: 6, ...judged(false, 'insufficient'), findings: [{ id: 'N1', scope: 'page', pages: ['f1'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.',
     problem: 'The claim on this page goes further than the series it shows supports.', fix: 'State the growth over the window the page shows and no more.', basis: 'changed', justification: 'The revision changed the page this item is on.', evidence: '' }] }));
   const taken = await answer(t.deck, verification(p2, t.binding, []));
   const history = JSON.parse(await fs.readFile(path.join(t.deck.dir, '.reviews', 'finance', 'storyline-history', 'pass-2.json'), 'utf8'));

@@ -325,13 +325,14 @@ const held = (n, carried) => {{ const all = words(n); const answer = all.slice(0
 const titles = fs.readdirSync('./skills/professional-slides/examples').filter((f) => f.endsWith('.pages.json')).flatMap((f) => JSON.parse(fs.readFileSync('./skills/professional-slides/examples/' + f, 'utf8')).pages)
   .filter((page) => page.type && typeof page.title === 'string').map((page) => page.title.replace(/[{{][{{][^}}]*[}}][}}]/g, 'x'));
 const share = titles.map((title) => contentWords(title).size / title.trim().split(' ').filter(Boolean).length).sort((a, b) => a - b);
-console.log(JSON.stringify({{ cap: titleContentWords(), limits: [TEXT_LIMITS.titleWords, PLAN.titleWords.max], share: CONTENT_THRESHOLDS.titleContentShare, carriedMin: CONTENT_THRESHOLDS.answerCarriedMin,
+console.log(JSON.stringify({{ cap: titleContentWords(), limits: [TEXT_LIMITS.titleWords, PLAN.titleWords.max], target: PLAN.titleWords.target, share: CONTENT_THRESHOLDS.titleContentShare, carriedMin: CONTENT_THRESHOLDS.answerCarriedMin,
   short: [held(10, 3), held(10, 4)], middle: [held(18, 6), held(18, 7)], long: [held(30, 6), held(30, 7)], longer: [held(48, 6), held(48, 7)],
   titles: titles.length, median: share[Math.floor(share.length / 2)] }}));
 """)
-        # Derived from the title word limit, not written down: twelve words at the content-word share of a title's words.
+        # Derived from the length a title is written to, not written down: twelve words at the content-word share of a
+        # title's words. The most a title may run to is longer, and asks no more of the answer.
         self.assertEqual(result["limits"][0], result["limits"][1])
-        self.assertEqual(result["cap"], int(result["limits"][0] * result["share"] + 1e-9))
+        self.assertEqual(result["cap"], int(result["target"] * result["share"] + 1e-9))
         self.assertEqual(result["cap"], 7)
         # A short answer is held to 35% of its words, as every deck's best title once was...
         self.assertEqual(result["short"], [["titleMissing"], []])       # 3 of 10 is under 35%, 4 is over

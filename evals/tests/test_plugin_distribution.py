@@ -133,16 +133,15 @@ class PluginDistributionTests(unittest.TestCase):
         ships = lambda rel: packager.shipped(packager.PurePosixPath(rel))
         for rel in ['requirements.txt', 'README.md', 'assets/icon.png', 'skills/s/SKILL.md', 'skills/s/agents/openai.yaml',
                     'skills/s/references/charts.md', 'skills/s/references/evaluation/rules.json',
-                    'skills/s/runtime/compose.mjs', 'skills/s/runtime/gates/page_gates.py',
+                    'skills/s/runtime/compose-deck.mjs', 'skills/s/runtime/gates/page_gates.py',
                     'skills/s/runtime/fonts/arial-metrics.json', 'skills/s/runtime/README.md',
                     'skills/s/examples/page-types.pages.json', 'skills/s/examples/assets/hills.jpg',
                     'skills/s/assets/simple-icons/LICENSE.md', 'skills/s/assets/lucide/LICENSE',
                     'skills/s/assets/design-options/options.json',
                     # The build runs the scene design checks, so the overlap module ships with what it imports.
-                    'skills/s/runtime/validate-overlap.mjs', 'skills/s/runtime/overlap-policy.mjs', 'skills/s/runtime/adapters/html.mjs']:
+                    'skills/s/runtime/validate-overlap.mjs', 'skills/s/runtime/text-layout.mjs']:
             self.assertTrue(ships(rel), rel)
-        for rel in ['package.json', 'package-lock.json', 'evals/run.sh', 'assets/notes/icon.png',
-                    'skills/s/runtime/fixtures.mjs',
+        for rel in ['package.json', 'package-lock.json', 'evals/run.sh', 'evals/support/compose.mjs', 'assets/notes/icon.png',
                     'skills/s/runtime/gates/.gitignore', 'skills/s/examples/page-types.author-log.jsonl',
                     'skills/s/examples/gallery-acceptance.deck.json', 'skills/s/examples/assets/notes.txt',
                     'skills/s/scratch/x.mjs', 'skills/s/.DS_Store']:
@@ -223,21 +222,12 @@ class ShippedPackageTests(RealPackage, unittest.TestCase):
         self.assertIn('python-pptx', (self.dest/'requirements.txt').read_text())
 
     def test_it_leaves_out_what_only_the_suite_uses(self):
-        runtime = 'skills/professional-slides/runtime/'
-        for rel in packager.TEST_ONLY_RUNTIME:
-            self.assertNotIn(runtime + rel, self.files)
         self.assertNotIn('skills/professional-slides/examples/gallery-acceptance.deck.json', self.files)
         self.assertFalse([f for f in self.files if f.endswith('.jsonl') or '__pycache__' in f])
         self.assertFalse([f for f in self.files if f.startswith(('evals/', 'output/', 'dist/', 'node_modules/'))])
 
-    def test_the_test_only_list_names_modules_that_exist(self):
-        # An entry for a module that was renamed or deleted would exclude nothing.
-        runtime = ROOT/'skills/professional-slides/runtime'
-        for rel in packager.TEST_ONLY_RUNTIME:
-            self.assertTrue((runtime/rel).is_file(), rel)
-
     def test_every_shipped_module_resolves_its_imports_and_assets_inside_the_package(self):
-        """A test-only module the pipeline starts importing must come off the exclude list."""
+        """A shipped module that imports what does not ship (the suite's evals/support/) fails here."""
         unresolved = []
         for rel in self.files:
             if not rel.endswith('.mjs'):

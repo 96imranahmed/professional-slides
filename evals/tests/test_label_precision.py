@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "skills" / "professional-slides" / "runtime"
 
 PLANNED = '''
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
 const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
 '''
@@ -94,7 +94,7 @@ class NativeLabelPrecisionTests(unittest.TestCase):
         sys.path.insert(0, str(RUNTIME / "emit"))
         from pptx import Presentation
         scene = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'p',cover:{title:'x'},slides:[{title:'Share rose in both markets over the period',layout:'exhibit-full',
   exhibit:{type:'chart.column',heading:'Share by market',categories:['A','B','C','D'],series:[{name:'Share',values:[32,40.8,15,14.9]}]}}]};

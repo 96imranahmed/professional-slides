@@ -39,18 +39,20 @@ import { POLARITIES } from "./tables.mjs";
 import { waivedRules, predatedRule, ruleIntroduced } from "./weight.mjs";
 import { textWordList, textWords } from "./text-contract.mjs";
 import { deckSchema } from "./deck-keys.mjs";
+import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing, and checked at
-// compile. A title sets on one line at twelve words; past them it is carrying
-// the period or scope its `subtitle` is for. Strong decks' titles run 7 to 13
-// words, median 10. The page gates hold the same numbers (weight.json
+// compile. A title sets on one line at about ten words and on two lines at
+// fifteen; past them it is carrying the period or scope its `subtitle` is
+// for. Strong decks' titles run a median of 10 words, and two in five run past
+// twelve - the finding with its comparator and its cause. The page gates hold the same numbers (weight.json
 // `plan.titleWords.max`, page_gates.py TITLE_WORDS, TITLE_LINES and
 // TAKEAWAY_LONG), and a test holds each pair to one value.
 // The executive summary's ceiling, as the budget every check reads sets it.
 const SUMMARY_WORDS = wordBudgetOf("text-page", { role: "executive-summary" }).ceiling;
-export const TEXT_LIMITS = Object.freeze({ titleWords: 12, titleTarget: 10, titleLines: 2, subtitleLines: 1, takeawayLines: 2, barLines: 2 });
+export const TEXT_LIMITS = Object.freeze({ titleWords: 15, titleTarget: 10, titleLines: 2, subtitleLines: 1, takeawayLines: 2, barLines: 2 });
 export const titleWords = (title) => textWords(String(title ?? "").replace(/\s*\(\d+\/\d+\)\s*$/, ""));
 
 // Where the page's explanation lives. Each maps onto what the composer draws.
@@ -59,7 +61,7 @@ export const COMMENTARY = Object.freeze({
   "beside-left": "a commentary column to the left of the exhibit",
   below: "points in a band under the exhibit",
   rail: "one claim in a filled side panel (`rail` text) beside the exhibit",
-  "on-exhibit": "callouts on the chart itself (`annotations`), no separate text",
+  "on-exhibit": "on the chart itself, no separate text: a number mark (`cagr`, `changeAnnotations`, labelled `referenceLines`, `stackTotals`) first, sentence callouts (`annotations`) where the mechanism needs them",
   "in-exhibit": "the explanation lives in the exhibit's cells (an implication column, a findings matrix, labelled cards)",
   captions: "one finding under each panel (`caption` on every exhibit)",
   "so-what-bar": "one implication in a filled bar across the foot of the exhibit (`bar` text); the page's close",
@@ -299,10 +301,17 @@ export function markedChart(ex) {
   // (`targets`): it draws no callout or highlight, and the target line on
   // every row is the comparison a ranking is asked to mark. Only there: every
   // other chart ignores the key, and a bare bar chart is not marked by it.
-  const lists = ["annotations", "highlights", "referenceLines", "events", "changeAnnotations", ...(TARGET_CHARTS.has(ex?.type) ? ["targets"] : [])];
-  return lists.some((key) => Array.isArray(ex?.[key]) && ex[key].length > 0)
-    || ["change", "cagr", "growth", "focusSeries"].some((key) => ex?.[key] !== undefined && ex[key] !== false);
+  const lists = ["annotations", "highlights", "events", ...(TARGET_CHARTS.has(ex?.type) ? ["targets"] : [])];
+  return lists.some((key) => Array.isArray(ex?.[key]) && ex[key].length > 0) || (ex?.focusSeries !== undefined && ex.focusSeries !== false) || numberMarked(ex);
 }
+
+// A number set on the plot: the change or growth rate on an arrow, the gap
+// bracketed, a benchmark as a reference line, a stack's total. Strong decks
+// mark a chart this way far more often than with a sentence - a signed change
+// on one page in eight, a total on one in ten - so a number mark carries the
+// page's commentary on the plot, and a sentence callout beside it is optional.
+const NUMBER_MARKS = ["changeAnnotations", "referenceLines", "stackTotals", "segmentGrowth", "seriesGrowth", "change", "cagr", "growth"];
+export const numberMarked = (ex) => NUMBER_MARKS.some((key) => (Array.isArray(ex?.[key]) ? ex[key].length > 0 : ex?.[key] != null && ex[key] !== false));
 
 // The evidence floor for a chart page. Strong consulting decks' chart pages
 // plot a median of about 22 values (the middle half 10 to 48), while a type's
@@ -368,8 +377,9 @@ export const limitOf = (type, form, target) => LIMITS[`${type}/${form}`] ?? LIMI
 // three, the fourth note is commentary and belongs beside the chart.
 export const CALLOUTS_MAX = 3;
 export const WATERFALL_BELOW_CALLOUTS = 2;
-// The rail's panel is a third of the body row; its statement is set at heading
-// size and runs to eight lines, measured here the way the renderer sets it.
+// The rail's panel is a third of the body row at most - a quarter where its
+// statement fits there (compose-text-pages.mjs); its statement is set at
+// heading size and runs to eight lines, measured here the way the renderer sets it.
 const RAIL_WIDTH = 373;
 export const railFits = (text) => { try { sideStatementLayout({ x: 0, y: 0, width: RAIL_WIDTH, height: 600 }, { text }); return true; } catch { return false; } };
 // The so-what bar runs the body's width and holds two lines: one implication,
@@ -924,7 +934,7 @@ function readableCategories(ex) {
   if (ex.forecastFrom !== undefined) ex.forecastFrom = to(ex.forecastFrom);
 }
 
-// The chart-form refusals, by the code a replay of a stored build reports.
+// The chart-form refusals (chartFormDefect), by code.
 export const CHART_FORM_CODES = Object.freeze({
   SCATTER_OVER_TIME: "a scatter whose x axis is time: a trend drawn without its line",
   SCATTER_CURVE: "six or more points running one way as x grows, drawn as loose dots",
@@ -1028,25 +1038,6 @@ const waivedAdvice = (code, rule, message, rules) =>
   `${code}: ${String(message).replace(/^[^:]+:\s*(?:[A-Z][A-Z_]+ - )?/, "")} (not enforced: introduced in rules version ${ruleIntroduced(rule)}, after the version ${rules?.rulesVersion} this revision records)`;
 
 /**
- * The chart-form refusals read off a compiled deck, for replaying a stored
- * build against them: each page's refusal as `{ code, slide }`, with a
- * one-column fact grid reported beside whatever else the page is refused for.
- */
-export function chartFormFindings(deck) {
-  const findings = [];
-  for (const slide of deck?.slides || []) {
-    const t = slide.pageType;
-    if (!t) continue;
-    const exhibits = exhibitsOf(slide);
-    const defect = chartFormDefect({ type: t.type, form: t.form, metrics: slide.metrics }, slide.id, exhibits, deck.players);
-    if (defect) findings.push({ code: defect.code, slide: slide.id });
-    if (defect?.code !== "NUMBER_CARDS" && exhibits.some((ex) => ex.type === "fact-grid" && ex.columns === 1 && (ex.items || []).some((item) => !item?.text)))
-      findings.push({ code: "NUMBER_CARDS", slide: slide.id });
-  }
-  return findings;
-}
-
-/**
  * Shares of one measure set as same-size tiles. A metric strip held 9.6% and
  * 57% of the same web-visit measure in boxes of one width, and its chart
  * 2.0% and 78% in bars of one width: equal boxes say the numbers are alike
@@ -1068,7 +1059,7 @@ function sharesInTiles(page, exhibits) {
 }
 
 /**
- * The page's text that the composer sets a `highlight` in (compose.mjs
+ * The page's text that the composer sets a `highlight` in (compose-passes.mjs
  * highlightThePhrase): the points and row blocks, the rail or a side panel,
  * the so-what bar and the takeaway, paragraphs, panel captions, and the cells of a table,
  * a findings matrix or a comparison. The compile check reads the same list, so
@@ -1183,10 +1174,11 @@ export function citationForms(keys, registry) {
   const entries = keys.map((key) => registry[key]);
   const label = entries.length > 1 ? "Sources" : "Source";
   const line = (names) => `${label}: ${names.join("; ")}`;
-  const named = (short, status) => entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name; return status && e.status ? `${name} (${e.status})` : name; });
+  // Several articles of one publisher share its short name: a short form says it once, and the fullest form names each.
+  const named = (short, status) => [...new Set(entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name; return status && e.status ? `${name} (${e.status})` : name; }))];
   const brief = named(true, false);
-  const counted = Array.from({ length: Math.max(0, entries.length - 1) }, (_, i) => entries.length - 1 - i)
-    .map((shown) => `${line(brief.slice(0, shown))}; +${entries.length - shown} more in the notes`);
+  const counted = Array.from({ length: Math.max(0, brief.length - 1) }, (_, i) => brief.length - 1 - i)
+    .map((shown) => `${line(brief.slice(0, shown))}; +${brief.length - shown} more in the notes`);
   return [...new Set([line(named(false, true)), line(named(true, true)), line(brief), ...counted, `${label}: ${entries.length} ${entries.length === 1 ? "record" : "records"}, listed in the notes`])];
 }
 
@@ -1610,7 +1602,7 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
   if (type.minCategories && (primary.categories || primary.rows || []).length < type.minCategories)
     throw new Error(`${id}: a ranking shows the whole set - ${type.minCategories} members or more. Two or three numbers are a metric pair: use a numbers page.`);
   // The evidence floor (EVIDENCE_FLOOR), counted on what the page plots.
-  const values = plottedValues(exhibits);
+  const values = plottedValues(exhibits, { printed: true });
   const isChart = chartPage(page.type, exhibits);
   if (isChart && !(page.type === "composition" && WHOLE_PARTS.includes(page.form))) {
     const floor = page.type === "bridge" ? EVIDENCE_FLOOR.bridge : EVIDENCE_FLOOR.chart;
@@ -1620,7 +1612,10 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
   const reviewed = unwaived((skip) => reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)], skip), held);
   if (reviewed) throw new Error(reviewed);
   const form = unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip), held);
-  if (form) throw new Error(form.message);
+  if (form) {
+    registered(CHART_FORM_CODES, form.code);
+    throw new Error(form.message);
+  }
   if (page.type === "ranking" && page.form === "aligned-bars") {
     if (slide.exhibit) slide.exhibit = alignedBarsGroup(primary); else slide.exhibits = [alignedBarsGroup(primary)];
   }
@@ -1704,8 +1699,8 @@ function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, wa
   }
   if (["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" needs the points it places`);
-  if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length)
-    throw new Error(`${id}: commentary "on-exhibit" writes the explanation as callouts on the chart - give the exhibit \`annotations\` ({ category, text })`);
+  if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length && !numberMarked(primary))
+    throw new Error(`${id}: commentary "on-exhibit" writes the explanation on the chart - mark it with a number: the change or growth rate (\`cagr\`, \`changeAnnotations\`), the gap bracketed, a benchmark as a labelled \`referenceLines\`, the stack's \`stackTotals\`; or give it \`annotations\` ({ category, text })`);
   if (page.commentary === "captions") {
     const bare = exhibits.filter((e) => !(typeof e.caption === "string" && e.caption.trim()));
     if (page.type === "picture" ? !(page.pictures || []).every((p) => p.label || p.line) : bare.length)
@@ -1723,7 +1718,7 @@ function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, wa
     const long = (primary.annotations || []).filter((a) => !calloutFits(a.text));
     if (long.length) throw new Error(`${id}: ${long.length} callout${long.length === 1 ? " is" : "s are"} too long for the chart's callout box ("${long[0].text}"); a callout holds about ${countInWords(calloutCapacity())} words - split it, or choose "beside" for the argument`);
     const said = (primary.annotations || []).reduce((n, a) => n + words(a.text).length, 0);
-    if (said < COPY_LIMITS.calloutWordsMin) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; give them the mechanism and the qualification (10 or more words between them), or choose "beside"`);
+    if (said < COPY_LIMITS.calloutWordsMin && !numberMarked(primary)) throw new Error(`${id}: moving the explanation onto the chart means writing it there - the callouts carry ${said} words; mark the finding with a number (the change, the gap, the total), or give the callouts the mechanism (10 or more words between them), or choose "beside"`);
   }
   if (page.commentary === "rail") {
     if ((typeof page.rail !== "string" || words(page.rail).length < COPY_LIMITS.railWordsMin)) throw new Error(`${id}: commentary "rail" sets one developed claim in the side panel - write it as \`rail\`, ten words or more`);
@@ -1930,7 +1925,7 @@ export function markPlayerCells(slide, players) {
   // A findings matrix heads its columns at the page's level ("Anthropic",
   // "OpenAI route"): a column headed by a player carries the mark as a
   // table's does. Its first header heads the row labels when it heads one
-  // more column than the rows carry (compose.mjs reads it the same way).
+  // more column than the rows carry (the composer reads it the same way).
   if (Array.isArray(slide.columns) && Array.isArray(slide.rows) && slide.rows.some((row) => Array.isArray(row?.cells))) {
     const count = Math.max(...slide.rows.map((row) => (Array.isArray(row?.cells) ? row.cells.length : 0)));
     slide.columns = markHeaders(slide.columns, slide.columns.length > count ? 1 : 0);

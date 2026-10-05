@@ -37,7 +37,7 @@ class PictureArchitectureTests(unittest.TestCase):
     def test_the_count_chooses_the_shape_and_the_shape_is_recorded(self):
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const picture=(label)=>({{alt:label+' skyline',label,text:label+' carries the cheaper half of the decision by a clear margin.'}});
 const page=(n)=>({{title:'A title that states the finding for this page',pictures:[...Array(n)].map((_,i)=>picture('City '+i)),soWhat:'One of them wins.'}});
 const shapeOf=(slide)=>{{const recent=[];composeSlide(slide,0,'{BASE}',undefined,1,recent);return recent[0];}};
@@ -59,7 +59,7 @@ console.log(JSON.stringify({{ok:true}}));
         # of cards the largest frame on a page whose subject is the pictures.
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'Two cities, and the one the offer decides',pictures:[
   {{alt:'London',label:'London',text:'Rent at 62% of the New York figure.'}},
   {{alt:'New York',label:'New York',text:'Median pay 34% higher, and the tax that comes with it.'}}],
@@ -82,7 +82,7 @@ console.log(JSON.stringify({{ok:true}}));
         # in it.
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const page=(pictures)=>({{title:'A title that states the finding for this page',pictures,soWhat:'It matters.'}});
 const unsourced=composeSlide(page([{{alt:'Joker, still to source',label:'Joker',text:'The one with the box office.'}},
   {{alt:'Thanos, still to source',label:'Thanos',text:'The one with the franchise.'}}]),0,'{BASE}');
@@ -105,7 +105,7 @@ console.log(JSON.stringify({{ok:true}}));
     def test_the_pictures_are_the_evidence_so_an_exhibit_is_refused(self):
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'A title that states the finding for this page',
   pictures:[{{alt:'A',label:'A',text:'x'}},{{alt:'B',label:'B',text:'y'}}],
   exhibit:{{type:'table',columns:['a','b'],rows:[['1','2']]}}}};
@@ -126,7 +126,7 @@ console.log(JSON.stringify({{ok:true}}));
         result = run_node(f'''
 import assert from 'node:assert/strict';
 import {{auditContent}} from '{BASE}/runtime/content-audit.mjs';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'Two cities, and the one the offer decides',pictures:[
   {{alt:'London',label:'London',text:'Rent at 62% of the New York figure.'}},
   {{alt:'New York',label:'New York',text:'Median pay 34% higher.'}}]}};

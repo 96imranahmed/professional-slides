@@ -40,7 +40,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { authorDeck, compileDeck, readInsights, workedExamples } from './skills/professional-slides/runtime/author-deck.mjs';
 import { REPAIRS, SETTLED_LATER, GATE_CLASSES, repairOf } from './skills/professional-slides/runtime/gates/gate_classes.mjs';
-import { BOUND_FIELDS, storylineBinding, storylinePageHashes, recordedMeasures } from './skills/professional-slides/runtime/storyline.mjs';
+import { BOUND_FIELDS, storylineBinding, recordedMeasures } from './skills/professional-slides/runtime/storyline.mjs';
 const dir = './evals/quality/fixtures/evidence';
 const read = (name) => JSON.parse(fs.readFileSync(`${dir}/${name}.pages.json`, 'utf8'));
 const playersOf = (doc) => (doc.deck.players || []).map((p) => (typeof p === 'string' ? p : p.name));
@@ -174,6 +174,19 @@ console.log(JSON.stringify({ trend: a.map(said), repair: a[0]?.repair ?? null, d
         self.assertEqual([result["waits"]["form"], result["waits"]["stage"]], ["donut", "evidence"])
         self.assertTrue(result["waits"]["to"].split("/")[0] in ("stacked-bar", "stacked-column", "marimekko", "waffle", "treemap", "pie"), result["waits"])
 
+    def test_a_typed_chart_with_a_value_missing_is_refused_at_the_spine_as_a_bound_one_is(self):
+        # The worked trend line with one value taken out, cut back to its spine: no chart draws a missing value, so the draft
+        # refuses the page as it refuses a bound chart whose record leaves a member undisclosed. (That every worked form cut
+        # back to its spine passes its draft and lays out to the same bound page is held by test_spine_witness GridTests.)
+        result = run_node(SETUP + '''
+const examples = workedExamples();
+const trend = structuredClone(examples.pages.find((p) => p.type === 'trend' && p.form === 'line')); trend.exhibit.series[0].values[2] = null;
+const holed = await authorDeck({ deck: examples.deck, pages: [spineOf(trend)] }, { baseDir: './skills/professional-slides/examples', draft: true, fit: false });
+console.log(JSON.stringify({ holed: holed.blocking.filter((f) => f.class === 'P').map((f) => [f.code, f.measured?.undisclosed ?? null]) }));
+''')
+        self.assertEqual([code for code, _ in result["holed"]], ["SPINE_UNDRAWABLE"])
+        self.assertEqual(len(result["holed"][0][1]), 1)
+
 
 class DependencyInADraftTests(unittest.TestCase):
     def test_the_dependency_contract_blocks_in_a_draft_wherever_the_page_declares_enough(self):
@@ -196,34 +209,17 @@ console.log(JSON.stringify({
 ''')
         self.assertEqual(result["asWritten"]["blocking"], [])
         self.assertEqual(result["relation"]["blocking"], ["RELATION_UNDECLARED o3"])
-        self.assertEqual(result["relationStubbed"]["blocking"], ["RELATION_UNDECLARED o3"])
+        # Cut to stubs, the summary's table of tokens declares no view of what it shows, which no summary draws whole (test_spine_views).
+        self.assertEqual(result["relationStubbed"]["blocking"], ["SPINE_UNDETERMINED o0", "RELATION_UNDECLARED o3"])
         self.assertIn("CONTEXT_UNEXPLAINED o3", result["context"]["blocking"])
         self.assertIn("PROOF_OFF_CLAIM o1", result["offClaim"]["blocking"])
         self.assertEqual(result["noClaim"]["blocking"], ["CLAIM_MEASURES_MISSING o1"])
-        self.assertEqual(result["bare"]["blocking"], [])
+        # The executive summary is the page that declares its exhibit at the spine (SummaryFillTests); every other page waits.
+        self.assertEqual(result["bare"]["blocking"], ["SPINE_UNFILLED o0"])
         self.assertTrue(all(line.endswith(" layout") for line in result["bare"]["deferred"] if line.startswith("PROOF_MISSING")), result["bare"]["deferred"])
         # A citation is the copy's: it waits, and says so.
         self.assertEqual(result["uncited"]["blocking"], [])
         self.assertIn("SOURCE_UNCITED o1 copy", result["uncited"]["deferred"])
-
-
-class StructureInADraftTests(unittest.TestCase):
-    def test_a_structure_rule_only_another_page_type_mends_blocks_and_one_a_form_mends_waits(self):
-        result = run_node(SETUP + '''
-const doc = read('finance'), insights = await insightsOf('finance', doc);
-// The fixture four times over: its page types repeat past the share the contract allows, which no form or placement mends.
-const long = spine(doc); const pages = long.pages; long.pages = [];
-for (let round = 0; round < 4; round += 1) for (const p of pages) long.pages.push(round ? { ...p, id: `${p.id}r${round}` } : p);
-const run = await draftOf(long, insights);
-const S = (list) => list.filter((f) => f.class === 'S');
-console.log(JSON.stringify({ blocking: S(run.blocking).map((f) => [f.code, repairOf(f).settledLater]), deferred: S(run.advisories).filter((f) => f.deferred).map((f) => [f.code, f.settledBy]),
-  typeShare: REPAIRS.VARIETY_TYPE_SHARE, column: REPAIRS.VARIETY_COLUMN }));
-''')
-        self.assertIn(["VARIETY_TYPE_SHARE", None], result["blocking"])
-        self.assertTrue(all(kind is None for _, kind in result["blocking"]), result["blocking"])
-        self.assertTrue(all(kind in ("copy", "layout", "fit") for _, kind in result["deferred"]), result["deferred"])
-        self.assertEqual(result["typeShare"], ["type", "pages"])
-        self.assertIn("layout", result["column"])
 
 
 class RepairRegistryTests(unittest.TestCase):
@@ -268,7 +264,7 @@ console.log(JSON.stringify({ fields: Object.keys(BOUND_FIELDS),
     view: moved((d) => { page(d, 'f3').exhibit.select = { from: 'FY22' }; }),
     record: bindingOf(read('finance'), changedLog) !== bindingOf(read('finance')) },
   layout: {
-    form: moved((d) => { page(d, 'f5').form = 'lollipop'; }),
+    form: moved((d) => { const p = page(d, 'f5'); p.form = 'bars'; for (const c of p.exhibit.columns.filter((c) => c.heat)) { delete c.heat; c.bar = true; } }),
     commentary: moved((d) => { const p = page(d, 'f3'); p.commentary = 'rail'; p.rail = p.bar; delete p.bar; }),
     heading: moved((d) => { page(d, 'f3').exhibit.heading = 'Liquid assets and short-term liabilities at year end'; }),
     bar: moved((d) => { page(d, 'f3').bar = 'The cushion has narrowed for three years and the board should rebuild it before lending grows again.'; }),
@@ -335,34 +331,11 @@ done();
         for label in ("undisclosed", "relation", "context", "claim", "typed"):
             self.assertIn(label, result["labels"])
 
-    def test_every_worked_form_cut_back_to_its_spine_passes_its_draft_and_lays_out_to_the_same_bound_page(self):
-        # The worked page of every form is a layout of its own spine: the spine passes the draft's page checks, and the page
-        # the critique would be bound to is the same before the copy and the marks are added as after.
-        result = run_node(SETUP + '''
-const examples = workedExamples();
-const out = [];
-for (const worked of examples.pages.filter((p) => p.type)) {
-  const one = (p) => ({ deck: examples.deck, pages: [p] });
-  const cut = spineOf(worked);
-  const draft = await authorDeck(one(cut), { baseDir: './skills/professional-slides/examples', draft: true, fit: false });
-  const before = storylinePageHashes(compileDeck(one(cut), { draft: true, partial: true }).spec)[worked.id], after = storylinePageHashes(compileDeck(one(worked), { partial: true }).spec)[worked.id];
-  const blocked = draft.blocking.filter((f) => f.class === 'P');
-  if (blocked.length || before !== after) out.push({ page: `${worked.type}/${worked.form} ${worked.id}`, blocked: blocked.map((f) => `${f.code}: ${String(f.repair).slice(0, 160)}`), sameBoundPage: before === after });
-}
-// A typed chart with a value missing is refused at the spine as a bound one is.
-const trend = structuredClone(examples.pages.find((p) => p.type === 'trend' && p.form === 'line')); trend.exhibit.series[0].values[2] = null;
-const holed = await authorDeck({ deck: examples.deck, pages: [spineOf(trend)] }, { baseDir: './skills/professional-slides/examples', draft: true, fit: false });
-console.log(JSON.stringify({ pages: examples.pages.filter((p) => p.type).length, out, holed: holed.blocking.filter((f) => f.class === 'P').map((f) => [f.code, f.measured?.undisclosed ?? null]) }));
-''')
-        self.assertGreaterEqual(result["pages"], 80)
-        self.assertEqual(result["out"], [])
-        self.assertEqual([code for code, _ in result["holed"]], ["SPINE_UNDRAWABLE"])
-        self.assertEqual(len(result["holed"][0][1]), 1)
-
 
 class SummaryFillTests(unittest.TestCase):
     def test_an_executive_summary_declares_the_exhibit_it_needs_at_the_spine(self):
         result = run_node(SETUP + '''
+import { deckLimits } from './skills/professional-slides/runtime/limits.mjs';
 const doc = read('finance'), insights = await insightsOf('finance', doc);
 const summary = (change) => { const d = spine(read('finance')); change(page(d, 'f0')); return d; };
 const of = async (d) => (await draftOf(d, insights)).blocking.filter((f) => f.id === 'f0').map((f) => [f.code, f.measured, String(f.repair)]);
@@ -370,16 +343,18 @@ const text = await of(summary((p) => { delete p.exhibit; }));
 // A revision recorded before the rule that holds a page to its empty bands hears it as advice.
 const old = summary((p) => { delete p.exhibit; }); Object.assign(old.deck, { workflow: 'existing_deck_revision', rulesVersion: 2 });
 const revision = await draftOf(old, insights);
-const VIEW = { measures: ['i-loans/loans', 'i-earn/pat', 'i-cash/ocf', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result'], as: 'table', labels: { from: 'FY25', to: 'FY26' } };
-console.log(JSON.stringify({ text, table: await of(summary(() => {})), stubbed: await of(summary((p) => { p.exhibit = {}; })), declared: await of(summary((p) => { p.exhibit = { basis: VIEW }; })),
+const VIEW = { measures: ['i-loans/loans', 'i-earn/pat', 'i-cash/ocf', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cover/result'], as: 'table', labels: { from: 'FY25', to: 'FY26' } };
+// The summary's word ceiling as the author is told it (`--limits`, derive-content.mjs wordBudgetOf).
+console.log(JSON.stringify({ ceiling: deckLimits().executiveSummary.bodyWords.max, text, table: await of(summary(() => {})), stubbed: await of(summary((p) => { p.exhibit = {}; })), declared: await of(summary((p) => { p.exhibit = { basis: VIEW }; })),
   thin: await of(summary((p) => { p.exhibit.rows = p.exhibit.rows.slice(0, 3); })),
   revision: [revision.blocking.filter((f) => f.code === 'SPINE_UNFILLED').length, revision.advisories.filter((f) => f.code === 'SPINE_UNFILLED').map((f) => f.waived?.introducedIn)] }));
 ''')
         self.assertEqual([code for code, _, _ in result["text"]], ["SPINE_UNFILLED"])
         code, measured, repair = result["text"][0]
         self.assertEqual(measured["exhibits"], 0)
-        self.assertEqual(measured["ceiling"], 204)
-        for said in ("cannot fill its page on text alone", "204 body words", "Its answer table is part of the spine", '"type": "table"', "reopens it"):
+        self.assertGreater(result["ceiling"], 0)
+        self.assertEqual(measured["ceiling"], result["ceiling"])
+        for said in ("cannot fill its page on text alone", f"{result['ceiling']} body words", "Its answer table is part of the spine", '"type": "table"', "reopens it"):
             self.assertIn(said, repair)
         self.assertEqual(result["table"], [])       # the summary with its table declared fills the page
         # A place kept for the exhibit that says nothing of what it will show leaves the claim's measures read as plotted whole, which
@@ -410,13 +385,21 @@ class DraftCliTests(unittest.TestCase):
         return subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages), *flags], capture_output=True, text=True)
 
     def test_the_draft_and_the_plan_refuse_the_same_bound_facts(self):
-        pages = self.stage("withPage(two({ series: BOTH }))")
+        # One spine, two pages the layout cannot finish: a bound chart of a peer set with a member the record does not disclose
+        # (f7), and a bound exhibit under a metric strip with no `type`, which the form does not set (x1).
+        untyped = {"id": "x1", "type": "numbers", "form": "metric-strip", "commentary": "none", "why": "Two figures carry the claim and the series they come from sits under them",
+                   "title": "The loan book grew by more than half in seven years", "evidence": ["i-loans", "A-loans"], "settles": {"kind": "rate", "what": "the loan book at year end", "measures": ["i-loans/loans"]},
+                   "metrics": [{"measure": "i-loans/loans@FY26", "format": "0", "label": "Loan book, FY26"}, {"measure": "A-loans/percent", "format": "0.0%", "label": "Growth in seven years"}],
+                   "exhibit": {"series": [{"measure": "i-loans/loans", "name": "Loans"}]}}
+        pages = self.stage(f"(() => {{ const d = withPage(two({{ series: BOTH }})); d.pages.push({json.dumps(untyped)}); return d; }})()")
         draft, plan = self.run_cli(pages, "--draft"), self.run_cli(pages, "--plan")
         self.assertEqual(draft.returncode, 2, draft.stderr[-1500:])
         self.assertIn("SPINE_UNDRAWABLE [f7]", draft.stderr)
+        self.assertIn("COMPILE [x1]", draft.stderr)
+        self.assertIn("the exhibit has no `type`", draft.stderr)
         self.assertEqual(plan.returncode, 2, plan.stderr[-1500:])
-        self.assertEqual([item["code"] for item in json.loads(plan.stdout)["unlayable"]], ["SPINE_UNDRAWABLE"])
-        self.assertIn("cannot be laid out as the spine declares", plan.stderr)
+        self.assertEqual(sorted((item["code"], item["id"]) for item in json.loads(plan.stdout)["unlayable"]), [("COMPILE", "x1"), ("SPINE_UNDRAWABLE", "f7")])
+        self.assertIn("the draft of this proposal refuses", plan.stderr)
 
     def test_what_a_draft_leaves_to_the_full_compile_is_grouped_and_is_only_copy_layout_or_fit(self):
         members = ["Harbour", "Millrace", "Castlefield", "Dunmore", "Eastbank", "Ferrybridge", "Greyfriars"]
@@ -437,6 +420,7 @@ class DraftCliTests(unittest.TestCase):
             self.assertFalse(any(code in line for line in deferred), code)
         self.assertFalse(any("enforced by the full compile" in line for line in summary["advisories"]))
         self.assertIn("Left to the full compile - what the copy, the layout or the fit settles", draft.stderr)
+        self.assertIn("A draft is the full compile of the spine completed with placeholder copy, and this is all it defers", draft.stderr)
 
 
 if __name__ == "__main__":

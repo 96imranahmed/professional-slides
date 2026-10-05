@@ -212,7 +212,7 @@ export function unsetAnswers(prefs) {
 /**
  * The deck-level keys the answers set. This is the whole of how a preference
  * reaches a build: each answer becomes a key the deck spec already reads
- * (design-systems.mjs applyDesign, compose.mjs), and an author's explicit key
+ * (design-systems.mjs applyDesign, compose-deck.mjs), and an author's explicit key
  * on the deck still wins because `apply` never overwrites one.
  *
  *   design       -> design

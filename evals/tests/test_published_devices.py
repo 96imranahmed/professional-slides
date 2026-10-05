@@ -140,7 +140,7 @@ console.log(JSON.stringify({rates:rows.map(n=>n.text),heading:nodes.find(n=>n.da
 class MarkedPointsTests(unittest.TestCase):
     def test_a_page_that_asks_for_icons_keeps_them_after_a_side_column_page(self):
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const ex={type:'chart.bar',heading:'Impact',unit:'pp',categories:['A','B','C'],series:[{name:'S',values:[4,3,2]}]};
 const pts=[{icon:'money',lead:'One',text:'First point.'},{icon:'shield',lead:'Two',text:'Second point.'},{icon:'growth',lead:'Three',text:'Third point.'}];

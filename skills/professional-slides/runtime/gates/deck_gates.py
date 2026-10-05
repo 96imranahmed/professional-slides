@@ -179,7 +179,9 @@ def marked_share(carriers, pattern, recoloured=False):
             return True
         # A recoloured category is the commonest mark of all and draws no
         # node of its own: the bar keeps its role and carries `highlighted`.
-        return recoloured and any((n.get("data") or {}).get("highlighted")
+        # A stack's total is a data label anchored over the stack, a number
+        # mark as a change is (build-bars.mjs pageChartAnnotated).
+        return recoloured and any((n.get("data") or {}).get("highlighted") or (n.get("data") or {}).get("anchor") == "stack-total"
                                   for n in slide.get("nodes", []))
     return sum(1 for s in carriers if marked(s)) / float(len(carriers))
 

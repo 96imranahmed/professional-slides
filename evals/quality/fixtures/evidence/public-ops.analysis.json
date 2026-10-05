@@ -12,6 +12,15 @@
    "strength": "strong"
   },
   {
+   "id": "B-calls",
+   "op": "growth",
+   "inputs": [
+    "o-demand/calls"
+   ],
+   "soWhat": "Calls rose by a fifth in two years while crews on shift fell",
+   "strength": "supporting"
+  },
+  {
    "id": "B-headroom",
    "op": "threshold",
    "inputs": [
@@ -34,9 +43,9 @@
    "assumptions": [
     {
      "name": "quarterly rise",
-     "value": 0.5,
+     "value": 0.47,
      "unit": "minutes",
-     "rationale": "the mean quarterly rise over the last eight quarters continues"
+     "rationale": "the mean quarterly rise of the last two years, 8.9 to 12.2 minutes over seven quarters, continues"
     }
    ],
    "horizon": [
@@ -51,12 +60,16 @@
     "2027 Q1",
     "2027 Q2",
     "2027 Q3",
-    "2027 Q4"
+    "2027 Q4",
+    "2028 Q1",
+    "2028 Q2",
+    "2028 Q3",
+    "2028 Q4"
    ],
    "threshold": {
     "ref": "o-standard/standard"
    },
-   "soWhat": "On the recent trend the service breaches the standard within three years",
+   "soWhat": "On the two-year trend the service breaches the standard in 2028",
    "strength": "supporting"
   },
   {

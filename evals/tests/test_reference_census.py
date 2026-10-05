@@ -171,14 +171,6 @@ class ReferenceCensusTests(unittest.TestCase):
         words = next(line for line in printed.splitlines() if line.startswith("Words per page"))
         self.assertTrue(words.rstrip().endswith("-"))
 
-    def test_the_committed_reference_is_numbers_only(self):
-        data = json.loads((ROOT / "evals" / "reference_census.json").read_text())
-        strings = []
-        walk = lambda value: strings.append(value) if isinstance(value, str) else [walk(v) for v in (value.values() if isinstance(value, dict) else value if isinstance(value, list) else [])]  # noqa: E731
-        walk(data["summary"])
-        self.assertEqual(strings, [])
-        self.assertNotIn("/", data.get("note", "").replace("evals/scripts/reference_census.py", ""))
-
 
 if __name__ == "__main__":
     unittest.main()

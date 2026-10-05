@@ -220,8 +220,8 @@ console.log(JSON.stringify({ share: [by.share.status, by.share.reason], gap: [by
             run = subprocess.run([NODE, str(ROOT / "skills/professional-slides/runtime/analysis.mjs"), str(Path(tmp) / "finance.pages.json")], capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stderr)
             written = json.loads((Path(tmp) / "finance.analysis-results.json").read_text(encoding="utf-8"))
-            self.assertEqual([r["id"] for r in written["results"]], ["A-ocf", "A-earn", "A-cushion", "A-peers", "A-floor", "A-loans", "A-loans-year", "A-liquid-year", "A-index", "A-short-year"])
-            self.assertEqual(json.loads(run.stdout)["assumed"], 1)
+            self.assertEqual([r["id"] for r in written["results"]], ["A-ocf", "A-earn", "A-cushion", "A-peers", "A-cover", "A-floor", "A-loans", "A-loans-year", "A-liquid-year", "A-index", "A-short-year"])
+            self.assertEqual(json.loads(run.stdout)["assumed"], 0)  # the liquidity floor is a recorded rule, not an assumption
             (Path(tmp) / "finance.analysis.json").unlink()
             bare = subprocess.run([NODE, str(ROOT / "skills/professional-slides/runtime/analysis.mjs"), str(Path(tmp) / "finance.pages.json")], capture_output=True, text=True)
             self.assertEqual(bare.returncode, 2)
@@ -446,7 +446,7 @@ console.log(JSON.stringify({ counts: cat.counts, ids: cat.entries.map((e) => e.e
             by_inputs = {(e["entry"]["op"], tuple(e["entry"]["inputs"])): e for e in out["entries"]}
             # The plan's own gap and comparison are marked as already run; growth is offered over every series.
             self.assertEqual(by_inputs[("gap", ("i-liquidity/liquid", "i-liquidity/short-liabilities"))]["inPlan"], ["A-cushion"])
-            self.assertEqual(by_inputs[("compare", ("i-peers/margin", "i-peers/loan-growth", "i-peers/capital"))]["inPlan"], ["A-peers"])
+            self.assertEqual(by_inputs[("compare", ("i-peers/margin", "i-peers/loan-growth", "i-peers/liquidity-cover", "i-peers/capital"))]["inPlan"], ["A-peers"])
             self.assertEqual(sum(1 for e in out["entries"] if e["entry"]["op"] == "growth"), 7)
             self.assertTrue(all(e["status"] in ("computed", "assumed") and e["finding"] for e in out["entries"]))
             self.assertEqual(out["catalogue"]["entries"], len(out["entries"]))
@@ -532,7 +532,7 @@ console.log(JSON.stringify({{
 """)
         single, merged = result["ids"]
         self.assertEqual(merged, single)  # the parts, merged in the order listed after the log's own insights, are the one log
-        self.assertEqual(result["parts"], [{"file": "insights/subject.json", "insights": 2}, {"file": "insights/peers.json", "insights": 2}])
+        self.assertEqual(result["parts"], [{"file": "insights/subject.json", "insights": 2}, {"file": "insights/peers.json", "insights": 3}])
         self.assertEqual(result["where"], [None, "insights/subject.json", "insights/peers.json"])
         self.assertEqual(result["analyses"][1], result["analyses"][0])  # and the analyses computed over it are the same
         self.assertEqual(result["clean"], 0)
@@ -620,13 +620,13 @@ fs.rmSync(dir, {{ recursive: true, force: true }});
         # Eight declared players and no computed comparison: refused before the outline.
         self.assertEqual(result["noAnalysis"], [["ANALYSIS_REQUIRED", "blocker"]])
         self.assertEqual(result["unplaced"], [["blocker", ["A-junk"], 8]])  # run, and none of the eight players is in it
-        self.assertEqual(result["prose"], [["MEASURES_MISSING", 6]])
+        self.assertEqual(result["prose"], [["MEASURES_MISSING", 7]])
         self.assertIn("as data", result["proseRepair"])
         self.assertEqual(result["older"], [["advisory", {"rulesVersion": 3, "introducedIn": 4}]])
         # A deck that compares nothing is not asked for a matrix, and one service with no players is not either.
         self.assertEqual(result["explainer"], [])
         self.assertEqual(result["ops"], [])
-        self.assertEqual(result["derived"], ["roster", True, 10])
+        self.assertEqual(result["derived"], ["roster", True, 11])
 
 
 class DependencyTests(unittest.TestCase):
@@ -688,7 +688,10 @@ console.log(JSON.stringify({{
   twoUnits: onPage('f1', (p, d) => {{ const b = branches(d); p.exhibit = {{ ...p.exhibit, series: [...p.exhibit.series, ...b.series], basis: {{ measures: ['i-loans/loans', 'i-efficiency/branches'], role: 'proof' }} }}; p.evidence.push('i-efficiency'); }}),
   // What a metric prints: a unit letter is read, a sign is held, the first number is the one stated, a label is not a number.
   metrics: Object.fromEntries(['4.3pp', '+4.3%', '-4.3%', '999x', '+900% (FY25: 47)', 'FY26', '4.26'].map((value) => [value, codes((p) => {{ p.metrics[0].value = value; }})])),
-  rounded: onPage('f5', (p) => {{ p.exhibit.series[0].values = p.exhibit.series[0].values.map((v) => Math.round(v)); }}),
+  // The peer margins drawn as a ranking, each rounded to a whole number.
+  rounded: onPage('f5', (p) => {{ Object.assign(p, {{ type: 'ranking', form: 'bar', commentary: 'none', settles: {{ kind: 'rank', what: 'net interest margin across eight credit unions', measures: ['A-peers/margin'] }},
+    exhibit: {{ heading: 'Net interest margin, FY26', unit: '%', categories: ['Northgate', 'Castlefield', 'Ferrybridge', 'Harbour', 'Eastbank', 'Millrace', 'Greyfriars', 'Dunmore'],
+      series: [{{ name: 'Margin', values: [3.4, 3.1, 3.0, 2.9, 2.8, 2.6, 2.4, 2.2].map((v) => Math.round(v)) }}], basis: {{ measures: ['A-peers/margin'], role: 'proof' }} }} }}); }}),
   tableUnshown: onPage('f0', (p) => {{ p.exhibit.basis.measures.push('i-peers/loan-growth'); }}),
   tableCell: onPage('f0', (p) => {{ p.exhibit.rows[0][2] = '999m'; }}),
   undeclared: codes((p, d) => {{ p.exhibit = branches(d); delete p.exhibit.basis; p.evidence.push('i-efficiency'); }}),

@@ -460,9 +460,11 @@ export function comboChart({ id, frame, props }) {
   // writes "$878m" on every other page. The unit decides which end it goes on.
   const secondaryCurrency = String(props.secondaryUnit ?? "").trim().match(/^([$£€¥₹])\s*(.*)$/);
   const secondaryFormat = props.secondaryValueFormat ?? props.valueFormat ?? {};
+  // A word unit ("listings", "msf") is set off by a space; a symbol or a scale ("%", "x", "m", "bn") is not.
+  const spaced = (unit) => (/^[A-Za-z]{3,}/.test(unit) ? ` ${unit}` : unit);
   const unitFormat = secondaryCurrency
-    ? { prefix: secondaryCurrency[1], suffix: secondaryCurrency[2] }
-    : props.secondaryUnit ? { prefix: "", suffix: props.secondaryUnit } : {};
+    ? { prefix: secondaryCurrency[1], suffix: spaced(secondaryCurrency[2]) }
+    : props.secondaryUnit ? { prefix: "", suffix: spaced(String(props.secondaryUnit).trim()) } : {};
   const lineFormat = secondary
     ? { ...props, valueFormat: { ...secondaryFormat, ...unitFormat,
         ...props.secondaryValueFormat, grouping: secondaryFormat.grouping ?? true } }
@@ -498,8 +500,19 @@ export function comboChart({ id, frame, props }) {
       // the line's value sits above its point, clear of the bar label.
       const inside = !secondary && bar.height >= 40;
       nodes.push(textPrimitive({ id: stableId(id, "value-label", barSeries.name, category), role: "data-label", frame: { x: bar.x, y: inside ? bar.y + 6 : bar.y - 26, width: bar.width, height: 24 }, text: formatValue(barSeries.values[index], props), style: textStyle(CHART_LABEL, inside ? token("color.onPrimary") : INK, true, "center"), data: { category, series: barSeries.name } }));
-      const ly = Math.min(lineY - 30, inside ? bar.y - 26 : bar.y - 52);
-      nodes.push(textPrimitive({ id: stableId(id, "value-label", lineSeries.name, category), role: "data-label", frame: { x: x - categorySpan / 2, y: ly, width: categorySpan, height: 24 }, text: formatValue(lineSeries.values[index], lineFormat), style: textStyle(CHART_LABEL, SERIES[1], true, "center"), data: { category, series: lineSeries.name } }));
+      const text = formatValue(lineSeries.values[index], lineFormat);
+      // Above its point, unless a steep neighbour's segment runs through that box: then under the point, where it clears the bar label.
+      const above = Math.min(lineY - 30, inside ? bar.y - 26 : bar.y - 52), under = lineY + 8;
+      const half = Math.min(categorySpan, text.length * 7 + 8) / 2;
+      const crossed = (top) => [index - 1, index + 1].filter((j) => j >= 0 && j < categories.length).some((j) => {
+        const jx = plot.x + categorySpan * j + categorySpan / 2, jy = lineScale(lineSeries.values[j]);
+        return Array.from({ length: 21 }, (_, k) => k / 20).some((t) => { const px = x + (jx - x) * t, py = lineY + (jy - lineY) * t; return px > x - half && px < x + half && py > top && py < top + 24; });
+      });
+      const roomUnder = under + 24 <= (inside ? bar.y : bar.y - 28);
+      // A callout keyed to this category takes the space by its mark, so the label stays above there.
+      const called = (props.annotations || []).some((note) => String(note?.category) === String(category));
+      const ly = crossed(above) && roomUnder && !called && !crossed(under) ? under : above;
+      nodes.push(textPrimitive({ id: stableId(id, "value-label", lineSeries.name, category), role: "data-label", frame: { x: x - categorySpan / 2, y: ly, width: categorySpan, height: 24 }, text, style: textStyle(CHART_LABEL, SERIES[1], true, "center"), data: { category, series: lineSeries.name } }));
     }
     categoryMap.set(category, { x: x - categorySpan / 2, y: plot.y, width: categorySpan, height: plot.height });
     pointMap.set(`${barSeries.name}:${category}`, barPoint);

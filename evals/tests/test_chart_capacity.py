@@ -295,7 +295,7 @@ class PeerReferenceDomainTests(unittest.TestCase):
     def test_peer_domain_includes_a_target_present_in_only_one_chart(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const charts=[24,28].map((value,i)=>({type:'chart.bar',heading:i?'West room seats':'East room seats',unit:'seats',categories:['A'],series:[{name:'Seats',values:[value]}],...(i===0?{referenceLines:[{value:60,label:'Capacity'}]}:{})}));
 const scene=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-target',slides:[{id:'s',title:'Both rooms remain below the shared capacity',arrange:'row',exhibits:charts}]})).deck;

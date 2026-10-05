@@ -402,3 +402,16 @@ class FurnitureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedShortNameTests(unittest.TestCase):
+    def test_articles_of_one_publisher_are_named_once_in_the_short_forms(self):
+        result = run_node('''
+import { citationForms } from './skills/professional-slides/runtime/page-types.mjs';
+const reg = { a: { name: 'Commercial Observer, first article (2026)', short: 'Commercial Observer' }, b: { name: 'Commercial Observer, second article (2026)', short: 'Commercial Observer' }, c: { name: 'Bisnow, an article', short: 'Bisnow' } };
+console.log(JSON.stringify(citationForms(['a', 'b', 'c'], reg)));
+''')
+        self.assertIn("first article", result[0])        # the fullest form names each source
+        self.assertIn("second article", result[0])
+        self.assertEqual(result[1], "Sources: Commercial Observer; Bisnow")  # a short form says the publisher once
+        self.assertEqual(result[-1], "Sources: 3 records, listed in the notes")

@@ -26,7 +26,7 @@ class DonutLegendTests(unittest.TestCase):
         # PowerPoint cannot place rim labels); one that asks for a legend keeps
         # it in the native chart.
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const build=(extra)=>{const spec={schema:'professional-slides.deck/v3',id:'d',cover:{title:'x'},slides:[{title:'Two firms supply most of the judged pages',layout:'exhibit-full',
   exhibit:{type:'chart.donut',heading:'Pages by firm',unit:'pages',labels:['Firm A','Firm B','Firm C'],values:[75,52,5],...extra}}]};
@@ -80,7 +80,7 @@ class BarScaleTests(unittest.TestCase):
         # Four "% of films" columns each scaled to their own maximum could not
         # be read across a row, and each printed "(unit, common scale 0 to N)".
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const col = (label) => ({label, unit: '% of films', bar: true, barScale: 'share'});
 const spec={schema:'professional-slides.deck/v3',id:'b',cover:{title:'x'},slides:[{title:'The lead holds until the bars reward peaks over consistency',layout:'exhibit-full',
@@ -116,7 +116,7 @@ class SeriesRoundingTests(unittest.TestCase):
         except ModuleNotFoundError:
             self.skipTest("needs python-pptx (python3 -m pip install -r requirements.txt)")
         scene = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'r',cover:{title:'x'},slides:[{title:'BCG leads with charts and McKinsey with text',layout:'exhibit-full',
   exhibit:{type:'chart.stacked-column',percent:true,heading:'Pages by family',categories:['BCG','McKinsey'],

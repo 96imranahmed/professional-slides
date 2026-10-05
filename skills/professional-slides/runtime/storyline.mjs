@@ -57,12 +57,12 @@ import { textWords } from "./text-contract.mjs";
 import { registered } from "./errors.mjs";
 import {
   SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, BLOCKING,
-  pageListErrors, settlePageList, advanceLedger, openEntries, openBlocking, openAboutImported, aboutImportedErrors, ABOUT_IMPORTED_RULE, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
+  pageListErrors, settlePageList, advanceLedger, openEntries, openBlocking, openAboutImported, aboutImportedErrors, ABOUT_IMPORTED_RULE, verificationErrors, coverageErrors,
   changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
   callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, requestHash, requestErrors, stageReview, lineageStore, restartLineage, isAuthFailure,
   readInventory, revisionChanges, locateDeck, requestStatement, scopeSourceErrors, requestProvenanceOf, evidenceScopeOf, answerStatusOf, retireLineage, carriedItems, settleCarried, carriedErrors, CARRIED_SCHEMA,
-  ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, SAMPLING_WORDS, COMPLETENESS_NOTE, ARGUMENT_SEVERITIES, RATING_CAPS, ratingScale, spineClauses, REVIEW_HISTORY, readConfirmations,
+  ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, SAMPLING_WORDS, ARGUMENT_SEVERITIES, BLOCKING_STAKE, ratingScale, spineClauses, REVIEW_HISTORY, readConfirmations,
 } from "./review-passes.mjs";
 import { repairOf, reviewRepairOf } from "./gates/gate_classes.mjs";
 import { titleLimits, titleLimitsLine, titleErrors } from "./review-floors.mjs";
@@ -73,6 +73,7 @@ import { typeFitNote } from "./claim-fit.mjs";
 import { VIEW_CLASSES, declaredLabels, declaresView, dependencyNotes, metricsOf, refsOf, roleFor } from "./gates/dependency_gates.mjs";
 import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 import { carriedSaid, withCarriedPages } from "./revision.mjs";
+import { naturalClass } from "./spine-witness.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
 // scope allows and whose answer is offered as provisional: the decisive gaps
@@ -84,7 +85,7 @@ export const STORYLINE_MODES = Object.freeze(["spine", "full"]);
 // `narrowed` closes an item the answer no longer needs, because it now claims
 // less; `scope-limited` keeps open, at its severity, a missing analysis whose
 // data the team may not fetch - a limit recorded, never a defect excused.
-export const STORYLINE_STATUSES = Object.freeze([...STATUSES, "unavailable", "narrowed", "scope-limited"]);
+export const STORYLINE_STATUSES = Object.freeze([...STATUSES, "unavailable", "narrowed", "scope-limited", "withdrawn"]);
 /** How a missing analysis could be supplied: what the team is asked to do about it. */
 export const REMEDIES = Object.freeze({
   computable: "the measures in the packet can compute it",
@@ -123,11 +124,11 @@ const OWN_CHECKS = {
   claim: ["page", "the page's claim is a finding with an implication, not a count, a fact or a two-number comparison"],
   shape: ["page", "the evidence has the shape the claim needs - the share and its movement, the ratio, the benchmark gap, the map, the judging table - not an unjudged list; where a page's line ends in `fit:`, the runtime read from its measures that another page type carries the claim directly: the page changes its type, or its claim is one only its own type makes (exact values to look up, a judgement the measures do not hold)"],
   sourcing: ["page", "the claim traces to insights in the log, each with its calculation and source files: supported, partly supported or unsupported, naming the insight ids"],
-  restatement: ["page", "the page moves the argument on from the page before it"],
+  restatement: ["page", "the page moves the argument on from the page before it (a summary, a divider and the close are exempt)"],
   consequence: ["page", "the page says what follows for the decision, not only what is true"],
   spine: ["spine", "the titles read alone tell the story: each a finding, in an order that builds to the answer"],
   answer: ["spine", "the governing answer answers every part of the user's request, is sharp enough to be wrong, and is what the pages add up to"],
-  pillars: ["spine", "the pillars are a MECE set of reasons that together prove the answer; each has its strongest counter-argument and the condition that would reverse it, answered by the storyline"],
+  pillars: ["spine", "the pillars are distinct reasons that together prove the answer, and none rests on nothing"],
   numbers: ["spine", "a figure is the same number on every page that states it - in a title, a claim or a measure shown - and totals reconcile across pages"],
   flow: ["spine", "no section previews another or ends without its point"],
   summary: ["spine", ""],
@@ -158,10 +159,11 @@ const ITEM_PROPERTIES = {
   fix: STR(20),
 };
 // A finding about the imported deck (review-passes.mjs ABOUT_IMPORTED_RULE): optional, and only a revision's critique may set it.
-const ABOUT_IMPORTED = { aboutImported: { type: "boolean" } };
-const ITEM = { type: "object", additionalProperties: false, required: Object.keys(ITEM_PROPERTIES), properties: { ...ITEM_PROPERTIES, ...ABOUT_IMPORTED } };
+// `ifUnfixed` is what a blocking item does to the decision (BLOCKING_STAKE): a major or blocker without it is recorded as minor.
+const OPTIONAL_ITEM = { aboutImported: { type: "boolean" }, ifUnfixed: { type: "string" } };
+const ITEM = { type: "object", additionalProperties: false, required: Object.keys(ITEM_PROPERTIES), properties: { ...ITEM_PROPERTIES, ...OPTIONAL_ITEM } };
 const NEW_ITEM = { type: "object", additionalProperties: false, required: [...Object.keys(ITEM_PROPERTIES), "basis", "justification", "evidence"],
-  properties: { ...ITEM_PROPERTIES, ...ABOUT_IMPORTED, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } } };
+  properties: { ...ITEM_PROPERTIES, ...OPTIONAL_ITEM, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } } };
 const PAGE_ENTRY = {
   type: "object", additionalProperties: false, required: ["page", "verdict", ...STORYLINE_PAGE_CHECKS],
   properties: {
@@ -172,16 +174,17 @@ const PAGE_ENTRY = {
       properties: { status: { type: "string", enum: SOURCING_STATUSES }, insights: { type: "array", items: { type: "string" } }, note: STR() } },
   }
 };
-const PILLAR = { type: "object", additionalProperties: false, required: ["pillar", "pages", "verdict", "overlap", "strongestCounter", "reversal", "answered"],
-  properties: { pillar: STR(), pages: { type: "array", items: { type: "string" }, minItems: 1 }, verdict: { type: "string", enum: ["holds", "weak", "fails"] },
-    overlap: STR(10), strongestCounter: STR(10), reversal: STR(10), answered: { type: "boolean" } } };
+// A pillar is judged, not argued against: a counter-argument is the critic's to raise where it would flip the answer, as an item.
+const PILLAR = { type: "object", additionalProperties: false, required: ["pillar", "pages", "verdict"],
+  properties: { pillar: STR(), pages: { type: "array", items: { type: "string" }, minItems: 1 }, verdict: { type: "string", enum: ["holds", "weak", "fails"] }, note: { type: "string" },
+    overlap: { type: "string" }, strongestCounter: { type: "string" }, reversal: { type: "string" }, answered: { type: "boolean" } } };
 // `public`: "known" when the critic can name the public source that publishes
 // the data; "speculative" otherwise, and a speculative analysis is never major.
 const MISSING = { type: "object", additionalProperties: false, required: ["id", "analysis", "why", "data", "public", "remedy", "severity"],
   properties: { id: ITEM_PROPERTIES.id, analysis: STR(10), why: STR(10), data: STR(10), public: { type: "string", enum: ["known", "speculative"] },
-    remedy: { type: "string", enum: Object.keys(REMEDIES) }, severity: ITEM_PROPERTIES.severity } };
+    remedy: { type: "string", enum: Object.keys(REMEDIES) }, severity: ITEM_PROPERTIES.severity, ifUnfixed: { type: "string" } } };
 const CUT = { type: "object", additionalProperties: false, required: ["id", "pages", "action", "freedUse", "severity"],
-  properties: { id: ITEM_PROPERTIES.id, pages: ITEM_PROPERTIES.pages, action: { type: "string", enum: ["cut", "merge"] }, freedUse: STR(10), severity: ITEM_PROPERTIES.severity } };
+  properties: { id: ITEM_PROPERTIES.id, pages: ITEM_PROPERTIES.pages, action: { type: "string", enum: ["cut", "merge"] }, freedUse: STR(10), severity: ITEM_PROPERTIES.severity, ifUnfixed: { type: "string" } } };
 const STATUS = { type: "object", additionalProperties: false, required: ["finding", "status", "evidence"],
   properties: { finding: { type: "string" }, status: { type: "string", enum: STORYLINE_STATUSES }, evidence: STR(20), severity: { type: "string", enum: SEVERITIES },
     pages: { type: "array", items: { type: "string" } }, searchLog: { type: "string" }, artifact: { type: "string" }, answers: ANSWERS_SCHEMA } };
@@ -189,14 +192,17 @@ const COMPLETENESS = { type: "array", items: { type: "object", additionalPropert
   properties: { check: { type: "string", enum: STORYLINE_DIMENSIONS }, result: { type: "string", enum: ["findings", "clean"] }, note: { type: "string" } } } };
 const ANSWER_PARTS = { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["part", "verdict", "missingEvidence"],
   properties: { part: STR(3), verdict: { type: "string", enum: ANSWER_VERDICTS }, missingEvidence: { type: "string" } } } };
-const JUDGEMENT = (verdicts) => ({ type: "object", additionalProperties: false, required: ["verdict", "note"], properties: { verdict: { type: "string", enum: verdicts }, note: STR(10) } });
+const JUDGEMENT = (verdicts) => ({ type: "object", additionalProperties: false, required: ["verdict", "note"], properties: { verdict: { type: "string", enum: verdicts }, note: { type: "string" } } });
+// The verdict and the two judgements are read off the ledger (withJudgements), never asked of the critic: an answer may
+// carry them, and the runtime's reading replaces them.
 const COMMON = { verdict: { type: "string", enum: STORYLINE_VERDICTS }, rating: { type: "number", minimum: 0, maximum: 10 }, binding: HASH, summary: STR(40), provenance: PROVENANCE_SCHEMA,
   compliance: JUDGEMENT(COMPLIANCE_VERDICTS), sufficiency: JUDGEMENT(SUFFICIENCY_VERDICTS) };
+const DERIVED = ["verdict", "compliance", "sufficiency", "completeness"];
 
 /** Pass one of the page-level critique (--full): every page of the spine, every spine-level section, and what found nothing. */
 export const STORYLINE_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "compliance", "sufficiency", "spine", "answer", "answerParts", "pillars", "pages", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "findings", "topFixes", "completeness"],
+  required: ["pass", "verifies", "rating", "binding", "summary", "spine", "answer", "answerParts", "pillars", "pages", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "findings", "topFixes"],
   properties: {
     pass: { type: "integer", enum: [1] }, verifies: { type: "null" }, ...COMMON,
     spine: STR(60), answer: STR(40), answerParts: ANSWER_PARTS,
@@ -206,7 +212,7 @@ export const STORYLINE_SCHEMA = {
     missingAnalyses: { type: "array", items: MISSING },
     cutOrMerge: { type: "array", items: CUT },
     findings: { type: "array", items: ITEM },
-    topFixes: { type: "array", items: { type: "string" }, minItems: 1 },
+    topFixes: { type: "array", items: { type: "string" } },
     completeness: COMPLETENESS,
     mergedFrom: { type: "array", items: { type: "string" } },
     // One answer for each blocking item a retired lineage left open (review-passes.mjs carriedErrors); absent where the packet carries none.
@@ -222,7 +228,7 @@ delete STORYLINE_SPINE_SCHEMA.properties.mergedFrom;
 /** Pass two and after: a status for every open item, new items only if serious and additive. */
 export const STORYLINE_VERIFICATION_SCHEMA = {
   type: "object", additionalProperties: false,
-  required: ["pass", "verifies", "verdict", "rating", "binding", "summary", "compliance", "sufficiency", "pages", "statuses", "findings", "topFixes"],
+  required: ["pass", "verifies", "rating", "binding", "summary", "pages", "statuses", "findings", "topFixes"],
   properties: {
     pass: { type: "integer", minimum: 2 }, verifies: HASH, ...COMMON,
     pages: { type: "array", items: PAGE_ENTRY },
@@ -239,13 +245,13 @@ export const STORYLINE_SPINE_VERIFICATION_SCHEMA = { ...STORYLINE_VERIFICATION_S
 delete STORYLINE_SPINE_VERIFICATION_SCHEMA.properties.pages;
 
 /** One reviewer's share of a long spine's page-level first pass: a section of pages, or the spine sections. */
-const SPINE_PART_KEYS = ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes", "compliance", "sufficiency"];
+const SPINE_PART_KEYS = ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes"];
 const partSchema = (kind) => {
   const { pass: _pass, verifies: _verifies, mergedFrom: _mergedFrom, ...properties } = STORYLINE_SCHEMA.properties;
   const checks = kind === "section" ? STORYLINE_PAGE_CHECKS : SPINE_CHECKS;
   return {
     type: "object", additionalProperties: false,
-    required: ["part", "binding", "verdict", "rating", "summary", "pages", "findings", "completeness", ...(kind === "spine" ? SPINE_PART_KEYS : [])],
+    required: ["part", "binding", "rating", "summary", "pages", "findings", ...(kind === "spine" ? SPINE_PART_KEYS : [])],
     properties: {
       part: { type: "object", additionalProperties: false, required: ["kind", "id", "pages"],
         properties: { kind: { type: "string", enum: [kind] }, id: { type: "string" }, pages: { type: "array", items: { type: "string" } } } },
@@ -260,10 +266,16 @@ const schemaFor = (mode, scope) => (scope ? (mode === "full" ? STORYLINE_VERIFIC
 // The schema a critic is handed: the one its answer is validated against, less a key the packet gives it nothing to answer with.
 // `carried` answers the items a retired lineage left open; offered on a packet that carries none, a critic of a revision filled it
 // with the slides the revision carries, and the whole answer was refused for it.
-const offeredSchema = (mode, scope, { carried = false } = {}) => { const schema = schemaFor(mode, scope);
-  if (scope || carried || !schema.properties.carried) return schema;
-  const { carried: _carried, ...properties } = schema.properties;
-  return { ...schema, properties }; };
+// Nor is a critic offered what the runtime reads off its items (DERIVED), or the fields an older pillar carried, which an
+// answer may still hold and which nothing reads.
+const LEGACY_PILLAR = ["overlap", "strongestCounter", "reversal", "answered"];
+function offered(schema, { carried = false } = {}) {
+  const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => !DERIVED.includes(key) && (carried || key !== "carried")));
+  if (properties.pillars) properties.pillars = { ...properties.pillars, items: { ...PILLAR, properties: Object.fromEntries(Object.entries(PILLAR.properties).filter(([key]) => !LEGACY_PILLAR.includes(key))) } };
+  return { ...schema, properties };
+}
+const offeredSchema = (mode, scope, { carried = false } = {}) => offered(schemaFor(mode, scope), { carried: Boolean(scope) || carried });
+const offeredPart = (kind) => offered(STORYLINE_PART_SCHEMAS[kind]);
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 
@@ -363,20 +375,11 @@ export function recordedMeasures(insights) {
 // this one function, for a page drawn at the spine and for the same page laid
 // out: there is no fourth class for an exhibit to fall into between the two.
 const FIGURE_EXHIBITS = new Set(["fact-grid", "stat-list"]);
-export const viewClassOf = (ex) => { const type = String(ex?.type ?? ""); return type.startsWith("chart") ? "chart" : type === "table" || isTable(ex) ? "table" : "figure"; };
+// A map plots a value a member - a district's shade, a marker's size - so it is read as a chart whose axis is its features and markers.
+export const viewClassOf = (ex) => { const type = String(ex?.type ?? ""); return type.startsWith("chart") || type === "map" ? "chart" : type === "table" || isTable(ex) ? "table" : "figure"; };
 const classOf = viewClassOf;
 const WHOLE = "all";
-/**
- * The class a page not yet drawn is taken to show a measure in: a figure for a
- * measure of one value, a table on a page type whose exhibit is a table,
- * otherwise a chart. It follows from the page type and the measure, both of
- * which the critique is bound to, never from the form, which is the layout's.
- * The table types are page-types.mjs's (familyOf of the type alone), listed
- * here so the critique does not load the layout engine; a test holds the two
- * together.
- */
-const TABLE_TYPES = new Set(["scorecard", "lookup", "matrix", "options"]);
-const naturalClass = (type, measure) => (measure.axis.kind === "scalar" ? "figure" : TABLE_TYPES.has(type) ? "table" : "chart");
+// The class a page not yet drawn is taken to show a measure in is the witness's (spine-witness.mjs naturalClass): one reading, so the two cannot drift.
 
 const stringsIn = (node, out = []) => {
   if (typeof node === "string") out.push(node);
@@ -393,10 +396,14 @@ const firstNumber = (text) => printedNumbers(String(text ?? "")).slice(0, 1);
 // A typed value read as a printed number: its own digits and its own sign.
 const typedNumber = (value) => ({ n: Math.abs(value), decimals: (String(value).split(".")[1] || "").length, sign: value < 0 ? -1 : 1, scale: null, scaled: false, percent: false });
 
-// A chart's category axis, or null where it has none to read (a scatter's
-// points, a map's markers).
+// A chart's category axis - a map's shaded features and its markers among them -
+// or null where it has none to read (a scatter's points).
 function categoryAxis(ex) {
   if (classOf(ex) !== "chart") return null;
+  if (ex.type === "map") {
+    const members = [...(ex.choropleth?.values ?? []).map((value) => value?.featureId), ...(ex.markers ?? []).map((marker) => marker?.label)].filter((name) => name !== undefined && name !== null);
+    return members.length ? new Set(members.map(String)) : null;
+  }
   const group = ex.type === "chart-group" && Array.isArray(ex.charts) ? ex.charts.flatMap((c) => c?.props?.categories || []) : null;
   const axis = ex.categories ?? ex.labels ?? group;
   return Array.isArray(axis) ? new Set(axis.map(String)) : null;
@@ -494,7 +501,7 @@ function declaredView(basis, ref, measure, fallback) {
 function shownOf(slide, measures) {
   const declared = slide?.pageType?.dependencies ?? {};
   const recorded = (basis) => (measures ? refsOf(basis).filter((ref) => measures[ref] !== undefined) : []);
-  const views = new Map(), drawn = [], undrawn = new Set(), read = new Set();
+  const views = new Map(), drawn = [], undrawn = new Set(), read = new Set(), named = new Set();
   const add = (ref, view, declaredOnly = false) => { views.set(ref, [...(views.get(ref) ?? []), view]); (declaredOnly ? undrawn : read).add(ref); };
   const type = slide?.pageType?.type;
   // A spine not laid out yet keeps an exhibit's place with its type alone, or with nothing (author-deck.mjs --draft): declared, not drawn.
@@ -502,6 +509,7 @@ function shownOf(slide, measures) {
   const exhibits = [...exhibitsOf(slide).map((ex, at) => [ex, declared.exhibits?.[at]]),
     ...(Array.isArray(slide?.blocks) ? slide.blocks : []).map((block, at) => [block?.exhibit, declared.blocks?.[at]])];
   for (const [ex, basis] of exhibits) {
+    for (const ref of recorded(basis)) named.add(ref);
     if (!drawnYet(ex)) {
       // Declared and not drawn: the view the basis states is the one the critic reads, and the one the drawn exhibit is held to.
       if (declaresView(basis)) for (const ref of recorded(basis)) add(ref, declaredView(basis, ref, measures[ref], naturalClass(type, measures[ref])), true);
@@ -525,6 +533,7 @@ function shownOf(slide, measures) {
   const figures = metricsOf(slide ?? {});
   const items = exhibits.filter(([ex]) => drawnYet(ex) && FIGURE_EXHIBITS.has(ex.type)).flatMap(([ex]) => (Array.isArray(ex.items) ? ex.items : [])).map((item) => item?.value);
   (declared.metrics || []).forEach((basis, at) => {
+    for (const ref of recorded(basis)) named.add(ref);
     const printed = (figures[at] ? [figures[at].value] : items).filter((value) => value !== undefined && value !== null);
     // Declared and not drawn yet: the view the basis states, or nothing to read.
     if (!printed.length) { if (declaresView(basis)) for (const ref of recorded(basis)) add(ref, declaredView(basis, ref, measures[ref], "figure"), true); return; }
@@ -532,7 +541,8 @@ function shownOf(slide, measures) {
     for (const ref of recorded(basis)) add(ref, viewOf("figure", measures[ref].axis.kind === "scalar" ? null : statedLabels(printed.flatMap(firstNumber), measures[ref]), measures[ref], printed.map(String)));
   });
   // `declared`: the measures whose every view on the page is a declared one - nothing drawn shows them yet.
-  return { views, drawn, declared: new Set([...undrawn].filter((ref) => !read.has(ref))) };
+  // `named`: every measure an exhibit or a figure on the page names, drawn or not.
+  return { views, drawn, declared: new Set([...undrawn].filter((ref) => !read.has(ref))), named };
 }
 
 /**
@@ -628,9 +638,16 @@ export function storylineBinding(spec, measures = null) {
   return sha256(JSON.stringify({ request: requestHash(spec), answer: spec.answer ?? null, ...(offered.status === "provisional" ? { answerStatus: offered } : {}), pages: storyStructure(spec, measures) }));
 }
 
-/** One hash per page of the argument: what a verification pass compares to say which pages moved. */
+/**
+ * One hash per page of the argument: what a verification pass compares to say
+ * which pages moved. A page's place is part of it - the page before it and
+ * whether it stands in the appendix - so a fix that reorders the storyline or
+ * moves a page to the appendix is a page that moved, while a page inserted
+ * moves only the page after it.
+ */
 export function storylinePageHashes(spec, measures = null) {
-  return Object.fromEntries(storyStructure(spec, measures).map((p) => [p.id, sha256(JSON.stringify(p))]));
+  const pages = storyStructure(spec, measures), appendix = new Set((spec.appendix || []).map((s) => String(s.id)));
+  return Object.fromEntries(pages.map((p, at) => [p.id, sha256(JSON.stringify({ ...p, after: pages[at - 1]?.id ?? null, appendix: appendix.has(String(p.id)) }))]));
 }
 
 const isContent = (p) => !p.kind || p.kind === "content";
@@ -638,7 +655,8 @@ const isContent = (p) => !p.kind || p.kind === "content";
 // The numbers a drafted exhibit draws, in a line: each series from its first
 // to its last value, or the first values. Shown in the page-level packet
 // only, with the drafted exhibit and said to be a draft.
-const fmt = (n) => (Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString("en-US");
+// Three significant figures below a hundred, so a small ratio keeps the precision a claim about it needs (0.35, not 0.3).
+const fmt = (n) => (Math.abs(n) >= 100 ? Math.round(n) : Number(n.toPrecision(3))).toLocaleString("en-US", { maximumFractionDigits: 6 });
 function draftedNumbers(exhibits) {
   const out = [];
   for (const ex of exhibits) {
@@ -657,16 +675,21 @@ function draftedNumbers(exhibits) {
 }
 
 // A measure as the critic reads it: what it runs over and its recorded values,
-// which are the numbers every page that shows it turns on. A series longer
-// than `max` periods is given by its ends and its length.
-function measureLine(ref, label, registry, max) {
+// which are the numbers every page that shows it turns on. Past `max` values
+// it is given by its ends and every value the page's title or claim cites - a
+// member it names, a number it prints - so a claim the line backs is never
+// one the critic cannot check.
+function measureLine(ref, label, registry, max, cited = "") {
   const m = registry.get(ref);
   if (!m) return `${label}: NOT IN THE LOG`;
   const axis = axisOf(m), values = valuesOf(m), unit = m.unit ? ` ${m.unit}` : "";
   const show = (v) => (typeof v === "number" && Number.isFinite(v) ? fmt(v) : "n/a");
   if (axis.kind === "scalar") return `${label}: ${show(values[0])}${unit}`;
-  if (axis.kind === "periods" && values.length > max) return `${label}: ${axis.labels[0]} ${show(values[0])} to ${axis.labels.at(-1)} ${show(values.at(-1))}${unit}, ${values.length} periods`;
-  return `${label}: ${axis.labels.slice(0, max).map((name, i) => `${name} ${show(values[i])}`).join(", ")}${axis.labels.length > max ? `, ... (${axis.labels.length} ${axis.kind})` : ""}${unit}`;
+  const at = (i) => `${axis.labels[i]} ${show(values[i])}`;
+  if (values.length <= max) return `${label}: ${axis.labels.map((_, i) => at(i)).join(", ")}${unit}`;
+  const said = String(cited), printed = new Set(printedNumbers(said).map((n) => n.n));
+  const named = axis.labels.map((name, i) => i).filter((i) => i === 0 || i === values.length - 1 || said.includes(String(axis.labels[i])) || printed.has(values[i]) || printed.has(Number(show(values[i]))));
+  return `${label}: ${named.map((i, k) => `${k && i > named[k - 1] + 1 ? "... " : ""}${at(i)}`).join(", ")}${unit} (${values.length} ${axis.kind}; the rest not cited on this page)`;
 }
 
 // What a page shows of a measure, as the critic reads it and the critique is
@@ -684,9 +707,10 @@ export function viewWords([kind, labels], measure) {
   return `${CLASS_WORDS[kind] ?? `shown in a ${kind}`}${measure.axis.kind === "scalar" ? "" : labels === WHOLE ? ", whole" : labels.length ? `, ${window(labels)}` : `, none of its ${measure.axis.kind} named`}`;
 }
 const naturalWords = (type, measure) => `${CLASS_WORDS[naturalClass(type, measure)]}${measure.axis.kind === "scalar" ? "" : `, every one of its ${measure.axis.labels.length} ${measure.axis.kind}`}`;
-function viewsLine(views, measure, type) {
+// A page that already draws exhibits and none of them this measure does not show it, whatever a page not drawn yet is read as.
+function viewsLine(views, measure, type, drawsOthers = false) {
   if (!measure) return "";
-  if (!views) return ` [not drawn yet: critiqued as ${naturalWords(type, measure)}]`;
+  if (!views) return drawsOthers ? " [on none of the page's exhibits: the page draws other measures]" : ` [not drawn yet: critiqued as ${naturalWords(type, measure)}]`;
   return ` [the page shows it ${[...new Set(views.map((view) => viewWords(view, measure)))].join("; and ")}]`;
 }
 
@@ -791,7 +815,8 @@ async function storyPages(spec, specPath, { max }) {
     return { n: i + 1, id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", section, title: s.title ?? s.text ?? "", claim: planned.claim ?? s.pageType?.content?.claim ?? null,
       settles: planned.settles ?? s.pageType?.content?.settles ?? null,
       // Each measure with its recorded values and what the page shows of it: the windows and classes the critique is bound to.
-      measures: (({ views }) => measureRoles(s).map(({ ref, role }) => ({ ref, role, line: `${measureLine(ref, `${ref}${role === "context" ? " (context)" : role === "claim" && declaredBases(s).length ? " (the claim's; nothing declared as its proof)" : ""}`, registry, max)}${viewsLine(views.get(ref) ?? null, measures?.[ref], s.pageType?.type)}` })))(shownOf(s, measures)),
+      // A measure an exhibit not drawn yet names is read as that exhibit will draw it, not as missing from a page that shows others.
+      measures: (({ views, named }) => measureRoles(s).map(({ ref, role }) => ({ ref, role, line: `${measureLine(ref, `${ref}${role === "context" ? " (context)" : role === "claim" && declaredBases(s).length ? " (the claim's)" : ""}`, registry, max, `${s.title ?? ""} ${planned.claim ?? s.pageType?.content?.claim ?? ""}`)}${viewsLine(views.get(ref) ?? null, measures?.[ref], s.pageType?.type, views.size > 0 && !named.has(ref))}` })))(shownOf(s, measures)),
       drafted: exhibits.map(describeExhibit), draftedNumbers: draftedNumbers(exhibits), commentary: body.slice(0, 6), source: s.source ?? null,
       // The context measures and the relation the claim asserts, for the critic to judge: declared by the author, never inferred.
       declared: dependencyNotes({ bases: declaredBases(s), settles: s.pageType?.content?.settles }),
@@ -820,11 +845,10 @@ async function storyPages(spec, specPath, { max }) {
 export const STORYLINE_SECTION_THRESHOLD = 30;
 export const STORYLINE_SECTION_MAX = 16;
 
-// How many values of a measure a page's line lists before it is given by its ends.
-const SPINE_MEASURE_VALUES = 4;
+// How many values of a measure a page's line lists before it is given by its ends and what the page cites.
+const MEASURE_VALUES = 12;
 // And how many measures a page's line in the spine packet gives in full; the rest are named.
 const SPINE_MEASURES = 4;
-const FULL_MEASURE_VALUES = 12;
 
 const HISTORY = "storyline-history";
 // What a ready critique leaves the author to do, said where it is reached: the one layout pass.
@@ -833,7 +857,7 @@ const READY_NOTE = "The argument is settled: lay the pages out now, once - exhib
 // under another version hashed its pages differently, so nothing can say which
 // of them changed since: its lineage is retired and the critique begins again
 // (prepareStoryline), not read as a deck in which every page moved.
-const BINDING_VERSION = 4;
+const BINDING_VERSION = 5;
 const bindingVersionOf = (record) => record?.bindingVersion ?? 1;
 const PACKET_RECORD = "storyline-packet.json";
 
@@ -859,7 +883,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const base = path.dirname(specPath);
   const store = await lineageStore(spec, outputDirectory, specPath);
   // The spine packet gives a measure in a few values; the page-level packet gives the series.
-  const { pages, content, log, analysis, measures, reconcile } = await storyPages(spec, specPath, { max: mode === "full" ? FULL_MEASURE_VALUES : SPINE_MEASURE_VALUES });
+  const { pages, content, log, analysis, measures, reconcile } = await storyPages(spec, specPath, { max: MEASURE_VALUES });
   // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
   const sources = await sourceFiles(base);
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
@@ -900,8 +924,8 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   if (sections) {
     await fs.mkdir(path.join(dir, "sections"), { recursive: true });
     await fs.mkdir(path.join(dir, "parts"), { recursive: true });
-    await writeJson(path.join(dir, "part-schema.json"), STORYLINE_PART_SCHEMAS.section);
-    await writeJson(path.join(dir, "spine-part-schema.json"), STORYLINE_PART_SCHEMAS.spine);
+    await writeJson(path.join(dir, "part-schema.json"), offeredPart("section"));
+    await writeJson(path.join(dir, "spine-part-schema.json"), offeredPart("spine"));
     for (const [id, text] of parts) await fs.writeFile(path.join(dir, "sections", `${id}.md`), signed(text));
   }
   await fs.mkdir(store, { recursive: true });
@@ -1005,7 +1029,7 @@ const analysesLines = (packet) => `COMPUTED ANALYSES (run by the runtime over th
 ${(packet.analyses || []).map((a) => `- ${a.line}`).join("\n") || "- none"}${(packet.analysisProblems || []).length ? `\nANALYSIS PLAN PROBLEMS: ${packet.analysisProblems.join("; ")}` : ""}`;
 
 function checksPrompt() {
-  return `THE CHECKS. Page checks on every content page; spine checks on the storyline as a whole. After each check's own question come the deck review's words for it: apply them now, to what the packet shows of each page. A defect of argument first found on the drawn page reopens this critique.
+  return `THE CHECKS. Page checks on every content page; spine checks on the storyline as a whole. After each check's own question come the deck review's words for it: apply them now, to what the packet shows of each page.
 ${STORYLINE_DIMENSIONS.map((d) => `- ${d} (${STORYLINE_CHECKS[d].scope}): ${STORYLINE_CHECKS[d].checks}`).join("\n")}
 
 SEVERITY, on the deck review's scale:
@@ -1049,13 +1073,30 @@ export function settleCritiqueForm(reviewIn, ids, contentIds = ids) {
     });
   };
   settle("findings", (item) => (item.scope === "spine" ? `${item.problem ?? ""} ${item.fix ?? ""}` : null));
-  settle("cutOrMerge", (item) => String(item.freedUse ?? ""));
+  // A cut names the pages it cuts; the page its freed space goes to is not cut with it. A merge names every page it joins.
+  settle("cutOrMerge", (item) => (item.action === "merge" ? String(item.freedUse ?? "") : null));
   settle("pillars", null);
   settle("statuses", null);
+  // A cut or merge left without a severity is what the scale makes one: minor.
+  (Array.isArray(review.cutOrMerge) ? review.cutOrMerge : []).forEach((item, i) => {
+    if (!item || typeof item !== "object" || item.severity !== undefined) return;
+    item.severity = "minor";
+    mended.push({ at: `cutOrMerge[${i}]${item.id ? ` (${item.id})` : ""}`, did: "minor", was: "no severity", pages: item.pages || [] });
+  });
+  // A blocking item says what it does to the decision (BLOCKING_STAKE); one that does not is a minor item, recorded as one.
+  for (const name of ["findings", "missingAnalyses", "cutOrMerge"]) (Array.isArray(review[name]) ? review[name] : []).forEach((item, i) => {
+    if (!item || typeof item !== "object" || !BLOCKING.has(item.severity) || String(item.ifUnfixed ?? "").trim().length >= STAKE_MIN) return;
+    mended.push({ at: `${name}[${i}]${item.id ? ` (${item.id})` : ""}`, did: "minor", was: item.severity, pages: item.pages || [] });
+    item.severity = "minor";
+  });
   return { review, mended };
 }
+// The least a blocking item's `ifUnfixed` says: a sentence naming what the decision-maker would get wrong.
+const STAKE_MIN = 30;
 /** `mended` (settleCritiqueForm) as the lines a run prints. */
-const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}` : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
+const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}`
+  : entry.did === "minor" ? `${entry.at}: ${entry.was === "no severity" ? "filed with no severity, so recorded as minor" : `filed ${entry.was} without \`ifUnfixed\` - what the decision-maker would get wrong - so recorded as minor`}`
+  : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
 
 /**
  * The rules validation enforces on the form of a critique, each as the prompt
@@ -1066,28 +1107,26 @@ const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `
  * a spine critique returns, and `completeness` false for a verification pass,
  * which carries none.
  */
-export const storylineFormRules = ({ checks = STORYLINE_DIMENSIONS, cap = null, completeness = true } = {}) => [
+export const storylineFormRules = ({ cap = null } = {}) => [
   ...(cap ? [{ id: "cap", matches: /returns at most \d+ items/, rule: `at most ${cap} items in all: findings, missing analyses and cuts` }] : []),
   { id: "pages", matches: /a page finding names one page|list the affected pages/, rule: "a finding with `scope: \"page\"` has exactly one id in `pages`; a spine finding has one or more" },
   { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} just before a page id, none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
   { id: "title", matches: /the title it proposes|asks for a title of/, rule: "a `fix` that proposes a title in quotes, or a length for one, keeps to the limits above" },
-  ...(completeness ? [
-    { id: "completeness-entries", matches: /completeness: (?:unknown check|say what was checked for every|\S+ listed twice)|completeness\[\d+\]\.check/, rule: `\`completeness\` holds exactly one entry for each of ${checks.join(", ")}, and no other` },
-    { id: "completeness-result", matches: /marked clean but|marked findings but/, rule: "its `result` is \"findings\" exactly when this answer files an item under that check - a finding whose `check` it is; under missing, a missing analysis; under cuts, a cut or merge - and \"clean\" otherwise" },
-    { id: "completeness-note", matches: /say what was (?:found|checked)/, rule: `its \`note\` runs to ${COMPLETENESS_NOTE.clean} characters or more for clean (what you checked), ${COMPLETENESS_NOTE.findings} or more for findings` },
-  ] : []),
 ];
-const itemRules = (options) => `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A spine finding lists EVERY page it concerns (for the answer: the summary and closing pages). ${PAGE_IDS_RULE}
+const itemRules = (options) => `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A spine finding lists EVERY page it concerns (for the answer: the summary and closing pages). ${PAGE_IDS_RULE} ${BLOCKING_STAKE}.
 FORM. Validation refuses the whole answer on any of these:
 ${storylineFormRules(options).map((item) => `- ${item.rule}`).join("\n")}`;
 
-const PAGE_RULES = `PAGE VERDICTS. \`pages\` holds one entry for every content page: its verdict (ok, minor, major, blocker - the worst open item naming the page), a note for claim, shape, restatement and consequence, and \`sourcing\` { status: supported | partly | unsupported | n/a, insights: the ids it rests on, note }. An unsupported page carries a major or blocker sourcing finding; a partly supported one a sourcing finding at any severity.`;
+const PAGE_RULES = `PAGES. \`pages\` holds one entry for every content page: a note for claim, shape, restatement and consequence, and \`sourcing\` { status: supported | partly | unsupported | n/a, insights: the ids it rests on, note }. An unsupported page carries a major or blocker sourcing finding; a partly supported one a sourcing finding at any severity. Each page's verdict is read off the items that name it.`;
 
-// The two judgements a critique returns beside its verdict, and the scale its rating is on.
-const JUDGEMENT_RULES = `TWO JUDGEMENTS, KEPT APART. \`compliance\`: has the team done everything the evidence in scope allows? "complete" only when no major or blocker item it could still act on is open. \`sufficiency\`: does the evidence support the answer as stated? "sufficient" only when no major or blocker item is open at all; "provisional" when the only ones open need evidence the team may not fetch and the answer is offered as provisional; else "insufficient". A severity is never lowered because the scope forbids the remedy.
-RATING SCALE, the deck review's: ${ratingScale()}.`;
+// How a critic should weigh what it finds: the prior a fair reader brings, said to every critic before the checks.
+const CALIBRATION = `CALIBRATION. Most storylines a competent team brings you are ready to lay out with a few minor items; an answer with no items at all is valid. A blocking item (major or blocker) is the exception: file one only where you can say in \`ifUnfixed\` what the decision-maker would wrongly conclude or decide if it stays - "the committee would back the programme on an absorption rate the deck never shows". Everything else is minor, however many pages it touches; minor items reach the team just the same, so never raise a severity to get one acted on. Judge the storyline you are given against the request, not against the deck you would have written.`;
 
-const ANSWER_RULES = `THE ANSWER, PART BY PART. In \`answerParts\` list each part of the user's request (each question it asks, each choice it wants made) with how the governing answer meets it: "answered", "cannot rank" (with \`missingEvidence\` naming the decisive evidence that is missing, and why it decides the part) or "declined" (anything else that does not answer it). "cannot rank" is allowed once; a second, or any part declined, fails the answer check: the verdict is revise and a major or blocker \`answer\` finding says what the answer must commit to. \`missingEvidence\` is "" for an answered part.`;
+// What the critic does not write: the verdict and the two judgements are the ledger's (withJudgements), and the rating is its own.
+const JUDGEMENT_RULES = `THE VERDICT IS READ OFF YOUR ITEMS: ready when no major or blocker is open and the answer check passes; provisional when the only ones open need evidence the scope forbids and the answer is offered as provisional; else revise. You do not write the verdict, compliance or sufficiency. Rate the storyline as you judge it: the rating is a second, independent reading, not a sum of your items.
+RATING SCALE, the deck review's: ${ratingScale({ capped: false })}.`;
+
+const ANSWER_RULES = `THE ANSWER, PART BY PART. In \`answerParts\` list each part of the user's request (each question it asks, each choice it wants made) with how the governing answer meets it: "answered", "cannot rank" (with \`missingEvidence\` naming the decisive evidence that is missing, and why it decides the part) or "declined" (anything else that does not answer it). "cannot rank" is allowed once; a second, or any part declined, fails the answer check: the verdict is revise, and a major or blocker \`answer\` finding says what the answer must commit to. \`missingEvidence\` is "" for an answered part.`;
 
 // A revision's first critique reads what the revision changed; the rest is the
 // user's deck as it stands, there for context.
@@ -1122,11 +1161,13 @@ function requestLines(packet) {
   return `${request}${said.scope ? `\n${said.scope}` : ""}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${said.offered ? `\n${said.offered}` : ""}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
 }
 
+// A deck with no dividers has no drawn pillars: it is not one pillar called "Opening", and the critic is told so.
 const sectionsLine = (packet) => {
+  if (!packet.pages.some((p) => p.kind === "section")) return "- none: the deck runs without section dividers, so read the pillars as the reasons the answer gives, not as sections";
   const groups = [];
   for (const p of packet.pages) {
     if (p.kind === "section") groups.push({ title: p.title, ids: [] });
-    else if (isContent(p)) { if (!groups.length) groups.push({ title: "Opening", ids: [] }); groups.at(-1).ids.push(p.id); }
+    else if (isContent(p)) { if (!groups.length) groups.push({ title: "(before the first section)", ids: [] }); groups.at(-1).ids.push(p.id); }
   }
   return groups.map((g) => `- ${g.title}: ${g.ids.length ? `${g.ids[0]}-${g.ids.at(-1)} (${g.ids.length} pages)` : "no pages"}`).join("\n");
 };
@@ -1135,9 +1176,9 @@ const SPINE_HEADING = "THE SPINE (title | claim where it differs | page type, se
 
 /** The spine critique: the request, the answer, the sections and a line per page - small, and at most ten items back. */
 export function spinePrompt(packet) {
-  return `You are a senior partner reviewing a team's storyline before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and shows. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
+  return `You are the senior partner who signs a team's storyline off before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and shows. You did not write it. Be exacting and fair: your job is to say whether it is ready to lay out and, where it is not, what would make it so. Judge from this packet alone: do not search the web or open other files.
 
-This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return the items that most change whether the deck answers the request, ${SPINE_ITEM_MAX} at most (FORM below). Later passes only verify them, and may add only a serious new problem on a part the team changed.
+This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return the items that matter, ${SPINE_ITEM_MAX} at most (FORM below); fewer is normal. Later passes verify them, and may add only a serious new problem on a part the team changed.
 ${revisionLines(packet)}${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
@@ -1156,15 +1197,16 @@ ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
+${CALIBRATION}
+
 Work through it in this order.
 1. The spine alone: does it tell the story? Write \`spine\`.
-2. The answer, on its check above: an answer, or a restatement or refusal of the request? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
-3. The pillars, on their check above. For each in \`pillars\`: its pages, your verdict, overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
+2. The answer, on its check above: an answer, or a restatement or refusal of the request? In \`answer\`, write it as it should read - the team's own words where they already answer - and judge it part by part in \`answerParts\`.
+3. The pillars, on their check above. For each in \`pillars\`: its pages, your verdict and a note on what holds it up or what it lacks.
 4. The pages, from their lines, on every page check - and a title (a section's too) that claims more than the periods or members its pages show, a comparison with one member - each as a finding on its pages.
 5. \`numbers\`: set every figure in a title or claim beside the measures recorded on its page and on each other page stating that quantity. \`sectionFlow\` and \`execSummary\`, a sentence or two each.
 6. Missing analyses, each with \`public\` known or speculative; cut or merge.
-7. Completeness: one entry per check in \`completeness\`, as FORM below says.
-8. Verdict: "ready" only if no major or blocker item is open and the answer check passes. Rate the storyline on the scale below; rank the top fixes.
+7. Rate the storyline on the scale below and rank the top fixes (none, where nothing needs fixing).
 
 ${JUDGEMENT_RULES}
 
@@ -1179,9 +1221,9 @@ export function storylinePrompt(packet) {
   const split = packet.sections?.length ? `
 THIS STORYLINE IS LONG (${packet.contentPages} content pages), so critique it in parallel where the harness can spawn subagents: give each prompt in the packet's sections/ folder (${packet.sections.map((s) => `${s.id}.md: ${s.pages.length} pages`).join("; ")}; spine.md for the spine checks) to its own fresh critic at the same time, save each JSON answer as parts/<id>.json beside it, then run \`node runtime/storyline.mjs merge <deck> <out>\`. Without subagents, work through this prompt alone.
 ` : "";
-  return `You are a senior partner reviewing a team's storyline before a single slide is drawn - the problem-solving session where a weak story gets taken apart. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
+  return `You are the senior partner who signs a team's storyline off before a single slide is drawn - the problem-solving session where a story is tested before it is built. You did not write it. Be exacting and fair: your job is to say whether it is ready to lay out and, where it is not, what would make it so. Judge from this packet alone: do not search the web or open other files.
 
-This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}, and it is exhaustive: every ${packet.revision ? "changed" : "content"} page gets a verdict on every page check, and every spine check gets an answer. Later passes only verify your items and may add only a serious new problem on a page the team changed, so what you leave out now is not raised again.
+This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}: every ${packet.revision ? "changed" : "content"} page gets a note on every page check, and every spine check is considered. Later passes verify your items and may add only a serious new problem on a page the team changed.
 ${split}${revisionLines(packet)}${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify(packet.players)}
@@ -1199,18 +1241,19 @@ ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
+${CALIBRATION}
+
 Work through it in this order.
 
 1. The spine alone. Read the titles without the pages: does it tell the story? Write \`spine\`.
-2. The answer. Is it an answer to the request, or a restatement or refusal of it? Sharp enough to be wrong? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
-3. The pillars. Do they form a MECE set of reasons that together prove the answer? For each pillar in \`pillars\`: its pages, your verdict (holds, weak, fails), the overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
+2. The answer. Is it an answer to the request, or a restatement or refusal of it? Sharp enough to be wrong? In \`answer\`, write it as it should read - the team's own words where they already answer - and judge it part by part in \`answerParts\`.
+3. The pillars. Are they distinct reasons that together prove the answer? For each pillar in \`pillars\`: its pages, your verdict (holds, weak, fails) and a note on what holds it up or what it lacks.
 4. Every page, in order. The bar is a deck that feels important: every page carries evidence a reader could not have assembled in five minutes. Check the claim, the evidence shape (a measure of two values where the series exists, two or three members where the whole set exists, statements where a measure is needed), its sourcing against the insight log (the insight ids, their calculations, their sources), whether it restates the page before, and whether it states a consequence. Where pages carry a "page type:" line, judge whether the page type is the claim's reading task. Say what evidence each weak page should rest on and show instead.
 5. Numbers across pages: the same figure with the same unit, base and period everywhere, totals that reconcile (\`numbers\`).
 6. Section flow (\`sectionFlow\`) and the executive summary against the body and the close (\`execSummary\`).
 7. Missing analyses: what a strong team would have run, why it matters to the answer, the public data behind it, and whether that data is \`public\` known or speculative.
 8. Cut or merge: pages that repeat, preview or exist to reach a count, and what the freed pages should carry. Cut body pages where the argument is better without them; a surplus or weak page that still earns a lookup moves to the appendix, which counts toward the requested length.
-9. Completeness: one entry per check in \`completeness\`, as FORM below says.
-10. Verdict. "ready" only if no major or blocker item is open and the answer check passes: the answer is sharp, the pillars hold, the decisive pages are analytical and sourced, and no missing analysis would change the answer. Otherwise "revise". Rate the storyline on the scale below. Rank the top fixes.
+9. Rate the storyline on the scale below and rank the top fixes (none, where nothing needs fixing).
 
 ${PAGE_RULES}
 
@@ -1220,12 +1263,12 @@ ${ANSWER_RULES}
 
 ${itemRules()}
 
-Set pass to 1 and verifies to null. Bind the review to ${packet.binding}. Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_SCHEMA)}`;
+Set pass to 1 and verifies to null. Bind the review to ${packet.binding}. Return ONLY JSON matching this schema: ${JSON.stringify(offeredSchema("full", null, { carried: (packet.carried || []).length > 0 }))}`;
 }
 
 export function storylineSectionPrompt(packet, section) {
   const pages = packet.pages.filter((p) => section.pages.includes(p.id));
-  return `You are one of several senior critics reading a long storyline in parallel, before anything is drawn. Yours is section ${section.id}, "${section.title}": pages ${section.pages.join(", ")}. A spine critic takes the answer, pillars, numbers across pages, section flow, summary, missing analyses and cuts. Be adversarial and specific; judge from this packet alone.
+  return `You are one of several senior critics reading a long storyline in parallel, before anything is drawn. Yours is section ${section.id}, "${section.title}": pages ${section.pages.join(", ")}. A spine critic takes the answer, pillars, numbers across pages, section flow, summary, missing analyses and cuts. Be exacting and fair; judge from this packet alone.
 
 ${requestLines(packet)}
 THE WHOLE TITLE SPINE, for context:
@@ -1238,20 +1281,22 @@ ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
-Check every page check on every one of your pages; this is the exhaustive first pass.
+${CALIBRATION}
+
+Check every page check on every one of your pages.
 
 ${PAGE_RULES}
 
-${itemRules({ checks: STORYLINE_PAGE_CHECKS })}
-Name only pages in your section; leave the spine sections as short notes ("see the spine critic").
+${itemRules()}
+Name only pages in your section; leave the spine sections as short notes ("see the spine critic"). Rate your section on the scale: ${ratingScale({ capped: false })}.
 
-\`completeness\` covers the page checks (${STORYLINE_PAGE_CHECKS.join(", ")}). Set part to ${JSON.stringify({ kind: "section", id: section.id, pages: section.pages })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMAS.section)}`;
+Set part to ${JSON.stringify({ kind: "section", id: section.id, pages: section.pages })}. Bind to ${packet.binding}.
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("section"))}`;
 }
 
 /** The spine critic of a long page-level critique: the compact spine, not the whole page listing again. */
 export function storylineSpinePrompt(packet) {
-  return `You are the spine critic of a long storyline read in parallel, before anything is drawn: section critics give every page its verdict. Be adversarial and specific; judge from this packet alone: do not search the web or open other files.
+  return `You are the spine critic of a long storyline read in parallel, before anything is drawn: section critics read every page. Be exacting and fair; judge from this packet alone: do not search the web or open other files.
 ${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
@@ -1269,16 +1314,18 @@ ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
-You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\`, \`compliance\`, \`sufficiency\` - and file spine findings listing every page they concern. Leave \`pages\` empty. \`completeness\` covers ${SPINE_CHECKS.join(", ")}. Your verdict, rating and summary become the critique's.
+${CALIBRATION}
+
+You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\` - and file spine findings listing every page they concern (${SPINE_CHECKS.join(", ")}). Leave \`pages\` empty. Your rating and summary become the critique's.
 
 ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${itemRules({ checks: SPINE_CHECKS })}
+${itemRules()}
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", pages: packet.pages.filter(isContent).map((p) => p.id) })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMAS.spine)}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spine"))}`;
 }
 
 export function storylineVerificationPrompt(packet) {
@@ -1293,7 +1340,7 @@ export function storylineVerificationPrompt(packet) {
     ? `You are verifying changes made to a storyline after its pages were laid out. An earlier critique passed this storyline as ready; the runtime's own compile then refused, on that storyline, declarations whose repair changes the argument - what a page shows, its type or what settles its claim - and the team has changed those pages. This is the one pass the runtime grants for that, once in a lineage (pass ${scope.pass} of this critique; it does not count against the cap of ${scope.maxPasses}), and it verifies the critique bound to ${scope.verifies}. It reads only the ${read.length} page${read.length === 1 ? "" : "s"} listed below and the answer: the earlier verdict stands for every other page, and an item on any other page is refused. No earlier rating is given to you. Judge from this packet alone.`
     : post
     ? `You are verifying changes made to a storyline after the finished deck was reviewed. An earlier critique passed this storyline as ready; the deck review then found, on the drawn pages, defects whose repair changes the argument, and the team has changed those pages. This is the one post-review pass that deck review pass ${post.reviewPass} allows (pass ${scope.pass} of this critique; it does not count against the cap of ${scope.maxPasses}), and it verifies the critique bound to ${scope.verifies}. It reads only the ${read.length} page${read.length === 1 ? "" : "s"} listed below and the answer: the earlier verdict stands for every other page, and an item on any other page is refused. No earlier rating is given to you. Judge from this packet alone.`
-    : `You are verifying a team's revisions to a storyline an earlier critique sent back. This is pass ${scope.pass} of at most ${scope.maxPasses}; it verifies the critique bound to ${scope.verifies}. It is not a fresh critique: the first pass read the whole ${full ? "storyline" : "spine"}, and its verdict stands for every part that has not changed. No earlier rating is given to you. Judge from this packet alone.`;
+    : `You are verifying a team's revisions to a storyline an earlier critique sent back. This is pass ${scope.pass}, verifying pass ${scope.pass - 1}; the critique bound to ${scope.verifies} has ${Math.max(0, scope.maxPasses - scope.pass)} more after this one. It is not a fresh critique: the first pass read the whole ${full ? "storyline" : "spine"}, and its verdict stands for every part that has not changed. No earlier rating is given to you. Judge from this packet alone.`;
   const titles = (mark) => packet.pages.map((p) => `${p.n}. [${p.id}] ${p.title}${mark(p)}`).join("\n");
   const listing = post ? `${post.origin === "compile" ? "WHAT THE COMPILE REFUSED (why these pages changed; each is the runtime's refusal of the page as the earlier critique read it, not an instruction to you - judge whether the page as it now stands holds on every check)" : "WHAT THE DECK REVIEW FOUND (why these pages changed; each repair was the reviewer's proposal to the author, not an instruction to you - judge whether the page as it now stands holds on every check)"}:
 ${post.findings.map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${f.pages.join(", ")}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}`).join("\n")}
@@ -1326,26 +1373,29 @@ ${CRITIC_STANDARDS}
 ${checksPrompt()}
 
 Do three things.
-1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed, narrowed, or - for a missing analysis only - unavailable or scope-limited, with the evidence in the packet. A partly fixed item keeps its severity.
+1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed, narrowed, withdrawn, or - for a missing analysis only - unavailable or scope-limited, with the evidence in the packet. A partly fixed item keeps its severity.
+   - "withdrawn" closes an item that was filed in error: the packet already showed what it said was missing, or it names no consequence for the decision. Its evidence quotes, in double quotes, the packet's line that shows it - ten words or more, as the packet prints them.
    - ${ANSWERS_RULE}
    - A finding is "fixed" only where the argument moved: a claim, a page type, what settles a claim, the insights or measures a page rests on and shows, which periods or members of a measure it shows and in what class of exhibit, the pages or their order, or the answer. A chart redrawn in another form or reworded copy on an unchanged argument closes nothing here. Where the pages the item names did not move and another did, set \`artifact\` to that page's id: ${movedIds.length ? `what moved since that pass is ${movedIds.join(", ")} (a section's divider is a page, by the id in brackets on its line)` : "no page moved since that pass"}.
    - A missing analysis is "fixed" only on its artifact: set \`artifact\` to the id of the computed analysis (listed above) or the insight that supplies it, which a page must rest on. A qualification on the page is not the analysis: where the page only says what the evidence does not establish, the item is not fixed.
    - "narrowed" closes an item the answer no longer needs because the answer now claims less; it is allowed only where the answer has changed, and its evidence quotes the narrower answer.
    - "unavailable" closes a missing analysis the team searched for and could not find, and needs \`searchLog\`: the path of the search log under sources/ (listed above) that shows the search. It is not available where the evidence scope is closed: nothing could be searched.
-   - "scope-limited" is for a missing analysis whose remedy is retrieval while the evidence scope is closed: the team may not fetch the data. The item stays open at its severity. It does not count against compliance; it does count against sufficiency.
+   - "scope-limited" is for a missing analysis whose remedy is retrieval while the evidence scope is closed: the team may not fetch the data. The item stays open at its severity, and the answer can at most be provisional.
 2. ${full ? "PAGES: a full page entry for every page listed above, as the first pass wrote them." : "THE ANSWER: if the answer or the request changed, judge it again in `answerParts`."}
 3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it) are refused. An open item that still stands is that item's status, not a new item: a new item under an open item's check on a page it names is folded into the open item, which stays open, and is refused only where you also call that item fixed. New ids must be new; \`evidence\` is "" except for basis missed.${post ? " In this pass a new item names only the pages listed above." : ""} Then stop: the storyline is not re-critiqued.
 
 ${full ? PAGE_RULES : ""}
 
+${CALIBRATION}
+
 ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${itemRules({ completeness: false })}
+${itemRules()}
 
-"ready" only when no major or blocker item, earlier or new, is open. "provisional" only when every major or blocker item still open is scope-limited, compliance is complete and the answer is offered as provisional; otherwise "revise". Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(schemaFor(packet.mode, scope))}`;
+Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredSchema(packet.mode, scope))}`;
 }
 
 /**
@@ -1443,21 +1493,22 @@ function sourcingErrors(pages, ledger, insightIds) {
  * check - the critique cannot say ready, and a major or blocker answer
  * finding must say what the answer has to commit to.
  */
-function answerErrors(review, ledger) {
+// Why the answer check fails, or null. A provisional answer does not pretend to rank what its evidence cannot: the parts it
+// leaves unranked are its declared limits, not a refusal.
+function answerFails(review, provisional) {
+  const parts = Array.isArray(review.answerParts) ? review.answerParts : [];
+  const unranked = parts.filter((p) => p?.verdict === "cannot rank").length, declined = parts.filter((p) => p?.verdict === "declined").length;
+  if (!declined && (unranked <= 1 || provisional)) return null;
+  return `${declined ? `${declined} part${declined === 1 ? "" : "s"} of the request declined` : ""}${declined && unranked > 1 ? " and " : ""}${unranked > 1 ? `${unranked} parts left unranked (once is allowed)` : ""}`;
+}
+function answerErrors(review, ledger, provisional) {
   const parts = review.answerParts;
   if (!Array.isArray(parts)) return [];
   const errors = [];
   for (const [i, part] of parts.entries()) if (part?.verdict === "cannot rank" && (typeof part.missingEvidence !== "string" || part.missingEvidence.trim().length < 20))
     errors.push(`answerParts[${i}]: "cannot rank" names the decisive missing evidence in missingEvidence, and why it decides "${part.part}"`);
-  const unranked = parts.filter((p) => p?.verdict === "cannot rank").length;
-  const declined = parts.filter((p) => p?.verdict === "declined").length;
-  // A provisional answer does not pretend to rank what its evidence cannot: the
-  // parts it leaves unranked are its declared limits, not a refusal.
-  if ((unranked > 1 && review.verdict !== "provisional") || declined) {
-    const why = `${declined ? `${declined} part${declined === 1 ? "" : "s"} of the request declined` : ""}${declined && unranked > 1 ? " and " : ""}${unranked > 1 ? `${unranked} parts left unranked (once is allowed)` : ""}`;
-    if (review.verdict === "ready") errors.push(`verdict is ready while the answer check fails: ${why}`);
-    if (!openBlocking(ledger).some((e) => e.dimension === "answer")) errors.push(`the answer check fails (${why}): file a major or blocker \`answer\` finding saying what the answer must commit to`);
-  }
+  const why = answerFails(review, provisional);
+  if (why && !openBlocking(ledger).some((e) => e.dimension === "answer")) errors.push(`the answer check fails (${why}): file a major or blocker \`answer\` finding saying what the answer must commit to, with its \`ifUnfixed\``);
   return errors;
 }
 
@@ -1467,7 +1518,14 @@ function answerErrors(review, ledger) {
  * rests on - never on a qualification; `narrowed` needs an answer that changed;
  * `scope-limited` is a retrieval the closed scope forbids, and stays open.
  */
-function closureErrors(review, ledger, { analyses = [], insightIds = null, rested = new Set(), evidenceScope = null, answerChanged = false, artifacts = null, prior = null, moved = null } = {}) {
+const QUOTE_WORDS = 10;
+const squeeze = (text) => String(text ?? "").replace(/[\s"“”]+/g, " ").trim().toLowerCase();
+/** Does `evidence` quote, in double quotes, QUOTE_WORDS words or more that the packet prints. */
+function quotesPacket(evidence, pageText) {
+  const said = squeeze(Object.values(pageText).join("\n"));
+  return [...String(evidence ?? "").matchAll(/["“]([^"”]+)["”]/g)].some(([, quote]) => quote.trim().split(/\s+/).length >= QUOTE_WORDS && said.includes(squeeze(quote)));
+}
+function closureErrors(review, ledger, { analyses = [], insightIds = null, rested = new Set(), evidenceScope = null, answerChanged = false, artifacts = null, prior = null, moved = null, pageText = null } = {}) {
   const errors = [];
   // What stood, unchanged, at the pass that left the item open cannot be what closes it.
   const stale = (id) => Boolean(prior?.artifacts && prior?.rested && artifacts && prior.rested.includes(id) && prior.artifacts[id] !== undefined && prior.artifacts[id] === artifacts[id]);
@@ -1493,6 +1551,8 @@ function closureErrors(review, ledger, { analyses = [], insightIds = null, reste
       if (!touched && !answerChanged) errors.push(`${at}: fixed, and ${(entry.pages || []).length ? `${entry.pages.join(", ")} ${entry.pages.length === 1 ? "is" : "are"}` : "the spine is"} as ${(entry.pages || []).length === 1 ? "it was" : "they were"} at the pass that filed ${s.finding}; where another page carries the repair, name it in \`artifact\` - a finding does not close on a storyline that did not move, and a page moves when its claim, its page type, what settles it, or the insights and measures it rests on change, not when it is redrawn or reworded`);
     }
     if (s.status === "narrowed" && !answerChanged) errors.push(`${at}: narrowed closes an item the answer no longer needs because it now claims less; the answer has not changed since the pass this verifies`);
+    // An item filed in error is withdrawn on the packet's own words: a line it prints that shows the item was never so.
+    if (s.status === "withdrawn" && pageText && !quotesPacket(s.evidence, pageText)) errors.push(`${at}: withdrawn closes an item filed in error, on the packet's own line: quote that line in double quotes in \`evidence\`, ${QUOTE_WORDS} words or more as the packet prints them`);
     if (s.status === "scope-limited") {
       if (entry.code !== "MISSING_ANALYSIS" || entry.remedy !== "retrieval") errors.push(`${at}: scope-limited is for a missing analysis whose remedy is retrieval; ${s.finding} is ${entry.code}${entry.remedy ? ` with remedy ${entry.remedy}` : ""} - the team can still act on it`);
       else if (evidenceScope?.retrieval !== "closed") errors.push(`${at}: the deck's evidence scope is open, so the data can be fetched: report the item as not fixed, or unavailable with its search log`);
@@ -1507,35 +1567,27 @@ function closureErrors(review, ledger, { analyses = [], insightIds = null, reste
 const limitedBy = (evidenceScope) => (entry) => entry.code === "MISSING_ANALYSIS" && entry.remedy === "retrieval" && evidenceScope?.retrieval === "closed";
 
 /**
- * The verdict, the two judgements and the rating, held to the ledger they
- * summarise: compliance is complete exactly when nothing the team can still
- * act on is open; sufficiency is sufficient exactly when nothing is open;
- * provisional needs a complete, scope-limited ledger and a deck that offers
- * its answer as provisional; and the rating sits under the cap its worst open
- * item sets.
+ * The verdict and the two judgements, read off the ledger they summarise
+ * (`after`, the ledger with this pass applied) rather than asked of the
+ * critic, so they cannot disagree with its items: ready when no major or
+ * blocker is open and the answer check passes; provisional when every one open
+ * is a retrieval the closed scope forbids and the deck offers its answer as
+ * provisional; revise otherwise. Compliance is complete when nothing the team
+ * can act on is open; sufficiency is sufficient when nothing is open. The
+ * rating stays the critic's own: a second signal, never clamped to the items.
+ * In a page-level pass each page's verdict is the worst open item naming it.
  */
-function judgementErrors(review, ledger, { answerStatus = null, evidenceScope = null } = {}) {
-  const errors = [];
-  const scopeLimited = limitedBy(evidenceScope);
-  const open = openBlocking(ledger), limited = open.filter(scopeLimited), doable = open.filter((e) => !scopeLimited(e));
-  const provisional = answerStatus?.status === "provisional";
-  const names = (list) => list.map((e) => `${e.id} (${e.severity})`).join(", ");
-  if (review.verdict === "provisional") {
-    if (doable.length) errors.push(`verdict is provisional while ${names(doable)} ${doable.length === 1 ? "is" : "are"} open and within the team's reach; provisional is for a storyline whose only open items the evidence scope forbids`);
-    if (!limited.length) errors.push("verdict is provisional with no scope-limited item open: say ready, or revise");
-    if (!provisional) errors.push("verdict is provisional but the deck offers its answer as final: the deck sets `answerStatus: \"provisional\"` with its `answerLimits`, or narrows the answer until the open items no longer bear on it");
-  }
-  const compliance = review.compliance?.verdict, sufficiency = review.sufficiency?.verdict;
-  if (compliance === "complete" && doable.length) errors.push(`compliance is complete while ${names(doable)} ${doable.length === 1 ? "is" : "are"} open and within the team's reach`);
-  if (compliance === "incomplete" && !doable.length) errors.push("compliance is incomplete with no major or blocker item open that the team can act on: file the item, or say complete");
-  if (sufficiency === "sufficient" && open.length) errors.push(`sufficiency is sufficient while ${names(open)} ${open.length === 1 ? "is" : "are"} open: an item the scope forbids still leaves the answer short of its evidence`);
-  if (sufficiency !== "sufficient" && compliance !== undefined && !open.length) errors.push("sufficiency is not sufficient with no major or blocker item open: file what the answer still lacks, or say sufficient");
-  if (sufficiency === "provisional" && (doable.length || !provisional)) errors.push(`sufficiency is provisional ${doable.length ? `while ${names(doable)} can still be acted on` : "but the deck offers its answer as final"}: it is insufficient`);
-  if (typeof review.rating === "number") {
-    const worstOpen = open.some((e) => e.severity === "blocker") ? "blocker" : open.length ? "major" : null;
-    if (worstOpen && review.rating > RATING_CAPS[worstOpen]) errors.push(`rating ${review.rating} with a ${worstOpen} open (${names(open.filter((e) => e.severity === worstOpen))}): on the rating scale a storyline with a ${worstOpen} open is ${RATING_CAPS[worstOpen]} or less`);
-  }
-  return errors;
+export function withJudgements(review, after, { answerStatus = null, evidenceScope = null } = {}) {
+  const scopeLimited = limitedBy(evidenceScope), open = openBlocking(after), doable = open.filter((e) => !scopeLimited(e));
+  const provisional = answerStatus?.status === "provisional", failing = answerFails(review, provisional);
+  const verdict = !open.length && !failing ? "ready" : !doable.length && provisional && !failing ? "provisional" : "revise";
+  const names = (list) => list.map((e) => e.id).join(", ");
+  const worst = (id) => { const naming = openEntries(after).filter((e) => (e.pages || []).includes(id)).map((e) => e.severity);
+    return naming.includes("blocker") ? "blocker" : naming.includes("major") ? "major" : naming.includes("minor") ? "minor" : "ok"; };
+  return { ...review, verdict,
+    compliance: { verdict: doable.length ? "incomplete" : "complete", note: doable.length ? `open and within reach: ${names(doable)}` : "nothing open that the team can act on" },
+    sufficiency: { verdict: !open.length ? "sufficient" : !doable.length && provisional ? "provisional" : "insufficient", note: open.length ? `open: ${names(open)}` : "nothing major or blocking open" },
+    ...(Array.isArray(review.pages) ? { pages: review.pages.map((entry) => ({ ...entry, verdict: worst(entry.page) })) } : {}) };
 }
 
 /** A revision's first critique files items only where the revision is involved. */
@@ -1580,16 +1632,16 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
     errors.push(...verificationErrors(review, { scope: mode === "full" ? scope : { ...scope, mustInspect: [] }, ledger, items, ids, pageKey: "page", deckScope: "spine", statuses: STORYLINE_STATUSES, pageText }));
     errors.push(...unavailableErrors(review, ledger, sources));
     // A post-review pass reads the pages its deck review named, and files nothing elsewhere.
+    // An item there may list another page beside one it reads (a figure two pages disagree on), but not stand wholly outside them.
     if (scope.postReview) for (const item of items) {
-      const outside = (item.pages || []).filter((id) => !scope.postReview.pages.includes(id));
-      if (outside.length) errors.push(`${item.id}: this is ${scope.postReview.origin === "compile" ? "the pass a compile refusal allowed" : "a post-review pass"}, which reads ${scope.postReview.pages.join(", ")} and the answer only; ${outside.join(", ")} ${outside.length === 1 ? "is" : "are"} outside it - the earlier critique's verdict stands there`);
+      if (!(item.pages || []).length || item.pages.some((id) => scope.postReview.pages.includes(id))) continue;
+      errors.push(`${item.id}: this is ${scope.postReview.origin === "compile" ? "the pass a compile refusal allowed" : "a post-review pass"}, which reads ${scope.postReview.pages.join(", ")} and the answer only; ${item.pages.join(", ")} ${item.pages.length === 1 ? "is" : "are"} outside it - the earlier critique's verdict stands there`);
     }
-    errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged), artifacts, prior: scope.prior ?? null,
+    errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged), artifacts, prior: scope.prior ?? null, pageText,
       moved: Array.isArray(scope.changed) && Array.isArray(scope.deleted) ? { changed: scope.changed, deleted: scope.deleted } : null }));
   } else {
     if (mode === "full") errors.push(...coverageErrors(review.pages, revision ? revision.changed : contentIds, "page"));
     if (revision) errors.push(...revisionItemErrors(items, revision.changed));
-    errors.push(...completenessErrors(review.completeness, STORYLINE_DIMENSIONS, items, "check"));
     errors.push(...carriedErrors(review, carried, items.map((item) => item.id)));
     for (const [i, pillar] of review.pillars.entries()) {
       const unknown = pillar.pages.filter((id) => !ids.includes(id));
@@ -1597,11 +1649,8 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
     }
   }
   const after = storylineLedger(scope ? ledger : [], review);
-  if (mode === "full") errors.push(...verdictErrors(review.pages, after, "page"), ...sourcingErrors(review.pages, after, insightIds));
-  errors.push(...answerErrors(review, after));
-  errors.push(...judgementErrors(review, after, { answerStatus, evidenceScope }));
-  const open = openBlocking(after);
-  if (review.verdict === "ready" && open.length) errors.push(`verdict is ready while ${open.map((e) => `${e.id} (${e.severity})`).join(", ")} ${open.length === 1 ? "is" : "are"} open; ready means no major or blocker item remains`);
+  if (mode === "full") errors.push(...sourcingErrors(review.pages, after, insightIds));
+  errors.push(...answerErrors(review, after, answerStatus?.status === "provisional"));
   return errors;
 }
 
@@ -1614,7 +1663,23 @@ async function readCritique(file) {
     return { review: null, invalid: `the critique is not valid JSON (${error.message}): have the critic write its answer again` };
   }
 }
-const packetContext = (packet) => ({
+/**
+ * A critic's answer, read as the loop reads it against its packet's context (packetContext): its page lists
+ * settled and a blocking item with no stake recorded as minor
+ * (settleCritiqueForm), validated against the packet, and its verdict and
+ * judgements read off the ledger (withJudgements). `{ review, errors,
+ * mended, ledger }`; `review` is the answer as recorded, where `errors` is
+ * empty. The calibration harness reads answers through this too, so what it
+ * measures is what the loop records.
+ */
+export function judgeCritique(answer, context) {
+  const settled = settleCritiqueForm(answer, context.ids, context.contentIds ?? context.ids);
+  const errors = validateStorylineRecord(settled.review, context);
+  if (errors.length) return { review: null, errors, mended: settled.mended, ledger: null };
+  const ledger = storylineLedger(context.scope ? context.ledger : [], settled.review);
+  return { review: withJudgements(settled.review, ledger, { answerStatus: context.answerStatus ?? null, evidenceScope: context.evidenceScope ?? null }), errors: [], mended: settled.mended, ledger };
+}
+export const packetContext = (packet) => ({
   ids: packet.pages.map((p) => p.id), contentIds: packet.pages.filter(isContent).map((p) => p.id), scope: packet.scope ?? null, ledger: packet.scope?.ledger ?? [],
   insightIds: packet.insights?.present ? new Set(packet.insights.items.map((i) => i.id)) : null, mode: packet.mode ?? "full", sources: packet.sources ?? [],
   pageText: packetPageText(packet), promptHash: packet.promptHash ?? null, revision: packet.revision ?? null,
@@ -1639,9 +1704,11 @@ const packetContext = (packet) => ({
 export function validateStorylineReview(review, spec, { record = null, packet = null, measures = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) and bring it to ready before the deck review"];
   const structure = storyStructure(spec);
-  const judged = record?.review ?? review;
-  const errors = record ? [] : validateStorylineRecord(review, packet ? packetContext(packet)
-    : { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id), mode: Array.isArray(review.pages) ? "full" : "spine" });
+  // A recorded pass was judged when it was recorded; an answer not yet recorded is read as the loop would read it.
+  const read = record ? null : judgeCritique(review, packet ? packetContext(packet)
+    : { ids: structure.map((p) => p.id), contentIds: structure.filter(isContent).map((p) => p.id), mode: Array.isArray(review.pages) ? "full" : "spine", answerStatus: answerStatusOf(spec), evidenceScope: evidenceScopeOf(spec) });
+  const judged = record?.review ?? read.review ?? review;
+  const errors = record ? [] : [...read.errors];
   if (judged.binding !== storylineBinding(spec, measures)) {
     const was = record?.pageHashes ?? packet?.pageHashes;
     const moved = was ? changedPages(was, storylinePageHashes(spec, measures)) : null;
@@ -1652,13 +1719,13 @@ export function validateStorylineReview(review, spec, { record = null, packet = 
   if (judged.verdict === "provisional") {
     // A provisional storyline passes the gate as provisional, never as ready:
     // every open item is one the evidence scope forbids, and the deck says so.
-    const ledger = record?.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review);
+    const ledger = record?.ledger ?? read.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review);
     const doable = openBlocking(ledger).filter((e) => !limitedBy(evidenceScopeOf(spec))(e));
     if (doable.length) errors.push(`the storyline critique says provisional but ${doable.map((e) => `${e.id} (${e.severity})`).join(", ")} ${doable.length === 1 ? "is" : "are"} still open and within reach`);
     if (answerStatusOf(spec).status !== "provisional") errors.push("the storyline critique says provisional but the deck offers its answer as final: set `answerStatus: \"provisional\"` with its `answerLimits`");
   } else if (judged.verdict !== "ready") errors.push(`the storyline critique says revise (${judged.rating ?? "?"}/10): revise the storyline, re-run the critique and bring it to ready before the deck review${(judged.topFixes || []).length ? ` - ${judged.topFixes.slice(0, 3).join("; ")}` : ""}`);
   else if (!errors.length) {
-    const open = openBlocking(record?.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review));
+    const open = openBlocking(record?.ledger ?? read.ledger ?? storylineLedger(packet?.scope?.ledger ?? [], review));
     if (open.length) errors.push(`the storyline critique says ready but ${open.map((e) => `${e.id} (${e.severity})`).join(", ")} ${open.length === 1 ? "is" : "are"} still open`);
   }
   return errors;
@@ -1912,7 +1979,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     const last = history.at(-1);
     const open = last ? openBlocking(last.ledger ?? storylineLedger([], last.review)).map((e) => ({ id: e.id, code: e.code ?? null, dimension: e.dimension ?? null, severity: e.severity, pages: e.pages || [], text: itemLines(e).replace(/\n\s*/g, " | ") })) : [];
     const archived = await retireLineage(historyDir, { note, files: [path.join(store, PACKET_RECORD), path.join(out, "storyline-review.json")], open });
-    retired = `The earlier storyline lineage (${history.length} pass${history.length === 1 ? "" : "es"}) was recorded under binding version ${bindingVersionOf(history.at(-1) ?? packet)} and is archived in ${path.join(historyDir, archived)}: the critique is bound to which periods or members of each measure a page shows and in what class of exhibit, read as the full compile reads them, which that record does not hold. This is a clean first pass, not a restart, and nothing of the old lineage counts against the pass cap${open.length ? `. Its ${open.length} open blocking item${open.length === 1 ? " is" : "s are"} carried into the new packet (${open.map((e) => e.id).join(", ")}): the critic says of each whether it still stands` : ""}`;
+    retired = `The earlier storyline lineage (${history.length} pass${history.length === 1 ? "" : "es"}) was recorded under binding version ${bindingVersionOf(history.at(-1) ?? packet)} and is archived in ${path.join(historyDir, archived)}: this runtime binds the critique under version ${BINDING_VERSION}, which reads the pages differently, so that record cannot say which of them changed. This is a clean first pass, not a restart, and nothing of the old lineage counts against the pass cap${open.length ? `. Its ${open.length} open blocking item${open.length === 1 ? " is" : "s are"} carried into the new packet (${open.map((e) => e.id).join(", ")}): the critic says of each whether it still stands` : ""}`;
     history = [];
     packet = null;
   }
@@ -1923,11 +1990,14 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
     // The page lists are settled before the form is judged: a range expanded, a page the item's own text names added. What was
     // settled is written back to the answer, so every later reading of it is of the same lists, and kept on the pass's record.
-    const context = packetContext(packet), settled = settleCritiqueForm(review, context.ids, context.contentIds);
-    const errors = validateStorylineRecord(settled.review, { ...context, sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) });
-    if (errors.length) return refusedForm(out, errors);
-    if (settled.mended.length) { review = settled.review; said.mended.push(...settled.mended); await writeJson(path.join(out, "storyline-review.json"), review); }
-    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, bindingVersion: BINDING_VERSION, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
+    const judged = judgeCritique(review, { ...packetContext(packet), sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) });
+    if (judged.errors.length) return refusedForm(out, judged.errors);
+    // What the runtime settled and read off the ledger is written back, so every later reading of the answer is of the record.
+    ({ review } = judged);
+    const { ledger } = judged;
+    said.mended.push(...judged.mended);
+    await writeJson(path.join(out, "storyline-review.json"), review);
+    history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, bindingVersion: BINDING_VERSION, ledger, mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
       ...(said.mended.length ? { formMended: said.mended } : {}),
       // A post-review pass says so in the lineage: which deck-review pass allowed it and the pages it read. It is not counted against the cap.
       ...(packet.scope?.postReview && packet.scope.postReview.origin !== "compile" ? { kind: POST_REVIEW, postReview: { key: packet.scope.postReview.key, reviewPass: packet.scope.postReview.reviewPass, pages: packet.scope.postReview.pages, findings: packet.scope.postReview.findings.map((f) => f.id) } } : {}),
@@ -1998,12 +2068,7 @@ function partErrors(part, packet) {
   if (structure.length) return structure;
   const { ids, insightIds, promptHash, limits, dividers } = packetContext(packet);
   const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null, { limits, dividers }), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
-  const items = storylineItems(part);
-  if (meta.kind === "section") {
-    errors.push(...coverageErrors(part.pages, meta.pages, "page"), ...completenessErrors(part.completeness, STORYLINE_PAGE_CHECKS, items, "check"));
-    const ledger = storylineLedger([], part);
-    errors.push(...verdictErrors(part.pages, ledger, "page"), ...sourcingErrors(part.pages, ledger, insightIds));
-  } else errors.push(...completenessErrors(part.completeness, SPINE_CHECKS, items.filter((f) => STORYLINE_CHECKS[f.dimension]?.scope === "spine"), "check"));
+  if (meta.kind === "section") errors.push(...coverageErrors(part.pages, meta.pages, "page"), ...sourcingErrors(part.pages, storylineLedger([], part), insightIds));
   return errors;
 }
 
@@ -2020,7 +2085,7 @@ export function mergeStorylineParts(partsIn, packet) {
   const relabel = (part, list) => (list || []).map((item) => ({ ...item, id: rename(part, item.id) }));
   const [lead] = parts.filter((p) => p.part.kind === "spine");
   const merged = {
-    pass: 1, verifies: null, binding: packet.binding, rating: lead.rating, summary: lead.summary, compliance: lead.compliance, sufficiency: lead.sufficiency, ...(lead.provenance ? { provenance: lead.provenance } : {}),
+    pass: 1, verifies: null, binding: packet.binding, rating: lead.rating, summary: lead.summary, ...(lead.provenance ? { provenance: lead.provenance } : {}),
     spine: lead.spine, answer: lead.answer, answerParts: lead.answerParts, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
@@ -2028,13 +2093,10 @@ export function mergeStorylineParts(partsIn, packet) {
     ...(lead.carried ? { carried: lead.carried.map((answer) => (answer.finding ? { ...answer, finding: rename(lead, answer.finding) } : answer)) } : {}),
   };
   const ledger = storylineLedger([], merged);
-  const joined = joinParts(parts, contentIds, ledger, { pageKey: "page", dimensions: STORYLINE_DIMENSIONS, dimKey: "check" });
+  const joined = joinParts(parts, contentIds, ledger, { pageKey: "page", dimensions: [], dimKey: "check" });
   if (joined.errors.length) return { errors: joined.errors };
-  // The section critics' items can reopen what the spine critic judged closed.
-  const reopened = openBlocking(ledger).length > 0;
-  const within = openBlocking(ledger).filter((e) => !limitedBy(packet.evidenceScope)(e)).length > 0;
-  Object.assign(merged, { pages: joined.pages, completeness: joined.completeness, verdict: lead.verdict === "ready" && !reopened ? "ready" : lead.verdict === "provisional" && !within ? "provisional" : "revise",
-    ...(within && lead.verdict !== "revise" ? { compliance: { ...lead.compliance, verdict: "incomplete" }, sufficiency: { ...lead.sufficiency, verdict: "insufficient" }, rating: Math.min(lead.rating, RATING_CAPS[openBlocking(ledger).some((e) => e.severity === "blocker") ? "blocker" : "major"]) } : {}) });
+  // The verdict and the judgements are read off the joined ledger when the merged pass is recorded (withJudgements).
+  merged.pages = joined.pages;
   return { review: merged, errors: [], mended };
 }
 

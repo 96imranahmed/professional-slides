@@ -73,13 +73,14 @@ const exhibitsOf = (page) => [page?.exhibit, ...(Array.isArray(page?.exhibits) ?
 const isChartKind = (kind) => String(kind ?? "").startsWith("chart");
 const written = (value) => typeof value === "string" && value.trim().length > 0;
 const humanised = (name) => String(name ?? "").replace(/[_.-]+/g, " ").trim();
-const classOfKind = (kind) => (isChartKind(kind) ? "chart" : kind === "table" ? "table" : "figure");
-// The page types whose one exhibit is a table (storyline.mjs TABLE_TYPES reads the same four for a measure's natural class).
+const classOfKind = (kind) => (isChartKind(kind) || kind === "map" ? "chart" : kind === "table" ? "table" : "figure");
 // The keys of an exhibit or a block a renderer reads as data, not as words a reader sees: the completion leaves them as written.
 const STRUCTURAL = new Set(["icon", "type", "src", "image", "url", "id", "tone", "variant", "treatment", "arrangement", "date", "start", "end", "from", "to", "kind", "status", "geography", "measure", "format"]);
-const TABLE_PAGES = new Set(["scorecard", "lookup", "options"]);
-// The chart kinds a callout names one category of; small multiples and a box plot carry a highlight, a slope a focused series (author-deck.mjs bindScaffold).
-const CALLOUT_KINDS = new Set(["chart.line", "chart.column", "chart.bar", "chart.area", "chart.lollipop", "chart.stacked-column", "chart.stacked-bar", "chart.stacked-area", "chart.combo", "chart.waterfall"]);
+// The page types whose one exhibit is a table: a measure on one is tabulated where nothing declares its view (naturalClass).
+const TABLE_TYPES = new Set(["scorecard", "lookup", "matrix", "options"]);
+// The chart kinds a callout names one category of, along their axis - what the witness marks a finding on and a scaffold carries a
+// worked page's callout onto (author-deck.mjs bindScaffold); small multiples and a box plot carry a highlight, a slope a focused series.
+export const CALLOUT_KINDS = new Set(["chart.line", "chart.column", "chart.bar", "chart.area", "chart.lollipop", "chart.stacked-column", "chart.stacked-bar", "chart.stacked-area", "chart.combo", "chart.waterfall"]);
 
 /** `value` with the completion's mark taken out of every string: what a witness is composed from. */
 export function unmarked(value) {
@@ -225,8 +226,15 @@ function figuresFrom(demand) {
     label: marked(`${humanised(d.measure.name)}${label === null ? "" : `, ${label}`}`), ...(d.role === "context" ? { role: "context", ...(d.relevance !== undefined ? { relevance: d.relevance } : {}) } : {}) })));
 }
 
-/** The class a page of `type` shows `measure` in where nothing declares one (storyline.mjs naturalClass). */
-const naturalClass = (type, measure) => (axisOf(measure).kind === "scalar" ? "figure" : TABLE_PAGES.has(type) || type === "matrix" ? "table" : "chart");
+/**
+ * The class a page not yet drawn is taken to show a measure in (`measure.axis`,
+ * the axis it runs over): a figure for a measure of one value, a table on a
+ * page type whose exhibit is a table, otherwise a chart. It follows from the
+ * page type and the measure, both of which the critique is bound to, never
+ * from the form, which is the layout's: the one reading the critique
+ * (storyline.mjs) and the witness take.
+ */
+export const naturalClass = (type, measure) => (measure.axis.kind === "scalar" ? "figure" : TABLE_TYPES.has(type) ? "table" : "chart");
 
 /**
  * The kind of exhibit a page draws at exhibit `at`: the one its form sets
@@ -260,7 +268,7 @@ const classWords = (name) => (name === "chart" ? "plotted" : name === "table" ? 
  */
 function exhibitFrom(page, demand, kind, { block = false, worked = null, given = null, at = 0 } = {}) {
   const open = kind === null;
-  const wanted = demand.find((d) => d.class)?.class ?? (open ? naturalClass(page.type, (demand.find((d) => d.axis.kind !== "scalar") ?? demand[0]).measure) : classOfKind(kind));
+  const wanted = demand.find((d) => d.class)?.class ?? (open ? naturalClass(page.type, demand.find((d) => d.axis.kind !== "scalar") ?? demand[0]) : classOfKind(kind));
   if (!open && classOfKind(kind) !== wanted) return { why: `its basis declares ${demand.map((d) => d.ref).join(", ")} ${wanted === "chart" ? "plotted" : wanted === "table" ? "tabulated" : "stated as a figure"}, and a ${page.type}/${page.form} page draws ${classOfKind(kind) === "chart" ? "a chart" : classOfKind(kind) === "table" ? "a table" : `a ${kind}`} there` };
   const byAxis = demand.find((d) => d.axis.kind !== "scalar")?.axis.kind === "periods" ? "chart.line" : "chart.bar";
   const named = `exhibit ${at + 1}'s \`basis\` stub has no \`type\`, and the plan gives it \`${given}\` (\`--plan\` prints the kind on the page's line)`;
@@ -399,7 +407,7 @@ export function completePage(pageIn, { example = null, registry = new Map(), sho
       const made = exhibitFrom(page, demand, typeof slot.ex.type === "string" && slot.ex.type ? slot.ex.type : kind, { worked: exampleExhibits[slot.at] ?? exampleExhibits[0] ?? null, given, at: slot.at });
       // What the critic would be told the page shows where the spine declares no view: each measure whole, in its natural class.
       const read = declared.length && declared.every((d) => d.class && (d.labels || d.axis.kind === "scalar")) ? ""
-        : `${declared.length ? "its `basis` declares no view of" : "nothing on the page draws"} ${demand.filter((d) => !d.class || !d.labels).map((d) => d.ref).join(", ")}, so the critic is told the page shows ${demand.length === 1 ? "it" : "each"} ${declared.find((d) => d.class)?.class === "table" || (!declared.some((d) => d.class) && naturalClass(page.type, (demand.find((d) => d.axis.kind !== "scalar") ?? demand[0]).measure) === "table") ? "tabulated" : declared.find((d) => d.class)?.class === "figure" ? "stated as figures" : "plotted"}, whole where no periods or members are declared; `;
+        : `${declared.length ? "its `basis` declares no view of" : "nothing on the page draws"} ${demand.filter((d) => !d.class || !d.labels).map((d) => d.ref).join(", ")}, so the critic is told the page shows ${demand.length === 1 ? "it" : "each"} ${declared.find((d) => d.class)?.class === "table" || (!declared.some((d) => d.class) && naturalClass(page.type, demand.find((d) => d.axis.kind !== "scalar") ?? demand[0]) === "table") ? "tabulated" : declared.find((d) => d.class)?.class === "figure" ? "stated as figures" : "plotted"}, whole where no periods or members are declared; `;
       if (made.why) return { why: `${read}${made.why}`, ...(made.directed ? { directed: true } : {}) };
       exhibit = { ...(typeof slot.ex.type === "string" && slot.ex.type ? { type: slot.ex.type } : {}), ...made.exhibit };
       if (made.labels) drawnLabels.set(slot.at, made.labels);
@@ -646,7 +654,8 @@ const reasonOf = (message, id) => unmarked(String(message ?? "")).replace(/^(?:C
  * compiled slide alone under the deck's settings, returning the composer's
  * refusal or null (left out, a witness is proven to compile and not to
  * compose). `shownOf(page)` reads what a page as written already shows by
- * reference, and `kindsOf(page)` gives the kind the deck's plan gives each of
+ * reference, and whether its references bind as written (`unbound`: a page
+ * no layout binds keeps the binding's finding), and `kindsOf(page)` gives the kind the deck's plan gives each of
  * its untyped stubs, by place (a `Map`, or null).
  */
 export function proveSpine(doc, { registry, exampleOf, compileOne, composes = null, shownOf, kindsOf = () => null }) {
@@ -656,8 +665,9 @@ export function proveSpine(doc, { registry, exampleOf, compileOne, composes = nu
     const index = offset + i, id = String(page.id ?? `page-${index + 1}`), type = PAGE_TYPES[page.type];
     // A form or a placement the type does not offer is the spine's own refusal, made by the compile on the page as written.
     if (!Object.hasOwn(type.forms, page.form ?? "") || !placementsOf(page.type, page.form).includes(page.commentary)) return page;
+    // A page whose references do not bind as written is tried in the type's other layouts too - another form may draw what its
+    // own cannot (two units as a combo, not a line) - and left to the binding's own finding where none does.
     const read = shownOf(page);
-    if (read.unbound) return page;
     let first = null, asDeclared = null, taken = null;
     for (const layout of layoutsOf(page)) {
       let refusal = null, stage = null, done = null, compiled = null, directed = false;
@@ -688,6 +698,7 @@ export function proveSpine(doc, { registry, exampleOf, compileOne, composes = nu
         ...(first?.refusal && (taken.form !== page.form || taken.commentary !== page.commentary) ? { moved: { form: page.form, commentary: page.commentary, to: `${taken.form}/${taken.commentary}`, why: reasonOf(first.refusal, id), stage: first.stage } } : {}) });
       return reported.done.page;
     }
+    if (read.unbound) return page;
     const forms = Object.keys(type.forms), why = reasonOf(first?.refusal, id), drawn = exhibitsOf(page).filter((ex) => !undrawnExhibit(ex)).length;
     const said = { spine: `${id}: ${why}`,
       undetermined: `${id}: what the spine declares the page shows cannot be written into a ${page.type} page - ${why}. No other form or commentary placement of the type holds it either (${forms.length} form${forms.length === 1 ? "" : "s"} tried). ${BOUND}${first?.directed ? "" : `. Declare a view the type can show (\`labels\`, \`members\` or \`as\` in the exhibit's \`basis\`), write the exhibit by reference now (\`--scaffold ${page.type} --evidence <insight id> --id ${id}\` prints one), or choose the page type this evidence carries (\`--types\`)`}`,

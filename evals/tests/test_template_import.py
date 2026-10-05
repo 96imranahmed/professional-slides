@@ -80,7 +80,7 @@ class TemplateImportTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {{applyTemplate,toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{applyTemplate,toDeckPlan}} from './evals/support/compose.mjs';
 import {{planDeck}} from './skills/professional-slides/runtime/planner.mjs';
 import {{CHROME,configureChrome}} from './skills/professional-slides/runtime/core.mjs';
 const dir=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','house-'));
@@ -121,7 +121,7 @@ class HouseFooterTests(unittest.TestCase):
             house.write_text(json.dumps({'schema': 'professional-slides.house/v1', 'footer': 'House name'}))
             run_node(f'''
 import assert from 'node:assert/strict';
-import {{applyTemplate,toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{applyTemplate,toDeckPlan}} from './evals/support/compose.mjs';
 const spec={{schema:'professional-slides.deck/v3',template:'house.json',slides:[{{title:'Growth funds expansion',points:['Evidence supports the decision']}}]}};
 const base={json.dumps(str(root))};
 assert.equal(applyTemplate(spec,base).footer,'House name');

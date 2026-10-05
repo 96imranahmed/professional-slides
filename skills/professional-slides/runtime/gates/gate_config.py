@@ -225,6 +225,7 @@ THRESHOLDS = {
     # columns per page; commentary that says the exhibit again is, and
     # RESTATEMENT measures exactly that. One question, one instrument.
     "caveats_max": 2,           # caveat lines per page; a strong deck runs at most two
+    "caveat_words_max": 0.52,   # caveat words a hundred, deck-wide: strong decks' p90 (median 0.27)
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers
     "schema_from": 6,           # tables in a deck before schema repetition is worth reporting
 }
@@ -400,6 +401,7 @@ GATE_CODES = {
     "RESTATEMENT": "commentary that repeats the exhibit instead of reading it",
     "PLANNING_VOICE": "planning language left on the page",
     "CAVEAT_HEAVY": "a page spending more of itself on limits than on findings",
+    "CAVEAT_DENSE": "the deck states its limits in its argument at a rate strong decks keep to footnotes",
     "TABLE_SCHEMA_FLAT": "the same table invented over and over across the deck",
     "CONTRADICTED_SHARE": "a percentage in the prose the page's own counts do not give",
     "DECK_CRAFT": "the deck emphasises, sources or comments at a rate strong decks do not",
@@ -425,7 +427,7 @@ ADVISORY_CODES = {
     "DEAD_BAND", "INTERNAL_VOID", "UNANNOTATED", "LAYOUT_MONOTONY",
     "COLUMN_MONOTONY", "TABLE_SCHEMA_FLAT", "IMAGE_BUDGET", "IMAGE_RUN",
     "THIN_EVIDENCE", "HERO_EXHIBIT", "COLUMN_VOID", "THIN_COLUMN", "NUMBERS_ON_MARKS",
-    "SCENE_VOID", "SCENE_INK", "DECK_INK", "RENDER_DRIFT",
+    "SCENE_VOID", "SCENE_INK", "DECK_INK", "RENDER_DRIFT", "CAVEAT_DENSE",
 }
 
 # The void findings are questions at mild values and block past the fill's

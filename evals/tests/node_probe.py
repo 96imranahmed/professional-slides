@@ -344,16 +344,45 @@ def run_node(source: str) -> dict:
 
 
 _EXAMPLE_SCENES = {}
+_AUTHORED_EXAMPLES = {}
+
+
+def authored_example(name="page-types"):
+    """A worked example's pages file authored into a temporary directory, once a run.
+
+    The examples ship the pages file alone; `<name>.deck.json`, `.plan.json`
+    and `.content.json` are what author-deck.mjs writes beside it, so they are
+    written here, beside a copy of the examples' assets, and never committed.
+    """
+    if name not in _AUTHORED_EXAMPLES:
+        import tempfile
+        work = Path(tempfile.mkdtemp(prefix=f"ps-example-{name}-"))
+        atexit.register(shutil.rmtree, work, ignore_errors=True)
+        examples = SKILL / "examples"
+        shutil.copytree(examples / "assets", work / "assets")
+        shutil.copy(examples / f"{name}.pages.json", work / f"{name}.pages.json")
+        out = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(work / f"{name}.pages.json")],
+                             cwd=ROOT, capture_output=True, text=True)
+        if out.returncode != 0 or not (work / f"{name}.deck.json").exists():
+            raise AssertionError(f"author-deck.mjs refused {name}.pages.json (exit {out.returncode})\n{out.stderr[-2000:]}\n{out.stdout[-2000:]}")
+        _AUTHORED_EXAMPLES[name] = work
+    return _AUTHORED_EXAMPLES[name]
 
 
 def example_scene(name="nyc-or-sf"):
-    """A shipped example deck compiled to its scene, cached for the run."""
+    """A shipped example deck compiled to its scene, cached for the run.
+
+    A deck spec in examples/ is read as it is; an example shipped as a pages
+    file is authored first (authored_example).
+    """
     if name not in _EXAMPLE_SCENES:
+        examples = SKILL / "examples"
+        directory = examples if (examples / f"{name}.deck.json").exists() else authored_example(name)
         _EXAMPLE_SCENES[name] = run_node(f"""
 import fs from 'node:fs';
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
-const dir = './skills/professional-slides/examples';
+const dir = {json.dumps(str(directory))};
 const spec = JSON.parse(fs.readFileSync(dir + '/{name}.deck.json', 'utf8'));
 console.log(JSON.stringify(planDeck(toDeckPlan(spec, dir)).deck));
 """)

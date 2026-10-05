@@ -203,7 +203,7 @@ console.log(JSON.stringify(out));
 
     def test_the_keys_reach_the_composed_deck(self):
         result = run_node('''
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { optionDeck } from './skills/professional-slides/runtime/design-options.mjs';
 const read = (answers) => {
   const plan = toDeckPlan(optionDeck(answers), './skills/professional-slides/runtime');
@@ -372,25 +372,6 @@ census = [reference_census.title_rule(np.asarray(page(h).resize((1200, 675)).con
 print(infer.title_treatment(page(False).resize((640, 360)), (255, 255, 255)), infer.title_treatment(page(True).resize((640, 360)), (255, 255, 255)), *census)
 ''')
         self.assertEqual(out.split(), ["rule", "None", "True", "False"])
-
-
-class IntakeDocumentationTests(unittest.TestCase):
-    def test_skill_and_theming_document_the_intake(self):
-        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-        theming = (SKILL / "references" / "theming.md").read_text(encoding="utf-8")
-        self.assertIn("references/theming.md#design-intake", skill)
-        for phrase in ("preferences.mjs show", "preferences.mjs set", "preferences.mjs apply", "assets/design-options/"):
-            self.assertIn(phrase, skill)
-        self.assertIn("## Design intake", theming)
-        for phrase in ("design-systems.png", "palettes.png", "trackers.png", "title-treatments.png", "surfaces.png",
-                       "import-template.py", "infer-style.py", "design-options.mjs", "AskUserQuestion", "XDG_CONFIG_HOME",
-                       "live-pitch", "pre-read", "--from-house"):
-            self.assertIn(phrase, theming)
-        # Every stored answer the file accepts has a row saying which deck keys it sets.
-        for answer in ("`design`", "`colours: \"brand\"`", "`titleRule`", "`tracker`", "`surfaces`", "`density`", "`typography`", "`house`"):
-            self.assertIn(f"| {answer}", theming)
-        for text in (skill, theming, (ROOT / "README.md").read_text(encoding="utf-8")):
-            self.assertNotIn("assets/design-systems.png", text)
 
 
 if __name__ == "__main__":

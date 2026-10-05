@@ -334,7 +334,7 @@ class RatingDiscTests(unittest.TestCase):
         # so on the twelve-row scorecard the disc sat on top of its own word.
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './evals/support/compose.mjs';
 const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
 const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';

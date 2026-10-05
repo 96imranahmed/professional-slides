@@ -560,7 +560,8 @@ const attempt = async (s) => { try { return (await R.buildReviewPacket({ outputD
 const none = await attempt(spec);
 const { dir: staging } = await S.buildStorylinePacket(specPath, dir);
 const provenance = prov(await hashOf(staging));
-await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { verdict: 'revise', topFixes: ['Show the whole peer set'], provenance })));
+await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { verdict: 'revise', topFixes: ['Show the whole peer set'], provenance,
+  findings: [{ id: 'F1', scope: 'page', pages: [spec.slides[0].id], check: 'shape', severity: 'major', ifUnfixed: 'The committee would rank the players on a comparison of two of them.', problem: 'The page compares the subject with one rival where the whole peer set exists.', fix: 'Plot the whole peer set ranked on the same measure.' }] })));
 const revise = await attempt(spec);
 await fs.writeFile(path.join(dir, 'storyline-review.json'), JSON.stringify(storyReady(spec, { provenance })));
 const packetDir = await attempt(spec);
@@ -606,7 +607,7 @@ await fs.writeFile(reviewPath, JSON.stringify(storyReady(spec)));
 const handWritten = await S.storylineGate(spec, out, { deckPath: specPath });
 await fs.rm(reviewPath);
 const step = await S.prepareStoryline(specPath, out);
-const critique = storyReady(spec, { verdict: 'revise', provenance: prov(await hashOf(step.dir)), findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' }] });
+const critique = storyReady(spec, { verdict: 'revise', provenance: prov(await hashOf(step.dir)), findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' }] });
 critique.completeness.find((c) => c.check === 'claim').result = 'findings';
 await fs.writeFile(reviewPath, JSON.stringify({ ...critique, authorResponse: 'F1 misreads the page; the count is the finding.' }));
 const rebutted = await S.prepareStoryline(specPath, out);
@@ -635,10 +636,10 @@ class StorylinePassTests(unittest.TestCase):
         result = run_node(FIXTURES + '''
 const spec = specOf(['p01', 'p02', 'p03']);
 const missing = storyFull(spec); missing.pages = missing.pages.slice(0, 2);
-const sampled = storyFull(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'spine', pages: ['p01'], check: 'claim', severity: 'major', problem: 'Several titles report counts, e.g. p01 and p02, without an implication.', fix: 'Rewrite each title as the finding the count supports.' }] });
+const sampled = storyFull(spec, { verdict: 'revise', findings: [{ id: 'F1', scope: 'spine', pages: ['p01'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'Several titles report counts, e.g. p01 and p02, without an implication.', fix: 'Rewrite each title as the finding the count supports.' }] });
 sampled.pages[0].verdict = 'major';
 const unsupported = storyFull(spec); unsupported.pages[1].sourcing = { status: 'unsupported', insights: [], note: 'no insight carries the claim' };
-const readyWithMajor = storyFull(spec, { findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'shape', severity: 'major', problem: 'A two-number chart carries a ranking claim.', fix: 'Plot the whole peer set ranked on the same basis.' }] });
+const readyWithMajor = storyFull(spec, { findings: [{ id: 'F1', scope: 'page', pages: ['p02'], check: 'shape', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'A two-number chart carries a ranking claim.', fix: 'Plot the whole peer set ranked on the same basis.' }] });
 readyWithMajor.pages[1].verdict = 'major'; readyWithMajor.completeness.find((c) => c.check === 'shape').result = 'findings';
 console.log(JSON.stringify({ ok: S.validateStorylineReview(storyFull(spec), spec), missing: S.validateStorylineReview(missing, spec),
   sampled: S.validateStorylineReview(sampled, spec), unsupported: S.validateStorylineReview(unsupported, spec), readyWithMajor: S.validateStorylineReview(readyWithMajor, spec) }));
@@ -647,7 +648,8 @@ console.log(JSON.stringify({ ok: S.validateStorylineReview(storyFull(spec), spec
         self.assertTrue(any('p03' in e for e in result['missing']))
         self.assertTrue(any('by example' in e for e in result['sampled']))
         self.assertTrue(any('unsupported claim' in e for e in result['unsupported']))
-        self.assertTrue(any('verdict is ready while F1' in e for e in result['readyWithMajor']))
+        # A critic's "ready" beside an open major does not open the gate: the verdict is read off the items.
+        self.assertTrue(any('says revise' in e for e in result['readyWithMajor']), result['readyWithMajor'])
 
     def test_the_spine_critique_answers_the_request_in_ten_items_or_fewer(self):
         # One first critique returned 141 items from 272 KB of prompts,
@@ -662,12 +664,12 @@ const eleven = storyReady(spec, { findings: Array.from({ length: 11 }, (_, i) =>
 eleven.completeness.find((c) => c.check === 'claim').result = 'findings';
 const parts = (verdicts) => verdicts.map(([part, verdict, missingEvidence = '']) => ({ part, verdict, missingEvidence }));
 const twoUnranked = storyReady(spec, { answerParts: parts([['short run', 'answered'], ['long run', 'cannot rank', 'No audited retention or margin series exists for either company.'], ['capital structure', 'cannot rank', 'The debt terms of both facilities are private.']]) });
-const answerFinding = { id: 'F1', scope: 'spine', pages: ['p01', 'p02', 'p03'], check: 'answer', severity: 'major', problem: 'Two of the three questions are left unranked by the answer.', fix: 'Commit to a directional call on the long run with its confidence and reversal.' };
+const answerFinding = { id: 'F1', scope: 'spine', pages: ['p01', 'p02', 'p03'], check: 'answer', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'Two of the three questions are left unranked by the answer.', fix: 'Commit to a directional call on the long run with its confidence and reversal.' };
 const flagged = storyReady(spec, { verdict: 'revise', answerParts: twoUnranked.answerParts, findings: [answerFinding] });
 flagged.completeness.find((c) => c.check === 'answer').result = 'findings';
 const oneUnranked = storyReady(spec, { answerParts: parts([['short run', 'answered'], ['long run', 'cannot rank', 'No audited retention or margin series exists for either company.']]) });
 const unnamed = storyReady(spec, { answerParts: parts([['long run', 'cannot rank']]) });
-const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides the long-run call.', data: 'Company S-1 cohort tables', public: pub, remedy: 'retrieval', severity: 'major' }] });
+const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides the long-run call.', data: 'Company S-1 cohort tables', public: pub, remedy: 'retrieval', severity: 'major', ifUnfixed: 'The committee would make the long-run call without the retention it turns on.' }] });
 const m = (r) => { r.completeness.find((c) => c.check === 'missing').result = 'findings'; return r; };
 console.log(JSON.stringify({ eleven: S.validateStorylineReview(eleven, spec), twoUnranked: S.validateStorylineReview(twoUnranked, spec), flagged: S.validateStorylineReview(flagged, spec),
   oneUnranked: S.validateStorylineReview(oneUnranked, spec), unnamed: S.validateStorylineReview(unnamed, spec),
@@ -692,7 +694,7 @@ await fs.mkdir(out);
 const ids = ['p01', 'p02', 'p03', 'p04'];
 await fs.writeFile(specPath, JSON.stringify(specOf(ids)));
 const one = await S.prepareStoryline(specPath, out);
-const weak = { id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' };
+const weak = { id: 'F1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title reports a count without an implication.', fix: 'Rewrite the title as the finding the count supports.' };
 const critique = storyReady(specOf(ids), { verdict: 'revise', findings: [weak], provenance: prov(await hashOf(one.dir)) });
 critique.completeness.find((c) => c.check === 'claim').result = 'findings';
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(critique));
@@ -713,7 +715,7 @@ const ready = await S.prepareStoryline(specPath, out);
 const gate = await S.storylineGate(revised, out, { deckPath: specPath });
 const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out, { deckPath: specPath });
 // The verifier files the defect it still sees as a new item on the page F1 names: folded into F1, which stays open.
-const restate = { id: 'N1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', problem: 'The rewritten title still reports a count and no implication.', fix: 'State what the faster rate means for the decision.', basis: 'changed', justification: '', evidence: '' };
+const restate = { id: 'N1', scope: 'page', pages: ['p02'], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The rewritten title still reports a count and no implication.', fix: 'State what the faster rate means for the decision.', basis: 'changed', justification: '', evidence: '' };
 const sentBack = { verdict: 'revise', rating: 6, compliance: { verdict: 'incomplete', note: 'The claim item is still within reach.' }, sufficiency: { verdict: 'insufficient', note: 'The page does not yet support the answer.' }, topFixes: ['Rewrite p02'] };
 const foldCheck = (o) => S.validateStorylineRecord(verification({ ...sentBack, ...o }), { ids, contentIds: ids, scope: packet.scope, ledger: critique.ledgerFor, mode: 'spine', promptHash: packet.promptHash });
 critique.ledgerFor = S.storylineLedger([], critique);

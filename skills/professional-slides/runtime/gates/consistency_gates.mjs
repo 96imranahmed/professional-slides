@@ -598,8 +598,17 @@ const drawnNumbers = (value, out = []) => {
 // --- a figure as a quantity: what an edit's stale copies are found by --------
 // What kind of quantity a printed number says it is: a percentage, a number at a stated scale ("£12.4m", "£12.4 million" and
 // "GBP 12.40m" are each 12.4 at a million), money in whole units - or null where nothing but its digits says.
-const kindSaid = (number, unit = null) => (number.percent || (unit && percentUnit(unit)) ? "percent" : number.scale ? `x${number.scale}` : unit && unitScale(unit) > 1 ? `x${unitScale(unit)}` : number.currency ? "money" : null);
-const scaleSaid = (kind) => (kind?.startsWith("x") ? Number(kind.slice(1)) : null);
+// A kind names its currency after a colon where the number or its unit names one ("x1000000:£"): "€12.4m" is not "£12.4m".
+const CURRENCY_CODES = Object.freeze({ USD: "$", US$: "$", GBP: "£", EUR: "€", JPY: "¥" });
+const currencyIn = (mark) => { const said = String(mark ?? "").toUpperCase(); return said ? CURRENCY_CODES[said] ?? said : null; };
+const unitCurrency = (unit) => currencyIn(/[$£€¥]/.exec(String(unit ?? ""))?.[0] ?? /\b(USD|GBP|EUR|CHF|JPY|AUD|CAD)\b/i.exec(String(unit ?? ""))?.[1]);
+const kindSaid = (number, unit = null) => {
+  const base = number.percent || (unit && percentUnit(unit)) ? "percent" : number.scale ? `x${number.scale}` : unit && unitScale(unit) > 1 ? `x${unitScale(unit)}` : number.currency ? "money" : null;
+  const money = base && base !== "percent" ? currencyIn(number.currencyMark) ?? (unit ? unitCurrency(unit) : null) : null;
+  return money ? `${base}:${money}` : base;
+};
+const baseOf = (kind) => (kind ? kind.split(":")[0] : null), moneyOf = (kind) => (kind ? kind.split(":")[1] ?? null : null);
+const scaleSaid = (kind) => (baseOf(kind)?.startsWith("x") ? Number(baseOf(kind).slice(1)) : null);
 const decimalsOf = (value) => (String(value).split(".")[1] || "").length;
 const closeTo = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 const quoted = (text) => { const line = String(text).replace(/\s+/g, " ").trim(); return `"${line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line}"`; };
@@ -617,7 +626,7 @@ function quantitiesOf(texts, exhibits) {
   for (const ex of exhibits) {
     for (const cell of chartCells(ex)) out.push({ n: Math.abs(cell.value), decimals: decimalsOf(cell.value), kind: kindSaid({}, cell.unit), shown: String(cell.value), said: `"${cell.name}" at "${cell.label}", in a chart`, drawn: true });
     for (const cell of tableCells(ex)) { const text = cell.cell && typeof cell.cell === "object" ? cellText(cell.cell) : String(cell.cell ?? ""), numbers = printedNumbers(text).filter((item) => item.kind !== "period");
-      if (numbers.length === 1) out.push({ n: numbers[0].n, decimals: numbers[0].decimals, kind: kindSaid(numbers[0], cell.unit ?? headerUnit(cell.label)), shown: numbers[0].shown, said: `"${cell.name}" under "${cell.label}"` }); }
+      if (numbers.length === 1) out.push({ n: numbers[0].n, decimals: numbers[0].decimals, kind: kindSaid(numbers[0], cell.unit ?? headerUnit(cell.label) ?? headerUnit(cell.name)), shown: numbers[0].shown, said: `"${cell.name}" under "${cell.label}"` }); }
   }
   return out;
 }
@@ -632,7 +641,13 @@ function quantitiesOf(texts, exhibits) {
 function sameFigure(old, there) {
   const rounds = there.drawn && there.decimals > old.decimals && closeTo(Number(there.n.toFixed(old.decimals)), old.n);
   const [a, b] = [scaleSaid(old.kind), scaleSaid(there.kind)];
-  if (old.kind && there.kind) return old.kind === there.kind ? (there.n === old.n ? "same" : rounds ? "rounds" : null) : a && b && closeTo(old.n * a, there.n * b) ? "scale" : null;
+  if (old.kind && there.kind) {
+    const [mine, theirs] = [moneyOf(old.kind), moneyOf(there.kind)];
+    // Another currency is another figure; a currency only one of the two names leaves the digits alike, and no more.
+    if (mine && theirs && mine !== theirs) return null;
+    if (baseOf(old.kind) === baseOf(there.kind)) return there.n === old.n ? (mine === theirs ? "same" : "digits") : rounds ? "rounds" : null;
+    return a && b && closeTo(old.n * a, there.n * b) ? "scale" : null;
+  }
   // A figure that says what it is is not a bare count in a sentence ("14%" is not "14 stores").
   if ((old.kind && there.count) || (there.kind && old.count)) return null;
   if (there.n === old.n) return "digits";
@@ -682,27 +697,32 @@ function staleEdits(carried, spec, stale) {
     // was written, whole - "£12.4 million" is one figure, and "£12.4" a kilo on another slide is not it.
     const kept = quantitiesOf([edit.new], []);
     const gone = quantitiesOf([edit.old], []).filter((old) => !kept.some((now) => now.n === old.n && now.kind === old.kind));
-    // And the words with digits that are no measurement - a period, a year, a name ("FY26", "2026", "Q3").
+    // And the words with digits that are no measurement - a period, a year, a name ("FY26", "2026", "Q3"). A year another
+    // slide prints may date another figure, so a label left standing is asked about, never refused, and the edited slide's
+    // own other mentions of it are its own.
     const labels = removedTokens(edit.old, edit.new).filter((token) => /\d/.test(token) && !printedNumbers(token).some((number) => number.kind !== "period"));
-    const figures = [...new Set([...gone.map((old) => old.shown), ...labels])];
+    const figures = [...new Set(gone.map((old) => old.shown))];
     const phrases = [...new Set([edit.old, ...figures])];
     const strong = [], weak = [];
     for (const page of pages) {
       if (excused.has(page.id)) continue;
       // On the edited slide the old words are gone from where they stood; what can still stand there is a figure they held.
       const hit = (page.id === item.id ? figures : phrases).find((words) => page.texts.some((text) => printsWords(text, words)));
+      const label = !hit && page.id !== item.id ? labels.find((words) => page.texts.some((text) => printsWords(text, words))) : null;
+      if (label) { weak.push({ id: page.id, number: label, said: "a period label", how: "label", n: label }); continue; }
       // Words only the speaker's notes print are said to be there: the slide itself may not show them.
       if (hit) { strong.push({ id: page.id, phrase: hit, n: numbersIn(hit), ...(page.notes && printsWords(page.notes, hit) && !page.texts.some((text) => text !== page.notes && printsWords(text, hit)) ? { notes: true } : {}) }); continue; }
       const graded = gone.flatMap((old) => page.quantities.map((there) => ({ old, there, how: sameFigure(old, there) })).filter((match) => match.how));
       const same = graded.find((match) => match.how === "same");
       if (same) { strong.push({ id: page.id, phrase: same.there.shown, said: same.there.said, n: [same.old.n] }); continue; }
-      // The edited slide is read for the figure it still states, not for the digits its other numbers share.
-      const near = page.id === item.id ? null : ["scale", "rounds", "digits"].map((how) => graded.find((match) => match.how === how)).find(Boolean);
+      // The edited slide is read for the figure it still states, and for its own chart, which no text edit reaches - not for
+      // the digits its other numbers share.
+      const near = ["scale", "rounds", "digits"].map((how) => graded.find((match) => match.how === how && (page.id !== item.id || match.there.drawn))).find(Boolean);
       if (near) weak.push({ id: page.id, number: near.there.shown, said: near.there.said, how: near.how, n: near.old.n });
     }
     for (const hit of strong) for (const n of hit.n) stale.add(`${hit.id}|${n}`);
     for (const hit of weak) stale.add(`${hit.id}|${hit.n}`);
-    const code = registered(CONSISTENCY_CODES, figures.length ? "NUMBER_STALE" : "WORDING_STALE");
+    const code = registered(CONSISTENCY_CODES, figures.length || labels.length ? "NUMBER_STALE" : "WORDING_STALE");
     // A short title is common words: where one still stands is asked, not refused.
     const exact = figures.length > 0 || edit.what !== "title" || wordsIn(edit.old).length >= TITLE_QUOTED_WORDS;
     const where = `${item.id} now prints "${edit.new}" where the slide printed "${edit.old}"`;
@@ -712,7 +732,8 @@ function staleEdits(carried, spec, stale) {
     const apartBy = edit.what === "title" || !others.length ? "" : ` - or, where the words on another page are a different thing, name that page on this edit: \`"only": [${others.map((id) => `"${id}"`).join(", ")}]\` (each is listed for the reviewer)`;
     if (strong.length) findings.push({ code, severity: exact ? "blocker" : "advisory", id: item.id, pages: [...new Set([item.id, ...strong.map((s) => s.id)])], measured: { old: edit.old, new: edit.new, still: strong.map(({ n: _n, ...hit }) => hit) },
       repair: `${where}, and ${strong.map((s) => (s.said ? `${at(s.id)} still states ${s.phrase} (${s.said})` : `${at(s.id)} still prints "${s.phrase}"${s.notes ? " in its speaker notes" : ""}`)).join(", ")}: the deck now says two things. Make the same change there - \`replace\` on a carried page, naming the words as that slide prints them; the new words on a composed one${exact ? apartBy : "; where the words are only alike, leave them"}` });
-    const HOW = { scale: (w) => `${w.id} still states ${w.number} (${w.said}), the same amount at another scale`, rounds: (w) => `${w.id} still plots ${w.number} (${w.said}), which the figure rounds`, digits: (w) => `${w.id} still shows ${w.number} (${w.said})` };
+    const HOW = { scale: (w) => `${w.id} still states ${w.number} (${w.said}), the same amount at another scale`, rounds: (w) => `${w.id} still plots ${w.number} (${w.said}), which the figure rounds`, digits: (w) => `${w.id} still shows ${w.number} (${w.said})`,
+      label: (w) => `${w.id} still prints "${w.number}", which may date another figure` };
     if (weak.length) findings.push({ code, severity: "advisory", id: item.id, pages: [item.id, ...weak.map((w) => w.id)], measured: { old: edit.old, new: edit.new, still: weak.map(({ n: _n, ...hit }) => hit) },
       repair: `${where}, and ${weak.map((w) => HOW[w.how](w)).join(", ")}. Nothing says outright that each is the figure this edit changed, so check each: where it is, change it there too - \`replace\` for words and a table's cell, and a \`type\` in place of \`carry\` for a chart's values, which no text edit reaches` });
   }

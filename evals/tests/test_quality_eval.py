@@ -52,13 +52,9 @@ class Harness:
                                 "timeoutMinutes": 1}},
         }))
 
-    def run_eval(self, sha, *extra, slides=4, anchors=None, check=True, env=None):
+    def run_eval(self, sha, *extra, slides=4, check=True, env=None):
         args = [NODE, str(RUN), "--set", "dev", "--brief", BRIEF, "--config", str(self.config),
                 "--results", str(self.results), "--store", str(self.store), "--skill-sha", sha, *extra]
-        if anchors is None:
-            args.append("--no-anchors")
-        else:
-            args += ["--anchors-file", str(anchors)]
         env = {**os.environ, "FAKE_AGENT_SLIDES": str(slides), "FAKE_JUDGE_LOG": str(self.judge_log),
                "FAKE_AGENT_LOG": str(self.agent_log), **(env or {})}
         out = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, env=env, timeout=120)
@@ -104,7 +100,7 @@ class BlindingTests(Harness, unittest.TestCase):
         brief_in_packet = run_node('''
 import {briefRequest} from './evals/quality/lib.mjs';
 import fs from 'node:fs';
-console.log(JSON.stringify(briefRequest(fs.readFileSync('./evals/cold-run/briefs/network-rollout.md','utf8'))));
+console.log(JSON.stringify(briefRequest(fs.readFileSync('./evals/quality/briefs/dev/network-rollout.md','utf8'))));
 ''')
         self.assertNotIn("Why this brief is in the suite", brief_in_packet)
 
@@ -358,50 +354,10 @@ console.log(JSON.stringify(out));
         self.assertEqual((result["lone"]["plan"], result["lone"]["missing"]), ("one/a.plan.json", {}))
 
 
-class AnchorTests(Harness, unittest.TestCase):
-    def test_judge_error_is_computed_over_scored_anchors_only(self):
-        anchors = self.tmp / "anchors"
-        (anchors / "images").mkdir(parents=True)
-        shutil.copy(QUALITY / "anchors" / "images" / "high-page-types-21.jpg", anchors / "images" / "a.jpg")
-        shutil.copy(QUALITY / "anchors" / "images" / "low-specimen-02.jpg", anchors / "images" / "b.jpg")
-        shutil.copy(QUALITY / "anchors" / "images" / "low-specimen-10.jpg", anchors / "images" / "c.jpg")
-        doc = {"schema": "professional-slides.quality-anchors/v1", "scale": {"min": 1, "max": 10}, "anchors": [
-            {"id": "a", "tier": "high", "image": "images/a.jpg", "humanScore": 8, "provisional": False},
-            {"id": "b", "tier": "low", "image": "images/b.jpg", "humanScore": 3, "provisional": False},
-            {"id": "c", "tier": "low", "image": "images/c.jpg", "humanScore": None, "provisional": True}]}
-        (anchors / "anchors.json").write_text(json.dumps(doc))
-        out = self.run_eval("aaa", "--runs", "1", anchors=anchors / "anchors.json")
-        # The fake judge scores every page 5: |5-8| and |5-3| average 2.5.
-        self.assertIn("mean absolute error 2.5 over 2 scored anchors", out.stdout)
-        row = [r for r in self.rows() if r.get("kind") == "anchors"][0]
-        self.assertEqual([a["id"] for a in row["anchors"]], ["a", "b"])
-        self.assertEqual([p["files"] for p in self.judged() if p["mode"] == "anchor"],
-                         [["page.jpg", "rubric.md"], ["page.jpg", "rubric.md"]])
-
-    def test_the_shipped_anchors_are_provisional_and_pinned(self):
-        import hashlib
-        doc = json.loads((QUALITY / "anchors" / "anchors.json").read_text())
-        schema = json.loads((QUALITY / "anchors" / "schema.json").read_text())
-        anchors = doc["anchors"]
-        self.assertGreaterEqual(len(anchors), 10)
-        self.assertLessEqual(len(anchors), 20)
-        self.assertEqual({a["tier"] for a in anchors}, {"high", "low"})
-        required = set(schema["properties"]["anchors"]["items"]["required"])
-        for anchor in anchors:
-            with self.subTest(anchor=anchor["id"]):
-                self.assertTrue(required <= set(anchor))
-                self.assertTrue(anchor["provisional"])
-                self.assertIsNone(anchor["humanScore"])
-                image = QUALITY / "anchors" / anchor["image"]
-                self.assertEqual(hashlib.sha256(image.read_bytes()).hexdigest(), anchor["sha256"])
-        out = self.run_eval("aaa", "--runs", "1", "--dry-run", anchors=QUALITY / "anchors" / "anchors.json")
-        self.assertIn(f"anchors: 0 of {len(anchors)} carry a human score", out.stdout)
-
-
 class ArithmeticTests(unittest.TestCase):
     def test_spread_win_rate_and_summary(self):
         result = run_node('''
-import {spread,winRate,summarize,anchorError} from './evals/quality/lib.mjs';
+import {spread,winRate,summarize} from './evals/quality/lib.mjs';
 const dims=(n)=>({argument:n,evidence:n,visual:n,copy:n,sequence:n});
 const row=(sha,brief,run,rating,preferred,extra={})=>({key:{skillSha:sha,judge:'j:m',brief,run},status:'judged',
   judge:{rating,dimensions:dims(rating),majors:[]},build:{accepted:rating>6},plan:{accepted:true},deck:{delivered:true},
@@ -413,7 +369,7 @@ const rows=[row('new','dev/a',1,6,'current'),row('new','dev/a',2,8,'tie'),row('n
   row('new','dev/a',1,1,'previous',{key:{skillSha:'new',judge:'j:m',brief:'dev/a',run:1},agent:'codex'})];
 const s=summarize(rows,{skillSha:'new',judge:'j:m'});
 console.log(JSON.stringify({a:s.briefs['dev/a'],b:s.briefs['dev/b'],all:s.pairwise,
-  one:spread([4]),none:spread([]),mae:anchorError([{humanScore:8,judgeScore:5},{humanScore:3,judgeScore:5},{humanScore:null,judgeScore:9}])}));
+  one:spread([4]),none:spread([])}));
 ''')
         a = result["a"]
         self.assertEqual(a["runs"], 3, "another judge's, version's or treatment's rows stay out")
@@ -425,7 +381,6 @@ console.log(JSON.stringify({a:s.briefs['dev/a'],b:s.briefs['dev/b'],all:s.pairwi
         self.assertEqual(result["all"]["comparisons"], 3, "skipped comparisons are not counted")
         self.assertEqual(result["one"]["sd"], 0)
         self.assertIsNone(result["none"]["mean"])
-        self.assertEqual(result["mae"], 2.5)
 
     def test_judge_output_is_read_through_its_envelope(self):
         result = run_node('''
@@ -449,23 +404,23 @@ console.log(JSON.stringify({parsed,refused,pref,tie,filled:fillTemplate(['x','{p
 
 
 class BriefSetTests(unittest.TestCase):
-    def test_dev_is_the_cold_run_briefs_and_heldout_is_three_new_ones(self):
+    def test_dev_is_the_development_briefs_and_heldout_is_three_new_ones(self):
         result = run_node('''
 import {briefs} from './evals/quality/lib.mjs';
 console.log(JSON.stringify({dev:briefs('dev').map(b=>b.id),heldout:briefs('heldout').map(b=>b.id),all:briefs('all').length}));
 ''')
-        cold = sorted(p.stem for p in (ROOT / "evals" / "cold-run" / "briefs").glob("*.md"))
-        self.assertEqual(result["dev"], [f"dev/{name}" for name in cold])
+        dev = sorted(p.stem for p in (QUALITY / "briefs" / "dev").glob("*.md"))
+        self.assertEqual(result["dev"], [f"dev/{name}" for name in dev])
         self.assertEqual(result["heldout"], ["heldout/competitive-position", "heldout/investor-pitch", "heldout/steerco-update"])
-        self.assertEqual(result["all"], len(cold) + 3)
+        self.assertEqual(result["all"], len(dev) + 3)
 
-    def test_heldout_briefs_are_written_like_the_cold_run_briefs(self):
+    def test_heldout_briefs_are_written_like_the_dev_briefs(self):
         heldout = QUALITY / "briefs" / "heldout"
-        # The fields a cold-run brief sets out, every one of them, and a note
+        # The fields a development brief sets out, every one of them, and a note
         # the harness keeps back from the agent.
         field = re.compile(r"^- \*\*([A-Z][\w ]+)\.\*\*", re.M)
-        cold = [set(field.findall(p.read_text())) for p in sorted((ROOT / "evals" / "cold-run" / "briefs").glob("*.md"))]
-        shared = set.intersection(*cold)
+        dev = [set(field.findall(p.read_text())) for p in sorted((QUALITY / "briefs" / "dev").glob("*.md"))]
+        shared = set.intersection(*dev)
         self.assertTrue(shared)
         briefs = [p for p in sorted(heldout.glob("*.md")) if p.name != "README.md"]
         self.assertTrue(briefs)

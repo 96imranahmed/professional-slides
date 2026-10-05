@@ -240,7 +240,7 @@ class NativeChartAgreementTests(unittest.TestCase):
         from node_probe import RUNTIME
         from pptx import Presentation
         scene = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const members = Array.from({ length: 40 }, (_, i) => 'Op' + String(i + 1).padStart(2, '0'));
 const years = ['FY17','FY18','FY19','FY20','FY21','FY22','FY23','FY24','FY25','FY26'];

@@ -4,7 +4,8 @@
   "id": "product",
   "workflow": "new_deck",
   "request": "Where should Lumen invest next to hold its lead over Quill and Paperly?",
-  "answer": "Lumen leads only on retention, so it invests there and in conversion rather than matching integrations.",
+  "brief": "Where should Lumen invest next to hold its lead over Quill and Paperly?",
+  "answer": "Lumen should invest next in retention and conversion: its new onboarding, now given to every signup, keeps 37% of August signups to March against Quill's 31%, and paying users nearly quadrupled in eight months; integrations, its widest gap, are tested before they are funded.",
   "players": [
    "Lumen",
    "Quill",
@@ -19,21 +20,168 @@
    "status": "illustrative"
   },
   "public-pricing": {
-   "name": "Published pricing and integration pages, March 2026",
+   "name": "Published pricing, integration and product-metric pages, March 2026",
    "status": "illustrative"
   }
  },
  "pages": [
   {
+   "id": "p0",
+   "type": "summary",
+   "form": "executive-summary",
+   "commentary": "none",
+   "takeaway": false,
+   "title": "Lumen should invest next in retention and conversion, with integrations tested first",
+   "why": "The opening states where to invest and the evidence for each lever, with the gap the plan leaves open",
+   "evidence": [
+    "p-retention",
+    "p-rollout",
+    "p-rivals",
+    "p-paid",
+    "C-rivals",
+    "C-lift",
+    "C-paid"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "retention, integrations and price against Quill and Paperly, and Lumen's paying users",
+    "measures": [
+     "C-rivals/retention",
+     "C-rivals/integrations",
+     "C-rivals/price",
+     "p-paid/paying"
+    ]
+   },
+   "adds": "Each point says what its lever is worth and what would change the call, which the table does not show",
+   "exhibit": {
+    "type": "table",
+    "treatment": "dimensions",
+    "columns": [
+     "Lever",
+     "Lumen",
+     "Quill",
+     "Paperly",
+     "Call"
+    ],
+    "rows": [
+     [
+      "Retention in March, % of August signups",
+      "{{C-rivals/retention@Lumen | 0}}",
+      "{{C-rivals/retention@Quill | 0}}",
+      "n/a",
+      "Invest: the lead holds on the new onboarding"
+     ],
+     [
+      "Paying users, thousand",
+      "{{p-paid/paying@Aug 2025 | 0.0}} to {{p-paid/paying@Mar 2026 | 0.0}}",
+      "n/a",
+      "n/a",
+      "Invest: conversion drove the gain"
+     ],
+     [
+      "Integrations listed",
+      "{{C-rivals/integrations@Lumen | 0}}",
+      "{{C-rivals/integrations@Quill | 0}}",
+      "{{C-rivals/integrations@Paperly | 0}}",
+      "Test before funding"
+     ],
+     [
+      "Price, USD a month",
+      "{{C-rivals/price@Lumen | 0}}",
+      "{{C-rivals/price@Quill | 0}}",
+      "{{C-rivals/price@Paperly | 0}}",
+      "Hold: conversion rose at this price"
+     ]
+    ]
+   },
+   "highlight": "conversion is the second lever to fund",
+   "points": [
+    "Lumen's lead rests on retention, and only since its new onboarding: in a randomised August test it kept {{p-retention/new-onboarding@Mar 2026 | 0%}} of signups to March against {{p-retention/old-onboarding@Mar 2026 | 0%}} on the old one. Every signup has had it since September, so the lead over Quill now holds for the whole base.",
+    "Paying users nearly quadrupled in eight months and their share of actives more than doubled, at the highest price of the three, so conversion is the second lever to fund and price is not what holds it back.",
+    "Integrations are the widest gap, but nothing yet shows they cost users: measure retention by integration use before funding them. Paperly publishes no retention figure, so the lead is shown over Quill alone."
+   ]
+  },
+  {
+   "id": "p3",
+   "type": "scorecard",
+   "form": "heatmap",
+   "commentary": "so-what-bar",
+   "title": "Lumen out-retains Quill on its new onboarding but trails on price and integrations",
+   "why": "Three products on three common measures, the undisclosed cell kept as n/a",
+   "evidence": [
+    "p-rivals",
+    "C-rivals"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "retention, price and integrations for three products",
+    "measures": [
+     "C-rivals/retention",
+     "C-rivals/price",
+     "C-rivals/integrations"
+    ]
+   },
+   "exhibit": {
+    "columns": [
+     {
+      "label": "Product",
+      "type": "category"
+     },
+     {
+      "label": "Retention in March, % of August signups",
+      "heat": true
+     },
+     {
+      "label": "Price, USD a month",
+      "heat": true
+     },
+     {
+      "label": "Integrations",
+      "heat": true
+     }
+    ],
+    "rows": [
+     [
+      "Lumen",
+      37,
+      12,
+      14
+     ],
+     [
+      "Quill",
+      31,
+      8,
+      41
+     ],
+     [
+      "Paperly",
+      "n/a",
+      10,
+      26
+     ]
+    ],
+    "basis": {
+     "measures": [
+      "C-rivals/retention",
+      "C-rivals/price",
+      "C-rivals/integrations"
+     ]
+    }
+   },
+   "bar": "The lead is real on retention alone, so the plan defends it and tests integrations before matching them",
+   "subtitle": "March 2026; retention of August signups; Paperly publishes no retention figure"
+  },
+  {
    "id": "p1",
    "type": "trend",
    "form": "line",
    "commentary": "so-what-bar",
-   "title": "The new onboarding retains 15 points more by March",
+   "title": "The new onboarding, now given to every signup, retains 15 points more by March",
    "why": "Two cohorts in one unit on one scale, so the gap is read off the chart",
    "evidence": [
     "p-retention",
-    "C-lift"
+    "C-lift",
+    "p-rollout"
    ],
    "settles": {
     "kind": "comparison",
@@ -99,176 +247,67 @@
      }
     ]
    },
-   "bar": "Retention is where the product changed, so the plan invests there first"
+   "bar": "Most of what the new onboarding still loses goes in the first month, so that is where the next retention money goes"
   },
   {
    "id": "p2",
    "type": "trend",
-   "form": "line",
+   "form": "combo",
    "commentary": "so-what-bar",
-   "title": "Paying users doubled as a share of actives",
-   "why": "The ratio of two records, computed and drawn over time",
+   "title": "Paying users nearly quadrupled, doubling their share of actives",
+   "why": "Paying users and their share of actives, two units over the same months, which a combo trend carries",
    "evidence": [
     "p-paid",
     "C-paid"
    ],
    "settles": {
     "kind": "rate",
-    "what": "paying users as a share of active users by month",
+    "what": "paying users and their share of active users by month",
     "measures": [
+     "p-paid/paying",
      "C-paid/result"
     ]
    },
    "exhibit": {
-    "heading": "Paying users as a share of active users",
-    "unit": "%",
-    "categories": [
-     "Aug 2025",
-     "Sep 2025",
-     "Oct 2025",
-     "Nov 2025",
-     "Dec 2025",
-     "Jan 2026",
-     "Feb 2026",
-     "Mar 2026"
-    ],
+    "heading": "Paying users and their share of active users",
     "series": [
      {
-      "name": "Paid share",
-      "values": [
-       3.974359,
-       4.534884,
-       5.052632,
-       5.784314,
-       6.545455,
-       7.179487,
-       7.983871,
-       8.992248
-      ]
+      "measure": "p-paid/paying",
+      "name": "Paying users"
+     },
+     {
+      "measure": "C-paid/result",
+      "name": "Paid share"
      }
     ],
-    "basis": {
-     "measures": [
-      "C-paid/result"
-     ]
-    },
+    "role": "proof",
     "highlights": [
      {
       "category": "Mar 2026"
      }
     ]
    },
-   "bar": "Conversion, not signups, is now the faster route to revenue"
+   "bar": "Conversion, more than new actives, drove the gain, so it is the second lever to fund"
   },
   {
-   "id": "p3",
-   "type": "scorecard",
-   "form": "heatmap",
-   "commentary": "so-what-bar",
-   "title": "Lumen leads on retention and trails on price and integrations",
-   "why": "Three products on three common measures, the undisclosed cell kept as n/a",
-   "evidence": [
-    "p-rivals",
-    "C-rivals"
-   ],
+   "id": "p5",
+   "type": "summary",
+   "form": "takeaways",
+   "commentary": "none",
+   "takeaway": false,
+   "why": "The close states what to fund now, what to hold and the test that decides integrations",
    "settles": {
-    "kind": "comparison",
-    "what": "retention, price and integrations for three products",
-    "measures": [
-     "C-rivals/retention",
-     "C-rivals/price",
-     "C-rivals/integrations"
-    ]
+    "kind": "qualitative",
+    "what": "the investment calls and the next step on integrations"
    },
-   "exhibit": {
-    "columns": [
-     {
-      "label": "Product",
-      "type": "category"
-     },
-     {
-      "label": "Month-eight retention, %",
-      "heat": true
-     },
-     {
-      "label": "Price, USD a month",
-      "heat": true
-     },
-     {
-      "label": "Integrations",
-      "heat": true
-     }
-    ],
-    "rows": [
-     [
-      "Lumen",
-      37,
-      12,
-      14
-     ],
-     [
-      "Quill",
-      31,
-      8,
-      41
-     ],
-     [
-      "Paperly",
-      "n/a",
-      10,
-      26
-     ]
-    ],
-    "basis": {
-     "measures": [
-      "C-rivals/retention",
-      "C-rivals/price",
-      "C-rivals/integrations"
-     ]
-    }
-   },
-   "bar": "The lead is real on one measure only, so the strategy defends retention"
-  },
-  {
-   "id": "p4",
-   "type": "composition",
-   "form": "donut",
-   "commentary": "so-what-bar",
-   "title": "Capture is 46% of sessions and search another 27%",
-   "why": "The parts of one whole, four of them",
-   "evidence": [
-    "p-usage",
-    "C-mix"
-   ],
-   "settles": {
-    "kind": "share",
-    "what": "sessions by first feature used, March 2026",
-    "measures": [
-     "p-usage/sessions"
-    ]
-   },
-   "exhibit": {
-    "labels": [
-     "Capture",
-     "Search",
-     "Sharing",
-     "Templates"
-    ],
-    "values": [
-     46,
-     27,
-     18,
-     9
-    ],
-    "unit": "% of sessions",
-    "heading": "Sessions by first feature used, March 2026",
-    "basis": {
-     "measures": [
-      "p-usage/sessions"
-     ]
-    }
-   },
-   "bar": "Sharing and templates are where a second habit would have to be built"
+   "adds": null,
+   "title": "Fund first-month retention and conversion now, and test integrations before matching rivals",
+   "items": [
+    "Put the next retention money into the first month after signup, where the new onboarding still loses most of the users it loses.",
+    "Fund the conversion work that more than doubled the paying share of actives, and hold the price, which has not held conversion back.",
+    "Measure retention by integration use this quarter, and fund integrations only if users without them leave faster.",
+    "Treat the lead over Paperly as unproven until it publishes retention on the same basis as Lumen and Quill."
+   ]
   }
  ]
 }

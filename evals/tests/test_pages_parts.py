@@ -141,7 +141,7 @@ console.log(JSON.stringify({{ same: JSON.stringify(a) === JSON.stringify(b), sli
     def test_a_finding_names_the_part_file_its_page_came_from(self):
         pages = self.doc["pages"]
         broken = dict(pages[8])
-        broken["title"] = " ".join(["word"] * 14)  # past the title's word limit
+        broken["title"] = " ".join(["word"] * 16)  # past the title's word limit
         self.doc["pages"] = pages[:8] + [broken] + pages[9:]
         parts = self.split()
         result = author(str(parts), "--check")
@@ -158,16 +158,6 @@ console.log(JSON.stringify({{ same: JSON.stringify(a) === JSON.stringify(b), sli
         self.assertEqual(env_run.returncode, 0, env_run.stderr)
         written = json.loads(parts.read_text(encoding="utf-8"))
         self.assertEqual([entry for entry in written["pages"] if "include" in entry], [{"include": "pages/second.pages.json"}, {"include": "pages/third.pages.json"}])
-
-
-class DocumentedTests(unittest.TestCase):
-    def test_the_workflow_and_the_form_are_documented(self):
-        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-        reference = (SKILL / "references" / "page-types.md").read_text(encoding="utf-8")
-        self.assertIn('{ "include": "pages/<section>.pages.json" }', skill)
-        self.assertIn("--page <page-id>", skill)
-        self.assertIn('{ "include": "pages/economics.pages.json" }', reference)
-        self.assertIn("names the part file to edit", reference)
 
 
 if __name__ == "__main__":

@@ -91,7 +91,7 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
     ...(placed.includes("rail") ? { rail: { words: { min: COPY_LIMITS.railWordsMin, max: railCapacity(), measured: true } } } : {}),
     ...(placed.includes("so-what-bar") ? { bar: { words: { min: COPY_LIMITS.barWordsMin }, lines: { max: TEXT_LIMITS.barLines } } } : {}),
     ...(placed.includes("captions") ? { caption: { words: { min: COPY_LIMITS.captionWordsMin } } } : {}),
-    ...(placed.includes("on-exhibit") ? { callouts: { count: { max: CALLOUTS_MAX }, wordsEach: { max: calloutCapacity(), measured: true }, wordsBetweenThem: { min: COPY_LIMITS.calloutWordsMin } } } : {}),
+    ...(placed.includes("on-exhibit") ? { callouts: { count: { max: CALLOUTS_MAX }, wordsEach: { max: calloutCapacity(), measured: true }, wordsBetweenThem: { min: COPY_LIMITS.calloutWordsMin, note: "none needed where the chart carries a number mark - a change, a growth rate, a bracketed gap, a labelled reference line, a stack's total - which is how strong decks mark a chart" } } } : {}),
     ...(forms.includes("labelled-rows") ? { blocks: { points: { ...COPY_LIMITS.blockPoints }, labelWords: { max: COPY_LIMITS.blockLabelWords } } } : {}),
     ...(type === "argument" ? { panel: { words: { min: COPY_LIMITS.panelWordsMin } } } : {}),
     // A photograph stands in for words: the floor falls by the share of the body it holds, to this share of the floor at least.

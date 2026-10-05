@@ -41,8 +41,8 @@ called.
    confirmation read of the accepted deck; a run that stops before it (a review
    or confirmation packet waiting) is still judged, and recorded as not
    delivered with its `deliveryStage`.
-3. **Score.** The cold-run scorer (`../cold-run/score.mjs`) runs the build
-   bars on the scene and the plan gates on the plan.
+3. **Score.** The scorer (`score.mjs`, below) runs the build bars on the
+   scene and the plan gates on the plan.
 4. **Judge, blind.** A packet directory holding only `brief.md`, `rubric.md`
    (condensed; five dimensions and majors) and the rendered pages as contact
    sheets. No pages file, plan, scene, reviews, self-check, storyline critique
@@ -72,10 +72,59 @@ record (won-tied-lost) with its win rate, where a tie counts a half. Overall:
 the pairwise win rate against the previous version. Three runs is the least
 that shows spread; a mean moving by less than the standard deviation is noise.
 
+## Scoring a run
+
+`score.mjs` scores the plan an agent wrote and the deck it built. The runner
+calls it on every deck it collects; it scores a run made by hand the same way:
+
+```bash
+node evals/quality/score.mjs out/deck.plan.json out/          # plan and build
+node evals/quality/score.mjs out/deck.plan.json               # plan alone
+node evals/quality/score.mjs - out/                           # build alone
+node evals/quality/score.mjs out/deck.plan.json out/ --json
+```
+
+Exit 0 when the run clears every bar, 2 when it does not. It scores two things
+and refuses to average them:
+
+- **The plan** - the dot-dash, through `plan_gates.mjs`: what the deck was
+  going to be before anything was drawn.
+- **The build** - a built output directory, through the build bars in
+  `runtime/build-bars.mjs` (`designStatistics` and `scoreBuild`, re-exported by
+  `score.mjs`) read off `scene.json`: the bars delivery refuses a deck under,
+  applied from 12 analytical pages, with the empty-frame ceiling on every deck.
+  A catalogue (`purpose: "catalogue"`) is held to the ceilings only.
+
+They disagree more often than you would expect, and the disagreement is the
+finding: a Marvel plan recorded nine architectures and 0.888 entropy and
+produced a deck carrying 2.9 distinct exhibits per ten pages, no table
+treatment and no chart annotation. A plan can only be judged on what it
+records, so the build is the check on the plan and the plan the check on the
+brief; one combined number would hide which was wrong.
+
+Where the author's run log is beside the plan or the build directory
+(`<id>.author-log.jsonl`, which `author-deck.mjs` appends to on every run), the
+report also carries what the run cost - `cost`: compile runs and refused runs
+by mode (draft, check, full), runs a page, refusals by code and by page, and
+the longest streak of refused runs on one page. The numbers are counted from
+the log (`runtime/run-log.mjs`), never estimated, and reported, never scored:
+a run that kept no log has no `cost`, and a deck is not accepted for being cheap.
+
+The numbers do not replace looking: read the report, then look at the rendered
+pages, because the beautification pass in `references/design.md` catches what
+they cannot.
+
 ## Briefs
 
-- **dev** - the cold-run briefs in `../cold-run/briefs/`. Look at these runs,
-  find what failed, fix the skill.
+- **dev** - `briefs/dev/`. Look at these runs, find what failed, fix the skill.
+  Each is aimed at a different failure:
+
+  | Brief | What it is there to catch |
+  | --- | --- |
+  | `marvel-vs-dc.md` | The craft gap. An ordinary comparison that passed every gate and still read as dry. |
+  | `london-vs-new-york.md` | Geography drawn as paragraphs beside a stock photograph instead of as an annotated map. |
+  | `network-rollout.md` | The long scorecard: a twelve-row table on a four-point scale, which the skill can draw and almost never does. |
+
 - **heldout** - `briefs/heldout/`. Never used to tune the skill: nobody reads a
   held-out run to decide what to change. They say whether fixes made against
   the dev briefs generalise. See `briefs/heldout/README.md` for what to do when
@@ -85,8 +134,7 @@ that shows spread; a mean moving by less than the standard deviation is noise.
 
 `config.json` holds argv templates. Agent: `{prompt}`, `{workspace}`,
 `{plugin}`. Judge: `{prompt}`, `{packet}`, `{schema}` (the JSON schema the
-answer must match: `judge-schema.json`, `pairwise-schema.json`,
-`anchor-judge-schema.json`), `{model}`. The `claude` entries were checked
+answer must match: `judge-schema.json` or `pairwise-schema.json`), `{model}`. The `claude` entries were checked
 against `claude --help`. The `codex` agent entry is marked `unverified`: its
 flags were written without the CLI installed, and Codex loads plugins from its
 marketplace rather than from `{plugin}`, so install the package first. The
@@ -98,35 +146,13 @@ finding about the skill. `--prompt unattended` adds one line telling the agent
 nobody will answer - it changes the run, so it is part of what a result row
 records and pairwise only compares like with like.
 
-## Judge calibration
-
-`anchors/` holds rendered pages with a known place on the page scale. Once a
-person has scored them, every run reports the judge's mean absolute error over
-the scored anchors and records it as an `anchors` row; until then the runner
-says none are scored. See `anchors/README.md`.
-
-## Gate validity
-
-`defects.json` labels what people found on the stored specimens with the gate
-that should catch each defect. `gate-validity.mjs` replays the stored scenes and
-plans through today's gates and prints per-gate recall and precision:
-
-```bash
-node evals/quality/gate-validity.mjs
-node evals/quality/gate-validity.mjs --overlap                 # also the Chromium overlap audit
-node evals/quality/gate-validity.mjs --renders anthropic-vs-openai-2026=path/to/rendered
-```
-
-A defect with `expectedGate: null` is one no gate measures yet; the report
-lists what fired on those pages, which is where a new gate starts.
-
 ## Evidence validity
 
 `fixtures/evidence/` holds four fixture decks on different subjects - a credit
 union with eight declared players, an ambulance service under a closed evidence
 scope, a note-taking app against two rivals, and an explanation that compares
-nothing - each a pages file, an insight log with measures and an analysis plan
-(`make_fixtures.py` wrote them). Most exhibits type their values beside a
+nothing - each a pages file, an insight log with measures and an analysis
+plan. Most exhibits type their values beside a
 `basis`; the credit union also writes numbers by reference - a bound chart, an
 indexed trend bound to an index analysis, a bound metric, tokens in a title and
 in table cells - and the ambulance service draws a recorded series and a
@@ -178,113 +204,57 @@ node evals/quality/evidence-validity.mjs           # the table; exit 2 unless ev
 
 ## Critic calibration
 
-A storyline rated 5, then 4, then 6.2 across three different packets says
-nothing about the critic. `critic-calibration.mjs` measures it on packets that
-do not change:
+A critic that catches every planted defect and also sends clean decks back is
+not calibrated: it tells nothing apart. `critic-calibration.mjs` measures the
+storyline critic on packets that do not change:
 
 ```bash
 node evals/quality/critic-calibration.mjs --list                # the anchors, and what each plants
-node evals/quality/critic-calibration.mjs --repeats 5 --dry-run
-node evals/quality/critic-calibration.mjs --repeats 5 [--anchors finance,finance:declined-answer] [--judge claude]
+node evals/quality/critic-calibration.mjs --repeats 3 --dry-run
+node evals/quality/critic-calibration.mjs --repeats 3 --parallel 4 --raw <dir>        # every answer kept as returned
+node evals/quality/critic-calibration.mjs --from-raw <dir>                            # score the kept answers again; nothing is called
 node evals/quality/critic-calibration.mjs --repeats 3 --anchor-dir ~/decks/anchors    # your own decks, with the verdict you expect
 node evals/quality/critic-calibration.mjs --repeats 3 --review-packet <staged packet> # a deck-review packet, repeated
-node evals/quality/critic-calibration.mjs --repeats 3 --parallel 4 --raw runs/raw     # four calls at a time; every answer kept as returned
-node evals/quality/critic-calibration.mjs --from-raw runs/raw                         # score the kept answers again; nothing is called
 ```
 
+Every answer is read as the storyline loop reads it (`judgeCritique` in
+`runtime/storyline.mjs`): page lists settled, a blocking item with no
+`ifUnfixed` recorded as minor, validated against its packet, and its verdict
+read off its items. An answer the loop would refuse is counted under `form`
+and not judged.
+
 - **Repeats.** Each frozen packet is answered `--repeats` times by a fresh
-  critic (the judge command; `{packet}` is the staged packet directory). The
-  median spread of those ratings is the noise floor: a deck's rating moving by
-  less than it between two critiques is not a result.
-- **Planted anchors.** The four fixture decks clean, and each with one defect
-  of argument planted - an answer that declines the request, the players'
-  comparison cut, a chart about something else kept as context, a page that
-  restates its neighbour.
-- **What calibrated means: discrimination.** A critic is calibrated when, for
-  every plant, the planted deck is sent back with a blocking item filed under
-  the check that was planted (*caught*) **and** its clean twin draws no
-  blocking item under that check (*the planted check quiet on the clean
-  deck*); when every deck of yours is given the verdict you expect; and when
-  it has not sent back every deck it was shown. The catch alone decides
-  nothing: a critic that files under every check on every deck catches every
-  plant. Each pair's line says `told apart` or `NOT told apart` with the
-  three figures, and the result names why a run is not calibrated (`why`).
-  Whether a planted deck is also rated below its clean deck by more than the
-  spread is the secondary measure (`ratingSeparation`): reported, and it
-  decides nothing. A delivery bar rests on verdicts and findings, and on a
-  rating only where decks a person has judged anchor it.
-- **The clean fixture decks are twins, not anchors.** They carry no expected
-  verdict - six pages are too thin to say what a ready storyline is, and a
-  critic that sends one back is not wrong - so the run reports what was said
-  of them (`cleanVerdict`) as `not measured`. A planted deck run without its
-  clean twin is not measured either.
-- **Form, counted apart.** Every answer is validated as the storyline loop
-  validates it. One the loop would refuse is not rated, and is not a verdict
-  on the critic's judgement either: the result reports it under `form`
-  (answers, how many failed, and under which rule), and the calibration
-  verdict is read off the valid answers. An anchor that returned no valid
-  answer is `not measured`, not failed.
+  critic. The median spread of the ratings is the noise floor.
+- **Plants, found at their place.** The four fixture decks clean, and each
+  with one defect of argument planted: an answer that declines the request,
+  the players' comparison cut, a chart about something else kept as context
+  on one page, a page that restates its neighbour. Each plant names where it
+  goes and how to tell it was found there (`PLANTED[name].at` and
+  `.caught`): an answer part declined, a blocking item that opens on the
+  comparison (a comparison word or a declared rival in its first two
+  sentences - an item that sizes a gap and mentions a peer later is not it),
+  a blocking item on the target page, a cut or restatement item on the
+  repeated page. The repeated page is a cut - minor on the scale - so its
+  deck need not be sent back; the other three are blocking. A plant that
+  would move nothing is not run: the chart-as-context plant needs a deck
+  with two typed charts, so it is not planted on one that has a single
+  chart.
+- **The same test on the clean twin.** What the test finds at the plant's
+  place on the clean deck is a false alarm. A pair is told apart when the
+  plant is found in two answers in three or more, the false alarm comes in
+  one in three or fewer, and a blocking plant's deck is sent back.
+- **Clean decks passed.** Each clean fixture and the full-size worked
+  example (`showcase`, about fifty pages) must be passed by two answers in
+  three or more. This is the failure the measure exists for.
+- **Your decks.** `--anchor-dir` takes folders holding a deck and an
+  `anchor.json` - `{ "deck": "<id>.pages.json", "expect": "ready" | "revise",
+  "about": "..." }`, with an optional `rating` a person gave it - and holds
+  the critic to the verdict you expect.
 
-### What the real critic's run shows
-
-`calibration/storyline-critic.json` is the summary of a real run of the
-storyline critic on every built-in anchor - thirteen packets, three answers
-each, 39 calls - scored by `--from-raw` from the answers the run kept (no
-answer's text is recorded). It is **not calibrated**, and the fixtures are why:
-
-- Every planted deck was sent back with its plant's check filed: 7 of 7
-  measured pairs caught, 7 of 7 sent back. Read alone that was called
-  calibrated.
-- The same check was filed on the clean twin in 5 of those 7 pairs: an answer
-  that declines, a comparison cut and context kept off the claim are each
-  "caught" on a clean six-page fixture too. Only the restated page is told
-  apart, and only on the fixtures - quiet on the two clean ones it was run
-  on, filed on the planted ones in 6 of 6 answers; among the showcase's fifty
-  pages its check fires on the clean deck as well - so 2 of 7 pairs
-  discriminate. (The pair on the showcase's answer returned no valid answer:
-  not measured.)
-- The clean decks were themselves sent back: finance, public-ops, product and
-  the showcase by every valid answer, the explainer by 2 of 3, rated 4 to
-  6.8. They are too thin to say what "8, ready" looks like.
-- 7 of the 39 answers failed validation on form and were not rated.
-
-So on today's fixtures the critic's verdict is not evidence of calibration:
-it shows the critic finds what is planted, and not that it tells a planted
-deck from a clean one. What can show that is a clean deck a careful critic
-passes - which a six-page fixture is not.
-
-### What can anchor a rating
-
-Two kinds of full-size anchor exist, and they are not the same thing.
-
-- **Your own decks (`--anchor-dir`).** One folder a deck, holding the deck's
-  files as the author left them - `<id>.pages.json` or a compiled
-  `<id>.deck.json`, with its insight log, analyses and `sources/` - and an
-  `anchor.json`:
-
-  ```json
-  { "deck": "<id>.pages.json", "expect": "ready", "about": "the board paper that was approved as written" }
-  ```
-
-  `expect` is `ready` or `revise`: the verdict you would expect of a careful
-  critic. `rating` is optional: the number a person gave the deck, printed
-  beside the critic's and never averaged into it. The harness copies the folder to a temporary directory (it writes
-  nothing into yours), freezes the storyline packet and reports, per anchor,
-  the share of valid answers that agreed, and the mean rating the decks you
-  expected ready and the decks you expected sent back were given
-  (`ratingAnchors`). This is what a rating can be anchored to: decks a person
-  has judged. A critic is not calibrated while it disagrees with one. A deck
-  you expect `ready`, beside a copy of it with a defect you plant by hand and
-  expect sent back, is the pair the built-in fixtures cannot give.
-- **The showcase (`showcase`, in the repo).** The worked-example deck
-  (`skills/professional-slides/examples/page-types.pages.json`, about fifty
-  pages) clean, and with the two plants that apply to a deck with no insight
-  log. It is an anchor for **form at full size**: do answers about fifty pages
-  validate, how wide is the spread on a long packet, is a plant caught among
-  fifty pages. It carries no expected verdict, on purpose. A deck written to
-  show every page type is not proof of a good argument, and a critic that
-  sends it back is not wrong; its rating must not be read as what a good
-  storyline gets.
+Calibrated means every pair told apart, every clean deck passed and every
+expected verdict given. Whether a planted deck is also rated below its twin
+is reported and decides nothing. A run costs `anchors x repeats` critic calls
+and is written to `runs/critic-calibration/`.
 
 ### The judge command and the schema
 
@@ -390,7 +360,7 @@ form carries best, and the third that are free choose between two or three
 kinds, so two seeds cannot differ on much more than a fifth of the pages.
 
 `fixtures/variety/` holds the fixed spine: a fictional rail operator whose
-pages set every reading task the fit table knows (`make_fixture.py` wrote it).
+pages set every reading task the fit table knows.
 A page with no fit read - a diagram, a summary - is placed by the structure
 rules alone and reported where it differs between seeds, not failed.
 
@@ -401,7 +371,7 @@ rules alone and reported where it differs between seeds, not failed.
 checks blinding (the fake agent writes author files carrying a marker, and the
 fake judge reports any packet file carrying it), pairing through the shuffled
 order, results keying and the summary's arithmetic.
-`evals/tests/test_gate_validity.py` covers the replay, and
+`evals/tests/test_quality_score.py` covers the scorer, and
 `evals/tests/test_plan_variety.py` the variability measurement and its four
 assertions.
 `evals/tests/test_evidence_contract.py` runs the evidence measurement and

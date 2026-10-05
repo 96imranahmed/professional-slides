@@ -62,7 +62,7 @@ function resolve(root, from, specifier) {
   let spec = specifier;
   if (spec.startsWith("file://")) spec = decodeURIComponent(spec.slice(7));
   let target;
-  if (spec.startsWith("./skills/") || spec.startsWith("skills/")) target = path.join(root, spec);
+  if (/^\.?\/?(skills|evals)\//.test(spec) && !spec.startsWith("/")) target = path.join(root, spec);
   else if (spec.startsWith(".")) target = path.resolve(path.dirname(from), spec);
   else if (spec.startsWith("/")) target = spec;
   else return null;

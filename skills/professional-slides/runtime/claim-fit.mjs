@@ -36,6 +36,7 @@
 // questions one: where no task can be read, there is no fit to rank by.
 import { axisOf, isPercentUnit, normalUnit, valuesOf } from "./measures.mjs";
 import { drawRank } from "./design-systems.mjs";
+import { JUDGED_CELLS } from "./evidence.mjs";
 
 /**
  * The grades a form takes for a claim: `direct`, the best fit - the form shows
@@ -211,7 +212,7 @@ export const CARRIERS = Object.freeze([
     carries: { profile: D, rank: W }, needs: (p) => need(p.axis !== "periods", "measures over members") },
   { type: "scorecard", form: "progress", kind: "table", bound: "a token a cell under a column of type progress",
     carries: { profile: (p) => (p.percent && !p.signed && p.top <= 100 ? D : GRADE.none) }, needs: (p) => need(p.percent && !p.signed && p.top <= 100, "percentages of a maximum") },
-  ...["harvey", "rag", "lights", "check", "dot", "trend", "binary"].map((form) => ({ type: "scorecard", form, kind: "table", judged: true,
+  ...[...JUDGED_CELLS].map((form) => ({ type: "scorecard", form, kind: "table", judged: true,
     shows: { harvey: "members rated against criteria on a declared scale", rag: "a state or verdict a cell: on track, at risk, off track", lights: "a state a cell as a lamp", check: "which members meet each criterion",
       dot: "a yes or no a cell", trend: "the direction each measure moved for each member", binary: "which of two states each cell is in" }[form] })),
   // --- lookup --------------------------------------------------------------
@@ -321,11 +322,68 @@ export function handOf(seed) {
 /**
  * Where a mark falls in a deck's hand for one reading task, lowest first: a
  * kind of the hand by its place in it; any other mark - a form that is a page
- * construction, as `<type>/<form>` - by the seed alone, after them.
+ * construction, as `<type>/<form>` - at a place the seed draws among them,
+ * before the lead, between two marks or after the last each as likely: so a
+ * construction of equal fit is taken about as often as a mark of the hand,
+ * and neither ahead of every chart nor behind every one by construction.
  */
 export function markRank(seed, task, mark) {
-  const at = (handOf(seed).get(task) ?? []).indexOf(mark);
-  return at >= 0 ? at : 100 + drawRank(seed, "mark", task ?? "", mark);
+  const hand = handOf(seed).get(task) ?? [], at = hand.indexOf(mark);
+  return at >= 0 ? at : drawRank(seed, "mark", task ?? "", mark) * (hand.length + 1) - 1;
+}
+
+/**
+ * A form as a deck's draw ranks it for a reading task: by the kind it draws,
+ * so a page that draws its ranking as a form and one that draws it as a panel
+ * take the same mark; a form that draws no chart by its own name; two forms of
+ * one kind told apart by their names.
+ */
+export function formDraw(seed, type, form, task) {
+  const kind = kindOfForm(type, form), own = `${type}/${form}`;
+  return markRank(seed, task, String(kind).startsWith("chart.") ? kind : own) + drawRank(seed, "mark", task ?? "", own) / 1e6;
+}
+
+/**
+ * Whose turn it is among marks of equal fit: a mark's load, lowest first -
+ * how many exhibits the deck already draws in it (`count`), weighed by its
+ * place in the deck's hand for the task (`place`, 0 for the lead). The lead
+ * mark is taken until it has been drawn twice for each time the second has,
+ * and three times for the third: the hand is an order of preference, and a
+ * deck draws its marks in that proportion. So a deck led by dot plots is
+ * mostly dot plots where a ranking leaves the choice, with bars among them,
+ * and the next deck the other way round - neither a deck in one encoding nor
+ * every deck the same mixture.
+ */
+const turnOf = (count, place) => (count + 1) * (place + 1);
+
+/**
+ * Marks of equal fit in the order a deck's draw takes them: `{ ordered,
+ * by(a, b) }`, `by` naming what tells two apart. A mark is an exhibit kind,
+ * or a form as `<type>/<form>` (formDraw); `mark(item)` reads an item's.
+ * In turn: what the caller weighs ahead of the draw (`before`, each
+ * `[by, (a, b) => number]` - the structure rules, panels that match, a
+ * revision's convention); one the draw features from the design system's
+ * repertoire (`featured`, a set of marks: a deck uses what it features
+ * wherever the evidence allows); where the deck has a draw (`seed`), whose
+ * turn it is in its hand for `task` - `load(item)` the exhibits it already
+ * draws so (turnOf) - then the mark's place in the hand ("seed": one order a
+ * deck, so every page that reads one task and can take the deck's mark takes
+ * it); a deck with no draw takes what it draws least ("spread"); then
+ * `after`; then the order given ("order"). The spread comes after the draw
+ * and never before it: it is the same under every seed, and gave every deck
+ * from one spine the same mixture. The one order of the plan's forms
+ * (deck-structure.mjs allocateStructure), the kinds it gives open exhibits
+ * (openKinds) and a scaffold's form and kinds, so a scaffold takes what the
+ * plan gives its page.
+ */
+export function drawOrder(items, { seed = null, task = null, featured = null, load = null, mark = (item) => item, before = [], after = [] } = {}) {
+  const drawn = seed !== null && seed !== undefined;
+  const rank = (m) => { const [type, form] = String(m).split("/"); return form === undefined ? markRank(seed, task, m) : formDraw(seed, type, form, task); };
+  const place = new Map(drawn ? [...new Set(items.map(mark))].sort((a, b) => rank(a) - rank(b)).map((m, at) => [m, at]) : []);
+  const keys = [...before, ["featured", (a, b) => Boolean(featured?.has(mark(b))) - Boolean(featured?.has(mark(a)))],
+    ...(drawn ? [...(load ? [["seed", (a, b) => turnOf(load(a), place.get(mark(a))) - turnOf(load(b), place.get(mark(b)))]] : []), ["seed", (a, b) => place.get(mark(a)) - place.get(mark(b))]]
+      : load ? [["spread", (a, b) => load(a) - load(b)]] : []), ...after];
+  return { ordered: [...items].sort((a, b) => keys.map(([, key]) => key(a, b)).find((d) => d !== 0) ?? 0), by: (a, b) => keys.find(([, key]) => key(a, b) !== 0)?.[0] ?? "order" };
 }
 
 /**
@@ -344,6 +402,13 @@ export function describeFit() {
 
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const SPREAD = ["min", "q1", "median", "q3", "max"];
+/**
+ * Whether a single value is one a series is read against - a standard, an
+ * assumption, a threshold analysis's (`owner`, the insight it belongs to,
+ * where known) or one named as a target: what a profile counts as a target
+ * and a bullet draws as one, so the two read the same value.
+ */
+const isTarget = (m, owner = null) => m.standard === true || Boolean(m.assumed) || owner?.op === "threshold" || /threshold|target|floor|ceiling|limit|standard|covenant/i.test(m.name);
 // A measure every reference to it carries a place on: `ref@label` names one value of it.
 const bare = (ref) => String(ref).split("@")[0].trim();
 
@@ -420,8 +485,8 @@ export function profileOf(refs, { registry, insights = null, evidence = [], ex =
   const values = along.flatMap((m) => labels.map((label) => valuesOf(m)[axisOf(m).labels.indexOf(label)])).filter(finite);
   const units = new Set(series.map((m) => normalUnit(m.unit)));
   const names = new Set(series.map((m) => String(m.name).toLowerCase()));
-  // A threshold the series is read against: a single value in its unit that is a standard, an assumption or a threshold analysis's.
-  const targets = single.filter((m) => units.has(normalUnit(m.unit)) && (m.standard === true || m.assumed || ownerOf(m)?.op === "threshold" || /threshold|target|floor|ceiling|limit|standard|covenant/i.test(m.name))).length;
+  // A threshold the series is read against: a single value in its unit that is a target (isTarget).
+  const targets = single.filter((m) => units.has(normalUnit(m.unit)) && isTarget(m, ownerOf(m))).length;
   const sums = (Array.isArray(evidence) ? evidence : []).map((id) => insights?.get?.(id)).filter((item) => item?.derived && item.op === "sum" && Array.isArray(item.inputs));
   const periods = series.map((m) => (typeof m.period === "string" ? m.period.trim().toLowerCase() : null));
   return {
@@ -741,7 +806,7 @@ export function boundKeys(kind, measures, { form = null } = {}) {
     return box.every(Boolean) ? out({ series: named(box) }, box) : { why: `a box plot is five measures over the same members, named ${SPREAD.join(", ")}, and the insight does not record them` };
   }
   if (kind === "chart.bullet") {
-    const target = single.find(sameUnit) ?? series.find((x) => x !== lead && sameUnit(x) && x.axis.kind === "members");
+    const target = single.find((x) => sameUnit(x) && isTarget({ ...x.m, name: x.name })) ?? series.find((x) => x !== lead && sameUnit(x) && x.axis.kind === "members");
     return overMembers && target ? out({ series: named([lead]), targets: { measure: target.ref } }, [lead, target], { names: [lead.name] }) : { why: "a bullet sets a measure over members against a target in its unit, and the insight records no such target" };
   }
   if (kind === "chart.slope") {

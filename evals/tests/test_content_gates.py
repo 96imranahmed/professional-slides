@@ -207,6 +207,20 @@ class CaveatTests(unittest.TestCase):
                 text("list-item", "Pay bands overlap; the role, not the salary, separates the offers.")]
         self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
 
+    def test_a_deck_that_qualifies_every_page_is_advised_and_its_footnotes_are_not_counted(self):
+        # No one page is CAVEAT_HEAVY, but one limit on every page is twice the rate strong decks keep to their body.
+        def deck(limit, role="list-item"):
+            return [{"id": f"p{i}", "readingTask": "chart-with-commentary", "nodes": [
+                text("action-title", "Peak trains run full while the off-peak runs half empty"),
+                text("list-item", "Off-peak journeys grew 16% where trains ran half-hourly and 4% where they ran hourly, across ten stations."),
+                text(role, limit)]} for i in range(1, 14)]
+        limit = "The survey is unverified and does not cover weekend riders."
+        dense = run(page_gates.gate_caveat_dense, deck(limit), list(range(13)))
+        self.assertEqual([(f["code"], page_gates.severity(f)["severity"]) for f in dense], [("CAVEAT_DENSE", "advisory")])
+        self.assertGreater(dense[0]["measured"], page_gates.THRESHOLDS["caveat_words_max"])
+        self.assertEqual(run(page_gates.gate_caveat_dense, deck(limit, "footnote-text"), list(range(13))), [])
+        self.assertEqual(run(page_gates.gate_caveat_dense, deck(limit)[:5], list(range(5))), [])  # too few pages to read a rate
+
 
 class TableSchemaTests(unittest.TestCase):
     """The same table, invented over and over."""

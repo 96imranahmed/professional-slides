@@ -1,8 +1,8 @@
-import { CONTENT_FRAME, SLIDE, absolute, compileDeck, component, flow, grid, overlay, section, token } from "./core.mjs";
-import { REGISTRY } from "./registry.mjs";
-import { instantiateSlideTemplate, planSlide } from "./planner.mjs";
-import { SLIDE_TYPE_GUIDANCE, guidanceNote } from "./guidance.mjs";
-import { INSIGHT_TREE_TABLE_FOUR_BRANCH_SAMPLE } from "./insight-tree-table.mjs";
+import { CONTENT_FRAME, SLIDE, absolute, compileDeck, component, flow, grid, overlay, section, token } from "../../skills/professional-slides/runtime/core.mjs";
+import { REGISTRY } from "../../skills/professional-slides/runtime/registry.mjs";
+import { instantiateSlideTemplate, planSlide } from "../../skills/professional-slides/runtime/planner.mjs";
+import { SLIDE_TYPE_GUIDANCE, guidanceNote } from "../../skills/professional-slides/runtime/guidance.mjs";
+import { INSIGHT_TREE_TABLE_FOUR_BRANCH_SAMPLE } from "../../skills/professional-slides/runtime/insight-tree-table.mjs";
 
 function centeredFrame(preferred) {
   if ((preferred.width || 0) >= SLIDE.width && (preferred.height || 0) >= SLIDE.height) {

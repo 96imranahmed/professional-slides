@@ -10,7 +10,7 @@ class StandardPipelineContentTests(unittest.TestCase):
     def test_explicit_layouts_preserve_prose_and_audit_detects_loss(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {auditContent} from './skills/professional-slides/runtime/content-audit.mjs';
 const exhibit={type:'table',columns:['Category','Evidence'],rows:[['First','Observed'],['Second','Reported']]};
@@ -68,7 +68,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_grouping_preserves_units_precision_and_explicit_highlight_intent(self):
         result=run_node("""
 import assert from 'node:assert/strict';
-import {styleTable,composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,composeSlide} from './evals/support/compose.mjs';
 const table=styleTable({type:'table',columns:['Place','Rent','Change'],rows:[['A','£2640.00','1250%'],['B','£2000.50','1000%']]});
 assert.equal(table.rows[0][1],'£2,640.00');assert.equal(table.rows[1][1],'£2,000.50');assert.equal(table.rows[0][2],'1,250%');
 const slide=composeSlide({title:'DCEU remains a smaller cohort',layout:'exhibit-full',exhibit:{type:'chart.column',categories:['MCU','DCEU'],series:[{name:'Count',values:[37,15]}],highlights:[]}},0);

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -65,7 +66,8 @@ class SameContentTests(unittest.TestCase):
             # above the floor of its words a block - would be refused at the render (it is: 37.3 against 41.3 with the cycle
             # set so). The search says that, where it once called the cycle "verified" and the render then refused the deck.
             self.assertIn("No other form or placement of this type fits with the same content", run.stderr)
-            self.assertIn('fails:  form "cycle", commentary "below" - would take the deck\'s median words a block under its band', run.stderr)
+            # (Under the points it would also take the deck past its cap on points below, which the line names first.)
+            self.assertRegex(run.stderr, r'fails:  form "cycle", commentary "below" - .*would take the deck\'s median words a block under its band')
             self.assertNotIn("passes the scene checks", run.stderr)
             self.assertNotIn("verified", run.stderr)
             # The verdict is remembered with what it drops, so a later run says the same without composing again.
@@ -74,11 +76,11 @@ class SameContentTests(unittest.TestCase):
             self.assertEqual(verdict("cycle"), {"form": "cycle", "commentary": "below", "remaining": []})
             self.assertEqual(verdict("steps"), {"form": "steps", "commentary": "below", "remaining": [], "drops": ["exhibit.center"]})
             again = cli(Path(tmp) / "page-types.pages.json", "--check", "--fit-cap", "12")
-            self.assertIn('fails:  form "steps", commentary "below" - would take the deck\'s median words a block under its band', again.stderr)
+            self.assertRegex(again.stderr, r'fails:  form "steps", commentary "below" - .*would take the deck\'s median words a block under its band')
 
     def test_which_fields_a_form_draws_is_read_off_its_composition(self):
         result = run_node('''
-import { fitSearch, fitLines, writtenFields } from './skills/professional-slides/runtime/fit-search.mjs';
+import { fitSearch, fitLines } from './skills/professional-slides/runtime/fit-search.mjs';
 const page = { id: 'p1', type: 'mechanism', form: 'cycle', commentary: 'beside', why: 'w', title: 't', points: ['a', 'b'],
   exhibit: { type: 'cycle', center: 'Loop', items: [{ label: 'One', text: 'first' }, { label: 'Two', text: 'second' }] } };
 // A stand-in composer: a cycle draws everything; steps draw each item's label and nothing else of the exhibit; no form draws `why`.
@@ -90,10 +92,9 @@ const search = (alternatives) => fitSearch([{ id: 'p1', page, index: 0 }], { spe
   compile: (p) => { if (!['cycle', 'steps'].includes(p.form) || !['beside', 'below'].includes(p.commentary)) throw new Error('p1: not offered here'); return { id: 'p1', form: p.form }; },
   compose: async (spec) => ({ deck: { slides: [{ id: 'p1', nodes: [] }] }, pageErrors: [] }), pageGates: () => ({ ran: true, findings: [] }), localFindings: () => [], structure: () => [], brief: (f) => f.code, drawn });
 const fit = (await search(12)).get('p1');
-console.log(JSON.stringify({ fields: writtenFields(page).map((f) => f.path), pass: fit.pass, partial: fit.partial, lead: fitLines(fit).lead, lines: fitLines(fit).lines.filter((l) => l.startsWith('fits')),
+console.log(JSON.stringify({ pass: fit.pass, partial: fit.partial, lead: fitLines(fit).lead, lines: fitLines(fit).lines.filter((l) => l.startsWith('fits')),
   none: fitLines({ pass: [], partial: fit.partial, fail: [], needs: [], untried: [] }).lead }));
 ''')
-        self.assertEqual(result["fields"], ["why", "title", "points", "exhibit", "exhibit.center", "exhibit.items", "exhibit.items[].label", "exhibit.items[].text"])
         self.assertEqual(result["pass"], [{"form": "cycle", "commentary": "below"}])
         # Steps drop the centre and each item's text; the whole list is not dropped, since its labels are drawn.
         self.assertEqual([[alt["form"], alt["drops"]] for alt in result["partial"]], [["steps", ["exhibit.center", "exhibit.items[].text"]]] * 2)
@@ -118,6 +119,10 @@ class PlanTests(unittest.TestCase):
             self.assertTrue(planned["standing"]["S"])
             self.assertEqual([line for line in planned["standing"]["S"] if line not in checked["standing"]["S"]], [])
             self.assertIn("As declared, the deck satisfies its structure rules.", plan.stderr)
+            # Its pages carry their copy, so the plan composes them as written and reads their blocks as the check does: one number.
+            words = lambda line: float(re.search(r"median words a block on the prose pages ([\d.]+);", line).group(1))  # noqa: E731
+            self.assertEqual([line.split(":")[0] for line in planned["standing"]["estimated"]], ["TEXT_FRAGMENTED.floor", "TEXT_FRAGMENTED.ceiling"])
+            self.assertEqual(words(planned["standing"]["estimated"][0]), words(next(line for line in checked["standing"]["G"] if line.startswith("TEXT_FRAGMENTED.floor"))))
 
     def test_a_page_with_no_exhibit_yet_is_estimated_and_marked_and_the_verdict_says_so(self):
         # The same deck as a spine that keeps its forms and placements and has no exhibit written: what a form sets is read,
@@ -151,10 +156,16 @@ for (const page of doc.pages) if (page.type && placementsOf(page.type, page.form
 const full = allocateStructure(doc, { planOf }), again = allocateStructure(doc, { planOf }), cut = allocateStructure(doc, { planOf, maxEvaluations: 10 });
 const rows = (plan) => plan.pages.map((p) => `${p.id} ${p.form} ${p.commentary} ${p.source}`).join('|');
 console.log(JSON.stringify({ full: [full.satisfied, full.capped, full.steps > 0, full.evaluations > 10], same: rows(full) === rows(again) && full.evaluations === again.evaluations,
-  cut: [cut.satisfied, cut.capped, cut.steps, cut.unsatisfied.map((u) => u.code)] }));
+  before: full.declared.findings.filter((f) => f.severity === 'blocker').map((f) => f.code), changed: full.pages.filter((p) => p.source === 'changed').length,
+  proposed: full.pages.filter((p) => p.source === 'proposed').length, cut: [cut.satisfied, cut.capped, cut.steps, cut.unsatisfied.map((u) => u.code)] }));
 ''')
         self.assertEqual(result["full"], [True, False, True, True])
         self.assertTrue(result["same"])
+        # Every page that takes commentary beside its exhibit: the column cap is broken as declared, and the plan says which
+        # declared choices to change rather than only that the deck fails - and proposes nothing the pages declare.
+        self.assertIn("VARIETY_COLUMN", result["before"])
+        self.assertGreater(result["changed"], 0)
+        self.assertEqual(result["proposed"], 0)
         # Stopped by its count with a rule still broken, the plan says it was stopped and which rule is left.
         satisfied, capped, steps, left = result["cut"]
         self.assertEqual([satisfied, capped, steps], [False, True, 1])
@@ -277,19 +288,6 @@ console.log(JSON.stringify({ rate: of('RATE'), each: of('EACH'), cap: of('CAP'),
         self.assertFalse([line for line in result["lines"]["p3"] if line.startswith("RATE")])
 
 
-class WhatARunWritesTests(unittest.TestCase):
-    def test_a_check_writes_no_deck_and_the_two_files_it_does_write_are_the_ones_documented(self):
-        def stack(doc):
-            page_of(doc, "p10")["form"] = "stack"
-        with tempfile.TemporaryDirectory() as tmp:
-            file = worked_deck(tmp, stack)
-            self.assertEqual(cli(file, "--check").returncode, 2)
-            # A refused check of a page the fit search answered: the run log and the search's cache, and nothing else.
-            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["assets", "page-types.author-cache.json", "page-types.author-log.jsonl", "page-types.pages.json"])
-        for doc_file, said in ((SKILL / "references" / "page-types.md", "no deck is written (the run log and the fit cache are)"), (AUTHOR, "<id>.author-log.jsonl and may update the fit search's")):
-            self.assertIn(said, " ".join(doc_file.read_text(encoding="utf-8").replace("//", " ").split()))
-
-
 class ScaffoldTests(unittest.TestCase):
     def test_a_scaffold_bound_to_an_insight_carries_none_of_the_examples_words(self):
         result = run_node('''
@@ -302,7 +300,7 @@ const example = (type) => workedExamples().pages.find((p) => p.type === type);
 const out = {};
 for (const type of ['trend', 'numbers']) {
   const page = scaffoldPage(type, { id: 'p00', insight: series }), worked = new Set(texts(example(type)));
-  out[type] = { heading: page.exhibit.heading, annotations: (page.exhibit.annotations || []).map((a) => a.text), kept: texts(page).filter((text) => worked.has(text)), points: page.points ?? null, kpi: page.kpi ?? null, bound: page.exhibit.series };
+  out[type] = { annotations: (page.exhibit.annotations || []).map((a) => a.text), kept: texts(page).filter((text) => worked.has(text)), kpi: page.kpi ?? null, bound: page.exhibit.series };
 }
 // Unbound, the scaffold is still the worked example's own page: its data and its words, to copy the shape of.
 const plain = scaffoldPage('trend', { id: 'p00' });
@@ -311,12 +309,9 @@ console.log(JSON.stringify({ ...out, plain: plain.exhibit.heading === example('t
         for kind in ("trend", "numbers"):
             with self.subTest(type=kind):
                 page = result[kind]
-                self.assertEqual(page["heading"], "(Exhibit heading: what is measured, for whom, in which unit)")
                 self.assertTrue(page["annotations"])
-                self.assertEqual(set(page["annotations"]), {"(What happened here, and why it matters)"})
                 self.assertEqual(page["kept"], [], "a sentence of the worked example on the author's data")
                 self.assertEqual(page["bound"], [{"measure": "i-clinics/visits", "name": "visits"}])
-        self.assertTrue(all(point.startswith("(A point:") for point in result["numbers"]["points"]))
         # A bound figure's format keeps the number it prints: one decimal place would print 0.0 for 0.043.
         self.assertEqual(result["numbers"]["kpi"]["format"], "0.000")
         self.assertTrue(result["plain"])

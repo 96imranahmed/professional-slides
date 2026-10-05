@@ -229,6 +229,7 @@ console.log(JSON.stringify([[-21.428, '+0.0%'], [4.255, '+0.0%'], [1251, 'CHF 0.
     def test_metrics_and_tokens_are_written_from_the_measures_they_name(self):
         result = run_node(LOG + '''
 import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+import { plottedValues } from './skills/professional-slides/runtime/evidence.mjs';
 const cash = { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] };
 const strip = page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, title: 'Cash reached {{i-bal/cash@FY26}} million as net debt fell to {{A-net/result@FY26 | 0}} million',
   subtitle: 'Revenue {{i-bal/revenue | CHF0.0bn | /1000}}; rate {{i-bal/rate | +0.0%}}',
@@ -246,6 +247,9 @@ const cited = compileDeck(deckOf(page({ title: 'Cash rose every year while Alpha
 console.log(JSON.stringify({ title: bound.title, subtitle: bound.subtitle, metrics: bound.metrics, caption: bound.exhibit.caption, gate: codes(strip),
   table: [bind(tokens).page.exhibit.rows, bind(tokens).page.exhibit.basis, codes(tokens)], mixed: [bind(mixed).page.exhibit.basis ?? null, codes(mixed)],
   mixedWithBasis: codes(table(mixed.exhibit.rows, { basis: { measures: ['i-peers/profit', 'i-peers/margin'] } })),
+  judged: [codes(table([['Alpha', '{{i-peers/profit@Alpha | 0m}}', { type: 'harvey', value: 4 }], ['Beta', '{{i-peers/profit@Beta | 0m}}', { type: 'rag', value: 'red' }]], { columns: ['Carrier', 'Profit', { label: 'Readiness', type: 'harvey' }] })).filter((code) => code === 'BASIS_MISSING'),
+    plottedValues({ type: 'table', columns: ['Carrier', 'Profit', 'Readiness'], rows: [['Alpha', '20m', { type: 'harvey', value: 4 }], ['Beta', '3m', { type: 'harvey', value: 1 }]] }),
+    plottedValues({ type: 'stat-list', items: [{ value: '29%' }, { value: 15.3 }, { value: 'n/a' }] }, { printed: true })],
   grid: [bind(grid).page.exhibit.items.map((item) => item.value), bind(grid).page.exhibit.basis, codes(grid)], hero: [bind(hero).page.kpi, codes(hero)],
   cited: cited.spec.slides[0]?.source ?? cited.compileErrors }));
 ''')
@@ -263,6 +267,9 @@ console.log(JSON.stringify({ title: bound.title, subtitle: bound.subtitle, metri
         # One that also types numbers says which measures those are.
         self.assertEqual(result["mixed"], [None, ["BASIS_MISSING", "PROOF_MISSING"]])
         self.assertEqual(result["mixedWithBasis"], [])
+        # A scorecard's judged cells - Harvey balls, RAG states - are grades no measure holds: beside tokens they type nothing.
+        # For the evidence floor, a figure bound and printed ("29%") is read as a number as a typed one is; "n/a" is not.
+        self.assertEqual(result["judged"], [[], 2, 2])
         self.assertEqual(result["grid"], [["55m", "25m"], {"measures": ["i-bal/cash", "i-bal/floor"], "role": "proof", "labels": {"i-bal/cash": ["FY26"]}, "bound": True}, []])
         self.assertEqual(result["hero"], [{"label": "cash at the year end", "value": "GBP 55m", "basis": {"measures": ["i-bal/cash"], "role": "proof", "labels": {"i-bal/cash": ["FY26"]}, "bound": True}}, []])
         # A number printed through a token is cited to the record it came from, beside what the exhibit plots.

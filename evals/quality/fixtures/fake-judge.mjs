@@ -6,7 +6,7 @@
  * envelope with the verdict as text in `result`.
  *
  * Deck: rating 3 + number of sheets (capped at 10). Pair: prefers the deck with
- * more sheets, tie when equal. Anchor: FAKE_JUDGE_ANCHOR_RATING (default 5).
+ * more sheets, tie when equal.
  *
  *   FAKE_JUDGE_LOG   append {mode, files, leaks, prompt} here
  */
@@ -28,9 +28,6 @@ if (files.some((f) => f.startsWith("deck-1/"))) {
   mode = "pair";
   const [one, two] = [sheets("deck-1"), sheets("deck-2")];
   verdict = { preference: one === two ? "tie" : one > two ? "deck-1" : "deck-2", margin: "clear", reasons: ["more pages"] };
-} else if (files.some((f) => /^page\./.test(f))) {
-  mode = "anchor";
-  verdict = { rating: Number(process.env.FAKE_JUDGE_ANCHOR_RATING ?? 5) };
 } else {
   mode = "deck";
   const rating = Math.min(10, 3 + sheets("sheets"));

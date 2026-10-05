@@ -54,7 +54,7 @@ async function stage(name, deckPatch = {{}}, initial = null) {{
 const packetOf = async (step) => JSON.parse(await fs.readFile(path.join(step.dir, 'packet.json'), 'utf8'));
 const judged = (complete, sufficiency) => ({{ compliance: {{ verdict: complete ? 'complete' : 'incomplete', note: 'Judged against what the evidence in scope allows.' }},
   sufficiency: {{ verdict: sufficiency, note: 'Judged against the answer as it is stated.' }} }});
-const missing = (id, remedy, pub = 'known', severity = 'major') => ({{ id, analysis: `The analysis ${{id}} the answer turns on`, why: 'It would change which district takes the first crews.', data: 'The records named in the packet', public: pub, remedy, severity }});
+const missing = (id, remedy, pub = 'known', severity = 'major') => ({{ id, analysis: `The analysis ${{id}} the answer turns on`, why: 'It would change which district takes the first crews.', data: 'The records named in the packet', public: pub, remedy, severity, ifUnfixed: 'The committee would send crews to the wrong district first.' }});
 // A first spine critique that sends the storyline back for the analyses it names.
 const first = (packet, ids, missingAnalyses, o = {{}}) => ({{ pass: 1, verifies: null, verdict: 'revise', rating: 6, binding: packet.binding, summary: 'The argument holds in outline but two analyses it turns on are missing.',
   ...judged(false, 'insufficient'), provenance: {{ backend: 'subagent', model: 'fixture', promptHash: packet.promptHash }},
@@ -99,10 +99,7 @@ const notRun = await pass([status('M1', 'fixed', { artifact: 'B-vehicles' }), st
 const handWritten = await pass([status('M1', 'fixed', { artifact: 'o-response' }), status('M2', 'scope-limited')], provisional);
 const unrested = await pass([status('M1', 'fixed', { artifact: 'B-districts-unused' }), status('M2', 'scope-limited')], provisional);
 const searched = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'unavailable', { searchLog: 'sources/o-response.csv' })]);
-const ready = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'scope-limited')]);
-const sufficient = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'scope-limited')], { ...provisional, ...judged(true, 'sufficient') });
 const lowered = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'scope-limited', { severity: 'minor' })], provisional);
-const overrated = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'scope-limited')], { ...provisional, rating: 8 });
 const wrongItem = await pass([status('M1', 'scope-limited'), status('M2', 'scope-limited')], { ...provisional, ...judged(false, 'insufficient'), verdict: 'revise', rating: 6 });
 const accepted = await pass([status('M1', 'fixed', { artifact: 'B-headroom' }), status('M2', 'scope-limited')], provisional);
 const spec = JSON.parse(await fs.readFile(deck.specPath, 'utf8'));
@@ -117,7 +114,7 @@ await clear(deck);
 const still = await stage('public-ops');
 const s1 = await packetOf(await S.prepareStoryline(still.specPath, still.out));
 const sids = s1.pages.filter((p) => p.kind === 'content').map((p) => p.id);
-const filed = first(s1, sids, [missing('M1', 'computable', 'speculative')], { findings: [{ id: 'F1', scope: 'page', pages: [sids[0]], check: 'claim', severity: 'major', problem: 'The title states a topic, not what the series shows.', fix: 'State the rise and its size in the title.' }],
+const filed = first(s1, sids, [missing('M1', 'computable', 'speculative')], { findings: [{ id: 'F1', scope: 'page', pages: [sids[0]], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title states a topic, not what the series shows.', fix: 'State the rise and its size in the title.' }],
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: ['missing', 'claim'].includes(check) ? 'findings' : 'clean', note: ['missing', 'claim'].includes(check) ? `Filed an item under ${check}.` : `Checked ${check} across the spine and found nothing to raise.` })) });
 await answer(still, filed);
 await still.write({}, (d) => { d.pages.at(-1).title = `${d.pages.at(-1).title} now`; });
@@ -131,8 +128,7 @@ console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.s
   analyses: p1.analyses.map((a) => [a.id, a.status]),
   caveat: [caveat.status, said(caveat, 'fixed on its artifact')], notRun: [notRun.status, said(notRun, 'could not be run')], handWritten: [handWritten.status, said(handWritten, 'not among the packet\\'s computed analyses')],
   unrested: [unrested.status, said(unrested, 'not among the packet')], searched: [searched.status, said(searched, 'the evidence scope is closed')],
-  ready: [ready.status, said(ready, 'verdict is ready while M2'), said(ready, 'sufficiency is sufficient while M2')], sufficient: [sufficient.status, said(sufficient, 'sufficiency is sufficient while M2')],
-  lowered: [lowered.status, said(lowered, 'keeps its major severity')], overrated: [overrated.status, said(overrated, '7 or less')],
+  lowered: [lowered.status, said(lowered, 'keeps its major severity')],
   wrongItem: [wrongItem.status, said(wrongItem, 'the team can still act on it')],
   accepted: [accepted.status, accepted.limits?.length], gate, outcome: [outcome.verdict, outcome.open.map((e) => [e.id, e.severity]), outcome.answerLimits.length], finalGate: finalGate.some((e) => e.includes('offers its answer as final')) }));
 ''')
@@ -151,11 +147,8 @@ console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.s
         # Nor does an item close on what already stood when it was filed, or on a page that did not move.
         self.assertEqual(result["unmoved"], ["invalid", True, True, False])
         self.assertEqual(result["searched"], ["invalid", True])  # nothing could be searched
-        # The forbidden retrieval stays open at its severity: not ready, not sufficient, not lowered.
-        self.assertEqual(result["ready"], ["invalid", True, True])
-        self.assertEqual(result["sufficient"], ["invalid", True])
+        # The forbidden retrieval stays open at its severity, never lowered; the verdict is read off the ledger, so it is provisional below.
         self.assertEqual(result["lowered"], ["invalid", True])
-        self.assertEqual(result["overrated"], ["invalid", True])
         self.assertEqual(result["wrongItem"], ["invalid", True])  # a computable analysis is not excused by the scope
         # Provisional is a pass of its own: the gate opens, and the record keeps what stayed open.
         self.assertEqual(result["accepted"], ["provisional", 1])
@@ -174,9 +167,8 @@ const guess = check(first(p1, ids, [missing('M1', 'retrieval', 'speculative')]))
 const computable = check(first(p1, ids, [missing('M1', 'computable', 'speculative')]));
 const assumption = check(first(p1, ids, [missing('M1', 'assumption', 'speculative', 'blocker')], { rating: 5 }));
 const noRemedy = check(first(p1, ids, [{ ...missing('M1', 'retrieval'), remedy: undefined }]));
-const overrated = check(first(p1, ids, [missing('M1', 'computable', 'speculative', 'blocker')]));
-const complete = check(first(p1, ids, [missing('M1', 'retrieval')], judged(true, 'insufficient')));
-const provisional = check(first(p1, ids, [missing('M1', 'retrieval')], { verdict: 'provisional', ...judged(true, 'provisional') }));
+// The verdict and the judgements are read off the ledger, whatever the critic wrote: an open retrieval on an open scope is within reach.
+const derived = S.withJudgements(first(p1, ids, [missing('M1', 'retrieval')], { verdict: 'ready', ...judged(true, 'sufficient'), rating: 9 }), S.storylineLedger([], first(p1, ids, [missing('M1', 'retrieval')])), { evidenceScope: p1.evidenceScope, answerStatus: p1.answerStatus });
 const critique = first(p1, ids, [missing('M1', 'retrieval')]);
 await answer(deck, critique);
 // A title changes; the answer does not.
@@ -195,7 +187,7 @@ const three = await S.prepareStoryline(deck.specPath, deck.out);
 const p3 = await packetOf(three);
 const narrowed = await answer(deck, verification(p3, critique.binding, [status('M1', 'narrowed', { evidence: 'The answer now claims the lead only among the two products that publish retention.' })]));
 await clear(deck);
-console.log(JSON.stringify({ guess, computable, assumption, noRemedy: noRemedy.some((e) => e.includes('remedy')), overrated, complete, provisional,
+console.log(JSON.stringify({ guess, computable, assumption, noRemedy: noRemedy.some((e) => e.includes('remedy')), derived: [derived.verdict, derived.compliance.verdict, derived.sufficiency.verdict, derived.rating],
   two: [two.status, p2.scope.answerChanged], narrowedSame: [narrowedSame.status, said(narrowedSame, 'the answer has not changed')],
   limitedOpen: [limitedOpen.status, said(limitedOpen, 'evidence scope is open')], three: p3.scope.answerChanged, narrowed: narrowed.status,
   remedies: Object.keys(S.REMEDIES), statuses: S.STORYLINE_STATUSES, verdicts: S.STORYLINE_VERDICTS, closed: P.CLOSED }));
@@ -205,16 +197,15 @@ console.log(JSON.stringify({ guess, computable, assumption, noRemedy: noRemedy.s
         self.assertEqual(result["computable"], [])
         self.assertEqual(result["assumption"], [])
         self.assertTrue(result["noRemedy"])
-        self.assertTrue(any("5 or less" in e for e in result["overrated"]), result["overrated"])  # a blocker open caps the rating
-        self.assertTrue(any("compliance is complete while M1" in e for e in result["complete"]), result["complete"])  # the scope is open: the team can fetch it
-        self.assertTrue(any("provisional is for a storyline whose only open items the evidence scope forbids" in e for e in result["provisional"]), result["provisional"])
+        # The scope is open, so the team can fetch it: revise, incomplete, insufficient - and the rating stays the critic's own reading.
+        self.assertEqual(result["derived"], ["revise", "incomplete", "insufficient", 9])
         self.assertEqual(result["two"], ["packet-written", False])
         self.assertEqual(result["narrowedSame"], ["invalid", True])
         self.assertEqual(result["limitedOpen"], ["invalid", True])
         self.assertTrue(result["three"])
         self.assertEqual(result["narrowed"], "ready")
         self.assertEqual(result["remedies"], ["computable", "assumption", "retrieval"])
-        self.assertEqual(result["statuses"][-3:], ["unavailable", "narrowed", "scope-limited"])
+        self.assertEqual(result["statuses"][-4:], ["unavailable", "narrowed", "scope-limited", "withdrawn"])
         self.assertEqual(result["verdicts"], ["ready", "provisional", "revise"])
         self.assertNotIn("scope-limited", result["closed"])  # a limit recorded, never a defect excused
 
@@ -376,7 +367,7 @@ const laidOut = await deck.write({}, null);
 const afterLayout = [laidOut.slides.filter((s) => s.pageType?.pending).length, await gate(laidOut), (await S.prepareStoryline(deck.specPath, deck.out)).status];
 // Then layout repairs: another form, another chart type, the commentary moved, a caption and the points rewritten.
 const refit = await deck.write({}, (d) => { const f4 = page(d, 'f4'); f4.form = 'stack'; f4.exhibits[1].type = 'chart.bar'; f4.exhibits[0].caption = 'A caption rewritten after the critique, eight words or more';
-  const f5 = page(d, 'f5'); f5.form = 'lollipop'; });
+  const f5 = page(d, 'f5'); f5.form = 'bars'; for (const column of f5.exhibit.columns.filter((c) => c.heat)) { delete column.heat; column.bar = true; } });
 const afterRefit = [refit.slides.find((s) => s.id === 'f4').pageType.form, refit.slides.find((s) => s.id === 'f5').pageType.form, await gate(refit), (await S.prepareStoryline(deck.specPath, deck.out)).status];
 // A changed claim breaks it, and the loop writes the verification pass for that page alone.
 const reclaimed = await deck.write({}, (d) => { page(d, 'f1').title = 'Loans grew 57% in seven years, twice the pace of deposits'; });
@@ -408,7 +399,7 @@ console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p)
         # critique pass later. It is refused where it is drafted, on that page alone, in the critic's own words.
         self.assertEqual([entry[:2] for entry in result["blind"]], [["f0", "SPINE_UNDETERMINED"]])
         self.assertIn("the critic is told the page shows each plotted, whole", result["blind"][0][2])
-        self.assertEqual(result["afterRefit"], ["stack", "lollipop", [], "ready"])  # and so does a form, chart-type or copy repair
+        self.assertEqual(result["afterRefit"], ["stack", "bars", [], "ready"])  # and so does a form, chart-type or copy repair
         self.assertEqual(len(result["claimGate"]), 1)
         self.assertIn("the spine changed after the storyline critique (f1:", result["claimGate"][0])
         self.assertIn("Copy edits and a chart redrawn in another chart form do not change the spine", result["claimGate"][0])

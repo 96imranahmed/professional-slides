@@ -18,8 +18,8 @@ class OverlapTests(unittest.TestCase):
         results = run_node(r'''
 import { createRequire } from 'node:module';
 import { textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, token } from './skills/professional-slides/runtime/core.mjs';
-import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
-import { auditSlideOverlaps } from './skills/professional-slides/runtime/validate-overlap.mjs';
+import { renderSlideHtml } from './evals/support/html.mjs';
+import { auditSlideOverlaps } from './evals/support/overlap-audit.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require(require.resolve('playwright', {paths:[process.env.RUNTIME_NODE_MODULES]}));
 const browser = await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_BROWSER_PATH});

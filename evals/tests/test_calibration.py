@@ -129,7 +129,7 @@ class CompareTests(unittest.TestCase):
     def test_the_comparison_reads_targets_weight_json_still_carries(self):
         result = run_node('''
 import {ROWS,measureScene,compare} from './evals/calibration/compare.mjs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import fs from 'node:fs';
 const dir='./skills/professional-slides/examples';

@@ -12,7 +12,7 @@ const error = (fn) => { try { fn(); return null; } catch (e) { return e.message;
 """
 
 PLANNED = '''
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
 const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
 '''
@@ -22,7 +22,7 @@ class ComposeTableTests(unittest.TestCase):
     def test_bar_focus_survives_composition_without_changing_scale_or_peer_marks(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
@@ -50,7 +50,7 @@ console.log('{}');
     def test_explicit_peer_tables_keep_their_semantic_treatments(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const records={type:'table',columns:['Record','Content'],rows:[['Q01','Customer request'],['Q02','Source excerpt']]};
 const categories={type:'table',treatment:'categories',columns:[{label:'Evidence class',type:'category'},'Condition'],rows:[['Access','Scoped fields'],['Commitment','No invented approval']]};
@@ -72,7 +72,7 @@ console.log('{}');
     def test_clock_times_and_decimal_labels_are_not_sequence_numbers(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 for (const labels of [['09:05 · Probe','09:12 · Replay'],['1.1 Component','1.2 Component']]) {
  const table={columns:['Probe','Evidence'],rows:labels.map(label=>[label,'Version record'])};
@@ -90,7 +90,7 @@ console.log('{}');
     def test_automatic_treatments_preserve_styled_rows_and_totals(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const decision={columns:['Work package','Hours','Decision output'],rows:[
  ['Review',10,'Independent ratings'],{style:'accented',cells:['Adjudication',1.5,'Ruling']},['Total',11.5,'Review package']]};
@@ -115,7 +115,7 @@ console.log('{}');
     def test_treatment_follows_content_not_the_first_option(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const stages=styleTable({columns:['Stage','When','Decision at that point'],rows:[['Move alone','Year 1','Rent small'],['Partner joins','Year 2','Re-size']]});
 assert.equal(stages.treatment,'categories');
 assert.deepEqual(stages.rows.map(r=>r[0].sectionNumber),[1,2]);
@@ -149,7 +149,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_two_tables_share_a_page_only_when_they_read_as_one_design(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {splitTables} from './skills/professional-slides/runtime/compose.mjs';
+import {splitTables} from './evals/support/compose.mjs';
 const light=(cols,rows)=>({type:'table',columns:cols,rows});
 const stages=light(['Stage','When'],[['Move alone','Year 1'],['Partner joins','Year 2']]);
 const visits=light(['Visit','Then decide'],[['NYC','Lead option'],['SF','Only if']]);
@@ -199,7 +199,7 @@ class StatusTableTests(unittest.TestCase):
     def test_observed_use_and_signed_changes_remain_neutral_without_a_verdict(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const ex={type:'table',columns:['Agent','Used draft?','Cost change'],rows:[['Control','Yes','+20%'],['Offer','No','-15%']]};
 const styled=styleTable(ex);
@@ -215,7 +215,7 @@ console.log('{}');
     def test_verdict_cells_recommended_column_and_total_rows_are_inferred(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable, paginateTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable, paginateTable} from './evals/support/compose.mjs';
 const t=styleTable({columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]});
 assert.equal(t.rows[0][0].sectionNumber,1);assert.equal(t.rows[0][0].surface,'plain');
 assert.deepEqual(t.rows[0][2],{type:'rag',value:'at-risk',text:'At risk'});
@@ -288,7 +288,7 @@ class BarColumnTests(unittest.TestCase):
     def test_a_bar_column_derives_its_shared_scale_and_keeps_the_figures(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const table = styleTable({type:'table',
   columns:[{label:'Segment'},{label:'Revenue',unit:'$m'},{label:'Growth to 2027',unit:'% p.a.',bar:true}],
   rows:[['Enterprise','1,240','11.2'],['Mid-market','780','6.4'],['Regulated','560','14.8']]});
@@ -337,7 +337,7 @@ class InferredTreatmentTests(unittest.TestCase):
         # still wins, and words from no one scale stay words.
         run_node(r"""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const columns=['Function','Recognition','Owner'];
 const rows=[['Finance','Full','A'],['Operations','Strong','B'],['Sales','Partial','C']];
 const inferred=styleTable({columns,rows});
@@ -361,7 +361,7 @@ console.log('{}');
     def test_figures_take_the_treatment_their_shape_supports(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 // A matrix: three columns of exact figures in one unit share one heat scale,
 // each cell keeping its figure.
 const matrix=styleTable({columns:['Region','2023','2024','2025'],rows:[['North','12%','14%','19%'],['South','8%','9%','11%'],['East','21%','24%','30%']]});
@@ -395,7 +395,7 @@ console.log('{}');
     def test_a_labelled_table_of_figures_takes_its_bars_and_keeps_its_total(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 // A filled label column styles the names, not the figures beside them.
 const pair=styleTable({columns:[{label:'Lab',type:'category'},'Committed round'],rows:[['OpenAI','$122B'],['Anthropic','$65B']]});
 assert.equal(pair.columns[1].type,'bars');
@@ -421,7 +421,7 @@ console.log('{}');
         # the definition names - here a highlighted row - is the table's own.
         run_node(r"""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const rows=[['Eastern','14.6','Electrify first'],['Valley','11.2','Extend the sidings'],['Dales','9.1','Grows first']];
 const columns=['Line',{label:'Journeys',unit:'million'},{label:'What it means',implication:true}];
 const gutter=styleTable({columns,rows});
@@ -437,7 +437,7 @@ console.log('{}');
         # The bars are drawn before the rank is derived; read as text the bar
         # cells were empty and every row ranked first.
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const last=(t)=>t.rows.map(r=>(Array.isArray(r)?r:r.cells).at(-1));
 const authored=styleTable({columns:['Company',{label:'Deal size',unit:'$m',bar:true}],rows:[['A','300'],['B','450'],['C','149']],derive:['rank'],deriveFrom:'Deal size'});
 const inferred=styleTable({columns:['Company',{label:'Deal size',unit:'$m'}],rows:[['A','300'],['B','450'],['C','149']],derive:['rank','share']});
@@ -450,7 +450,7 @@ console.log(JSON.stringify({authored:last(authored),inferred:inferred.rows.map(r
     def test_a_figure_written_as_a_bound_a_range_or_missing_is_drawn_for_what_it_says(self):
         result = run_node(r"""
 import assert from 'node:assert/strict';
-import {styleTable, quantity} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable, quantity} from './evals/support/compose.mjs';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 // What a cell says: exact, approximate, bounded, a range, or none of those.
 assert.deepEqual(quantity('$4,500–5,600'),{value:5600,low:4500,mark:'$|',bound:'range'});
@@ -496,7 +496,7 @@ console.log(JSON.stringify({ok:true}));
         # treatment that needs no width - heat, keyless because every cell
         # prints its figure - rather than going back to a plain column.
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const props=styleTable({columns:['Line','Revenue, $','Basis of the estimate and its period'],rows:[['A','1,250,000.50','Company filing for the year to March, audited'],['B','980,250.25','Press report of the private metric, unaudited'],['C','1,105,750.75','Analyst estimate from the round memo, unaudited']]});
 const nodes=(width)=>REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height:400},props}).nodes;
@@ -517,7 +517,7 @@ console.log(JSON.stringify({wide:nodes(900).some(n=>n.role==='table-bar'),narrow
         # row's figure is the least whatever the range, so that row is accented;
         # a title that ranks nothing leaves the figures as written.
         result = run_node(r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const table={type:'table',panelHeading:'Two-bedroom asks',columns:[{label:'Listing',type:'text'},{label:'Size',unit:'bath / sq ft',type:'text'},{label:'Rent',unit:'$ a month',align:'right'}],
   rows:[['332 Jefferson #415','1 bath / 1,000 sq ft','$3,600'],['300 Newark #4F','2 bath / 1,150 sq ft','$4,400'],['Park Slope range','900-1,000 sq ft','$4,500-5,600']]};
@@ -536,7 +536,7 @@ console.log(JSON.stringify({ranked:accented(ranked),bars:ranked.some(n=>n.role.s
         # A row block's table has a fixed height: the width the bars take made
         # the names beside them wrap past it, and the page refused to compose.
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const props=styleTable({columns:[{label:'Lab',type:'category'},'Post-money, $B'],rows:[['OpenAI, March round','852'],['Anthropic, May round','965']]});
 const at=(width,height)=>{ try { const nodes=REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width,height},props}).nodes;
@@ -549,7 +549,7 @@ console.log(JSON.stringify({roomy:at(300,160),tight:at(300,100)}));
     def test_cards_wrap_into_a_grid(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const items=[...Array(6)].map((_,i)=>({icon:'target',title:`Card ${i}`,text:'A line about it.'}));
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const grid=composeSlide({title:'A title that states the finding here',exhibit:{type:'cards',tone:'plain',items,columns:3}},0);
@@ -586,7 +586,7 @@ class FindingsMatrixMarkTests(unittest.TestCase):
         result = run_node(r"""
 import assert from 'node:assert/strict';
 import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {TABLE_VARIANTS} from './skills/professional-slides/runtime/table-fixtures.mjs';
 const page={id:'m',type:'matrix',form:'findings-matrix',commentary:'in-exhibit',takeaway:false,
@@ -615,7 +615,7 @@ console.log(JSON.stringify({alts,logos:roles.filter(r=>r==='table-header-logo').
 
     def test_a_heat_key_names_missing_states_only_where_a_cell_is_missing(self):
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 const key=(rows)=>{ const props=styleTable({columns:['Rent',{label:'$305k',unit:'%'},{label:'$385k',unit:'%'},{label:'$460k',unit:'%'}],rows});
   return renderTable({id:'t',frame:{x:0,y:0,width:900,height:400},props}).nodes.filter(n=>n.role==='table-legend').map(n=>n.text).join(' '); };
@@ -634,7 +634,7 @@ console.log(JSON.stringify({full,gap}));
         # is a ramp from the least figure to the greatest, in their units; and
         # since every cell prints its figure, the author may drop it.
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 const table={columns:['Monthly rent',{label:'$305k',unit:'%'},{label:'$385k',unit:'%'},{label:'$460k',unit:'%'}],rows:[['$4,000','15.7','12.5','10.4'],['$5,500','21.6','17.1','14.3'],['$6,500','25.6','20.3','17.0']]};
 const draw=(extra)=>renderTable({id:'t',frame:{x:0,y:0,width:560,height:400},props:styleTable({...table,...extra})}).nodes;
@@ -686,7 +686,7 @@ class RatingColumnTests(unittest.TestCase):
         # scale - the deck's densest table drew no treatment at all.
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './evals/support/compose.mjs';
 const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
 const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 const markets=['Netherlands','Ireland','Sweden','Poland','Germany','France','Spain','Italy','Portugal','Czechia','Romania','Greece'];
@@ -707,7 +707,7 @@ console.log('{}');
         """First cold run: only known anchors become marks; a column mostly unknown stays words."""
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable as rawStyleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable as rawStyleTable} from './evals/support/compose.mjs';
 const readiness={type:'harvey',label:'Data readiness',min:0,max:4,anchors:{0:'None',1:'Weak',2:'Partial',3:'Strong',4:'Full'}};
 const styleTable=ex=>rawStyleTable({...ex,scales:{readiness},columns:ex.columns.map((c,i)=>i===1?{...(typeof c==='string'?{label:c}:c),scale:'readiness'}:c)});
 const rows=[['A','Full','1'],['B','Open','2'],['C','Open','3'],['D','N/A','4'],['E','Strong','5'],['F','TBD','6']];
@@ -726,7 +726,7 @@ class ImplicationGutterTests(unittest.TestCase):
         # France row and read as a verdict on France.
         run_node('''
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 // Prizes that do not add up: a closing row equal to the sum of the rows above
 // is a total, which an implication gutter no longer stops the composer reading.
 const rows=Array.from({length:12},(_,i)=>[`Market ${i+1}`,`${10+i}`,`Wave ${i%3+1}`]);
@@ -748,7 +748,7 @@ class TableSplitTests(unittest.TestCase):
         """PR #4 review: styled total rows were left out of the weight that decides when tables split."""
         result=run_node('''
 import assert from 'node:assert/strict';
-import {splitTables} from './skills/professional-slides/runtime/compose.mjs';
+import {splitTables} from './evals/support/compose.mjs';
 const table={type:'table',treatment:'standard',columns:['Item','Value'],rows:[{style:'total',cells:['Total','10']}]};
 assert.equal(splitTables({title:'Totals',exhibits:[table,table]}).length,1);
 const heavy={...table,rows:[{style:'total',cells:['A'.repeat(70),'10']}]};

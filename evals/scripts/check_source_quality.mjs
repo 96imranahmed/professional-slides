@@ -9,7 +9,7 @@ import { deadExports } from "./dead_exports.mjs";
 
 const root = process.cwd();
 const runtimeNode = process.env.RUNTIME_NODE || process.execPath, runtimePython = pythonBin();
-const sourceRoots = ["skills/professional-slides/runtime", "evals/scripts", "evals/quality", "evals/cold-run", "evals/calibration"];
+const sourceRoots = ["skills/professional-slides/runtime", "evals/scripts", "evals/quality", "evals/support", "evals/calibration"];
 // Generated or cached, never authored: the quality eval's kept runs and bytecode.
 const SKIPPED_DIRECTORIES = new Set(["runs", "__pycache__", "node_modules"]);
 

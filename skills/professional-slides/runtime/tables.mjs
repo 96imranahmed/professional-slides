@@ -949,7 +949,7 @@ function widenForWords(model, widths, props, { padding, textSize, chevronInset }
  *     one): each cell shaded at its step of the column's range, with no key -
  *     every cell prints its figure (measureTable omits a heat key on those
  *     terms), and the panel that could not hold the bars has no row to spare.
- *   - The row the page's title ranks (`fallbackRow`, compose.mjs: "cheapest"
+ *   - The row the page's title ranks (`fallbackRow`, compose-tables.mjs: "cheapest"
  *     over a column whose least figure is one row's), tinted as an accented
  *     row, when a figure is a bound or a range: one shade cannot state "500+"
  *     or "$4,500-5,600", but the row the argument turns on can still be found.

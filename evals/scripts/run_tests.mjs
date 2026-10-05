@@ -24,8 +24,8 @@
  * run. Each worker keeps its own warm Node probe worker, so no two processes
  * share one.
  *
- * `evals/run.sh` is the fuller version: it also prints the content-stage and
- * cold-run numbers for the example decks.
+ * `evals/run.sh` is the fuller version: it also prints the example decks'
+ * content-stage numbers and runs the source checks.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";

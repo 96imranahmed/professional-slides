@@ -40,11 +40,11 @@
 //   compose-points.mjs        points, prose, the side column, the so-what close, fill
 //   compose-pictures.mjs      images, photographs, picture pages and their credits
 //   compose-body.mjs          the page body's frame and sizes, and the deck's design layout
-export { splitReadingModes, splitTables, paginateTable, TRACKER_NAMES, sectionTabs, agendaPages, composeDeck, applyTemplate, toDeckPlan } from "./compose-deck.mjs";
-export { SLIDE_KEYS, composeSlide } from "./compose-page.mjs";
-export { SHAPE_NAMES, PASS_NAMES } from "./compose-passes.mjs";
-export { PAGE_SHAPE_NAMES } from "./compose-layouts.mjs";
-export { barScales, quantity, styleTable } from "./compose-tables.mjs";
-export { changeFromContent, focusFromTitle, namedInTitle } from "./compose-charts.mjs";
-export { IMPLICATION_NAMES, POINT_STYLE_NAMES, resolveFill } from "./compose-points.mjs";
-export { pictureCredits } from "./compose-pictures.mjs";
+export { splitReadingModes, splitTables, paginateTable, TRACKER_NAMES, sectionTabs, agendaPages, composeDeck, applyTemplate, toDeckPlan } from "../../skills/professional-slides/runtime/compose-deck.mjs";
+export { SLIDE_KEYS, composeSlide } from "../../skills/professional-slides/runtime/compose-page.mjs";
+export { SHAPE_NAMES, PASS_NAMES } from "../../skills/professional-slides/runtime/compose-passes.mjs";
+export { PAGE_SHAPE_NAMES } from "../../skills/professional-slides/runtime/compose-layouts.mjs";
+export { barScales, quantity, styleTable } from "../../skills/professional-slides/runtime/compose-tables.mjs";
+export { changeFromContent, focusFromTitle, namedInTitle } from "../../skills/professional-slides/runtime/compose-charts.mjs";
+export { IMPLICATION_NAMES, POINT_STYLE_NAMES, resolveFill } from "../../skills/professional-slides/runtime/compose-points.mjs";
+export { pictureCredits } from "../../skills/professional-slides/runtime/compose-pictures.mjs";

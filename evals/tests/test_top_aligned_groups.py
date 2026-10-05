@@ -58,7 +58,7 @@ console.log(JSON.stringify({cell:dots[0].frame.width,dotsTop:Math.min(...dots.ma
 
     def test_a_waffle_does_not_take_its_neighbours_callout_band(self):
         result = run_node(r"""
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const waffle={type:'chart.waffle',heading:'Outstations',unit:'outstations',categories:['Asia','Europe'],series:[{name:'n',values:[7,4]}],caption:'Seven of the eleven listed outstations are in Asia, the rest in Europe.'};
 const bar={type:'chart.bar',heading:'Destinations',unit:'destinations',categories:['a','b','c'],series:[{name:'n',values:[14,100,152]}],
@@ -131,7 +131,7 @@ console.log(JSON.stringify({text:describeTypes()}));
 class CommentaryBelowTests(unittest.TestCase):
     def test_four_points_below_run_two_by_two_and_read_as_prose(self):
         scene = run_node(r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const sentence='The regional shock fell on demand faster than on seats, so fuller aircraft could not rescue the margin this year.';
 const points=['Demand fell first','A global hit too','Every hub model','Cash is the buffer'].map((lead)=>({lead,text:sentence}));
@@ -156,7 +156,7 @@ console.log(JSON.stringify(deck));
 class TopOfRegionTests(unittest.TestCase):
     def test_short_groups_start_at_the_top_of_their_region(self):
         result = run_node(r"""
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const table={type:'table',columns:['Measure','Value'],rows:[['Cash','54.9'],['Debt','56.2']]};
 const chart={type:'chart.column',categories:['a','b','c'],series:[{name:'s',values:[1,2,3]}]};
@@ -184,7 +184,7 @@ console.log(JSON.stringify({
 class NaturalSizeFigureTests(unittest.TestCase):
     def test_a_staircase_starts_under_the_title_with_its_points_under_it(self):
         result = run_node(r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const exhibit={type:'steps',items:['A relationship','A choice','A consequence'].map((label)=>({label,text:'A sentence of supporting detail that runs to about two lines at this width.'}))};
 const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides:[{id:'s',title:'Three steps from relationship to consequence',

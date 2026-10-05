@@ -66,7 +66,7 @@ spine-exhibits.mjs the exhibits a spine fully determines - a bound or typed char
 deck-keys.mjs      the deck-level keys `deck` takes, each with its type: what `--schema deck` prints and the compile holds `deck` to
 compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
 derive-content.mjs the content plan and text plan read off the composed pages; each page's word floor and ceiling
-compose.mjs        the composer's entry point, kept for the tests that import it; the work is in compose-*.mjs:
+compose-*.mjs      the composer (the suite reads it through evals/support/compose.mjs):
                    compose-deck (deck/v3 spec -> planner items, design layout), compose-page (one page: which arrangement), compose-arrangements, compose-layouts,
                    compose-exhibits, compose-charts (chart rules), compose-tables (table treatment, inferred treatments), compose-metrics (metric strips),
                    compose-points, compose-body, compose-text-pages, compose-pictures, compose-picture-pages, compose-passes (pagination and splitting)
@@ -85,7 +85,7 @@ fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons
 fetch-places.mjs   coordinates for map markers that name a place, cached in the deck folder's assets/places.json (run by the build)
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV plus a chart block
 build-deck.mjs     assets -> plan -> scene -> claims -> pptx -> render -> readback -> page gates -> density profile; refusals are REFUSAL_CODES
-validate-overlap.mjs  scene design checks author-deck and the build run (OVERLAP_CODES: text on a line, text on a box edge, a descender on a rule, an unkeyed scatter); the rendered-DOM overlap audit the tests run
+validate-overlap.mjs  scene design checks author-deck and the build run (OVERLAP_CODES: text on a line, text on a box edge, a descender on a rule, an unkeyed scatter); the rendered-DOM overlap audit the tests run is evals/support/overlap-audit.mjs
 errors.mjs         EXIT (the exit codes), RefusalError (a repairable input, exit 2), UsageError (a command line it cannot read, exit 1) and registered() (a finding's code, checked against its module's code table)
 cli.mjs            the plumbing every command shares: isMain, parseCli on util.parseArgs, runCli (exit codes and refusal printing), pythonBin, readJson and writeJson
 color.mjs          colour arithmetic on #RRGGBB: mix, relative luminance, WCAG contrast (emit/color.py ports it)

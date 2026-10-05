@@ -100,7 +100,7 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   // whole deck is held to, since the page that states the answer must hold
   // what the deck must prove; `lead` is the share of the answer's leading
   // clause (its verdict, before the reasons) that the page's title carries.
-  // A title holds twelve words, so it is asked for the verdict and the page
+  // A title is written to twelve words, so it is asked for the verdict and the page
   // for the reasons, the rivals and the thresholds a reasoned answer names.
   answerCoverageMin: 0.6,
   answerUpFrontMin: 0.6,
@@ -117,9 +117,11 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   // share of the whole answer, as every deck's best title once was
   // (`answerCarriedMin`) - up to the content words a full-length title holds,
   // so that a long answer is not asked for more than a title can say. A title
-  // runs to `plan.titleWords.max` words (weight.json), and this share of a
-  // title's words are content words: the median over the example decks'
-  // titles, so a full-length title written as a sentence holds seven of them
+  // is written to `plan.titleWords.target` words (weight.json; the most it may
+  // run to is longer, for the comparator a finding needs, and is no part of
+  // this), and this share of a title's words are content words: the median
+  // over the example decks' titles, so a full-length title written as a
+  // sentence holds seven of them
   // (test_answer_up_front.py measures the examples against it).
   titleContentShare: 0.6,
   // The fewest content words a leading clause has: under them it is a name or
@@ -366,7 +368,7 @@ export function answerLead(answer) {
 }
 
 /** The content words a full-length title can hold: the title word limit, at the content-word share of a title's words. */
-export const titleContentWords = () => Math.floor(PLAN.titleWords.max * CONTENT_THRESHOLDS.titleContentShare);
+export const titleContentWords = () => Math.floor(PLAN.titleWords.target * CONTENT_THRESHOLDS.titleContentShare);
 
 /** The share of `words` (a set) that `text` carries, and the ones it does not. */
 function carriedBy(words, text) {

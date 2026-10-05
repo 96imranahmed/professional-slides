@@ -109,13 +109,15 @@ function lollipopLayout(frameIn, props) {
   const { series, categories } = seriesOf(props, 1, 1);
   const labelWidth = Math.min(200, Math.max(72, ...categories.map((c) => Math.ceil(measure(c, 200).width) + 12)));
   const valueWidth = Math.max(40, ...series[0].values.map((v) => Math.ceil(measure(formatValue(v, props), 120, { bold: true }).width) + 12));
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth + 8, valueLabelInset: valueWidth + 12, centerPlot: false });
+  // A negative value's label sits left of its dot, off the stem that runs back to zero, so the plot leaves it room there.
+  const negative = series[0].values.some((v) => v < 0);
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth + 8 + (negative ? valueWidth + 4 : 0), valueLabelInset: valueWidth + 12, centerPlot: false });
   const bounds = numericBounds(series[0].values, { min: props.xMin, max: props.xMax, axis: "x", includeZero: true });
   const rowHeight = Math.min(72, (plot.height + 24) / categories.length);
-  return { series, categories, plot, bounds, labelWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
+  return { series, categories, plot, bounds, labelWidth, valueWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
 }
 function lollipopChart({ id, frame, props }) {
-  const { series, categories, plot, bounds, labelWidth, rowHeight } = lollipopLayout(frame, props);
+  const { series, categories, plot, bounds, labelWidth, valueWidth, rowHeight } = lollipopLayout(frame, props);
   assertHighlighted(id, props, categories, "the members a lollipop ranks");
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const zero = xAt(Math.max(bounds.min, Math.min(0, bounds.max)));
@@ -131,7 +133,10 @@ function lollipopChart({ id, frame, props }) {
     nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right") }));
     nodes.push(linePrimitive({ id: stableId(id, "stem", c), role: "chart-line", x1: zero, y1: y, x2: xAt(v), y2: y, style: lineStyle(color, token("line.standard")), data: { category: c, value: v } }));
     nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c), role: "chart-mark", frame: { x: xAt(v) - 7, y: y - 7, width: 14, height: 14 }, style: fillStyle(color), data: { category: c, value: v, highlighted: focus } }));
-    nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: { x: xAt(v) + 12, y: y - 10, width: Math.max(20, frame.x + frame.width - xAt(v) - 12), height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category: c } }));
+    const label = v < 0
+      ? { frame: { x: xAt(v) - 12 - valueWidth, y: y - 10, width: valueWidth, height: 20 }, align: "right" }
+      : { frame: { x: xAt(v) + 12, y: y - 10, width: Math.max(20, frame.x + frame.width - xAt(v) - 12), height: 20 }, align: "left" };
+    nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: label.frame, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), label.align), data: { category: c } }));
   });
   // Callouts and reference lines are the shared chart decorations; the subject
   // is already drawn in the accent above, so highlights are not drawn twice.

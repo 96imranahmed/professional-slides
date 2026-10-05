@@ -360,18 +360,17 @@
    "id": "p05",
    "type": "ranking",
    "form": "aligned-bars",
-   "commentary": "below",
+   "commentary": "so-what-bar",
    "takeaway": false,
    "why": "Where Northvale stands among all seven regional operators is the claim, and the reason sits in two more measures for the same operators, so the three share one axis with Northvale marked",
    "settles": {
     "kind": "rank",
     "what": "journeys per route-km, off-peak trains per hour and peak load factor for all seven comparable regional operators, FY26"
    },
-   "adds": "The column explains why intensity trails - hourly off-peak service on full-peak lines - and what the gap is worth",
+   "adds": "The bar says what the gap is worth: more than half of the journeys the target needs, on today's network",
    "title": "Northvale sits mid-table on journeys per route-km, 27% below the leading peer",
+   "bar": "Matching the peers' half-hourly off-peak on the Dales and Valley lines alone adds about 7 million journeys a year",
    "highlight": [
-    "27% below Westmoor",
-    "hourly on three of its five",
     "7 million journeys"
    ],
    "exhibit": {
@@ -434,17 +433,6 @@
      }
     ]
    },
-   "points": [
-    {
-     "lead": "Mid-table, and the gap is off-peak",
-     "text": "Northvale carries 104 thousand journeys per route-km, just under the peer median of 108 and 27% below Westmoor, the most intensive operator in the set. Its peak intensity is close to the leaders'; the difference is between the peaks, where Westmoor and Southdown run half-hourly on most lines and Northvale runs hourly on three of its five."
-    },
-    {
-     "lead": "Worth 7 million journeys",
-     "text": "Reaching the peer median off-peak intensity on the Dales and Valley lines alone would add about 7 million journeys a year on today's network, more than half of the 11.7 million the target needs, without a new route-km. The ranking is a timetable problem, and the plan starts there."
-    }
-   ],
-   "pointsHeading": false,
    "source": "Source: illustrative data for fictional operators; route-km excludes freight-only track"
   },
   {
@@ -535,14 +523,14 @@
    "id": "p06b",
    "type": "picture",
    "form": "photo-backdrop",
-   "commentary": "below",
+   "commentary": "captions",
    "takeaway": false,
    "why": "The claim is about a place and the people who travel to it, so the evidence sits on the Dales themselves",
    "settles": {
     "kind": "rate",
     "what": "Saturday load factor by departure hour on Dales line trains out of Leeds, FY26"
    },
-   "adds": "The points say who fills the morning trains and why the evening leaves them empty",
+   "adds": "The caption says who fills the morning trains and why the evening leaves them empty",
    "title": "Saturday Dales trains leave Leeds 97% full, fuller than the weekday peak",
    "photo": {
     "path": "assets/hills.jpg",
@@ -590,18 +578,9 @@
      {
       "category": "10:00"
      }
-    ]
+    ],
+    "caption": "Four in five Saturday riders are walkers bound for Skipton, and the last train home leaves at 18:40, before most of them finish"
    },
-   "points": [
-    {
-     "lead": "Walkers fill the morning",
-     "text": "Four in five Saturday passengers out of Leeds are leisure trips, bound for the walks beyond Skipton, so the 09:00 to 11:00 trains fill. That demand arrives without marketing; what it lacks is seats in the morning and a train home at the hour the walkers finish."
-    },
-    {
-     "lead": "The evening runs light",
-     "text": "The last train home leaves Skipton at 18:40, before most walkers finish, so the return trips go by car instead, and a trip that returns by car is often made by car the next time. A later last train belongs in the weekend timetable the plan adds: it carries return journeys the morning trains already generate."
-    }
-   ],
    "highlight": [
     "Four in five",
     "18:40"
@@ -1330,9 +1309,9 @@
    "title": "Four constraints cap the peak: fleet, crews, track and depot",
    "highlight": [
     "none is held spare",
-    "not before 2029",
+    "arrive in 2029",
     "rest-day overtime",
-    "not to the peak",
+    "off-peak timetable",
     "two single-track sections",
     "£38 million",
     "94% of its sidings",
@@ -1343,7 +1322,7 @@
      "label": "The fleet is fully used",
      "points": [
       "All 58 units run in the morning peak and none is held spare, so a failure cancels a train rather than swapping in a replacement.",
-      "New units are on order but not before 2029, when electrification releases eleven diesel units for other lines."
+      "New units arrive in 2029, when electrification releases eleven diesel units for other lines."
      ],
      "metric": {
       "value": "58 of 58",
@@ -1355,7 +1334,7 @@
      "label": "Crews are fully rostered",
      "points": [
       "Every peak diagram is covered, but 9% of peak shifts rely on rest-day overtime, so a new peak train would have no driver to run it.",
-      "Fourteen drivers in training qualify by mid-2027; the plan assigns them to the off-peak timetable, not to the peak."
+      "Fourteen drivers in training qualify by mid-2027; the plan assigns them all to the off-peak timetable."
      ],
      "metric": {
       "value": "9%",
@@ -1368,7 +1347,7 @@
      "points": [
       "The Eastern line runs through two single-track sections where trains in opposite directions wait for each other.",
       "Each extra peak train adds a crossing, which is why punctuality fell as the timetable grew.",
-      "Doubling both sections would cost about £38 million and is not in the funded plan."
+      "Doubling both sections would cost about £38 million, outside the funded plan."
      ],
      "metric": {
       "value": "2",
@@ -3247,7 +3226,7 @@
       "A. Karim",
       "Oct 2027",
       "not-started",
-      "Not due until October; off the critical path"
+      "Due in October; off the critical path"
      ],
      [
       "Housing site agreements",

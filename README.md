@@ -29,7 +29,7 @@ The output is PowerPoint. Google Slides is a downstream import the user makes; v
 | Ships | Stays out |
 | --- | --- |
 | `plugin.json` (portable), `.codex-plugin/plugin.json` (Codex), `.claude-plugin/plugin.json` (Claude Code), `README.md`, `requirements.txt`, `assets/icon.png` | `package.json` and `node_modules/` (development only) |
-| `skills/professional-slides/`: `SKILL.md`, `agents/`, `references/`, `runtime/`, `assets/`, and the example decks in `examples/` | runtime modules only the tests import, `*.author-log.jsonl` logs, `examples/gallery-acceptance.deck.json` (a component-gallery fixture for the tests, `purpose: "catalogue"`, which builds with blockers by design), `evals/`, and every build or output directory |
+| `skills/professional-slides/`: `SKILL.md`, `agents/`, `references/`, `runtime/`, `assets/`, and the example decks in `examples/` | `*.author-log.jsonl` logs, `examples/gallery-acceptance.deck.json` (a component-gallery fixture for the tests, `purpose: "catalogue"`, which builds with blockers by design), `evals/`, and every build or output directory |
 
 The three manifests carry the same name, version, description and author. Codex installs the package from a marketplace entry (`codex plugin add professional-slides@personal` after rebuilding it); Claude Code loads it from `.claude-plugin/plugin.json`, for one session with `claude --plugin-dir dist/professional-slides`. Installed plugin files are read-only: write deck artifacts to a task-owned directory outside the installed plugin.
 
@@ -40,9 +40,9 @@ Use Node 20.9 or newer and install development dependencies with `npm ci`. `node
 ```bash
 npm run check                                  # source checks (syntax, probes, dead exports) and the unit suite
 node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow]
-evals/run.sh [--slow]                          # the suite plus example decks, specimens and gate validity
+evals/run.sh [--slow]                          # the suite plus the example decks' content stage and the source checks
 node evals/quality/run.mjs --set dev --runs 3  # headless agent runs, judged blind against the previous version
 python3 evals/scripts/package_plugin.py
 ```
 
-`--slow` adds the LibreOffice end-to-end render; `--strict` fails when a test was skipped for a missing dependency. [evals/README.md](evals/README.md) covers the quality runner, calibration, cold runs and the page gates. None of these checks alone proves a deck's argument, factual accuracy or visual quality: inspect every final render and the saved PPTX before claiming acceptance, and after changing plugin source, reinstall it and compare the installed files with the source.
+`--slow` adds the LibreOffice end-to-end render; `--strict` fails when a test was skipped for a missing dependency. [evals/README.md](evals/README.md) covers the quality runner, calibration and the page gates. None of these checks alone proves a deck's argument, factual accuracy or visual quality: inspect every final render and the saved PPTX before claiming acceptance, and after changing plugin source, reinstall it and compare the installed files with the source.

@@ -293,14 +293,16 @@ console.log(JSON.stringify({ restated: stale(restated), dropped: stale(dropped),
         self.assertIn('f0 still states 49m of the same thing ("Profit after tax" under "FY26")', restated[0][2])
         # A number the page stopped printing that had no label: said as a question, never refused.
         dropped = result["dropped"]
-        self.assertEqual([[severity, pages] for severity, pages, _ in dropped], [["advisory", ["f2", "f0"]]], dropped)
+        # Every page that prints the digits is asked about, here f3's "4.3 points above the minimum" too: digits alone say no more.
+        self.assertEqual([[severity, pages] for severity, pages, _ in dropped], [["advisory", ["f2", "f0", "f3"]]], dropped)
         self.assertIn("f2 no longer states +4.3%", dropped[0][2])
         self.assertIn("Nothing but the digits says these are the figure the revision changed", dropped[0][2])
         self.assertEqual(result["refused"], [])
 
     def test_a_name_changed_on_one_page_and_kept_on_another_is_advised(self):
         result = run_node(self.probe + '''
-const renamed = await revised((d) => { const f5 = page(d, 'f5'); f5.title = f5.title.replace('Harbour', 'Haven'); f5.bar = f5.bar.replace('Harbour', 'Haven'); f5.exhibit.categories = f5.exhibit.categories.map((c) => (c === 'Harbour' ? 'Haven' : c)); f5.exhibit.highlights = [{ category: 'Haven' }]; });
+// f5 is the peers' scorecard: its title and its row label name the subject; the cells stay bound to the member they print.
+const renamed = await revised((d) => { const f5 = page(d, 'f5'); f5.title = f5.title.replace('Harbour', 'Haven'); f5.exhibit.rows = f5.exhibit.rows.map((row) => (row[0] === 'Harbour' ? ['Haven', ...row.slice(1)] : row)); });
 console.log(JSON.stringify({ pages: renamed.changed.content, wording: [...renamed.blocking, ...renamed.advisories].filter((f) => f.code === 'WORDING_STALE').map((f) => [f.severity, f.pages, f.repair]), refused: renamed.refused }));
 ''')
         self.assertIn("f5", result["pages"])

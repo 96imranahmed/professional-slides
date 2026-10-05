@@ -34,7 +34,7 @@ console.log(JSON.stringify({ rows: [...new Set(rows)], free: [...new Set(free)].
 
     def test_unpinned_pages_vary_between_seeds_and_pinned_ones_do_not(self):
         result = run_node('''
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 const page = (i) => ({ title: 'Revenue rose in every region while costs held flat ' + i,
   exhibit: { type: 'chart.column', categories: ['2021','2022','2023','2024'], series: [{ name: 'Revenue', values: [10, 12, 14, 15 + i] }] },
   points: [{ lead: 'Price led', text: 'List prices rose while volumes held across the period' }, { lead: 'Costs held', text: 'Headcount was flat across the four years' }] });

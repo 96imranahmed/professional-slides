@@ -39,7 +39,7 @@ class FinancialChartRuntimeTests(unittest.TestCase):
     def test_signed_peer_bars_share_physical_scale_when_only_one_has_losses(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const slide={id:'s',title:'One offer cannot fund both savings goals',layout:'two-up',exhibits:[[8,-12],[39,8]].map((values,i)=>({type:'chart.bar',heading:i?'New York residual':'London residual',unit:'£k',categories:['First goal','Second goal'],series:[{name:'Residual',values}],dataTable:false,valueFormat:{decimals:1}}))};
 const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-bars',slides:[slide]}));
@@ -52,7 +52,7 @@ console.log('{}');
     def test_paired_signed_charts_share_the_complete_numeric_domain(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {composeSlide,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const walk=item=>[item,...(item.items||[]).flatMap(walk)];
 for(const [type,series,min,max] of [
@@ -620,7 +620,7 @@ import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs';
-import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {changeFromContent} from './evals/support/compose.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
 const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];

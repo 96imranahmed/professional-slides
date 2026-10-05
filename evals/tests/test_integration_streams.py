@@ -214,7 +214,7 @@ class OfflineAssetsTests(unittest.TestCase):
         result = run_node(PLAYERS + '''
 const tell = async (doc) => { const run = await authorDeck(doc, { baseDir: dir, fit: false });
   const at = (list) => { const f = list.find((x) => x.code === 'CRAFT_PLAYERS_UNINTRODUCED'); return f ? { severity: f.severity, class: f.class, pending: Boolean(f.pending), assets: f.measured?.assets ?? null, unnamed: f.measured?.unnamed ?? null } : null; };
-  return { blocking: at(run.blocking), advised: at(run.advisories), line: run.standings.find((s) => s.code === 'CRAFT_PLAYERS_UNINTRODUCED').line,
+  return { blocking: at(run.blocking), advised: at(run.advisories), line: run.standings.find((s) => s.code === 'CRAFT_PLAYERS_UNINTRODUCED').line, codes: run.blocking.map((f) => f.code),
     assets: run.advisories.filter((f) => /^ASSETS_/.test(f.code)).map((f) => [f.code, f.class, f.severity]), statement: run.assets?.fetch }; };
 const waiting = await tell(named);
 const declared = structuredClone(named); declared.deck.assets = { fetch: 'none', reason: 'The build machine has no network access and no logo files were supplied' };
@@ -228,6 +228,8 @@ console.log(JSON.stringify({ waiting, offline, unnamed }));
         self.assertIsNone(result["waiting"]["blocking"])
         self.assertEqual(result["waiting"]["advised"], {"severity": "advisory", "class": "G", "pending": True, "assets": None, "unnamed": None})
         self.assertEqual(result["waiting"]["assets"], [["ASSETS_NEEDED", "S", "advisory"]])
+        self.assertIn("player logos drawn 0; floor 1: short by 1 logos - advisory", result["waiting"]["line"])
+        self.assertNotIn("PLAYERS_UNMARKED", result["waiting"]["codes"])   # every player is introduced by its mark on a page
         # Declared offline, nothing waits: every player is named on a page, so the floor advises, here as at the build.
         self.assertIsNone(result["offline"]["blocking"])
         self.assertEqual(result["offline"]["advised"], {"severity": "advisory", "class": "G", "pending": False, "assets": "none", "unnamed": None})
@@ -294,12 +296,12 @@ console.log(JSON.stringify({ codes: first.blocking.filter((f) => f.id === 'f6').
 ''')
         self.assertEqual(result["codes"], ["SCENE_VOID"])
         self.assertIn({"form": "indexed", "commentary": "beside"}, result["pass"])
-        self.assertIn({"form": "line", "commentary": "below"}, result["pass"])
+        self.assertIn({"form": "line", "commentary": "beside"}, result["pass"])
         # A form the measures cannot fill is not offered as passing.
         self.assertIn("stacked-column", result["needs"])
         self.assertEqual(result["after"], [])
-        self.assertEqual(result["authored"], [[f"A-index/{name}", True] for name in ("loans", "liquid", "pat", "ocf")])
-        self.assertEqual(result["basis"], ["A-index/loans", "A-index/liquid", "A-index/pat", "A-index/ocf"])
+        self.assertEqual(result["authored"], [[f"A-index/{name}", True] for name in ("loans", "liquid", "short-liabilities", "ocf")])
+        self.assertEqual(result["basis"], ["A-index/loans", "A-index/liquid", "A-index/short-liabilities", "A-index/ocf"])
         self.assertEqual(result["values"], [8, 8, 8, 8])
 
     def test_the_plan_allocates_a_spine_whose_pages_will_be_bound(self):
@@ -374,7 +376,7 @@ console.log(JSON.stringify({ codes: first.blocking.filter((f) => f.id === 'f6').
             self.assertNotIn("categories", page["exhibit"])
             self.assertEqual(page["settles"], {"measures": ["i-loans/loans"]})
             self.assertEqual(list(page)[-1], "limits")
-            self.assertEqual([page["limits"]["type"], page["limits"]["form"], page["limits"]["title"]["words"]["max"]], ["trend", "line", 12])
+            self.assertEqual([page["limits"]["type"], page["limits"]["form"], page["limits"]["title"]["words"]["max"]], ["trend", "line", 15])
             # Pasted whole, limits block and all, the scaffold compiles and binds.
             result = run_node(PROBE + f'''
 const doc = load('finance');
@@ -463,7 +465,7 @@ console.log(JSON.stringify({ unbound: deck.first.unbound, status: [one.status, s
         self.assertRegex(result["titles"][0], r"^Loans grew \d+% in seven years to \d+ million$")
         self.assertNotEqual(result["titles"][2], result["titles"][0])
         # A bound exhibit's measures, and a bound metric's, are what the page shows.
-        self.assertEqual(result["f6"], [[f"A-index/{name}", "proof"] for name in ("loans", "liquid", "pat", "ocf")])
+        self.assertEqual(result["f6"], [[f"A-index/{name}", "proof"] for name in ("loans", "liquid", "short-liabilities", "ocf")])
         self.assertIn(["A-ocf/percent", "proof"], result["f2"])
         self.assertEqual([result["form"], result["kept"]], ["column", []])
         for changed, pages in (("rebound", "f2"), ("retitled", "f0, f1, f6")):
@@ -524,7 +526,7 @@ class PartsEverywhereTests(unittest.TestCase):
     """Item 5: a pages file in parts and an insight log in parts are one deck to every reader."""
 
     def test_the_compile_the_analyses_and_the_storyline_read_both_kinds_of_parts(self):
-        # The fixture is an evidence fixture, not a finished deck: it has no summary page and no question, so its
+        # The fixture is an evidence fixture, not a finished deck: its mechanism page is too thin for its frame, so its
         # check is refused. Whole or in parts, it is refused for the same findings.
         found = lambda file: sorted((f["code"], f.get("id")) for f in log_of(file)[-1]["findings"])
         with tempfile.TemporaryDirectory() as whole_dir, tempfile.TemporaryDirectory() as tmp:
@@ -535,11 +537,11 @@ class PartsEverywhereTests(unittest.TestCase):
             checked = run(AUTHOR, file, "--check")
             self.assertEqual([checked.returncode, unsplit.returncode], [2, 2])
             self.assertEqual(found(file), found(whole))
-            self.assertIn(("TEXT_COVERAGE_LOW", "o4"), found(file))
+            self.assertIn(("TEXT_COVERAGE_LOW", "o5"), found(file))
             self.assertEqual(checked.stderr.split("Where the deck stands:")[1].split("Page budgets:")[0], unsplit.stderr.split("Where the deck stands:")[1].split("Page budgets:")[0])
             # A finding on a page that came from a part names the part; one on a page of the root file does not.
-            self.assertIn("TEXT_COVERAGE_LOW [o4 in pages/crews.pages.json]", checked.stderr)
-            self.assertNotIn("TEXT_COVERAGE_LOW [o4 in", unsplit.stderr)
+            self.assertIn("TEXT_COVERAGE_LOW [o5 in pages/crews.pages.json]", checked.stderr)
+            self.assertNotIn("TEXT_COVERAGE_LOW [o5 in", unsplit.stderr)
             # The analysis CLI: the catalogue and the run, over the merged log.
             listed = run(ANALYSIS, file, "--catalogue")
             self.assertEqual(listed.returncode, 0, listed.stderr)
@@ -569,18 +571,19 @@ const o6 = packet.pages.find((p) => p.id === 'o6'), o4 = packet.pages.find((p) =
 console.log(JSON.stringify({{ refused: [...bindingFindings, ...compileErrors].length, status: step.status, pages: packet.pages.map((p) => p.id), o6: o6.measures.map((m) => m.ref), o4: o4.evidence.map((e) => [e.id, Boolean(e.missing)]),
   closed: prompt.includes('only the board papers supplied by the service may be used') }}));
 ''')
-            self.assertEqual([result["refused"], result["status"], result["pages"]], [0, "packet-written", ["o1", "o2", "o3", "o4", "o5", "o6"]])
+            self.assertEqual([result["refused"], result["status"], result["pages"]], [0, "packet-written", ["o0", "o1", "o2", "o3", "o5", "o6", "o4", "o7"]])
             # The scenario's path, joined to the recorded series in one bound line, is what the page shows.
             self.assertIn("B-path/path", result["o6"])
             # An insight recorded in a part of the log is found by the page that rests on it.
-            self.assertEqual(result["o4"], [["o-districts", False], ["B-districts", False]])
+            self.assertEqual(result["o4"], [["o-districts", False], ["B-districts", False], ["o-standard", False]])
             self.assertTrue(result["closed"])
             # The run log counts each kind of run, and `--log` reads it as the run cost.
-            self.assertEqual([run(AUTHOR, file, "--draft", "--check").returncode, run(AUTHOR, file).returncode], [2, 2])
+            # The draft passes - the spine states its question and opens on its summary - and the full compile is refused for the thin mechanism page.
+            self.assertEqual([run(AUTHOR, file, "--draft", "--check").returncode, run(AUTHOR, file).returncode], [0, 2])
             cost = json.loads(run(AUTHOR, file, "--log").stdout)
-            self.assertEqual([cost["runs"], cost["refused"], cost["pages"], cost["runsPerPage"]], [4, 3, 6, 0.67])
-            self.assertEqual(cost["modes"], {"check": {"runs": 1, "refused": 1}, "page": {"runs": 1, "refused": 0}, "draft": {"runs": 1, "refused": 1}, "full": {"runs": 1, "refused": 1}})
-            self.assertEqual(cost["refusalsByPage"]["o4"]["runs"], 2)
+            self.assertEqual([cost["runs"], cost["refused"], cost["pages"], cost["runsPerPage"]], [4, 2, 8, 0.5])
+            self.assertEqual(cost["modes"], {"check": {"runs": 1, "refused": 1}, "page": {"runs": 1, "refused": 0}, "draft": {"runs": 1, "refused": 0}, "full": {"runs": 1, "refused": 1}})
+            self.assertEqual(cost["refusalsByPage"]["o5"]["runs"], 2)
             self.assertNotIn("note", cost)
             self.assertTrue(all(entry["v"] == 2 for entry in log_of(file)))
             self.assertFalse((Path(tmp) / "public-ops.plan.json").exists())

@@ -272,9 +272,9 @@
   },
   {
    "id": "i-peers",
-   "finding": "Harbour is mid-table on margin and second on loan growth among eight credit unions",
+   "finding": "Harbour is second of eight on loan growth and last on liquidity cover, and fourth on margin and on capital among those that publish it",
    "shape": "peer-set",
-   "calculation": "net interest margin, loan growth and capital ratio, latest year",
+   "calculation": "net interest margin, loan growth, capital ratio and liquidity cover (liquid assets over liabilities due within a year), latest year",
    "sources": [
     "sources/i-peers.csv"
    ],
@@ -364,10 +364,57 @@
      "boundaries": {
       "Dunmore": "calendar year, not fiscal"
      }
+    },
+    "liquidity-cover": {
+     "unit": "%",
+     "population": "regional credit unions",
+     "period": "FY26",
+     "members": [
+      "Harbour",
+      "Northgate",
+      "Millrace",
+      "Castlefield",
+      "Dunmore",
+      "Eastbank",
+      "Ferrybridge",
+      "Greyfriars"
+     ],
+     "values": [
+      104.3,
+      131.0,
+      118.5,
+      126.4,
+      109.8,
+      122.0,
+      115.2,
+      112.6
+     ]
     }
    },
    "cite": [
     "regulator-returns"
+   ]
+  },
+  {
+   "id": "i-rule",
+   "finding": "The regulator requires a credit union's liquid assets to cover at least 100% of its liabilities due within a year",
+   "shape": "fact",
+   "calculation": "minimum liquidity cover in the regulator's prudential rules for credit unions: liquid assets over liabilities due within a year, at each year end",
+   "sources": [
+    "sources/i-rule.csv"
+   ],
+   "soWhat": "It is the floor Harbour's liquidity cover is tested against",
+   "strength": "strong",
+   "measures": {
+    "minimum": {
+     "unit": "%",
+     "population": "credit unions under the regional regulator",
+     "period": "FY26",
+     "value": 100
+    }
+   },
+   "cite": [
+    "regulator-rules"
    ]
   }
  ]

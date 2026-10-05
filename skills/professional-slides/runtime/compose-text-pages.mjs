@@ -6,9 +6,18 @@ import { textWords } from "./text-contract.mjs";
 import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG, deckDensity } from "./compose-body.mjs";
 import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
+import { sideStatementLayout } from "./figures.mjs";
 
 // The width prose beside a panel may take at most: the body less the gap and the least the panel keeps.
 const PROSE_ROOM = BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH;
+// A panel beside an exhibit or points takes a quarter of the row where its
+// statement sets there in its eight lines, and a third only where it needs
+// it: a claim of twenty-odd words in a third of the page is a dark band of
+// air beside an exhibit that wanted the width. It is measured a tenth
+// narrower than the quarter, so a design's gap or margin cannot push the
+// statement past its eight lines once it is set.
+const QUARTER = 0.9 * (BODY_WIDTH - COLUMN_GAP) / 4;
+const fitsQuarter = (props) => { try { sideStatementLayout({ x: 0, y: 0, width: QUARTER, height: BODY_WIDTH }, props); return true; } catch { return false; } };
 
 /**
  * For a page that is prose beside its panel and nothing else - a memo, or a
@@ -47,7 +56,7 @@ export function sidebarPage(items, { id, slide, exhibits, baseDir, fill, pointsS
   const proseOnly = !exhibits.length && !slide.points?.length;
   items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [panelBox,
     proseOnly ? proseBeside(slide.paragraphs, id, PROSE_ROOM, slide.highlight, slide.density ?? deckDensity())
-      : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: 2 }, height: "fill" }, items: body }] });
+      : { id: `${id}-body`, layout: "flow.column", size: { width: { fr: fitsQuarter(panelBox.props) ? 3 : 2 }, height: "fill" }, items: body }] });
 }
 
 // A page of words alone: its points in a ledger, columns or rows, a memo's prose beside its panel, or a document's columns.

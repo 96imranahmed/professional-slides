@@ -152,7 +152,7 @@ class ComposerTests(unittest.TestCase):
     def test_a_lone_metric_over_a_table_becomes_the_side_column_number(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide, composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide, composeDeck} from './evals/support/compose.mjs';
 const table={type:'table',columns:['Criterion','Marvel','DC'],rows:[['Gross','$10.1bn','$2.8bn'],['Films','27','15']]};
 // One tile above a table floats; it becomes the hero number beside its evidence.
 const page=composeSlide({title:'T',metrics:[{value:'78%',label:'MCU share of combined gross'}],exhibit:table,soWhat:'The cohort decides it.'},0);
@@ -288,7 +288,7 @@ class DensityFloorGateTests(unittest.TestCase):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {resolveWeight, WEIGHT_BY_FILL, normalizeWeight} from './skills/professional-slides/runtime/weight.mjs';
-import {composeDeck, applyTemplate} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck, applyTemplate} from './evals/support/compose.mjs';
 // Fill sets the floors; the deck overrides them; a bad key is refused.
 assert.equal(resolveWeight({}, 'full').pageWords, WEIGHT_BY_FILL.full.pageWords);
 assert.equal(resolveWeight({weight:{pageWords:150}}, 'balanced').pageWords, 150);
@@ -316,7 +316,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_the_side_column_fills_its_track_on_every_deck(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const side=(slide,fill)=>composeSlide(slide,0,process.cwd(),fill).items.find(i=>i.id==='s01-row').items.find(i=>i.id==='s01-side');
 const page={title:'T',exhibit:chart,points:['one','two','three']};
@@ -508,7 +508,7 @@ class CorpusCalibrationTests(unittest.TestCase):
     def test_a_page_carries_numbered_notes(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'T',points:['a','b'],note:['Excludes the 2019 disposal','FY22 basis; figures may not sum']},0);
 assert.equal(page.note,'Notes: 1. Excludes the 2019 disposal   2. FY22 basis; figures may not sum');
 assert.equal(composeSlide({title:'T',points:['a'],note:'Single line'},0).note,'Note: Single line');
@@ -526,7 +526,7 @@ class FurnitureTests(unittest.TestCase):
     def test_footnotes_mark_their_label_and_print_numbered(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.column',heading:'Annual investment',unit:'$B',categories:['2019','2020','2021','2022','2023'],series:[{name:'Deal value',values:[48,62,70,62,39]}],change:{from:'2022',to:'2023'}};
 const page=composeSlide({title:'Activity declined between 2022 and 2023',exhibit:chart,points:['Deal value fell by a third'],
   footnotes:[{on:'2022',text:'2022 includes two $4B+ deals that did not repeat'},{text:'Values are announced enterprise values'}]},0);
@@ -549,7 +549,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_a_chart_can_tabulate_itself(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'T',points:['a','b'],exhibit:{type:'chart.column',heading:'Revenue',unit:'$m',
   categories:['FY23','FY24','FY25'],series:[{name:'Revenue',values:[52,58.4,61]},{name:'Cost',values:[47,51,55]}],dataTable:true}},0);
 const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
@@ -669,7 +669,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_two_statements_read_as_a_pair_centred_on_the_exhibit(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
             {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
 const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[item]:(item.items||[]).flatMap(walk);
@@ -703,7 +703,7 @@ console.log(JSON.stringify({accepted:true}));
         author's to ask for."""
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
   categories:['Highland','Central','East','Coast'],
   series:[{name:'Normal',values:[40,65,42,48]},{name:'Design Dry',values:[28,47,27,33]}]};
@@ -736,7 +736,7 @@ console.log(JSON.stringify({accepted:true}));
         it: across a gutter between columns, down a band across the page."""
         result = run_node("""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
   categories:['Highland','Central'],series:[{name:'Normal',values:[40,65]}]};
@@ -787,7 +787,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_a_label_table_heads_its_columns(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
             {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
 const headed=composeSlide({title:'T',columns:['Occupation','What the data shows'],rows,soWhat:'The exposure is concentrated'},0);
@@ -805,7 +805,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_chart_data_tables_require_an_authored_request_at_any_deck_weight(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.column',heading:'Revenue and cost',unit:'$m',categories:['FY21','FY22','FY23','FY24','FY25'],
   series:[{name:'Revenue',values:[44,49,52,58,61]},{name:'Cost',values:[40,44,47,51,55]}]};
 const kinds=(page)=>{const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
@@ -842,7 +842,7 @@ class HeavyPageTests(unittest.TestCase):
     def test_a_row_matrix_carries_bulleted_cells_under_a_lead(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'Five challenges shape the sector',
   columns:['Challenge','A - Pre-COVID trends','B - Impacts'],
   rows:[{label:'Health of transit',icon:'people',cells:[
@@ -1045,7 +1045,7 @@ class DerivedColumnTests(unittest.TestCase):
     def test_share_rank_and_change_are_computed_from_the_table(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const styled=styleTable({type:'table',treatment:'open',derive:['share','rank','change'],
   deriveFrom:'Jobs, 2019',deriveAgainst:'Jobs, 2014',total:true,
   columns:[{label:'Subsector',type:'text'},{label:'Jobs, 2014',type:'text',align:'right'},{label:'Jobs, 2019',type:'text',align:'right'}],

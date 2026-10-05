@@ -1,4 +1,4 @@
-"""The composer's text (runtime/compose.mjs): lists, prose rows, summaries and highlights.
+"""The composer's text (runtime/compose-*.mjs): lists, prose rows, summaries and highlights.
 
 How points set beside or under an exhibit start, split and read - down or
 across - and where a page's highlighted phrase lands. Each test composes a
@@ -9,13 +9,13 @@ import unittest
 from node_probe import run_node
 
 DECK = """
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const build=(slides, extra={})=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides,...extra},'.')).deck;
 """
 
 PLANNED = '''
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
 const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
 '''
@@ -53,7 +53,7 @@ class ListTrackTests(unittest.TestCase):
         # the page read as two lists rather than one set of five.
         run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const slide=composeSlide({title:'Five findings',points:[
@@ -83,7 +83,7 @@ console.log('{}');
         # number and the first thing said about it.
         run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const exhibit={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const points=['The first thing the number says','The second thing the number says'];
@@ -114,7 +114,7 @@ class ProseRowTests(unittest.TestCase):
         # example, an interpretation - set as three columns under the chart.
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'series',slides:[{
   title:'The animated series is where the pairing was first drawn',layout:'exhibit-top',
@@ -144,7 +144,7 @@ console.log('{}');
         # columns' headings: both are three parallel answers to one question.
         run_node('''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const exhibit={type:'chart.column',heading:'Appearances',unit:'count',
   categories:['1992','1993','1994','1995'],series:[{name:'Episodes',values:[28,20,10,5]}]};

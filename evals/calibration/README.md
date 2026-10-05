@@ -82,12 +82,5 @@ no tool writes it. Where each target comes from:
 | `plan.craft.tableTreated.observed`, `chartAnnotated.observed`, `tableRows` | vision pass over table and chart pages |
 | `plan.textForm` | `measure_text_form.py` |
 
-After changing `weight.json`, re-score the stored cold-run specimens and read
-what moved:
-
-```bash
-node evals/cold-run/specimens.mjs          # verdicts under the new rules
-node evals/cold-run/specimens.mjs --stamp  # record them, with the new weight.json hash
-node evals/cold-run/baseline.mjs --stamp   # the example decks, likewise
-node evals/quality/gate-validity.mjs       # per-gate recall and precision on the labelled defects
-```
+After changing `weight.json`, run the unit suite and a quality eval on the
+development briefs (`node evals/quality/run.mjs --set dev`) to see what moved.

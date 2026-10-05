@@ -50,7 +50,7 @@ console.log(JSON.stringify({plainHeadings:role(plain,'process-heading'),datedHea
             """
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { CHART_IDS } from './skills/professional-slides/runtime/charts.mjs';
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const { deck, fixtures } = buildFixtureDeck();
 const visual = new Set(['fill','stroke','color','fontFamily','fontSize','lineWidth','radius']);
 const missing = deck.slides.flatMap(slide => slide.nodes.flatMap(node => Object.entries(node.style || {})
@@ -269,7 +269,7 @@ console.log(JSON.stringify({
 import assert from 'node:assert/strict';
 import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
-import { componentFixtureSpecs, componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
+import { componentFixtureSpecs, componentVariantFixtureSpecs } from './evals/support/fixtures.mjs';
 const results = [];
 for (const id of ['action-title','section-title','slide-chrome']) {
   const definition = REGISTRY.get(id), chrome = id === 'slide-chrome';
@@ -413,7 +413,7 @@ console.log(JSON.stringify({total:cases.length,rejected:cases.filter(Boolean).le
         result = run_node(
             """
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const frame = {x:60,y:100,width:720,height:100};
 const definition = REGISTRY.get('section-heading');
 const render = rule => definition.render({id:'test',frame,props:{...definition.sample,rule}}).nodes;
@@ -505,7 +505,7 @@ console.log(JSON.stringify({
 
     def test_wrapped_headings_share_top_line_and_one_rule(self):
         result = run_node("""
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const slide = buildFixtureDeck().deck.slides.find(s => s.id === 'fixture-layout-wrapped-headings');
 const headings = slide.nodes.filter(n => n.role === 'section-heading');
 const rules = slide.nodes.filter(n => n.role === 'section-heading-rule');

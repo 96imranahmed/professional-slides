@@ -166,9 +166,11 @@ class CriticCalibrationTests(unittest.TestCase):
         self.assertEqual(result["noiseFloor"], 0.2)
         self.assertIn("more than 0.2", result["reading"])
         for pair in result["pairs"]:
-            self.assertTrue(pair["separated"], pair)  # below its clean deck by more than the spread
-            self.assertEqual((pair["caught"], pair["saidRevise"]), (1, 1), pair)
-            self.assertEqual((pair["cleanFiled"], pair["discriminated"]), (0, True), pair)  # and its check quiet on the clean deck
+            self.assertEqual(pair["separated"], pair["blocking"], pair)  # a blocking plant is rated below its clean deck by more than the spread; a cut is not
+            self.assertEqual((pair["hit"], pair["falseAlarm"], pair["discriminated"]), (1, 0, True), pair)  # found at its place, quiet there on the twin
+        # A page repeated is a cut, not a reason to send the deck back; the blocking plants are sent back.
+        self.assertEqual({p["anchor"]: (p["blocking"], p["saidRevise"]) for p in result["pairs"]}["explainer:restated-page"], (False, 0))
+        self.assertEqual(result["primary"]["cleanPassed"], {"met": 2, "of": 2})
         self.assertEqual(result["invalidAnswers"], 0)  # every answer is one the storyline loop would record
 
     def test_a_critic_that_misses_the_planted_defect_is_not_calibrated(self):
@@ -176,7 +178,7 @@ class CriticCalibrationTests(unittest.TestCase):
         self.assertEqual(run.returncode, 2)
         self.assertFalse(result["calibrated"])
         pair = result["pairs"][0]
-        self.assertEqual((pair["ordered"], pair["caught"], pair["saidRevise"]), (False, 0, 0))
+        self.assertEqual((pair["hit"], pair["saidRevise"], pair["discriminated"]), (0, 0, False))
 
     def test_a_full_size_anchor_is_measured_for_form_and_a_users_anchor_for_its_verdict(self):
         # A user's two decks, one they consider ready and one they do not; the fake critic passes both.
@@ -188,12 +190,12 @@ class CriticCalibrationTests(unittest.TestCase):
             (anchors / name / "anchor.json").write_text(json.dumps({"deck": "finance.pages.json", "expect": expect, "about": f"a deck its owner would call {expect}", **({"rating": 8.5} if name == "good" else {})}))
         listed = subprocess.run([NODE, str(QUALITY / "critic-calibration.mjs"), "--list", "--anchor-dir", str(anchors)], capture_output=True, text=True, cwd=ROOT)
         self.assertIn("showcase:restated-page", listed.stdout)
-        self.assertIn("clean, full size, no expected verdict", listed.stdout)
+        self.assertIn("clean, full size", listed.stdout)
         self.assertIn("user/bad", listed.stdout)
         chosen = "showcase,showcase:declined-answer,showcase:restated-page,user/good,user/bad"
         run, result = self.calibrate("--repeats", "3", "--anchors", chosen, "--anchor-dir", str(anchors), env={"FAKE_CRITIC_INVALID": "2"})
         rows = {row["id"]: row for row in result["anchors"]}
-        # The worked example at full size: about fifty pages, with no verdict expected of it - a critic that sent it back would not be wrong.
+        # The worked example at full size: about fifty pages, a clean deck the critic should pass.
         self.assertGreaterEqual(rows["showcase"]["pages"], 45)
         self.assertNotIn("expect", rows["showcase"])
         self.assertTrue(all(row["valid"] == 2 and len(row["invalid"]) == 1 for row in rows.values()), rows)
@@ -201,17 +203,18 @@ class CriticCalibrationTests(unittest.TestCase):
         self.assertEqual(result["form"]["answers"], 15)
         self.assertEqual(result["form"]["invalid"], 5)
         self.assertEqual(result["form"]["rules"][0]["count"], 5)
-        self.assertIn("completeness", result["form"]["rules"][0]["rule"])
+        self.assertIn("answerParts", result["form"]["rules"][0]["rule"])
         for pair in result["pairs"]:
-            self.assertEqual((pair["measured"], pair["separated"], pair["caught"], pair["saidRevise"]), (True, True, 1, 1), pair)
+            self.assertEqual((pair["measured"], pair["hit"], pair["falseAlarm"]), (True, 1, 0), pair)
         self.assertEqual({a["anchor"]: (a["expect"], a["agreed"]) for a in result["anchored"]}, {"user/good": ("ready", 1), "user/bad": ("revise", 0)})
         self.assertEqual(result["ratingAnchors"]["ready"]["n"], 1)
         # A rating a person recorded for a deck is printed beside the critic's.
         self.assertEqual({a["anchor"]: a.get("human") for a in result["anchored"]}, {"user/good": 8.5, "user/bad": None})
         self.assertIn("against a recorded 8.5", run.stdout)
-        # Verdict and defects caught lead the report; rating separation follows and decides nothing.
-        self.assertEqual(result["primary"], {"verdict": {"met": 3, "of": 4}, "caught": {"met": 2, "of": 2}, "cleanQuiet": {"met": 2, "of": 2}, "discriminated": {"met": 2, "of": 2}})
-        self.assertLess(run.stdout.index("primary - verdicts as expected: 3 of 4; planted defects caught: 2 of 2"), run.stdout.index("secondary - ratings separated"))
+        self.assertEqual(result["primary"], {"discriminated": {"met": 2, "of": 2}, "caught": {"met": 2, "of": 2}, "quietOnTwin": {"met": 2, "of": 2}, "cleanPassed": {"met": 0, "of": 0}, "expected": {"met": 1, "of": 2}})
+        # The worked example is reported and not held to a pass: it shows page types, not an argument.
+        self.assertIn("clean (reported, not held to a pass)", run.stdout)
+        self.assertLess(run.stdout.index("primary - told apart 2 of 2; clean decks passed 0 of 0; expected verdicts 1 of 2"), run.stdout.index("secondary - ratings separated"))
         # The critic passed a deck its owner expects sent back: not calibrated, whatever the plants say.
         self.assertEqual((result["verdict"], run.returncode), ("not calibrated", 2))
         self.assertIn("form: 5 of 15 answers failed validation", run.stdout)
@@ -249,122 +252,90 @@ console.log(JSON.stringify({ inline: [JSON.parse(inline.schemaJson).type, inline
         self.assertTrue(result["asPath"])
         self.assertEqual(result["text"], ['{"type":"object"}', ""])  # no file to point at: the schema goes inline
 
-    def test_calibrated_is_discrimination_and_neither_a_rating_gap_nor_a_catch_alone(self):
+    def test_calibrated_is_discrimination_at_the_plants_place_and_clean_decks_passed(self):
         result = run_node('''
 import { calibration, anchors, PLANTED } from './evals/quality/critic-calibration.mjs';
 const row = (id, planted, mean, sd, extra = {}) => ({ id, deck: id.split(':')[0], planted, answers: 3, valid: 3, invalid: [], rating: { n: 3, mean, sd, min: mean - sd, max: mean + sd },
-  verdicts: planted ? { revise: 3 } : { ready: 3 }, ...(planted ? {} : { saidReady: 1, unplanted: { x: 0, y: 0 } }), ...extra });
+  blocking: { mean: planted ? 1 : 0 }, verdicts: planted ? { revise: 3 } : { ready: 3 }, ...(planted ? {} : { saidReady: 1, unplanted: { 'declined-answer': 0, 'context-off-claim': 0 } }), ...extra });
 const told = { caught: 1, saidRevise: 1 };
-const noisy = calibration([row('a', null, 7.2, 0.9), row('a:x', 'x', 6.8, 0.7, told), row('b', null, 8, 0.3)]);
+const noisy = calibration([row('a', null, 7.2, 0.9), row('a:declined-answer', 'declined-answer', 6.8, 0.7, told), row('b', null, 8, 0.3)]);
 const single = calibration([{ ...row('a', null, 8, 0), rating: { n: 1, mean: 8, sd: 0, min: 8, max: 8 } }]);
-const missed = calibration([row('a', null, 7.2, 0.2), row('a:x', 'x', 5.1, 0.2, { caught: 0, saidRevise: 1 })]);
-// Ratings that separate by five points, every plant caught and sent back - by a critic that files the same check on the clean deck.
-const indiscriminate = calibration([row('a', null, 9, 0.1, { unplanted: { x: 1, y: 0 } }), row('a:x', 'x', 4, 0.1, told), row('a:y', 'y', 4, 0.1, told)]);
-const sometimes = calibration([row('a', null, 8, 0.1, { unplanted: { x: 0.33, y: 0 } }), row('a:x', 'x', 5, 0.1, told)]);
-// Every deck rated 5 and sent back, every plant "caught": the critic an earlier measure called calibrated.
-const flat = (id, planted) => row(id, planted, 5, 0, { verdicts: { revise: 3 }, ...(planted ? told : { saidReady: 0, unplanted: { x: 1, y: 1 } }) });
-const everything = calibration([flat('a', null), flat('a:x', 'x'), flat('a:y', 'y'), flat('b', null), flat('b:x', 'x')]);
-// And one that sends every deck back for something no plant is caught on: the pairs are told apart, the verdict tells nothing.
-const harsh = (id, planted) => row(id, planted, 5, 0, { verdicts: { revise: 3 }, ...(planted ? told : { saidReady: 0, unplanted: { x: 0, y: 0 } }) });
-const always = calibration([harsh('a', null), harsh('a:x', 'x')]);
-// A clean row that does not say how the planted check fared on it measures nothing.
+const missed = calibration([row('a', null, 7.2, 0.2), row('a:declined-answer', 'declined-answer', 5.1, 0.2, { caught: 0, saidRevise: 1 })]);
+// Ratings five points apart and every plant found - by a critic that finds the same thing at the same place on the clean deck.
+const indiscriminate = calibration([row('a', null, 9, 0.1, { unplanted: { 'declined-answer': 1, 'context-off-claim': 0 } }), row('a:declined-answer', 'declined-answer', 4, 0.1, told), row('a:context-off-claim', 'context-off-claim', 4, 0.1, told)]);
+// A critic that tells every plant apart and sends the clean decks back: the failure the user saw.
+const harsh = calibration([row('a', null, 5, 0, { verdicts: { revise: 3 }, saidReady: 0 }), row('a:declined-answer', 'declined-answer', 4, 0, told)]);
+// A blocking plant found but its deck not sent back is not told apart.
+const lenient = calibration([row('a', null, 8, 0.1), row('a:declined-answer', 'declined-answer', 7, 0.1, { caught: 1, saidRevise: 0 })]);
+// A clean row that does not say how the plant's test fared on it measures nothing.
 const { unplanted: _none, ...bare } = row('a', null, 8, 0.1);
-const unknown = calibration([bare, row('a:x', 'x', 5, 0.1, told)]);
-const brief = (c) => [c.calibrated, c.verdict, c.primary.discriminated, c.primary.cleanQuiet];
-console.log(JSON.stringify({ noisy: [noisy.noiseFloor, noisy.pairs[0].gap, noisy.pairs[0].ordered, noisy.pairs[0].separated, noisy.pairs[0].discriminated, noisy.calibrated], primary: noisy.primary, secondary: noisy.ratingSeparation,
+const unknown = calibration([bare, row('a:declined-answer', 'declined-answer', 5, 0.1, told)]);
+const brief = (c) => [c.calibrated, c.verdict, c.primary.discriminated, c.primary.cleanPassed];
+console.log(JSON.stringify({ noisy: [noisy.noiseFloor, noisy.pairs[0].gap, noisy.pairs[0].separated, noisy.pairs[0].discriminated, noisy.calibrated], primary: noisy.primary, secondary: noisy.ratingSeparation,
   missed: [missed.pairs[0].separated, missed.primary.caught, missed.calibrated], single: [single.noiseFloor, single.reading],
-  indiscriminate: [...brief(indiscriminate), indiscriminate.ratingSeparation.met, indiscriminate.pairs.map((p) => [p.anchor, p.cleanFiled, p.discriminated]), indiscriminate.why],
-  sometimes: brief(sometimes), everything: [...brief(everything), everything.sendsEverythingBack, everything.why.length], always: [...brief(always), always.sendsEverythingBack, always.why],
-  unknown: [unknown.calibrated, unknown.verdict, unknown.unmeasured], cleanVerdict: [noisy.cleanVerdict.measured, noisy.cleanVerdict.decks, noisy.cleanVerdict.passed, everything.cleanVerdict.sentBack],
-  anchors: anchors().length, clean: anchors().filter((a) => !a.planted).map((a) => a.id), expects: anchors().filter((a) => a.expect).length, planted: Object.keys(PLANTED) }));
+  indiscriminate: [...brief(indiscriminate), indiscriminate.pairs.map((p) => [p.anchor, p.falseAlarm, p.discriminated]), indiscriminate.why],
+  harsh: [...brief(harsh), harsh.why], lenient: brief(lenient), unknown: [unknown.calibrated, unknown.verdict, unknown.unmeasured],
+  anchors: anchors().length, clean: anchors().filter((a) => !a.planted).map((a) => a.id), planted: Object.keys(PLANTED), blocking: Object.values(PLANTED).map((p) => p.blocking) }));
 ''')
-        # 0.4 lower on a critic whose answers spread by 0.9: ordered, and not evidence. The rating is the secondary measure:
-        # the critic sent the planted deck back, caught the plant, and left the planted check quiet on the clean deck - told apart.
-        self.assertEqual(result["noisy"], [0.7, 0.4, True, False, True, True])
-        self.assertEqual(result["primary"], {"verdict": {"met": 1, "of": 1}, "caught": {"met": 1, "of": 1}, "cleanQuiet": {"met": 1, "of": 1}, "discriminated": {"met": 1, "of": 1}})
+        # 0.4 lower on a critic whose answers spread by 0.9: not separated, and it decides nothing - the plant was found, quiet on the twin, sent back.
+        self.assertEqual(result["noisy"], [0.7, 0.4, False, True, True])
+        self.assertEqual(result["primary"], {"discriminated": {"met": 1, "of": 1}, "caught": {"met": 1, "of": 1}, "quietOnTwin": {"met": 1, "of": 1}, "cleanPassed": {"met": 2, "of": 2}, "expected": {"met": 0, "of": 0}})
         self.assertEqual(result["secondary"], {"met": 0, "of": 1, "ordered": 1})
-        # And the converse: ratings that separate do not make up for a plant that was not caught.
         self.assertEqual(result["missed"], [True, {"met": 0, "of": 1}, False])
-        # Nor for a check that fires on the clean deck as on the planted one: both pairs separated by five points, one of two told apart.
-        calibrated, verdict, discriminated, quiet, separated, pairs, why = result["indiscriminate"]
-        self.assertEqual([calibrated, verdict, discriminated, quiet, separated], [False, "not calibrated", {"met": 1, "of": 2}, {"met": 1, "of": 2}, 2])
-        self.assertEqual(pairs, [["a:x", 1, False], ["a:y", 0, True]])
-        self.assertIn("the planted check fires on the clean deck too", why[0])
-        self.assertIn("a:x (clean 1)", why[0])
-        # One clean answer in three is enough: the catch on the planted deck is then not evidence the critic saw the plant.
-        self.assertEqual(result["sometimes"][:2], [False, "not calibrated"])
-        # A critic that sends every deck back and files under every check catches every plant and is not calibrated.
-        self.assertEqual(result["everything"], [False, "not calibrated", {"met": 0, "of": 3}, {"met": 0, "of": 3}, True, 2])
-        # One that sends every deck back for a check of its own is not either, though each pair is told apart.
-        self.assertEqual(result["always"][:5], [False, "not calibrated", {"met": 1, "of": 1}, {"met": 1, "of": 1}, True])
-        self.assertEqual(result["always"][5], ["every answer on every deck said revise: a verdict that never changes tells nothing apart"])
-        # A pair whose clean side does not say is not measured, never passed.
-        self.assertEqual(result["unknown"], [False, "not measured", ["a:x"]])
-        # The clean fixture decks are twins for their plants and carry no expected verdict: what was said of them is reported, not measured.
-        self.assertEqual(result["cleanVerdict"], [False, 2, ["a", "b"], ["a", "b"]])
-        self.assertEqual(result["expects"], 0)
+        calibrated, verdict, discriminated, passed, pairs, why = result["indiscriminate"]
+        self.assertEqual([calibrated, verdict, discriminated, passed], [False, "not calibrated", {"met": 1, "of": 2}, {"met": 1, "of": 1}])
+        self.assertEqual(pairs, [["a:declined-answer", 1, False], ["a:context-off-claim", 0, True]])
+        self.assertIn("not told apart: a:declined-answer (found 1, on the twin 1", why[0])
+        # Every plant told apart, and the clean deck sent back: not calibrated, and said why.
+        self.assertEqual(result["harsh"][:4], [False, "not calibrated", {"met": 1, "of": 1}, {"met": 0, "of": 1}])
+        self.assertIn("a clean deck was sent back: a (passed 0)", result["harsh"][4][0])
+        self.assertEqual(result["lenient"][:3], [False, "not calibrated", {"met": 0, "of": 1}])
+        self.assertEqual(result["unknown"], [False, "not measured", ["a:declined-answer"]])
         self.assertIsNone(result["single"][0])
         self.assertIn("--repeats 3", result["single"][1])
         self.assertEqual(result["clean"], ["explainer", "finance", "product", "public-ops"])
         self.assertEqual(result["planted"], ["declined-answer", "comparison-cut", "context-off-claim", "restated-page"])
-        self.assertEqual(result["anchors"], 16)
+        self.assertEqual(result["blocking"], [True, True, True, False])
+        # Four clean decks and eleven plants: context-off-claim is not planted on product, whose one typed chart would be moved onto its own page.
+        self.assertEqual(result["anchors"], 15)
+
+    def test_a_plant_is_caught_by_what_an_item_opens_on_and_a_plant_that_moves_nothing_is_refused(self):
+        result = run_node("""
+import { PLANTED } from './evals/quality/critic-calibration.mjs';
+const cut = PLANTED['comparison-cut'], doc = { deck: { players: ['Harbour', 'Dunmore', 'Eastbank'] } };
+const answer = (text) => ({ missingAnalyses: [{ severity: 'major', analysis: text }] });
+const caught = (text) => cut.caught(answer(text), cut.at(doc));
+const one = { deck: { id: 'one' }, pages: [{ id: 'p1', exhibit: { basis: { measures: ['i/a'] }, series: [{ name: 'A', values: [1, 2] }] } }] };
+let refused = null; try { PLANTED['context-off-claim'].plant(structuredClone(one)); } catch (error) { refused = error.message; }
+console.log(JSON.stringify({ sizing: caught('Size and time the term funding. Show the headroom in pounds. Show the funding that brings cover to the next-thinnest peer.'),
+  missing: caught('No page sets Harbour against its peers. The answer ranks it all the same.'), rival: caught('The answer rests on no page. It sets Harbour against Dunmore on cover.'), refused }));
+""")
+        # An item that sizes a gap and names a peer in its third sentence is not the missing comparison; one that opens on it is.
+        self.assertEqual([result["sizing"], result["missing"], result["rival"]], [False, True, True])
+        self.assertIn("needs two pages with typed charts", result["refused"])
 
     def test_a_critic_that_sends_every_deck_back_is_not_calibrated_end_to_end(self):
         anchors = "finance,finance:declined-answer,finance:comparison-cut,explainer,explainer:restated-page"
-        # Files a major under every check a plant is caught on, on every deck: every plant "caught", every planted deck sent back.
+        # Files a major under every check a plant is caught on, on every deck: every plant found, and found on the clean decks too.
         run, result = self.calibrate("--repeats", "2", "--anchors", anchors, env={"FAKE_CRITIC_SENDS_BACK": "every-check"})
         self.assertEqual((run.returncode, result["calibrated"], result["verdict"]), (2, False, "not calibrated"))
-        self.assertEqual((result["primary"]["caught"], result["primary"]["verdict"]), ({"met": 3, "of": 3}, {"met": 3, "of": 3}))
-        self.assertEqual((result["primary"]["cleanQuiet"], result["primary"]["discriminated"]), ({"met": 0, "of": 3}, {"met": 0, "of": 3}))
-        self.assertTrue(result["sendsEverythingBack"])
-        self.assertIn("NOT calibrated - the planted check fires on the clean deck too", run.stdout)
-        self.assertIn("NOT told apart: caught 1; revise 1; the same check on the clean deck 1", run.stdout)
+        self.assertEqual((result["primary"]["caught"], result["primary"]["discriminated"], result["primary"]["cleanPassed"]), ({"met": 3, "of": 3}, {"met": 0, "of": 3}, {"met": 0, "of": 2}))
+        self.assertIn("NOT told apart: found at its place 1; the same test on the clean twin 1", run.stdout)
         rows = {row["id"]: row for row in result["anchors"]}
         self.assertEqual(rows["finance"]["unplanted"], {"declined-answer": 1, "comparison-cut": 1, "context-off-claim": 1, "restated-page": 1})
-        # Sends every deck back for an item of its own: each pair told apart, the verdict never changes - not calibrated.
+        # Sends every deck back for an item of its own: each pair told apart, the clean decks sent back - not calibrated.
         run, result = self.calibrate("--repeats", "2", "--anchors", anchors, env={"FAKE_CRITIC_SENDS_BACK": "numbers"})
         self.assertEqual((run.returncode, result["calibrated"]), (2, False))
         self.assertEqual(result["primary"]["discriminated"], {"met": 3, "of": 3})
-        self.assertEqual(result["cleanVerdict"]["sentBack"], ["explainer", "finance"])
-        self.assertIn("every answer on every deck said revise", run.stdout)
-        # The careful critic on the same anchors: told apart on every pair, the clean decks passed and their verdict still not measured.
+        self.assertEqual(result["primary"]["cleanPassed"], {"met": 0, "of": 2})
+        self.assertIn("a clean deck was sent back", run.stdout)
+        # The careful critic on the same anchors: told apart on every pair, the clean decks passed.
         run, result = self.calibrate("--repeats", "2", "--anchors", anchors)
         self.assertEqual((run.returncode, result["calibrated"], result["why"]), (0, True, []))
-        self.assertEqual((result["primary"]["discriminated"], result["cleanVerdict"]["measured"], result["cleanVerdict"]["passed"]), ({"met": 3, "of": 3}, False, ["explainer", "finance"]))
-        self.assertIn("clean fixture decks - verdict not measured", run.stdout)
+        self.assertEqual((result["primary"]["discriminated"], result["primary"]["cleanPassed"]), ({"met": 3, "of": 3}, {"met": 2, "of": 2}))
         # A planted deck measured without its clean twin is not measured: there is nothing to tell it apart from.
         run, result = self.calibrate("--repeats", "1", "--anchors", "finance:declined-answer")
         self.assertEqual((result["verdict"], result["unmeasured"], run.returncode), ("not measured", ["finance:declined-answer"], 2))
-
-    def test_the_readme_says_what_the_recorded_run_of_the_real_critic_shows(self):
-        # The README cited a real critic's result no file in the repo held, and drew from it that a catch is calibration.
-        record = json.loads((QUALITY / "calibration" / "storyline-critic.json").read_text(encoding="utf-8"))
-        readme = " ".join((QUALITY / "README.md").read_text(encoding="utf-8").split())
-        primary = record["primary"]
-        self.assertEqual((record["verdict"], record["calibrated"]), ("not calibrated", False))
-        self.assertEqual((primary["caught"], primary["verdict"]), ({"met": 7, "of": 7}, {"met": 7, "of": 7}))
-        self.assertEqual((primary["cleanQuiet"], primary["discriminated"]), ({"met": 2, "of": 7}, {"met": 2, "of": 7}))
-        told = sorted(pair["anchor"] for pair in record["pairs"] if pair["discriminated"])
-        self.assertEqual(told, ["explainer:restated-page", "product:restated-page"])
-        self.assertEqual(record["unmeasured"], ["showcase:declined-answer"])
-        self.assertEqual((record["form"]["answers"], record["form"]["invalid"], record["run"]["calls"]), (39, 7, 39))
-        self.assertEqual(record["cleanVerdict"]["sentBack"], ["finance", "product", "public-ops", "showcase"])
-        # A summary: counts, shares and ids, and nothing a critic wrote.
-        self.assertTrue(all(isinstance(row["invalid"], int) for row in record["anchors"]))
-        self.assertNotRegex(json.dumps(record), r"problem|\bfix\b|summary\"")
-        for said in ("`calibration/storyline-critic.json`", "39 calls", "7 of 7 measured pairs caught, 7 of 7 sent back", "in 5 of those 7 pairs", "so 2 of 7 pairs discriminate",
-                     "7 of the 39 answers failed validation", "the critic's verdict is not evidence of calibration", "**What calibrated means: discrimination.**", "twins, not anchors"):
-            self.assertIn(said, readme)
-        # And the measure the record was scored by is the one this checkout holds: its pairs say what the harness's own rows say.
-        result = run_node('''
-import fs from 'node:fs';
-import { calibration } from './evals/quality/critic-calibration.mjs';
-const record = JSON.parse(fs.readFileSync('./evals/quality/calibration/storyline-critic.json', 'utf8'));
-const again = calibration(record.anchors.map((row) => ({ ...row, invalid: Array.from({ length: row.invalid }, () => ['form']) })));
-console.log(JSON.stringify({ verdict: again.verdict, primary: again.primary, pairs: again.pairs.map((p) => [p.anchor, p.cleanFiled, p.discriminated]), recorded: record.pairs.map((p) => [p.anchor, p.cleanFiled, p.discriminated]), why: again.why.length, unmeasured: again.unmeasured }));
-''')
-        self.assertEqual((result["verdict"], result["primary"], result["unmeasured"]), (record["verdict"], record["primary"], record["unmeasured"]))
-        self.assertEqual(result["pairs"], result["recorded"])
 
     def test_calls_run_in_parallel_and_kept_answers_are_scored_again_without_a_critic(self):
         anchors = "finance,finance:declined-answer,explainer,explainer:restated-page"
@@ -413,7 +384,7 @@ class HeldOutBuildTests(unittest.TestCase):
             deck = json.loads(Path(tmp, "finance.deck.json").read_text())
             declared = [slide.get("pageType", {}).get("dependencies") for slide in deck["slides"]]
             self.assertTrue(all(declared), declared)
-            self.assertEqual(len(json.loads(Path(tmp, "finance.analysis-results.json").read_text())["results"]), 10)
+            self.assertEqual(len(json.loads(Path(tmp, "finance.analysis-results.json").read_text())["results"]), 11)
             out = os.path.join(tmp, "out")
             env = {**os.environ, "PROFESSIONAL_SLIDES_HOME": os.path.join(tmp, "home"), "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")}
             built = subprocess.run([NODE, str(runtime / "build-deck.mjs"), os.path.join(tmp, "finance.deck.json"), out, "--no-fetch"], cwd=ROOT, capture_output=True, text=True, env=env, timeout=300)

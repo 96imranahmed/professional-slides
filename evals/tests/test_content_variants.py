@@ -35,7 +35,7 @@ console.log('{}');
     def test_auto_layout_preserves_evidence_and_only_authored_supplements(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const chart={type:'chart.column',heading:'Workload volume',unit:'cases',categories:['A','B'],series:[{name:'Cases',values:[10,20]}]};
 const make=slide=>toDeckPlan({schema:'professional-slides.deck/v3',id:'t',tracker:false,slides:[{id:'s',title:'The comparison uses matching populations and periods',...slide}]});
@@ -58,7 +58,7 @@ console.log('{}');
     def test_exhibit_commentary_does_not_change_with_its_neighbours(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const page=(id,n=2)=>({id,title:'Capacity serves the defined workload under fixed assumptions',layout:'exhibit-top',pointsHeading:false,pointsStyle:'prose',
  exhibit:{type:'chart.bar',heading:'Service capacity',unit:'hours',categories:['Baseline','Scenario'],series:[{name:'Capacity',values:[100,120]}]},

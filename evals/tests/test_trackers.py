@@ -8,7 +8,7 @@ class TrackerTemplateTests(unittest.TestCase):
         result = run_node(r"""
 import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { componentFixtureSpecs, componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
+import { componentFixtureSpecs, componentVariantFixtureSpecs } from './evals/support/fixtures.mjs';
 const page=REGISTRY.get('tracker-page'),label=REGISTRY.get('tracker-label');
 assert.equal(Object.keys(page.variants).length,18);
 assert.equal(Object.keys(label.variants).length,8);
@@ -154,7 +154,7 @@ class DeckTrackerChoiceTests(unittest.TestCase):
     def test_each_tracker_draws_where_that_tracker_belongs(self):
         result = run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan, TRACKER_NAMES} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan, TRACKER_NAMES} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const page=(n)=>({id:'s'+n,title:`A page that says something measurable here ${n}`,
   points:['one point that runs to a full sentence','a second point that also runs on']});

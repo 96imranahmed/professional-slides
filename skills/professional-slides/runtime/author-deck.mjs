@@ -104,12 +104,13 @@ import { runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose-page.mjs";
 import { composeAll } from "./compose-all.mjs";
+import { chartDraws } from "./charts.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { assetFindings, assetNotice, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
 import { storylineWarning, recordCompileRefusal, unsupportedPillars, unfiledSources, sourceFiles, recordedMeasures, spineReadings, storyStructure, viewWords, BOUND_FIELDS } from "./storyline.mjs";
-import { DEFERRED, inLayout, proveSpine, stripWitness, undeterminedFinding, unmarked } from "./spine-witness.mjs";
+import { CALLOUT_KINDS, DEFERRED, inLayout, proveSpine, stripWitness, undeterminedFinding, unmarked } from "./spine-witness.mjs";
 import { deckStatementFindings, revisionChanges, scopeSourceErrors, unheldLine } from "./review-passes.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, composedPageLimits, isCarried, revisionLine, revisionRecordFindings, revisionStatement, stampKept, withImportedCredits } from "./revision.mjs";
 import { sourceKindsOf } from "./fit-review.mjs";
@@ -121,7 +122,7 @@ import { readPagesFile, withParts } from "./pages-file.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { axisOf, hasMeasures, insightLogRefusal, isPercentUnit, measureConflicts, measureRegistry, readInsightLog, unmeasuredInsights, valuesOf } from "./measures.mjs";
-import { DATA_KEYS, GRADE, FIT_WORDS, READING_TASKS, boundKeys, fitSentence, kindOfForm, markRank, pageFit, profileWords, sharedKinds } from "./claim-fit.mjs";
+import { DATA_KEYS, GRADE, FIT_WORDS, READING_TASKS, boundKeys, drawOrder, exhibitRefs, fitSentence, kindOfForm, pageFit, profileWords, sharedKinds } from "./claim-fit.mjs";
 import { featuredDraw } from "./design-systems.mjs";
 import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
@@ -130,7 +131,7 @@ import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
-import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, formDraw, freeChoices, openKindsOf, shapeStructure, stubsOf } from "./deck-structure.mjs";
+import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, freeChoices, openKindsOf, shapeStructure, stubsOf } from "./deck-structure.mjs";
 import { FIT, fitSearch } from "./fit-search.mjs";
 import { fillGuidance } from "./fill-guidance.mjs";
 import { briefOf, contributions, contributorsOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
@@ -326,10 +327,12 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     // Where the page compiles as declared and composes only in another layout, its witness is that layout's compile.
     const elsewhere = proved.witness ? compileDeck({ ...withKeys(docIn), pages: [proved.witness], appendix: [] }, { insights, partial: true }).spec.slides[0] : null;
     witnessed.set(index, elsewhere ? unmarked(elsewhere) : recorded(unmarked(slide), { source: authored.source, bound: page }, dependencies, binding.bound));
-    const spine = spineOf(page, index), own = withoutDependencies(spine, measured, written.bound.printed.get(spine));
+    // A page whose references bind only in the layout its witness took (proveSpine) is read in that layout: the form is the layout's.
+    const relaid = written.bound.failed.has(page?.id) ? bindDeck({ ...withKeys(docIn), pages: [inLayout(spineOf(page, index), proved.form, proved.commentary)], appendix: [] }, insights) : null;
+    const spine = relaid ? relaid.doc.pages[0] : spineOf(page, index), bound = (relaid ?? written).bound, own = withoutDependencies(spine, measured, bound.printed.get(spine));
     const reported = stripWitness(slide, proved.filled);
     if (proved.moved && reported.pageType) reported.pageType.moved = proved.moved;
-    return recorded(reported, { source: own.page.source, bound: spine }, own.dependencies, written.bound);
+    return recorded(reported, { source: own.page.source, bound: spine }, own.dependencies, bound);
   });
   const compiled = [...compile(doc.pages), ...compile(doc.appendix || [], doc.pages.length)];
   const slides = compiled.slice(0, doc.pages.length).filter(Boolean), appendix = compiled.slice(doc.pages.length).filter(Boolean);
@@ -338,7 +341,7 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
   // refusal where what could be checked of it without the binding was refused too.
   const authored = written ? [...written.doc.pages, ...(written.doc.appendix || [])] : [...doc.pages, ...(doc.appendix || [])];
   const idAt = (index) => authored[index]?.id ?? `page-${index + 1}`;
-  const carried = revision ? carriedEntries(doc.pages.filter((page, index) => !(isCarried(page) && refusals.has(index)))) : [];
+  const carried = revision ? carriedEntries(doc.pages, { skip: (page, index) => isCarried(page) && refusals.has(index) }) : [];
   // `page` is the page as the binding left it - its bound exhibits written out - which is what stands in for it (withStandIns).
   // A refused page keeps the record of what it declares (`record`): its type, what settles it and each `basis`, with its
   // exhibits as written - what a draft's particular proofs read to say which bound choice mends it (spine-exhibits.mjs), and
@@ -417,8 +420,9 @@ function spineProof(doc, { insights, measured, written, baseDir, sourceKinds = n
   return proveSpine(doc, { registry: measured, exampleOf, kindsOf: (page) => (open.has(String(page?.id)) ? new Map(open.get(String(page.id)).map((item) => [item.at, item.kind])) : null),
     compileOne: (page) => {
       const one = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true });
+      // A reference that does not bind in this layout may bind in another (two units drawn as a combo, not a line): the layout's to choose.
       const refused = one.failed.find((f) => !f.unbound);
-      return { slide: one.spec.slides[0] ?? null, refusal: one.bindingFindings[0]?.repair ?? refused?.message ?? (one.spec.slides[0] ? null : "the page did not compile"), stage: refused?.stage ?? null, unbound: one.bindingFindings.length > 0 };
+      return { slide: one.spec.slides[0] ?? null, refusal: one.bindingFindings[0]?.repair ?? refused?.message ?? (one.spec.slides[0] ? null : "the page did not compile"), stage: refused?.stage ?? (one.bindingFindings.length ? "layout" : null), unbound: one.bindingFindings.length > 0 };
     },
     // A layout holds the page where the composer takes it and the composed page keeps what the page carries: a form that
     // composes by leaving an exhibit out has not laid the page out.
@@ -430,15 +434,16 @@ function spineProof(doc, { insights, measured, written, baseDir, sourceKinds = n
         return lost ? `${slide.id}: composed in this form the page drops ${lost.kind ? `its ${lost.kind} (${lost.value})` : `what it carries ("${String(lost.text ?? "").slice(0, 80)}")`}` : null;
       } catch (error) { return (error.pageErrors ?? [error.message])[0]; }
     } : null,
-    // What the page as written already shows by reference, and the periods or members each of its drawn exhibits sets along its axis.
+    // What the page as written already shows by reference, and the periods or members each of its drawn exhibits sets along its axis:
+    // where its references did not bind, the axis of the first measure each names, which a layout that binds them draws.
     shownOf: (page) => {
       const id = String(page?.id ?? ""), spine = spines.get(id) ?? page;
-      if (written.bound.failed.has(page?.id)) return { unbound: true, shown: new Set(), labels: [] };
       const exhibits = [spine.exhibit, ...(Array.isArray(spine.exhibits) ? spine.exhibits : [])].filter((ex) => ex && typeof ex === "object");
       // A number printed in the title or the prose is copy: what a page shows of a measure is what an exhibit or a figure of it shows.
       const blocks = (Array.isArray(spine.blocks) ? spine.blocks : []).map((block) => block?.exhibit).filter((ex) => ex && typeof ex === "object");
       const shown = new Set([...exhibits, ...blocks, ...metricsOf(spine)].flatMap((item) => (Array.isArray(item.basis?.measures) ? item.basis.measures : [])));
-      return { unbound: false, shown, labels: exhibits.map((ex) => (Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : null)) };
+      const axis = (ex) => exhibitRefs(ex).map((ref) => measured.get(ref)).map((m) => (m ? axisOf(m) : null)).find((a) => a && a.kind !== "scalar")?.labels ?? null;
+      return { unbound: written.bound.failed.has(page?.id), shown, labels: exhibits.map((ex) => (Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : axis(ex))) };
     } });
 }
 
@@ -490,7 +495,8 @@ export function withoutDependencies(pageIn, registry = new Map(), printed = []) 
 
 // Metadata written the same on most pages is stamped by a loop, not chosen by
 // reading the page, and says nothing true about any one of them.
-const SIGNATURE_FIELDS = ["why", "settles", "adds", "takeaway", "subtitle", "rail", "bar"];
+// `settles.what` on its own as well: a stamped sentence hides inside settles objects that differ only by their measures.
+const SIGNATURE_FIELDS = ["why", "settles", "settles.what", "adds", "takeaway", "subtitle", "rail", "bar"];
 export const SIGNATURE_SHARE = 0.6;
 const SIGNATURE_FROM = 8;
 // A title that states a gap is allowed on at most this share of the analytical
@@ -526,7 +532,7 @@ export function deckSpineFindings(doc, insights = null) {
     for (const field of SIGNATURE_FIELDS) {
       const counts = new Map();
       for (const page of typed) {
-        const value = page[field];
+        const value = field.split(".").reduce((at, key) => (at && typeof at === "object" ? at[key] : undefined), page);
         const text = typeof value === "string" ? value.trim() : value && typeof value === "object" ? JSON.stringify(value) : null;
         if (!text || (typeof value === "string" && textWords(text) < 3)) continue;
         counts.set(text, (counts.get(text) || 0) + 1);
@@ -758,33 +764,12 @@ const waitsFor = (f) => repairOf(f).settledLater;
  * it leaves unsatisfied no form or placement mends - only another page type,
  * another page or other evidence, all of which the critique is bound to.
  */
-function structurePlan(doc, insights) {
+function structurePlan(doc, insights, sourceKinds = null) {
   let compiled = new Map();
   try { const { spec } = compileDeck(doc, { insights, partial: true }); compiled = new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])); }
   catch { compiled = new Map(); }
   // Any form the catalogue allows, whatever its fit: a draft holds a rule against a spine only where nothing the layout can choose meets it.
-  return allocateStructure(doc, { insights, planOf, compiled, forms: "any" });
-}
-
-/**
- * Everything a draft refuses of what each page declares, on the compiled spine
- * (`spine`, compileDeck in draft): the pages no layout of their type holds, the
- * exhibits the spine determines that cannot be drawn, the pages whose witness
- * the critique would read differently, and the dependency contract read off
- * the witness. What a plan refuses too, so the two refuse the same spines.
- */
-function spineBoundFindings(doc, spine, { insights, baseDir }) {
-  const refused = spine.failed.filter((f) => !f.unbound).map((f) => ({ code: f.code ?? "COMPILE", id: f.id, severity: "blocker", repair: f.message }));
-  const refusedIds = new Set(spine.failed.map((f) => String(f.id)));
-  const one = (page) => { const made = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true }); const why = made.bindingFindings[0]?.repair ?? made.compileErrors[0]; if (why) throw new Error(why); return made.spec.slides[0]; };
-  const recorded = { ...spine.spec, slides: [...spine.spec.slides, ...spine.failed.filter((f) => f.record).map((f) => f.record)] };
-  const undrawable = WEIGHT.applyRulesVersion(spineExhibitFindings(doc, { spec: recorded, insights, baseDir, compile: one, sceneGates: (deck) => sceneGateFindings(deck, undefined, spine.spec) }), spine.spec);
-  const proven = new Set(undrawable.map((f) => String(f.id)));
-  // Held or not by the one decision every finding is put to (weight.mjs notHeldOn), as the draft's own is (authorDeck): no rules
-  // version names it and it reads one composed page, so it is held on every deck, a revision's composed pages among them.
-  const undetermined = spine.witness ? WEIGHT.applyRulesVersion(undeterminedPages(spine.spec, spine.witness.spec, insights, spine.witness.pages), spine.spec).filter((f) => !refusedIds.has(String(f.id)) && !proven.has(String(f.id))) : [];
-  const said = new Set([...refusedIds, ...proven, ...undetermined.map((f) => String(f.id))]);
-  return [...refused.filter((f) => !proven.has(String(f.id))), ...undrawable, ...undetermined, ...spineDependencies(doc, insights, spine.spec, spine.witness?.doc ?? null).filter((f) => !said.has(String(f.id)))].filter((f) => isBlocker(f) && (refusedIds.has(String(f.id)) || !waitsFor(f)));
+  return allocateStructure(doc, { insights, planOf, compiled, forms: "any", sourceKinds });
 }
 
 /**
@@ -1141,7 +1126,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // made on the spine's witness; the spine's own rules; the content plan's rules on claims; the dependency contract, read off
   // the witness; a structure rule no allocation of forms and placements satisfies. What a draft leaves to the full compile is
   // the closed list spine-witness.mjs DEFERRED states - the copy, unbound content, the layout, the fit - and nothing else.
-  const unmet = new Map((draft ? structurePlan(doc, insights).unsatisfied : []).map((u) => [u.code, u]));
+  const unmet = new Map((draft ? structurePlan(doc, insights, sourceKinds).unsatisfied : []).map((u) => [u.code, u]));
   const NO_ALLOCATION = "No allocation of forms and commentary placements satisfies this rule (`--plan` prints the closest one found): what mends it is another page type, another page, or other evidence on a page - which the storyline critique is bound to, so settle it before the critique";
   // A structure or aggregate rule the layout can usually mend is the spine's where the plan's allocation cannot satisfy it.
   const settled = gathered.map((f) => (draft && isBlocker(f) && waitsFor(f) && boundOnly(f.code).length && unmet.has(f.code) ? { ...f, touches: boundOnly(f.code), repair: `${f.repair ?? ""} ${NO_ALLOCATION}`.trim() } : f));
@@ -1407,18 +1392,21 @@ export function scaffoldReport(type, { id = "p00", form = null, insight = null, 
   const measured = insight.measures && typeof insight.measures === "object" && Object.keys(insight.measures).length > 0;
   // How the type's forms carry what the insight's measures give a reader to read (claim-fit.mjs): the forms are tried best fit
   // first, forms of one grade in the order the deck's `variation` draws them - the catalogue's order where it has none.
-  // `claim` is the page's own `settles`, where the pages file holds the page: the kind of claim and the relation it asserts.
-  const fit = measured ? pageFit({ id, type, settles: { ...(claim?.kind ? { kind: claim.kind } : {}), ...(claim?.relation ? { relation: claim.relation } : {}), measures: Object.keys(insight.measures).map((name) => `${insight.id}/${name}`) }, evidence: [insight.id] },
+  // `claim` is the page's own `settles`, where the pages file holds the page: the kind of claim, the relation it asserts and the
+  // measures of this insight it names - what the plan reads the page's fit from - else every measure the insight records.
+  const asked = (Array.isArray(claim?.measures) ? claim.measures : []).filter((ref) => String(ref).startsWith(`${insight.id}/`));
+  const fit = measured ? pageFit({ id, type, settles: { ...(claim?.kind ? { kind: claim.kind } : {}), ...(claim?.relation ? { relation: claim.relation } : {}), measures: asked.length ? asked : Object.keys(insight.measures).map((name) => `${insight.id}/${name}`) }, evidence: [insight.id] },
     { registry: measureRegistry([insight]), insights: new Map([[insight.id, insight]]) }) : null;
   const gradeIn = (name) => fit?.forms.ranked.find((item) => item.form === name)?.grade ?? -1;
-  // The deck's draw, as the plan reads it (deck-structure.mjs): a kind or a form by where it falls in the deck's hand for the reading
-  // task, what the draw features first - so a scaffold takes the form and the kinds the plan gives the page, whatever its id.
-  const drawn = (key, task = fit?.task) => (seed === null ? 0 : (featured?.kinds.has(key) || featured?.forms.has(`${type}/${key}`) ? -1 : 0) + (String(key).startsWith("chart.") ? markRank(seed, task, key) : formDraw(seed, type, key, task)));
-  const tried = form || !fit?.task ? sources : [...sources].sort((a, b) => gradeIn(b.form) - gradeIn(a.form) || drawn(a.form) - drawn(b.form));
+  // The deck's draw, as the plan takes it (claim-fit.mjs drawOrder): what it features, then where a mark falls in the deck's hand for
+  // the reading task - so a scaffold takes the form and the kinds the plan gives the page, whatever its id.
+  const marks = seed === null ? null : new Set([...(featured?.forms ?? []), ...(featured?.kinds ?? [])]);
+  const order = (items, { task = fit?.task, mark, before = [] } = {}) => drawOrder(items, { seed, task, featured: marks, mark, before }).ordered;
+  const tried = form || !fit?.task ? sources : order(sources, { mark: (source) => `${type}/${source.form}`, before: [["grade", (a, b) => gradeIn(b.form) - gradeIn(a.form)]] });
   const attempts = !measured ? [] : tried.map((source) => {
     const named = { ...scaffoldBase(source, type, id), evidence: [insight.id] };
     delete named.settles;
-    const { claimed, why } = bindScaffold(named, insight, { fit, drawn, declared: kinds ?? [] });
+    const { claimed, why } = bindScaffold(named, insight, { fit, order, declared: kinds ?? [] });
     if (!claimed.length) return { form: source.form, page: null, why: why ?? "the form's exhibit takes no measure" };
     // The page with prompts for its commentary too, where that still compiles; else with the example's commentary under the bound exhibit.
     let refusal = null;
@@ -1489,8 +1477,6 @@ function promptedCommentary(pageIn) {
   return page;
 }
 
-// The charts of series whose renderers draw a highlighted category (charts.mjs: `draws` of each).
-const HIGHLIGHTED_CHARTS = new Set(["chart.bar", "chart.column", "chart.stacked-bar", "chart.stacked-column", "chart.line", "chart.area"]);
 // The most measures a scaffolded table sets side by side, and the most rows it writes.
 const SCAFFOLD_TABLE = Object.freeze({ measures: 5, rows: 12 });
 
@@ -1510,7 +1496,7 @@ const SCAFFOLD_TABLE = Object.freeze({ measures: 5, rows: 12 });
  *   a fact grid, stat list  a figure an item, each naming its measure
  *   metrics, a hero figure  each naming its measure
  */
-function bindScaffold(page, insight, { fit = null, drawn = () => 0, declared = [] } = {}) {
+function bindScaffold(page, insight, { fit = null, order, declared = [] } = {}) {
   const measures = Object.entries(insight.measures && typeof insight.measures === "object" ? insight.measures : {}).map(([name, m]) => ({ ref: `${insight.id}/${name}`, name, m, axis: axisOf(m) }));
   const claimed = [], reasons = [];
   const series = measures.filter((x) => x.axis.kind !== "scalar");
@@ -1531,9 +1517,10 @@ function bindScaffold(page, insight, { fit = null, drawn = () => 0, declared = [
     if (kind === "chart.slope") ex.focusSeries = written.names[0];
     claimed.push(...written.claimed);
     promptExhibit(ex);
-    // A chart over periods that marks nothing is scaffolded with its latest period highlighted - the value a title over time
-    // most often states - for the author to move to the period the title names (the compile proposes it: dependency_gates.mjs claimMarks).
-    if (Array.isArray(ex.series) && !ex.pivot && from.find((x) => x.axis.kind !== "scalar")?.axis.kind === "periods" && HIGHLIGHTED_CHARTS.has(String(ex.type ?? "")) && !markedChart(ex)) ex.highlights = [{ category: last }];
+    // A chart over periods that marks nothing is scaffolded with its latest period highlighted - the value a title over time most
+    // often states - where its renderer draws a highlight (charts.mjs chartDraws), for the author to move to the period the title
+    // names (the compile proposes it: dependency_gates.mjs claimMarks).
+    if (Array.isArray(ex.series) && !ex.pivot && from.find((x) => x.axis.kind !== "scalar")?.axis.kind === "periods" && chartDraws(String(ex.type ?? ""), "highlights") && !markedChart(ex)) ex.highlights = [{ category: last }];
   };
   // The first chart of a page is drawn as its form draws it; any other by the kind it names.
   const kindOf = (ex, at) => String(ex.type ?? (at === 0 ? kindOfForm(page.type, page.form) ?? "" : ""));
@@ -1545,7 +1532,7 @@ function bindScaffold(page, insight, { fit = null, drawn = () => 0, declared = [
   const matched = sharedKinds(fit?.exhibits ?? []);
   const cuts = (fit?.exhibits ?? []).map((cut) => {
     const from = [...cut.refs.map((ref) => measures.find((x) => x.ref === ref)).filter(Boolean), ...singles];
-    const kinds = cut.kinds.equal.map((item) => item.kind).filter((kind) => kind.startsWith("chart.")).sort((a, b) => matched.includes(b) - matched.includes(a) || drawn(a, cut.task) - drawn(b, cut.task));
+    const kinds = order(cut.kinds.equal.map((item) => item.kind).filter((kind) => kind.startsWith("chart.")), { task: cut.task, before: [["matched", (a, b) => matched.includes(b) - matched.includes(a)]] });
     // A kind the page already names for this exhibit - the plan's, once copied in - is the one scaffolded, where it carries the cut
     // as well as any; a cut past the exhibits the page names takes a kind the page names for another, so the panels still match.
     const named = declared[cut.at] ?? declared.find((kind) => kinds.includes(kind));
@@ -1558,7 +1545,7 @@ function bindScaffold(page, insight, { fit = null, drawn = () => 0, declared = [
       // The worked exhibit's callouts come with it as prompts, moved to what the new exhibit draws: a chart marks its finding.
       const from = charted[at % charted.length];
       const ex = { type: cut.kind, heading: PROMPTS.heading, ...(typeof from.caption === "string" ? { caption: PROMPTS.caption } : {}),
-        ...(Array.isArray(from.annotations) && MARKED_KINDS.has(cut.kind) ? { annotations: structuredClone(from.annotations).filter((mark) => mark && typeof mark === "object" && mark.category !== undefined).slice(0, 1).map((mark) => ({ category: mark.category, text: mark.text })) } : {}) };
+        ...(Array.isArray(from.annotations) && CALLOUT_KINDS.has(cut.kind) ? { annotations: structuredClone(from.annotations).filter((mark) => mark && typeof mark === "object" && mark.category !== undefined).slice(0, 1).map((mark) => ({ category: mark.category, text: mark.text })) } : {}) };
       bindChart(ex, cut.kind, cut.from);
       return ex;
     });
@@ -1605,9 +1592,6 @@ function bindScaffold(page, insight, { fit = null, drawn = () => 0, declared = [
   if (page.kpi && typeof page.kpi === "object" && printed.length) { page.kpi = figure(printed[0]); claimed.push(printed[0].ref); }
   return { claimed: [...new Set(claimed)], why: reasons[0] ?? (charts.length || page.metrics || page.kpi ? null : `a ${page.type}/${page.form} page carries no exhibit or figure that takes a measure`) };
 }
-
-// The chart kinds whose callout names one category along an axis: what a scaffold carries a worked page's callout onto.
-const MARKED_KINDS = new Set(["chart.line", "chart.column", "chart.bar", "chart.area", "chart.lollipop"]);
 
 // How each scorecard form that codes recorded magnitudes codes a table's measure columns, in place; each returns how many it coded.
 // A heatmap shades every column on its own range; bars set the first measure as in-cell bars and leave the rest as figures;
@@ -1734,7 +1718,9 @@ async function placementBlocks(doc, { insights, baseDir }) {
   const keyOf = (page, choice) => `${page.id}|${choice.form}|${choice.commentary}`;
   // Each page as bound: an exhibit that names its measures written out, so the placeholder copy can mark a period or member of it.
   const written = bindDeck(doc, insights).doc, bound = [...written.pages, ...(written.appendix || [])];
-  const candidates = pages.flatMap((page, index) => freeChoices(page).map((choice) => ({ page: bound[index] ?? page, index, choice })));
+  // A summary after the deck's first analytical page closes it (deck-structure.mjs freeChoices).
+  const opening = pages.findIndex((page) => PAGE_TYPES[page?.type]);
+  const candidates = pages.flatMap((page, index) => freeChoices(page, null, index > opening).map((choice) => ({ page: bound[index] ?? page, index, choice })));
   const slides = [];
   let deck = null;
   for (const [at, { page, index, choice }] of candidates.entries()) {
@@ -1854,9 +1840,8 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
   const sourceKinds = await sourceKindsOf(doc.deck, file);
   const plan = allocateStructure(doc, { insights, planOf, compiled, blocksOf, sourceKinds });
   // What the critique will read of each page as the spine stands: part of what the plan proposes, since the layout is held to it.
-  // The titles the critique will be bound to are composed where the deck's design sets them (spine-fit.mjs), as a draft composes them.
-  // And what the spine says each page shows is proven drawable, with the dependency contract on what the pages declare
-  // (spine-exhibits.mjs, spineDependencies): everything a draft refuses of the bound facts, the plan refuses too.
+  // The proposal is drafted (authorDeck in draft, below), and what that draft refuses the plan refuses: the titles where the deck's
+  // design sets them, each exhibit the spine determines proven drawable, the dependency contract and the structure rules.
   // A page that declares no form or no placement is read in the one the plan gives it: the spine the author is about to have,
   // since those are the choices this run asks them to copy in. A choice the page declares is read as declared.
   const given = new Map(plan.pages.map((page) => [String(page.id), page]));
@@ -1864,15 +1849,17 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
     return to && (page.form === undefined || page.commentary === undefined) ? inLayout(page, page.form ?? to.form, page.commentary ?? to.commentary) : page; };
   const proposed = { ...doc, pages: doc.pages.map(take), ...(Array.isArray(doc.appendix) ? { appendix: doc.appendix.map(take) } : {}) };
   let readings = [], unfit = [], unlayable = [], drafted = null;
-  // Where the proposal stands is read by the draft itself, run on it: the plan allocates on descriptors and estimates an
-  // exhibit a page has not declared, and a standing printed from those can differ from the one the next command prints.
-  try { drafted = (await authorDeck(proposed, { baseDir: dir, insights, draft: true })).standings.filter((st) => st.class === "S"); } catch { drafted = null; }
+  // Where the proposal stands, and what of it is refused, is read by the draft itself, run on it: the plan allocates on descriptors
+  // and estimates an exhibit a page has not declared, and a standing or a refusal printed from those can differ from the ones the
+  // next command prints. So the plan refuses all the draft of its own proposal refuses - the titles that do not fit said apart, and
+  // a structure rule the allocation already reports unmet said once.
   try {
-    const spine = compileDeck(proposed, { insights, draft: true, partial: true, baseDir: dir, sourceKinds });
-    readings = readingLines(spine.spec, insights);
-    unfit = spineFitFindings(withStandIns(proposed, spine.spec, spine.failed, insights, sourceKinds).structural, dir);
-    unlayable = spineBoundFindings(proposed, spine, { insights, baseDir: dir });
-  } catch { readings = []; }
+    const draft = await authorDeck(proposed, { baseDir: dir, insights, draft: true }), unmet = new Set(plan.unsatisfied.map((u) => u.code));
+    drafted = draft.standings.filter((st) => st.class === "S");
+    readings = readingLines(draft.spec, insights);
+    unfit = draft.blocking.filter((f) => f.code === "SPINE_UNFIT");
+    unlayable = draft.blocking.filter((f) => f.code !== "SPINE_UNFIT" && !unmet.has(f.code));
+  } catch { drafted = null; }
   // Where the forms that carry the claims best cannot meet a rule between them, the plan says what meeting it would cost: the
   // same search with every form of each type allowed, and the pages it would move off the forms that carry their claims best.
   const loose = !plan.satisfied && plan.pinned.length ? allocateStructure(doc, { insights, planOf, compiled, blocksOf, sourceKinds, forms: "any" }) : null;
@@ -1883,6 +1870,8 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
   // The pages no reading could be taken from, under the choice the plan gives them.
   const unwritten = blocksOf ? plan.pages.filter((page) => { const source = typed.find((p) => String(p.id) === String(page.id)); return source && !blocksOf(source, { form: page.form, commentary: page.commentary }); }).length : plan.pages.length;
   const read = (structure) => readStandings(structure.standings.filter((st) => classOf(st.code) === "S"));
+  // The structure rules the draft of the proposal refuses that no form or placement decides: the allocation does not claim them.
+  const ruled = [...new Set(unlayable.filter((f) => classOf(f.code) === "S").map((f) => f.code))];
   const blockers = (structure) => inClassOrder(structure.findings.filter((f) => isBlocker(f) && classOf(f.code) === "S"));
   const count = (source) => plan.pages.filter((page) => page.source === source).length;
   const declared = plan.pages.every((page) => !["proposed", "placed"].includes(page.source)) ? { blocking: blockers(plan.declared).map((f) => f.code), standing: read(plan.declared).map((st) => st.line) } : null;
@@ -1892,7 +1881,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
     ...(declared ? [declared.blocking.length ? `As declared${estimated.length ? ", on that estimate," : ","} the deck's structure rules ${estimated.length ? "would refuse" : "refuse"} it: ${[...new Set(declared.blocking)].join(", ")}.`
       : `As declared${estimated.length ? ", on that estimate," : ","} the deck satisfies its structure rules.`] : ["Not every page declares a form and a placement, so the structure rules are read on the proposal."]),
     ...(unshaped.length ? ["", "Types the evidence cannot carry (choose another type, or find the data):", ...unshaped.map((line) => `  ${line}`)] : []),
-    "", plan.satisfied ? `Proposed allocation (satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}; nothing was written - copy the choices you take into the pages file):`
+    "", plan.satisfied ? `Proposed allocation (${ruled.length ? `its forms and placements meet every structure rule they decide; the draft of it refuses ${ruled.join(", ")}, below` : `satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}`}; nothing was written - copy the choices you take into the pages file):`
       : `No allocation of forms and placements satisfies ${plan.unsatisfied.map((u) => u.code).join(", ")}${plan.capped ? ` within the search's budget (${plan.steps} changes, ${plan.evaluations} readings of the structure)` : ""}; the closest found:`,
     ...plan.pages.map((page) => `  ${String(page.id).padEnd(8)} ${page.type.padEnd(13)} form ${String(page.form).padEnd(18)} commentary ${String(page.commentary).padEnd(12)} ${page.source === "placed" ? "form declared, placement proposed" : page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})` : ""}${page.imported && page.source !== "proposed" ? " - imported page, kept as drawn" : ""}${page.estimated ? " - exhibit estimated" : ""}` +
       (page.reads ? ` - taken to meet a structure rule; this form reads ${page.reads.join(", ")}: check the evidence holds it` : "") + fitWords(page)),
@@ -1903,8 +1892,8 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
         (served.length ? ` ${mended.join(", ")} would be met only by drawing ${served.length === 1 ? "this page" : "these pages"} in a form that is not a best fit for ${served.length === 1 ? "its" : "their"} claim: ${served.slice(0, 12).map((page) => `${page.id} as ${page.form} (best fit: ${page.best.join(", ")})`).join("; ")}${served.length > 12 ? `; and ${served.length - 12} more` : ""}. That trades the picture for the rule, and the plan does not propose it: the sounder repair is evidence of another shape or a page of another type, made before the critique. A form you declare on a page is kept, and is named under VARIETY_FIT_UNUSED.`
           : mended.length ? ` ${mended.join(", ")} would be met by other placements or forms the catalogue allows these pages; declare them and run --plan again.` : " No form the catalogue allows these pages meets it either: the page types or the evidence have to change.")] : [])] : []),
     ...(unfit.length ? ["", `${unfit.length} title${unfit.length === 1 ? "" : "s"} the storyline critique will be bound to ${unfit.length === 1 ? "does" : "do"} not fit where this deck draws ${unfit.length === 1 ? "it" : "them"} (SPINE_UNFIT; the plan is refused until ${unfit.length === 1 ? "it does" : "they do"}):`, ...unfit.map((f) => `  ${f.repair}`)] : []),
-    ...(unlayable.length ? ["", `${unlayable.length} thing${unlayable.length === 1 ? "" : "s"} the storyline critique will be bound to cannot be laid out as the spine declares ${unlayable.length === 1 ? "it" : "them"} (the plan is refused until ${unlayable.length === 1 ? "it is" : "they are"} mended; \`--draft\` refuses the same):`,
-      ...inClassOrder(unlayable, typed.map((page) => String(page.id))).map((f) => `  ${f.code} [${f.id}] ${f.repair}`)] : []),
+    ...(unlayable.length ? ["", `${unlayable.length} thing${unlayable.length === 1 ? "" : "s"} the draft of this proposal refuses - the spine as it would stand once its choices are copied in, which the layout cannot mend (the plan is refused until ${unlayable.length === 1 ? "it is" : "they are"} mended; \`--draft\` refuses the same):`,
+      ...inClassOrder(unlayable, typed.map((page) => String(page.id))).map((f) => `  ${f.code}${(f.id ?? f.page) === undefined ? "" : ` [${f.id ?? f.page}]`} ${f.repair}`)] : []),
     ...(readings.length ? ["", `${READINGS_NOTE}:`, ...readings.map((line) => `  ${line}`)] : []),
     "", drafted ? "Where the proposed deck stands (structure rules, read by `--draft`'s own compile of this proposal, so the next draft prints the same; the aggregates are measured once pages compose):"
       : "Where the proposed deck stands (structure rules, on the plan's descriptors - the proposal did not compile as a draft; the aggregates are measured once pages compose):", ...(drafted ?? read(plan.structure)).map((st) => `  ${st.line}`),
@@ -1927,11 +1916,11 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
       ...(page.kinds ? { kinds: page.kinds.map((item) => item.kind), alsoKinds: [...new Set(page.kinds.flatMap((item) => item.also))], kindsBy: [...new Set(page.kinds.filter((item) => item.also.length).map((item) => item.by))] } : {}), ...(page.exhibits ? { exhibits: page.exhibits.map((item) => `${item.where} ${item.has}: ${item.better.join(" or ")}`) } : {}),
       ...(page.elsewhere ? { elsewhere: page.elsewhere.map((item) => `${item.type}/${item.form}`) } : {}), ...(page.beside ? { beside: page.beside.map((item) => `${item.type}/${item.form}`) } : {}), ...(page.typeHand ? { typeHand: `${page.typeHand.type}/${page.typeHand.form}` } : {}) }])) } : {}) },
     ...(declared ? { declared } : {}), ...(unshaped.length ? { evidence: unshaped } : {}), ...(unfit.length ? { unfit: unfit.map((f) => ({ code: f.code, id: f.id, measured: f.measured, repair: f.repair })) } : {}),
-    ...(unlayable.length ? { unlayable: unlayable.map((f) => ({ code: f.code, id: f.id, measured: f.measured, repair: f.repair })) } : {}),
+    ...(unlayable.length ? { unlayable: unlayable.map((f) => ({ code: f.code, id: f.id ?? f.page, measured: f.measured, repair: f.repair })) } : {}),
     search: { steps: plan.steps, evaluations: plan.evaluations }, standing: { S: (drafted ?? read(plan.structure)).map((st) => st.line), ...(fragments.length ? { estimated: fragments.map((st) => st.line) } : {}) } }, null, 1));
   // What the run was refused for, as the author log keeps it.
   refusal.push(...plan.unsatisfied.map((u) => ({ code: u.code, class: classOf(u.code), message: String(u.standing ? readStandings([u.standing])[0].line : u.finding.repair).slice(0, 300) })),
-    ...[...unfit, ...unlayable].map((f) => ({ code: f.code, class: classOf(f.code), id: String(f.id), message: String(f.repair).slice(0, 300) })));
+    ...[...unfit, ...unlayable].map((f) => ({ code: f.code, class: classOf(f.code), ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), message: String(f.repair).slice(0, 300) })));
   return plan.satisfied && !unfit.length && !unlayable.length ? 0 : 2;
 }
 

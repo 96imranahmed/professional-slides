@@ -204,7 +204,10 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
  * parts read back from the written file and compared with the source's.
  */
 async function assembleRevision({ spec, stem, baseDir, directory, py, result, deck, render }) {
-  const inventory = await readJson(path.resolve(baseDir, String(spec.inventory)), { optional: true });
+  const inventoryPath = path.resolve(baseDir, String(spec.inventory));
+  const inventory = await readJson(inventoryPath, { optional: true });
+  // Without the inventory every carried title reads as changed, and the assembler would rewrite each one: the compile refuses this, and so does the build.
+  if (!inventory) throw new RefusalError(registered(REVISION_CODES, "REVISION_SOURCE_MISSING"), `The revision's inventory is not at ${inventoryPath}: the carried slides are read against it. Put back the <id>.inventory.json the import wrote, or import the deck again`);
   const order = assemblyOrder(spec, inventory, deck.slides);
   const composedPath = deck.slides.length ? path.join(directory, `${stem}.composed.pptx`) : null;
   const planPath = path.join(directory, "assembly.json"), pptxPath = path.join(directory, `${stem}.pptx`);

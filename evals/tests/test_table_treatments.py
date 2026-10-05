@@ -13,12 +13,11 @@ tables and call the same ones treated:
   heat cells, Harvey balls or dots, in-cell bars, state marks, logos, icons
   or a total band. Zebra banding is not one.
 
-These tests hold the three to that, on the stored specimen and a composed deck.
+These tests hold the three to that, on the gallery deck and a composed deck.
 """
 
 from __future__ import annotations
 
-import gzip
 import json
 import os
 import sys
@@ -34,17 +33,24 @@ sys.path.insert(0, str(GATES))
 import deck_gates  # noqa: E402
 import page_gates  # noqa: E402
 
-SPECIMEN = ROOT / "evals" / "cold-run" / "specimens" / "anthropic-vs-openai-2026" / "scene.json.gz"
+GALLERY = ROOT / "skills" / "professional-slides" / "examples" / "gallery-acceptance.deck.json"
+
+# The gallery deck compiled as build-deck compiles a spec: its scene, every table on it.
+COMPILE_GALLERY = f"""
+import fs from 'node:fs';
+import path from 'node:path';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const file = {json.dumps(str(GALLERY))};
+console.log(JSON.stringify(planDeck(toDeckPlan(JSON.parse(fs.readFileSync(file, 'utf8')), path.dirname(file))).deck));
+"""
 
 # The three JavaScript counts of one scene file, and which tables it exempts.
 MEASURES_JS = """
 import fs from 'node:fs';
-import zlib from 'node:zlib';
 import {designStatistics, tableStatistics, rowBlockSmallTable} from './skills/professional-slides/runtime/build-bars.mjs';
 import {sceneStatistics} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-let raw = fs.readFileSync(process.env.TABLE_TREATMENT_SCENE);
-if (raw[0] === 0x1f) raw = zlib.gunzipSync(raw);
-const scene = JSON.parse(raw);
+const scene = JSON.parse(fs.readFileSync(process.env.TABLE_TREATMENT_SCENE, 'utf8'));
 const design = designStatistics(scene), craft = sceneStatistics(scene), tables = tableStatistics(scene);
 console.log(JSON.stringify({
   tables, design: { tables: design.tables, share: design.tablesTreated }, craft: { tables: craft.tables, treated: craft.tablesTreated },
@@ -81,15 +87,19 @@ class OneCountTests(unittest.TestCase):
         self.assertEqual(node["design"]["share"], round(treated / tables, 2) if tables else None)
         self.assertEqual(exempt_in_python(scene), node["exempt"])
 
-    def test_the_three_measures_count_the_stored_specimen_alike(self):
-        scene = json.loads(gzip.decompress(SPECIMEN.read_bytes()))
-        node = measures_in_node(SPECIMEN)
+    def test_the_three_measures_count_the_gallery_deck_alike(self):
+        scene = run_node(COMPILE_GALLERY)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "scene.json"
+            path.write_text(json.dumps(scene), encoding="utf-8")
+            node = measures_in_node(path)
         self.assertGreater(node["tables"]["tables"], 10)
+        self.assertGreater(node["tables"]["treated"], 0)
         self.assert_one_count(scene, node)
 
     def test_the_three_measures_count_a_composed_deck_alike(self):
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const plan = (slides) => planDeck(toDeckPlan({ schema: 'professional-slides.deck/v3', id: 'd', slides })).deck;
 const points = ['A point that says what the row shows and why it matters here.', 'A second point with the qualification.'];
@@ -186,7 +196,7 @@ class ChartDataTableTests(unittest.TestCase):
         # own data, not a table the page is built on. Both counts leave it out,
         # and a table of the same rows on its own page is still counted.
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 import { countedTables, chartDataTable } from './skills/professional-slides/runtime/build-bars.mjs';
 const chart = { type: 'chart.column', heading: 'Journeys by case', unit: 'million', categories: ['FY26', 'FY27', 'FY28', 'FY29'],
@@ -212,7 +222,7 @@ console.log(JSON.stringify({ scene: deck, js: deck.slides.map((s) => ({ tables: 
         # figures to the table; a chart that asks for both is refused.
         result = run_node("""
 import assert from 'node:assert/strict';
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const series = [{ name: 'Central', values: [48.3, 49.6, 51.8, 54.4, 57.3, 60] }, { name: 'Low', values: [48.3, 49.4, 51.1, 53.2, 55, 56.5] }];
 const categories = ['FY26', 'FY27', 'FY28', 'FY29', 'FY30', 'FY31'];

@@ -39,6 +39,13 @@ class BlockExtractionTests(unittest.TestCase):
         self.assertEqual(density_profile.page_blocks(page), [12, 7])
         self.assertEqual(density_profile.body_words(page), 21)
 
+    def test_a_source_that_wraps_is_footer_all_the_way_down(self):
+        # The second and third lines of a long source footer are the footer, not two short blocks of body.
+        page = "\n".join(["Title of the page", "", "A developed point of about a dozen words that says what follows.", "",
+                           "Source: Avison Young, Manhattan office report Q3 2026; Colliers,", "Manhattan office market Q3 2026; CBRE lending", "momentum Q2 2026"])
+        self.assertEqual(density_profile.page_blocks(page, {"Title of the page"}), [12])
+        self.assertEqual(density_profile.body_words(page, {"Title of the page"}), 12)
+
     def test_a_kicker_above_the_title_does_not_turn_the_title_into_body(self):
         # A generated page sets its section kicker above the title. The corpus
         # rule drops only the first line, so given the page's header lines the
@@ -65,7 +72,7 @@ class ExecutiveSummaryTests(unittest.TestCase):
         # The client summary is four to six developed statements with their
         # parts as sub-points, not three bullets and an insight box.
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const points=Array.from({length:6},(_,i)=>({lead:'Statement '+(i+1)+'.',text:'A developed statement with its evidence and what follows from it.',...(i===0?{points:['The first part','The second part']}:{})}));
 const spec={schema:'professional-slides.deck/v3',id:'e',cover:{title:'x'},slides:[{title:'The answer the deck argues, stated in one line',role:'executive-summary',shape:'executive-summary',pointsStyle:'prose',points}]};

@@ -321,7 +321,7 @@ export const CHECKABLE = "checkable: { rule, measure } when a deterministic chec
 // What makes a repair a sentence an author can act on: long enough to say
 // where, and built on a verb that says what to do. The list is closed so the
 // rule can be printed in the prompt exactly as it is enforced (FORM_RULES).
-export const REPAIR_VERBS = Object.freeze(["add", "replace", "move", "merge", "cut", "rewrite", "split", "show", "plot", "label", "reduce", "enlarge", "use", "drop", "state", "cite", "fill", "define", "align", "highlight",
+export const REPAIR_VERBS = Object.freeze(["add", "replace", "change", "move", "merge", "cut", "rewrite", "split", "show", "plot", "label", "reduce", "enlarge", "use", "drop", "state", "cite", "fill", "define", "align", "highlight",
   "annotate", "redraw", "respace", "encode", "introduce", "source", "shorten", "convert", "retitle", "rename", "reword", "delete", "remove", "draw", "print", "mark", "sort", "swap", "correct", "reconcile", "footnote"]);
 const REPAIR_VERB = new RegExp(`\\b(${REPAIR_VERBS.join("|")})\\b`, "i");
 const REPAIR_FLOOR = Object.freeze({ blocking: 40, other: 25 });
@@ -579,12 +579,14 @@ export function validateReview(review, slideIds, { scope = null, ledger = [], wa
  * given a verdict, the findings held to the first pass's rules, and bound to
  * the verification pass it confirms.
  */
-export function validateConfirmation(review, slideIds, { confirms, waivers = [] } = {}) {
+export function validateConfirmation(review, slideIds, { confirms, waivers = [], revision = null, imported = [] } = {}) {
   if (!review || typeof review !== "object") return ["confirmation is not an object"];
   const errors = [...unknownKeyErrors(review, CONFIRMATION_SCHEMA, "confirmation"), ...basicErrors(review)];
   if (review.confirms !== confirms) errors.push(`confirms must be ${confirms}, the binding of the verification pass this read confirms`);
   if (!Array.isArray(review.findings)) return [...errors, "findings must be an array"];
   errors.push(...findingErrors(review.findings, slideIds));
+  // A finding marked as the imported deck's blocks nothing, so a confirmation is held to the first pass's rule for the mark.
+  errors.push(...aboutImportedErrors(review.findings.map((f) => ({ id: f.id, pages: Array.isArray(f.slides) ? f.slides : [], aboutImported: f.aboutImported })), revision ? slideIds.filter((id) => !revision.changed.includes(id)) : imported.length ? imported : null));
   errors.push(...coverageErrors(review.pages, slideIds));
   for (const entry of Array.isArray(review.pages) ? review.pages : []) if (typeof entry?.note !== "string" || entry.note.trim().length < 10) errors.push(`pages ${entry?.slide}: say in a note what you saw on the page`);
   errors.push(...openedErrors(review.opened, slideIds, slideIds));
@@ -687,6 +689,8 @@ export function mergeReviewParts(parts, slideIds, { sections = null, binding, pr
     same.slides = sort([...same.slides, ...finding.slides]);
     if (!same.reason.includes(finding.reason)) same.reason = `${same.reason} / ${finding.reason}`;
     if (SEVERITIES.indexOf(finding.severity) > SEVERITIES.indexOf(same.severity)) { same.severity = finding.severity; same.repair = finding.repair; }
+    // The repair kept may be either part's, so what the joined finding touches is what either touches.
+    if (same.touches || finding.touches) same.touches = [...new Set([...(same.touches || []), ...(finding.touches || [])])];
     same.checkable = same.checkable ?? finding.checkable ?? null;
   }
   const joined = joinParts(parts, slideIds, advanceLedger([], {}, deckItems({ findings })), { pageKey: "slide", dimensions: DIMENSIONS, dimKey: "dimension" });

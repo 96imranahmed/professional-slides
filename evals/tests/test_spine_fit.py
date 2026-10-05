@@ -93,10 +93,12 @@ console.log(JSON.stringify({ unfit: unfit.map((f) => [f.id, f.class, f.severity]
     def test_a_spine_that_passes_its_draft_meets_no_later_refusal_over_a_bound_title(self):
         # The property, over the designs, the trackers and a range of title lengths: where the draft holds nothing against
         # the titles, the dividers, the contents page and every title band compose in the deck as the build composes it.
+        # Six and eight words straddle what the dividers hold (some designs and trackers take each, some refuse it) and
+        # twelve is past it everywhere; a shorter title passes everywhere and nothing refuses it later, so it proves nothing more.
         result = run_node(SPINE + '''
 import { DESIGN_NAMES } from './skills/professional-slides/runtime/design-systems.mjs';
 const cases = [];
-for (const [at, design] of DESIGN_NAMES.entries()) for (const tracker of [undefined, 'pills', 'label', 'number-strip', 'repeat-contents']) for (const n of [4, 8, 10, 12, 14]) {
+for (const [at, design] of DESIGN_NAMES.entries()) for (const tracker of [undefined, 'pills', 'label', 'number-strip', 'repeat-contents']) for (const n of [6, 8, 12]) {
   const variation = ['a1', 'b7'][(at + n) % 2];
   const d = sectioned([titled(n, 'Growth:'), titled(n, 'Funding:'), titled(n, 'Cover:')], { design, variation, ...(tracker ? { tracker } : {}) });
   const { spec } = compileDeck(d, { insights, draft: true, partial: true });
@@ -122,15 +124,17 @@ console.log(JSON.stringify({ cases: cases.length, refused: cases.filter((c) => c
 
     def test_the_tracker_and_the_cover_are_composed_too_and_a_refusal_no_title_lifts_is_left_alone(self):
         result = run_node(SPINE + '''
+// The draft's own reading of the titles (spine-fit.mjs, on the draft's compile); a whole draft where the composition's report is read too.
+const fit = (d) => ({ unfit: spineFitFindings(compileDeck(d, { insights, draft: true, partial: true }).spec, dir).map((f) => [f.id, f.measured, f.repair]) });
 const draft = async (d) => { const run = await authorDeck(d, { baseDir: dir, insights, draft: true });
   return { unfit: run.blocking.filter((f) => f.code === 'SPINE_UNFIT').map((f) => [f.id, f.measured, f.repair]), composing: run.advisories.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').length }; };
 const long = ['Growth in lending outpaces the deposits behind it', 'Funding the growth from deposits costs more each year', 'Cover narrows every year against the floor'];
 const cover = (d, title, subtitle) => { d.deck.cover = { title, subtitle }; return d; };
-console.log(JSON.stringify({ pills: await draft(sectioned(long, { tracker: 'pills' })), label: await draft(sectioned(long, { tracker: 'label' })),
+console.log(JSON.stringify({ pills: fit(sectioned(long, { tracker: 'pills' })), label: fit(sectioned(long, { tracker: 'label' })),
   // A setting the deck names wrongly is no title's doing: it stays the composition's to report.
   wrong: await draft(sectioned(['Growth', 'Funding', 'Cover'], { tracker: 'dots' })),
-  cover: await draft(cover(sectioned(['Growth', 'Funding', 'Cover']), Array.from({ length: 40 }, (_, i) => WORDS[i % WORDS.length]).join(' '), 'Board paper')),
-  subtitle: await draft(cover(sectioned(['Growth', 'Funding', 'Cover']), 'Harbour', Array.from({ length: 60 }, (_, i) => WORDS[i % WORDS.length]).join(' '))) }));
+  cover: fit(cover(sectioned(['Growth', 'Funding', 'Cover']), Array.from({ length: 40 }, (_, i) => WORDS[i % WORDS.length]).join(' '), 'Board paper')),
+  subtitle: fit(cover(sectioned(['Growth', 'Funding', 'Cover']), 'Harbour', Array.from({ length: 60 }, (_, i) => WORDS[i % WORDS.length]).join(' '))) }));
 ''')
         # Section titles too long to set as pills: one finding, with the words each title may run to and the sections over it.
         self.assertEqual(len(result["pills"]["unfit"]), 1)
@@ -213,24 +217,6 @@ class SpineCliTests(unittest.TestCase):
         self.assertEqual(plan.returncode, 0, plan.stderr[-2000:])
         self.assertEqual(draft.returncode, 0, draft.stderr[-2000:])
 
-    def test_the_plan_of_a_long_stubbed_spine_is_not_refused_for_exhibits_it_has_not_drawn(self):
-        # On a spine long enough for the rules to apply, basis-only stubs made the plan exit 2: "the median chart page
-        # plots 0", and players unmarked on a profiles page that was only a stub.
-        # (The fixture four times over repeats its page types, which is the one rule this spine does break.)
-        plan = self.run_cli(self.write("longSpine(true)"), "--plan")
-        printed = json.loads(plan.stdout)["plan"]
-        # The plan keeps every page in a form that carries its claim best, and four copies of seven pages do not hold twelve
-        # kinds of exhibit at that fit: it says so, and that only forms off the best fit - a loan book as a slope, a model, small
-        # multiples - would meet the two rules, which it does not propose. With every form allowed, as a draft asks, only the
-        # page types are left unmet (StubbedSpineTests holds that).
-        self.assertEqual([item["code"] for item in printed["unsatisfied"]], ["VARIETY_TYPE_SHARE", "VARIETY_EXHIBIT_RANGE", "PAGE_SHAPE_FLAT"], plan.stderr[-2500:])
-        self.assertEqual(printed["servedWouldMeet"], ["VARIETY_EXHIBIT_RANGE", "PAGE_SHAPE_FLAT"])
-        self.assertTrue(printed["served"])
-        self.assertIn("would be met only by drawing these pages in a form that is not a best fit for their claim", plan.stderr)
-        self.assertFalse([line for line in printed["pages"] if "(reads its own data)" in line])   # no page was moved off its best fit
-        self.assertNotIn("values the median chart page plots 0", plan.stderr)
-        self.assertNotIn("PLAYERS_UNMARKED: compared players with no logo on the cover or the first 3 pages 8", plan.stderr)
-
     def test_a_long_section_title_is_refused_by_the_draft_and_the_plan_and_the_limit_is_the_decks(self):
         pages = self.write("sectioned([titled(4, 'Growth:'), titled(16, 'Funding:'), titled(4, 'Cover:')], { variation: 'a1' })")
         draft, plan = self.run_cli(pages, "--draft"), self.run_cli(pages, "--plan")
@@ -277,16 +263,19 @@ console.log(JSON.stringify({ f1: [f1.exhibit.type, f1.pageType.values, f1.pageTy
         # The run's own failure: on a deck long enough for the rules to apply, basis-only stubs gave "the median chart
         # page plots 0", unmarked players and too few pages of two exhibits - and the same spine without stubs passed.
         result = run_node(SPINE + '''
+import { repairOf } from './skills/professional-slides/runtime/gates/gate_classes.mjs';
 const read = (d) => { const plan = allocateStructure(d, { insights, planOf });
   const standing = (code) => plan.declared.standings.find((st) => st.code === code);
   return { depth: standing('EVIDENCE_DEPTH').value, each: Object.values(standing('EVIDENCE_DEPTH').each ?? {}), panels: standing('VARIETY_PANELS').count, players: standing('PLAYERS_UNMARKED')?.value ?? null,
     unsatisfied: plan.unsatisfied.map((u) => u.code).filter((code) => ['EVIDENCE_DEPTH', 'PLAYERS_UNMARKED', 'VARIETY_PANELS'].includes(code)) }; };
 const stubbed = read(longSpine(true)), bare = read(longSpine(false));
 const draft = await authorDeck(longSpine(true), { baseDir: dir, insights, draft: true });
-const line = (code) => draft.standings.find((st) => st.code === code);
+const line = (code) => draft.standings.find((st) => st.code === code), structure = (list) => list.filter((f) => f.class === 'S');
 console.log(JSON.stringify({ stubbed, bare, draft: { depth: line('EVIDENCE_DEPTH').value, panels: line('VARIETY_PANELS').count, players: line('PLAYERS_UNMARKED').value, // The four rounds repeat the fixture's titles, which is the one thing a draft holds against this spine.
   // The pages of the later rounds are the first round's pages again - the same claim measures, the same views - which a draft now holds too.
-  blocking: draft.blocking.map((f) => f.code).filter((code) => !['CONTENT_CLAIM_REPEATS', 'PROOF_REPEATS'].includes(code)), repeats: draft.blocking.filter((f) => f.code === 'PROOF_REPEATS').map((f) => f.rule) } }));
+  blocking: draft.blocking.map((f) => f.code).filter((code) => !['CONTENT_CLAIM_REPEATS', 'PROOF_REPEATS'].includes(code)), repeats: draft.blocking.filter((f) => f.code === 'PROOF_REPEATS').map((f) => f.rule),
+  // Each structure rule the draft blocks or leaves to the full compile, with what its repair can be settled by.
+  structure: structure(draft.blocking).map((f) => [f.code, repairOf(f).settledLater]), deferred: structure(draft.advisories).filter((f) => f.deferred).map((f) => [f.code, f.settledBy]) } }));
 ''')
         stubbed, bare, draft = result["stubbed"], result["bare"], result["draft"]
         self.assertGreater(stubbed["depth"], 0)
@@ -297,12 +286,17 @@ console.log(JSON.stringify({ stubbed, bare, draft: { depth: line('EVIDENCE_DEPTH
         self.assertEqual(stubbed["unsatisfied"], [])
         # A draft reads the undrawn pages the same way, so its standings are the plan's.
         self.assertEqual([draft["depth"], draft["panels"], draft["players"]], [stubbed["depth"], stubbed["panels"], 0])
-        # What a draft holds against this spine is what the plan holds against it: the page types the four rounds repeat,
-        # which no form or placement mends and the storyline critique is bound to. (It was left to the full compile.)
-        self.assertEqual(draft["blocking"], ["VARIETY_TYPE_SHARE"])
+        # What a draft holds against this spine is what no form or placement mends, which the storyline critique is bound to: the
+        # page types the four rounds repeat, and the range of exhibit kinds - twenty-nine pages ask for twelve, and with a deck's
+        # pages of figures capped at a tenth (rules version 7: two pages here) the search over every form the catalogue allows reaches eleven.
+        self.assertEqual(draft["blocking"], ["VARIETY_TYPE_SHARE", "VARIETY_EXHIBIT_RANGE"])
         self.assertTrue(draft["repeats"])
         self.assertEqual(set(draft["repeats"]), {"PROOF_REPEATS.identical"})
-
+        # A structure rule blocks in a draft only where no copy, layout or fit settles it; one a form or placement mends waits.
+        self.assertIn(["VARIETY_TYPE_SHARE", None], draft["structure"])
+        self.assertTrue(all(kind is None for _, kind in draft["structure"]), draft["structure"])
+        self.assertTrue(draft["deferred"])
+        self.assertTrue(all(kind in ("copy", "layout", "fit") for _, kind in draft["deferred"]), draft["deferred"])
 
     def test_a_page_that_does_not_compile_stands_in_with_what_its_bound_exhibit_will_plot(self):
         # A page refused for its copy, its exhibit bound to its measures: stood in for as the binding wrote it, it plots the

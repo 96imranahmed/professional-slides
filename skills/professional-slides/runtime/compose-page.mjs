@@ -4,7 +4,7 @@
 // fixed shapes (`KINDS`), and an analytical page takes the layout chosen for it
 // (compose-layouts.mjs) built from the arrangements (compose-arrangements.mjs).
 import { SIZE, HUG, LAYOUT } from "./compose-body.mjs";
-import { imageProps, normalizePictures } from "./compose-pictures.mjs";
+import { imageProps, normalizePictures, sourcedPicture } from "./compose-pictures.mjs";
 import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem } from "./compose-points.mjs";
 import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
 import { SLIDE_PASSES } from "./compose-passes.mjs";
@@ -191,7 +191,7 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   for (const [, run] of SLIDE_PASSES.slice(0, 3)) slide = run(slide, ctx);
   if (KINDS[slide.kind]) {
     return { id, ...KINDS[slide.kind](slide, ctx),
-      ...(slide.image ? { image: imageProps(slide.image, baseDir) } : {}),
+      ...(slide.image && sourcedPicture(slide.image) ? { image: imageProps(slide.image, baseDir) } : {}),
       ...(slide.notes ? { notes: slide.notes } : {}) };
   }
   let slideIn;

@@ -242,8 +242,10 @@ export const REPERTOIRE = Object.freeze({
  */
 export function featuredDraw(seed, design = "consulting") {
   const entries = REPERTOIRE[Object.hasOwn(REPERTOIRE, design ?? "") ? design : "consulting"];
-  const random = seededRandom(`${seed}:repertoire`);
-  const drawn = [...entries].sort(() => random() - 0.5).slice(0, 2);
+  // Two entries drawn each pair as likely as another (Fisher-Yates): a sort by a random comparison favours the entries listed first.
+  const random = seededRandom(`${seed}:repertoire`), drawn = [...entries];
+  for (let i = drawn.length - 1; i > 0; i -= 1) { const j = Math.floor(random() * (i + 1)); [drawn[i], drawn[j]] = [drawn[j], drawn[i]]; }
+  drawn.length = 2;
   return { say: drawn.map((entry) => entry.say), forms: new Set(drawn.flatMap((entry) => entry.forms ?? [])), kinds: new Set(drawn.flatMap((entry) => entry.kinds ?? [])) };
 }
 

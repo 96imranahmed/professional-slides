@@ -15,12 +15,13 @@ carries its copy under each placement and steers its free choices away from
 placements that take the median out of the band - a page with no copy yet has
 no reading, and the plan prints no number for it; and the fit search does not
 propose an alternative that does. The rule and its band are unchanged, and
-only the render blocks on it.
+only the render blocks on it. (That a written deck's plan reads the number its
+check reads is held in test_author_loop_honesty, beside that check; that the
+fit cache keeps each alternative's blocks, in test_authoring_loop.)
 """
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -145,9 +146,10 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         self.assertEqual(result["declared"], ["below", "below"])
         self.assertEqual(result["changed"][0], result["changed"][1])   # what the structure rules change, and nothing more
         self.assertTrue(result["forms"])
-        # Left to the structure rules alone, most pages take a placement that breaks the text up and the deck stands under the
-        # band; steered, enough open pages take another that satisfies the same rules, and it stands inside.
-        self.assertLess(result["medians"][1], low)
+        # Steered, enough open pages take a placement that keeps the text whole and still satisfies the same rules, and the deck
+        # stands inside the band - never further from it than the structure rules alone leave it (which, with points under the
+        # exhibit held to an eighth of the deck, is inside it here too; the worst case below is the one steering cannot lift).
+        self.assertGreaterEqual(result["medians"][0], result["medians"][1])
         self.assertGreaterEqual(result["medians"][0], low)
         self.assertEqual({(code, key) for code, key, _, _, _ in result["estimate"]}, {("TEXT_FRAGMENTED", "floor"), ("TEXT_FRAGMENTED", "ceiling")})
         self.assertTrue(all(blocks is False and tolerance == density_profile.SCENE_TOLERANCE for _, _, _, blocks, tolerance in result["estimate"]))
@@ -158,14 +160,14 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         self.assertEqual(result["unsatisfied"][2], result["unsatisfied"][1])
         self.assertEqual(result["worst"], [20])
 
-    def stage(self, strip):
+    def stage(self):
+        """The worked deck cut back to a spine that writes no copy, in a folder of its own."""
         tmp = Path(tempfile.mkdtemp(prefix="fragment-plan-"))
         self.addCleanup(shutil.rmtree, tmp, True)
         shutil.copytree(EXAMPLES / "assets", tmp / "assets")
         doc = json.loads((EXAMPLES / "page-types.pages.json").read_text())
-        if strip:
-            keep = {"id", "kind", "type", "form", "commentary", "why", "title", "settles", "evidence", "exhibit", "exhibits", "metrics", "kpi", "blocks", "rows", "photo", "pictures"}
-            doc["pages"] = [{k: v for k, v in page.items() if k in keep} if page.get("type") else page for page in doc["pages"]]
+        keep = {"id", "kind", "type", "form", "commentary", "why", "title", "settles", "evidence", "exhibit", "exhibits", "metrics", "kpi", "blocks", "rows", "photo", "pictures"}
+        doc["pages"] = [{k: v for k, v in page.items() if k in keep} if page.get("type") else page for page in doc["pages"]]
         (tmp / "page-types.pages.json").write_text(json.dumps(doc))
         return tmp / "page-types.pages.json"
 
@@ -174,7 +176,7 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         # for their copy - three points of 56 words - and the first check of the written deck measured 24.8: nine pages changed
         # form after the critique was ready. Words a block are a property of the copy, so a spine has no reading: the plan
         # prints the rule and what a block is, and no number.
-        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(self.stage(strip=True)), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=600)
+        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(self.stage()), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=600)
         printed = json.loads(plan.stdout)
         self.assertNotIn("estimated", printed["standing"], plan.stderr[-1500:])
         self.assertNotRegex(plan.stderr, r"TEXT_FRAGMENTED\.(floor|ceiling): median words a block on the prose pages \d")
@@ -183,24 +185,6 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         self.assertIn(f"pages carry no copy yet, and the rule is on the copy - the prose pages' median words a block, held between {low} and {high}", plan.stderr)
         self.assertIn("`--check` prints the deck's standing from the composed pages as soon as they carry copy", plan.stderr)
         self.assertNotIn("TEXT_FRAGMENTED", [item["code"] for item in printed["plan"]["unsatisfied"]])
-
-    def test_the_plan_of_a_written_deck_reads_the_median_the_check_reads(self):
-        # Once the pages carry their copy the plan composes them as written and reads their blocks as the check does: one number.
-        pages = self.stage(strip=False)
-        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=600)
-        printed = json.loads(plan.stdout)
-        self.assertEqual([line.split(":")[0] for line in printed["standing"]["estimated"]], ["TEXT_FRAGMENTED.floor", "TEXT_FRAGMENTED.ceiling"], plan.stderr[-1500:])
-        self.assertTrue(all("read from the scene of the pages as their copy is written, the way --check reads it" in line for line in printed["standing"]["estimated"]))
-        self.assertIn("Read from the scene of each page as its copy is written, under its placement, the way `--check` reads it", plan.stderr)
-        checked = run_node(f"""
-import fs from 'node:fs';
-import {{ authorDeck }} from './skills/professional-slides/runtime/author-deck.mjs';
-const doc = JSON.parse(fs.readFileSync({json.dumps(str(pages))}, 'utf8'));
-const run = await authorDeck(doc, {{ baseDir: {json.dumps(str(pages.parent))}, fit: false }});
-console.log(JSON.stringify({{ value: run.standings.find((st) => st.code === 'TEXT_FRAGMENTED' && st.key === 'floor').value }}));
-""")
-        value = float(re.search(r"median words a block on the prose pages ([\d.]+);", printed["standing"]["estimated"][0]).group(1))
-        self.assertEqual(value, checked["value"])
 
 
 class FitSearchEstimateTests(unittest.TestCase):
@@ -224,22 +208,6 @@ console.log(JSON.stringify({ pass: out.pass.length, fail: out.fail.map((alt) => 
         self.assertIn("would take the deck's median words a block under its band", result["fail"][0][0])
         self.assertIn("would take the deck's median words a block under its band", result["lines"][0])
         self.assertEqual([wpb for _, wpb in result["shifts"]], [21, 22])   # each alternative is asked with its own blocks
-
-    def test_the_compile_reads_the_shift_against_the_band_and_the_deck_as_it_stands(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            work = Path(tmp)
-            shutil.copytree(EXAMPLES / "assets", work / "assets")
-            doc = json.loads((EXAMPLES / "page-types.pages.json").read_text())
-            # A page of panels stacked where they sit side by side: it leaves a band empty, and the search tries its other arrangements.
-            next(p for p in doc["pages"] if p.get("id") == "p10")["form"] = "stack"
-            (work / "page-types.pages.json").write_text(json.dumps(doc))
-            run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(work / "page-types.pages.json"), "--check"], capture_output=True, text=True, cwd=ROOT, timeout=300)
-            self.assertEqual(run.returncode, 2)
-            # The verdicts the search remembers carry each alternative's blocks, so a later run reads the shift without composing again.
-            cache = json.loads((work / "page-types.author-cache.json").read_text())
-            verdicts = cache["fits"]["p10"]["verdicts"]
-            self.assertTrue(all("blocks" in verdict for verdict in verdicts if not verdict["remaining"]), verdicts)
-            self.assertTrue(all(set(verdict["blocks"]) == {"count", "wordsPerBlock", "prose"} for verdict in verdicts if "blocks" in verdict))
 
 
 if __name__ == "__main__":

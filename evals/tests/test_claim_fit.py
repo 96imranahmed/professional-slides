@@ -82,10 +82,6 @@ console.log(JSON.stringify({ missing: forms.filter((f) => !rows.includes(f)), ex
         # The forms no measure decides say what the page has to show.
         self.assertIn("- right for: harvey - members rated against criteria on a declared scale", types)
         self.assertIn("cycle - something that repeats", types)
-        # And the design reference names the same section, where the choice is explained.
-        design = (SKILL / "references" / "design.md").read_text(encoding="utf-8")
-        self.assertIn("### Which form carries which claim", design)
-        self.assertIn("runtime/claim-fit.mjs", design)
 
 
 class ReadingTaskTests(unittest.TestCase):

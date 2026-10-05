@@ -14,7 +14,7 @@ import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
 import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
 import { pointsPerRow, resolveFill } from "./compose-points.mjs";
-import { imageProps, playerMarks, pictureCredits } from "./compose-pictures.mjs";
+import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
 import { AGENDA_LIMITS, agendaStyleFor } from "./panels.mjs";
 
@@ -82,12 +82,6 @@ export function splitTables(slide) {
   });
 }
 
-/**
- * A long table continues on the next page with its header row repeated rather
- * than stepping down to dense type: more than MAX_ROWS rows split into equal
- * pages marked (1/2), (2/2). Applies to a lone table under an auto layout.
- */
-const MAX_ROWS = 8;
 // Commentary set in columns under a full-width table (`exhibit-top`, or the
 // journal's lean toward it) takes its height from the table's budget: each
 // column as many body lines as its longest point needs, plus its lead and the
@@ -108,6 +102,13 @@ function pointsBelowHeight(slide) {
   return height;
 }
 
+/**
+ * A lone table under an auto layout steps down its density - body, compact,
+ * dense - before it splits, and splits only where its rows as the renderer
+ * measures them do not fit the body at the densest: into equal pages marked
+ * (1/2), (2/2), the header repeated. Sixteen rows of short cells, or twelve
+ * that wrap, stay one table.
+ */
 export function paginateTable(slide, bodyScale = 1) {
   if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
   const ex = slide.exhibit;
@@ -351,7 +352,8 @@ function composeDeckWith(spec, baseDir) {
     // disk (the player's own `logo`, or assets/logos/ as the build fetches it).
     const marks = playerMarks(spec, baseDir);
     if (marks.length >= 2 && !spec.cover.image) cover.marks = marks;
-    if (spec.cover.image) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
+    // A cover photograph planned and not fetched yet is the build's to fill (fetch-pictures.mjs): until then the cover composes without it.
+    if (spec.cover.image && sourcedPicture(spec.cover.image)) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
     else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);

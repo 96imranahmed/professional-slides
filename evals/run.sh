@@ -2,7 +2,7 @@
 # Run the eval suite.
 #
 #   evals/run.sh            unit tests, the example decks' content stage and
-#                           build bars, the stored specimens, gate validity
+#                           the node-side source checks
 #   evals/run.sh --slow     also the LibreOffice end-to-end render
 #                           (PS_RUN_SLOW=1, read by test_end_to_end_render.py)
 #
@@ -32,8 +32,16 @@ echo "== content stage (example plans) =="
 # example decks carry one. `plan_gates.mjs` and `content_gates.mjs` spent weeks
 # wired into nothing: a grep for either returned one hit, a sentence in a
 # reference document, while the deck they would have caught reached a reader.
+# The worked example ships as its pages file, so it is authored into a scratch
+# directory first and its content plan read from there.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+cp -R skills/professional-slides/examples/assets "$work/"
+cp skills/professional-slides/examples/page-types.pages.json "$work/"
+"$NODE" skills/professional-slides/runtime/author-deck.mjs "$work/page-types.pages.json" >/dev/null 2>&1 \
+  || echo "  page-types.pages.json did not author; its content plan is not shown"
 found=0
-for plan in skills/professional-slides/examples/*.content.json; do
+for plan in skills/professional-slides/examples/*.content.json "$work"/*.content.json; do
   [ -e "$plan" ] || continue
   found=1
   printf '  %-28s ' "$(basename "$plan")"
@@ -49,23 +57,6 @@ print("%s | %d pages, %d%% quantitative kinds, %d%% structured kinds, kinds %s"
 ' || true
 done
 [ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
-
-echo "== cold-run baseline =="
-# The same harness a cold run is scored with, pointed at the example decks,
-# compiled in-process so nothing has to be built first. It prints rather than
-# fails: where a hand-authored deck misses a bar that is a finding about the
-# deck, and the number moving is the thing to notice.
-"$NODE" evals/cold-run/baseline.mjs || true
-
-echo "== stored specimens =="
-# Recorded runs scored again under today's rules; test_cold_run.py holds the
-# expected verdicts, this prints where each stands.
-"$NODE" evals/cold-run/specimens.mjs || true
-
-echo "== gate validity =="
-# Per-gate recall and precision against the defects people found on the
-# specimens (evals/quality/defects.json).
-"$NODE" evals/quality/gate-validity.mjs || true
 
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs

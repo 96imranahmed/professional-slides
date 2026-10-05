@@ -174,6 +174,17 @@ console.log(JSON.stringify({
         for refused in ("decimal", "thousand", "noPeriod"):
             self.assertIn("must not contain statistics", result[refused])
 
+    def test_a_share_of_a_base_period_is_a_unit_and_a_figure_after_it_is_still_a_result(self):
+        result = run_node(self.PROBE + '''
+const units = { year: '% of 2019', month: '% of Feb-2020 baseline', quarter: '% vs Q3-2019', share: 'Share of 2019 rent',
+  appended: '% of 2019, up 12%', equated: '% of 2019 = 85', decimal: '% of 2019.5', value: 'value of 2019' };
+console.log(JSON.stringify(Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, refusal({ heading: 'Weekly office attendance', unit })]))));
+''')
+        for allowed in ("year", "month", "quarter", "share"):
+            self.assertIsNone(result[allowed], f"{allowed}: {result[allowed]}")
+        for refused in ("appended", "equated", "decimal", "value"):
+            self.assertIn("must not contain statistics", result[refused])
+
     def test_every_example_the_message_lists_as_allowed_is_allowed(self):
         # The refusal ends: a heading may name a period ("FY26", "2 August 2026", "at 2025's rate"), a sample ("n = 240"),
         # a set size ("top 40", or the members counted: "20 suppliers"), a model by its designation ("X77", "505X"),

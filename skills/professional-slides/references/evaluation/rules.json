@@ -46,7 +46,7 @@
       "id": "title-spine",
       "owner": "../copy.md",
       "severity": "material",
-      "rationale": "Titles carry the answer: within 12 words, hedge-free, distinct from each other.",
+      "rationale": "Titles carry the answer: within 15 words, hedge-free, distinct from each other.",
       "positive": "Transit rides use only 15-28 of the 45 minutes",
       "negative": "The 45-minute limit looks plausible for some journeys"
     },

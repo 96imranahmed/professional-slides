@@ -50,7 +50,7 @@ const staged = async (step) => JSON.parse(await fs.readFile(path.join(step.dir, 
 // One step of the storyline loop answered: the packet's critique saved, and the loop run again.
 const answer = async (d, step, o = {}) => { await fs.writeFile(path.join(d.out, 'storyline-review.json'), JSON.stringify(critique(await staged(step), o))); return S.prepareStoryline(d.specPath, d.out); };
 const retitle = async (d, id, title) => { d.spec = { ...d.spec, slides: d.spec.slides.map((s) => (s.id === id ? { ...s, title, ...(s.pageType ? { pageType: { ...s.pageType, content: { ...s.pageType.content, claim: title } } } : {}) } : s)) }; await fs.writeFile(d.specPath, JSON.stringify(d.spec)); };
-const item = (id, page) => ({ id, scope: 'page', pages: [page], check: 'claim', severity: 'major', problem: 'The title claims more than its evidence shows on this page.', fix: 'Pull the title back to the finding the evidence supports.' });
+const item = (id, page) => ({ id, scope: 'page', pages: [page], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title claims more than its evidence shows on this page.', fix: 'Pull the title back to the finding the evidence supports.' });
 const fixed = (id) => ({ finding: id, status: 'fixed', evidence: 'The title now states only what the measure on the page shows.' });
 '''
 
@@ -76,8 +76,8 @@ const out = {
   dimensions: Object.fromEntries(R.DIMENSIONS.map((dim) => [dim, P.dimensionAt(dim)])),
   // One severity scale: the critic's sentence for a level is the opening of the reviewer's.
   severity: ['blocker', 'major', 'minor', 'none'].map((level) => spine.includes(`- ${level}: ${P.ARGUMENT_SEVERITIES[level]}`) && P.SEVERITY_DEFINITIONS[level].startsWith(P.ARGUMENT_SEVERITIES[level]) && review.includes(P.SEVERITY_DEFINITIONS[level])),
-  // One rating scale, with its caps, in both prompts.
-  rating: [spine.includes(P.ratingScale()), R.STANDARDS.includes(P.ratingScale({ rendered: true })), P.ratingScale().includes('With a blocker open the rating is 5 or less; with a major open, 7 or less')],
+  // One rating scale in both prompts; the reviewer's carries its caps, the critic's rating is a second reading beside its items.
+  rating: [spine.includes(P.ratingScale({ capped: false })), R.STANDARDS.includes(P.ratingScale({ rendered: true })), P.ratingScale().includes('With a blocker open the rating is 5 or less; with a major open, 7 or less')],
   anchors: ['2 or less - no argument: the question restated, or facts without an answer', '8 - the bar: nothing major open and the remaining weaknesses limited'].every((anchor) => P.ratingScale().includes(anchor) && P.ratingScale({ rendered: true }).includes(anchor)),
   bytes: Buffer.byteLength(spine) };
 await done(d);
@@ -427,7 +427,7 @@ await done(d);
 console.log(JSON.stringify({ p01: packet.floors.pages.p01, p02: packet.floors.pages.p02, deck: packet.floors.deck, band: packet.floors.band, pages: Object.keys(packet.floors.pages),
   said: ['FLOORS THE BUILD HOLDS', '- p01: 150 body words, held to 96-293 (chart-with-commentary); 3 blocks at 48 words a block (a prose page: counts toward the deck\\'s 41.3-86.5 band); counts toward PAGE_SHAPE_FLAT.share',
     'TEXT_FRAGMENTED.floor: median words a block on the prose pages 54.5; floor 41.3', 'PAGE_SHAPE_FLAT.share: pages on the commonest architecture 2 of 5 pages, 40%; cap 40%: at the cap, 1 more blocks'].map((text) => prompt.includes(text)),
-  titles: [packet.floors.titles.title.words.max, prompt.includes('Titles: a page title runs to 6-12 words (10 the norm) on 2 lines at most. A repair that proposes a title')], roomy: prompt.includes('EVIDENCE_MIX'), same: JSON.stringify(floors.pages.p01) === JSON.stringify(packet.floors.pages.p01), bare: [bare.band, bare.pages.p01.words, bare.pages.p01.blocks ?? null] }));
+  titles: [packet.floors.titles.title.words.max, prompt.includes('Titles: a page title runs to 6-15 words (10 the norm) on 2 lines at most. A repair that proposes a title')], roomy: prompt.includes('EVIDENCE_MIX'), same: JSON.stringify(floors.pages.p01) === JSON.stringify(packet.floors.pages.p01), bare: [bare.band, bare.pages.p01.words, bare.pages.p01.blocks ?? null] }));
 ''')
         self.assertEqual(result['p01'], {'words': {'now': 150, 'floor': 96, 'ceiling': 293, 'task': 'chart-with-commentary'}, 'blocks': {'count': 3, 'wordsPerBlock': 48, 'prose': True}, 'rules': ['PAGE_SHAPE_FLAT.share']})
         # The footer's share is counted from the scene with the gate's own bands, against the gate's own bar.
@@ -437,7 +437,7 @@ console.log(JSON.stringify({ p01: packet.floors.pages.p01, p02: packet.floors.pa
         self.assertEqual(result['pages'], ['p01', 'p02', 'p03', 'p04', 'p05', 'p06'])
         self.assertEqual(result['said'], [True, True, True, True])
         self.assertFalse(result['roomy'])
-        self.assertEqual(result['titles'], [12, True])
+        self.assertEqual(result['titles'], [15, True])
         self.assertTrue(result['same'])
         self.assertEqual(result['bare'], [None, {'now': 11, 'floor': 96, 'ceiling': 293, 'task': 'chart-with-commentary'}, None])
 
@@ -464,7 +464,7 @@ const titled = await reviewFloors(d.out, scene, { spec: d.spec, base: d.dir });
 const long = 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".';
 out.titles = titled.titles;
 out.title = [floorErrors([major({ slides: ['p01'], repair: long, floors: 'The subtitle takes the period and the scope.' })], titled), floorErrors([major({ slides: ['p01'], repair: 'Retitle to "The subject leads the market on revenue and margin".' })], titled),
-  floorErrors([major({ slides: ['p01'], repair: 'Rewrite the title to 15-18 words so that it names each of the measures.' })], titled), floorErrors([major({ slides: ['p01'], repair: long })], floors)];
+  floorErrors([major({ slides: ['p01'], repair: 'Rewrite the title to 16-18 words so that it names each of the measures.' })], titled), floorErrors([major({ slides: ['p01'], repair: long })], floors)];
 // A section title is held to what this deck's dividers hold; the sentence, or a finding on a divider, says which title is meant.
 const limits = { title: titled.titles.title, sectionTitle: { words: 9, lines: 2 } };
 const ten = "Rewrite the section title as 'The subject out-earns each reporting rival with almost no debt'.";
@@ -486,11 +486,11 @@ console.log(JSON.stringify(out));
         self.assertTrue(result['offered'])
         self.assertEqual(result['part_of_page'], [])
         self.assertEqual(result['target'], 1)
-        self.assertEqual(result['titles'], {'title': {'words': {'min': 6, 'max': 12, 'target': 10}, 'lines': 2}})
+        self.assertEqual(result['titles'], {'title': {'words': {'min': 6, 'max': 15, 'target': 10}, 'lines': 2}})
         self.assertEqual([len(e) for e in result['title']], [1, 0, 1, 0])  # without the deck, no title limit is shown and none is held
         self.assertIn('the title it proposes runs to 18 words', result['title'][0][0])
-        self.assertIn('the build refuses a page title past 12 (TITLE_WORDS): propose one of 12 words or fewer', result['title'][0][0])
-        self.assertIn('asks for a title of 15-18 words', result['title'][2][0])
+        self.assertIn('the build refuses a page title past 15 (TITLE_WORDS): propose one of 15 words or fewer', result['title'][0][0])
+        self.assertIn('asks for a title of 16-18 words', result['title'][2][0])
         self.assertIn('runs to 10 words', result['section'][0][0])
         self.assertIn('refuses a section title past 9', result['section'][0][0])
         self.assertEqual([result['section'][1], result['section'][2]], [[], 1])
@@ -519,7 +519,7 @@ console.log(JSON.stringify({ critique: [critique.status, critique.pass], review:
         self.assertEqual(result['listed'], ['p05'])
         self.assertTrue(result['example'])
         self.assertEqual(result['deck'], 3)  # the deck's rules a repair of that page could break are still said
-        self.assertEqual(result['titles'], 12)
+        self.assertEqual(result['titles'], 15)
 
 
 class SectionFormTests(unittest.TestCase):
@@ -645,29 +645,25 @@ const rules = S.storylineFormRules({ cap: S.SPINE_ITEM_MAX });
 const context = { ids: packet.pages.map((p) => p.id), contentIds: packet.pages.filter((p) => !p.kind || p.kind === 'content').map((p) => p.id), mode: packet.mode, promptHash: packet.promptHash, limits: packet.limits };
 const errors = (o, edit = (c) => c) => S.validateStorylineRecord(edit(critique(packet, o)), context);
 const spine = (id, pages, o = {}) => ({ ...item(id, pages[0]), scope: 'spine', pages, ...o });
-const completeness = (edit) => (c) => ({ ...c, completeness: edit(c.completeness) });
 // Each rule of form broken once, as a critic breaks it.
 const broken = {
   cap: errors({ findings: Array.from({ length: 11 }, (_, i) => item(`F${i + 1}`, `p0${(i % 6) + 1}`)) }),
   pages: errors({ findings: [{ ...item('F1', 'p02'), pages: ['p02', 'p03'] }] }),
   sampled: errors({ findings: [spine('F1', ['p02', 'p03'], { problem: 'Several titles claim more than their pages show, including p02 and p03 among them.' })] }),
-  title: errors({ findings: [{ ...item('F1', 'p02'), fix: 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".' }] }),
-  missing: errors({}, completeness((list) => list.slice(1))), twice: errors({}, completeness((list) => [...list, list[0]])), unknown: errors({}, completeness((list) => [...list.slice(1), { ...list[0], check: 'layout' }])),
-  result: errors({}, completeness((list) => list.map((entry) => (entry.check === 'flow' ? { ...entry, result: 'findings', note: 'Filed under another check.' } : entry)))),
-  note: errors({}, completeness((list) => list.map((entry) => (entry.check === 'flow' ? { ...entry, note: 'ok' } : entry)))) };
+  title: errors({ findings: [{ ...item('F1', 'p02'), fix: 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".' }] }) };
 const all = Object.values(broken).flat();
 // A page a spine finding's text names and its list leaves out is not a refusal: the runtime adds it and says it did.
 const leftOut = S.settleCritiqueForm(critique(packet, { findings: [spine('F1', ['p02'], { problem: 'The claim on p02 is restated on p03 with the same measure and no new step.' })] }), context.ids, context.contentIds);
 await done(d);
-console.log(JSON.stringify({ leftOut: [leftOut.review.findings[0].pages, leftOut.mended.map((m) => [m.did, m.pages]), S.validateStorylineRecord(leftOut.review, context)], good: errors({}), found: errors({ findings: [item('F1', 'p02')] }), limits: packet.limits, shown: prompt.includes('LIMITS THE BUILD HOLDS: a page title runs to 6-12 words (10 the norm) on 2 lines at most.'),
+console.log(JSON.stringify({ leftOut: [leftOut.review.findings[0].pages, leftOut.mended.map((m) => [m.did, m.pages]), S.validateStorylineRecord(leftOut.review, context)], good: errors({}), found: errors({ findings: [item('F1', 'p02')] }), limits: packet.limits, shown: prompt.includes('LIMITS THE BUILD HOLDS: a page title runs to 6-15 words (10 the norm) on 2 lines at most.'),
   stated: rules.filter((rule) => !prompt.includes(`- ${rule.rule}`)).map((rule) => rule.id), ids: rules.map((rule) => rule.id), unmatched: all.filter((e) => !rules.some((rule) => rule.matches.test(e))),
   each: Object.fromEntries(Object.entries(broken).map(([name, list]) => [name, list.length])), title: broken.title[0], cap: broken.cap[0].slice(0, 44) }));
 ''')
         self.assertEqual(result['good'], [])
         self.assertEqual(result['found'], [])
-        self.assertEqual(result['limits'], {'title': {'words': {'min': 6, 'max': 12, 'target': 10}, 'lines': 2}})
+        self.assertEqual(result['limits'], {'title': {'words': {'min': 6, 'max': 15, 'target': 10}, 'lines': 2}})
         self.assertTrue(result['shown'])
-        self.assertEqual(result['ids'], ['cap', 'pages', 'sampled', 'title', 'completeness-entries', 'completeness-result', 'completeness-note'])
+        self.assertEqual(result['ids'], ['cap', 'pages', 'sampled', 'title'])
         self.assertEqual(result['leftOut'], [['p02', 'p03'], [['named', ['p03']]], []])
         self.assertEqual(result['stated'], [])     # every rule the validator enforces is in the prompt, word for word
         self.assertEqual(result['unmatched'], [])  # and every refusal above is one of them
@@ -675,7 +671,7 @@ console.log(JSON.stringify({ leftOut: [leftOut.review.findings[0].pages, leftOut
         self.assertIn('the title it proposes runs to 18 words', result['title'])
         self.assertEqual(result['cap'], 'the spine critique returns at most 10 items ')
 
-    def test_a_long_spines_section_and_spine_parts_are_each_offered_only_what_their_validator_takes(self):
+    def test_a_long_spines_section_and_spine_parts_are_offered_only_what_a_critic_judges(self):
         result = run_node(FIXTURES + '''
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'storyline-parts-'));
 const specPath = path.join(dir, 'fixture.deck.json');
@@ -686,25 +682,17 @@ const read = async (name) => fs.readFile(path.join(staging, name), 'utf8');
 const section = packet.sections[0];
 const [sectionPrompt, spinePrompt] = [await read(`sections/${section.id}.md`), await read('sections/spine.md')];
 const [sectionSchema, spineSchema] = [JSON.parse(await read('part-schema.json')), JSON.parse(await read('spine-part-schema.json'))];
-const enumOf = (schema) => schema.properties.completeness.items.properties.check.enum;
-// What a schema's enum offers the part's validator takes, and what it does not offer the validator refuses.
-const stored = JSON.parse(await fs.readFile(path.join(dir, '.reviews', 'fixture', 'storyline-packet.json'), 'utf8'));
-const refusals = (kind, check) => S.mergeStorylineParts([{ part: { kind, id: kind === 'section' ? section.id : 'spine', pages: kind === 'section' ? section.pages : [] }, binding: packet.binding,
-  completeness: [{ check, result: 'clean', note: 'Checked it across the pages given and found nothing to raise.' }] }], stored).errors.filter((e) => /completeness\\[0\\]\\.check must be one of/.test(e)).length;
-const out = { section: enumOf(sectionSchema), spine: enumOf(spineSchema), kinds: [sectionSchema.properties.part.properties.kind.enum, spineSchema.properties.part.properties.kind.enum],
+// What the runtime reads off the ledger is offered to neither part: a critic is asked only what it judges.
+const derived = (schema) => Object.keys(schema.properties).filter((key) => ['verdict', 'compliance', 'sufficiency', 'completeness'].includes(key));
+const out = { offered: [derived(sectionSchema), derived(spineSchema)], kinds: [sectionSchema.properties.part.properties.kind.enum, spineSchema.properties.part.properties.kind.enum],
   inPrompt: [sectionPrompt.includes(JSON.stringify(sectionSchema)), spinePrompt.includes(JSON.stringify(spineSchema))],
-  rules: [sectionPrompt.includes('- `completeness` holds exactly one entry for each of claim, shape, sourcing, restatement, consequence, and no other'), spinePrompt.includes('- `completeness` holds exactly one entry for each of spine, answer, pillars, numbers, flow, summary, missing, cuts, and no other')],
-  agree: S.STORYLINE_DIMENSIONS.map((check) => [enumOf(sectionSchema).includes(check) === !refusals('section', check), enumOf(spineSchema).includes(check) === !refusals('spine', check)]),
   required: [sectionSchema.required.includes('answerParts'), spineSchema.required.includes('answerParts')], divider: packet.limits.sectionTitle.lines };
 await fs.rm(dir, { recursive: true, force: true }); await fs.rm(staging, { recursive: true, force: true });
 console.log(JSON.stringify(out));
 ''')
-        self.assertEqual(result['section'], ['claim', 'shape', 'sourcing', 'restatement', 'consequence'])
-        self.assertEqual(result['spine'], ['spine', 'answer', 'pillars', 'numbers', 'flow', 'summary', 'missing', 'cuts'])
+        self.assertEqual(result['offered'], [[], []])
         self.assertEqual(result['kinds'], [['section'], ['spine']])
         self.assertEqual(result['inPrompt'], [True, True])
-        self.assertEqual(result['rules'], [True, True])
-        self.assertEqual(result['agree'], [[True, True]] * 13)
         self.assertEqual(result['required'], [False, True])
         self.assertEqual(result['divider'], 2)  # a deck with dividers is told what a section title holds
 

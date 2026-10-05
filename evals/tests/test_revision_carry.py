@@ -374,7 +374,7 @@ console.log(JSON.stringify(consistencyFindings(doc, null, { spec, inventory, cha
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 2)
         self.assertEqual(self.refused(work), [("NUMBER_STALE", "s02")])
-        self.assertIn("Held to rules version 5, below the 6 its import stamped", done.stderr)
+        self.assertIn(f"Held to rules version 5, below the {WEIGHT['rulesVersion']} its import stamped", done.stderr)
 
         def everywhere(doc):
             older("The deck was authored and accepted under version five last quarter")(doc)
@@ -860,7 +860,7 @@ class BuildTests(SwappedDeck):
         self.assertEqual(self.build["status"], "built-unrendered")
         self.assertEqual(self.build["blockers"], [])
         out = self.swapped / "out"
-        self.assertEqual(Path(self.build["pptxPath"]), out / "deck.pptx")
+        self.assertEqual(Path(self.build["pptxPath"]).resolve(), (out / "deck.pptx").resolve())
         self.assertTrue((out / "deck.composed.pptx").exists())
         # The composed pages' own scene holds the one page; the assembled deck's holds all eight, in order.
         scene = json.loads((out / "scene.json").read_text())

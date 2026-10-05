@@ -24,7 +24,7 @@
 // same bands off the families the author declared, which can be wrong, and so
 // only advise; here the count is exact, and it blocks.
 
-import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { PLAN, DECK_LENGTH, RULES, applyRulesVersion } from "../weight.mjs";
 import { calloutCapacity, countInWords } from "../chart-annotations.mjs";
 import { isTable, rowCells } from "../evidence.mjs";
 import { FIT_WORDS } from "../claim-fit.mjs";
@@ -77,6 +77,10 @@ export const VARIETY = Object.freeze({
   // Strong decks: commonest placement 27%, so the cap sits just outside it;
   // the worked example's commonest placement is under a quarter.
   commentaryShareMax: 0.3,
+  // Points under the exhibit have a cap of their own: strong decks set
+  // bullets under an exhibit on about one page in fifty, and comment on the
+  // plot, in the cells, under each panel or beside it instead.
+  belowShareMax: 0.12,
   takeawayShareMax: 0.25,   // strong decks: 9% of pages close on a line or band; a so-what bar is a close
   // Structure, counted on the page as drawn (page-types.mjs drawnOf), from
   // fifteen pages. Strong decks carry two or more exhibits on a quarter to a
@@ -102,9 +106,14 @@ export const VARIETY = Object.freeze({
   // floor is still thin: the median chart page has to reach 15, between strong
   // decks' lower quartile and median, so half the charts carry a peer set, a
   // second series or a longer window. Read from eight chart pages, where a
-  // median means something.
+  // median means something. The target is advised, never refused: strong
+  // decks' chart pages print about 26 numbers, a quarter of them under 20
+  // (weight.json reference.numericByFamily), so a median under 20 is a deck
+  // thinner than most of theirs - but a page of twelve honest values is not
+  // refused for it.
   evidenceFrom: 8,
   evidenceMedianMin: 15,
+  evidenceMedianTarget: 20,
 });
 
 // The pages a deck of one exhibit and a column is usually hiding: what the
@@ -292,7 +301,8 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
-  const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
+  // `rule` names the variant of a code a rules version introduced (weight.json rules.introduced).
+  const block = (code, measured, threshold, repair, pages = null, rule = null) => findings.push({ slide: pages, code, ...(rule ? { rule } : {}), severity: "blocker", measured, threshold, repair });
   const stand = (code, what, value, bar, side, more = {}) => standings.push({ code, what, value, bar, side, applies: true, blocks: true, ...more });
   if (slides.length < VARIETY.from) {
     stand("VARIETY_TYPE_RANGE", "content pages (the variety contract is read from this many)", slides.length, VARIETY.from, "min", { unit: "pages", applies: false });
@@ -389,6 +399,14 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
       "that puts each sentence where the eye already is for that page" +
       (top === "beside" || top === "below" ? ` - and ask whether the page is one exhibit at all: ${redraws()}.` : "."));
   }
+  const below = idsWhere((s) => placement(s) === "below");
+  stand("VARIETY_COMMENTARY", "pages with points under the exhibit", share(below.length, n), VARIETY.belowShareMax, "max", { key: "below", count: below.length, of: n, pages: below });
+  if (below.length / n > VARIETY.belowShareMax) {
+    block("VARIETY_COMMENTARY", { commentary: "below", pages: below.length, of: n, share: share(below.length, n), ids: below }, VARIETY.belowShareMax,
+      `${below.length} of ${n} pages put their points under the exhibit, where strong decks do it on about one page in fifty; at most ` +
+      `${Math.floor(VARIETY.belowShareMax * n)} here. Put the finding on the plot as a number - the change, the gap, the total - or in the table's ` +
+      `cells, a caption under each panel, a so-what bar, or nowhere when the title carries it: ${redraws()}.`, below, "VARIETY_COMMENTARY.below");
+  }
   // A so-what bar is a close as much as a closing line is: counted apart, a
   // deck could close every page by moving the line into a bar.
   const closes = slides.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length;
@@ -423,7 +441,8 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
   }
   const depth = evidenceDepth(slides);
   stand("EVIDENCE_DEPTH", "values the median chart page plots", depth.median, VARIETY.evidenceMedianMin, "min", { unit: "values", applies: depth.chartPages >= VARIETY.evidenceFrom,
-    each: Object.fromEntries(slides.filter((s) => s.pageType?.chart && Number.isFinite(s.pageType.values)).map((s) => [s.id ?? "?", s.pageType.values])) });
+    each: Object.fromEntries(slides.filter((s) => s.pageType?.chart && Number.isFinite(s.pageType.values)).map((s) => [s.id ?? "?", s.pageType.values])),
+    ...(depth.median < VARIETY.evidenceMedianTarget ? { note: `advised: under strong decks' ${VARIETY.evidenceMedianTarget}, which a peer set, a second series or a longer window on the thinnest pages reaches` } : {}) });
   if (depth.chartPages >= VARIETY.evidenceFrom && depth.median < VARIETY.evidenceMedianMin) {
     block("EVIDENCE_DEPTH", depth, VARIETY.evidenceMedianMin,
       `The median chart page plots ${depth.median} values across ${depth.chartPages} chart pages; strong decks' chart pages plot about 22 ` +
@@ -457,7 +476,7 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
  */
 function mixFindings(slides, stand) {
   const findings = [];
-  const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
+  const block = (code, measured, threshold, repair, pages = null, rule = null) => findings.push({ slide: pages, code, ...(rule ? { rule } : {}), severity: "blocker", measured, threshold, repair });
   const mix = exhibitMix(slides);
   for (const band of PLAN.mixEnforced.bands) {
     const [family, side] = band.split(".");
@@ -468,11 +487,13 @@ function mixFindings(slides, stand) {
     stand("VARIETY_EXHIBIT_MIX", `pages carried by ${family === "numbers" ? "numbers or cards" : family === "text" ? "text" : `a ${family}`}`, got.share, limit, side, { key: band, count: got.pages, of: mix.pages, pages: got.ids });
     if (side === "min" ? exact >= limit : exact <= limit) continue;
     const shares = Object.fromEntries(Object.entries(mix.families).map(([f, v]) => [f, v.share]));
+    // A band a rules version lowered: a share between its old bar and the new is the rule as tightened (weight.json rules.tightened).
+    const lowered = RULES.tightened?.[`VARIETY_EXHIBIT_MIX.${band}`];
     block("VARIETY_EXHIBIT_MIX", { family, share: got.share, pages: got.pages, of: mix.pages, direction: side === "min" ? "below" : "above", mix: shares, ids: got.ids }, limit,
       side === "min"
         ? `${got.pages} of ${mix.pages} pages are carried by a ${family} (${Math.round(exact * 100)}%); a deck this long carries at least ${Math.round(limit * 100)}%. ${MIX_REPAIR[family]}.`
         : `${got.pages} of ${mix.pages} pages are carried by ${family === "numbers" ? "numbers or cards" : `a ${family}`} (${Math.round(exact * 100)}%, ${got.ids.slice(0, 12).join(", ")}); at most ${Math.round(limit * 100)}%. ${MIX_REPAIR[family]}.`,
-      side === "min" ? null : got.ids);
+      side === "min" ? null : got.ids, lowered && exact <= lowered.before ? `VARIETY_EXHIBIT_MIX.${band}.tightened` : null);
   }
   const floor = PLAN.craft.exhibitVarietyPerTen.min;
   // The floor is a rate per ten pages; in kinds, it is the fewest this deck's length allows.

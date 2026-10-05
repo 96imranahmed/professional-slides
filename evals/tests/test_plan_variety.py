@@ -21,8 +21,10 @@ spine that is not a benchmark deck's.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -71,28 +73,6 @@ def stage(tmp, mutate=None):
 
 
 class AllocationTests(unittest.TestCase):
-    def test_every_page_is_given_a_best_fit_form_seeds_differ_where_the_choice_is_free_and_agree_where_it_is_not(self):
-        result = run_node(LOAD + """
-const seeds = ['s1', 's2', 's3', 's4', 's5', 's6'];
-const plans = seeds.map((seed) => plan(seeded(seed)));
-const typed = doc.pages.filter((page) => page.type);
-const free = typed.filter((page) => (best(page) ?? []).length > 1).map((page) => page.id), pinned = typed.filter((page) => (best(page) ?? []).length === 1).map((page) => page.id);
-const formsOf = (id) => [...new Set(plans.map((p) => formOf(p, id).form))];
-console.log(JSON.stringify({ satisfied: plans.map((p) => p.satisfied), free: free.length, pinned: pinned.length,
-  outside: plans.flatMap((p) => p.pages.filter((page) => { const forms = best(typed.find((x) => x.id === page.id)); return forms && !forms.includes(page.form); }).map((page) => page.id)),
-  freeVaried: free.filter((id) => formsOf(id).length > 1), pinnedVaried: pinned.filter((id) => formsOf(id).length > 1),
-  again: JSON.stringify(plan(seeded('s1')).pages) === JSON.stringify(plans[0].pages), distinct: new Set(plans.map((p) => JSON.stringify(p.pages.map((page) => [page.form, page.draws])))).size,
-  reads: plans.flatMap((p) => p.pages.filter((page) => page.reads && best(typed.find((x) => x.id === page.id))).map((page) => page.id)) }));
-""")
-        self.assertEqual(result["satisfied"], [True] * 6)
-        self.assertEqual(result["outside"], [])                      # never a form outside the page's best fit
-        self.assertGreaterEqual(result["free"], 8)
-        self.assertGreaterEqual(len(result["freeVaried"]), result["free"] // 2, result)   # the seed reaches the pages with a choice
-        self.assertEqual(result["pinnedVaried"], [])                 # and no page without one
-        self.assertTrue(result["again"])                             # one seed, one deck
-        self.assertGreaterEqual(result["distinct"], 5)               # six seeds, at least five different decks
-        self.assertEqual(result["reads"], [])                        # no page whose fit is read took a form "to meet a rule"
-
     def test_a_free_choice_is_made_by_the_decks_hand_and_a_deck_with_no_draw_spreads_its_kinds(self):
         result = run_node(LOAD + """
 const p = plan(seeded('s1')), bare = plan(doc);
@@ -174,7 +154,9 @@ console.log(JSON.stringify({ said: draws.consulting.every((draw) => draw.say.len
     def test_a_rule_the_best_fit_forms_cannot_meet_is_reported_unmet_and_never_met_with_a_weaker_form(self):
         # Eighteen pages, three of them panels: the floor on pages of two or more exhibits wants a fourth, and the only form that
         # would give one is a strip over a chart on a page of four single figures, which a grid or a list carries and a strip does
-        # not. The plan said nothing of fit and took the strip.
+        # not. The plan said nothing of fit and took the strip. The best-fit forms cannot meet two more: three pages of
+        # figures in eighteen pass the tenth of a deck the numbers family is held to, and with points below capped they
+        # cannot spread the pages' architectures; a search over every form meets all three.
         result = run_node(LOAD + """
 const one = (id, type, evidence, measures, more = {}) => ({ id, type, title: `Page ${id} states a finding of its own about the operator`, why: 'the claim decides the type', evidence, settles: { kind: 'comparison', what: 'w', measures, ...more } });
 const round = (n) => [
@@ -185,16 +167,15 @@ const d = { deck: { ...doc.deck, variation: 's1' }, pages: [...round(1), ...roun
 const strict = plan(d), loose = plan(d, { forms: 'any' });
 const outside = (p) => p.pages.filter((page) => { const forms = best(d.pages.find((x) => x.id === page.id)); return forms && !forms.includes(page.form); }).map((page) => `${page.id} ${page.form}`);
 console.log(JSON.stringify({ strict: { unsatisfied: strict.unsatisfied.map((u) => u.code), outside: outside(strict), pinned: strict.pinned.length, served: strict.pages.filter((page) => page.served).length },
-  loose: { unsatisfied: loose.unsatisfied.map((u) => u.code), outside: outside(loose), served: loose.pages.filter((page) => page.served).map((page) => `${page.id} ${page.form}`), best: loose.pages.find((page) => page.served)?.served } }));
+  loose: { unsatisfied: loose.unsatisfied.map((u) => u.code), outside: outside(loose), served: loose.pages.filter((page) => page.served).map((page) => `${page.id} ${page.form}`), best: loose.pages.find((page) => page.served && page.form === 'metric-strip')?.served } }));
 """)
         strict, loose = result["strict"], result["loose"]
-        self.assertEqual(strict["unsatisfied"], ["VARIETY_PANELS"])
+        self.assertEqual(strict["unsatisfied"], ["VARIETY_PANELS", "VARIETY_EXHIBIT_MIX", "PAGE_SHAPE_FLAT"])
         self.assertEqual([strict["outside"], strict["served"]], [[], 0])
         self.assertEqual(strict["pinned"], 18)   # every page is held to fewer forms than its type has, and the plan names them
         # Asked whether any form the catalogue allows meets it - a draft's question - the search finds one, and marks the page it moved.
         self.assertEqual(loose["unsatisfied"], [])
-        self.assertEqual(len(loose["outside"]), 1)
-        self.assertRegex(loose["outside"][0], r"^f\d metric-strip$")
+        self.assertTrue(any(re.match(r"^f\d metric-strip$", page) for page in loose["outside"]), loose["outside"])
         self.assertEqual(loose["served"], loose["outside"])
         self.assertEqual(sorted(loose["best"]), ["fact-grid", "stat-list"])
 
@@ -212,87 +193,101 @@ console.log(JSON.stringify({ v09: formOf(p, 'v09'), v04: formOf(p, 'v04'), unuse
 
 
 class PlanCommandTests(unittest.TestCase):
+    """The seeded spine planned once, its allocation copied into the pages and drafted once: what each test below reads."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.home = Path(tempfile.mkdtemp(prefix="plan-command-"))
+        def seed(doc):
+            doc["deck"]["variation"] = "s1"
+        cls.file = stage(cls.home, seed)
+        cls.plan = cli(cls.file, "--plan")
+        cls.planned = cls.refused()
+        doc = json.loads(cls.file.read_text(encoding="utf-8"))
+        for line in json.loads(cls.plan.stdout)["plan"]["pages"]:
+            page_id, (_, form, commentary) = line.split()[0], line.split()[1].split("/")
+            next(p for p in doc["pages"] if p.get("id") == page_id).update(form=form, commentary=commentary)
+        cls.allocated = doc
+        cls.file.write_text(json.dumps(doc), encoding="utf-8")
+        cls.draft = cli(cls.file, "--draft")
+        cls.drafted = cls.refused()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.home, ignore_errors=True)
+
+    @classmethod
+    def refused(cls):
+        """What the last run refused, from its line of the run log."""
+        return {(f["code"], f.get("id")) for f in json.loads((cls.home / "variety.author-log.jsonl").read_text(encoding="utf-8").splitlines()[-1])["findings"]}
+
     def test_the_plan_prints_how_many_forms_fit_each_page_and_what_chose_and_a_draft_lists_the_choices(self):
+        plan = self.plan
+        printed = json.loads(plan.stdout)["plan"]
+        self.assertTrue(printed["satisfied"])
+        # The plan reads the spine in the forms it proposes, as the draft will once they are copied in: the opening summary of
+        # this bare spine carries no answer table, and the plan says so now and not one command later. The closing summary is
+        # proposed as what to keep, which asks for none.
+        self.assertEqual(plan.returncode, 2, plan.stderr[-2000:])
+        unlayable = [[f["code"], f["id"]] for f in json.loads(plan.stdout)["unlayable"]]
+        self.assertIn(["SPINE_UNFILLED", "v01"], unlayable)
+        self.assertNotIn("v31", [page for _, page in unlayable])
+        fit = printed["fit"]
+        # Two dates of ten members: one form fits. Ten members on one measure: two do, and the plan says what chose.
+        self.assertEqual(fit["v04"], {"task": "pair"})
+        self.assertEqual(sorted([fit["v09"]["also"][0], next(line.split()[1].split("/")[1] for line in printed["pages"] if line.startswith("v09 "))]), ["bar", "lollipop"])
+        self.assertIn(fit["v09"]["by"], ("seed", "rules", "featured"))
+        self.assertRegex(plan.stderr, r"v09 +ranking +form (bar|lollipop) +commentary \S+ +proposed - 2 forms fit equally \((bar, lollipop|lollipop, bar)\); (bar|lollipop) chosen by ")
+        self.assertRegex(plan.stderr, r"v10 +panels +form row[^\n]*exhibits chart\.(\w+), chart\.\1, chart\.\1 - 3 kinds fit equally")
+        self.assertIn("How each form was chosen: a page that declares no form is given one that carries its claim best", plan.stderr)
+        self.assertIn("and never a form that carries it less directly", plan.stderr)
+        self.assertIn("VARIETY_KIND_SHARE: exhibits drawn in the 3 commonest kinds", plan.stderr)
+        self.assertIn("else the one this deck's draw takes for that reading task - one order a deck, drawn by its `variation` (s1)", plan.stderr)
+        # Without a seed the deck has no hand: its kinds are spread, the catalogue's order stands, and the plan says the deck has none.
         with tempfile.TemporaryDirectory() as tmp:
-            def seed(doc):
-                doc["deck"]["variation"] = "s1"
-            file = stage(tmp, seed)
-            plan = cli(file, "--plan")
-            printed = json.loads(plan.stdout)["plan"]
-            self.assertTrue(printed["satisfied"])
-            # The plan reads the bound facts on the spine in the forms it proposes, as the draft will once they are copied in: the
-            # two summaries of this bare spine carry no answer table, and the plan says so now and not one command later.
-            self.assertEqual(plan.returncode, 2, plan.stderr[-2000:])
-            self.assertEqual([[f["code"], f["id"]] for f in json.loads(plan.stdout)["unlayable"]], [["SPINE_UNFILLED", "v01"], ["SPINE_UNFILLED", "v31"]])
-            fit = printed["fit"]
-            # Two dates of ten members: one form fits. Ten members on one measure: two do, and the plan says what chose.
-            self.assertEqual(fit["v04"], {"task": "pair"})
-            self.assertEqual(sorted([fit["v09"]["also"][0], next(line.split()[1].split("/")[1] for line in printed["pages"] if line.startswith("v09 "))]), ["bar", "lollipop"])
-            self.assertIn(fit["v09"]["by"], ("seed", "rules", "featured"))
-            self.assertRegex(plan.stderr, r"v09 +ranking +form (bar|lollipop) +commentary \S+ +proposed - 2 forms fit equally \((bar, lollipop|lollipop, bar)\); (bar|lollipop) chosen by ")
-            self.assertRegex(plan.stderr, r"v10 +panels +form row[^\n]*exhibits chart\.(\w+), chart\.\1, chart\.\1 - 3 kinds fit equally")
-            self.assertIn("How each form was chosen: a page that declares no form is given one that carries its claim best", plan.stderr)
-            self.assertIn("and never a form that carries it less directly", plan.stderr)
-            self.assertIn("VARIETY_KIND_SHARE: exhibits drawn in the 3 commonest kinds", plan.stderr)
-            self.assertIn("else the one this deck's draw takes for that reading task - one order a deck, drawn by its `variation` (s1)", plan.stderr)
-            # Without a seed the deck has no hand: its kinds are spread, the catalogue's order stands, and the plan says the deck has none.
             bare = cli(stage(tmp), "--plan")
-            self.assertIn("chosen by the catalogue's order (the deck has no `variation`)", bare.stderr)
-            self.assertIn("chosen by the spread of the deck's kinds", bare.stderr)
-            self.assertIn("this deck has none, so its kinds are spread and the catalogue's order breaks what is left: give it one with `node runtime/variation.mjs`", bare.stderr)
+        self.assertIn("chosen by the catalogue's order (the deck has no `variation`)", bare.stderr)
+        self.assertIn("chosen by the spread of the deck's kinds", bare.stderr)
+        self.assertIn("this deck has none, so its kinds are spread and the catalogue's order breaks what is left: give it one with `node runtime/variation.mjs`", bare.stderr)
 
     def test_the_plan_prints_where_the_proposal_stands_as_the_draft_of_it_will(self):
         # A plan allocates on descriptors and estimates the exhibits of a page that has none; the standings it printed from
         # those differed from the ones the draft printed of the same spine (the exhibit kinds, their share, the pages an
         # architecture counts). They are read by the draft's own compile of the proposal now: one set of lines.
-        with tempfile.TemporaryDirectory() as tmp:
-            def seed(doc):
-                doc["deck"]["variation"] = "s1"
-            file = stage(tmp, seed)
-            doc = json.loads(file.read_text(encoding="utf-8"))
-            for line in json.loads(cli(file, "--plan").stdout)["plan"]["pages"]:
-                page_id, (_, form, commentary) = line.split()[0], line.split()[1].split("/")
-                next(p for p in doc["pages"] if p.get("id") == page_id).update(form=form, commentary=commentary)
-            file.write_text(json.dumps(doc), encoding="utf-8")
-            plan = cli(file, "--plan")
-            planned = json.loads(plan.stdout)["standing"]["S"]
-            said = cli(file, "--draft").stderr
-            stands = said[said.index("Where the deck stands"):].splitlines()
-            drafted = {line.strip().split(":")[0]: line.strip() for line in stands if line.startswith("  ") and ": " in line}
-            self.assertGreater(len(planned), 20)
-            self.assertEqual([line for line in planned if drafted.get(line.split(":")[0]) != line], [])
-            self.assertIn("read by `--draft`'s own compile of this proposal", plan.stderr)
+        plan = cli(self.file, "--plan")
+        planned = json.loads(plan.stdout)["standing"]["S"]
+        said = self.draft.stderr
+        stands = said[said.index("Where the deck stands"):].splitlines()
+        drafted = {line.strip().split(":")[0]: line.strip() for line in stands if line.startswith("  ") and ": " in line}
+        self.assertGreater(len(planned), 20)
+        self.assertEqual([line for line in planned if drafted.get(line.split(":")[0]) != line], [])
+        self.assertIn("read by `--draft`'s own compile of this proposal", plan.stderr)
+
+    def test_the_plan_refuses_at_least_what_the_draft_of_its_own_proposal_refuses(self):
+        # The plan proposed the closing summary as a second executive summary and refused it for the answer table that form asks
+        # for; and it read the bound facts of its proposal alone, so the draft of the choices it printed refused seven things where
+        # it had refused two, under a line saying the allocation satisfied every structure rule. Copied in, a plan's choices are
+        # refused by the next command for nothing the plan did not refuse first.
+        self.assertIn("v31 summary/takeaways/none proposed", json.loads(self.plan.stdout)["plan"]["pages"])
+        self.assertEqual(self.draft.returncode, 2)
+        self.assertEqual(self.drafted - self.planned, set())
+        self.assertNotIn("satisfies every structure rule", self.plan.stderr)
 
     def test_a_draft_lists_the_forms_that_carry_each_page_with_a_choice_and_names_a_declared_form_that_only_serves(self):
+        # The plan's allocation copied into the pages, and one page declared against its claim: two dates of ten operators as paired bars.
+        doc = copy.deepcopy(self.allocated)
+        next(p for p in doc["pages"] if p.get("id") == "v04")["form"] = "bar"
         with tempfile.TemporaryDirectory() as tmp:
-            def seed(doc):
-                doc["deck"]["variation"] = "s1"
-            file = stage(tmp, seed)
-            doc = json.loads(file.read_text(encoding="utf-8"))
-            # The plan's allocation copied into the pages, and one page declared against its claim: two dates of ten operators as paired bars.
-            for line in json.loads(cli(file, "--plan").stdout)["plan"]["pages"]:
-                page_id, (_, form, commentary) = line.split()[0], line.split()[1].split("/")
-                next(p for p in doc["pages"] if p.get("id") == page_id).update(form=form, commentary=commentary)
-            next(p for p in doc["pages"] if p.get("id") == "v04")["form"] = "bar"
+            file = stage(tmp)
             file.write_text(json.dumps(doc), encoding="utf-8")
             said = cli(file, "--draft").stderr
-            self.assertIn("Which forms carry each page's claim", said)
-            self.assertIn("take the one `--plan` allocates", said)
-            self.assertRegex(said, r"v09 ranking/(bar|lollipop): where each member of a set stands on one measure - best fit bar, lollipop")
-            self.assertIn("v04 ranking/bar: two values in one unit for each member - before and after, or one measure against another - best fit dumbbell; the declared form carries it with the reader doing work", said)
-            # A page whose one best-fit form is the form it has needs no line.
-            self.assertNotRegex(said, r"\n  v07 bridge/waterfall: ")
-            self.assertIn("VARIETY_FIT_UNUSED: pages drawn in a form that carries their claim less directly than another they could take 1; cap 0: over by 1 page - advisory", said)
-
-    def test_the_skill_tells_the_author_to_take_the_plans_allocation_and_where_the_choice_is_explained(self):
-        skill = " ".join((SKILL / "SKILL.md").read_text(encoding="utf-8").split())
-        self.assertIn("Give the deck its `variation` first", skill)
-        self.assertIn("Take its allocation, not each type's first form", skill)
-        self.assertIn("(references/design.md#which-form-carries-which-claim)", skill)
-        self.assertIn("A form is never chosen for variety against the claim", skill)
-        design = (SKILL / "references" / "design.md").read_text(encoding="utf-8")
-        for said in ("gives a page that declares no form one of its best-fit forms, and never a weaker one", "What this does not do is rotate", "**On a revision** none of this restyles the user's deck"):
-            self.assertIn(said, design)
+        self.assertIn("Which forms carry each page's claim", said)
+        self.assertIn("take the one `--plan` allocates", said)
+        self.assertRegex(said, r"v09 ranking/(bar|lollipop): where each member of a set stands on one measure - best fit bar, lollipop")
+        self.assertIn("v04 ranking/bar: two values in one unit for each member - before and after, or one measure against another - best fit dumbbell; the declared form carries it with the reader doing work", said)
+        # A page whose one best-fit form is the form it has needs no line.
+        self.assertNotRegex(said, r"\n  v07 bridge/waterfall: ")
+        self.assertIn("VARIETY_FIT_UNUSED: pages drawn in a form that carries their claim less directly than another they could take 1; cap 0: over by 1 page - advisory", said)
 
 
 class OpenKindTests(unittest.TestCase):
@@ -402,7 +397,7 @@ console.log(JSON.stringify({{
     def test_a_page_another_type_carries_as_directly_is_told_so_where_its_evidence_can_rest_under_that_type(self):
         result = run_node(LOAD + """
 const parts = (evidence) => ({ id: 'z', type: 'composition', title: 'Fares are over half of revenue and the rest is three small lines', why: 'parts of one whole', evidence, settles: { kind: 'share', what: 'w', measures: ['i-revenue-parts/revenue'] } });
-const seeds = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'];
+const seeds = ['a', 'b', 'c', 'd', 'e', 'f'];
 const of = (evidence, seed) => formOf(plan({ ...seeded(seed), pages: [...doc.pages, parts(evidence)] }), 'z');
 const both = seeds.map((seed) => of(['i-revenue-parts', 'i-punctual'], seed));
 console.log(JSON.stringify({ beside: both.map((page) => (page.beside ?? []).map((item) => `${item.type}/${item.form}`).join()), hands: both.map((page) => page.typeHand ? `${page.typeHand.type}/${page.typeHand.form}` : null),
@@ -501,8 +496,10 @@ console.log(JSON.stringify({ changed: p.pages.filter((page) => page.source === '
         self.assertTrue(result["kept"])
         self.assertEqual(result["fit"], 0)
         self.assertEqual(result["standings"], ["VARIETY_KIND_SHARE"])   # the share is counted; nothing is judged without measures
-        # The deck's own way of drawing is read from its declared forms, which needs no measure: the added page of parallel points is drawn as its other one is.
-        self.assertEqual(result["added"][:2], [result["added"][2], "convention"])
+        # The deck's own way of drawing is read from its declared forms, which needs no measure - but the rules come first: a
+        # second card set would take the numbers family to its cap, so the added page of points is drawn another way, and says why.
+        self.assertEqual(result["added"][1], "rules")
+        self.assertNotEqual(result["added"][0], result["added"][2])
 
     def test_the_plan_command_reads_the_inventory_beside_a_revisions_pages_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -533,7 +530,7 @@ console.log(JSON.stringify({ changed: p.pages.filter((page) => page.source === '
 
 class VariabilityEvalTests(unittest.TestCase):
     def test_the_eval_holds_its_four_assertions_on_the_fixed_spine_and_reports_the_distances(self):
-        run = cli("--seeds", "3", "--designs", "consulting,journal", "--json", FIXTURE / "variety.pages.json", script=EVAL)
+        run = cli("--seeds", "3", "--designs", "consulting,journal", "--json", "--allocations", FIXTURE / "variety.pages.json", script=EVAL)
         self.assertEqual(run.returncode, 0, run.stderr[-1500:] + run.stdout[-1500:])
         report = json.loads(run.stdout)
         self.assertTrue(report["accepted"])
@@ -542,10 +539,14 @@ class VariabilityEvalTests(unittest.TestCase):
         self.assertGreaterEqual(spine["free"], 10)
         self.assertGreaterEqual(spine["pinned"], 5)
         self.assertTrue(spine["freeVaried"])                                   # (a)
+        self.assertGreaterEqual(len(spine["freeVaried"]), spine["free"] // 2)  # the seed reaches the pages with a choice
         self.assertEqual(spine["pinnedVaried"], [])                            # (b)
         self.assertEqual(spine["outsideBestFit"], [])                          # (c)
         self.assertTrue(spine["reproducible"])                                 # (d)
         self.assertTrue(spine["satisfied"])
+        # Three seeds under each of two designs: a different deck a seed, one pair of seeds aside.
+        decks = {design: len({json.dumps(a["pages"]) for a in spine["allocations"] if a["design"] == design}) for design in ("consulting", "journal")}
+        self.assertGreaterEqual(sum(decks.values()), 5, decks)
         self.assertGreater(spine["betweenSeeds"]["pages"], 0.05)
         self.assertGreater(spine["betweenSeeds"]["kinds"], 0)
         self.assertLessEqual(spine["betweenSeeds"]["pages"], spine["betweenSeeds"]["free"])

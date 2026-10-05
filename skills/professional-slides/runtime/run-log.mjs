@@ -9,7 +9,7 @@
 // other commands, and a session's whole command count is larger than this. The cost of a
 // deck is agent round trips - each one a whole-deck compile to learn about one
 // page - and it was only ever visible when an author kept a log by hand. Read
-// from this file it is a number a run is scored on (evals/cold-run/score.mjs):
+// from this file it is a number a run is scored on (evals/quality/score.mjs):
 // nothing here is estimated, and a run with no log has no cost recorded.
 import { readFileSync } from "node:fs";
 

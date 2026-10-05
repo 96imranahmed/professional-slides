@@ -34,7 +34,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "journeys each year against the FY19 level",
     "measures": [
      "i-journeys/journeys"
     ]
@@ -50,7 +50,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "journeys by year for six operators",
     "measures": [
      "i-operators/northvale",
      "i-operators/coast",
@@ -71,7 +71,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "each operator's journeys in FY19 and FY26",
     "measures": [
      "i-then-now/fy19",
      "i-then-now/fy26"
@@ -91,7 +91,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "journeys since the FY20 low and the growth that recovered them",
     "measures": [
      "i-journeys/growth",
      "i-journeys/journeys"
@@ -108,7 +108,7 @@
    ],
    "settles": {
     "kind": "share",
-    "what": "the measures the page names, as recorded",
+    "what": "the peak, off-peak and weekend shares of journeys by year",
     "measures": [
      "i-daypart/peak",
      "i-daypart/off-peak",
@@ -126,7 +126,7 @@
    ],
    "settles": {
     "kind": "structure",
-    "what": "the measures the page names, as recorded",
+    "what": "the steps from FY25 journeys to FY26",
     "measures": [
      "i-bridge/journeys"
     ]
@@ -156,7 +156,7 @@
    ],
    "settles": {
     "kind": "rank",
-    "what": "the measures the page names, as recorded",
+    "what": "punctuality for ten operators",
     "measures": [
      "i-punctual/punctuality"
     ]
@@ -172,7 +172,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "punctuality, cost and fleet age for the operators side by side",
     "measures": [
      "i-profile/punctuality",
      "i-profile/cost",
@@ -194,7 +194,7 @@
    ],
    "settles": {
     "kind": "rank",
-    "what": "the measures the page names, as recorded",
+    "what": "cost per journey for twenty operators",
     "measures": [
      "i-cost-field/cost"
     ]
@@ -210,7 +210,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "the three measures the board asked for, operator by operator",
     "measures": [
      "i-profile/punctuality",
      "i-profile/cost",
@@ -232,7 +232,7 @@
    ],
    "settles": {
     "kind": "rank",
-    "what": "the measures the page names, as recorded",
+    "what": "the spread of monthly punctuality for each operator",
     "measures": [
      "i-spread/min",
      "i-spread/q1",
@@ -252,7 +252,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "trains a day against journey growth, line by line",
     "measures": [
      "i-frequency/frequency",
      "i-frequency/growth"
@@ -269,7 +269,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "the operators graded on punctuality, cost and fleet age",
     "measures": [
      "i-profile/punctuality",
      "i-profile/cost",
@@ -305,7 +305,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "revenue and punctuality by year",
     "measures": [
      "i-money/revenue",
      "i-money/punctuality"
@@ -322,7 +322,7 @@
    ],
    "settles": {
     "kind": "share",
-    "what": "the measures the page names, as recorded",
+    "what": "revenue split by source",
     "measures": [
      "i-revenue-parts/revenue"
     ]
@@ -338,7 +338,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "revenue and punctuality, each on its own panel",
     "measures": [
      "i-money/revenue",
      "i-money/punctuality"
@@ -359,7 +359,7 @@
    ],
    "settles": {
     "kind": "share",
-    "what": "the measures the page names, as recorded",
+    "what": "the peak, off-peak and weekend shares for five operators",
     "measures": [
      "i-daypart-peers/peak",
      "i-daypart-peers/off-peak",
@@ -377,7 +377,7 @@
    ],
    "settles": {
     "kind": "count",
-    "what": "the measures the page names, as recorded",
+    "what": "the stations, staff, depots and lines the network runs",
     "measures": [
      "i-estate/stations",
      "i-estate/staff",
@@ -396,7 +396,7 @@
    ],
    "settles": {
     "kind": "share",
-    "what": "the measures the page names, as recorded",
+    "what": "the fleet split by class",
     "measures": [
      "i-fleet/fleet"
     ]
@@ -423,7 +423,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "punctuality against the peers beside the revenue split",
     "measures": [
      "i-punctual/punctuality",
      "i-revenue-parts/revenue"
@@ -444,7 +444,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "response times in eight districts against the nine-minute standard",
     "measures": [
      "i-response/response",
      "i-response/standard"
@@ -461,7 +461,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "how many districts meet the standard",
     "measures": [
      "i-response/standard",
      "i-response/response"
@@ -488,7 +488,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "peak, off-peak and weekend journeys on eight lines",
     "measures": [
      "i-lines/peak",
      "i-lines/off-peak",
@@ -507,7 +507,7 @@
    ],
    "settles": {
     "kind": "comparison",
-    "what": "the measures the page names, as recorded",
+    "what": "journeys by year beside the fleet split by class",
     "measures": [
      "i-journeys/journeys",
      "i-fleet/fleet"
@@ -528,7 +528,7 @@
    ],
    "settles": {
     "kind": "rate",
-    "what": "the measures the page names, as recorded",
+    "what": "journeys by operator and year",
     "measures": [
      "i-operators/northvale",
      "i-operators/coast",

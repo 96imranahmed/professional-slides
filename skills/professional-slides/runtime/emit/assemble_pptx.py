@@ -93,6 +93,16 @@ def q(prefix: str, tag: str) -> str:
     return f"{{{NS[prefix]}}}{tag}"
 
 
+def resolve(part: str, target: str) -> str:
+    """The part an internal relationship of `part` points at ("" is the package itself)."""
+    return target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), target))
+
+
+def slide_link(kind: str) -> bool:
+    """A relationship from one slide to another (a hyperlink or an action): the other slide is not a part the first draws on."""
+    return kind == REL + "slide"
+
+
 class Package:
     """A .pptx as its parts: name -> bytes, in the order the zip holds them."""
 
@@ -116,7 +126,7 @@ class Package:
         for el in etree.fromstring(data):
             target = el.get("Target", "")
             internal = el.get("TargetMode") != "External"
-            name = (target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), target))) if internal else None
+            name = resolve(part, target) if internal else None
             out.append((el.get("Id"), el.get("Type"), name, el))
         return out
 
@@ -401,8 +411,7 @@ class Assembly:
             for el in list(root):
                 if el.get("TargetMode") == "External":
                     continue
-                target = el.get("Target", "")
-                resolved = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(name), target))
+                resolved = resolve(name, el.get("Target", ""))
                 if el.get("Type") == REL + "notesMaster" and self.notes_master:
                     to = self.notes_master
                 elif resolved in self.renamed:
@@ -454,6 +463,35 @@ class Assembly:
         (masters.addnext(listed) if masters is not None else self.presentation.insert(0, listed))
 
     # dropping a source slide ----------------------------------------------
+    def unlink(self, part: str, gone: set) -> list:
+        """Take out of `part` every link to a slide in `gone`: the relationship, and each hyperlink that used it (its text stays).
+
+        Returns the slides it linked to. A reference to a cut slide that is not
+        a hyperlink - a slide zoom, a custom action - cannot be taken out
+        without redrawing the slide, so it is refused."""
+        rels_name = Package.rels_name(part)
+        data = self.parts.get(rels_name)
+        if data is None:
+            return []
+        rels = etree.fromstring(data)
+        cut = {el.get("Id"): resolve(part, el.get("Target", "")) for el in rels
+               if el.get("TargetMode") != "External" and slide_link(el.get("Type")) and resolve(part, el.get("Target", "")) in gone}
+        if not cut:
+            return []
+        slide = etree.fromstring(self.parts[part])
+        for el in list(slide.iter()):
+            if el.get(q("r", "id")) not in cut:
+                continue
+            if el.tag not in (q("a", "hlinkClick"), q("a", "hlinkMouseOver")):
+                raise Refusal(f"{part} refers to {cut[el.get(q('r', 'id'))]}, which the revision cuts, through <{etree.QName(el).localname}>: keep that slide, or redraw the slide that refers to it by giving its page a `type`")
+            el.getparent().remove(el)
+        for el in list(rels):
+            if el.get("Id") in cut:
+                rels.remove(el)
+        self.parts[part], self.parts[rels_name] = serialise(slide), serialise(rels)
+        self.new |= {part, rels_name}
+        return sorted(set(cut.values()))
+
     def drop(self, part: str):
         """Remove a source slide's part, its relationships and the notes page that is its alone."""
         for _, kind, target, _ in self.source.rels(part):
@@ -474,8 +512,7 @@ class Assembly:
             for el in etree.fromstring(data):
                 if el.get("TargetMode") == "External":
                     continue
-                target = el.get("Target", "")
-                resolved = target.lstrip("/") if target.startswith("/") or not name else posixpath.normpath(posixpath.join(posixpath.dirname(name), target))
+                resolved = resolve(name, el.get("Target", ""))
                 if resolved in self.parts and resolved not in seen:
                     seen.add(resolved)
                     queue.append(resolved)
@@ -487,7 +524,7 @@ class Assembly:
         Only those parts are candidates, so a part the source deck held and
         nothing ever pointed at stays as the user saved it; a chart, a
         workbook or a picture a kept slide also shows is reached, and stays."""
-        candidates = [name for part in dropped for name in self.source.closure(part)]
+        candidates = [name for part in dropped for name in self.source.closure(part, slide_link)]
         kept = self.reachable()
         removed = []
         for name in dict.fromkeys(candidates):
@@ -632,6 +669,15 @@ def assemble(plan: dict, base: Path) -> tuple:
                 raise Refusal(f"The plan places composed slide {index}, and the composed deck holds {len(made)}")
             order.append(("composed", assembly.bring(made[index - 1][2])))
     dropped = [(slide_id, rid, part) for at, (slide_id, rid, part) in enumerate(listed, 1) if at not in used]
+    # A kept slide that links to a cut one loses the link (its text stays): a link to a missing part is a damaged file.
+    # The slide is then changed, so it is reported as an edit and not proven identical.
+    gone = {part for _, _, part in dropped}
+    for at, (_, _, part) in enumerate(listed, 1):
+        if at in used and (unlinked := assembly.unlink(part, gone)):
+            change = {"unlinked": unlinked}
+            known = next((edit for edit in edits if edit["slide"] == at), None)
+            (known["changes"].append(change) if known else edits.append({"slide": at, "changes": [change]}))
+            carried = [(index, kept) for index, kept in carried if index != at]
     for _, _, part in dropped:
         assembly.drop(part)
     # A deck whose slides are all carried in their own order lists them as it did: the three parts that list them are not written again.
@@ -646,7 +692,7 @@ def assemble(plan: dict, base: Path) -> tuple:
     written = Package(data)
     preserved, compared, drifted = 0, set(), []
     for index, part in carried:
-        closure = source.closure(part)
+        closure = source.closure(part, slide_link)
         same = all(written.parts.get(name) == source.parts[name] for name in closure)
         compared |= set(closure)
         if same:
@@ -675,11 +721,14 @@ def check(plan: dict, base: Path) -> list:
             continue
         if not any(key in entry for key in ("title", "edits", "hidden")):
             continue
-        # Each change on its own, so one that cannot be made does not hide the next.
+        # In sequence, as assemble() makes them, so an edit is tried on the slide the edits before it leave; one that
+        # cannot be made is listed and skipped, so it does not hide the next.
+        part = listed[index - 1][2]
+        slide, notes = source.parts[part], source.parts.get(source.notes_of(part))
         for single in [{key: entry[key]} for key in ("title",) if key in entry] + [{"edits": [edit]} for edit in entry.get("edits") or []]:
             try:
-                part = listed[index - 1][2]
-                edit_slide(source.parts[part], single, index, source.parts.get(source.notes_of(part)))
+                slide, edited_notes, _ = edit_slide(slide, single, index, notes)
+                notes = edited_notes if edited_notes is not None else notes
             except Refusal as refusal:
                 refusals.append({"slide": index, "message": str(refusal)})
     return refusals

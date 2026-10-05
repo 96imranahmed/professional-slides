@@ -1,7 +1,7 @@
 // Nice numbers: the values an axis, a shared scale or a legend may land on.
 // One definition for the renderer's axis domain and ticks (chart-axes.mjs `range`
 // and `tickCount`, which gates/nice_ticks.py ports), the shared maximum of peer
-// charts (compose.mjs) and a map's size legend (maps.mjs).
+// charts (compose-arrangements.mjs) and a map's size legend (maps.mjs).
 
 /**
  * Tick steps a reader recognises: 1, 2, 2.5 or 5 times a power of ten.

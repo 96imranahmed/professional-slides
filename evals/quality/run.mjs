@@ -14,7 +14,7 @@
  * is the mean and spread per brief and the pairwise win rate, per treatment.
  *
  * Options
- *   --set NAME            dev (the cold-run briefs), heldout, or all
+ *   --set NAME            dev, heldout, or all
  *   --brief ID            only this brief (repeatable), e.g. dev/network-rollout
  *   --runs N              agent runs per brief (default 3)
  *   --agent NAME          an entry of config.agents
@@ -25,35 +25,32 @@
  *   --report              print the summary for this skill version and judge, one per treatment
  *                         recorded (or only --agent / --prompt's), and stop
  *   --no-pairwise         skip the comparison with the previous version
- *   --no-anchors          skip judge calibration on scored anchors
  *   --keep-workspace      leave each agent workspace in place
  *   --config FILE         default evals/quality/config.json
  *   --results FILE        default evals/quality/results.jsonl
  *   --store DIR           where decks are kept for later comparison (default evals/quality/runs);
  *                         results.jsonl records each deck relative to it
- *   --anchors-file FILE   default evals/quality/anchors/anchors.json
  *   --skill-sha VALUE     label the version under test instead of reading it from git
  */
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import {
-  QUALITY, ROOT, RESULT_SCHEMA, anchorError, appendResult, briefRequest, briefs, buildAnchorPacket, buildDeckPacket,
+  QUALITY, ROOT, RESULT_SCHEMA, appendResult, briefRequest, briefs, buildDeckPacket,
   buildPairPacket, collectArtifacts, deckPages, fillTemplate, schemaVars, formatSummary, isRecorded, keptDir, keyOf, nextRun, pairSwap,
   parseJudgeOutput, previousDeck, readResults, skillSha as readSkillSha, storeArtifacts, summarize, treatmentsOf,
   validatePreference, validateVerdict,
 } from "./lib.mjs";
-import { scoreRun } from "../cold-run/score.mjs";
+import { scoreRun } from "./score.mjs";
 import { readRunLog, runCost } from "../../skills/professional-slides/runtime/run-log.mjs";
 import { isMain, pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
 
 const USAGE = "Usage: run.mjs --set dev|heldout|all [--runs N] [--agent NAME] [--judge NAME] [--dry-run] (see the header for every option)";
 const VALUE_FLAGS = new Set(["--set", "--brief", "--runs", "--agent", "--judge", "--judge-model", "--prompt", "--config",
-  "--results", "--store", "--anchors-file", "--skill-sha"]);
-const SWITCHES = new Set(["--dry-run", "--report", "--no-pairwise", "--no-anchors", "--keep-workspace", "--help"]);
+  "--results", "--store", "--skill-sha"]);
+const SWITCHES = new Set(["--dry-run", "--report", "--no-pairwise", "--keep-workspace", "--help"]);
 
 export function parseArgs(argv) {
   const options = { brief: [] };
@@ -107,7 +104,7 @@ function readJson(file) {
   return JSON.parse((raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw).toString("utf8"));
 }
 
-/** The build bars and plan gates on what the run built, via the cold-run scorer. */
+/** The build bars and plan gates on what the run built, via the scorer (score.mjs). */
 function scoreStored(dir, kept) {
   const plan = kept.plan ? readJson(path.join(dir, kept.plan)) : null;
   const scene = kept.scene ? readJson(path.join(dir, kept.scene)) : null;
@@ -127,54 +124,12 @@ function judgeCall(judge, packet, model) {
   return parseJudgeOutput(out.stdout);
 }
 
-function loadAnchors(file) {
-  if (!existsSync(file)) return { anchors: [], dir: path.dirname(file) };
-  const doc = JSON.parse(readFileSync(file, "utf8"));
-  return { anchors: doc.anchors ?? [], dir: path.dirname(file) };
-}
-
-function calibrate({ judge, judgeKey, model, anchorsFile, resultsFile, dryRun, log }) {
-  const { anchors, dir } = loadAnchors(anchorsFile);
-  const scored = anchors.filter((a) => typeof a.humanScore === "number");
-  if (!scored.length) {
-    log(`anchors: 0 of ${anchors.length} carry a human score; judge error not computed`);
-    return null;
-  }
-  if (dryRun) {
-    log(`anchors: would score ${scored.length} of ${anchors.length} anchors with ${judgeKey}`);
-    return null;
-  }
-  const results = [];
-  for (const anchor of scored) {
-    const image = path.join(dir, anchor.image);
-    const sha = createHash("sha256").update(readFileSync(image)).digest("hex");
-    if (anchor.sha256 && sha !== anchor.sha256) throw new Error(`anchor ${anchor.id}: image bytes differ from the scored image`);
-    const packetDir = mkdtempSync(path.join(os.tmpdir(), "ps-quality-anchor-"));
-    try {
-      const verdict = judgeCall(judge, buildAnchorPacket(packetDir, { image }), model);
-      const judgeScore = typeof verdict?.rating === "number" ? verdict.rating : null;
-      results.push({ id: anchor.id, tier: anchor.tier, humanScore: anchor.humanScore, judgeScore });
-    } catch (error) {
-      results.push({ id: anchor.id, tier: anchor.tier, humanScore: anchor.humanScore, judgeScore: null, error: error.message });
-    } finally {
-      rmSync(packetDir, { recursive: true, force: true });
-    }
-  }
-  const mae = anchorError(results);
-  const row = { schema: RESULT_SCHEMA, kind: "anchors", recorded: new Date().toISOString(), judge: judgeKey,
-                anchors: results, n: results.filter((r) => r.judgeScore !== null).length, meanAbsoluteError: mae };
-  appendResult(resultsFile, row);
-  log(`anchors: judge ${judgeKey} mean absolute error ${mae ?? "n/a"} over ${row.n} scored anchors`);
-  return row;
-}
-
 export async function main(argv = process.argv.slice(2), log = console.log) {
   const options = parseArgs(argv);
   if (options.help) { log(USAGE); return 0; }
   const config = JSON.parse(readFileSync(options.config ?? path.join(QUALITY, "config.json"), "utf8"));
   const resultsFile = path.resolve(options.results ?? path.join(QUALITY, "results.jsonl"));
   const store = path.resolve(options.store ?? path.join(QUALITY, "runs"));
-  const anchorsFile = path.resolve(options.anchorsFile ?? path.join(QUALITY, "anchors", "anchors.json"));
   const agentName = options.agent ?? config.defaults?.agent;
   const judgeName = options.judge ?? config.defaults?.judge;
   const promptName = options.prompt ?? config.defaults?.prompt ?? "brief";
@@ -303,7 +258,6 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     }
   }
 
-  if (!options.noAnchors) calibrate({ judge, judgeKey, model, anchorsFile, resultsFile, dryRun: options.dryRun, log });
   if (!options.dryRun) log(`\n${formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName }))}`);
   return 0;
 }

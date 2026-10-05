@@ -274,7 +274,7 @@ console.log(JSON.stringify({width:label.frame.width,bold:label.style.bold}));
 
     def test_a_total_row_leaves_the_implication_and_verdict_cells_blank(self):
         result = run_node(PRELUDE + """
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
 const frame={x:60,y:100,width:1100,height:500};
 const styled=styleTable({type:'table',columns:['Market','Revenue',{label:'Verdict',implication:true}],rows:[['A','10','Go'],['B','20','Hold'],['C','30','Go']],total:true});

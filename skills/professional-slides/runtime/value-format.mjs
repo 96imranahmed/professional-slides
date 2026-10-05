@@ -40,7 +40,7 @@ const QUOTED_PLACES_MAX = 2;
  * disagreeing, and the chart's one precision - whole numbers once its largest
  * value reaches a hundred - would round exactly the figure the page is about.
  * The composer hands each chart the figures its page writes with decimals
- * (`quotedFigures`, compose.mjs); a value the copy quotes is printed as the
+ * (`quotedFigures`, compose-passes.mjs); a value the copy quotes is printed as the
  * copy prints it, and every other label keeps the chart's precision.
  */
 export function quotedDecimals(props, value) {

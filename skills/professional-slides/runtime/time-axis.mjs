@@ -31,6 +31,8 @@ export function parsePeriod(label) {
   if ((m = /^((?:19|20)\d{2})\s?[AEFPB]?$/i.exec(s))) return { kind: "year", t: Number(m[1]) * 12 };
   // A fiscal year: FY25, FY2025, FY'25, FY 25.
   if ((m = /^FY\s?'?(\d{2}|\d{4})[AEFPB]?$/i.exec(s))) return { kind: "year", t: year(m[1]) * 12 };
+  // A scenario's years counted from its start ("Year 1", "Year +2") are periods: a projection runs over them.
+  if ((m = /^Year\s?\+?(\d{1,2})$/i.exec(s))) return { kind: "year-offset", t: Number(m[1]) * 12 };
   // A split fiscal year whose second half is the next year: 2025-26, 2025/26.
   if ((m = /^((?:19|20)\d{2})[-–/](\d{2})$/.exec(s)) && (Number(m[1]) + 1) % 100 === Number(m[2])) return { kind: "year", t: Number(m[1]) * 12 };
   // A quarter: Q1 2025, Q1'25, Q1-25, Q1 FY25, 1Q25, 2025 Q1, 2025-Q1.

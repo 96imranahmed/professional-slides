@@ -1,4 +1,4 @@
-import { TOKENS, SLIDE, styleValue } from "../core.mjs";
+import { TOKENS, SLIDE, styleValue } from "../../skills/professional-slides/runtime/core.mjs";
 
 function escapeHtml(value) {
   return String(value ?? "")

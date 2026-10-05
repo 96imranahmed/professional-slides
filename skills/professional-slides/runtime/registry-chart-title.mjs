@@ -30,16 +30,19 @@ function assertChartTitleCopy(props = {}) {
     const month = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
     // "March 2026" is the date the measure is taken at, as "FY26" is.
     // "31 March 2026", "calendar 2025": the date or year the measure is taken at.
-    copy = copy.replace(new RegExp(`\\b(?:\\d{1,2}\\s+)?${month}\\.?\\s+${year}\\b`, "gi"), "period");
+    // "Feb-2020" and "Q3-2019" join the month or quarter to its year with a hyphen, and are periods as their spaced spellings are.
+    copy = copy.replace(new RegExp(`\\b(?:\\d{1,2}\\s+)?${month}\\.?(?:\\s+|-)${year}\\b`, "gi"), "period");
     copy = copy.replace(new RegExp(`\\b(?:calendar|fiscal|financial)\\s+(?:year\\s+)?${year}\\b`, "gi"), "period");
     // Dates written as numbers: 2026-03-31, 31/03/2026, March 31, 2026.
     copy = copy.replace(new RegExp(`\\b${year}-\\d{1,2}-\\d{1,2}\\b|\\b\\d{1,2}/\\d{1,2}/(?:${year}|\\d{2})\\b|\\b${month}\\.?\\s+\\d{1,2},?\\s+${year}\\b`, "gi"), "period");
-    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:\\s+${year})?|${month}\\.?\\s+${year}|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
+    const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:(?:\\s+|-)${year})?|${month}\\.?\\s+${year}|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
     // "Index, 2021 = 100", "Index, FY19 = 100" and the bare "2018 = 100" a
     // heading ends on ("Passengers carried, 2018 = 100") name the base, not a
     // result: a period set equal to 100 is an index base whether or not the
     // word "index" stands before it. A figure appended to it still rejects.
     copy = copy.replace(new RegExp(`(?:\\bindex(?:ed)?\\b[^\\d]*?)?(?:${period}|\\b${year})\\s*=\\s*100\\b(?![.,]?\\d)`, "gi"), "index base");
+    // "% of 2019", "% of Feb-2020 baseline", "% vs Q3-2019": a share of a base period, as an index base is.
+    copy = copy.replace(new RegExp(`(?:%|\\bpercent|\\bshare)\\s+(?:of|vs\\.?|versus)\\s+(?:${period}|${year})\\b(?![\\d.,%])`, "gi"), "share of base period");
     copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
     // A year in the possessive names whose period it is - "at 2025's growth rate" - whatever word stands before it.

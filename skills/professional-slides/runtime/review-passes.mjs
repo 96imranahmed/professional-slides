@@ -43,7 +43,8 @@ export const STATUSES = Object.freeze(["fixed", "partly fixed", "not fixed", "re
 // A status that closes an entry. `unavailable` and `narrowed` are the
 // storyline's: a missing analysis searched for and not found, with the search
 // log to show it, and a finding met by an answer that now claims less.
-export const CLOSED = Object.freeze(["fixed", "unavailable", "narrowed"]);
+// `withdrawn` is the storyline's too: an item the critic now reads as filed in error, quoting the packet line that shows it.
+export const CLOSED = Object.freeze(["fixed", "unavailable", "narrowed", "withdrawn"]);
 export const MAX_PASSES = 3;
 // The rating a deck review must give for the deck to be accepted: 7 is "useful,
 // with substantial work still needed" (references/taste-review.md#benchmark-and-score).
@@ -61,18 +62,26 @@ export const REVIEW_HISTORY = "review-history";
 // reads again on the page - and `rendered` the defects only a drawn page can
 // have. The critic is told the first two, the reviewer all three, from this
 // one definition, so a major at the spine is a major on the page.
+//
+// A level is set by what the defect does to the reader's decision, not by the
+// kind of defect: almost every page could be sharper, deeper or better placed,
+// and a scale that made those major sent every deck back. So the argument
+// side names consequences, and a blocking item says which one it has
+// (`ifUnfixed`, BLOCKING_STAKE).
 const SEVERITY_SCALE = Object.freeze({
-  blocker: { means: "a reader would be misled or the page cannot be shown",
-    argument: "a wrong or unreconciled number, a figure that differs between the pages that state it, a claim its evidence contradicts, a decisive claim with nothing behind it, an answer that does not follow from the pages",
+  blocker: { means: "a reader would act on something false, or the page cannot be shown",
+    argument: "a figure that is wrong or differs between the pages that state it, a claim the evidence shown contradicts, an answer that does not follow from the pages",
     rendered: "an encoding that distorts (unequal time gaps drawn equal, a truncated bar baseline), clipped or unreadable content, an unfinished element (a blank total row, a placeholder)" },
-  major: { means: "a partner would send the page back: the reader gets the point late, at avoidable cost or with the wrong emphasis",
-    argument: "a claim that goes further than its evidence or has no source, evidence of the wrong shape for the claim, a comparison across incompatible bases, a page that restates or re-proves another, a missing countercase, a missing analysis that would change the answer",
-    rendered: "the wrong chart form, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task" },
-  minor: { means: "polish a reader notices only on close reading and that does not change what they take away",
-    argument: "a claim that could be sharper, a page better placed",
+  major: { means: "the decision-maker's first question would sink the answer or one of its reasons, and the deck could have answered it",
+    argument: "a reason the answer rests on with no evidence behind it, evidence that cannot show what the claim asserts, a comparison on incompatible bases, a missing analysis without which the answer could flip",
+    rendered: "the wrong chart form for the comparison, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task" },
+  minor: { means: "worth improving, and the reader would still decide the same way",
+    argument: "a claim that could be sharper or go less far, a page better placed or merged, a counter-argument worth a line, an analysis that would deepen the answer without changing it",
     rendered: "a few points of misalignment, one inconsistent number format, a slightly long label" },
   none: { means: "an observation that needs no action" },
 });
+/** What a blocking item of argument says it does to the decision, as a critic is asked for it (storyline.mjs `ifUnfixed`). */
+export const BLOCKING_STAKE = "A blocking item (major or blocker) carries `ifUnfixed`: what the decision-maker would wrongly conclude or decide if it stays. Without it the item is recorded as minor";
 const severityText = (parts) => Object.freeze(Object.fromEntries(Object.entries(SEVERITY_SCALE).map(([level, said]) => [level, `${said.means}${parts.some((part) => said[part]) ? `: ${parts.map((part) => said[part]).filter(Boolean).join(", ")}` : ""}`])));
 /** The severity scale as the deck reviewer reads it: every level with its defects of argument and of the drawn page. */
 export const SEVERITY_DEFINITIONS = severityText(["argument", "rendered"]);
@@ -93,7 +102,8 @@ const RATING_SCALE = Object.freeze([
   { at: "9.5+", means: "exceptional", rendered: " across the deck, its least effective page included" },
 ]);
 /** The rating scale in a line, for a prompt: `rendered` adds what the deck reviewer judges on the drawn pages. */
-export const ratingScale = ({ rendered = false } = {}) => `${RATING_SCALE.map((anchor) => `${anchor.at} - ${anchor.means}${rendered ? anchor.rendered ?? "" : ""}`).join("; ")}. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less; ${ACCEPT_RATING} or more says nothing major is open`;
+// `capped: false` gives the scale without its caps: the storyline critic's rating is a second reading beside its items, not a sum of them.
+export const ratingScale = ({ rendered = false, capped = true } = {}) => `${RATING_SCALE.map((anchor) => `${anchor.at} - ${anchor.means}${rendered ? anchor.rendered ?? "" : ""}`).join("; ")}${capped ? `. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less; ${ACCEPT_RATING} or more says nothing major is open` : ""}`;
 
 /**
  * The deck review's rubric, clause by clause, and where each clause is first
@@ -120,7 +130,7 @@ export const RUBRIC_CLAUSES = Object.freeze({
   identity: { scope: "page", clauses: [clause("named companies, products and places carry their visual anchors where the reader needs recognition - logos, product images, maps"), clause("a player is introduced before it is compared", "flow")] },
   sourcing: { scope: "page", clauses: [clause("every number and claim has a source line a reader can look up, with its as-at date"), clause("footnotes define estimates, bases and exclusions")] },
   consistency: { scope: "deck", clauses: [clause("no construction repeated across a window of neighbouring pages"), clause("equal things styled alike"), clause("one term for one thing"), clause("one number format, unit and rounding per measure")] },
-  rhythm: { scope: "deck", clauses: [clause("sections open, develop and close", "flow"), clause("page types vary with the reading task", "flow"), clause("the sequence builds rather than repeats", "spine"), clause("no page previews or re-proves another", "restatement")] },
+  rhythm: { scope: "deck", clauses: [clause("sections open, develop and close", "flow"), clause("page types vary with the reading task", "flow"), clause("the sequence builds rather than repeats", "spine"), clause("no page previews or re-proves another (the executive summary and the close restate the body by design)", "restatement")] },
   bookends: { scope: "deck", clauses: [clause("the executive summary states the answer and the pillars the body proves, with the numbers the body shows", "summary"), clause("the close states the decision, its conditions and the next step, and agrees with the summary", "summary")] },
 });
 /** The rubric's clauses the storyline critic applies under `check`, in the reviewer's words. */
@@ -647,10 +657,13 @@ const SAMPLING_BEFORE = /\b(?:e\.\s?g\.?|eg\.|for example|for instance|such as|i
 const SAMPLING_AFTER = /^[\s,;)]*(?:etc\.?|and others|among others|and more|and so on|\.\.\.|…)/i;
 /** The words the two patterns above look for, as a prompt lists them: before a page id, and after one. */
 export const SAMPLING_WORDS = Object.freeze({ before: ["e.g.", "for example", "for instance", "such as", "including", "notably", "among them"], after: ["etc.", "and others", "among others", "and more", "and so on", "..."] });
-export function samplingProblem(text, ids) {
+export function samplingProblem(text, ids, pages = null) {
   const source = String(text ?? "");
   for (const m of source.matchAll(SAMPLING_BEFORE)) {
-    if (pageRefs(source.slice(m.index, m.index + m[0].length + 60), ids).size) return `lists pages by example ("${m[0]} ..."): name every affected page`;
+    const window = source.slice(m.index, m.index + m[0].length + 60), examples = pageRefs(window, ids);
+    // Pages named as examples beside a list that holds more than them are examples of a complete list, not the list.
+    const exampled = (id) => examples.has(id) || new RegExp(`(?<![\\w-])${escape(id)}(?![\\w-])`).test(window);
+    if (examples.size && !(Array.isArray(pages) && pages.some((id) => !exampled(id)))) return `lists pages by example ("${m[0]} ..."): name every affected page`;
   }
   const token = new RegExp(`(?<![\\w])(?:${[...ids].sort((a, b) => b.length - a.length).map(escape).join("|")})(?!\\w)`, "g");
   for (const m of source.matchAll(token)) if (SAMPLING_AFTER.test(source.slice(m.index + m[0].length, m.index + m[0].length + 20))) return `ends a page list with "etc." or "and others": name every affected page`;
@@ -670,7 +683,7 @@ export function pageListErrors(at, { scope, pages, text, ids, deckScope = "deck"
   if (unknown.length) errors.push(`${at}: unknown page${unknown.length === 1 ? "" : "s"} ${unknown.join(", ")}`);
   if (new Set(pages).size !== pages.length) errors.push(`${at}: a page is listed twice`);
   if (scope === "page" && pages.length !== 1) errors.push(`${at}: a page finding names one page; a defect on several pages is a ${deckScope} finding with every page listed`);
-  const sampled = samplingProblem(text, ids);
+  const sampled = samplingProblem(text, ids, pages);
   if (sampled) errors.push(`${at}: ${sampled}`);
   // A caller that settles its page lists first (settlePageList) has already added the pages the text names: `named: false`.
   if (scope === deckScope && holdNamed) {
@@ -698,7 +711,9 @@ export function severityChange(entry, status, downgrade = () => false) {
 // files the defect it still sees without looking up which open item it is, so
 // the two are one finding and are folded into one (advanceLedger) rather than
 // counted twice or refused.
-const restated = (open, item) => open.find((e) => e.code === item.code && (e.pages || []).some((id) => (item.pages || []).includes(id))) ?? null;
+// A finding about the imported deck and one about the revision's own pages are two findings, whatever they share: folded
+// together, a blocker would take the other's flag and stop blocking.
+const restated = (open, item) => open.find((e) => e.code === item.code && Boolean(e.aboutImported) === Boolean(item.aboutImported) && (e.pages || []).some((id) => (item.pages || []).includes(id))) ?? null;
 const sharedPages = (entry, item) => (item.pages || []).filter((id) => (entry.pages || []).includes(id));
 
 /**
@@ -794,7 +809,9 @@ export function advanceLedger(prior, review, items, { downgrade = () => false, a
       const said = `${item.reason ?? ""}${item.repair ? ` → ${item.repair}` : ""}`.trim();
       // A closing status beside a finding that restates the item is a contradiction the validator refuses; here the item stays open.
       if (!judged.has(was.id) || CLOSED.includes(kept.status)) Object.assign(kept, { status: "not fixed", evidence: said });
+      // What the folded finding's repair touches is the entry's too: a pass scoped by what repairs touch must not lose it.
       Object.assign(kept, { severity: worst([was.severity, kept.severity, item.severity]), pages: [...new Set([...(kept.pages || []), ...(item.pages || [])])],
+        ...(item.touches || kept.touches ? { touches: [...new Set([...(kept.touches || []), ...(item.touches || [])])] } : {}),
         folded: [...(kept.folded || []), { id: item.id, pass, severity: item.severity, pages: item.pages || [], reason: said }], updatedIn: pass });
       continue;
     }

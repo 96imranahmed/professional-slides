@@ -70,7 +70,7 @@
 // Binding runs before the page is compiled, so everything after it reads an
 // ordinary typed page; the dependency gate does not re-check what the runtime
 // wrote, and reads every number that is still typed.
-import { cellText, isTable, plottedValues, resultCells, rowCells } from "./evidence.mjs";
+import { cellText, isTable, judgedCell, plottedValues, resultCells, rowCells } from "./evidence.mjs";
 import { axisOf, isPercentUnit, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
 import { decimalsNeeded, leadingScale, matches, measurementsIn, unitScale } from "./printed-numbers.mjs";
 import { registered } from "./errors.mjs";
@@ -351,7 +351,7 @@ function bindPage(page, registry, bound) {
 function typedMeasurements(ex, filled) {
   const figure = (value) => (typeof value === "number" ? (Number.isFinite(value) ? [String(value)] : []) : measurementsIn(withoutTokens(value), true, String(value ?? "")).map((number) => number.shown));
   if (Array.isArray(ex.rows) && (isTable(ex) || ex.rows.every((row) => rowCells(row).length)))
-    return ex.rows.flatMap((row) => resultCells(row).flatMap((cell) => (cell && typeof cell === "object" ? (typeof cell.value === "number" ? [String(cell.value)] : figure(cellText(cell))) : figure(cell))));
+    return ex.rows.flatMap((row) => resultCells(row).flatMap((cell) => (judgedCell(cell) ? [] : cell && typeof cell === "object" ? (typeof cell.value === "number" ? [String(cell.value)] : figure(cellText(cell))) : figure(cell))));
   if (Array.isArray(ex.items) && !Array.isArray(ex.series))
     return ex.items.flatMap((item) => (!item || typeof item !== "object" || filled.has(item) ? [] : Array.isArray(item.values) ? item.values.filter((value) => typeof value === "number").map(String) : item.value === undefined || item.value === null ? [] : figure(item.value)));
   const plotted = plottedValues(JSON.parse(withoutTokens(JSON.stringify(ex))));

@@ -77,7 +77,7 @@ class MetricColumnVoidTests(unittest.TestCase):
         # the column they carry it to the foot, where the dumbbell stops short.
         from node_probe import run_node
         scene = run_node('''
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const metrics=[{value:'5.9x',label:'ChatGPT visits per Claude visit, Aug 2026',sublabel:'Six-site Similarweb panel'},{value:'+7.6pp',label:'Claude visit share gained in a year',sublabel:'August 2025 to August 2026'},{value:'-21pp',label:'ChatGPT visit share lost in a year',sublabel:'Same six-site panel'}];
 const exhibit={type:'chart.dumbbell',heading:'Web visits and cross-use',unit:'%',categories:['Visits: Claude','Visits: ChatGPT','Claude users also on ChatGPT','ChatGPT users also on Claude'],

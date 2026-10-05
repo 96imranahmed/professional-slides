@@ -246,18 +246,6 @@ class MarvelSpecimenTests(unittest.TestCase):
         # the full deck named none across fifty.
         self.assertEqual(report["statistics"]["withHighlight"], 1)
 
-    def test_the_deck_had_countable_evidence_in_its_own_prose(self):
-        """Twelve issues, two dates, two grosses — all drawn as diagrams.
-
-        The failure was not that the subject had no numbers. It was that nothing
-        asked what would settle each claim until after the shape was picked.
-        """
-        countable = [p for p in self.SPECIMEN if p["settles"]["kind"] != "qualitative"]
-        self.assertEqual(len(countable), 1)
-        prose = " ".join(p["settles"]["what"] for p in self.SPECIMEN)
-        for number in ["twelve-issue", "two dates", "gross"]:
-            self.assertIn(number, prose)
-
 
 if __name__ == "__main__":
     unittest.main()

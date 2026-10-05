@@ -119,10 +119,15 @@ export const cellText = (cell) => {
 const labelInCells = (row) => Array.isArray(row) || row?.label === undefined;
 export const rowLabel = (row) => (labelInCells(row) ? rowCells(row)[0] : row.label);
 export const resultCells = (row) => rowCells(row).slice(labelInCells(row) ? 1 : 0);
-const numericCells = (ex) => ex.rows.reduce((n, row) => n + resultCells(row).filter((c) => /\d/.test(cellText(c))).length, 0);
+// A scorecard's judged cell - a Harvey ball, a RAG state, a lamp, a tick, a dot,
+// an arrow, one of two states - is a grade on the author's scale, not a measurement:
+// no measure holds it, so it is neither bound nor counted as a plotted value.
+export const JUDGED_CELLS = new Set(["harvey", "rag", "lights", "check", "dot", "trend", "binary"]);
+export const judgedCell = (cell) => Boolean(cell) && typeof cell === "object" && JUDGED_CELLS.has(cell.type);
+const numericCells = (ex) => ex.rows.reduce((n, row) => n + resultCells(row).filter((c) => !judgedCell(c) && /\d/.test(cellText(c))).length, 0);
 
-export function plottedValues(ex) {
-  if (Array.isArray(ex)) return ex.reduce((n, e) => n + plottedValues(e), 0);
+export function plottedValues(ex, { printed = false } = {}) {
+  if (Array.isArray(ex)) return ex.reduce((n, e) => n + plottedValues(e, { printed }), 0);
   if (!ex || typeof ex !== "object") return 0;
   const type = String(ex.type ?? "");
   if (type === "chart-group") return (ex.charts || []).reduce((n, c) => n + plottedValues({ type: c?.component, ...(c?.props || {}) }), 0);
@@ -135,7 +140,9 @@ export function plottedValues(ex) {
     return ex.series.reduce((n, s) => n + (Array.isArray(s?.points) ? s.points.length : counted(s?.values)), 0) + counted(ex.targets);
   if (Array.isArray(ex.points)) return ex.points.length;
   if (Array.isArray(ex.values)) return ex.values.flat().filter(finite).length;
-  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) ? 1 : 0), 0);
+  // `printed`: a figure bound and printed ("29%") is a number the reader reads as a typed one (29) is - the evidence floor
+  // counts both, so a page drawn at the spine and laid out reads the same; the binding gates count only what was typed.
+  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) || (printed && typeof item?.value === "string" && /\d/.test(item.value)) ? 1 : 0), 0);
   if (Array.isArray(ex.markers)) return ex.markers.length;
   return 0;
 }

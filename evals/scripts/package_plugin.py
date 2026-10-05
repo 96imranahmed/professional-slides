@@ -5,8 +5,9 @@
 
 The package is an allowlist: a file ships only when `shipped()` names it. What
 a developer checkout accumulates - evals/, build outputs, node_modules, the
-Node dev manifest, test-only runtime modules, authoring logs, eval fixtures -
-stays out without anyone having to remember to exclude it.
+Node dev manifest, authoring logs, eval fixtures - stays out without anyone
+having to remember to exclude it. Code only the suite uses lives under
+evals/support/, never in the runtime.
 """
 from pathlib import Path, PurePosixPath
 import argparse
@@ -30,12 +31,6 @@ ROOT_FILES = {
 MANIFESTS = {'plugin.json', '.codex-plugin/plugin.json', '.claude-plugin/plugin.json'}
 IMAGES = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
 
-# Runtime modules only the eval suite imports. A shipped module that starts
-# importing one of these fails test_plugin_distribution's import check, which
-# is the prompt to take it off this list.
-TEST_ONLY_RUNTIME = {
-    'fixtures.mjs',
-}
 # Example files that exist to exercise the suite rather than to teach an author.
 EVAL_EXAMPLES = {'gallery-acceptance.deck.json'}
 
@@ -62,7 +57,7 @@ def shipped(rel: PurePosixPath) -> bool:
     if area == 'references':
         return rel.suffix in {'.md', '.json'}
     if area == 'runtime':
-        return rel.suffix in {'.mjs', '.py', '.json', '.md'} and inner.as_posix() not in TEST_ONLY_RUNTIME
+        return rel.suffix in {'.mjs', '.py', '.json', '.md'}
     if area == 'examples':
         if inner.parts[0] == 'assets':
             return rel.suffix in IMAGES
@@ -71,6 +66,20 @@ def shipped(rel: PurePosixPath) -> bool:
         return len(inner.parts) == 1 and rel.suffix == '.json' and rel.name not in EVAL_EXAMPLES
     if area == 'assets':
         return rel.suffix in IMAGES | {'.json'} or rel.name.startswith('LICENSE')
+    return False
+
+
+def compiled_example(source: Path, rel: PurePosixPath) -> bool:
+    """A deck spec, plan, content plan or fit cache author-deck.mjs wrote beside an example's pages file.
+
+    An example that ships as `<id>.pages.json` ships as that alone: what
+    compiling it writes is the author's output, made again on every run."""
+    parts = rel.parts
+    if len(parts) != 4 or parts[2] != 'examples':
+        return False
+    for suffix in ('.deck.json', '.plan.json', '.content.json', '.author-cache.json'):
+        if rel.name.endswith(suffix):
+            return (source / rel).with_name(rel.name[:-len(suffix)] + '.pages.json').is_file()
     return False
 
 
@@ -87,7 +96,8 @@ def package(source: Path, destination: Path):
     files = []
     for p in source.rglob('*'):
         rel = p.relative_to(source)
-        if p.is_relative_to(destination) or not shipped(PurePosixPath(rel.as_posix())):
+        posix = PurePosixPath(rel.as_posix())
+        if p.is_relative_to(destination) or not shipped(posix) or compiled_example(source, posix):
             continue
         if p.is_symlink():
             raise ValueError(f'Symlinks must not enter the distributable: {rel}')

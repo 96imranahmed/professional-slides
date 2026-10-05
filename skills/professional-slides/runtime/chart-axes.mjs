@@ -44,7 +44,7 @@ export const plotHeadroom = (type) => (horizontalChart(type) ? BAR_HEADROOM : VA
 /**
  * The band above a plot for its legend - 24px for the first row, 26 for each
  * row it wraps to - and its headroom. chartFrame reserves it, and a row of
- * peer charts shares the tallest (compose.mjs): the two must agree, or peers
+ * peer charts shares the tallest (compose-arrangements.mjs): the two must agree, or peers
  * handed the row's band start their plots on different lines.
  */
 export const topBand = (legendRows, headroom = VALUE_HEADROOM) => (legendRows ? 24 + headroom + (legendRows - 1) * 26 : headroom);

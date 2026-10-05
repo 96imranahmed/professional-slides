@@ -122,6 +122,20 @@ def without_furniture(line: str, runs: set[tuple[str, ...]] | None) -> str:
     return line if len(kept) == len(stretches) else "  ".join(kept)
 
 
+def without_footer(lines: list[str]) -> list[str]:
+    """The lines without the source and note lines. A source or note that wraps runs on to the rows under it with no
+    blank row between, and all of it is the footer: dropping only its first line counts the rest as body."""
+    out, footer = [], False
+    for line in lines:
+        if not line.strip():
+            footer = False
+        elif SOURCE_LINE.match(line) or footer:
+            footer = True
+            continue
+        out.append(line)
+    return out
+
+
 def page_blocks(text: str, header: set[str] | None = None, furniture: set[tuple[str, ...]] | None = None) -> list[int]:
     """Words per text block, the title, page numbers and source lines removed,
     and with them the tracker the runtime set (`furniture`, the page's
@@ -130,11 +144,11 @@ def page_blocks(text: str, header: set[str] | None = None, furniture: set[tuple[
     labels are blocks where they run to three words. The tracker is taken out
     of the run it stood in and the run is left whole."""
     kept = []
-    for line in strip_header(text.split("\n"), header):
+    for line in without_footer(strip_header(text.split("\n"), header)):
         if not line.strip():
             kept.append("")
             continue
-        if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
+        if PAGE_NUMBER.match(line):
             continue
         rest = without_furniture(line, furniture)
         if rest.strip():
@@ -249,8 +263,8 @@ def scene_fragmentation(scene: dict) -> dict:
 
 def body_words(text: str, header: set[str] | None = None) -> int:
     """Body words as the reading-task bank counts them: every word but the title and source lines."""
-    lines = [l for l in strip_header(text.split("\n"), header) if l.strip() and not PAGE_NUMBER.match(l)]
-    return max(0, sum(words(l) for l in lines) - sum(words(l) for l in lines if SOURCE_LINE.match(l)))
+    lines = [l for l in without_footer(strip_header(text.split("\n"), header)) if l.strip() and not PAGE_NUMBER.match(l)]
+    return sum(words(l) for l in lines)
 
 
 # The standfirst is the title's own line (planRole in derive-content.mjs), so

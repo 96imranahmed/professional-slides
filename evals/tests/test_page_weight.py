@@ -9,7 +9,7 @@ class PageWeightTests(unittest.TestCase):
     def test_implication_marker_and_insight_column(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 const registry=createRegistry();
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
@@ -52,7 +52,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node('''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const registry=createRegistry();
 const title=registry.get('chart-title');
 const props={heading:'Revenue by business line',unit:'$B'};
@@ -105,7 +105,7 @@ console.log(JSON.stringify({ok:true}));
     def test_fill_levels(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {resolveFill,composeSlide,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {resolveFill,composeSlide,toDeckPlan} from './evals/support/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 // The fill follows the density unless the deck names one.
 assert.equal(resolveFill({}),'balanced');

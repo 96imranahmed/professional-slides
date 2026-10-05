@@ -10,7 +10,7 @@ class PageFurnitureTests(unittest.TestCase):
     def test_side_panel_tones_and_photo_strips(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items||[]){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 // A dark side panel is a section with the dark treatment and an inverse list.
@@ -35,7 +35,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {normalizePeriods,normalizeEvents,periodBandHeight} from './skills/professional-slides/runtime/charts.mjs';
-import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {changeFromContent} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 const cats=['2019','2020','2021','2022'];
 assert.deepEqual(normalizePeriods({periods:[{from:'2019',to:'2020',label:'Boom'},{from:'2021',to:'2022',label:'Bust'}]},cats).map(p=>[p.from,p.to]),[[0,1],[2,3]]);
@@ -60,7 +60,7 @@ console.log(JSON.stringify({ok:true}));
     def test_highlight_row_and_line_budget_pagination(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,paginateTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,paginateTable} from './evals/support/compose.mjs';
 const rows=Array.from({length:12},(_,i)=>[`City ${i+1}`,String(100-i),String(i+1)]);
 const styled=styleTable({type:'table',columns:['City','Delay','Rank'],rows,highlightRow:'City 3'});
 assert.equal(styled.rows[2].style,'accented');
@@ -81,7 +81,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,agendaPages} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,agendaPages} from './evals/support/compose.mjs';
 const registry=createRegistry();
 const frame={x:0,y:0,width:600,height:360};
 // Unit chart: one dot per count, a grey remainder for percent blocks.
@@ -130,7 +130,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,changeFromContent} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 const registry=createRegistry();
 // Paired bars: one panel per series, the later panels without category labels, drawn not native.
@@ -168,7 +168,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,sectionTabs,styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,sectionTabs,styleTable} from './evals/support/compose.mjs';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 const registry=createRegistry();
 // Metrics grid: nine tiles become three rows of three, prominent, filling the frame.

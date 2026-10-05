@@ -142,7 +142,7 @@ class TrackerChoiceTests(unittest.TestCase):
                   points:[{{text:'A developed point that carries this page on its own.'}}]}}'''
             for i, t in enumerate(titles))
         return run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[
   {{id:'sum',title:'The answer is stated first',role:'executive-summary',layout:'text',
     points:[{{text:'A finding that carries the page and says something.'}}]}},
@@ -189,7 +189,7 @@ class TableDensityTests(unittest.TestCase):
 
     def densest(self, rows, palette):
         sizes = run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 import {{planDeck}} from './skills/professional-slides/runtime/planner.mjs';
 const deck = planDeck(toDeckPlan({{schema:'professional-slides.deck/v3', id:'t',
   palette:{json.dumps(palette)}, density:'pre-read', slides:[{{
@@ -227,7 +227,7 @@ class HighlightedVerdictTests(unittest.TestCase):
     def verdict_column(self, highlight):
         """The last cell of every row, as the composer leaves it."""
         return run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
   id:'p', title:'A scorecard whose last column states the verdict',
   layout:'exhibit-top', highlight:{json.dumps(highlight)},
@@ -257,7 +257,7 @@ console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
 
     def test_a_highlight_on_an_ordinary_cell_still_marks_it(self):
         marked = run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
   id:'p', title:'A scorecard whose last column states the verdict',
   layout:'exhibit-top', highlight:'Lowest critic score',

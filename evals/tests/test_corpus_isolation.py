@@ -31,7 +31,7 @@ DOCUMENT_NAME = re.compile(r"[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf", re.I)
 FIRMS = re.compile(r"\b(?:mckinsey|bcg|bain|deloitte|accenture|kearney|booz|kpmg|pwc|l\.e\.k|oliver wyman)\b", re.I)
 # The directories that describe the calibration set or record runs against it.
 # Specimens and their decks are about their own subjects and may name anyone.
-CALIBRATION_FACING = ('evals/calibration', 'evals/quality', 'evals/client-deck-benchmark.md', 'evals/README.md')
+CALIBRATION_FACING = ('evals/calibration', 'evals/quality', 'evals/README.md')
 
 
 def evals_text_files():

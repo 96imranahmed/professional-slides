@@ -49,10 +49,11 @@ class TitleBandTests(unittest.TestCase):
         result = run_node(WORKED + '''
 const typed = structuredClone(worked.pages.filter((p) => p.type).slice(0, 8));
 // One page with both lengths wrong; one with a long subtitle whose first refusal is something else.
-typed[2].title = `${typed[2].title} and then some more words that take it well past twelve`; typed[2].subtitle = LONG;
+typed[2].title = `${typed[2].title} and then some more words that take it well past fifteen`; typed[2].subtitle = LONG;
 typed[4].subtitle = LONG; typed[4].takeaway = 7;
 const said = (mode) => Object.fromEntries(compileDeck(deckOf(structuredClone(typed)), { partial: true, ...mode }).failed.filter((f) => [typed[2].id, typed[4].id].includes(f.id)).map((f) => [f.id === typed[2].id ? 'both' : 'other', f.message]));
-// A revision recorded before the twelve-word title hears a title inside the old bar of fourteen as advice, and is still told its subtitle is long.
+// A title inside fifteen words is no version's refusal - version 3 lowered the bar to twelve, and it has been raised past the old fourteen
+// since - and a revision under any version is still told its subtitle is long.
 const thirteen = { title: 'Revenue grew faster than cost in every one of the last eight fiscal years', subtitle: LONG };
 const older = titleBandProblems(thirteen, 'p', { rules: { workflow: 'existing_deck_revision', rulesVersion: 2 } });
 const current = titleBandProblems(thirteen, 'p', { rules: { workflow: 'existing_deck_revision', rulesVersion: 6 } });
@@ -64,8 +65,8 @@ console.log(JSON.stringify({ full: said({}), draft: said({ draft: true }), older
             self.assertIn("; and its subtitle runs to 18 words; keep it to 16 or fewer", both, mode)
             self.assertIn("`takeaway` is the closing sentence", other, mode)
             self.assertIn("Also refused on this page, so mend it in the same edit: the subtitle runs to 18 words", other, mode)
-        self.assertEqual(result["older"], [["p: the subtitle runs to"], 1])
-        self.assertEqual(result["current"], 2)
+        self.assertEqual(result["older"], [["p: the subtitle runs to"], 0])
+        self.assertEqual(result["current"], 1)
 
 
 class InsightLogTests(unittest.TestCase):
@@ -108,11 +109,11 @@ console.log(JSON.stringify({{ bare: await run({{}}, false), filed: await run({{}
 ''')
         self.assertEqual(len(result["bare"]), 1)
         severity, cls, count, repair = result["bare"][0]
-        self.assertEqual([severity, cls, count], ["advisory", "S", 6])
-        self.assertIn('6 insights name sources that are not files under sources/ (i-loans: "sources/i-loans.csv"', repair)
-        self.assertIn("the storyline critic is told the log has 6 unsourced findings", repair)
+        self.assertEqual([severity, cls, count], ["advisory", "S", 7])
+        self.assertIn('7 insights name sources that are not files under sources/ (i-loans: "sources/i-loans.csv"', repair)
+        self.assertIn("the storyline critic is told the log has 7 unsourced findings", repair)
         self.assertEqual(result["filed"], [])
-        self.assertEqual([entry[:3] for entry in result["revision"]], [["advisory", "S", 6]])
+        self.assertEqual([entry[:3] for entry in result["revision"]], [["advisory", "S", 7]])
         self.assertEqual(result["named"], [{"id": "a", "none": False, "missing": ["Annual report 2025"]}, {"id": "b", "none": True, "missing": []}])
 
 
