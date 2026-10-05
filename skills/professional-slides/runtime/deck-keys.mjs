@@ -33,10 +33,11 @@ const DECK_KEYS = Object.freeze({
   inventory: key("string (a path)", ["string"], "a revision's source inventory, <id>.inventory.json beside the pages file, as import-deck.py wrote it"),
   purpose: key("\"evaluation\" | \"catalogue\"", ["string"], "an evaluation deck is held to 50 rendered pages; a catalogue makes no argument and skips the storyline gate - never set on a deck that argues something"),
   rulesVersion: key("number", ["number"], "the rules version the deck was authored under; the compile stamps the current one where it is absent"),
+  rulesVersionReason: key("a sentence", ["string"], "on a revision that records a `rulesVersion` below the one its import stamped: why the deck is held to the older rules, for the reviewer to check"),
   // the brief: what the reviews judge against
   request: key("string", ["string"], "the user's request, verbatim; a new deck without it is refused"),
   requestProvenance: key("\"verbatim\" | \"reconstructed\" | \"paraphrased\"", ["string"], "how `request` came to be; the reviews are told"),
-  evidenceScope: key("{ retrieval: \"open\" | \"closed\", note, quote }", ["object"], "closed where only the evidence supplied may be used, quoting the words of the request that set the limit"),
+  evidenceScope: key("{ retrieval: \"open\" | \"closed\", note, quote, source }", ["object"], "closed where only the evidence supplied may be used, quoting the words that set the limit: from the `request` where it is verbatim, and from the file named in `source` (the brief, saved as text beside the pages file) where the request is reconstructed or paraphrased"),
   audience: key("string", ["string"], "who reads the deck, and on what occasion"),
   decision: key("string", ["string"], "the decision the deck is for"),
   question: key("string", ["string"], "the governing question the answer answers"),

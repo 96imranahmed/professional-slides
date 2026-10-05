@@ -2,15 +2,33 @@
 // (`metricsStrip`), or, when the exhibit keeps its own height and has few
 // rows, a column of tiles beside it (`metricsBesideExhibit`, `metricsColumn`).
 import { REGISTRY } from "./registry.mjs";
+import { CONTENT_FRAME, token, tokenValue } from "./core.mjs";
+import { metricHeight } from "./panels.mjs";
 import { SIDEWAYS_CATEGORIES } from "./compose-charts.mjs";
 import { BRIDGE_VARIANTS } from "./compose-points.mjs";
 
 /** A KPI strip: equal tiles in a row, hugging one tile height. */
 /** `metricsTone` on the page sets every tile: dark, tint, ink (black tiles) or rule (accent values behind hairlines). */
+// How far a strip grows past its usual height to hold a tile whose label and sublabel wrap: past this it is a band of prose.
+const STRIP_GROWTH = 1.5;
 export function metricsStrip(metrics, id, tone) {
   const tiles = metrics.map((m) => (typeof m === "string" ? { value: m } : m));
   const prominent = tone === "ink" || tone === "rule";
-  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: prominent ? 124 : tone === "ring" ? 150 : 104 }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: { ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m }, size: { width: { fr: 1 }, height: "fill" } })) };
+  const propsOf = (m) => ({ ...(tone ? { tone } : {}), ...(prominent ? { variant: "prominent" } : {}), ...(tiles.length > 1 ? { valign: "top" } : {}), ...m });
+  const usual = prominent ? 124 : tone === "ring" ? 150 : 104;
+  // The strip is as tall as its tallest tile needs at the width this many tiles leave each: five tiles with sublabels wrap
+  // where three do not, and a strip of one fixed height refused them as "too short" with nothing the author could change.
+  const width = (CONTENT_FRAME.width - tokenValue(token("space.4")) * (tiles.length - 1)) / tiles.length;
+  // What a tile's own check holds it to: its value, label, sublabel and delta with the gaps between them, the tile's padding
+  // aside (panels.mjs metricNodes) - so a strip that held its tiles at the usual height still stands at it.
+  const pad = (m) => (propsOf(m).tone === "hero" ? 0 : tokenValue(token("space.3")));
+  const heights = tone === "ring" ? [] : tiles.map((m) => { try { return Math.ceil(metricHeight(width, propsOf(m)) - 2 * pad(m)); } catch { return 0; } });
+  const needed = Math.max(usual, ...heights), most = Math.floor(usual * STRIP_GROWTH);
+  if (needed > most) {
+    const tall = tiles[heights.indexOf(needed)];
+    throw new Error(`A strip of ${tiles.length} tiles gives each ${Math.floor(width)}px, and the tile "${String(tall.label ?? tall.value)}" needs ${needed}px for its value, label${tall.sublabel ? " and sublabel" : ""}${tall.delta ? " and delta" : ""} where a strip grows to ${most}px: shorten its label${tall.sublabel ? " or sublabel (or drop the sublabels)" : ""}, or set fewer tiles - ${tiles.length - 1} leave each ${Math.floor((CONTENT_FRAME.width - tokenValue(token("space.4")) * (tiles.length - 2)) / Math.max(1, tiles.length - 1))}px`);
+  }
+  return { id, layout: "flow.row", size: { width: { fr: 1 }, height: needed }, items: tiles.map((m, i) => ({ id: `${id}-${i}`, component: "metric", props: propsOf(m), size: { width: { fr: 1 }, height: "fill" } })) };
 }
 
 /**

@@ -15,11 +15,11 @@ from node_probe import run_node
 FINDINGS = '''
 const findings = [
   { id: 'F1', scope: 'page', slides: ['p04'], dimension: 'chart', code: 'BROKEN_GEOMETRY', severity: 'major', reason: 'The FY26 callout sits on top of the 48.3 data label.',
-    repair: 'Move the callout above the plot so the value label shows.',
+    repair: 'Move the callout above the plot so the value label shows.', touches: ['layout'],
     checkable: { rule: 'A chart callout never overlaps a data label', measure: 'Intersection area of each callout box with each value-label box; any overlap fails' } },
   { id: 'F2', scope: 'page', slides: ['p09'], dimension: 'argument', code: 'MISSING_ARGUMENT', severity: 'major', reason: 'The page never says why the bridge matters for the plan.',
-    repair: 'Add a closing sentence that states what the bridge implies for the plan.', checkable: null },
-  { id: 'F3', scope: 'page', slides: ['p11'], dimension: 'text', code: 'EDITORIAL', severity: 'minor', reason: 'The word "loop" is used twice in the title.', repair: 'Cut the second "loop" from the title.' },
+    repair: 'Add a closing sentence that states what the bridge implies for the plan.', touches: ['copy'], checkable: null },
+  { id: 'F3', scope: 'page', slides: ['p11'], dimension: 'text', code: 'EDITORIAL', severity: 'minor', reason: 'The word "loop" is used twice in the title.', repair: 'Cut the second "loop" from the title.', touches: ['title'] },
 ];
 '''
 

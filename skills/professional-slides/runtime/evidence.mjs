@@ -89,6 +89,10 @@ export function breadthProblem(insight) {
   if (!Object.keys(counts).length)
     return `${id} (${insight.shape}): record how wide its data is - \`breadth: { ${BREADTH_KEYS[insight.shape].map((k) => `${k}: n`).join(", ")} }\` or the \`data\` itself - so the pages resting on it can be held to what a ${insight.shape} is: ${shape.means}`;
   if (shape.needs(counts)) return null;
+  // A breadth recorded under another shape's key says nothing this shape reads: the repair is the key, not more research.
+  const read = BREADTH_KEYS[insight.shape], other = Object.keys(counts).filter((key) => !read.includes(key));
+  if (other.length && !read.some((key) => key in counts))
+    return `${id} (${insight.shape}): \`breadth\` records ${other.map((key) => `\`${key}\``).join(", ")}, and a ${insight.shape} is counted in ${read.map((key) => `\`${key}\``).join(" and ")} - ${shape.means}. Write \`breadth: { ${read.map((key) => `${key}: n`).join(", ")} }\`${other.length === 1 && read.length === 1 ? ` (the ${counts[other[0]]} recorded as ${other[0]} ${counts[other[0]] === 1 ? "is its part" : `are its ${read[0]}`}, if that is what they count)` : ""}, or leave \`breadth\` out and give the \`data\` itself`;
   return `${id} (${insight.shape}): the data has ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}; a ${insight.shape} is ${shape.means}. ` +
     `That is a research task before any page is written: find ${shape.deepen}. If the data does not exist, record the shape it has (\`fact\`) and carry it on a numbers page`;
 }

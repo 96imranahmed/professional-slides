@@ -57,7 +57,7 @@ export const DEPENDENCY_CODES = Object.freeze({
   PROOF_OFF_CLAIM: "an exhibit offered as proof plots no measure of the page's claim",
   PROOF_MISSING: "a page whose exhibits are all context: nothing on it proves the claim",
   CONTEXT_UNEXPLAINED: "a context exhibit that does not say why it is on the page",
-  SOURCE_UNCITED: "the page's citation leaves out a source its exhibits or its claim rest on, or is typed where it can be derived",
+  SOURCE_UNCITED: "the page's citation leaves out a source the measures it shows are cited to, or is typed where it can be derived",
   RELATION_UNDECLARED: "two measures of the claim in one unit sit in separate exhibits and the page does not say what the reader is to read between them",
   RELATION_SPLIT: "the claim asserts a relation between two measures and no exhibit shows them on one basis",
 });
@@ -276,12 +276,18 @@ function basisFindings(id, what, item, basis, { registry, evidence, plots, bound
 
 /**
  * The citation keys a page's dependencies need: every `cite` key of the
- * insights its claim, its exhibits and the numbers bound into its text
- * (`printed`, their measures) rest on (an analysis carries its inputs').
- * Empty when those insights name no registry key.
+ * measures it shows - the ones its exhibits and figures name in a `basis`,
+ * and the ones bound into its text (`printed`) - and of the measures its
+ * claim is about (`settles.measures`), each measure's own where it records
+ * one, otherwise its insight's (measures.mjs measureRegistry; an analysis
+ * carries its inputs'). A claim rests on the record of what it is about
+ * whether or not the page draws it: a title that says orders outgrew revenue
+ * over a chart of revenue alone still owes the reader the orders' source.
+ * What is not asked is the rest of an insight - a measure the page neither
+ * shows nor claims. Empty when those measures name no registry key.
  */
 export function requiredCitations(page, registry, printed = []) {
-  const refs = [...(Array.isArray(page.settles?.measures) ? page.settles.measures : []), ...exhibitsOf(page).flatMap((ex) => refsOf(ex.basis)), ...metricsOf(page).flatMap((m) => refsOf(m.basis)), ...printed];
+  const refs = [...exhibitsOf(page).flatMap((ex) => refsOf(ex.basis)), ...metricsOf(page).flatMap((m) => refsOf(m.basis)), ...printed, ...(Array.isArray(page.settles?.measures) ? page.settles.measures : [])].filter((ref) => registry.has(ref));
   return [...new Set(refs.flatMap((ref) => registry.get(ref)?.cite || []))];
 }
 
@@ -349,21 +355,49 @@ const NOT_PROSE = new Set(["id", "type", "form", "kind", "commentary", "why", "a
  * label ("FY26", "Q3", "M25", "500-4", "15th").
  */
 function untracedNumbers(page, pool) {
+  return typedNumbers(page).filter(({ number }) => !pool.some((m) => traces(number, m))).map(({ field, number }) => ({ field, shown: number.shown }));
+}
+
+// With no measure named, a number is matched across every measure the page rests on, so the units must agree: a
+// percentage states a percentage (or a recorded ratio or fraction, a hundred times over), and money or a scaled count states
+// neither. A number that prints a scale is held to the scale the unit names ("1,600bn" is not 1.6 kept in billions).
+const tracesValue = (number, m, value) => {
+  const percent = percentUnit(m.unit);
+  if (percent && (number.scaled || number.currency)) return false;
+  if (!number.percent || percent) return states(number, value, { unit: m.unit });
+  return isRatioUnit(m.unit) && typeof value === "number" && states({ ...number, percent: false, scaled: false, scale: null }, value * 100);
+};
+const traces = (number, m) => valuesOf(m).some((value) => tracesValue(number, m, value));
+
+/**
+ * The cells of `measures` (registry entries) a typed number states: each
+ * `{ ref, label, value }`, the period or member whose recorded value the
+ * number is at the precision it is printed (null for a single value). A
+ * number that states one cell and no other has said what it is.
+ */
+export function statedCells(number, measures) {
+  return measures.flatMap((m) => { const axis = axisOf(m); return valuesOf(m).flatMap((value, at) => (typeof value === "number" && tracesValue(number, m, value) ? [{ ref: m.ref, label: axis.kind === "scalar" ? null : axis.labels[at], value }] : [])); });
+}
+
+/** The measures a page's typed numbers can state: those of the insights it rests on and what they were computed from. */
+export function pagePool(page, registry) {
+  const evidence = Array.isArray(page?.evidence) ? page.evidence : [];
+  const rested = [...registry.values()].filter((m) => evidence.includes(m.owner));
+  return [...new Set([...rested, ...rested.flatMap((m) => [...lineage(m.ref, registry)].map((ref) => registry.get(ref)).filter(Boolean))])];
+}
+
+/**
+ * Every piece of text a page says to its reader, with where it stands:
+ * `[{ field, text, written, figure }]` - `text` with what the runtime wrote
+ * (tokens) taken out, `written` as it stands, `figure` where the text is a
+ * figure on its own (a table cell, a tile's value). What a page rests on and
+ * how it is built, and the names along an axis, are not text of this kind
+ * (NOT_PROSE); nor is a metric's `value` where its `basis` already holds it to
+ * a measure.
+ */
+export function pageTexts(page) {
   const found = [];
-  // With no measure named, a number is matched across every measure the page rests on, so the units must agree: a
-  // percentage states a percentage (or a recorded ratio or fraction, a hundred times over), and money or a scaled count states
-  // neither. A number that prints a scale is held to the scale the unit names ("1,600bn" is not 1.6 kept in billions).
-  const traces = (number, m) => {
-    const percent = percentUnit(m.unit);
-    if (percent && (number.scaled || number.currency)) return false;
-    if (!number.percent || percent) return statesMeasure(number, m);
-    return isRatioUnit(m.unit) && valuesOf(m).some((v) => typeof v === "number" && states({ ...number, percent: false, scaled: false, scale: null }, v * 100));
-  };
-  const stated = (number) => pool.some((m) => traces(number, m));
-  const read = (value, field, figure) => {
-    // A figure on its own is the one number its text holds, with no word beside it: "648m", "37", "~50" - not "104 of 219 clinics" or "Line 2" (printed-numbers.mjs measurementsIn).
-    for (const number of measurementsIn(typeof value === "number" ? String(value) : withoutTokens(value), figure, String(value))) if (!stated(number)) found.push({ field, shown: number.shown });
-  };
+  const read = (value, field, figure) => found.push({ field, text: typeof value === "number" ? String(value) : withoutTokens(value), written: String(value), figure });
   const walk = (node, field, figure) => {
     if (typeof node === "string" || (typeof node === "number" && figure)) return read(node, field, figure);
     if (!node || typeof node !== "object") return;
@@ -380,6 +414,53 @@ function untracedNumbers(page, pool) {
   };
   walk(page, "", false);
   return found;
+}
+
+/**
+ * Every number typed on a page as a measurement, with where it stands:
+ * `[{ field, number }]` (printed-numbers.mjs measurementsIn: a figure on its
+ * own is the one number its text holds, with no word beside it - "648m",
+ * "37", "~50" - not "104 of 219 clinics" or "Line 2").
+ */
+export const typedNumbers = (page) => pageTexts(page).flatMap(({ field, text, written, figure }) => measurementsIn(text, figure, written).map((number) => ({ field, number })));
+
+/**
+ * The mark each page's own claim names on its charts: where the title states
+ * a number of a measure at one period or member - by a token, or typed and
+ * traced to exactly one such value of the measures the page rests on - and a
+ * chart of the page plots that measure over a category of that name, the
+ * category is what the title is about, and a highlight on it marks the claim
+ * on the plot. A Map from page id to `[{ exhibit, at, category, mark, because
+ * }]`: `exhibit` the chart as the page names it, `at` its place among the
+ * page's exhibits, `mark` the JSON to write on it. Nothing is written: the
+ * author is told the exact mark, and what the page says about it stays theirs.
+ * Empty without measures, and for a title that states no such number.
+ */
+export function claimMarks(doc, insights) {
+  const registry = measureRegistry(insights), out = new Map();
+  if (!registry.size) return out;
+  const { doc: written, bound } = bindDeck(doc, insights);
+  const authored = [...(doc.pages || []), ...(doc.appendix || [])];
+  [...(written.pages || []), ...(written.appendix || [])].forEach((page, index) => {
+    if (!page || typeof page !== "object" || !page.type) return;
+    const id = String(page.id ?? `page-${index + 1}`);
+    if (bound.failed.has(id)) return;
+    const pool = pagePool(page, registry);
+    // What the title states: each token's measure and label, and each typed number that is one value of one measure.
+    const stated = [...(bound.stated.get(page) ?? []).filter((entry) => entry.how === "token" && /`title`$/.test(entry.field)).map((entry) => ({ ref: entry.ref, label: entry.label, shown: entry.shown })),
+      ...typedNumbers({ title: authored[index]?.title }).flatMap(({ number }) => { const cells = statedCells(number, pool); return new Set(cells.map((cell) => `${cell.ref}@${cell.label}`)).size === 1 ? [{ ...cells[0], shown: number.shown }] : []; })]
+      .filter((cell) => cell.label !== null && cell.label !== undefined);
+    const marks = [];
+    exhibitsOf(page).forEach((ex, at) => {
+      const categories = (Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : []).map(String), refs = refsOf(ex.basis);
+      const named = stated.filter((cell) => refs.includes(cell.ref) && categories.includes(String(cell.label)) && !(ex.highlights || []).some((mark) => String(mark?.category) === String(cell.label)));
+      const each = [...new Map(named.map((cell) => [String(cell.label), cell])).values()];
+      if (each.length) marks.push({ exhibit: nameOf(ex, at), at, category: each.map((cell) => String(cell.label)), mark: { highlights: [...(ex.highlights || []), ...each.map((cell) => ({ category: String(cell.label) }))] },
+        because: each.map((cell) => `the title's ${cell.shown} is ${cell.ref} at ${cell.label}`).join("; ") });
+    });
+    if (marks.length) out.set(id, marks);
+  });
+  return out;
 }
 
 /**
@@ -405,8 +486,7 @@ export function dependencyFindings(doc, insights) {
     const add = (code, repair, measured) => out.push({ code: registered(DEPENDENCY_CODES, code), id, severity: "blocker", ...(measured === undefined ? {} : { measured }), repair: `${id}: ${repair}` });
     const evidence = Array.isArray(page.evidence) ? page.evidence : [];
     // The measures a typed number can state: those of the insights the page rests on, what they were computed from, and the assumptions they state.
-    const rested = [...registry.values()].filter((m) => evidence.includes(m.owner));
-    const pool = [...new Set([...rested, ...rested.flatMap((m) => [...lineage(m.ref, registry)].map((ref) => registry.get(ref)).filter(Boolean))]),
+    const pool = [...pagePool(page, registry),
       ...evidence.flatMap((owner) => (insights.get?.(owner)?.assumptions || []).filter((a) => typeof a?.value === "number").map((a) => ({ value: a.value, unit: a.unit })))];
     const untraced = pool.length ? untracedNumbers(authored[index], pool) : [];
     if (untraced.length) out.push({ code: registered(BINDING_CODES, "NUMBER_UNTRACED"), id, severity: "advisory", measured: untraced.map((u) => `${u.field}: ${u.shown}`),
@@ -421,7 +501,7 @@ export function dependencyFindings(doc, insights) {
     if (!numeric.some(Boolean) && !declared) continue;
     exhibits.forEach((ex, i) => {
       // An exhibit whose every measurement is written by reference has its basis written from the references (bind.mjs); one that also types a measurement says what those are.
-      const mixed = bound.shown.get(ex)?.size && bound.typed.get(ex)?.length ? `${nameOf(ex, i)} writes numbers of ${[...bound.shown.get(ex)].join(", ")} by reference and still types ${bound.typed.get(ex).slice(0, 6).join(", ")}${bound.typed.get(ex).length > 6 ? ", ..." : ""}: write ${bound.typed.get(ex).length === 1 ? "that" : "those"} by reference too (\`{{<insight id>/<measure>@<period or member> | 0.0}}\`, a figure's \`measure\`) and the basis is written from the references, or give the exhibit \`basis: { measures: [...], role }\` naming every measure it shows. A year, a period label, an ordinal and a count in a phrase are not measurements and need neither` : null;
+      const mixed = bound.shown.get(ex)?.size && bound.typed.get(ex)?.length ? `${nameOf(ex, i)} writes numbers of ${[...bound.shown.get(ex)].join(", ")} by reference and still types ${bound.typed.get(ex).slice(0, 6).join(", ")}${bound.typed.get(ex).length > 6 ? ", ..." : ""}: write ${bound.typed.get(ex).length === 1 ? "that" : "those"} by reference too (\`{{<insight id>/<measure>@<period or member> | 0.0}}\`, a figure's \`measure\`) and the basis is written from the references, or give the exhibit \`basis: { measures: [...], role }\` naming every measure it shows. A change, a gap or a share worked out from recorded measures is an analysis: add it to the analysis plan (\`growth\`, \`gap\`, \`share\`) and print its result by its own token, so the number is computed and not typed. A year, a period label, an ordinal and a count in a phrase are not measurements and need neither` : null;
       if (!ex.basis && mixed) { add("BASIS_MISSING", mixed, bound.typed.get(ex)); return; }
       if (!ex.basis) { if (numeric[i]) add("BASIS_MISSING", `${nameOf(ex, i)} plots ${plottedValues(ex)} number${plottedValues(ex) === 1 ? "" : "s"} and names no measure: name the measures in its series and let the runtime write the values - \`series: [{ measure: "<insight id>/<measure>", name }]\` - or keep the typed values and give it \`basis: { measures: ["<insight id>/<measure>"], role }\`: the measures it plots, from the insights the page rests on, and whether it is "proof" of the claim or "context" beside it`); return; }
       out.push(...basisFindings(id, nameOf(ex, i), ex, ex.basis, { registry, evidence, plots: true, bound, typed: typedExhibits[i] }));
@@ -448,8 +528,11 @@ export function dependencyFindings(doc, insights) {
     out.push(...relationFindings(page, id, registry));
     const cites = requiredCitations(page, registry, [...(bound.printed.get(page) ?? [])]);
     if (cites.length && page.source !== undefined) {
+      // A typed line is refused here whoever typed it. Where it is the line the slide a revision's page stands for already
+      // carried, unchanged, over numbers that slide already showed, the one decision on what a deck is held to says so
+      // (weight.mjs notHeldOn, from what the compile checked against the inventory: revision.mjs keptFromSlide).
       if (!Array.isArray(page.source)) add("SOURCE_UNCITED", `the page's \`source\` is typed, and the insights it rests on carry their citations (${cites.join(", ")}): leave \`source\` out and the citation is written from them, or list the registry keys - a typed line is how a page comes to cite one record while plotting another`, cites);
-      else { const missing = cites.filter((key) => !page.source.includes(key)); if (missing.length) add("SOURCE_UNCITED", `\`source\` leaves out ${missing.join(", ")}, which the measures the page plots are cited to`, missing); }
+      else { const missing = cites.filter((key) => !page.source.includes(key)); if (missing.length) add("SOURCE_UNCITED", `\`source\` leaves out ${missing.join(", ")}, which the measures the page plots or its claim is about are cited to`, missing); }
     }
   }
   return out;
@@ -462,7 +545,11 @@ export function dependencyFindings(doc, insights) {
  * their measures - which exhibit draws them is the layout's. `settles.stated`
  * is what the binding recorded of the page (bind.mjs): every assumed measure
  * it shows, with where the page says so, and every negative value it prints
- * without its sign.
+ * without its sign; and what the compile recorded of its citation
+ * (author-deck.mjs compileDeck): every source it cites that the registry declares
+ * names no publisher, date or document, with the reason it gives; and what
+ * the deck's own consistency check read of it (author-deck.mjs authorDeck):
+ * every earlier page whose proof it shows again.
  */
 export function dependencyNotes({ bases = [], settles = null }) {
   // One line for each relevance claimed: the context measures of a basis that share it, whether the whole exhibit is context or one series of it.
@@ -473,6 +560,10 @@ export function dependencyNotes({ bases = [], settles = null }) {
   else if (relation?.kind) notes.push(`the claim asserts a ${relation.kind} between its measures`);
   for (const item of settles?.stated?.assumed ?? []) notes.push(`${item.ref} is assumed, not recorded${item.rationale ? ` ("${String(item.rationale).trim()}")` : ""} - ${item.said ? `said on the page by ${item.said}` : "printed in the page's text, where nothing marks it as an assumption"}`);
   for (const item of settles?.stated?.unsigned ?? []) notes.push(`${item.ref} is printed without its sign: "${item.shown}" for a recorded ${item.recorded}`);
+  // A proof another page already gave (consistency_gates.mjs PROOF_REPEATS), for the critic to judge: a comparator read anew, or one page twice.
+  for (const item of settles?.stated?.repeats ?? []) notes.push(`${item.measures.length ? `plots ${item.measures.join(", ")}` : "draws the numbers"} over the same periods or members as ${item.page} does${item.whole ? ", and shows nothing else as proof" : ""}: judge whether this page proves something ${item.page} does not`);
+  // What a cited source is declared not to name is a limit of the evidence the deck states once, not a fault of each page that cites it.
+  for (const item of settles?.stated?.limits ?? []) notes.push(`cites "${item.name}", which the deck declares names no ${item.missing.join(", no ")} (${item.reason}): a declared limit of the evidence, stated once for the deck on its page of what the sources do not name. Judge whether the limit is declared truthfully and whether the claim can bear it; do not file the missing ${item.missing.join(" or ")} against this page`);
   return notes;
 }
 

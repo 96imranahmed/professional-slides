@@ -47,7 +47,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { SHAPES } from "./evidence.mjs";
-import { axisOf, composeUnit, isPercentUnit, measureRegistry, normalUnit, readInsightLog, valuesOf } from "./measures.mjs";
+import { axisOf, composeUnit, insightLogRefusal, isPercentUnit, measureRegistry, normalUnit, readInsightLog, valuesOf } from "./measures.mjs";
 import { notJson } from "./pages-file.mjs";
 
 /** The operations an analysis can be: what each computes, and from how many measures. */
@@ -718,6 +718,9 @@ async function main(argv) {
   let log;
   try { log = await readInsightLog(dir, stem); } catch (error) { console.error(error.message); return EXIT.refused; }
   if (!log) { console.error(`${stem}.insights.json is not beside the pages file: the analyses run over its measures`); return EXIT.refused; }
+  // A log this command runs over is one the pages compile over: it is held to the compile's own reading of it, here, first.
+  const unread = insightLogRefusal(log.insights || []);
+  if (unread) { console.error(`${unread}\nThe analyses run over the log author-deck.mjs compiles the pages over, so it is refused here for what the compile would refuse it for.`); return EXIT.refused; }
   if (values.catalogue) {
     // The analyses the measures allow, whether or not a plan exists yet: an invalid plan is still read for what it already runs.
     let written;

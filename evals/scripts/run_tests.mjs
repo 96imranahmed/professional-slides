@@ -113,15 +113,34 @@ function readTimings() {
   try { return JSON.parse(readFileSync(TIMINGS, "utf8")); } catch { return {}; }
 }
 
-const TEST_CLASS = /^class (\w+)\([^)]*\bTestCase\b[^)]*\):/gm;
+const CLASS = /^class (\w+)\(([^)]*)\):/gm;
 
-/** The units a run is split into: every TestCase class, or the module when it declares none. */
+/**
+ * The test classes each module of the tests folder declares, by module. A
+ * class is a test class when it names TestCase among its bases, or a class
+ * that is one - declared in its own module or in another, since a module
+ * imports a shared fixture class by its bare name (`class StaleTextTests(
+ * CarriedDeck)`). Read from the source, so nothing is imported to schedule
+ * it. A class matched on TestCase alone left every such subclass unscheduled:
+ * its tests passed under `python -m unittest` and never ran here.
+ */
+function testClasses() {
+  const declared = readdirSync(TESTS).filter((file) => file.endsWith(".py")).flatMap((file) => [...readFileSync(path.join(TESTS, file), "utf8").matchAll(CLASS)]
+    .map((match) => ({ module: file.replace(/\.py$/, ""), name: match[1], bases: match[2].match(/\w+/g) ?? [] })));
+  const known = new Set(["TestCase"]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const item of declared) if (!known.has(item.name) && item.bases.some((base) => known.has(base))) { known.add(item.name); grew = true; }
+  }
+  const byModule = new Map();
+  for (const item of declared) if (known.has(item.name) && item.bases.some((base) => known.has(base))) byModule.set(item.module, [...(byModule.get(item.module) ?? []), item.name]);
+  return byModule;
+}
+
+/** The units a run is split into: every test class, or the module when it declares none. */
 export function units(modules) {
-  return modules.flatMap((name) => {
-    const source = readFileSync(path.join(TESTS, `${name}.py`), "utf8");
-    const classes = [...source.matchAll(TEST_CLASS)].map((m) => `${name}.${m[1]}`);
-    return classes.length ? classes : [name];
-  });
+  const classes = testClasses();
+  return modules.flatMap((name) => ((classes.get(name) ?? []).length ? classes.get(name).map((cls) => `${name}.${cls}`) : [name]));
 }
 
 /** Longest first: last run's time where known, a share of the file's size (a fair proxy) where not. */

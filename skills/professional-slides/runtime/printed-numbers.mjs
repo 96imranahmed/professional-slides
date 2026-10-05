@@ -45,11 +45,17 @@ const SCALE_OF = Object.freeze({ k: 1e3, thousand: 1e3, thousands: 1e3, m: 1e6, 
  * "m per clinic" the scale is the numerator's.
  */
 export function unitScale(unit) {
-  const [head] = String(unit ?? "").split(/\s+(?:per(?!\s*cent)|an?)\s+/i);
-  if (!String(unit ?? "").trim()) return null;
-  const scales = new Set(head.toLowerCase().split(/[^a-z]+/).map((word) => SCALE_OF[word]).filter(Boolean));
-  return scales.size === 1 ? [...scales][0] : scales.size ? null : 1;
+  const key = String(unit ?? "");
+  if (!UNIT_SCALES.has(key)) UNIT_SCALES.set(key, (() => {
+    const [head] = key.split(/\s+(?:per(?!\s*cent)|an?)\s+/i);
+    if (!key.trim()) return null;
+    const scales = new Set(head.toLowerCase().split(/[^a-z]+/).map((word) => SCALE_OF[word]).filter(Boolean));
+    return scales.size === 1 ? [...scales][0] : scales.size ? null : 1;
+  })());
+  return UNIT_SCALES.get(key);
 }
+// A deck has a few dozen units and sets every printed number against every measure: each unit is read once.
+const UNIT_SCALES = new Map();
 
 /** The scale a piece of text opens on - "bn", " million", "k" set against or after a number - or null. */
 export function leadingScale(text) {

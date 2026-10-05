@@ -26,6 +26,10 @@ const BODY = "The page's exhibit and copy are written at the layout step, once t
 // Ordinary prose, for the words a place holds when no title is written for it yet.
 const PROSE = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
 const proseOf = (n) => Array.from({ length: n }, (_, i) => PROSE[i % PROSE.length]).join(" ");
+// The words of a title: longer than prose, since a title drops the short words that pad a sentence. A line breaks between
+// words, so long words fill a divider in fewer characters than short ones do.
+const TITLE_PROSE = "Demand recovered because capacity returned before competitors rebuilt their regional networks".split(" ");
+const titleProseOf = (n) => Array.from({ length: n }, (_, i) => TITLE_PROSE[i % TITLE_PROSE.length]).join(" ");
 // The most words a divider is measured to: one that still takes this many has no limit to publish.
 const MOST_WORDS = 40;
 
@@ -171,6 +175,9 @@ export function spineFitFindings(spec, baseDir) {
  * ordinary prose - and their characters - that fit the tightest of its
  * dividers. A deck with no sections written yet is measured with three; null
  * where the deck does not compose at all, so there is no divider to measure.
+ * `title` is the same measure taken with a title's longer words: what the
+ * dividers hold whatever the words, where `words` is the most they hold of
+ * short ones.
  */
 export function sectionTitleRoom(specIn, baseDir) {
   const written = (specIn.slides || []).filter(isSection);
@@ -181,5 +188,25 @@ export function sectionTitleRoom(specIn, baseDir) {
   // A deck that does not compose even with a word on each divider has no divider to measure: the caller keeps the house default.
   if (ids.some((id) => refused(id, proseOf(1)))) return null;
   const words = Math.min(...ids.map((id) => most(MOST_WORDS, (n) => n > 0 && !refused(id, proseOf(n)))));
-  return words >= MOST_WORDS ? null : { words, characters: proseOf(words).length };
+  if (words >= MOST_WORDS) return null;
+  // The same dividers measured with a title's longer words: what they hold of those, in words and characters. A limit given
+  // to someone who will write a title is this one - nine words of prose fitted where eight words of a real title did not.
+  const titled = Math.min(words, ...ids.map((id) => most(words, (n) => n > 0 && !refused(id, titleProseOf(n)))));
+  return { words, characters: proseOf(words).length, title: { words: titled, characters: titleProseOf(titled).length } };
+}
+
+/**
+ * Whether `title` fits the dividers of this deck as a section's title, by the
+ * composer: on each divider `ids` names, or on every one where it names none.
+ * What a title a judge proposes for a section is held to (review-floors.mjs
+ * titleErrors) - the title itself, composed, where a count of words can only
+ * bound it. Null where the deck has no divider to compose.
+ */
+export function sectionTitleFits(specIn, baseDir, title, ids = null) {
+  const written = (specIn.slides || []).filter(isSection);
+  if (!written.length) return null;
+  const spec = reduced(specIn);
+  const all = spec.slides.filter(isSection).map((slide) => String(slide.id));
+  const named = (ids || []).map(String).filter((id) => all.includes(id));
+  return (named.length ? named : all).every((id) => { const { errors } = composeProbe(retitled(spec, (slide) => (String(slide?.id) === id ? { ...slide, title } : slide)), baseDir); return !errors.has(id) && !errors.has(""); });
 }

@@ -187,8 +187,9 @@ const two = await S.prepareStoryline(deck.specPath, deck.out);
 const p2 = await packetOf(two);
 const narrowedSame = await answer(deck, verification(p2, critique.binding, [status('M1', 'narrowed')]));
 const limitedOpen = await answer(deck, verification(p2, critique.binding, [status('M1', 'scope-limited')], { verdict: 'revise', rating: 6, ...judged(true, 'insufficient') }));
-// The answer now claims less, and the item no longer bears on it. (The refused answers are cleared: the next packet is for the new spine.)
-await fs.rm(path.join(deck.out, 'storyline-review.json'));
+// The answer now claims less, and the item no longer bears on it. (A refused answer is moved aside by the loop, so nothing waits in its
+// place and the next packet is for the new spine.)
+if (await fs.access(path.join(deck.out, 'storyline-review.json')).then(() => true, () => false)) throw new Error('a refused answer was left in place');
 await fs.writeFile(deck.specPath, JSON.stringify({ ...doc, answer: 'Lumen leads on retention among the two products that publish it, and invests there.' }));
 const three = await S.prepareStoryline(deck.specPath, deck.out);
 const p3 = await packetOf(three);
@@ -272,9 +273,56 @@ console.log(JSON.stringify({
         self.assertEqual(result["unquoted"][0], "refused")
         self.assertIn("quotes, in `quote`, the words of the `request`", result["unquoted"][1])
         self.assertEqual(result["invented"][0], "refused")  # words the request does not contain
+        # A request that is not the user's own words cannot vouch for a limit by quoting itself: it names the file that sets it.
         self.assertEqual(result["paraphrased"][0], "refused")
-        self.assertIn("rests on the user's own words", result["paraphrased"][1])
+        self.assertIn("names, in `source`, the file that sets the limit", result["paraphrased"][1])
+        self.assertIn("The scope is the user's to close, not the author's", result["paraphrased"][1])
         self.assertEqual(result["quoted"][0], "packet-written")
+
+    def test_a_closed_scope_stands_on_a_reconstructed_request_when_the_file_that_sets_the_limit_says_so(self):
+        # Two authors given a brief that closed the evidence, and no words of the user's own, met the refusal above; one
+        # recorded the request as verbatim to get past it. Whether the evidence is closed and how the request came to be
+        # recorded are separate facts: the limit is quoted from the brief itself, which the loop reads, and the critic is told.
+        result = run_node(LOOP + '''
+import { authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+import { requestStatement, evidenceScopeOf } from './skills/professional-slides/runtime/review-passes.mjs';
+const note = 'the commissioning brief supplies the papers and closes the list';
+const brief = 'Brief for the signalling explainer.\\n\\nUse only the documents in the\\nproject folder; do not search for others.';
+const scope = (o = {}) => ({ retrieval: 'closed', note, quote: 'Use only the documents in the project folder', source: 'sources/brief.md', ...o });
+const tried = async (patch, file = brief) => { const deck = await stage('explainer', patch);
+  if (file !== null) await fs.writeFile(path.join(deck.dir, 'sources', 'brief.md'), file);
+  const step = await S.prepareStoryline(deck.specPath, deck.out);
+  const prompt = step.dir ? await fs.readFile(path.join(step.dir, 'prompt.md'), 'utf8') : '';
+  const packet = step.dir ? await packetOf(step) : null;
+  // The compile reads the same file, in the deck's own folder.
+  const doc = JSON.parse(await fs.readFile(path.join(FIX, 'explainer.pages.json'), 'utf8'));
+  const compiled = await authorDeck({ ...doc, deck: { ...doc.deck, ...patch } }, { baseDir: deck.dir, insights: await readInsights(deck.dir, 'explainer', {}), draft: true });
+  await clear(deck);
+  return { status: step.status, errors: (step.errors || []).join(' '), told: prompt.split('\\n').find((line) => line.startsWith('EVIDENCE SCOPE')) ?? '', label: /THE USER'S REQUEST \\(([a-z]+):/.exec(prompt)?.[1] ?? 'verbatim',
+    scope: packet?.evidenceScope ?? null, compile: compiled.blocking.filter((f) => f.code === 'STATEMENT_INVALID').map((f) => f.repair) }; };
+console.log(JSON.stringify({
+  reconstructed: await tried({ requestProvenance: 'reconstructed', evidenceScope: scope() }),
+  paraphrased: await tried({ requestProvenance: 'paraphrased', evidenceScope: scope() }),
+  revision: await tried({ workflow: 'existing_deck_revision', requestProvenance: 'reconstructed', evidenceScope: scope() }),
+  nofile: await tried({ requestProvenance: 'reconstructed', evidenceScope: scope() }, null),
+  unsaid: await tried({ requestProvenance: 'reconstructed', evidenceScope: scope({ quote: 'the team may use nothing but these papers' }) }),
+  unsourced: await tried({ requestProvenance: 'reconstructed', evidenceScope: { retrieval: 'closed', note, quote: 'Use only the documents in the project folder' } }),
+  outside: await tried({ requestProvenance: 'reconstructed', evidenceScope: scope({ source: '../brief.md' }) }) }));
+''')
+        for name in ("reconstructed", "paraphrased", "revision"):
+            run = result[name]
+            self.assertEqual([run["status"], run["compile"]], ["packet-written", []], name)
+            self.assertEqual(run["scope"]["source"], "sources/brief.md", name)
+            self.assertEqual(run["label"], "paraphrased" if name == "paraphrased" else "reconstructed", name)   # the provenance is still said as it is
+            self.assertIn("EVIDENCE SCOPE: closed - only the evidence supplied may be used", run["told"], name)
+            self.assertIn("so the limit is quoted from the file that sets it (sources/brief.md, where the runtime found these words): \"Use only the documents in the project folder\"", run["told"], name)
+            self.assertIn("where they set no such limit the scope is open", run["told"], name)
+        # What the old refusal protected is kept by reading the file: a closure the author can only assert is still refused,
+        # by the loop and by the compile alike.
+        for name, said in (("nofile", "is not a file beside the pages file"), ("unsaid", "are not in sources/brief.md"), ("unsourced", "names, in `source`, the file that sets the limit"), ("outside", "in the deck's own folder")):
+            self.assertEqual(result[name]["status"], "refused", name)
+            self.assertIn(said, result[name]["errors"], name)
+            self.assertTrue(any(said in repair for repair in result[name]["compile"]), name)
 
 
 class LayoutOnceTests(unittest.TestCase):
@@ -309,20 +357,23 @@ const critiqued = async (deck) => {
     completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })) }));
   return { one, p1, ready };
 };
-// A spine that does not say the summary will tabulate two years of each series: laying it out shows the critic's reader something the critique did not read.
-const blind = await stage('finance', {}, bare(false));
-const blindReady = (await critiqued(blind)).ready.status;
-const blindLine = (await fs.readFile(path.join(blind.out, '..', '.reviews', 'finance', 'storyline-packet.json'), 'utf8').then(JSON.parse)).pages.find((p) => p.id === 'f0').measures[0].line;
-const blindLayout = await S.storylineGate(await blind.write({}, null), blind.out, { deckPath: blind.specPath });
-await clear(blind);
+// A spine that does not say the summary will tabulate two years of each series is not a spine the critic can be handed:
+// the draft compiles the page from what it declares and refuses it, saying what the critic would have been told.
+const blindDoc = JSON.parse(await fs.readFile(path.join(FIX, 'finance.pages.json'), 'utf8'));
+bare(false)(blindDoc);
+const blindDir = await fs.mkdtemp(path.join(os.tmpdir(), 'closure-blind-'));
+for (const file of ['finance.insights.json', 'finance.analysis.json']) await fs.copyFile(path.join(FIX, file), path.join(blindDir, file));
+const blindDraft = compileDeck(blindDoc, { insights: await readInsights(blindDir, 'finance', { alternatives: alternativesOf(blindDoc.deck) }), draft: true, partial: true });
+await fs.rm(blindDir, { recursive: true, force: true });
+const blind = blindDraft.failed.map((f) => [f.id, f.code, f.message]);
 const deck = await stage('finance', {}, bare(true));
-const drawnAtSpine = deck.spec.slides.filter((s) => s.pageType && !s.pageType.deferred).map((s) => s.id);
+const drawnAtSpine = deck.spec.slides.filter((s) => s.pageType && !s.pageType.pending).map((s) => s.id);
 const { one, p1, ready } = await critiqued(deck);
 const gate = async (spec) => S.storylineGate(spec, deck.out, { deckPath: deck.specPath });
 const page = (d, id) => d.pages.find((p) => p.id === id);
 // The one layout pass: every exhibit drawn, every sentence written.
 const laidOut = await deck.write({}, null);
-const afterLayout = [laidOut.slides.filter((s) => s.pageType?.deferred).length, await gate(laidOut), (await S.prepareStoryline(deck.specPath, deck.out)).status];
+const afterLayout = [laidOut.slides.filter((s) => s.pageType?.pending).length, await gate(laidOut), (await S.prepareStoryline(deck.specPath, deck.out)).status];
 // Then layout repairs: another form, another chart type, the commentary moved, a caption and the points rewritten.
 const refit = await deck.write({}, (d) => { const f4 = page(d, 'f4'); f4.form = 'stack'; f4.exhibits[1].type = 'chart.bar'; f4.exhibits[0].caption = 'A caption rewritten after the critique, eight words or more';
   const f5 = page(d, 'f5'); f5.form = 'lollipop'; });
@@ -343,7 +394,7 @@ const remeasured = await gate(await deck.write({}, null));
 await fs.writeFile(logPath, JSON.stringify(log));
 const restored = await gate(await deck.write({}, null));
 await clear(deck);
-console.log(JSON.stringify({ drawnAtSpine, blind: [blindReady, blindLine, blindLayout], summaryLine: p1.pages.find((p) => p.id === 'f0').measures[0].line, one: one.status, ready: [ready.status, ready.note], afterLayout, afterRefit, claimGate, two: [two.status, p2.scope.changed, p2.scope.mustInspect],
+console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p) => p.id === 'f0').measures[0].line, one: one.status, ready: [ready.status, ready.note], afterLayout, afterRefit, claimGate, two: [two.status, p2.scope.changed, p2.scope.mustInspect],
   rested, undeclared, remeasured, restored, shown: p1.pages.find((p) => p.id === 'f4').measures.map((m) => [m.ref, m.role]) }));
 ''')
         self.assertEqual(result["drawnAtSpine"], [])  # nothing was laid out when the critique read it
@@ -353,12 +404,10 @@ console.log(JSON.stringify({ drawnAtSpine, blind: [blindReady, blindLine, blindL
         self.assertEqual(result["afterLayout"], [0, [], "ready"])  # the full layout of every page keeps the ready critique
         # The critic was shown what the summary's table shows of each series, since the spine carried it.
         self.assertIn("[the page shows it tabulated, 2 of its 8 periods: FY25, FY26]", result["summaryLine"])
-        # A spine that left the table out was read as showing each series whole; the table then drawn shows two years of
-        # eight, so the layout reopens that page, and only that page.
-        self.assertEqual(result["blind"][0], "ready")
-        self.assertIn("[not drawn yet: critiqued as plotted, every one of its 8 periods]", result["blind"][1])
-        self.assertEqual(len(result["blind"][2]), 1)
-        self.assertIn("the spine changed after the storyline critique (f0: a title,", result["blind"][2][0])
+        # A spine that left the table out used to be read as showing each series whole and reopened at the layout, a
+        # critique pass later. It is refused where it is drafted, on that page alone, in the critic's own words.
+        self.assertEqual([entry[:2] for entry in result["blind"]], [["f0", "SPINE_UNDETERMINED"]])
+        self.assertIn("the critic is told the page shows each plotted, whole", result["blind"][0][2])
         self.assertEqual(result["afterRefit"], ["stack", "lollipop", [], "ready"])  # and so does a form, chart-type or copy repair
         self.assertEqual(len(result["claimGate"]), 1)
         self.assertIn("the spine changed after the storyline critique (f1:", result["claimGate"][0])

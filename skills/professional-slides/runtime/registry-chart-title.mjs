@@ -42,6 +42,8 @@ function assertChartTitleCopy(props = {}) {
     copy = copy.replace(new RegExp(`(?:\\bindex(?:ed)?\\b[^\\d]*?)?(?:${period}|\\b${year})\\s*=\\s*100\\b(?![.,]?\\d)`, "gi"), "index base");
     copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
+    // A year in the possessive names whose period it is - "at 2025's growth rate" - whatever word stands before it.
+    copy = copy.replace(new RegExp(`\\b${year}(?=['\u2019]s\\b)`, "g"), "period");
     copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|to|versus|vs\\.?|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
     copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
     copy = copy.replace(new RegExp(`^\\s*${year}(?=\\s*(?:$|[,;) ]))`), "period"); // a unit line that opens with its period
@@ -64,12 +66,19 @@ function assertChartTitleCopy(props = {}) {
     // letters and digits too, and is a result, so it is left to reject.
     copy = copy.replace(/\b(?!\d+(?:[xX]|bn|mn|[mkb]|pp|pts?|bps)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
     copy = copy.replace(/\b\d{3}(?:-\d{1,2}[A-Za-z]*|\s+MAX(?:\s+\d{1,2})?)\b/g, "designation");
+    // So is a three-digit model with a capital letter for its variant ("505X", "220F"): a multiplier is written with a small x
+    // and a magnitude with M, K or B, which are left to reject.
+    copy = copy.replace(/\b\d{3}(?![MKB]\b)[A-Z]\b/g, "designation");
     // A rank scale says which end is best ("rank, 1 = best"), and a set size
     // says how many members the chart shows ("top 40", "World's Top 100"):
     // both describe the measure. A figure after them - "top 40%", "top 3.5x" -
     // is still a result.
     copy = copy.replace(/\brank(?:ed|ing)?\b\s*[,;:]?\s*\(?\s*1\s*=\s*(?:best|top|highest|largest|first|lowest|worst)\s*\)?/gi, "rank scale");
     copy = copy.replace(/\b(?:top|bottom|largest|biggest|busiest|leading|first|last)\s+\d{1,4}\b(?![.,]\d)(?!\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b|percent\b|points?\b|times\b|fold\b))/gi, "member set");
+    // And so does a count of the members set off as the population - "Depots in service, 20 suppliers", "(12
+    // markets)": a whole number before a plural noun, after the comma or bracket that opens the population (or opening a unit
+    // line), with nothing after the noun. A magnitude or a currency there is a value, and is left to reject.
+    copy = copy.replace(/(^\s*|[,;(]\s*)\d{1,4}\s+(?!(?:percent|points?|pts|times|fold|millions?|billions?|thousands?|hundreds?|bn|mn|pp|bps|dollars|pounds|euros|cents|pence)\b)(?:[a-z][a-z-]*\s+){0,2}[a-z][a-z-]*s\b(?=\s*(?:$|[,;)]))/gi, "$1member set");
     const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
     // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
     // not when it counts things the chart shows ("three monthly budgets").
@@ -79,7 +88,7 @@ function assertChartTitleCopy(props = {}) {
       ?? copy.match(/\b(?:doubled|tripled|halved)\b/i)?.[0] ?? copy.match(new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)\\b`, "i"))?.[0];
     if (result) {
       throw new Error(
-        `Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)} carries "${result.trim()}", which reads as a value the chart shows. Put it on the mark, a label or an annotation, and keep the ${field} to the measure, population and period. A ${field} may name a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("1 = best").`
+        `Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)} carries "${result.trim()}", which reads as a value the chart shows. Put it on the mark, a label or an annotation, and keep the ${field} to the measure, population and period. A ${field} may name a period ("FY26", "2 August 2026", "at 2025's rate"), a sample ("n = 240"), a set size ("top 40", or the members counted, set off by a comma: "20 suppliers"), a model by its designation ("X77", "505X"), an index base ("2019 = 100") or a rank scale ("1 = best").`
       );
     }
   }

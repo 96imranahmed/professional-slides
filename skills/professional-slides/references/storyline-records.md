@@ -9,7 +9,7 @@ This section owns what a deck must carry to be built; other references link here
 | Deck | Must carry |
 | --- | --- |
 | New (`workflow: "new_deck"`) | the user's `request` verbatim (`REQUEST_MISSING`); `<id>.content.json`, `<id>.plan.json` and `<id>.deck.json` together, from one full `author-deck.mjs` compile (`STAGE_MISSING`, `STAGE_CONTRACT`); a unique stable ID on every slide, with the same exact title in all three; an opening summary declaring `role: "executive-summary"` before the first section (`NO_SUMMARY`), whose content [Copy](copy.md#executive-summary) owns |
-| Rebuilt (`workflow: "existing_deck_revision"`) | `inventory` on `deck`, naming the `<id>.inventory.json` beside the pages file (`REVISION_INVENTORY_MISSING`); each page's `sourceSlide`; every imported slide mapped to a page type (`REVISION_UNMAPPED`). It may carry partial plans ([Revising an existing deck](storylining.md#revising-an-existing-deck)) |
+| Rebuilt (`workflow: "existing_deck_revision"`) | `inventory` on `deck`, naming the `<id>.inventory.json` beside the pages file (`REVISION_INVENTORY_MISSING`); each page's `sourceSlide`; every imported slide mapped to a page type or carried as it is, `carry: true` (`REVISION_UNMAPPED`). It may carry partial plans ([Revising an existing deck](storylining.md#revising-an-existing-deck)) |
 
 Records join by ID, never by position. Content and design records cover every authored slide, including cover, dividers and appendix; mark structural content records `role: "structural"`, which keeps their text checks without an analytical claim. Revisions keep unaffected records but reconcile every changed dependency.
 

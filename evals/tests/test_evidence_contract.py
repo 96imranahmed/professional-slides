@@ -160,16 +160,16 @@ console.log(JSON.stringify({ bad: planProblems({ analyses: [{ id: 'A1', op: 'ave
         # on a single value drew its start as "base", a label no reader can place.
         result = run_node(LOG + '''
 import { runAnalyses, planProblems, ANALYSIS_OPS } from './skills/professional-slides/runtime/analysis.mjs';
-const single = [...insights, { id: 'i-pax', shape: 'fact', sources: ['sources/c.csv'], measures: { passengers: { unit: 'm', population: 'the airports', period: '2025', value: 140 }, undated: { unit: 'm', population: 'the airports', period: 'FY27', value: 10 } } }];
+const single = [...insights, { id: 'i-vis', shape: 'fact', sources: ['sources/c.csv'], measures: { visitors: { unit: 'k', population: 'the museums', period: '2025', value: 260 }, undated: { unit: 'k', population: 'the museums', period: 'FY27', value: 30 } } }];
 const scenario = (input, horizon) => runAnalyses(plan([{ id: 'S', op: 'scenario', inputs: [input], method: 'compound', horizon,
   assumptions: [{ name: 'growth', value: 10, unit: '% a year', rationale: 'the growth recorded last year continues unchanged' }] }]), single).results[0];
 console.log(JSON.stringify({
   bad: planProblems(plan([{ id: 'A', op: 'compare', inputs: ['i-peers/profit'], members: 'Alpha' }, { id: 'B', op: 'compare', inputs: ['i-peers/profit'], members: ['Alpha'] },
     { id: 'C', op: 'gap', inputs: ['i-bal/debt', 'i-bal/cash'], members: ['Alpha', 'Beta'] }])),
   good: planProblems(plan([{ id: 'A', op: 'compare', inputs: ['i-peers/profit'], members: ['Alpha', 'Beta'] }])), does: ANALYSIS_OPS.compare.does,
-  dated: scenario('i-pax/passengers', ['2026', '2027']).measures.path.periods,
+  dated: scenario('i-vis/visitors', ['2026', '2027']).measures.path.periods,
   // A horizon that already uses the value's own period keeps the two apart.
-  clash: scenario('i-pax/undated', ['FY27', 'FY28']).measures.path.periods,
+  clash: scenario('i-vis/undated', ['FY27', 'FY28']).measures.path.periods,
   series: scenario('i-bal/cash', ['FY27', 'FY28']).measures.path.periods }));
 ''')
         self.assertEqual(len(result["bad"]), 3)

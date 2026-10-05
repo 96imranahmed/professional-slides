@@ -44,8 +44,12 @@ const insights = await readInsights(dir, 'finance', { alternatives: doc().deck.p
 const KEYS = ['id', 'kind', 'type', 'form', 'commentary', 'takeaway', 'why', 'title', 'settles', 'evidence', 'adds'];
 const refs = (item) => [...(Array.isArray(item?.series) ? item.series.flatMap((s) => [].concat(s?.measure ?? [])) : []), ...(item?.measure !== undefined ? [item.measure] : [])].map((ref) => String(ref).split('@')[0]);
 const stub = (item) => (item?.basis ? { basis: item.basis } : refs(item).length ? { basis: { measures: [...new Set(refs(item))], role: item.role ?? 'proof' } } : {});
+// A stub says what its exhibit will show where a page of its type cannot show the whole measure plotted, which is how an undeclared
+// measure is read: the summary's table shows two years of each measure and one lender's margin (a draft refuses the stub that leaves it unsaid).
+const VIEWS = { f0: { as: 'table', labels: { from: 'FY25', to: 'FY26' }, members: ['Harbour'] } };
+const viewed = (id, kept) => (VIEWS[id] && kept.basis ? { basis: { ...kept.basis, ...VIEWS[id] } } : kept);
 const spine = ({ stubs = true } = {}) => { const d = doc(); d.pages = d.pages.map((page) => (page.type ? { ...Object.fromEntries(KEYS.filter((k) => page[k] !== undefined).map((k) => [k, page[k]])),
-  ...(stubs && page.exhibit ? { exhibit: stub(page.exhibit) } : {}), ...(stubs && page.exhibits ? { exhibits: page.exhibits.map(stub) } : {}), ...(stubs && page.metrics ? { metrics: page.metrics.map(stub) } : {}) } : page)); return d; };
+  ...(stubs && page.exhibit ? { exhibit: viewed(page.id.replace(/r\\d+$/, ''), stub(page.exhibit)) } : {}), ...(stubs && page.exhibits ? { exhibits: page.exhibits.map(stub) } : {}), ...(stubs && page.metrics ? { metrics: page.metrics.map(stub) } : {}) } : page)); return d; };
 // The same spine under sections: three pillars, each with a title of `words` words.
 const WORDS = 'liquidity cover narrows while lending grows faster than the deposits that fund it across every branch region'.split(' ');
 const titled = (n, lead) => [lead, ...WORDS].slice(0, n).join(' ');
@@ -53,7 +57,7 @@ const titled = (n, lead) => [lead, ...WORDS].slice(0, n).join(' ');
 const longSpine = (stubs) => { const d = spine({ stubs }); const pages = d.pages; d.pages = [];
   for (let round = 0; round < 4; round += 1) for (const page of pages) d.pages.push(round ? { ...page, id: `${page.id}r${round}` } : page);
   d.pages.splice(1, 0, { id: 'pp', type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', title: 'Eight lenders compete for the same regional deposits and borrowers', why: 'The players are introduced before they are compared',
-    evidence: ['A-peers'], settles: { kind: 'comparison', what: 'the eight lenders', measures: ['A-peers/margin'] }, ...(stubs ? { exhibit: { basis: { measures: ['A-peers/margin'] } } } : {}) });
+    evidence: ['A-peers'], settles: { kind: 'comparison', what: 'the eight lenders', measures: ['A-peers/margin'] }, ...(stubs ? { exhibit: { basis: { measures: ['A-peers/margin'], as: 'table' } } } : {}) });
   return d; };
 const sectioned = (titles, deck = {}) => { const d = spine(); const pages = d.pages; d.deck = { ...d.deck, ...deck };
   d.pages = [pages[0], { id: 's1', kind: 'section', title: titles[0] }, pages[1], pages[2], { id: 's2', kind: 'section', title: titles[1] }, pages[3], pages[4], { id: 's3', kind: 'section', title: titles[2] }, pages[5], pages[6]]; return d; };
@@ -215,7 +219,15 @@ class SpineCliTests(unittest.TestCase):
         # (The fixture four times over repeats its page types, which is the one rule this spine does break.)
         plan = self.run_cli(self.write("longSpine(true)"), "--plan")
         printed = json.loads(plan.stdout)["plan"]
-        self.assertEqual([item["code"] for item in printed["unsatisfied"]], ["VARIETY_TYPE_SHARE"], plan.stderr[-2500:])
+        # The plan keeps every page in a form that carries its claim best, and four copies of seven pages do not hold twelve
+        # kinds of exhibit at that fit: it says so, and that only forms off the best fit - a loan book as a slope, a model, small
+        # multiples - would meet the two rules, which it does not propose. With every form allowed, as a draft asks, only the
+        # page types are left unmet (StubbedSpineTests holds that).
+        self.assertEqual([item["code"] for item in printed["unsatisfied"]], ["VARIETY_TYPE_SHARE", "VARIETY_EXHIBIT_RANGE", "PAGE_SHAPE_FLAT"], plan.stderr[-2500:])
+        self.assertEqual(printed["servedWouldMeet"], ["VARIETY_EXHIBIT_RANGE", "PAGE_SHAPE_FLAT"])
+        self.assertTrue(printed["served"])
+        self.assertIn("would be met only by drawing these pages in a form that is not a best fit for their claim", plan.stderr)
+        self.assertFalse([line for line in printed["pages"] if "(reads its own data)" in line])   # no page was moved off its best fit
         self.assertNotIn("values the median chart page plots 0", plan.stderr)
         self.assertNotIn("PLAYERS_UNMARKED: compared players with no logo on the cover or the first 3 pages 8", plan.stderr)
 
@@ -273,7 +285,8 @@ const stubbed = read(longSpine(true)), bare = read(longSpine(false));
 const draft = await authorDeck(longSpine(true), { baseDir: dir, insights, draft: true });
 const line = (code) => draft.standings.find((st) => st.code === code);
 console.log(JSON.stringify({ stubbed, bare, draft: { depth: line('EVIDENCE_DEPTH').value, panels: line('VARIETY_PANELS').count, players: line('PLAYERS_UNMARKED').value, // The four rounds repeat the fixture's titles, which is the one thing a draft holds against this spine.
-  blocking: draft.blocking.map((f) => f.code).filter((code) => code !== 'CONTENT_CLAIM_REPEATS') } }));
+  // The pages of the later rounds are the first round's pages again - the same claim measures, the same views - which a draft now holds too.
+  blocking: draft.blocking.map((f) => f.code).filter((code) => !['CONTENT_CLAIM_REPEATS', 'PROOF_REPEATS'].includes(code)), repeats: draft.blocking.filter((f) => f.code === 'PROOF_REPEATS').map((f) => f.rule) } }));
 ''')
         stubbed, bare, draft = result["stubbed"], result["bare"], result["draft"]
         self.assertGreater(stubbed["depth"], 0)
@@ -287,6 +300,8 @@ console.log(JSON.stringify({ stubbed, bare, draft: { depth: line('EVIDENCE_DEPTH
         # What a draft holds against this spine is what the plan holds against it: the page types the four rounds repeat,
         # which no form or placement mends and the storyline critique is bound to. (It was left to the full compile.)
         self.assertEqual(draft["blocking"], ["VARIETY_TYPE_SHARE"])
+        self.assertTrue(draft["repeats"])
+        self.assertEqual(set(draft["repeats"]), {"PROOF_REPEATS.identical"})
 
 
     def test_a_page_that_does_not_compile_stands_in_with_what_its_bound_exhibit_will_plot(self):
@@ -310,36 +325,44 @@ console.log(JSON.stringify({ blocking: run.blocking.filter((f) => f.id === 'f3')
 
 class BoundRecordTests(unittest.TestCase):
     def test_every_form_has_the_same_bound_record_in_a_draft_and_in_a_full_compile(self):
-        # The critique is bound to a page's kind, title, claim, type, what settles it and what it rests on. A form that
-        # set the page's kind only once its copy arrived read as a changed argument at layout (a takeaways page did).
+        # The critique is bound to a page's kind, title, claim, type, what settles it, what it rests on and what it shows.
+        # A draft is the full compile of the page completed with placeholder copy, so over every form of the catalogue: the
+        # page as written has one record in a draft and in the full compile, the numbers its exhibits draw included; and the
+        # page with nothing drawn is either refused or read exactly as the page its draft proves can be laid out from it.
         result = run_node('''
-import { compilePage, PAGE_TYPES } from './skills/professional-slides/runtime/page-types.mjs';
-import { workedExamples, withoutDependencies } from './skills/professional-slides/runtime/author-deck.mjs';
+import { PAGE_TYPES } from './skills/professional-slides/runtime/page-types.mjs';
+import { workedExamples, compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
 import * as S from './skills/professional-slides/runtime/storyline.mjs';
 const worked = workedExamples();
 const SPINE = ['id', 'kind', 'type', 'form', 'commentary', 'takeaway', 'why', 'title', 'settles', 'evidence', 'adds'];
-const compile = (page, options) => { const { page: authored, dependencies } = withoutDependencies(page); const slide = compilePage(authored, 0, { players: worked.deck.players, ...options });
-  if (dependencies && slide.pageType) slide.pageType.dependencies = dependencies.declared; return slide; };
-const record = (slide) => S.storyStructure({ slides: [slide] })[0];
-const differing = [], forms = new Set();
-for (const page of worked.pages.filter((p) => p.type)) {
-  forms.add(`${page.type}/${page.form}`);
-  const full = record(compile(page, {}));
-  const spine = Object.fromEntries(SPINE.filter((key) => page[key] !== undefined).map((key) => [key, page[key]]));
-  // The page with nothing drawn, and the page as written compiled as a draft: neither may differ from the full compile,
-  // but for the numbers an exhibit draws, which the spine has not drawn yet.
-  for (const [name, draft] of [['spine', record(compile(spine, { draft: true, spine: true }))], ['written', record(compile(page, { draft: true, spine: true }))]]) {
-    const keys = Object.keys({ ...full, ...draft }).filter((key) => !(name === 'spine' && key === 'drawn'));
-    const moved = keys.filter((key) => JSON.stringify(full[key]) !== JSON.stringify(draft[key]));
-    if (moved.length) differing.push([page.id, `${page.type}/${page.form}`, name, moved]);
-  }
+const typed = worked.pages.filter((p) => p.type);
+const doc = (pages) => ({ deck: worked.deck, ...(worked.sources ? { sources: worked.sources } : {}), pages });
+const records = (spec) => new Map(S.storyStructure(spec).map((page) => [page.id, page]));
+const differing = [], forms = new Set(typed.map((page) => `${page.type}/${page.form}`));
+const same = (a, b, name, page, skip = []) => { const moved = Object.keys({ ...a, ...b }).filter((key) => !skip.includes(key) && JSON.stringify(a?.[key]) !== JSON.stringify(b?.[key])); if (moved.length) differing.push([page.id, `${page.type}/${page.form}`, name, moved]); };
+const full = compileDeck(doc(typed), { partial: true });
+const written = compileDeck(doc(typed), { draft: true, partial: true });
+const bare = compileDeck(doc(typed.map((page) => Object.fromEntries(SPINE.filter((key) => page[key] !== undefined).map((key) => [key, page[key]])))), { draft: true, partial: true });
+const fullOf = records(full.spec), writtenOf = records(written.spec), bareOf = records(bare.spec), witnessOf = records(bare.witness.spec);
+const refused = new Set(bare.failed.map((f) => String(f.id)));
+let accepted = 0;
+for (const page of typed) {
+  if (!fullOf.has(page.id)) { differing.push([page.id, `${page.type}/${page.form}`, 'the worked page does not compile', full.failed.find((f) => f.id === page.id)?.message]); continue; }
+  same(fullOf.get(page.id), writtenOf.get(page.id), 'written', page);
+  // A bare page is refused by its compile, or as undetermined where the critic's reading of it is not its witness's (a
+  // worked page that plots typed numbers: the spine names none of them). One the draft takes argues what the worked page does.
+  if (refused.has(page.id) || JSON.stringify(bareOf.get(page.id)) !== JSON.stringify(witnessOf.get(page.id))) continue;
+  accepted += 1;
+  same(bareOf.get(page.id), fullOf.get(page.id), 'spine against the worked page', page, ['shows', 'measures', 'views', 'drawn']);
 }
 const catalogue = Object.entries(PAGE_TYPES).flatMap(([type, t]) => Object.keys(t.forms).map((form) => `${type}/${form}`));
-console.log(JSON.stringify({ differing, walked: forms.size, missing: catalogue.filter((form) => !forms.has(form)) }));
+console.log(JSON.stringify({ differing, walked: forms.size, accepted, missing: catalogue.filter((form) => !forms.has(form)) }));
 ''')
         self.assertEqual(result["missing"], [])
         self.assertGreaterEqual(result["walked"], 90)
         self.assertEqual(result["differing"], [])
+        # Most of the catalogue is a page whose bare spine a draft can prove; the rest it refuses, never reads loosely.
+        self.assertGreaterEqual(result["accepted"], 40)
 
 
 if __name__ == "__main__":

@@ -29,18 +29,22 @@
 // alternative in one deck - and all their pages go through the page gates in
 // one call.
 import { PAGE_TYPES, placementsOf, withChoice } from "./page-types.mjs";
+import { FIT_WORDS } from "./claim-fit.mjs";
 
 export const FIT = Object.freeze({ perPage: 6 });
 
 /**
  * Every other form and commentary placement the catalogue allows the page's
  * type, nearest first: the same form with another placement, another form
- * with the same placement, then the rest.
+ * with the same placement, then the rest. `grade(form)` is how well a form
+ * carries the page's claim (claim-fit.mjs pageFit; null where no fit is
+ * read): among the other forms, those that carry it best are tried first, so
+ * the alternatives a capped search composes are the ones worth taking.
  */
-export function alternativeChoices(page) {
+export function alternativeChoices(page, grade = () => null) {
   const type = PAGE_TYPES[page?.type];
   if (!type || !Object.hasOwn(type.forms, page.form ?? "")) return [];
-  const others = Object.keys(type.forms).filter((form) => form !== page.form);
+  const others = Object.keys(type.forms).filter((form) => form !== page.form).map((form, at) => ({ form, at, grade: grade(form) ?? 0 })).sort((a, b) => b.grade - a.grade || a.at - b.at).map((item) => item.form);
   return [
     ...placementsOf(page.type, page.form).filter((commentary) => commentary !== page.commentary).map((commentary) => ({ form: page.form, commentary })),
     ...others.filter((form) => placementsOf(page.type, form).includes(page.commentary)).map((form) => ({ form, commentary: page.commentary })),
@@ -126,6 +130,22 @@ const withoutId = (message, id) => { const text = String(message); return text.s
  *                               does not compile or compose): what tells which
  *                               of the page's fields an alternative draws
  *   brief(finding)              a finding in a phrase, with by how much
+ *   grade(page, form)           how well `form` carries the page's claim, as a
+ *                               grade of claim-fit.mjs, or null where no fit
+ *                               is read: alternatives are tried best fit
+ *                               first, and one that carries the claim less
+ *                               directly than the page's own form says so
+ *   marks(target)               the mark the page's own bare chart is asked for
+ *                               (author-deck.mjs provenMarks: what its
+ *                               UNANNOTATED finding names), or null; with
+ *                               `marked(page, marks)` - the page with it
+ *                               written - and `marksDrawn(slides)` - do these
+ *                               composed slides mark their chart. An
+ *                               alternative is tried with the mark written
+ *                               where it compiles so, and where its chart then
+ *                               draws the mark it is offered with it (`marks`
+ *                               on the alternative): the author is not handed
+ *                               a form that fits and is still a bare chart
  *   aggregate(id, blocks)       what swapping the page for an alternative whose
  *                               text sets in `blocks` (the page budget's block
  *                               estimate) would do to a deck aggregate read off
@@ -146,13 +166,17 @@ const withoutId = (message, id) => { const text = String(message); return text.s
  * `--check --render`), which marks each one it rendered (`rendered`) or moves
  * it to `fail` with what the render refused.
  */
-export async function fitSearch(targets, { spec, deck, compile, compose, pageGates, localFindings, structure, brief, drawn = null, aggregate = null, known = () => null, learned = () => {},
-  perPage = FIT.perPage }) {
+export async function fitSearch(targets, { spec, deck, compile, compose, pageGates, localFindings, structure, brief, drawn = null, aggregate = null, grade = () => null, known = () => null, learned = () => {},
+  marks = () => null, marked = (page) => page, marksDrawn = () => false, perPage = FIT.perPage }) {
   const plans = targets.map((target) => {
     const tryable = [], refused = new Map();
-    for (const choice of alternativeChoices(target.page)) {
-      const page = withChoice(target.page, choice.form, choice.commentary);
-      try { tryable.push({ ...choice, page, slide: compile(page, target.index) }); }
+    const named = marks(target);
+    for (const choice of alternativeChoices(target.page, (form) => grade(target.page, form))) {
+      const plain = withChoice(target.page, choice.form, choice.commentary);
+      // The mark the page's bare chart is asked for is written on the alternative where its form takes it; a form that refuses it is tried as the page stands.
+      let withMark = null;
+      if (named) try { const page = marked(plain, named); withMark = { page, slide: compile(page, target.index), marks: named }; } catch { withMark = null; }
+      try { tryable.push({ ...choice, ...(withMark ?? { page: plain, slide: compile(plain, target.index) }) }); }
       // An alternative that does not compile from the page as written needs content the page lacks: its refusal says what.
       catch (error) { const needs = withoutId(error.message, target.id); refused.set(needs, [...(refused.get(needs) || []), choice]); }
     }
@@ -197,7 +221,9 @@ export async function fitSearch(targets, { spec, deck, compile, compose, pageGat
         : [...(gateFindings.get(`${round}|${plan.id}`) || []), ...local.filter((f) => String(f.id ?? "") === plan.id)].map(brief))];
       // An alternative that clears the gates is then asked whether it draws what the page wrote.
       const drops = !remaining.length && drawn ? await droppedFields(plan.page, alt.page, plan.index, drawn) : [];
-      return { form: alt.form, commentary: alt.commentary, remaining, ...(drops.length ? { drops } : {}), ...(blocksOf.has(`${round}|${plan.id}`) ? { blocks: blocksOf.get(`${round}|${plan.id}`) } : {}) };
+      // The alternative is offered with the mark only where its own chart draws it: the composition says, not the form's name.
+      const carries = alt.marks && marksDrawn((composed.deck?.slides || []).filter((s) => (s.sourceSlideId ?? s.id) === plan.id)) ? { marks: alt.marks } : {};
+      return { form: alt.form, commentary: alt.commentary, remaining, ...carries, ...(drops.length ? { drops } : {}), ...(blocksOf.has(`${round}|${plan.id}`) ? { blocks: blocksOf.get(`${round}|${plan.id}`) } : {}) };
     }));
     // A page is remembered only when every alternative it was owed has a verdict.
     if (!plan.verdicts && verdicts.length === plan.tried.length && gated.ran) learned(plan, verdicts);
@@ -207,16 +233,23 @@ export async function fitSearch(targets, { spec, deck, compile, compose, pageGat
       const broken = alt ? structure(plan.id, alt.slide) : [];
       // What the swap would do to an aggregate read off the pages' text: an alternative that takes the deck out of its band is not one to propose.
       const shifts = aggregate && verdict.blocks && !verdict.remaining.length ? aggregate(plan.id, verdict.blocks) : [];
-      if (!verdict.remaining.length && !broken.length && !shifts.length) (verdict.drops?.length ? partial : pass).push({ form: verdict.form, commentary: verdict.commentary, ...(verdict.drops?.length ? { drops: verdict.drops } : {}) });
+      // A form that fits the page and carries its claim less directly than the form it has is said to: the layout is mended, the picture is weaker.
+      const own = grade(plan.page, plan.page.form), other = verdict.form === plan.page.form ? own : grade(plan.page, verdict.form);
+      const weaker = own !== null && other !== null && other < own ? { weaker: other } : {};
+      if (!verdict.remaining.length && !broken.length && !shifts.length) (verdict.drops?.length ? partial : pass).push({ form: verdict.form, commentary: verdict.commentary, ...weaker, ...(verdict.marks ? { marks: verdict.marks } : {}), ...(verdict.drops?.length ? { drops: verdict.drops } : {}) });
       else fail.push({ form: verdict.form, commentary: verdict.commentary, remaining: verdict.remaining, ...(broken.length ? { structure: broken } : {}), ...(shifts.length ? { aggregate: shifts } : {}) });
     }
     const untried = [...plan.tried.slice(verdicts.length), ...plan.beyond].map(({ form, commentary }) => ({ form, commentary }));
+    // The alternatives that carry the claim as directly as the page's own form come first: those are the ones to take.
+    pass.sort((a, b) => (a.weaker === undefined ? 0 : 1) - (b.weaker === undefined ? 0 : 1));
     out.set(plan.id, { pass, partial, fail, needs: plan.needs, untried, capped: untried.length ? `${perPage} alternatives a page are composed (--fit-cap raises it)` : null });
   }
   return out;
 }
 
 const choiceName = ({ form, commentary }) => `form "${form}", commentary "${commentary}"`;
+// The mark an alternative was composed with, as the author writes it: the page's chart is bare, and the form is offered with what mends that.
+const markNote = (alt) => (alt.marks?.length ? `; composed with the mark the page's bare chart is asked for - ${alt.marks.map((mark) => `\`"highlights": ${JSON.stringify(mark.mark.highlights)}\` on ${mark.exhibit}`).join("; ")} - which this form draws: write it with the form` : "");
 
 /** What the search found for a page, as the sentences its finding leads with and the lines printed under it. */
 export function fitLines(fit) {
@@ -224,16 +257,19 @@ export function fitLines(fit) {
   const lines = [
     // An alternative is called verified only on what verified it: the scene's checks without a render, the render's with one.
     ...fit.pass.map((alt) => `${alt.rendered ? "passes, rendered" : "passes the scene checks"}: ${choiceName(alt)} - compiles from the page as written, draws every field the page's own form uses, composes, clears the page gates and keeps the deck's structure rules` +
-      (alt.rendered ? "; rendered with the build's stages, and the render's gates report nothing on it" : `; not rendered${alt.unrendered ? ` (${alt.unrendered})` : ""} - what only a render shows is checked by \`--check --render\``)),
-    ...(fit.partial || []).map((alt) => `fits, dropping content: ${choiceName(alt)} - composes and clears the gates, and does not draw ${alt.drops.map((path) => (path.startsWith("(") ? path : `\`${path}\``)).join(", ")}: not the same content - take it only if the page can do without ${alt.drops.length === 1 ? "that" : "those"}`),
+      (alt.rendered ? "; rendered with the build's stages, and the render's gates report nothing on it" : `; not rendered${alt.unrendered ? ` (${alt.unrendered})` : ""} - what only a render shows is checked by \`--check --render\``) +
+      (alt.weaker !== undefined ? `; a weaker fit for the claim than the page's own form - it ${FIT_WORDS[alt.weaker]} - so take it only where no layout of a form that carries the claim as directly fits` : "") + markNote(alt)),
+    ...(fit.partial || []).map((alt) => `fits, dropping content: ${choiceName(alt)} - composes and clears the gates, and does not draw ${alt.drops.map((path) => (path.startsWith("(") ? path : `\`${path}\``)).join(", ")}: not the same content - take it only if the page can do without ${alt.drops.length === 1 ? "that" : "those"}${markNote(alt)}`),
     ...fit.fail.map((alt) => `fails:  ${choiceName(alt)} - ${[...alt.remaining, ...(alt.structure || []).map((code) => `would break ${code} (deck structure)`), ...(alt.aggregate || [])].join("; ")}`),
     ...fit.needs.slice(0, 6).map((item) => `needs:  ${item.choices.slice(0, 4).map((c) => `${c.form}/${c.commentary}`).join(", ")}${item.choices.length > 4 ? ` and ${item.choices.length - 4} more` : ""} - ${item.needs}`),
     ...(fit.needs.length > 6 ? [`needs:  ${fit.needs.length - 6} more refusals, each a form or placement that needs other content`] : []),
     ...(fit.untried.length ? [`untried: ${fit.untried.map((c) => `${c.form}/${c.commentary}`).slice(0, 8).join(", ")}${fit.untried.length > 8 ? ` and ${fit.untried.length - 8} more` : ""} - ${fit.capped}`] : []),
   ];
-  const rendered = fit.pass.length > 0 && fit.pass.every((alt) => alt.rendered);
+  // The lead names the alternatives that carry the claim as directly as the page's own form; where only weaker fits pass, it says so.
+  const direct = fit.pass.filter((alt) => alt.weaker === undefined), named = direct.length ? direct : fit.pass;
+  const rendered = named.length > 0 && named.every((alt) => alt.rendered);
   const lead = fit.pass.length
-    ? `With the same content, ${fit.pass.map(choiceName).join(" or ")} ${rendered ? "fits (verified: composed, gated and rendered in this deck)" : "passes the scene checks (composed and gated in this deck; the render is checked by `--check --render`)"}. Choose one, or repair the page as it stands: `
+    ? `With the same content, ${named.map(choiceName).join(" or ")} ${rendered ? "fits (verified: composed, gated and rendered in this deck)" : "passes the scene checks (composed and gated in this deck; the render is checked by `--check --render`)"}${direct.length ? "" : " - each a weaker fit for the claim than the form the page has"}. Choose one, or repair the page as it stands: `
     : fit.fail.length || (fit.partial || []).length ? `No other form or placement of this type fits with the same content (${fit.fail.length + (fit.partial || []).length} tried${fit.untried.length ? `, ${fit.untried.length} untried` : ""}${(fit.partial || []).length ? `; ${fit.partial.length} fit${fit.partial.length === 1 ? "s" : ""} only by dropping a field the page wrote` : ""}; listed below), so the page's content has to change: `
       : "";
   return { lead, lines };

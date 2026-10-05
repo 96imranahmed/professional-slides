@@ -48,7 +48,7 @@
 // is ready, and leaves it valid. Its passes live beside the deck file, keyed by
 // deck id (review-passes.mjs lineageStore), so a new output directory continues
 // the lineage rather than restarting it.
-import { SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, trendChart, isTable, cellText, rowCells, rowLabel } from "./evidence.mjs";
+import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, trendChart, isTable, cellText, rowCells, rowLabel } from "./evidence.mjs";
 import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -56,18 +56,23 @@ import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from 
 import { textWords } from "./text-contract.mjs";
 import { registered } from "./errors.mjs";
 import {
-  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING,
-  pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
+  SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, BLOCKING,
+  pageListErrors, settlePageList, advanceLedger, openEntries, openBlocking, openAboutImported, aboutImportedErrors, ABOUT_IMPORTED_RULE, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
   changedPages, capMessage, uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts,
   callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, requestHash, requestErrors, stageReview, lineageStore, restartLineage, isAuthFailure,
-  readInventory, revisionChanges, locateDeck, requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, retireLineage, carriedItems, settleCarried, carriedErrors, CARRIED_SCHEMA,
-  ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf,
+  readInventory, revisionChanges, locateDeck, requestStatement, scopeSourceErrors, requestProvenanceOf, evidenceScopeOf, answerStatusOf, retireLineage, carriedItems, settleCarried, carriedErrors, CARRIED_SCHEMA,
+  ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, SAMPLING_WORDS, COMPLETENESS_NOTE, ARGUMENT_SEVERITIES, RATING_CAPS, ratingScale, spineClauses, REVIEW_HISTORY, readConfirmations,
 } from "./review-passes.mjs";
+import { repairOf, reviewRepairOf } from "./gates/gate_classes.mjs";
+import { titleLimits, titleLimitsLine, titleErrors } from "./review-floors.mjs";
+import { sectionTitleFits } from "./spine-fit.mjs";
 import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
-import { readInsightLog } from "./measures.mjs";
+import { insightGradeProblems, readInsightLog } from "./measures.mjs";
+import { typeFitNote } from "./claim-fit.mjs";
 import { VIEW_CLASSES, declaredLabels, declaresView, dependencyNotes, metricsOf, refsOf, roleFor } from "./gates/dependency_gates.mjs";
 import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
+import { carriedSaid, withCarriedPages } from "./revision.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
 // scope allows and whose answer is offered as provisional: the decisive gaps
@@ -91,16 +96,6 @@ export const REMEDIES = Object.freeze({
 // as it is stated. A deck can comply and still not be sufficient.
 export const COMPLIANCE_VERDICTS = Object.freeze(["complete", "incomplete"]);
 export const SUFFICIENCY_VERDICTS = Object.freeze(["sufficient", "provisional", "insufficient"]);
-// What a rating means, so that two passes and two critics use one scale; and
-// the most a storyline with an open item can be rated.
-export const RATING_ANCHORS = Object.freeze({
-  "9-10": "ready as it stands; nothing a top team would add is missing",
-  "7-8": "the argument holds; only minor items remain",
-  "5-7": "a major item is open",
-  "3-5": "a blocker is open",
-  "0-2": "no argument: the question restated, or facts without an answer",
-});
-export const RATING_CAPS = Object.freeze({ blocker: 5, major: 7 });
 // The spine critique returns the items that most change whether the deck
 // answers the request, not everything a reader could say.
 export const SPINE_ITEM_MAX = 10;
@@ -116,22 +111,33 @@ export const STORYLINE_CODES = Object.freeze({
  * What the critique checks. The first five are checked on every page and
  * noted in its coverage entry; the rest are read off the spine as a whole.
  * references/storylining.md#stress-test-the-storyline states the same list.
+ *
+ * Each check is the critique's own question and, after it, every clause of
+ * the deck review's rubric that the spine already decides (review-passes.mjs
+ * RUBRIC_CLAUSES, by the check each names), in the reviewer's words. So the
+ * critic applies at the spine what the reviewer will apply to the drawn page,
+ * and neither prompt holds a second wording of it: `own` is the critique's,
+ * `held` the reviewer's, `checks` the two as the prompt prints them.
  */
-export const STORYLINE_CHECKS = Object.freeze({
-  claim: { scope: "page", checks: "the page's claim is a finding with an implication, not a count, a fact or a two-number comparison" },
-  shape: { scope: "page", checks: "the evidence has the shape the claim needs - the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the benchmark gap, the map, the judging table - not two numbers or an unjudged list; a comparison sets every member on the same measures, n/a where one is undisclosed, not a different metric per member" },
-  sourcing: { scope: "page", checks: "the claim traces to insights in the log, each with its calculation and source files: supported, partly supported or unsupported, naming the insight ids" },
-  restatement: { scope: "page", checks: "the page moves the argument on from the page before it; it does not restate it or re-prove another page's proposition" },
-  consequence: { scope: "page", checks: "the page says what follows for the decision, not only what is true" },
-  spine: { scope: "spine", checks: "the titles read alone tell the story: each a finding, in an order that builds to the answer" },
-  answer: { scope: "spine", checks: "the governing answer answers every part of the user's request, is sharp enough to be wrong, and is what the pages add up to" },
-  pillars: { scope: "spine", checks: "the pillars are a MECE set of reasons that together prove the answer; each has its strongest counter-argument and the condition that would reverse it, answered by the storyline" },
-  numbers: { scope: "spine", checks: "a figure is the same number, unit, base and period on every page that states it, and totals reconcile across pages" },
-  flow: { scope: "spine", checks: "sections open, develop and close in an order a reader follows; no section previews another or ends without its point" },
-  summary: { scope: "spine", checks: "the executive summary states the answer and the pillars the body proves, with the body's numbers, and the close agrees with it" },
-  missing: { scope: "spine", checks: "the analyses a strong team would have run are here, or named with why they matter and the public data behind them" },
-  cuts: { scope: "spine", checks: "pages that repeat, preview or pad are cut or merged, and the freed pages carry a missing analysis" },
-});
+const OWN_CHECKS = {
+  claim: ["page", "the page's claim is a finding with an implication, not a count, a fact or a two-number comparison"],
+  shape: ["page", "the evidence has the shape the claim needs - the share and its movement, the ratio, the benchmark gap, the map, the judging table - not an unjudged list; where a page's line ends in `fit:`, the runtime read from its measures that another page type carries the claim directly: the page changes its type, or its claim is one only its own type makes (exact values to look up, a judgement the measures do not hold)"],
+  sourcing: ["page", "the claim traces to insights in the log, each with its calculation and source files: supported, partly supported or unsupported, naming the insight ids"],
+  restatement: ["page", "the page moves the argument on from the page before it"],
+  consequence: ["page", "the page says what follows for the decision, not only what is true"],
+  spine: ["spine", "the titles read alone tell the story: each a finding, in an order that builds to the answer"],
+  answer: ["spine", "the governing answer answers every part of the user's request, is sharp enough to be wrong, and is what the pages add up to"],
+  pillars: ["spine", "the pillars are a MECE set of reasons that together prove the answer; each has its strongest counter-argument and the condition that would reverse it, answered by the storyline"],
+  numbers: ["spine", "a figure is the same number on every page that states it - in a title, a claim or a measure shown - and totals reconcile across pages"],
+  flow: ["spine", "no section previews another or ends without its point"],
+  summary: ["spine", ""],
+  missing: ["spine", "the analyses a strong team would have run are here, or named with why they matter and the public data behind them"],
+  cuts: ["spine", "pages that repeat, preview or pad are cut or merged, and the freed pages carry a missing analysis"],
+};
+export const STORYLINE_CHECKS = Object.freeze(Object.fromEntries(Object.entries(OWN_CHECKS).map(([check, [scope, own]]) => {
+  const held = spineClauses(check);
+  return [check, Object.freeze({ scope, own, held: Object.freeze(held), checks: [own, ...held].filter(Boolean).join("; ") })];
+})));
 export const STORYLINE_DIMENSIONS = Object.freeze(Object.keys(STORYLINE_CHECKS));
 export const STORYLINE_PAGE_CHECKS = Object.freeze(STORYLINE_DIMENSIONS.filter((d) => STORYLINE_CHECKS[d].scope === "page"));
 const SPINE_CHECKS = STORYLINE_DIMENSIONS.filter((d) => STORYLINE_CHECKS[d].scope === "spine");
@@ -151,9 +157,11 @@ const ITEM_PROPERTIES = {
   problem: STR(20),
   fix: STR(20),
 };
-const ITEM = { type: "object", additionalProperties: false, required: Object.keys(ITEM_PROPERTIES), properties: ITEM_PROPERTIES };
+// A finding about the imported deck (review-passes.mjs ABOUT_IMPORTED_RULE): optional, and only a revision's critique may set it.
+const ABOUT_IMPORTED = { aboutImported: { type: "boolean" } };
+const ITEM = { type: "object", additionalProperties: false, required: Object.keys(ITEM_PROPERTIES), properties: { ...ITEM_PROPERTIES, ...ABOUT_IMPORTED } };
 const NEW_ITEM = { type: "object", additionalProperties: false, required: [...Object.keys(ITEM_PROPERTIES), "basis", "justification", "evidence"],
-  properties: { ...ITEM_PROPERTIES, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } } };
+  properties: { ...ITEM_PROPERTIES, ...ABOUT_IMPORTED, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } } };
 const PAGE_ENTRY = {
   type: "object", additionalProperties: false, required: ["page", "verdict", ...STORYLINE_PAGE_CHECKS],
   properties: {
@@ -231,20 +239,31 @@ export const STORYLINE_SPINE_VERIFICATION_SCHEMA = { ...STORYLINE_VERIFICATION_S
 delete STORYLINE_SPINE_VERIFICATION_SCHEMA.properties.pages;
 
 /** One reviewer's share of a long spine's page-level first pass: a section of pages, or the spine sections. */
-export const STORYLINE_PART_SCHEMA = {
-  type: "object", additionalProperties: false,
-  required: ["part", "binding", "verdict", "rating", "summary", "pages", "findings", "completeness"],
-  properties: {
-    part: { type: "object", additionalProperties: false, required: ["kind", "id", "pages"],
-      properties: { kind: { type: "string", enum: ["section", "spine"] }, id: { type: "string" }, pages: { type: "array", items: { type: "string" } } } },
-    ...STORYLINE_SCHEMA.properties,
-  }
+const SPINE_PART_KEYS = ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes", "compliance", "sufficiency"];
+const partSchema = (kind) => {
+  const { pass: _pass, verifies: _verifies, mergedFrom: _mergedFrom, ...properties } = STORYLINE_SCHEMA.properties;
+  const checks = kind === "section" ? STORYLINE_PAGE_CHECKS : SPINE_CHECKS;
+  return {
+    type: "object", additionalProperties: false,
+    required: ["part", "binding", "verdict", "rating", "summary", "pages", "findings", "completeness", ...(kind === "spine" ? SPINE_PART_KEYS : [])],
+    properties: {
+      part: { type: "object", additionalProperties: false, required: ["kind", "id", "pages"],
+        properties: { kind: { type: "string", enum: [kind] }, id: { type: "string" }, pages: { type: "array", items: { type: "string" } } } },
+      ...properties,
+      completeness: { ...COMPLETENESS, items: { ...COMPLETENESS.items, properties: { ...COMPLETENESS.items.properties, check: { type: "string", enum: checks } } } },
+    }
+  };
 };
-delete STORYLINE_PART_SCHEMA.properties.pass;
-delete STORYLINE_PART_SCHEMA.properties.verifies;
-delete STORYLINE_PART_SCHEMA.properties.mergedFrom;
+export const STORYLINE_PART_SCHEMAS = Object.freeze({ section: partSchema("section"), spine: partSchema("spine") });
 
 const schemaFor = (mode, scope) => (scope ? (mode === "full" ? STORYLINE_VERIFICATION_SCHEMA : STORYLINE_SPINE_VERIFICATION_SCHEMA) : (mode === "full" ? STORYLINE_SCHEMA : STORYLINE_SPINE_SCHEMA));
+// The schema a critic is handed: the one its answer is validated against, less a key the packet gives it nothing to answer with.
+// `carried` answers the items a retired lineage left open; offered on a packet that carries none, a critic of a revision filled it
+// with the slides the revision carries, and the whole answer was refused for it.
+const offeredSchema = (mode, scope, { carried = false } = {}) => { const schema = schemaFor(mode, scope);
+  if (scope || carried || !schema.properties.carried) return schema;
+  const { carried: _carried, ...properties } = schema.properties;
+  return { ...schema, properties }; };
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 
@@ -334,12 +353,18 @@ export function recordedMeasures(insights) {
   }));
 }
 
-// How an exhibit shows a measure: plotted (any chart, whatever its form),
-// tabulated, or stated as a figure (a metric, a hero figure, a fact grid or a
-// stat list). A line redrawn as columns is the same class; a chart swapped for
-// a table, or for one figure, is not.
+// How an exhibit shows a measure, one of three classes and no other
+// (dependency_gates.mjs VIEW_CLASSES): plotted (any chart, whatever its form),
+// tabulated, or stated as a figure - a metric, a hero figure, a fact grid, a
+// stat list, and a number written into any other exhibit (a timeline's item, a
+// card, a step of a flow), which states it and neither plots nor tabulates it.
+// A line redrawn as columns is the same class; a chart swapped for a table, or
+// for one figure, is not. The class is read off the exhibit's type alone, by
+// this one function, for a page drawn at the spine and for the same page laid
+// out: there is no fourth class for an exhibit to fall into between the two.
 const FIGURE_EXHIBITS = new Set(["fact-grid", "stat-list"]);
-const classOf = (ex) => { const type = String(ex?.type ?? ""); return type.startsWith("chart") ? "chart" : type === "table" || isTable(ex) ? "table" : FIGURE_EXHIBITS.has(type) ? "figure" : type || "exhibit"; };
+export const viewClassOf = (ex) => { const type = String(ex?.type ?? ""); return type.startsWith("chart") ? "chart" : type === "table" || isTable(ex) ? "table" : "figure"; };
+const classOf = viewClassOf;
 const WHOLE = "all";
 /**
  * The class a page not yet drawn is taken to show a measure in: a figure for a
@@ -425,8 +450,19 @@ function statedViews(ex, measureList) {
 // hold a number where the class states numbers; `drawn` is added where none of
 // them can be read off the exhibit, which is then held to the numbers or the
 // figure it draws.
+// A measure of one value is one number wherever the page prints it - a tile, a
+// sentence of a timeline, a reference line across a chart - so it has one view,
+// a figure, whatever exhibit carries it: nothing about how it is drawn is the
+// argument's.
 const wholeOf = (kind, measure) => (kind === "chart" ? measure.axis.labels : measure.axis.labels.filter((_, at) => typeof measure.values[at] === "number"));
-const viewOf = (kind, labels, measure, drawn = null) => [kind, labels === null || labels.length === wholeOf(kind, measure).length ? WHOLE : labels, ...(drawn && labels !== null && !labels.length ? [drawn] : [])];
+const viewOf = (kind, labels, measure, drawn = null) => (measure.axis.kind === "scalar" ? ["figure"]
+  : [kind, labels === null || labels.length === wholeOf(kind, measure).length ? WHOLE : labels, ...(drawn && labels !== null && !labels.length ? [drawn] : [])]);
+/** The view a page not yet drawn is taken to show of a measure nothing declares a view of: whole, in its natural class. */
+const naturalView = (type, measure) => viewOf(naturalClass(type, measure), null, measure);
+// The periods or members the runtime wrote into an exhibit or a figure for `ref` (bind.mjs: a basis marked `bound`), in the measure's
+// order: every one a chart sets on its axis, and - as for a declared view (declaredView) - those that hold a number where the class
+// states numbers, since a cell or a tile that prints "n/a" states nothing of the measure.
+const boundLabels = (basis, ref, measure, kind) => (measure.axis.kind === "scalar" ? null : wholeOf(kind, measure).filter((label) => (basis.labels?.[ref] ?? []).includes(label)));
 
 /**
  * The view of `measure` a `basis` declares for an exhibit or a figure not
@@ -473,6 +509,8 @@ function shownOf(slide, measures) {
     }
     const refs = recorded(basis), numbers = plottedNumbers(ex);
     if (!refs.length) { if (numbers.length) drawn.push({ class: classOf(ex), values: numbers }); continue; }
+    // Written by reference, the exhibit shows exactly the periods or members its references name: read from them, whatever its headers and labels say.
+    if (basis.bound === true) { for (const ref of refs) add(ref, viewOf(classOf(ex), boundLabels(basis, ref, measures[ref], classOf(ex)), measures[ref])); continue; }
     // A chart's category axis says which periods or members it shows, and the dependency gates hold the values it plots there to the record;
     // an exhibit with no axis - a table, a figure grid, a scatter - is read by what it names and states (statedViews).
     const axis = categoryAxis(ex);
@@ -490,6 +528,7 @@ function shownOf(slide, measures) {
     const printed = (figures[at] ? [figures[at].value] : items).filter((value) => value !== undefined && value !== null);
     // Declared and not drawn yet: the view the basis states, or nothing to read.
     if (!printed.length) { if (declaresView(basis)) for (const ref of recorded(basis)) add(ref, declaredView(basis, ref, measures[ref], "figure"), true); return; }
+    if (basis?.bound === true) { for (const ref of recorded(basis)) add(ref, viewOf("figure", boundLabels(basis, ref, measures[ref], "figure"), measures[ref])); return; }
     for (const ref of recorded(basis)) add(ref, viewOf("figure", measures[ref].axis.kind === "scalar" ? null : statedLabels(printed.flatMap(firstNumber), measures[ref]), measures[ref], printed.map(String)));
   });
   // `declared`: the measures whose every view on the page is a declared one - nothing drawn shows them yet.
@@ -524,20 +563,23 @@ function shownOf(slide, measures) {
  */
 export function storyStructure(spec, measures = null) {
   const pages = [...(spec.slides || []), ...(spec.appendix || [])];
-  return pages.map((s, i) => {
+  // A slide a revision carries from its source deck (revision.mjs) is a page of the argument by its title and its place alone:
+  // the runtime neither types it nor draws it, so nothing else of it is bound, and its words are the copy's.
+  const carried = (list) => (spec.carried?.length ? withCarriedPages(spec, list, (entry) => ({ id: entry.id, kind: "carried", title: String(entry.retitled ?? entry.title ?? ""), sourceSlide: entry.sourceSlide }), (page) => String(page.id)) : list);
+  return carried(pages.map((s, i) => {
     const content = s.pageType?.content ?? {};
     const settles = content.settles ?? s.settles ?? null;
     const shows = shownMeasures(s);
     const recorded = measures ? shows.map((entry) => entry.slice(entry.indexOf(":") + 1)).filter((ref, at, all) => measures[ref] !== undefined && all.indexOf(ref) === at) : [];
     const { views, drawn } = shownOf(s, measures);
-    const viewed = (ref) => (views.get(ref) ?? [[naturalClass(s.pageType?.type, measures[ref]), WHOLE]]).map((view) => JSON.stringify(view)).filter((view, at, all) => all.indexOf(view) === at).sort();
+    const viewed = (ref) => (views.get(ref) ?? [naturalView(s.pageType?.type, measures[ref])]).map((view) => JSON.stringify(view)).filter((view, at, all) => all.indexOf(view) === at).sort();
     return { id: s.id ?? `p${i + 1}`, kind: s.kind ?? "content", title: String(s.title ?? s.text ?? ""),
       claim: content.claim ?? s.claim ?? null, type: s.pageType?.type ?? null,
       settles: settles && typeof settles === "object" ? { kind: settles.kind ?? null, what: settles.what ?? null, measures: Array.isArray(settles.measures) ? settles.measures : [], relation: settles.relation ?? null } : null,
       rests: [...new Set(Array.isArray(content.evidence) ? content.evidence : [])].sort(), shows,
       ...(recorded.length ? { measures: Object.fromEntries(recorded.map((ref) => [ref, measures[ref].hash])), views: Object.fromEntries(recorded.map((ref) => [ref, viewed(ref)])) } : {}),
       ...(drawn.length ? { drawn } : {}) };
-  });
+  }));
 }
 
 /**
@@ -562,6 +604,23 @@ export const BOUND_FIELDS = Object.freeze({
   view: "what a page shows of each measure: which of its periods or members, and whether plotted, tabulated or stated as a figure; and the numbers an exhibit with no recorded measure draws",
   record: "the recorded values, unit and periods or members of a measure a page shows",
 });
+
+/**
+ * What the repair of a deck-review finding reaches: "layout" where everything
+ * it changes is the layout's (gates/gate_classes.mjs reviewRepairOf: copy,
+ * layout, fit), so the ready critique stands; "argument" where it writes a
+ * field the critique is bound to (BOUND_FIELDS), which reopens it. The
+ * reviewer's own statement (`touches`) decides; a finding that carries none
+ * is read by its code - "argument" or "layout" where every repair of that
+ * code is one or the other, and "unstated" where they could be either or the
+ * code lists none.
+ */
+export function repairReach(finding) {
+  const { stated, touches } = reviewRepairOf(finding);
+  const bound = touches.filter((field) => Object.hasOwn(BOUND_FIELDS, field));
+  if (stated) return bound.length ? "argument" : "layout";
+  return !touches.length || (bound.length && bound.length < touches.length) ? "unstated" : bound.length ? "argument" : "layout";
+}
 
 /** The critique's binding: the argument (storyStructure), the governing answer and its status, and the user's request. */
 export function storylineBinding(spec, measures = null) {
@@ -616,7 +675,7 @@ function measureLine(ref, label, registry, max) {
 // measure nothing on the page shows yet.
 const CLASS_WORDS = { chart: "plotted", table: "tabulated", figure: "stated as a figure" };
 // One view in words: "tabulated, 2 of its 8 periods: FY25, FY26".
-function viewWords([kind, labels], measure) {
+export function viewWords([kind, labels], measure) {
   const all = measure.axis.labels;
   const window = (shown) => {
     const at = shown.map((label) => all.indexOf(label)), run = measure.axis.kind === "periods" && shown.length > 2 && at.every((index, i) => i === 0 || index === at[i - 1] + 1);
@@ -650,7 +709,7 @@ export function spineReadings(spec, measures) {
     // Each reading with the views it is of, as data: the class, and the periods or members shown (null for a measure of one value).
     const listed = (ref, [kind, labels]) => ({ class: kind, labels: measures[ref].axis.kind === "scalar" ? null : labels === WHOLE ? wholeOf(kind, measures[ref]) : labels });
     const undrawn = refs.filter((ref) => !views.has(ref) || declared.has(ref)).map((ref) => ({ ref, declared: declared.has(ref),
-      views: (declared.has(ref) ? views.get(ref) : [[naturalClass(s.pageType.type, measures[ref]), WHOLE]]).map((view) => listed(ref, view)),
+      views: (declared.has(ref) ? views.get(ref) : [naturalView(s.pageType.type, measures[ref])]).map((view) => listed(ref, view)),
       reading: declared.has(ref) ? [...new Set(views.get(ref).map((view) => viewWords(view, measures[ref])))].join("; and ") : naturalWords(s.pageType.type, measures[ref]) }));
     return undrawn.length ? [{ id: String(s.id), measures: undrawn }] : [];
   });
@@ -677,6 +736,35 @@ async function readEvidence(spec, specPath) {
 /** The recorded measures of a deck whose file is at `deckPath`; null where the deck file, or its log, is not there. */
 const readMeasures = async (spec, deckPath) => (deckPath ? (await readEvidence(spec, deckPath)).measures : null);
 
+// A quantity recorded twice. Two measures of different insights, in one unit,
+// that agree on some of the periods or members they share and differ on
+// others are most likely one quantity recorded twice with a disagreement in
+// it - and then the pages that show them disagree, which a reader of the
+// drawn deck finds as a blocker. (Two different quantities in one unit differ
+// everywhere they meet; the same quantity agrees everywhere.) The runtime
+// cannot be sure, so it lists every such pair for the critic to say. A page's
+// line gives a measure in a few values, so without the list a disagreement on
+// the fifth member of a peer set is not in the packet at all. A difference of
+// rounding alone (32.007 against 32.0) is not a difference.
+const RECONCILE_MAX = 12;
+const decimalsOf = (n) => (String(n).split(".")[1] || "").length;
+const sameAtCoarser = (a, b) => { const places = Math.min(decimalsOf(a), decimalsOf(b)); return Number(a.toFixed(places)) === Number(b.toFixed(places)); };
+/** The pairs of shown measures that may be one quantity recorded twice, as lines; `shown` maps a measure to the pages that show it, `only` keeps the pairs a page of that list shows. */
+function recordedTwice(shown, registry, only = null) {
+  const refs = [...shown.keys()].filter((ref) => registry.get(ref)?.unit);
+  const lines = [];
+  for (const [i, a] of refs.entries()) for (const b of refs.slice(i + 1)) {
+    const [ma, mb] = [registry.get(a), registry.get(b)];
+    if (a.split("/")[0] === b.split("/")[0] || ma.unit !== mb.unit) continue;
+    if (only && ![...shown.get(a), ...shown.get(b)].some((id) => only.includes(id))) continue;
+    const [xa, xb] = [axisOf(ma), axisOf(mb)], [va, vb] = [valuesOf(ma), valuesOf(mb)];
+    const met = xa.labels.map((label, at) => [label, va[at], vb[xb.labels.indexOf(label)]]).filter(([, p, q]) => typeof p === "number" && typeof q === "number");
+    const differ = met.filter(([, p, q]) => !sameAtCoarser(p, q));
+    if (differ.length && differ.length < met.length) lines.push(`${a} (shown on ${shown.get(a).join(", ")}) and ${b} (shown on ${shown.get(b).join(", ")}), ${ma.unit}: agree on ${met.length - differ.length} of the ${met.length} they share; differ on ${differ.slice(0, 4).map(([label, p, q]) => `${label}, ${p} against ${q}`).join("; ")}${differ.length > 4 ? `; and ${differ.length - 4} more` : ""}`);
+  }
+  return lines.slice(0, RECONCILE_MAX);
+}
+
 /**
  * The pages the critique reads, with what each rests on: its claim, its page
  * type, what settles it, the measures it declares it shows with their recorded
@@ -694,7 +782,7 @@ async function storyPages(spec, specPath, { max }) {
   const insights = new Map((log?.insights || []).map((i) => [i.id, i]));
   const registry = measureRegistry(log?.insights || []);
   let section = null;
-  const pages = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
+  const composed = [...(spec.slides || []), ...(spec.appendix || [])].map((s, i) => {
     if (s.kind === "section") section = String(s.title ?? s.text ?? "");
     const planned = byId.get(s.id) || {};
     const body = (planned.textPlan || []).filter((b) => ["body", "qualification"].includes(b.role)).map((b) => b.text);
@@ -707,10 +795,22 @@ async function storyPages(spec, specPath, { max }) {
       drafted: exhibits.map(describeExhibit), draftedNumbers: draftedNumbers(exhibits), commentary: body.slice(0, 6), source: s.source ?? null,
       // The context measures and the relation the claim asserts, for the critic to judge: declared by the author, never inferred.
       declared: dependencyNotes({ bases: declaredBases(s), settles: s.pageType?.content?.settles }),
+      // Where the page's type has no form that carries what its measures ask of a reader and another type has (claim-fit.mjs): read, not declared, for the shape check.
+      fit: s.pageType && registry.size ? typeFitNote(s, { registry, insights, carriedBy: (type) => !TYPE_SHAPES[type] || evidence.some((id) => TYPE_SHAPES[type].includes(insights.get(id)?.shape)) }) : "",
       evidence: evidence.map((id) => { const item = insights.get(id); return item ? { id, finding: item.finding, calculation: item.calculation ?? null, sources: item.sources ?? [], strength: item.strength ?? null } : { id, missing: true }; }),
       ...(s.pageType ? { type: s.pageType.type } : {}) };
   });
-  return { pages, content, log, analysis, measures };
+  // The slides a revision carries, in their places: each by its title and the words it prints, as the inventory read them and as the revision's edits leave them.
+  const inventory = spec.carried?.length ? await readInventory(spec, specPath) : null;
+  const said = new Map(carriedSaid(spec, inventory).map((item) => [item.id, item]));
+  const pages = (spec.carried?.length ? withCarriedPages(spec, composed, (entry) => ({ id: entry.id, kind: "carried", title: String(entry.retitled ?? entry.title ?? ""), says: said.get(entry.id)?.texts.slice(1, 9) ?? [], edited: Boolean(said.get(entry.id)?.edited),
+    // A slide the revision edited is judged against all it says and shows - its record, whole (revision.mjs slideRecord): a title rewritten over a table is read against every row.
+    // With it, the lines the revision rewrote, each beside what it replaced: every other line of the record is the user's own, and a critic who cannot tell the two apart files the user's words as the revision's.
+    ...(said.get(entry.id)?.edited ? { record: said.get(entry.id).record, rewrote: said.get(entry.id).rewritten.map((line) => ({ what: line.title ? "title" : "line", was: line.was, now: line.text })) } : {}) }), (page) => String(page.id)) : composed)
+    .map((page, i) => ({ ...page, n: i + 1 }));
+  const shown = new Map();
+  for (const page of composed) for (const { ref } of page.measures) if (registry.has(ref)) shown.set(ref, [...(shown.get(ref) ?? []), page.id]);
+  return { pages, content, log, analysis, measures, reconcile: (only) => recordedTwice(shown, registry, only) };
 }
 
 // A spine past this many content pages is critiqued page by page (--full) by
@@ -733,7 +833,7 @@ const READY_NOTE = "The argument is settled: lay the pages out now, once - exhib
 // under another version hashed its pages differently, so nothing can say which
 // of them changed since: its lineage is retired and the critique begins again
 // (prepareStoryline), not read as a deck in which every page moved.
-const BINDING_VERSION = 3;
+const BINDING_VERSION = 4;
 const bindingVersionOf = (record) => record?.bindingVersion ?? 1;
 const PACKET_RECORD = "storyline-packet.json";
 
@@ -759,9 +859,9 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const base = path.dirname(specPath);
   const store = await lineageStore(spec, outputDirectory, specPath);
   // The spine packet gives a measure in a few values; the page-level packet gives the series.
-  const { pages, content, log, analysis, measures } = await storyPages(spec, specPath, { max: mode === "full" ? FULL_MEASURE_VALUES : SPINE_MEASURE_VALUES });
+  const { pages, content, log, analysis, measures, reconcile } = await storyPages(spec, specPath, { max: mode === "full" ? FULL_MEASURE_VALUES : SPINE_MEASURE_VALUES });
   // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
-  const sources = await fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f))).catch(() => []);
+  const sources = await sourceFiles(base);
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
   const contentPages = pages.filter(isContent).length;
   const targetPages = Number.isFinite(spec.targetPages) ? spec.targetPages : spec.purpose === "evaluation" ? 50 : null;
@@ -777,10 +877,14 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     // Each analysis result and insight by the hash of its content: what a later pass compares to say an item closed on something that changed.
     artifacts: Object.fromEntries([...analysis.results.map((r) => [r.id, r.hash]), ...(log?.insights || []).filter((item) => item?.id && !item.derived).map((item) => [item.id, sha256(JSON.stringify(item))])]),
     question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
+    // What a title is held to, so a fix that proposes one stays inside it.
+    limits: titleLimits(spec, base),
+    // Measures that may be one quantity recorded twice: where a revision or a later pass reads part of the deck, the pairs a page it reads shows.
+    reconcile: reconcile(scope ? scope.postReview?.pages ?? scope.changed : revision ? revision.spine : null),
     // The blocking items open when an earlier lineage was retired: a first pass says of each whether it still stands.
     ...(!scope && carried.length ? { carried } : {}),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
-  const schema = schemaFor(mode, scope);
+  const schema = offeredSchema(mode, scope, { carried: !scope && carried.length > 0 });
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const dir = await stageReview("storyline", {}, { previous: previous?.staging });
   packet.staging = dir;
@@ -796,7 +900,8 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   if (sections) {
     await fs.mkdir(path.join(dir, "sections"), { recursive: true });
     await fs.mkdir(path.join(dir, "parts"), { recursive: true });
-    await writeJson(path.join(dir, "part-schema.json"), STORYLINE_PART_SCHEMA);
+    await writeJson(path.join(dir, "part-schema.json"), STORYLINE_PART_SCHEMAS.section);
+    await writeJson(path.join(dir, "spine-part-schema.json"), STORYLINE_PART_SCHEMAS.spine);
     for (const [id, text] of parts) await fs.writeFile(path.join(dir, "sections", `${id}.md`), signed(text));
   }
   await fs.mkdir(store, { recursive: true });
@@ -804,15 +909,6 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   return { dir, packet, store };
 }
 
-// How an insight is graded, and what makes a measurement a finding: one
-// definition, read where the insight log is compiled (author-deck.mjs
-// readInsights, which refuses an ungraded log) and where the critic is shown it.
-export const INSIGHT_STRENGTHS = Object.freeze(["strong", "supporting", "context"]);
-export function insightGradeProblems(item) {
-  const id = item?.id ?? "?";
-  return [...(INSIGHT_STRENGTHS.includes(item?.strength) ? [] : [`${id}: \`strength\` is one of ${INSIGHT_STRENGTHS.join(", ")}${item?.strength === undefined ? "" : ` (got ${JSON.stringify(item.strength)})`}`]),
-    ...(typeof item?.soWhat === "string" && textWords(item.soWhat) >= 4 ? [] : [`${id}: \`soWhat\` says what follows for the decision, in a sentence`])];
-}
 /**
  * The pillars that rest on no strong insight (PILLAR_UNSUPPORTED): `pages` in
  * order as { kind, title, evidence, appendix }, a section opening each pillar
@@ -831,6 +927,21 @@ export function unsupportedPillars(pages, insights) {
 }
 
 /**
+ * The insights whose `sources` are not files the deck holds: `[{ id, none,
+ * missing }]`, `none` where an insight names no source and `missing` the
+ * entries that are not a file under sources/ (`sources`: the files there, as
+ * paths relative to it). A source is the file a finding was read from, by its
+ * path - `sources/accounts.csv` - so a name or a registry key is not one.
+ */
+export function unfiledSources(items, sources = []) {
+  const have = new Set(sources.map((f) => `sources/${f}`));
+  return (items || []).flatMap((item) => { const listed = Array.isArray(item?.sources) ? item.sources : [], missing = listed.filter((f) => !have.has(f));
+    return !listed.length ? [{ id: item?.id ?? "?", none: true, missing: [] }] : missing.length ? [{ id: item?.id ?? "?", none: false, missing }] : []; });
+}
+/** The files under `<base>/sources`, as paths relative to it: what an insight's `sources` are checked against. */
+export const sourceFiles = (base) => fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f)).map((f) => f.split(path.sep).join("/"))).catch(() => []);
+
+/**
  * The insight log, checked for what makes a finding a finding: a statement,
  * the calculation that produced it, its grade and what follows from it, and a
  * source file that exists. Problems are reported to the critic, who weighs
@@ -839,7 +950,6 @@ export function unsupportedPillars(pages, insights) {
 export function checkInsights(log, sources = [], pages = null) {
   if (!log) return { present: false, items: [], problems: ["no insight log: the titles were written without recorded findings"] };
   const items = Array.isArray(log.insights) ? log.insights : [];
-  const have = new Set(sources.map((f) => `sources/${f}`));
   const problems = [];
   for (const item of items) {
     if (!item?.finding || !item?.calculation) problems.push(`${item?.id ?? "?"}: a finding needs its statement and the calculation behind it`);
@@ -850,10 +960,9 @@ export function checkInsights(log, sources = [], pages = null) {
     if (!SHAPES[item?.shape]) problems.push(`${item?.id ?? "?"}: record the data's \`shape\` - one of ${Object.keys(SHAPES).join(", ")}`);
     // And its breadth: a four-year series or a three-member peer set is a thin page waiting to be written.
     else if (breadthProblem(item)) problems.push(breadthProblem(item));
-    const missing = (item?.sources || []).filter((f) => !have.has(f));
-    if (!(item?.sources || []).length) problems.push(`${item?.id ?? "?"}: no source file`);
-    else if (missing.length) problems.push(`${item?.id ?? "?"}: source not in sources/: ${missing.join(", ")}`);
   }
+  // One line for every insight whose sources are not files: the compile said the same to the author first (author-deck.mjs SOURCES_UNFILED).
+  problems.push(...unfiledSources(items, sources).map((entry) => (entry.none ? `${entry.id}: no source file` : `${entry.id}: source not in sources/: ${entry.missing.join(", ")}`)));
   if (pages) for (const pillar of unsupportedPillars(pages, new Map(items.map((i) => [i.id, i])))) problems.push(`PILLAR_UNSUPPORTED: "${pillar.title}" rests on no strong insight`);
   return { present: true, items: items.map((i) => ({ id: i.id, finding: i.finding, shape: i.shape ?? null, breadth: breadthOf(i), strength: i.strength ?? null, calculation: i.calculation ?? null, sources: i.sources ?? [] })), problems };
 }
@@ -863,31 +972,44 @@ const settlesLine = (p) => (p.settles?.kind ? `${p.settles.kind}${p.settles.what
 // The measures a page shows, each with its recorded values; past `max` of them the rest are named.
 const shownLine = (measures, join, max = measures.length) => `${measures.slice(0, max).map((m) => m.line).join(join)}${measures.length > max ? `${join}and ${measures.slice(max).map((m) => m.ref).join(", ")}` : ""}`;
 const restsLine = (p) => (p.evidence?.length ? p.evidence.map((e) => e.missing ? `${e.id} (NOT IN THE LOG)` : `${e.id} "${e.finding}" (calc: ${e.calculation ?? "none"}; sources: ${e.sources.join(", ") || "none"})`).join("; ") : "no insight named");
-const spineLine = (p) => isContent(p)
+// A carried slide is the user's own: its title, and what it says in a line, so the critic reads the argument across it.
+const carriedLine = (p) => `${p.n}. [${p.id}] ${p.title || "(untitled)"} | a slide of the user's deck, carried as it is${p.edited ? " (edited in place by this revision)" : ""}${(p.says || []).length ? ` | says: ${p.says.join(" / ").slice(0, 320)}` : ""}`
+  + ((p.rewrote || []).length ? `\n     WHAT THE REVISION REWROTE ON IT - only this is the revision's; every other line below is the user's own, as it stood:\n${p.rewrote.map((line) => `       the ${line.what}, from "${line.was}" to "${line.now}"`).join("\n")}` : "")
+  + ((p.record || []).length ? `\n     THE SLIDE ITSELF under that title, as this revision leaves it - its record, whole (the title is not repeated here):\n${p.record.map((line) => `       ${line}`).join("\n")}` : "");
+const spineLine = (p) => p.kind === "carried" ? carriedLine(p) : isContent(p)
   ? `${p.n}. [${p.id}] ${p.title}${p.type ? `\n     page type: ${p.type}` : ""}${settlesLine(p) ? `\n     settled by: ${settlesLine(p)}` : ""}\n     shows: ${shownLine(p.measures || [], " / ") || "no measure declared"}${(p.declared || []).length ? `\n     declared: ${p.declared.join(" / ")}` : ""}\n     rests on: ${restsLine(p)}${(p.drafted || []).length ? `\n     drafted exhibits (not settled): ${p.drafted.join(" + ")}${p.draftedNumbers ? `; drawing ${p.draftedNumbers}` : ""}` : ""}${(p.commentary || []).length ? `\n     drafted copy (not settled): ${p.commentary.join(" / ").slice(0, 400)}` : ""}`
-  : `${p.n}. -- ${p.kind}: ${p.title}`;
+  : `${p.n}. [${p.id}] -- ${p.kind}: ${p.title}`;
 
 // One line per page for the spine critique: title, claim where it differs,
 // page type and what kind of evidence settles it, the measures it shows with
 // their recorded values, and the insight ids it rests on - only what the
 // critique is bound to. A drafted exhibit's numbers are not in it.
-const compactLine = (p) => isContent(p)
-  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}${p.settles?.kind ? `, settled by ${p.settles.kind}` : ""}` : ""}${(p.measures || []).length ? ` | shows: ${shownLine(p.measures, "; ", SPINE_MEASURES)}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}${(p.declared || []).length ? ` | declared: ${p.declared.join(" / ")}` : ""}`
-  : `${p.n}. -- ${p.kind}: ${p.title}`;
+const compactLine = (p) => p.kind === "carried" ? carriedLine(p) : isContent(p)
+  ? `${p.n}. [${p.id}] ${p.title}${p.claim && p.claim !== p.title ? ` | claim: ${p.claim}` : ""}${p.type ? ` | ${p.type}${p.settles?.kind ? `, settled by ${p.settles.kind}` : ""}` : ""}${(p.measures || []).length ? ` | shows: ${shownLine(p.measures, "; ", SPINE_MEASURES)}` : ""} | rests on: ${(p.evidence || []).map((e) => `${e.id}${e.missing ? " (NOT IN THE LOG)" : ""}`).join(", ") || "none"}${(p.declared || []).length ? ` | declared: ${p.declared.join(" / ")}` : ""}${p.fit ? ` | fit: ${p.fit}` : ""}`
+  : `${p.n}. [${p.id}] -- ${p.kind}: ${p.title}`;
 
 // The text of a page as the packet shows it: what a missed item's quoted evidence is checked against.
-const packetPageText = (packet) => Object.fromEntries(packet.pages.map((p) => [p.id, [p.title, p.claim, p.type, settlesLine(p), ...(p.measures || []).map((m) => m.line), p.draftedNumbers, ...(p.drafted || []), ...(p.declared || []), ...(p.commentary || []), ...(p.evidence || []).map((e) => `${e.id} ${e.finding ?? ""}`)].filter(Boolean).join("\n")]));
+const packetPageText = (packet) => Object.fromEntries(packet.pages.map((p) => [p.id, [p.title, ...(p.says || []), p.claim, p.type, settlesLine(p), ...(p.measures || []).map((m) => m.line), p.draftedNumbers, ...(p.drafted || []), ...(p.declared || []), ...(p.commentary || []), ...(p.evidence || []).map((e) => `${e.id} ${e.finding ?? ""}`)].filter(Boolean).join("\n")]));
+
+// The measures that may be one quantity recorded twice (recordedTwice), as the critic is asked about them.
+const reconcileLines = (packet) => ((packet.reconcile || []).length ? `
+FIGURES TO RECONCILE. Each pair below is two measures of different insights, in one unit, that agree on some of the periods or members they share and differ on others. Say in \`numbers\` of each whether they are one quantity - then the pages disagree: a blocker \`numbers\` finding naming both - or two quantities, and why:
+${packet.reconcile.map((line) => `- ${line}`).join("\n")}
+` : "");
+
+// The title limits the build holds (review-floors.mjs titleLimits), as the critic is held to them in a fix.
+const limitsLine = (packet) => (packet.limits ? `\nLIMITS THE BUILD HOLDS: ${titleLimitsLine(packet.limits)}.\n` : "");
 
 // What the runtime computed from the insight log's measures before the outline was written.
 const analysesLines = (packet) => `COMPUTED ANALYSES (run by the runtime over the log's measures; a page rests on one by its id):
 ${(packet.analyses || []).map((a) => `- ${a.line}`).join("\n") || "- none"}${(packet.analysisProblems || []).length ? `\nANALYSIS PLAN PROBLEMS: ${packet.analysisProblems.join("; ")}` : ""}`;
 
 function checksPrompt() {
-  return `THE CHECKS. The page checks are made on every content page; the spine checks on the storyline as a whole.
+  return `THE CHECKS. Page checks on every content page; spine checks on the storyline as a whole. After each check's own question come the deck review's words for it: apply them now, to what the packet shows of each page. A defect of argument first found on the drawn page reopens this critique.
 ${STORYLINE_DIMENSIONS.map((d) => `- ${d} (${STORYLINE_CHECKS[d].scope}): ${STORYLINE_CHECKS[d].checks}`).join("\n")}
 
-SEVERITY:
-${["blocker", "major", "minor", "none"].map((s) => `- ${s}: ${s === "blocker" ? "the answer does not follow, a decisive claim is unsupported or contradicted, or a number conflicts across pages" : s === "major" ? "a page or pillar a partner would send back: an obvious or unsourced claim, the wrong evidence shape, a restated page, a missing countercase, a missing analysis that would change the answer" : s === "minor" ? "a weakness that does not change whether the answer follows: a claim that could be sharper, a page better placed" : SEVERITY_DEFINITIONS[s]}`).join("\n")}`;
+SEVERITY, on the deck review's scale:
+${["blocker", "major", "minor", "none"].map((s) => `- ${s}: ${ARGUMENT_SEVERITIES[s]}`).join("\n")}`;
 }
 
 // What the critique settles and what it leaves to the layout, said to every
@@ -897,28 +1019,92 @@ const ARGUMENT_RULES = `the pages are laid out once, after this critique is read
 
 /** The storylining standard, condensed, so a critic needs no other file. */
 export const CRITIC_STANDARDS = `THE STANDARD. You need no other file: this is the skill's storylining guidance, condensed.
-- The answer answers the user's request - every part of it - and is sharp enough to be wrong. An answer that declines part of the request fails the answer check: "cannot rank" is allowed at most once, and only when it names the decisive missing evidence; an answer that leaves two of three questions unranked is not an answer.
-- The pillars are a MECE set of reasons that together prove the answer; each has its strongest counter-argument and the condition that would reverse it.
-- Every analytical page carries a finding with an implication, drawn from the insight log: not a count, a fact or a two-number comparison. Its evidence has the shape the claim needs: the trend with its rate, the whole ranked peer set, the share and its movement, the ratio, the gap to a benchmark, the map, the judging table. A comparison sets every member on the same measures, n/a where one is undisclosed.
-- Each page moves the argument on: none restates, previews or re-proves another. The summary states what the body proves, with its numbers, and the close agrees with it.
-- A missing analysis names why it would change the answer, the data behind it and its \`remedy\`: ${Object.entries(REMEDIES).map(([key, about]) => `"${key}" (${about})`).join(", ")}. Ask first whether the packet's own measures would settle it. Mark \`public: "known"\` only when you can name the public source that publishes the data; otherwise "speculative", and a speculative retrieval is never major. You are not searching the web: say what you know is published. An analysis is met by the analysis, never by a caveat saying what the evidence does not establish.
+- A missing analysis names why it would change the answer, the data behind it and its \`remedy\`: ${Object.entries(REMEDIES).map(([key, about]) => `"${key}" (${about})`).join(", ")}. Ask first whether the packet's own measures would settle it. Mark \`public: "known"\` only when you can name the public source that publishes the data; otherwise "speculative", and a speculative retrieval is never major. Say what you know is published. An analysis is met by the analysis, never by a caveat saying what the evidence does not establish.
 - The requested length counts the appendix: recommend cutting weak or repetitive body pages freely, and move surplus pages that still earn a lookup to the appendix, which keeps the total at the requested length; give the freed body pages to a missing analysis.
 - Judge the argument, not the drawing or the wording: ${ARGUMENT_RULES}`;
 
-const ITEM_RULES = `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A page finding names its one page; a spine finding lists EVERY page it concerns (for the answer, the summary and closing pages) - never a sample, never "e.g.", "such as" or "etc.". Validation refuses a sampled page list and a finding whose text names a page its list leaves out.`;
+// How a page is named, and what the runtime does with a list that names one loosely (settleCritiqueForm): said once, to every critic.
+const PAGE_IDS_RULE = "Name a page by the id in brackets on its line (a divider has one), never by its position. A range in a page list (\"p16-p19\") is read as every page between, and a page a spine item's `problem`, `fix` or `freedUse` names by id is added to its list; the record says the runtime did.";
+
+/**
+ * A critique with its page lists settled (review-passes.mjs settlePageList):
+ * `{ review, mended }`. Ranges are expanded in every page list - a finding's,
+ * a cut's, a pillar's, a status's - and a spine finding or a cut gains each
+ * page its own text names by id. Nothing a critic judged is touched, and each
+ * thing done is listed in `mended` (`at`, `did`, `pages`), which the loop keeps
+ * on the pass's record and prints. A critique that is not an object is returned
+ * as it is, for validation to refuse.
+ */
+export function settleCritiqueForm(reviewIn, ids, contentIds = ids) {
+  if (!reviewIn || typeof reviewIn !== "object" || Array.isArray(reviewIn)) return { review: reviewIn, mended: [] };
+  const review = structuredClone(reviewIn), mended = [];
+  const settle = (name, textOf) => {
+    if (!Array.isArray(review[name])) return;
+    review[name].forEach((item, i) => {
+      if (!item || typeof item !== "object") return;
+      const done = settlePageList(item.pages, ids, { text: textOf ? textOf(item) : null, spanned: contentIds });
+      if (!done.mended.length) return;
+      item.pages = done.pages;
+      mended.push(...done.mended.map((entry) => ({ at: `${name}[${i}]${item.id ?? item.finding ? ` (${item.id ?? item.finding})` : ""}`, ...entry })));
+    });
+  };
+  settle("findings", (item) => (item.scope === "spine" ? `${item.problem ?? ""} ${item.fix ?? ""}` : null));
+  settle("cutOrMerge", (item) => String(item.freedUse ?? ""));
+  settle("pillars", null);
+  settle("statuses", null);
+  return { review, mended };
+}
+/** `mended` (settleCritiqueForm) as the lines a run prints. */
+const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}` : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
+
+/**
+ * The rules validation enforces on the form of a critique, each as the prompt
+ * states it (`rule`) and as its refusal reads (`matches`): one table, so the
+ * critic is told exactly what is tested (the deck review's is reviewer.mjs
+ * formRules). `checks` are the checks the answer's completeness covers - all
+ * of them, a section's page checks or the spine part's - `cap` the most items
+ * a spine critique returns, and `completeness` false for a verification pass,
+ * which carries none.
+ */
+export const storylineFormRules = ({ checks = STORYLINE_DIMENSIONS, cap = null, completeness = true } = {}) => [
+  ...(cap ? [{ id: "cap", matches: /returns at most \d+ items/, rule: `at most ${cap} items in all: findings, missing analyses and cuts` }] : []),
+  { id: "pages", matches: /a page finding names one page|list the affected pages/, rule: "a finding with `scope: \"page\"` has exactly one id in `pages`; a spine finding has one or more" },
+  { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} just before a page id, none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
+  { id: "title", matches: /the title it proposes|asks for a title of/, rule: "a `fix` that proposes a title in quotes, or a length for one, keeps to the limits above" },
+  ...(completeness ? [
+    { id: "completeness-entries", matches: /completeness: (?:unknown check|say what was checked for every|\S+ listed twice)|completeness\[\d+\]\.check/, rule: `\`completeness\` holds exactly one entry for each of ${checks.join(", ")}, and no other` },
+    { id: "completeness-result", matches: /marked clean but|marked findings but/, rule: "its `result` is \"findings\" exactly when this answer files an item under that check - a finding whose `check` it is; under missing, a missing analysis; under cuts, a cut or merge - and \"clean\" otherwise" },
+    { id: "completeness-note", matches: /say what was (?:found|checked)/, rule: `its \`note\` runs to ${COMPLETENESS_NOTE.clean} characters or more for clean (what you checked), ${COMPLETENESS_NOTE.findings} or more for findings` },
+  ] : []),
+];
+const itemRules = (options) => `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A spine finding lists EVERY page it concerns (for the answer: the summary and closing pages). ${PAGE_IDS_RULE}
+FORM. Validation refuses the whole answer on any of these:
+${storylineFormRules(options).map((item) => `- ${item.rule}`).join("\n")}`;
 
 const PAGE_RULES = `PAGE VERDICTS. \`pages\` holds one entry for every content page: its verdict (ok, minor, major, blocker - the worst open item naming the page), a note for claim, shape, restatement and consequence, and \`sourcing\` { status: supported | partly | unsupported | n/a, insights: the ids it rests on, note }. An unsupported page carries a major or blocker sourcing finding; a partly supported one a sourcing finding at any severity.`;
 
 // The two judgements a critique returns beside its verdict, and the scale its rating is on.
 const JUDGEMENT_RULES = `TWO JUDGEMENTS, KEPT APART. \`compliance\`: has the team done everything the evidence in scope allows? "complete" only when no major or blocker item it could still act on is open. \`sufficiency\`: does the evidence support the answer as stated? "sufficient" only when no major or blocker item is open at all; "provisional" when the only ones open need evidence the team may not fetch and the answer is offered as provisional; else "insufficient". A severity is never lowered because the scope forbids the remedy.
-RATING SCALE: ${Object.entries(RATING_ANCHORS).map(([band, means]) => `${band} ${means}`).join("; ")}. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less.`;
+RATING SCALE, the deck review's: ${ratingScale()}.`;
 
 const ANSWER_RULES = `THE ANSWER, PART BY PART. In \`answerParts\` list each part of the user's request (each question it asks, each choice it wants made) with how the governing answer meets it: "answered", "cannot rank" (with \`missingEvidence\` naming the decisive evidence that is missing, and why it decides the part) or "declined" (anything else that does not answer it). "cannot rank" is allowed once; a second, or any part declined, fails the answer check: the verdict is revise and a major or blocker \`answer\` finding says what the answer must commit to. \`missingEvidence\` is "" for an answered part.`;
 
 // A revision's first critique reads what the revision changed; the rest is the
 // user's deck as it stands, there for context.
+// What the deck is made of is said from the counts - the slides carried, the ones edited in place, the pages composed - so
+// one carried slide beside forty composed pages is not read as "mostly the user's own".
+function revisionMakeup(packet) {
+  const pages = packet.pages || [], carried = pages.filter((p) => p.kind === "carried"), edited = carried.filter((p) => p.edited).length, kept = carried.length - edited, composed = pages.length - carried.length;
+  if (!carried.length) return "";
+  const parts = [kept ? `${kept} ${kept === 1 ? "is the user's own slide" : "are the user's own slides"}, carried into the new deck unchanged` : null, edited ? `${edited} ${edited === 1 ? "is a slide of theirs" : "are slides of theirs"} with words edited in place` : null,
+    composed ? `${composed} ${composed === 1 ? "is a page" : "are pages"} the revision composed` : null].filter(Boolean);
+  const whose = composed > carried.length ? "Most of the deck is the revision's own argument, to be critiqued as one" : composed ? "Most of the deck is the user's own" : "The deck is the user's own";
+  return `Of its ${pages.length} pages, ${parts.join(", ")}. ${whose}: a carried slide is listed by its title and what it says, for the argument it sits in, and is not yours to critique. `;
+}
 const revisionLines = (packet) => (packet.revision ? `
-THIS IS A REVISION of the user's existing deck. The pages marked [changed] are the revision's${packet.revision.dropped?.length ? `, and ${packet.revision.dropped.length} slide${packet.revision.dropped.length === 1 ? " was" : "s were"} cut from the source deck (the pages either side are marked)` : ""}; the others are the user's deck as it stands, shown for context. File items only where the revision is involved: a page item names a changed page, and a spine item or a cut lists at least one. A missing analysis is in scope only where a changed page needs it.
+THIS IS A REVISION of the user's existing deck. ${revisionMakeup(packet)}The pages marked [changed] are the revision's${packet.revision.dropped?.length ? `, and ${packet.revision.dropped.length} slide${packet.revision.dropped.length === 1 ? " was" : "s were"} cut from the source deck (the pages either side are marked)` : ""}; the others are the user's deck as it stands, shown for context. File items only where the revision is involved: a page item names a changed page, and a spine item or a cut lists at least one. A missing analysis is in scope only where a changed page needs it.
+WHAT A PAGE OF A REVISION RESTS ON. A slide of the user's own - carried, or edited in place - has no insight log behind it and is asked for none: its record is the slide itself, quoted beside its title (\`says:\`). Judge a changed title or changed words against what that slide says and shows; do not file a sourcing finding because the packet records no insight, calculation or source file for it. A page the revision COMPOSED is the team's own page and rests on what its line shows: where it draws numbers and names no insight, that is a sourcing finding, and the fix is one record in the insight log for the numbers it draws - their unit, population, period or members and values, with the source they came from, which may be the user's own slide - named in the page's \`evidence\`.
+${ABOUT_IMPORTED_RULE} The request below is the change the user asked for, where one is recorded: judge whether the changed pages make it and still fit the argument around them, and in \`answerParts\` take the parts of that change - not the question the user's deck was written to answer.
 ` : "");
 /** The blocking items a retired lineage left open, as a first pass is asked about them. */
 const carriedLines = (packet) => (packet.carried?.length ? `
@@ -951,7 +1137,7 @@ const SPINE_HEADING = "THE SPINE (title | claim where it differs | page type, se
 export function spinePrompt(packet) {
   return `You are a senior partner reviewing a team's storyline before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and shows. You did not write it and you owe it nothing. Be adversarial and specific. Judge from this packet alone: do not search the web or open other files.
 
-This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return at most ${SPINE_ITEM_MAX} items - findings, missing analyses and cuts together - the ones that most change whether the deck answers the request. Later passes only verify them, and may add only a serious new problem on a part the team changed.
+This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return the items that most change whether the deck answers the request, ${SPINE_ITEM_MAX} at most (FORM below). Later passes only verify them, and may add only a serious new problem on a part the team changed.
 ${revisionLines(packet)}${carriedLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
@@ -965,26 +1151,26 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map((p) => marked(packet, compactLine(p), p)).join("\n")}
-
+${reconcileLines(packet)}${limitsLine(packet)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
 Work through it in this order.
 1. The spine alone: does it tell the story? Write \`spine\`.
-2. The answer: is it an answer to the request, or a restatement or refusal of it? Sharp enough to be wrong? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
-3. The pillars: a MECE set of reasons that together prove the answer? For each in \`pillars\`: its pages, your verdict, overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
-4. The pages, from their lines: a claim that is a count or a fact, a page type or measures too thin for the claim, a page with no insight behind it, a page that restates another, a page with no consequence - each as a finding on its pages.
-5. \`numbers\`, \`sectionFlow\` and \`execSummary\`, in a sentence or two each.
+2. The answer, on its check above: an answer, or a restatement or refusal of the request? Rewrite it the way it should read in \`answer\`, and judge it part by part in \`answerParts\`.
+3. The pillars, on their check above. For each in \`pillars\`: its pages, your verdict, overlaps and gaps, the strongest counter-argument, the condition that would reverse it, and whether the storyline answers it.
+4. The pages, from their lines, on every page check - and a title (a section's too) that claims more than the periods or members its pages show, a comparison with one member - each as a finding on its pages.
+5. \`numbers\`: set every figure in a title or claim beside the measures recorded on its page and on each other page stating that quantity. \`sectionFlow\` and \`execSummary\`, a sentence or two each.
 6. Missing analyses, each with \`public\` known or speculative; cut or merge.
-7. Completeness: one entry per check in \`completeness\` - "findings" when you filed any under it, "clean" with what you checked when you did not.
+7. Completeness: one entry per check in \`completeness\`, as FORM below says.
 8. Verdict: "ready" only if no major or blocker item is open and the answer check passes. Rate the storyline on the scale below; rank the top fixes.
 
 ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${ITEM_RULES}
+${itemRules({ cap: SPINE_ITEM_MAX })}
 
 Set pass to 1 and verifies to null. Bind the review to ${packet.binding}. Return ONLY JSON matching the schema in ${packet.staging ? path.join(packet.staging, "schema.json") : "schema.json beside this prompt"}.`;
 }
@@ -1008,7 +1194,7 @@ ${analysesLines(packet)}
 
 THE STORYLINE (title, page type, what settles the claim, the measures it shows with their recorded values, the insights it rests on; drafted exhibits and copy are the author's sketch):
 ${packet.pages.map((p) => marked(packet, spineLine(p), p)).join("\n")}
-
+${reconcileLines(packet)}${limitsLine(packet)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1023,7 +1209,7 @@ Work through it in this order.
 6. Section flow (\`sectionFlow\`) and the executive summary against the body and the close (\`execSummary\`).
 7. Missing analyses: what a strong team would have run, why it matters to the answer, the public data behind it, and whether that data is \`public\` known or speculative.
 8. Cut or merge: pages that repeat, preview or exist to reach a count, and what the freed pages should carry. Cut body pages where the argument is better without them; a surplus or weak page that still earns a lookup moves to the appendix, which counts toward the requested length.
-9. Completeness: one entry per check in \`completeness\` - "findings" when you filed any under it, "clean" with what you checked when you did not.
+9. Completeness: one entry per check in \`completeness\`, as FORM below says.
 10. Verdict. "ready" only if no major or blocker item is open and the answer check passes: the answer is sharp, the pillars hold, the decisive pages are analytical and sourced, and no missing analysis would change the answer. Otherwise "revise". Rate the storyline on the scale below. Rank the top fixes.
 
 ${PAGE_RULES}
@@ -1032,7 +1218,7 @@ ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${ITEM_RULES}
+${itemRules()}
 
 Set pass to 1 and verifies to null. Bind the review to ${packet.binding}. Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_SCHEMA)}`;
 }
@@ -1056,10 +1242,11 @@ Check every page check on every one of your pages; this is the exhaustive first 
 
 ${PAGE_RULES}
 
-${ITEM_RULES} Name only pages in your section; leave the spine sections as short notes ("see the spine critic").
+${itemRules({ checks: STORYLINE_PAGE_CHECKS })}
+Name only pages in your section; leave the spine sections as short notes ("see the spine critic").
 
 \`completeness\` covers the page checks (${STORYLINE_PAGE_CHECKS.join(", ")}). Set part to ${JSON.stringify({ kind: "section", id: section.id, pages: section.pages })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMA)}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMAS.section)}`;
 }
 
 /** The spine critic of a long page-level critique: the compact spine, not the whole page listing again. */
@@ -1077,7 +1264,7 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map(compactLine).join("\n")}
-
+${reconcileLines(packet)}${limitsLine(packet)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1088,34 +1275,52 @@ ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${ITEM_RULES}
+${itemRules({ checks: SPINE_CHECKS })}
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", pages: packet.pages.filter(isContent).map((p) => p.id) })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMA)}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(STORYLINE_PART_SCHEMAS.spine)}`;
 }
 
 export function storylineVerificationPrompt(packet) {
   const { scope } = packet;
   const full = packet.mode === "full";
-  const read = packet.pages.filter((p) => scope.mustInspect.includes(p.id));
+  const post = scope.postReview ?? null;
+  // The pages whose argument moved since the pass this verifies, by id: what `artifact` may name for a finding fixed elsewhere.
+  const movedIds = [...(scope.changed || []), ...(scope.deleted || []).map((id) => `${id} (deleted)`)];
+  const read = packet.pages.filter((p) => (post ? post.pages : scope.mustInspect).includes(p.id));
   const changed = new Set(scope.changed);
-  return `You are verifying a team's revisions to a storyline an earlier critique sent back. This is pass ${scope.pass} of at most ${scope.maxPasses}; it verifies the critique bound to ${scope.verifies}. It is not a fresh critique: the first pass read the whole ${full ? "storyline" : "spine"}, and its verdict stands for every part that has not changed. No earlier rating is given to you. Judge from this packet alone.
+  const opening = post?.origin === "compile"
+    ? `You are verifying changes made to a storyline after its pages were laid out. An earlier critique passed this storyline as ready; the runtime's own compile then refused, on that storyline, declarations whose repair changes the argument - what a page shows, its type or what settles its claim - and the team has changed those pages. This is the one pass the runtime grants for that, once in a lineage (pass ${scope.pass} of this critique; it does not count against the cap of ${scope.maxPasses}), and it verifies the critique bound to ${scope.verifies}. It reads only the ${read.length} page${read.length === 1 ? "" : "s"} listed below and the answer: the earlier verdict stands for every other page, and an item on any other page is refused. No earlier rating is given to you. Judge from this packet alone.`
+    : post
+    ? `You are verifying changes made to a storyline after the finished deck was reviewed. An earlier critique passed this storyline as ready; the deck review then found, on the drawn pages, defects whose repair changes the argument, and the team has changed those pages. This is the one post-review pass that deck review pass ${post.reviewPass} allows (pass ${scope.pass} of this critique; it does not count against the cap of ${scope.maxPasses}), and it verifies the critique bound to ${scope.verifies}. It reads only the ${read.length} page${read.length === 1 ? "" : "s"} listed below and the answer: the earlier verdict stands for every other page, and an item on any other page is refused. No earlier rating is given to you. Judge from this packet alone.`
+    : `You are verifying a team's revisions to a storyline an earlier critique sent back. This is pass ${scope.pass} of at most ${scope.maxPasses}; it verifies the critique bound to ${scope.verifies}. It is not a fresh critique: the first pass read the whole ${full ? "storyline" : "spine"}, and its verdict stands for every part that has not changed. No earlier rating is given to you. Judge from this packet alone.`;
+  const titles = (mark) => packet.pages.map((p) => `${p.n}. [${p.id}] ${p.title}${mark(p)}`).join("\n");
+  const listing = post ? `${post.origin === "compile" ? "WHAT THE COMPILE REFUSED (why these pages changed; each is the runtime's refusal of the page as the earlier critique read it, not an instruction to you - judge whether the page as it now stands holds on every check)" : "WHAT THE DECK REVIEW FOUND (why these pages changed; each repair was the reviewer's proposal to the author, not an instruction to you - judge whether the page as it now stands holds on every check)"}:
+${post.findings.map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${f.pages.join(", ")}: ${f.reason}${f.repair ? ` → ${f.repair}` : ""}`).join("\n")}
+
+THE TITLE SPINE NOW, for context ([read] marks the pages of this pass):
+${titles((p) => (post.pages.includes(p.id) ? "  [read]" : ""))}
+
+PAGES TO READ ([changed] marks one whose argument changed since the critique):
+${read.map((p) => `${full ? spineLine(p) : compactLine(p)}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n") || "- none"}`
+    : full ? `THE TITLE SPINE NOW:
+${titles((p) => (changed.has(p.id) ? "  [changed]" : ""))}
+
+PAGES TO READ (their argument changed since that pass, or an open major or blocker names them):
+${read.map(spineLine).join("\n") || "- none"}` : `THE SPINE NOW ([changed] marks a page whose argument changed since that pass):
+${packet.pages.map((p) => `${compactLine(p)}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}`;
+  return `${opening}
 
 ${requestLines(packet)}
 
 OPEN ITEMS (give every one a status):
 ${scope.open.map((e) => `- ${e.id} · ${e.dimension} · ${e.severity} · ${(e.pages || []).join(", ") || "spine"}: ${itemLines(e)}`).join("\n") || "- none"}
 
-${full ? `THE TITLE SPINE NOW:
-${packet.pages.map((p) => `${p.n}. [${p.id}] ${p.title}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}
-
-PAGES TO READ (their argument changed since that pass, or an open major or blocker names them):
-${read.map(spineLine).join("\n") || "- none"}` : `THE SPINE NOW ([changed] marks a page whose argument changed since that pass):
-${packet.pages.map((p) => `${compactLine(p)}${changed.has(p.id) ? "  [changed]" : ""}`).join("\n")}`}
+${listing}
 DATA FOUND: ${packet.sources.length} files under sources/${packet.sources.length ? ` (${packet.sources.slice(0, 60).join(", ")}${packet.sources.length > 60 ? ", ..." : ""})` : ""}
 ${analysesLines(packet)}
 THE ANSWER ${scope.answerChanged ? "HAS CHANGED" : "HAS NOT CHANGED"} since the pass this verifies.
-
+${reconcileLines(packet)}${limitsLine(packet)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1123,13 +1328,13 @@ ${checksPrompt()}
 Do three things.
 1. STATUSES: for every open item, fixed, partly fixed, not fixed, regressed, narrowed, or - for a missing analysis only - unavailable or scope-limited, with the evidence in the packet. A partly fixed item keeps its severity.
    - ${ANSWERS_RULE}
-   - A finding is "fixed" only where the argument moved: a claim, a page type, what settles a claim, the insights or measures a page rests on and shows, which periods or members of a measure it shows and in what class of exhibit, the pages or their order, or the answer. A chart redrawn in another form or reworded copy on an unchanged argument closes nothing here.
+   - A finding is "fixed" only where the argument moved: a claim, a page type, what settles a claim, the insights or measures a page rests on and shows, which periods or members of a measure it shows and in what class of exhibit, the pages or their order, or the answer. A chart redrawn in another form or reworded copy on an unchanged argument closes nothing here. Where the pages the item names did not move and another did, set \`artifact\` to that page's id: ${movedIds.length ? `what moved since that pass is ${movedIds.join(", ")} (a section's divider is a page, by the id in brackets on its line)` : "no page moved since that pass"}.
    - A missing analysis is "fixed" only on its artifact: set \`artifact\` to the id of the computed analysis (listed above) or the insight that supplies it, which a page must rest on. A qualification on the page is not the analysis: where the page only says what the evidence does not establish, the item is not fixed.
    - "narrowed" closes an item the answer no longer needs because the answer now claims less; it is allowed only where the answer has changed, and its evidence quotes the narrower answer.
    - "unavailable" closes a missing analysis the team searched for and could not find, and needs \`searchLog\`: the path of the search log under sources/ (listed above) that shows the search. It is not available where the evidence scope is closed: nothing could be searched.
    - "scope-limited" is for a missing analysis whose remedy is retrieval while the evidence scope is closed: the team may not fetch the data. The item stays open at its severity. It does not count against compliance; it does count against sufficiency.
 2. ${full ? "PAGES: a full page entry for every page listed above, as the first pass wrote them." : "THE ANSWER: if the answer or the request changed, judge it again in `answerParts`."}
-3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it) are refused. An open item that still stands is that item's status, not a new item: a new item under an open item's check on a page it names is folded into the open item, which stays open, and is refused only where you also call that item fixed. New ids must be new; \`evidence\` is "" except for basis missed. Then stop: the storyline is not re-critiqued.
+3. NEW ITEMS, only if additive: major or blocker, with \`basis\` ${Object.entries(NEW_BASES).map(([k, v]) => `${k} (${v})`).join("; ")}. A new minor item, an item on an unchanged page unless it is a missed major or blocker whose \`evidence\` quotes the packet's line for that page exactly (and a justification of why the first pass could not see it) are refused. An open item that still stands is that item's status, not a new item: a new item under an open item's check on a page it names is folded into the open item, which stays open, and is refused only where you also call that item fixed. New ids must be new; \`evidence\` is "" except for basis missed.${post ? " In this pass a new item names only the pages listed above." : ""} Then stop: the storyline is not re-critiqued.
 
 ${full ? PAGE_RULES : ""}
 
@@ -1137,7 +1342,7 @@ ${JUDGEMENT_RULES}
 
 ${ANSWER_RULES}
 
-${ITEM_RULES}
+${itemRules({ completeness: false })}
 
 "ready" only when no major or blocker item, earlier or new, is open. "provisional" only when every major or blocker item still open is scope-limited, compliance is complete and the answer is offered as provisional; otherwise "revise". Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
 Return ONLY JSON matching this schema: ${JSON.stringify(schemaFor(packet.mode, scope))}`;
@@ -1180,7 +1385,7 @@ function schemaErrors(value, schema, at) {
 export function storylineItems(review) {
   const items = [];
   for (const f of review?.findings || []) items.push({ id: f.id, code: `STORY_${String(f.check ?? "").toUpperCase()}`, dimension: f.check, scope: f.scope, severity: f.severity,
-    pages: f.pages || [], reason: f.problem, repair: f.fix, ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}) });
+    pages: f.pages || [], reason: f.problem, repair: f.fix, ...(f.aboutImported ? { aboutImported: true } : {}), ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}) });
   for (const m of review?.missingAnalyses || []) items.push({ id: m.id, code: registered(STORYLINE_CODES, "MISSING_ANALYSIS"), dimension: "missing", scope: "spine", severity: m.severity, pages: [],
     reason: `${m.analysis}: ${m.why}`, repair: `Run it on ${m.data}`, public: m.public ?? null, remedy: m.remedy ?? null });
   for (const c of review?.cutOrMerge || []) items.push({ id: c.id, code: registered(STORYLINE_CODES, c.action === "cut" ? "CUT_PAGE" : "MERGE_PAGES"), dimension: "cuts", scope: "spine", severity: c.severity,
@@ -1190,7 +1395,7 @@ export function storylineItems(review) {
 
 export const storylineLedger = (prior, review) => advanceLedger(prior, review, storylineItems(review));
 
-function itemErrors(review, ids, own = null, { cap = null } = {}) {
+function itemErrors(review, ids, own = null, { cap = null, limits = null, dividers = [], sectionFits = null } = {}) {
   const errors = [];
   const seen = new Set();
   const lists = [["findings", review.findings || []], ["missingAnalyses", review.missingAnalyses || []], ["cutOrMerge", review.cutOrMerge || []]];
@@ -1198,8 +1403,11 @@ function itemErrors(review, ids, own = null, { cap = null } = {}) {
     const at = `${name}[${i}]${item?.id ? ` (${item.id})` : ""}`;
     if (seen.has(item.id)) errors.push(`${at}: id ${item.id} is used twice`);
     seen.add(item.id);
-    if (name === "findings") errors.push(...pageListErrors(at, { scope: item.scope, pages: item.pages, text: `${item.problem ?? ""} ${item.fix ?? ""}`, ids, deckScope: "spine" }));
-    if (name === "cutOrMerge") errors.push(...pageListErrors(at, { scope: "spine", pages: item.pages, text: item.freedUse, ids, deckScope: "spine" }));
+    if (name === "findings") errors.push(...pageListErrors(at, { scope: item.scope, pages: item.pages, text: `${item.problem ?? ""} ${item.fix ?? ""}`, ids, deckScope: "spine", named: false }));
+    // A fix that proposes a title the build would refuse sends the author into a refusal: held to the limits the packet showed (review-floors.mjs).
+    if (name === "findings") errors.push(...titleErrors(item.fix, limits, at, { section: (item.pages || []).length > 0 && item.pages.every((id) => dividers.includes(id)),
+      sectionFits: sectionFits ? (title) => sectionFits(title, (item.pages || []).filter((id) => dividers.includes(id))) : null }));
+    if (name === "cutOrMerge") errors.push(...pageListErrors(at, { scope: "spine", pages: item.pages, text: item.freedUse, ids, deckScope: "spine", named: false }));
     // Only data the critic knows to be published can carry a major: a guess at
     // what might exist is a research question, not a defect of the storyline.
     // An analysis the team can run from the packet's own measures, or under a
@@ -1358,18 +1566,24 @@ function unavailableErrors(review, ledger, sources) {
  * against and `promptHash` the packet's (its provenance is checked when given).
  */
 export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null,
-  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null, carried = [] } = {}) {
+  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null, carried = [], limits = null, dividers = [], sectionFits = null, untouched = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
   const structure = schemaErrors(review, schemaFor(mode, scope), "storyline review");
   if (structure.length) return structure;
-  const errors = itemErrors(review, ids, null, { cap: mode === "spine" ? SPINE_ITEM_MAX : null });
+  const errors = itemErrors(review, ids, null, { cap: mode === "spine" ? SPINE_ITEM_MAX : null, limits, dividers, sectionFits });
   if (promptHash !== undefined) errors.push(...provenanceErrors(review, promptHash));
   const items = storylineItems(review);
+  errors.push(...aboutImportedErrors((review.findings || []).map((f) => ({ id: f.id, pages: f.pages || [], aboutImported: f.aboutImported })), untouched));
   if (scope) {
     errors.push(...verificationErrors(review, { scope: mode === "full" ? scope : { ...scope, mustInspect: [] }, ledger, items, ids, pageKey: "page", deckScope: "spine", statuses: STORYLINE_STATUSES, pageText }));
     errors.push(...unavailableErrors(review, ledger, sources));
+    // A post-review pass reads the pages its deck review named, and files nothing elsewhere.
+    if (scope.postReview) for (const item of items) {
+      const outside = (item.pages || []).filter((id) => !scope.postReview.pages.includes(id));
+      if (outside.length) errors.push(`${item.id}: this is ${scope.postReview.origin === "compile" ? "the pass a compile refusal allowed" : "a post-review pass"}, which reads ${scope.postReview.pages.join(", ")} and the answer only; ${outside.join(", ")} ${outside.length === 1 ? "is" : "are"} outside it - the earlier critique's verdict stands there`);
+    }
     errors.push(...closureErrors(review, ledger, { analyses, insightIds, rested, evidenceScope, answerChanged: Boolean(scope.answerChanged), artifacts, prior: scope.prior ?? null,
       moved: Array.isArray(scope.changed) && Array.isArray(scope.deleted) ? { changed: scope.changed, deleted: scope.deleted } : null }));
   } else {
@@ -1406,6 +1620,9 @@ const packetContext = (packet) => ({
   pageText: packetPageText(packet), promptHash: packet.promptHash ?? null, revision: packet.revision ?? null,
   analyses: packet.analyses ?? [], rested: new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id))),
   evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null, artifacts: packet.artifacts ?? null, carried: packet.carried ?? [],
+  limits: packet.limits ?? null, dividers: packet.pages.filter((p) => p.kind === "section").map((p) => p.id),
+  // The slides a revision carries and did not edit: what a finding about the imported deck names. Null for a deck that carries none.
+  untouched: packet.pages.some((p) => p.kind === "carried") ? packet.pages.filter((p) => p.kind === "carried" && !p.edited).map((p) => p.id) : null,
 });
 
 /**
@@ -1465,13 +1682,19 @@ export async function storylineGate(spec, directory, { deckPath = null } = {}) {
   const store = await lineageStore(spec, directory, deckPath);
   const history = await readStorylineHistory(store);
   const deck = await locateDeck(spec, directory, deckPath);
-  if (!history.length && (await unchangedRevision(spec, deck))) return [];
+  // A revision whose spine is the user's own needs no critique - and a lineage recorded under another binding version, which
+  // cannot be compared with today's spine, does not ask one of it: there is nothing of the revision's for a critic to read.
+  if ((!history.length || bindingVersionOf(history.at(-1)) !== BINDING_VERSION) && (await unchangedRevision(spec, deck))) return [];
   const measures = await readMeasures(spec, deck);
   const packet = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const { review, invalid } = await readCritique(path.join(directory, "storyline-review.json"));
   if (invalid) return [invalid];
   const recorded = review ? history.find((h) => h.binding === review.binding && h.pass === review.pass) : null;
-  if (review && !recorded && packet && bindingVersionOf(packet) === BINDING_VERSION && packet.binding === review.binding && packet.pass === review.pass) return validateStorylineReview(review, spec, { packet, measures });
+  if (review && !recorded && packet && bindingVersionOf(packet) === BINDING_VERSION && packet.binding === review.binding && packet.pass === review.pass) {
+    // Read as the loop will read it: with its page lists settled.
+    const context = packetContext(packet);
+    return validateStorylineReview(settleCritiqueForm(review, context.ids, context.contentIds).review, spec, { packet, measures });
+  }
   const latest = history.at(-1);
   if (latest && bindingVersionOf(latest) !== BINDING_VERSION) return [staleLineage(latest, history.length)];
   if (latest) return validateStorylineReview(latest.review, spec, { record: latest, measures });
@@ -1487,12 +1710,14 @@ export async function storylineGate(spec, directory, { deckPath = null } = {}) {
  */
 export async function storylineOutcome(spec, directory, { deckPath = null } = {}) {
   const latest = (await readStorylineHistory(await lineageStore(spec, directory, deckPath))).at(-1);
-  if (latest?.review?.verdict !== "provisional") return { verdict: latest?.review?.verdict ?? null };
-  return { verdict: "provisional", open: openBlocking(latest.ledger).map((e) => ({ id: e.id, severity: e.severity, reason: reasonOf(e) })), answerLimits: answerStatusOf(spec).limits };
+  // What the critic said of the imported deck goes with the outcome whatever the verdict: delivery reports it to the user.
+  const aboutImported = openAboutImported(latest?.ledger).map((e) => ({ id: e.id, from: "storyline critique", severity: e.severity, pages: e.pages || [], reason: reasonOf(e), repair: e.repair ?? null }));
+  if (latest?.review?.verdict !== "provisional") return { verdict: latest?.review?.verdict ?? null, aboutImported };
+  return { verdict: "provisional", aboutImported, open: openBlocking(latest.ledger).map((e) => ({ id: e.id, severity: e.severity, reason: reasonOf(e) })), answerLimits: answerStatusOf(spec).limits };
 }
 
 // What is said of a lineage recorded under another binding version, by the gate and by the loop that retires it.
-const staleLineage = (latest, passes) => `the storyline critique on record (${passes} pass${passes === 1 ? "" : "es"}, the last one ${latest.review?.verdict ?? "unreadable"}) was recorded under binding version ${bindingVersionOf(latest)}, and the critique is now bound to more of what a page shows (version ${BINDING_VERSION}), so it cannot say which pages changed since: run node runtime/storyline.mjs <id>.deck.json out/, which archives that lineage and writes a first pass - not a restart, and not counted against the pass cap`;
+const staleLineage = (latest, passes) => `the storyline critique on record (${passes} pass${passes === 1 ? "" : "es"}, the last one ${latest.review?.verdict ?? "unreadable"}) was recorded under binding version ${bindingVersionOf(latest)}, and what a page shows of each measure is read differently now (version ${BINDING_VERSION}), so it cannot say which pages changed since: run node runtime/storyline.mjs <id>.deck.json out/, which archives that lineage and writes a first pass - not a restart, and not counted against the pass cap`;
 
 // A revision that leaves the user's spine as it was - every page's title,
 // order and source slide - needs no storyline critique: the argument is the
@@ -1514,6 +1739,124 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
   return errors.length ? `Warning: the storyline gate is not ready for ${directory} - ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""}. Copy written now is written against a spine the critique has not passed; delivery refuses the deck until the gate is ready.` : null;
 }
 
+// The repair path after the deck review. A deck review reads the drawn pages
+// and can find the argument wanting where the critique passed it; most such
+// repairs change a bound fact, and by then the critique's passes are usually
+// spent. So each rejected deck-review pass grants one storyline verification
+// pass of its own, outside the critique's cap. It is narrow by construction:
+// it reads only the pages that pass's open findings name whose repair reaches
+// the argument (repairReach), and the answer; every page whose argument moved
+// must be one of them; and a further change after it is an ordinary pass,
+// counted against the cap. No cap is raised: the deck review's own cap bounds
+// how many of these a lineage can ever be granted.
+// How such a pass is marked in the lineage (`kind` on its record), so it is never counted as one of the critique's own.
+const POST_REVIEW = "post-review";
+export const POST_REVIEW_RULE = "each rejected deck-review pass allows one storyline verification pass that does not count against the critique's cap: it reads only the pages named by that pass's open findings whose repair reopens the argument, and the answer; it is refused where a page outside them changed, and a second change after it counts against the cap";
+
+// The other pass outside the cap: where the runtime's own full compile raises, on the storyline a critique passed as ready,
+// a finding every repair of which changes what the critique is bound to, and the runtime's own draft of the same pages does
+// not raise it. A draft is the full compile of the spine, so the two cannot disagree about a bound fact by design; this is
+// what holds if they ever do, since the cost of the runtime's own disagreement with itself must not be the author's whole
+// deck. It is granted on the compile's record and on nothing an author says or does: the compile writes the record itself,
+// only when every page it read carries the hash the ready pass recorded, and only for what its draft of those pages passed
+// (recordCompileRefusal). Once in a lineage; the pass reads the refused pages and the answer and nothing else, is shown the
+// refusals, and is not granted where any other page moved.
+//
+// A page the page compile refuses never earns it. Whether such a refusal's repair writes a bound field cannot be read off
+// the refusal - a ninth callout, a key the composer does not read and an exhibit not written yet are refused by the same
+// steps that refuse an exhibit's type - and a pass granted on the step alone was one any author could earn by adding a
+// callout. Nor does it need to: a page the draft passes has a witness (spine-witness.mjs), a layout of it the page compile
+// takes that binds as the spine does, so what the compile refuses of that page is mended by laying it out as the witness is.
+const COMPILE_REFUSAL = "compile-refusal";
+const COMPILE_REFUSAL_RECORD = "compile-refusal.json";
+export const COMPILE_REFUSAL_RULE = "a full compile that raises, on the storyline a critique passed as ready, a finding whose every repair changes what the critique is bound to, where the runtime's own draft of the same pages raised none, allows one storyline verification pass that does not count against the critique's cap, once in a lineage: it reads only the pages of those findings and the answer, is shown them, and is refused where a page outside them changed";
+
+/**
+ * Record that the full compile refused bound facts of the ready storyline that
+ * its draft passed, in the deck's lineage store; returns the record, or null
+ * where there is nothing to record. Called by the compile itself
+ * (author-deck.mjs) with what it found: `spec` the compiled deck, `refused`
+ * the pages its page compile refused (`{ id, record }`, `record` what the page
+ * declares: its type, what settles it and each exhibit as written), `findings`
+ * its blocking findings, `measures` the log's recorded measures, and
+ * `drafted`, which runs the draft of the same pages and returns its blocking
+ * findings (called only where there is something a record could hold).
+ *
+ * The record is written only when the deck is still the storyline the latest
+ * pass called ready - every page, a refused one by its record, hashing as that
+ * pass recorded it - and holds only findings every repair of which writes a
+ * bound field (their code lists no copy, layout or fit repair,
+ * gates/gate_classes.mjs), on a page of that storyline, that the draft of the
+ * same pages does not raise on that page.
+ */
+export async function recordCompileRefusal(specPath, { spec, refused = [], findings = [], measures = null, drafted = async () => [] }) {
+  const store = await lineageStore(spec, path.dirname(path.resolve(specPath)), specPath);
+  const latest = (await readPasses(path.join(store, HISTORY))).at(-1);
+  if (!latest || bindingVersionOf(latest) !== BINDING_VERSION || !["ready", "provisional"].includes(latest.review?.verdict)) return null;
+  const records = refused.filter((f) => f.record).map((f) => f.record);
+  const moved = changedPages(latest.pageHashes, storylinePageHashes({ ...spec, slides: [...(spec.slides || []), ...records] }, measures));
+  if (!moved || moved.changed.length || moved.deleted.length) return null;
+  const pageOf = (f) => (f.id === undefined || f.id === null ? null : String(f.id));
+  const candidates = findings.filter((f) => f.code !== "COMPILE" && pageOf(f) && Object.hasOwn(latest.pageHashes, pageOf(f)) && boundOnly(f));
+  if (!candidates.length) return null;
+  // What the draft of the same pages says: a finding it raises too is no disagreement of the runtime with itself.
+  const said = new Set((await drafted()).map((f) => `${f.code}\u0000${pageOf(f)}`));
+  const bound = candidates.filter((f) => !said.has(`${f.code}\u0000${pageOf(f)}`)).map((f) => ({ id: pageOf(f), code: f.code, reason: String(f.repair ?? f.reason ?? "") }));
+  if (!bound.length) return null;
+  const record = { binding: latest.binding, pass: latest.pass, pages: [...new Set(bound.map((f) => f.id))], findings: bound, recordedAt: new Date().toISOString() };
+  await writeJson(path.join(store, COMPILE_REFUSAL_RECORD), record);
+  return record;
+}
+/** Whether every repair of a finding writes a field the critique is bound to: its code lists repairs, and none of them is the copy's, the layout's or the fit's. */
+const boundOnly = (finding) => { const { touches, settledLater } = repairOf(finding); return touches.length > 0 && settledLater === null; };
+
+/**
+ * The compile-refusal pass a lineage may take now, or why it may not:
+ * `{ grant }` in the shape of a post-review grant (its pages, and the refusals
+ * as the findings the critic is shown) or `{ why }`. `record` is what the
+ * compile wrote (recordCompileRefusal), `latest` the pass being verified and
+ * `moved` the pages whose argument changed or were deleted since it.
+ */
+function compileRefusalPass(history, record, latest, moved) {
+  if (!record || !Array.isArray(record.pages) || !Array.isArray(record.findings)) return { why: "no full compile of this deck has raised, on the storyline the critique passed as ready, a finding whose every repair changes what the critique is bound to and that its draft of the same pages passed" };
+  if (history.some((h) => h.kind === COMPILE_REFUSAL)) return { why: "the one pass a compile refusal allows in a lineage is spent" };
+  if (record.binding !== latest.binding) return { why: "the compile's refusal on record was of another storyline than the one the latest pass read" };
+  const changed = [...moved.changed, ...moved.deleted];
+  const outside = changed.filter((id) => !record.pages.includes(id));
+  if (outside.length) return { why: `${outside.join(", ")} changed, and the compile refused nothing bound on ${outside.length === 1 ? "it" : "them"} (it refused ${record.pages.join(", ")})` };
+  if (!changed.length) return { why: "no page the compile refused has changed" };
+  return { grant: { key: `compile:${record.binding}`, origin: "compile", reviewPass: null, pages: record.pages,
+    findings: record.findings.map((f, at) => ({ id: `R${at + 1}`, code: f.code, severity: "blocker", pages: [f.id], reason: f.reason, repair: "", reach: "argument" })) } };
+}
+
+/**
+ * The post-review pass a lineage may take now, or why it may not: `{ grant }`
+ * - the deck-review pass that allows it, its findings that reach the argument
+ * and the pages they name - or `{ why }`. `history` is the storyline passes,
+ * `reviews` and `confirmations` the deck review's, `moved` the pages whose
+ * argument changed or were deleted since the latest storyline pass.
+ */
+function postReviewPass(history, reviews, confirmations, moved, revised = null) {
+  const review = reviews.at(-1);
+  if (!review) return { why: "no deck review has read this deck yet, and the pass exists only to verify what one sent back" };
+  const refused = confirmations.filter((c) => c.afterPass === review.pass && c.accepted !== true).at(-1) ?? null;
+  if (review.accepted === true && !refused) return { why: `deck review pass ${review.pass} accepted the deck: nothing it sent back is open` };
+  const key = refused ? `confirmation:${refused.binding}` : review.binding;
+  if (history.some((h) => h.postReview?.key === key)) return { why: `the one post-review pass deck review pass ${review.pass} allows is spent` };
+  // What that pass left open: its ledger, and the findings of a confirmation read that refused it.
+  const ledger = [...(review.ledger || []), ...(refused?.review?.findings || []).map((f) => ({ ...f, pages: f.slides || [], status: "open" }))];
+  const reach = openEntries(ledger).filter((e) => repairReach(e) !== "layout");
+  // A revision is judged on what it changes: a page of the imported deck it leaves as it was is the user's, and no finding sends it to the critic.
+  const own = (id) => !revised || revised.restyle || revised.content.includes(id);
+  const reaching = reach.filter((e) => (e.pages || []).some(own));
+  const pages = [...new Set(reaching.flatMap((e) => e.pages || []))].filter(own);
+  if (reach.length && !pages.length) return { why: `the open findings of deck review pass ${review.pass} whose repair reaches the argument name only pages of the imported deck this revision leaves unchanged (${[...new Set(reach.flatMap((e) => e.pages || []))].join(", ")}): they are about the user's deck as it stands and oblige no storyline pass` };
+  if (!pages.length) return { why: `no open finding of deck review pass ${review.pass} has a repair that reaches the argument` };
+  const outside = [...moved.changed, ...moved.deleted].filter((id) => !pages.includes(id));
+  if (outside.length) return { why: `${outside.join(", ")} changed, and no open finding of deck review pass ${review.pass} whose repair reaches the argument names ${outside.length === 1 ? "it" : "them"} (it names ${pages.join(", ")})` };
+  return { grant: { key, reviewPass: review.pass, pages, findings: reaching.map((e) => ({ id: e.id, code: e.code, severity: e.severity, pages: (e.pages || []).filter(own), reason: reasonOf(e), repair: e.repair ?? "", reach: repairReach(e) })) } };
+}
+
 /**
  * One step of the storyline loop. Records a returned critique (validated
  * against the packet it answered) in the lineage store, then says where the
@@ -1524,11 +1867,35 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
  * starts a new lineage (restartLineage), which needs `reason` and, the second
  * time, `userApproved`.
  */
-export async function prepareStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}) {
+/**
+ * A critique refused for its form is moved aside (`storyline-review.refused.json`,
+ * the last one kept), so the corrected answer is written to a path that holds
+ * no file: a critic whose tools may create a file and not overwrite one can
+ * answer a correction round. Returns the path, or null where nothing was moved.
+ */
+async function setAside(out) {
+  const from = path.join(out, "storyline-review.json"), to = path.join(out, "storyline-review.refused.json");
+  try { await fs.rename(from, to); return to; } catch { return null; }
+}
+const refusedForm = async (out, errors) => { const kept = await setAside(out);
+  return { status: "invalid", errors, ...(kept ? { refused: kept, note: `The refused answer was moved to ${kept}: have the critic correct what the errors name and save the corrected answer as ${path.join(out, "storyline-review.json")}, which is free to write` } : {}) }; };
+
+/**
+ * Advance the storyline loop one step (see the file header): read a critique
+ * waiting in the output directory, settle and validate its form, record it,
+ * and say what comes next. Whatever the runtime settled of the critique's page
+ * lists is on the pass's record and in the result (`formMended`).
+ */
+export async function prepareStoryline(specPath, outputDirectory, options = {}) {
+  const said = { mended: [...(options.formMended ?? [])] };
+  const step = await advanceStoryline(specPath, outputDirectory, options, said);
+  return said.mended.length && step && typeof step === "object" ? { ...step, formMended: mendedLines(said.mended) } : step;
+}
+async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
   const out = path.resolve(outputDirectory);
-  const request = requestErrors(spec);
+  const request = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
   if (request.length) return { status: "refused", errors: request };
   const store = await lineageStore(spec, out, specPath);
   const historyDir = path.join(store, HISTORY);
@@ -1545,18 +1912,27 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
     const last = history.at(-1);
     const open = last ? openBlocking(last.ledger ?? storylineLedger([], last.review)).map((e) => ({ id: e.id, code: e.code ?? null, dimension: e.dimension ?? null, severity: e.severity, pages: e.pages || [], text: itemLines(e).replace(/\n\s*/g, " | ") })) : [];
     const archived = await retireLineage(historyDir, { note, files: [path.join(store, PACKET_RECORD), path.join(out, "storyline-review.json")], open });
-    retired = `The earlier storyline lineage (${history.length} pass${history.length === 1 ? "" : "es"}) was recorded under binding version ${bindingVersionOf(history.at(-1) ?? packet)} and is archived in ${path.join(historyDir, archived)}: the critique is now bound to which periods or members of each measure a page shows and in what class of exhibit, which that record does not hold. This is a clean first pass, not a restart, and nothing of the old lineage counts against the pass cap${open.length ? `. Its ${open.length} open blocking item${open.length === 1 ? " is" : "s are"} carried into the new packet (${open.map((e) => e.id).join(", ")}): the critic says of each whether it still stands` : ""}`;
+    retired = `The earlier storyline lineage (${history.length} pass${history.length === 1 ? "" : "es"}) was recorded under binding version ${bindingVersionOf(history.at(-1) ?? packet)} and is archived in ${path.join(historyDir, archived)}: the critique is bound to which periods or members of each measure a page shows and in what class of exhibit, read as the full compile reads them, which that record does not hold. This is a clean first pass, not a restart, and nothing of the old lineage counts against the pass cap${open.length ? `. Its ${open.length} open blocking item${open.length === 1 ? " is" : "s are"} carried into the new packet (${open.map((e) => e.id).join(", ")}): the critic says of each whether it still stands` : ""}`;
     history = [];
     packet = null;
   }
-  if (invalid && !stale) return { status: "invalid", errors: [invalid] };
-  const review = stale ? null : answered;
+  if (invalid && !stale) return refusedForm(out, [invalid]);
+  let review = stale ? null : answered;
   if (review && !history.some((h) => h.binding === review.binding && h.pass === review.pass)) {
     if (!packet || packet.binding !== review.binding || packet.pass !== review.pass)
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
-    const errors = validateStorylineRecord(review, packetContext(packet));
-    if (errors.length) return { status: "invalid", errors };
+    // The page lists are settled before the form is judged: a range expanded, a page the item's own text names added. What was
+    // settled is written back to the answer, so every later reading of it is of the same lists, and kept on the pass's record.
+    const context = packetContext(packet), settled = settleCritiqueForm(review, context.ids, context.contentIds);
+    const errors = validateStorylineRecord(settled.review, { ...context, sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) });
+    if (errors.length) return refusedForm(out, errors);
+    if (settled.mended.length) { review = settled.review; said.mended.push(...settled.mended); await writeJson(path.join(out, "storyline-review.json"), review); }
     history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, bindingVersion: BINDING_VERSION, ledger: storylineLedger(packet.scope?.ledger ?? [], review), mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
+      ...(said.mended.length ? { formMended: said.mended } : {}),
+      // A post-review pass says so in the lineage: which deck-review pass allowed it and the pages it read. It is not counted against the cap.
+      ...(packet.scope?.postReview && packet.scope.postReview.origin !== "compile" ? { kind: POST_REVIEW, postReview: { key: packet.scope.postReview.key, reviewPass: packet.scope.postReview.reviewPass, pages: packet.scope.postReview.pages, findings: packet.scope.postReview.findings.map((f) => f.id) } } : {}),
+      // So does the pass a compile refusal allowed: its kind, the pages it read and the refusals that earned it.
+      ...(packet.scope?.postReview?.origin === "compile" ? { kind: COMPILE_REFUSAL, compileRefusal: { key: packet.scope.postReview.key, pages: packet.scope.postReview.pages, refusals: packet.scope.postReview.findings.map((f) => ({ page: f.pages[0], code: f.code, reason: f.reason })) } } : {}),
       artifacts: packet.artifacts ?? null, rested: [...new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id)))] })).record);
     if (packet.carried?.length) await settleCarried(historyDir, review.binding);
   }
@@ -1576,7 +1952,10 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
   const brief = (e) => `${e.id} ${e.dimension} (${e.severity}) on ${(e.pages || []).join(", ") || "the spine"}${(e.folded || []).length ? ` (restated as ${e.folded.map((f) => f.id).join(", ")})` : ""}`;
   if (latest && latest.binding === binding) {
     const open = openBlocking(latest.ledger);
-    if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding, note: READY_NOTE };
+    // What the critic filed about the imported deck blocks nothing, and is the user's to hear: the run names each.
+    const told = openAboutImported(latest.ledger);
+    if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding, note: READY_NOTE,
+      ...(told.length ? { aboutImported: told.map(brief), tell: `${told.length} item${told.length === 1 ? " is" : "s are"} about the imported deck - a slide of the user's own this revision did not change. Nothing is refused for ${told.length === 1 ? "it" : "them"}, and no slide is to be edited that the user did not ask to change: delivery reports ${told.length === 1 ? "it" : "each"} to the user (out/delivery.json \`aboutImported\`), who decides` } : {}) };
     // Provisional: the team has done what the evidence in scope allows, the
     // answer is offered as provisional, and what stays open is recorded with it.
     if (latest.review.verdict === "provisional" && open.length && open.every(limitedBy(evidenceScopeOf(spec))) && answerStatusOf(spec).status === "provisional")
@@ -1590,20 +1969,35 @@ export async function prepareStoryline(specPath, outputDirectory, { maxPasses = 
   if (scope) scope.answerChanged = typeof latest.answerHash === "string" && latest.answerHash !== sha256(spec.answer ?? "");
   // The artifacts as they stood at that pass, and which of them a page rested on: what `fixed` is held against.
   if (scope && latest.artifacts && Array.isArray(latest.rested)) scope.prior = { artifacts: latest.artifacts, rested: latest.rested };
-  if (scope?.capped) return { status: "capped", pass: scope.pass, message: capMessage("storyline critique", scope.pass, maxPasses, latest.ledger) };
+  if (scope) {
+    // The cap counts the critique's own passes; a post-review pass is granted by the deck review and counted against that.
+    const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL].includes(h.kind)).length;
+    scope.capped = spent + 1 > maxPasses;
+    const moved = changedPages(latest.pageHashes, storylinePageHashes(spec, measures)) ?? { changed: scope.changed, deleted: scope.deleted };
+    const reviewDir = path.join(store, REVIEW_HISTORY);
+    const post = postReviewPass(history, await readPasses(reviewDir), await readConfirmations(reviewDir), moved, revisionChanges(spec, await readInventory(spec, specPath)));
+    // The pass a compile refusal allows, where no deck review allows one: on the compile's own record, never on a flag.
+    const refusal = post.grant ? { why: null } : compileRefusalPass(history, await readJson(path.join(store, COMPILE_REFUSAL_RECORD), { optional: true }), latest, moved);
+    const grant = post.grant ?? refusal.grant ?? null;
+    if (grant) Object.assign(scope, { capped: false, postReview: grant, mustInspect: wanted === "full" ? ids.filter((id) => grant.pages.includes(id)) : [] });
+    else if (scope.capped) return { status: "capped", pass: scope.pass, message: `${capMessage("storyline critique", spent + 1, maxPasses, latest.ledger)} The post-review pass (${POST_REVIEW_RULE}) is not available: ${post.why}. Nor is the pass a compile refusal allows (${COMPILE_REFUSAL_RULE}): ${refusal.why}.` };
+  }
   const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes, carried: scope ? [] : await carriedItems(historyDir) });
+  // The folder the answer is saved into exists from the moment it is asked for: an answer written elsewhere and copied in is not lost to a missing directory.
+  await fs.mkdir(out, { recursive: true });
   return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0, ...(retired ? { retired } : {}),
+    ...(scope?.postReview && scope.postReview.origin !== "compile" ? { postReview: { reviewPass: scope.postReview.reviewPass, pages: scope.postReview.pages } } : {}),
+    ...(scope?.postReview?.origin === "compile" ? { compileRefusal: { pages: scope.postReview.pages, refusals: scope.postReview.findings.map((f) => `${f.pages[0]}: ${f.code}`) } } : {}),
     note: next.sections ? `Give each prompt in ${path.join(dir, "sections")} to its own fresh critic in parallel (no other context), save each answer as ${path.join(dir, "parts", "<id>.json")}, then run storyline.mjs merge` : `Give ${path.join(dir, "prompt.md")} to a fresh critic (no other context) and save its JSON as ${path.join(out, "storyline-review.json")}, then run this again` };
 }
 
 function partErrors(part, packet) {
   const meta = part?.part;
   if (!meta || !["section", "spine"].includes(meta.kind)) return ["part must say { kind: section|spine, id, pages }"];
-  const structure = schemaErrors(part, { ...STORYLINE_PART_SCHEMA, required: ["part", "binding", "verdict", "rating", "summary", "pages", "findings", "completeness",
-    ...(meta.kind === "spine" ? ["spine", "answer", "answerParts", "pillars", "numbers", "sectionFlow", "execSummary", "missingAnalyses", "cutOrMerge", "topFixes", "compliance", "sufficiency"] : [])] }, meta.id);
+  const structure = schemaErrors(part, STORYLINE_PART_SCHEMAS[meta.kind], meta.id);
   if (structure.length) return structure;
-  const { ids, insightIds, promptHash } = packetContext(packet);
-  const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
+  const { ids, insightIds, promptHash, limits, dividers } = packetContext(packet);
+  const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null, { limits, dividers }), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
   const items = storylineItems(part);
   if (meta.kind === "section") {
     errors.push(...coverageErrors(part.pages, meta.pages, "page"), ...completenessErrors(part.completeness, STORYLINE_PAGE_CHECKS, items, "check"));
@@ -1614,8 +2008,11 @@ function partErrors(part, packet) {
 }
 
 /** Join a long spine's parallel critiques into one first pass, as reviewer.mjs does for the deck. */
-export function mergeStorylineParts(parts, packet) {
-  const { contentIds } = packetContext(packet);
+export function mergeStorylineParts(partsIn, packet) {
+  const { ids, contentIds } = packetContext(packet);
+  // Each part's page lists are settled as a whole critique's are, and what was settled is returned for the record.
+  const mended = [];
+  const parts = partsIn.map((part) => { const settled = settleCritiqueForm(part, ids, contentIds); mended.push(...settled.mended.map((entry) => ({ ...entry, at: `${part?.part?.id ?? "part"}: ${entry.at}` }))); return settled.review; });
   const errors = [...parts.flatMap((part) => partErrors(part, packet).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
     ...partSetErrors(parts, contentIds, { key: "pages", binding: packet.binding, sections: packet.sections })];
   if (errors.length) return { errors };
@@ -1638,7 +2035,7 @@ export function mergeStorylineParts(parts, packet) {
   const within = openBlocking(ledger).filter((e) => !limitedBy(packet.evidenceScope)(e)).length > 0;
   Object.assign(merged, { pages: joined.pages, completeness: joined.completeness, verdict: lead.verdict === "ready" && !reopened ? "ready" : lead.verdict === "provisional" && !within ? "provisional" : "revise",
     ...(within && lead.verdict !== "revise" ? { compliance: { ...lead.compliance, verdict: "incomplete" }, sufficiency: { ...lead.sufficiency, verdict: "insufficient" }, rating: Math.min(lead.rating, RATING_CAPS[openBlocking(ledger).some((e) => e.severity === "blocker") ? "blocker" : "major"]) } : {}) });
-  return { review: merged, errors: [] };
+  return { review: merged, errors: [], mended };
 }
 
 /** Merge saved parts into out/storyline-review.json and record it. */
@@ -1648,10 +2045,10 @@ export async function mergeStorylineDirectory(specPath, outputDirectory, options
   const packet = await readJson(path.join(await lineageStore(spec, out, specPath), PACKET_RECORD), { optional: true });
   if (!packet?.sections) return { status: "invalid", errors: ["no split storyline packet to merge against: run storyline.mjs --full on a long spine first"] };
   const { files, parts } = await readParts(path.join(packet.staging, "parts"));
-  const { review, errors } = mergeStorylineParts(parts, packet);
+  const { review, errors, mended } = mergeStorylineParts(parts, packet);
   if (errors.length) return { status: "invalid", errors, parts: files };
   await writeJson(path.join(out, "storyline-review.json"), review);
-  return prepareStoryline(specPath, out, options);
+  return prepareStoryline(specPath, out, { ...options, formMended: mended });
 }
 
 /**
@@ -1670,12 +2067,13 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
   try {
     if (packet.sections) {
       const prompt = (id) => fs.readFile(path.join(step.dir, "sections", `${id}.md`), "utf8");
-      const jobs = [...await Promise.all(packet.sections.map(async (s) => ({ id: s.id, prompt: await prompt(s.id) }))), { id: "spine", prompt: await prompt("spine") }];
+      const jobs = [...await Promise.all(packet.sections.map(async (s) => ({ id: s.id, prompt: await prompt(s.id) }))), { id: "spine", prompt: await prompt("spine"), schemaPath: path.join(step.dir, "spine-part-schema.json") }];
       const parts = await reviewParts(which, jobs, { partsDir: path.join(step.dir, "parts"), schemaPath: path.join(step.dir, "part-schema.json"), model, timeoutMs, cwd: step.dir, promptHash: packet.promptHash });
       const record = await readJson(path.join(await lineageStore(await readJson(specPath), outputDirectory, specPath), PACKET_RECORD));
       const merged = mergeStorylineParts(parts, record);
       if (merged.errors.length) return { status: "invalid", errors: merged.errors };
       review = merged.review;
+      options.formMended = merged.mended;
     } else review = await callReviewer(which, { prompt: await fs.readFile(path.join(step.dir, "prompt.md"), "utf8"), schemaPath: path.join(step.dir, "schema.json"),
       outPath: path.join(step.dir, "codex-last-message.json"), model, timeoutMs, cwd: step.dir, promptHash: packet.promptHash });
   } catch (error) {
@@ -1683,7 +2081,7 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
     throw error;
   }
   await writeJson(path.join(outputDirectory, "storyline-review.json"), review);
-  const next = await prepareStoryline(specPath, outputDirectory, { maxPasses });
+  const next = await prepareStoryline(specPath, outputDirectory, { maxPasses, formMended: options.formMended });
   return { ...next, verdict: review.verdict, rating: review.rating, topFixes: review.topFixes };
 }
 

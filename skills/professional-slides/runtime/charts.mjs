@@ -19,7 +19,7 @@ import { CHART_GUIDANCE } from "./guidance.mjs";
 import { HORIZONS_SAMPLE, HORIZONS_TOKENS, HORIZONS_VARIANTS, renderHorizons, resolveHorizonsVariant } from "./horizons.mjs";
 import { evidenceTreatment, releasedEvidenceProps, packedEvidenceProps } from "./chart-annotations.mjs";
 import { SERIES, MARK_WEIGHT_TOKENS } from "./chart-axes.mjs";
-import { CATEGORY_DECORATIONS, refuseUndrawn } from "./chart-decorations.mjs";
+import { CATEGORY_DECORATIONS, refuseUndrawn, referenceSeriesAsLines, assumedRunBracketed } from "./chart-decorations.mjs";
 import { categoricalChart } from "./chart-categorical.mjs";
 import { lineChart, comboChart } from "./chart-line.mjs";
 import { waterfall, waffleLayout, waffleChart, bubbleGridLayout, bubbleGrid, marimekkoLayout, marimekko, rangeChart } from "./chart-specialty.mjs";
@@ -317,13 +317,22 @@ export function registerCharts(registry) {
       render: ({ id, frame, props = {}, tokens }) => {
         refuseUndrawn(chart, props, id, chartDefinitions);
         if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
+        // A series that is a threshold, a target or a constant is drawn as a reference line where the chart draws them, and a
+        // recorded series carried forward on an assumption has the turn bracketed (chart-decorations.mjs SERIES_STATES). Each is
+        // tried in turn: where the line's label or the bracket's band finds no room, the series stay dashed and keyed.
+        const drawn = (within) => {
+          const lined = referenceSeriesAsLines(props, chart.draws);
+          const attempts = [lined && assumedRunBracketed(lined, chart.draws), lined, assumedRunBracketed(props, chart.draws)].filter(Boolean);
+          for (const attempt of attempts) { try { return renderResolved(chart.render, { id, frame: within, tokens, props: attempt }); } catch { continue; } }
+          return renderResolved(chart.render, { id, frame: within, tokens, props });
+        };
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
-          return { nodes: renderResolved(chart.render, { id, frame, tokens, props }) };
+          return { nodes: drawn(frame) };
         }
         const title = registry.get("chart-title"), titleProps = headingProps(props);
         const height = title.measureContent({ frame, props: titleProps }).height;
-        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...renderResolved(chart.render, { id, frame: { ...frame, y: frame.y + height, height: frame.height - height }, tokens, props })] };
+        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...drawn({ ...frame, y: frame.y + height, height: frame.height - height })] };
       }
     });
   }
@@ -331,4 +340,12 @@ export function registerCharts(registry) {
 }
 
 export const CHART_IDS = Object.freeze(chartDefinitions.map((chart) => chart.id));
+/**
+ * Does the chart `kind` draw `decoration` (a key of CHART_DECORATIONS: the
+ * period bracket, reference lines, highlights): true or false, and null for
+ * a kind that is no registered chart. What writes a decoration for the author
+ * (bind.mjs: the bracket over an assumed run) asks first, so it never writes
+ * one the chart would refuse as dropped unseen.
+ */
+export const chartDraws = (kind, decoration) => { const chart = chartDefinitions.find((item) => item.id === kind); return chart ? chart.draws.includes(decoration) : null; };
 

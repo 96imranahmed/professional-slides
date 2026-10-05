@@ -490,11 +490,16 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
-  // Two keys the planned specs do not carry ride onto the scene slide: the
-  // page's role, and `hidden`, its show state in the file (emit_pptx.py).
+  // Three keys the planned specs do not carry ride onto the scene slide: the
+  // page's role, `hidden`, its show state in the file (emit_pptx.py), and - on
+  // a page the composer split in two, a table past its rows - the id of the
+  // page it was split from (`sourceSlideId`), which is how every reader of the
+  // scene finds the page a slide belongs to: without it a split page had no
+  // text for the content plan to read and was refused as TEXT_PLAN_INCOMPLETE.
   deck.slides.forEach((slide, index) => {
     if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role;
     if (deckPlan.slides[index].hidden) slide.hidden = true;
+    if (deckPlan.slides[index].sourceSlideId) slide.sourceSlideId = deckPlan.slides[index].sourceSlideId;
   });
   return {deck, decisions:planned.map(item=>item.decision)};
 }

@@ -103,8 +103,16 @@ export function buildLedger(scene) {
     counts: { claims: unique.length, pages: Object.keys(byPage).length, findings: findings.length } };
 }
 
-export async function writeLedger(directory) {
-  const ledger = buildLedger(await readJson(path.join(directory, "scene.json")));
+/**
+ * The ledger of the build at `directory`, written as claims.json. `edited`
+ * are slides the runtime did not compose but whose words this build changed -
+ * a revision's text edits on slides carried from the source deck, each as
+ * `{ id, nodes }` holding the changed lines alone - which join the composed
+ * pages: a claim the revision rewrote is the revision's to reproduce.
+ */
+export async function writeLedger(directory, { edited = [] } = {}) {
+  const scene = await readJson(path.join(directory, "scene.json"));
+  const ledger = buildLedger(edited.length ? { ...scene, slides: [...scene.slides, ...edited] } : scene);
   await writeJson(path.join(directory, "claims.json"), ledger);
   return ledger;
 }
@@ -115,10 +123,14 @@ export const findingKey = (finding) => `${finding.code}:${finding.claim ?? findi
  * The author's self-check is complete when every page that makes claims has a
  * verdict bound to its current claims, every ledger finding is answered, and
  * the title-spine pass is recorded. A rebuild keeps the verdicts of pages whose
- * claims did not change and asks only for the pages that did.
+ * claims did not change and asks only for the pages that did. `spinePass:
+ * false` is a revision that carries slides from its source deck: the spine is
+ * the user's, so no merge pass is asked of it, and with no claim of its own
+ * to reproduce it owes no self-check at all.
  */
-export function validateSelfCheck(selfCheck, ledger) {
+export function validateSelfCheck(selfCheck, ledger, { spinePass = true } = {}) {
   if (!ledger) return [];
+  if (!spinePass && !Object.keys(ledger.pageHashes).length && !ledger.findings.length) return [];
   if (!selfCheck || typeof selfCheck !== "object") return ["self-check.json is missing: reproduce every claim in claims.json from the source records, then record a verdict per page"];
   const errors = [];
   const pages = selfCheck.pages && typeof selfCheck.pages === "object" ? selfCheck.pages : {};
@@ -127,7 +139,7 @@ export function validateSelfCheck(selfCheck, ledger) {
   const answers = selfCheck.findings && typeof selfCheck.findings === "object" ? selfCheck.findings : {};
   const open = ledger.findings.filter((f) => typeof answers[findingKey(f)] !== "string" || answers[findingKey(f)].trim().length < 20);
   if (open.length) errors.push(`${open.length} ledger finding(s) are unanswered: ${open.map(findingKey).join(", ")}`);
-  if (typeof selfCheck.spine !== "string" || selfCheck.spine.trim().length < 40) errors.push("self-check.spine must record the title-spine pass: which pages were merged or cut, or why none were");
+  if (spinePass && (typeof selfCheck.spine !== "string" || selfCheck.spine.trim().length < 40)) errors.push("self-check.spine must record the title-spine pass: which pages were merged or cut, or why none were");
   return errors;
 }
 

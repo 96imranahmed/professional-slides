@@ -358,7 +358,7 @@ export function metricNodes({ id, frame, props }) {
   const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
-  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta; give the tile more height or drop the delta");
+  if (total > frame.height + 0.01) throw new Error(`Metric tile is too short for its ${["value", labelLayout && "label", sub && "sublabel", delta && "delta"].filter(Boolean).join(", ")}: they take ${Math.ceil(total)}px at this width and the tile has ${Math.floor(frame.height)}px. Shorten the ${sub ? "sublabel or the label" : "label"}${delta ? ", or drop the delta" : ""}, or set fewer tiles so each is wider`);
   const nodes = [];
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));

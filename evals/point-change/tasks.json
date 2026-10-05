@@ -1,0 +1,137 @@
+{
+ "$comment": "The point-change benchmark's tasks. Each is a change a user asks of a deck they already have: `request` is their words (what a real agent is given, with the deck), `moves` what the scripted author writes into the pages file, one move a compile - a move after the first is made only when the compile before it refused - and `accept` what the revised deck is held to. An edit is `{ page, replace }` or `{ page, title }` on a carried page (`reset: true` writes the page's `replace` afresh, where a move corrects the one before), `{ page, set }` to give a page a type, `{ deck }` to set deck-level keys, or `{ sources }` to add to the citation registry beside them. `accept.edits` are the changes the request asks for, as `{ old, new }`: a line that differs on an edited slide and is not the source line with them made is an edit nobody asked for. `accept.prints` reads a slide's words, or its speaker notes with `notes: true`; `accept.retitled` lists the slides whose title must no longer be the source's, whatever words the author chose - a slide number, or `{ slide, says }` where the new title must use those words; `accept.refusedFor` the codes the first compile must refuse the first move for. `critic` has the scripted critic find something (`aboutImported`: a finding about a slide the revision did not change), and `deliver: true` carries the run past the review packet to an accepted delivery with a scripted reviewer.",
+ "tasks": [
+  {
+   "id": "number-propagates",
+   "fixture": "user",
+   "request": "FY26 revenue has been restated from £12.4m to £12.6m. Update the deck wherever it states the figure and change nothing else.",
+   "moves": [
+    { "note": "The summary states the figure, so the author changes it there.",
+      "edits": [{"page": "s02", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}] },
+    { "note": "The compile names the closing slide, which still prints the old figure, and the table's total, which states the same quantity under \"Revenue (£m)\".",
+      "edits": [{"page": "s08", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}, {"page": "s04", "replace": [{"old": "12.4", "new": "12.6"}]}] }
+   ],
+   "accept": {
+    "prints": [{"slide": 2, "text": "£12.6m"}, {"slide": 8, "text": "£12.6m"}, {"slide": 4, "text": "12.6"}],
+    "gone": ["£12.4m", "12.4"],
+    "changed": ["s02", "s04", "s08"],
+    "stale": ["s04", "s08"],
+    "critique": [],
+    "edits": [{"old": "£12.4m", "new": "£12.6m"}, {"old": "12.4", "new": "12.6"}]
+   }
+  },
+  {
+   "id": "retitle",
+   "fixture": "user",
+   "request": "Slide 4's title is a label. Retitle it to say what the table shows: London grows fastest on the thinnest margin.",
+   "moves": [
+    { "note": "A title is the slide's own text: it is rewritten in place.",
+      "edits": [{"page": "s04", "title": "London grows fastest on the thinnest margin"}] }
+   ],
+   "accept": {
+    "prints": [],
+    "gone": ["Store performance by region"],
+    "changed": ["s04"],
+    "critique": ["s04"],
+    "edits": [],
+    "retitled": [{"slide": 4, "says": ["London", "fastest", "margin"]}]
+   }
+  },
+  {
+   "id": "exhibit-swap",
+   "fixture": "user",
+   "request": "Redraw the pie on slide 7 as a donut, with a title that says what it shows. Leave the other slides as they are.",
+   "moves": [
+    { "note": "A chart is redrawn by giving its page a type: the runtime composes that one page, from the values the inventory holds.",
+      "edits": [{"deck": {"density": "live-pitch"}}, {"page": "s07", "set": {"sourceSlide": 7, "type": "composition", "form": "donut", "commentary": "below", "title": "Wholesale is now 22% of sales, more than twice delivery", "why": "Four channels of one year's sales are parts of a whole; the donut keeps the slide's reading and sets the shares side by side.", "settles": {"kind": "share", "what": "Share of FY26 sales by channel"}, "adds": "The points say which channels carry the stores and why wholesale matters to the plan.", "exhibit": {"heading": "Share of FY26 sales, %", "labels": ["In store", "Takeaway", "Delivery", "Wholesale"], "values": [41, 27, 10, 22]}, "points": ["Wholesale is 22% of sales, up from 16% in FY22, and it is the one channel that grows without a new lease", "In store and takeaway together are 68% of sales, so the estate still carries the business", "Delivery is the smallest channel at 10% and the only one that pays a commission to a platform"]}}] }
+   ],
+   "accept": {
+    "prints": [{"slide": 7, "text": "41%"}, {"slide": 7, "text": "27%"}],
+    "gone": ["Sales mix by channel"],
+    "changed": ["s07"],
+    "composed": ["s07"],
+    "draws": {"slide": 7, "component": "chart.donut"},
+    "critique": ["s07"],
+    "retitled": [7],
+    "edits": []
+   }
+  },
+  {
+   "id": "notations",
+   "fixture": "notations",
+   "request": "FY26 revenue has been restated from £12.4m to £12.6m. Update the deck wherever it states the figure and change nothing else.",
+   "deliver": true,
+   "moves": [
+    { "note": "The summary states the figure, so the author changes it there.",
+      "edits": [{"page": "s02", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}] },
+    { "note": "The compile names every slide that still states the quantity, whatever the notation: the table's total, \"£12.4 million\" in the priorities, the close, and the speaker's notes of the flagship slide.",
+      "edits": [{"page": "s08", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}, {"page": "s04", "replace": [{"old": "12.4", "new": "12.6"}]}, {"page": "s06", "replace": [{"old": "£12.4 million", "new": "£12.6 million"}]}, {"page": "s05", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}] }
+   ],
+   "accept": {
+    "prints": [{"slide": 2, "text": "£12.6m"}, {"slide": 8, "text": "£12.6m"}, {"slide": 4, "text": "12.6"}, {"slide": 6, "text": "£12.6 million"}, {"slide": 5, "text": "£12.6m", "notes": true}, {"slide": 2, "text": "landed at £12.45 in FY26, against £12.4 the year before"}, {"slide": 2, "text": "13.4%"}],
+    "gone": ["£12.4m", "£12.4 million"],
+    "edits": [{"old": "£12.4m", "new": "£12.6m"}, {"old": "£12.4 million", "new": "£12.6 million"}, {"old": "12.4", "new": "12.6"}],
+    "changed": ["s02", "s04", "s05", "s06", "s08"],
+    "critique": [],
+    "stale": ["s04", "s05", "s06", "s08"]
+   }
+  },
+  {
+   "id": "bare-number",
+   "fixture": "notations",
+   "request": "FY26 revenue has been restated from 12.4 to 12.6 (£m). Update the deck wherever it states the figure and change nothing else.",
+   "moves": [
+    { "note": "The author types the figure as the request gives it - bare.",
+      "edits": [{"page": "s02", "replace": [{"old": "12.4", "new": "12.6"}]}] },
+    { "note": "The compile refuses the edit: the summary prints 12.4 only inside longer numbers, and names them. The author names the figure whole, and follows it to the slides the compile lists.",
+      "edits": [{"page": "s02", "reset": true, "replace": [{"old": "£12.4m", "new": "£12.6m"}]}, {"page": "s08", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}, {"page": "s04", "replace": [{"old": "12.4", "new": "12.6"}]}, {"page": "s06", "replace": [{"old": "£12.4 million", "new": "£12.6 million"}]}, {"page": "s05", "replace": [{"old": "£12.4m", "new": "£12.6m"}]}] }
+   ],
+   "accept": {
+    "prints": [{"slide": 2, "text": "£12.6m"}, {"slide": 8, "text": "£12.6m"}, {"slide": 4, "text": "12.6"}, {"slide": 6, "text": "£12.6 million"}, {"slide": 5, "text": "£12.6m", "notes": true}, {"slide": 2, "text": "landed at £12.45 in FY26, against £12.4 the year before"}, {"slide": 2, "text": "13.4%"}],
+    "gone": ["£12.4m", "£12.4 million"],
+    "edits": [{"old": "£12.4m", "new": "£12.6m"}, {"old": "£12.4 million", "new": "£12.6 million"}, {"old": "12.4", "new": "12.6"}],
+    "changed": ["s02", "s04", "s05", "s06", "s08"],
+    "critique": [],
+    "refusedFor": ["REVISION_CARRY_INVALID"]
+   }
+  },
+  {
+   "id": "swap-own-title",
+   "fixture": "user",
+   "request": "Redraw the pie on slide 7 as a donut. Leave everything else as it is.",
+   "moves": [
+    { "note": "The page is composed where the slide stood, under the slide's own title and with the slide's own two lines: a label title is the user's, and nothing of the argument moves.",
+      "edits": [{"deck": {"density": "live-pitch"}}, {"page": "s07", "set": {"sourceSlide": 7, "type": "composition", "form": "donut", "commentary": "rail", "takeaway": false, "title": "Sales mix by channel", "why": "Four channels of one year's sales are parts of a whole; the donut keeps the slide's own reading.", "settles": {"kind": "share", "what": "Share of FY26 sales by channel"}, "adds": "The rail keeps the slide's own two lines beside the redrawn chart.", "rail": "Wholesale is 22% of sales. Delivery is the smallest channel at 10%", "exhibit": {"heading": "Share of FY26 sales, %", "labels": ["In store", "Takeaway", "Delivery", "Wholesale"], "values": [41, 27, 10, 22]}}}] }
+   ],
+   "accept": {
+    "prints": [{"slide": 7, "text": "Sales mix by channel"}, {"slide": 7, "text": "Wholesale is 22% of sales"}],
+    "gone": [],
+    "edits": [],
+    "changed": ["s07"],
+    "composed": ["s07"],
+    "draws": {"slide": 7, "component": "chart.donut"},
+    "critique": []
+   }
+  },
+  {
+   "id": "retitle-contradicts",
+   "fixture": "user",
+   "request": "Slide 4's title is a label. Retitle it to say what the table shows: London grows fastest on the thinnest margin.",
+   "deliver": true,
+   "critic": {"aboutImported": {"pages": ["s02", "s04"], "severity": "blocker", "problem": "The new title on slide 4 says London grows fastest, which its own table shows at 11.0% like for like; the summary on slide 2 still says the South grew fastest like for like at 9.4%.", "fix": "The user decides which is meant: correct the summary's sentence to London at 11.0%, or say on what other basis the South leads."}},
+   "moves": [
+    { "note": "A title is the slide's own text: it is rewritten in place.",
+      "edits": [{"page": "s04", "title": "London grows fastest on the thinnest margin"}] }
+   ],
+   "accept": {
+    "prints": [],
+    "gone": ["Store performance by region"],
+    "changed": ["s04"],
+    "critique": ["s04"],
+    "edits": [],
+    "aboutImported": ["s02"],
+    "retitled": [{"slide": 4, "says": ["London", "fastest", "margin"]}]
+   }
+  }
+ ]
+}

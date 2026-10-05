@@ -1005,6 +1005,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // A series that says it is assumed or a reference is drawn dashed, lighter or as a reference line (chart-decorations.mjs
+  // SERIES_STATES), which a native series cannot say: that chart stays drawn.
+  if (Array.isArray(props.series) && props.series.some((item) => item?.state !== undefined || item?.assumedFrom !== undefined)) return null;
   // External stack labels and their leaders use measured scene coordinates;
   // Office repositioning the labels would detach those leaders from the text.
   if (renderedNodes?.some(node => node.role === "data-label" && node.data?.external)) return null;

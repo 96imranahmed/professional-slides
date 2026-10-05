@@ -8,7 +8,7 @@
 // a test holds each to the gate that enforces it (test_published_limits.py).
 // `measured` marks a capacity the renderer measures in pixels, given here as
 // the words of ordinary prose it holds: a guide to write to, not the test.
-import { PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
+import { INFERENCE_WORDS, PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
   railCapacity, calloutCapacity } from "./page-types.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
@@ -43,8 +43,9 @@ const budget = (task, density, slide = null) => { const b = wordBudgetOf(task, s
 export function deckLimits({ density, sectionTitle = null } = {}) {
   return {
     ...copyLimits(),
-    sectionTitle: { lines: { max: SECTION_TITLE_LINES }, words: { max: sectionTitle?.words ?? sectionTitleCapacity(), measured: true }, ...(sectionTitle ? { characters: { max: sectionTitle.characters, measured: true } } : {}), codes: ["SPINE_UNFIT"],
-      note: sectionTitle ? "measured on this deck's own dividers - its design, variation, tracker and sections - in ordinary prose; every run composes each section title itself, a draft and a plan too"
+    sectionTitle: { lines: { max: SECTION_TITLE_LINES }, words: { max: sectionTitle?.words ?? sectionTitleCapacity(), measured: true }, ...(sectionTitle ? { characters: { max: sectionTitle.characters, measured: true } } : {}),
+      ...(sectionTitle?.title ? { whateverTheWords: { words: { max: sectionTitle.title.words }, characters: { max: sectionTitle.title.characters }, measured: true } } : {}), codes: ["SPINE_UNFIT"],
+      note: sectionTitle ? `measured on this deck's own dividers - its design, variation, tracker and sections. \`words\` and \`characters\` are the most they hold, of short words (ordinary prose)${sectionTitle.title ? `; \`whateverTheWords\` is what they hold of a title's longer words, so a section title of ${sectionTitle.title.words} words or fewer fits and one between ${sectionTitle.title.words} and ${sectionTitle.words} fits where its words are short` : ""}. Every run composes each section title itself, a draft and a plan too`
         : "measured on the house default's divider; name the pages file (`<id>.pages.json --limits`) for what this deck's design, variation and sections hold" },
     sources: { name: { words: { max: SOURCE_TITLE_WORDS.name } }, short: { words: { max: SOURCE_TITLE_WORDS.short } }, status: { words: { max: SOURCE_TITLE_WORDS.status } }, note: "a `sources` registry entry's `name` and `short` are a title and its `status` a label, refused at the compile when longer; a caveat or a method is the page's `note`. The footer as drawn counts toward NOTE_HEAVY: a citation written from registry keys is fitted by the runtime to the words the page's footer has room for" },
     contents: { sections: { list: { ...AGENDA_LIMITS.list }, columns: { ...AGENDA_LIMITS.columns } }, codes: ["CONTENTS_UNFIT"], note: "the appendix divider counts as a section" },
@@ -52,7 +53,8 @@ export function deckLimits({ density, sectionTitle = null } = {}) {
       inOneTitleForARevisionRecordedBeforeTheUpFrontRule: { min: CONTENT_THRESHOLDS.answerCarriedMin },
       codes: ["CONTENT_ANSWER_UNCARRIED"], note: "shares of the answer's content words; the answer itself has no length limit" },
     bodyWords: Object.fromEntries(Object.keys(READING_TASK_BANK).map((task) => [task, budget(task, density)]).filter(([, b]) => b)),
-    executiveSummary: { bodyWords: budget("text-page", density, { role: "executive-summary" }) },
+    executiveSummary: { bodyWords: budget("text-page", density, { role: "executive-summary" }), codes: ["WORDS", "SPINE_UNFILLED"],
+      note: "the ceiling counts every word of the body - the cells of the summary's table as well as its points - and the page does not fill on points alone, so the answer table is short: a call of a few words a cell" },
   };
 }
 
@@ -77,7 +79,7 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
     const tasks = [...new Set((commentary ? [commentary] : placements(f)).map((placement) => taskOf(f, placement)))];
     return Object.fromEntries(tasks.map((task) => [task, budget(task, density, summary)]).filter(([, b]) => b));
   };
-  const exhibit = (f) => { const l = limitOf(type, f, t.forms[f]); return l ? { [l.key]: { min: l.min, ...(l.max ? { max: l.max } : {}) }, ...(l.valueChars ? { valueCharacters: { max: l.valueChars } } : {}) } : null; };
+  const exhibit = (f) => { const l = limitOf(type, f, t.forms[f]); return l ? { [l.key]: { min: l.min, ...(l.max ? { max: l.max } : {}) }, ...(l.valueChars ? { valueCharacters: { max: l.valueChars } } : {}), ...(l.columns ? { columns: { min: 1, max: l.columns, note: "tiles across; optional - left out, the grid sets them" } } : {}) } : null; };
   const [lo, hi] = Array.isArray(t.exhibits) ? t.exhibits : [t.exhibits, t.exhibits];
   const perForm = (f) => ({ commentary: placements(f), bodyWords: words(f), ...(exhibit(f) ? { exhibit: exhibit(f) } : {}) });
   const placed = commentary ? [commentary] : [...new Set(forms.flatMap(placements))];
@@ -94,6 +96,11 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
     ...(type === "argument" ? { panel: { words: { min: COPY_LIMITS.panelWordsMin } } } : {}),
     // A photograph stands in for words: the floor falls by the share of the body it holds, to this share of the floor at least.
     ...(type === "picture" ? { pictureRelief: { floorShare: { min: 1 - PICTURE_SHARE_MAX }, note: "bodyWords.min falls by the share of the body the photograph holds" } } : {}),
+    // What a table on the page is held to that no count says: rules a run otherwise meets only by breaking them.
+    ...(hi > 0 ? { table: {
+      implicationColumn: { headerHoldsOneOf: [...INFERENCE_WORDS], codes: ["GUTTER_UNEARNED"], note: "a column marked `implication: true` draws a \"therefore\" chevron before it, so its header names the inference, not another fact" },
+      numbers: { codes: ["BASIS_MISSING"], note: "a table that prints one recorded number by token prints every measurement by token - a change or a share computed from recorded measures is an analysis (`growth`, `gap`, `share` in <id>.analysis.json), printed by its own token - or declares `basis: { measures, role }` naming every measure it shows; a year, a period label, an ordinal and a count in a phrase are not measurements" } } } : {}),
+    ...(type === "numbers" ? { tiles: { codes: ["TILES_ONE_MEASURE", "SHARES_IN_TILES"], note: "each tile, strip figure or grid item states a different measure: one measure at two dates or for two members is plotted on one axis (a trend, a ranking, or the page's own chart), not set in two tiles; a strip takes the height its tallest tile needs, so five tiles with sublabels hold short labels" } } : {}),
     ...(form ? perForm(form) : { forms: Object.fromEntries(forms.map((f) => [f, perForm(f)])) }),
   };
 }

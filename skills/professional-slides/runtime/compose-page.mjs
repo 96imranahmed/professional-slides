@@ -94,6 +94,7 @@ export const SLIDE_KEYS = Object.freeze({
   notes: "the speaker notes, which print in the file and never on the page",
   hidden: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide carries it",
   // the rest
+  sourceSlide: "on a revision's section or agenda page, the imported slide it stands for (a typed page keeps its own in `pageType`); never drawn",
   serves: "which ranked criteria this page answers",
   pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
   tone: "dark or light, on the fixed-shape pages",

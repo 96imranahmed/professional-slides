@@ -26,8 +26,8 @@ const years = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'];
 const regions = ['Europe', 'East Asia & Australasia', 'Americas', 'West Asia & Indian Ocean', 'Africa', 'Middle East'];
 """
 
-QATAR = """{heading:'Qatar airline passengers',unit:'million',categories:['FY24','FY25','FY26','FY27','FY28','FY29'],
- series:[{name:'Passengers',values:[40,43.1,41.8,45.3,49.1,53.2]}],forecastFrom:'FY27'}"""
+FORECAST = """{heading:'Regional museum visitors',unit:'thousand',categories:['FY24','FY25','FY26','FY27','FY28','FY29'],
+ series:[{name:'Visitors',values:[200,215.5,209,226.5,245.5,266]}],forecastFrom:'FY27'}"""
 
 
 class CalloutBoxTests(unittest.TestCase):
@@ -120,7 +120,7 @@ class LeaderTests(unittest.TestCase):
     """A leader ends on its mark: a column's top centre, a bar's end, a line's dot."""
 
     def test_leader_lands_on_the_column_top_centre_and_the_bar_end_centre(self):
-        """Emirates deck: callout leaders landed on a column's right edge, pointing at the gap between bars."""
+        """A real deck: callout leaders landed on a column's right edge, pointing at the gap between bars."""
         result = run_node("""
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const frame={x:72,y:180,width:1136,height:460};
@@ -143,7 +143,7 @@ console.log(JSON.stringify({column:pick(column,'E Asia'),bar:pick(bar,'Europe')}
         self.assertAlmostEqual(bar['leader']['y2'], bar['mark']['y'] + bar['mark']['height'] / 2, places=3)
 
     def test_a_leader_onto_a_crossing_point_shares_its_band(self):
-        """Emirates deck: two callouts that met nowhere sat in two bands because a leader's corridor caught the rival's marker."""
+        """A real deck: two callouts that met nowhere sat in two bands because a leader's corridor caught the rival's marker."""
         # Two callouts over different months met nowhere across the plot, yet
         # sat in two stacked bands: packed into one, the taller plot set the
         # May point a point and a half above its rival's, and the leader's
@@ -205,10 +205,10 @@ console.log(JSON.stringify({ boxed: nodes.some((n) => n.role === 'annotation-sur
         self.assertEqual(result["placement"], "rail")
 
     def test_a_callout_takes_free_space_in_the_plot_before_a_band(self):
-        """Fifty-six-page re-author: callouts over short pandemic columns took a band off the plot when the plot had room above them."""
+        """Fifty-six-page re-author: callouts over the short columns of a collapse took a band off the plot when the plot had room above them."""
         result = run_node(PRELUDE + """
 const categories = ['FY17','FY18','FY19','FY20','FY21','FY22','FY23','FY24','FY25','FY26'];
-const props = (annotations, extra = {}) => ({ categories, series: [{ name: 'Passengers', values: [56, 58, 59, 56, 7, 20, 44, 52, 54, 53] }], highlights: [], referenceLines: [], annotations, ...extra });
+const props = (annotations, extra = {}) => ({ categories, series: [{ name: 'Visitors', values: [280, 290, 295, 280, 35, 100, 220, 260, 270, 265] }], highlights: [], referenceLines: [], annotations, ...extra });
 const frame = { x: 72, y: 150, width: 1136, height: 440 };
 const render = (p) => REGISTRY.get('chart.column').render({ id: 'c', frame, props: p }).nodes;
 const notes = [{ category: 'FY21', text: 'Closure: 7m' }, { category: 'FY22', text: 'Reopening: 20m' }];
@@ -220,7 +220,7 @@ const meet = (a, b) => !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a
 console.log(JSON.stringify({ plain: tallest(plain), inPlot: tallest(inPlot), banded: tallest(banded), placements: boxes.map((b) => b.data.evidencePlacement),
   clear: boxes.every((b) => marks.every((m) => !meet(b.frame, m))) }));
 """)
-        self.assertEqual(result["placements"], ["beside", "beside"], "above the short pandemic columns, in the plot")
+        self.assertEqual(result["placements"], ["beside", "beside"], "above the short columns, in the plot")
         self.assertAlmostEqual(result["inPlot"], result["plain"], delta=0.5, msg="the plot keeps its height")
         self.assertLess(result["banded"], result["plain"] - 40, "a band would have taken it")
         self.assertTrue(result["clear"])
@@ -276,14 +276,14 @@ console.log(JSON.stringify({ apart: boxes(apart), near: boxes(near), heights: { 
 
 class ReferenceLabelTests(unittest.TestCase):
     def test_a_crowded_reference_label_moves_outside_instead_of_throwing(self):
-        """Emirates deck: a reference label crowded by callouts threw instead of moving outside the plot."""
+        """A real deck: a reference label crowded by callouts threw instead of moving outside the plot."""
         # The two callouts sit on neighbouring years, so their boxes meet across
         # and stack in two bands (callouts that do not meet share one band and
         # leave the label room inside): the plot is short and the label crowded.
         result = run_node(f"""
 import {{REGISTRY}} from './skills/professional-slides/runtime/registry.mjs';
 const frame={{x:72,y:162,width:1136,height:431}};
-const props={{...{QATAR},referenceLines:[{{value:53.2,label:'Emirates FY26: 53.2m'}}],
+const props={{...{FORECAST},referenceLines:[{{value:266,label:'Largest peer FY26: 266'}}],
   annotations:[{{category:'FY26',text:'The latest year fell about 3%, well below the required path'}},{{category:'FY27',text:'Illustrative path: about 8.4% a year'}}]}};
 const nodes=REGISTRY.get('chart.column').render({{id:'c',frame,props}}).nodes;
 const label=nodes.find(n=>n.role==='chart-reference-label').frame;
@@ -310,11 +310,11 @@ class CalloutPositionTests(unittest.TestCase):
         result = run_node("""
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 const cats = ['FY17', 'FY18', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'];
-const note = 'Passengers fell by half in the first pandemic year';
-const headings = ['Passengers by route group', 'Passengers by cabin', 'Passengers by region'];
+const note = 'Visitors fell by half in the year the halls were shut';
+const headings = ['Visitors by exhibition', 'Visitors by ticket', 'Visitors by region'];
 const deck = (annotations, panels, type, lines) => ({ schema: 'professional-slides.deck/v3', id: 't', design: 'consulting', cover: { title: 'T' },
-  slides: [{ id: 'p1', title: 'Passengers recovered to a new peak after the pandemic trough', arrange: 'row', exhibits: Array.from({ length: panels }, (_, k) => ({ type, heading: headings[k], unit: 'm', categories: cats,
-    series: Array.from({ length: lines }, (_, s) => ({ name: `Series ${s}`, values: cats.map((_, i) => (i < 5 ? 10 + s * 22 + ((i * 7 + s * 3) % 9) : 8 + s * 3 + i)) })), annotations })) }] });
+  slides: [{ id: 'p1', title: 'Visitors recovered to a new peak after the year of closure', arrange: 'row', exhibits: Array.from({ length: panels }, (_, k) => ({ type, heading: headings[k], unit: 'k', categories: cats,
+    series: Array.from({ length: lines }, (_, s) => ({ name: `Series ${s}`, values: cats.map((_, i) => (i < 5 ? 20 + s * 44 + (((i * 7 + s * 3) % 9) * 2) : 16 + s * 6 + i * 2)) })), annotations })) }] });
 const refusal = (spec) => { try { return (composeAll(spec, '.', { partial: true }).pageErrors ?? [])[0] ?? null; } catch (error) { return (error.pageErrors ?? [error.message])[0]; } };
 const at = (category, panels, type, lines, series = 'Series 0') => refusal(deck([{ category, series, text: note }], panels, type, lines));
 // Three bar panels: a note of this size has room beside the two shortest bars and nowhere else.

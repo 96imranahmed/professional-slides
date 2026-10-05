@@ -53,12 +53,31 @@ Every page is checked on every page dimension, and the deck on the three deck di
 | `rhythm` | deck | Sections open, develop and close; page types vary with the reading task; the sequence builds; no page previews or re-proves another. |
 | `bookends` | deck | The executive summary states the answer and pillars the body proves, with its numbers; the close states the decision, conditions and next step and agrees with the summary. |
 
-**Severity** is calibrated so the same defect gets the same level on every deck (defined once in `runtime/review-passes.mjs`):
+**Severity** is calibrated so the same defect gets the same level on every deck. It is defined once (`runtime/review-passes.mjs`), each level with its defects of argument and its defects of the drawn page; the storyline critic is given the first, the reviewer both.
 
-- **blocker:** a reader would be misled or the page cannot be shown - a wrong or unreconciled number, a claim its evidence contradicts, a distorting encoding (unequal time gaps drawn equal, a truncated bar baseline), clipped or unreadable content, an unfinished element (a blank total row, a placeholder).
-- **major:** a partner would send the page back - the point arrives late, at avoidable cost or with the wrong emphasis: the wrong chart form, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task.
-- **minor:** polish noticed only on close reading that does not change what the reader takes away.
-- **none:** an observation needing no action.
+| Level | What it means | Of the argument (the critic and the reviewer) | Of the drawn page (the reviewer) |
+| --- | --- | --- | --- |
+| blocker | A reader would be misled or the page cannot be shown | A wrong or unreconciled number, a figure that differs between the pages that state it, a claim its evidence contradicts, a decisive claim with nothing behind it, an answer that does not follow | A distorting encoding (unequal time gaps drawn equal, a truncated bar baseline), clipped or unreadable content, an unfinished element (a blank total row, a placeholder) |
+| major | A partner would send the page back: the point arrives late, at avoidable cost or with the wrong emphasis | A claim that goes further than its evidence or has no source, evidence of the wrong shape, a comparison across incompatible bases, a page that restates or re-proves another, a missing countercase or analysis | The wrong chart form, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task |
+| minor | Polish noticed only on close reading that does not change what the reader takes away | A claim that could be sharper, a page better placed | A few points of misalignment, one inconsistent number format |
+| none | An observation needing no action | | |
+
+### One standard, applied earlier
+
+The deck review is the second judge of the argument; the storyline critique is the first, and reads it before anything is drawn. The two are held to one standard, so that `ready` at the spine means what the review will hold the argument to:
+
+- **The checks.** Every clause of the rubric is defined once with where it is first decidable. A clause the spine packet decides - from the request, the answer, the titles in order, and each page's claim, type, what settles it, insights and shown measures - is printed in the critic's prompt under the storyline check that applies it, in the reviewer's words. The rest need the rendered page.
+- **The scales.** The severity levels above and the rating scale ([below](#benchmark-and-score)) are the same sentences in both prompts.
+- **The count.** A deck-review finding the spine already decided is recorded as "visible at the spine": on the pass (`atSpine` in its record and in `delivery.json`) and on its line in `REJECTED.md`. That count on a deck is the measure of whether the two judges agree.
+
+| Decided at the spine | Needs the rendered page |
+| --- | --- |
+| `argument`, `evidence`, `rhythm`, `bookends`: every clause | `chart`, `table`, `layout`, `consistency`, `sourcing`: every clause (the critic checks that a claim traces to its insights; the source line is drawn copy) |
+| `text`: the action title commits to a finding | `text`: density, block length, restatement, jargon, the subtitle |
+| `identity`: a player is introduced before it is compared | `identity`: logos, product images, maps |
+| Codes `FACTUAL_ERROR`, `UNSUPPORTED_CLAIM`, `MISLEADING_COMPARISON`, `UNCLEAR_ARGUMENT`, `HEDGED_TITLE` | Every other code of the reviewer's |
+
+A finding is classed by its code where the code is the reviewer's own, and otherwise - a gate's code, or one the reviewer coined - by its dimension, at the spine only where every clause of that dimension is.
 
 ## Pass one is exhaustive
 
@@ -67,7 +86,8 @@ Every later pass only verifies, so the first pass is the only one that may find 
 - misses any rendered page in `pages`, the coverage record: one entry per page with its `verdict` (`ok`, `minor`, `major`, `blocker`) and `checks`, a short note for each page dimension ("n/a - no table on this page" where there is nothing to check);
 - gives a page a verdict other than the worst open finding naming it;
 - files a deck finding without its full page list: `scope: "deck"` lists every affected page in `slides`, and a list given by example ("e.g.", "such as", "etc.") or a reason naming a page the list leaves out is refused;
-- leaves a finding without an `id`, a rubric `dimension`, a concrete `repair` (what to add, replace, move, merge, cut, plot or rewrite) or `checkable` (a rule, or null);
+- leaves a finding without an `id`, a rubric `dimension`, a concrete `repair` (a sentence built on one of the verbs the prompt lists), `touches` (what the repair changes: one or more of copy, layout, exhibit-view, title, claim, evidence, structure) or `checkable` (a rule, or null);
+- states, in a repair, a word count outside the band the packet shows for the page without saying in `floors` how the page stays inside it ([floors](#the-floors-a-repair-stays-inside));
 - skips the **completeness self-check**: `completeness` holds one entry per dimension, `findings` when any was filed under it, or `clean` with what was checked and why nothing was found;
 - omits the `assessment` (argument, evidence, visual, copy, sequence, best page, worst page, most repetitive sequence, most deletable page);
 - leaves a page out of `opened`, the pages the reader actually opened at full size - recorded apart from `binding`, which the packet prints and which says only which build was read;
@@ -78,10 +98,54 @@ Every later pass only verifies, so the first pass is the only one that may find 
 
 Above 24 pages the packet splits the deck review's first pass, so that no reader has fifty pages to hold (the storyline's `--full` critique splits the same way above 30 content pages, at most 16 a section):
 
-- **Section prompts** (`sections/s1.md`, ... in the staged packet): one section per divider, short ones folded together, none over 14 pages; each reviewer checks its pages on every page dimension.
-- **The spine prompt** (`sections/spine.md`): the deck dimensions across the whole sequence, the assessment, the rating and the density comparison.
+- **Section prompts** (`sections/s1.md`, ... in the staged packet): one section per divider, short ones folded together, none over 14 pages; each reviewer checks its pages on every page dimension, and on those only. Its rubric, its schema (`part-schema.json`) and the validator agree: a section part takes findings and completeness entries under the eight page dimensions, and no assessment or waiver verdict.
+- **The spine prompt** (`sections/spine.md`, schema `spine-part-schema.json`): the deck dimensions across the whole sequence - its completeness covers those three - the assessment, the waivers, the rating and the density comparison.
 - **Run them in parallel** where the harness has subagents, one fresh reviewer each; save the answers as `parts/<id>.json` in the staged packet and run `node runtime/reviewer.mjs merge <id>.deck.json out/` (or pass the parts folder to `deliver-deck.mjs --review`). The `codex` and `claude` backends run the parts in parallel themselves; a harness without subagents works through `prompt.md` alone, page by page.
 - **The merge** refuses a part that misses a page of its section, a page two section parts both read, and a section with no part; it reads `parts/<id>.json` only (a backend's raw `<id>.last-message.json` beside it is not a part); it joins a deck finding seen from several sections (same code and dimension) into one over the union of its pages at the worst severity, renumbers colliding ids, and recomputes page verdicts, since a spine finding can raise a page its section reviewer passed.
+
+### The form of an answer
+
+Every prompt ends, beside its schema, with the rules of form validation enforces, word for word from the table the validator's refusals are read against (`formRules` in `runtime/reviewer.mjs`), and with one finding and one completeness entry that pass them:
+
+- a `repair` of 40 characters or more for a major or blocker and 25 for a minor, containing one of the listed verbs;
+- `touches` on every finding that asks for a repair, including `title` where the repair sentence itself says to retitle or to rewrite a title, and `structure` where it says to merge, cut, split, move or add a page;
+- no page list by example - the listed words ("including", "such as", "etc." among them) near a page id are refused;
+- every page a deck finding's text names, by id, by number or inside a range, is in its `slides`; an id spelt as an ordinary word (a page called cover) counts only where it is written as an id, in brackets;
+- one completeness entry per dimension the reader reports on, `findings` exactly where it filed one, with a note of 30 characters or more for `clean` and 10 for `findings`.
+
+A refused answer's errors are gathered by rule: one line a rule, with every place it was broken and the first error in full, so one correction round mends them all. `reviewer.mjs merge` returns them as `grouped` beside the raw `errors`.
+
+### The floors a repair stays inside
+
+The build holds each page to measured bars the rendered page does not show, so the packet carries them (`floors`) and the prompt prints them, for the pages that read covers:
+
+- per page, its body words and the floor and ceiling composed for its reading task; its blocks and words a block, and whether it is one of the prose pages the words-a-block band is measured over; the footer's share of its text against the note bar; and the deck rules at their bar that the page counts toward;
+- for the deck, every rule with no room left, and both sides of the words-a-block band (`TEXT_FRAGMENTED`).
+
+Every number is read from the build's own outputs - `scene.json`, `density-profile.json` and the standings of the gate reports - never retyped. A reviewer does not ask for what a gate refuses: where the right repair moves a page toward a floor, the finding says in `floors` how the page stays inside it. Validation refuses a repair that states a body word count outside the page's band, or a words-a-block figure outside the deck's band on a prose page, and says nothing in `floors`; a repair that states no number is held by the prompt, and by the gate at the rebuild.
+
+The packet also prints what a title is held to - a page title's words and lines (`TITLE_WORDS`), and what a section title of this deck holds on its dividers - and validation refuses a repair that proposes a longer title in quotes, or asks for one by length; `floors` does not excuse a title. The storyline critic is shown the same limits and its `fix` is held to them.
+
+## After a rejection
+
+A rejected review's findings are listed in `REJECTED.md` in two groups, by what each repair changes. The reviewer says it (`touches`), and the registry the draft uses (the repair registry in `runtime/gates/gate_classes.mjs`, the bound fields in `runtime/storyline.mjs`) says whether that is the layout's or the argument's.
+
+| Group | `touches` | What the author does |
+| --- | --- | --- |
+| Repairable without reopening the argument | `copy`, `layout` only | Fix in `<id>.pages.json`, recompile, rebuild and rerun delivery. The storyline critique stays ready; the next review pass verifies the changed pages. |
+| Reopen the argument | any of `exhibit-view`, `title`, `claim`, `evidence`, `structure` | Change only the pages these findings name, at the spine; recompile; run `node runtime/storyline.mjs <id>.deck.json out/` and bring it back to `ready`; then rebuild and rerun delivery. |
+| Not said which | none on record (a review from before the field), and the code's repairs could be either | Read each repair; one that changes a bound fact belongs with the group above. |
+
+**The post-review pass.** Each rejected deck-review pass allows one storyline verification pass that does not count against the critique's cap of three:
+
+- it reads only the pages named by that review pass's open findings whose repair reaches the argument, and the answer; the critic is shown those findings as the reason the pages changed, and may file an item on those pages only;
+- it is refused where a page outside them changed, and it does not exist before a deck review has rejected the deck;
+- it is recorded in the storyline lineage with `kind: "post-review"` and `postReview` (the review pass that allowed it and the pages it read), which is what keeps it out of the count of the critique's own passes;
+- a second change after it is an ordinary pass, counted against the cap. Where the cap is spent, the open findings go to the user.
+
+No cap is raised: the deck review's own three passes bound how many of these a lineage can be granted. The findings of a confirmation read that refused the deck grant the pass the same way.
+
+**On a revision** the same path applies to the pages the revision changed. A finding may name a page of the imported deck beside a changed one (a number changed on one page and left in its old form on another); `REJECTED.md` then says which of its pages are the user's as imported, and the post-review pass reads only the pages the revision has changed. A finding is never filed on imported pages alone, on any pass, and nothing obliges a storyline pass over a page the revision leaves as it was. A one-page revision therefore costs: no storyline prompt where its spine is unchanged, else one that reads the one page; one review prompt that reads the one page; and, only where that review sends the page's argument back, one post-review prompt and one verification prompt, each reading that page.
 
 ## Later passes verify
 
@@ -103,9 +167,12 @@ A review that does not validate is refused as `INVALID_REVIEW`, a transport prob
 - **Confirmation read.** When the accepting pass is a verification, delivery stages one more packet: a fresh reader - no ledger, no earlier rating, no earlier findings - reads the final artifact whole, opens every page, answers in `out/confirmation.json`, and must accept at the same bar (`REVIEW_UNCONFIRMED` otherwise; its findings join the ledger for the next pass). The cost is bounded at three passes and one confirmation; past that the deck goes back to the user. `delivery.json` reports the confirming reader's rating as the deck's score.
 - **Provenance.** Every packet is staged in a clean temporary directory holding only the renders, the packet, the prompts and the schemas, and ends with its prompt hash. Every answer carries `provenance: { backend, model, promptHash }` echoing it; an answer that does not is refused (`REVIEW_PROVENANCE`). `--reviewer auto` runs the host's own CLI first and leaves a packet when the CLI is not signed in; the codex model comes from `evaluation/rules.json`.
 - **Revisions.** This is the one statement of a revision's review scope. A revision (`workflow: "existing_deck_revision"`) is compared, page by page through each page's `sourceSlide`, with the inventory it was imported from (`revisionChanges` in `runtime/review-passes.mjs`):
-  - **The spine** changes with a changed title, a moved or new page, or a cut beside one. One whose spine is unchanged needs no storyline critique; otherwise the critique reads the spine changes.
+  - **The spine** changes with a changed title (written as `title` or through `replace`), a moved or new page, a cut beside one, or a page composed to show evidence its slide did not hold - a page the runtime composed keeps its slide's spine only where it has the slide's title over evidence every number of which the slide already held, and a slide that held only its title gives a page nothing but that title. Reworded copy on such a page is the review's to read, not the critique's. One whose spine is unchanged needs no storyline critique; otherwise the critique reads the spine changes.
   - **The deck review's first pass** reads the pages whose copy changed - their words or numbers - and the pages drawn unlike their source slide: another kind of evidence (text where it had a table) or another chart kind, a new picture, a part the slide did not have (cards, tiles, a hero number), or a drawing setting the inventory cannot vouch for (`icon`, `style`, `frame`, `crop`, `variant`, `treatment`). It files findings only where they are involved.
   - **A restyle** - a revision that changed no word or number - is read whole: every page.
+  - **A revision that carries slides** (`carry: true`: the slide is copied from the source deck, [Revising an existing deck](storylining.md#revising-an-existing-deck)) is read on the pages it composed and the carried slides it edited in place, each at full size in the assembled deck's renders (`out/deck/`); the slides carried untouched are the user's own, shown in the spreads for the sequence and given no entry. It is never a restyle, the build bars are held on the pages it composed and said not to be held on the carried slides (`bars.notHeld` in `delivery.json`), the self-check covers the claims on the composed pages and the lines rewritten on carried slides with no title-spine pass, and a confirmation read is told which pages are the revision's.
+  - **What a revision's reviewer is also shown and may file.** The reviewer is shown what the revision left standing on purpose (each `only`, to check) and may file a finding whose remedy lies in a slide the revision did not change with `aboutImported: true`: it keeps its severity, blocks nothing, and is reported to the user in `delivery.json` (`aboutImported`), beside every change the revision made (`made`).
+  - **Everything added to the two reviews keeps that scope.** The critic applies the reviewer's argument checks to the changed pages only; the packet shows the floors of the pages the revision changed and no others; and a [post-review pass](#after-a-rejection) reads only the pages its findings name, which on a revision are changed pages. A one-page revision whose spine is unchanged stages no storyline prompt and one review prompt that reads one page.
 - **Lineage.** Both loops keep their passes beside the deck file, keyed by deck id (`<deck dir>/.reviews/<id>/storyline-history/` and `review-history/`, with each pass's ledger, and `lineage.json` logging every restart), so a rebuild into another output directory continues the same lineage and cap. `--full-review` starts a new lineage with an exhaustive pass, for a repair that changed the argument itself, and needs `--reason`, which is logged; a second restart needs `--user-approved` (`LINEAGE_RESTART`). Switching the storyline critique between the spine and `--full` is a restart too.
 
 ## Every checkable finding becomes a check
@@ -179,11 +246,14 @@ Before scoring, compare the candidate with the [atlas](reference-atlas.md) devic
 
 Record argument, evidence, visual explanation, hierarchy/copy and sequence quality separately in the narrative. Use calibrated anchors, not a mechanical average:
 
+- **2 or less:** no argument - the question restated, or facts without an answer.
 - **5:** understandable in parts, but weak proof, repetitive structure or costly reading materially limits usefulness.
 - **7:** useful and mostly supported, with substantial editorial/design work still needed.
 - **8:** the delivery bar: nothing major open and the remaining weaknesses limited.
 - **9:** strong argument and evidence, effective visual explanation, coherent rhythm; remaining weaknesses are limited and explicit.
 - **9.5+:** exceptional against strong comparable references across the deck, including its least effective page. No avoidable generic framework, unearned duplicate or missing decisive relationship is excused by a clean build.
+
+The storyline critique is rated on this same scale, from the one definition both prompts print (`ratingScale` in `runtime/review-passes.mjs`): a rating of 5 or less with a blocker open and 7 or less with a major open. The storyline validator enforces those two caps; the deck reviewer is told them and its acceptance rule (8 or more with nothing major open) is what delivery enforces.
 
 No major/blocker findings is necessary for acceptance, but not sufficient for an exceptional score. A valid appendix lookup need not be spectacular; it must earn its place and be efficient for its task. A prior score is not a floor. User calibration remains separate, never averaged into the independent rating. If user inspection exposes a recurring missed defect, withdraw the earlier acceptance as a quality signal and reassess the next full candidate.
 
@@ -193,7 +263,7 @@ Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnosti
 
 Return the answer to the schema `runtime/reviewer.mjs` writes into the packet; a key the schema does not name is refused at any level:
 
-- **Pass one** (`out/review.json`): `pass: 1`, `verifies: null`, `accepted`, `summary`, `rating`, `binding`, `opened`, `provenance`, `pages`, `findings` (each with `id`, `scope`, `slides`, `dimension`, `code`, `severity`, `reason`, `repair`, `checkable`), `completeness`, `assessment`, `density` (the density pass above: `deck`, and per flagged page `slide`, `verdict`, `reason` and, where required, `point`) and, when the packet shows waivers, `waivers`.
+- **Pass one** (`out/review.json`): `pass: 1`, `verifies: null`, `accepted`, `summary`, `rating`, `binding`, `opened`, `provenance`, `pages`, `findings` (each with `id`, `scope`, `slides`, `dimension`, `code`, `severity`, `reason`, `repair`, `touches`, `checkable` and, where the repair moves a page toward a floor, `floors`), `completeness`, `assessment`, `density` (the density pass above: `deck`, and per flagged page `slide`, `verdict`, `reason` and, where required, `point`) and, when the packet shows waivers, `waivers`.
 - **A later pass** (`out/review.json`): `pass`, `verifies`, `opened`, `provenance`, `pages` for the pages it read, `statuses`, additive `findings` with `basis`, `justification` and `evidence`, and `density`.
 - **The confirmation read** (`out/confirmation.json`): `confirms`, a verdict and note for every page, its findings and the assessment.
 

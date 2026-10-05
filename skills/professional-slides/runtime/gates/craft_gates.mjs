@@ -9,10 +9,17 @@
 //
 // They are floors, not targets. A deck well above them can still be flat, and
 // the review judges that; a deck below them has not made the choices at all.
+//
+// The build bars (build-bars.mjs) are read here too, on the same scene and by
+// the definition delivery reads them: a deck that delivery would refuse for a
+// bar is refused for it at the compile and the build, with the number, and a
+// waived bar is an advisory until the reviewer confirms it. Where a rate
+// falls under its craft floor as well - most tables plain, most charts bare -
+// the one finding is the craft floor's, which no waiver lifts.
 
-import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
+import { PLAN, DECK_LENGTH, applyRulesVersion, carriedCount, isAnalyticalPage } from "../weight.mjs";
 import { photographsWaived } from "./plan_gates.mjs";
-import { tableStatistics } from "../build-bars.mjs";
+import { BUILD_BAR_CODES, barStandings, barsNotHeld, chartStatistics, countedTables, pageChartAnnotated, tableStatistics, tableTreated } from "../build-bars.mjs";
 import { trivialChart, trendChart } from "../evidence.mjs";
 import { registered } from "../errors.mjs";
 import { assetsDeclaration } from "../asset-needs.mjs";
@@ -44,7 +51,6 @@ export const codedSource = (text) => SOURCE_CODE.test(String(text ?? ""));
 // DECK_LENGTH.craftDevices, where a deck has room for all of them.
 const CRAFT = PLAN.craft;
 const STEP_TYPES = new Set(["steps", "process", "chevron-process", "staircase"]);
-const ANNOTATION = /^(annotation-|chart-(bracket|delta|event-|highlight|reference|band|callout|change))/;
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 const isChart = (ex) => String(ex.type ?? "").startsWith("chart.");
@@ -60,12 +66,67 @@ export function shareAsBars(ex) {
 
 /**
  * The deck's craft findings. `standings`, when given, takes where the deck
- * stands against each floor, broken or not (the record variety_gates.mjs and
- * gate_config.py write), for the author's report.
+ * stands against each floor and each build bar, broken or not (the record
+ * variety_gates.mjs and gate_config.py write), for the author's report.
+ * `scene` is the pages the runtime drew: on a revision that carries slides,
+ * the pages it composed, which is where the build bars are held.
  */
 export function craftFindings(spec, scene, { standings = [], picturesSupplied = 0 } = {}) {
+  const floors = floorFindings(spec, scene, standings, picturesSupplied);
+  // One finding a rate: under its craft floor a rate is refused by that floor, and the finding says what the build bar asks beyond it.
+  const bars = barFindings(spec, scene, standings).flatMap((f) => {
+    const under = floors.find((floor) => floor.code === CRAFT_UNDER_BAR[f.code] && floor.severity === "blocker");
+    if (!under) return [f];
+    under.repair = `${under.repair} The build bar ${f.code} asks more than this floor: ${f.standing}.`;
+    return [];
+  });
   // A deck revised under older rules hears the rules introduced since as advisories.
-  return applyRulesVersion(floorFindings(spec, scene, standings, picturesSupplied), spec);
+  return applyRulesVersion([...bars, ...floors], spec);
+}
+
+// The craft floor that reads the same rate as each build bar, lower down.
+const CRAFT_UNDER_BAR = Object.freeze({ BAR_TABLES_TREATED: "CRAFT_TABLES_PLAIN", BAR_CHARTS_ANNOTATED: "CRAFT_CHARTS_BARE" });
+// What mends each bar, said with the number.
+const BAR_REPAIRS = Object.freeze({
+  BAR_EXHIBIT_VARIETY: "Go back through the pages and ask what each has to show - a ranking, a trend with its growth rate, a composition, a network on a map, a scorecard, a portrait of each player - and draw the ones that repeat a neighbour's exhibit as the exhibit their evidence is",
+  BAR_TABLES_TREATED: "Give each plain table the treatment its reading task asks for: Harvey balls or ratings where it compares options on criteria, bars in the cells where it ranks, a check, cross or status column and an implication column where it judges, logos where it is about named companies",
+  BAR_CHARTS_ANNOTATED: "Put the finding where the eye already is on each bare chart: the growth rate on an arrow, the gap bracketed, the focal bar highlighted, the target or benchmark as a reference line, the event that explains a break flagged on the axis",
+  BAR_DRAWINGS_PER_PAGE: "The pages are rules and paragraphs: set the evidence as exhibits - a table with its treatment, a chart, cards or tiles - rather than as text on the canvas",
+  BAR_UNSOURCED_PICTURES: "A photograph planned as `{ alt }` with no file is an empty frame: put the file in assets/pictures/ (or give the picture its `path` and `credit`), let the build fetch it, or take the picture off the page",
+});
+const WAIVE = (code) => `If the deck is right to miss this bar, record \`waivers: [{ "code": "${code}", "reason": "<a sentence saying why>" }]\` on \`deck\`: the miss is then an advisory here, and at delivery the reviewer is shown the waiver and must confirm it`;
+
+/**
+ * The build bars as the compile and the build hold them (build-bars.mjs
+ * barStandings: the one definition delivery reads, over the same pages). A
+ * miss nothing covers blocks - the refusal delivery has always made of every
+ * deck, whatever version it records, so the bars are no version's rule and
+ * the three stages hold one thing - and names the pages that hold the rate
+ * down; a waived miss is an advisory. On a revision that
+ * carries slides the scene is the pages it composed: the bar is held on
+ * those, as delivery holds it, and the finding says the carried slides are
+ * not counted.
+ */
+function barFindings(spec, scene, standings) {
+  const { outcome, standings: read } = barStandings(scene, spec.waivers || [], { purpose: spec.purpose ?? null, carried: carriedCount(spec) });
+  standings.push(...read);
+  const line = Object.fromEntries(read.map((standing) => [standing.code, standing]));
+  const idOf = (slide) => String(slide.sourceSlideId ?? slide.id);
+  const notHeld = barsNotHeld(new Set((scene?.slides || []).map(idOf)).size, carriedCount(spec));
+  const analytical = (scene?.slides || []).filter((slide, index) => isAnalyticalPage(slide, index));
+  // The pages that hold each rate down, by the count the bar itself makes.
+  const holding = { BAR_TABLES_TREATED: (slide) => countedTables(slide).some((table) => !tableTreated(slide, table)), BAR_CHARTS_ANNOTATED: (slide) => pageChartAnnotated(slide) === false,
+    BAR_UNSOURCED_PICTURES: (slide) => (slide.nodes || []).some((n) => String(n.role ?? "") === "image-frame") };
+  const pagesOf = (code) => (holding[code] ? [...new Set(analytical.filter(holding[code]).map(idOf))] : []);
+  const stood = (f) => { const st = line[f.code]; return st.of ? `${st.count} of ${st.of} ${st.counted[1]} (${Math.round((st.count / st.of) * 100)}%) against the delivery floor of ${Math.round(st.bar * 100)}%: ${-st.margin} more reach it`
+    : f.floor !== undefined ? `${f.measured} ${st.unit} against the delivery floor of ${f.floor}` : `${f.measured} ${st.unit} against a delivery cap of ${f.ceiling}`; };
+  const listed = (ids) => (ids.length ? ` (holding it down: ${ids.slice(0, 12).join(", ")}${ids.length > 12 ? ", ..." : ""})` : "");
+  const finding = (f, severity, pages, repair, more = {}) => ({ slide: null, code: registered(BUILD_BAR_CODES, f.code), severity, measured: f.measured, threshold: f.floor ?? f.ceiling, standing: stood(f),
+    ...(pages.length ? { pages } : {}), repair, ...more });
+  return [
+    ...outcome.unwaived.map((f) => finding(f, "blocker", pagesOf(f.code), `${stood(f)}${listed(pagesOf(f.code))}${notHeld ? ` - ${notHeld}` : ""}. Delivery refuses the deck for this bar, and the compile and the build hold it by the same number over the same pages. ${BAR_REPAIRS[f.code]}. ${WAIVE(f.code)}`)),
+    ...outcome.waived.map((f) => finding(f, "advisory", pagesOf(f.code), `${stood(f)}${notHeld ? ` - ${notHeld}` : ""}. The deck waives this bar ("${f.reason}"), so nothing is refused here; delivery shows the waiver to the reviewer, who must confirm it`, { waivedBy: f.reason })),
+  ];
 }
 
 function floorFindings(spec, scene, standings, picturesSupplied) {
@@ -111,9 +172,6 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
   // (weight.json plan.craft: `min` asks the plan, `blockBelow` stops the deck).
   const stats = sceneStatistics(scene);
   const treated = CRAFT.tableTreated, annotated = CRAFT.chartAnnotated;
-  const rate = (n, of) => (of ? Math.round((n / of) * 1000) / 1000 : 0);
-  stand("CRAFT_TABLES_PLAIN", "tables carrying a treatment", rate(stats.tablesTreated, stats.tables), treated.blockBelow, "min", { unit: "share", applies: stats.tables >= treated.blockFrom });
-  stand("CRAFT_CHARTS_BARE", "charts marking something on the plot", rate(stats.chartsAnnotated, stats.charts), annotated.blockBelow, "min", { unit: "share", applies: stats.charts >= annotated.blockFrom });
   if (stats.tables >= treated.blockFrom && stats.tablesTreated / stats.tables < treated.blockBelow) {
     block("CRAFT_TABLES_PLAIN", { treated: stats.tablesTreated, of: stats.tables }, treated.blockBelow,
       `${stats.tablesTreated} of ${stats.tables} tables carry a treatment. A table that compares options on criteria wants Harvey balls or ` +
@@ -190,12 +248,17 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
   }
 
   // One coded source is one too many, so this is a count, not a share.
-  const coded = [...(spec.slides || []), ...(spec.appendix || [])].filter((slide) => codedSource(slide.source) || (slide.footnotes || []).some(codedSource));
+  // A source the deck's registry declares is cited by the name its record gives it, and a record may be of a document that is
+  // itself called a ledger ("Official-source ledger supplied with the brief"): that is the source named, not a pointer to one the
+  // reader lacks. So the names the registry declares are set aside before a line is read for codes.
+  const declared = Object.values(spec.sources && typeof spec.sources === "object" ? spec.sources : {}).flatMap((entry) => [entry?.name, entry?.short]).filter((name) => typeof name === "string" && name.trim().length > 3).sort((x, y) => y.length - x.length);
+  const typed = (text) => declared.reduce((line, name) => line.split(name).join(" "), String(text ?? ""));
+  const coded = [...(spec.slides || []), ...(spec.appendix || [])].filter((slide) => codedSource(typed(slide.source)) || (slide.footnotes || []).some((note) => codedSource(typed(note))));
   if (coded.length) {
     block("CRAFT_SOURCE_CODES", { pages: coded.length, example: String(coded[0].source ?? "").slice(0, 80) }, 0,
       `${coded.length} source line${coded.length === 1 ? "" : "s"} cite ledger codes ("${String(coded[0].source ?? "").slice(0, 60)}"). ` +
       "The reader has no ledger. Name each source as it would be cited: publisher, document, date - \"Northvale Rail Annual Report 2025-26; " +
-      "Office of Rail Statistics, quarterly release, Feb 2026\". Keep the URLs in sources.md.", coded.map((slide) => slide.id ?? null));
+      "Office of Rail Statistics, quarterly release, Feb 2026\". Keep the URLs in sources.md. A document that is itself a ledger or a register is cited by declaring it in the pages file's `sources` registry (`{ name, status }`) and naming its key: a declared record's name is read as the source's name.", coded.map((slide) => slide.id ?? null));
   }
 
   const perTen = content.length ? (stats.distinctExhibits / content.length) * 10 : 0;
@@ -237,22 +300,17 @@ function unnamedPlayers(spec, scene) {
 
 /** What the built scene draws: its tables and how many carry a treatment, its charts and how many mark the finding, its anchors. */
 export function sceneStatistics(scene) {
-  let charts = 0, chartsAnnotated = 0, icons = 0, logos = 0, pictures = 0;
-  // Tables are counted one definition for every treated share
-  // (build-bars.mjs tableStatistics, gates/table-treatments.json).
+  let icons = 0, logos = 0, pictures = 0;
+  // Tables and chart pages are counted by one definition each, the build
+  // bars' (build-bars.mjs tableStatistics, chartStatistics; gates/table-treatments.json).
   const { tables, treated: tablesTreated } = tableStatistics(scene);
+  const { charts, annotated: chartsAnnotated } = chartStatistics(scene);
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
-    if (!slide.nodes?.some((n) => n.role === "action-title") || /^picture-credits(?:-\d+)?$/.test(String(slide.id ?? ""))) continue;
+    if (!slide.nodes?.some((n) => n.role === "action-title") || /^(?:picture-credits|source-limits)(?:-\d+)?$/.test(String(slide.id ?? ""))) continue;
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
-    // A chart-group composes its charts inside one instance, so its name does
-    // not start with "chart."; its plotted marks still say it is a chart page.
-    if (components.some((c) => c.startsWith("chart.") || c === "chart-group") || roles.includes("chart-mark")) {
-      charts += 1;
-      if (slide.nodes.some((n) => n.data?.highlighted) || roles.some((r) => ANNOTATION.test(r))) chartsAnnotated += 1;
-    }
     icons += roles.filter((r) => /icon/.test(r)).length;
     logos += roles.filter((r) => /logo/.test(r) && r !== "cover-logo").length;
   }

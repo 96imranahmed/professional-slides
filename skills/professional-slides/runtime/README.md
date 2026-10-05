@@ -6,7 +6,7 @@ Node lays the page out; Python writes and checks the file. No vendor runtime. Th
 
 ```
 node runtime/doctor.mjs [--json] [--no-render]
-$RUNTIME_PYTHON runtime/import-deck.py deck.pptx out/ [--id <id>] [--force]
+$RUNTIME_PYTHON runtime/import-deck.py deck.pptx out/ [--id <id>] [--carry] [--force]
 node runtime/preferences.mjs show | get [key] | set key=value ... | clear [key] | deck-keys | apply <id>.pages.json | path
 node runtime/author-deck.mjs <id>.pages.json [--draft | --check [--render] | --plan | --log] [--page <id>[,<id>...]] [--fit-cap <n>]
 node runtime/author-deck.mjs --types | --schema [<type> | deck] | --example <type>[/<form>] | --icons
@@ -47,7 +47,8 @@ One scheme for every command above (EXIT in `errors.mjs`):
 
 ```
 doctor.mjs         step 0: Node, a Python that imports the emitter's packages (RUNTIME_PYTHON), soffice, pdftoppm, pdftotext; an install line per missing piece
-import-deck.py     an existing PPTX, read and never written -> <id>.inventory.json (each slide as it shows: hidden flag, paragraphs in displayed order, pictures with their displayed box, rotation and mirroring), a starter <id>.pages.json (workflow "existing_deck_revision", stable ids, old copy as `draft`, `hidden: true` on a hidden slide) and assets/<id>/
+import-deck.py     an existing PPTX, read and never written -> <id>.inventory.json (each slide as it shows: hidden flag, paragraphs in displayed order, pictures with their displayed box, rotation and mirroring), a starter <id>.pages.json (workflow "existing_deck_revision", stable ids, old copy as `draft`, `hidden: true` on a hidden slide) and assets/<id>/, with the deck itself kept as <id>.source.pptx. `--carry` writes the point-change starter: every slide a page marked `carry: true`
+revision.mjs       a revision's carried slides: a page marked `carry: true` is copied from the source deck, not composed; what each edit changes on its slide, the order the deck is assembled in, the checks on the edits (REVISION_CODES) and the words an edit left standing on another slide
 preferences.mjs    the design intake's answers, stored once per user outside any project
 design-options.mjs one labelled contact sheet per intake question, each tile built with that answer (emit/contact_sheet.py lays them out)
 import-template.py a template deck -> house profile (palette, faces, chrome, density); infer-style.py the same from a PDF or screenshots
@@ -56,6 +57,7 @@ page-types.mjs     the page types: required choices, the structure they compile 
 author-deck.mjs    pages file (the dot-dash) -> deck, plan and content plan; every finding in one run, in class order (AUTHORING_CODES); stamps `rulesVersion`
 deck-structure.mjs the deck's structure read off declared choices: a page's architecture before it composes, the page-shape rule, and `--plan`'s allocation of forms and placements
 fit-search.mjs     for a page that does not fit: its type's other forms and placements compiled from the page as written, composed and gated; one that fits only by dropping a field the page wrote is listed apart, and one is called verified only once `--check --render` has rendered it
+fill-guidance.mjs  for a page that stands part empty, under its word floor or over its ceiling: the page composed again with its points run shorter and longer and its table's rows fewer and more, and the lengths that fill it
 deck-report.mjs    the author's report: findings in class order, where the deck stands against each structure and aggregate rule, each page's part in the aggregates
 pages-file.mjs     the pages file read whole: `{ "include": ... }` entries spliced in, ids unique across the parts, the part each page came from
 limits.mjs         every countable limit a page or a deck is held to, read from the constants the checks read (`--limits`, a scaffold's `limits` block)
@@ -103,14 +105,16 @@ gates/semantic_gates.py what the page says: restatement, planning voice, caveats
 gates/deck_gates.py     the deck-wide gates: photographs, craft rates, device vocabulary, evidence mix, front matter, page weight, architectures, thin-page habit
 gates/text_stats.py     the one word count (text-contract.mjs textWords, ported), printed words for the density profile, content words; stopwords.json the shared stopword lists
 gates/density_profile.py  words as a reader meets them on the rendered PDF; TEXT_FRAGMENTED
-gates/variety_gates.mjs, gates/content_gates.mjs, gates/plan_gates.mjs, gates/craft_gates.mjs  the variety contract, the content plan, the plan record, the craft floors
+gates/variety_gates.mjs, gates/content_gates.mjs, gates/plan_gates.mjs, gates/craft_gates.mjs  the variety contract, the content plan, the plan record, the craft floors and the build bars as the compile holds them
+gates/consistency_gates.mjs  what the pages state between them: one number given two values, a number a revision changed that another page still states, a proof another page already gave
 gates/gate_classes.mjs  the class of every finding code (deck structure, page-local, deck aggregate, review), the layout codes the fit search answers, and a standing as one line
-build-bars.mjs     the bars delivery measures on the built scene (BUILD_BAR_CODES) and the measures that let a partly fixed deck finding drop (DOWNGRADE_MEASURES)
+build-bars.mjs     the bars delivery measures on the built scene (BUILD_BAR_CODES), read by the compile and the build too (barStandings) and the measures that let a partly fixed deck finding drop (DOWNGRADE_MEASURES)
 storyline.mjs      the storyline critique: spine or full packet, validation, the gate the deck review and delivery wait for
 reviewer.mjs       the deck review: rubric, pass-one, verification and confirmation schemas, section split and merge; backends codex | claude | packet
 review-passes.mjs  the loop both reviews share: page lists, statuses, ledger, pass cap, lineage under <deck dir>/.reviews/<id>/, staging, provenance, exit codes
 deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> build bars -> self-check -> review passes -> confirmation read -> <id>-DELIVERED.pptx or REJECTED.md
 emit/emit_pptx.py      scene -> editable PPTX (placeholders, native charts with workbooks, preset autoshapes and freeforms, palette -> theme)
+emit/assemble_pptx.py  a revision's deck: the source PPTX with its carried slides kept byte for byte, its edited slides' text rewritten in place and the composed slides set in with their own master; reads every carried slide back and compares it with the source (`revision.preserved`); `--check` tries the edits and writes nothing
 emit/render_pptx.py    PPTX -> PDF (LibreOffice) -> PNG per slide + montage
 emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene; lists the hidden slides (`readback.hidden`) and reports HIDDEN_STATE when the file and the scene disagree
 emit/color.py          WCAG luminance and contrast, as palettes.mjs and core.mjs compute them, for the emitter and the template importer

@@ -27,6 +27,7 @@
 import { PLAN, DECK_LENGTH, applyRulesVersion } from "../weight.mjs";
 import { calloutCapacity, countInWords } from "../chart-annotations.mjs";
 import { isTable, rowCells } from "../evidence.mjs";
+import { FIT_WORDS } from "../claim-fit.mjs";
 
 export const VARIETY_CODES = Object.freeze({
   PAGE_TYPE_UNDECLARED: "the deck's pages were not authored as page types, so nothing chose their structure",
@@ -42,6 +43,9 @@ export const VARIETY_CODES = Object.freeze({
   EVIDENCE_DEPTH: "the deck's chart pages plot too few values: the median chart page is thinner than strong decks'",
   VARIETY_EXHIBIT_MIX: "one evidence family is outside its band across the deck's compiled pages",
   VARIETY_EXHIBIT_RANGE: "the deck draws too few kinds of exhibit for its length",
+  // Measured and advised, never refused (fitStandings): the range floor counts the kinds a deck draws, not how its exhibits are shared between them.
+  VARIETY_KIND_SHARE: "the three commonest exhibit kinds carry most of the deck's exhibits",
+  VARIETY_FIT_UNUSED: "a page is drawn in a form, or an exhibit in a kind, that carries its claim less directly than another its measures fill",
   // Raised by author-deck.mjs: the page failed to compose; the rest of the deck is still checked.
   PAGE_DOES_NOT_COMPOSE: "a page could not be composed",
   // Raised by author-deck.mjs: the page's type refused its choices.
@@ -483,6 +487,85 @@ function mixFindings(slides, stand) {
   return findings;
 }
 
+// How a deck's exhibits are shared between kinds. The range floor (VARIETY_EXHIBIT_RANGE) asks for a number of kinds and is met
+// by a deck that draws a dozen kinds once each and three of them forty times: three decks written from one brief each drew 14
+// or 15 kinds and set 63% to 70% of their exhibits as a table, a bar chart and a line chart. `max` is a mark to read the share
+// against, not a calibrated bar: the reference decks were measured by exhibit family, not kind, so there is nothing to calibrate
+// a kind share on. It sits between those decks and the skill's own worked decks (the worked example sets half its exhibits in
+// its three commonest kinds). It is read from two dozen exhibits: under that three kinds carry most of any deck (a deck of
+// twelve at the range floor draws five kinds, and three of five is 60%), and the share says nothing. And it only advises: which kind a page takes is decided by what the page claims (claim-fit.mjs), so the remedy it names is the free
+// choices among the pages drawn in those kinds - and where there are none, it says the mix follows from the claims.
+export const KIND_SHARE = Object.freeze({ top: 3, max: 0.55, from: 24 });
+
+/**
+ * Two readings of a deck's exhibits that no rule holds, as standings and
+ * advisories:
+ *
+ *   VARIETY_KIND_SHARE  the share of the exhibits drawn in the three commonest
+ *                       kinds (KIND_SHARE), with the pages among them that
+ *                       could take another kind at the same fit
+ *   VARIETY_FIT_UNUSED  the pages drawn in a form - or carrying an exhibit in a
+ *                       kind - that carries their claim less directly than
+ *                       another their measures fill ("fit left on the table")
+ *
+ * `fits` is each page's fit by id (claim-fit.mjs pageFit, deck-structure.mjs
+ * fitsOf); without an insight log there is none, and only the share is read.
+ * `kept` is, on a revision, the ids of the pages kept as their source slide
+ * drew them (deck-structure.mjs keptAsSource; null for new work): such a page
+ * is the user's own drawing - it is counted in the share and never counted as
+ * fit unused. The fit is read on the pages the revision adds or redraws, and
+ * on those only; and the share of a revision is a standing and never an
+ * advisory, since a revision draws its pages as the source deck draws them.
+ * `carried` is the exhibits of the slides a revision carries from its source
+ * deck, `[{ id, kind }]` as the inventory read them (deck-structure.mjs
+ * carriedKinds): a carried slide is never compiled, so its exhibits are
+ * counted in the share from there, and nothing of it is judged.
+ */
+export function fitStandings(spec, { fits = new Map(), kept = null, carried = [] } = {}) {
+  if (spec.purpose === "catalogue") return { findings: [], standings: [] };
+  const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
+  const drawn = [...slides.flatMap((slide) => exhibitsOf(slide).map((ex) => ({ id: String(slide.id), kind: String(ex.type ?? "") }))), ...carried.map((item) => ({ id: String(item.id), kind: String(item.kind ?? "") }))].filter((item) => item.kind);
+  const tally = new Map();
+  for (const item of drawn) tally.set(item.kind, (tally.get(item.kind) ?? 0) + 1);
+  const top = [...tally].sort((a, b) => b[1] - a[1]).slice(0, KIND_SHARE.top);
+  const count = top.reduce((sum, [, n]) => sum + n, 0), value = drawn.length ? Math.round((count / drawn.length) * 1000) / 1000 : 0;
+  const applies = drawn.length >= KIND_SHARE.from;
+  const own = (id) => !kept?.has(String(id));
+  const known = [...fits.values()].filter(Boolean);
+  // What a page could take in place of what it draws, at the same fit: the latitude the deck has without changing what any page claims.
+  const free = known.filter((fit) => own(fit.id)).flatMap((fit) => [
+    ...(fit.chosen && fit.chosen.grade === fit.forms.top && fit.forms.equal.length > 1 ? [{ id: fit.id, has: `${fit.type}/${fit.form}`, kind: fit.forms.equal.find((item) => item.form === fit.form)?.kind, also: fit.forms.equal.filter((item) => item.form !== fit.form).map((item) => item.form) }] : []),
+    // A chart among charts is free to be another chart: a table in its place is the author's call for exact values, never the plan's.
+    ...fit.exhibits.filter((item) => item.grade !== null && item.grade === item.kinds.top).map((item) => ({ id: fit.id, has: item.kind, kind: item.kind, also: item.kinds.equal.map((kind) => kind.kind).filter((kind) => kind !== item.kind && kind.startsWith("chart.")) })),
+  ]).filter((item) => item.also.length && top.some(([kind]) => kind === item.kind))
+    // One entry a page and form: two panels of one kind are one choice.
+    .reduce((list, item) => { const same = list.find((other) => other.id === item.id && other.has === item.has); if (same) same.also = [...new Set([...same.also, ...item.also])]; else list.push({ ...item }); return list; }, []);
+  const left = known.filter((fit) => fit.left.length), ours = left.filter((fit) => own(fit.id));
+  const keeps = (kept ? slides.filter((slide) => kept.has(String(slide.id))).length : 0) + new Set(carried.map((item) => String(item.id))).size;
+  const imported = keeps ? `; ${keeps} of the deck's pages are kept as the source deck drew them, counted here and not judged` : "";
+  // The standing line names what to do about it, since an advisory's repair is not printed with a refusal: a few pages, the rest counted.
+  const short = (kind) => String(kind).replace(/^chart\./, "");
+  const some = (list, say) => `${list.slice(0, 6).map(say).join("; ")}${list.length > 6 ? `; and ${list.length - 6} more` : ""}`;
+  // A revision is told the share and nothing to do about it: its pages are drawn as the source deck draws them, and consistency with that deck comes before spread.
+  const latitude = kept ? "; read of the imported deck as revised, which a revision does not redraw" : free.length ? `; carried as directly by another form, so free to differ: ${some(free, (item) => `${item.id} ${short(item.has)} (or ${item.also.map(short).join(", ")})`)}` : drawn.length && fits.size ? "; no page in those kinds is carried as directly by another form" : "";
+  const mend = ours.length ? `: ${some(ours, (fit) => `${fit.id} ${fit.left.map((item) => `${item.where === "form" ? "form" : item.where} ${short(item.has)} -> ${item.better.map(short).join(" or ")}`).join(", ")}`)}` : "";
+  const standings = [
+    { code: "VARIETY_KIND_SHARE", what: `exhibits drawn in the ${KIND_SHARE.top} commonest kinds (${top.map(([kind, n]) => `${kind} ${n}`).join(", ") || "none"}), of ${drawn.length}`, value, bar: KIND_SHARE.max, side: "max", unit: "share", applies, blocks: false,
+      pages: [...new Set(free.map((item) => String(item.id)))], note: `advised, never refused; a mark to read the share against, not a bar calibrated on the reference decks${latitude}${imported}` },
+    ...(fits.size ? [{ code: "VARIETY_FIT_UNUSED", what: "pages drawn in a form that carries their claim less directly than another they could take", value: ours.length, bar: 0, side: "max", unit: "pages", applies: true, blocks: false,
+      pages: ours.map((fit) => String(fit.id)), note: `advised, never refused${mend}${imported}` }] : []),
+  ];
+  const findings = [];
+  if (applies && value > KIND_SHARE.max && !kept) findings.push({ code: "VARIETY_KIND_SHARE", severity: "advisory", slide: [...new Set(free.map((item) => item.id))], measured: { share: value, exhibits: drawn.length, kinds: Object.fromEntries(top) }, threshold: KIND_SHARE.max,
+    repair: `${count} of the deck's ${drawn.length} exhibits are ${top.map(([kind, n]) => `${kind} (${n})`).join(", ")} - ${Math.round(value * 100)}%. ` +
+      (free.length ? `No page need claim anything else to change that: ${free.slice(0, 12).map((item) => `${item.id} (${item.has}) is carried as directly by ${item.also.join(" or ")}`).join("; ")}${free.length > 12 ? `; and ${free.length - 12} more` : ""}. Take another of those forms where the deck repeats one - \`--plan\` gives each such page the form whose turn it is in the deck's draw (its \`variation\`), and says which on the page's line.`
+        : `None of the pages in those kinds is carried as directly by another form, so the mix follows from what the pages claim: a wider mix needs evidence of another shape - a gap between two points, a part of a whole, two measures set against each other - not another chart of the same one.`) });
+  if (ours.length) findings.push({ code: "VARIETY_FIT_UNUSED", severity: "advisory", slide: ours.map((fit) => fit.id), measured: { pages: ours.length },
+    repair: ours.slice(0, 12).map((fit) => `${fit.id}: ${fit.left.map((item) => `${item.where === "form" ? `form \`${item.has}\`` : `${item.where} (\`${item.has}\`)`} ${FIT_WORDS[item.grade]}${item.where === "form" ? "" : ` of its measures`}; ${item.better.map((name) => `\`${name}\``).join(" or ")} ${item.better.length === 1 ? "carries" : "carry"} it directly`).join(", and ")}`).join(" | ") +
+      `${ours.length > 12 ? ` | and ${ours.length - 12} more` : ""}. A form within the page's type is the layout's to change, and keeps the storyline critique; keep the form where the page's point is something the measures do not say, and say so in \`why\`` });
+  return { findings, standings };
+}
+
 // Deck-level defects that show only across the whole deck, read from the compiled pages.
 export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3, titleShare: 0.2, titleNames: 2 });
 
@@ -595,6 +678,9 @@ function logoTexts(page) {
       else walk(v, inLogo || key === "logo" || (key === "exhibit" && v?.type === "logos"));
     }
     if (value.type === "logos") found.push(...(value.items || []).map((item) => String(item?.name ?? "")));
+    // A logo cell that names its player marks that player, with a file to draw or without: the refusal tells the author to
+    // write one, so the rule reads the key it names (`player`) as well as the image's `alt`.
+    if (value.type === "logo" && typeof value.player === "string" && value.player.trim()) found.push(value.player);
   };
   walk(page, false);
   return found;

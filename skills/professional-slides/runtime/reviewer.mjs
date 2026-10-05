@@ -31,16 +31,20 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { normalizeText, textWords } from "./text-contract.mjs";
-import { storylineGate, readStorylineHistory, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
+import { storylineGate, readStorylineHistory, repairReach, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
+import { REVIEW_TOUCHES } from "./gates/gate_classes.mjs";
+import { reviewFloors, floorsPrompt, floorErrors } from "./review-floors.mjs";
 import { designStatistics, measurePasses, DOWNGRADE_MEASURES } from "./build-bars.mjs";
+import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE } from "./revision.mjs";
 import { assetsPrompt } from "./asset-needs.mjs";
 import { dependencyNotes } from "./gates/dependency_gates.mjs";
+import { reviewFit } from "./fit-review.mjs";
 import {
   SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, ACCEPT_RATING, MAX_CONFIRMATIONS,
-  pageListErrors, advanceLedger, openEntries, openBlocking, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
+  pageListErrors, advanceLedger, openEntries, openBlocking, aboutImportedErrors, ABOUT_IMPORTED_RULE, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
   uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, deckStatementFindings, unknownKeyErrors, stageReview, lineageStore, isAuthFailure, readConfirmations,
-  requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf,
+  requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, RUBRIC_CLAUSES, dimensionAt, ratingScale, REVIEW_HISTORY, SAMPLING_WORDS, COMPLETENESS_NOTE, groupErrors,
 } from "./review-passes.mjs";
 
 export { MAX_PASSES, MAX_CONFIRMATIONS, designStatistics };
@@ -87,6 +91,24 @@ export const CODES = Object.freeze({
   EDITORIAL: "a wording preference"
 });
 
+// Where a finding was first decidable. The reviewer's codes that name a defect
+// of the argument - a claim, its evidence, a comparison's bases - are
+// decidable from the spine packet (a source line is not: it is drawn copy), which the storyline critic read before
+// anything was drawn; every other code of the reviewer's names a defect of the
+// drawn page. A code that is not the reviewer's own (a gate's, or one the
+// reviewer coined) is classed by its rubric dimension (dimensionAt): at the
+// spine only where every clause of that dimension is. A deck finding classed
+// at the spine is recorded as such (deckItems `decidable`): the argument held
+// at `ready` and found wanting on the page is the measure of whether the two
+// judges agree, and each one is a check the critique owed the author earlier.
+export const CODES_AT_SPINE = Object.freeze(["FACTUAL_ERROR", "UNSUPPORTED_CLAIM", "MISLEADING_COMPARISON", "UNCLEAR_ARGUMENT", "HEDGED_TITLE"]);
+export const SPINE_LABEL = "visible at the spine";
+/** "spine" where the storyline critic could have decided the finding from its packet, "page" where it needs the rendered page. */
+export function decidableAt(finding) {
+  if (Object.hasOwn(CODES, finding?.code)) return CODES_AT_SPINE.includes(finding.code) ? "spine" : "page";
+  return dimensionAt(finding?.dimension) === "spine" ? "spine" : "page";
+}
+
 // A flagged page is right, or it is wrong in one of three ways. Only "right"
 // lets the deck through: the profile's flag is a question, the verdict is the
 // answer, and a padded page that cleared the hard floor is answered here.
@@ -97,20 +119,10 @@ export const DENSITY_VERDICTS = Object.freeze(["right", "too thin", "too dense",
  * dimensions are checked on every page and each gets a note in the page's
  * coverage entry; the three deck dimensions are checked across the sequence.
  * references/taste-review.md#the-rubric states the same list for the reader.
+ * Its clauses are defined once (review-passes.mjs RUBRIC_CLAUSES), with the
+ * storyline check that applies each one the spine already decides.
  */
-export const RUBRIC = Object.freeze({
-  argument: { scope: "page", checks: "the title states the finding the page proves and the exhibit and commentary prove it; the claim goes no further than its evidence; the page's job in the argument is clear" },
-  evidence: { scope: "page", checks: "members compared on the same measures, with n/a where one does not publish a measure - never a different metric per member; every number reproduced against its source and against the other pages that print it; evidence deep enough for the claim (the whole peer set, the trend with its rate, not two numbers); bases, units and periods compatible" },
-  chart: { scope: "page", checks: "the chart form fits the comparison (ranking, trend, share, bridge, distribution); honest axes - time spaced by time, bars from a zero baseline, scale and units stated; the subject highlighted and rivals muted; an annotation marks the finding (the gap, the break, the rate); not a two-number chart" },
-  table: { scope: "page", checks: "verdict, score and status cells encoded (Harvey balls, ratings, pills, bars), not plain words; totals defined and filled; units in the headers; numbers right-aligned and rounded alike; row and column order meaningful" },
-  text: { scope: "page", checks: "density right for the reading task; the longest block readable; no sentence restating the title or the exhibit; jargon and acronyms explained; the action title commits to a finding in two lines or fewer; the subtitle adds scope, not a second title" },
-  layout: { scope: "page", checks: "no empty band; the exhibit dominates and the page is balanced; edges aligned; hierarchy reads title, exhibit, commentary; the frame is occupied, not a small figure in a large box" },
-  identity: { scope: "page", checks: "named companies, products and places carry their visual anchors where the reader needs recognition - logos, product images, maps; a player is introduced before it is compared" },
-  sourcing: { scope: "page", checks: "every number and claim has a source line a reader can look up, with its as-at date; footnotes define estimates, bases and exclusions" },
-  consistency: { scope: "deck", checks: "no construction repeated across a window of neighbouring pages; equal things styled alike; one term for one thing; one number format, unit and rounding per measure" },
-  rhythm: { scope: "deck", checks: "sections open, develop and close; page types vary with the reading task; the sequence builds rather than repeats; no page previews or re-proves another" },
-  bookends: { scope: "deck", checks: "the executive summary states the answer and the pillars the body proves, with the numbers the body shows; the close states the decision, its conditions and the next step, and agrees with the summary" },
-});
+export const RUBRIC = Object.freeze(Object.fromEntries(Object.entries(RUBRIC_CLAUSES).map(([dimension, { scope, clauses }]) => [dimension, Object.freeze({ scope, checks: clauses.map((item) => item.text).join("; ") })])));
 export const DIMENSIONS = Object.freeze(Object.keys(RUBRIC));
 export const PAGE_DIMENSIONS = Object.freeze(DIMENSIONS.filter((d) => RUBRIC[d].scope === "page"));
 export const DECK_DIMENSIONS = Object.freeze(DIMENSIONS.filter((d) => RUBRIC[d].scope === "deck"));
@@ -132,11 +144,19 @@ const FINDING_PROPERTIES = {
   severity: { type: "string", enum: SEVERITIES },
   reason: { type: "string", minLength: 20 },
   repair: { type: "string" },
+  // What the repair changes, in the reviewer's judgement (gates/gate_classes.mjs REVIEW_TOUCHES): what says whether it reopens the storyline critique.
+  touches: { type: "array", items: { type: "string", enum: Object.keys(REVIEW_TOUCHES) } },
   checkable: CHECKABLE_SCHEMA,
+  // How the page stays inside the floors the packet shows for it, where the repair moves it toward one (review-floors.mjs).
+  floors: { type: "string" },
+  // A finding about the imported deck, on a revision (review-passes.mjs ABOUT_IMPORTED_RULE): reported to the user, never blocking.
+  aboutImported: { type: "boolean" },
 };
-const FINDING = { type: "object", additionalProperties: false, required: Object.keys(FINDING_PROPERTIES), properties: FINDING_PROPERTIES };
+const FINDING_REQUIRED = Object.keys(FINDING_PROPERTIES).filter((key) => !["floors", "aboutImported"].includes(key));
+const findingSchema = (dimensions = DIMENSIONS) => ({ type: "object", additionalProperties: false, required: FINDING_REQUIRED, properties: { ...FINDING_PROPERTIES, dimension: { type: "string", enum: dimensions } } });
+const FINDING = findingSchema();
 const NEW_FINDING = {
-  type: "object", additionalProperties: false, required: [...Object.keys(FINDING_PROPERTIES), "basis", "justification", "evidence"],
+  type: "object", additionalProperties: false, required: [...FINDING_REQUIRED, "basis", "justification", "evidence"],
   // `evidence` quotes the page, exactly as printed; required for a missed finding.
   properties: { ...FINDING_PROPERTIES, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } }
 };
@@ -182,11 +202,12 @@ const DENSITY = {
     }
   }
 };
-const COMPLETENESS = {
+const completenessSchema = (dimensions = DIMENSIONS) => ({
   type: "array",
   items: { type: "object", additionalProperties: false, required: ["dimension", "result", "note"],
-    properties: { dimension: { type: "string", enum: DIMENSIONS }, result: { type: "string", enum: ["findings", "clean"] }, note: { type: "string" } } }
-};
+    properties: { dimension: { type: "string", enum: dimensions }, result: { type: "string", enum: ["findings", "clean"] }, note: { type: "string" } } }
+});
+const COMPLETENESS = completenessSchema();
 const ASSESSMENT = { type: "object", additionalProperties: false, required: ASSESSMENT_KEYS,
   properties: Object.fromEntries(ASSESSMENT_KEYS.map((k) => [k, { type: "string", minLength: 10 }])) };
 // A verdict on each build-bar waiver the packet shows: the deck misses a bar
@@ -260,20 +281,34 @@ export const CONFIRMATION_SCHEMA = {
 };
 delete CONFIRMATION_SCHEMA.properties.density;
 
-/** One reviewer's share of a long deck's first pass: a section of pages, or the spine. */
-export const PART_SCHEMA = {
-  type: "object", additionalProperties: false,
-  required: ["part", "binding", "accepted", "summary", "rating", "opened", "provenance", "pages", "findings", "completeness"],
-  properties: {
-    part: { type: "object", additionalProperties: false, required: ["kind", "id", "slides"],
-      properties: { kind: { type: "string", enum: ["section", "spine"] }, id: { type: "string" }, slides: { type: "array", items: { type: "string" } } } },
-    ...COMMON,
-    pages: { type: "array", items: PAGE_ENTRY },
-    findings: { type: "array", items: FINDING },
-    completeness: COMPLETENESS,
-    assessment: ASSESSMENT,
-  }
+/**
+ * One reviewer's share of a long deck's first pass, in two schemas, each
+ * offering exactly what validatePart accepts of its kind. A section part
+ * holds its pages on the page dimensions: its findings and its completeness
+ * take those dimensions only, and it carries no assessment and no waiver
+ * verdicts, which are the spine's. The spine part holds the deck: findings on
+ * any dimension, completeness over the deck dimensions, the assessment and
+ * the waivers.
+ */
+const partSchema = (kind) => {
+  const section = kind === "section";
+  const { waivers: _waivers, ...common } = COMMON;
+  return {
+    type: "object", additionalProperties: false,
+    required: ["part", "binding", "accepted", "summary", "rating", "opened", "provenance", "pages", "findings", "completeness", ...(section ? [] : ["assessment"])],
+    properties: {
+      part: { type: "object", additionalProperties: false, required: ["kind", "id", "slides"],
+        properties: { kind: { type: "string", enum: [kind] }, id: { type: "string" }, slides: { type: "array", items: { type: "string" } } } },
+      ...(section ? common : COMMON),
+      pages: { type: "array", items: PAGE_ENTRY },
+      findings: { type: "array", items: findingSchema(section ? PAGE_DIMENSIONS : DIMENSIONS) },
+      completeness: completenessSchema(section ? PAGE_DIMENSIONS : DECK_DIMENSIONS),
+      ...(section ? {} : { assessment: ASSESSMENT }),
+    }
+  };
 };
+export const SECTION_PART_SCHEMA = partSchema("section");
+export const SPINE_PART_SCHEMA = partSchema("spine");
 
 // A finding a deterministic check could have caught before the build names the
 // check it wants: `rule` (what must hold, said as a rule) and `measure` (what
@@ -283,20 +318,44 @@ export const PART_SCHEMA = {
 // them as candidates for a compile-time or composition check.
 export const CHECKABLE = "checkable: { rule, measure } when a deterministic check on the pages file, the composed scene or the render could have caught the defect before the build (a callout covering a data label, a title over two lines, a caption repeating its heading); null for judgement (the argument, emphasis, whether the page is worth reading, whether the evidence supports the claim)";
 
-const REPAIR_VERB = /\b(add|replace|move|merge|cut|rewrite|split|show|plot|label|reduce|enlarge|use|drop|state|cite|fill|define|align|highlight|annotate|redraw|respace|encode|introduce|source|shorten|convert)\b/i;
+// What makes a repair a sentence an author can act on: long enough to say
+// where, and built on a verb that says what to do. The list is closed so the
+// rule can be printed in the prompt exactly as it is enforced (FORM_RULES).
+export const REPAIR_VERBS = Object.freeze(["add", "replace", "move", "merge", "cut", "rewrite", "split", "show", "plot", "label", "reduce", "enlarge", "use", "drop", "state", "cite", "fill", "define", "align", "highlight",
+  "annotate", "redraw", "respace", "encode", "introduce", "source", "shorten", "convert", "retitle", "rename", "reword", "delete", "remove", "draw", "print", "mark", "sort", "swap", "correct", "reconcile", "footnote"]);
+const REPAIR_VERB = new RegExp(`\\b(${REPAIR_VERBS.join("|")})\\b`, "i");
+const REPAIR_FLOOR = Object.freeze({ blocking: 40, other: 25 });
+
+// Where a repair sentence itself says it changes a bound fact, `touches` must
+// say so too: the author is told from `touches` whether a repair reopens the
+// storyline critique, and "Retitle the page" filed as copy would send it down
+// the wrong path. Only what a sentence states outright is read - a retitling,
+// or pages merged, cut, split, moved or added; everything else about what a
+// repair changes stays the reviewer's judgement. The verbs are listed so the
+// prompt states the rule as it is tested (formRules).
+const TITLE_VERBS = Object.freeze(["rewrite", "reword", "rename", "shorten", "replace", "change", "correct"]);
+const PAGE_VERBS = Object.freeze(["cut", "delete", "remove", "drop", "split", "move", "add"]);
+// "Move the page number" moves no page: a page's own parts, named after the word, are not the page.
+const PAGE_PARTS = ["number", "numbers", "title", "subtitle", "footer", "header", "heading", "margin", "edge", "frame", "width", "height", "body", "grid", "label", "note", "source", "reference"];
+const TOUCH_CUES = Object.freeze([
+  { word: "title", says: "retitles a page or a section", cue: new RegExp(`\\bretitle\\b|\\b(?:${TITLE_VERBS.join("|")})\\s+(?:(?:the|this|its)\\s+)?(?:(?:page|slide|section|action)(?:'s)?\\s+)?title\\b`, "i") },
+  { word: "structure", says: "merges, cuts, splits, moves or adds a page", cue: new RegExp(`\\bmerge\\s+(?:(?:the|these|both|two|into)\\s+)*(?:one\\s+)?(?:pages?|slides?)\\b|\\b(?:${PAGE_VERBS.join("|")})\\s+(?:(?:the|this|a|new)\\s+)*(?:page|slide)\\b(?!'s|\\s+(?:${PAGE_PARTS.join("|")})\\b)`, "i") },
+]);
 
 /** A review's findings in ledger form; an old review's `slide` reads as a one-page list. */
 export function deckItems(review) {
   const items = (review?.findings || []).map((f, i) => ({
     id: f.id ?? `F${i + 1}`, code: f.code, severity: f.severity, scope: f.scope ?? (f.slide ? "page" : "deck"), dimension: f.dimension ?? null,
     pages: Array.isArray(f.slides) ? f.slides : f.slide ? [f.slide] : [], reason: f.reason, repair: f.repair,
+    // What the reviewer says the repair changes, and where the defect was first decidable: what delivery groups a rejection by.
+    ...(Array.isArray(f.touches) ? { touches: f.touches } : {}), decidable: decidableAt(f), ...(f.aboutImported ? { aboutImported: true } : {}),
     ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}),
   }));
   // A density verdict other than "right" blocks as a finding would, and is
   // carried in the ledger so the next pass re-judges that page.
   for (const entry of review?.density?.pages || []) {
     if (entry.verdict === "right") continue;
-    items.push({ id: `density:${entry.slide}`, code: "DENSITY_MISMATCH", severity: "major", scope: "page", dimension: "text", pages: [entry.slide],
+    items.push({ id: `density:${entry.slide}`, code: "DENSITY_MISMATCH", severity: "major", scope: "page", dimension: "text", pages: [entry.slide], touches: ["copy"], decidable: "page",
       reason: `${entry.verdict}: ${entry.reason}`,
       repair: "Rewrite the page to the skill's density targets for pages doing its job: add the missing reasoning, cut the padding, or split the long block into points" });
   }
@@ -340,7 +399,7 @@ export function pageTexts(scene) {
   return Object.fromEntries((scene?.slides || []).map((s) => [s.id, (s.nodes || []).filter((n) => n.type === "text").map((n) => n.data?.textLayout?.source ?? n.text ?? "").join("\n")]));
 }
 
-function findingErrors(findings, ids) {
+function findingErrors(findings, ids, { dimensions = DIMENSIONS } = {}) {
   const errors = [];
   const seen = new Set();
   for (const [i, f] of findings.entries()) {
@@ -351,17 +410,26 @@ function findingErrors(findings, ids) {
     seen.add(f.id);
     if (!["page", "deck"].includes(f.scope)) errors.push(`${at}: scope must be page or deck`);
     errors.push(...pageListErrors(at, { scope: f.scope, pages: f.slides, text: `${f.reason ?? ""} ${f.repair ?? ""}`, ids }));
-    if (!DIMENSIONS.includes(f.dimension)) errors.push(`${at}: dimension must be one of ${DIMENSIONS.join(", ")}`);
+    if (!dimensions.includes(f.dimension)) errors.push(`${at}: dimension must be one of ${dimensions.join(", ")}${DIMENSIONS.includes(f.dimension) ? ` - ${f.dimension} is the spine reviewer's: file what you see on your pages under the page dimension it shows in` : ""}`);
     if (!/^[A-Z][A-Z0-9_]+$/.test(f.code ?? "")) errors.push(`${at}: invalid code ${f.code}`);
     if (!SEVERITIES.includes(f.severity)) errors.push(`${at}: unknown severity ${f.severity}`);
     if (typeof f.reason !== "string" || f.reason.trim().length < 20) errors.push(`${at}: the reason says what is wrong on the page`);
     if (BLOCKING.has(f.severity) && f.code === "EDITORIAL") errors.push(`${at}: EDITORIAL cannot be ${f.severity}`);
     if (f.severity !== "none" && SEVERITIES.includes(f.severity)) {
-      const floor = BLOCKING.has(f.severity) ? 40 : 25;
-      if (typeof f.repair !== "string" || f.repair.trim().length < floor || !REPAIR_VERB.test(f.repair)) errors.push(`${at}: a ${f.severity} finding needs a concrete repair sentence saying what to add, replace, move, merge, cut, plot or rewrite`);
+      const floor = BLOCKING.has(f.severity) ? REPAIR_FLOOR.blocking : REPAIR_FLOOR.other;
+      const short = typeof f.repair !== "string" || f.repair.trim().length < floor;
+      if (short || !REPAIR_VERB.test(f.repair)) errors.push(`${at}: a ${f.severity} finding needs a concrete repair sentence saying what to add, replace, move, merge, cut, plot or rewrite (${short ? `it runs to ${String(f.repair ?? "").trim().length} characters; ${floor} or more` : `none of the verbs the rule looks for is in it: ${REPAIR_VERBS.join(", ")}`})`);
+      // What the repair changes is the reviewer's judgement; validation asks only that it is said, in the listed words.
+      const unknown = Array.isArray(f.touches) ? f.touches.filter((word) => !Object.hasOwn(REVIEW_TOUCHES, word)) : [];
+      if (!Array.isArray(f.touches) || !f.touches.length || unknown.length) errors.push(`${at}: touches says what the repair changes - one or more of ${Object.keys(REVIEW_TOUCHES).join(", ")}${unknown.length ? ` (got ${unknown.join(", ")})` : ""}`);
+      else for (const { word, says, cue } of TOUCH_CUES) {
+        const said = String(f.repair ?? "").match(cue);
+        if (said && !f.touches.includes(word)) errors.push(`${at}: the repair ${says} ("${said[0]}") and touches leaves out ${word}: add "${word}" to touches, since the author is told from it whether the repair reopens the storyline critique`);
+      }
     }
     if (f.checkable === undefined) errors.push(`${at}: checkable is required - { rule, measure } or null`);
-    else if (f.checkable !== null) {
+    if (f.floors !== undefined && typeof f.floors !== "string") errors.push(`${at}: floors is a sentence saying how the page stays inside the floors the packet shows`);
+    if (f.checkable !== undefined && f.checkable !== null) {
       const c = f.checkable;
       if (typeof c !== "object" || Array.isArray(c)) errors.push(`${at}: checkable must be { rule, measure } or null`);
       else {
@@ -402,6 +470,19 @@ function openedErrors(opened, required, ids) {
   if (unopened.length) errors.push(`opened: this read must open ${unopened.length === ids.length ? "every page" : "every page it was given"} at full size; not opened: ${unopened.join(", ")}`);
   return errors;
 }
+
+// What the deck is made of, from its counts: the slides carried untouched, the ones edited in place, the pages the runtime composed.
+function revisionMakeup(slides) {
+  const carried = slides.filter((s) => s.carried), edited = carried.filter((s) => s.carried.edited).length, kept = carried.length - edited, composed = slides.length - carried.length;
+  if (!carried.length) return "";
+  return `Of its ${slides.length} pages, ${[kept ? `${kept} ${kept === 1 ? "is the user's own slide" : "are the user's own slides"}, carried unchanged` : null, edited ? `${edited} ${edited === 1 ? "is a slide of theirs" : "are slides of theirs"} with words edited in place` : null,
+    composed ? `${composed} ${composed === 1 ? "is a page" : "are pages"} the revision composed` : null].filter(Boolean).join(", ")}. `;
+}
+
+// What a revision left standing on purpose: the pages it says print a changed figure or changed words of another thing
+// (`only`, revision.mjs excusedPages). The stale check did not read them for that change, so the reviewer is asked to.
+const excusedLine = (revision) => (revision?.excused?.length ? `
+LEFT STANDING ON PURPOSE. The revision says the following print a figure or words it changed elsewhere, of a different thing, and so were not changed: ${revision.excused.map((item) => `${item.page}${item.old ? ` changed "${item.old}"` : " changed its slide's figures"} and says ${item.only.join(", ")} ${item.only.length === 1 ? "states" : "state"} another thing`).join("; ")}. Check each against the page named: where it is the same figure or the same words, that is a finding on the changed page.` : "");
 
 /**
  * A revision's first pass reads the pages the revision changed: one entry for
@@ -451,20 +532,29 @@ const ratingErrors = (review, open) => (Number.isFinite(review.rating) && review
  * with a scope (verificationScope) it is a later pass checked against the
  * ledger it verifies. `waivers` are the build-bar waivers the packet showed;
  * `downgrade` (downgradeRule) and `pageText` (pageTexts) hold a verification
- * pass's residual severities and missed findings to the rebuilt scene.
+ * pass's residual severities and missed findings to the rebuilt scene;
+ * `floors` (review-floors.mjs) are the floors the packet showed, which a
+ * repair that states a word count is held to; `imported` are the pages of a
+ * revision's source deck that it left unchanged, which no later pass files a
+ * finding on alone.
  */
-export function validateReview(review, slideIds, { scope = null, ledger = [], waivers = [], downgrade = () => false, pageText = null, revision = null } = {}) {
+export function validateReview(review, slideIds, { scope = null, ledger = [], waivers = [], downgrade = () => false, pageText = null, revision = null, imported = [], floors = null } = {}) {
   if (!review || typeof review !== "object") return ["review is not an object"];
   const errors = [...unknownKeyErrors(review, scope ? VERIFICATION_SCHEMA : REVIEW_SCHEMA, "review"), ...basicErrors(review)];
   if (!Array.isArray(review.findings)) return [...errors, "findings must be an array"];
-  errors.push(...findingErrors(review.findings, slideIds));
+  errors.push(...findingErrors(review.findings, slideIds), ...floorErrors(review.findings, floors));
   if (!Array.isArray(review.pages)) return [...errors, "pages must hold one coverage entry per page read"];
   errors.push(...pageCheckErrors(review.pages));
   errors.push(...openedErrors(review.opened, scope ? scope.mustInspect : revision ? revision.changed : slideIds, slideIds));
   errors.push(...waiverVerdictErrors(review.waivers, waivers));
   const items = deckItems({ findings: review.findings });
+  // A finding about the imported deck names a slide the revision left as it was: the pages outside what it changed.
+  errors.push(...aboutImportedErrors(review.findings.map((f) => ({ id: f.id, pages: Array.isArray(f.slides) ? f.slides : [], aboutImported: f.aboutImported })), revision ? slideIds.filter((id) => !revision.changed.includes(id)) : imported.length ? imported : null));
   if (scope) {
     errors.push(...verificationErrors(review, { scope, ledger, items, ids: slideIds, automatic: isDensity, downgrade, pageText }));
+    // A revision's later passes keep the first pass's rule: the user's pages as imported are not reviewed for themselves.
+    for (const item of items) if ((item.pages || []).length && item.pages.every((id) => imported.includes(id)))
+      errors.push(`findings (${item.id}): ${item.pages.join(", ")} ${item.pages.length === 1 ? "is the user's page" : "are the user's pages"} as imported, unchanged by this revision; a finding names a page the revision changed`);
   } else {
     if (review.pass !== 1) errors.push("pass must be 1: this is the first, exhaustive pass");
     if (review.verifies !== null && review.verifies !== undefined) errors.push("verifies is null on the first pass");
@@ -514,16 +604,17 @@ export function validateConfirmation(review, slideIds, { confirms, waivers = [] 
  * pages on every page dimension; the spine part covers the deck dimensions
  * and writes the deck's assessment, rating and density comparison.
  */
-export function validatePart(part, slideIds, { waivers = [] } = {}) {
+export function validatePart(part, slideIds, { waivers = [], floors = null } = {}) {
   if (!part || typeof part !== "object") return ["part is not an object"];
   const meta = part.part;
   if (!meta || !["section", "spine"].includes(meta.kind) || typeof meta.id !== "string") return ["part must say { kind: section|spine, id, slides }"];
-  const errors = [...unknownKeyErrors(part, PART_SCHEMA, "part"), ...basicErrors(part)];
+  const section = meta.kind === "section";
+  const errors = [...unknownKeyErrors(part, section ? SECTION_PART_SCHEMA : SPINE_PART_SCHEMA, "part"), ...basicErrors(part)];
   if (!/^[a-f0-9]{64}$/.test(part.binding ?? "")) errors.push("binding is missing");
   if (!Array.isArray(part.findings)) return [...errors, "findings must be an array"];
-  errors.push(...findingErrors(part.findings, slideIds));
+  errors.push(...findingErrors(part.findings, slideIds, { dimensions: section ? PAGE_DIMENSIONS : DIMENSIONS }), ...floorErrors(part.findings, floors));
   const items = deckItems({ findings: part.findings });
-  if (meta.kind === "section") {
+  if (section) {
     const own = new Set(meta.slides || []);
     const outside = [...new Set(items.flatMap((f) => f.pages).filter((id) => !own.has(id)))];
     if (outside.length) errors.push(`findings name ${outside.join(", ")}, outside this section; the spine reviewer files deck findings across sections`);
@@ -541,6 +632,33 @@ export function validatePart(part, slideIds, { waivers = [] } = {}) {
 }
 
 /**
+ * The rules validation enforces on the form of a finding and of the
+ * completeness self-check, each with what it is (`rule`, as every prompt
+ * prints it beside the schema) and how its refusal reads (`matches`). One
+ * table for the prompt and for the grouping of a refused answer's errors
+ * (review-passes.mjs groupErrors), so the reviewer is told exactly what is
+ * checked, and an answer that breaks one rule in twenty places hears it once
+ * with every place listed. `dimensions` are the ones the prompt's reader
+ * reports on.
+ */
+export const formRules = (dimensions = DIMENSIONS) => [
+  { id: "repair", matches: /needs a concrete repair sentence/, rule: `\`repair\`, on every finding whose severity is not none: ${REPAIR_FLOOR.blocking} characters or more for a major or blocker, ${REPAIR_FLOOR.other} or more for a minor, and containing one of these verbs as a word: ${REPAIR_VERBS.join(", ")}` },
+  { id: "touches", matches: /touches says what the repair changes/, rule: `\`touches\`, on every finding whose severity is not none: one or more of ${Object.keys(REVIEW_TOUCHES).join(", ")}, naming everything the repair changes` },
+  { id: "touches-said", matches: /and touches leaves out/, rule: `\`touches\` includes title where the repair says to retitle, or to ${TITLE_VERBS.join(", ")} the title of a page or a section, and structure where it says to merge pages or to ${PAGE_VERBS.join(", ")} a page` },
+  { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: in \`reason\` and \`repair\`, none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} within a few words before a page id, and none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
+  { id: "left-out", matches: /which the finding's page list leaves out/, rule: "a deck finding's `slides` holds every page its `reason` or `repair` names - by id, as \"page 12\", or inside a range (\"p16-p19\" and \"p16 to p19\" name every page between); an id that is an ordinary word counts only written as an id, in brackets" },
+  { id: "one-page", matches: /a page finding names one page/, rule: "a finding with `scope: \"page\"` has exactly one id in `slides`; the same defect on several pages is one `scope: \"deck\"` finding" },
+  { id: "dimension", matches: /dimension must be one of/, rule: `a finding's \`dimension\` is one of ${(dimensions === DECK_DIMENSIONS ? DIMENSIONS : dimensions).join(", ")}` },
+  { id: "checkable", matches: /checkable/, rule: "`checkable` is on every finding: null, or { rule, measure } with ten characters or more in each" },
+  { id: "completeness-entries", matches: /completeness: (?:unknown dimension|say what was checked for every|\S+ listed twice)/, rule: `\`completeness\` holds exactly one entry for each of ${dimensions.join(", ")}, and for no other dimension` },
+  { id: "completeness-result", matches: /marked clean but|marked findings but/, rule: "a completeness entry's `result` is \"findings\" exactly when this answer files a finding under that dimension, and \"clean\" otherwise" },
+  { id: "completeness-note", matches: /say what was (?:found|checked)/, rule: `a completeness \`note\` runs to ${COMPLETENESS_NOTE.clean} characters or more for clean (what you checked and why nothing was found) and ${COMPLETENESS_NOTE.findings} or more for findings (what was found)` },
+  { id: "verdict", matches: /the verdict and the findings must agree/, rule: "a page's `verdict` is the worst severity among this answer's findings that list it in `slides` (ok when none does, or only findings of severity none)" },
+];
+/** A refused answer's errors, gathered by the rule each breaks (groupErrors over formRules). */
+export const groupedErrors = (errors, dimensions = DIMENSIONS) => groupErrors(errors, formRules(dimensions));
+
+/**
  * Join a long deck's parts into one first-pass review. Findings keep their
  * ids unless two parts used the same one; deck findings with the same code and
  * dimension - the same recurring defect seen from several sections - become
@@ -548,8 +666,8 @@ export function validatePart(part, slideIds, { waivers = [] } = {}) {
  * verdicts are recomputed from the joined findings, since a spine finding can
  * raise a page a section reviewer passed.
  */
-export function mergeReviewParts(parts, slideIds, { sections = null, binding, promptHash = null, waivers = [] } = {}) {
-  const errors = [...parts.flatMap((part) => validatePart(part, slideIds, { waivers }).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
+export function mergeReviewParts(parts, slideIds, { sections = null, binding, promptHash = null, waivers = [], floors = null } = {}) {
+  const errors = [...parts.flatMap((part) => validatePart(part, slideIds, { waivers, floors }).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
     ...partSetErrors(parts, slideIds, { key: "slides", sections, binding }),
     // Every part answers the same packet: the prompt hash it printed.
     ...(promptHash ? parts.flatMap((part) => provenanceErrors(part, promptHash).map((e) => `${part?.part?.id ?? "part"}: ${e}`)) : [])];
@@ -601,15 +719,27 @@ export function reviewSections(scene, { max = 14 } = {}) {
 }
 
 /**
+ * The deck a review reads, in the build at `directory`: the scene and its
+ * renders - or, for a revision that carries slides from its source deck, the
+ * assembled deck (build-deck.mjs assembleRevision): every slide in its place,
+ * a carried one by its title and words alone, with the assembled file's
+ * renders. `file` and `rendered` are where each is, under the directory.
+ */
+export async function reviewedDeck(directory) {
+  const assembled = await readJson(path.join(directory, ASSEMBLED_SCENE), { optional: true });
+  return assembled ? { scene: assembled, file: ASSEMBLED_SCENE, rendered: ASSEMBLED_RENDERS } : { scene: await readJson(path.join(directory, "scene.json")), file: "scene.json", rendered: "rendered" };
+}
+
+/**
  * Bind a visual review to the exact editable file, scene and rendered pages,
  * and to the user's request it was judged against (its hash): a review of the
  * same pages against another request is another review.
  */
 export async function reviewBinding(directory, { request = null } = {}) {
-  const scene = await readJson(path.join(directory, "scene.json"));
+  const { scene, file, rendered } = await reviewedDeck(directory);
   const result = await readJson(path.join(directory, "build-result.json"));
-  const files = ["scene.json", path.relative(directory, result.pptxPath),
-    ...scene.slides.map((_, i) => `rendered/slide-${i + 1}.png`)];
+  const files = [file, path.relative(directory, result.pptxPath),
+    ...scene.slides.map((_, i) => `${rendered}/slide-${i + 1}.png`)];
   const hash = createHash("sha256");
   for (const file of files) { hash.update(file); hash.update(await fs.readFile(path.join(directory, file))); }
   if (request) hash.update(`request:${sha256(request)}`);
@@ -618,17 +748,17 @@ export async function reviewBinding(directory, { request = null } = {}) {
 
 /** One hash per slide over its scene record and its render: what a verification review compares. */
 export async function slideHashes(directory) {
-  const scene = await readJson(path.join(directory, "scene.json"));
+  const { scene, rendered } = await reviewedDeck(directory);
   const hashes = {};
   for (const [i, slide] of scene.slides.entries()) {
     const hash = createHash("sha256").update(JSON.stringify(slide));
-    hash.update(await fs.readFile(path.join(directory, "rendered", `slide-${i + 1}.png`)).catch(() => Buffer.alloc(0)));
+    hash.update(await fs.readFile(path.join(directory, rendered, `slide-${i + 1}.png`)).catch(() => Buffer.alloc(0)));
     hashes[slide.id] = hash.digest("hex");
   }
   return hashes;
 }
 
-const HISTORY = "review-history";
+const HISTORY = REVIEW_HISTORY;
 export const CHECK_CANDIDATES = "check-candidates.json";
 
 /**
@@ -698,8 +828,9 @@ export const reviewHistory = (store) => path.join(store, HISTORY);
  * `store` is lineageStore(spec, out, deckPath): beside the deck, not in out/.
  */
 export async function recordReview(store, directory, review, priorLedger = [], { downgrade = () => false, accepted = false } = {}) {
-  const { file } = await recordPass(reviewHistory(store), { review, pageHashes: await slideHashes(directory),
-    ledger: deckLedger(review.pass > 1 ? priorLedger : [], review, { downgrade }), accepted });
+  const ledger = deckLedger(review.pass > 1 ? priorLedger : [], review, { downgrade });
+  // `atSpine`: the open findings the storyline critic could have decided - counted on every pass, so the loop can say whether the two judges agree.
+  const { file } = await recordPass(reviewHistory(store), { review, pageHashes: await slideHashes(directory), ledger, accepted, atSpine: spineAgreement(ledger) });
   await recordCheckCandidates(store, review, file);
   return file;
 }
@@ -837,16 +968,31 @@ function acceptanceBlockers(review, waivers = []) {
 export function reviewOutcome(review, priorLedger = [], { waivers = [], downgrade = () => false } = {}) {
   const ledger = deckLedger(review?.pass > 1 ? priorLedger : [], review, { downgrade });
   const blocking = openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity,
-    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair }));
+    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair, ...repairClass(e) }));
   const held = acceptanceBlockers(review, waivers);
   const newBlockers = ledger.filter((e) => e.raisedIn === (review?.pass ?? 1) && e.severity === "blocker" && e.status === "open");
   return { accepted: review?.accepted === true && blocking.length === 0 && held.length === 0, blocking: [...blocking, ...held], ledger, newBlockers: newBlockers.length };
 }
 
+/**
+ * What delivery groups a rejected review's findings by: `reach`, what the
+ * repair reaches (storyline.mjs repairReach - "layout" leaves the storyline
+ * critique standing, "argument" reopens it, "unstated" where the record does
+ * not say and the code's repairs could be either), and `decidable`, where the
+ * defect was first decidable (decidableAt; a ledger entry recorded before the
+ * field is classed afresh).
+ */
+export const repairClass = (entry) => ({ reach: repairReach(entry), decidable: entry.decidable ?? decidableAt(entry) });
+/** How many of a ledger's open findings the storyline critic could have decided from its packet: the measure of whether the two judges agree. */
+export function spineAgreement(ledger) {
+  const open = openEntries(ledger).filter((e) => (e.decidable ?? decidableAt(e)) === "spine");
+  return { label: SPINE_LABEL, findings: open.length, blocking: open.filter((e) => BLOCKING.has(e.severity)).length, ids: open.map((e) => e.id) };
+}
+
 /** A confirmation read's outcome: its own findings and rating alone, with no ledger behind it. */
 export function confirmationOutcome(review, { waivers = [] } = {}) {
   const ledger = advanceLedger([], {}, deckItems({ findings: review?.findings || [] }));
-  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair })),
+  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair, ...repairClass(e) })),
     ...acceptanceBlockers(review, waivers)];
   return { accepted: review?.accepted === true && blocking.length === 0, blocking, ledger };
 }
@@ -895,7 +1041,7 @@ const stagedScope = (scope) => scope && ({ pass: scope.pass, verifies: scope.ver
  * { confirms: <binding of the accepted verification pass> } for the fresh
  * confirmation read, which is told nothing of the ledger.
  */
-export async function buildReviewPacket({ outputDirectory, spec, deckPath = null, scope = null, confirmation = null, waivers = [], revision = null }) {
+export async function buildReviewPacket({ outputDirectory, spec, deckPath = null, scope = null, confirmation = null, waivers = [], revision = null, imported = [] }) {
   const dir = path.resolve(outputDirectory);
   if (!spec || typeof spec !== "object") throw new Error("buildReviewPacket needs the deck spec: the deck review is prepared only once the storyline critique is ready for its spine");
   const [statement] = deckStatementFindings(spec);
@@ -903,13 +1049,15 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
   const gate = await storylineGate(spec, dir, { deckPath });
   if (gate.length) throw Object.assign(new Error(`The deck review waits for the storyline critique: ${gate.join("; ")}`), { code: "STORYLINE_UNREVIEWED", reasons: gate });
   const store = await lineageStore(spec, dir, deckPath);
-  const scene = await readJson(path.join(dir, "scene.json"));
+  // The deck as the reviewer reads it, and - where a revision carries slides - the composed pages' own scene, which the gates and the statistics read.
+  const { scene, rendered } = await reviewedDeck(dir);
+  const composedScene = scene.assembled ? await readJson(path.join(dir, "scene.json")) : scene;
   const gates = (await readJson(path.join(dir, "gates.json"), { optional: true })) ?? { findings: [] };
-  const renders = await fs.readdir(path.join(dir, "rendered")).catch(() => []);
+  const renders = await fs.readdir(path.join(dir, rendered)).catch(() => []);
   const spreadFiles = renders.filter((f) => /^spread-.*\.png$/.test(f)).sort();
-  const staged = { "rendered/montage.png": path.join(dir, "rendered", "montage.png"),
-    ...Object.fromEntries(scene.slides.map((_, i) => [`rendered/slide-${i + 1}.png`, path.join(dir, "rendered", `slide-${i + 1}.png`)])),
-    ...Object.fromEntries(spreadFiles.map((f) => [`rendered/${f}`, path.join(dir, "rendered", f)])) };
+  const staged = { "rendered/montage.png": path.join(dir, rendered, "montage.png"),
+    ...Object.fromEntries(scene.slides.map((_, i) => [`rendered/slide-${i + 1}.png`, path.join(dir, rendered, `slide-${i + 1}.png`)])),
+    ...Object.fromEntries(spreadFiles.map((f) => [`rendered/${f}`, path.join(dir, rendered, f)])) };
   const previous = await readPacketRecord(store);
   const packetDir = await stageReview("review", staged, { previous: previous?.staging });
   const specSlides = new Map([...(spec.slides || []), ...(spec.appendix || [])].map((slide) => [slide.id, slide]));
@@ -919,28 +1067,39 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
     title: s.nodes.find((n) => n.role === "action-title" || n.role === "cover-title")?.text?.replace(/\n/g, " ") ?? "",
     text: textOf(s),
     exhibits: (s.componentInstances || []).filter((c) => /^(chart\.|table|image-frame|metric)/.test(c.component)).map((c) => ({ component: c.component, frame: c.frame })),
-    gateFindings: (gates.findings || []).filter((f) => f.slide === s.id || f.slide === i + 1),
+    // The gates number the pages they read: the composed pages, which an assembled deck sets among carried slides.
+    gateFindings: s.carried ? [] : (gates.findings || []).filter((f) => f.slide === s.id || f.slide === (s.composed ?? i + 1)),
+    ...(s.carried ? { carried: s.carried } : {}),
     image: path.join(packetDir, "rendered", `slide-${i + 1}.png`),
     ...checklistOf(s),
     // What the compile recorded as stated from an assumption, or printed without its sign: the reviewer judges whether the page says so.
     stated: statedNotes(specSlides.get(s.id)),
   }));
-  const statistics = designStatistics(scene);
+  const statistics = designStatistics(composedScene);
   const density = confirmation ? null : await readJson(path.join(dir, "density-profile.json"), { optional: true });
   const craft = ((await readJson(path.join(dir, "preflight-gates.json"), { optional: true }))?.findings || []).filter((f) => String(f.code).startsWith("CRAFT_"));
+  // What the runtime read of the exhibits' fit to their claims (claim-fit.mjs): the first pass judges it; on a revision, of the pages it added or redrew.
+  const fit = confirmation || scope ? [] : await reviewFit(spec, deckPath);
   const spreads = spreadFiles.map((f) => path.join(packetDir, "rendered", f));
   const sections = !scope && !confirmation && !revision && slides.length > SECTION_REVIEW_THRESHOLD ? reviewSections(scene) : null;
+  // The floors a repair must stay inside, for the pages this read covers: the pages a revision changed, the pages a verification rereads, or every page.
+  const read = scope ? scope.mustInspect : !confirmation && revision ? revision.changed : null;
+  // The floors are the build's, measured on the pages the runtime composed: a slide a revision carries is held to none.
+  const measured = await reviewFloors(dir, composedScene, { spec, base: deckPath ? path.dirname(path.resolve(deckPath)) : null });
+  const floors = { ...measured, pages: Object.fromEntries(Object.entries(measured.pages).filter(([id]) => !read || read.includes(id))) };
   const schema = confirmation ? CONFIRMATION_SCHEMA : scope ? VERIFICATION_SCHEMA : REVIEW_SCHEMA;
   // A verification pass is told which open deck findings a measured check now
   // clears for a lower residual severity, and which storyline items stand on the pages it rereads.
-  const downgrade = downgradeRule(scene);
+  const downgrade = downgradeRule(composedScene);
   const shown = scope ? { ...stagedScope(scope), open: scope.open.map((e) => ({ ...e, ...(downgrade(e) ? { downgradable: DOWNGRADE_MEASURES[e.code].measure } : {}) })) } : null;
   const storyline = scope ? await storylineOnChanged(store, scope.changed) : null;
   const binding = await reviewBinding(dir, { request: requestOf(spec) });
   const packet = { binding, kind: confirmation ? "confirmation" : scope ? "verification" : "review", pass: confirmation ? null : scope ? scope.pass : 1,
     verifies: scope ? scope.verifies : null, confirms: confirmation?.confirms ?? null, maxPasses: scope?.maxPasses ?? MAX_PASSES,
-    scope: shown, sections, craft, statistics, density, request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec), question: spec.question ?? null, answer: spec.answer ?? spec.context?.governingAnswer ?? "",
-    waivers, storyline, assets: (await readJson(path.join(dir, "build-result.json"), { optional: true }))?.assets ?? null, revision: !scope && !confirmation && revision ? { changed: revision.changed } : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
+    scope: shown, sections, craft, fit, statistics, density, floors, request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec), question: spec.question ?? null, answer: spec.answer ?? spec.context?.governingAnswer ?? "",
+    waivers, storyline, assets: (await readJson(path.join(dir, "build-result.json"), { optional: true }))?.assets ?? null, revision: !scope && revision ? { changed: revision.changed, ...(revision.excused?.length ? { excused: revision.excused } : {}) } : null,
+    // On a revision's later pass: the pages of the imported deck it left unchanged, which take no finding of their own.
+    imported: scope && imported.length ? imported : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
     titles: slides.map((s) => `${s.index}. [${s.id}] ${s.title}`), slides, rubric: RUBRIC, severities: SEVERITY_DEFINITIONS, codes: CODES, schema };
   const main = confirmation ? confirmationPrompt(packet) : scope ? verificationPrompt(packet) : reviewPrompt(packet);
   const parts = sections ? [...sections.map((section) => [section.id, sectionPrompt(packet, section)]), ["spine", spinePrompt(packet)]] : [];
@@ -953,7 +1112,8 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
   if (sections) {
     await fs.mkdir(path.join(packetDir, "sections"), { recursive: true });
     await fs.mkdir(path.join(packetDir, "parts"), { recursive: true });
-    await writeJson(path.join(packetDir, "part-schema.json"), PART_SCHEMA);
+    await writeJson(path.join(packetDir, "part-schema.json"), SECTION_PART_SCHEMA);
+    await writeJson(path.join(packetDir, "spine-part-schema.json"), SPINE_PART_SCHEMA);
     for (const [id, text] of parts) await fs.writeFile(path.join(packetDir, "sections", `${id}.md`), signed(text));
   }
   const record = { kind: packet.kind, pass: packet.pass, binding, verifies: packet.verifies, confirms: packet.confirms, promptHash: packet.promptHash,
@@ -975,10 +1135,11 @@ async function storylineOnChanged(store, changed = []) {
   return { checks: Object.fromEntries(STORYLINE_PAGE_CHECKS.map((c) => [c, STORYLINE_CHECKS[c].checks])), items };
 }
 
-/** The rubric and the severity scale, as the reviewer reads them. */
-export function rubricPrompt() {
-  return `THE RUBRIC. Check every dimension on every page it applies to; the deck dimensions across the whole sequence.
-${DIMENSIONS.map((d) => `- ${d} (${RUBRIC[d].scope}): ${RUBRIC[d].checks}`).join("\n")}
+/** The rubric and the severity scale, as the reviewer reads them: every dimension, or the ones a section reviewer reports on. */
+export function rubricPrompt(dimensions = DIMENSIONS) {
+  const others = DIMENSIONS.filter((d) => !dimensions.includes(d));
+  return `THE RUBRIC. Check every dimension on every page it applies to${others.length ? "" : "; the deck dimensions across the whole sequence"}.
+${dimensions.map((d) => `- ${d} (${RUBRIC[d].scope}): ${RUBRIC[d].checks}`).join("\n")}${others.length ? `\n${others.join(", ")} are read across the whole deck by the spine reviewer: you write no note, no completeness entry and no finding under them. A defect of that kind you see on your own pages is filed under the page dimension it shows in.` : ""}
 
 SEVERITY, calibrated so the same defect gets the same level on every deck:
 ${["blocker", "major", "minor", "none"].map((s) => `- ${s}: ${SEVERITY_DEFINITIONS[s]}`).join("\n")}`;
@@ -997,13 +1158,33 @@ export const STANDARDS = `THE STANDARD. You need no other file: this is the skil
 - The answer. A page or a summary that declines part of the request ("cannot rank", "no defensible call") without naming the decisive missing evidence is an argument finding, however carefully it is caveated.
 - Challenge. Name the least-supported conclusion, the best and worst page, the most repetitive sequence and the most deletable page, with the merger and what it would lose. The requested length does not protect filler, a preview or a methods page that could join its result.
 - File once. One defect recurring on many pages is one deck finding listing every page, with its cause. No preferences, no fault quota, no statistics turned into a taste formula.
-- Score with anchors, not an average: 5 - understandable in parts, but weak proof or costly reading; 7 - useful and mostly supported, with substantial editorial or design work still needed; ${ACCEPT_RATING} - the delivery bar: nothing major open and the remaining weaknesses limited; 9 - strong argument and evidence, effective visual explanation, coherent rhythm; 9.5+ - exceptional across the deck, its least effective page included. A rating below ${ACCEPT_RATING} means major work remains: file it as findings. No earlier score, target or repair list exists for you; do not look for one.`;
+- Score with anchors, not an average, on the scale the storyline critique was rated on: ${ratingScale({ rendered: true })}. ${ACCEPT_RATING} is the delivery bar; a rating below it means major work remains: file it as findings. No earlier score, target or repair list exists for you; do not look for one.`;
 
-const FINDING_RULES = `FINDINGS. Give each finding an id (F1, F2, ...), a scope, the rubric dimension it belongs to, a code, a severity, a reason and a concrete repair (what to add, replace, move, merge, cut, plot, label or rewrite, and where). A page finding names its one page in \`slides\`. A deck finding - a defect of the sequence, or one defect recurring on several pages - lists EVERY page it affects in \`slides\`, in deck order: never a sample, never "e.g.", "such as", "for example" or "etc.". Validation refuses a sampled page list, and a finding whose reason or repair names a page its \`slides\` leave out. Do not file twenty copies of one defect: file it once, as a deck finding with all its pages.`;
+const FINDING_RULES = `FINDINGS. Give each finding an id (F1, F2, ...), a scope, the rubric dimension it belongs to, a code, a severity, a reason, a concrete repair (what to add, replace, move, merge, cut, plot, label or rewrite, and where) and \`touches\`, what that repair changes. A page finding names its one page in \`slides\`. A deck finding - a defect of the sequence, or one defect recurring on several pages - lists EVERY page it affects in \`slides\`, in deck order: never a sample. Validation refuses a sampled page list, and a finding whose reason or repair names a page its \`slides\` leave out. Do not file twenty copies of one defect: file it once, as a deck finding with all its pages.
+TOUCHES. The author can redo the layout and the copy freely, but the argument was settled by a storyline critique before the pages were drawn, and a repair that changes it sends the page back through that critique. So say what your repair changes, with every word that applies:
+${Object.entries(REVIEW_TOUCHES).map(([word, { about }]) => `- ${word}: ${about}`).join("\n")}
+The first two leave the argument as it was read. Do not shrink a repair to keep it among them: where the title claims more than the page shows, the repair is the title or the evidence, and saying so is what gets it fixed.`;
+
+/**
+ * The rules of form, printed beside the schema: what validation enforces on a
+ * finding and on the completeness self-check, word for word from the table
+ * the validator's refusals are grouped by (formRules), and one finding and
+ * one completeness entry that pass them.
+ */
+export const exampleFinding = (page) => ({ id: "F1", scope: "page", slides: [page], dimension: "chart", code: "UNANNOTATED_PLOT", severity: "major",
+  reason: "The gap the title states is not marked on the chart, so the reader subtracts two end labels to find it.",
+  repair: "Add a bracket between the two leaders' end labels and label it with the gap the title states.", touches: ["copy"], checkable: null });
+export const exampleCompleteness = (dimension) => ({ dimension, result: "clean", note: `Checked ${dimension} on every page given and found nothing a reader would stumble on.` });
+function formPrompt(packet, { dimensions = DIMENSIONS, page = null, completeness = true } = {}) {
+  const rules = formRules(dimensions).filter((item) => completeness || !item.id.startsWith("completeness"));
+  return `FORM. Validation refuses the whole answer when one finding breaks one of these, so check every finding against each before you return:
+${rules.map((item) => `- ${item.rule}`).join("\n")}
+A finding that passes: ${JSON.stringify(exampleFinding(page ?? packet.slides?.[0]?.id ?? "p01"))}${completeness ? `\nA completeness entry that passes: ${JSON.stringify(exampleCompleteness(dimensions.find((d) => d !== "chart") ?? dimensions[0]))}` : ""}`;
+}
 
 const PAGE_RULES = `PAGE COVERAGE. \`pages\` holds one entry per page: its id, a verdict (ok, minor, major, blocker) and \`checks\`, a short note for each page dimension (${PAGE_DIMENSIONS.join(", ")}) saying what you checked and what you saw - "n/a - no table on this page" where a dimension has nothing to check. A page's verdict is the worst severity of the open findings that name it (ok when none does); validation refuses a verdict that disagrees with the findings.`;
 
-const COMPLETENESS_RULES = (dimensions) => `COMPLETENESS SELF-CHECK. \`completeness\` holds one entry per dimension (${dimensions.join(", ")}): result "findings" when you filed any under it, or "clean" with a note saying what you checked and why nothing was found. A clean dimension with nothing said about it is a gap, not a pass.`;
+const COMPLETENESS_RULES = (dimensions) => `COMPLETENESS SELF-CHECK. \`completeness\` holds one entry per dimension (${dimensions.join(", ")}) and no other: result "findings" when you filed any under it, with a note saying what was found, or "clean" with a note saying what you checked and why nothing was found. A clean dimension with nothing said about it is a gap, not a pass.`;
 
 const OPENED = (which) => `OPENED. List in \`opened\` the id of every page you actually opened at full size - ${which}. The binding says which build you read; \`opened\` says what you looked at, and a page you did not open is not in it.`;
 
@@ -1037,7 +1218,10 @@ function gatePrompt(packet, only = null) {
 ${slides.flatMap((s) => (s.gateFindings || []).map((f) => `- ${s.id} (page ${s.index}) ${f.code}: ${f.measured ?? ""} (threshold ${f.threshold ?? ""})`)).join("\n") || "- none"}
 
 Deck craft findings from the build (a blocker has already stopped delivery; confirm each advisory or explain why it does not apply):
-${(packet.craft || []).map((f) => `- ${f.severity} ${f.code}: ${JSON.stringify(f.measured)}`).join("\n") || "- none"}`;
+${(packet.craft || []).map((f) => `- ${f.severity} ${f.code}: ${JSON.stringify(f.measured)}`).join("\n") || "- none"}${(packet.fit || []).filter((f) => !only || !f.pages.length || f.pages.some((id) => only.includes(id))).length ? `
+
+Exhibit choice, read by the runtime from the measures each page shows (advisories: where a page is right as drawn, say what it shows that the measures do not; where it is not, the finding is DEVICE_OVERUSE or NARROW_REPERTOIRE):
+${packet.fit.filter((f) => !only || !f.pages.length || f.pages.some((id) => only.includes(id))).map((f) => `- ${f.code}: ${f.text}`).join("\n")}` : ""}`;
 }
 
 const VISUAL = `VISUAL REVIEW. Read the deck through its spreads (rendered/spread-*.png, four pages to a sheet at reading size) and the montage for the sequence, then open every page at full size for its page checks. The semantic checks: coherent argument and counts; reconciled totals, periods, sample membership and durations; scoped comparisons, non-causal wording unless supported, and reversal conditions that affect the named option; focus that supports the claim; appropriate table category/dimension grammar; one chart heading owner; consistent qualifiers; vertically balanced sparse groups; meaningful arrows and rules; and cross-slide consistency. Neutral charts, joined verdicts and optional commentary are valid where they serve the page.`;
@@ -1056,7 +1240,8 @@ export function reviewPrompt(packet) {
   const slides = packet.slides || [];
   const changed = new Set(packet.revision?.changed || []);
   const revision = packet.revision ? `
-THIS IS A REVISION of the user's existing deck. The revision changed ${changed.size} of ${slides.length} pages, marked [changed] below: read those at full size on every dimension, give each an entry in \`pages\` and list them in \`opened\`. The other pages are the user's as they stand: read them in the spreads for the sequence, give them no entry, and file a finding only where a changed page is involved - a page finding on a changed page, a deck finding listing at least one.
+THIS IS A REVISION of the user's existing deck. ${revisionMakeup(slides)}The revision changed ${changed.size} of ${slides.length} pages, marked [changed] below: read those at full size on every dimension, give each an entry in \`pages\` and list them in \`opened\`. The other pages are the user's as they stand: read them in the spreads for the sequence, give them no entry, and file a finding only where a changed page is involved - a page finding on a changed page, a deck finding listing at least one.${excusedLine(packet.revision)}
+${ABOUT_IMPORTED_RULE}
 ` : "";
   const split = packet.sections?.length ? `
 THIS DECK IS LONG (${slides.length} pages), so read it in parallel where the harness can spawn subagents: give each prompt in the packet's sections/ folder (${packet.sections.map((s) => `${s.id}.md: ${s.slides.length} pages`).join("; ")}; and spine.md for the whole sequence) to its own fresh reviewer at the same time and save each JSON answer as parts/<id>.json beside it; the merge joins them into one review and refuses any part that misses a page. A harness with no subagents works through this prompt alone, page by page.
@@ -1095,6 +1280,8 @@ ${checkablePrompt()}
 
 ${gatePrompt(packet)}
 
+${floorsPrompt(packet.floors)}
+
 ${waiverPrompt(packet.waivers)}
 
 PAGES (id, page, title, image, exhibits, dimensions with nothing to check):
@@ -1117,6 +1304,8 @@ ${densityPrompt(packet.density)}
 
 Bind this review to ${packet.binding}. Set pass to 1 and verifies to null. Rate the actual deck out of ten independently of any requested target; a passing gate is not a taste score.
 
+${formPrompt(packet, { page: packet.revision?.changed?.[0] })}
+
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=true only at a rating of ${ACCEPT_RATING} or more with no major or blocker finding. The summary is two sentences: what the deck does well and what must change.`;
 }
@@ -1131,7 +1320,7 @@ ${requestPrompt(packet)}
 THE WHOLE TITLE SPINE, for context (review only your pages):
 ${(packet.titles || []).join("\n")}
 
-${rubricPrompt()}
+${rubricPrompt(PAGE_DIMENSIONS)}
 
 ${STANDARDS}
 
@@ -1141,7 +1330,8 @@ ${PAGE_RULES}
 
 ${OPENED("every one of your pages")}
 
-${FINDING_RULES} A defect recurring on several of your pages is a deck finding listing every one of them; the merge joins it with the same defect seen from other sections. Name only pages in your section.
+${FINDING_RULES}
+A defect recurring on several of your pages is a deck finding listing every one of them, under a page dimension; the merge joins it with the same defect seen from other sections. Name only pages in your section.
 
 ${COMPLETENESS_RULES(PAGE_DIMENSIONS)}
 
@@ -1152,6 +1342,8 @@ ${checkablePrompt()}
 
 ${gatePrompt(packet, section.slides)}
 
+${floorsPrompt(packet.floors, section.slides)}
+
 YOUR PAGES:
 ${slides.map(pageLine).join("\n")}
 
@@ -1159,10 +1351,13 @@ ${VISUAL}
 
 ${CRAFT}
 
-${densityPrompt(packet.density, section.slides)} Leave density.deck to the spine reviewer: write "Judged by the spine reviewer for the whole deck." there. Leave \`waivers\` to the spine reviewer.
+${densityPrompt(packet.density, section.slides)} Leave density.deck to the spine reviewer: write "Judged by the spine reviewer for the whole deck." there. Return no \`waivers\` and no \`assessment\`: both are the spine reviewer's, and the schema below does not take them.
 
 Set part to ${JSON.stringify({ kind: "section", id: section.id, slides: section.slides })}. Bind to ${packet.binding}; rate your section out of ten.
-Return ONLY JSON matching this schema: ${JSON.stringify(PART_SCHEMA)}`;
+
+${formPrompt(packet, { dimensions: PAGE_DIMENSIONS, page: section.slides[0] })}
+
+Return ONLY JSON matching this schema: ${JSON.stringify(SECTION_PART_SCHEMA)}`;
 }
 
 /** The spine of a long deck's first pass: what no section reviewer can see. */
@@ -1181,7 +1376,8 @@ ${STANDARDS}
 
 Your dimensions are ${DECK_DIMENSIONS.join(", ")}, plus identity and number consistency across the deck: repeated constructions in any window of neighbouring pages, one styling and term and number format for one thing, the section flow, the executive summary against the body and the close. Read the montage and every spread (${(packet.spreads || []).join(", ") || "rendered/spread-*.png"}; montage ${packet.montage}), opening pages at full size where a sequence needs it.
 
-${FINDING_RULES} Across sections, list every affected page in the deck. Leave \`pages\` empty: the section reviewers cover the pages. List in \`opened\` any page you opened at full size.
+${FINDING_RULES}
+Across sections, list every affected page in the deck. Leave \`pages\` empty: the section reviewers cover the pages. List in \`opened\` any page you opened at full size.
 
 ${COMPLETENESS_RULES(DECK_DIMENSIONS)}
 
@@ -1191,6 +1387,8 @@ ${codesPrompt(packet)}
 ${checkablePrompt()}
 
 ${waiverPrompt(packet.waivers)}
+
+${floorsPrompt(packet.floors, [])}
 
 Candidate diagnostics, not quality targets:
 ${JSON.stringify(candidateStatistics, null, 1)}
@@ -1202,7 +1400,10 @@ ${ASSESS}
 ${densityPrompt(packet.density, [])} Write density.deck for the whole deck; the section reviewers judge the flagged pages.
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", slides: (packet.slides || []).map((s) => s.id) })}. Bind to ${packet.binding}. Rate the whole deck out of ten; your rating and summary become the review's.
-Return ONLY JSON matching this schema: ${JSON.stringify(PART_SCHEMA)}`;
+
+${formPrompt(packet, { dimensions: DECK_DIMENSIONS })}
+
+Return ONLY JSON matching this schema: ${JSON.stringify(SPINE_PART_SCHEMA)}`;
 }
 
 /** A verification pass: a status for every open finding, and only additive new ones. */
@@ -1237,7 +1438,7 @@ Do three things.
 2. PAGES. Read every listed page on every page dimension and record it in \`pages\` exactly as the first pass did (verdict and a note per dimension). A page's verdict is the worst open finding naming it, counting the open findings above. ${OPENED("every page listed above")}
 3. NEW FINDINGS, only if additive. A new finding must be major or blocker, and its \`basis\` must be one of:
 ${Object.entries(NEW_BASES).map(([k, v]) => `   - ${k}: ${v}`).join("\n")}
-   Validation refuses a new minor finding, a new finding on a page that did not change unless it is a missed major or blocker that quotes the page in \`evidence\` exactly as printed and justifies why the earlier passes could not see it. A defect an open finding already names is that finding's status, not a new finding: a new finding with an open finding's code on a page it names is folded into the open one, which stays open, and is refused only where you also call the open one fixed. Give new findings ids no earlier pass used, a \`justification\` ("" is fine for basis changed) and \`evidence\` ("" is fine except for basis missed). The deck is not re-reviewed: stop when these three are done, or the loop never converges.
+   Validation refuses a new minor finding, a new finding on a page that did not change unless it is a missed major or blocker that quotes the page in \`evidence\` exactly as printed and justifies why the earlier passes could not see it. A defect an open finding already names is that finding's status, not a new finding: a new finding with an open finding's code on a page it names is folded into the open one, which stays open, and is refused only where you also call the open one fixed. Give new findings ids no earlier pass used, a \`justification\` ("" is fine for basis changed) and \`evidence\` ("" is fine except for basis missed). The deck is not re-reviewed: stop when these three are done, or the loop never converges.${packet.imported ? `\n   THIS DECK IS A REVISION of the user's existing deck. ${packet.imported.join(", ")} ${packet.imported.length === 1 ? "is a page" : "are pages"} of it that the revision did not change: validation refuses a new finding that names only those. Name one beside a changed page where the change left the two inconsistent.` : ""}
 
 ${FINDING_RULES}
 
@@ -1245,9 +1446,13 @@ ${checkablePrompt()}
 
 ${waiverPrompt(packet.waivers)}
 
+${floorsPrompt(packet.floors, scope.mustInspect)}
+
 ${densityPrompt(packet.density, scope.mustInspect, scope.rejudge)}
 
 Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind this review to ${packet.binding}. Rate the repaired deck out of ten on what you now see.
+
+${formPrompt(packet, { page: scope.mustInspect?.[0], completeness: false })}
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=true only at a rating of ${ACCEPT_RATING} or more while no major or blocker finding, earlier or new, is open. The summary is two sentences: which repairs held and what, if anything, must still change.`;
@@ -1263,8 +1468,14 @@ Set accepted=true only at a rating of ${ACCEPT_RATING} or more while no major or
 export function confirmationPrompt(packet) {
   const { reference: historicalReference, ...candidateStatistics } = packet.statistics || {};
   const slides = packet.slides || [];
+  // A revision that carries the user's own slides is confirmed on the pages it changed, in the deck they sit in.
+  const changed = new Set(packet.revision?.changed || []);
+  const revision = packet.revision ? `
+THIS IS A REVISION of the user's existing deck: ${changed.size} of its ${slides.length} pages are the revision's, marked [changed] below, and the others are the user's own slides, carried into this file unchanged. Open every page and give each its entry, as below, but judge the revision: file a finding only where a changed page is involved - on a changed page, or across the deck listing at least one - and rate the changed pages as they read in the deck around them, not the user's slides.
+${ABOUT_IMPORTED_RULE}
+` : "";
   return `You are a fresh reader of a finished consulting deck, reading it once and whole before it goes to the client, as an engagement manager would the night before a steering committee. No earlier review, rating, finding or repair list is given to you, and none exists for you to look for: rate what you see.
-
+${revision}
 ${requestPrompt(packet)}
 
 TITLES ALONE (read as a memo first - does the argument flow, and does it answer every part of the request?):
@@ -1291,8 +1502,10 @@ ${checkablePrompt()}
 
 ${waiverPrompt(packet.waivers)}
 
+${floorsPrompt(packet.floors)}
+
 PAGES (id, page, title, image, exhibits):
-${slides.map(pageLine).join("\n") || "- (see packet.json)"}
+${slides.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- (see packet.json)"}
 Spreads: ${(packet.spreads || []).join(", ") || "rendered/spread-*.png"}
 Montage: ${packet.montage}
 
@@ -1306,6 +1519,8 @@ ${JSON.stringify(candidateStatistics, null, 1)}
 ${ASSESS}
 
 Set confirms to "${packet.confirms}". Bind this read to ${packet.binding}. Rate the deck out of ten on what you see.
+
+${formPrompt(packet, { completeness: false })}
 
 Return ONLY JSON matching this schema: ${JSON.stringify(packet.schema)}
 Set accepted=true only at a rating of ${ACCEPT_RATING} or more with no major or blocker finding. The summary is two sentences: what the deck does well and what must change.`;
@@ -1348,9 +1563,13 @@ export async function mergeReviewDirectory(outputDirectory, partsDirectory = nul
   const from = partsDirectory ? path.resolve(partsDirectory) : record?.staging ? path.join(record.staging, "parts") : null;
   if (!from) return { status: "invalid", errors: ["no review packet was written for this deck: run deliver-deck with --reviewer packet first, or name the parts folder"] };
   const { files, parts } = await readParts(from);
-  const slideIds = (await readJson(path.join(dir, "scene.json"))).slides.map((s) => s.id);
-  const { review, errors } = mergeReviewParts(parts, slideIds, { sections: record?.sections ?? null, binding: record?.binding, promptHash: record?.promptHash ?? null, waivers: record?.waivers ?? [] });
-  if (errors.length) return { status: "invalid", errors, parts: files };
+  // The pages the review names are the deck's - a revision's assembled deck with its carried slides in their places - and the floors are measured on the pages the runtime composed.
+  const scene = await readJson(path.join(dir, "scene.json"));
+  const slideIds = (await reviewedDeck(dir)).scene.slides.map((s) => s.id);
+  const { review, errors } = mergeReviewParts(parts, slideIds, { sections: record?.sections ?? null, binding: record?.binding, promptHash: record?.promptHash ?? null, waivers: record?.waivers ?? [],
+    floors: await reviewFloors(dir, scene, { spec, base: deckPath ? path.dirname(path.resolve(deckPath)) : null }) });
+  // The errors as they were raised, and gathered by the rule each breaks: what to send back to the reviewers, once.
+  if (errors.length) return { status: "invalid", errors, grouped: groupedErrors(errors), parts: files };
   const reviewPath = path.join(dir, "review.json");
   await writeJson(reviewPath, review);
   return { status: "merged", reviewPath, review, parts: files, findings: review.findings.length };
@@ -1362,9 +1581,9 @@ export async function mergeReviewDirectory(outputDirectory, partsDirectory = nul
  * leave its staged packet for the calling agent. A CLI that fails because it
  * is not signed in falls back to the packet, with the reason in the note.
  */
-export async function runReview({ outputDirectory, spec, deckPath = null, backend = "auto", model, timeoutMs = 600000, scope = null, confirmation = null, waivers = [], revision = null }) {
+export async function runReview({ outputDirectory, spec, deckPath = null, backend = "auto", model, timeoutMs = 600000, scope = null, confirmation = null, waivers = [], revision = null, imported = [] }) {
   const out = path.resolve(outputDirectory);
-  const { packetDir, packet } = await buildReviewPacket({ outputDirectory: out, spec, deckPath, scope, confirmation, waivers, revision });
+  const { packetDir, packet } = await buildReviewPacket({ outputDirectory: out, spec, deckPath, scope, confirmation, waivers, revision, imported });
   const which = detectBackend(backend);
   const reviewPath = path.join(out, confirmation ? "confirmation.json" : "review.json");
   const deck = deckPath ? path.resolve(deckPath) : "<id>.deck.json";
@@ -1381,10 +1600,10 @@ export async function runReview({ outputDirectory, spec, deckPath = null, backen
       // fifty-page first pass is only exhaustive when no reader has fifty pages.
       const prompts = Object.fromEntries(await Promise.all([...packet.sections.map((s) => s.id), "spine"].map(async (id) => [id, await fs.readFile(path.join(packetDir, "sections", `${id}.md`), "utf8")])));
       const jobs = [...packet.sections.map((section) => ({ id: section.id, prompt: prompts[section.id], images: packet.slides.filter((s) => section.slides.includes(s.id)).map((s) => s.image) })),
-        { id: "spine", prompt: prompts.spine, images: [packet.montage, ...packet.spreads] }];
+        { id: "spine", prompt: prompts.spine, images: [packet.montage, ...packet.spreads], schemaPath: path.join(packetDir, "spine-part-schema.json") }];
       const parts = await reviewParts(which, jobs, { partsDir: path.join(packetDir, "parts"), schemaPath: path.join(packetDir, "part-schema.json"), model, timeoutMs, cwd: packetDir, promptHash: packet.promptHash });
-      const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), { sections: packet.sections, binding: packet.binding, promptHash: packet.promptHash, waivers });
-      if (merged.errors.length) throw new Error(`The section reviews could not be merged:\n- ${merged.errors.join("\n- ")}`);
+      const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), { sections: packet.sections, binding: packet.binding, promptHash: packet.promptHash, waivers, floors: packet.floors });
+      if (merged.errors.length) throw new Error(`The section reviews could not be merged:\n- ${groupedErrors(merged.errors).join("\n- ")}`);
       review = merged.review;
     } else {
       review = await callReviewer(which, { prompt: await fs.readFile(path.join(packetDir, "prompt.md"), "utf8"), schemaPath: path.join(packetDir, "schema.json"),

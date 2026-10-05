@@ -4,14 +4,27 @@
 // They are the plan gates' craft numbers applied to what was actually drawn
 // rather than to what was promised: a plan can record nine architectures and
 // the deck it produced still carry three distinct exhibits per ten pages, no
-// table treatment and no chart annotation. Delivery measures them after the
-// page gates (deliver-deck.mjs); the cold-run scorer (evals/cold-run/score.mjs)
+// table treatment and no chart annotation. One definition of each bar lives
+// here and every stage reads it (barOutcome): the compile and the build
+// (gates/craft_gates.mjs, which `--check --render` runs too) and delivery
+// (deliver-deck.mjs), so a deck is never refused at delivery for a number its
+// first compile did not print. The cold-run scorer (evals/cold-run/score.mjs)
 // re-exports them, so the harness and delivery hold a deck to one set of bars.
 //
-// A miss blocks delivery unless the deck carries a waiver for that bar
-// (deck-level `waivers: [{ code, reason }]`, carried from pages.json) and the
-// accepted review confirms it: the packet shows each waiver to the reviewer and
-// the review returns a verdict for each.
+// A miss blocks unless the deck carries a waiver for that bar (deck-level
+// `waivers: [{ code, reason }]`, carried from pages.json) and the accepted
+// review confirms it: the packet shows each waiver to the reviewer and the
+// review returns a verdict for each. A waived miss is an advisory at the
+// compile and the build, which cannot hear the reviewer.
+//
+// Every stage reads every bar over the same pages: the pages the runtime drew,
+// which is the scene. For a new deck, and for a revision that recomposes its
+// deck whole, that is the deck. A revision that carries slides from its source
+// deck (`carry: true`, revision.mjs) composes only the pages it changed, so the
+// bars are held on those - a floor from as many analytical pages as any deck's
+// (BARS_FROM), a ceiling from the first - and are not held on the carried
+// slides, which are the user's own and are never drawn here: each stage says
+// so beside the number (barStandings `note`, delivery's `bars.notHeld`).
 //
 // The same measures decide when a reviewer may lower a deck finding it calls
 // partly fixed (DOWNGRADE_MEASURES): a deck-scope finding about table
@@ -126,11 +139,25 @@ export const pageTableTreated = (slide) => {
   const tables = countedTables(slide);
   return tables.length ? tables.every((table) => tableTreated(slide, table)) : null;
 };
+// A page is carried by a chart where it composes a chart component or a chart
+// group - aligned bars and small multiples compose their charts inside one
+// instance, whose name does not start with "chart." - or draws plotted marks.
+const chartCarried = (slide) => componentsOf(slide).some((c) => c.startsWith("chart.") || c === "chart-group") || rolesOf(slide).includes("chart-mark");
 /** A page's chart carries an annotation or a recoloured mark; null when the page has no chart. */
-export const pageChartAnnotated = (slide) => (componentsOf(slide).some((c) => c.startsWith("chart."))
+export const pageChartAnnotated = (slide) => (chartCarried(slide)
   // A recoloured category draws no node of its own - the mark keeps its role
   // and carries `highlighted` - and it is the commonest mark there is.
   ? (slide.nodes || []).some((n) => n.data?.highlighted) || rolesOf(slide).some((r) => ANNOTATION.test(r)) : null);
+/** Every chart page among the analytical pages, and how many mark their finding: the one count behind BAR_CHARTS_ANNOTATED and CRAFT_CHARTS_BARE. */
+export function chartStatistics(scene) {
+  let charts = 0, annotated = 0;
+  (scene?.slides || []).forEach((slide, index) => {
+    if (!isAnalyticalPage(slide, index)) return;
+    const marked = pageChartAnnotated(slide);
+    if (marked !== null) { charts += 1; if (marked) annotated += 1; }
+  });
+  return { charts, annotated };
+}
 /** A page carries a visual anchor a reader recognises: a picture with its file, a logo, an icon or a map. */
 export const pageHasAnchor = (slide) => (slide.nodes || []).some((n) => {
   const role = String(n.role ?? "");
@@ -143,8 +170,9 @@ export function designStatistics(scene) {
   // The analytical pages the gates and the census count (weight.json analyticalPage).
   const content = scene.slides.filter(isAnalyticalPage);
   const kinds = new Set();
-  let charts = 0, annotated = 0, marks = 0, unsourced = 0;
+  let marks = 0, unsourced = 0;
   const { tables, treated } = tableStatistics(scene);
+  const { charts, annotated } = chartStatistics(scene);
   for (const slide of content) {
     for (const c of componentsOf(slide)) if (!["chrome", "slide-chrome", "section", "page-template"].includes(c)) kinds.add(c);
     // "Drawings": every primitive that is not type. A well-made
@@ -155,8 +183,6 @@ export function designStatistics(scene) {
     // is how a page gets laid out before its pictures are cleared, and it is
     // not how a deck is delivered - so it is counted, not assumed away.
     unsourced += slide.nodes.filter((n) => String(n.role ?? "") === "image-frame").length;
-    const chart = pageChartAnnotated(slide);
-    if (chart !== null) { charts += 1; if (chart) annotated += 1; }
   }
   const round = (n) => Math.round(n * 100) / 100;
   return {
@@ -219,14 +245,68 @@ export function waiverErrors(waivers) {
 /**
  * The bars against a deck's waivers: every miss, the misses a waiver covers
  * (each shown to the reviewer, whose confirmation delivery requires) and the
- * misses nothing covers, which block delivery. `purpose` is the spec's: a
- * catalogue is held to the ceilings only, here as in scoreBuild.
+ * misses nothing covers, which block. `purpose` is the spec's: a catalogue is
+ * held to the ceilings only, here as in scoreBuild. The compile, the build
+ * and delivery all read it, over the scene: the pages the runtime drew, which
+ * on a revision that carries slides are the pages it composed.
  */
 export function barOutcome(scene, waivers = [], { purpose = null } = {}) {
   const { statistics, findings } = scoreBuild(scene, { purpose });
   const byCode = new Map((waivers || []).map((w) => [w.code, w]));
   const waived = findings.filter((f) => byCode.has(f.code)).map((f) => ({ ...f, reason: byCode.get(f.code).reason }));
   return { statistics, misses: findings, waived, unwaived: findings.filter((f) => !byCode.has(f.code)) };
+}
+
+/**
+ * What a revision that carries slides is told of the bars, in a clause: they
+ * are read over the pages it composed, and not held on the slides it carries.
+ * Null where nothing is carried. One wording for the compile's standings and
+ * findings and for delivery's record.
+ */
+export const barsNotHeld = (composed, carried) => (carried > 0 ? `read over the ${composed} page${composed === 1 ? "" : "s"} this revision composed; not held on the ${carried} slide${carried === 1 ? "" : "s"} it carries from the source deck, which ${carried === 1 ? "is" : "are"} the user's own` : null);
+
+// What each bar counts, as its standing says it (gates/gate_classes.mjs standingLine): a share of counted things names them.
+const BAR_STANDINGS = Object.freeze({
+  exhibitVarietyPerTen: { code: "BAR_EXHIBIT_VARIETY", what: "kinds of exhibit drawn per ten analytical pages", unit: "kinds per ten pages" },
+  tablesTreated: { code: "BAR_TABLES_TREATED", what: "tables carrying a treatment", counted: ["table", "tables"] },
+  chartsAnnotated: { code: "BAR_CHARTS_ANNOTATED", what: "chart pages marking something on the plot", counted: ["chart page", "chart pages"] },
+  drawingsPerPage: { code: "BAR_DRAWINGS_PER_PAGE", what: "drawn primitives that are not type, per analytical page", unit: "a page" },
+  unsourcedPictures: { code: "BAR_UNSOURCED_PICTURES", what: "picture frames with no picture in them", unit: "frames" },
+});
+// The share as scoreBuild compares it with a floor: to two decimal places.
+const reaches = (count, of, min) => Math.round((count / of) * 100) / 100 >= min;
+
+/**
+ * Where a deck stands against every build bar, from the first compile: the
+ * outcome (barOutcome) and one standing a bar, in the record every deck-level
+ * rule writes, read as delivery reads it. A share of counted things - tables,
+ * chart pages - says how many more reach the floor, by the comparison the bar
+ * itself makes. A bar the deck waives is said on the line and does not block
+ * here; `carried`, the number of slides a revision carries from its source
+ * deck, is said on every line: the bar is not held on those.
+ */
+export function barStandings(scene, waivers = [], { purpose = null, carried = 0 } = {}) {
+  const outcome = barOutcome(scene, waivers, { purpose });
+  const statistics = outcome.statistics;
+  const counts = { tablesTreated: (({ tables, treated }) => ({ count: treated, of: tables }))(tableStatistics(scene)), chartsAnnotated: (({ charts, annotated }) => ({ count: annotated, of: charts }))(chartStatistics(scene)) };
+  const waived = new Set(outcome.waived.map((f) => f.code)), notHeld = barsNotHeld(new Set((scene?.slides || []).map((slide) => String(slide.sourceSlideId ?? slide.id))).size, carried);
+  const said = (code) => [waived.has(code) ? "waived on the deck: delivery asks the reviewer to confirm it" : null, notHeld].filter(Boolean).join("; ") || null;
+  const floors = Object.entries(BUILD_BARS).map(([key, bar]) => {
+    const { count, of } = counts[key] ?? {};
+    const applies = statistics.contentPages >= BARS_FROM && purpose !== "catalogue" && statistics[key] !== null && statistics[key] !== undefined;
+    let margin;
+    if (of) {
+      let need = 0, spare = 0;
+      while (!reaches(count + need, of, bar.min) && count + need < of) need += 1;
+      while (!need && count - spare > 0 && reaches(count - spare - 1, of, bar.min)) spare += 1;
+      margin = need ? -need : spare;
+    }
+    return { ...BAR_STANDINGS[key], value: statistics[key] ?? 0, bar: bar.min, side: "min", barName: "delivery floor", ...(of ? { count, of, margin } : {}),
+      applies, blocks: !waived.has(bar.code), ...(said(bar.code) ? { note: said(bar.code) } : {}) };
+  });
+  const ceilings = Object.entries(BUILD_CEILINGS).map(([key, bar]) => ({ ...BAR_STANDINGS[key], value: statistics[key] ?? 0, bar: bar.max, side: "max", barName: "delivery cap",
+    applies: true, blocks: !waived.has(bar.code), ...(said(bar.code) ? { note: said(bar.code) } : {}) }));
+  return { outcome, standings: [...floors, ...ceilings] };
 }
 
 /**

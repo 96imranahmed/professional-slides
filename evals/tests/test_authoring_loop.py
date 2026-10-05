@@ -391,7 +391,10 @@ class PageRunTests(unittest.TestCase):
 class PlanTests(unittest.TestCase):
     @staticmethod
     def spine(doc):
-        keep = ("id", "title", "type", "why", "kind", "evidence")
+        # The worked deck cut back to its claims: it has no insight log and its exhibits plot typed numbers, so nothing here
+        # says what a page will show. The plan still allocates it - that is what these tests read - and refuses it for what
+        # the draft of its proposal would: bound facts the spine leaves to the layout (`unlayable`, below).
+        keep = ("id", "title", "type", "why", "kind", "evidence", "settles")
         doc["pages"] = [{k: v for k, v in p.items() if k in keep} if p.get("type") else p for p in doc["pages"]]
 
     def test_a_spine_is_given_forms_and_placements_that_satisfy_the_structure_rules(self):
@@ -399,8 +402,12 @@ class PlanTests(unittest.TestCase):
             file = examples_deck(tmp, self.spine)
             before = file.read_text()
             run = cli(file, "--plan")
-            self.assertEqual(run.returncode, 0, run.stderr[-800:])
             plan = json.loads(run.stdout)
+            # The allocation is whole and satisfies the structure rules. The run is refused all the same: read in the forms the
+            # plan proposes, as the draft will read it, this spine leaves to the layout what the critique is bound to - numbers
+            # its charts will plot that no measure records, and a summary with nothing to fill it.
+            self.assertEqual(run.returncode, 2, run.stderr[-800:])
+            self.assertEqual({f["code"] for f in plan["unlayable"]}, {"SPINE_UNDETERMINED", "SPINE_UNFILLED"})
             self.assertTrue(plan["plan"]["satisfied"])
             self.assertEqual(plan["plan"]["unsatisfied"], [])
             self.assertEqual(len(plan["plan"]["pages"]), 44)
@@ -422,7 +429,8 @@ class PlanTests(unittest.TestCase):
             # Nothing is written but the run log's line: a plan is a refusable run of the tool, and is counted (run-log.mjs).
             self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["assets", "page-types.author-log.jsonl", "page-types.pages.json"])
             logged = [json.loads(line) for line in (Path(tmp) / "page-types.author-log.jsonl").read_text().splitlines()]
-            self.assertEqual([(entry["mode"], entry["ok"]) for entry in logged], [("plan", True)])
+            self.assertEqual([(entry["mode"], entry["ok"]) for entry in logged], [("plan", False)])
+            self.assertEqual({f["code"] for f in logged[0]["findings"]}, {"SPINE_UNDETERMINED", "SPINE_UNFILLED"})
             # The search is deterministic.
             self.assertEqual(cli(file, "--plan").stdout, run.stdout)
             # Every choice is one the catalogue compiles: a form of the type, a placement of the form.
@@ -447,7 +455,9 @@ console.log(JSON.stringify(Object.fromEntries(Object.entries(PAGE_TYPES).map(([t
             file = examples_deck(tmp, forms_only)
             declared = {p["id"]: p["form"] for p in json.loads(file.read_text())["pages"] if p.get("type")}
             run = cli(file, "--plan")
-            self.assertEqual(run.returncode, 0, run.stderr[-800:])
+            # Refused for the bound facts this cut-back spine leaves to the layout (above), with its allocation printed whole.
+            self.assertEqual(run.returncode, 2, run.stderr[-800:])
+            self.assertEqual({f["code"] for f in json.loads(run.stdout)["unlayable"]}, {"SPINE_UNDETERMINED", "SPINE_UNFILLED"})
             rows = json.loads(run.stdout)["plan"]["pages"]
             kept = [row for row in rows if row.split(" ")[1].split("/")[1] == declared[row.split(" ")[0]]]
             moved = [row for row in rows if row not in kept]

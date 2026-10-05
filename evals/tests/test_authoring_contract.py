@@ -36,6 +36,9 @@ import {{ compileDeck, scaffoldPage, insightTypes }} from '{AUTHOR}';
 const example = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
 const pageOf = (id) => structuredClone([...example.pages, ...(example.appendix || [])].find((p) => p.id === id));
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
+// A page drafted: the one compile of the page completed with placeholder copy. Its refusal, or null where the draft takes it.
+const drafted = (page) => compileDeck({{ deck: {{ id: 'd' }}, pages: [page] }}, {{ draft: true, partial: true }});
+const draftError = (page) => drafted(page).compileErrors[0] ?? null;
 const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const trend = (extra = {{}}) => ({{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhibit', why: 'The break is the claim and sits where it happens',
   settles: {{ kind: 'rate', what: 'Journeys by year from the operator reports' }}, adds: 'The callouts say why the line broke and why it has not recovered',
@@ -59,7 +62,7 @@ const bar = compilePage(trend({ commentary: 'so-what-bar', adds: undefined, bar:
 console.log(JSON.stringify({
   plain: compilePage(plain).pageType.content, rail: rail.pageType.content.adds, bar: bar.pageType.content.adds,
   noAdds: error(() => compilePage(trend({ adds: undefined }))), nullAdds: error(() => compilePage(trend({ adds: null }))),
-  draftNoAdds: error(() => compilePage(trend({ adds: undefined }), 0, { draft: true })),
+  draftNoAdds: draftError(trend({ adds: undefined })),
   qualitative: error(() => compilePage(trend({ settles: { kind: 'qualitative', what: 'The operator statement of its plan' } }))),
   tableQualitative: error(() => compilePage({ ...pageOf('p08'), settles: { kind: 'qualitative', what: 'The operator statement of its plan' } })),
   matrixQualitative: error(() => compilePage({ ...pageOf('p13'), settles: { kind: 'qualitative', what: 'What riders told the surveys' } })),
@@ -70,7 +73,7 @@ console.log(JSON.stringify({
         self.assertTrue(result["bar"].startswith("The recovery stalled"))  # a rail or a bar is its own answer
         self.assertIn("say in `adds` what the callouts say", result["noAdds"])
         self.assertIn("`adds: null` says they add nothing", result["nullAdds"])
-        self.assertIsNone(result["draftNoAdds"])  # the copy's rules wait for the full compile
+        self.assertIsNone(result["draftNoAdds"])  # the copy is the full compile's: a draft stands in for it
         self.assertIn('not settled by a "qualitative" judgement', result["qualitative"])
         self.assertIn("tabulates", result["tableQualitative"])
         self.assertIsNone(result["matrixQualitative"])  # a findings matrix may rest on statements
@@ -153,18 +156,28 @@ console.log(JSON.stringify({ weak: weak.map((f) => [f.code, f.pages]), strong: c
         self.assertEqual(result["weak"], [["PILLAR_UNSUPPORTED", ["Supply"]]])
         self.assertEqual(result["strong"], 0)
 
-    def test_a_draft_defers_the_exhibit_and_the_full_compile_refuses_it(self):
+    def test_a_draft_refuses_the_exhibit_the_full_compile_refuses_and_defers_only_the_copy(self):
+        # A trend drawn over two periods is refused by the full compile under every form of the type. A draft used to keep
+        # the page with that refusal recorded "for the full compile", and the critique was then bound to a page that could
+        # not be laid out as it stood. A draft is the full compile of the page completed: it refuses the page too.
         result = run_node(PAGES + """
 const thin = trend({ exhibit: { categories: ['2019', '2020'], series: [{ name: 'x', values: [1, 2] }], annotations: [{ category: '2020', text: 'Traffic fell to a fifth when the network was grounded' }] } });
-const drafted = compilePage(thin, 0, { spine: true });
-console.log(JSON.stringify({ deferred: drafted.pageType.deferred, advisories: drafted.pageType.advisories, type: drafted.pageType.type,
-  full: error(() => compilePage(thin)), spineTitle: error(() => compilePage(trend({ title: 'one two three four five six seven eight nine ten eleven twelve thirteen' }), 0, { spine: true })),
-  spineType: error(() => compilePage(trend({ form: 'pie' }), 0, { spine: true })) }));
+const refused = drafted(thin), noCopy = drafted(trend({ adds: undefined, exhibit: { ...trend().exhibit, annotations: undefined } }));
+console.log(JSON.stringify({ refused: refused.failed.map((f) => [f.code, f.message]), slides: refused.spec.slides.length,
+  pending: noCopy.spec.slides[0]?.pageType.pending, errors: noCopy.compileErrors, type: noCopy.spec.slides[0]?.pageType.type, callouts: noCopy.spec.slides[0]?.exhibit.annotations ?? null,
+  full: error(() => compilePage(thin)), spineTitle: draftError(trend({ title: 'one two three four five six seven eight nine ten eleven twelve thirteen' })),
+  spineType: draftError(trend({ form: 'pie' })) }));
 """)
-        self.assertIn("four or more periods", result["deferred"])
-        self.assertTrue(any(a.startswith("deferred to the full compile") for a in result["advisories"]))
-        self.assertEqual(result["type"], "trend")
+        self.assertEqual([code for code, _ in result["refused"]], ["SPINE_UNDRAWABLE"])
+        self.assertIn("four or more periods", result["refused"][0][1])
+        self.assertIn("No form of a trend page holds the exhibit the spine draws here", result["refused"][0][1])
+        self.assertEqual(result["slides"], 0)
         self.assertIn("four or more periods", result["full"])
+        # What a draft defers is the copy: the page with no callouts and no `adds` compiles, says so, and carries none of the copy stood in for it.
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(result["pending"], ["copy"])
+        self.assertEqual(result["type"], "trend")
+        self.assertIsNone(result["callouts"])
         self.assertIn("TITLE_WORDS", result["spineTitle"])  # the spine's own rules hold in a draft
         self.assertIn("choose `form`", result["spineType"])
 

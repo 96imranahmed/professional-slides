@@ -31,6 +31,7 @@ node evals/quality/run.mjs --report                # the summary for this skill 
 node evals/quality/gate-validity.mjs               # per-gate recall and precision on labelled defects
 node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught (typed, bound and traced numbers), clean fixture decks clear
 node evals/quality/critic-calibration.mjs --repeats 5 [--dry-run]   # the storyline critic on frozen packets: its spread, and planted anchors
+node evals/quality/variability.mjs                 # the plan under several seeds and design systems: decks differ where a claim leaves a choice of form, and nowhere else
 ```
 
 ## Cold runs
@@ -46,6 +47,21 @@ scored again, live, under today's rules. See `cold-run/README.md`.
 node evals/cold-run/score.mjs out/deck.plan.json out/
 node evals/cold-run/specimens.mjs [--stamp]   # the stored runs under today's rules; --stamp records new verdicts
 node evals/cold-run/baseline.mjs [--stamp]    # the example decks, compiled and scored
+```
+
+## Point changes
+
+`point-change/` is the skill's second workflow as a command: a change to one
+page of a deck the user already has - a figure that stands on three slides, a
+title, an exhibit redrawn - run the way `SKILL.md` tells an author to run it,
+on decks made on the spot. It checks that the change was made, that every
+other slide came out byte for byte as it went in, that a figure left behind
+on another slide was caught, and that nothing but the changed pages was
+refused, critiqued or reviewed; and it counts the commands the run took. See
+`point-change/README.md`.
+
+```bash
+node evals/point-change/run.mjs [--task <id>] [--agent claude]
 ```
 
 ## Calibration

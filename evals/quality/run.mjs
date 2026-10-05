@@ -42,7 +42,7 @@ import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import {
   QUALITY, ROOT, RESULT_SCHEMA, anchorError, appendResult, briefRequest, briefs, buildAnchorPacket, buildDeckPacket,
-  buildPairPacket, collectArtifacts, deckPages, fillTemplate, formatSummary, isRecorded, keptDir, keyOf, nextRun, pairSwap,
+  buildPairPacket, collectArtifacts, deckPages, fillTemplate, schemaVars, formatSummary, isRecorded, keptDir, keyOf, nextRun, pairSwap,
   parseJudgeOutput, previousDeck, readResults, skillSha as readSkillSha, storeArtifacts, summarize, treatmentsOf,
   validatePreference, validateVerdict,
 } from "./lib.mjs";
@@ -121,7 +121,7 @@ function scoreStored(dir, kept) {
 }
 
 function judgeCall(judge, packet, model) {
-  const command = fillTemplate(judge.command, { prompt: packet.prompt, packet: packet.dir, schema: packet.schema, model });
+  const command = fillTemplate(judge.command, { prompt: packet.prompt, packet: packet.dir, ...schemaVars(judge, { text: packet.schema }), model });
   const out = run(command, { cwd: packet.dir, timeoutMinutes: judge.timeoutMinutes ?? 30 });
   if (out.code !== 0) throw new Error(`judge exited ${out.code ?? out.signal ?? out.error}: ${(out.stderr || out.stdout).slice(-600)}`);
   return parseJudgeOutput(out.stdout);

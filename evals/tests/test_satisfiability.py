@@ -175,17 +175,18 @@ console.log(JSON.stringify({
             self.assertIn("must not contain statistics", result[refused])
 
     def test_every_example_the_message_lists_as_allowed_is_allowed(self):
-        # The refusal ends: a heading may name a period ("FY26", "2 August 2026"), a sample ("n = 240"),
-        # a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("1 = best").
+        # The refusal ends: a heading may name a period ("FY26", "2 August 2026", "at 2025's rate"), a sample ("n = 240"),
+        # a set size ("top 40", or the members counted: "20 suppliers"), a model by its designation ("X77", "505X"),
+        # an index base ("2019 = 100") or a rank scale ("1 = best").
         result = run_node(self.PROBE + '''
 const message = refusal({ heading: 'Revenue up 12%' });
 const listed = [...message.slice(message.indexOf('may name')).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 const scale = (text) => (/^1 = /.test(text) ? `rank, ${text}` : text);
 console.log(JSON.stringify({ listed, headings: listed.map((text) => refusal({ heading: `Operators by size, ${scale(text)}` })), units: listed.map((text) => refusal({ heading: 'Operators by size', unit: scale(text) })) }));
 ''')
-        self.assertEqual(result["listed"], ["FY26", "2 August 2026", "n = 240", "top 40", "2019 = 100", "1 = best"])
-        self.assertEqual(result["headings"], [None] * 6)
-        self.assertEqual(result["units"], [None] * 6)
+        self.assertEqual(result["listed"], ["FY26", "2 August 2026", "at 2025's rate", "n = 240", "top 40", "20 suppliers", "X77", "505X", "2019 = 100", "1 = best"])
+        self.assertEqual(result["headings"], [None] * 10)
+        self.assertEqual(result["units"], [None] * 10)
 
     def test_a_form_the_catalogue_offers_is_not_refused_by_its_own_type(self):
         # The three forms no page could satisfy, each compiled at its least.

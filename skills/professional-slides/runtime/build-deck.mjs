@@ -3,6 +3,12 @@
 //
 //   node runtime/build-deck.mjs spec.json out/ [--preflight] [--no-render] [--python python3]
 //
+// A revision that carries slides from its source deck (revision.mjs) composes, emits and gates only
+// the pages it gave a type - written as <id>.composed.pptx - and then assembles the deck: the source
+// deck with those slides set in and its edited slides rewritten (emit/assemble_pptx.py). <id>.pptx is
+// the assembled deck, rendered into deck/ for the review; every carried slide is read back from it and
+// compared with the source's, byte for byte (`revision.preserved` in build-result.json).
+//
 // Vendor-neutral: node for layout, python-pptx to emit, LibreOffice to render. Writes
 // scene.json, planning.json, deck.pptx, rendered/slide-N.png, montage.png, readback.json,
 // gates.json and build-result.json into out/. Exit codes (EXIT in errors.mjs):
@@ -42,7 +48,8 @@ import { auditTextPlan, auditExportText } from "./text-contract.mjs";
 import { writeLedger } from "./claims.mjs";
 import { storylineWarning } from "./storyline.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
-import { applyRulesVersion } from "./weight.mjs";
+import { applyRulesVersion, carriedCount, notHeldOn } from "./weight.mjs";
+import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE, REVISION_CODES, assemblyOrder, carriedSaid, sourceDeckPath } from "./revision.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -173,12 +180,65 @@ export async function buildDeck(specPath, outputDirectory, { preflight = false, 
   transferHighlights(spec, stages);
   const { deck, scenePath } = await composeScene({ spec, baseDir, directory, timings, result, stages });
   if (only) await keepPages({ deck, stages, scenePath, result, only });
-  const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath });
-  if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
-  await readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design, fromMemory: Boolean(source) });
+  // A revision that carries slides composes only the pages it gave a type: those are emitted and gated as a deck of their
+  // own, and the deck the user receives is assembled from the source deck around them. A revision that composes no page
+  // at all - text edits on carried slides, a slide dropped - has nothing to emit or gate, and is assembled alone.
+  const carries = carriedCount(spec) > 0, composes = deck.slides.length > 0;
+  if (composes) {
+    const { gates, pptxPath, emitted, design } = await preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath, composedOnly: carries });
+    if (preflight) { result.status = result.preflight.passed ? "preflight-passed" : "preflight-findings"; return finish(result, directory, started); }
+    await readBackAndRender({ render, spec, stem, baseDir, directory, py, result, stages, deck, scenePath, gates, pptxPath, emitted, design, fromMemory: Boolean(source) });
+  } else if (preflight) { result.preflight = { passed: true, findings: [] }; result.status = "preflight-passed"; return finish(result, directory, started); }
+  if (carries && !only) await assembleRevision({ spec, stem, baseDir, directory, py, result, deck, render });
   withBudget(result);
   Object.assign(result, buildOutcome(result, { render }));
   return finish(result, directory, started);
+}
+
+/**
+ * The revision's deck, assembled: the source deck with the composed slides
+ * set in and the edited slides rewritten (emit/assemble_pptx.py), written as
+ * <id>.pptx beside the composed pages' own file, and rendered into deck/ so
+ * the review reads the deck the user will open. `result.revision` records
+ * the order, what was edited and what was proven kept: each carried slide's
+ * parts read back from the written file and compared with the source's.
+ */
+async function assembleRevision({ spec, stem, baseDir, directory, py, result, deck, render }) {
+  const inventory = await readJson(path.resolve(baseDir, String(spec.inventory)), { optional: true });
+  const order = assemblyOrder(spec, inventory, deck.slides);
+  const composedPath = deck.slides.length ? path.join(directory, `${stem}.composed.pptx`) : null;
+  const planPath = path.join(directory, "assembly.json"), pptxPath = path.join(directory, `${stem}.pptx`);
+  await writeJson(planPath, { source: sourceDeckPath(spec, inventory, baseDir), sha256: inventory?.source?.sha256 ?? null, composed: composedPath, slides: order });
+  const assembled = await py("assembleMs", [path.join(runtime, "emit", "assemble_pptx.py"), planPath, pptxPath], { expect: [0, 2] });
+  const report = lastJson(assembled.stdout) ?? {};
+  if (assembled.code !== 0) throw new RefusalError(registered(REVISION_CODES, report.refused && /source deck|inventory was read/.test(report.refused) ? "REVISION_SOURCE_MISSING" : "REVISION_CARRY_INVALID"), report.refused ?? assembled.stderr.trim());
+  result.pptxPath = pptxPath;
+  result.revision = { source: inventory?.source?.file ?? null, order: order.map((item) => ({ id: item.id, ...(item.carry ? { carried: item.carry, ...(item.title !== undefined || item.edits || item.hidden !== undefined ? { edited: true } : {}) } : { composed: item.composed }) })),
+    ...(composedPath ? { composedPptx: composedPath } : {}), carried: report.carried, edited: report.edited, composed: report.composed, dropped: report.dropped,
+    // The parts only the dropped slides drew on, which left the file with them (a chart's data, its workbook, a picture).
+    removed: report.removed ?? [], edits: report.edits, preserved: report.preserved };
+  // A carried slide the written file does not hold byte for byte is not the user's slide: the build says so rather than deliver it.
+  if (report.preserved?.drifted?.length) result.revisionFindings = report.preserved.drifted.map((index) => ({ code: registered(REVISION_CODES, "REVISION_CARRY_DRIFT"), severity: "blocker", slide: index,
+    repair: `Source slide ${index} was carried, and a part it draws on in ${path.basename(pptxPath)} is not the source deck's byte for byte: the assembled file is not the user's deck. This is a fault of the assembler, not of the pages file - report it with the source deck` }));
+  // The assembled deck as the review reads it (reviewer.mjs reviewedDeck): every slide in its place - a composed page as the
+  // scene holds it, a carried slide by its title and its words, which is all the runtime knows of it.
+  const said = new Map(carriedSaid(spec, inventory).map((item) => [item.id, item]));
+  const text = (role, value) => ({ type: "text", role, text: value });
+  await fs.writeFile(path.join(directory, ASSEMBLED_SCENE), JSON.stringify({ id: deck.id, assembled: true, source: inventory?.source?.file ?? null,
+    slides: order.map((item) => (item.composed ? { ...deck.slides[item.composed - 1], composed: item.composed }
+      : { id: item.id, carried: { slide: item.carry, edited: Boolean(said.get(item.id)?.edited) }, componentInstances: [],
+          nodes: (said.get(item.id)?.texts ?? []).map((value, at) => text(at === 0 ? "action-title" : "paragraph", value)) })) }));
+  // The lines the revision rewrote on carried slides join the claim ledger: a figure the revision changed is its own to reproduce.
+  const rewritten = [...said.values()].filter((item) => item.rewritten.length).map((item) => ({ id: item.id, nodes: item.rewritten.map((line) => text(line.title ? "action-title" : "paragraph", line.text)) }));
+  if (rewritten.length) result.claims = (await writeLedger(directory, { edited: rewritten })).counts;
+  if (render) {
+    const deckDirectory = path.join(directory, ASSEMBLED_RENDERS);
+    const rendered = await py("deckRenderMs", [path.join(runtime, "emit", "render_pptx.py"), pptxPath, deckDirectory], { expect: [0, RENDERER_MISSING] });
+    if (rendered.code === RENDERER_MISSING) result.renderSkipped = result.renderSkipped ?? lastJson(rendered.stdout)?.message ?? "The deck was not rendered: the renderer is not installed.";
+    else { const sheets = await py("deckSheetsMs", [path.join(runtime, "emit", "render_pptx.py"), "--sheets", deckDirectory]);
+      result.revision.render = { directory: deckDirectory, ...lastJson(rendered.stdout), ...(lastJson(sheets.stdout) ?? {}) };
+      result.montagePath = result.revision.render.montage ?? result.montagePath; }
+  }
 }
 
 /** Each stage plan found beside the spec, gated with its report written and refused when rejected; returns the stages that were found. */
@@ -262,9 +322,12 @@ async function composeScene({ spec, baseDir, directory, timings, result, stages 
   const { deck, decisions } = composeAll(spec, baseDir);
   // An evaluation of the skill is judged on a deck long enough to show its
   // rhythm, repetition and weakest page; a short one is a diagnostic.
-  if (spec.purpose === "evaluation" && deck.slides.length < EVALUATION_MIN_PAGES) {
+  // The deck's length is every page it renders: the slides a revision carries are pages of it. Whether the rule is held on
+  // this deck is the one decision every stage asks (weight.mjs notHeldOn): a refusal here is a refusal at the compile.
+  const pages = deck.slides.length + carriedCount(spec);
+  if (spec.purpose === "evaluation" && pages < EVALUATION_MIN_PAGES && !notHeldOn({ code: "EVALUATION_TOO_SHORT", measured: pages }, spec)) {
     // The page gates' code (gate_config.py COMPOSE_CODES), refused here before anything is emitted.
-    throw new RefusalError("EVALUATION_TOO_SHORT", `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${deck.slides.length}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
+    throw new RefusalError("EVALUATION_TOO_SHORT", `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${pages}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
   }
   const contentAudit = auditContent(spec, deck);
   const textAudit = auditTextPlan(stages.content || {}, deck, { deck: spec });
@@ -284,20 +347,22 @@ async function composeScene({ spec, baseDir, directory, timings, result, stages 
 }
 
 /** The story gates beside the emitter, then the coverage, craft and design findings folded into the preflight report. */
-async function preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath }) {
+async function preflightScene({ preflight, spec, stem, baseDir, directory, py, result, deck, scenePath, composedOnly = false }) {
   // Story gates need only the scene (titles, words, hedges, monotony), so they
   // run beside the emitter, which needs only the scene too.
   const gates = path.join(runtime, "gates", "page_gates.py");
   const preflightReport = path.join(directory, "preflight-gates.json");
-  const pptxPath = path.join(directory, `${stem}.pptx`);
+  // Beside carried slides the composed pages are a file of their own; the deck is assembled from it afterwards.
+  const pptxPath = path.join(directory, composedOnly ? `${stem}.composed.pptx` : `${stem}.pptx`);
   const [pre, emitted] = await together(
     py("preflightMs", [gates, scenePath, "--report", preflightReport, ...rulesArgs(spec)], { expect: [0, 2] }),
     preflight ? null : py("emitMs", [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath]));
-  result.preflight = { ...(await readReport(preflightReport)), report: preflightReport, passed: pre.code === 0 };
+  result.preflight = judged({ ...(await readReport(preflightReport)), report: preflightReport, passed: pre.code === 0 }, spec);
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
   // Deck craft floors, read off the spec and the composed scene. A blocker
   // fails the preflight, so the deck is built for inspection but never delivered.
+  // The build bars are held here over the pages this build drew, as at the compile and at delivery (build-bars.mjs barOutcome).
   const craft = craftFindings(spec, deck, { picturesSupplied: await suppliedPictures(baseDir) });
   if (craft.length) {
     result.preflight.findings = [...(result.preflight.findings || []), ...craft];
@@ -312,6 +377,21 @@ async function preflightScene({ preflight, spec, stem, baseDir, directory, py, r
   result.preflight = withFindings(result.preflight, design);
   await writeJson(preflightReport, result.preflight);
   return { gates, pptxPath, emitted, design };
+}
+
+/**
+ * A Python gate's report as this deck is held to it, by the one decision
+ * every stage asks (weight.mjs notHeldOn): the gates know the rules a deck's
+ * version predates, and not which rules that measure the deck a revision's
+ * composed pages are too few to be read by. A report that failed only for
+ * findings the deck is not held to passes; one that failed with no finding
+ * to show for it still fails.
+ */
+export function judged(report, spec) {
+  if (!Array.isArray(report.findings)) return report;
+  const findings = applyRulesVersion(report.findings, spec);
+  const blocked = report.findings.some(isBlocking), blocks = findings.some(isBlocking);
+  return { ...report, findings, ...(blocked && !blocks ? { passed: true, accepted: true } : {}) };
 }
 
 /** The emitted file read back beside its render; with a renderer, the page gates, density profile and review sheets on the renders. */
@@ -355,9 +435,9 @@ async function readBackAndRender({ render, spec, stem, baseDir, directory, py, r
         // across its prose pages blocks (TEXT_FRAGMENTED).
         py("densityMs", [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport, ...rulesArgs(spec)]),
         py("sheetsMs", [path.join(runtime, "emit", "render_pptx.py"), "--sheets", renderDirectory]));
-      result.gates = withFindings({ ...(await readReport(gateReport)), report: gateReport, passed: gated.code === 0 }, design);
+      result.gates = withFindings(judged({ ...(await readReport(gateReport)), report: gateReport, passed: gated.code === 0 }, spec), design);
       if (design.length) { const { report: _, passed: __, ...written } = result.gates; await writeJson(gateReport, written); }
-      result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout), findings: (await readReport(profileReport)).findings ?? [] };
+      result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout), findings: applyRulesVersion((await readReport(profileReport)).findings ?? [], spec) };
       Object.assign(result.render, lastJson(sheets.stdout) ?? {});
       result.montagePath = result.render?.montage;
     }
@@ -421,12 +501,15 @@ export function buildOutcome(result, { render = true } = {}) {
   const superseded = (f) => render && result.gates && f.code === "DECK_SCENE_VOID";
   if (result.preflight && result.preflight.passed === false) for (const f of (result.preflight.findings || []).filter(blocking).filter((f) => !superseded(f))) add("page gates", f);
   if (result.gates && result.gates.passed === false) for (const f of (result.gates.findings || []).filter(blocking)) add("page gates", f);
-  if (result.readback?.accepted !== true) {
+  // A revision that composed no page emitted no file of its own to read back: its deck is the assembled one, proven against the source.
+  const assembledOnly = Boolean(result.revision) && !result.revision.composed;
+  if (result.readback?.accepted !== true && !assembledOnly) {
     for (const f of result.readback?.findings || []) add("readback", f);
     if (!(result.readback?.findings || []).length) add("readback", { code: registered(BUILD_CODES, "READBACK_MISSING") });
   }
   if (result.textCoverage?.accepted === false) for (const f of (result.textCoverage.findings || []).filter(blocking)) add("rendered text", f);
   for (const f of (result.densityProfile?.findings || []).filter(blocking)) add("density profile", f);
+  for (const f of result.revisionFindings || []) add("assembly", f);
   // A report that failed without naming a finding is still a blocker.
   if (result.preflight?.passed === false && !(result.preflight.findings || []).some(blocking)) add("page gates", { code: registered(BUILD_CODES, "PREFLIGHT_FAILED") });
   if (render && result.gates && result.gates.passed === false && !blockers.some((b) => b.source === "page gates")) add("page gates", { code: registered(BUILD_CODES, "GATES_FAILED") });
@@ -435,7 +518,7 @@ export function buildOutcome(result, { render = true } = {}) {
   const counts = (report) => (report?.findings || []).filter((f) => !blocking(f)).reduce((m, f) => ({ ...m, [f.code]: (m[f.code] || 0) + 1 }), {});
   const before = counts(result.preflight), after = counts(result.gates);
   const advisories = Object.fromEntries([...new Set([...Object.keys(before), ...Object.keys(after)])].sort().map((code) => [code, Math.max(before[code] || 0, after[code] || 0)]));
-  const status = blockers.length ? "built-with-blockers" : render && result.gates ? "built" : "built-unrendered";
+  const status = blockers.length ? "built-with-blockers" : render && (result.gates || (assembledOnly && result.revision.render)) ? "built" : "built-unrendered";
   return { status, blockers, advisories };
 }
 
@@ -449,7 +532,7 @@ const readReport = async (file) => (await readJson(file, { optional: true })) ??
 export const BUILD_REPORTS = Object.freeze([
   "scene.json", "planning.json", "preflight-gates.json", "content-audit.json",
   "readback.json", "gates.json", "build-result.json", "text-coverage.json", "rendered-text-coverage.json",
-  "density-profile.json", "claims.json",
+  "density-profile.json", "claims.json", "assembly.json", ASSEMBLED_SCENE,
 ]);
 
 // Skill evaluations are judged on at least this many rendered pages

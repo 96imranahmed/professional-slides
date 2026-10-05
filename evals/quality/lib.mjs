@@ -85,6 +85,21 @@ export function fillTemplate(command, vars) {
     (Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : whole)));
 }
 
+/**
+ * What a judge command can say of the schema its answer must match. Some CLIs
+ * take the schema itself as the flag's value and refuse a file path there;
+ * others take a path. So a template names which it wants: `{schemaJson}` is
+ * the schema inline, on one line; `{schemaPath}` a file that holds it ("" when
+ * the caller has none); and `{schema}` is the one the judge's `schemaAs` says
+ * - "json" (the default: what this eval has always passed) or "path". The
+ * schema is given as its `text` or as the `file` holding it; `shown` prints a
+ * placeholder for the inline form, for a dry run.
+ */
+export function schemaVars(judge, { text = null, file = null, shown = false } = {}) {
+  const json = shown ? "<schema, inline>" : JSON.stringify(JSON.parse(text ?? readFileSync(file, "utf8")));
+  return { schemaJson: json, schemaPath: file ?? "", schema: judge?.schemaAs === "path" && file ? file : json };
+}
+
 // --- what an agent run left behind ---------------------------------------------
 
 // Review and storyline histories (`.reviews/`) hold earlier copies of the

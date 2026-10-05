@@ -244,12 +244,15 @@ class PageRunTests(unittest.TestCase):
             findings, rest = run.stderr.split("Each page's part in the deck's aggregates:")
             self.assertIn("G. Deck aggregates", findings.split("Deck aggregate findings these pages are not counted in")[0])
             self.assertIn("CRAFT_CHARTS_BARE", findings.split("Deck aggregate findings these pages are not counted in")[0])
-            # Its part in the aggregates names the craft rate it counts towards, and which way it pulls.
-            self.assertIn(f"{charted}: CRAFT_CHARTS_BARE: this page counts as 1 chart page, 0 marking something on the plot", " ".join(rest.split()))
+            # Its part in the aggregates names the rate it counts towards - by the delivery bar, which is the one standing the
+            # rate now has: the floor under it is the finding above - and which way it pulls.
+            self.assertIn(f"{charted}: BAR_CHARTS_ANNOTATED: this page counts as 1 chart page, 0 marking something on the plot", " ".join(rest.split()))
+            self.assertIn("floor 0.65", " ".join(rest.split()))
             self.assertIn("pulls the deck the wrong way", rest)
             # A page with no chart has no part in it: the finding is listed apart, and the run answers for the page alone.
             other = cli(file, "--check", "--page", "p02")
             self.assertIn("Deck aggregate findings these pages are not counted in (not counted in this run's exit code; the whole-deck run holds them):", other.stderr)
+            self.assertNotIn("p02: BAR_CHARTS_ANNOTATED", other.stderr)
             self.assertNotIn("p02: CRAFT_CHARTS_BARE", other.stderr)
 
     def test_the_pages_a_finding_is_made_of_are_read_off_its_rule(self):

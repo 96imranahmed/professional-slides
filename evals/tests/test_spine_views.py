@@ -126,8 +126,11 @@ console.log(JSON.stringify({ pages: Object.keys(full.pages).length, bare: [bare.
   read: declared.drafted.structure.f0.views, drawn: full.structure.f0.views, less: [laid.errors, Object.keys(laid.pages).filter((id) => laid.pages[id] !== declared.drafted.pages[id])] }));
 ''')
         self.assertGreaterEqual(result["pages"], 7)
-        # The guarantee is kept: an undeclared spine is read as showing each measure whole, and the two-year table is less.
-        self.assertEqual(result["bare"], [[], ["f0"]])
+        # An undeclared spine is read as showing each measure plotted whole, which a summary's table cannot do: where the draft
+        # used to pass that spine and the layout then moved the page, the draft now refuses the page and says what to declare.
+        self.assertEqual(len(result["bare"][0]), 1)
+        self.assertIn("f0: what the spine declares the page shows cannot be written into a summary page", result["bare"][0][0])
+        self.assertIn("its `basis` declares no view of", result["bare"][0][0])
         self.assertEqual(result["declared"], [[], []])
         self.assertEqual(result["read"], result["drawn"])
         self.assertEqual(result["read"]["A-peers/margin"], ['["table",["Harbour"]]'])
@@ -166,7 +169,8 @@ console.log(JSON.stringify({
         self.assertEqual(result["list"], {"i/ocf": ['["chart",["Y1","Y4"]]']})
         self.assertEqual(result["figure"], {"i/ocf": ['["figure",["Y4"]]']})
         self.assertEqual(result["drawnFigure"], result["figure"])
-        self.assertEqual(result["two"], {"i/ocf": ['["table",["Y1","Y2"]]'], "i/peers": ['["table",["B"]]'], "i/rate": ['["table","all"]']})
+        # A measure of one value is one number wherever the page prints it: it has one view, whatever exhibit carries it.
+        self.assertEqual(result["two"], {"i/ocf": ['["table",["Y1","Y2"]]'], "i/peers": ['["table",["B"]]'], "i/rate": ['["figure"]']})
         self.assertEqual(result["each"], {"i/ocf": ['["chart",["Y4"]]'], "i/peers": ['["chart",["A","B"]]']})
         self.assertEqual(result["drawnWins"], {"i/ocf": ['["chart","all"]']})
         self.assertEqual(result["readings"], [{"id": "p1", "measures": [
@@ -194,14 +198,21 @@ console.log(JSON.stringify({ ok: found(SUMMARY_VIEW), kind: found({ as: 'pie' })
         # as a content page, and the same page with its items as a takeaways page - a "changed argument" nobody made.
         result = run_node('''
 import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
+import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
 const page = { id: 'p9', type: 'summary', form: 'takeaways', commentary: 'none', title: 'Three findings carry the answer and one of them is new', why: 'The close restates the findings the answer rests on',
   settles: { kind: 'qualitative', what: 'the three findings of the deck' } };
 const laid = compilePage({ ...page, items: [{ title: 'Growth outran funding', text: 'Lending grew faster than the deposits behind it in each of the last three years.' }, { title: 'Cash fell', text: 'Operating cash flow fell by a fifth in the latest year.' }, { title: 'Cover is thin', text: 'Liquid assets cover short liabilities by less than the floor requires.' }] }, 0, {});
-const spine = compilePage(page, 0, { draft: true, spine: true });
-console.log(JSON.stringify({ spine: spine.kind ?? null, laid: laid.kind ?? null, deferred: Boolean(spine.pageType?.deferred ?? spine.deferred) }));
+// A draft is the one compile of the page completed: the spine's slide is the laid-out slide less what the layout adds.
+const drafted = compileDeck({ deck: { id: 'd' }, pages: [page] }, { draft: true, partial: true });
+const spine = drafted.spec.slides[0];
+console.log(JSON.stringify({ spine: spine.kind ?? null, laid: laid.kind ?? null, pending: spine.pageType?.pending ?? null, items: spine.items ?? null, errors: drafted.compileErrors }));
 ''')
         self.assertEqual(result["laid"], "takeaways")
+        self.assertEqual(result["errors"], [])
         self.assertEqual(result["spine"], result["laid"])
+        # The items the witness stood in for are not the author's: the spine's slide carries none, and says its content is pending.
+        self.assertIsNone(result["items"])
+        self.assertEqual(result["pending"], ["content"])
 
 
 class SpineReadingReportTests(unittest.TestCase):
@@ -218,18 +229,29 @@ class SpineReadingReportTests(unittest.TestCase):
         return subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "finance.pages.json"), *flags], capture_output=True, text=True)
 
     def test_a_draft_prints_how_each_undrawn_measure_will_be_read(self):
-        run = self.run_cli({}, "--draft")
+        run = self.run_cli({"f0": {"as": "table", "labels": {"from": "FY25", "to": "FY26"}, "members": ["Harbour"]}}, "--draft")
         self.assertEqual(run.returncode, 0, run.stderr[-2000:])
         summary = json.loads(run.stdout)
         by_page = {line.split(" ", 1)[0]: line for line in summary["readings"]}
         self.assertEqual(set(by_page), {"f0", "f1", "f2", "f3", "f4", "f5", "f6"})
         self.assertIn("i-loans/loans: read as plotted, every one of its 8 periods", by_page["f1"])
         self.assertIn("A-ocf/percent: read as stated as a figure", by_page["f2"])
-        self.assertIn("A-cushion/result: read as plotted, every one of its 8 periods", by_page["f0"])
+        self.assertIn("A-cushion/result: read as tabulated, 2 of its 8 periods: FY25, FY26 (declared)", by_page["f0"])
         # The human-readable report carries the same lines and says what to do about them.
         self.assertIn("How the storyline critique will read each measure a page shows and does not draw yet", run.stderr)
         self.assertIn("`as: \"chart\" | \"table\" | \"figure\"`", run.stderr)
         self.assertIn("  " + by_page["f1"], run.stderr)
+
+    def test_a_stub_that_declares_no_view_a_page_of_its_type_can_show_is_refused_with_the_readings_beside_it(self):
+        # The summary's stub declares no view, so it is read as plotting each measure whole - which no summary draws. The
+        # draft used to pass this spine and the layout then changed what the critic had read; now the draft refuses the page,
+        # and prints how the other pages will be read beside the refusal.
+        run = self.run_cli({}, "--draft")
+        self.assertEqual(run.returncode, 2, run.stderr[-2000:])
+        self.assertIn("SPINE_UNDETERMINED [f0]", run.stderr)
+        self.assertIn("its `basis` declares no view of", run.stderr)
+        self.assertIn("so the critic is told the page shows each plotted", run.stderr)
+        self.assertIn("f1 i-loans/loans: read as plotted, every one of its 8 periods", run.stderr)
 
     def test_a_declared_view_is_printed_as_declared(self):
         run = self.run_cli({"f0": {"as": "table", "labels": {"from": "FY25", "to": "FY26"}, "members": ["Harbour"]}}, "--draft")
@@ -239,7 +261,7 @@ class SpineReadingReportTests(unittest.TestCase):
         self.assertIn("A-peers/margin: read as tabulated, 1 of its 8 members: Harbour (declared)", line)
 
     def test_a_plan_includes_each_page_s_reading(self):
-        run = self.run_cli({}, "--plan")
+        run = self.run_cli({"f0": {"as": "table", "labels": {"from": "FY25", "to": "FY26"}, "members": ["Harbour"]}}, "--plan")
         self.assertEqual(run.returncode, 0, run.stderr[-2000:])
         plan = json.loads(run.stdout)["plan"]
         self.assertEqual(len(plan["readings"]), 7)

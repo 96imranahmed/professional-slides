@@ -164,13 +164,15 @@ insights.get('i-peers').shape = 'mix';
 const donut = { ...peers({ measure: 'i-peers/margin' }), type: 'composition', form: 'donut', commentary: 'so-what-bar', settles: { kind: 'share', what: 'margin across eight credit unions', measures: ['i-peers/margin'] } };
 const run = await draftOf(withPage(donut), insights);
 console.log(JSON.stringify({ trend: a.map(said), repair: a[0]?.repair ?? null, donut: run.blocking.filter((f) => f.id === 'f7').map(said),
-  waits: run.spec.slides.find((s) => s.id === 'f7')?.pageType.deferredStage ?? null }));
+  waits: run.spec.slides.find((s) => s.id === 'f7')?.pageType.moved ?? null }));
 ''')
         self.assertEqual(result["trend"], [["SPINE_UNDRAWABLE", "f7", "P"]])
         self.assertIn("No form of a trend page holds the exhibit the spine draws here", result["repair"])
         self.assertIn("bound to the page's type and to what it shows of each measure", result["repair"])
         self.assertEqual(result["donut"], [])          # another form of the type holds it: the layout's to choose
-        self.assertEqual(result["waits"], "evidence")  # and the compile says which step refused the form as declared
+        # and the draft says which step of the compile refused the form as declared, and which form holds the page
+        self.assertEqual([result["waits"]["form"], result["waits"]["stage"]], ["donut", "evidence"])
+        self.assertTrue(result["waits"]["to"].split("/")[0] in ("stacked-bar", "stacked-column", "marimekko", "waffle", "treemap", "pie"), result["waits"])
 
 
 class DependencyInADraftTests(unittest.TestCase):
@@ -368,7 +370,8 @@ const text = await of(summary((p) => { delete p.exhibit; }));
 // A revision recorded before the rule that holds a page to its empty bands hears it as advice.
 const old = summary((p) => { delete p.exhibit; }); Object.assign(old.deck, { workflow: 'existing_deck_revision', rulesVersion: 2 });
 const revision = await draftOf(old, insights);
-console.log(JSON.stringify({ text, table: await of(summary(() => {})), stubbed: await of(summary((p) => { p.exhibit = { basis: p.exhibit.basis }; })),
+const VIEW = { measures: ['i-loans/loans', 'i-earn/pat', 'i-cash/ocf', 'i-liquidity/liquid', 'i-liquidity/short-liabilities', 'A-cushion/result'], as: 'table', labels: { from: 'FY25', to: 'FY26' } };
+console.log(JSON.stringify({ text, table: await of(summary(() => {})), stubbed: await of(summary((p) => { p.exhibit = {}; })), declared: await of(summary((p) => { p.exhibit = { basis: VIEW }; })),
   thin: await of(summary((p) => { p.exhibit.rows = p.exhibit.rows.slice(0, 3); })),
   revision: [revision.blocking.filter((f) => f.code === 'SPINE_UNFILLED').length, revision.advisories.filter((f) => f.code === 'SPINE_UNFILLED').map((f) => f.waived?.introducedIn)] }));
 ''')
@@ -379,7 +382,11 @@ console.log(JSON.stringify({ text, table: await of(summary(() => {})), stubbed: 
         for said in ("cannot fill its page on text alone", "204 body words", "Its answer table is part of the spine", '"type": "table"', "reopens it"):
             self.assertIn(said, repair)
         self.assertEqual(result["table"], [])       # the summary with its table declared fills the page
-        self.assertEqual(result["stubbed"], [])     # declared and not drawn yet: not proven either way
+        # A place kept for the exhibit that says nothing of what it will show leaves the claim's measures read as plotted whole, which
+        # no summary draws: the draft used to pass that and the layout then changed what the critic had read. It is refused now.
+        self.assertEqual([code for code, _, _ in result["stubbed"]], ["SPINE_UNDETERMINED"])
+        self.assertIn("so the critic is told the page shows each plotted", result["stubbed"][0][2])
+        self.assertEqual(result["declared"], [])    # a stub that declares the view the table will show: drawn in the witness, nothing refused
         thin = {code: repair for code, _, repair in result["thin"]}
         self.assertIn("Give the exhibit the rows the answer needs", thin["SPINE_UNFILLED"])
         self.assertEqual(result["revision"][0], 0)
@@ -422,7 +429,9 @@ class DraftCliTests(unittest.TestCase):
         self.assertTrue(all(line.startswith(("settled by the copy: ", "settled by the layout: ", "settled by the fit: ")) for line in deferred), deferred)
         self.assertTrue(all(line.endswith("(enforced by the full compile)") for line in deferred))
         copy = next(line for line in deferred if line.startswith("settled by the copy"))
-        self.assertRegex(copy, r"PAGE_DOES_NOT_COMPOSE x\d+ \(f1, ")
+        # The pages a draft stood in for: their copy and unbound content are the full compile's, and no page is said not to compose for want of copy.
+        self.assertRegex(copy, r"pages whose copy or unbound content is not written yet x\d+ \(f0, f1, ")
+        self.assertNotIn("PAGE_DOES_NOT_COMPOSE", " ".join(deferred))
         # Nothing the draft defers is a fact the critique binds, and no other advisory is marked as enforced later.
         for code in ("RELATION_UNDECLARED", "PROOF_OFF_CLAIM", "CONTEXT_UNEXPLAINED", "CLAIM_MEASURES_MISSING", "BASIS_", "SPINE_", "VARIETY_TYPE"):
             self.assertFalse(any(code in line for line in deferred), code)

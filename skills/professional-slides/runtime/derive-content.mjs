@@ -175,7 +175,7 @@ export function deriveContent(spec, deck) {
       // page whose copy waits for the full compile is marked, so the answer
       // gate (content_gates.mjs) knows which page to read and how far.
       id: page.id, n: index + 1, ...(page.kind ? { kind: page.kind } : {}), ...(t ? (t.type === "summary" && t.form === "executive-summary" ? { role: "executive-summary" } : {}) : { role: "structural" }),
-      ...(t?.deferred ? { deferred: true } : {}),
+      ...(t?.pending?.includes("copy") ? { deferred: true } : {}),
       claim: content.claim || String(page.title ?? page.text ?? ""),
       settles: content.settles ?? { kind: "qualitative", what: page.kind ? "Structure of the deck" : String(page.title ?? "") },
       adds: content.adds ?? null,

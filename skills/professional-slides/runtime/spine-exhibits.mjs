@@ -22,20 +22,19 @@
 //     whole - is composed as a chart of the periods or members the critic
 //     will be told it shows (storyline.mjs spineReadings), where that reading
 //     is "plotted".
-//   - A page whose exhibits are all drawn and whose type refuses them is
-//     compiled under every other form and placement of its type: where one
-//     holds them the matter is the layout's, and where none does only another
-//     type or another view mends it.
 //   - An executive summary is composed with placeholder points up to its word
 //     ceiling beside the exhibit it declares: one that still leaves a band
 //     empty needs an exhibit the spine has not declared.
 //
-// Whether an exhibit fits the frame its page gives it, and every word on it,
-// stays the layout's and is composed by the full compile.
+// These are proofs of particular facts, each with the repair that names the
+// bound choice to make. The general proof is the spine's witness
+// (spine-witness.mjs): every page completed and put through the one compile
+// under each form and placement of its type, so a page no layout holds is
+// refused by the compile itself.
 import { composeAll } from "./compose-all.mjs";
 import { registered } from "./errors.mjs";
 import { bindDeck } from "./bind.mjs";
-import { PAGE_TYPES, markedChart, placementsOf, undrawnExhibit, withChoice } from "./page-types.mjs";
+import { PAGE_TYPES, markedChart, undrawnExhibit } from "./page-types.mjs";
 import { plottedValues } from "./evidence.mjs";
 import { measureRegistry, valuesOf, axisOf } from "./measures.mjs";
 import { refsOf } from "./gates/dependency_gates.mjs";
@@ -49,7 +48,6 @@ export const SPINE_EXHIBIT_CODES = Object.freeze({
 // What a chart carries that the critique is not bound to: its marks and its words. Taken off for the probe, which draws the data alone.
 const MARKS = ["annotations", "highlights", "caption", "changeAnnotations", "events", "note", "basis"];
 const HEADING = "What the exhibit measures";
-const NOTE = "A placeholder note standing where the page's own callout will be written at layout.";
 const TITLE = "A neutral title for the page the probe composes";
 // Ordinary prose, for the words a summary holds when its points are not written yet.
 const PROSE = "the operator added capacity on the busiest routes before demand returned in full and the margin held through the year because costs fell faster than fares did".split(" ");
@@ -95,36 +93,7 @@ function composeProbes(spec, probes, baseDir) {
   return new Map([...refused].filter(([key]) => probes.some((probe) => probe.key === key)));
 }
 
-// The copy a placement holds when it is written at a developed length: three points of the reference pages' median block.
-const POINT_WORDS = 56, POINTS = 3;
 const ADDS = "Each point carries the condition its finding depends on, which the exhibit does not show";
-
-/**
- * A page with placeholder copy standing wherever its commentary placement
- * asks for copy the page has not written: developed points beside or under an
- * exhibit, a rail, a bar, a caption under each panel, callouts on a chart,
- * `adds`, and a heading on each chart. What the page wrote is kept. It is the
- * page as the layout will fill it, near enough to compose: what a plan
- * estimates a placement's text blocks from before any copy exists. Given the
- * page as bound (bind.mjs), so a chart's periods or members are there to mark.
- */
-export function withPlaceholderCopy(pageIn) {
-  const page = structuredClone(pageIn);
-  const exhibits = exhibitsOf(page), written = (value) => typeof value === "string" && value.trim().length > 0;
-  for (const ex of exhibits) if ((isChart(ex) || Array.isArray(ex.series) || ex.measure !== undefined) && !written(ex.heading)) ex.heading = HEADING;
-  if (["beside", "beside-left", "below"].includes(page.commentary) && !(Array.isArray(page.points) && page.points.length) && !page.paragraphs)
-    page.points = Array.from({ length: POINTS }, (_, k) => proseOf(POINT_WORDS, k * 7));
-  if (page.commentary === "rail" && !written(page.rail)) page.rail = proseOf(24);
-  if (page.commentary === "so-what-bar" && !written(page.bar)) page.bar = proseOf(16, 5);
-  if (page.commentary === "captions") exhibits.forEach((ex, k) => { if (!written(ex.caption)) ex.caption = proseOf(14, k * 5 + 3); });
-  const first = exhibits[0], labels = first && (Array.isArray(first.categories) ? first.categories : Array.isArray(first.labels) ? first.labels : null);
-  if (page.commentary === "on-exhibit" && first && !(Array.isArray(first.annotations) && first.annotations.length) && labels?.length)
-    first.annotations = [...new Set([labels.at(-1), labels[0]])].map((category, k) => ({ category, text: proseOf(8, k * 9) }));
-  // A type that marks its finding on the plot is given one mark to stand for it.
-  else if (PAGE_TYPES[page.type]?.marked && first && labels?.length && !markedChart(first)) first.annotations = [{ category: labels.at(-1), text: proseOf(8) }];
-  if (["beside", "beside-left", "below", "captions", "on-exhibit"].includes(page.commentary) && !written(page.adds)) page.adds = ADDS;
-  return page;
-}
 
 const BOUND = "The storyline critique is bound to what the page shows of each measure, so decide it now: mended after the critique is ready, it sends the page back for another pass";
 const listed = (labels) => `${labels.slice(0, 12).map((label) => JSON.stringify(String(label))).join(", ")}${labels.length > 12 ? ", ..." : ""}`;
@@ -134,8 +103,8 @@ const listed = (labels) => `${labels.slice(0, 12).map((label) => JSON.stringify(
  * executive summary that cannot fill its page: findings for a draft and a
  * plan. `doc` is the pages document as authored, `spec` its compiled spine
  * (author-deck.mjs compileDeck, draft) - a page that did not compile is read
- * from the document alone - and `compile(page, index, { draft })` compiles
- * one page as the deck's compile does, throwing its refusal. `sceneGates`
+ * from the document alone - and `compile(page)` is the full compile of one
+ * page in the deck's context, throwing its refusal. `sceneGates`
  * runs the page gates on a composed deck (the summary's fill is theirs to
  * measure); without it the summary is not probed.
  */
@@ -153,9 +122,9 @@ export function spineExhibitFindings(doc, { spec, insights = null, baseDir, comp
     if (!page || typeof page !== "object" || !page.type) return;
     const id = String(page.id ?? `page-${index + 1}`);
     if (bound.failed.has(id)) return;
-    const slide = compiled.get(id), deferred = Boolean(slide?.pageType?.deferred);
+    const slide = compiled.get(id);
     // A page that compiled is drawn from its compiled exhibits - typed by its form, a ranking's aligned bars grouped; one that did not, from the page as bound.
-    const own = exhibitsOf(page), shown = slide && !deferred ? exhibitsOf(slide) : own;
+    const own = exhibitsOf(page), shown = slide ? exhibitsOf(slide) : own;
     const target = PAGE_TYPES[page.type]?.forms?.[page.form];
     own.forEach((ex, at) => {
       if (undrawnExhibit(ex) || !plottedValues(ex)) return;
@@ -224,53 +193,8 @@ export function spineExhibitFindings(doc, { spec, insights = null, baseDir, comp
       `Declare the view the page will show: fewer ${probe.kind} (\`select\` on the bound exhibit, or \`labels\` / \`members\` in its \`basis\`), or a table (\`"as": "table"\`)`);
   }
 
-  // --- a page whose exhibits are all drawn and whose type refuses them: every other form of the type ------------
-  authored.forEach((page, index) => {
-    if (!page || typeof page !== "object" || !page.type || !PAGE_TYPES[page.type]) return;
-    const id = String(page.id ?? `page-${index + 1}`), slide = compiled.get(id);
-    if (slide?.pageType?.deferredStage !== "evidence" || findings.some((f) => f.id === id)) return;
-    const own = [...exhibitsOf(page), ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.exhibit).filter((ex) => ex && typeof ex === "object") : [])];
-    // Only where the spine has drawn every exhibit of the page: one still to be written is the layout's to add.
-    if (!own.length || own.some((ex) => undrawnExhibit(ex) || !plottedValues(ex))) return;
-    // The page as authored, its words taken off, under each form and placement of its type: bound again for that form - a
-    // measure written out as slices for a donut and as a series for a waffle - with its one measure named either way, and under
-    // each way a mark can stand on its exhibits (as written, none, a callout on the last period or member, a highlight on it).
-    // What every one of them refuses is refused of what the page shows, not of how it is drawn.
-    const source = [...doc.pages, ...(doc.appendix || [])][index];
-    const lastOf = (ex) => { const labels = Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : Array.isArray(ex.items) ? ex.items.map((item) => item?.label ?? item?.name) : [];
-      return labels.filter((label) => label !== undefined && label !== null).at(-1); };
-    const reshaped = (ex, shape) => { if (shape === "written" || !ex || typeof ex !== "object") return ex;
-      if (shape === "series" && ex.measure !== undefined && ex.series === undefined) { const { measure, ...rest } = ex; return { ...rest, series: [{ measure, name: String(measure).split("/").pop() }] }; }
-      if (shape === "one" && Array.isArray(ex.series) && ex.series.length === 1 && ex.series[0]?.measure !== undefined && ex.measure === undefined) { const { series, ...rest } = ex; return { ...rest, measure: series[0].measure }; }
-      return null; };
-    const witness = (shape, mark, form, commentary) => {
-      const cut = structuredClone(source);
-      for (const key of ["points", "paragraphs", "rail", "bar", "takeaway", "highlight", "subtitle", "note", "pointsHeading"]) delete cut[key];
-      for (const key of ["exhibit"]) if (cut[key]) { const next = reshaped(cut[key], shape); if (next === null) return null; cut[key] = next; }
-      if (Array.isArray(cut.exhibits)) { const next = cut.exhibits.map((ex) => reshaped(ex, shape)); if (shape !== "written" && next.every((ex) => ex === null)) return null; cut.exhibits = next.map((ex, at) => ex ?? cut.exhibits[at]); }
-      if (mark !== "written") for (const ex of exhibitsOf(cut)) for (const key of MARKS.filter((key) => key !== "basis")) delete ex[key];
-      const rebound = bindDeck({ ...doc, pages: [withChoice(cut, form, commentary)], appendix: [] }, insights);
-      if (rebound.findings.length) return null;
-      const out = rebound.doc.pages[0];
-      for (const ex of exhibitsOf(out)) { const last = lastOf(ex);
-        if (last !== undefined && !markedChart(ex)) { if (mark === "callout") ex.annotations = [{ category: last, text: NOTE }]; if (mark === "highlight") ex.highlights = [{ category: last }]; } }
-      return out; };
-    const holds = [];
-    for (const shape of ["written", "series", "one"]) for (const mark of ["written", "none", "callout", "highlight"]) for (const form of Object.keys(PAGE_TYPES[page.type].forms)) for (const commentary of placementsOf(page.type, form)) {
-      if (holds.length) break;
-      const candidate = witness(shape, mark, form, commentary);
-      if (!candidate) continue;
-      try { compile(candidate, index, { draft: true }); holds.push(`${form}/${commentary}`); } catch { /* refused under this form, shape and mark too */ }
-    }
-    if (holds.length) return;
-    const forms = Object.keys(PAGE_TYPES[page.type].forms);
-    add("SPINE_UNDRAWABLE", id, { type: page.type, forms: forms.length },
-      `${String(slide.pageType.deferred).replace(`${id}: `, "").replace(/[.\s]*$/, "")}. No form of a ${page.type} page holds the exhibit${own.length === 1 ? "" : "s"} the spine draws here (${forms.length === 1 ? `its one form, ${forms[0]}, refuses` : `all ${forms.length} forms refuse`} ${own.length === 1 ? "it" : "them"}, whatever the marks and the commentary). ` +
-      `The storyline critique is bound to the page's type and to what it shows of each measure, so mend it now: the page type this evidence carries (\`--types\`), or a view of the measure this type holds (\`select\` on the bound exhibit, or other measures)`);
-  });
-
   // --- an executive summary, with placeholder points up to its word ceiling ---------------------------------------
-  if (sceneGates) authored.forEach((page, index) => {
+  if (sceneGates) [...(doc.pages || []), ...(doc.appendix || [])].forEach((page, index) => {
     if (!page || typeof page !== "object" || page.type !== "summary" || page.form !== "executive-summary") return;
     const id = String(page.id ?? `page-${index + 1}`);
     if (bound.failed.has(id) || findings.some((f) => f.id === id)) return;
@@ -282,7 +206,7 @@ export function spineExhibitFindings(doc, { spec, insights = null, baseDir, comp
       return { ...out, points: Array.from({ length: SUMMARY_POINTS }, (_, k) => proseOf(each, k * 7)), adds: typeof out.adds === "string" && out.adds.trim() ? out.adds : ADDS }; };
     const measure = (total) => {
       let slide;
-      try { slide = compile(withPoints(total), index, { draft: false }); } catch { return null; }
+      try { slide = compile(withPoints(total)); } catch { return null; }
       let composed = null;
       try { composed = composeAll({ ...spec, slides: [slide], appendix: undefined }, baseDir, { partial: true }); } catch { return null; }
       if ((composed.pageErrors ?? []).length || !composed.deck) return null;
@@ -305,7 +229,7 @@ export function spineExhibitFindings(doc, { spec, insights = null, baseDir, comp
     const size = band && typeof band === "object" && Number.isFinite(band.to - band.from) ? `a band of ${Math.round(band.to - band.from)}px` : "a band of its body";
     add("SPINE_UNFILLED", id, { ceiling: Math.floor(ceiling), words: full.budget?.body ?? null, exhibits: own.length },
       own.length ? `an executive summary of this deck holds ${Math.floor(ceiling)} body words, its exhibit's among them, and at that length ${size} still stands empty with the exhibit as the spine draws it. Give the exhibit the rows the answer needs - one a question or a lever, with its call - now: an exhibit that gains numbers after the critique is ready changes what the page shows, and reopens it`
-        : `an executive summary cannot fill its page on text alone: it holds ${Math.floor(ceiling)} body words, and at that length ${size} still stands empty. Its answer table is part of the spine - declare it now: \`"exhibit": { "type": "table", "columns": ["Question", "Call", "How sure", "What would reverse it"], "rows": [[...], ...] }\`, its cells the calls in words, or its numbers written by reference (\`{{<insight id>/<measure> | 0.0}}\`, with the measures in \`settles.measures\`). ` +
+        : `an executive summary cannot fill its page on text alone: it holds ${Math.floor(ceiling)} body words, and at that length ${size} still stands empty. Its answer table is part of the spine - declare it now: \`"exhibit": { "type": "table", "columns": ["Question", "Call", "How sure", "What would reverse it"], "rows": [[...], ...] }\`, its cells the calls in words, or its numbers written by reference (\`{{<insight id>/<measure> | 0.0}}\`, with the measures in \`settles.measures\`). The ${Math.floor(ceiling)} words count the table's cells with the points, so keep a cell to a call of a few words. ` +
           "Added after the critique is ready, an exhibit that states numbers changes what the page shows and reopens it (`--example summary/executive-summary` prints one)",
       { rule: "SCENE_VOID" });
   });

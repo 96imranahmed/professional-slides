@@ -12,7 +12,7 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, 
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
-  growthColumn } from "./chart-decorations.mjs";
+  growthColumn, seriesState, stateLabel } from "./chart-decorations.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
 // before it labels every nth row instead.
@@ -507,8 +507,11 @@ function categoricalColors(chart) {
     ? forecastLegend.map((label, index) => index === forecastLegend.length - 1
       ? { label, key: "forecast", colorIndex: SERIES.findIndex(color => color.tokenId === "color.chartSeries6"), color: token("color.chartSeries6") }
       : { label, key: "actual", colorIndex: colorIndexFor(0, 0), color: SERIES[colorIndexFor(0, 0)] })
-    : series.map((item, seriesIndex) => ({ label: item.name, colorIndex: colorIndexFor(seriesIndex, 0), color: colorFor(seriesIndex, 0) }));
-  return { colorIndexFor, forecastIndex, colorFor, legendItems };
+    : series.map((item, seriesIndex) => ({ label: stateLabel(item, categories), colorIndex: colorIndexFor(seriesIndex, 0), color: colorFor(seriesIndex, 0) }));
+  // A mark that is an assumption or a reference, not a record (chart-decorations.mjs SERIES_STATES): a whole series, or an assumed run from its `assumedFrom` on. It keeps its series colour at a lighter fill.
+  const states = series.map((item) => seriesState(item, categories));
+  const lighter = (seriesIndex, categoryIndex) => states[seriesIndex].state === "reference" || (states[seriesIndex].state === "assumed" && categoryIndex >= states[seriesIndex].from);
+  return { colorIndexFor, forecastIndex, colorFor, legendItems, lighter };
 }
 
 /** The legend, the axes and the zero baseline, and the scales and maps the marks are placed by. */
@@ -623,10 +626,13 @@ function drawCategory(chart, category, categoryIndex) {
   drawCategoryIcon(chart, category, categoryStart);
 }
 
+// The fill of a mark that is an assumption or a reference: its series colour, light enough to read as not a record and dark enough to carry an ink label.
+const LIGHTER_FILL = 0.4;
+
 /** A category's bars or segments and their value labels; returns the stack's running ends. */
 function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
   const { id, props, horizontal, stacked, series, stackLabels, barHighlighted, barHighlight, showDataLabels, barLabelGap, barLabelWidth,
-    segmentGrowth, plot, colorIndexFor, colorFor, nodes, pointMap, yScale, xScale, rowSize, rowLine, rowShown, segmentMids, barSpan } = chart;
+    segmentGrowth, plot, colorIndexFor, colorFor, lighter, nodes, pointMap, yScale, xScale, rowSize, rowLine, rowShown, segmentMids, barSpan } = chart;
   let positiveCumulative = 0;
   let negativeCumulative = 0;
   series.forEach((item, seriesIndex) => {
@@ -658,8 +664,8 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
       id: stableId(id, "series", item.name, category),
       role: "chart-mark",
       frame: bar,
-      style: fillStyle(markColor),
-      data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}) }
+      style: lighter(seriesIndex, categoryIndex) ? fillStyle(markColor, markColor, token("line.hairline"), LIGHTER_FILL) : fillStyle(markColor),
+      data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}), ...(lighter(seriesIndex, categoryIndex) ? { state: seriesState(item, chart.categories).state } : {}) }
     }));
     // A zero segment has no area in a stack. Printing its label inside a
     // one-pixel placeholder both invents a visible segment and fails fit.
@@ -685,7 +691,7 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
         role: "data-label",
         frame: labelFrame,
         text: labelText,
-        style: textStyle(horizontal && !stacked ? rowSize : CHART_LABEL, labelOnFill ? onFill(markColor) : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
+        style: textStyle(horizontal && !stacked ? rowSize : CHART_LABEL, labelOnFill && !lighter(seriesIndex, categoryIndex) ? onFill(markColor) : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
         data: { category, series: item.name }
       }));
     }
@@ -957,7 +963,7 @@ function keepValueLabelsOffReferenceLines(chart) {
       const top=Math.max(mark.frame.y+6,Math.max(...crossing)+4);
       if(top+ink.height+4<=mark.frame.y+mark.frame.height&&clear(top)&&ink.width<=mark.frame.width-4){
         const fill=colorFor(seriesIndex,categoryIndex);
-        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:{x:mark.frame.x,y:top-pad,width:mark.frame.width,height:label.frame.height},text:label.text,style:textStyle(CHART_LABEL,onFill(fill),labelBold(),"center"),data:{...label.data,placement:"inside",referenceInside:true}}));
+        Object.assign(label,textPrimitive({id:label.id,role:label.role,frame:{x:mark.frame.x,y:top-pad,width:mark.frame.width,height:label.frame.height},text:label.text,style:textStyle(CHART_LABEL,chart.lighter(seriesIndex,categoryIndex)?INK:onFill(fill),labelBold(),"center"),data:{...label.data,placement:"inside",referenceInside:true}}));
         continue;
       }
     }

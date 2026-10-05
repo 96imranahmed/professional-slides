@@ -320,21 +320,33 @@ function checkDeckSpread(findings, pages, standings = []) {
 //     quantifier that is not its first word and that no preposition or
 //     conjunction governs: the object or complement of a verb ("remains THE
 //     strongest", "keeps ITS lead", "leads EVERY rival");
-//   - the next clause taking its subject up with a pronoun ("...: it leads
-//     every rival"), which a label is never followed by.
+//   - the next clause taking its subject up with a subject pronoun ("...: it
+//     leads every rival"). A possessive does not: "Northfield retail banking
+//     division: its lead is narrow" opens a new subject, of the thing a label
+//     has just named.
 // A clause that shows none of them - a bare verb over a bare noun, "Alder
 // beats Birch: ..." - is read on with the next clause, the stricter reading.
+//
+// What governs a noun phrase is read off the phrase too, and prepositions are a
+// closed class: the list holds all of the common ones, since one left off it
+// ("Verdict AFTER all three tests", "Position VERSUS the peers") made a label
+// read as a clause. And a determiner over a calendar unit is when, not what: in
+// "Answer this quarter for lending", "this quarter" is an adverbial, as
+// "last year" or "every month" is, and no verb's object.
 const CLAUSE_END = /[.!?;:](?=\s|$)|\s[—–-]\s|,?\s+(?:because|unless|although|though|whereas|provided|given that|so that|as long as|only if|if)\b/i;
 const PREDICATE_WORD = /\b(?:is|are|was|were|be|been|has|have|had|will|would|can|cannot|could|should|must|may|might|shall|does|did|do|not|never|than)(?:n't)?\b/i;
 const DETERMINERS = new Set(["the", "a", "an", "its", "their", "his", "her", "our", "your", "my", "this", "that", "these", "those", "every", "each", "all", "both", "no", "any", "some", "most", "more", "fewer", "less", "neither", "either", "another"]);
-const GOVERNORS = new Set(["of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "onto", "over", "under", "across", "between", "among", "through", "during", "against", "within",
-  "without", "about", "above", "below", "behind", "beyond", "per", "via", "as", "and", "or", "nor", "but", "than"]);
-const TAKES_UP = /^\s*(?:it|they|this|these|those|both|each|its|their)\b/i;
+const GOVERNORS = new Set(["of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "onto", "over", "under", "across", "between", "among", "amongst", "amid", "through", "throughout", "during", "against", "within",
+  "without", "about", "above", "below", "behind", "beneath", "beside", "besides", "beyond", "per", "via", "as", "and", "or", "nor", "but", "than",
+  "after", "before", "since", "until", "till", "versus", "vs", "despite", "toward", "towards", "upon", "around", "along", "alongside", "near", "off", "outside", "inside", "past", "up", "down",
+  "underneath", "except", "excluding", "including", "regarding", "concerning", "following", "given", "like", "unlike", "plus", "minus"]);
+const CALENDAR_UNITS = new Set(["year", "years", "quarter", "quarters", "month", "months", "week", "weeks", "day", "days", "decade", "decades", "season", "seasons", "half", "term", "period", "cycle", "time"]);
+const TAKES_UP = /^\s*(?:it|they|this|these|those|both|each)\b/i;
 /** Does `text` say something of its subject - is it a clause, not just a noun phrase naming one (see above). `next` is the text after the colon that ends it. */
 function predicates(text, next = "") {
   if (PREDICATE_WORD.test(text) || TAKES_UP.test(next)) return true;
   const words = String(text).toLowerCase().match(/[a-z][a-z']*/g) ?? [];
-  return words.some((word, at) => at > 0 && DETERMINERS.has(word) && !GOVERNORS.has(words[at - 1]) && !DETERMINERS.has(words[at - 1]));
+  return words.some((word, at) => at > 0 && DETERMINERS.has(word) && !GOVERNORS.has(words[at - 1]) && !DETERMINERS.has(words[at - 1]) && !CALENDAR_UNITS.has(words[at + 1]));
 }
 export function answerLead(answer) {
   const whole = String(answer ?? "").trim();
@@ -485,7 +497,9 @@ function report(content, findings, pages, deck = content) {
     if (n) counts[code] = n;
   }
   // A deck revised under older rules hears the rules introduced since as advisories.
-  const reported = applyRulesVersion(findings.map((f) => ({ ...f, severity: f.severity ?? (f.code === "CONTENT_NO_HIGHLIGHT" ? "advisory" : "blocking") })), deck ?? {});
+  // A finding on a page is judged with the page it names: what a revision's page kept of its slide is read by its id (weight.mjs notHeldOn).
+  const idOf = new Map(pages.filter((p) => p.n !== undefined && p.id !== undefined).map((p) => [p.n, p.id]));
+  const reported = applyRulesVersion(findings.map((f) => ({ ...f, severity: f.severity ?? (f.code === "CONTENT_NO_HIGHLIGHT" ? "advisory" : "blocking") })), deck ?? {}, (f) => (f.id ?? idOf.get(f.page)));
   return {
     schema: "professional-slides.content-gates/v1",
     id: content?.id ?? null,

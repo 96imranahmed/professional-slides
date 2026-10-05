@@ -181,7 +181,9 @@ console.log(JSON.stringify({ out, floor: EVIDENCE_FLOOR, copy: COPY_LIMITS, call
                 held = form["held"]
                 if held:
                     expected = {held["key"]: {"min": held["min"], **({"max": held["max"]} if held.get("max") else {})},
-                                **({"valueCharacters": {"max": held["valueChars"]}} if held.get("valueChars") else {})}
+                                **({"valueCharacters": {"max": held["valueChars"]}} if held.get("valueChars") else {}),
+                                # A grid's tiles across are a limit the compile holds too, printed with the rest.
+                                **({"columns": {"min": 1, "max": held["columns"], "note": "tiles across; optional - left out, the grid sets them"}} if held.get("columns") else {})}
                     self.assertEqual(form["exhibit"], expected)
                 else:
                     self.assertIsNone(form["exhibit"])

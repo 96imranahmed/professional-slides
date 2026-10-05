@@ -8,7 +8,7 @@ import { timePositions, spacedLabelIndices, monthlyLabelStep } from "./time-axis
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
-import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumn } from "./chart-decorations.mjs";
+import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumn, seriesState, stateLabel, statesSeries } from "./chart-decorations.mjs";
 
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
 
@@ -241,7 +241,9 @@ function linePlot(chart) {
 function lineAxes(chart) {
   const { id, frame, props, categories, series, showLegend, spacing, showValueAxis, bounds, labelWidth, plot, labelSlot, labelHeight, xScale } = chart;
   const nodes = [
-    ...(showLegend ? topLegend({ id, frame, items: series.map((item, index) => ({ label: item.name, colorIndex: props.colorIndices?.[index] ?? index })) }) : []),
+    // Where a series says it is assumed or a reference, the key is a line - solid for a record, dashed for the rest - and says which.
+    ...(showLegend ? topLegend({ id, frame, variant: statesSeries(props) ? "line" : "swatch", items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: props.colorIndices?.[index] ?? index,
+      ...(seriesState(item, categories).state !== "recorded" ? { state: "forecast" } : {}) })) }) : []),
     ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })
   ];
   const pointMap = new Map();
@@ -274,7 +276,8 @@ function drawLines(chart) {
   const weight = markWeight();
   // A line alone on its plot takes a light fill beneath it (markWeight); two
   // or more lines keep bare strokes, where fills would stack into mud.
-  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1;
+  // The fill is the weight of a record: a line that is an assumption, in whole or from part-way, stays a bare stroke.
+  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded";
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
     if (area || lone) {
@@ -294,6 +297,11 @@ function drawLines(chart) {
         data: { paths: [polygonPoints], series: item.name, baselineValue, ...(lone ? { lone: true } : {}) }
       }));
     }
+    // What the series is decides its stroke (chart-decorations.mjs SERIES_STATES): a record is solid with filled markers; an
+    // assumed run - the whole series, or from `assumedFrom` on - dashed and lighter, its markers open; a reference kept
+    // among the series a thin dashed rule with no markers at all.
+    const { state, from: assumedAt } = seriesState(item, categories);
+    const reference = state === "reference", assumed = (index) => state === "assumed" && index >= assumedAt;
     points.slice(1).forEach((point, index) => nodes.push(linePrimitive({
       id: stableId(id, "segment", item.name, index),
       role: "chart-line",
@@ -301,23 +309,25 @@ function drawLines(chart) {
       y1: points[index].y,
       x2: point.x,
       y2: point.y,
-      style: lineStyle(lineColor(seriesIndex), weight.line)
+      style: reference || assumed(index + 1) ? lineStyle(lineColor(seriesIndex), token("line.standard"), "dash") : lineStyle(lineColor(seriesIndex), weight.line),
+      ...(reference || assumed(index + 1) ? { data: { series: item.name, state } } : {})
     })));
     const labelSides = lineLabelSides(points.map(point => point.value));
     const radius = weight.marker / 2;
-    points.forEach((point) => {
-      nodes.push(ellipsePrimitive({
+    points.forEach((point, pointIndex) => {
+      if (!reference) nodes.push(ellipsePrimitive({
         id: stableId(id, "point", item.name, point.category),
         role: "chart-marker",
         frame: { x: point.x - radius, y: point.y - radius, width: weight.marker, height: weight.marker },
-        style: fillStyle(lineColor(seriesIndex))
+        style: assumed(pointIndex) ? fillStyle(token("color.canvas"), lineColor(seriesIndex), token("line.standard")) : fillStyle(lineColor(seriesIndex)),
+        ...(assumed(pointIndex) ? { data: { series: item.name, state } } : {})
       }));
       const mappedPoint = { ...point, changeX: point.x, changeY: point.y - (showDataLabels ? 30 : 16) };
       pointMap.set(`${item.name}:${point.category}`, mappedPoint);
       if (series.length === 1) pointMap.set(`value:${point.category}`, mappedPoint);
       const categoryPoint = pointMap.get(`category:${point.category}`);
       if (!categoryPoint || mappedPoint.y < categoryPoint.y) pointMap.set(`category:${point.category}`, mappedPoint);
-      if (showDataLabels && labelAt(points.indexOf(point)) && !(endLabels && point.category === categories.at(-1))) {
+      if (showDataLabels && !reference && labelAt(points.indexOf(point)) && !(endLabels && point.category === categories.at(-1))) {
         const first = point.category === categories[0];
         const last = point.category === categories.at(-1);
         nodes.push(textPrimitive({
@@ -336,7 +346,7 @@ function drawLines(chart) {
     if (endLabels) {
       const point = points.at(-1);
       // The label starts clear of the 10px marker, not on it.
-      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${item.name} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: lineColor(seriesIndex) });
+      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${stateLabel(item, categories)} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: lineColor(seriesIndex) });
     }
   });
   return { pendingEndLabels };
@@ -440,7 +450,7 @@ export function comboChart({ id, frame, props }) {
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;
   const nodes = [
-    ...topLegend({ id, frame, items: series.map((item) => item.name) }),
+    ...topLegend({ id, frame, items: series.map((item) => stateLabel(item, categories)) }),
     ...axes(id, barPlot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
   ];
   const pointMap = new Map();
@@ -504,7 +514,7 @@ export function comboChart({ id, frame, props }) {
     y1: linePoints[index].y,
     x2: point.x,
     y2: point.y,
-    style: lineStyle(SERIES[1], token("line.standard"))
+    style: lineStyle(SERIES[1], token("line.standard"), seriesState(lineSeries, categories).state === "recorded" || index + 1 < seriesState(lineSeries, categories).from ? "solid" : "dash")
   })));
   linePoints.forEach((point) => nodes.push(ellipsePrimitive({
     id: stableId(id, "point", lineSeries.name, point.category),

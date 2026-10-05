@@ -212,7 +212,7 @@ console.log(JSON.stringify({
   barElsewhere: error(() => compilePage(ranked({ commentary: 'on-exhibit', exhibit: { ...ranked().exhibit, annotations: [{ category: 'E', text: 'Northvale discounts least of the seven operators in the set' }] } }))),
   longBar: error(() => compilePage(ranked({ bar: long }))),
   barPoints: error(() => compilePage(ranked({ points: ['a', 'b'] }))),
-  draftBar: error(() => compilePage(ranked({ bar: undefined }), 0, { draft: true })),
+  draftBar: compileDeck({ deck: { id: 'd' }, pages: [ranked({ bar: undefined })] }, { draft: true, partial: true }).compileErrors[0] ?? null,
 }));
 ''')
         self.assertIn('"in-exhibit", "so-what-bar"', result['rowsBelow'])
@@ -468,6 +468,7 @@ console.log(JSON.stringify({{ long: error(() => compilePage(trend)), strip: erro
     def test_evidence_shapes_draft_and_every_error_at_once(self):
         result = run_node(f'''
 import {{ compilePage }} from '{KIT}';
+import {{ compileDeck }} from '{AUTHOR}';
 import {{ composeAll }} from './skills/professional-slides/runtime/compose-all.mjs';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const insights = new Map([['i1', {{ id: 'i1', shape: 'fact', finding: 'Two airlines carried 53m and 42m.' }}], ['i2', {{ id: 'i2', shape: 'peer-set', finding: 'Ten airlines ranked by orders.' }}]]);
@@ -482,7 +483,7 @@ try {{ composeAll({{ schema: 'professional-slides.deck/v3', id: 'x', slides: [
   {{ id: 'b', title: 'Another page that is fine now', points: ['ok'] }},
   {{ id: 'c', title: 'A second bad chart page', exhibit: {{ type: 'chart.nope' }} }}] }}, '.'); }} catch (e) {{ all = e.pageErrors; }}
 console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']), 0, {{ insights }})), missing: error(() => compilePage(ranking([]), 0, {{ insights }})),
-  settles: derived.pageType.content.settles, draft: error(() => compilePage(onExhibit, 0, {{ draft: true }})), full: error(() => compilePage(onExhibit)), all }}));
+  settles: derived.pageType.content.settles, draft: compileDeck({{ deck: {{ id: 'd' }}, pages: [onExhibit] }}, {{ draft: true, partial: true }}).compileErrors[0] ?? null, full: error(() => compilePage(onExhibit)), all }}));
 ''')
         self.assertIn('peer-set', result['twoNumbers'])  # a ranking needs the whole set; two numbers are a research task
         self.assertIn('evidence', result['missing'])
@@ -578,8 +579,8 @@ class RerunGapsTests(unittest.TestCase):
 import {{ compilePage, describeTypes, railCapacity }} from '{KIT}';
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const base = {{ takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'The page type fits the claim here', settles: {{ kind: 'count', what: 'The route page count' }} }};
-const waffle = (series) => compilePage({{ ...base, id: 'w', type: 'composition', form: 'waffle', commentary: 'beside', title: 'Outstations by region',
-  exhibit: {{ categories: ['Asia', 'Europe', 'Middle East', 'Africa'], series }} }}, 0, {{ draft: true }});
+const waffle = (series) => compilePage({{ ...base, id: 'w', type: 'composition', form: 'waffle', commentary: 'beside', title: 'Outstations by region', points: ['Asia holds half of the fourteen outstations.', 'Africa holds one.'],
+  exhibit: {{ categories: ['Asia', 'Europe', 'Middle East', 'Africa'], series }} }});
 const facts = (value) => compilePage({{ ...base, id: 'f', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Cash',
   exhibit: {{ items: [value, '32.0bn', '56.2bn'].map((v) => ({{ value: v, label: 'AED' }})) }} }});
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];

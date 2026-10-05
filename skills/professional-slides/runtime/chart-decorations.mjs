@@ -11,6 +11,7 @@ import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitiv
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, renderAnnotationRail, renderChangeAnnotations, renderEvidenceAnnotations } from "./chart-annotations.mjs";
 import { FONT, INK, SECONDARY, GRID, CHART_LABEL, textStyle, lineStyle, CHART_ANNOTATION, labelBold } from "./chart-axes.mjs";
+import { formatValue } from "./value-format.mjs";
 
 // A target or capacity is part of the quantitative comparison. Include it in
 // automatic domains; numericBounds also rejects it outside an explicit domain.
@@ -297,7 +298,9 @@ function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowO
         }
         return true;
       });
-      const labelFrame = labelCandidates.find((candidate) => fits(candidate) && clearOfSeries(candidate)) ?? labelCandidates.find(fits);
+      // A reference that was written as a series (referenceSeriesAsLines) takes a label only where it is clear of the lines:
+      // with none, the chart is drawn again with it as a dashed series, which needs no label in the plot.
+      const labelFrame = labelCandidates.find((candidate) => fits(candidate) && clearOfSeries(candidate)) ?? (reference.fromSeries ? undefined : labelCandidates.find(fits));
       if (!labelFrame) throw Object.assign(new Error(`No collision-free reference-line label position${reference.placement === "outside-end" ? " outside the plot" : allowOutsideReferenceLabels ? "; set placement: \"outside-end\" or revise the chart composition" : "; revise the chart composition"}`), { referenceIndex: index });
       overlay.push(textPrimitive({
         id: stableId(id, "reference-label", index),
@@ -405,4 +408,86 @@ export function refuseUndrawn(chart, props, id, catalogue) {
     const name = chart.id.replace("chart.", "");
     throw new Error(`${id}: ${/^[aeiou]/.test(name) ? "an" : "a"} ${name} chart does not draw ${CHART_DECORATIONS[key]}, and set here it would be dropped unseen - remove it and say it in the commentary or a caption${drawers.length ? `, or show the evidence as a chart that draws it (${drawers.join(", ")})` : ""}`);
   }
+}
+
+// What a series is, beside its numbers: `state` on a series of any chart that
+// plots series against categories.
+//
+//   recorded   a record, drawn as a series is (the default)
+//   assumed    an assumption, a scenario's path or a forecast: a line is
+//              dashed with open markers, a bar or column a lighter fill, and
+//              the key says "(assumed)". `assumedFrom: "<category>"` says the
+//              same of the run from that category on - a recorded series
+//              carried forward - and the rest is drawn as recorded.
+//   reference  a threshold, a target or a constant the data is read against:
+//              where it is one value across the axis and the chart draws
+//              reference lines, it is drawn as one - a dashed rule across the
+//              plot, named and valued at the line's end, with no markers and
+//              no place in the legend - and otherwise as a thin dashed line
+//              or a lighter bar keyed "(reference)".
+//
+// A bound exhibit is given these by the runtime, which knows which of its
+// measures are assumed and which are a single value (bind.mjs); a typed one
+// says them itself. Drawn as recorded data, an assumed constant and a
+// threshold read as two more measured series.
+export const SERIES_STATES = Object.freeze(["recorded", "assumed", "reference"]);
+const constant = (values) => Array.isArray(values) && values.length > 0 && values.every((value) => Number.isFinite(value) && value === values[0]);
+// A name that already says what the series is needs no "(assumed)" or "(reference)" after it.
+const SAYS = Object.freeze({ assumed: /assum|forecast|project|scenario|estimate|plan\b|outlook/i, reference: /reference|target|threshold|standard|limit|floor|ceiling|\bcap\b|test|benchmark|covenant|required/i });
+
+/** What a series says of itself, checked: `{ state, from }`, `from` the index of the first assumed category (0 for a series assumed throughout, -1 for none). */
+export function seriesState(item, categories = []) {
+  const state = item?.state ?? (item?.assumedFrom !== undefined ? "assumed" : "recorded");
+  if (!SERIES_STATES.includes(state)) throw new Error(`series "${item?.name ?? ""}": \`state\` is one of ${SERIES_STATES.map((name) => `"${name}"`).join(", ")}`);
+  if (item?.assumedFrom === undefined) return { state, from: state === "assumed" ? 0 : -1 };
+  const from = categories.map(String).indexOf(String(item.assumedFrom));
+  if (state !== "assumed" || from < 0) throw new Error(`series "${item?.name ?? ""}": \`assumedFrom\` names the category its assumed run starts at${state !== "assumed" ? ", on a series whose `state` is \"assumed\" or left out" : ` (${categories.slice(0, 12).join(", ")})`}`);
+  return { state, from };
+}
+
+/** A series' name as its key or end label prints it: with what it is, where the name does not say. A run assumed from part-way is said by its bracket, not its name. */
+export function stateLabel(item, categories = []) {
+  const { state, from } = seriesState(item, categories);
+  return state === "recorded" || (state === "assumed" && from > 0) || SAYS[state].test(item.name) ? item.name : `${item.name} (${state})`;
+}
+
+/** Does any series of `props` say what it is: a chart that draws them all as recorded data needs none of this. */
+export const statesSeries = (props) => Array.isArray(props?.series) && props.series.some((item) => item && typeof item === "object" && (item.state !== undefined || item.assumedFrom !== undefined));
+
+/**
+ * `props` with each constant reference series drawn as a reference line: taken
+ * out of the series and set in `referenceLines`, named and valued. Null where
+ * there is nothing to convert - no such series, a chart that draws no
+ * reference lines, or no other series left to plot - and the series are then
+ * drawn as the chart draws a reference kept among its series.
+ */
+export function referenceSeriesAsLines(props, draws = []) {
+  if (!statesSeries(props) || !draws.includes("referenceLines")) return null;
+  const categories = props.categories || [];
+  const lines = props.series.filter((item) => seriesState(item, categories).state === "reference" && constant(item.values));
+  const kept = props.series.filter((item) => !lines.includes(item));
+  if (!lines.length || !kept.length) return null;
+  const named = (item) => { const value = formatValue(item.values[0], props); return item.name.includes(value) ? item.name : `${item.name} ${value}`; };
+  const { focusSeries, ...rest } = props;
+  return { ...rest, series: kept, referenceLines: [...(props.referenceLines || []), ...lines.map((item) => ({ value: item.values[0], label: named(item), fromSeries: true }))],
+    // What named a series by its place or its name follows the series that are left: a focus needs two of them, and one that is not now a line.
+    ...(Array.isArray(props.colorIndices) ? { colorIndices: props.colorIndices.filter((_, at) => !lines.includes(props.series[at])) } : {}),
+    ...(focusSeries !== undefined && kept.length > 1 && kept.some((item) => item.name === focusSeries) ? { focusSeries } : {}) };
+}
+
+/**
+ * `props` with the turn from record to assumption bracketed above the plot:
+ * where its series are assumed from one category on (`assumedFrom`) and the
+ * chart says nothing of periods itself, the recorded run and the assumed run
+ * are named over the axis, as the binding names them for a measure joined to
+ * a scenario (bind.mjs). Null where there is nothing to bracket - no such
+ * series, two series that turn at different categories, a chart that draws no
+ * period bands, or one that already marks its periods or its forecast.
+ */
+export function assumedRunBracketed(props, draws = []) {
+  if (!statesSeries(props) || !draws.includes("periods") || props.periods !== undefined || props.forecastFrom !== undefined) return null;
+  const categories = (props.categories || []).map(String);
+  const turns = [...new Set(props.series.filter((item) => item?.assumedFrom !== undefined).map((item) => categories.indexOf(String(item.assumedFrom))))];
+  if (turns.length !== 1 || turns[0] <= 0) return null;
+  return { ...props, periods: [{ from: categories[0], to: categories[turns[0] - 1], label: "Recorded" }, { from: categories[turns[0]], to: categories.at(-1), label: "Assumed" }] };
 }

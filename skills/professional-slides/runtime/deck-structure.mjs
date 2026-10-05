@@ -14,7 +14,9 @@ import { axisOf, measureRegistry } from "./measures.mjs";
 import { declaredPlot, refsOf } from "./gates/dependency_gates.mjs";
 import { resolveFill } from "./compose-points.mjs";
 import { DECK_LENGTH, PLAN } from "./weight.mjs";
-import { varietyFindings } from "./gates/variety_gates.mjs";
+import { exhibitKinds, fitStandings, varietyFindings } from "./gates/variety_gates.mjs";
+import { kindOfForm, markRank, pageFit, otherTypes, sharedKinds } from "./claim-fit.mjs";
+import { featuredDraw } from "./design-systems.mjs";
 import { runPlanGates, styleEntropy } from "./gates/plan_gates.mjs";
 import { classOf, standingRoom } from "./gates/gate_classes.mjs";
 
@@ -132,9 +134,15 @@ export function shapeStructure(pages, { airy = false } = {}) {
  * (author-deck.mjs); findings of other classes the two raise come back too,
  * for the caller to file.
  */
-export function declaredStructure(spec, { planOf }) {
+export function declaredStructure(spec, { planOf, insights = undefined, sourceKinds = null }) {
   const standings = [];
   const variety = varietyFindings(spec, { structureOf, drawnOf, standings });
+  // How the deck's exhibits are spread over their kinds, and the pages drawn in a form that carries their claim less directly than
+  // another they could take: said with the standings, and never a refusal (gates/variety_gates.mjs fitStandings). Read where the
+  // caller passes the insight log (null where the deck has none); a search that only weighs the rules leaves it out.
+  const fit = insights === undefined ? { findings: [], standings: [] } : fitStandings(spec, { fits: fitsOf(spec, insights), kept: keptAsSource(spec, sourceKinds), carried: carriedKinds(spec.carried, sourceKinds) });
+  standings.push(...fit.standings);
+  variety.push(...fit.findings);
   const plan = planOf(spec);
   const report = runPlanGates(plan, { deck: spec });
   const content = plan.pages.filter((page) => !page.kind || page.kind === "content");
@@ -177,25 +185,138 @@ function structureCost({ findings, standings }) {
 }
 const cheaper = (a, b) => a.blockers !== b.blockers ? a.blockers < b.blockers : Math.abs(a.lacking - b.lacking) > 1e-9 ? a.lacking < b.lacking
   : Math.abs(a.drift - b.drift) > 1e-9 ? a.drift < b.drift : a.tight !== b.tight ? a.tight < b.tight : a.pressure < b.pressure - 1e-9;
+// The same order with the pressure left out: what the rules themselves say of two allocations.
+const heldCheaper = (a, b) => cheaper({ ...a, pressure: 0 }, { ...b, pressure: 0 });
+/**
+ * Of two choices for one page - each `{ cost, spread, featured, rank, drawn }`
+ * - is the first to be taken, and on what (`by`): by what each leaves of the
+ * structure rules ("rules"); then, the rules left alike, by whether the
+ * deck's draw features it from its design system's repertoire ("featured": a
+ * deck uses what it features wherever the evidence allows); then by the
+ * deck's own hand - where the mark falls in the deck's draw for the page's
+ * reading task ("seed": design-systems.mjs markRank), one order a deck, so
+ * every page that reads one task and can take the deck's mark takes it. A
+ * deck with no draw (`drawn` false) has no hand: its choices are told apart
+ * by the spread of its kinds - how many decided pages already draw what the
+ * choice draws ("spread") - then by the room under the caps ("room"), and
+ * last by the catalogue's order ("order"). The spread comes after the draw
+ * and never before it: it is the same under every seed, so it gave every deck
+ * from one spine the same mixture, and one deck three encodings of one task.
+ */
+function compared(a, b) {
+  if (heldCheaper(a.cost, b.cost)) return { first: true, by: "rules" };
+  if (heldCheaper(b.cost, a.cost)) return { first: false, by: "rules" };
+  if (a.featured !== b.featured) return { first: a.featured, by: "featured" };
+  if (a.drawn && a.turn !== b.turn) return { first: a.turn < b.turn, by: "seed" };
+  if (a.drawn && a.rank !== b.rank) return { first: a.rank < b.rank, by: "seed" };
+  if (a.spread !== b.spread) return { first: a.spread < b.spread, by: "spread" };
+  if (Math.abs(a.cost.pressure - b.cost.pressure) > 1e-9) return { first: a.cost.pressure < b.cost.pressure, by: "room" };
+  return { first: a.rank < b.rank, by: "order" };
+}
+const preferred = (a, b) => compared(a, b).first;
 
 // The exhibit a page draws where its form leaves the kind to the author, told
 // from the shape of the evidence it rests on (evidence.mjs SHAPES).
 const SHAPE_EXHIBIT = { series: "chart.line", "peer-set": "chart.bar", mix: "chart.stacked-bar", "measure-pair": "chart.scatter", bridge: "chart.waterfall",
   geography: "map", schedule: "timeline", roster: "table", fact: "table", qualitative: "table" };
 
-// The exhibit a measure takes by the axis it runs over; one value is a figure, not an exhibit.
+// The exhibit a measure takes by the axis it runs over, where the fit table reads no task from it; one value is a figure, not an exhibit.
 const AXIS_EXHIBIT = { periods: "chart.line", members: "chart.bar" };
 const REGISTRIES = new WeakMap();
 const registryOf = (insights) => { if (!insights || typeof insights !== "object") return new Map(); if (!REGISTRIES.has(insights)) REGISTRIES.set(insights, measureRegistry(insights)); return REGISTRIES.get(insights); };
 
+/** Each analytical page's fit (claim-fit.mjs pageFit), by page id: the compiled slides of a deck, or the pages of a spine. */
+export function fitsOf(spec, insights) {
+  const registry = registryOf(insights);
+  const pages = [...(spec.slides ?? spec.pages ?? []), ...(spec.appendix ?? [])].filter((page) => page && typeof page === "object" && (page.pageType || page.type));
+  return new Map(registry.size ? pages.map((page) => [String(page.id), pageFit(page, { registry, insights })]).filter(([, fit]) => fit) : []);
+}
+
+/**
+ * A deck's draw as the plan reads it (`deck.variation`, `deck.design`): the
+ * seed, and the forms and kinds it features from its design system's
+ * repertoire. A deck with no `variation` has no draw, and a revision features
+ * nothing: its pages are drawn as the source deck draws its like.
+ */
+export function drawOf(deck) {
+  const seed = deck?.variation ?? null;
+  return { seed, ...(seed === null || deck?.workflow === REVISION ? { forms: new Set(), kinds: new Set() } : featuredDraw(seed, deck?.design)) };
+}
+
+/**
+ * Whose turn it is among marks of equal fit: a mark's load, lowest first -
+ * how many exhibits the deck already draws in it (`count`), weighed by its
+ * place in the deck's hand for the task (`place`, 0 for the lead). The lead
+ * mark is taken until it has been drawn twice for each time the second has,
+ * and three times for the third: the hand is an order of preference, and a
+ * deck draws its marks in that proportion. So a deck led by dot plots is
+ * mostly dot plots where a ranking leaves the choice, with bars among them,
+ * and the next deck the other way round - neither a deck in one encoding nor
+ * every deck the same mixture.
+ */
+const turnOf = (count, place) => (count + 1) * (place + 1);
+
+/**
+ * A form as a deck's draw ranks it for a reading task (design-systems.mjs
+ * markRank): by the kind it draws, so a page that draws its ranking as a form
+ * and one that draws it as a panel take the same mark; forms that draw one
+ * kind, and page constructions, are told apart by their own names. What the
+ * plan and a scaffold order forms of equal fit by.
+ */
+export function formDraw(seed, type, form, task) {
+  const kind = kindOfForm(type, form);
+  return (typeof kind === "string" && kind.startsWith("chart.") ? markRank(seed, task, kind) : 0) + markRank(seed, task, `${type}/${form}`) / 1e6;
+}
+
+/**
+ * The kind each exhibit of a page takes where its form leaves the kind open
+ * and the page has not said it - a cut of the claim nobody has written, or an
+ * exhibit the spine declares by a `basis` stub with no `type`: the kinds that
+ * carry each cut of the claim's measures best (claim-fit.mjs), one a cut.
+ * Among kinds of one grade, one every cut of the page can take comes first,
+ * so panels match; then one the deck's draw features (`featured`); on a
+ * revision, the one the source deck draws most (`convention`); then the
+ * deck's own hand for the cut's reading task (`seed`: design-systems.mjs
+ * markRank - one order a deck, so a deck's rankings are all drawn one way);
+ * and for a deck with no draw the one `fewest(kind)` says it draws least,
+ * then the catalogue's order.
+ * `[{ at, kind, also, task, by }]`: `at` the exhibit's place on the page,
+ * `also` the other kinds of the same grade, `by` what told the kind from them
+ * ("only", "matched", "featured", "convention", "seed", "spread" or
+ * "order"). Empty where no task is read from the measures.
+ */
+export function openKinds(page, insights, { seed = null, fewest = () => 0, featured = null, convention = null } = {}) {
+  const fit = pageFit(page, { registry: registryOf(insights), insights });
+  const cuts = (fit?.exhibits ?? []).filter((item) => !item.written);
+  const matched = sharedKinds(cuts);
+  return cuts.map((cut) => {
+    const kinds = cut.kinds.equal.map((item) => item.kind).filter((kind) => kind.startsWith("chart."));
+    const drawn = seed !== null && seed !== undefined;
+    const rank = (kind) => (drawn ? markRank(seed, cut.task, kind) : 0);
+    // The deck's hand is an order, and each mark's turn comes round in proportion to its place in it (turnOf).
+    const place = new Map([...kinds].sort((a, b) => rank(a) - rank(b)).map((kind, at) => [kind, at]));
+    const turn = (kind) => (drawn ? turnOf(fewest(kind), place.get(kind)) : 0);
+    const keys = [["matched", (kind) => (matched.includes(kind) ? 0 : 1)], ["featured", (kind) => (featured?.has(kind) ? 0 : 1)], ...(convention ? [["convention", convention]] : []), ["seed", turn], ["seed", rank], ["spread", fewest]];
+    const ordered = [...kinds].sort((a, b) => keys.map(([, key]) => key(a) - key(b)).find((d) => d !== 0) ?? 0);
+    const by = ordered.length < 2 ? "only" : keys.find(([, key]) => key(ordered[0]) !== key(ordered[1]))?.[0] ?? "order";
+    return { at: cut.at, kind: ordered[0], also: ordered.slice(1), task: cut.task, by };
+  }).filter((item) => item.kind);
+}
+
 /**
  * The exhibit kinds a page's evidence takes where the page has not written
  * its exhibits, one for each exhibit in turn: an estimate, from what the page
- * does declare. First the measures its claim is about (`settles.measures`),
- * each by the axis it runs over; then the insights it rests on, by their
- * shape, those its type can carry first. A table where it declares neither.
+ * does declare. Where a reading task can be told from the measures its claim
+ * is about, the kind that carries each cut of them best (claim-fit.mjs), kinds
+ * of one grade in the order the deck's `variation` draws them. Otherwise
+ * those measures each by the axis it runs over; then the insights it rests
+ * on, by their shape, those its type can carry first. A table where it
+ * declares neither.
  */
-export function evidenceExhibits(page, insights) {
+export function evidenceExhibits(page, insights, { seed = null, kinds: featured = null } = {}) {
+  // Where the measures say what a reader is to do with them, each exhibit is estimated as the kind that carries it (openKinds).
+  const fitted = openKinds(page, insights, { seed, featured }).map((item) => item.kind);
+  if (fitted.length) return fitted;
   const registry = registryOf(insights);
   const claimed = (Array.isArray(page?.settles?.measures) ? page.settles.measures : []).map((ref) => AXIS_EXHIBIT[axisOf(registry.get(ref)).kind]).filter(Boolean);
   const found = (Array.isArray(page?.evidence) ? page.evidence : []).map((id) => insights?.get?.(id)).filter(Boolean);
@@ -205,11 +326,14 @@ export function evidenceExhibits(page, insights) {
   return kinds.length ? kinds : ["table"];
 }
 
-// The exhibit a `basis` stub declares, where the page's form leaves the kind to the author: the class it states in `as`,
-// otherwise the one its first recorded measure takes by its axis; a measure of one value is a figure.
+// The exhibit a `basis` stub declares, where the page's form leaves the kind to the author: the class it states in `as`;
+// otherwise the kind that carries its measures best, in the deck's draw (`fitted`, openKinds) - a stub is given the kind the plan
+// proposes for it, not a line because it runs over periods; and where no task is read from them, the one its first recorded
+// measure takes by its axis. A measure of one value is a figure.
 const CLASS_EXHIBIT = { table: "table", figure: "fact-grid" };
-function stubKind(basis, registry) {
+function stubKind(basis, registry, fitted = null) {
   if (CLASS_EXHIBIT[basis?.as]) return CLASS_EXHIBIT[basis.as];
+  if (fitted) return fitted;
   const axis = refsOf(basis).filter((ref) => registry.has(ref)).map((ref) => axisOf(registry.get(ref)).kind)[0];
   return axis === undefined ? null : AXIS_EXHIBIT[axis] ?? (basis?.as === "chart" ? null : CLASS_EXHIBIT.figure);
 }
@@ -223,14 +347,66 @@ function stubKind(basis, registry) {
  * kind), and `values` how many values the stubs will plot between them, from
  * the measures they name (gates/dependency_gates.mjs declaredPlot) - null
  * where a stub names no recorded measure, so the page's depth is not read yet.
+ * `given` is the kinds the deck's plan gives the page's open exhibits
+ * (openKindsOf, by page): a stub whose kind is open is read as the kind it is
+ * given there, so a draft and a plan read one stub as one kind. Without it
+ * the stub is read as the first of the kinds that carry it best.
  */
-export function stubsOf(page, insights) {
+export function stubsOf(page, insights, given = null) {
   const registry = registryOf(insights);
   const own = exhibitsOf(page && typeof page === "object" ? page : {});
   const plots = own.filter(undrawnExhibit).map((ex) => declaredPlot(ex.basis, registry));
-  return { kinds: own.map((ex) => (undrawnExhibit(ex) ? stubKind(ex.basis, registry) : null)), values: plots.every((n) => n !== null) ? plots.reduce((sum, n) => sum + n, 0) : null };
+  const fitted = new Map((given ?? (own.some((ex) => undrawnExhibit(ex) && ex.type === undefined) ? openKinds(page, insights) : [])).map((item) => [item.at, item.kind]));
+  return { kinds: own.map((ex, at) => (undrawnExhibit(ex) ? stubKind(ex.basis, registry, fitted.get(at) ?? null) : null)), values: plots.every((n) => n !== null) ? plots.reduce((sum, n) => sum + n, 0) : null };
 }
 
+// The workflow of a point change to an imported deck (review-passes.mjs REVISION), named here so the structure search loads no review code.
+const REVISION = "existing_deck_revision";
+const sourceOf = (page) => page?.pageType?.sourceSlide ?? page?.sourceSlide;
+
+/**
+ * How a revision's source deck draws its pages: how many of the imported
+ * pages are drawn in each form (`forms`, by `<type>/<form>`) and in each
+ * exhibit kind (`kinds`) - the kinds each page's source slide drew where the
+ * inventory says (`sourceKinds`, by source slide), else the ones the page
+ * itself writes or its form sets. What a page the revision adds or redraws is
+ * matched to, so the deck stays drawn one way.
+ */
+function sourceConventions(pages, sourceKinds) {
+  const forms = new Map(), kinds = new Map();
+  const count = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
+  for (const page of pages) {
+    if (!page || typeof page !== "object" || page.sourceSlide === undefined) continue;
+    const type = PAGE_TYPES[page.type], formed = type && Object.hasOwn(type.forms, page.form ?? "");
+    if (formed) count(forms, `${page.type}/${page.form}`);
+    const own = exhibitsOf(page).filter((ex) => ex.type).map((ex) => String(ex.type));
+    for (const kind of sourceKinds?.get?.(page.sourceSlide) ?? (own.length ? own : formed ? [String(type.forms[page.form])] : [])) count(kinds, kind);
+  }
+  return { forms, kinds };
+}
+
+/**
+ * The pages of a revision kept as their source slide drew them, by id: an
+ * imported page whose exhibits are of the kinds its slide drew (`sourceKinds`,
+ * by source slide; without an inventory, every imported page). They are the
+ * user's own drawing: the fit is not read against them. Null for new work.
+ */
+export function keptAsSource(spec, sourceKinds = null) {
+  if (spec?.workflow !== REVISION) return null;
+  const kindsOf = (page) => exhibitsOf(page).map((ex) => String(ex.type ?? "")).filter(Boolean).sort().join("|");
+  return new Set([...(spec.slides ?? spec.pages ?? []), ...(spec.appendix ?? [])].filter((page) => page && typeof page === "object" && sourceOf(page) !== undefined)
+    .filter((page) => !sourceKinds?.has?.(sourceOf(page)) || kindsOf(page) === [...sourceKinds.get(sourceOf(page))].sort().join("|")).map((page) => String(page.id)));
+}
+/**
+ * The exhibits the slides a revision carries from its source deck draw, as
+ * `[{ id, kind }]`: `carried` is the carried pages - the compiled deck's
+ * `carried`, or the pages file's pages marked `carry: true` - and
+ * `sourceKinds` what each source slide drew (fit-review.mjs sourceKindsOf).
+ * A carried slide is never compiled, so the deck's share of exhibit kinds
+ * counts it from here (gates/variety_gates.mjs fitStandings); it is the
+ * user's own, and nothing of it is judged.
+ */
+export const carriedKinds = (carried, sourceKinds) => (carried || []).flatMap((page) => (sourceKinds?.get?.(page?.sourceSlide) ?? []).map((kind) => ({ id: String(page.id), kind })));
 // What stands for an exhibit kind nobody has declared, to tell which stand-ins rest on an estimate.
 const UNDECLARED = "(undeclared)";
 /** Does a page's stand-in under `choice` carry an exhibit whose kind neither the page nor its form declares. */
@@ -243,18 +419,54 @@ const SUBJECT_FORMS = new Set(["mechanism", "schedule", "picture", "argument", "
 const openForms = (type) => (SUBJECT_FORMS.has(type) ? Object.keys(PAGE_TYPES[type].forms).slice(0, 1) : plannableForms(type));
 
 /**
- * The choices a plan takes freely for a page: the form it declares, or the
- * forms that read the data its type's first form reads, each with the
- * placement it declares where that form compiles with it, or with every
- * placement the form takes. Empty for a page with no known type.
+ * The choices a plan takes freely for a page: the form it declares; or the
+ * forms that carry its claim best where its measures say what the claim asks
+ * of a reader (`fitted`, claim-fit.mjs); or the forms that read the data its
+ * type's first form reads. Each with the placement the page declares where
+ * that form compiles with it, or with every placement the form takes. Empty
+ * for a page with no known type.
  */
-export function freeChoices(page) {
+export function freeChoices(page, fitted = null) {
   const type = page && typeof page === "object" ? PAGE_TYPES[page.type] : null;
   if (!type) return [];
-  const forms = Object.hasOwn(type.forms, page.form ?? "") ? [page.form] : openForms(page.type);
+  const forms = Object.hasOwn(type.forms, page.form ?? "") ? [page.form] : fitted?.length ? fitted : openForms(page.type);
   // A placement the page declares is kept on every form that compiles with it.
   return forms.flatMap((form) => { const placements = placementsOf(page.type, form);
     return (placements.includes(page.commentary) ? [page.commentary] : placements).map((commentary) => ({ form, commentary })); });
+}
+
+/**
+ * The kinds a deck's open exhibits take, by page (`Map` page -> openKinds'
+ * result): every page whose form leaves the kind of an exhibit open and that
+ * has not said it, in page order, each cut given - of the kinds that carry it
+ * equally well - the one the deck's draw features, then the one whose turn it
+ * is in the deck's hand for the cut's reading task (turnOf: counted over the
+ * exhibits the pages type themselves, the charts their declared forms draw,
+ * and the cuts already given). A deck with no draw takes the one it draws
+ * least. On a revision the one the source deck draws most (`sourceKinds`:
+ * what each source slide drew), and nothing is featured: its like is drawn
+ * its way. One reading for a plan and a draft: both stand a stub in as the
+ * kind it is given here.
+ */
+export function openKindsOf(doc, insights, { sourceKinds = null } = {}) {
+  const draw = drawOf(doc.deck), revision = doc.deck?.workflow === REVISION;
+  const all = [...(doc.pages || []), ...(doc.appendix || [])], pages = all.filter((page) => page && typeof page === "object" && PAGE_TYPES[page.type]);
+  const bySource = revision ? sourceConventions(all, sourceKinds) : null;
+  const drawnKinds = new Map();
+  const drew = (kind) => drawnKinds.set(kind, (drawnKinds.get(kind) ?? 0) + 1);
+  for (const page of pages) {
+    const own = exhibitsOf(page).filter((ex) => ex.type).map((ex) => String(ex.type)), drawsByForm = PAGE_TYPES[page.type].forms[page.form ?? ""];
+    own.forEach(drew);
+    if (!own.length && typeof drawsByForm === "string" && drawsByForm.startsWith("chart.")) drew(drawsByForm);
+  }
+  const given = new Map();
+  for (const page of pages) {
+    const kinds = openKinds(page, insights, { seed: draw.seed, featured: draw.kinds, fewest: (kind) => drawnKinds.get(kind) ?? 0, convention: revision ? (kind) => -(bySource.kinds.get(kind) ?? 0) : null });
+    if (!kinds.length) continue;
+    given.set(page, kinds);
+    kinds.forEach((item) => drew(item.kind));
+  }
+  return given;
 }
 
 // The band the render holds the prose pages' median words a block to (TEXT_FRAGMENTED), and the pages it is read from.
@@ -292,6 +504,24 @@ const BLOCKS = Object.freeze({ low: PLAN.textForm.wordsPerBlock.q1, high: PLAN.t
  * (TEXT_FRAGMENTED), no declared choice is changed for it, and it never makes
  * a plan unsatisfied.
  *
+ * A page whose fit is read (claim-fit.mjs) is given one of the forms that
+ * carry its claim best, and stays among them whatever a rule says: a rule
+ * those forms cannot meet between them is left unsatisfied, with the pages so
+ * held (`pinned`). Where several fit equally the choice is made by what the
+ * deck's draw features, then the spread of the deck's kinds, then the room
+ * under the caps, then the deck's `variation` - each page says which (`by`).
+ * `forms: "any"` asks instead whether any allocation the catalogue allows
+ * meets the rules: the forms that only serve a claim are then tried to mend a
+ * broken rule, and a page so moved is marked (`served`). That is the question
+ * a draft asks before it holds a rule against a spine; the plan asks it only
+ * to say what a rule its best-fit forms cannot meet would cost.
+ *
+ * On a revision (`sourceKinds`: what each source slide drew, by slide) an
+ * imported page keeps the form it declares and is never changed for a rule;
+ * one that declares none takes the form that draws what its slide drew; and a
+ * page the revision adds takes, of its candidates, the form the source deck
+ * draws most. Nothing is spread and nothing featured.
+ *
  * The search is deterministic and bounded by count, never by the clock: each
  * open page in turn takes the choice that leaves the deck's structure cost
  * lowest (ties to the catalogue's order), then single changes are applied
@@ -310,60 +540,123 @@ const BLOCKS = Object.freeze({ low: PLAN.textForm.wordsPerBlock.q1, high: PLAN.t
  * placement proposed), "proposed" (both given) or "changed" (a declared
  * choice changed to mend a rule, with what it `was`).
  */
-export function allocateStructure(doc, { insights = null, planOf, compiled = null, blocksOf = null, maxSteps = 40, maxEvaluations = 40000 } = {}) {
+export function allocateStructure(doc, { insights = null, planOf, compiled = null, blocksOf = null, sourceKinds = null, forms = "best", maxSteps = 40, maxEvaluations = 40000 } = {}) {
   let evaluations = 0;
+  // The deck's draw, which orders the choices left free once fit and spread have been weighed; a deck without one takes the catalogue's order.
+  const seed = doc.deck?.variation ?? null;
+  // A revision's imported pages are the user's own: each keeps the form it declares, whatever a rule or the fit says of it, and
+  // a page the revision adds or redraws is drawn as the source deck draws its like before the fit's free choices are spread.
+  const revision = doc.deck?.workflow === REVISION;
+  // What the draw features from the design system's repertoire: among forms and kinds of equal fit, these come first. A revision features nothing.
+  const featured = drawOf(doc.deck);
+  const formRank = (type, form, task) => formDraw(seed, type, form, task);
+  const registry = registryOf(insights);
   const all = [...(doc.pages || []).map((page) => ({ page, appendix: false })), ...(doc.appendix || []).map((page) => ({ page, appendix: true }))];
+  const drawnBySource = revision ? sourceConventions(all.map(({ page }) => page), sourceKinds) : null;
   const entries = all.map(({ page, appendix }, index) => {
     const type = page && typeof page === "object" ? PAGE_TYPES[page.type] : null;
     if (!type) return { page, index, appendix, fixed: true };
     const formDeclared = Object.hasOwn(type.forms, page.form ?? "");
-    const options = freeChoices(page);
+    // How the type's forms carry the page's claim, where its measures say what the claim asks of a reader: a page that declares no
+    // form is given one of those that carry it best, and only those are weighed against each other for spread and by the draw.
+    const fit = registry.size ? pageFit(page, { registry, insights }) : null;
+    const gradeIn = (form) => (fit?.task ? fit.forms.ranked.find((item) => item.form === form)?.grade ?? 0 : null);
+    const best = !formDeclared && fit?.task ? fit.forms.equal.map((item) => item.form).filter((form) => Object.hasOwn(type.forms, form)) : [];
+    // On a revision: a page imported from a slide that drew a chart or a table takes the form that draws the same, whatever the
+    // fit says of it; any other page that declares no form takes, of the forms it could be given, the one the source deck draws most.
+    const candidates = best.length ? best : formDeclared ? [] : openForms(page.type);
+    const asSource = revision && !formDeclared && page.sourceSlide !== undefined ? Object.keys(type.forms).filter((form) => (sourceKinds?.get?.(page.sourceSlide) ?? []).includes(String(type.forms[form]))) : [];
+    const used = (form) => (drawnBySource?.forms.get(`${page.type}/${form}`) ?? 0) * 1000 + (drawnBySource?.kinds.get(String(type.forms[form])) ?? 0);
+    const most = revision && !asSource.length && candidates.length ? Math.max(...candidates.map(used)) : 0;
+    const conventional = most > 0 ? candidates.filter((form) => used(form) === most) : [];
+    const given = asSource.length ? asSource.filter((form) => !best.length || best.includes(form)).concat(asSource).slice(0, 1) : conventional.length ? conventional : best;
+    const options = freeChoices(page, given);
     const declared = formDeclared && placementsOf(page.type, page.form).includes(page.commentary);
-    // Every choice the catalogue allows the type, for when the forms a plan chooses freely cannot satisfy a rule between them.
-    const wider = Object.keys(type.forms).flatMap((form) => placementsOf(page.type, form).map((commentary) => ({ form, commentary })));
+    // Every choice the plan may take to mend a broken rule when the free ones cannot. A page whose fit is read never leaves the
+    // forms that carry its claim best - a rule those cannot meet is reported unmet, not met with a weaker picture - and a
+    // declared form whose fit is read is changed only for one that carries the claim at least as directly.
+    // (`forms: "any"` asks the other question - whether any allocation the catalogue allows meets the rules - and lifts both.)
+    const mendable = asSource.length ? given : forms === "any" ? Object.keys(type.forms) : best.length ? given : formDeclared && fit?.chosen ? Object.keys(type.forms).filter((form) => gradeIn(form) >= fit.chosen.grade) : Object.keys(type.forms);
+    const wider = mendable.flatMap((form) => placementsOf(page.type, form).map((commentary) => ({ form, commentary })));
     // The page as the compile reads it, where it compiles as written under the choices it declares.
     const written = declared ? compiled?.get?.(String(page.id ?? `page-${index + 1}`)) ?? null : null;
-    return { page, index, appendix, type, options, wider, declared, formDeclared, written, slides: new Map(),
-      choice: declared ? { form: page.form, commentary: page.commentary } : options[0], exhibitType: evidenceExhibits(page, insights), stubs: stubsOf(page, insights) };
+    return { page, index, appendix, type, options, wider, declared, formDeclared, written, slides: new Map(), fit, best, fitted: best.length > 0, imported: revision && page.sourceSlide !== undefined,
+      // The forms the page is held to by its fit, where that is fewer than its type has: what a rule left unmet is pinned by.
+      held: mendable.length < Object.keys(type.forms).length && !asSource.length ? mendable : null,
+      by: asSource.length ? "source" : conventional.length && conventional.length < candidates.length ? "convention" : null,
+      choice: declared ? { form: page.form, commentary: page.commentary } : options[0], exhibitType: evidenceExhibits(page, insights, featured), stubs: stubsOf(page, insights) };
   });
+  // The kinds of the exhibits whose form leaves them open (openKindsOf): a stub the spine declares with no kind is stood in for
+  // by the kind it is given there, whatever told it from its equals.
+  const open = openKindsOf(doc, insights, { sourceKinds });
+  for (const entry of entries.filter((e) => !e.fixed)) {
+    const kinds = open.get(entry.page);
+    if (!kinds?.length) continue;
+    entry.kinds = kinds;
+    entry.exhibitType = kinds.map((item) => item.kind);
+    entry.stubs = stubsOf(entry.page, insights, kinds);
+  }
   const slideOf = (entry, choice) => {
     const key = `${choice.form}/${choice.commentary}`;
     if (entry.written && choice.form === entry.page.form && choice.commentary === entry.page.commentary) return entry.written;
     if (!entry.slides.has(key)) entry.slides.set(key, declaredSlide({ ...entry.page, ...choice }, entry.index, { exhibitType: entry.exhibitType, players: doc.deck?.players, stubs: entry.stubs }));
     return entry.slides.get(key);
   };
-  const evaluate = (override = null) => {
-    evaluations += 1;
+  // The deck under the choices as they stand, one page swapped for another choice where `override` names it.
+  const specOf = (override = null) => {
     const slides = [], appendix = [];
     for (const entry of entries) {
       const slide = entry.fixed ? (entry.page && typeof entry.page === "object" && entry.page.kind ? entry.page : null)
         : slideOf(entry, override?.entry === entry ? override.choice : entry.choice);
       if (slide) (entry.appendix ? appendix : slides).push(slide);
     }
-    const spec = { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
+    return { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
+  };
+  const evaluate = (override = null) => {
+    evaluations += 1;
+    const spec = specOf(override), slides = spec.slides, appendix = spec.appendix ?? [];
     const declared = declaredStructure(spec, { planOf });
     const shape = shapeStructure([...slides, ...appendix].filter((slide) => slide.pageType).map((slide) => ({ id: slide.id, architecture: declaredArchitecture(slide) })),
       { airy: resolveFill(spec) === "airy" });
-    // The deck's median words a block under these choices, where the caller estimated each page's (`blocksOf`): an estimate,
-    // which steers the free choices and never refuses a plan - the render measures the rule.
+    // The deck's median words a block under these choices, where the caller read each page's off its scene (`blocksOf`: the
+    // page as its copy is written, never a stand-in for copy to come): it steers the free choices and never refuses a plan -
+    // the render measures the rule.
     const read = blocksOf ? entries.filter((entry) => !entry.fixed).map((entry) => [entry, blocksOf(entry.page, override?.entry === entry ? override.choice : entry.choice)]).filter(([, blocks]) => blocks?.prose && blocks.count > 0) : [];
     const sizes = read.map(([, blocks]) => blocks.wordsPerBlock).sort((a, b) => a - b);
     const middle = sizes.length ? (sizes.length % 2 ? sizes[(sizes.length - 1) / 2] : (sizes[sizes.length / 2 - 1] + sizes[sizes.length / 2]) / 2) : null;
     const estimate = sizes.length >= BLOCKS.from ? [["floor", BLOCKS.low, "min"], ["ceiling", BLOCKS.high, "max"]].map(([key, bar, side]) => ({ code: "TEXT_FRAGMENTED", key, what: "median words a block on the prose pages", value: round(middle, 1), bar, side, unit: "words",
-      applies: true, blocks: false, estimated: "estimated with placeholder copy at a developed length; the render measures it", tolerance: BLOCKS.tolerance, each: Object.fromEntries(read.map(([entry, blocks]) => [String(entry.page.id ?? `page-${entry.index + 1}`), blocks.wordsPerBlock])) })) : [];
+      applies: true, blocks: false, estimated: "read from the scene of the pages as their copy is written, the way --check reads it; the render measures it", tolerance: BLOCKS.tolerance, each: Object.fromEntries(read.map(([entry, blocks]) => [String(entry.page.id ?? `page-${entry.index + 1}`), blocks.wordsPerBlock])) })) : [];
     return { findings: [...declared.findings, ...shape.findings], standings: [...declared.standings, ...shape.standings, ...estimate] };
   };
   const typed = entries.filter((entry) => !entry.fixed);
   const before = evaluate();
-  // Each open page in turn takes the choice that leaves the cost lowest.
+  // Each open page in turn takes the choice that leaves the cost lowest. Where its choices are forms that carry its claim
+  // equally well, two that leave the rules as they were are told apart by whether the deck's draw features one, then by the
+  // deck's own hand for the page's reading task (compared): so one deck draws one task one way wherever the claim leaves the
+  // choice free, and two decks from one brief differ there and nowhere else. A deck with no draw spreads its kinds instead.
+  // A page whose fit is not read keeps the catalogue's order, as before: nothing is rotated that no fit ranks. A revision
+  // spreads nothing: its free choices were already narrowed to the source deck's own (above), and the draw breaks what is left.
+  const decided = new Map();
+  const kindsUnder = (entry, choice) => { const slide = slideOf(entry, choice); return slide ? exhibitKinds(slide) : []; };
+  const settle = (entry) => { for (const kind of kindsUnder(entry, entry.choice)) decided.set(kind, (decided.get(kind) ?? 0) + 1); };
+  typed.filter((e) => e.declared).forEach(settle);
   for (const entry of typed.filter((e) => !e.declared)) {
-    let best = null;
-    for (const choice of entry.options) {
-      const cost = structureCost(evaluate({ entry, choice }));
-      if (!best || cheaper(cost, best.cost)) best = { choice, cost };
-    }
+    const hand = entry.fitted && seed !== null;
+    // Each form's place in the deck's hand among the forms this page could take, and whose turn it is (turnOf).
+    const places = new Map(hand ? [...new Set(entry.options.map((choice) => choice.form))].sort((a, b) => formRank(entry.page.type, a, entry.fit.task) - formRank(entry.page.type, b, entry.fit.task)).map((form, at) => [form, at]) : []);
+    const weighed = entry.options.map((choice, at) => { const spread = entry.fitted && !revision ? kindsUnder(entry, choice).reduce((sum, kind) => sum + (decided.get(kind) ?? 0), 0) : 0;
+      return { choice, cost: structureCost(evaluate({ entry, choice })), spread, featured: entry.fitted && featured.forms.has(`${entry.page.type}/${choice.form}`),
+        drawn: hand, turn: hand ? turnOf(spread, places.get(choice.form)) : 0, rank: hand ? formRank(entry.page.type, choice.form, entry.fit.task) : at }; });
+    const best = weighed.reduce((kept, candidate) => (preferred(candidate, kept) ? candidate : kept));
+    // What told the form from the others it could have taken: the strongest of them, and the first thing the two differ on.
+    const rivals = weighed.filter((candidate) => candidate.choice.form !== best.choice.form);
+    if (entry.fitted && rivals.length && !entry.by) entry.by = compared(best, rivals.reduce((kept, candidate) => (preferred(candidate, kept) ? candidate : kept))).by;
     entry.choice = best.choice;
+    settle(entry);
   }
+  // A page's choices with those that keep its form first: of two changes that mend a rule equally, the one that moves only the
+  // commentary is taken, so a form the spread or the draw chose is not changed as a side effect of a placement.
+  const sameFormFirst = (entry, choices) => [...choices.filter((choice) => choice.form === entry.choice.form), ...choices.filter((choice) => choice.form !== entry.choice.form)];
   // Then single changes, while one lowers the cost: the open pages first, the declared ones only when no open page helps.
   let current = evaluate(), cost = structureCost(current), steps = 0, capped = false;
   while ((cost.blockers || cost.lacking || cost.drift || cost.tight) && !capped) {
@@ -375,15 +668,42 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     // An estimate steers the free choices only: a form built for particular data, or a change to a declared choice, is taken
     // for the rules the plan is held to, so those are weighed with the estimate left out.
     const held = (c) => ({ ...c, drift: 0 });
-    for (const [pool, choices, free] of [[open, "options", true], ...(broken ? [[open.filter((e) => !e.formDeclared), "wider", false], [typed.filter((e) => e.declared || e.formDeclared), "wider", false]] : [])]) {
-      for (const entry of pool) for (const choice of entry[choices]) {
+    for (const [pool, choices, free] of [[open, "options", true], ...(broken ? [[open.filter((e) => !e.formDeclared), "wider", false], [typed.filter((e) => (e.declared || e.formDeclared) && !e.imported), "wider", false]] : [])]) {
+      for (const entry of pool) for (const choice of sameFormFirst(entry, entry[choices])) {
         if (choice.form === entry.choice.form && choice.commentary === entry.choice.commentary) continue;
+        // A form chosen among equals by the spread and the draw is changed to mend a broken rule, never for room alone:
+        // room is made with placements, or the seed's choices would be undone wherever a rule sat at its bar.
+        if (!broken && entry.fitted && choice.form !== entry.choice.form) continue;
         const next = structureCost(evaluate({ entry, choice }));
         if (free ? cheaper(next, best?.cost ?? cost) : cheaper(held(next), held(best?.cost ?? cost))) best = { entry, choice, cost: next };
       }
       if (best) break;
     }
+    // A rule that counts the commonest of several classes - the commonest skeleton, placement or architecture - does not move
+    // when a page leaves a class tied with another over the cap: two changes mend it and neither is cheaper alone. So where
+    // no single change helps a broken rule, a page that rule counts is moved to a free choice that makes nothing worse, and
+    // the single changes are read again from there; the first such pair that ends cheaper is taken.
+    if (!best && broken) {
+      const counted = new Set(current.standings.filter((standing) => standing.blocks && ["over", "short"].includes(standingRoom(standing).state)).flatMap((standing) => standing.pages ?? []).map(String));
+      pairs: for (const entry of open.filter((e) => counted.has(String(e.page.id ?? `page-${e.index + 1}`)))) for (const choice of sameFormFirst(entry, entry.options)) {
+        if (choice.form === entry.choice.form && choice.commentary === entry.choice.commentary) continue;
+        const moved = structureCost(evaluate({ entry, choice }));
+        if (moved.blockers > cost.blockers || moved.lacking > cost.lacking + 1e-9 || evaluations >= maxEvaluations) continue;
+        const kept = entry.choice;
+        entry.choice = choice;
+        for (const other of open) for (const next of sameFormFirst(other, other.options)) {
+          if (other === entry || (next.form === other.choice.form && next.commentary === other.choice.commentary)) continue;
+          const after = structureCost(evaluate({ entry: other, choice: next }));
+          if (cheaper(after, best?.cost ?? cost)) best = { entry: other, choice: next, cost: after, first: { entry, choice } };
+        }
+        entry.choice = kept;
+        if (best) break pairs;
+      }
+      if (best) { if (best.first.choice.form !== best.first.entry.choice.form) best.first.entry.by = "rules"; best.first.entry.choice = best.first.choice; steps += 1; }
+    }
     if (!best) break;
+    // A form changed here was changed for a rule, whatever chose it first.
+    if (best.choice.form !== best.entry.choice.form) best.entry.by = "rules";
     best.entry.choice = best.choice;
     steps += 1;
     current = evaluate();
@@ -401,13 +721,60 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
   const formChanged = (entry) => entry.formDeclared && entry.choice.form !== entry.page.form;
   // A page read off an estimate: it does not compile as written, and neither it nor its form says what kind an exhibit of it is.
   const estimated = (entry) => !(entry.written && !changed(entry)) && estimatedUnder(entry.page, entry.index, entry.choice);
+  // What the fit says of each page's choice, for the plan to print: the task read from its measures, the other forms that carry it
+  // as well (the latitude) and what told the chosen one from them, the forms that carry it more directly than the one it has, and
+  // the kinds its open exhibits were given.
+  const shapesOf = (entry) => (Array.isArray(entry.page.evidence) ? entry.page.evidence : []).map((id) => insights?.get?.(id)?.shape).filter(Boolean);
+  const fitNote = (entry) => {
+    const fit = entry.fit, ranked = fit?.task ? fit.forms : null;
+    const grade = ranked ? ranked.ranked.find((item) => item.form === entry.choice.form)?.grade ?? 0 : null;
+    const judged = entry.formDeclared && entry.choice.form === entry.page.form && !fit?.chosen;
+    const equal = ranked ? ranked.equal.map((item) => item.form) : [];
+    const shapes = shapesOf(entry);
+    const carriedBy = (type) => !TYPE_SHAPES[type] || shapes.some((shape) => TYPE_SHAPES[type].includes(shape));
+    const elsewhere = registry.size && !entry.imported ? otherTypes(entry.page, { registry, insights, carriedBy }) : [];
+    // And the forms of other types that carry the claim as directly as this one's best, where the page's evidence can rest under
+    // that type: the page's latitude in its type, with the one this deck's draw would take where it ranks one above the page's own.
+    const beside = registry.size && !entry.imported && !revision ? otherTypes(entry.page, { registry, insights, carriedBy, equal: true }) : [];
+    const ownRank = seed !== null && fit?.task ? formRank(entry.page.type, entry.choice.form, fit.task) : null;
+    const drawn = ownRank === null ? null : beside.filter((item) => formRank(item.type, item.form, item.task) < ownRank).sort((a, b) => formRank(a.type, a.form, a.task) - formRank(b.type, b.form, b.task))[0] ?? null;
+    // Where the author declared a choice the fit leaves free - a form, or the kind of an exhibit on a page of open kinds - the
+    // mark this deck's draw takes among its equals, when it is another: said, never made (a declared choice is always kept).
+    const kept = entry.formDeclared && entry.choice.form === entry.page.form;
+    const hand = seed !== null && !revision && kept && ranked && !judged && grade === ranked.top && equal.length > 1
+      ? [...equal].sort((a, b) => (featured.forms.has(`${entry.page.type}/${b}`) ? 1 : 0) - (featured.forms.has(`${entry.page.type}/${a}`) ? 1 : 0) || formRank(entry.page.type, a, fit.task) - formRank(entry.page.type, b, fit.task))[0] : null;
+    const typed = seed !== null && !revision ? (fit?.exhibits ?? []).filter((item) => item.written && item.kind && item.grade === item.kinds.top).map((item) => {
+      const kinds = item.kinds.equal.map((kind) => kind.kind).filter((kind) => kind.startsWith("chart.")).sort((a, b) => (featured.kinds.has(b) ? 1 : 0) - (featured.kinds.has(a) ? 1 : 0) || markRank(seed, item.task, a) - markRank(seed, item.task, b));
+      return { where: `exhibit ${item.at + 1}`, has: item.kind, task: item.task, also: kinds.filter((kind) => kind !== item.kind), hand: kinds[0] };
+    }).filter((item) => item.also.length && item.hand !== item.has) : [];
+    return { ...(ranked ? { task: fit.task } : {}), ...(ranked && !judged && grade === ranked.top && equal.length > 1 ? { also: equal.filter((form) => form !== entry.choice.form) } : {}),
+      ...(hand && hand !== entry.choice.form ? { hand } : {}), ...(typed.length ? { typed } : {}),
+      ...(entry.by && (!entry.formDeclared || entry.choice.form !== entry.page.form) ? { by: entry.by } : {}),
+      ...(ranked && !judged && grade < ranked.top && !entry.imported ? { better: equal } : {}), ...(entry.kinds?.length ? { kinds: entry.kinds } : {}),
+      ...(fit?.left.some((item) => item.where !== "form") && !entry.imported ? { exhibits: fit.left.filter((item) => item.where !== "form") } : {}), ...(elsewhere.length ? { elsewhere } : {}),
+      ...(beside.length ? { beside: beside.map(({ type, form }) => ({ type, form })), ...(drawn ? { typeHand: { type: drawn.type, form: drawn.form, kind: kindOfForm(drawn.type, drawn.form) } } : {}) } : {}) };
+  };
+  // A page moved off the forms that carry its claim best: one given a form outside them, or a declared form changed for one outside them.
+  const offBest = (entry) => Boolean(entry.fit?.task) && !entry.fit.forms.equal.some((item) => item.form === entry.choice.form) && (entry.fitted || (Boolean(entry.fit.chosen) && entry.choice.form !== entry.page.form));
+  // A rule left unmet while pages are held to the forms that carry their claims best: the pages so held, for the plan to name.
+  const pinned = unsatisfied.length ? typed.filter((entry) => entry.held && !entry.imported).map((entry) => ({ id: entry.page.id ?? `page-${entry.index + 1}`, forms: entry.held })) : [];
+  // The deck's exhibits by kind under the allocation, and the pages whose form leaves fit unused (gates/variety_gates.mjs fitStandings): read once, on the result.
+  const final = specOf();
+  const spread = fitStandings(final, { fits: fitsOf(final, insights), kept: keptAsSource(final, sourceKinds), carried: carriedKinds(all.map(({ page }) => page).filter((page) => page?.carry === true), sourceKinds) });
+  current.standings.push(...spread.standings);
   return {
     pages: typed.map((entry) => ({ id: entry.page.id ?? `page-${entry.index + 1}`, type: entry.page.type, form: entry.choice.form, commentary: entry.choice.commentary,
       source: formChanged(entry) || (entry.declared && changed(entry)) ? "changed" : entry.declared ? "declared" : entry.formDeclared ? "placed" : "proposed", ...(estimated(entry) ? { estimated: true } : {}),
+      ...(entry.imported ? { imported: true } : {}), ...fitNote(entry),
+      // Under `forms: "any"`: a page moved off the forms that carry its claim best to meet a rule, with the forms it left.
+      ...(offBest(entry) ? { served: entry.fit.forms.equal.map((item) => item.form) } : {}),
+      // The exhibits the page draws under its choice, by kind: what the deck's spread is counted over.
+      draws: exhibitsOf(slideOf(entry, entry.choice) ?? {}).map((ex) => String(ex.type ?? "")).filter(Boolean),
       // A form the plan took only to mend a rule, with the data it is built for: the author checks the evidence holds it.
-      ...(!entry.declared && entry.page.form !== entry.choice.form && !openForms(entry.page.type).includes(entry.choice.form)
+      // (A form the page's own measures fill, and that carries its claim best, was chosen for that and needs no such check.)
+      ...(!entry.declared && entry.page.form !== entry.choice.form && !openForms(entry.page.type).includes(entry.choice.form) && !(entry.fitted && entry.best.includes(entry.choice.form)) && entry.by !== "source"
         ? { reads: dataKeys(entry.type.forms[entry.choice.form], { type: entry.page.type, form: entry.choice.form }) } : {}),
       ...((entry.declared && changed(entry)) || formChanged(entry) ? { was: { form: entry.page.form, ...(entry.declared ? { commentary: entry.page.commentary } : {}) } } : {}) })),
-    structure: current, declared: before, satisfied: !unsatisfied.length, unsatisfied, steps, evaluations, capped: capped && !!(cost.blockers || cost.lacking),
+    structure: current, declared: before, satisfied: !unsatisfied.length, unsatisfied, pinned, steps, evaluations, capped: capped && !!(cost.blockers || cost.lacking),
   };
 }

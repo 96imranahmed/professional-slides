@@ -1,5 +1,5 @@
 {
- "$comment": "Command templates for the quality eval. Each command is an argv array; {placeholders} are filled per call. Agent: {prompt} is the brief as a stranger would type it, {workspace} the empty directory the run starts in (also its cwd), {plugin} a freshly packaged copy of this checkout's plugin. Judge: {prompt} is the judging instruction, {packet} the directory holding only the brief, the rubric and the rendered pages (also its cwd), {schema} the JSON schema the answer must match, {model} the judge model. Entries marked `unverified` carry flags that were not checked against the installed CLI; confirm them with `<cli> --help` before trusting a run.",
+ "$comment": "Command templates for the quality eval. Each command is an argv array; {placeholders} are filled per call. Agent: {prompt} is the brief as a stranger would type it, {workspace} the empty directory the run starts in (also its cwd), {plugin} a freshly packaged copy of this checkout's plugin. Judge: {prompt} is the judging instruction, {packet} the directory holding only the brief, the rubric and the rendered pages (also its cwd), {schemaJson} the JSON schema the answer must match, inline on one line, {schemaPath} a file holding it where the caller has one, {schema} whichever of the two the judge's `schemaAs` names (\"json\", the default, or \"path\"), {model} the judge model. Entries marked `unverified` carry flags that were not checked against the installed CLI; confirm them with `<cli> --help` before trusting a run.",
  "defaults": {"agent": "claude", "judge": "claude", "prompt": "brief"},
  "prompts": {
   "brief": "{brief}",
@@ -20,9 +20,9 @@
  "judges": {
   "claude": {
    "model": "opus",
-   "command": ["claude", "-p", "{prompt}", "--model", "{model}", "--tools", "Read,Glob", "--allowedTools", "Read,Glob", "--add-dir", "{packet}", "--output-format", "json", "--json-schema", "{schema}", "--no-session-persistence"],
+   "command": ["claude", "-p", "{prompt}", "--model", "{model}", "--tools", "Read,Glob", "--allowedTools", "Read,Glob", "--add-dir", "{packet}", "--output-format", "json", "--json-schema", "{schemaJson}", "--no-session-persistence"],
    "timeoutMinutes": 30,
-   "note": "Read and Glob only, rooted at the packet. --json-schema makes the answer structured; the runner also accepts a bare JSON object in the result text."
+   "note": "Read and Glob only, rooted at the packet. --json-schema makes the answer structured and takes the schema itself, not a file (checked against `claude --help`, Claude Code 2.1: a path is refused as not valid JSON); the runner also accepts a bare JSON object in the result text."
   }
  }
 }

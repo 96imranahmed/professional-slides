@@ -31,7 +31,7 @@ const density = { deck: 'No density profile was built for this fixture, so no me
 const clean = (dims, found = []) => dims.map((d) => found.includes(d) ? { dimension: d, result: 'findings', note: 'Filed the findings above.' } : { dimension: d, result: 'clean', note: `Checked ${d} on every page and found nothing to raise.` });
 const assessment = () => Object.fromEntries(R.ASSESSMENT_KEYS.map((k) => [k, `A sentence about ${k}.`]));
 const major = (o = {}) => ({ id: 'F1', scope: 'page', slides: ['p02'], dimension: 'chart', code: 'MISLEADING_TIME_AXIS', severity: 'major',
-  reason: 'Monthly observations with gaps are drawn at equal spacing, steepening the growth.', repair: 'Replot the line on a true time axis so the gaps show as gaps.', checkable: null, ...o });
+  reason: 'Monthly observations with gaps are drawn at equal spacing, steepening the growth.', repair: 'Replot the line on a true time axis so the gaps show as gaps.', touches: ['layout'], checkable: null, ...o });
 
 // A prebuilt deck: `count` analytical pages after a cover. `rich` pages each
 // draw a different exhibit with its treatment; a poor deck draws one kind of
@@ -106,6 +106,28 @@ async function done(d) {
 
 
 class DeliveryLoopTests(unittest.TestCase):
+    def test_a_deck_made_under_a_closed_scope_is_delivered_as_one_with_where_the_limit_is_written(self):
+        result = run_node(FIXTURES + '''
+const closed = (o) => ({ evidenceScope: { retrieval: 'closed', note: 'the brief supplies the records and closes the list', quote: 'Use only the records supplied with this brief', ...o } });
+const run = async (deck, brief) => { const d = await prebuilt({ deck });
+  if (brief) { await fs.mkdir(path.join(d.dir, 'sources'), { recursive: true }); await fs.writeFile(path.join(d.dir, 'sources', 'brief.md'), brief); }
+  await storylineReady(d);
+  const pending = await deliver(d, { reviewer: 'packet' });
+  const report = JSON.parse(await fs.readFile(path.join(d.out, 'delivery.json'), 'utf8').catch(() => 'null'));
+  const prompt = await fs.readFile(path.join((await record(d)).staging, 'prompt.md'), 'utf8').catch(() => '');
+  await done(d);
+  return { stage: pending.stage, scope: (pending.evidenceScope ?? report?.evidenceScope) ?? null, told: prompt.split('\\n').find((line) => line.startsWith('EVIDENCE SCOPE')) ?? '' }; };
+console.log(JSON.stringify({
+  reconstructed: await run({ requestProvenance: 'reconstructed', ...closed({ source: 'sources/brief.md' }) }, 'Who is better positioned? Use only the records supplied with this brief.'),
+  verbatim: await run({ request: 'Who is better positioned in the short run and the long run? Use only the records supplied with this brief.', ...closed({}) }, null),
+  open: await run({}, null) }));
+''')
+        scope = result["reconstructed"]["scope"]
+        self.assertEqual([scope["retrieval"], scope["source"], scope["requestProvenance"], scope["quote"]], ["closed", "sources/brief.md", "reconstructed", "Use only the records supplied with this brief"])
+        self.assertIn("the limit is quoted from the file that sets it (sources/brief.md", result["reconstructed"]["told"])   # the deck's reviewer is told as the critic was
+        self.assertEqual([result["verbatim"]["scope"]["retrieval"], result["verbatim"]["scope"]["requestProvenance"], "source" in result["verbatim"]["scope"]], ["closed", "verbatim", False])
+        self.assertIsNone(result["open"]["scope"])
+
     def test_packet_review_verification_confirmation_accept(self):
         result = run_node(FIXTURES + '''
 const d = await prebuilt();
@@ -166,7 +188,7 @@ const rec2 = await record(d);
 await deliver(d, { reviewFile: await write(d, 'r2.json', { pass: 2, verifies: rec1.binding, accepted: true, summary: 'The time axis now spaces months by time; the repair held.', rating: 8.4, binding: rec2.binding,
   opened: ['p02'], provenance: provenanceOf(rec2), pages: [pageEntry('p02')], statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The line now sits on a true time axis with the gaps visible.' }], findings: [], density }) });
 const rec3 = await record(d);
-const dead = major({ id: 'F1', slides: ['p04'], dimension: 'layout', code: 'DEAD_SPACE', reason: 'The lower half of the page is empty under a small table.', repair: 'Enlarge the table to fill the band or merge the page with p05.' });
+const dead = major({ id: 'F1', slides: ['p04'], dimension: 'layout', code: 'DEAD_SPACE', reason: 'The lower half of the page is empty under a small table.', repair: 'Enlarge the table to fill the band or merge the page with p05.', touches: ['layout', 'structure'] });
 const refused = await deliver(d, { reviewFile: await write(d, 'c1.json', { confirms: rec2.binding, accepted: false, summary: 'Sound argument, but half of page four is empty space.', rating: 7.4, binding: rec3.binding,
   opened: [...d.ids], provenance: provenanceOf(rec3), pages: d.ids.map((id) => ({ slide: id, verdict: id === 'p04' ? 'major' : 'ok', note: `Read ${id} at full size.` })), findings: [dead], assessment: assessment() }) });
 const delivered = await exists(path.join(d.out, 'fixture-DELIVERED.pptx'));

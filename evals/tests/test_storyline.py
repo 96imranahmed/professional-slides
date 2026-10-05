@@ -179,7 +179,8 @@ console.log(JSON.stringify({
         self.assertEqual(result['views'], {'i-spend/subject': ['["chart","all"]']})
         self.assertEqual(result['undrawn'], result['views'])
         self.assertEqual(result['natural'], [])
-        self.assertEqual(result['scalar'], {'i-one/total': ['["figure","all"]']})
+        # A measure of one value has one view - a figure - whatever exhibit carries it.
+        self.assertEqual(result['scalar'], {'i-one/total': ['["figure"]']})
         self.assertEqual(result['windowed'], {'i-spend/subject': ['["chart",["2023","2024"]]']})
         # A measure of the claim is proof by definition; an exhibit or a metric adds what the claim does not name, with its role.
         self.assertEqual(result['shows'], ['context:i-spend/rival', 'proof:i-spend/subject', 'proof:i-terms/years'])
@@ -334,7 +335,7 @@ console.log(JSON.stringify({ gate, step: [step.status, step.pass, step.retired],
         self.assertEqual(result['step'][:2], ['packet-written', 1])
         self.assertIn('archived in', result['step'][2])
         self.assertIsNone(result['scope'])
-        self.assertEqual(result['version'], 3)
+        self.assertEqual(result['version'], 4)
         self.assertEqual(result['archived'], ['pass-1.json', 'pass-2.json', 'pass-3.json', 'storyline-review.json'])
         self.assertEqual([result['left'], result['answer']], [[], False])
         # Logged as a retirement with why, and not as a restart, which a second time would need the user's approval.

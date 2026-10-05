@@ -25,7 +25,7 @@ const checks = () => Object.fromEntries(R.PAGE_DIMENSIONS.map((d) => [d, `checke
 const pageEntry = (slide, verdict = 'ok') => ({ slide, verdict, checks: checks() });
 const finding = (o = {}) => ({ id: 'F1', scope: 'page', slides: ['p02'], dimension: 'chart', code: 'MISLEADING_TIME_AXIS', severity: 'major',
   reason: 'Monthly observations with gaps are drawn at equal spacing, steepening the growth.',
-  repair: 'Replot the line on a true time axis so the gaps show as gaps.', checkable: null, ...o });
+  repair: 'Replot the line on a true time axis so the gaps show as gaps.', touches: ['layout'], checkable: null, ...o });
 const worstOn = (findings, id) => findings.filter((f) => f.slides.includes(id) && f.severity !== 'none').map((f) => f.severity).sort((a, b) => RANK.indexOf(b) - RANK.indexOf(a))[0];
 const density = { deck: 'No density profile was built for this fixture, so no medians are compared.', pages: [] };
 const prov = (promptHash = 'd'.repeat(64)) => ({ backend: 'subagent', model: 'fixture-model', promptHash });

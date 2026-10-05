@@ -210,6 +210,51 @@ console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLea
         self.assertEqual(result["clauses"], list(clauses.values()))
         self.assertEqual(result["labels"], labels)
 
+    def test_a_label_is_told_from_its_own_phrase_whatever_preposition_or_date_it_carries(self):
+        # A review found labels read as the answer's whole lead: a preposition the list of governors lacked ("after",
+        # "versus", "before") left the determiner behind it looking like a verb's object, a determiner over a calendar unit
+        # ("this quarter") looked like one too, and a possessive opening the next clause ("its lead is narrow") was taken for
+        # a pronoun taking the label up as a subject. Each is decided from the phrase: a title that only repeats the label
+        # then carries a share of the verdict, not all of the lead.
+        labels = [
+            "Verdict after all three tests: Northfield should expand in the north and exit the south",
+            "Position versus the peers on cost: Alder leads on scale and trails on margin",
+            "Outcome before any restructuring charge: profit rises 12% on flat revenue",
+            "Answer this quarter for lending: hold the rate and widen the book in the north",
+            "Northfield retail banking division: its lead is narrow and rests on two branches",
+            "Findings since the last board meeting: demand held and costs fell",
+            "Outlook despite the new entrant: the lead holds for two more years",
+        ]
+        clauses = {
+            # A verb's object is still an object behind a longer phrase, and a subject pronoun still takes a clause up.
+            "Harbour keeps its lead despite the new entrant: defend the northern branches": "Harbour keeps its lead despite the new entrant",
+            "Three lenders outgrew their deposits after the rate rise: funding limits growth": "Three lenders outgrew their deposits after the rate rise",
+            "Northern margins doubled southern margins: they justify the second shift": "Northern margins doubled southern margins",
+            "Harbour won every tender this year: it should bid for the northern contract": "Harbour won every tender this year",
+        }
+        result = run_node(f"""
+import {{ answerLead }} from '{GATES}';
+console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLead), labels: {json.dumps(labels)}.map(answerLead) }}));
+""")
+        self.assertEqual(result["labels"], labels)
+        self.assertEqual(result["clauses"], list(clauses.values()))
+
+    def test_a_title_that_repeats_a_label_does_not_lead_a_revision_with_its_answer_either(self):
+        # The lead is read the same way for a deck being revised: under the current rules a title that only repeats the
+        # label before the colon is refused, and a revision recorded before the up-front rule hears it as an advisory.
+        answer = ("Verdict after all three tests: expand capacity in the northern region now because margins there are double the southern margins "
+                  "and the depot has spare capacity.")
+        titles = ["The verdict after all three tests is set out below", "Margins in the northern region are double the southern margins",
+                  "The depot has spare capacity for another shift", "Expand costs are recovered inside two years on current volumes"] + TITLES[4:]
+        points = ["Expand capacity in the northern region now: margins there are double the southern margins.", "The depot has spare capacity for the added shift."]
+        for options, severity in (("{ deck: { workflow: 'existing_deck_revision', rulesVersion: 6 } }", "blocking"), ("{}", "blocking"),
+                                  ("{ deck: { workflow: 'existing_deck_revision', rulesVersion: 4 } }", "advisory")):
+            upfront = [f for f in answer_findings(plan(titles=titles, points=points, answer=answer), options) if f["rule"].endswith("upfront")]
+            self.assertEqual([f["severity"] for f in upfront], [severity], options)
+            # The lead the title is held to is the verdict behind the label, which this title does not state.
+            self.assertLess(upfront[0]["measured"]["lead"], 0.5, options)
+            self.assertIn("expand", upfront[0]["measured"]["leadMissing"], options)
+
     def test_the_answer_the_run_wrote_is_carried_by_the_title_that_states_its_verdict(self):
         answer = ("Harbour remains the region's strongest all-round lending group: it leads every rival that reports on deposits, branch network, profit, margin "
                   "and card volume, while Tideway Mutual leads on rated service and Westmoor on growth; the lead is narrowing and rests on four conditions.")

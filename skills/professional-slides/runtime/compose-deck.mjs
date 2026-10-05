@@ -9,6 +9,7 @@ import { measureTable } from "./tables.mjs";
 import { resolveWeight, normalizeWeight } from "./weight.mjs";
 import { readJsonSync } from "./cli.mjs";
 import { applyDesign } from "./design-systems.mjs";
+import { composedPlaces } from "./revision.mjs";
 import { styleTable, heavyTable, barScales, validateCategoryLabels, columnWeight } from "./compose-tables.mjs";
 import { DIAGRAM_TYPES } from "./compose-exhibits.mjs";
 import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withDesignLayout } from "./compose-body.mjs";
@@ -307,6 +308,29 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
   return out;
 }
 
+/**
+ * The generated page that states, once, what the deck's sources are declared
+ * not to name: one row for each source the registry marks `missing` (a
+ * publisher, a date, a document) that a page cites, with the reason the
+ * registry gives and the pages that cite it - read from what the compile
+ * recorded on each page (`settles.stated.limits`, author-deck.mjs). A deck
+ * whose records name no publisher says so here rather than on every page
+ * that prints one of their numbers; each page's own source line still names
+ * its sources. None when no cited source declares a limit.
+ */
+export function sourceLimitPages(spec) {
+  const limits = new Map();
+  for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const limit of slide?.pageType?.content?.settles?.stated?.limits ?? []) {
+    const entry = limits.get(limit.key) ?? { ...limit, pages: [] };
+    if (slide.id) entry.pages.push(`{{page:${slide.id}}}`);
+    limits.set(limit.key, entry);
+  }
+  if (!limits.size) return [];
+  return [{ id: "source-limits", kind: "content", density: "appendix", title: "What the sources do not name",
+    exhibit: { type: "table", columns: [{ label: "Source", type: "text" }, { label: "Does not name", type: "text", width: 130 }, { label: "Why, and what is known of it", type: "text" }, { label: "Cited on page", type: "text", width: 150 }],
+      rows: [...limits.values()].map((limit) => [limit.name, limit.missing.join(", "), `${limit.reason}.`, limit.pages.join(", ")]) } }];
+}
+
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
   return withDesignLayout(spec.designLayout, () => withDeckDensity(spec.density, () => composeDeckWith(spec, baseDir)));
@@ -376,7 +400,7 @@ function composeDeckWith(spec, baseDir) {
        ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
     : [];
   const credits = pictureCredits(spec);
-  const storySlides = [...spec.slides, ...appendix, ...credits];
+  const storySlides = [...spec.slides, ...appendix, ...sourceLimitPages(spec), ...credits];
   // The contents page leads the deck; `repeat-contents` also reprints it in
   // front of every later section, which is the other way a deck tracks.
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
@@ -396,10 +420,14 @@ function composeDeckWith(spec, baseDir) {
   // instead of repeating whichever shape fitted first.
   const recent = [], recentStyles = [];
   const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale));
+  // A revision that carries slides from its source deck (revision.mjs) composes only some of the deck's pages: each stands
+  // among the carried slides, and prints the number of its place in the deck, not of its place among the composed pages.
+  const places = Array.isArray(spec.carried) && spec.carried.length ? composedPlaces(spec, [...slides, ...expanded]) : null;
+  const placeOf = (index) => places?.[index] ?? index + 1;
   const pageNumbers = new Map();
   expanded.forEach((page, index) => {
     for (const key of new Set([page.id, page.sourceSlideId].filter(Boolean))) {
-      const numbers = pageNumbers.get(key) || []; numbers.push(slides.length + index + 1); pageNumbers.set(key, numbers);
+      const numbers = pageNumbers.get(key) || []; numbers.push(placeOf(slides.length + index)); pageNumbers.set(key, numbers);
     }
   });
   const resolveReferences = value => {
@@ -415,7 +443,8 @@ function composeDeckWith(spec, baseDir) {
   mapAll(expanded, (raw) => {
     // Hidden is the slide's state in the file, not its layout: it rides past
     // the composer, and a page split in two hides both halves.
-    const { sourceSlideId, hidden, ...page } = resolveReferences(raw);
+    // So does the imported slide a revision's section stands for (`sourceSlide`), which is its record and never drawn.
+    const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
     if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
     const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
@@ -434,8 +463,9 @@ function composeDeckWith(spec, baseDir) {
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
     fill,
     weight,
-    slides: slides.map((s) => {
+    slides: slides.map((s, index) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
+      if (places && s.kind !== "cover" && page.pageNumber === undefined) page.pageNumber = placeOf(index);
       // The document title sits in the footer beside the page number.
       if (spec.footer && s.kind !== "cover" && page.companyName === undefined) page.companyName = spec.footer;
       return page;

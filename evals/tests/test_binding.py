@@ -76,11 +76,12 @@ console.log(JSON.stringify({
 ''')
         self.assertEqual(result["line"], {"type": "chart.line", "heading": "Cash and debt", "unit": "GBP m", "categories": ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"],
                                           "series": [{"name": "Cash", "values": [15, 21, 37, 43, 50, 55]}, {"name": "debt", "values": [108, 96, 82, 68, 58, 56]}],
-                                          "basis": {"measures": ["i-bal/cash", "i-bal/debt"], "role": "proof"}})
+                                          # What the runtime wrote is exactly what the exhibit shows of each measure: the periods are recorded on its basis, marked as the runtime's.
+                                          "basis": {"measures": ["i-bal/cash", "i-bal/debt"], "role": "proof", "labels": {"i-bal/cash": ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"], "i-bal/debt": ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"]}, "bound": True}})
         self.assertEqual(result["range"], ["FY23", "FY24", "FY25"])
         # Time keeps its order whatever order the periods are listed in.
         self.assertEqual([result["listed"]["categories"], result["listed"]["series"][0]["values"]], [["FY22", "FY26"], [21, 55]])
-        self.assertEqual(result["context"], {"measures": ["i-bal/debt"], "role": "context", "relevance": "It shows what the cash was not spent on"})
+        self.assertEqual(result["context"], {"measures": ["i-bal/debt"], "role": "context", "relevance": "It shows what the cash was not spent on", "labels": {"i-bal/debt": ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"]}, "bound": True})
         self.assertEqual([result["ranked"]["categories"], result["ranked"]["series"][0]["values"], result["ranked"]["unit"]], [["Delta", "Alpha", "Beta"], [21, 15, 8], "%"])
         self.assertEqual([result["chosen"]["categories"], result["chosen"]["series"][0]["values"]], [["Delta", "Alpha"], [21, 15]])
         self.assertEqual(result["shared"], ["Alpha", "Beta"])
@@ -250,20 +251,20 @@ console.log(JSON.stringify({ title: bound.title, subtitle: bound.subtitle, metri
 ''')
         self.assertEqual(result["title"], "Cash reached 55 million as net debt fell to 1 million")
         self.assertEqual(result["subtitle"], "Revenue CHF1.3bn; rate -0.9%")
-        self.assertEqual(result["metrics"][0], {"label": "Rate", "value": "-0.9%", "basis": {"measures": ["i-bal/rate"], "role": "proof"}})
-        self.assertEqual(result["metrics"][1], {"label": "Debt", "value": "GBP 56m", "basis": {"measures": ["i-bal/debt"], "role": "context", "relevance": "It is what the cash is set against"}})
+        self.assertEqual(result["metrics"][0], {"label": "Rate", "value": "-0.9%", "basis": {"measures": ["i-bal/rate"], "role": "proof", "bound": True}})
+        self.assertEqual(result["metrics"][1], {"label": "Debt", "value": "GBP 56m", "basis": {"measures": ["i-bal/debt"], "role": "context", "relevance": "It is what the cash is set against", "labels": {"i-bal/debt": ["FY26"]}, "bound": True}})
         # A metric whose value is a token states that measure; a token in its sublabel is commentary and gives it no basis.
-        self.assertEqual(result["metrics"][2], {"value": "CHF1.3bn", "label": "Revenue", "basis": {"measures": ["i-bal/revenue"], "role": "proof"}})
+        self.assertEqual(result["metrics"][2], {"value": "CHF1.3bn", "label": "Revenue", "basis": {"measures": ["i-bal/revenue"], "role": "proof", "bound": True}})
         self.assertEqual(result["metrics"][3], {"value": "21", "label": "Typed", "sublabel": "from 15"})
         self.assertEqual(result["caption"], "Cash rose from 15 to 55 million over five years of retained earnings")
         self.assertEqual(result["gate"], [])
         # A table whose every number is a token has said what it shows; an undisclosed value prints as n/a.
-        self.assertEqual(result["table"], [[["Alpha", "20m", "15%"], ["Beta", "3m", "8%"], ["Gamma", "n/a", "n/a"]], {"measures": ["i-peers/profit", "i-peers/margin"], "role": "proof"}, []])
+        self.assertEqual(result["table"], [[["Alpha", "20m", "15%"], ["Beta", "3m", "8%"], ["Gamma", "n/a", "n/a"]], {"measures": ["i-peers/profit", "i-peers/margin"], "role": "proof", "labels": {"i-peers/profit": ["Alpha", "Beta", "Gamma"], "i-peers/margin": ["Alpha", "Beta"]}, "bound": True}, []])
         # One that also types numbers says which measures those are.
         self.assertEqual(result["mixed"], [None, ["BASIS_MISSING", "PROOF_MISSING"]])
         self.assertEqual(result["mixedWithBasis"], [])
-        self.assertEqual(result["grid"], [["55m", "25m"], {"measures": ["i-bal/cash", "i-bal/floor"], "role": "proof"}, []])
-        self.assertEqual(result["hero"], [{"label": "cash at the year end", "value": "GBP 55m", "basis": {"measures": ["i-bal/cash"], "role": "proof"}}, []])
+        self.assertEqual(result["grid"], [["55m", "25m"], {"measures": ["i-bal/cash", "i-bal/floor"], "role": "proof", "labels": {"i-bal/cash": ["FY26"]}, "bound": True}, []])
+        self.assertEqual(result["hero"], [{"label": "cash at the year end", "value": "GBP 55m", "basis": {"measures": ["i-bal/cash"], "role": "proof", "labels": {"i-bal/cash": ["FY26"]}, "bound": True}}, []])
         # A number printed through a token is cited to the record it came from, beside what the exhibit plots.
         self.assertEqual(result["cited"], "Sources: Annual report 2026 (illustrative); Regulator returns 2026 (illustrative)")
 
@@ -459,10 +460,10 @@ const insights = {
 const of = (type, insight, form) => { const report = scaffoldReport(type, { id: 'p9', insight, form });
   // What is printed binds and compiles against the insight's own log.
   const compiled = compileDeck({ deck: { id: 'd', design: 'consulting' }, pages: [report.page] }, { insights: new Map([[insight.id, insight]]), partial: true });
-  return { form: report.form, bound: report.bound, typed: report.typed, fallback: report.fallback, passed: (report.passed ?? []).map((item) => item.form), page: report.page,
+  return { form: report.form, bound: report.bound, typed: report.typed, fallback: report.fallback, passed: (report.passed ?? []).map((item) => item.form), page: report.page, fit: report.fit ?? null,
     compiles: compiled.compileErrors.length === 0 && compiled.bindingFindings.length === 0 }; };
 console.log(JSON.stringify({ bridge: of('bridge', insights.bridge), panels: of('panels', insights.pair), lookup: of('lookup', insights.pair), numbers: of('numbers', insights.facts),
-  hero: of('numbers', insights.facts, 'hero-number'), composition: of('composition', insights.mix), scorecard: of('scorecard', insights.roster) }));
+  hero: of('numbers', insights.facts, 'hero-number'), composition: of('composition', insights.mix), scorecard: of('scorecard', insights.roster), harvey: of('scorecard', insights.roster, 'harvey') }));
 ''')
         bridge = result["bridge"]
         self.assertEqual([bridge["bound"], bridge["typed"], bridge["compiles"]], [["i-bridge/effect"], [], True])
@@ -477,10 +478,12 @@ console.log(JSON.stringify({ bridge: of('bridge', insights.bridge), panels: of('
         self.assertEqual(lookup["bound"], ["i-pair/served", "i-pair/planned"])
         self.assertEqual(lookup["page"]["exhibit"]["rows"][0][:3], ["North", "{{i-pair/served@North | 0.0}}", "{{i-pair/planned@North | 0.0}}"])
         self.assertEqual([lookup["typed"], lookup["compiles"]], [[], True])
-        # Single values fill a grid or a list of figures, not the chart under a hero number: the form the measures fill is taken.
+        # Single values fill a grid or a list of figures, not the chart under a hero number: the forms that carry four figures
+        # are read from the measures (claim-fit.mjs), one of them is taken, and the other is named as fitting as well.
         numbers = result["numbers"]
         self.assertIn(numbers["form"], ("fact-grid", "stat-list"))
-        self.assertIn("hero-number", numbers["passed"])
+        self.assertEqual(numbers["fit"]["task"], "figures")
+        self.assertEqual({numbers["form"], *numbers["fit"]["equal"]}, {"fact-grid", "stat-list"})
         self.assertEqual([numbers["typed"], numbers["compiles"]], [[], True])
         self.assertTrue(all("measure" in item for item in numbers["page"]["exhibit"]["items"]))
         # Asked for by form, the hero number is given, and what still holds the example's numbers is listed.
@@ -489,19 +492,28 @@ console.log(JSON.stringify({ bridge: of('bridge', insights.bridge), panels: of('
         # One measure over six parts fills a form that takes six, not the type's first.
         self.assertEqual([result["composition"]["typed"], result["composition"]["compiles"], result["composition"]["bound"]], [[], True, ["i-mix/share"]])
         self.assertNotEqual(result["composition"]["form"], "stacked-column")
-        # Nothing of a scorecard takes a measure: the page is the worked example, and says so and why.
+        # A scorecard of a recorded measure over members binds it, a token a cell under a coded column.
         scorecard = result["scorecard"]
-        self.assertEqual(scorecard["bound"], [])
-        self.assertEqual(len(scorecard["fallback"]), 1)
-        self.assertIn("codes a judgement a cell, which no measure records", scorecard["fallback"][0])
-        self.assertIn("--scaffold lookup --evidence i-roster", scorecard["fallback"][0])
+        self.assertEqual([scorecard["form"], scorecard["bound"], scorecard["typed"], scorecard["compiles"]], ["bars", ["i-roster/vans"], [], True])
+        self.assertTrue(scorecard["page"]["exhibit"]["columns"][1]["bar"])
+        self.assertEqual(scorecard["page"]["exhibit"]["rows"][0][:2], ["North", "{{i-roster/vans@North | 0.0}}"])
+        # A form whose cells are a judgement takes no measure: the page is the worked example, and says so and why.
+        harvey = result["harvey"]
+        self.assertEqual(harvey["bound"], [])
+        self.assertEqual(len(harvey["fallback"]), 1)
+        self.assertIn("code a judgement, which no measure records", harvey["fallback"][0])
+        self.assertIn("--scaffold lookup --evidence i-roster", harvey["fallback"][0])
 
     def test_the_scaffold_command_says_what_it_bound_and_why_it_fell_back(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.stage(tmp)
             bound = self.author(tmp, "--scaffold", "trend", "--evidence", "i-liquidity")
             self.assertIn("Bound to i-liquidity: trend/line names i-liquidity/liquid, i-liquidity/short-liabilities, and the runtime writes the numbers.", bound.stderr)
-            fallback = self.author(tmp, "--scaffold", "scorecard", "--evidence", "i-peers")
+            # A scorecard of recorded measures binds them in a form that codes magnitudes; a judged form, asked for by name, does not.
+            coded = self.author(tmp, "--scaffold", "scorecard", "--evidence", "i-peers")
+            self.assertIn("Bound to i-peers: scorecard/", coded.stderr)
+            self.assertIn("{{i-peers/margin@Harbour | 0.0}}", coded.stdout)
+            fallback = self.author(tmp, "--scaffold", "scorecard/harvey", "--evidence", "i-peers")
             self.assertEqual(fallback.returncode, 0, fallback.stderr)
             self.assertIn("Not bound to i-peers: the page printed is the worked example of scorecard/harvey with the insight named as `evidence`, and its numbers are the example's own.", fallback.stderr)
             self.assertIn("Why:", fallback.stderr)

@@ -10,15 +10,17 @@ So the same reading is applied to the composed scene: its text nodes' lines,
 set on rows as pdftotext sets the rendered page, with a block ending where the
 page leaves a band without text (gates/density_profile.py scene_blocks). The
 unrendered compile prints the deck's standing from it, marked as an estimate
-with the margin it was calibrated to; the plan composes each page with
-placeholder copy under each placement and steers its free choices away from
-placements that take the median out of the band; and the fit search does not
+with the margin it was calibrated to; the plan composes each page that
+carries its copy under each placement and steers its free choices away from
+placements that take the median out of the band - a page with no copy yet has
+no reading, and the plan prints no number for it; and the fit search does not
 propose an alternative that does. The rule and its band are unchanged, and
 only the render blocks on it.
 """
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -45,17 +47,17 @@ def label(role, x, y, words, height=20):
 
 class SceneBlockTests(unittest.TestCase):
     def test_blocks_are_read_off_the_scene_as_the_render_reads_them(self):
-        point = ["Kestrel handled ninety five million international passengers", "in the year, fifteen million more than the airport in", "second place, and has ranked first every year since."]
+        point = ["Marlow lent eighty two thousand books to its readers", "in the year, nine thousand more than the branch in", "second place, and has ranked first every year since."]
         slide = {"id": "p1", "readingTask": "chart-with-commentary", "nodes": [
-            text("action-title", 60, 58, ["Kestrel handles more passengers than any other airport"], 36),
-            text("tracker-compact-label", 60, 30, ["Contents / The hub"], 16),
-            text("section-heading", 60, 154, ["International passengers, ten busiest airports"], 24),
+            text("action-title", 60, 58, ["Marlow lends more books than any other branch"], 36),
+            text("tracker-compact-label", 60, 30, ["Contents / The branch"], 16),
+            text("section-heading", 60, 154, ["Loans, the ten busiest branches"], 24),
             # A point beside the chart, and a second one a paragraph's space below it.
             text("list-item", 840, 178, point), text("list-item", 840, 300, point),
             # A chart's labels on the first point's rows are part of its block; a value alone on a row past it is a label, and dropped.
-            label("category-label", 60, 200, "DXB"), label("data-label", 400, 200, "95.19"),
-            label("data-label", 400, 420, "52.7"),
-            text("source-text", 60, 683, ["Source: airport rankings 2025"], 12), label("page-number", 1196, 683, "20", 12),
+            label("category-label", 60, 200, "MRL"), label("data-label", 400, 200, "82.4"),
+            label("data-label", 400, 420, "47.3"),
+            text("source-text", 60, 683, ["Source: branch returns 2025"], 12), label("page-number", 1196, 683, "20", 12),
         ]}
         blocks = density_profile.scene_blocks(slide)
         words = sum(len(line.split()) for line in point)
@@ -156,24 +158,49 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         self.assertEqual(result["unsatisfied"][2], result["unsatisfied"][1])
         self.assertEqual(result["worst"], [20])
 
-    def test_the_plan_command_prints_the_estimate_from_pages_composed_with_placeholder_copy(self):
-        # The worked deck cut back to a spine that keeps its exhibits: each page's choices, its claim and what it draws, with no
-        # commentary written. The plan composes each with placeholder copy under its placement and reads the median from them.
+    def stage(self, strip):
         tmp = Path(tempfile.mkdtemp(prefix="fragment-plan-"))
         self.addCleanup(shutil.rmtree, tmp, True)
         shutil.copytree(EXAMPLES / "assets", tmp / "assets")
         doc = json.loads((EXAMPLES / "page-types.pages.json").read_text())
-        keep = {"id", "kind", "type", "form", "commentary", "why", "title", "settles", "evidence", "exhibit", "exhibits", "metrics", "kpi", "blocks", "rows", "photo", "pictures"}
-        doc["pages"] = [{k: v for k, v in page.items() if k in keep} if page.get("type") else page for page in doc["pages"]]
+        if strip:
+            keep = {"id", "kind", "type", "form", "commentary", "why", "title", "settles", "evidence", "exhibit", "exhibits", "metrics", "kpi", "blocks", "rows", "photo", "pictures"}
+            doc["pages"] = [{k: v for k, v in page.items() if k in keep} if page.get("type") else page for page in doc["pages"]]
         (tmp / "page-types.pages.json").write_text(json.dumps(doc))
-        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "page-types.pages.json"), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=300)
+        return tmp / "page-types.pages.json"
+
+    def test_the_plan_prints_no_number_for_copy_that_is_not_written(self):
+        # A run's plan printed "median words a block 48.1; floor 41.3: 6.8 words to spare" from pages composed with a stand-in
+        # for their copy - three points of 56 words - and the first check of the written deck measured 24.8: nine pages changed
+        # form after the critique was ready. Words a block are a property of the copy, so a spine has no reading: the plan
+        # prints the rule and what a block is, and no number.
+        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(self.stage(strip=True)), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=600)
         printed = json.loads(plan.stdout)
-        self.assertIn("estimated", printed["standing"], plan.stderr[-1500:])
-        self.assertEqual([line.split(":")[0] for line in printed["standing"]["estimated"]], ["TEXT_FRAGMENTED.floor", "TEXT_FRAGMENTED.ceiling"])
-        self.assertTrue(all("estimated with placeholder copy at a developed length; the render measures it" in line for line in printed["standing"]["estimated"]))
-        self.assertIn("Estimated, from each page that composes with placeholder copy under its placement", plan.stderr)
+        self.assertNotIn("estimated", printed["standing"], plan.stderr[-1500:])
+        self.assertNotRegex(plan.stderr, r"TEXT_FRAGMENTED\.(floor|ceiling): median words a block on the prose pages \d")
+        low, high = density_profile.TEXT_FORM["wordsPerBlock"]["q1"], density_profile.TEXT_FORM["wordsPerBlock"]["q3"]
+        self.assertIn(f"TEXT_FRAGMENTED is not read here: ", plan.stderr)
+        self.assertIn(f"pages carry no copy yet, and the rule is on the copy - the prose pages' median words a block, held between {low} and {high}", plan.stderr)
+        self.assertIn("`--check` prints the deck's standing from the composed pages as soon as they carry copy", plan.stderr)
         self.assertNotIn("TEXT_FRAGMENTED", [item["code"] for item in printed["plan"]["unsatisfied"]])
-        self.assertFalse(any("TEXT_FRAGMENTED" in line for line in printed["standing"]["S"]))
+
+    def test_the_plan_of_a_written_deck_reads_the_median_the_check_reads(self):
+        # Once the pages carry their copy the plan composes them as written and reads their blocks as the check does: one number.
+        pages = self.stage(strip=False)
+        plan = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages), "--plan"], capture_output=True, text=True, cwd=ROOT, timeout=600)
+        printed = json.loads(plan.stdout)
+        self.assertEqual([line.split(":")[0] for line in printed["standing"]["estimated"]], ["TEXT_FRAGMENTED.floor", "TEXT_FRAGMENTED.ceiling"], plan.stderr[-1500:])
+        self.assertTrue(all("read from the scene of the pages as their copy is written, the way --check reads it" in line for line in printed["standing"]["estimated"]))
+        self.assertIn("Read from the scene of each page as its copy is written, under its placement, the way `--check` reads it", plan.stderr)
+        checked = run_node(f"""
+import fs from 'node:fs';
+import {{ authorDeck }} from './skills/professional-slides/runtime/author-deck.mjs';
+const doc = JSON.parse(fs.readFileSync({json.dumps(str(pages))}, 'utf8'));
+const run = await authorDeck(doc, {{ baseDir: {json.dumps(str(pages.parent))}, fit: false }});
+console.log(JSON.stringify({{ value: run.standings.find((st) => st.code === 'TEXT_FRAGMENTED' && st.key === 'floor').value }}));
+""")
+        value = float(re.search(r"median words a block on the prose pages ([\d.]+);", printed["standing"]["estimated"][0]).group(1))
+        self.assertEqual(value, checked["value"])
 
 
 class FitSearchEstimateTests(unittest.TestCase):

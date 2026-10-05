@@ -211,7 +211,9 @@ class ImportDeckTests(unittest.TestCase):
     def test_inventory_names_the_source_by_basename_and_hash(self):
         self.assertEqual(self.inventory["schema"], "professional-slides.inventory/v1")
         self.assertEqual(self.inventory["id"], "board-pack-q3-v2")
-        self.assertEqual(self.inventory["source"], {"file": "Board Pack (Q3) v2.pptx", "sha256": hashlib.sha256(self.pptx.read_bytes()).hexdigest()})
+        # The deck is kept beside its inventory, byte for byte: what a carried slide is copied from when the revision is built.
+        self.assertEqual(self.inventory["source"], {"file": "Board Pack (Q3) v2.pptx", "sha256": hashlib.sha256(self.pptx.read_bytes()).hexdigest(), "copy": "board-pack-q3-v2.source.pptx"})
+        self.assertEqual((self.out / "board-pack-q3-v2.source.pptx").read_bytes(), self.pptx.read_bytes())
         self.assertEqual(self.inventory["slideSize"], {"width": 1280, "height": 720})
         self.assertEqual([s["id"] for s in self.inventory["slides"]], ["s01", "s02", "s03", "s04", "s05"])
         self.assertEqual([s["index"] for s in self.inventory["slides"]], [1, 2, 3, 4, 5])
@@ -249,8 +251,10 @@ class ImportDeckTests(unittest.TestCase):
 
     def test_starter_takes_the_cover_and_drafts_the_rest(self):
         deck = self.starter["deck"]
+        # The starter records the rules version the revision is made under: a rule introduced later is an advisory to it.
+        current = json.loads((RUNTIME / "weight.json").read_text())["rulesVersion"]
         self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "board-pack-q3-v2", "workflow": "existing_deck_revision",
-                                "inventory": "board-pack-q3-v2.inventory.json", "request": "",
+                                "inventory": "board-pack-q3-v2.inventory.json", "rulesVersion": current, "request": "",
                                 "cover": {"title": "Northvale growth plan", "subtitle": "Board meeting March 2026"}})
         pages = self.starter["pages"]
         self.assertEqual([(p["id"], p["sourceSlide"]) for p in pages], [("s02", 2), ("s03", 3), ("s04", 4), ("s05", 5)])

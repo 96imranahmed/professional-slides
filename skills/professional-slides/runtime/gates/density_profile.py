@@ -227,7 +227,7 @@ def scene_fragmentation(scene: dict) -> dict:
     is the render's to measure."""
     pages = []
     for index, slide in enumerate(scene.get("slides", [])):
-        if is_cover(slide, index) or re.match(r"^(agenda-\d+|picture-credits(?:-\d+)?)$", str(slide.get("id") or "")):
+        if is_cover(slide, index) or re.match(r"^(agenda-\d+|(?:picture-credits|source-limits)(?:-\d+)?)$", str(slide.get("id") or "")):
             continue
         task = slide.get("readingTask")
         if task in STRUCTURAL_TASKS or not task:
@@ -307,7 +307,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
         task = reference.get("task")
         # Generated pages - the contents pages composition inserts and the
         # picture credits, split or not - carry no reading task of their own.
-        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|picture-credits(?:-\d+)?)$", str(slide.get("id") or "")):
+        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|(?:picture-credits|source-limits)(?:-\d+)?)$", str(slide.get("id") or "")):
             continue
         text = texts[index - 1] if index - 1 < len(texts) else ""
         header = header_lines(slide) or None

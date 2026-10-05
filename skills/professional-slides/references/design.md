@@ -57,6 +57,40 @@ A chart that is no type's form - a range, radial bars - reaches a page as a pane
 
 When two rows fit, the message decides: "China rose from sixth to first" is movement, so `rank-flow`; "China is first" is a level, so a sorted bar. Record the choice and the rejected alternative in the page's `why`. A deck that finds itself using one chart form for most of its charts should go back through this table page by page; `PLAN_CHART_MONOTONY` reports it.
 
+### Which form carries which claim
+
+The table above is also held as data, in `runtime/claim-fit.mjs`, so the programs that propose a form read the same choice an author makes. For a page it reads the **reading task** off the measures the page shows - the axis they run over, how many periods or members the page shows of them, how many series, their units, a threshold among them, whether they are parts of a whole or the steps of a bridge - and off the claim (`settles.kind`, and the relation it asserts between its measures: a gap, levels, an index, or each read separately). Every form of the page's type is then graded against that task:
+
+| Grade | Means | Example, for two dates of each of ten members |
+| --- | --- | --- |
+| best fit | the form shows the very thing the reader is asked to read, and the measures fill it | `dumbbell`: the gap is the mark |
+| serves | the values are there and the reader works the relation out | `bar` with twenty bars in ten pairs |
+| weak | the form draws the measures and not what the claim says of them | `distribution` |
+
+`author-deck.mjs --types` prints the whole table by reading task ("Which form carries which claim"), and each type's forms whose content is a judgement or the subject's own shape - a Harvey ball, a cycle, a gantt - with what the page has to show for the form to be right; those are never proposed or questioned from measures.
+
+One definition, read everywhere a form is chosen or judged:
+
+- **`--plan`** gives a page that declares no form one of its best-fit forms, and never a weaker one. A structure rule those forms cannot meet between them is reported unmet with the pages that pin it, and with what meeting it would cost - the pages a search over every form would move off their best fit - which the plan does not propose. A declared form is always kept.
+- **Where several forms fit equally** the choice is free, and the plan makes it in this order, saying which on each page's line ("3 forms fit equally (lollipop, bar, column); lollipop chosen by this deck's draw for the reading task"):
+  1. a form the deck's draw features from its design system's repertoire;
+  2. the deck's own hand. The `variation` draws, once for the deck, an order of the kinds that can be a best fit for each reading task - this deck's rankings lead with dot plots, its trends with columns - and no two tasks lead with one kind where the table gives them another. A page takes the mark whose turn it is: the lead until the deck has drawn it twice for each time it has drawn the second, three times for the third. So one deck is mostly one mark for one reading task, with its equals among them, and the next deck from the same spine leads with another.
+
+  A deck with no `variation` has no hand: it takes the kind it has drawn least, then the room under the structure rules' caps, then the catalogue's order.
+
+  The exhibits of a page whose form leaves their kind to the author (`panels`, the chart under a `metric-strip` or beside a `hero-number`) are chosen the same way, one kind for every cut that can take it. So two decks planned from one spine under different seeds differ on the pages with a free choice and agree on the rest.
+- **An exhibit the spine declares by a `basis` stub with no `type`** is given its kind the same way. The plan prints it on the page's line ("exhibits chart.lollipop, chart.lollipop - 3 kinds fit equally"), every run reads the stub as that kind, and that is the `type` to write on it. A stub that says `as: "table"` or `"figure"` has said what it is.
+- **A form or a kind you have already declared** is kept. Where it is one of several equals, the line says which the deck's draw would take ("this deck's draw takes lollipop"), for you to take or leave before the critique.
+- **How much is free** is a property of the evidence, not of the plan. On three decks written from one brief, four exhibits in ten were a table, a grid of figures or a diagram whose page type the evidence set; a quarter were charts one form carries best; a third had a free choice, mostly between two or three kinds, and seven in ten of those sat on pages of open kinds. Two seeds therefore differ on about a fifth of a deck's exhibit pages and no more: the rest is the same evidence asking for the same form. The page type is not a second source of variety - a type rests on one shape of evidence, so almost no chart page has an equal in another type its evidence can rest under (the plan says so where one has: "another type carries it as directly"). `evals/quality/variability.mjs` measures all of this on any spine.
+- **`--scaffold <type> --evidence <insight-id>`** tries the forms best fit first, binds the first that binds completely, and says which others fit as well, which only serve, and which would fit and what the measures lack for them. With `--id <page-id>` it takes the form that page declares - the plan's allocation, once copied in.
+- **`--draft`** lists, for each page with a choice to make or mend, the forms that are its best fit (`fits`).
+- **The fit search** tries a misfit page's other forms best fit first, and marks an alternative that fits the layout and carries the claim less directly than the form the page has.
+- **Where the deck stands** shows two readings on every run, neither a refusal: `VARIETY_KIND_SHARE`, the share of the deck's exhibits its three commonest kinds carry, with the pages among them that another form carries as directly; and `VARIETY_FIT_UNUSED`, the pages drawn in a form that only serves their claim while another of their type is its best fit. The deck reviewer is shown both, and the storyline critic is told where a page's type has no best-fit form and another type has one.
+
+What this does not do is rotate. A page whose claim one form carries best gets that form in every deck; a deck whose evidence is twenty trends is twenty line charts, and the remedy the standing names then is evidence of another shape, not another chart of the same one.
+
+**On a revision** none of this restyles the user's deck. An imported page keeps the form it declares, and one that declares none takes the form that draws what its source slide drew (the inventory's chart type), whatever the fit says of it; the plan never changes either to mend a rule. A page the revision adds takes, among the forms that carry its claim best, the one the source deck draws most - an exhibit it declares by an untyped stub the same - so consistency with the user's deck comes before the deck's own hand, the draw's features are not consulted, the seed breaks only what is left, and no line tells a revision what its draw would take. The two standings count the imported pages and judge only the pages the revision added or redrew; `VARIETY_KIND_SHARE` is a standing there and never an advisory.
+
 ## Make every exhibit earn its page
 
 A chart earns its page by showing a relationship the reader could not get from the numbers in the title. Two bars of one series are a metric pair with a chart drawn round it: set them as metrics with the delta, or widen the evidence until the chart shows something. `CRAFT_TRIVIAL_CHARTS` stops a deck where more than a quarter of the charts are two-number charts. The forms that carry an implication:

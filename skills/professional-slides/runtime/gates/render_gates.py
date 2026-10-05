@@ -520,7 +520,9 @@ def gate_words(slide_no, slide, findings, profile):
                 "An executive summary is read first and in full, so it is held to "
                 "the upper quartile of text pages: keep each point to its finding "
                 "and the number that proves it, and leave the qualifications to the "
-                "pages that carry the evidence." if summary else
+                "pages that carry the evidence. The ceiling is on every word of the "
+                "body, the cells of its table with its points: a table of long cells "
+                "leaves the points no room, so keep each cell to a call of a few words." if summary else
                 "Above the fence for pages doing this job: cut the page to its "
                 "claim, its evidence and its consequence, or split it in two.",
             ))

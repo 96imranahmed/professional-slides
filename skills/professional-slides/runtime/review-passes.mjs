@@ -35,6 +35,7 @@ import { registered } from "./errors.mjs";
 import { deckStem } from "./artifact-path.mjs";
 import { waiverErrors } from "./build-bars.mjs";
 import { assetsDeclarationErrors } from "./asset-needs.mjs";
+import { carriedChanges, withCarriedPages } from "./revision.mjs";
 
 export const SEVERITIES = Object.freeze(["none", "minor", "major", "blocker"]);
 export const PAGE_VERDICTS = Object.freeze(["ok", "minor", "major", "blocker"]);
@@ -50,15 +51,86 @@ export const ACCEPT_RATING = 8;
 // Fresh, blind reads of the final artifact a lineage may spend after a
 // verification pass accepts; each pass the user adds beyond the cap adds one.
 export const MAX_CONFIRMATIONS = 1;
+// The folder of a lineage store that keeps the deck review's passes: named here because the storyline loop reads it too (its post-review pass).
+export const REVIEW_HISTORY = "review-history";
 
 // Calibrated, so two reviewers put the same defect at the same level and the
-// acceptance rule means the same thing on every deck.
-export const SEVERITY_DEFINITIONS = Object.freeze({
-  blocker: "a reader would be misled or the page cannot be shown: a wrong or unreconciled number, a claim its evidence contradicts, an encoding that distorts (unequal time gaps drawn equal, a truncated bar baseline), clipped or unreadable content, an unfinished element (a blank total row, a placeholder)",
-  major: "a partner would send the page back: the reader gets the point late, at avoidable cost or with the wrong emphasis - the wrong chart form, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task",
-  minor: "polish a reader notices only on close reading and that does not change what they take away: a few points of misalignment, one inconsistent number format, a slightly long label",
-  none: "an observation that needs no action",
+// acceptance rule means the same thing on every deck. One scale for both
+// judges: `means` is the level, `argument` the defects of argument at that
+// level - what the storyline critic reads at the spine and the deck reviewer
+// reads again on the page - and `rendered` the defects only a drawn page can
+// have. The critic is told the first two, the reviewer all three, from this
+// one definition, so a major at the spine is a major on the page.
+const SEVERITY_SCALE = Object.freeze({
+  blocker: { means: "a reader would be misled or the page cannot be shown",
+    argument: "a wrong or unreconciled number, a figure that differs between the pages that state it, a claim its evidence contradicts, a decisive claim with nothing behind it, an answer that does not follow from the pages",
+    rendered: "an encoding that distorts (unequal time gaps drawn equal, a truncated bar baseline), clipped or unreadable content, an unfinished element (a blank total row, a placeholder)" },
+  major: { means: "a partner would send the page back: the reader gets the point late, at avoidable cost or with the wrong emphasis",
+    argument: "a claim that goes further than its evidence or has no source, evidence of the wrong shape for the claim, a comparison across incompatible bases, a page that restates or re-proves another, a missing countercase, a missing analysis that would change the answer",
+    rendered: "the wrong chart form, a judgement table set as plain text, a wall of text, an empty band, a missing identity anchor, a construction repeated across neighbouring pages, density wrong for the task" },
+  minor: { means: "polish a reader notices only on close reading and that does not change what they take away",
+    argument: "a claim that could be sharper, a page better placed",
+    rendered: "a few points of misalignment, one inconsistent number format, a slightly long label" },
+  none: { means: "an observation that needs no action" },
 });
+const severityText = (parts) => Object.freeze(Object.fromEntries(Object.entries(SEVERITY_SCALE).map(([level, said]) => [level, `${said.means}${parts.some((part) => said[part]) ? `: ${parts.map((part) => said[part]).filter(Boolean).join(", ")}` : ""}`])));
+/** The severity scale as the deck reviewer reads it: every level with its defects of argument and of the drawn page. */
+export const SEVERITY_DEFINITIONS = severityText(["argument", "rendered"]);
+/** The same scale as the storyline critic reads it: the levels and their defects of argument, in the reviewer's words. */
+export const ARGUMENT_SEVERITIES = severityText(["argument"]);
+
+// What a rating means, on one scale for both judges, so that "8, ready" at the
+// spine and "8, accepted" on the deck are the same claim about the argument.
+// `means` is what both judge; `rendered` what only the deck review can add.
+// The caps are part of the scale: an open blocker or major bounds the number.
+export const RATING_CAPS = Object.freeze({ blocker: 5, major: 7 });
+const RATING_SCALE = Object.freeze([
+  { at: "2 or less", means: "no argument: the question restated, or facts without an answer" },
+  { at: String(RATING_CAPS.blocker), means: "understandable in parts, but weak proof", rendered: " or costly reading" },
+  { at: String(RATING_CAPS.major), means: "useful and mostly supported, with substantial work still needed", rendered: ", editorial and design work included" },
+  { at: String(ACCEPT_RATING), means: "the bar: nothing major open and the remaining weaknesses limited" },
+  { at: "9", means: "strong argument and evidence, nothing a top team would add missing", rendered: ", effective visual explanation, coherent rhythm" },
+  { at: "9.5+", means: "exceptional", rendered: " across the deck, its least effective page included" },
+]);
+/** The rating scale in a line, for a prompt: `rendered` adds what the deck reviewer judges on the drawn pages. */
+export const ratingScale = ({ rendered = false } = {}) => `${RATING_SCALE.map((anchor) => `${anchor.at} - ${anchor.means}${rendered ? anchor.rendered ?? "" : ""}`).join("; ")}. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less; ${ACCEPT_RATING} or more says nothing major is open`;
+
+/**
+ * The deck review's rubric, clause by clause, and where each clause is first
+ * decidable. A clause with a `spine` check is decidable from the spine packet
+ * - the request, the answer, the titles in order, and each page's claim, type,
+ * what settles it, the insights it rests on and the measures it shows - so the
+ * storyline critic applies it under that check, in these words, before
+ * anything is drawn (storyline.mjs STORYLINE_CHECKS). A clause with none needs
+ * the rendered page. Both prompts print the clause from here: the reviewer in
+ * its rubric, the critic under the check named, so `ready` at the spine means
+ * what the reviewer will later hold the argument to.
+ */
+const clause = (text, spine = null) => Object.freeze({ text, spine });
+export const RUBRIC_CLAUSES = Object.freeze({
+  argument: { scope: "page", clauses: [clause("the title states the finding the page proves and the exhibit and commentary prove it", "claim"), clause("the claim goes no further than its evidence", "sourcing"), clause("the page's job in the argument is clear", "restatement")] },
+  evidence: { scope: "page", clauses: [clause("members compared on the same measures, with n/a where one does not publish a measure - never a different metric per member", "shape"),
+    clause("every number reproduced against its source and against the other pages that print it", "numbers"), clause("evidence deep enough for the claim (the whole peer set, the trend with its rate, not two numbers)", "shape"), clause("bases, units and periods compatible", "numbers")] },
+  chart: { scope: "page", clauses: [clause("the chart form fits the comparison (ranking, trend, share, bridge, distribution)"), clause("honest axes - time spaced by time, bars from a zero baseline, scale and units stated"), clause("the subject highlighted and rivals muted"),
+    clause("an annotation marks the finding (the gap, the break, the rate)"), clause("not a two-number chart")] },
+  table: { scope: "page", clauses: [clause("verdict, score and status cells encoded (Harvey balls, ratings, pills, bars), not plain words"), clause("totals defined and filled"), clause("units in the headers"), clause("numbers right-aligned and rounded alike"), clause("row and column order meaningful")] },
+  text: { scope: "page", clauses: [clause("density right for the reading task"), clause("the longest block readable"), clause("no sentence restating the title or the exhibit"), clause("jargon and acronyms explained"),
+    clause("the action title commits to a finding in two lines or fewer", "claim"), clause("the subtitle adds scope, not a second title")] },
+  layout: { scope: "page", clauses: [clause("no empty band"), clause("the exhibit dominates and the page is balanced"), clause("edges aligned"), clause("hierarchy reads title, exhibit, commentary"), clause("the frame is occupied, not a small figure in a large box")] },
+  identity: { scope: "page", clauses: [clause("named companies, products and places carry their visual anchors where the reader needs recognition - logos, product images, maps"), clause("a player is introduced before it is compared", "flow")] },
+  sourcing: { scope: "page", clauses: [clause("every number and claim has a source line a reader can look up, with its as-at date"), clause("footnotes define estimates, bases and exclusions")] },
+  consistency: { scope: "deck", clauses: [clause("no construction repeated across a window of neighbouring pages"), clause("equal things styled alike"), clause("one term for one thing"), clause("one number format, unit and rounding per measure")] },
+  rhythm: { scope: "deck", clauses: [clause("sections open, develop and close", "flow"), clause("page types vary with the reading task", "flow"), clause("the sequence builds rather than repeats", "spine"), clause("no page previews or re-proves another", "restatement")] },
+  bookends: { scope: "deck", clauses: [clause("the executive summary states the answer and the pillars the body proves, with the numbers the body shows", "summary"), clause("the close states the decision, its conditions and the next step, and agrees with the summary", "summary")] },
+});
+/** The rubric's clauses the storyline critic applies under `check`, in the reviewer's words. */
+export const spineClauses = (check) => Object.values(RUBRIC_CLAUSES).flatMap((dimension) => dimension.clauses).filter((item) => item.spine === check).map((item) => item.text);
+/**
+ * Where a rubric dimension is decidable: "spine" when every clause is, "page"
+ * when none is, "both" when the spine decides some of it. The reviewer's codes
+ * are classed beside their definitions (reviewer.mjs CODES_AT_SPINE).
+ */
+export const dimensionAt = (dimension) => { const at = (RUBRIC_CLAUSES[dimension]?.clauses || []).map((item) => Boolean(item.spine)); return at.length && at.every(Boolean) ? "spine" : at.some(Boolean) ? "both" : "page"; };
 
 // Why a later pass may add a finding at all. Anything else is the loop reopening itself.
 export const NEW_BASES = Object.freeze({
@@ -136,7 +208,18 @@ export const REQUEST_PROVENANCES = Object.freeze({
 export const requestProvenanceOf = (spec) => (Object.hasOwn(REQUEST_PROVENANCES, spec?.requestProvenance) ? spec.requestProvenance : "verbatim");
 /** Whether the author may fetch evidence beyond what was supplied: `{ retrieval: "open" | "closed", note }`. */
 export const evidenceScopeOf = (spec) => ({ retrieval: spec?.evidenceScope?.retrieval === "closed" ? "closed" : "open", note: typeof spec?.evidenceScope?.note === "string" ? spec.evidenceScope.note.trim() : "",
-  ...(spec?.evidenceScope?.retrieval === "closed" && typeof spec.evidenceScope.quote === "string" ? { quote: spec.evidenceScope.quote.trim() } : {}) });
+  ...(spec?.evidenceScope?.retrieval === "closed" && typeof spec.evidenceScope.quote === "string" ? { quote: spec.evidenceScope.quote.trim() } : {}),
+  // Where the limit is written, on a deck whose `request` is not the user's own words (scopeSource).
+  ...(spec?.evidenceScope?.retrieval === "closed" && scopeSource(spec) ? { source: scopeSource(spec) } : {}) });
+/**
+ * The file a closed evidence scope quotes its limit from, where the deck's
+ * `request` is not the user's own words: `evidenceScope.source`, a path beside
+ * the pages file. A verbatim request is its own source, and has none.
+ */
+function scopeSource(spec) {
+  const source = spec?.evidenceScope?.source;
+  return requestProvenanceOf(spec) !== "verbatim" && typeof source === "string" && source.trim() ? source.trim() : null;
+}
 /** Whether the deck offers its answer as final or as provisional, and what a provisional one leaves open. */
 export const answerStatusOf = (spec) => ({ status: spec?.answerStatus === "provisional" ? "provisional" : "final", limits: Array.isArray(spec?.answerLimits) ? spec.answerLimits.filter((limit) => typeof limit === "string" && limit.trim()) : [] });
 /**
@@ -150,8 +233,13 @@ export function requestStatement(packet, subject) {
   const provenance = Object.hasOwn(REQUEST_PROVENANCES, packet?.requestProvenance) ? packet.requestProvenance : "verbatim";
   const label = provenance === "verbatim" ? null
     : `${provenance}: ${REQUEST_PROVENANCES[provenance]} - not the user's own words. It is the yardstick as far as it goes: judge the ${subject} against what it asks, do not hold it to the exact wording or to an answer the phrasing presumes, and say in the summary where it leaves the request open`;
+  // Whose words close the scope is said with it: the request's own, or - where the request on record is not the user's own
+  // words - those of the file the team holds, which the runtime found them in.
+  const limit = !packet?.evidenceScope?.quote ? "" : packet.evidenceScope.source
+    ? `; the request on record is ${provenance}, so the limit is quoted from the file that sets it (${packet.evidenceScope.source}, where the runtime found these words): "${packet.evidenceScope.quote}" - where they set no such limit the scope is open: say so, and mark nothing scope-limited`
+    : `; the request is said to set the limit in these words: "${packet.evidenceScope.quote}" - where they set no such limit the scope is open: say so, and mark nothing scope-limited`;
   const scope = packet?.evidenceScope?.retrieval === "closed"
-    ? `EVIDENCE SCOPE: closed - only the evidence supplied may be used${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}${packet.evidenceScope.quote ? `; the request is said to set the limit in these words: "${packet.evidenceScope.quote}" - where they set no such limit the scope is open: say so, and mark nothing scope-limited` : ""}. An analysis that needs other data cannot be run. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
+    ? `EVIDENCE SCOPE: closed - only the evidence supplied may be used${packet.evidenceScope.note ? ` (${packet.evidenceScope.note})` : ""}${limit}. An analysis that needs other data cannot be run. It keeps its severity - a decisive gap is still decisive - and is met only by an answer that claims less, or stays open under a provisional answer.`
     : "";
   const limits = packet?.answerStatus?.status === "provisional" ? packet.answerStatus.limits || [] : null;
   const offered = limits ? `THE ANSWER IS OFFERED AS PROVISIONAL. It says it leaves open: ${limits.map((limit) => `"${limit}"`).join("; ")}. Judge whether those are the decisive gaps, and whether everything else the evidence allows has been done.` : "";
@@ -190,8 +278,15 @@ export function deckStatementFindings(deck) {
     // The limit is the user's to set, so it is shown in the user's words: the
     // author cannot close the scope on a request that does not say so.
     const flat = (text) => String(text ?? "").toLowerCase().replace(/\s+/g, " ").trim();
-    if (requestProvenanceOf(deck) !== "verbatim") statements.push("a closed `evidenceScope` rests on the user's own words; a request that is reconstructed or paraphrased cannot close it - record the request verbatim, or leave the scope open");
-    else if (textWords(scope.quote) < 4 || !flat(requestOf(deck)).includes(flat(scope.quote)))
+    // Whether the evidence is closed is a fact about the evidence, and how the request came to be recorded is another: a
+    // request rebuilt from a brief can sit beside a limit the brief sets. What the quote protects is that the limit is the
+    // user's and not the author's, so where the request on record is not the user's own words the limit is quoted from the
+    // file that sets it - the brief, the ticket, the message - which the compile and the storyline loop then read
+    // (scopeSourceErrors): a closure the author could only assert is still refused.
+    if (requestProvenanceOf(deck) !== "verbatim") {
+      if (textWords(scope.quote) < 4 || typeof scope.source !== "string" || !scope.source.trim())
+        statements.push(`a closed \`evidenceScope\` on a request that is ${requestProvenanceOf(deck)} names, in \`source\`, the file that sets the limit - the brief, the ticket or the message, saved as text beside the pages file ("sources/brief.md") - and quotes its words in \`quote\` (four words or more, as they appear there): the request on record is not the user's own words, so the limit is shown where it was written. The scope is the user's to close, not the author's`);
+    } else if (textWords(scope.quote) < 4 || !flat(requestOf(deck)).includes(flat(scope.quote)))
       statements.push("a closed `evidenceScope` quotes, in `quote`, the words of the `request` that set the limit (four words or more, as they appear there): the scope is the user's to close, not the author's");
   }
   if (deck?.answerStatus !== undefined && !["final", "provisional"].includes(deck.answerStatus)) statements.push("`answerStatus` is \"final\" or \"provisional\"");
@@ -201,6 +296,24 @@ export function deckStatementFindings(deck) {
   statements.push(...assetsDeclarationErrors(deck));
   if (statements.length) out.push({ code: registered(DECK_STATEMENT_CODES, "STATEMENT_INVALID"), severity: "blocker", repair: statements.join("; ") });
   return out;
+}
+/**
+ * Why a closed scope's `source` does not show the limit, as sentences: the
+ * file is not beside the deck (`baseDir`), or the words in `quote` are not in
+ * it. Read wherever the deck's own folder is at hand - the compile, the
+ * storyline loop - since the form alone (deckStatementFindings) cannot say
+ * whether the file says what the deck says it does. Empty for a scope that
+ * names no source: an open one, or one closed on a verbatim request.
+ */
+export async function scopeSourceErrors(deck, baseDir) {
+  const scope = evidenceScopeOf(deck);
+  if (scope.retrieval !== "closed" || !scope.source || !baseDir) return [];
+  const flat = (text) => String(text ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const file = path.resolve(baseDir, scope.source);
+  if (path.relative(path.resolve(baseDir), file).startsWith("..")) return [`\`evidenceScope.source\` (${scope.source}) is a file beside the pages file, in the deck's own folder`];
+  const text = await fs.readFile(file, "utf8").catch(() => null);
+  if (text === null) return [`\`evidenceScope.source\` names ${scope.source}, which is not a file beside the pages file: save the brief, the ticket or the message that sets the limit there as text, so the limit can be read where it was written`];
+  return flat(text).includes(flat(scope.quote)) ? [] : [`the words in \`evidenceScope.quote\` are not in ${scope.source}: quote the limit as that file states it (four words or more), or leave the scope open - the scope is the user's to close, not the author's`];
 }
 /** Why a deck cannot be reviewed without its request: a new deck must carry it, and what it says of it must be in form. */
 export const requestErrors = (spec) => deckStatementFindings({ workflow: spec?.workflow, request: spec?.request, requestProvenance: spec?.requestProvenance, evidenceScope: spec?.evidenceScope,
@@ -254,12 +367,29 @@ const numbersOf = (texts) => (texts.join(" ").match(/\d+(?:[.,]\d+)*/g) || []).m
 function sameContent(slide, source) {
   const page = said({ ...slide, title: undefined });
   // A source table says its cells and a chart its title, categories and series: not their sizes or type.
-  const before = said({ subtitle: source.subtitle, paragraphs: (source.paragraphs || []).map((p) => p.text), tables: (source.tables || []).map((t) => t?.cells),
+  // The deck's own furniture - a footer repeated on its slides, the page number - is no part of what the slide says.
+  const before = said({ subtitle: source.subtitle, paragraphs: (source.paragraphs || []).filter((p) => !["furniture", "page-number"].includes(p.role)).map((p) => p.text), tables: (source.tables || []).map((t) => t?.cells),
     charts: (source.charts || []).map((c) => ({ title: c?.title, categories: c?.categories, series: c?.series })) });
   const [a, b] = [wordsOf(page), wordsOf(before)];
   const shared = [...a].filter((w) => b.has(w)).length;
   const jaccard = a.size || b.size ? shared / (a.size + b.size - shared) : 1;
   return jaccard >= 0.8 && numbersOf(page) === numbersOf(before);
+}
+
+// Every number a value holds, as a reader compares them: "1,311.8" is 1311.8, and 41 is 41.0.
+const eachNumber = (texts) => (texts.join(" ").match(/\d+(?:[.,]\d+)*/g) || []).map((n) => Number(n.replace(/,/g, ""))).filter(Number.isFinite);
+/**
+ * Is the evidence a composed page shows evidence its source slide held: every
+ * number its evidence parts draw - its exhibits, tiles, rows; not its copy -
+ * is a number the slide printed or plotted. A slide that held nothing but its
+ * title gave the page no evidence and no argument: a page with a body of its
+ * own is not that slide's.
+ */
+function sameEvidence(slide, source) {
+  const held = new Set(eachNumber(said({ paragraphs: (source.paragraphs || []).map((p) => p.text), tables: (source.tables || []).map((t) => t?.cells), charts: (source.charts || []).map((c) => ({ categories: c?.categories, series: c?.series })) })));
+  const evidence = Object.entries(slide).filter(([key, value]) => value && typeof value === "object" && !INERT.has(key) && !BUILT.has(key) && !TEXT.has(key) && !PICTURE_PARTS.has(key)).map(([, value]) => value);
+  const bare = !(source.paragraphs || []).some((p) => !["furniture", "page-number"].includes(p.role)) && !(source.tables || []).length && !(source.charts || []).length && !(source.pictures || []).length;
+  return eachNumber(said(evidence)).every((n) => held.has(n)) && !(bare && said({ ...slide, title: undefined }).length > 0);
 }
 
 // A chart's kind as the inventory names it (python-pptx's chart type) and as a
@@ -271,6 +401,8 @@ function sourceChartKind(type) {
   const kinds = [[/^BAR_/, `${stacked}bar`], [/^COLUMN_/, `${stacked}column`], [/^LINE/, "line"], [/^PIE/, "pie"], [/^DOUGHNUT/, "donut"], [/^AREA/, `${stacked}area`], [/^(?:XY_SCATTER|BUBBLE)/, "scatter"], [/^RADAR/, "radar"]];
   return kinds.find(([pattern]) => pattern.test(name))?.[1] ?? `pptx:${name}`;
 }
+/** The evidence a source slide drew, by kind: a table for each of its tables, and each chart by its kind as a page names it without `chart.`. */
+export const sourceEvidence = (source) => [...(source?.tables || []).map(() => "table"), ...(source?.charts || []).map((c) => sourceChartKind(c?.type))];
 const exhibitKind = (exhibit) => { const type = String(exhibit?.type ?? "exhibit"); return type.startsWith("chart.") ? type.slice("chart.".length) : type; };
 const fileName = (file) => String(file ?? "").split(/[\\/]/).pop();
 const sameList = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -298,36 +430,70 @@ function drawingOf(slide) {
 }
 function sameDrawing(slide, source) {
   const page = drawingOf(slide);
-  const evidence = [...(source.tables || []).map(() => "table"), ...(source.charts || []).map((c) => sourceChartKind(c?.type))];
-  return !page.settings.length && sameList(page.evidence, evidence) && sameList(page.pictures, (source.pictures || []).map((p) => fileName(p?.file)));
+  return !page.settings.length && sameList(page.evidence, sourceEvidence(source)) && sameList(page.pictures, (source.pictures || []).map((p) => fileName(p?.file)));
 }
 
 /**
  * What a revision changed, against the deck it was imported from: `spine`,
- * the content pages whose title changed, that are new or moved, or that sit
- * beside a cut slide - what the storyline critique reads; `copy`, those plus
- * the pages whose words or numbers changed; `drawn`, the pages drawn other
- * than their slide was (sameDrawing); and `content`, every page in `copy` or
- * `drawn` - what the deck review's first pass reads. A revision whose spine
- * is unchanged needs no storyline critique; one whose copy is unchanged is a
+ * the pages whose title changed, that are new or moved, that sit beside a
+ * cut slide, or that the runtime composed to show evidence their slide did
+ * not hold (sameEvidence) - what the storyline critique reads; `copy`, those
+ * plus the pages whose words or numbers changed; `drawn`, the pages drawn other than their
+ * slide was (sameDrawing); and `content`, every page in `copy` or `drawn` -
+ * what the deck review's first pass reads. A revision whose spine is
+ * unchanged needs no storyline critique; one whose copy is unchanged is a
  * `restyle`, and the deck review reads every page. Null for new work.
+ *
+ * A revision that carries slides from its source deck (`carried` on the
+ * spec, revision.mjs) is read slide by slide: a carried slide is unchanged
+ * unless the revision edited it - a new title changes the spine, replaced
+ * words the copy - and every page the runtime composes is drawn anew beside
+ * the user's own slides, so the review reads each of them. `pages` then
+ * lists the carried slides in their places among the composed pages,
+ * `carried` the slides copied untouched, and it is never a restyle.
+ *
+ * A page composed where a slide stood is compared with what the inventory
+ * holds of that slide, and the inventory holds text, table objects and chart
+ * objects. A slide that draws its exhibit as shapes - as a deck this runtime
+ * built does - leaves nothing to compare the page's numbers with, so the
+ * page is read as changed whether the revision changed it or not: `unheld`
+ * lists the changed pages whose slide the inventory says it does not hold
+ * whole (`unheld` on the slide), for the run to say so (unheldLine). Carrying
+ * such a slide is what keeps it unchanged.
  */
 export function revisionChanges(spec, inventory) {
   if (spec?.workflow !== REVISION || !Array.isArray(inventory?.slides)) return null;
   const bySource = new Map(inventory.slides.map((s) => [s.index, s]));
-  const pages = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s?.pageType);
-  const sourceOf = (s) => s.pageType.sourceSlide ?? s.sourceSlide;
-  const spine = new Set(), copy = new Set(), drawn = new Set(), used = new Set();
+  const typed = [...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s?.pageType);
+  const carries = Array.isArray(spec.carried) && spec.carried.length > 0;
+  // Every page that stands for a slide or adds one, in deck order: the composed pages, and the carried slides among them.
+  const pages = carries ? withCarriedPages(spec, typed, (entry) => ({ id: entry.id, carried: entry })) : typed;
+  const sourceOf = (s) => (s.carried ? s.carried.sourceSlide : s.pageType.sourceSlide ?? s.sourceSlide);
+  const spine = new Set(), copy = new Set(), drawn = new Set(), used = new Set(), untouched = [], partial = new Set();
   let furthest = 0;
   for (const s of pages) {
     const from = sourceOf(s);
     const source = bySource.get(from);
-    if (!source) { spine.add(s.id); copy.add(s.id); continue; }
+    if (!source) { spine.add(s.id); copy.add(s.id); if (carries) drawn.add(s.id); continue; }
     used.add(from);
-    if (normalTitle(s.title ?? s.text) !== normalTitle(source.title) || from < furthest) spine.add(s.id);
+    const moved = from < furthest;
     furthest = Math.max(furthest, from);
+    if (s.carried) {
+      const changes = carriedChanges(s.carried, source);
+      // The title as the revision leaves it, whichever key wrote it: a title rewritten through `replace` is a title change.
+      if (changes.retitled !== undefined || moved) spine.add(s.id);
+      if (spine.has(s.id) || changes.edits) copy.add(s.id);
+      if (!copy.has(s.id)) untouched.push(s.id);
+      continue;
+    }
+    if (source.unheld) partial.add(s.id);
+    // The critique is bound to a page's title and to what it shows as evidence. So a page the runtime composed keeps its slide's
+    // spine where both are the slide's: the same title, over evidence every number of which the slide already held (sameEvidence).
+    // A title in common with a source slide keeps nothing from being read by itself - a page that shows other figures under it,
+    // or gives a body to a slide that held only its title, is the revision's own argument. Reworded copy is the review's to read.
+    if (normalTitle(s.title ?? s.text) !== normalTitle(source.title) || moved || !sameEvidence(s, source)) spine.add(s.id);
     if (spine.has(s.id) || !sameContent(s, source)) copy.add(s.id);
-    if (!sameDrawing(s, source)) drawn.add(s.id);
+    if (carries || !sameDrawing(s, source)) drawn.add(s.id);
   }
   for (const s of [...(spec.slides || []), ...(spec.appendix || [])]) if (s?.sourceSlide !== undefined) used.add(s.sourceSlide);
   // A source slide with body content that no page carries was cut: the pages either side of the gap changed with it.
@@ -340,7 +506,26 @@ export function revisionChanges(spec, inventory) {
   }
   const ids = pages.map((s) => s.id);
   return { spine: ids.filter((id) => spine.has(id)), copy: ids.filter((id) => copy.has(id)), drawn: ids.filter((id) => drawn.has(id)),
-    content: ids.filter((id) => copy.has(id) || drawn.has(id)), restyle: copy.size === 0, dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0 };
+    content: ids.filter((id) => copy.has(id) || drawn.has(id)), restyle: copy.size === 0 && !carries, dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0,
+    unheld: ids.filter((id) => partial.has(id) && (copy.has(id) || drawn.has(id))),
+    ...(carries ? { carried: untouched.filter((id) => !copy.has(id)) } : {}) };
+}
+
+/**
+ * Why a revision's pages are read as changed where the reason is the
+ * inventory and not the revision, in a sentence; null where there is nothing
+ * to say. Said by every run of a revision that composes such a page, so a
+ * rebuild of a deck whose exhibits are drawn shapes is not silently read as
+ * changed on every page.
+ */
+export function unheldLine(changes) {
+  const pages = changes?.unheld ?? [];
+  if (!pages.length) return null;
+  const all = pages.length === changes.pages.length;
+  const which = !all ? `${pages.length} of the ${changes.pages.length} pages` : pages.length === 1 ? "the one page" : `every one of the ${pages.length} pages`;
+  return `Read as changed: ${which} this revision composes${pages.length <= 12 ? ` (${pages.join(", ")})` : ""}, each where a slide stood that the inventory does not hold whole - drawn shapes it cannot read as a chart or a table, which is how a deck this runtime built draws its exhibits. `
+    + "Such a page cannot be set beside its slide number for number, and is read as changed whether or not the revision changed it: the stale-number check, the fill guidance and the deck review all read it. "
+    + "A slide the revision does not change is kept as it is, and read as unchanged, by carrying it: `carry: true` beside its `draft`.";
 }
 
 /**
@@ -387,17 +572,25 @@ export const provenanceLine = (hash, backend = "subagent") => `\n\nPROVENANCE. S
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// An id spelt as an ordinary word (`cover`, `summary`, `close`) is also a word
+// a sentence uses: "the cover ratio" names no page. Such an id counts as
+// named only where it is written as an id - in brackets, backticks or quotes,
+// as the prompts print it ("[cover]") - so a reviewer is not refused for a
+// page it never mentioned.
+const WORDLIKE = /^[A-Za-z]+$/;
+const marked = (text, hit) => /[[`'"]/.test(text[hit.at - 1] ?? "") && /[\]`'"]/.test(text[hit.end] ?? "");
+
 /**
  * Every page a sentence names, by id or by position ("page 12", "slides
  * 3-5"), with ranges ("p16-p19", "p16 to p19") expanded in deck order. It is
  * how validation holds a deck-level finding to the pages its own reason names.
  */
-export function pageRefs(text, ids) {
+export function pageRefs(text, ids, { positions = true } = {}) {
   const found = new Set();
   if (!text || !ids?.length) return found;
   const order = new Map(ids.map((id, i) => [id, i]));
   const token = new RegExp(`(?<![\\w])(${[...ids].sort((a, b) => b.length - a.length).map(escape).join("|")})(?!\\w)`, "g");
-  const hits = [...String(text).matchAll(token)].map((m) => ({ id: m[1], at: m.index, end: m.index + m[0].length }));
+  const hits = [...String(text).matchAll(token)].map((m) => ({ id: m[1], at: m.index, end: m.index + m[0].length })).filter((hit) => !WORDLIKE.test(hit.id) || marked(String(text), hit));
   hits.forEach((hit, i) => {
     found.add(hit.id);
     const next = hits[i + 1];
@@ -406,11 +599,45 @@ export function pageRefs(text, ids) {
       for (let k = a; k <= b; k += 1) found.add(ids[k]);
     }
   });
-  for (const m of String(text).matchAll(/\b(?:pages?|slides?)\s+(\d+)(?:\s*(?:-|–|to)\s*(\d+))?/gi)) {
+  // A page named by its position is read only where the reader was shown positions to name pages by (`positions`): a
+  // listing that prints every page's id is answered by id, and "page 12" of it is not the twelfth page's id.
+  if (positions) for (const m of String(text).matchAll(/\b(?:pages?|slides?)\s+(\d+)(?:\s*(?:-|–|to)\s*(\d+))?/gi)) {
     const from = Number(m[1]), to = Number(m[2] ?? m[1]);
     for (let n = Math.min(from, to); n <= Math.max(from, to); n += 1) if (ids[n - 1]) found.add(ids[n - 1]);
   }
   return found;
+}
+
+/**
+ * A page list as its writer meant it, where that can be read without judging
+ * anything: `{ pages, mended }`. An entry that is a range of two known ids
+ * ("p16-p19", "p16 to p19") is expanded in deck order over `spanned` (the pages
+ * a range runs over: a section's divider between two content pages is not one
+ * of them, unless it is an end of the range); and where `text` is given, every
+ * page it names by id that the list leaves out is added. `mended` says each
+ * thing done - `{ did: "range", from, pages }`, `{ did: "named", pages }` -
+ * so the caller can record that the runtime, not the writer, wrote those ids.
+ */
+export function settlePageList(pages, ids, { text = null, spanned = ids } = {}) {
+  if (!Array.isArray(pages)) return { pages, mended: [] };
+  const known = new Set(ids), order = new Map(ids.map((id, i) => [id, i])), runs = new Set(spanned), mended = [];
+  const expand = (entry) => {
+    if (typeof entry !== "string" || known.has(entry)) return null;
+    // An id may hold a hyphen of its own: the range is the split whose two halves are both pages.
+    for (const m of entry.matchAll(/\s*(?:-|–|—|\bto\b|\bthrough\b)\s*/gi)) {
+      const a = entry.slice(0, m.index).trim(), b = entry.slice(m.index + m[0].length).trim();
+      if (known.has(a) && known.has(b)) { const [lo, hi] = [order.get(a), order.get(b)].sort((x, y) => x - y); return ids.slice(lo, hi + 1).filter((id) => runs.has(id) || id === a || id === b); }
+    }
+    return null;
+  };
+  let out = [];
+  for (const entry of pages) { const span = expand(entry); if (span) { mended.push({ did: "range", from: entry, pages: span }); out.push(...span); } else out.push(entry); }
+  if (mended.length) out = [...new Set(out)];
+  if (text !== null && out.length) {
+    const named = [...pageRefs(text, ids, { positions: false })].filter((id) => !out.includes(id));
+    if (named.length) { mended.push({ did: "named", pages: named }); out = [...out, ...named].sort((a, b) => (order.get(a) ?? ids.length) - (order.get(b) ?? ids.length)); }
+  }
+  return { pages: mended.length ? out : pages, mended };
 }
 
 // A list of pages given by example: "e.g. p11, p16", "such as pages 4 and 9",
@@ -418,6 +645,8 @@ export function pageRefs(text, ids) {
 // refused rather than read as the whole list.
 const SAMPLING_BEFORE = /\b(?:e\.\s?g\.?|eg\.|for example|for instance|such as|including|notably|among them)/gi;
 const SAMPLING_AFTER = /^[\s,;)]*(?:etc\.?|and others|among others|and more|and so on|\.\.\.|…)/i;
+/** The words the two patterns above look for, as a prompt lists them: before a page id, and after one. */
+export const SAMPLING_WORDS = Object.freeze({ before: ["e.g.", "for example", "for instance", "such as", "including", "notably", "among them"], after: ["etc.", "and others", "among others", "and more", "and so on", "..."] });
 export function samplingProblem(text, ids) {
   const source = String(text ?? "");
   for (const m of source.matchAll(SAMPLING_BEFORE)) {
@@ -433,7 +662,7 @@ export function samplingProblem(text, ids) {
  * page, a deck finding on every page it affects - which includes every page
  * its own text names - and no list given by example.
  */
-export function pageListErrors(at, { scope, pages, text, ids, deckScope = "deck" }) {
+export function pageListErrors(at, { scope, pages, text, ids, deckScope = "deck", named: holdNamed = true }) {
   const errors = [];
   if (!Array.isArray(pages) || !pages.length) return [`${at}: list the affected pages (${scope === deckScope ? "every one of them" : "the page"})`];
   const known = new Set(ids);
@@ -443,7 +672,8 @@ export function pageListErrors(at, { scope, pages, text, ids, deckScope = "deck"
   if (scope === "page" && pages.length !== 1) errors.push(`${at}: a page finding names one page; a defect on several pages is a ${deckScope} finding with every page listed`);
   const sampled = samplingProblem(text, ids);
   if (sampled) errors.push(`${at}: ${sampled}`);
-  if (scope === deckScope) {
+  // A caller that settles its page lists first (settlePageList) has already added the pages the text names: `named: false`.
+  if (scope === deckScope && holdNamed) {
     const named = [...pageRefs(text, ids)].filter((id) => !pages.includes(id));
     if (named.length) errors.push(`${at}: the text names ${named.join(", ")}, which the finding's page list leaves out - list every affected page`);
   }
@@ -576,7 +806,35 @@ export function advanceLedger(prior, review, items, { downgrade = () => false, a
 }
 
 export const openEntries = (ledger) => (ledger || []).filter((e) => !CLOSED.includes(e.status) && e.severity !== "none");
-export const openBlocking = (ledger) => openEntries(ledger).filter((e) => BLOCKING.has(e.severity));
+export const openBlocking = (ledger) => openEntries(ledger).filter((e) => BLOCKING.has(e.severity) && !e.aboutImported);
+/**
+ * The open items that are about the imported deck (`aboutImported` on a
+ * critique's or a review's finding): a problem whose remedy is to change a
+ * slide of the user's own that the revision did not change and the user did
+ * not ask to change. They keep their severity and block nothing - the author
+ * may not edit that slide unasked - and each is reported to the user with
+ * the delivery (deliver-deck.mjs), who decides.
+ */
+export const openAboutImported = (ledger) => openEntries(ledger).filter((e) => e.aboutImported);
+// What both prompts say of such a finding on a revision, and what validation holds a flagged one to.
+export const ABOUT_IMPORTED_RULE = "ABOUT THE IMPORTED DECK. Where a changed page is right by its own evidence and the problem is that a slide the revision did NOT change says otherwise - or the problem lies wholly in such a slide's own words - the remedy is to change the user's own slide, which they did not ask for and the team may not do unasked. File it with `aboutImported: true`, list that slide beside the changed page it concerns, keep the severity it deserves, and say in the fix what the user has to decide. It does not block, and it does not count against the verdict, the rating, compliance or sufficiency - judge each of those as though it were not filed, since validation does: it is reported to the user with the revised deck. A problem the changed page can mend on its own - a title that claims what its own slide does not show, a figure it changed and left standing elsewhere - is NOT about the imported deck: say `aboutImported: false`. Every finding that lists a slide the revision did not change says one or the other; validation refuses one that leaves it unsaid. Before filing a contradiction between a changed page and an untouched slide, read the changed slide's own record: where it bears the changed page out, the untouched slide is the one that is wrong.";
+/**
+ * What a finding's `aboutImported` is held to. `findings` are `{ id, pages,
+ * aboutImported }` as the answer gave them; `untouched` the ids of the slides
+ * the revision left as they were, null for a deck that has no imported slide.
+ * Only a revision has an imported deck, and a finding flagged true names a
+ * slide the revision left as it was. A finding that lists such a slide says
+ * which it is - true or false: the question is whose remedy it is, and an
+ * answer that leaves it unsaid blocks a change for a slide nobody may edit, or
+ * waves through one the changed page should have mended, by default.
+ */
+export function aboutImportedErrors(findings, untouched) {
+  return (findings || []).flatMap((item) => { const named = untouched ? (item.pages || []).filter((id) => untouched.includes(id)) : [];
+    if (item.aboutImported === true && untouched === null) return [`${item.id}: \`aboutImported\` is for a revision of a deck the user already has; this deck has no imported slide`];
+    if (item.aboutImported === true && !named.length) return [`${item.id}: \`aboutImported\` says the remedy is to change a slide the revision left as it was, and ${(item.pages || []).join(", ") || "it"} names none (the untouched slides are ${untouched.join(", ") || "none"}); list that slide, or say \`aboutImported: false\`: a problem on a changed page is the revision's own`];
+    if (named.length && typeof item.aboutImported !== "boolean") return [`${item.id}: it lists ${named.join(", ")}, ${named.length === 1 ? "a slide" : "slides"} this revision did not change, so say whose remedy it is - \`aboutImported: true\` where the changed page is right and the fix is to change the user's own slide (reported to the user; it blocks nothing), \`aboutImported: false\` where the changed page can mend it alone`];
+    return []; });
+}
 
 const normalizeText = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").trim();
 /** Whether a quoted piece of evidence is printed on one of the pages it names. */
@@ -676,6 +934,28 @@ export function verificationErrors(review, { scope, ledger, items, ids, pageKey 
   return errors;
 }
 
+/**
+ * Validation errors gathered by rule, so one correction round mends every
+ * place a rule was broken. `rules` is [{ id, matches, rule }]: `matches` reads
+ * an error's text and `rule` states what the validator enforces, as the prompt
+ * stated it. Errors under one rule become one line - the rule, every place it
+ * was broken, and the first error in full as the example. An error no rule
+ * matches, and a rule broken once, stay as they were written.
+ */
+export function groupErrors(errors, rules) {
+  const groups = new Map(), out = [];
+  for (const error of errors) {
+    const found = rules.find((item) => item.matches.test(error));
+    if (!found) { out.push({ text: error }); continue; }
+    if (!groups.has(found.id)) { groups.set(found.id, { rule: found, errors: [] }); out.push(groups.get(found.id)); }
+    groups.get(found.id).errors.push(error);
+  }
+  // Where an error was raised - what stands before the rule's message ("s1: findings[4] (F5)") - or the error itself where it is short.
+  const place = (error, rule) => { const at = error.search(rule.matches); return error.length <= 90 || at <= 0 ? error : error.slice(0, at).replace(/[:\s]+$/, ""); };
+  return out.map((group) => (group.text ?? (group.errors.length === 1 ? group.errors[0]
+    : `${group.errors.length} places break one rule - ${group.rule.rule}. Every place: ${group.errors.map((error) => place(error, group.rule)).join("; ")}. The first in full - ${group.errors[0]}`)));
+}
+
 /** Coverage of a first pass: one entry per page, no page missing, none unknown or doubled. */
 export function coverageErrors(entries, ids, pageKey = "slide") {
   if (!Array.isArray(entries)) return ["pages must hold one entry per page"];
@@ -709,6 +989,7 @@ export function verdictErrors(entries, ledger, pageKey = "slide") {
  * A clean dimension has to say what was looked at, which is what makes a
  * silent gap visible.
  */
+export const COMPLETENESS_NOTE = Object.freeze({ clean: 30, findings: 10 });
 export function completenessErrors(completeness, dimensions, items, key = "dimension") {
   if (!Array.isArray(completeness)) return [`completeness must hold one entry per dimension: ${dimensions.join(", ")}`];
   const errors = [];
@@ -725,7 +1006,7 @@ export function completenessErrors(completeness, dimensions, items, key = "dimen
     if (!["findings", "clean"].includes(entry.result)) errors.push(`completeness ${dim}: result must be findings or clean`);
     else if (entry.result === "clean" && raised) errors.push(`completeness ${dim}: marked clean but ${raised} finding${raised === 1 ? "" : "s"} sit in it`);
     else if (entry.result === "findings" && !raised) errors.push(`completeness ${dim}: marked findings but none is filed under it`);
-    if (typeof entry.note !== "string" || entry.note.trim().length < (entry.result === "clean" ? 30 : 10)) errors.push(`completeness ${dim}: ${entry.result === "clean" ? "say what was checked and why nothing was found" : "say what was found"}`);
+    if (typeof entry.note !== "string" || entry.note.trim().length < (entry.result === "clean" ? COMPLETENESS_NOTE.clean : COMPLETENESS_NOTE.findings)) errors.push(`completeness ${dim}: ${entry.result === "clean" ? "say what was checked and why nothing was found" : "say what was found"}`);
   }
   return errors;
 }
@@ -909,7 +1190,7 @@ export async function callReviewer(which, { prompt, schemaPath, images = [], out
 export async function reviewParts(which, jobs, { partsDir, schemaPath, model, timeoutMs, cwd, promptHash }) {
   await fs.mkdir(partsDir, { recursive: true });
   return Promise.all(jobs.map(async (job) => {
-    const part = await callReviewer(which, { prompt: job.prompt, schemaPath, images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs, cwd, promptHash });
+    const part = await callReviewer(which, { prompt: job.prompt, schemaPath: job.schemaPath ?? schemaPath, images: job.images, outPath: path.join(partsDir, `${job.id}.last-message.json`), model, timeoutMs, cwd, promptHash });
     await writeJson(path.join(partsDir, `${job.id}.json`), part);
     return part;
   }));
@@ -1025,7 +1306,7 @@ export async function settleCarried(historyDir, binding) {
  * without a reason on the record.
  */
 export function carriedErrors(review, carried, ids) {
-  if (!carried?.length) return (review.carried || []).length ? ["`carried` answers items carried from a retired lineage, and this packet carries none"] : [];
+  if (!carried?.length) return (review.carried || []).length ? ["`carried` answers items carried from a retired lineage, and this packet carries none: leave `carried` out. It is not where a slide a revision carries is judged - what stands on one is a finding, with the slide's id in its `pages`; and a finding that lists a slide the revision did not change says whose remedy it is - `aboutImported: true` where the changed page is right and the fix is to change the user's own slide (reported to the user; it blocks nothing), `aboutImported: false` where the changed page can mend it alone"] : [];
   const answers = Array.isArray(review.carried) ? review.carried : [];
   const errors = [];
   for (const item of carried) {
