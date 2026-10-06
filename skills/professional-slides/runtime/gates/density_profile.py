@@ -26,10 +26,12 @@ A page's flags are questions: the input to the review's density pass
 (references/taste-review.md), where a reader looks at each flagged page and
 judges whether its density is right for the job it does - a padded page that
 clears the floor is the case it exists to catch. One deck-level measure
-blocks: the median words a block across the prose pages, once the deck has
-weight.json deckLength.density of them (TEXT_FRAGMENTED). Five blocks of
-twenty-five words a page is copy broken into labels whatever each page's
-reviewer says about it, and a deck of it is refused at the build.
+is reported for the deck: the median words a block across the prose pages,
+once the deck has weight.json deckLength.density of them (TEXT_FRAGMENTED).
+Five blocks of twenty-five words a page is copy broken into labels. It is
+advisory: read by full-width row, as the reference band was, it moves with
+where a commentary column sits on its track, so it does not refuse a build
+until a column-aware reading re-derives the band.
 """
 from __future__ import annotations
 
@@ -395,13 +397,13 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
     words, limits = deck["wordsPerBlock"], deck["wordsPerBlock"]["band"]
     each = {str(p["id"]): p["wordsPerBlock"] for p in prose}
     standings = [{"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": words["measured"] or 0, "bar": bar,
-                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "blocks": "TEXT_FRAGMENTED" not in waived, "each": each}
+                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "blocks": False, "each": each}
                  for key, bar, side in (("floor", limits[0], "min"), ("ceiling", limits[1], "max"))]
     return {
         "schema": "professional-slides.density-profile/v1",
         "$comment": ("Rendered pages measured with pdftotext -layout; targets from weight.json plan.textForm "
                      "and each page's textReference. A page's flags are questions for the review's density pass; "
-                     "`findings` holds the deck-level measure that blocks."),
+                     "`findings` holds the deck-level measure, advisory until a column-aware reading re-derives its band."),
         "deck": deck,
         "accepted": not any(f["severity"] == "blocker" for f in findings),
         "findings": findings,
@@ -421,7 +423,10 @@ def fragmentation(words_per_block: dict, prose: list) -> list:
     below = words_per_block["position"] == "below"
     worst = sorted(prose, key=lambda p: p["wordsPerBlock"], reverse=not below)[:6]
     return [{
-        "code": "TEXT_FRAGMENTED", "severity": "blocker", "slide": None,
+        # Advisory: the reading is by full-width row, as the reference band was measured, so it moves with where a
+        # column sits (a points column centred on its exhibit reads as smaller blocks than the same words at the top).
+        # It is reported for the density pass, and blocks again once a column-aware reading re-derives the band.
+        "code": "TEXT_FRAGMENTED", "severity": "advisory", "slide": None,
         "measured": {"wordsPerBlock": words_per_block["measured"], "pages": len(prose), "direction": words_per_block["position"],
                      "worst": [{"page": p["page"], "id": p["id"], "wordsPerBlock": p["wordsPerBlock"], "blocks": p["blocks"]} for p in worst]},
         "threshold": [low, high],

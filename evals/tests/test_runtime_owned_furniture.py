@@ -382,9 +382,9 @@ class FurnitureTests(unittest.TestCase):
         self.assertEqual(report["pages"][0]["blockSizes"], [12, 6, 50, 50])
         self.assertEqual(report["deck"]["wordsPerBlock"]["measured"], 29.5)
         self.assertEqual([f["code"] for f in report["findings"]], ["TEXT_FRAGMENTED"])
-        self.assertFalse(report["accepted"])
+        self.assertEqual(report["findings"][0]["severity"], "advisory")
 
-    def test_the_band_is_the_one_it_was_and_fragments_still_block(self):
+    def test_the_band_is_the_one_it_was_and_fragments_are_still_reported(self):
         form = density_profile.TEXT_FORM["wordsPerBlock"]
         self.assertEqual((form["q1"], form["q3"]), (41.3, 86.5))
         pages = 10
@@ -395,8 +395,8 @@ class FurnitureTests(unittest.TestCase):
         texts = [""] + [fragment.format(i=i) for i in range(pages)]
         with mock.patch.object(density_profile, "extract", return_value=texts):
             report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
-        self.assertFalse(report["accepted"])
         self.assertEqual(report["findings"][0]["code"], "TEXT_FRAGMENTED")
+        self.assertEqual(report["findings"][0]["severity"], "advisory")
         self.assertEqual(report["findings"][0]["threshold"], [41.3, 86.5])
 
 

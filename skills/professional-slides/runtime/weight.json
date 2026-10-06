@@ -317,7 +317,7 @@
       }
     },
     "textForm": {
-      "$comment": "How a well-made page shapes its words: a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so. A deck whose prose pages (reading tasks with commentary, text pages, mixed pages) run a median words-per-block outside wordsPerBlock q1-q3 is refused once it has deckLength.density of them (density_profile.py TEXT_FRAGMENTED): under the band is copy broken into labels, over it copy set as one slab.",
+      "$comment": "How a well-made page shapes its words: a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so. A deck whose prose pages (reading tasks with commentary, text pages, mixed pages) run a median words-per-block outside wordsPerBlock q1-q3 is flagged once it has deckLength.density of them (density_profile.py TEXT_FRAGMENTED, advisory: read by full-width row as the band was, it moves with where a commentary column sits, so it blocks again once a column-aware reading re-derives the band): under the band is copy broken into labels, over it copy set as one slab.",
       "pagesMeasured": 37,
       "blocksPerPage": {
         "median": 4,

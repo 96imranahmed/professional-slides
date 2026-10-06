@@ -318,8 +318,12 @@ function bodyListLayout(frame, itemsIn, props = {}) {
   const inlineLead = props.inlineLead === true;
   const measured = items.map((item) => {
     if (inlineLead && item.lead && item.text) {
-      const joined = `${item.lead} ${item.text}`;
-      const runs = accentRuns(joined, item.highlight ?? [item.lead], { bold: true, accent: true, strict: false })
+      // The lead keeps its accent beside a highlight in the text, and ends on a stop where it has none, so it never
+      // reads as the first words of the sentence it runs into.
+      const lead = /[.:;!?\u2013\u2014-]$/.test(item.lead.trim()) ? item.lead.trim() : `${item.lead.trim()}.`;
+      const joined = `${lead} ${item.text}`;
+      const highlights = [lead, ...[item.highlight ?? []].flat().filter((phrase) => phrase && phrase !== item.lead)];
+      const runs = accentRuns(joined, highlights, { bold: true, accent: true, strict: false })
         || [{ text: joined }];
       const block = measureTextRuns(runs, width, font);
       const subs = item.points.map((sub) => measureText(sub, Math.max(1, width - subIndent), font));

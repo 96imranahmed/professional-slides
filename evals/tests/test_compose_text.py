@@ -96,11 +96,15 @@ assert.equal(find(withInsight.items,i=>i.id==='s01-points').props.centre,false);
 // half of it between the heading rule and the first line.
 const headed=composeSlide({title:'T',exhibit,points},0);
 assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
-// Alone in an unheaded track the list spreads from the top too: centring the
-// leftover put as much air above the first point as under the last.
+// Alone in an unheaded track beside a chart the list spreads to the capped
+// gap and centres what is left: the slack sits round the block, not pooled
+// under the last point.
 const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
 const list=find(alone.items,i=>i.id==='s01-points');
-assert.equal(list.props.distribute,true); assert.equal(list.props.centre,false); assert.equal(list.size.height,'fill');
+assert.equal(list.props.distribute,true); assert.equal(list.props.centre,true); assert.equal(list.size.height,'fill');
+// Beside a process rail - a band across the middle of its frame - the list keeps its top.
+const strip=composeSlide({title:'T',exhibit:{type:'process',items:['Draft','Plan','Request','Publish']},points,pointsHeading:false},0);
+assert.notEqual(find(strip.items,i=>i.id==='s01-points').props.centre,true);
 console.log('{}');
 ''')
 

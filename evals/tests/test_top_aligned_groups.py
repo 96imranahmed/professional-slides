@@ -169,14 +169,14 @@ console.log(JSON.stringify({
   hero:find(hero.items,i=>i.id==='s01-side').leftover??null,
   sidebar:find(sidebar.items,i=>i.id==='s01-document').leftover??null,
   beside:find(beside.items,i=>i.id==='s01-side').leftover??null,
-  besideList:find(beside.items,i=>i.id==='s01-points').props.centre,
+  besideList:find(beside.items,i=>i.id==='s01-points').props.centre??null,
   middle:find(middle.items,i=>i.id==='s01-side').leftover??null,
   text:text.items.find(i=>i.component==='bullet-list').props.centre}));
 """)
         self.assertIsNone(result["hero"], "the number and its points start level with the exhibit")
         self.assertIsNone(result["sidebar"], "the copy starts level with the panel")
         self.assertIsNone(result["beside"])
-        self.assertIs(result["besideList"], False)
+        self.assertIs(result["besideList"], True, "a list that owns its column beside a chart centres in it")
         self.assertEqual(result["middle"], "center", "the author can still ask for the middle")
         self.assertIs(result["text"], False)
 

@@ -49,12 +49,14 @@ class FragmentationTests(unittest.TestCase):
         with mock.patch.object(density_profile, "extract", return_value=texts):
             return density_profile.profile(Path("deck.pdf"), scene(pages), content(pages, task), rules)
 
-    def test_prose_pages_of_fragments_block(self):
+    def test_prose_pages_of_fragments_are_reported_and_advised(self):
+        # Advisory until a column-aware reading re-derives the band: read by full-width row, the measure moves with where a
+        # commentary column sits on its track, so it is reported for the density pass and does not refuse the build.
         report = self.profile([25, 25, 25, 25, 25])
-        self.assertFalse(report["accepted"])
+        self.assertTrue(report["accepted"])
         [finding] = report["findings"]
         self.assertEqual(finding["code"], "TEXT_FRAGMENTED")
-        self.assertEqual(finding["severity"], "blocker")
+        self.assertEqual(finding["severity"], "advisory")
         self.assertEqual(finding["measured"]["direction"], "below")
         self.assertEqual(finding["threshold"], [FORM["wordsPerBlock"]["q1"], FORM["wordsPerBlock"]["q3"]])
         self.assertIn("p0", finding["repair"])
