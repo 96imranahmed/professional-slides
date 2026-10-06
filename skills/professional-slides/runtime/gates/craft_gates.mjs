@@ -17,7 +17,7 @@
 // falls under its craft floor as well - most tables plain, most charts bare -
 // the one finding is the craft floor's, which no waiver lifts.
 
-import { PLAN, DECK_LENGTH, applyRulesVersion, carriedCount, isAnalyticalPage } from "../weight.mjs";
+import { GENERATED, PLAN, DECK_LENGTH, applyRulesVersion, carriedCount, isAnalyticalPage } from "../weight.mjs";
 import { photographsWaived } from "./plan_gates.mjs";
 import { BUILD_BAR_CODES, barStandings, barsNotHeld, chartStatistics, countedTables, pageChartAnnotated, tableStatistics, tableTreated } from "../build-bars.mjs";
 import { trivialChart, trendChart } from "../evidence.mjs";
@@ -307,7 +307,7 @@ export function sceneStatistics(scene) {
   const { charts, annotated: chartsAnnotated } = chartStatistics(scene);
   const kinds = new Set();
   for (const slide of scene?.slides || []) {
-    if (!slide.nodes?.some((n) => n.role === "action-title") || /^(?:picture-credits|source-limits)(?:-\d+)?$/.test(String(slide.id ?? ""))) continue;
+    if (!slide.nodes?.some((n) => n.role === "action-title") || GENERATED.test(String(slide.id ?? ""))) continue;
     const components = (slide.componentInstances || []).map((c) => String(c.component));
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));

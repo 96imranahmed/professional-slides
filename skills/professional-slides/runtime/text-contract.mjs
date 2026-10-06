@@ -1,7 +1,7 @@
 // The dot-dash's visible copy is the source of truth through composition/export.
 import { readJsonSync } from "./cli.mjs";
 import { registered } from "./errors.mjs";
-import { PICTURE_SHARE_MAX, PLAN, applyRulesVersion } from "./weight.mjs";
+import { GENERATED, PICTURE_SHARE_MAX, PLAN, applyRulesVersion } from "./weight.mjs";
 
 const roles = new Set(['title', 'body', 'exhibit', 'qualification', 'source', 'furniture']);
 
@@ -46,7 +46,7 @@ const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}
 // the audits subtract it after matching what the plan does list.
 export const GENERATED_ROLES = /^(page-number|axis-label|tracker-|agenda-marker-label|table-section-number|table-row-number|footer-(left|right)|divider-number|divider-contents|map-size-legend-label)/;
 // Pages the runtime inserts: the contents pages, the appendix divider, the picture credits and the sources' declared limits.
-export const GENERATED_PAGE = /^(agenda-\d+|appendix-divider|(?:picture-credits|source-limits)(?:-\d+)?)$/;
+export const GENERATED_PAGE = new RegExp(`^(agenda-\\d+|appendix-divider)$|${GENERATED.source}`);
 // A structural page (cover, divider, contents, statement, takeaways) keeps its
 // text checks but is not an analytical page, so no reading-task floor applies.
 const STRUCTURAL_KINDS = new Set(['cover', 'section', 'divider', 'agenda', 'statement', 'takeaways']);

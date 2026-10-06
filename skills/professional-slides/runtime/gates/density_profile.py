@@ -44,7 +44,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from gate_config import CONTRACT, is_cover, is_tracker, waived_rules  # noqa: E402
+from gate_config import CONTRACT, GENERATED_PAGE, is_cover, is_tracker, waived_rules  # noqa: E402
 from text_stats import printed_words  # noqa: E402
 from text_blocks import as_lines, blocks, pdf_lines  # noqa: E402
 TEXT_FORM = CONTRACT["plan"]["textForm"]
@@ -67,6 +67,8 @@ PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
 # The targets exclude covers, dividers and contents; so does this, by the
 # planned task and by the page gates' own test for a structural page.
 STRUCTURAL_TASKS = {"cover", "structural"}
+# The contents pages composition inserts; the pages the build generates (picture credits, sources) are GENERATED_PAGE.
+AGENDA_PAGE = re.compile(r"^agenda-\d+$")
 
 
 def words(line: str) -> int:
@@ -234,7 +236,7 @@ def scene_fragmentation(scene: dict) -> dict:
     is the render's to measure."""
     pages = []
     for index, slide in enumerate(scene.get("slides", [])):
-        if is_cover(slide, index) or re.match(r"^(agenda-\d+|(?:picture-credits|source-limits)(?:-\d+)?)$", str(slide.get("id") or "")):
+        if is_cover(slide, index) or (AGENDA_PAGE.match(str(slide.get("id") or "")) or GENERATED_PAGE.match(str(slide.get("id") or ""))):
             continue
         task = slide.get("readingTask")
         if task in STRUCTURAL_TASKS or not task:
@@ -330,7 +332,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
         task = reference.get("task")
         # Generated pages - the contents pages composition inserts and the
         # picture credits, split or not - carry no reading task of their own.
-        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|(?:picture-credits|source-limits)(?:-\d+)?)$", str(slide.get("id") or "")):
+        if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or (AGENDA_PAGE.match(str(slide.get("id") or "")) or GENERATED_PAGE.match(str(slide.get("id") or ""))):
             continue
         text = texts[index - 1] if index - 1 < len(texts) else []
         header = header_lines(slide) or None

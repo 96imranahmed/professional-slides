@@ -93,7 +93,7 @@ Every analytical page carries:
 - Every page that cites the source carries the declaration in the notes both critics read, as a declared limit to judge rather than a finding to file page by page.
 - Each page's own source line is unchanged: it still names its sources.
 
-A citation written from keys is the runtime's to fit. The footer as drawn counts toward `NOTE_HEAVY` whoever wrote it, so the runtime sets its own line in the fullest form that keeps the footer's three lines and the words the page's footer has room for under that bar, given the page's `note` and footnotes:
+A citation written from keys is the runtime's to fit. The footer as drawn counts toward `NOTE_HEAVY` whoever wrote it, so the runtime sets its own line in the fullest form that keeps the footer's three lines, the words the page's footer has room for under that bar (given the page's `note` and footnotes), and sixteen words - the footer strong pages set, a quarter over its median of thirteen - so a source's `short` name is what most pages print:
 
 1. the full names with their statuses;
 2. each source's `short` name where the registry gives one (`"short": "Annual reports"`);

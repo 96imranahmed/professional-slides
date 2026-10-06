@@ -98,6 +98,14 @@ class DerivedCitationTests(unittest.TestCase):
         self.assertIn("(company-reported)", result["notes"])
         self.assertWithinTheBar(result)
 
+    def test_a_footer_prints_short_names_where_they_keep_it_to_the_reference_footer(self):
+        # Two sources in full fit the footer's lines and the note bar, and ran 30 words where strong pages set 13: their short
+        # names, which still name both, are what the page prints; the full citation stays in the notes.
+        result = self.probe(2, short=True, wordy=True)
+        text = result["text"].replace("\n", " ")
+        self.assertEqual(text, "Sources: Annual report FY20 (company-reported); Annual report FY21 (company-reported)")
+        self.assertIn("operating statistics annex", result["notes"])
+
     def test_short_names_are_used_before_sources_are_counted(self):
         result = self.probe(8, short=True, wordy=True)
         text = result["text"].replace("\n", " ")

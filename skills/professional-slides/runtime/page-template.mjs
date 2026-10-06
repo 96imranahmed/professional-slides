@@ -1,6 +1,7 @@
 import { CHROME, SLIDE, component, linePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { textWords } from "./text-contract.mjs";
+import { REFERENCE_PAGE_BANDS } from "./weight.mjs";
 
 export const PAGE_RULES = ["none", "bottom", "top-and-bottom"];
 export const PAGE_BRANDING = ["footer-company", "top-right-logo", "none"];
@@ -38,6 +39,8 @@ function assertPageCount(value) {
 // its shorter forms (`sourceForms`, page-types.mjs citationForms) and is set
 // in the fullest that fits, so the runtime never refuses its own footer.
 export const FOOTER_LINES_MAX = 3;
+// The words a derived citation is held to: the reference footer's median and a quarter more (weight.json reference.slides.bands.footer).
+export const FOOTER_WORDS = Math.round(REFERENCE_PAGE_BANDS.footer * 1.25);
 // A registry source's `name` is its title - the publisher, the publication and
 // its year - `short` the form the footer falls back to, and `status` what kind
 // of record it is ("audited", "company-reported", "unaudited half-year
@@ -124,12 +127,18 @@ export function pageTemplateLayout(frame, props = {}) {
   // never asks the author to. The last form - the count alone - is drawn when
   // no fuller one has room.
   const forms = Array.isArray(props.sourceForms) && props.sourceForms.length && props.source ? props.sourceForms : null;
+  // Among the forms that still name every source, the fullest within the footer strong pages set - thirteen words at the
+  // median, a quarter more allowed (FOOTER_WORDS) - is taken first: a source's short name identifies it, the full
+  // citation is kept in the notes, and a footer that printed every source in full doubled the furniture a reader passes
+  // over. Where no form that names every source is that short, the rule above stands: no name is dropped to save words.
   const wordsMax = forms && Number.isFinite(props.sourceWordsMax) ? props.sourceWordsMax : Infinity;
+  const namesEvery = (text) => !/in the notes$/.test(text);
   const citation = (width, refusal) => {
-    for (const text of forms ?? [props.source]) {
-      const layout = measure(text, width);
-      const roomy = textWords(text) <= wordsMax || text === forms?.at(-1);
-      if (layout.lines.length <= FOOTER_LINES_MAX && roomy) return { text, layout, data: forms ? { derived: true, ...(text !== forms[0] ? { fullCitation: forms[0] } : {}) } : {} };
+    const fits = (text, max) => { const layout = measure(text, width); return layout.lines.length <= FOOTER_LINES_MAX && (textWords(text) <= max || text === forms?.at(-1)) ? layout : null; };
+    const held = forms?.filter(namesEvery).find((text) => fits(text, Math.min(FOOTER_WORDS, wordsMax)));
+    for (const text of held ? [held] : forms ?? [props.source]) {
+      const layout = fits(text, wordsMax);
+      if (layout) return { text, layout, data: forms ? { derived: true, ...(text !== forms[0] ? { fullCitation: forms[0] } : {}) } : {} };
     }
     throw new Error(refusal);
   };
