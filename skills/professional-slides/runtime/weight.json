@@ -317,28 +317,34 @@
       }
     },
     "textForm": {
-      "$comment": "How a well-made page shapes its words: a block is a run of consecutive non-empty lines, title and source lines excluded, blocks under three words dropped as labels. A deck that answers every page with one long paragraph passes the word-count contract and still reads as an essay with pictures; these are the numbers that say so. A deck whose prose pages (reading tasks with commentary, text pages, mixed pages) run a median words-per-block outside wordsPerBlock q1-q3 is flagged once it has deckLength.density of them (density_profile.py TEXT_FRAGMENTED, advisory: read by full-width row as the band was, it moves with where a commentary column sits, so it blocks again once a column-aware reading re-derives the band): under the band is copy broken into labels, over it copy set as one slab.",
-      "pagesMeasured": 37,
+      "$comment": "How a well-made page shapes its words, read by column (gates/text_blocks.py): a block is a run of lines in one column with no gap between them, title, page-number and source lines excluded, blocks under three words dropped as labels. Read as full-width rows, as an earlier band was, two columns sharing rows merged into one block, which put strong pages at 56 words a block and moved a deck's reading with where its commentary column sat. Measured on the 93 reference pages that carry prose (sixty words or more, one block of fifteen: density_profile.py prose_blocks, the rule a deck's own prose pages are chosen by) of a 132-page sample of strong analytical decks (evals/calibration/measure_text_form.py). A deck whose prose pages run a median words-per-block outside wordsPerBlock q1-q3 is refused once it has deckLength.density of them (density_profile.py TEXT_FRAGMENTED): under the band is copy broken into labels, over it copy set as slabs. Strong prose pages carry three developed blocks of fifteen words or more (a median of 25 words each, 19 to 40) among labels, headings and callouts; the longest block on a page runs to 44 words at the median and 127 at the ninetieth percentile, which is where a block is refused (longestBlockMax, TEXT_BLOCK_TOO_LONG).",
+      "pagesMeasured": 93,
       "blocksPerPage": {
-        "median": 4,
-        "q1": 2.0,
-        "q3": 5.0,
+        "median": 10,
+        "q1": 6.0,
+        "q3": 13.0,
         "min": 1,
-        "max": 9
+        "max": 32
       },
       "wordsPerBlock": {
-        "median": 55.8,
-        "q1": 41.3,
-        "q3": 86.5
+        "median": 15.2,
+        "q1": 10.2,
+        "q3": 22.6
       },
       "longestBlock": {
-        "median": 128,
-        "q3": 152.0,
-        "max": 374
+        "median": 44,
+        "q3": 79.0,
+        "p90": 127,
+        "max": 246
       },
-      "longestBlockMax": 152.0,
+      "developedBlocks": {
+        "minWords": 15,
+        "perPage": 3,
+        "words": { "median": 25, "q1": 19, "q3": 40 }
+      },
+      "longestBlockMax": 127,
       "blocksPerPageMin": 2,
-      "singleBlockPagesMax": 0.135
+      "singleBlockPagesMax": 0.011
     }
   },
   "reference": {

@@ -112,12 +112,12 @@ const result = checkTextPlan(content);
 console.log(JSON.stringify({{codes: result.findings.map(f=>f.code), scores: result.scores}}));
 ''')
 
-    def test_a_block_past_the_client_third_quartile_is_refused(self):
+    def test_a_block_past_the_reference_ninetieth_percentile_is_refused(self):
         result = self.check(200)
         self.assertIn("TEXT_BLOCK_TOO_LONG", result["codes"])
 
     def test_a_block_inside_it_passes(self):
-        result = self.check(150)
+        result = self.check(120)
         self.assertNotIn("TEXT_BLOCK_TOO_LONG", result["codes"])
 
     def test_the_score_records_the_shape_as_well_as_the_volume(self):
@@ -128,7 +128,7 @@ console.log(JSON.stringify({{codes: result.findings.map(f=>f.code), scores: resu
     def test_the_cap_comes_from_the_measured_corpus(self):
         contract = json.loads((RUNTIME / "weight.json").read_text(encoding="utf-8"))
         form = contract["plan"]["textForm"]
-        self.assertEqual(form["longestBlockMax"], form["longestBlock"]["q3"])
+        self.assertEqual(form["longestBlockMax"], form["longestBlock"]["p90"])
         self.assertGreaterEqual(form["pagesMeasured"], 30)
 
 

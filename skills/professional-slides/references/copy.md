@@ -64,24 +64,27 @@ Numbers belong on marks. Replace a sentence that transcribes the chart with labe
 
 Word count is not shape. A deck can clear its text-coverage score with one block of 150 to 200 words per page and still read as an essay with pictures.
 
-The skill's targets for an analytic page (the numbers live in `runtime/weight.json`):
+The skill's targets for a page that carries prose (the numbers live in `runtime/weight.json`), read by column - a block is a run of lines in one column with no gap between them, so a bullet, a paragraph, a chart's heading and each callout are blocks of their own:
 
 | | Typical well-made page | Write to |
 | --- | --- | --- |
-| Text blocks per page | median 4 (quartiles 2 and 5) | two or three, more when the evidence has that many findings |
-| Words per block | median 56 (quartiles 41 and 86) | 41-86, the band `TEXT_FRAGMENTED` holds the prose pages' median to; a chart's heading and label rows count as blocks, as they did on the reference pages |
-| Longest block on a page | median 128, third quartile 152 | never past 152 |
-| Pages with a single block | about one in seven | rare, and only when one finding is the whole page |
+| Text blocks per page | median 10 (quartiles 6 and 13), labels and headings included | the exhibit's labels and callouts, and the commentary's points |
+| Developed blocks (fifteen words or more) | three a page, a median of 25 words each (quartiles 19 and 40) | three developed points on most pages, two where the exhibit carries a sentence callout |
+| Words per block | median 15 (quartiles 10 and 23) | the band `TEXT_FRAGMENTED` holds the prose pages' median to; a chart's heading and label rows count as blocks, as they did on the reference pages |
+| Longest block on a page | median 44, ninetieth percentile 127 | never past 127 |
+| Pages with a single block | about one in a hundred | only when one finding is the whole page |
 
-`TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 152 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
+`TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 127 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
 
 The repair is not a shorter sentence. It is two or three points that each make their own claim: split the run at the place where it stops proving one thing and starts proving the next, and give the second half its own lead. A page whose commentary is one block is asserting that its evidence supports exactly one finding, which is sometimes true and usually not.
 
 The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them.
 
-Commentary is two or three developed points of about 41 to 86 words each. A developed point has three parts: the finding (with the number the reader should see first - an unmarked point is marked on its own figure), the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments.
+Commentary is three developed points of about 20 to 40 words each - two where the exhibit carries a sentence callout of its own. A developed point has three parts: the finding (with the number the reader should see first - an unmarked point is marked on its own figure), the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments; a third developed point beats a second one stretched to sixty words.
 
-A deck whose prose pages run a median words-per-block outside the band is flagged (`TEXT_FRAGMENTED`, advisory: it is read by full-width row, as the band was, so it moves with where a commentary column sits), and the review's density pass judges the pages the density profile flags ([Taste review](taste-review.md#density-pass)). How this relates to the page's word floor and ceiling is in [Word measures](evaluation/index.md#word-measures). A takeaway band is a separate rule: one or two lines (`TAKEAWAY_LONG`, refused at compile).
+A deck whose prose pages run a median words-per-block outside the band is refused at the build (`TEXT_FRAGMENTED`), and the review's density pass judges the pages the density profile flags ([Taste review](taste-review.md#density-pass)). How this relates to the page's word floor and ceiling is in [Word measures](evaluation/index.md#word-measures).
+
+A takeaway band is a separate rule: one or two lines (`TAKEAWAY_LONG`, refused at compile).
 
 ## Where each kind of sentence goes
 

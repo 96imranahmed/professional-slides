@@ -9,15 +9,18 @@ one did - forty pages of a single prose block, which reads as an essay with
 pictures. Strong decks do not look like that.
 
 This measures the shape: how many separate text blocks a page carries and how
-long each one is. A "block" is a run of consecutive non-empty lines separated
-from its neighbours by a blank line, which is what pdftotext -layout leaves
-between bullets and paragraphs. Title and source/note lines are excluded on the
-same rule the word count uses.
+long each one is. A block is read by column, by the reading the density
+profile applies to a rendered deck (runtime/gates/text_blocks.py): a run of
+lines in one column with no gap between them. Read as full-width rows, two
+columns that share rows merged into one block, so the band moved with where a
+commentary column sat. Title, page-number and source/note lines are excluded
+on the rule the word count uses.
 
 The pages measured are listed in the set's root, in `text-form-pages.json`:
-{"pages": [{"file": "<path relative to the root>", "pages": [21, 22, ...]}]} -
-analytic pages (chart with commentary, comparison tables, developed synthesis),
-never covers, dividers or contents.
+{"pages": [{"file": "<path relative to the root>", "pages": [21, 22, ...]}]}.
+Of those, the band is taken over the pages that carry prose: sixty words or
+more, at least one block of fifteen (density_profile.py prose_blocks, the
+rule a deck's own prose pages are chosen by), where a page of labels alone is not.
 
 The summary printed is the shape of `plan.textForm` in runtime/weight.json,
 numbers only. --samples writes the per-page measurements, which name documents,
@@ -27,9 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import statistics as st
-import subprocess
 import sys
 from pathlib import Path
 
@@ -37,47 +38,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from corpus import corpus_root  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "runtime" / "gates"))
-from text_stats import printed_words  # noqa: E402
 
-SOURCE_LINE = re.compile(r"^\s*(source|sources|note|notes|footnote)\b[:\s]", re.I)
-PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
-
-
-def words(line: str) -> int:
-    """Printed words, as the density profile counts a rendered page (text_stats.py)."""
-    return len(printed_words(line))
-
-
-def block_sizes(text: str) -> list[int]:
-    """Words per text block in one page of pdftotext -layout output."""
-    seen_title = False
-    kept: list[str] = []
-    for line in text.split("\n"):
-        if not line.strip():
-            kept.append("")
-            continue
-        if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
-            continue
-        if not seen_title:
-            seen_title = True
-            continue
-        kept.append(line)
-    out, run = [], 0
-    for line in kept:
-        if line.strip():
-            run += words(line)
-        elif run:
-            out.append(run)
-            run = 0
-    if run:
-        out.append(run)
-    # A block of one or two words is a label or an axis tick, not a text block.
-    return [n for n in out if n >= 3]
-
-
-def page_text(pdf: Path, page: int) -> str:
-    return subprocess.run(["pdftotext", "-f", str(page), "-l", str(page), "-layout", str(pdf), "-"],
-                          capture_output=True, text=True).stdout
+from density_profile import page_blocks, prose_blocks  # noqa: E402
+from text_blocks import pdf_lines  # noqa: E402
 
 
 def summarise(per_page: list[dict]) -> dict:
@@ -90,7 +53,7 @@ def summarise(per_page: list[dict]) -> dict:
         "blocksPerPage": {"median": st.median(counts), "q1": quart(counts, 0), "q3": quart(counts, 2),
                           "min": min(counts), "max": max(counts)},
         "wordsPerBlock": {"median": st.median(per_block), "q1": quart(per_block, 0), "q3": quart(per_block, 2)},
-        "longestBlock": {"median": st.median(longest), "q3": quart(longest, 2), "max": max(longest)},
+        "longestBlock": {"median": st.median(longest), "q3": quart(longest, 2), "p90": round(st.quantiles(longest, n=10, method="inclusive")[8]), "max": max(longest)},
         "singleBlockPages": round(sum(1 for c in counts if c == 1) / len(counts), 3),
     }
 
@@ -108,8 +71,9 @@ def main(argv=None) -> int:
             print(f"missing: {entry['file']}", file=sys.stderr)
             return 1
         for page in entry["pages"]:
-            sizes = block_sizes(page_text(pdf, page))
-            if sizes:
+            # Read by column, the page's first line (its title) dropped.
+            sizes = page_blocks(pdf_lines(pdf, page, page)[0])
+            if prose_blocks(sizes):
                 per_page.append({"file": entry["file"], "page": page, "blocks": len(sizes), "bodyWords": sum(sizes),
                                  "wordsPerBlock": round(sum(sizes) / len(sizes), 1), "longestBlock": max(sizes)})
     if not per_page:

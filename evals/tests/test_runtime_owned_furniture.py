@@ -367,37 +367,36 @@ class FurnitureTests(unittest.TestCase):
         self.assertEqual(density_profile.page_blocks(page, {"Title"}, density_profile.furniture_runs(slide)), [14])
 
     def test_chart_scaffolding_counts_toward_the_measure_as_it_did_in_the_calibration(self):
-        # Ten prose pages, each a chart whose heading and axis row pdftotext sets as two short blocks beside two developed points of
-        # fifty words: 12, 6, 50 and 50 words a block, a page mean of 29.5, under the band's floor of 41.3. With the chart's
-        # scaffolding left out the same pages read 50 words a block and passed.
+        # Ten prose pages, each a chart whose heading and axis row are two short blocks beside two developed points of
+        # twenty-five words: 12, 6, 25 and 25 words a block, a page mean of 17, inside the band. With the chart's
+        # scaffolding left out the same pages would read 25 words a block, over it: the reference pages' labels were counted.
         pages = 10
         chart = [text("section-heading", "Passenger journeys by fiscal year and by line, in millions of journeys", "x:ex"), text("category-label", "FY21"), text("category-label", "FY22"),
                  text("category-label", "FY23"), text("category-label", "FY24"), text("category-label", "FY25"), text("category-label", "FY26")]
         slides = [{"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []}] + [
             {"id": f"p{i}", "componentInstances": [{"id": "ex", "component": "chart.line"}], "nodes": [text("action-title", f"Title {i}"), *chart]} for i in range(pages)]
         content = {"pages": [{"id": f"p{i}", "textReference": {"task": "chart-with-commentary"}} for i in range(pages)]}
-        page = "\n\n".join(["Title {i}", "Passenger journeys by fiscal year and by line, in millions of journeys", "FY21 FY22 FY23 FY24 FY25 FY26"] + [" ".join(["copy"] * 50)] * 2) + "\n"
+        page = "\n\n".join(["Title {i}", "Passenger journeys by fiscal year and by line, in millions of journeys", "FY21 FY22 FY23 FY24 FY25 FY26"] + [" ".join(["copy"] * 25)] * 2) + "\n"
         with mock.patch.object(density_profile, "extract", return_value=[""] + [page.format(i=i) for i in range(pages)]):
             report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
-        self.assertEqual(report["pages"][0]["blockSizes"], [12, 6, 50, 50])
-        self.assertEqual(report["deck"]["wordsPerBlock"]["measured"], 29.5)
-        self.assertEqual([f["code"] for f in report["findings"]], ["TEXT_FRAGMENTED"])
-        self.assertEqual(report["findings"][0]["severity"], "advisory")
+        self.assertEqual(report["pages"][0]["blockSizes"], [12, 6, 25, 25])
+        self.assertEqual(report["deck"]["wordsPerBlock"]["measured"], 17)
+        self.assertEqual(report["findings"], [])
 
-    def test_the_band_is_the_one_it_was_and_fragments_are_still_reported(self):
+    def test_the_band_is_the_column_reading_and_fragments_block(self):
         form = density_profile.TEXT_FORM["wordsPerBlock"]
-        self.assertEqual((form["q1"], form["q3"]), (41.3, 86.5))
+        self.assertEqual((form["q1"], form["q3"]), (10.2, 22.6))
         pages = 10
         slides = [{"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []}] + [
             {"id": f"p{i}", "componentInstances": [{"component": "slide-chrome"}], "nodes": [text("action-title", f"Title {i}"), text("axis-label", "word")]} for i in range(pages)]
         content = {"pages": [{"id": f"p{i}", "textReference": {"task": "chart-with-commentary"}} for i in range(pages)]}
-        fragment = "\n\n".join([f"Title {{i}}"] + [" ".join(["copy"] * 25)] * 5) + "\n"
+        fragment = "\n\n".join([f"Title {{i}}", " ".join(["copy"] * 15)] + [" ".join(["copy"] * 6)] * 8) + "\n"
         texts = [""] + [fragment.format(i=i) for i in range(pages)]
         with mock.patch.object(density_profile, "extract", return_value=texts):
             report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
         self.assertEqual(report["findings"][0]["code"], "TEXT_FRAGMENTED")
-        self.assertEqual(report["findings"][0]["severity"], "advisory")
-        self.assertEqual(report["findings"][0]["threshold"], [41.3, 86.5])
+        self.assertEqual(report["findings"][0]["severity"], "blocker")
+        self.assertEqual(report["findings"][0]["threshold"], [10.2, 22.6])
 
 
 if __name__ == "__main__":

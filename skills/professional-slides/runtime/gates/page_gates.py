@@ -66,7 +66,7 @@ from deck_gates import *  # noqa: E402,F401,F403
 # caller can substitute either for a run.
 from ink import ink_matrix, ink_rows, load_grey, load_ink_matrix, load_ink_rows, render_path  # noqa: E402
 from scene_ink import estimate as scene_ink_estimate  # noqa: E402
-from density_profile import scene_blocks, scene_fragmentation, prose_task  # noqa: E402
+from density_profile import prose_blocks, scene_blocks, scene_fragmentation  # noqa: E402
 
 GATE_MODULES = (gate_config, render_gates, scene_gates, semantic_gates, deck_gates)
 
@@ -560,9 +560,9 @@ def page_budget(scene, profile=None):
             "id": slide.get("id"),
             "readingTask": slide.get("readingTask"),
             # The page's text blocks as the render will read them, estimated from the scene (density_profile.scene_blocks):
-            # what the page adds to the deck's median words a block (TEXT_FRAGMENTED), and whether its reading task is prose.
+            # what the page adds to the deck's median words a block (TEXT_FRAGMENTED), and whether it carries prose.
             "blocks": (lambda blocks: {"count": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
-                                       "prose": prose_task(slide.get("readingTask"))})(scene_blocks(slide)),
+                                       "prose": prose_blocks(blocks)})(scene_blocks(slide)),
             "body": body_words(slide),
             "floor": body_floor(slide),
             "ceiling": words_limit(slide, slide_profile),

@@ -219,11 +219,11 @@ For a pre-read, explicitly test substantive text coverage against the task targe
 
 The word floor in the dot-dash is hard, so no page ships under the target for its reading task. Clearing it is not the same as reading well. Each build writes `density-profile.json`: the rendered pages measured the way the targets are set (body words against the page's reading task, text blocks per page, words per block, longest block) beside the targets, with every page outside the target band flagged. How these measures relate to the word floors and ceilings is set out once in [Evaluation](evaluation/index.md#word-measures).
 
-One measure is not the reader's call. A deck whose prose pages run a median words per block outside the middle half of the reference pages' (41 to 86) is refused at the build as `TEXT_FRAGMENTED` - under it the copy is broken into labels, over it set as slabs - and the repair is the copy, before any review.
+One measure is not the reader's call. A deck whose prose pages run a median words per block outside the middle half of the reference pages' (10 to 23, read by column) is refused at the build as `TEXT_FRAGMENTED` - under it the copy is broken into labels, over it set as slabs - and the repair is the copy, before any review.
 
 Read the deck comparison first, against the targets in [Copy](copy.md#how-much-prose-in-one-run). Then open every flagged page and give it a verdict:
 
-- **right:** the density suits the job. A chart-led page with one line of takeaway may rightly sit light, and a record table may rightly run dense. On a page with commentary or prose whose blocks average outside 41 to 86 words, `right` must quote in `point` the developed point that makes it right - 40 words or more, word for word as the page prints it; a page of fragments or one slab has none to quote, so it is not right.
+- **right:** the density suits the job. A chart-led page with one line of takeaway may rightly sit light, and a record table may rightly run dense. On a page that carries prose whose blocks average outside 10 to 23 words, `right` must quote in `point` the developed point that makes it right - 25 words or more, word for word as the page prints it; a page of fragments or one slab has none to quote, so it is not right.
 - **too thin:** the reader cannot explain the claim, mechanism, limitation or consequence from the page.
 - **too dense:** padding, restatement or detail the page does not need to prove its title. A page padded to clear the floor goes here.
 - **wrong shape:** the words are right in number and wrong in form, for example one long block where a well-made page makes three points.

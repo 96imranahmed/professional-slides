@@ -80,7 +80,7 @@ export function declaredArchitecture(slide) {
 // anything composes. A test holds the two copies to one value.
 export const SHAPE = Object.freeze({ from: DECK_LENGTH.shapeVariety, perTenMin: 3, shareMax: 0.4 });
 /** How far a scene's estimate of the deck's median words a block stood from the rendered median, in words: said with every such estimate. */
-export const BLOCK_ESTIMATE_TOLERANCE = 4;
+export const BLOCK_ESTIMATE_TOLERANCE = 2;
 
 /**
  * A deck's page architectures in page order, counted as PAGE_SHAPE_FLAT counts

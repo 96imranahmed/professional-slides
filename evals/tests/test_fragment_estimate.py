@@ -62,23 +62,25 @@ class SceneBlockTests(unittest.TestCase):
         ]}
         blocks = density_profile.scene_blocks(slide)
         words = sum(len(line.split()) for line in point)
-        # The heading and the first point run on with no band between them, with the chart's row; the second point stands alone.
-        self.assertEqual(blocks, [5 + words + 2, words])
+        # Read by column: the heading over the chart, each point in the column beside it; the chart's labels are under three words, and dropped.
+        self.assertEqual(blocks, [5, words, words])
         # The title, the tracker, the source line and the page number are left out, as on the rendered page.
         profile = density_profile.scene_fragmentation({"slides": [{"id": "cover", "nodes": []}, slide]})
-        self.assertEqual([p["blocks"] for p in profile["pages"]], [2])
+        self.assertEqual([p["blocks"] for p in profile["pages"]], [3])
         self.assertEqual(profile["pages"][0]["prose"], True)
 
     def test_the_deck_standing_is_an_estimate_that_never_blocks(self):
-        point = ["a point of four words"] * 3
-        page = lambda n, task: {"id": f"p{n}", "readingTask": task, "nodes": [text("list-item", 60, 200, point), text("list-item", 60, 400, point)]}  # noqa: E731
-        scene = {"slides": [{"id": "cover", "nodes": []}, *[page(n, "chart-with-commentary") for n in range(9)], page(9, "chart-led")]}
+        point = ["a point of four words"] * 4
+        # Three twenty-word points carry prose; a page of chart labels does not, whatever its reading task.
+        page = lambda n, task: {"id": f"p{n}", "readingTask": task, "nodes": [text("list-item", 60, 200 + 140 * at, point) for at in range(3)]}  # noqa: E731
+        labels = {"id": "p9", "readingTask": "chart-with-commentary", "nodes": [label("category-label", 60, 200 + 40 * at, "Northern line, peak") for at in range(6)]}
+        scene = {"slides": [{"id": "cover", "nodes": []}, *[page(n, "chart-with-commentary") for n in range(9)], labels]}
         standings = density_profile.scene_fragmentation(scene)["standings"]
         self.assertEqual([(s["code"], s["key"], s["side"], s["bar"]) for s in standings],
                          [("TEXT_FRAGMENTED", "floor", "min", density_profile.TEXT_FORM["wordsPerBlock"]["q1"]), ("TEXT_FRAGMENTED", "ceiling", "max", density_profile.TEXT_FORM["wordsPerBlock"]["q3"])])
         for standing in standings:
-            self.assertEqual([standing["value"], standing["estimated"], standing["blocks"], standing["applies"], standing["tolerance"]], [15, True, False, True, density_profile.SCENE_TOLERANCE])
-            self.assertEqual(len(standing["each"]), 9)      # the prose pages, each with its own figure; a chart-led page is not one
+            self.assertEqual([standing["value"], standing["estimated"], standing["blocks"], standing["applies"], standing["tolerance"]], [20, True, False, True, density_profile.SCENE_TOLERANCE])
+            self.assertEqual(len(standing["each"]), 9)      # the prose pages, each with its own figure; a page of labels is not one
         # The margin the estimate is said with is one figure in both languages.
         tolerance = run_node("import { BLOCK_ESTIMATE_TOLERANCE } from './skills/professional-slides/runtime/deck-structure.mjs'; console.log(JSON.stringify({ tolerance: BLOCK_ESTIMATE_TOLERANCE }));")
         self.assertEqual(tolerance["tolerance"], density_profile.SCENE_TOLERANCE)
@@ -94,10 +96,10 @@ const dir = './skills/professional-slides/examples';
 const doc = JSON.parse(fs.readFileSync(`${dir}/page-types.pages.json`, 'utf8'));
 const run = await authorDeck(doc, { baseDir: dir, fit: false });
 const standings = run.standings.filter((st) => st.code === 'TEXT_FRAGMENTED');
-const base = { code: 'TEXT_FRAGMENTED', key: 'floor', what: 'median words a block on the prose pages', bar: 41.3, side: 'min', unit: 'words', applies: true, blocks: false, estimated: true, tolerance: 4 };
+const base = { code: 'TEXT_FRAGMENTED', key: 'floor', what: 'median words a block on the prose pages', bar: 10.2, side: 'min', unit: 'words', applies: true, blocks: false, estimated: true, tolerance: 2 };
 console.log(JSON.stringify({ standings: standings.map((st) => ({ key: st.key, value: st.value, estimated: st.estimated, blocks: st.blocks, line: st.line, each: Object.keys(st.each ?? {}).length })),
   blocking: run.blocking.filter((f) => f.code === 'TEXT_FRAGMENTED').length, budget: run.budget.filter((b) => b.blocks).length,
-  near: standingLine({ ...base, value: 39.8 }), far: standingLine({ ...base, value: 30 }) }));
+  near: standingLine({ ...base, value: 8.7 }), far: standingLine({ ...base, value: 5 }) }));
 ''')
         self.assertEqual([s["key"] for s in result["standings"]], ["floor", "ceiling"])
         for standing in result["standings"]:
@@ -105,12 +107,13 @@ console.log(JSON.stringify({ standings: standings.map((st) => ({ key: st.key, va
             self.assertFalse(standing["blocks"])
             self.assertIn("estimated from the scene; the render measures it: --check --render", standing["line"])
             self.assertGreater(standing["each"], 8)
-            self.assertGreater(standing["value"], 20)
+            band = density_profile.TEXT_FORM["wordsPerBlock"]
+            self.assertTrue(band["q1"] <= standing["value"] <= band["q3"], standing["value"])   # the worked deck reads inside the band
         self.assertEqual(result["blocking"], 0)
         self.assertGreater(result["budget"], 30)        # every page's budget carries its own blocks
         # Inside the margin it was calibrated to, the estimate does not call the render's verdict; well outside it, it does.
-        self.assertIn("short by 1.5 words - inside the estimate's margin of 4 words: the render decides", result["near"])
-        self.assertIn("short by 11.3 words - would block at the render", result["far"])
+        self.assertIn("short by 1.5 words - inside the estimate's margin of 2 words: the render decides", result["near"])
+        self.assertIn("short by 5.2 words - would block at the render", result["far"])
 
 
 class PlanEstimateTests(unittest.TestCase):
@@ -125,12 +128,12 @@ const keep = ['id', 'kind', 'type', 'form', 'why', 'title', 'settles', 'evidence
 let kept = 0;
 const doc = { deck: src.deck, pages: src.pages.map((p) => p.type ? Object.fromEntries(Object.entries(p).filter(([k]) => keep.includes(k) || (k === 'commentary' && p.commentary === 'below' && kept++ < 2))) : p) };
 const declared = doc.pages.filter((p) => p.commentary).map((p) => p.id);
-// A stand-in for the composed estimate: three placements break a page's text into 20-word blocks, the others hold 45.
+// A stand-in for the composed estimate: three placements break a page's text into 8-word blocks, the others hold 15.
 const SHORT = ['below', 'on-exhibit', 'none'];
-const blocksOf = (p, choice) => ({ count: 4, wordsPerBlock: SHORT.includes(choice.commentary) ? 20 : 45, prose: true });
+const blocksOf = (p, choice) => ({ count: 4, wordsPerBlock: SHORT.includes(choice.commentary) ? 8 : 15, prose: true });
 const steered = allocateStructure(doc, { planOf, blocksOf }), plain = allocateStructure(doc, { planOf });
-const worst = allocateStructure(doc, { planOf, blocksOf: () => ({ count: 4, wordsPerBlock: 20, prose: true }) });
-const sizes = (plan) => plan.pages.filter((p) => p.type).map((p) => SHORT.includes(p.commentary) ? 20 : 45).sort((a, b) => a - b);
+const worst = allocateStructure(doc, { planOf, blocksOf: () => ({ count: 4, wordsPerBlock: 8, prose: true }) });
+const sizes = (plan) => plan.pages.filter((p) => p.type).map((p) => SHORT.includes(p.commentary) ? 8 : 15).sort((a, b) => a - b);
 const median = (v) => (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
 const changed = (plan) => plan.pages.filter((p) => p.source === 'changed').map((p) => `${p.id} ${p.form}`).sort();
 const at = (plan, id) => plan.pages.find((p) => p.id === id).commentary;
@@ -158,7 +161,7 @@ console.log(JSON.stringify({ pages: sizes(plain).length, declared: declared.map(
         # An estimate never makes a plan unsatisfied: the rule is the render's - even where no placement reaches the band.
         self.assertEqual(result["unsatisfied"][0], result["unsatisfied"][1])
         self.assertEqual(result["unsatisfied"][2], result["unsatisfied"][1])
-        self.assertEqual(result["worst"], [20])
+        self.assertEqual(result["worst"], [8])
 
     def stage(self):
         """The worked deck cut back to a spine that writes no copy, in a folder of its own."""

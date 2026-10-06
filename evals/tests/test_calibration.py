@@ -115,10 +115,12 @@ class CalibrationTextFormTests(unittest.TestCase):
             "Source: company accounts",
             "12",
         ])
-        self.assertEqual(measure.block_sizes(page), [17, 12])
+        self.assertEqual(measure.page_blocks(page), [17, 12])
+        self.assertFalse(measure.prose_blocks([17, 12]), "under sixty words, the page is not one the band is taken over")
         summary = measure.summarise([{"blocks": 2, "wordsPerBlock": 14.0, "longestBlock": 16},
                                      {"blocks": 1, "wordsPerBlock": 40.0, "longestBlock": 40},
                                      {"blocks": 4, "wordsPerBlock": 20.0, "longestBlock": 30}])
+        self.assertEqual(summary["longestBlock"]["p90"], 38)
         self.assertEqual(summary["pagesMeasured"], 3)
         self.assertEqual(summary["blocksPerPage"]["median"], 2)
         self.assertEqual(summary["singleBlockPages"], 0.333)

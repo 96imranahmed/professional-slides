@@ -8,30 +8,29 @@ the targets it is set against: a deck can clear every floor with one long
 paragraph a page, or with commentary padded to reach the floor, and a plan's
 counts need not describe the pages it renders.
 
-So this reads the rendered PDF itself: pdftotext -layout over the whole
-document, split into pages at its form feeds, the first non-empty line
-dropped as the title, page numbers and Source/Note lines dropped, a block
-being a run of non-empty lines between blank ones, blocks under three words
+So this reads the rendered PDF itself: pdftotext -bbox-layout over the whole
+document, each page's lines with their boxes, read into blocks by column
+(text_blocks.py) - a block is a run of lines in one column with no gap
+between them, so two columns that share rows stay two blocks. The title,
+page numbers and Source/Note lines are dropped, and blocks under three words
 dropped as labels. That is how the targets were measured on the reference
-decks' PDFs, and a page here is measured the same way: a chart's heading,
-unit, axis rows, category and data labels and legend are counted as the
-blocks pdftotext sets them in, because the reference pages' were. One thing
-is taken out, by the role of the scene node that drew it: the runtime's own
-section tracker, a strip repeated on every page that a reference page does
-not carry. It writes, for the deck and for each analytic page, these
-numbers beside the skill's targets, and flags every page outside the target
-band.
+decks' PDFs (evals/calibration/measure_text_form.py), and a page here is
+measured the same way: a chart's heading, unit, axis rows, category and
+data labels and legend are counted as the blocks they make, because the
+reference pages' were. One thing is taken out, by the role of the scene node
+that drew it: the runtime's own section tracker, a strip repeated on every
+page that a reference page does not carry. It writes, for the deck and for
+each analytic page, these numbers beside the skill's targets, and flags
+every page outside the target band.
 
 A page's flags are questions: the input to the review's density pass
 (references/taste-review.md), where a reader looks at each flagged page and
 judges whether its density is right for the job it does - a padded page that
 clears the floor is the case it exists to catch. One deck-level measure
-is reported for the deck: the median words a block across the prose pages,
-once the deck has weight.json deckLength.density of them (TEXT_FRAGMENTED).
-Five blocks of twenty-five words a page is copy broken into labels. It is
-advisory: read by full-width row, as the reference band was, it moves with
-where a commentary column sits on its track, so it does not refuse a build
-until a column-aware reading re-derives the band.
+blocks: the median words a block across the pages that carry prose (by the
+rule the reference pages were chosen by, prose_blocks), once the deck has
+weight.json deckLength.density of them (TEXT_FRAGMENTED). Under the band is
+copy broken into labels; over it, copy set as slabs.
 """
 from __future__ import annotations
 
@@ -47,6 +46,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from gate_config import CONTRACT, is_cover, is_tracker, waived_rules  # noqa: E402
 from text_stats import printed_words  # noqa: E402
+from text_blocks import as_lines, blocks, pdf_lines  # noqa: E402
 TEXT_FORM = CONTRACT["plan"]["textForm"]
 DECK_LENGTH = CONTRACT["deckLength"]
 
@@ -70,21 +70,17 @@ def squash(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip()
 
 
-def strip_header(lines: list[str], header: set[str] | None) -> list[str]:
+def strip_header(lines: list[dict], header: set[str] | None) -> list[dict]:
     """Remove the title. The plain rule drops a page's first line, which is
     its title on a well-made page. A generated page often carries a section kicker
     above the title, and the first-line rule then dropped the kicker and
     counted the title as body. Given the page's own title and kicker lines,
     those are removed instead; without them the first-line rule stands."""
-    if header:
-        return [l for l in lines if not (l.strip() and squash(l) in header)]
-    out, seen = [], False
-    for line in lines:
-        if line.strip() and not seen and not PAGE_NUMBER.match(line) and not SOURCE_LINE.match(line):
-            seen = True
-            continue
-        out.append(line)
-    return out
+    if header is not None:
+        return [l for l in lines if squash(l["text"]) not in header]
+    ordered = sorted(lines, key=lambda l: (l["y0"], l["x0"]))
+    first = next((l for l in ordered if not PAGE_NUMBER.match(l["text"]) and not SOURCE_LINE.match(l["text"])), None)
+    return [l for l in lines if l is not first]
 
 
 def furniture_runs(slide: dict) -> set[tuple[str, ...]]:
@@ -124,66 +120,61 @@ def without_furniture(line: str, runs: set[tuple[str, ...]] | None) -> str:
     return line if len(kept) == len(stretches) else "  ".join(kept)
 
 
-def without_footer(lines: list[str]) -> list[str]:
-    """The lines without the source and note lines. A source or note that wraps runs on to the rows under it with no
-    blank row between, and all of it is the footer: dropping only its first line counts the rest as body."""
-    out, footer = [], False
-    for line in lines:
-        if not line.strip():
-            footer = False
-        elif SOURCE_LINE.match(line) or footer:
-            footer = True
+def positioned(page, furniture: set[tuple[str, ...]] | None = None) -> list[dict]:
+    """A page's lines with their boxes: pdftotext -bbox-layout's for a rendered
+    page, or plain text read as one column. In plain text a tracker label
+    pdftotext set on a row of its own inside a paragraph is taken out before
+    the rows are placed, so it does not leave a gap where it stood."""
+    if not isinstance(page, str):
+        return list(page)
+    rows = [line if not line.strip() or PAGE_NUMBER.match(line) else without_furniture(line, furniture) for line in page.split("\n")]
+    return as_lines("\n".join(row for row, line in zip(rows, page.split("\n")) if row.strip() or not line.strip()))
+
+
+def kept_blocks(page, header: set[str] | None = None, furniture: set[tuple[str, ...]] | None = None) -> list[list[dict]]:
+    """The page's blocks (text_blocks.blocks), the title, page numbers and the
+    tracker the runtime set (`furniture`) taken out first, and each block's
+    source or note footer after: a source or note that wraps runs on in its
+    own block, and all of it is the footer."""
+    lines = []
+    for line in strip_header(positioned(page, furniture), header):
+        if PAGE_NUMBER.match(line["text"]):
             continue
-        out.append(line)
+        rest = without_furniture(line["text"], furniture)
+        if rest.strip():
+            lines.append({**line, "text": rest})
+    out = []
+    for block in blocks(lines):
+        body = []
+        for line in block:
+            if SOURCE_LINE.match(line["text"]):
+                break
+            body.append(line)
+        if body:
+            out.append(body)
     return out
 
 
-def page_blocks(text: str, header: set[str] | None = None, furniture: set[tuple[str, ...]] | None = None) -> list[int]:
-    """Words per text block, the title, page numbers and source lines removed,
-    and with them the tracker the runtime set (`furniture`, the page's
-    `furniture_runs`). Everything else pdftotext reads on the page is counted
-    as the reference pages' was: a chart's heading, its axis row and its
-    labels are blocks where they run to three words. The tracker is taken out
-    of the run it stood in and the run is left whole."""
-    kept = []
-    for line in without_footer(strip_header(text.split("\n"), header)):
-        if not line.strip():
-            kept.append("")
-            continue
-        if PAGE_NUMBER.match(line):
-            continue
-        rest = without_furniture(line, furniture)
-        if rest.strip():
-            kept.append(rest)
-    out, run = [], 0
-    for line in kept:
-        if line.strip():
-            run += words(line)
-        elif run:
-            out.append(run)
-            run = 0
-    if run:
-        out.append(run)
-    return [n for n in out if n >= 3]
+def page_blocks(page, header: set[str] | None = None, furniture: set[tuple[str, ...]] | None = None) -> list[int]:
+    """Words per text block, read by column (text_blocks.py), the title, page
+    numbers and source lines removed, and with them the tracker the runtime
+    set (`furniture`, the page's `furniture_runs`). Everything else on the
+    page is counted as the reference pages' was: a chart's heading, its axis
+    row and its labels are blocks where they run to three words."""
+    sizes = [sum(words(line["text"]) for line in block) for block in kept_blocks(page, header, furniture)]
+    return [n for n in sizes if n >= 3]
 
 
-# The same reading on a composed scene, before anything is rendered.
-#
-# pdftotext sets every text box on the page's rows and leaves a blank line
-# where the page has a band with no text on it; a block is a run of rows with
-# no blank line between them. On the scene the rows are the lines of the text
-# nodes, each at the height it is set at, and two consecutive rows are one
-# block while the gap between them is under SCENE_ROW_GAP - the gap at which
-# pdftotext starts a new block on our rendered pages, set between a body
-# line's pitch and the space the composer leaves between two points. Measured
-# against the rendered profile of two finished decks (about a hundred pages),
-# the half of the pages nearest came within a word, and each deck's median
-# within four: an estimate of where the render will stand, never the measure.
-SCENE_ROW_GAP = 26.0
-# How far the scene's estimate of a deck's median stood from the rendered one on those decks, in words a block.
-SCENE_TOLERANCE = 4.0
-# Two lines within this of each other are one printed row (a label and the value beside it).
-SCENE_ROW_JOIN = 4.0
+# The same reading on a composed scene, before anything is rendered: the
+# text nodes' lines, each set at its frame's left and width and at the height
+# the composer set it, read into blocks by the one rule (text_blocks.blocks).
+# A line's box is its type's height, not its pitch, as pdftotext boxes it.
+# Measured against the rendered profile of a finished 55-page deck, three
+# pages in four came within 1.2 words a block and the deck's median within
+# 0.2: an estimate of where the render will stand, never the measure.
+SCENE_TOLERANCE = 2.0
+# The share of a line's pitch its type fills (a body line set at 1.2 its size).
+SCENE_TYPE_SHARE = 1 / 1.2
 
 
 def scene_text_nodes(node, out=None):
@@ -199,40 +190,31 @@ def scene_text_nodes(node, out=None):
     return out
 
 
-def scene_blocks(slide: dict) -> list[int]:
-    """Words per text block as `page_blocks` will read the rendered page,
-    estimated from the composed scene: the title, its kicker, the tracker, the
-    page number and the source and note lines left out, as there."""
-    raw = []
+def scene_lines(slide: dict) -> list[dict]:
+    """The scene's text as positioned lines, the title, its kicker and the tracker left out."""
+    out = []
     for node in scene_text_nodes(slide.get("nodes", [])):
         if str(node.get("role", "")) in HEADER_ROLES or is_tracker(node):
             continue
         frame = node.get("frame") or {}
         lines = str(node.get("text", "")).split("\n")
         set_height = ((node.get("data") or {}).get("textLayout") or {}).get("lineHeight")
-        height = set_height or (frame.get("height", 0) / max(1, len(lines)))
+        pitch = set_height or (frame.get("height", 0) / max(1, len(lines)))
         # A node set by the composer starts at its frame's top; a label with no layout sits in the middle of its frame.
-        top = frame.get("y", 0) if set_height else frame.get("y", 0) + (frame.get("height", 0) - height * len(lines)) / 2
-        raw.extend((top + (i + 0.5) * height, frame.get("x", 0), line) for i, line in enumerate(lines) if line.strip())
-    rows = []
-    for y, x, line in sorted(raw):
-        if rows and y - rows[-1][0] <= SCENE_ROW_JOIN:
-            rows[-1][1].append((x, line))
-        else:
-            rows.append([y, [(x, line)]])
-    out, run, last = [], 0, None
-    for y, parts in rows:
-        line = "  ".join(text for _, text in sorted(parts))
-        if PAGE_NUMBER.match(line) or SOURCE_LINE.match(line):
-            continue
-        if last is not None and y - last > SCENE_ROW_GAP and run:
-            out.append(run)
-            run = 0
-        run += words(line)
-        last = y
-    if run:
-        out.append(run)
-    return [n for n in out if n >= 3]
+        top = frame.get("y", 0) if set_height else frame.get("y", 0) + (frame.get("height", 0) - pitch * len(lines)) / 2
+        size = pitch * SCENE_TYPE_SHARE
+        x0, x1 = frame.get("x", 0), frame.get("x", 0) + max(1, frame.get("width", 0))
+        out.extend({"x0": x0, "x1": x1, "y0": top + i * pitch + (pitch - size) / 2, "y1": top + i * pitch + (pitch + size) / 2, "text": line}
+                   for i, line in enumerate(lines) if line.strip())
+    return out
+
+
+def scene_blocks(slide: dict) -> list[int]:
+    """Words per text block as `page_blocks` will read the rendered page,
+    estimated from the composed scene (scene_lines): the title, its kicker,
+    the tracker, the page number and the source and note lines left out, as
+    there."""
+    return page_blocks(scene_lines(slide), set())
 
 
 def scene_fragmentation(scene: dict) -> dict:
@@ -249,7 +231,7 @@ def scene_fragmentation(scene: dict) -> dict:
         if task in STRUCTURAL_TASKS or not task:
             continue
         blocks = scene_blocks(slide)
-        pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_task(task), "blocks": len(blocks),
+        pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_blocks(blocks), "blocks": len(blocks),
                       "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0})
     prose = [p for p in pages if p["blocks"] and p["prose"]]
     if not prose:
@@ -263,10 +245,9 @@ def scene_fragmentation(scene: dict) -> dict:
         for key, bar, side in (("floor", low, "min"), ("ceiling", high, "max"))]}
 
 
-def body_words(text: str, header: set[str] | None = None) -> int:
+def body_words(page, header: set[str] | None = None) -> int:
     """Body words as the reading-task bank counts them: every word but the title and source lines."""
-    lines = [l for l in without_footer(strip_header(text.split("\n"), header)) if l.strip() and not PAGE_NUMBER.match(l)]
-    return sum(words(l) for l in lines)
+    return sum(words(line["text"]) for block in kept_blocks(page, header) for line in block)
 
 
 # The standfirst is the title's own line (planRole in derive-content.mjs), so
@@ -283,11 +264,10 @@ def header_lines(slide: dict) -> set[str]:
     return out
 
 
-def extract(pdf: Path) -> list[str]:
-    """Every page's text, in one pdftotext run split at its form feeds: one
-    run a page costs a second a page for the same text."""
-    text = subprocess.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True, check=True).stdout
-    return text.split("\f")
+def extract(pdf: Path) -> list[list[dict]]:
+    """Every page's positioned lines, in one pdftotext run: one run a page
+    costs a second a page for the same text."""
+    return pdf_lines(pdf)
 
 
 def quartiles(values: list[float]) -> tuple[float, float, float]:
@@ -306,8 +286,16 @@ def band(value, low, high) -> str:
     return "below" if value < low else "above" if value > high else "within"
 
 
-def prose_task(task) -> bool:
-    return bool(task) and ("commentary" in task or task in ("text-page", "mixed"))
+# A page carries prose when it sets this many words, one block of them at least
+# PROSE_BLOCK long: the pages the band was measured on (measure_text_form.py
+# reads the reference pages by this rule), where a page of labels alone is not.
+PROSE_WORDS = 60
+PROSE_BLOCK = 15
+
+
+def prose_blocks(blocks: list[int]) -> bool:
+    """Whether a page whose blocks are `blocks` carries prose, by the rule the reference pages were chosen by."""
+    return sum(blocks) >= PROSE_WORDS and max(blocks, default=0) >= PROSE_BLOCK
 
 
 def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = None) -> dict:
@@ -325,11 +313,11 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
         # picture credits, split or not - carry no reading task of their own.
         if task in STRUCTURAL_TASKS or is_cover(slide, index - 1) or re.match(r"^(agenda-\d+|(?:picture-credits|source-limits)(?:-\d+)?)$", str(slide.get("id") or "")):
             continue
-        text = texts[index - 1] if index - 1 < len(texts) else ""
+        text = texts[index - 1] if index - 1 < len(texts) else []
         header = header_lines(slide) or None
         blocks = page_blocks(text, header, furniture_runs(slide))
         body = body_words(text, header)
-        entry = {"page": index, "id": slide.get("id"), "task": task, "bodyWords": body,
+        entry = {"page": index, "id": slide.get("id"), "task": task, "prose": prose_blocks(blocks), "bodyWords": body,
                  "blocks": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
                  "longestBlock": max(blocks) if blocks else 0, "blockSizes": blocks, "flags": []}
         target = TASK_TARGETS.get(task, {}).get("bodyWords")
@@ -350,14 +338,12 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
             entry["flags"].append(f"blocks average {entry['wordsPerBlock']} words; strong pages' blocks run {TEXT_FORM['wordsPerBlock']['q1']} to {TEXT_FORM['wordsPerBlock']['q3']}")
         pages.append(entry)
 
-    # The text-form benchmark describes pages that carry prose:
-    # charts with commentary, comparison tables and developed synthesis. A
-    # chart-led page's only blocks are its bar and axis labels, so setting all
-    # analytic pages against it read a deck of developed 52-word points as 19
-    # words a block. The deck comparison uses the same population; pages led by
-    # their exhibit alone are summarised beside it.
-    prose = [p for p in pages if p["blocks"] and prose_task(p["task"])]
-    led = [p for p in pages if p["blocks"] and not prose_task(p["task"])]
+    # The text-form benchmark describes pages that carry prose, chosen on the
+    # reference decks by what they print (prose_blocks); a page whose only blocks
+    # are its bar and axis labels is not one. The deck comparison takes the same
+    # population by the same rule; pages that carry labels alone are summarised beside it.
+    prose = [p for p in pages if p["prose"]]
+    led = [p for p in pages if p["blocks"] and not p["prose"]]
     measured = prose or [p for p in pages if p["blocks"]]
 
     def compare(name, values, target, low, high):
@@ -397,13 +383,13 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
     words, limits = deck["wordsPerBlock"], deck["wordsPerBlock"]["band"]
     each = {str(p["id"]): p["wordsPerBlock"] for p in prose}
     standings = [{"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": words["measured"] or 0, "bar": bar,
-                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "blocks": False, "each": each}
+                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "each": each}
                  for key, bar, side in (("floor", limits[0], "min"), ("ceiling", limits[1], "max"))]
     return {
         "schema": "professional-slides.density-profile/v1",
-        "$comment": ("Rendered pages measured with pdftotext -layout; targets from weight.json plan.textForm "
-                     "and each page's textReference. A page's flags are questions for the review's density pass; "
-                     "`findings` holds the deck-level measure, advisory until a column-aware reading re-derives its band."),
+        "$comment": ("Rendered pages read by column (text_blocks.py, over pdftotext -bbox-layout); targets from weight.json "
+                     "plan.textForm and each page's textReference. A page's flags are questions for the review's density pass; "
+                     "`findings` holds the deck-level measure."),
         "deck": deck,
         "accepted": not any(f["severity"] == "blocker" for f in findings),
         "findings": findings,
@@ -423,10 +409,7 @@ def fragmentation(words_per_block: dict, prose: list) -> list:
     below = words_per_block["position"] == "below"
     worst = sorted(prose, key=lambda p: p["wordsPerBlock"], reverse=not below)[:6]
     return [{
-        # Advisory: the reading is by full-width row, as the reference band was measured, so it moves with where a
-        # column sits (a points column centred on its exhibit reads as smaller blocks than the same words at the top).
-        # It is reported for the density pass, and blocks again once a column-aware reading re-derives the band.
-        "code": "TEXT_FRAGMENTED", "severity": "advisory", "slide": None,
+        "code": "TEXT_FRAGMENTED", "severity": "blocker", "slide": None,
         "measured": {"wordsPerBlock": words_per_block["measured"], "pages": len(prose), "direction": words_per_block["position"],
                      "worst": [{"page": p["page"], "id": p["id"], "wordsPerBlock": p["wordsPerBlock"], "blocks": p["blocks"]} for p in worst]},
         "threshold": [low, high],

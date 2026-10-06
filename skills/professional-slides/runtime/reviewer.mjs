@@ -30,7 +30,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
-import { normalizeText, textWords } from "./text-contract.mjs";
+import { normalizeText, textWords, TEXT_FORM } from "./text-contract.mjs";
 import { storylineGate, readStorylineHistory, repairReach, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
 import { REVIEW_TOUCHES } from "./gates/gate_classes.mjs";
 import { reviewFloors, floorsPrompt, floorErrors } from "./review-floors.mjs";
@@ -915,10 +915,8 @@ export function validateDensityReview(review, profile, scope = null, pageText = 
   return errors;
 }
 
-// A developed point: the 40 to 90 words a commentary point runs to.
-export const DEVELOPED_POINT_WORDS = 40;
-// The pages the text-form band describes (density_profile.py prose_task).
-const proseTask = (task) => Boolean(task) && (String(task).includes("commentary") || ["text-page", "mixed"].includes(task));
+// A developed point: the median developed block on strong prose pages (weight.json plan.textForm.developedBlocks).
+export const DEVELOPED_POINT_WORDS = TEXT_FORM.developedBlocks.words.median;
 const squash = (text) => normalizeText(text).toLowerCase();
 
 /**
@@ -929,7 +927,8 @@ const squash = (text) => normalizeText(text).toLowerCase();
  * quote is fragmented or a slab, and its verdict is not right.
  */
 function rightVerdictErrors(entry, i, page, band, pageText) {
-  if (!page || !Array.isArray(band) || !proseTask(page.task) || !page.blocks) return [];
+  // The pages the text-form band describes: those the profile read as carrying prose (density_profile.py prose_blocks).
+  if (!page || !Array.isArray(band) || !page.prose || !page.blocks) return [];
   const blocks = Number(page.wordsPerBlock);
   if (!(blocks < band[0] || blocks > band[1])) return [];
   const at = `density.pages[${i}] (${entry.slide})`;
