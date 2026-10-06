@@ -158,7 +158,8 @@ function customGeography(value) {
   });
   const points = countries.flatMap(c => c.polygons.flat());
   const [minX,minY,maxX,maxY] = points.reduce((b,p) => [Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
-  const padX = Math.max(.001, (maxX-minX)*.08), padY = Math.max(.001, (maxY-minY)*.08);
+  // A hair of margin: the projection keeps its own padding, and the two together drew a city a fifth smaller than its frame.
+  const padX = Math.max(.001, (maxX-minX)*.02), padY = Math.max(.001, (maxY-minY)*.02);
   const bounds = value.bounds || [Math.max(-180,minX-padX),Math.max(-90,minY-padY),Math.min(180,maxX+padX),Math.min(90,maxY+padY)];
   if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(Number.isFinite) || bounds[0]>=bounds[2] || bounds[1]>=bounds[3] || bounds[0]<-180 || bounds[2]>180 || bounds[1]<-90 || bounds[3]>90) throw new Error("Invalid custom geography bounds");
   return { id: `custom:${id}`, title, bounds, countries, source, custom: true };
@@ -412,15 +413,21 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
 // half a degree), a single place gets a 6 by 4 degree window around it, and
 // the window then widens on its shorter side to the frame's shape, so the map
 // fills the frame with context rather than letterboxing inside it.
-const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4];
+// The floors are degrees for a country's or a region's network and a share of
+// the geography's own span for anything smaller: a city's buildings sit a few
+// hundredths of a degree apart, and a degree's window around them is the whole
+// city with the markers piled in a corner of it.
+const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4], FIT_PAD = 0.5, FIT_SHARE = 0.25;
 function fitBounds(markers, geography, frame = null) {
   const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
   if (!points.length) throw new Error('crop: "fit" needs at least one marker with longitude and latitude; give the markers coordinates or drop crop');
   let [minLon, minLat, maxLon, maxLat] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
   const grow = (lo, hi, min) => { const span = Math.max(hi - lo, min), mid = (lo + hi) / 2; return [mid - span / 2, mid + span / 2]; };
+  const [gw0, gs0, ge0, gn0] = geography.bounds;
+  const floorLon = (degrees) => Math.min(degrees, (ge0 - gw0) * FIT_SHARE), floorLat = (degrees) => Math.min(degrees, (gn0 - gs0) * FIT_SHARE);
   const single = points.length === 1 || (maxLon - minLon < 1e-6 && maxLat - minLat < 1e-6);
-  [minLon, maxLon] = grow(minLon, maxLon, single ? FIT_SINGLE[0] : FIT_MIN_LON); [minLat, maxLat] = grow(minLat, maxLat, single ? FIT_SINGLE[1] : FIT_MIN_LAT);
-  const padLon = Math.max(0.5, (maxLon - minLon) / 6), padLat = Math.max(0.5, (maxLat - minLat) / 6);
+  [minLon, maxLon] = grow(minLon, maxLon, floorLon(single ? FIT_SINGLE[0] : FIT_MIN_LON)); [minLat, maxLat] = grow(minLat, maxLat, floorLat(single ? FIT_SINGLE[1] : FIT_MIN_LAT));
+  const padLon = Math.max(floorLon(FIT_PAD) / 2, (maxLon - minLon) / 6), padLat = Math.max(floorLat(FIT_PAD) / 2, (maxLat - minLat) / 6);
   minLon -= padLon; maxLon += padLon; minLat -= padLat; maxLat += padLat;
   if (frame && frame.width > 0 && frame.height > 0) {
     const k = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
@@ -570,6 +577,9 @@ export function mapNodes({ id, frame, props = {} }) {
   return nodes;
 }
 
+// The narrowest a choropleth's scale is set: its two end labels and the steps between them read at this width.
+const LEGEND_MIN_WIDTH = 360;
+
 function choroplethNodes({id,frame,props,geography}) {
   const spec=props.choropleth,scale=normalizeQuantitativeScale(spec.scale);
   if ((props.highlightCountries||[]).length || (props.markers||[]).length) throw new Error('Choropleth cannot combine quantitative fill with highlights or markers');
@@ -642,7 +652,11 @@ function choroplethNodes({id,frame,props,geography}) {
       if (label.noteLayout) nodes.push(textPrimitive({id:stableId(id,'feature-note',label.country.id),role:'map-note',frame:{x,y:label.top+label.measured.height+gap/2,width:labelWidth,height:label.noteLayout.height},text:label.noteLayout.text,style:{fontFamily:FONT,fontSize:LABEL,color:SECONDARY,align,valign:'top',lineHeight:label.noteLayout.lineHeight,wrap:true},data:{...data,note:true,textLayout:label.noteLayout}}));
     }
   }
-  nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:frame.x,y:frame.y,width:frame.width,height:legendHeight},props:{scale}}));
+  // The scale sits over the map it keys, not across the page: over a narrow geography a page-wide bar reads as a
+  // separate exhibit, with the map small and alone beneath it.
+  const legendWidth=Math.min(frame.width,Math.max(LEGEND_MIN_WIDTH,projected.plot.width+2*gap));
+  const legendX=Math.max(frame.x,Math.min(frame.x+frame.width-legendWidth,projected.plot.x+projected.plot.width/2-legendWidth/2));
+  nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:legendX,y:frame.y,width:legendWidth,height:legendHeight},props:{scale}}));
   return nodes;
 }
 

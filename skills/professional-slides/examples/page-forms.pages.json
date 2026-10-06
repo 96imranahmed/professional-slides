@@ -2878,11 +2878,31 @@
    "title": "The timetable bid is at step three of five and on schedule",
    "exhibit": {
     "items": [
-     "Draft timetable",
-     "Crew and fleet plan",
-     "Path request",
-     "Safety case",
-     "Publish"
+     {
+      "label": "Draft timetable",
+      "period": "Agreed March 2026",
+      "detail": "The service pattern and its calling points"
+     },
+     {
+      "label": "Crew and fleet plan",
+      "period": "Agreed August 2026",
+      "detail": "Crews and units rostered to the pattern"
+     },
+     {
+      "label": "Path request",
+      "period": "June 2027 round",
+      "detail": "Paths asked of the infrastructure manager"
+     },
+     {
+      "label": "Safety case",
+      "period": "Once paths are offered",
+      "detail": "The case for running the new pattern"
+     },
+     {
+      "label": "Publish",
+      "period": "Before the start date",
+      "detail": "The timetable on sale to passengers"
+     }
     ],
     "active": 2
    },

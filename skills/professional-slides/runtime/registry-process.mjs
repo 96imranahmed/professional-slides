@@ -29,9 +29,41 @@ function processCeiling(frame, props, roadmap = false, sample = roadmap ? 360 : 
   return Math.ceil(Math.max(needed + 1, sample * 1.25));
 }
 
+// A frame taller than half its width - a process beside its commentary, or in
+// a panel - is a column, and a rail across it is a band in the middle of air:
+// the steps run down the column instead, each beside its marker, with the
+// stage's detail under its label.
+const VERTICAL_RATIO = 0.5;
+
+function verticalProcessNodes({ id, frame, items, active }) {
+  const nodes = [];
+  const span = frame.height / items.length, marker = 36, gap = tokenValue(token("space.2")) * 2;
+  const textX = frame.x + marker + gap, textWidth = frame.width - marker - gap;
+  const centre = (index) => frame.y + span * (index + 0.5);
+  if (items.length > 1) nodes.push(openLine(stableId(id, "rail"), frame.x + marker / 2, centre(0), frame.x + marker / 2, centre(items.length - 1), "process-rail", PRIMARY, STANDARD));
+  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), wrapWidthRatio: ENGINE_RESERVE };
+  items.forEach((item, index) => {
+    if (typeof item.label !== "string" || !item.label.trim()) throw new Error(`${id} stage ${index + 1} requires a label`);
+    const on = active === index, y = centre(index);
+    nodes.push(ellipsePrimitive({ id: stableId(id, "step-marker", index), role: "process-marker", frame: { x: frame.x, y: y - marker / 2, width: marker, height: marker }, style: boxStyle(on ? PRIMARY : SURFACE, PRIMARY, STANDARD, token("radius.round")) }));
+    nodes.push(textPrimitive({ id: stableId(id, "step-number", index), role: "process-number", frame: { x: frame.x, y: y - marker / 2, width: marker, height: marker }, text: String(index + 1), style: textStyle(LABEL, on ? WHITE : PRIMARY, true, "center") }));
+    const head = [item.label, item.period, item.maturity].filter((value) => value !== undefined && value !== null && value !== "").join("\n");
+    const label = measureText(head, textWidth, { ...font, bold: true });
+    const detail = item.detail ? measureText(item.detail, textWidth, font) : null;
+    const height = label.height + (detail ? 4 + detail.height : 0);
+    if (textWidth <= 0 || height > span) throw new Error(`${id} stage ${index + 1} needs more room for its complete label`);
+    // The block is centred on its marker, so a one-line stage reads level with its number.
+    const top = y - height / 2;
+    nodes.push(textPrimitive({ id: stableId(id, "step-label", index), role: "process-label", frame: { x: textX, y: top, width: textWidth, height: label.height }, text: label.text, style: { ...textStyle(COMPACT, INK, true, "left", "top"), lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
+    if (detail) nodes.push(textPrimitive({ id: stableId(id, "step-detail", index), role: "process-detail", frame: { x: textX, y: top + label.height + 4, width: textWidth, height: detail.height }, text: detail.text, style: { ...textStyle(COMPACT, INK, false, "left", "top"), lineHeight: detail.lineHeight, wrap: false }, data: { textLayout: detail } }));
+  });
+  return nodes;
+}
+
 function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   const items = props.items;
   if (!Array.isArray(items) || !items.length) throw new Error(`${id} requires ordered stages`);
+  if (!roadmap && !journey && items.length >= 3 && frame.height > VERTICAL_RATIO * frame.width) return verticalProcessNodes({ id, frame, items, active: props.active });
   const nodes = [];
   const span = frame.width / items.length;
   const railY = frame.y + frame.height * (roadmap ? 0.32 : 0.48);

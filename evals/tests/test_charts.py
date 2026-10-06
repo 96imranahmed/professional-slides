@@ -66,6 +66,23 @@ const bars=render('chart.column',{categories:['A','B'],series:[{name:'Value',val
 assert.ok(bars.some(n=>n.role==='axis-label' && Number(n.text)===0));
 """)
 
+    def test_a_bridge_whose_steps_are_a_sliver_of_its_totals_breaks_its_axis(self):
+        """A run's population bridge drew 1.66m totals and four steps of a few thousand as hairlines on a zero axis."""
+        self.check_js("""
+const props={categories:['July 2024','Births','Migration','Domestic','July 2025'],values:[1665510,2898,13270,-16852,1664826],totals:[0,4]};
+const nodes=render('chart.waterfall',props);
+const bar=(c)=>nodes.find(n=>n.role==='chart-mark'&&n.id.endsWith(c.toLowerCase().replace(/ /g,'-')));
+// Every step is drawn tall enough to read, the totals carry a break mark and record where the scale starts.
+for(const step of ['Births','Migration','Domestic']) assert.ok(bar(step).frame.height>=20, step);
+assert.equal(nodes.filter(n=>n.role==='chart-axis-break').length,4);
+assert.ok(bar('July 2024').data.axisBreak>0);
+// A bridge whose steps already read on a zero axis keeps it, and so does one with a value axis to misread.
+const plain=render('chart.waterfall',{categories:['Start','Up','Down','End'],values:[100,40,-30,110],totals:[0,3]});
+assert.equal(plain.filter(n=>n.role==='chart-axis-break').length,0);
+const axis=render('chart.waterfall',{...props,showValueAxis:true});
+assert.equal(axis.filter(n=>n.role==='chart-axis-break').length,0);
+""")
+
     def test_negative_waterfall_labels_follow_endpoints(self):
         """PR #4 review: a falling waterfall step's label belongs below the bar's end and above its category tick."""
         self.check_js("""
@@ -196,6 +213,15 @@ console.log(JSON.stringify({pie:labels(pie),donut:labels(donut),circle,
 
 
 class ComboLineTests(unittest.TestCase):
+    def test_the_combo_keys_its_line_as_a_line(self):
+        """Five combo pages of one deck keyed their line with a square swatch, read as a third bar series."""
+        result = run_node(PRELUDE + """
+const nodes = REGISTRY.get('chart.combo').render({ id: 'c', frame: { x: 0, y: 0, width: 760, height: 430 }, props: { categories: ['2023','2024','2025'],
+  series: [{ name: 'Sales value', values: [6, 11, 12] }, { name: 'Number of sales', values: [220, 266, 301] }], highlights: [], referenceLines: [], annotations: [] } }).nodes;
+console.log(JSON.stringify(nodes.filter((n) => n.role === 'legend-swatch').map((n) => n.type)));
+""")
+        self.assertEqual(result, ["rect", "line"])
+
     def test_a_second_scale_line_drawn_flat_is_refused_for_panels(self):
         """Fifty-six-page re-author: a combo's second-scale line was drawn flat under two banded callouts."""
         result = run_node(PRELUDE + """

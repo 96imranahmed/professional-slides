@@ -515,7 +515,7 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
     exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
     return;
   }
-  besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr, exhibit: exhibits[0] });
+  besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr });
 }
 
 /** What the side column holds - a number, statements, prose, the points - its heading, and the hero panel headed to match. */
@@ -614,7 +614,7 @@ function sideColumnWidth({ slide, fill, heroFr, baseSideFr, list, kpiTile, insig
 }
 
 /** The row: the hero, the bridge and the side column in reading order, and a photograph strip at the right. */
-function besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr, exhibit }) {
+function besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insightBoxes, sideItems, heading, hero, sideFr }) {
   // A column of statements and nothing else - one box, or a statement above a
   // box - has nothing that can spread down the track.
   const boxesOnly = sideItems.length > 0 && sideItems.every((item) => insightBoxes.includes(item));
@@ -622,9 +622,7 @@ function besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insigh
   // `pointsAlign: "middle"` centres it on the exhibit when the author asks.
   // A list that owns its column - nothing above or below it, no heading -
   // spreads its points to the capped gap and centres what is left, so the
-  // slack sits round the block rather than pooled under the last point. Beside
-  // a process rail it keeps its top: the rail is a band across the middle of
-  // its frame, and its column, mostly air, is the page's finding either way.
+  // slack sits round the block rather than pooled under the last point.
   // Centred whole, a short column of statements is a hole above as well as
   // below, and the band gates read by column. A headed column starts under its
   // heading, level with the exhibit's.
@@ -639,7 +637,7 @@ function besideRow(items, { id, slide, layout, baseDir, fill, tone, list, insigh
   // nothing to absorb it, so distributing would pin them to opposite ends of
   // an empty track; they sit together at the top instead.
   if (centre && list) { list.size = HUG; list.props = { ...list.props, distribute: false }; }
-  else if (list && !heading && sideItems.length === 1 && sideItems[0] === list && list.props?.distribute && exhibit?.type !== "process") {
+  else if (list && !heading && sideItems.length === 1 && sideItems[0] === list && list.props?.distribute) {
     list.props = { ...list.props, centre: true };
   }
   const spread = !centre && fill !== "airy" && sideItems.length > 1 && !boxesOnly ? "distribute" : null;

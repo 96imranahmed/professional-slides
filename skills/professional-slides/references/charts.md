@@ -159,6 +159,8 @@ Mutually exclusive response distributions compared across groups: one horizontal
 
 Bridges from start to finish: price-volume-mix, margin, cash, headcount, variance. Opening total, ordered signed contributions, optional subtotals, closing total, one unit system, a rounding rule and a residual policy; the bridge reconciles before it renders. Anchor opening, subtotal and closing columns to zero, order drivers causally, chronologically or by contribution and say which, label every contribution and the closing total, and show an unexplained residual as a residual. Variants: standard bridge with an optional start-to-end construction; contribution bridge without an opening total; bridge with subtotals; bridge with an auxiliary metric rail.
 
+Where every contribution is under a seventh of the level it moves and the chart carries no value axis, the runtime cuts the totals with a break mark and opens the scale on the band the contributions move through, so they read as bars rather than hairlines.
+
 *Example:* reported to normalized income, five signed drivers, a subtotal after the operating group, heading `Q2 2026 reported-to-normalized income bridge, $B`.
 
 ## Scatter and bubble

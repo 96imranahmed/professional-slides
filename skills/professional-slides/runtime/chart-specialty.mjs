@@ -9,6 +9,9 @@ import { FONT, INK, SECONDARY, PRIMARY, CHART_LABEL, AXIS_LABEL, LABEL_BAND, cha
   assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, normalizedHighlights } from "./chart-decorations.mjs";
 
+// A bridge's steps narrower than this share of their top are drawn on a broken scale (see `broken` below).
+const WATERFALL_BREAK_SHARE = 1 / 7;
+
 export function waterfall({ id, frame, props }) {
   assertGridlineOption(props);
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
@@ -22,7 +25,16 @@ export function waterfall({ id, frame, props }) {
     else total += value;
     running.push(total);
   });
-  const bounds = numericBounds(withReferenceValues([0, ...running], props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // A bridge whose steps are a sliver of its totals - a population of 1.66m moved by four steps of a few thousand - drawn
+  // from zero is two tall bars and four hairlines: the steps it exists to show cannot be seen. It is drawn as strong decks
+  // draw it: the totals cut by a break mark near their foot and the scale opened on the band the steps move through, so
+  // the steps take the upper half of the plot. Only on a chart with no value axis to misread, where every level is
+  // positive and no bound is set, and only where the steps' band is under a seventh of its top.
+  const steps = props.values.map((value, index) => (props.totals?.includes(index) ? null : [running[index] - value, running[index]])).filter(Boolean);
+  const stepLow = steps.length ? Math.min(...steps.flat()) : 0, stepHigh = steps.length ? Math.max(...steps.flat()) : 0;
+  const broken = !showValueAxis && props.yMin === undefined && props.yMax === undefined && steps.length > 0 && stepLow > 0 && running.every((level) => level > 0)
+    && stepHigh - stepLow < WATERFALL_BREAK_SHARE * stepHigh ? Math.max(0, stepLow - (stepHigh - stepLow)) : null;
+  const bounds = numericBounds(withReferenceValues(broken === null ? [0, ...running] : [broken, ...running], props), { min: broken ?? props.yMin, max: props.yMax, axis: "y", includeZero: broken === null, tight: !showValueAxis && props.gridlines !== true });
   // A label row below negative endpoints, above the category labels. It is
   // laid out with the frame (its bottom inset), so the frame's own fallbacks -
   // compact callout bands, callouts moved beside their marks - see it too. It
@@ -54,13 +66,18 @@ export function waterfall({ id, frame, props }) {
   props.categories.forEach((category, index) => {
     const value = props.values[index];
     const isTotal = props.totals?.includes(index);
-    const start = isTotal ? 0 : previous;
+    const start = isTotal ? (broken ?? 0) : previous;
     const end = isTotal ? value : previous + value;
     const top = Math.max(start, end);
     const bottom = Math.min(start, end);
     const bar = { x: plot.x + index * span + span * 0.2, y: yScale(top), width: span * 0.6, height: Math.max(2, yScale(bottom) - yScale(top)) };
     const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.chartSeries3");
-    nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill) }));
+    nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill), ...(isTotal && broken !== null ? { data: { axisBreak: broken } } : {}) }));
+    // The break: two strokes of the page across the bar's foot, so the cut is read as a cut and not as a short bar.
+    if (isTotal && broken !== null) for (const [at, dy] of [[0, 0], [1, 7]]) {
+      const y = bar.y + bar.height - 26 - dy;
+      nodes.push(linePrimitive({ id: stableId(id, "axis-break", category, at), role: "chart-axis-break", x1: bar.x - 4, y1: y + 5, x2: bar.x + bar.width + 4, y2: y - 5, style: lineStyle(token("color.surface"), token("line.medium")) }));
+    }
     nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
     const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38 };

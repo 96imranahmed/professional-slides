@@ -135,6 +135,25 @@ console.log('{}');
 """)
 
 
+class CityCropTests(unittest.TestCase):
+    def test_a_city_network_is_cropped_to_its_markers_not_to_a_degree_around_them(self):
+        """A run's ten Manhattan buildings drew as a cluster at the foot of the whole island: the crop's floor was a degree."""
+        result = run_node("""
+import {mapNodes} from './skills/professional-slides/runtime/maps.mjs';
+// A city 0.12 by 0.25 degrees, split into a north and a south district.
+const ring=(w,s,e,n)=>[[w,s],[e,s],[e,n],[w,n],[w,s]];
+const feature=(id,box)=>({type:'Feature',id,properties:{name:id,labelPoint:[(box[0]+box[2])/2,(box[1]+box[3])/2]},geometry:{type:'Polygon',coordinates:[ring(...box)]}});
+const geography={id:'city',title:'City',source:{url:'https://example.com/city',license:'Test',sha256:'a'.repeat(64)},
+  geojson:{type:'FeatureCollection',features:[feature('north',[-74.02,40.80,-73.90,40.95]),feature('south',[-74.02,40.70,-73.90,40.80])]}};
+const markers=[{label:'One',longitude:-74.00,latitude:40.71},{label:'Two',longitude:-73.98,latitude:40.75},{label:'Three',longitude:-73.97,latitude:40.74}];
+const frame={x:0,y:0,width:900,height:440};
+const south=(props)=>mapNodes({id:'m',frame,props:{geography,markers,...props}}).filter(n=>n.role==='map-land'&&n.id.includes('south'))[0].frame.height;
+console.log(JSON.stringify({fit:south({crop:'fit'}),whole:south({})}));
+""")
+        # Fitted to the three buildings, the district they stand in is drawn larger than it is on the whole city.
+        self.assertGreater(result["fit"], 1.3 * result["whole"])
+
+
 class GeographyImportTests(unittest.TestCase):
     def test_geography_cli_preserves_exact_source_and_existing_files(self):
         """Variant review: the geography importer rewrote its source bytes and overwrote existing files."""

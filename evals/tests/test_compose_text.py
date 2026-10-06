@@ -102,9 +102,9 @@ assert.equal(find(headed.items,i=>i.id==='s01-points').props.centre,false);
 const alone=composeSlide({title:'T',exhibit,points,pointsHeading:false},0);
 const list=find(alone.items,i=>i.id==='s01-points');
 assert.equal(list.props.distribute,true); assert.equal(list.props.centre,true); assert.equal(list.size.height,'fill');
-// Beside a process rail - a band across the middle of its frame - the list keeps its top.
+// Beside a process the list centres too: in a column the process runs its steps down it (registry-process.mjs), not across.
 const strip=composeSlide({title:'T',exhibit:{type:'process',items:['Draft','Plan','Request','Publish']},points,pointsHeading:false},0);
-assert.notEqual(find(strip.items,i=>i.id==='s01-points').props.centre,true);
+assert.equal(find(strip.items,i=>i.id==='s01-points').props.centre,true);
 console.log('{}');
 ''')
 

@@ -450,7 +450,7 @@ export function comboChart({ id, frame, props }) {
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;
   const nodes = [
-    ...topLegend({ id, frame, items: series.map((item) => stateLabel(item, categories)) }),
+    ...topLegend({ id, frame, items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: index, ...(item === lineSeries ? { mark: "line" } : {}) })) }),
     ...axes(id, barPlot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
   ];
   const pointMap = new Map();

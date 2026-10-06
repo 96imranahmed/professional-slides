@@ -117,6 +117,22 @@ console.log(JSON.stringify({across:drawn({x:0,y:0,width:1160,height:120},{items,
                 self.assertIn("24–36 months", drawn["periods"][3])
         self.assertEqual(result["strip"], {"labels": 4, "contained": True, "paintOrder": True})
 
+    def test_a_process_in_a_column_runs_its_steps_down_it(self):
+        """Beside its commentary a five-step rail sat as a 60px band across the middle of a 520px column, the rest air."""
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const items=['Draft timetable','Crew plan','Path request','Safety case','Publish'].map((label,i)=>({label,detail:`What step ${i+1} settles`}));
+const render=(width,height)=>REGISTRY.get('process').render({id:'p',frame:{x:0,y:0,width,height},props:{items,active:2}}).nodes;
+const span=(nodes)=>{const ys=nodes.filter(n=>n.role==='process-marker').map(n=>n.frame.y);return Math.max(...ys)-Math.min(...ys);};
+const column=render(836,528),strip=render(1160,300);
+console.log(JSON.stringify({columnSpan:span(column),stripSpan:span(strip),details:column.filter(n=>n.role==='process-detail').length,
+  beside:column.filter(n=>n.role==='process-label').every(n=>n.frame.x>36)}));
+""")
+        self.assertGreater(result["columnSpan"], 350)      # the steps run down the column
+        self.assertEqual(result["stripSpan"], 0)            # across a wide frame they stay on one rail
+        self.assertEqual(result["details"], 5)
+        self.assertTrue(result["beside"])
+
     def test_process_detail_is_visible_and_overflow_rejects(self):
         result = run_node("""
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';

@@ -53,7 +53,7 @@ PX = 914400 / 96  # EMU per CSS px at 96 px/in; slide is 1280x720 px = 13.333x7.
 
 # Roles a native chart replaces. Headings, units and rules stay as editable text.
 CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", "axis-label", "chart-gridline",
-                    "legend-swatch", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
+                    "legend-swatch", "legend-marker", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
                     "chart-wedge", "pie-label", "pie-leader", "chart-baseline", "chart-tick", "reference-line",
                     "reference-label", "chart-annotation", "annotation-leader", "chart-callout", "chart-highlight",
                     "value-label", "series-label", "end-label", "stack-label", "total-label", "axis-title",

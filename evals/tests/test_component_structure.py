@@ -229,7 +229,8 @@ const results = ids.map(id => {
   const swatches = nodes.filter(node => node.role === 'legend-swatch');
   const labels = nodes.filter(node => node.role === 'legend-label');
   const plotNodes = nodes.filter(node => ['chart-gridline','chart-mark','chart-line'].includes(node.role));
-  const legendRows = new Set(swatches.map(node => Math.round(node.frame.y)));
+  // One row whatever each key is drawn as: a square and a combo's line key share a centre, not a top.
+  const legendRows = new Set(swatches.map(node => Math.round(node.frame.y + node.frame.height / 2)));
   const top = Math.min(...swatches.map(node => node.frame.y));
   const plotTop = Math.min(...plotNodes.map(node => node.frame.y));
   const right = Math.max(...labels.map(node => node.frame.x + node.frame.width));
