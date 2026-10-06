@@ -83,6 +83,16 @@ class FragmentationTests(unittest.TestCase):
         standing = next(s for s in two["standings"] if s["code"] == "COMMENTARY_UNDEVELOPED")
         self.assertEqual((standing["value"], standing["bar"], standing["side"]), (2, 3, "min"))
 
+    def test_a_family_of_light_pages_is_told_what_words_that_job_carries(self):
+        # Exhibit-led pages each clearing their floor, the family's median well under strong pages': advised, never refused,
+        # and the repair is captions and callouts, not prose.
+        light = self.profile([20, 10], pages=6, task="exhibit-led")
+        found = [f for f in light["findings"] if f["code"] == "FAMILY_LIGHT"]
+        self.assertEqual([(f["severity"], f["measured"]["task"], f["measured"]["pages"]) for f in found], [("advisory", "exhibit-led", 6)])
+        self.assertIn("caption under each panel", found[0]["repair"])
+        self.assertTrue(light["accepted"])
+        self.assertEqual([f for f in self.profile([20, 10], pages=4, task="exhibit-led")["findings"] if f["code"] == "FAMILY_LIGHT"], [])
+
     def test_a_revision_under_older_rules_hears_it_as_advice(self):
         report = self.profile([15, 6, 6, 6, 6, 6, 6, 6, 6, 6], rules={"workflow": "existing_deck_revision", "rulesVersion": 2})
         self.assertTrue(report["accepted"])

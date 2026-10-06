@@ -176,7 +176,7 @@ const LISTED = [
   // --- G: deck aggregates ------------------------------------------------
   // What the chart pages plot is what the spine says each shows of its measures; a form that reads more of them is the layout's.
   ...codes("G", "EVIDENCE_DEPTH", ["layout", "view"]),
-  ...codes("G", "CONTENT_NO_HIGHLIGHT DECK_FLAT DECK_CRAFT TEXT_FRAGMENTED COMMENTARY_UNDEVELOPED CRAFT_CHARTS_BARE CAVEAT_DENSE", COPY),
+  ...codes("G", "CONTENT_NO_HIGHLIGHT DECK_FLAT DECK_CRAFT TEXT_FRAGMENTED COMMENTARY_UNDEVELOPED FAMILY_LIGHT CRAFT_CHARTS_BARE CAVEAT_DENSE", COPY),
   ...codes("G", `LAYOUT_MONOTONY PAGE_VARIETY COLUMN_MONOTONY EVIDENCE_MIX IMAGE_BUDGET IMAGE_RUN TABLE_SCHEMA_FLAT DECK_VOCABULARY
     CRAFT_TRIVIAL_CHARTS CRAFT_NO_TREND CRAFT_TABLES_PLAIN CRAFT_NO_ICONS CRAFT_NO_PICTURES CRAFT_PLAYERS_UNINTRODUCED
     CRAFT_EXHIBIT_VARIETY BAR_EXHIBIT_VARIETY BAR_TABLES_TREATED BAR_CHARTS_ANNOTATED BAR_DRAWINGS_PER_PAGE BAR_UNSOURCED_PICTURES
@@ -292,6 +292,7 @@ export const STANDING_FREE = Object.freeze(Object.fromEntries([
   ...reasons("the build's refusal of a stage whose own findings carry the standing", "CONTENT_REJECTED PLAN_REJECTED VARIETY_REJECTED"),
   ...reasons("the lower floor of a rate whose build bar (BAR_TABLES_TREATED, BAR_CHARTS_ANNOTATED) writes the standing, against the delivery floor", "CRAFT_TABLES_PLAIN CRAFT_CHARTS_BARE"),
   ...reasons("a stage of the build that failed without a finding of its own", "READBACK_MISSING PREFLIGHT_FAILED GATES_FAILED"),
+  ...reasons("an advisory naming the families of pages under their task's reference words; each page's own ratio is in the density profile, and the deck's in its `bodyWordsVsTaskMedian`", "FAMILY_LIGHT"),
 ]));
 
 // The structure and aggregate rules that count nothing over the deck, though they are not standing-free by name: a compiled

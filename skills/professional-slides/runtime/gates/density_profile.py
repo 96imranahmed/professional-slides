@@ -53,8 +53,20 @@ DECK_LENGTH = CONTRACT["deckLength"]
 DENSITY_CODES = {
     "TEXT_FRAGMENTED": "the deck's prose pages set their words in blocks whose median size is outside the middle half of the reference pages' (weight.json plan.textForm)",
     "COMMENTARY_UNDEVELOPED": "the deck's prose pages carry a median of fewer developed blocks - fifteen words or more - than strong prose pages' three (weight.json plan.textForm.developedBlocks)",
+    "FAMILY_LIGHT": "a family of five or more pages of one reading task whose median page carries under nine tenths of its task's reference body words - advised, with the kind of words that job carries",
 }
 DEVELOPED = TEXT_FORM["developedBlocks"]
+# A family of pages (one reading task) whose median page sits under this share of its task's reference median is told of.
+FAMILY_LIGHT = 0.9
+# ... once the family has this many pages: fewer is a page or two, which the per-page flags already name.
+FAMILY_FROM = 5
+# Where a light page of each family finds its words: never more prose, the kinds strong pages of that job carry.
+FAMILY_WORDS = {
+    "exhibit-led": "a caption under each panel, one sentence saying what it shows, or a sentence callout on the mark that names the mechanism",
+    "chart-led": "a sentence callout on the mark that names the mechanism, or a labelled reference line",
+    "table-led": "a so-what column, or one sentence under the table saying what the rows add up to",
+    "diagram-led": "a line of detail on each step or box, saying what it does",
+}
 # How far the scene's count of a deck's median developed blocks may stand from the render's: a block is a block on both.
 DEVELOPED_TOLERANCE = 0.5
 
@@ -396,7 +408,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
     deck["outsideBand"] = sorted(k for k, v in deck.items() if isinstance(v, dict) and v.get("position") in ("above", "below"))
     deck["developedPerPage"] = {"measured": st.median([p["developed"] for p in prose]) if prose else None, "target": DEVELOPED["perPage"],
                                 "position": "below" if prose and st.median([p["developed"] for p in prose]) < DEVELOPED["perPage"] else "within"}
-    findings = fragmentation(deck["wordsPerBlock"], prose) + undeveloped(deck["developedPerPage"], prose)
+    findings = fragmentation(deck["wordsPerBlock"], prose) + undeveloped(deck["developedPerPage"], prose) + light_families(pages)
     waived = waived_rules(rules or {})
     findings = [{**f, "severity": "advisory", "waived": {"rulesVersion": (rules or {}).get("rulesVersion"), "introducedIn": waived[f["code"]]}}
                 if f["code"] in waived else f for f in findings]
@@ -466,6 +478,34 @@ def undeveloped(developed_per_page: dict, prose: list) -> list:
                    "mechanism. Do not split a point in two or pad one. Start with {}."
                    .format(developed_per_page["measured"], DEVELOPED["perPage"], ", ".join(str(p["id"]) for p in thin))),
     }]
+
+
+def light_families(pages: list) -> list:
+    """FAMILY_LIGHT: a family of pages - one reading task, five pages or more - whose median page carries under
+    FAMILY_LIGHT of its task's reference body words. Advisory: each page clears its own floor, and the user wants light
+    text; but a deck whose exhibit-led pages sit at 0.85 of strong decks' is where its words fall short, and the repair is
+    the kind of words that job carries on strong pages (FAMILY_WORDS), not prose."""
+    by_task = {}
+    for p in pages:
+        if p.get("bodyWordsVsTaskMedian") is not None and p.get("task") in FAMILY_WORDS:
+            by_task.setdefault(p["task"], []).append(p)
+    out = []
+    for task, family in sorted(by_task.items()):
+        if len(family) < FAMILY_FROM:
+            continue
+        ratio = round(st.median([p["bodyWordsVsTaskMedian"] for p in family]), 2)
+        if ratio >= FAMILY_LIGHT:
+            continue
+        lightest = sorted(family, key=lambda p: p["bodyWordsVsTaskMedian"])[:5]
+        out.append({
+            "code": "FAMILY_LIGHT", "severity": "advisory", "slide": None,
+            "measured": {"task": task, "pages": len(family), "medianRatio": ratio,
+                         "lightest": [{"page": p["page"], "id": p["id"], "bodyWords": p["bodyWords"], "ratio": p["bodyWordsVsTaskMedian"]} for p in lightest]},
+            "threshold": FAMILY_LIGHT,
+            "repair": ("The deck's {} {} pages carry a median of {:.0%} of the body words strong pages of that job carry. Give the lightest - {} - "
+                       "{}; not more prose.").format(len(family), task, ratio, ", ".join(str(p["id"]) for p in lightest), FAMILY_WORDS[task]),
+        })
+    return out
 
 
 def main() -> int:
