@@ -1806,6 +1806,34 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
   return errors.length ? `Warning: the storyline gate is not ready for ${directory} - ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""}. Copy written now is written against a spine the critique has not passed; delivery refuses the deck until the gate is ready.` : null;
 }
 
+/**
+ * The storyline as the critique closed it, held through the layout. Once the
+ * critique has closed - its latest pass says ready or provisional, or its own
+ * passes are spent - an edit that moves what it is bound to cannot be read
+ * without a pass the deck may not have: a fresh one where it is ready, one past
+ * the cap, which only the user grants, where it is spent. A layout written by
+ * hand or by a helper moved eight such pages of one deck after its last pass,
+ * and delivery then refused the whole deck. So the compile refuses the edit
+ * where it is made (author-deck.mjs SPINE_LOCKED), naming the pages, and an
+ * author who means the change says so (`--reopen-spine`) and takes the deck
+ * back to the critique. `{ closed, verdict, pass, spent, pages, deleted }`, or
+ * null when the critique is still open or nothing it read has moved.
+ */
+export async function spineLock(spec, directory, { deckPath = null, maxPasses = MAX_PASSES } = {}) {
+  if (spec?.purpose === "catalogue") return null;
+  const history = await readStorylineHistory(await lineageStore(spec, directory, deckPath));
+  const latest = history.at(-1);
+  if (!latest || bindingVersionOf(latest) !== BINDING_VERSION) return null;
+  const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL].includes(h.kind)).length;
+  const verdict = latest.review?.verdict ?? null;
+  const closed = ["ready", "provisional"].includes(verdict) ? verdict : spent >= maxPasses ? "spent" : null;
+  if (!closed) return null;
+  const measures = await readMeasures(spec, await locateDeck(spec, directory, deckPath));
+  if (latest.binding === storylineBinding(spec, measures)) return null;
+  const moved = changedPages(latest.pageHashes, storylinePageHashes(spec, measures));
+  return { closed, verdict, pass: latest.pass, spent, pages: moved ? [...moved.changed, ...moved.deleted] : [], deleted: moved?.deleted ?? [] };
+}
+
 // The repair path after the deck review. A deck review reads the drawn pages
 // and can find the argument wanting where the critique passed it; most such
 // repairs change a bound fact, and by then the critique's passes are usually

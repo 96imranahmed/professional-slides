@@ -372,6 +372,8 @@ const afterRefit = [refit.slides.find((s) => s.id === 'f4').pageType.form, refit
 // A changed claim breaks it, and the loop writes the verification pass for that page alone.
 const reclaimed = await deck.write({}, (d) => { page(d, 'f1').title = 'Loans grew 57% in seven years, twice the pace of deposits'; });
 const claimGate = await gate(reclaimed);
+// The compile holds the closed argument where the edit is made (author-deck SPINE_LOCKED): the layout and its repairs are free, the claim is not.
+const locks = await Promise.all([laidOut, refit, reclaimed].map((spec) => S.spineLock(spec, deck.out, { deckPath: deck.specPath })));
 const two = await S.prepareStoryline(deck.specPath, deck.out);
 const p2 = await packetOf(two);
 // So does a changed evidence list, a measure the spine did not say the page would show, and a changed measure in the log.
@@ -385,7 +387,7 @@ const remeasured = await gate(await deck.write({}, null));
 await fs.writeFile(logPath, JSON.stringify(log));
 const restored = await gate(await deck.write({}, null));
 await clear(deck);
-console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p) => p.id === 'f0').measures[0].line, one: one.status, ready: [ready.status, ready.note], afterLayout, afterRefit, claimGate, two: [two.status, p2.scope.changed, p2.scope.mustInspect],
+console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p) => p.id === 'f0').measures[0].line, one: one.status, ready: [ready.status, ready.note], afterLayout, afterRefit, claimGate, locks, two: [two.status, p2.scope.changed, p2.scope.mustInspect],
   rested, undeclared, remeasured, restored, shown: p1.pages.find((p) => p.id === 'f4').measures.map((m) => [m.ref, m.role]) }));
 ''')
         self.assertEqual(result["drawnAtSpine"], [])  # nothing was laid out when the critique read it
@@ -400,6 +402,8 @@ console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p)
         self.assertEqual([entry[:2] for entry in result["blind"]], [["f0", "SPINE_UNDETERMINED"]])
         self.assertIn("the critic is told the page shows each plotted, whole", result["blind"][0][2])
         self.assertEqual(result["afterRefit"], ["stack", "bars", [], "ready"])  # and so does a form, chart-type or copy repair
+        self.assertEqual(result["locks"][:2], [None, None])
+        self.assertEqual({k: result["locks"][2][k] for k in ("closed", "pages", "deleted")}, {"closed": "ready", "pages": ["f1"], "deleted": []})
         self.assertEqual(len(result["claimGate"]), 1)
         self.assertIn("the spine changed after the storyline critique (f1:", result["claimGate"][0])
         self.assertIn("Copy edits and a chart redrawn in another chart form do not change the spine", result["claimGate"][0])

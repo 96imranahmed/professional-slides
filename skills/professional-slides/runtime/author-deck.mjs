@@ -23,7 +23,9 @@
 //   node runtime/author-deck.mjs <id>.pages.json --log   what the compile and plan runs so far found, and what recurred
 //                                                        (it says what it counts: no other command is logged)
 //   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json; warns when
-//                                                        the storyline gate in out/ (or --out <dir>) is not ready
+//                                                        the storyline gate in out/ (or --out <dir>) is not ready, and
+//                                                        once the critique has closed refuses a page whose argument
+//                                                        moved since (SPINE_LOCKED) unless --reopen-spine is given
 //   node runtime/author-deck.mjs <id>.pages.json --check compile and gate; no deck is written (like every run it adds a
 //                                                        line to <id>.author-log.jsonl and may update the fit search's
 //                                                        cache, <id>.author-cache.json: both are safe to delete)
@@ -109,7 +111,7 @@ import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { assetFindings, assetNotice, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
-import { storylineWarning, recordCompileRefusal, unsupportedPillars, unfiledSources, sourceFiles, recordedMeasures, spineReadings, storyStructure, viewWords, BOUND_FIELDS } from "./storyline.mjs";
+import { storylineWarning, spineLock, recordCompileRefusal, unsupportedPillars, unfiledSources, sourceFiles, recordedMeasures, spineReadings, storyStructure, viewWords, BOUND_FIELDS } from "./storyline.mjs";
 import { CALLOUT_KINDS, DEFERRED, inLayout, proveSpine, stripWitness, undeterminedFinding, unmarked } from "./spine-witness.mjs";
 import { deckStatementFindings, revisionChanges, scopeSourceErrors, unheldLine } from "./review-passes.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, composedPageLimits, isCarried, revisionLine, revisionRecordFindings, revisionStatement, stampKept, withImportedCredits } from "./revision.mjs";
@@ -163,6 +165,7 @@ export const AUTHORING_CODES = Object.freeze({
   ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
   PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
+  SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
   SOURCES_UNFILED: "an insight whose `sources` are not files under sources/ - a name or a registry key where the path of the file the finding was read from belongs, or none at all - advised at the compile, and told to the storyline critic as a problem of the log",
   // Advisories, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
@@ -1637,7 +1640,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan | --log | --repair-relation <page-id>] [--page <id>[,<id>...]] [--fit-cap <n>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan | --log | --repair-relation <page-id>] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1924,12 +1927,25 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
   return plan.satisfied && !unfit.length && !unlayable.length ? 0 : 2;
 }
 
+/** SPINE_LOCKED, one finding a page whose argument moved after the critique closed (storyline.mjs spineLock). */
+function spineLockFindings(lock) {
+  const how = lock.closed === "spent" ? `spent its ${lock.spent} passes` : `closed ${lock.verdict} at pass ${lock.pass}`;
+  const back = `To change the argument, run again with --reopen-spine and take the deck back to the critique (node runtime/storyline.mjs <id>.deck.json out/)${lock.closed === "spent" ? ", whose next pass is past its cap: only the user can grant it (--max-passes)" : ""}`;
+  if (!lock.pages.length) return [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
+    repair: `The storyline critique ${how}, and the deck's answer, its request or the order of its pages has moved since. The layout keeps what the critique read: put it back. ${back}.` }];
+  return lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id,
+    repair: lock.deleted.includes(id)
+      ? `The storyline critique ${how} with ${id} in the deck, and it has been taken out since. The layout keeps the pages the critique read: put it back. ${back}.`
+      : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }));
+}
+
 /** The CLI. Returns the exit code. */
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" }, limits: { type: "string", bare: "" },
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
-    page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" } }, { usage: USAGE });
+    page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
+    "reopen-spine": { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2001,6 +2017,12 @@ async function main(argv) {
   if (!draft && !named && compiled.blocking.length) try { refusalRecord = await recordCompileRefusal(path.join(dir, `${stem}.deck.json`), { spec, refused: compiled.refused, findings: compiled.blocking, measures: insights ? recordedMeasures([...insights.values()]) : null,
     drafted: async () => (await authorDeck(doc, { baseDir: dir, insights, draft: true, fit: false })).blocking }); } catch { refusalRecord = null; }
   if (refusalRecord) console.error(`This compile raises, on the storyline the critique passed as ready, what only a change to that storyline mends and what the draft of the same pages passed (${refusalRecord.findings.map((f) => `${f.id}: ${f.code}`).join("; ")}): the runtime disagrees with itself. Mend those pages; \`node runtime/storyline.mjs\` then writes one verification pass for them that does not count against the critique's cap - once in a lineage, and only while no other page's argument changes.\n`);
+  // The storyline as the critique closed it is held through the layout (storyline.mjs spineLock): a page whose argument moved
+  // since is refused here, where the edit was made, unless the run means it (--reopen-spine) and takes the deck back to the critique.
+  const lock = draft || values["reopen-spine"] ? null
+    : await spineLock(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`) }).catch(() => null);
+  const locked = lock ? spineLockFindings(lock) : [];
+  if (values["reopen-spine"] && !draft) console.error("--reopen-spine: the argument may change; every page whose argument moved goes back to the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) before delivery.\n");
   const revision = revisionStatement(spec, compiled.imported);
   if (revision) console.error(`${revisionLine(revision)}\n`);
   // Where a composed page is read as changed because the inventory cannot say otherwise, the run says so (review-passes.mjs unheldLine).
@@ -2019,7 +2041,7 @@ async function main(argv) {
   const keyOf = (f) => `${f.code}|${f.id ?? ""}`;
   const merge = (ours, theirs) => { const seen = new Set(ours.map(keyOf)); return inClassOrder([...ours, ...theirs.filter((f) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))], order); };
   // A finding on a page that came from a part names the part file to edit (pages-file.mjs).
-  const everything = withParts(doc, merge(compiled.blocking, rendered?.blockers ?? [])), advice = withParts(doc, merge(compiled.advisories, rendered?.advisories ?? []));
+  const everything = withParts(doc, merge([...locked, ...compiled.blocking], rendered?.blockers ?? [])), advice = withParts(doc, merge(compiled.advisories, rendered?.advisories ?? []));
   // What the render measured replaces what the scene estimated of the same rule.
   const measured = new Set((rendered?.standings ?? []).map((st) => st.code));
   const standings = rendered?.standings?.length ? readStandings([...compiled.standings.filter((st) => !measured.has(st.code) && !(st.code === "DECK_SCENE_VOID" && measured.has("DECK_THIN_PAGES"))), ...rendered.standings]) : compiled.standings;
