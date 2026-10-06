@@ -211,6 +211,25 @@ console.log(JSON.stringify({ p05: of('p05'), p03: of('p03'), p06: of('p06'), say
             self.assertNotIn("TEXT_PLAN_CHANGED", built.stderr)
 
 
+class MovedCommentaryTests(unittest.TestCase):
+    def test_points_declared_beside_and_drawn_below_are_told_to_the_author(self):
+        """Three pages of a 60-page deck declared their points beside a chart and were drawn under it, and nothing said so."""
+        result = run_node('''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+const examples = path.resolve('skills/professional-slides/examples');
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'moved-'));
+fs.cpSync(path.join(examples, 'assets'), path.join(dir, 'assets'), { recursive: true });
+const doc = JSON.parse(fs.readFileSync(path.join(examples, 'page-types.pages.json'), 'utf8'));
+const page = doc.pages.find((p) => p.id === 'p03');
+// Two short points beside a ten-year line: too little for the column, so the composer sets them under the chart.
+Object.assign(page, { commentary: 'beside', points: ['Journeys recovered to their FY19 level in FY24.', 'They have grown every year since.'] });
+const run = await authorDeck(doc, { baseDir: dir, fit: false });
+console.log(JSON.stringify(run.advisories.filter((f) => f.code === 'COMMENTARY_MOVED').map((f) => [f.id, f.measured.declared, f.measured.drawn])));
+''')
+        self.assertEqual(result, [["p03", "beside", "below"]])
+
+
 class PageRunTests(unittest.TestCase):
     def test_a_finding_about_two_pages_is_reported_to_a_run_of_either(self):
         def repeated(doc):

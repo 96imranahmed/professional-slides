@@ -164,6 +164,7 @@ export const AUTHORING_CODES = Object.freeze({
   ANALYSIS_REQUIRED: "a deck that compares declared players has no computed comparison of them on common measures",
   ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
+  COMMENTARY_MOVED: "a page whose points are declared beside its exhibit and drawn under it, because they fill too little of the column beside a chart that uses its width - advised, with what holds the column",
   PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
   SOURCES_UNFILED: "an insight whose `sources` are not files under sources/ - a name or a registry key where the path of the file the finding was read from belongs, or none at all - advised at the compile, and told to the storyline critic as a problem of the log",
@@ -915,6 +916,17 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     const page = [...spec.slides, ...(spec.appendix || [])].find((slide) => String(slide.id) === id), rows = [page?.exhibit, ...(page?.exhibits || [])].map((ex) => (Array.isArray(ex?.rows) ? ex.rows.length : 0)).find((n) => n > 0) ?? null;
     spineFindings.push({ code: "PAGE_SPLITS", severity: "advisory", id, measured: { slides: count, ...(rows ? { rows, rowsASlide: Math.ceil(rows / count) } : {}) },
       repair: `${id} is drawn as ${count} slides${rows ? `: its table has ${rows} rows, and one page holds ${Math.ceil(rows / count)} of them at the densest setting a table takes` : ": its exhibits do not share one page"}. Each part repeats the title with (1/${count}) to (${count}/${count}), the commentary stays with the first, and the deck is ${count - 1} slide${count === 2 ? "" : "s"} longer than its pages (a requested length counts them). Keep it where the reader looks rows up${rows ? `; to hold one page, cut the table to ${Math.ceil(rows / count)} rows or fewer - the members the claim compares - and move the rest to the appendix` : ""}` });
+  }
+  // A page whose points are declared beside its exhibit and drawn under it (compose-arrangements.mjs exhibitBesideCommentary: a
+  // short column beside a chart that uses its width) says so. The deck's placement rules count what a page declares, so a
+  // page drawn below while declaring beside is one the author should know of: the column wants its further point, or the
+  // page wants to declare what it is.
+  for (const slide of composed.deck?.slides ?? []) {
+    const id = String(slide.sourceSlideId ?? slide.id), page = [...spec.slides, ...(spec.appendix || [])].find((p) => String(p.id) === id);
+    const declared = page?.pageType?.commentary;
+    if (!["beside", "beside-left"].includes(declared) || !(slide.componentInstances || []).some((c) => c.id === `${slide.id}-below`)) continue;
+    spineFindings.push({ code: "COMMENTARY_MOVED", severity: "advisory", id, measured: { declared, drawn: "below" },
+      repair: `${id} declares its points ${declared === "beside" ? "beside" : "to the left of"} the exhibit and is drawn with them under it: they fill too little of the column beside a chart that uses its width, so the composer set them below. Write the further developed point the evidence carries - the column then holds - or declare commentary "below", which the deck counts toward its cap on points under the exhibit (VARIETY_COMMENTARY.below)` });
   }
   // A page whose references could not be bound (bind.mjs) is left out as one that did not compile is, and stood in for
   // by its declared choices; its finding is the binding's, in a draft as in the full compile.

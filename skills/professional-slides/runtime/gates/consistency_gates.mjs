@@ -405,9 +405,12 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
   // One value printed at two precisions on two pages (a chart's own labels are the layout's, and are not read). It is read
   // value by value, not measure by measure: a printed number keeps two significant figures (printed-numbers.mjs), so the
   // small values of a measure take decimal places its large ones do not, and one format for the whole measure is not the rule.
+  // A table's cells are not read either: a detailed table prints 5.84% where the pages that argue from it say 5.8%, and a
+  // reader looks a number up there at the precision it was recorded to.
+  const inTable = (entry) => /`[^`]*\b(?:rows|cells)[[.]/.test(String(entry.field ?? ""));
   const formats = [];
   for (const [key, entries] of stating) {
-    const printed = entries.filter((entry) => entry.how !== "exhibit" && entry.decimals !== undefined);
+    const printed = entries.filter((entry) => entry.how !== "exhibit" && entry.decimals !== undefined && !inTable(entry));
     const forms = new Map();
     for (const entry of printed) { const form = `${entry.decimals}|${Math.round(Math.log10(entry.factor ?? 1))}`; forms.set(form, [...(forms.get(form) ?? []), entry]); }
     const apartPages = [...forms.values()].map((group) => new Set(group.map((entry) => entry.page)));
@@ -420,7 +423,7 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
     const [a, b] = [pagesAt(conflict.refs[0], cell.labels[0]), pagesAt(conflict.refs[1], cell.labels[1])];
     if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions` });
   }
-  if (formats.length) finding("NUMBER_FORMATS_DIFFER", "advisory", formats.flatMap((f) => f.pages),
+  if (formats.length) finding("NUMBER_FORMATS_DIFFER", "blocker", formats.flatMap((f) => f.pages),
     `${formats.length} value${formats.length === 1 ? " is" : "s are"} rounded differently on different pages: ${listed(formats.map((f) => f.text))}. A reader who meets 53 on one page and 53.2 on another checks whether they are one number. Print each value in one format on every page - the same decimal places and scale in its token, figure or typed number - or say on the page that rounds that it does`,
     formats.slice(0, LISTED).map((f) => f.key));
 

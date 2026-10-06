@@ -119,13 +119,17 @@ console.log(JSON.stringify({ apart: find([rank('p1', 'i1/sites'), table('p2', ro
         self.assertIn('p1 gives 171 and p2 gives 166 for "Sites" at "Cinder", and both exhibits say they show i1/sites', result["apart"][0]["repair"])
         self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["loose"]], [["NUMBERS_DISAGREE", "advisory", ["p1", "p2"]]])
 
-    def test_one_value_printed_at_two_precisions_on_two_pages_is_advised(self):
+    def test_one_value_printed_at_two_precisions_in_the_prose_of_two_pages_blocks(self):
         result = run_node(LOG + '''
 const titled = (id, format) => trend(id, [{ measure: 'i4/visits', name: 'Aster' }], { title: `Aster saw {{i4/visits@FY25 | ${format}}} million visits, page ${id}` });
-console.log(JSON.stringify({ apart: find([titled('p1', '0.0'), titled('p2', '0')]), same: find([titled('p1', '0.0'), titled('p2', '0.0')]) }));
+// A detailed table prints the value at the precision it was recorded to; the page that argues from it may round.
+const looked = { ...trend('p2', [{ measure: 'i4/visits', name: 'Aster' }]), type: 'lookup', form: 'table', commentary: 'none', exhibit: { type: 'table', columns: ['Year', 'Visits'], rows: [['FY25', '{{i4/visits@FY25 | 0.00}}']] } };
+console.log(JSON.stringify({ apart: find([titled('p1', '0.0'), titled('p2', '0')]), same: find([titled('p1', '0.0'), titled('p2', '0.0')]),
+  table: find([titled('p1', '0.0'), looked]).filter((f) => f.code === 'NUMBER_FORMATS_DIFFER') }));
 ''')
         self.assertEqual(result["same"], [])
-        self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["apart"]], [["NUMBER_FORMATS_DIFFER", "advisory", ["p1", "p2"]]])
+        self.assertEqual(result["table"], [])
+        self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["apart"]], [["NUMBER_FORMATS_DIFFER", "blocker", ["p1", "p2"]]])
         self.assertIn('i4/visits@FY25 is "47.3" on p1 and "47" on p2', result["apart"][0]["repair"])
 
     def test_the_compile_reports_a_disagreement_and_refuses_a_contradiction(self):

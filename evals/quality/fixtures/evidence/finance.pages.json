@@ -102,7 +102,7 @@
       "Operating cash flow",
       "{{i-cash/ocf@FY25 | 0m}}",
       "{{i-cash/ocf@FY26 | 0m}}",
-      "Down {{A-ocf/percent | 0% | abs}}"
+      "Down {{A-ocf/percent | 0.0% | abs}}"
      ],
      [
       "Liquid assets",
@@ -152,7 +152,7 @@
    },
    "highlight": "term funding must come before further lending",
    "points": [
-    "Loans grew {{A-loans/percent | 0%}} in seven years and {{A-loans-year/percent | 0.0%}} in FY26. Profit kept rising, but operating cash flow fell {{A-ocf/percent | 0% | abs}}, so earnings no longer pay for the growth.",
+    "Loans grew {{A-loans/percent | 0%}} in seven years and {{A-loans-year/percent | 0.0%}} in FY26. Profit kept rising, but operating cash flow fell {{A-ocf/percent | 0.0% | abs}}, so earnings no longer pay for the growth.",
     "Liquid assets now cover {{A-cover/result@FY26 | 0%}} of the liabilities due within a year, down every year from {{A-cover/result@FY22 | 0%}} in FY22 to {{A-floor/headroom | 0.0}} points above the regulatory minimum. Each loan funded with money due within a year lowers it again, so term funding must come before further lending.",
     "Against its peers Harbour lends faster on thinner liquidity: second of eight on loan growth, last on cover, and fourth on margin and capital. Costs are not the risk: the cost-to-income ratio fell nine points.",
     "The ranking rests on one year of regulatory returns, one union without a capital ratio: a guide to position, not a forecast."

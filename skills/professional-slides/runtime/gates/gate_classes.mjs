@@ -127,6 +127,8 @@ const LISTED = [
   ...codes("P", "PAGE_DOES_NOT_COMPOSE", ["copy", "layout", "fit", "view"]),
   ...codes("P", "TITLE_COUNT_ONLY", ["title"]),
   ...codes("P", "PAGE_SPLITS", ["layout", "view"]),
+  // Commentary declared beside the exhibit and drawn under it (author-deck.mjs): the copy, or the declared placement.
+  ...codes("P", "COMMENTARY_MOVED", ["copy", "layout"]),
   // A carried slide that cannot be carried as its page is written, and one the built file does not hold byte for byte (revision.mjs).
   ...codes("P", "REVISION_CARRY_INVALID", ["copy", "title", "type"]),
   ...codes("P", "REVISION_CARRY_DRIFT", LAYOUT),
