@@ -12,6 +12,7 @@ export const OVERLAP_CODES = Object.freeze({
   TEXT_ON_EDGE: "a label within 2px of the frame of a box it is not inside",
   DESCENDER_ON_RULE: "a display-face numeral's old-style descender set on a rule under it",
   SCATTER_UNKEYED: "a scatter coloured by series with no key and no named ends",
+  TEXT_ON_TEXT: "two labels whose ink overlaps",
 });
 
 const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption"]);
@@ -19,6 +20,8 @@ const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", 
 const BOX_ROLES = new Set(["flow-step", "chart-mark", "fact-tile"]);
 const RULE_ROLES = new Set(["divider-accent", "cover-accent", "section-heading-rule", "takeaways-rule"]);
 const OLD_STYLE_DESCENDERS = /[34579]/;
+// How far two labels' ink may meet, each way, before they read as one over the other: the ink box's own rounding.
+const TEXT_CLEAR = 1.5;
 
 // The body faces' vertical metrics, as a share of the em: the line box holds
 // ascent and descent centred in its leading; figures and capitals reach the
@@ -98,6 +101,15 @@ export function sceneCollisions(slide) {
       if (near && !inside) findings.push({ code: "TEXT_ON_EDGE", slide: slide.id, text: text.id, box: box.id, roles: [text.role, box.role] });
     }
   }
+  // Two labels set over each other: a value label on a callout, a category name on its neighbour, an end label on a
+  // data label. The suite's rendered audit allows no text over text, and until now only the render's own throws and
+  // that audit caught it. Read by ink, a pair whose glyphs share more than a pixel each way.
+  const inked = nodes.filter((n) => n.type === "text" && String(n.text ?? "").trim() && n.frame).map((n) => [n, inkBox(n)]);
+  for (let i = 0; i < inked.length; i++) for (let j = i + 1; j < inked.length; j++) {
+    const [[a, p], [b, q]] = [inked[i], inked[j]];
+    const across = Math.min(p.x + p.width, q.x + q.width) - Math.max(p.x, q.x), down = Math.min(p.y + p.height, q.y + q.height) - Math.max(p.y, q.y);
+    if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: a.id, other: b.id, roles: [a.role, b.role] });
+  }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
     const size = Number(numeral.style?.fontSize?.value ?? 0) * 96 / 72, bottom = numeral.frame.y + numeral.frame.height;
     for (const rule of nodes.filter((n) => RULE_ROLES.has(n.role))) {
@@ -134,13 +146,14 @@ export function sceneChartFindings(slide) {
  * reader needs to tell its colours apart. A label within 2px of a neighbouring
  * box is cramped but legible - a spacing question, read beside the page.
  */
-export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_EDGE: "advisory" });
+export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_ON_EDGE: "advisory" });
 
 const OVERLAP_REPAIR = Object.freeze({
   TEXT_ON_LINE: "Move the label off the line: set a reference label at the end of its line clear of the series, a flow label above its arrow, a value label on the side of its point the line leaves open - or shorten it so it fits between the marks.",
   TEXT_ON_EDGE: "Give the label its gap from the box beside it: widen the category slot, set the value inside its own mark, or shorten the label.",
   DESCENDER_ON_RULE: "Set the numeral in lining figures (the body face) or lift it off the rule by its descent.",
   SCATTER_UNKEYED: "Keep the scatter's legend, or connect each series (connect: true) so its name sits at its end.",
+  TEXT_ON_TEXT: "Set one label clear of the other: fewer or shorter callouts on that part of the chart, a callout moved to the category its point leaves open, a shorter category name, or a wider slot.",
 });
 
 /**

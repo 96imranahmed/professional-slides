@@ -117,6 +117,22 @@ console.log(JSON.stringify({{
         self.assertEqual(result["serif"], ["DESCENDER_ON_RULE"])
         self.assertEqual(result["lining"], 0)
 
+    def test_two_labels_set_over_each_other_are_found_by_their_ink(self):
+        """A 65-page deck printed one map label over another; nothing on the scene read text against text."""
+        result = run_node(f"""
+import {{ sceneCollisions }} from '{RUNTIME}/validate-overlap.mjs';
+const label = (id, x, y, text) => ({{ id, type: 'text', role: 'map-label', text, frame: {{ x, y, width: 80, height: 16 }}, style: {{ align: 'left', valign: 'mid', fontFamily: {{ tokenId: 'font.body' }}, fontSize: {{ value: 10 }} }}, data: {{}} }});
+const on = (nodes) => sceneCollisions({{ id: 's', nodes }}).filter((f) => f.code === 'TEXT_ON_TEXT').map((f) => [f.text, f.other]);
+console.log(JSON.stringify({{
+  over: on([label('a', 587, 417, '160 Water St'), label('b', 573, 414, '61 Broadway')]),
+  // Two slots that meet while their words do not: a short label left-set in a wide frame beside its neighbour.
+  slots: on([label('a', 100, 100, 'Q3'), {{ ...label('b', 140, 100, 'Q4'), style: {{ align: 'right', valign: 'mid', fontFamily: {{ tokenId: 'font.body' }}, fontSize: {{ value: 10 }} }} }}]),
+  apart: on([label('a', 100, 100, '160 Water St'), label('b', 100, 130, '61 Broadway')]) }}));
+""")
+        self.assertEqual(result["over"], [["a", "b"]])
+        self.assertEqual(result["slots"], [])
+        self.assertEqual(result["apart"], [])
+
     def test_a_label_is_read_by_its_glyphs_not_the_slot_it_is_set_in(self):
         """Fifty-page audit: read as its 60px slot, a value label had its own series' segments through it."""
         # A line chart's value label is a 60px slot round four figures. Read as

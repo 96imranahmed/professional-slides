@@ -148,7 +148,7 @@ const full = allocateStructure(doc, { planOf }), again = allocateStructure(doc, 
 const rows = (plan) => plan.pages.map((p) => `${p.id} ${p.form} ${p.commentary} ${p.source}`).join('|');
 console.log(JSON.stringify({ full: [full.satisfied, full.capped, full.steps > 0, full.evaluations > 10], same: rows(full) === rows(again) && full.evaluations === again.evaluations,
   before: full.declared.findings.filter((f) => f.severity === 'blocker').map((f) => f.code), changed: full.pages.filter((p) => p.source === 'changed').length,
-  proposed: full.pages.filter((p) => p.source === 'proposed').length, cut: [cut.satisfied, cut.capped, cut.steps, cut.unsatisfied.map((u) => u.code)] }));
+  proposed: full.pages.filter((p) => p.source === 'proposed').length, cut: [cut.satisfied, cut.capped, cut.steps, cut.unsatisfied.map((u) => u.code)], spent: cut.evaluations }));
 ''')
         self.assertEqual(result["full"], [True, False, True, True])
         self.assertTrue(result["same"])
@@ -159,8 +159,11 @@ console.log(JSON.stringify({ full: [full.satisfied, full.capped, full.steps > 0,
         self.assertEqual(result["proposed"], 0)
         # Stopped by its count with a rule still broken, the plan says it was stopped and which rule is left.
         satisfied, capped, steps, left = result["cut"]
-        self.assertEqual([satisfied, capped, steps], [False, True, 1])
+        self.assertEqual([satisfied, capped], [False, True])
+        self.assertLessEqual(steps, 1)
         self.assertIn("VARIETY_COLUMN", left)
+        # The count holds inside a pass, not only between passes: a widened pass once ran past it by thousands.
+        self.assertLessEqual(result["spent"], 12)
 
 
 class OnePassTests(unittest.TestCase):

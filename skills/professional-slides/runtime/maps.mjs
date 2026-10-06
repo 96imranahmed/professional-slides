@@ -377,10 +377,12 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       if (!chosen) {
         // A dense cluster (a regional network's neighbouring towns) takes
         // every position touching the marker. The label moves further out -
-        // rings of 28, 44 and 64px in eight directions - with a hairline
-        // leader back to its marker, rather than printing over a neighbour.
+        // rings of 28 to 160px in eight directions - with a hairline leader
+        // back to its marker, rather than printing over a neighbour. A city's
+        // buildings a block apart need the far rings; what still overlaps is
+        // refused on the scene (validate-overlap.mjs TEXT_ON_TEXT).
         const pathClear = (x1, y1, x2, y2) => { for (let t = 0.1; t < 1; t += 0.1) { const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t; if (occupied.some((o) => x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height)) return false; } return true; };
-        ring: for (const reach of [28, 44, 64]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
+        ring: for (const reach of [28, 44, 64, 96, 128, 160]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
           const ux = Math.cos(degrees * Math.PI / 180), uy = Math.sin(degrees * Math.PI / 180);
           const cx = centerX + ux * (half + reach + width / 2 * Math.abs(ux)), cy = centerY + uy * (half + reach + height / 2 * Math.abs(uy));
           const f = { x: cx - width / 2, y: cy - height / 2, width, height };

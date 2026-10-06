@@ -166,7 +166,7 @@ const LISTED = [
   // The composed scene and its render (gates/page_gates.py, validate-overlap.mjs): what the page holds, and what its words and marks say.
   ...codes("P", "TITLE_LINES TITLE_WORDS TITLE_COUNT", ["title"]),
   ...codes("P", `INK_COVERAGE DEAD_BAND INTERNAL_VOID COLUMN_VOID TYPE_RANGE CPL TAKEAWAY_LONG WORDS HERO_EXHIBIT HEADING_WRAPS THIN_PAGE NOTE_HEAVY
-    THIN_COLUMN PLOT_SPAN THIN_TABLE THIN_EVIDENCE MISSING_RENDER SCENE_VOID RENDER_DRIFT SCENE_INK TEXT_ON_LINE TEXT_ON_EDGE DESCENDER_ON_RULE`, FIT),
+    THIN_COLUMN PLOT_SPAN THIN_TABLE THIN_EVIDENCE MISSING_RENDER SCENE_VOID RENDER_DRIFT SCENE_INK TEXT_ON_LINE TEXT_ON_TEXT TEXT_ON_EDGE DESCENDER_ON_RULE`, FIT),
   ...codes("P", "MISSING_ARGUMENT POINT_DEPTH UNANNOTATED TWIN_CELLS RESTATEMENT PLANNING_VOICE CAVEAT_HEAVY CONTRADICTED_SHARE", COPY),
   ...codes("P", "METRIC_STACK NUMBERS_ON_MARKS NICE_TICKS UNSOURCED_PICTURE UNSCALED_FIGURE SCATTER_UNKEYED", LAYOUT),
   // The saved file read back against the scene (emit/readback_pptx.py).
@@ -274,7 +274,7 @@ export function classOf(code) {
 // content, and finding it by hand costs a run a try.
 export const LAYOUT_CODES = Object.freeze(new Set(["PAGE_DOES_NOT_COMPOSE", "SCENE_VOID", "DEAD_BAND", "INTERNAL_VOID", "COLUMN_VOID",
   "TEXT_COVERAGE_LOW", "THIN_PAGE", "THIN_COLUMN", "INK_COVERAGE", "HERO_EXHIBIT", "WORDS", "TITLE_LINES", "HEADING_WRAPS", "CPL",
-  "PLOT_SPAN", "THIN_TABLE", "NOTE_HEAVY", "TEXT_ON_LINE", "TEXT_ON_EDGE"]));
+  "PLOT_SPAN", "THIN_TABLE", "NOTE_HEAVY", "TEXT_ON_LINE", "TEXT_ON_TEXT", "TEXT_ON_EDGE"]));
 
 // Every structure and aggregate rule says where the deck stands against it on
 // every run (`standing`, below) - except these, which have no quantity to

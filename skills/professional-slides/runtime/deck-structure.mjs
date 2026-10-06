@@ -624,7 +624,9 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     // for the rules the plan is held to, so those are weighed with the estimate left out.
     const held = (c) => ({ ...c, drift: 0 });
     for (const [pool, choices, free] of [[open, "options", true], ...(broken ? [[open.filter((e) => !e.formDeclared), "wider", false], [typed.filter((e) => (e.declared || e.formDeclared) && !e.imported), "wider", false]] : [])]) {
-      for (const entry of pool) for (const choice of sameFormFirst(entry, entry[choices])) {
+      singles: for (const entry of pool) for (const choice of sameFormFirst(entry, entry[choices])) {
+        // The budget holds inside a pass as between passes: a wide deck's widened pool is thousands of whole-deck evaluations.
+        if (evaluations >= maxEvaluations) break singles;
         if (choice.form === entry.choice.form && choice.commentary === entry.choice.commentary) continue;
         // A form chosen among equals by the spread and the draw is changed to mend a broken rule, never for room alone:
         // room is made with placements, or the seed's choices would be undone wherever a rule sat at its bar.
@@ -646,7 +648,8 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
         if (moved.blockers > cost.blockers || moved.lacking > cost.lacking + 1e-9 || evaluations >= maxEvaluations) continue;
         const kept = entry.choice;
         entry.choice = choice;
-        for (const other of open) for (const next of sameFormFirst(other, other.options)) {
+        seconds: for (const other of open) for (const next of sameFormFirst(other, other.options)) {
+          if (evaluations >= maxEvaluations) break seconds;
           if (other === entry || (next.form === other.choice.form && next.commentary === other.choice.commentary)) continue;
           const after = structureCost(evaluate({ entry: other, choice: next }));
           if (cheaper(after, best?.cost ?? cost)) best = { entry: other, choice: next, cost: after, first: { entry, choice } };
