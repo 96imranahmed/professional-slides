@@ -7,10 +7,13 @@
 //
 // A picture planned as `{ alt: "what it shows" }` - the cover image, a divider
 // image, a page `photo`, a photo cell - is searched on Commons by its `search`
-// (else its alt text). The first result that is a JPEG photograph at least
+// (else its alt text). Of the results that are JPEG photographs at least
 // 1200px wide, under CC0, CC BY, CC BY-SA or the public domain, and not a
-// map, diagram, logo or flag, is downloaded at 1600px; landscape results are
-// preferred. The picture gets its `path` and a `credit` naming author and
+// map, diagram, logo or flag, the one whose title, description and categories
+// name most of what the picture is planned to show is downloaded at 1600px,
+// landscape preferred among equals; a result that names none of it is not
+// taken, since a search returns what matches its words, not what shows the
+// subject. The words it matched are recorded with the file. The picture gets its `path` and a `credit` naming author and
 // licence, which CC BY and CC BY-SA require the deck to show. A picture that
 // must come from the client is marked `fetch: false` and stays a placeholder.
 // Logos (alt ending in "logo") are fetch-logos.mjs's business.
@@ -18,6 +21,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { UA, slugOf } from "./fetch-logos.mjs";
+import { contentWords } from "./gates/content_gates.mjs";
 
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
 const FREE = /^(cc0|cc[- ]by(-sa)?(\s[\d.]+)?(\s\w+)?|public domain|pd\b|pdm|attribution(-sharealike)?)/i;
@@ -40,11 +44,20 @@ export function picturePlaceholders(spec) {
 
 const stripHtml = (html) => String(html ?? "").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
 
+// Words a picture's plan shares with every photograph of anything: they say nothing of its subject.
+const GENERIC = new Set(["photo", "photograph", "picture", "image", "view", "views", "showing", "shows", "from", "with", "street", "building", "buildings", "city", "york"]);
+/** The words a candidate must name to show the subject: the plan's content words, less the generic ones. */
+export const subjectWords = (text) => [...contentWords(text)].filter((word) => !GENERIC.has(word));
+
 /**
  * The best freely licensed photograph among Commons search results (pages in
- * search order, each with `imageinfo`), or null. Pure, so it is tested offline.
+ * search order, each with `imageinfo`), or null. With `subject` - what the
+ * picture is planned to show - a candidate is taken only where its title,
+ * description or categories name some of it, and the one naming most wins.
+ * Pure, so it is tested offline.
  */
-export function chooseCommonsPhoto(pages) {
+export function chooseCommonsPhoto(pages, subject = null) {
+  const wanted = subject ? subjectWords(subject) : [];
   const ok = [];
   for (const page of [...pages].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))) {
     const info = page.imageinfo?.[0];
@@ -54,26 +67,32 @@ export function chooseCommonsPhoto(pages) {
     if (!FREE.test(license) || /\b(nc|nd)\b/i.test(license) || meta.NonFree?.value === "true") continue;
     if (NOT_A_PHOTO.test(page.title) || NOT_A_PHOTO.test(stripHtml(meta.ObjectName?.value))) continue;
     const artist = stripHtml(meta.Artist?.value).slice(0, 80) || "unknown author";
+    const description = stripHtml(meta.ImageDescription?.value).slice(0, 300);
+    const named = contentWords([page.title, description, stripHtml(meta.Categories?.value), stripHtml(meta.ObjectName?.value)].join(" "));
+    const matched = wanted.filter((word) => named.has(word));
+    if (wanted.length && !matched.length) continue;
     ok.push({
-      title: page.title, landscape: info.width >= info.height * 1.15,
+      title: page.title, landscape: info.width >= info.height * 1.15, description, matched,
       url: info.thumburl || info.url, page: info.descriptionurl, license, licenseUrl: meta.LicenseUrl?.value ?? null, artist,
       // The credits page prints this string, so it carries the links a reader
       // needs to trace the file and its licence.
       credit: `Photo: ${artist}, ${license}${meta.LicenseUrl?.value ? ` (${meta.LicenseUrl.value})` : ""}, via Wikimedia Commons${info.descriptionurl ? `: ${info.descriptionurl}` : ""}`,
     });
   }
-  return ok.find((c) => c.landscape) ?? ok[0] ?? null;
+  const best = Math.max(0, ...ok.map((c) => c.matched.length));
+  const top = ok.filter((c) => c.matched.length === best);
+  return top.find((c) => c.landscape) ?? top[0] ?? null;
 }
 
-export async function searchCommons(query) {
+export async function searchCommons(query, subject = null) {
   const params = new URLSearchParams({
     action: "query", format: "json", formatversion: "2", generator: "search", gsrnamespace: "6",
     gsrsearch: `${query} filetype:bitmap`, gsrlimit: "12", prop: "imageinfo",
-    iiprop: "url|size|mime|extmetadata", iiurlwidth: "1600", iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|ObjectName|NonFree",
+    iiprop: "url|size|mime|extmetadata", iiurlwidth: "1600", iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|ObjectName|NonFree|ImageDescription|Categories",
   });
   const res = await fetch(`${COMMONS}?${params}`, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`Commons API ${res.status}`);
-  return chooseCommonsPhoto((await res.json()).query?.pages ?? []);
+  return chooseCommonsPhoto((await res.json()).query?.pages ?? [], subject);
 }
 
 async function download(choice, file) {
@@ -102,11 +121,13 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
     const file = path.join(directory, `${slugOf(picture.alt)}.jpg`);
     const known = records.get(picture.alt);
     const exists = await fs.access(file).then(() => true, () => false);
+    // A photograph fetched for other search words is not the one asked for now: re-searched where the network is allowed.
+    const searched = exists && known && fetchMissing && (known.search ?? null) !== (picture.search ?? null);
     try {
-      if (!exists) {
+      if (!exists || searched) {
         if (!fetchMissing) continue;
-        const choice = await searchCommons(picture.search ?? picture.alt);
-        if (!choice) { failed.push(`${picture.alt}: no freely licensed photograph found; set \`search\` or supply the file`); continue; }
+        const choice = await searchCommons(picture.search ?? picture.alt, [picture.alt, picture.search].filter(Boolean).join(" "));
+        if (!choice) { failed.push(`${picture.alt}: no freely licensed photograph whose title, description or categories name what it is planned to show; set \`search\` to the place's own name, or supply the file`); continue; }
         await fs.mkdir(directory, { recursive: true });
         await download(choice, file);
         const { url, landscape, ...record } = choice;

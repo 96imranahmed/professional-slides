@@ -42,6 +42,26 @@ console.log(JSON.stringify({ choice: chooseCommonsPhoto(pages), none: chooseComm
         self.assertEqual(result['wanted'], ['A 787 on approach'])
 
 
+class PictureSubjectTests(unittest.TestCase):
+    def test_a_photograph_is_taken_for_its_subject_not_for_its_search_rank(self):
+        """A search returns what matches its words: the first free landscape for "Park Avenue towers" can be a park."""
+        result = run_node('''
+import { chooseCommonsPhoto } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+const page = (index, title, description, categories) => ({ index, title, imageinfo: [{ mime: 'image/jpeg', width: 2400, height: 1600, thumburl: 'u' + index, descriptionurl: 'd' + index,
+  extmetadata: { LicenseShortName: { value: 'CC BY 4.0' }, Artist: { value: 'Jo Bloggs' }, ImageDescription: { value: description }, Categories: { value: categories } } }] });
+const pages = [page(1, 'File:Autumn in the park.jpg', 'Leaves on a path', 'Parks in Brooklyn'),
+  page(2, 'File:Seagram Building.jpg', 'The tower on Park Avenue, Midtown', 'Office buildings in Manhattan|Park Avenue'),
+  page(3, 'File:Skyline.jpg', 'Office towers in Midtown Manhattan', 'Skylines of Manhattan')];
+const subject = 'Office towers on Park Avenue in Midtown Manhattan';
+console.log(JSON.stringify({ chosen: chooseCommonsPhoto(pages, subject)?.title, matched: chooseCommonsPhoto(pages, subject)?.matched,
+  none: chooseCommonsPhoto([pages[0]], 'Grand Central Terminal concourse'), blind: chooseCommonsPhoto(pages)?.title }));
+''')
+        self.assertEqual(result["chosen"], "File:Seagram Building.jpg")   # names park, avenue, midtown, manhattan, office
+        self.assertIn("avenue", result["matched"])
+        self.assertIsNone(result["none"])                                  # a result that names nothing of its subject is not taken
+        self.assertEqual(result["blind"], "File:Autumn in the park.jpg")   # with no subject, search order stands
+
+
 class PlaceFetchTests(unittest.TestCase):
     def test_named_markers_are_placed_from_the_cache_offline(self):
         """62-page deck: map discs sat on country centres; named markers are placed from the places cache."""
