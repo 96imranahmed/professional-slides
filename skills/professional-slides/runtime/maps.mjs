@@ -643,10 +643,12 @@ function choroplethNodes({id,frame,props,geography}) {
     let bottom=mapFrame.y+mapFrame.height;
     for (const label of [...lane].reverse()) {label.top=Math.min(label.top,bottom-label.height);bottom=label.top-gap;}
     for (const label of lane) {
-      const x=side==='left'?frame.x:frame.x+frame.width-labelWidth;
+      // The lanes stand beside the map as drawn, not at the frame's edges: a tall city in a wide frame drew its labels a
+      // third of the page away, every leader a long run across empty paper.
+      const x=side==='left'?Math.max(frame.x,projected.plot.x-2*gap-labelWidth):Math.min(frame.x+frame.width-labelWidth,projected.plot.x+projected.plot.width+2*gap);
       const edge=side==='left'?x+labelWidth:x;
       const data={featureId:label.country.id,value:values.get(label.country.id),unit:scale.unit,geography:geography.id,labelPoint:label.country.label,dependencies:[stableId(id,'land',label.country.id)]};
-      const elbow=side==='left'?centerFrame.x:centerFrame.x+centerFrame.width;
+      const elbow=side==='left'?Math.max(edge,projected.plot.x-gap):Math.min(edge,projected.plot.x+projected.plot.width+gap);
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'anchor'),role:'map-label-leader',x1:label.x,y1:label.y,x2:elbow,y2:label.y,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'lane'),role:'map-label-leader',x1:elbow,y1:label.y,x2:edge,y2:label.top+label.measured.height/2,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
       const align=side==='left'?'right':'left';

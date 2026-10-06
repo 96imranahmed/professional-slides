@@ -1170,12 +1170,19 @@ export function citationOf(source, registry, id = "page") {
  * many records is never refused for the citation the runtime derived, and
  * whatever the footer leaves out is kept whole in the speaker notes. A citation typed as text has one form, the author's.
  */
+// A source status that records only when it was read, not what kind of figure it gives.
+const RETRIEVAL_STATUS = /^(?:retrieved|accessed|downloaded|read)\b/i;
+
 export function citationForms(keys, registry) {
   const entries = keys.map((key) => registry[key]);
   const label = entries.length > 1 ? "Sources" : "Source";
   const line = (names) => `${label}: ${names.join("; ")}`;
   // Several articles of one publisher share its short name: a short form says it once, and the fullest form names each.
-  const named = (short, status) => [...new Set(entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name; return status && e.status ? `${name} (${e.status})` : name; }))];
+  // A status that is only when the source was read ("retrieved 2026-10-05") changes nothing about how its number reads: it
+  // stays in the registry, and no form prints it - on a deck whose every source was retrieved one day, it was a third of
+  // every footer.
+  const named = (short, status) => [...new Set(entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name;
+    const said = status && e.status && !RETRIEVAL_STATUS.test(e.status); return said ? `${name} (${e.status})` : name; }))];
   const brief = named(true, false);
   const counted = Array.from({ length: Math.max(0, brief.length - 1) }, (_, i) => brief.length - 1 - i)
     .map((shown) => `${line(brief.slice(0, shown))}; +${brief.length - shown} more in the notes`);
