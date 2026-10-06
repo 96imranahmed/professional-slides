@@ -180,6 +180,44 @@ console.log(JSON.stringify({
         self.assertEqual(result["clash"], ["base", "FY27", "FY28"])
         self.assertEqual(result["series"], ["FY26", "FY27", "FY28"])
 
+    def test_a_scenario_follows_a_recorded_schedule_step_by_step(self):
+        # A stabilised-rent path held income at 0% for three years from 2024 because a scenario applied one rate at every
+        # step; the record set the rate year by year (2.75%, 3%, then a freeze), and only the last year was frozen. A driver
+        # read from a record takes each step's rate from the period `at` names, and is the result's input like any other.
+        result = run_node(LOG + '''
+import { runAnalyses } from './skills/professional-slides/runtime/analysis.mjs';
+const log = [...insights, { id: 'i-rule', shape: 'series', sources: ['sources/rule.csv'], cite: ['orders'], measures: {
+  allowed: { unit: '%', population: 'the regulated units', periods: ['Oct-24', 'Oct-25', 'Oct-26'], values: [2.75, 3, 0], boundaries: { 'Oct-26': 'a freeze' } },
+  ahead: { unit: '% points', population: 'the regulated units', period: '2024', value: 1.9 } } }];
+const run = (assumptions, horizon = ['FY27', 'FY28', 'FY29']) => runAnalyses(plan([{ id: 'S', op: 'scenario', inputs: ['i-bal/cash'], method: 'compound', horizon, assumptions }]), log).results[0];
+const why = 'each year takes the order in force for most of it';
+const ruled = run([{ name: 'allowed rise', ref: 'i-rule/allowed', at: ['Oct-24', 'Oct-25', 'Oct-26'], rationale: why }]);
+const both = run([{ name: 'allowed rise', ref: 'i-rule/allowed', at: ['Oct-24', 'Oct-25', 'Oct-26'], rationale: why },
+  { name: 'income ahead of the rule', ref: 'i-rule/ahead', rationale: 'the latest recorded gap holds each year' }]);
+const net = runAnalyses(plan([{ id: 'S', op: 'scenario', inputs: ['i-bal/cash'], method: 'compound', horizon: ['FY27', 'FY28', 'FY29'], assumptions: [{ name: 'allowed rise', ref: 'i-rule/allowed', at: ['Oct-24', 'Oct-25', 'Oct-26'], rationale: why }] },
+  { id: 'T', op: 'scenario', inputs: ['i-bal/debt'], method: 'linear', horizon: ['FY27', 'FY28', 'FY29'], assumptions: [{ name: 'repaid', value: -5, unit: 'GBP m a year', rationale: 'the last two years of repayments continue' }] },
+  { id: 'G', op: 'gap', inputs: ['S/path', 'T/path'] }]), log).results[2].measures.result;
+console.log(JSON.stringify({ path: ruled.measures.path.values, from: ruled.measures.path.assumedFrom, net: [net.periods[0], net.assumedFrom], status: ruled.status, inputs: ruled.inputs, cite: ruled.cite, finding: ruled.finding,
+  listed: ruled.assumptions[0], boundaries: ruled.boundaries, both: both.measures.path.values, held: both.assumptions[1].value,
+  short: run([{ name: 'allowed rise', ref: 'i-rule/allowed', at: ['Oct-24', 'Oct-25'], rationale: why }]).reason,
+  hole: run([{ name: 'allowed rise', ref: 'i-rule/allowed', at: ['Oct-24', 'Oct-25', 'Oct-27'], rationale: why }]).reason,
+  absent: run([{ name: 'allowed rise', ref: 'i-rule/missing', at: ['Oct-24', 'Oct-25', 'Oct-26'], rationale: why }]) }));
+''')
+        self.assertEqual(result["path"], [55, 56.5125, 58.207875, 58.207875])  # 2.75%, then 3%, then the freeze: not one rate thrice
+        self.assertEqual(result["status"], "assumed")                         # applying a rule to income is still an assumption
+        self.assertEqual(result["from"], "FY27")                              # recorded at its base, assumed from the horizon on
+        self.assertEqual(result["net"], ["FY26", "FY27"])                     # and so is a gap of two paths from one base
+        self.assertEqual(result["inputs"], ["i-bal/cash", "i-rule/allowed"])   # the schedule is read like an input
+        self.assertEqual(result["cite"], ["annual-report", "orders"])
+        self.assertIn("allowed rise (2.75%, 3%, 0%) step by step", result["finding"])
+        self.assertEqual([result["listed"][k] for k in ("value", "values", "at", "ref", "unit")], [None, [2.75, 3, 0], ["Oct-24", "Oct-25", "Oct-26"], "i-rule/allowed", "%"])
+        self.assertEqual(result["boundaries"], ["i-rule/allowed Oct-26: a freeze"])
+        self.assertEqual([round(v, 2) for v in result["both"]], [55, 57.59, 60.44, 61.59])
+        self.assertEqual(result["held"], 1.9)                                 # a one-value record applies at every step
+        self.assertIn("`at` names the period each of the 3 steps of the horizon applies", result["short"])
+        self.assertIn("i-rule/allowed has no value at Oct-27", result["hole"])
+        self.assertEqual([result["absent"]["status"], result["absent"]["missing"]], ["unavailable", ["i-rule/missing"]])
+
     def test_what_cannot_be_computed_honestly_is_unavailable_or_carries_its_boundary(self):
         result = run_node("""
 import { runAnalyses } from './skills/professional-slides/runtime/analysis.mjs';

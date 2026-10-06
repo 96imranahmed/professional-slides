@@ -118,7 +118,9 @@ console.log(JSON.stringify({ exhibit: exhibitOf(joined), compiled: [compileError
         self.assertEqual(result["source"], "Source: Annual report 2026 (illustrative)")
         self.assertEqual(result["gate"], [])
         self.assertEqual(result["typed"], ["BASIS_VALUES"])
-        self.assertEqual(result["alone"], [{"from": "FY26", "to": "FY29", "label": "Assumed"}])  # a path drawn alone is assumed from end to end
+        # A path drawn alone starts at the recorded value it was carried from: that period is the record, and the run after it the
+        # assumption (a stabilised-income path bracketed its recorded 2024 base as "Assumed").
+        self.assertEqual(result["alone"], [{"from": "FY26", "to": "FY26", "label": "Recorded"}, {"from": "FY27", "to": "FY29", "label": "Assumed"}])
         # An exhibit that marks the run itself keeps its own mark, where it starts at the first assumed period.
         self.assertEqual([result["ownMark"].get("forecastFrom"), "periods" in result["ownMark"]], ["FY27", False])
         self.assertIn("start it at FY27", result["wrongMark"][0])

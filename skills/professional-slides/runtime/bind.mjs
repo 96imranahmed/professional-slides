@@ -27,9 +27,10 @@
 //   Each series is also told what it is, for the chart to draw: a measure of
 //   one value - a threshold, a target - is a `reference`, drawn as a reference
 //   line; a series that is an assumption throughout is `assumed`, and one
-//   joined to a scenario is `assumedFrom` the first assumed period, drawn
-//   dashed from there (chart-decorations.mjs SERIES_STATES). A series that
-//   says its own `state` keeps it.
+//   joined to a scenario - or a scenario's own path, recorded at its base -
+//   is `assumedFrom` the first assumed period, drawn dashed from there
+//   (chart-decorations.mjs SERIES_STATES). A series that says its own `state`
+//   keeps it.
 // - Every chart kind is written from the same references, each in the shape
 //   its renderer reads (shapeBound): small multiples take a series an item, a
 //   treemap its one measure's members as tiles, a box plot five measures as
@@ -444,8 +445,10 @@ function seriesOf(refs, what, { fail, measureOf }) {
     if (!labels) return fail(`${what} joins ${refs.join(" and ")}, whose periods cannot be put in one order (${axes.map((axis) => axis.labels.join(", ")).join(" | ")}): each lists its periods in time order, and the two orders disagree`, refs);
   }
   // Where two joined measures both hold a period the record is kept, whichever is listed first: an assumption never replaces a recorded value.
-  const holder = (label) => { const holding = measures.filter((m, i) => axes[i].labels.includes(label)); return holding.find((m) => !m.assumed) ?? holding[0]; };
-  const at = new Map(labels.map((label) => { const m = holder(label); return [label, { value: valuesOf(m)[axisOf(m).labels.indexOf(label)] ?? null, assumed: Boolean(m.assumed), ref: m.ref }]; }));
+  // A scenario's path is recorded at its base and assumed from `assumedFrom` on: the base is drawn as the record it is.
+  const assumedAt = (m, label) => Boolean(m.assumed) && !(m.assumedFrom !== undefined && axisOf(m).labels.indexOf(label) < axisOf(m).labels.indexOf(String(m.assumedFrom)));
+  const holder = (label) => { const holding = measures.filter((m, i) => axes[i].labels.includes(label)); return holding.find((m) => !assumedAt(m, label)) ?? holding[0]; };
+  const at = new Map(labels.map((label) => { const m = holder(label); return [label, { value: valuesOf(m)[axisOf(m).labels.indexOf(label)] ?? null, assumed: assumedAt(m, label), ref: m.ref }]; }));
   return { refs, measures, kind: axes[0].kind, unit: measures[0].unit, at, scalar: axes[0].kind === "scalar" ? valuesOf(measures[0])[0] ?? null : undefined };
 }
 

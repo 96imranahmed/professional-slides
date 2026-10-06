@@ -62,7 +62,7 @@ export const ANALYSIS_OPS = Object.freeze({
   rank: { inputs: [1, 1], does: "the members in order on one measure, with each one's rank" },
   share: { inputs: [1, 1], does: "each part as a percentage of the whole" },
   threshold: { inputs: [1, 1], does: "the headroom between a value (`at` a period or member, the last by default) and a `threshold` - a measure, or a stated assumption" },
-  scenario: { inputs: [1, 1], does: "a value carried over a `horizon` under stated `assumptions` (`method` linear or compound, `drivers` naming the assumptions applied each step), and where it crosses a `threshold`" },
+  scenario: { inputs: [1, 1], does: "a value carried over a `horizon` under stated `assumptions` (`method` linear or compound, `drivers` naming the assumptions applied each step; a driver `{ name, ref, at, rationale }` reads each step's rate from a recorded measure at the period `at` names), and where it crosses a `threshold`" },
 });
 
 const round = (value) => (typeof value === "number" && Number.isFinite(value) ? Math.round(value * 1e6) / 1e6 : null);
@@ -167,8 +167,12 @@ function combined(measures, plan, fold, { unit, notes = [] }, expr, divisor = nu
   const expression = expr(operands.map(said));
   const first = axis.labels[values.findIndex((v) => v !== null)], last = axis.labels[values.length - 1 - [...values].reverse().findIndex((v) => v !== null)];
   const result = { ...axisFields(axis, axis.first), values };
+  // Over periods a result rests on an assumption from the first period any input does: a scenario's path is its recorded
+  // base and then its assumed run, and a gap of two paths is recorded at the base they share.
+  const turns = axis.kind !== "periods" ? [] : operands.filter((o) => o.m.assumed).map((o) => (o.axis.kind === "periods" && o.m.assumedFrom !== undefined ? axis.labels.indexOf(String(o.m.assumedFrom)) : 0));
+  const assumedFrom = turns.length && Math.min(...turns) > 0 ? { assumedFrom: axis.labels[Math.min(...turns)] } : {};
   return {
-    measures: { result: { unit, population: populationOf(measures), ...axisFields(axis, axis.first), ...(axis.kind === "scalar" ? { value: values[0] } : { values }), ...(Object.keys(gaps).length ? { unavailable: gaps } : {}) } },
+    measures: { result: { unit, population: populationOf(measures), ...axisFields(axis, axis.first), ...(axis.kind === "scalar" ? { value: values[0] } : { values }), ...assumedFrom, ...(Object.keys(gaps).length ? { unavailable: gaps } : {}) } },
     boundaries: [...acrossOf(measures), ...axis.notes, ...notes, ...boundariesOf(operands.filter((o) => o.axis.kind !== "scalar").map((o) => o.m), axis.labels), ...boundariesOf(operands.filter((o) => o.axis.kind === "scalar" && !o.picked).map((o) => o.m), ["value"])],
     // Over time a result runs from its first period to its last; across members it has no order, so its smallest and its largest are said.
     finding: axis.kind === "scalar" ? `${expression} is ${show(values[0])} ${unit}`
@@ -375,24 +379,46 @@ const OPS = {
     const base = axis.kind === "scalar" ? valuesOf(m)[0] ?? null : at(m, start);
     if (base === null) unavailable(`${m.ref} has no value${start ? ` at ${start}` : ""} to start the scenario from`);
     const assumptions = Array.isArray(plan.assumptions) ? plan.assumptions : [];
-    const bad = assumptions.find((a) => !a || typeof a.name !== "string" || typeof a.value !== "number" || !Number.isFinite(a.value) || words(a.rationale) < 4);
-    if (!assumptions.length || bad) unavailable("a scenario states its `assumptions`, each { name, value, unit, rationale }: a number nobody recorded is an assumption, said as one");
+    const bad = assumptions.find((a) => !a || typeof a.name !== "string" || (typeof a.ref !== "string" && (typeof a.value !== "number" || !Number.isFinite(a.value))) || words(a.rationale) < 4);
+    if (!assumptions.length || bad) unavailable("a scenario states its `assumptions`, each { name, value, unit, rationale }, or { name, ref, at, rationale } for a driver read from a record: a number nobody recorded is an assumption, said as one");
     const horizon = (Array.isArray(plan.horizon) ? plan.horizon : []).map(String);
     if (!horizon.length) unavailable("a scenario names the `horizon` it runs over, as period labels");
+    // A driver can be read from a record rather than stated: `ref` names the measure, and `at` the period of it that each
+    // step of the horizon applies - a dated rule (a guideline set each year, a published schedule) followed step by step,
+    // where one rate held at every step would put a number nobody recorded on the years the record covers.
+    const recorded = new Map(assumptions.filter((a) => typeof a.ref === "string").map((a) => {
+      const source = context.registry.get(a.ref);
+      if (!source) { const error = new Unavailable(`the driver ${a.name} reads ${a.ref}, which is not a recorded measure`); error.missing = [a.ref]; throw error; }
+      const kind = axisOf(source).kind;
+      if (kind === "scalar") {
+        if (a.at !== undefined) unavailable(`${a.ref} is one value: the driver ${a.name} applies it at every step, with no \`at\``);
+        return [a.name, { source, labels: [], steps: horizon.map(() => valuesOf(source)[0] ?? null) }];
+      }
+      const labels = (Array.isArray(a.at) ? a.at : []).map(String);
+      if (labels.length !== horizon.length) unavailable(`the driver ${a.name} reads ${a.ref} over its ${kind}: \`at\` names the ${kind === "periods" ? "period" : "member"} each of the ${horizon.length} steps of the horizon applies, in order`);
+      const steps = labels.map((label) => at(source, label));
+      const hole = labels.find((label, i) => steps[i] === null);
+      if (hole !== undefined) unavailable(`${a.ref} has no value at ${hole}, which the driver ${a.name} applies at ${horizon[labels.indexOf(hole)]}`);
+      return [a.name, { source, labels, steps }];
+    }));
+    const stepOf = (a, i) => (recorded.has(a.name) ? recorded.get(a.name).steps[i] : a.value);
+    const unitOfDriver = (a) => a.unit ?? recorded.get(a.name)?.source.unit;
+    const valueOf = (a) => { const steps = recorded.get(a.name)?.steps; return !steps ? a.value : steps.every((v) => v === steps[0]) ? steps[0] : null; };
+    const said = (a) => (recorded.get(a.name)?.labels.length ? recorded.get(a.name).steps.map((v) => `${v}${method === "compound" ? "%" : ""}`).join(", ") : `${valueOf(a)}${method === "compound" ? "%" : ""}`);
     const method = plan.method ?? "linear";
     if (!["linear", "compound"].includes(method)) unavailable("a scenario's `method` is linear (each driver added every period) or compound (each driver a percentage applied every period)");
     const drivers = (Array.isArray(plan.drivers) && plan.drivers.length ? plan.drivers : assumptions.map((a) => a.name)).map(String);
     const unknown = drivers.filter((name) => !assumptions.some((a) => a.name === name));
     if (unknown.length) unavailable(`the drivers ${unknown.join(", ")} are not among the stated assumptions`);
     const applied = assumptions.filter((a) => drivers.includes(a.name));
-    const off = applied.find((a) => a.unit !== undefined && (method === "linear" ? normalUnit(String(a.unit).replace(/\s+(a|per)\s+\w+$/i, "")) !== normalUnit(m.unit) : !/%/.test(String(a.unit))));
-    if (off) unavailable(`the driver ${off.name} is in ${off.unit}; a ${method} scenario on ${m.ref} takes drivers in ${method === "linear" ? `${m.unit} a period` : "% a period"}`);
+    const off = applied.find((a) => unitOfDriver(a) !== undefined && (method === "linear" ? normalUnit(String(unitOfDriver(a)).replace(/\s+(a|per)\s+\w+$/i, "")) !== normalUnit(m.unit) : !/%/.test(String(unitOfDriver(a)))));
+    if (off) unavailable(`the driver ${off.name} is in ${unitOfDriver(off)}; a ${method} scenario on ${m.ref} takes drivers in ${method === "linear" ? `${m.unit} a period` : "% a period"}`);
     // The path starts at the period the value is recorded for: a measure over periods at the one it starts from, a measure of
     // one value at its own `period` - "base" only where it records none, or where the horizon already uses that label.
     const dated = typeof m.period === "string" && m.period.trim() && !horizon.includes(m.period.trim()) ? m.period.trim() : "base";
     const origin = start ?? dated;
     let current = base;
-    const values = horizon.map(() => { current = method === "linear" ? current + applied.reduce((sum, a) => sum + a.value, 0) : current * applied.reduce((f, a) => f * (1 + a.value / 100), 1); return round(current); });
+    const values = horizon.map((_, i) => { current = method === "linear" ? current + applied.reduce((sum, a) => sum + stepOf(a, i), 0) : current * applied.reduce((f, a) => f * (1 + stepOf(a, i) / 100), 1); return round(current); });
     let crossing = null, limit = null;
     if (plan.threshold && typeof plan.threshold === "object") {
       const t = plan.threshold;
@@ -409,11 +435,13 @@ const OPS = {
       const index = values.findIndex((v) => (below ? v < limit : v > limit));
       crossing = index < 0 ? null : horizon[index];
     }
-    const listed = [...assumptions.map((a) => ({ name: a.name, value: a.value, unit: a.unit ?? m.unit, rationale: String(a.rationale).trim() })),
+    const listed = [...assumptions.map((a) => ({ name: a.name, value: valueOf(a), unit: unitOfDriver(a) ?? m.unit, rationale: String(a.rationale).trim(),
+        ...(recorded.has(a.name) ? { ref: a.ref, ...(recorded.get(a.name).labels.length ? { at: recorded.get(a.name).labels, values: recorded.get(a.name).steps } : {}) } : {}) })),
       ...(plan.threshold && !plan.threshold.ref ? [{ name: plan.threshold.name ?? "threshold", value: limit, unit: plan.threshold.unit ?? m.unit, rationale: String(plan.threshold.rationale).trim() }] : [])];
-    return { assumptions: listed, boundaries: boundariesOf([m], start ? [start] : []), crossesAt: crossing,
-      measures: { path: { unit: m.unit, population: m.population, periods: [origin, ...horizon], values: [base, ...values], assumed: true, rationale: `${method} path under ${applied.map((a) => `${a.name} = ${a.value}`).join(", ")}` } },
-      finding: `From ${show(base)} ${m.unit}${start ? ` at ${start}` : ""}, ${method === "linear" ? "adding" : "compounding"} ${applied.map((a) => `${a.name} (${a.value}${method === "compound" ? "%" : ""})`).join(" and ")} each period gives ${show(values.at(-1))} by ${horizon.at(-1)}` +
+    const read = [...recorded.values()].flatMap(({ source, labels }) => boundariesOf([source], labels));
+    return { assumptions: listed, boundaries: [...boundariesOf([m], start ? [start] : []), ...read], crossesAt: crossing,
+      measures: { path: { unit: m.unit, population: m.population, periods: [origin, ...horizon], values: [base, ...values], assumed: true, assumedFrom: horizon[0], rationale: `${method} path under ${applied.map((a) => `${a.name} = ${said(a)}`).join(", ")}` } },
+      finding: `From ${show(base)} ${m.unit}${start ? ` at ${start}` : ""}, ${method === "linear" ? "adding" : "compounding"} ${applied.map((a) => `${a.name} (${said(a)})`).join(" and ")} ${applied.some((a) => recorded.get(a.name)?.labels.length) ? "step by step" : "each period"} gives ${show(values.at(-1))} by ${horizon.at(-1)}` +
         `${limit === null ? "" : crossing ? `, crossing ${show(limit)} at ${crossing}` : `, not crossing ${show(limit)} within the horizon`} - under stated assumptions, not a forecast`,
       calculation: `scenario(${m.ref}): ${method} path over ${horizon.length} period${horizon.length === 1 ? "" : "s"} from the recorded value, under ${listed.length} stated assumption${listed.length === 1 ? "" : "s"}, computed by the runtime` };
   },
@@ -486,10 +514,12 @@ export function runAnalyses(plan, insights, { alternatives = [] } = {}) {
     const inputs = a.inputs.map((ref) => registry.get(ref));
     // What a product is divided by is read as its inputs are: it is part of the result's lineage, sources and assumptions.
     const overRefs = a.op === "product" && Array.isArray(a.over) ? a.over : [], over = overRefs.map((ref) => registry.get(ref));
-    const read = [...inputs, ...over].filter(Boolean);
-    const absent = [...a.inputs, ...overRefs].filter((ref) => !registry.get(ref));
+    // A scenario's driver read from a record is an input too: its sources, its lineage and its absence are the result's.
+    const driverRefs = a.op === "scenario" && Array.isArray(a.assumptions) ? [...new Set(a.assumptions.map((x) => x?.ref).filter((ref) => typeof ref === "string" && ref.includes("/")))] : [];
+    const read = [...inputs, ...over, ...driverRefs.map((ref) => registry.get(ref))].filter(Boolean);
+    const absent = [...a.inputs, ...overRefs, ...driverRefs].filter((ref) => !registry.get(ref));
     const declared = Array.isArray(a.missing) ? a.missing.map((item) => item.trim()) : [];
-    const result = { id: a.id, op: a.op, inputs: [...a.inputs, ...overRefs], soWhat: a.soWhat.trim(), strength: a.strength, missing: [...absent, ...declared], assumptions: [], boundaries: [] };
+    const result = { id: a.id, op: a.op, inputs: [...a.inputs, ...overRefs, ...driverRefs], soWhat: a.soWhat.trim(), strength: a.strength, missing: [...absent, ...declared], assumptions: [], boundaries: [] };
     if (result.missing.length) {
       Object.assign(result, { status: "unavailable", reason: `${absent.length ? `no recorded measure ${absent.join(", ")}` : ""}${absent.length && declared.length ? "; " : ""}${declared.length ? `needs ${declared.join("; ")}` : ""}` });
     } else {
@@ -539,7 +569,7 @@ export function analysisInsights(results) {
 
 /** One line per result, for the author's summary and the critic's packet. */
 export const analysisLine = (r) => `${r.id} [${r.op}, ${r.status}] ${r.status === "unavailable" ? `cannot run: ${r.reason}` : r.finding}` +
-  `${(r.assumptions || []).length ? ` | assumes ${r.assumptions.map((a) => `${a.name}${a.value === undefined ? "" : ` = ${a.value}${a.unit ? ` ${a.unit}` : ""}`}`).join("; ")}` : ""}` +
+  `${(r.assumptions || []).length ? ` | assumes ${r.assumptions.map((a) => `${a.name}${Array.isArray(a.values) ? ` = ${a.values.join(", ")}${a.unit ? ` ${a.unit}` : ""}, read from ${a.ref} at ${a.at.join(", ")}` : a.value === undefined ? "" : ` = ${a.value}${a.unit ? ` ${a.unit}` : ""}${a.ref ? `, read from ${a.ref}` : ""}`}`).join("; ")}` : ""}` +
   `${(r.boundaries || []).length ? ` | boundaries: ${r.boundaries.slice(0, 4).join("; ")}${r.boundaries.length > 4 ? "; ..." : ""}` : ""}`;
 
 /** The analysis plan beside a pages file, or null; one that is not JSON is named in a line, without the parser's quote of its contents. */
