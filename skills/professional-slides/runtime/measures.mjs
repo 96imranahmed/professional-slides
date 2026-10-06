@@ -163,6 +163,8 @@ export function measureProblems(insight) {
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
     if (m.assumed !== undefined && m.assumed !== true) problems.push(`${at}: \`assumed\` is true for a number that is an assumption rather than a record, or left out`);
     if (m.assumed === true && (typeof m.rationale !== "string" || m.rationale.trim().split(/\s+/).length < 4)) problems.push(`${at}: an assumed measure says why that number in \`rationale\``);
+    // A share, a change or a spread the researcher worked out from what the source prints is not printed there: it says how.
+    if (m.computed !== undefined && (typeof m.computed !== "string" || m.computed.trim().split(/\s+/).length < 4)) problems.push(`${at}: \`computed\` says how the values were worked out from the numbers the source prints ("Manhattan net homes over the city's"), in four words or more - or is left out`);
   }
   return problems;
 }

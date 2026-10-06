@@ -88,6 +88,8 @@ Data is not yet a finding. Work each dataset the way an analyst would and record
       "exhibit": "trend: routes by month since launch, five operators, Northvale highlighted" } ] }
 ```
 
+Every number a measure records is read back from the insight's own `sources` at each compile - or from the files the measure names in its own `sources`, where the insight draws on several - at whatever scale or rounding the log keeps it (`SOURCE_NUMBERS_UNREAD`, advised). A measure worked out from what the source prints - a share, a change, a spread, a sum - says how in `computed` ("Manhattan net homes over the city's, each year"); better still, it is an analysis the runtime computes (below).
+
 Ask of every dataset:
 
 - **Rate:** how fast is it growing, over what span? What rate would the target need?

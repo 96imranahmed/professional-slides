@@ -117,6 +117,34 @@ console.log(JSON.stringify({{ bare: await run({{}}, false), filed: await run({{}
         self.assertEqual(result["named"], [{"id": "a", "none": False, "missing": ["Annual report 2025"]}, {"id": "b", "none": True, "missing": []}])
 
 
+class SourceReadBackTests(unittest.TestCase):
+    def test_a_number_its_own_source_file_does_not_print_is_told_to_the_author(self):
+        """Nothing read a source back: a log could cite a file for numbers the file does not hold."""
+        result = run_node('''
+import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+import { unreadNumbers } from './skills/professional-slides/runtime/storyline.mjs';
+import { measureProblems } from './skills/professional-slides/runtime/measures.mjs';
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'readback-'));
+await fs.mkdir(path.join(dir, 'sources'));
+await fs.writeFile(path.join(dir, 'sources/jobs.csv'), 'year,financial_k,total_k\\n2019,484.5,"4,629.9"\\n2020,473.1,"4,171.1"\\n');
+await fs.writeFile(path.join(dir, 'sources/rates.md'), 'The share stood at 12.4% in 2025.');
+const m = (values, more = {}) => ({ unit: 'k', population: 'NYC', periods: values.map((_, i) => String(2019 + i)), values, ...more });
+const items = [
+  // As recorded, grouped in thousands, and as a percentage of a share recorded as a fraction: all read back.
+  { id: 'ok', sources: ['sources/jobs.csv'], measures: { fin: m([484.5, 473.1]), total: m([4629.9, 4171.1]), jobs: m([484500, 473100]) } },
+  { id: 'share', sources: ['sources/rates.md'], measures: { share: { unit: 'share', population: 'NYC', period: '2025', value: 0.124 } } },
+  // A slipped column among columns that read back.
+  { id: 'slipped', sources: ['sources/jobs.csv'], measures: { fin: m([484.5, 473.1]), total: m([4692.9, 4117.1]) } },
+  // Worked out from what the file prints, and said so; and a number from another file, which names it.
+  { id: 'computed', sources: ['sources/jobs.csv'], measures: { share: m([10.5, 11.3], { computed: 'financial jobs over all jobs in each year' }), rate: { unit: '%', population: 'NYC', period: '2025', value: 12.4, sources: ['sources/rates.md'] } } }];
+const out = await unreadNumbers(items, dir);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ out, refused: measureProblems({ id: 'x', measures: { s: m([1, 2], { computed: 'a ratio' }) } }) }));
+''')
+        self.assertEqual(result["out"], [{"id": "slipped", "measures": ["total"], "missing": ["total 4692.9", "total 4117.1"]}])
+        self.assertTrue(any("`computed` says how" in problem for problem in result["refused"]))
+
+
 class SplitTableTests(unittest.TestCase):
     def test_a_table_too_long_for_one_page_says_it_splits_and_why_and_its_text_is_read(self):
         result = run_node(WORKED + '''

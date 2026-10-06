@@ -111,7 +111,7 @@ import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { assetFindings, assetNotice, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
-import { storylineWarning, spineLock, recordCompileRefusal, unsupportedPillars, unfiledSources, sourceFiles, recordedMeasures, spineReadings, storyStructure, viewWords, BOUND_FIELDS } from "./storyline.mjs";
+import { storylineWarning, spineLock, recordCompileRefusal, unsupportedPillars, unfiledSources, unreadNumbers, sourceFiles, recordedMeasures, spineReadings, storyStructure, viewWords, BOUND_FIELDS } from "./storyline.mjs";
 import { CALLOUT_KINDS, DEFERRED, inLayout, proveSpine, stripWitness, undeterminedFinding, unmarked } from "./spine-witness.mjs";
 import { deckStatementFindings, revisionChanges, scopeSourceErrors, unheldLine } from "./review-passes.mjs";
 import { carriedEntries, carriedFindings, carriedProblem, composedPageLimits, isCarried, revisionLine, revisionRecordFindings, revisionStatement, stampKept, withImportedCredits } from "./revision.mjs";
@@ -167,6 +167,7 @@ export const AUTHORING_CODES = Object.freeze({
   COMMENTARY_MOVED: "a page whose points are declared beside its exhibit and drawn under it, because they fill too little of the column beside a chart that uses its width - advised, with what holds the column",
   PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
+  SOURCE_NUMBERS_UNREAD: "an insight measure more than half of whose recorded values its own source files do not print - a slipped transcription, or a file that is not the one the number came from - advised, with the values",
   SOURCES_UNFILED: "an insight whose `sources` are not files under sources/ - a name or a registry key where the path of the file the finding was read from belongs, or none at all - advised at the compile, and told to the storyline critic as a problem of the log",
   // Advisories, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
@@ -905,6 +906,10 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   const unfiled = baseDir && insights ? unfiledSources([...insights.values()].filter((item) => !item.derived), await sourceFiles(baseDir)) : [];
   if (unfiled.length) spineFindings.push({ code: "SOURCES_UNFILED", severity: "advisory", pages: unfiled.map((entry) => entry.id), measured: { insights: unfiled.length, none: unfiled.filter((entry) => entry.none).map((entry) => entry.id) },
     repair: `${unfiled.length} insight${unfiled.length === 1 ? " names" : "s name"} sources that are not files under sources/ (${unfiled.slice(0, 8).map((entry) => (entry.none ? `${entry.id}: none` : `${entry.id}: ${entry.missing.slice(0, 2).map((f) => JSON.stringify(f)).join(", ")}${entry.missing.length > 2 ? ", ..." : ""}`)).join("; ")}${unfiled.length > 8 ? `; and ${unfiled.length - 8} more` : ""}). An insight's \`sources\` are the paths of the files its finding was read from - "sources/accounts-fy26.csv" - beside the pages file; a publisher's name or a key of the \`sources\` registry is a citation, which goes on the measure (\`cite\`) or the page (\`source\`). Save each file under sources/ and name its path, or the storyline critic is told the log has ${unfiled.length} unsourced finding${unfiled.length === 1 ? "" : "s"}` });
+  // And every recorded number its own source file does not print: the citation is the author's to check, file in hand.
+  const unread = baseDir && insights ? await unreadNumbers([...insights.values()].filter((item) => !item.derived), baseDir) : [];
+  if (unread.length) spineFindings.push({ code: "SOURCE_NUMBERS_UNREAD", severity: "advisory", pages: unread.map((entry) => entry.id), measured: { insights: unread.length, measures: unread.flatMap((entry) => entry.measures.map((m) => `${entry.id}/${m}`)) },
+    repair: `${unread.length} insight${unread.length === 1 ? " records" : "s record"} values its own source files do not print (${unread.slice(0, 6).map((entry) => `${entry.id}: ${entry.missing.slice(0, 3).join(", ")}`).join("; ")}${unread.length > 6 ? `; and ${unread.length - 6} more` : ""}). Open the file and check each: a slipped transcription is corrected in the log; a measure worked out from what the source prints - a share, a change, a spread - says how in \`computed\`; a number from another file names that file in the measure's own \`sources\`` });
   const { structural, declared, shaped, undrawn } = withStandIns(doc, spec, failed, insights, sourceKinds);
   const composed = await composeForAuthoring(spec, baseDir);
   // A page the composer drew as two slides or more - a table past the rows one page holds at its densest setting - says so, and

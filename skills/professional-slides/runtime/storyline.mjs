@@ -962,6 +962,63 @@ export function unfiledSources(items, sources = []) {
   return (items || []).flatMap((item) => { const listed = Array.isArray(item?.sources) ? item.sources : [], missing = listed.filter((f) => !have.has(f));
     return !listed.length ? [{ id: item?.id ?? "?", none: true, missing: [] }] : missing.length ? [{ id: item?.id ?? "?", none: false, missing }] : []; });
 }
+// The source files a number can be read back from without a parser of the runtime's own: text, tables and markup.
+const READABLE = /\.(?:csv|tsv|txt|md|json|html?|xml)$/i;
+// A measure is told of when more than this share of its recorded values cannot be found in its insight's source files.
+const UNREAD_SHARE = 0.5;
+// The scales a source prints a recorded number at: as it is, a share as a percentage or back, and by a thousand, a million or a billion either way.
+const SCALES = [1, 100, 0.01, 1e-3, 1e-6, 1e-9, 1e3, 1e6, 1e9];
+/** The numbers `text` prints, read both ways where a comma could be a thousands separator or a CSV field's end: "4,629.9" and "2,690.17" alike. */
+const numbersIn = (text) => [...(text.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g) ?? []), ...(text.match(/\d+(?:\.\d+)?/g) ?? [])].map((n) => Number(n.replace(/,/g, "")));
+/**
+ * Whether one of `printed` (a source's numbers) is `value` as the log records
+ * it: the same number at one of SCALES, rounded to the decimals the log keeps.
+ * The log's 2.08 (msf) is the source's 2,075,442 (sf). A number of one digit
+ * is found only as itself: rounded, 4 is found in any table.
+ */
+function printedIn(printed, value) {
+  const decimals = (String(value).split(".")[1] ?? "").length, tolerance = 0.5 * 10 ** -decimals + 1e-9, target = Math.abs(value);
+  return printed.some((n) => n === target || SCALES.some((scale) => {
+    const scaled = n * scale;
+    return Math.abs(scaled - target) <= tolerance && String(n).replace(/\D/g, "").replace(/^0+/, "").length >= 2;
+  }));
+}
+
+/**
+ * The insights whose recorded numbers their own source files do not print: of
+ * each finding whose `sources` include a file the runtime can read as text, the
+ * values its measures record, looked for in those files in the forms a source
+ * prints them. A source named for a number it does not carry is a citation no
+ * one checked - the transcription slipped, or the file is not the one the
+ * number came from. Told to the author, who opens the file; never refused,
+ * since a number a source states in words or in a chart cannot be read back.
+ * `[{ id, measures, missing }]`: the measures more than half of whose values no source file prints.
+ */
+export async function unreadNumbers(items, base) {
+  const out = [];
+  const read = new Map();
+  const numbersOf = async (files) => (await Promise.all(files.filter((file) => READABLE.test(file)).map((file) => {
+    if (!read.has(file)) read.set(file, fs.readFile(path.join(base, file), "utf8").then(numbersIn, () => null));
+    return read.get(file);
+  }))).filter(Boolean).flat();
+  for (const item of items || []) {
+    if (!item || item.status === "assumed" || item.derived) continue;
+    // Measure by measure, against the files it names or else its insight's: a slipped column among four that read back is
+    // still a column no source prints. A measure the researcher computed says how (`computed`) and is not looked for.
+    const unread = [];
+    for (const [name, m] of Object.entries(item.measures || {})) {
+      if (!m || m.assumed || m.computed) continue;
+      const printed = await numbersOf(Array.isArray(m.sources) ? m.sources : Array.isArray(item.sources) ? item.sources : []);
+      const values = (Array.isArray(m.values) ? m.values : [m.value]).filter(Number.isFinite);
+      if (!printed.length || !values.length) continue;
+      const missing = values.filter((value) => !printedIn(printed, value));
+      if (missing.length / values.length > UNREAD_SHARE) unread.push({ name, missing });
+    }
+    if (unread.length) out.push({ id: item.id, measures: unread.map((m) => m.name), missing: unread.flatMap((m) => m.missing.slice(0, 3).map((value) => `${m.name} ${value}`)).slice(0, 6) });
+  }
+  return out;
+}
+
 /** The files under `<base>/sources`, as paths relative to it: what an insight's `sources` are checked against. */
 export const sourceFiles = (base) => fs.readdir(path.join(base, "sources"), { recursive: true }).then((all) => all.filter((f) => /\.[a-z0-9]+$/i.test(f)).map((f) => f.split(path.sep).join("/"))).catch(() => []);
 
