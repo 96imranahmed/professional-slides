@@ -86,7 +86,7 @@ console.log(JSON.stringify(out));
         self.assertEqual(result['missingAtSpine'], [])
         self.assertEqual(result['missingInRubric'], [])
         self.assertEqual(result['leaked'], [])
-        self.assertEqual(result['counts'], [42, 15])
+        self.assertEqual(result['counts'], [43, 15])
         # Which checks carry the reviewer's clauses, and how many each.
         self.assertEqual({k: v for k, v in result['checks'].items() if v}, {'claim': 2, 'shape': 2, 'sourcing': 1, 'restatement': 2, 'spine': 1, 'numbers': 2, 'flow': 3, 'summary': 2})
         self.assertEqual(result['dimensions'], {'argument': 'spine', 'evidence': 'spine', 'chart': 'page', 'table': 'page', 'text': 'both', 'layout': 'page', 'identity': 'both',

@@ -127,7 +127,10 @@ export const RUBRIC_CLAUSES = Object.freeze({
   text: { scope: "page", clauses: [clause("density right for the reading task"), clause("the longest block readable"), clause("no sentence restating the title or the exhibit"), clause("jargon and acronyms explained"),
     clause("the action title commits to a finding in two lines or fewer", "claim"), clause("the subtitle adds scope, not a second title")] },
   layout: { scope: "page", clauses: [clause("no empty band"), clause("the exhibit dominates and the page is balanced"), clause("edges aligned"), clause("hierarchy reads title, exhibit, commentary"), clause("the frame is occupied, not a small figure in a large box")] },
-  identity: { scope: "page", clauses: [clause("named companies, products and places carry their visual anchors where the reader needs recognition - logos, product images, maps"), clause("a player is introduced before it is compared", "flow")] },
+  identity: { scope: "page", clauses: [clause("named companies, products and places carry their visual anchors where the reader needs recognition - logos, product images, maps"),
+    // The build chooses a photograph by its metadata (fetch-pictures.mjs): only the rendered page shows whether it is the subject.
+    clause("each photograph shows what its caption or the page names - that building, street or place, not a near miss or a generic stand-in"),
+    clause("a player is introduced before it is compared", "flow")] },
   sourcing: { scope: "page", clauses: [clause("every number and claim has a source line a reader can look up, with its as-at date"), clause("footnotes define estimates, bases and exclusions")] },
   consistency: { scope: "deck", clauses: [clause("no construction repeated across a window of neighbouring pages"), clause("equal things styled alike"), clause("one term for one thing"), clause("one number format, unit and rounding per measure")] },
   rhythm: { scope: "deck", clauses: [clause("sections open, develop and close", "flow"), clause("page types vary with the reading task", "flow"), clause("the sequence builds rather than repeats", "spine"), clause("no page previews or re-proves another (the executive summary and the close restate the body by design)", "restatement")] },
