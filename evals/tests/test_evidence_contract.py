@@ -447,7 +447,7 @@ console.log(JSON.stringify({ counts: cat.counts, ids: cat.entries.map((e) => e.e
             # The plan's own gap and comparison are marked as already run; growth is offered over every series.
             self.assertEqual(by_inputs[("gap", ("i-liquidity/liquid", "i-liquidity/short-liabilities"))]["inPlan"], ["A-cushion"])
             self.assertEqual(by_inputs[("compare", ("i-peers/margin", "i-peers/loan-growth", "i-peers/liquidity-cover", "i-peers/capital"))]["inPlan"], ["A-peers"])
-            self.assertEqual(sum(1 for e in out["entries"] if e["entry"]["op"] == "growth"), 7)
+            self.assertEqual(sum(1 for e in out["entries"] if e["entry"]["op"] == "growth"), 9)
             self.assertTrue(all(e["status"] in ("computed", "assumed") and e["finding"] for e in out["entries"]))
             self.assertEqual(out["catalogue"]["entries"], len(out["entries"]))
             # A plan that only compares the players: the draft's summary says what else the measures allow.
@@ -532,7 +532,7 @@ console.log(JSON.stringify({{
 """)
         single, merged = result["ids"]
         self.assertEqual(merged, single)  # the parts, merged in the order listed after the log's own insights, are the one log
-        self.assertEqual(result["parts"], [{"file": "insights/subject.json", "insights": 2}, {"file": "insights/peers.json", "insights": 3}])
+        self.assertEqual(result["parts"], [{"file": "insights/subject.json", "insights": 2}, {"file": "insights/peers.json", "insights": 4}])
         self.assertEqual(result["where"], [None, "insights/subject.json", "insights/peers.json"])
         self.assertEqual(result["analyses"][1], result["analyses"][0])  # and the analyses computed over it are the same
         self.assertEqual(result["clean"], 0)
@@ -620,7 +620,7 @@ fs.rmSync(dir, {{ recursive: true, force: true }});
         # Eight declared players and no computed comparison: refused before the outline.
         self.assertEqual(result["noAnalysis"], [["ANALYSIS_REQUIRED", "blocker"]])
         self.assertEqual(result["unplaced"], [["blocker", ["A-junk"], 8]])  # run, and none of the eight players is in it
-        self.assertEqual(result["prose"], [["MEASURES_MISSING", 7]])
+        self.assertEqual(result["prose"], [["MEASURES_MISSING", 8]])
         self.assertIn("as data", result["proseRepair"])
         self.assertEqual(result["older"], [["advisory", {"rulesVersion": 3, "introducedIn": 4}]])
         # A deck that compares nothing is not asked for a matrix, and one service with no players is not either.

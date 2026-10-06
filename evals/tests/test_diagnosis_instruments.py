@@ -360,7 +360,7 @@ console.log(JSON.stringify({ sizing: caught('Size and time the term funding. Sho
         self.assertEqual(empty.returncode, 1)
         self.assertIn("holds no packet", empty.stderr)
         refused = self.calibrate("--raw", str(raw), "--from-raw", str(raw))[0]
-        self.assertIn("one or the other", refused.stderr)
+        self.assertIn("one of them", refused.stderr)
 
 
 

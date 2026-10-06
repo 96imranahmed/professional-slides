@@ -416,6 +416,76 @@
    "cite": [
     "regulator-rules"
    ]
+  },
+  {
+   "id": "i-credit",
+   "finding": "Arrears stayed between 1.0% and 1.5% of loans and the impairment charge fell to about 0.2% while the book grew",
+   "shape": "series",
+   "calculation": "loans 90 days or more in arrears and the year's impairment charge, each as a share of the year-end loan book, from the annual report's credit-risk note, FY19-FY26",
+   "sources": [
+    "sources/i-credit.csv"
+   ],
+   "soWhat": "The growth has not been bought with weaker lending: the risk in it is funding, not credit quality",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "arrears": {
+     "unit": "% of loans",
+     "population": "Harbour Credit Union, loans 90 days or more in arrears",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      1.3,
+      1.4,
+      1.5,
+      1.3,
+      1.1,
+      1.0,
+      1.0,
+      1.1
+     ],
+     "better": "down"
+    },
+    "impairment": {
+     "unit": "% of loans",
+     "population": "Harbour Credit Union, impairment charge for the year",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      0.31,
+      0.42,
+      0.38,
+      0.22,
+      0.19,
+      0.18,
+      0.2,
+      0.21
+     ],
+     "better": "down"
+    }
+   },
+   "cite": [
+    "harbour-ar"
+   ]
   }
  ]
 }

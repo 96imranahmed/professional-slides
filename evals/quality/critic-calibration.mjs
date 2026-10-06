@@ -9,6 +9,7 @@
  *   node evals/quality/critic-calibration.mjs --repeats 3 --parallel 4 four critic calls at a time
  *   node evals/quality/critic-calibration.mjs --raw <dir>              keep every answer as the critic returned it, and each packet
  *   node evals/quality/critic-calibration.mjs --from-raw <dir>         score the answers a run kept, calling nothing
+ *   node evals/quality/critic-calibration.mjs --freeze <dir>           the packets alone, for critics this harness cannot call
  *
  * A benchmark's storyline was rated 5, then 4, then 6.2. The three packets
  * were three different decks, so the numbers say nothing about the critic:
@@ -399,11 +400,11 @@ function keptAnswers(directory, anchors) {
   }).filter(Boolean);
 }
 
-const USAGE = "Usage: critic-calibration.mjs [--repeats n] [--parallel n] [--anchors a,b] [--anchor-dir dir] [--review-packet dir] [--raw dir | --from-raw dir] [--judge key] [--model m] [--config file] [--out file] [--dry-run] [--list]";
+const USAGE = "Usage: critic-calibration.mjs [--repeats n] [--parallel n] [--anchors a,b] [--anchor-dir dir] [--review-packet dir] [--raw dir | --from-raw dir | --freeze dir] [--judge key] [--model m] [--config file] [--out file] [--dry-run] [--list]";
 
 export async function main(argv, log = console.log) {
   const { values } = parseCli(argv, { repeats: { type: "string" }, anchors: { type: "string" }, judge: { type: "string" }, model: { type: "string" }, config: { type: "string" },
-    out: { type: "string" }, "dry-run": { type: "boolean" }, list: { type: "boolean" }, "anchor-dir": { type: "string" }, "review-packet": { type: "string" }, parallel: { type: "string" }, raw: { type: "string" }, "from-raw": { type: "string" } }, { usage: USAGE, strict: true });
+    out: { type: "string" }, "dry-run": { type: "boolean" }, list: { type: "boolean" }, "anchor-dir": { type: "string" }, "review-packet": { type: "string" }, parallel: { type: "string" }, raw: { type: "string" }, "from-raw": { type: "string" }, freeze: { type: "string" } }, { usage: USAGE, strict: true });
   let all;
   try { all = [...anchors(), ...fullSizeAnchors(), ...(values["anchor-dir"] ? externalAnchors(values["anchor-dir"]) : [])]; }
   catch (error) { console.error(error.message); return EXIT.error; }
@@ -411,9 +412,26 @@ export async function main(argv, log = console.log) {
   const repeats = Number(values.repeats ?? 3), parallel = Number(values.parallel ?? 1);
   if (!Number.isInteger(repeats) || repeats < 1) { console.error(`--repeats is a positive whole number\n${USAGE}`); return EXIT.error; }
   if (!Number.isInteger(parallel) || parallel < 1) { console.error(`--parallel is how many critic calls run at a time: a positive whole number\n${USAGE}`); return EXIT.error; }
-  if (values.raw && values["from-raw"]) { console.error(`--raw keeps a run's answers and --from-raw scores the answers a run kept: one or the other\n${USAGE}`); return EXIT.error; }
+  if ([values.raw, values["from-raw"], values.freeze].filter(Boolean).length > 1) { console.error(`--raw keeps a run's answers, --from-raw scores the answers a run kept and --freeze writes the packets alone: one of them\n${USAGE}`); return EXIT.error; }
   const chosen = values.anchors ? all.filter((a) => values.anchors.split(",").includes(a.id)) : all;
   if (!chosen.length) { console.error(`No anchor named ${values.anchors}; --list prints them`); return EXIT.error; }
+  // The packets alone, for a critic this harness cannot call - a subagent of the session running it, or a judge logged in
+  // elsewhere: each anchor's prompt, packet and schema under the names --raw keeps, and nothing called. Its answers, saved
+  // beside them as <anchor>.run<n>.stdout.json, are scored with --from-raw.
+  if (values.freeze) {
+    const dir = path.resolve(values.freeze), root = fs.mkdtempSync(path.join(os.tmpdir(), "critic-calibration-"));
+    fs.mkdirSync(dir, { recursive: true });
+    try {
+      for (const anchor of chosen) {
+        const f = await freeze(anchor, root);
+        for (const file of ["prompt.md", "packet.json", "schema.json"]) if (fs.existsSync(path.join(f.staging, file))) fs.copyFileSync(path.join(f.staging, file), path.join(dir, `${fileName(anchor.id)}.${file}`));
+        fs.rmSync(f.staging, { recursive: true, force: true });
+        log(`${anchor.id}: ${path.join(dir, `${fileName(anchor.id)}.prompt.md`)}`);
+      }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    log(`\nGive each prompt to a fresh critic with no other context, ${repeats} time${repeats === 1 ? "" : "s"}; save answer n as <anchor>.run<n>.stdout.json in ${dir} (the answer object, or {"structured_output": answer}); then score them: critic-calibration.mjs --from-raw ${dir}`);
+    return EXIT.ok;
+  }
   const config = readJson(path.resolve(values.config ?? path.join(QUALITY, "config.json")));
   const judgeKey = values.judge ?? config.defaults.judge, judge = config.judges[judgeKey];
   if (!judge) { console.error(`No judge "${judgeKey}" in the config`); return EXIT.error; }

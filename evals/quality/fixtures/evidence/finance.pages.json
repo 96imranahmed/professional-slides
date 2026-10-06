@@ -167,7 +167,8 @@
    "why": "The growth of the book over time is the claim, so the series is drawn",
    "evidence": [
     "i-loans",
-    "A-loans"
+    "A-loans",
+    "i-credit"
    ],
    "settles": {
     "kind": "rate",
@@ -216,7 +217,7 @@
      }
     ]
    },
-   "bar": "A loan book this much larger needs deposits, wholesale funding and regulatory capital that have grown at the same pace, which the next pages test"
+   "bar": "The book grew without weaker lending - arrears stayed at {{i-credit/arrears@FY26 | 0.0%}} of loans - so what it needs is funding grown at the same pace, which the next pages test"
   },
   {
    "id": "f2",

@@ -213,6 +213,7 @@ node evals/quality/critic-calibration.mjs --list                # the anchors, a
 node evals/quality/critic-calibration.mjs --repeats 3 --dry-run
 node evals/quality/critic-calibration.mjs --repeats 3 --parallel 4 --raw <dir>        # every answer kept as returned
 node evals/quality/critic-calibration.mjs --from-raw <dir>                            # score the kept answers again; nothing is called
+node evals/quality/critic-calibration.mjs --freeze <dir> --anchors finance,product     # the packets alone, for critics run elsewhere
 node evals/quality/critic-calibration.mjs --repeats 3 --anchor-dir ~/decks/anchors    # your own decks, with the verdict you expect
 node evals/quality/critic-calibration.mjs --repeats 3 --review-packet <staged packet> # a deck-review packet, repeated
 ```
@@ -255,6 +256,10 @@ Calibrated means every pair told apart, every clean deck passed and every
 expected verdict given. Whether a planted deck is also rated below its twin
 is reported and decides nothing. A run costs `anchors x repeats` critic calls
 and is written to `runs/critic-calibration/`.
+
+### Critics this harness cannot call
+
+Where the judge command cannot run - a CLI that is not logged in on the machine, or critics that are subagents of the session running the calibration - `--freeze <dir>` writes each anchor's prompt, packet and schema under the names `--raw` keeps, and calls nothing. Give each prompt to a fresh critic with no other context, save answer *n* beside it as `<anchor>.run<n>.stdout.json` (the answer object, or `{"structured_output": answer}`), and score them with `--from-raw <dir>`. The scoring is the same; only who answered differs, and the result says it was scored from kept answers.
 
 ### The judge command and the schema
 
