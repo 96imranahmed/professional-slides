@@ -109,11 +109,11 @@ console.log(JSON.stringify({{ bare: await run({{}}, false), filed: await run({{}
 ''')
         self.assertEqual(len(result["bare"]), 1)
         severity, cls, count, repair = result["bare"][0]
-        self.assertEqual([severity, cls, count], ["advisory", "S", 7])
-        self.assertIn('7 insights name sources that are not files under sources/ (i-loans: "sources/i-loans.csv"', repair)
-        self.assertIn("the storyline critic is told the log has 7 unsourced findings", repair)
+        self.assertEqual([severity, cls, count], ["advisory", "S", 8])
+        self.assertIn('8 insights name sources that are not files under sources/ (i-loans: "sources/i-loans.csv"', repair)
+        self.assertIn("the storyline critic is told the log has 8 unsourced findings", repair)
         self.assertEqual(result["filed"], [])
-        self.assertEqual([entry[:3] for entry in result["revision"]], [["advisory", "S", 7]])
+        self.assertEqual([entry[:3] for entry in result["revision"]], [["advisory", "S", 8]])
         self.assertEqual(result["named"], [{"id": "a", "none": False, "missing": ["Annual report 2025"]}, {"id": "b", "none": True, "missing": []}])
 
 
@@ -137,11 +137,23 @@ const items = [
   { id: 'slipped', sources: ['sources/jobs.csv'], measures: { fin: m([484.5, 473.1]), total: m([4692.9, 4117.1]) } },
   // Worked out from what the file prints, and said so; and a number from another file, which names it.
   { id: 'computed', sources: ['sources/jobs.csv'], measures: { share: m([10.5, 11.3], { computed: 'financial jobs over all jobs in each year' }), rate: { unit: '%', population: 'NYC', period: '2025', value: 12.4, sources: ['sources/rates.md'] } } }];
+// A publisher's PDF is read through pdftotext: a one-page PDF printing two figures, written by hand.
+const stream = 'BT /F1 12 Tf 72 720 Td (Homes completed 4,874 in 2025 and 4,840 in 2024) Tj ET';
+const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+  `<< /Length ${stream.length} >>\\nstream\\n${stream}\\nendstream`, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+let pdf = '%PDF-1.4\\n'; const offsets = [];
+objects.forEach((body, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\\n${body}\\nendobj\\n`; });
+const xref = pdf.length;
+pdf += `xref\\n0 ${objects.length + 1}\\n0000000000 65535 f \\n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \\n`).join('')}trailer\\n<< /Size ${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n${xref}\\n%%EOF\\n`;
+await fs.writeFile(path.join(dir, 'sources/report.pdf'), pdf);
+items.push({ id: 'pdf', sources: ['sources/report.pdf'], measures: { done: m([4840, 4874]), slipped: m([4847, 4887]) } });
 const out = await unreadNumbers(items, dir);
 await fs.rm(dir, { recursive: true, force: true });
 console.log(JSON.stringify({ out, refused: measureProblems({ id: 'x', measures: { s: m([1, 2], { computed: 'a ratio' }) } }) }));
 ''')
-        self.assertEqual(result["out"], [{"id": "slipped", "measures": ["total"], "missing": ["total 4692.9", "total 4117.1"]}])
+        self.assertEqual(result["out"], [{"id": "slipped", "measures": ["total"], "missing": ["total 4692.9", "total 4117.1"]},
+                                         {"id": "pdf", "measures": ["slipped"], "missing": ["slipped 4847", "slipped 4887"]}])
         self.assertTrue(any("`computed` says how" in problem for problem in result["refused"]))
 
 
