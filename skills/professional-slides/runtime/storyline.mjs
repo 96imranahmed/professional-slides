@@ -66,6 +66,7 @@ import {
   ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, SAMPLING_WORDS, ARGUMENT_SEVERITIES, BLOCKING_STAKE, ratingScale, spineClauses, REVIEW_HISTORY, readConfirmations,
 } from "./review-passes.mjs";
 import { repairOf, reviewRepairOf } from "./gates/gate_classes.mjs";
+import { evidenceDepth, VARIETY } from "./gates/variety_gates.mjs";
 import { titleLimits, titleLimitsLine, titleErrors } from "./review-floors.mjs";
 import { sectionTitleFits } from "./spine-fit.mjs";
 import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
@@ -2073,34 +2074,63 @@ const RESEARCH_FILE = "research-tasks.json";
 
 /**
  * The research the critique asks for, as tasks the author works through
- * before the next pass: each missing analysis the critic filed and no pass has
- * closed, with what it is, why it matters, the data it runs on, its remedy and
- * what closes it - blocking ones first, the minor ones that would deepen the
- * answer after. A critic's missing analysis used to reach the author as an id
- * and a severity; the analysis, its data and what would close it stayed in the
- * lineage, and a deck went to its cap with its evidence as thin as it began.
- * Written beside the critique on every pass that leaves one open
- * (`research-tasks.json`), and returned with the run's result.
+ * before the next pass, in three kinds:
+ * - `analysis`: each missing analysis the critic filed and no pass has closed,
+ *   with what it is, why it matters, the data it runs on, its remedy and what
+ *   closes it;
+ * - `revision`: each open blocking finding, with the fix the critic named - an
+ *   item like "build the path year by year from the recorded orders" is
+ *   analysis work too, though it was filed as a finding;
+ * - `depth`: where the deck's chart pages plot fewer values than strong decks'
+ *   (EVIDENCE_DEPTH's target), its thinnest pages, each a peer set, a second
+ *   series or a longer window short.
+ * Blocking ones first. A critic's missing analysis used to reach the author as
+ * an id and a severity, and the findings that needed analysis not even that: a
+ * deck went to its cap with its evidence as thin as it began. Written beside
+ * the critique on every pass that leaves one open (`research-tasks.json`), and
+ * returned with the run's result.
  */
-export function researchTasks(history, ledger) {
-  const filed = new Map();
-  for (const pass of history) for (const m of pass.review?.missingAnalyses || []) filed.set(m.id, { ...m, pass: pass.pass });
-  const open = openEntries(ledger).filter((e) => e.dimension === "missing" && !e.aboutImported);
-  const tasks = open.map((e) => {
+// The page types whose chart plots as many values as its subject has parts or steps.
+const THIN_BY_FORM = new Set(["composition", "bridge"]);
+
+export function researchTasks(history, ledger, spec = null) {
+  const filed = new Map(), found = new Map();
+  for (const pass of history) {
+    for (const m of pass.review?.missingAnalyses || []) filed.set(m.id, { ...m, pass: pass.pass });
+    for (const f of pass.review?.findings || []) found.set(f.id, { ...f, pass: pass.pass });
+  }
+  const open = openEntries(ledger).filter((e) => !e.aboutImported);
+  const analyses = open.filter((e) => e.dimension === "missing").map((e) => {
     const m = filed.get(e.id) ?? {};
-    return { id: e.id, severity: e.severity, blocking: BLOCKING.has(e.severity), analysis: m.analysis ?? e.reason, why: m.why ?? null, data: m.data ?? null,
+    return { kind: "analysis", id: e.id, severity: e.severity, blocking: BLOCKING.has(e.severity), analysis: m.analysis ?? e.reason, why: m.why ?? null, data: m.data ?? null,
       public: m.public ?? e.public ?? null, remedy: m.remedy ?? e.remedy ?? null, ifUnfixed: m.ifUnfixed ?? null, filedAt: m.pass ?? null,
       closes: RESEARCH_CLOSES[m.remedy ?? e.remedy] ?? RESEARCH_CLOSES.retrieval };
   });
-  return tasks.sort((a, b) => Number(b.blocking) - Number(a.blocking));
+  const revisions = open.filter((e) => e.dimension !== "missing" && e.dimension !== "cuts" && BLOCKING.has(e.severity)).map((e) => {
+    const f = found.get(e.id) ?? {};
+    return { kind: "revision", id: e.id, severity: e.severity, blocking: true, pages: e.pages || [], analysis: f.problem ?? e.reason, why: f.ifUnfixed ?? null,
+      filedAt: f.pass ?? null, closes: `${f.fix ?? e.repair ?? "the change the finding names"} - on the pages it names, read by the next pass` };
+  });
+  const depth = spec ? evidenceDepth(spec.slides || []) : null;
+  // A part-to-whole page and a bridge plot as many values as the whole has parts or the change has steps: deepening one
+  // means another page, not more of this one, so the thinnest of the rest are asked.
+  const deepenable = (spec?.slides || []).filter((s) => s.pageType?.chart && Number.isFinite(s.pageType.values) && !THIN_BY_FORM.has(s.pageType.type))
+    .sort((a, b) => a.pageType.values - b.pageType.values).slice(0, 5);
+  const thin = depth && depth.chartPages >= VARIETY.evidenceFrom && depth.median < VARIETY.evidenceMedianTarget
+    ? deepenable.map((slide) => [null, String(slide.id), slide.pageType.values]).map(([, id, n]) => ({ kind: "depth", id: `depth-${id}`, severity: "minor", blocking: false, pages: [id],
+      analysis: `${id} plots ${n} values, where the deck's chart pages plot a median of ${depth.median} and strong decks' about ${VARIETY.evidenceMedianTarget}`,
+      data: "the whole peer set, a second series (a prior period, a benchmark), or a longer window of the same measure",
+      closes: "the page plots more of the evidence - its measures recorded over the wider set or window, and the page's view widened, which its next pass reads" }))
+    : [];
+  return [...analyses, ...revisions, ...thin].sort((a, b) => Number(b.blocking) - Number(a.blocking));
 }
 
 /** The tasks written beside the critique, or the file removed when none is open. Returns the lines the run prints. */
 async function writeResearchTasks(out, tasks) {
   const file = path.join(out, RESEARCH_FILE);
   if (!tasks.length) { await fs.rm(file, { force: true }); return []; }
-  await writeJson(file, { schema: "professional-slides.research-tasks/v1", note: "Run each before the next pass: a verification pass reads a missing analysis closed only on its artifact - the analysis, the insight a page rests on - or on the searches that show the data cannot be had", tasks });
-  return tasks.map((t) => `${t.id} (${t.severity}${t.blocking ? ", blocks" : ""}): ${t.analysis}${t.data ? ` - on ${t.data}` : ""}. Closes on: ${t.closes}`);
+  await writeJson(file, { schema: "professional-slides.research-tasks/v1", note: "Run each before the next pass: a verification pass reads a missing analysis closed only on its artifact - the analysis, the insight a page rests on - or on the searches that show the data cannot be had, and a finding closed on the change its fix names", tasks });
+  return tasks.map((t) => `${t.id} [${t.kind}] (${t.severity}${t.blocking ? ", blocks" : ""}): ${t.analysis}${t.data ? ` - on ${t.data}` : ""}. Closes on: ${t.closes}`);
 }
 
 async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
@@ -2169,7 +2199,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     const open = openBlocking(latest.ledger);
     // What the critic filed about the imported deck blocks nothing, and is the user's to hear: the run names each.
     const told = openAboutImported(latest.ledger);
-    const deepen = latest.review.verdict === "ready" && !open.length ? await writeResearchTasks(out, researchTasks(history, latest.ledger)) : [];
+    const deepen = latest.review.verdict === "ready" && !open.length ? await writeResearchTasks(out, researchTasks(history, latest.ledger, spec)) : [];
     if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding, note: READY_NOTE,
       ...(deepen.length ? { research: deepen, researchNote: `Minor missing analyses the critic said would deepen the answer without changing it (${RESEARCH_FILE}): worth running before the layout if the data is to hand - each one rested on reopens its pages for one verification pass` } : {}),
       ...(told.length ? { aboutImported: told.map(brief), tell: `${told.length} item${told.length === 1 ? " is" : "s are"} about the imported deck - a slide of the user's own this revision did not change. Nothing is refused for ${told.length === 1 ? "it" : "them"}, and no slide is to be edited that the user did not ask to change: delivery reports ${told.length === 1 ? "it" : "each"} to the user (out/delivery.json \`aboutImported\`), who decides` } : {}) };
@@ -2177,7 +2207,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     // answer is offered as provisional, and what stays open is recorded with it.
     if (latest.review.verdict === "provisional" && open.length && open.every(limitedBy(evidenceScopeOf(spec))) && answerStatusOf(spec).status === "provisional")
       return { status: "provisional", pass: latest.pass, mode: wanted, binding, limits: open.map(brief), note: "The storyline is provisional, not ready: every open item needs evidence the scope forbids. The deck review may start; delivery records the deck as provisional with these limits" };
-    const research = await writeResearchTasks(out, researchTasks(history, latest.ledger));
+    const research = await writeResearchTasks(out, researchTasks(history, latest.ledger, spec));
     return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), ...(research.length ? { research, researchFile: path.join(out, RESEARCH_FILE) } : {}),
       note: `Revise the argument at the root for the open items - a claim, what settles it, the insights and measures a page rests on and what it shows of them, the pages or the answer; a chart redrawn in another form or reworded copy is not a revision - then run this again: it writes the verification pass for what you changed${research.length ? `. Run the research first (${RESEARCH_FILE}): a missing analysis closes on its artifact, not on a page reworded around it` : ""}` };
   }
@@ -2200,7 +2230,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     const grant = post.grant ?? refusal.grant ?? null;
     if (grant) Object.assign(scope, { capped: false, postReview: grant, mustInspect: wanted === "full" ? ids.filter((id) => grant.pages.includes(id)) : [] });
     else if (scope.capped) {
-      const research = await writeResearchTasks(out, researchTasks(history, latest.ledger));
+      const research = await writeResearchTasks(out, researchTasks(history, latest.ledger, spec));
       return { status: "capped", pass: scope.pass, ...(research.length ? { research, researchFile: path.join(out, RESEARCH_FILE) } : {}),
         message: `${capMessage("storyline critique", spent + 1, maxPasses, latest.ledger)} The post-review pass (${POST_REVIEW_RULE}) is not available: ${post.why}. Nor is the pass a compile refusal allows (${COMPILE_REFUSAL_RULE}): ${refusal.why}.` };
     }

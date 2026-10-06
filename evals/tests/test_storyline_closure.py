@@ -320,6 +320,27 @@ console.log(JSON.stringify({
             self.assertTrue(any(said in repair for repair in result[name]["compile"]), name)
 
 
+class ResearchTaskTests(unittest.TestCase):
+    def test_findings_that_need_analysis_and_the_thinnest_chart_pages_are_research_too(self):
+        """Pass 4 of a 65-page deck left two majors that were analysis work, filed as findings: no task was written for either."""
+        result = run_node('''
+import * as S from './skills/professional-slides/runtime/storyline.mjs';
+const review = { pass: 1, findings: [{ id: 'F8', check: 'sourcing', severity: 'major', pages: ['m58'], problem: 'The scenario sets the fall it reports.', fix: 'Build the path year by year from the recorded orders.', ifUnfixed: 'The committee avoids a trade on an input.' },
+  { id: 'F9', check: 'claim', severity: 'minor', pages: ['m10'], problem: 'A minor point.', fix: 'Say more.' }],
+  missingAnalyses: [{ id: 'M1', analysis: 'Credit quality of the book', why: 'It would change the call', data: 'The annual report notes', public: 'known', remedy: 'retrieval', severity: 'major', ifUnfixed: 'The committee would miss the credit risk.' }] };
+const ledger = S.storylineLedger([], review);
+// Ten chart pages: a pie and a bridge plot their parts, the rest are thin trends.
+const slides = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, pageType: { chart: true, type: i === 0 ? 'composition' : i === 1 ? 'bridge' : 'trend', values: i + 3 } }));
+const tasks = S.researchTasks([{ pass: 1, review }], ledger, { slides });
+console.log(JSON.stringify(tasks.map((t) => [t.kind, t.id, t.blocking])));
+''')
+        kinds = [kind for kind, _, _ in result]
+        self.assertEqual(result[:2], [["analysis", "M1", True], ["revision", "F8", True]])   # blocking first; a minor finding is not research
+        self.assertEqual(kinds.count("depth"), 5)
+        self.assertNotIn(["depth", "depth-p0", False], result)                            # a pie plots its parts
+        self.assertNotIn(["depth", "depth-p1", False], result)                            # and a bridge its steps
+
+
 class LayoutOnceTests(unittest.TestCase):
     """Argument first, layout once: a ready critique survives the layout and not a changed argument."""
 
