@@ -387,12 +387,16 @@ function carriedBy(words, text) {
  */
 function openingPage(pages) {
   const analytical = pages.filter((p) => p.role !== "structural" && !p.kind);
-  const page = analytical.find((p) => p.role === "executive-summary") ?? analytical[0];
+  const at = analytical.findIndex((p) => p.role === "executive-summary");
+  const page = analytical[at] ?? analytical[0];
   if (!page) return null;
-  const blocks = (page.textPlan ?? []).filter((b) => !["source", "furniture"].includes(b.role));
-  const written = Array.isArray(page.textPlan) && !page.deferred && !page.uncomposed;
-  return { page, id: page.id ?? page.n, summary: page.role === "executive-summary", title: String(page.claim ?? ""),
-    whole: written ? [page.claim, page.highlight, ...blocks.map((b) => b.text)].flat().filter(Boolean).join(" \n ") : null };
+  // A summary may run on to a second page when the answer has more parts than one page holds: the pages that follow it
+  // as summaries are read with it, as the reader reads them, so the answer is carried by the summary as a whole.
+  const run = at < 0 ? [page] : analytical.slice(at).filter((p, i, all) => all.slice(0, i + 1).every((q) => q.role === "executive-summary"));
+  const written = run.every((p) => Array.isArray(p.textPlan) && !p.deferred && !p.uncomposed);
+  const said = (p) => [p.claim, p.highlight, ...(p.textPlan ?? []).filter((b) => !["source", "furniture"].includes(b.role)).map((b) => b.text)];
+  return { page, id: page.id ?? page.n, summary: page.role === "executive-summary", title: String(page.claim ?? ""), pages: run.map((p) => p.id ?? p.n),
+    whole: written ? run.flatMap(said).flat().filter(Boolean).join(" \n ") : null };
 }
 
 // The one question no page gate asks: does the deck deliver its own answer?
@@ -415,7 +419,7 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
     const answerWords = contentWords(answer);
     const { share: coverage, missing } = carriedBy(answerWords, claims.join(" \n "));
     const opening = openingPage(pages);
-    const named = opening ? `\`${opening.id}\` (${opening.summary ? "the executive summary" : "the opening page"})` : "the opening page";
+    const named = opening ? `${opening.pages.map((id) => `\`${id}\``).join(" and ")} (${opening.summary ? `the executive summary${opening.pages.length > 1 ? `, ${opening.pages.length} pages read as one` : ""}` : "the opening page"})` : "the opening page";
     const lead = answerLead(answer);
     const titled = carriedBy(contentWords(lead), opening?.title ?? "");
     const upFront = opening?.whole === null ? null : carriedBy(answerWords, opening?.whole ?? "");
@@ -434,7 +438,7 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
     const blocks = severity === "blocking";
     standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "coverage", what: "the answer's content words some claim carries", value: round(coverage), bar: CONTENT_THRESHOLDS.answerCoverageMin, side: "min", unit: "share", applies: true, blocks });
     if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "lead", what: "the answer's leading clause the opening title carries", value: round(titled.share), bar: CONTENT_THRESHOLDS.answerLeadMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
-    if (opening && upFront) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "upfront", what: "the answer's content words the opening page carries", value: round(upFront.share), bar: CONTENT_THRESHOLDS.answerUpFrontMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
+    if (opening && upFront) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "upfront", what: "the answer's content words the opening page carries", value: round(upFront.share), bar: CONTENT_THRESHOLDS.answerUpFrontMin, side: "min", unit: "share", applies: true, blocks, pages: opening.pages });
     if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "title", what: "the answer's content words the opening title carries", value: round(inTitle.share), bar: round(titleBar), side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
     const quoted = (words) => words.slice(0, 6).map((w) => `"${w}"`).join(", ");
     if (coverage < CONTENT_THRESHOLDS.answerCoverageMin)

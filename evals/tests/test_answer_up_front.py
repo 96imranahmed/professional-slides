@@ -88,6 +88,18 @@ console.log(JSON.stringify({{ words: answer.size, best }}));
         self.assertGreater(result["words"], 30)
         self.assertLess(result["best"], 0.35)
 
+    def test_a_summary_that_runs_on_to_a_second_page_is_read_as_one(self):
+        # The answer's reasons split across two summary pages: neither carries it alone, the two together do.
+        content = plan(points=SUMMARY_POINTS[:1])
+        second = content["pages"][1]
+        second["role"] = "executive-summary"
+        second["textPlan"] = [{"id": "t", "role": "title", "text": second["claim"]}] + [
+            {"id": f"b{k}", "role": "body", "text": text} for k, text in enumerate(SUMMARY_POINTS[1:])]
+        self.assertEqual(answer_findings(content), [])
+        alone = plan(points=SUMMARY_POINTS[:1])
+        [finding] = answer_findings(alone)
+        self.assertEqual(finding["rule"], "CONTENT_ANSWER_UNCARRIED.upfront")
+
     def test_it_fails_when_the_summary_does_not_carry_it(self):
         thin = ["Growth is possible.", "Several levers exist.", "Timing matters."]
         [finding] = answer_findings(plan(points=thin))
