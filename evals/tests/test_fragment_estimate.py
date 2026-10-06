@@ -75,7 +75,7 @@ class SceneBlockTests(unittest.TestCase):
         page = lambda n, task: {"id": f"p{n}", "readingTask": task, "nodes": [text("list-item", 60, 200 + 140 * at, point) for at in range(3)]}  # noqa: E731
         labels = {"id": "p9", "readingTask": "chart-with-commentary", "nodes": [label("category-label", 60, 200 + 40 * at, "Northern line, peak") for at in range(6)]}
         scene = {"slides": [{"id": "cover", "nodes": []}, *[page(n, "chart-with-commentary") for n in range(9)], labels]}
-        standings = density_profile.scene_fragmentation(scene)["standings"]
+        standings = [s for s in density_profile.scene_fragmentation(scene)["standings"] if s["code"] == "TEXT_FRAGMENTED"]
         self.assertEqual([(s["code"], s["key"], s["side"], s["bar"]) for s in standings],
                          [("TEXT_FRAGMENTED", "floor", "min", density_profile.TEXT_FORM["wordsPerBlock"]["q1"]), ("TEXT_FRAGMENTED", "ceiling", "max", density_profile.TEXT_FORM["wordsPerBlock"]["q3"])])
         for standing in standings:

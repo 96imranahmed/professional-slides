@@ -52,7 +52,16 @@ DECK_LENGTH = CONTRACT["deckLength"]
 
 DENSITY_CODES = {
     "TEXT_FRAGMENTED": "the deck's prose pages set their words in blocks whose median size is outside the middle half of the reference pages' (weight.json plan.textForm)",
+    "COMMENTARY_UNDEVELOPED": "the deck's prose pages carry a median of fewer developed blocks - fifteen words or more - than strong prose pages' three (weight.json plan.textForm.developedBlocks)",
 }
+DEVELOPED = TEXT_FORM["developedBlocks"]
+# How far the scene's count of a deck's median developed blocks may stand from the render's: a block is a block on both.
+DEVELOPED_TOLERANCE = 0.5
+
+
+def developed(blocks: list[int]) -> int:
+    """How many of a page's blocks are developed: a finding with its basis, not a label (DEVELOPED minWords)."""
+    return sum(1 for n in blocks if n >= DEVELOPED["minWords"])
 SOURCE_LINE = re.compile(r"^\s*(source|sources|note|notes|footnote)\b[:\s]", re.I)
 PAGE_NUMBER = re.compile(r"^\s*\d{1,3}\s*$")
 # The targets exclude covers, dividers and contents; so does this, by the
@@ -231,7 +240,7 @@ def scene_fragmentation(scene: dict) -> dict:
         if task in STRUCTURAL_TASKS or not task:
             continue
         blocks = scene_blocks(slide)
-        pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_blocks(blocks), "blocks": len(blocks),
+        pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_blocks(blocks), "blocks": len(blocks), "developed": developed(blocks),
                       "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0})
     prose = [p for p in pages if p["blocks"] and p["prose"]]
     if not prose:
@@ -240,9 +249,19 @@ def scene_fragmentation(scene: dict) -> dict:
     low, high = TEXT_FORM["wordsPerBlock"]["q1"], TEXT_FORM["wordsPerBlock"]["q3"]
     each = {str(p["slide"]): p["wordsPerBlock"] for p in prose}
     return {"pages": pages, "standings": [
-        {"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": value, "bar": bar, "side": side, "unit": "words",
-         "applies": len(prose) >= DECK_LENGTH["density"], "blocks": False, "estimated": True, "tolerance": SCENE_TOLERANCE, "each": each}
-        for key, bar, side in (("floor", low, "min"), ("ceiling", high, "max"))]}
+        *({"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": value, "bar": bar, "side": side, "unit": "words",
+           "applies": len(prose) >= DECK_LENGTH["density"], "blocks": False, "estimated": True, "tolerance": SCENE_TOLERANCE, "each": each}
+          for key, bar, side in (("floor", low, "min"), ("ceiling", high, "max"))),
+        undeveloped_standing(prose, slide_key="slide", estimated=True)]}
+
+
+def undeveloped_standing(prose: list, slide_key: str = "id", estimated: bool = False) -> dict:
+    """COMMENTARY_UNDEVELOPED's standing: the prose pages' median developed blocks against strong prose pages' median."""
+    value = st.median([p["developed"] for p in prose]) if prose else 0
+    return {"code": "COMMENTARY_UNDEVELOPED", "key": "floor", "what": "median developed blocks (fifteen words or more) on the prose pages", "value": value,
+            "bar": DEVELOPED["perPage"], "side": "min", "unit": "blocks", "applies": len(prose) >= DECK_LENGTH["density"],
+            "each": {str(p[slide_key]): p["developed"] for p in prose},
+            **({"blocks": False, "estimated": True, "tolerance": DEVELOPED_TOLERANCE} if estimated else {})}
 
 
 def body_words(page, header: set[str] | None = None) -> int:
@@ -317,7 +336,7 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
         header = header_lines(slide) or None
         blocks = page_blocks(text, header, furniture_runs(slide))
         body = body_words(text, header)
-        entry = {"page": index, "id": slide.get("id"), "task": task, "prose": prose_blocks(blocks), "bodyWords": body,
+        entry = {"page": index, "id": slide.get("id"), "task": task, "prose": prose_blocks(blocks), "developed": developed(blocks), "bodyWords": body,
                  "blocks": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
                  "longestBlock": max(blocks) if blocks else 0, "blockSizes": blocks, "flags": []}
         target = TASK_TARGETS.get(task, {}).get("bodyWords")
@@ -373,7 +392,9 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
                              "position": "above" if single > TEXT_FORM["singleBlockPagesMax"] else "within"},
     }
     deck["outsideBand"] = sorted(k for k, v in deck.items() if isinstance(v, dict) and v.get("position") in ("above", "below"))
-    findings = fragmentation(deck["wordsPerBlock"], prose)
+    deck["developedPerPage"] = {"measured": st.median([p["developed"] for p in prose]) if prose else None, "target": DEVELOPED["perPage"],
+                                "position": "below" if prose and st.median([p["developed"] for p in prose]) < DEVELOPED["perPage"] else "within"}
+    findings = fragmentation(deck["wordsPerBlock"], prose) + undeveloped(deck["developedPerPage"], prose)
     waived = waived_rules(rules or {})
     findings = [{**f, "severity": "advisory", "waived": {"rulesVersion": (rules or {}).get("rulesVersion"), "introducedIn": waived[f["code"]]}}
                 if f["code"] in waived else f for f in findings]
@@ -382,9 +403,10 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
     # page's own figure: the author's check prints it (author-deck.mjs --render).
     words, limits = deck["wordsPerBlock"], deck["wordsPerBlock"]["band"]
     each = {str(p["id"]): p["wordsPerBlock"] for p in prose}
-    standings = [{"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": words["measured"] or 0, "bar": bar,
-                  "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "each": each}
-                 for key, bar, side in (("floor", limits[0], "min"), ("ceiling", limits[1], "max"))]
+    standings = [*({"code": "TEXT_FRAGMENTED", "key": key, "what": "median words a block on the prose pages", "value": words["measured"] or 0, "bar": bar,
+                    "side": side, "unit": "words", "applies": len(prose) >= DECK_LENGTH["density"], "each": each}
+                   for key, bar, side in (("floor", limits[0], "min"), ("ceiling", limits[1], "max"))),
+                 undeveloped_standing(prose)]
     return {
         "schema": "professional-slides.density-profile/v1",
         "$comment": ("Rendered pages read by column (text_blocks.py, over pdftotext -bbox-layout); targets from weight.json "
@@ -421,6 +443,26 @@ def fragmentation(words_per_block: dict, prose: list) -> list:
                            if below else
                            "The copy is set as slabs: break each page's argument into its points, one finding and its "
                            "evidence each. Start with " + ", ".join(str(p["id"]) for p in worst) + ".")),
+    }]
+
+
+def undeveloped(developed_per_page: dict, prose: list) -> list:
+    """COMMENTARY_UNDEVELOPED: the prose pages' median developed blocks under strong prose pages' median, read once the
+    deck has deckLength.density prose pages. A page of two developed points where strong pages make three or more reads
+    as a page that says less than its evidence carries: the repair is a further finding, not the same two split."""
+    if len(prose) < DECK_LENGTH["density"] or developed_per_page.get("position") != "below":
+        return []
+    thin = sorted(prose, key=lambda p: (p["developed"], p["bodyWords"]))[:8]
+    return [{
+        "code": "COMMENTARY_UNDEVELOPED", "severity": "blocker", "slide": None,
+        "measured": {"developedPerPage": developed_per_page["measured"], "pages": len(prose),
+                     "thinnest": [{"page": p["page"], "id": p["id"], "developed": p["developed"], "bodyWords": p["bodyWords"]} for p in thin]},
+        "threshold": DEVELOPED["perPage"],
+        "repair": ("The prose pages carry a median of {} developed blocks - fifteen words or more - where strong prose pages carry {}. "
+                   "Give the pages that stop at one or two a further developed point: a finding the evidence carries that the "
+                   "page does not yet say, with its basis and what follows - or a sentence callout on the chart that names the "
+                   "mechanism. Do not split a point in two or pad one. Start with {}."
+                   .format(developed_per_page["measured"], DEVELOPED["perPage"], ", ".join(str(p["id"]) for p in thin))),
     }]
 
 

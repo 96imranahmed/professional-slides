@@ -381,7 +381,7 @@ class FurnitureTests(unittest.TestCase):
             report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
         self.assertEqual(report["pages"][0]["blockSizes"], [12, 6, 25, 25])
         self.assertEqual(report["deck"]["wordsPerBlock"]["measured"], 17)
-        self.assertEqual(report["findings"], [])
+        self.assertEqual([f["code"] for f in report["findings"] if f["code"] == "TEXT_FRAGMENTED"], [])
 
     def test_the_band_is_the_column_reading_and_fragments_block(self):
         form = density_profile.TEXT_FORM["wordsPerBlock"]

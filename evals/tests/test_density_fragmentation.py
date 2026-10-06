@@ -53,7 +53,7 @@ class FragmentationTests(unittest.TestCase):
         # A developed opening and nine one-line fragments: prose, read as labels.
         report = self.profile([15, 6, 6, 6, 6, 6, 6, 6, 6, 6])
         self.assertFalse(report["accepted"])
-        [finding] = report["findings"]
+        finding = next(f for f in report["findings"] if f["code"] == "TEXT_FRAGMENTED")
         self.assertEqual(finding["code"], "TEXT_FRAGMENTED")
         self.assertEqual(finding["severity"], "blocker")
         self.assertEqual(finding["measured"]["direction"], "below")
@@ -64,14 +64,24 @@ class FragmentationTests(unittest.TestCase):
         # Three developed points with the chart's heading and label rows around them, as a strong page sets them.
         self.assertTrue(self.profile([8, 25, 4, 30, 5, 20, 6])["accepted"])
         slab = self.profile([140, 130])
-        self.assertEqual([f["measured"]["direction"] for f in slab["findings"]], ["above"])
+        self.assertEqual([f["measured"]["direction"] for f in slab["findings"] if f["code"] == "TEXT_FRAGMENTED"], ["above"])
 
     def test_it_reads_prose_pages_only_and_needs_enough_of_them(self):
         # A page whose blocks are its labels carries no prose, however many it has.
         self.assertTrue(self.profile([12, 12, 12, 12], task="chart-led")["accepted"])
-        self.assertEqual(self.profile([12, 12, 12, 12])["findings"], [])
+        self.assertEqual(self.profile([12, 12, 12, 12])["findings"], [])   # nor is it held to the developed-block floor
         short = density_profile.CONTRACT["deckLength"]["density"] - 1
         self.assertTrue(self.profile([15, 6, 6, 6, 6, 6, 6, 6, 6, 6], pages=short)["accepted"])
+
+    def test_prose_pages_that_stop_at_two_developed_points_block(self):
+        # Strong prose pages carry a median of three developed blocks; a deck whose pages stop at two says less than its evidence.
+        two = self.profile([8, 25, 4, 30, 5, 6])
+        [finding] = two["findings"]
+        self.assertEqual((finding["code"], finding["severity"], finding["measured"]["developedPerPage"]), ("COMMENTARY_UNDEVELOPED", "blocker", 2))
+        self.assertIn("Do not split a point in two", finding["repair"])
+        self.assertTrue(self.profile([8, 25, 4, 30, 5, 20, 6])["accepted"])
+        standing = next(s for s in two["standings"] if s["code"] == "COMMENTARY_UNDEVELOPED")
+        self.assertEqual((standing["value"], standing["bar"], standing["side"]), (2, 3, "min"))
 
     def test_a_revision_under_older_rules_hears_it_as_advice(self):
         report = self.profile([15, 6, 6, 6, 6, 6, 6, 6, 6, 6], rules={"workflow": "existing_deck_revision", "rulesVersion": 2})

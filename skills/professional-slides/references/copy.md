@@ -82,7 +82,7 @@ The opposite failure is the fragment: a bold lead and one sentence of twenty wor
 
 Commentary is three developed points of about 20 to 40 words each - two where the exhibit carries a sentence callout of its own. A developed point has three parts: the finding (with the number the reader should see first - an unmarked point is marked on its own figure), the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments; a third developed point beats a second one stretched to sixty words.
 
-A deck whose prose pages run a median words-per-block outside the band is refused at the build (`TEXT_FRAGMENTED`), and the review's density pass judges the pages the density profile flags ([Taste review](taste-review.md#density-pass)). How this relates to the page's word floor and ceiling is in [Word measures](evaluation/index.md#word-measures).
+A deck whose prose pages run a median words-per-block outside the band is refused at the build (`TEXT_FRAGMENTED`), and so is one whose prose pages carry a median of fewer than three developed blocks (`COMMENTARY_UNDEVELOPED`). The review's density pass judges the pages the density profile flags ([Taste review](taste-review.md#density-pass)). How this relates to the page's word floor and ceiling is in [Word measures](evaluation/index.md#word-measures).
 
 A takeaway band is a separate rule: one or two lines (`TAKEAWAY_LONG`, refused at compile).
 

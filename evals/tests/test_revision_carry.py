@@ -514,7 +514,7 @@ console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.fil
         held = lambda deck: {code for code, verdict in self.result["stages"][deck].items() if verdict[0]}
         self.assertEqual(held("fresh"), set(self.codes))
         self.assertEqual(held("rebuilt6"), set(self.codes))
-        self.assertEqual(set(self.codes) - held("rebuilt5"), {code for code in self.codes if self.introduced.get(code) == 6})
+        self.assertEqual(set(self.codes) - held("rebuilt5"), {code for code in self.codes if (self.introduced.get(code) or 0) > 5})
         self.assertEqual(set(self.codes) - held("mostly6"), set())
         self.assertEqual(set(self.codes) - held("few6"), set(self.result["measures"]) - set(self.result["rules"]["always"]))
         # What a draft refuses of a page the critique would read differently from its witness (spine-witness.mjs) is no version's
