@@ -52,7 +52,7 @@
    "type": "trend",
    "form": "line",
    "commentary": "so-what-bar",
-   "title": "Faults on the converted section fell by two thirds",
+   "title": "Faults fell by two thirds after the section switched to moving blocks in 2023 Q3",
    "why": "The fall over time is the claim, so the quarterly series is drawn",
    "evidence": [
     "x-faults"
@@ -68,6 +68,8 @@
     "heading": "Signal faults on the converted section",
     "unit": "faults a quarter",
     "categories": [
+     "2022 Q3",
+     "2022 Q4",
      "2023 Q1",
      "2023 Q2",
      "2023 Q3",
@@ -81,13 +83,15 @@
      {
       "name": "Faults",
       "values": [
+       62,
+       60,
        61,
        58,
-       49,
-       44,
-       31,
-       26,
-       22,
+       41,
+       32,
+       27,
+       23,
+       21,
        19
       ]
      }
@@ -100,6 +104,12 @@
     "highlights": [
      {
       "category": "2024 Q4"
+     }
+    ],
+    "annotations": [
+     {
+      "category": "2023 Q3",
+      "text": "Moving blocks replace fixed blocks on the section from here"
      }
     ]
    },

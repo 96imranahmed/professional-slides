@@ -305,7 +305,7 @@
    "type": "trend",
    "form": "line",
    "commentary": "so-what-bar",
-   "title": "Liquidity cover fell from 134% in FY22 to 104%, 4.3 points above the minimum",
+   "title": "Short-term liabilities closed on liquid assets, leaving cover 4.3 points above the minimum",
    "why": "Two series in one unit on one scale, so the reader sees liabilities due within a year closing on the liquid assets that cover them",
    "evidence": [
     "i-liquidity",

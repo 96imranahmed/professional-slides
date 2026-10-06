@@ -254,11 +254,12 @@
    "type": "trend",
    "form": "combo",
    "commentary": "so-what-bar",
-   "title": "Paying users nearly quadrupled, doubling their share of actives",
+   "title": "Paying users nearly quadrupled as the new onboarding reached every signup",
    "why": "Paying users and their share of actives, two units over the same months, which a combo trend carries",
    "evidence": [
     "p-paid",
-    "C-paid"
+    "C-paid",
+    "p-rollout"
    ],
    "settles": {
     "kind": "rate",
@@ -285,9 +286,15 @@
      {
       "category": "Mar 2026"
      }
+    ],
+    "annotations": [
+     {
+      "category": "Sep 2025",
+      "text": "Every signup gets the new onboarding from this month on"
+     }
     ]
    },
-   "bar": "Conversion, more than new actives, drove the gain, so it is the second lever to fund"
+   "bar": "Paid share rose from the month every signup got the new onboarding, so conversion is its second return, not a separate bet"
   },
   {
    "id": "p5",
