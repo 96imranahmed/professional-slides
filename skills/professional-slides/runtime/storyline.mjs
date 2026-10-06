@@ -52,6 +52,7 @@ import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialC
 import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { textWords } from "./text-contract.mjs";
 import { registered } from "./errors.mjs";
@@ -962,8 +963,12 @@ export function unfiledSources(items, sources = []) {
   return (items || []).flatMap((item) => { const listed = Array.isArray(item?.sources) ? item.sources : [], missing = listed.filter((f) => !have.has(f));
     return !listed.length ? [{ id: item?.id ?? "?", none: true, missing: [] }] : missing.length ? [{ id: item?.id ?? "?", none: false, missing }] : []; });
 }
-// The source files a number can be read back from without a parser of the runtime's own: text, tables and markup.
-const READABLE = /\.(?:csv|tsv|txt|md|json|html?|xml)$/i;
+// The source files a number can be read back from: text, tables and markup as they are, a PDF through pdftotext (the
+// reader the density profile already needs). Research sources are often a publisher's PDF report.
+const READABLE = /\.(?:csv|tsv|txt|md|json|html?|xml|pdf)$/i;
+const sourceText = (file) => (/\.pdf$/i.test(file)
+  ? new Promise((resolve) => execFile("pdftotext", ["-layout", file, "-"], { maxBuffer: 64 * 1024 * 1024 }, (error, stdout) => resolve(error ? null : stdout)))
+  : fs.readFile(file, "utf8").catch(() => null));
 // A measure is told of when more than this share of its recorded values cannot be found in its insight's source files.
 const UNREAD_SHARE = 0.5;
 // The scales a source prints a recorded number at: as it is, a share as a percentage or back, and by a thousand, a million or a billion either way.
@@ -998,7 +1003,7 @@ export async function unreadNumbers(items, base) {
   const out = [];
   const read = new Map();
   const numbersOf = async (files) => (await Promise.all(files.filter((file) => READABLE.test(file)).map((file) => {
-    if (!read.has(file)) read.set(file, fs.readFile(path.join(base, file), "utf8").then(numbersIn, () => null));
+    if (!read.has(file)) read.set(file, sourceText(path.join(base, file)).then((text) => (text === null ? null : numbersIn(text))));
     return read.get(file);
   }))).filter(Boolean).flat();
   for (const item of items || []) {
@@ -1152,6 +1157,7 @@ export function settleCritiqueForm(reviewIn, ids, contentIds = ids) {
 const STAKE_MIN = 30;
 /** `mended` (settleCritiqueForm) as the lines a run prints. */
 const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}`
+  : entry.did === "dropped" ? `${entry.at}: a later pass adds only major or blocker findings, so this ${entry.was} point was left out of the record`
   : entry.did === "minor" ? `${entry.at}: ${entry.was === "no severity" ? "filed with no severity, so recorded as minor" : `filed ${entry.was} without \`ifUnfixed\` - what the decision-maker would get wrong - so recorded as minor`}`
   : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
 
@@ -1731,6 +1737,19 @@ async function readCritique(file) {
  */
 export function judgeCritique(answer, context) {
   const settled = settleCritiqueForm(answer, context.ids, context.contentIds ?? context.ids);
+  // A later pass adds only blocking findings. A minor point filed anyway is left out and said, not refused: refused, the
+  // whole answer went back to its critic for one stray line, and its judgement came back the same. One that restates an open
+  // finding stays, since the ledger folds it into that finding.
+  if (context.scope && Array.isArray(settled.review?.findings)) {
+    const open = openEntries(context.ledger ?? []);
+    settled.review.findings = settled.review.findings.filter((item, i) => {
+      if (!item || typeof item !== "object" || BLOCKING.has(item.severity)) return true;
+      const code = `STORY_${String(item.check ?? "").toUpperCase()}`;
+      if (open.some((e) => e.code === code && (e.pages || []).some((id) => (item.pages || []).includes(id)))) return true;
+      settled.mended.push({ at: `findings[${i}]${item.id ? ` (${item.id})` : ""}`, did: "dropped", was: item.severity, pages: item.pages || [] });
+      return false;
+    });
+  }
   const errors = validateStorylineRecord(settled.review, context);
   if (errors.length) return { review: null, errors, mended: settled.mended, ledger: null };
   const ledger = storylineLedger(context.scope ? context.ledger : [], settled.review);

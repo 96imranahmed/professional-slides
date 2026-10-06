@@ -706,12 +706,12 @@ const packet = JSON.parse(await fs.readFile(path.join(two.dir, 'packet.json'), '
 const verification = (o = {}) => ({ pass: 2, verifies: critique.binding, verdict: 'ready', rating: 8, binding: S.storylineBinding(revised), summary: 'The rewritten title now states the finding the count supports.',
   compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
   provenance: prov(packet.promptHash), statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The title now states the rate against the nearest rival.' }], findings: [], topFixes: [], ...o });
-await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
-const nit = await S.prepareStoryline(specPath, out);
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ provenance: prov('0'.repeat(64)) })));
 const forged = await S.prepareStoryline(specPath, out);
-await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification()));
+// A minor point a later pass files anyway is left out of the record and said, and the pass stands: not sent back for one line.
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
 const ready = await S.prepareStoryline(specPath, out);
+const nit = ready;
 const gate = await S.storylineGate(revised, out, { deckPath: specPath });
 const moved = await S.storylineGate(specOf(ids, { p02: 'The subject added routes twice as fast as its nearest rival', p03: 'A new claim' }), out, { deckPath: specPath });
 // The verifier files the defect it still sees as a new item on the page F1 names: folded into F1, which stays open.
@@ -728,7 +728,7 @@ const switched = await S.prepareStoryline(specPath, out, { mode: 'full' });
 const withReason = await S.prepareStoryline(specPath, out, { mode: 'full', reason: 'The user asked for a page-level critique before the copy.' });
 await cleanup(dir);
 console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect, 'ledger' in packet.scope, 'priorRating' in packet.scope],
-  nit: [nit.status, nit.errors?.some((e) => e.includes('not additive'))], forged: [forged.status, forged.errors?.some((e) => e.includes('promptHash'))], ready: ready.status, gate, moved, capped: capped.capped,
+  nit: [nit.status, (nit.formMended || []).some((e) => e.includes('this minor point was left out'))], forged: [forged.status, forged.errors?.some((e) => e.includes('promptHash'))], ready: ready.status, gate, moved, capped: capped.capped,
   switched, withReason: [withReason.status, withReason.mode, withReason.pass], folded, conflict, foldedLedger }));
 ''')
         self.assertEqual(result['one'], ['packet-written', 1, 'spine'])
@@ -736,7 +736,7 @@ console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revi
         self.assertEqual(result['two'], ['packet-written', 2])
         # The spine verifier reads the whole (small) spine; the staged packet carries no ledger and no earlier rating.
         self.assertEqual(result['scope'], [['p02'], [], False, False])
-        self.assertEqual(result['nit'], ['invalid', True])
+        self.assertEqual(result['nit'], ['ready', True])
         self.assertEqual(result['forged'], ['invalid', True])
         self.assertEqual(result['ready'], 'ready')
         self.assertEqual(result['gate'], [])
