@@ -264,7 +264,11 @@ function lineAxes(chart) {
     const categoryX = slotX(index);
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
     const shown = spacedLabels ? spacedLabels.includes(index) : every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
-    if (shown && !(!spacedLabels && every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: categoryX, y: plot.y + plot.height + 16, width: categorySlot, height: Math.min(40, Math.ceil(labelHeight) + 4) }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
+    // The label is held inside the frame by its own width, not its slot's: a last point at the plot's edge, its slot clamped
+    // in by half a slot, pushed "Q3-2026" into "Q3-2025" where its own ink needed a few pixels.
+    const ink = Math.min(categorySlot, Math.ceil(measureText(String(category), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL) }).width) + 4);
+    const labelX = Math.max(frame.x, Math.min(frame.x + frame.width - ink, xScale(index) - ink / 2));
+    if (shown && !(!spacedLabels && every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: labelX, y: plot.y + plot.height + 16, width: ink, height: Math.min(40, Math.ceil(labelHeight) + 4) }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   return { nodes, pointMap, categoryMap };
 }
