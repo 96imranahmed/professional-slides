@@ -22,6 +22,8 @@ const KINDS = Object.freeze({
   object: (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value),
 });
 
+// The words the footer's deck line may run to.
+export const FOOTER_LINE_WORDS = 5;
 const key = (type, accepts, about, test = null) => Object.freeze({ type, accepts: Object.freeze(accepts), about, ...(test ? { test } : {}) });
 
 /** Every key `deck` takes: its `type` as an author reads it, the kinds of value it `accepts`, and what it is `about` in a line. */
@@ -72,7 +74,11 @@ const DECK_KEYS = Object.freeze({
   // the front matter and the navigation
   cover: key("{ title, subtitle, date, logo, image, layout, tone, notes }", ["object"], "the cover page"),
   logo: key("string", ["string"], "the wordmark the cover prints"),
-  footer: key("string", ["string"], "the document title printed in the footer beside the page number"),
+  // Printed on every page, so it is read past on every page: a short name, as strong decks set it. A 55-page deck's six-word
+  // line was half its footer's words.
+  footer: key("string", ["string"], `the short name printed in the footer beside the page number, ${FOOTER_LINE_WORDS} words at most`,
+    // A revision's footer is the user's own line, carried from the deck it imports.
+    (value, deck) => (deck?.workflow !== "existing_deck_revision" && value.trim().split(/\s+/).filter(Boolean).length > FOOTER_LINE_WORDS ? `runs to ${value.trim().split(/\s+/).length} words, and it is printed on every page: a short name of ${FOOTER_LINE_WORDS} words or fewer ("Manhattan real estate, Oct 2026"), the full title on the cover` : null)),
   contents: key("true | false | \"once\"", ["boolean", "string"], "whether the deck draws a contents page; on from two sections"),
   agenda: key("true | false | \"once\"", ["boolean", "string"], "the older spelling of `contents` and `tracker: \"repeat-contents\"` together"),
   agendaStyle: key("\"list\" | \"columns\"", ["string"], "how the contents page sets the sections"),
@@ -110,7 +116,7 @@ export function deckKeyProblems(deck) {
       continue;
     }
     if (!entry.accepts.some((kind) => KINDS[kind](value))) { problems.push(`\`${name}\` on \`deck\` is ${entry.type} - ${entry.about}; it was given ${kindOf(value)}`); continue; }
-    const wrong = entry.test?.(value);
+    const wrong = entry.test?.(value, deck);
     if (wrong) problems.push(`\`${name}\` on \`deck\` ${wrong}`);
   }
   return problems;
