@@ -86,6 +86,8 @@ const prompt = await fs.readFile(path.join(one.dir, 'prompt.md'), 'utf8');
 const ids = p1.pages.filter((p) => p.kind === 'content').map((p) => p.id);
 const critique = first(p1, ids, [missing('M1', 'computable', 'speculative'), missing('M2', 'retrieval')]);
 const revise = await answer(deck, critique);
+// The research the critique asks for is written beside it, each task with its data, its remedy and what closes it.
+const tasks = JSON.parse(await fs.readFile(path.join(deck.out, 'research-tasks.json'), 'utf8')).tasks.map((t) => [t.id, t.remedy, t.blocking, t.data, t.closes.split(':')[0]]);
 // The team narrows what it offers: the answer is now provisional, and says what it leaves open.
 await deck.write({ answer: 'On the board papers alone, demand per crew and handover drive the rise; Uplands and Valley take the first crews, provisionally.',
   answerStatus: 'provisional', answerLimits: ['Whether vehicles rather than crews bind cannot be settled without the fleet register'] }, null);
@@ -121,7 +123,7 @@ await still.write({}, (d) => { d.pages.at(-1).title = `${d.pages.at(-1).title} n
 const s2 = await packetOf(await S.prepareStoryline(still.specPath, still.out));
 const unmoved = await answer(still, verification(s2, filed.binding, [status('F1', 'fixed'), status('M1', 'fixed', { artifact: 'B-headroom' })]));
 await clear(still);
-console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.status, p2.scope.answerChanged],
+console.log(JSON.stringify({ one: one.status, revise: revise.status, research: [revise.research.length, tasks], two: [two.status, p2.scope.answerChanged],
   unmoved: [unmoved.status, said(unmoved, 'already computed and rested on, unchanged'), said(unmoved, 'does not close on a storyline that did not move'), s2.scope.changed.includes(sids[0])],
   told: [prompt.includes('EVIDENCE SCOPE: closed'), prompt.includes('only the board papers supplied by the service may be used'), prompt.includes('B-vehicles [gap, unavailable]'), prompt.includes('B-path [scenario, assumed]')],
   told2: [prompt2.includes('THE ANSWER IS OFFERED AS PROVISIONAL'), prompt2.includes('THE ANSWER HAS CHANGED')],
@@ -134,6 +136,8 @@ console.log(JSON.stringify({ one: one.status, revise: revise.status, two: [two.s
 ''')
         self.assertEqual(result["one"], "packet-written")
         self.assertEqual(result["revise"], "revise")
+        self.assertEqual(result["research"], [2, [["M1", "computable", True, "The records named in the packet", "compute it from data the log already holds"],
+                                                  ["M2", "retrieval", True, "The records named in the packet", "find the data"]]])
         self.assertEqual(result["two"], ["packet-written", True])
         # The critic is told the scope, what the runtime computed, and what it could not.
         self.assertEqual(result["told"], [True, True, True, True])

@@ -1986,6 +1986,47 @@ export async function prepareStoryline(specPath, outputDirectory, options = {}) 
   const step = await advanceStoryline(specPath, outputDirectory, options, said);
   return said.mended.length && step && typeof step === "object" ? { ...step, formMended: mendedLines(said.mended) } : step;
 }
+// What closes a missing analysis, by its remedy: the artifact a verification pass reads it `fixed` on (STATUS: `fixed` needs
+// `artifact`), or the search a pass reads it `unavailable` on.
+const RESEARCH_CLOSES = Object.freeze({
+  computable: "compute it from data the log already holds: an analysis in <id>.analysis.json whose result a page rests on",
+  retrieval: "find the data: its source file under sources/, an insight in <id>.insights.json recording its measures, and a page resting on it - or, where it cannot be had, the searches made (`unavailable` with its search log)",
+  assumption: "state it as an assumption: an insight with `status: \"assumed\"` and the basis for the figure, and a page that rests on it and says so",
+});
+const RESEARCH_FILE = "research-tasks.json";
+
+/**
+ * The research the critique asks for, as tasks the author works through
+ * before the next pass: each missing analysis the critic filed and no pass has
+ * closed, with what it is, why it matters, the data it runs on, its remedy and
+ * what closes it - blocking ones first, the minor ones that would deepen the
+ * answer after. A critic's missing analysis used to reach the author as an id
+ * and a severity; the analysis, its data and what would close it stayed in the
+ * lineage, and a deck went to its cap with its evidence as thin as it began.
+ * Written beside the critique on every pass that leaves one open
+ * (`research-tasks.json`), and returned with the run's result.
+ */
+export function researchTasks(history, ledger) {
+  const filed = new Map();
+  for (const pass of history) for (const m of pass.review?.missingAnalyses || []) filed.set(m.id, { ...m, pass: pass.pass });
+  const open = openEntries(ledger).filter((e) => e.dimension === "missing" && !e.aboutImported);
+  const tasks = open.map((e) => {
+    const m = filed.get(e.id) ?? {};
+    return { id: e.id, severity: e.severity, blocking: BLOCKING.has(e.severity), analysis: m.analysis ?? e.reason, why: m.why ?? null, data: m.data ?? null,
+      public: m.public ?? e.public ?? null, remedy: m.remedy ?? e.remedy ?? null, ifUnfixed: m.ifUnfixed ?? null, filedAt: m.pass ?? null,
+      closes: RESEARCH_CLOSES[m.remedy ?? e.remedy] ?? RESEARCH_CLOSES.retrieval };
+  });
+  return tasks.sort((a, b) => Number(b.blocking) - Number(a.blocking));
+}
+
+/** The tasks written beside the critique, or the file removed when none is open. Returns the lines the run prints. */
+async function writeResearchTasks(out, tasks) {
+  const file = path.join(out, RESEARCH_FILE);
+  if (!tasks.length) { await fs.rm(file, { force: true }); return []; }
+  await writeJson(file, { schema: "professional-slides.research-tasks/v1", note: "Run each before the next pass: a verification pass reads a missing analysis closed only on its artifact - the analysis, the insight a page rests on - or on the searches that show the data cannot be had", tasks });
+  return tasks.map((t) => `${t.id} (${t.severity}${t.blocking ? ", blocks" : ""}): ${t.analysis}${t.data ? ` - on ${t.data}` : ""}. Closes on: ${t.closes}`);
+}
+
 async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
@@ -2052,13 +2093,17 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     const open = openBlocking(latest.ledger);
     // What the critic filed about the imported deck blocks nothing, and is the user's to hear: the run names each.
     const told = openAboutImported(latest.ledger);
+    const deepen = latest.review.verdict === "ready" && !open.length ? await writeResearchTasks(out, researchTasks(history, latest.ledger)) : [];
     if (latest.review.verdict === "ready" && !open.length) return { status: "ready", pass: latest.pass, mode: wanted, binding, note: READY_NOTE,
+      ...(deepen.length ? { research: deepen, researchNote: `Minor missing analyses the critic said would deepen the answer without changing it (${RESEARCH_FILE}): worth running before the layout if the data is to hand - each one rested on reopens its pages for one verification pass` } : {}),
       ...(told.length ? { aboutImported: told.map(brief), tell: `${told.length} item${told.length === 1 ? " is" : "s are"} about the imported deck - a slide of the user's own this revision did not change. Nothing is refused for ${told.length === 1 ? "it" : "them"}, and no slide is to be edited that the user did not ask to change: delivery reports ${told.length === 1 ? "it" : "each"} to the user (out/delivery.json \`aboutImported\`), who decides` } : {}) };
     // Provisional: the team has done what the evidence in scope allows, the
     // answer is offered as provisional, and what stays open is recorded with it.
     if (latest.review.verdict === "provisional" && open.length && open.every(limitedBy(evidenceScopeOf(spec))) && answerStatusOf(spec).status === "provisional")
       return { status: "provisional", pass: latest.pass, mode: wanted, binding, limits: open.map(brief), note: "The storyline is provisional, not ready: every open item needs evidence the scope forbids. The deck review may start; delivery records the deck as provisional with these limits" };
-    return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), note: "Revise the argument at the root for the open items - a claim, what settles it, the insights and measures a page rests on and what it shows of them, the pages or the answer; a chart redrawn in another form or reworded copy is not a revision - then run this again: it writes the verification pass for what you changed" };
+    const research = await writeResearchTasks(out, researchTasks(history, latest.ledger));
+    return { status: "revise", pass: latest.pass, mode: wanted, open: open.map(brief), ...(research.length ? { research, researchFile: path.join(out, RESEARCH_FILE) } : {}),
+      note: `Revise the argument at the root for the open items - a claim, what settles it, the insights and measures a page rests on and what it shows of them, the pages or the answer; a chart redrawn in another form or reworded copy is not a revision - then run this again: it writes the verification pass for what you changed${research.length ? `. Run the research first (${RESEARCH_FILE}): a missing analysis closes on its artifact, not on a page reworded around it` : ""}` };
   }
   const ids = storyStructure(spec).filter(isContent).map((p) => p.id);
   const scope = latest ? nextPassScope(latest, storylinePageHashes(spec, measures), { ids, ledger: latest.ledger ?? storylineLedger([], latest.review), maxPasses }) : null;
@@ -2078,7 +2123,11 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
     const refusal = post.grant ? { why: null } : compileRefusalPass(history, await readJson(path.join(store, COMPILE_REFUSAL_RECORD), { optional: true }), latest, moved);
     const grant = post.grant ?? refusal.grant ?? null;
     if (grant) Object.assign(scope, { capped: false, postReview: grant, mustInspect: wanted === "full" ? ids.filter((id) => grant.pages.includes(id)) : [] });
-    else if (scope.capped) return { status: "capped", pass: scope.pass, message: `${capMessage("storyline critique", spent + 1, maxPasses, latest.ledger)} The post-review pass (${POST_REVIEW_RULE}) is not available: ${post.why}. Nor is the pass a compile refusal allows (${COMPILE_REFUSAL_RULE}): ${refusal.why}.` };
+    else if (scope.capped) {
+      const research = await writeResearchTasks(out, researchTasks(history, latest.ledger));
+      return { status: "capped", pass: scope.pass, ...(research.length ? { research, researchFile: path.join(out, RESEARCH_FILE) } : {}),
+        message: `${capMessage("storyline critique", spent + 1, maxPasses, latest.ledger)} The post-review pass (${POST_REVIEW_RULE}) is not available: ${post.why}. Nor is the pass a compile refusal allows (${COMPILE_REFUSAL_RULE}): ${refusal.why}.` };
+    }
   }
   const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes, carried: scope ? [] : await carriedItems(historyDir) });
   // The folder the answer is saved into exists from the moment it is asked for: an answer written elsewhere and copied in is not lost to a missing directory.
