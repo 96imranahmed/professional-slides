@@ -90,6 +90,8 @@ Data is not yet a finding. Work each dataset the way an analyst would and record
 
 Every number a measure records is read back from the insight's own `sources` at each compile - or from the files the measure names in its own `sources`, where the insight draws on several - at whatever scale or rounding the log keeps it (`SOURCE_NUMBERS_UNREAD`, advised). A measure worked out from what the source prints - a share, a change, a spread, a sum - says how in `computed` ("Manhattan net homes over the city's, each year"); better still, it is an analysis the runtime computes (below).
 
+A dated event the values turn on - a switch, a law, a launch - is recorded on the measure itself, `events: { "2023 Q3": "Switch to moving blocks" }` (a period the measure records, six words or fewer). The storyline critic reads it beside the values, which is where a claim like "faults fell after the switch" is checked, and a chart bound to the measure draws it as an event marker at that period (`events: false` on the exhibit draws none). Put in a callout or a calculation alone, the date never reaches the spine the critique reads.
+
 Ask of every dataset:
 
 - **Rate:** how fast is it growing, over what span? What rate would the target need?

@@ -684,6 +684,12 @@ function draftedNumbers(exhibits) {
 function measureLine(ref, label, registry, max, cited = "") {
   const m = registry.get(ref);
   if (!m) return `${label}: NOT IN THE LOG`;
+  // The dated events the values turn on, said with them: a claim that a fall followed a switch is checked against the switch.
+  const events = m.events && typeof m.events === "object" ? Object.entries(m.events) : [];
+  return `${valuesLine(m, label, max, cited)}${events.length ? ` (events: ${events.map(([when, what]) => `${when} ${what}`).join("; ")})` : ""}`;
+}
+
+function valuesLine(m, label, max, cited) {
   const axis = axisOf(m), values = valuesOf(m), unit = m.unit ? ` ${m.unit}` : "";
   const show = (v) => (typeof v === "number" && Number.isFinite(v) ? fmt(v) : "n/a");
   if (axis.kind === "scalar") return `${label}: ${show(values[0])}${unit}`;

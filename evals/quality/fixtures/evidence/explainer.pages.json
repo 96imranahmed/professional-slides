@@ -66,50 +66,15 @@
    },
    "exhibit": {
     "heading": "Signal faults on the converted section",
-    "unit": "faults a quarter",
-    "categories": [
-     "2022 Q3",
-     "2022 Q4",
-     "2023 Q1",
-     "2023 Q2",
-     "2023 Q3",
-     "2023 Q4",
-     "2024 Q1",
-     "2024 Q2",
-     "2024 Q3",
-     "2024 Q4"
-    ],
     "series": [
      {
-      "name": "Faults",
-      "values": [
-       62,
-       60,
-       61,
-       58,
-       41,
-       32,
-       27,
-       23,
-       21,
-       19
-      ]
+      "measure": "x-faults/faults",
+      "name": "Faults"
      }
     ],
-    "basis": {
-     "measures": [
-      "x-faults/faults"
-     ]
-    },
     "highlights": [
      {
       "category": "2024 Q4"
-     }
-    ],
-    "annotations": [
-     {
-      "category": "2023 Q3",
-      "text": "Moving blocks replace fixed blocks on the section from here"
      }
     ]
    },

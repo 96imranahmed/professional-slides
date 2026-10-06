@@ -730,6 +730,15 @@ function bindExhibit(ex, what, context) {
     // A pie or a donut names its slices in `labels`; every other chart its axis in `categories`.
     ex[!bySeries && /pie|donut/.test(String(ex.type ?? page.form ?? "")) ? "labels" : "categories"] = labels;
   }
+  // A dated event a measure records (`events`: { "<period>": "what happened" }) is drawn where the exhibit plots that period,
+  // as the chart's own event marker: the critic reads it beside the values (storyline.mjs measureLine), and the reader sees
+  // it on the axis, from the one record. `events: false` on the exhibit draws none; events the author wrote stand.
+  if (ex.events === false) delete ex.events;
+  else if (kind === "periods" && ex.events === undefined && chartDraws(drawnAs, "events") === true) {
+    const marked = new Map();
+    for (const s of series) for (const m of s.measures) for (const [at, label] of Object.entries(m.events ?? {})) if (labels.includes(at) && !marked.has(at)) marked.set(at, { at, label });
+    if (marked.size) ex.events = [...marked.values()];
+  }
   delete ex.measure; delete ex.pivot;
   if (!perSeries && written !== undefined) ex.unit = written;
   if (twoScales) { ex.secondaryAxis = true; ex.secondaryUnit ??= units[1]; }

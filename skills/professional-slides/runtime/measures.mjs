@@ -163,6 +163,10 @@ export function measureProblems(insight) {
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
     if (m.assumed !== undefined && m.assumed !== true) problems.push(`${at}: \`assumed\` is true for a number that is an assumption rather than a record, or left out`);
     if (m.assumed === true && (typeof m.rationale !== "string" || m.rationale.trim().split(/\s+/).length < 4)) problems.push(`${at}: an assumed measure says why that number in \`rationale\``);
+    // A dated event the values turn on - a switch, a law, a launch - is recorded with them, where the critic reads it and the chart draws it.
+    if (m.events !== undefined && (axis.kind !== "periods" || !m.events || typeof m.events !== "object" || Array.isArray(m.events)
+      || Object.entries(m.events).some(([when, text]) => !axis.labels.includes(when) || typeof text !== "string" || !text.trim() || text.trim().split(/\s+/).length > 6)))
+      problems.push(`${at}: \`events\` is { "<period>": "what happened" } on a measure over periods - a period it records, and a label of six words or fewer ("Switch to moving blocks") - or left out`);
     // A share, a change or a spread the researcher worked out from what the source prints is not printed there: it says how.
     if (m.computed !== undefined && (typeof m.computed !== "string" || m.computed.trim().split(/\s+/).length < 4)) problems.push(`${at}: \`computed\` says how the values were worked out from the numbers the source prints ("Manhattan net homes over the city's"), in four words or more - or is left out`);
   }

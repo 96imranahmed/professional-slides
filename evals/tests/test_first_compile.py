@@ -157,6 +157,32 @@ console.log(JSON.stringify({ out, refused: measureProblems({ id: 'x', measures: 
         self.assertTrue(any("`computed` says how" in problem for problem in result["refused"]))
 
 
+class MeasureEventTests(unittest.TestCase):
+    def test_a_dated_event_on_a_measure_is_read_by_the_critic_and_drawn_on_the_chart(self):
+        """A claim that faults fell after a switch was failed twice: the switch sat in a callout and a calculation, which the spine does not show."""
+        result = run_node('''
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { compileDeck, readInsights } from './skills/professional-slides/runtime/author-deck.mjs';
+import { measureProblems } from './skills/professional-slides/runtime/measures.mjs';
+const FIX = 'evals/quality/fixtures/evidence';
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'events-'));
+fs.copyFileSync(path.join(FIX, 'explainer.insights.json'), path.join(dir, 'explainer.insights.json'));
+const doc = JSON.parse(fs.readFileSync(path.join(FIX, 'explainer.pages.json'), 'utf8'));
+const { spec } = compileDeck(doc, { insights: await readInsights(dir, 'explainer', {}), partial: true });
+const quiet = structuredClone(doc); quiet.pages[1].exhibit.events = false;
+const off = compileDeck(quiet, { insights: await readInsights(dir, 'explainer', {}), partial: true }).spec;
+fs.rmSync(dir, { recursive: true, force: true });
+const m = { unit: 'x', population: 'p', periods: ['2023 Q1', '2023 Q2'], values: [1, 2] };
+console.log(JSON.stringify({ drawn: spec.slides.find((s) => s.id === 'x2').exhibit.events, off: off.slides.find((s) => s.id === 'x2').exhibit.events ?? null,
+  stranger: measureProblems({ id: 'x', measures: { m: { ...m, events: { '2024 Q1': 'Not a period it records' } } } }).length,
+  long: measureProblems({ id: 'x', measures: { m: { ...m, events: { '2023 Q2': 'a label that runs on for far too many words' } } } }).length,
+  fine: measureProblems({ id: 'x', measures: { m: { ...m, events: { '2023 Q2': 'Switch to moving blocks' } } } }).length }));
+''')
+        self.assertEqual(result["drawn"], [{"at": "2023 Q3", "label": "Switch to moving blocks"}])
+        self.assertIsNone(result["off"])
+        self.assertEqual([result["stranger"], result["long"], result["fine"]], [1, 1, 0])
+
+
 class SplitTableTests(unittest.TestCase):
     def test_a_table_too_long_for_one_page_says_it_splits_and_why_and_its_text_is_read(self):
         result = run_node(WORKED + '''
