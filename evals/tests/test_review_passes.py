@@ -755,3 +755,47 @@ console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revi
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ConfirmationTests(unittest.TestCase):
+    def test_a_blocking_item_a_second_critic_does_not_confirm_is_recorded_as_minor(self):
+        """Fresh critics on one clean deck filed a different major each run; one critic's major held the deck on its own."""
+        result = run_node('''
+// The probe's worker runs other tests' scripts after this one: the step is switched on here and back off at the end.
+const was = process.env.PS_STORYLINE_CONFIRM; process.env.PS_STORYLINE_CONFIRM = '1';
+import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+import * as S from './skills/professional-slides/runtime/storyline.mjs';
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'confirm-')), out = path.join(dir, 'out'); await fs.mkdir(out);
+const ids = ['p01', 'p02', 'p03'];
+const spec = { schema: 'professional-slides.deck/v3', id: 'c', request: 'Should we enter the northern market this year?', requestProvenance: 'verbatim',
+  answer: 'Yes: enter the north this year, because demand there grows twice as fast as in the south.',
+  slides: ids.map((id, i) => ({ id, title: ['Enter the north this year while demand grows fastest', 'Northern demand grows twice as fast as southern', 'Two rivals have not yet entered the north'][i], kind: 'content' })) };
+const specPath = path.join(dir, 'c.deck.json'); await fs.writeFile(specPath, JSON.stringify(spec));
+const one = await S.prepareStoryline(specPath, out);
+const packet = JSON.parse(await fs.readFile(path.join(one.dir, 'packet.json'), 'utf8'));
+const item = (id, severity) => ({ id, scope: 'page', pages: ['p02'], check: 'claim', severity, problem: `The page states growth without the base it grows from (${id}).`, fix: 'Print the base beside the rate.', ...(severity === 'minor' ? {} : { ifUnfixed: 'The committee would read a small base as a large market and enter too early.' }) });
+const critique = { pass: 1, verifies: null, binding: packet.binding, rating: 6, summary: 'The answer leads, but one claim needs its base before the committee can act on it.',
+  compliance: { verdict: 'complete', note: 'Everything the evidence allows is attempted.' }, sufficiency: { verdict: 'insufficient', note: 'One claim lacks the base it rests on.' },
+  provenance: { backend: 'subagent', model: 'fixture', promptHash: packet.promptHash },
+  spine: 'Read alone, the titles give the answer first, then prove the demand and then the opening it leaves.', answer: 'Enter the north this year, because its demand grows twice as fast as the south.', answerParts: [{ part: 'Should we enter the northern market this year', verdict: 'answered', missingEvidence: '' }],
+  pillars: [{ pillar: 'Demand and opening', pages: ids, verdict: 'holds', overlap: 'One pillar; nothing overlaps.', strongestCounter: 'The base may be small.', reversal: 'Northern demand below a tenth of southern.', answered: true }],
+  numbers: 'The figures agree across the pages that print them.', sectionFlow: 'No sections; the titles carry the order.', execSummary: 'The first page states the answer.',
+  findings: [item('F1', 'major')], missingAnalyses: [], cutOrMerge: [], topFixes: ['Print the base on p02'],
+  completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'claim' ? 'findings' : 'clean', note: `Checked ${check} across the spine.` })) };
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(critique));
+const asked = await S.prepareStoryline(specPath, out);
+const prompt = await fs.readFile(asked.prompt, 'utf8');
+const hash = prompt.match(/"answers": "([0-9a-f]{64})"/)[1];
+await fs.writeFile(path.join(out, 'storyline-confirm.json'), JSON.stringify({ answers: hash, confirmations: [{ id: 'F1', verdict: 'minor', reason: 'The base is printed on the page before, so the committee would not misread the market.' }] }));
+const recorded = await S.prepareStoryline(specPath, out);
+const history = await S.readStorylineHistory(path.join(dir, '.reviews', 'c'));
+console.log(JSON.stringify({ asked: [asked.status, asked.items], recorded: [recorded.status, (recorded.formMended || []).some((l) => l.includes('did not confirm'))],
+  ledger: history.at(-1).ledger.map((e) => [e.id, e.severity]), confirmation: history.at(-1).confirmation?.verdicts?.F1?.verdict }));
+await fs.rm(dir, { recursive: true, force: true });
+process.env.PS_STORYLINE_CONFIRM = was;
+''')
+        self.assertEqual(result["asked"], ["confirm", ["F1 (major)"]])
+        self.assertEqual(result["recorded"], ["ready", True])     # the only blocking item unconfirmed, the verdict reads ready
+        self.assertEqual(result["ledger"], [["F1", "minor"]])
+        self.assertEqual(result["confirmation"], "minor")
+

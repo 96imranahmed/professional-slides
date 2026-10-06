@@ -1165,6 +1165,7 @@ const STAKE_MIN = 30;
 /** `mended` (settleCritiqueForm) as the lines a run prints. */
 const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}`
   : entry.did === "dropped" ? `${entry.at}: a later pass adds only major or blocker findings, so this ${entry.was} point was left out of the record`
+  : entry.did === "unconfirmed" ? `${entry.at}: filed ${entry.was}, and the second critic did not confirm it blocks (${entry.why}), so recorded as minor`
   : entry.did === "minor" ? `${entry.at}: ${entry.was === "no severity" ? "filed with no severity, so recorded as minor" : `filed ${entry.was} without \`ifUnfixed\` - what the decision-maker would get wrong - so recorded as minor`}`
   : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
 
@@ -2055,6 +2056,51 @@ async function setAside(out) {
   const from = path.join(out, "storyline-review.json"), to = path.join(out, "storyline-review.refused.json");
   try { await fs.rename(from, to); return to; } catch { return null; }
 }
+// A second critic's word on each blocking item a pass files, before the pass is recorded. One critic's majors vary from run
+// to run: fresh critics on one clean deck filed a different major missing analysis each run, and a deck went to its cap on
+// whichever one it drew. So each new blocking item is put to a second fresh critic, reading the same packet, who says
+// whether it blocks; an item it does not confirm is recorded as minor - still in the ledger, no longer holding the deck -
+// and the verdict is read off the items as ever. `PS_STORYLINE_CONFIRM=0` switches it off (the test harness does, to
+// drive the loop with fixture answers; one test drives the confirmation itself).
+const CONFIRM_FILE = "storyline-confirm.json";
+const CONFIRM_REASON = 20;
+const confirming = () => process.env.PS_STORYLINE_CONFIRM !== "0";
+/** The blocking items a pass's answer files: what a second critic is asked to confirm. */
+const blockingItems = (review) => ["findings", "missingAnalyses", "cutOrMerge"].flatMap((list) => (Array.isArray(review?.[list]) ? review[list] : [])
+  .filter((item) => item && BLOCKING.has(item.severity)).map((item) => ({ list, id: item.id, severity: item.severity, pages: item.pages || [],
+    text: item.problem ?? item.analysis ?? `${item.action ?? ""} ${(item.pages || []).join(", ")}`.trim(), fix: item.fix ?? item.remedy ?? item.freedUse ?? null, ifUnfixed: item.ifUnfixed ?? null })));
+const confirmHash = (items) => sha256(JSON.stringify(items.map((i) => [i.id, i.severity, i.text])));
+
+/** The prompt that asks the second critic, staged beside the packet it reads. */
+async function stageConfirmation(packet, items) {
+  const file = path.join(packet.staging, "confirm.md"), hash = confirmHash(items);
+  await writeJson(path.join(packet.staging, "confirm-schema.json"), { type: "object", required: ["answers", "confirmations"], additionalProperties: false, properties: {
+    answers: { type: "string", enum: [hash] },
+    confirmations: { type: "array", items: { type: "object", required: ["id", "verdict", "reason"], additionalProperties: false,
+      properties: { id: { type: "string", enum: items.map((i) => i.id) }, verdict: { type: "string", enum: ["blocks", "minor"] }, reason: { type: "string", minLength: CONFIRM_REASON } } } } } });
+  await fs.writeFile(file, `You are a second storyline critic. A first critic read the packet in ${packet.staging} (prompt.md: the request, the answer and the spine with its evidence) and filed the blocking items below. Read that packet - judge from it alone, no other file, no web - and say of each item whether it blocks.
+
+An item blocks when, left as it is, it would lead the decision-maker to conclude or decide wrongly: the answer rests on it. A real point that would sharpen the deck without changing what it concludes is minor. Judge each on its own; do not add items, and do not rewrite them.
+
+${items.map((i) => `- ${i.id} (${i.severity}${i.pages.length ? `, ${i.pages.join(", ")}` : ""}): ${i.text}${i.fix ? `\n  The fix it asks: ${i.fix}` : ""}${i.ifUnfixed ? `\n  What it says follows if unfixed: ${i.ifUnfixed}` : ""}`).join("\n")}
+
+Return ONLY JSON: {"answers": "${hash}", "confirmations": [{"id": "<item id>", "verdict": "blocks" | "minor", "reason": "<a sentence: what the decision-maker would get wrong, or why they would not>"}]} - one entry an item.
+`);
+  return { file, hash };
+}
+
+/** The second critic's answer checked against the items it was asked of: `{ verdicts, errors }`. */
+function confirmationErrors(answer, items, hash) {
+  if (!answer || typeof answer !== "object") return { errors: [`${CONFIRM_FILE} is not a JSON object`] };
+  if (answer.answers !== hash) return { errors: [`${CONFIRM_FILE} answers other items than this pass files (its \`answers\` is not ${hash}): give the latest confirm.md to a fresh critic`] };
+  const given = new Map((Array.isArray(answer.confirmations) ? answer.confirmations : []).map((c) => [c?.id, c]));
+  const errors = items.flatMap((i) => { const c = given.get(i.id);
+    if (!c) return [`${CONFIRM_FILE}: no verdict on ${i.id}`];
+    if (!["blocks", "minor"].includes(c.verdict)) return [`${CONFIRM_FILE}: ${i.id}'s verdict is "blocks" or "minor"`];
+    return typeof c.reason === "string" && c.reason.trim().length >= CONFIRM_REASON ? [] : [`${CONFIRM_FILE}: ${i.id} says why in \`reason\`, a sentence`]; });
+  return { errors, verdicts: Object.fromEntries(items.map((i) => [i.id, given.get(i.id)])) };
+}
+
 const refusedForm = async (out, errors) => { const kept = await setAside(out);
   return { status: "invalid", errors, ...(kept ? { refused: kept, note: `The refused answer was moved to ${kept}: have the critic correct what the errors name and save the corrected answer as ${path.join(out, "storyline-review.json")}, which is free to write` } : {}) }; };
 
@@ -2171,14 +2217,37 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
     // The page lists are settled before the form is judged: a range expanded, a page the item's own text names added. What was
     // settled is written back to the answer, so every later reading of it is of the same lists, and kept on the pass's record.
-    const judged = judgeCritique(review, { ...packetContext(packet), sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) });
+    const context = { ...packetContext(packet), sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) };
+    let judged = judgeCritique(review, context);
     if (judged.errors.length) return refusedForm(out, judged.errors);
+    // Each blocking item the pass files is put to a second critic before the pass is recorded (CONFIRM_FILE).
+    const asked = confirming() ? blockingItems(judged.review) : [];
+    let confirmation = null;
+    if (asked.length) {
+      const staged = await stageConfirmation(packet, asked);
+      const answer = await readJson(path.join(out, CONFIRM_FILE), { optional: true });
+      if (!answer || answer.answers !== staged.hash) return { status: "confirm", pass: packet.pass, items: asked.map((i) => `${i.id} (${i.severity})`), prompt: staged.file,
+        note: `The critique files ${asked.length} blocking item${asked.length === 1 ? "" : "s"}. Give ${staged.file} to a second fresh critic (no other context) and save its JSON as ${path.join(out, CONFIRM_FILE)}, then run this again: an item it does not confirm is recorded as minor` };
+      const checked = confirmationErrors(answer, asked, staged.hash);
+      if (checked.errors.length) return { status: "invalid", errors: checked.errors };
+      const unconfirmed = asked.filter((i) => checked.verdicts[i.id].verdict === "minor");
+      if (unconfirmed.length) {
+        const lowered = structuredClone(review);
+        for (const i of unconfirmed) for (const item of lowered[i.list] || []) if (item?.id === i.id) item.severity = "minor";
+        judged = judgeCritique(lowered, context);
+        if (judged.errors.length) return refusedForm(out, judged.errors);
+        said.mended.push(...unconfirmed.map((i) => ({ at: `${i.list} (${i.id})`, did: "unconfirmed", was: i.severity, pages: i.pages, why: checked.verdicts[i.id].reason })));
+      }
+      confirmation = { hash: staged.hash, verdicts: checked.verdicts };
+    }
     // What the runtime settled and read off the ledger is written back, so every later reading of the answer is of the record.
     ({ review } = judged);
     const { ledger } = judged;
     said.mended.push(...judged.mended);
     await writeJson(path.join(out, "storyline-review.json"), review);
+    if (confirmation) await fs.rm(path.join(out, CONFIRM_FILE), { force: true });
     history.push((await recordPass(historyDir, { review, pageHashes: packet.pageHashes, bindingVersion: BINDING_VERSION, ledger, mode: packet.mode ?? "full", answerHash: sha256(packet.answer ?? ""),
+      ...(confirmation ? { confirmation } : {}),
       ...(said.mended.length ? { formMended: said.mended } : {}),
       // A post-review pass says so in the lineage: which deck-review pass allowed it and the pages it read. It is not counted against the cap.
       ...(packet.scope?.postReview && packet.scope.postReview.origin !== "compile" ? { kind: POST_REVIEW, postReview: { key: packet.scope.postReview.key, reviewPass: packet.scope.postReview.reviewPass, pages: packet.scope.postReview.pages, findings: packet.scope.postReview.findings.map((f) => f.id) } } : {}),
@@ -2332,7 +2401,14 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
     throw error;
   }
   await writeJson(path.join(outputDirectory, "storyline-review.json"), review);
-  const next = await prepareStoryline(specPath, outputDirectory, { maxPasses, formMended: options.formMended });
+  let next = await prepareStoryline(specPath, outputDirectory, { maxPasses, formMended: options.formMended });
+  // The blocking items go to a second critic before the pass is recorded, by the same backend.
+  if (next.status === "confirm") {
+    const answer = await callReviewer(which, { prompt: await fs.readFile(next.prompt, "utf8"), schemaPath: path.join(step.dir, "confirm-schema.json"),
+      outPath: path.join(step.dir, "confirm-last-message.json"), model, timeoutMs, cwd: step.dir, promptHash: null });
+    await writeJson(path.join(outputDirectory, CONFIRM_FILE), answer);
+    next = await prepareStoryline(specPath, outputDirectory, { maxPasses, formMended: options.formMended });
+  }
   return { ...next, verdict: review.verdict, rating: review.rating, topFixes: review.topFixes };
 }
 
@@ -2351,7 +2427,7 @@ async function main(argv) {
     : values.run !== undefined ? await runStorylineReview(path.resolve(spec), path.resolve(out), values.run, { ...options, model: values.model })
     : await prepareStoryline(path.resolve(spec), path.resolve(out), options);
   console.log(JSON.stringify(result));
-  return ["ready", "provisional"].includes(result.status) ? EXIT.ok : result.status === "packet-written" ? EXIT.waiting : EXIT.refused;
+  return ["ready", "provisional"].includes(result.status) ? EXIT.ok : ["packet-written", "confirm"].includes(result.status) ? EXIT.waiting : EXIT.refused;
 }
 
 if (isMain(import.meta.url)) runCli(main);

@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "professional-slides"
 RUNTIME = SKILL / "runtime"
 REFERENCES = SKILL / "references"
+# The storyline loop puts each blocking item to a second critic before it records a pass (storyline.mjs CONFIRM_FILE).
+# The suite drives the loop with fixture answers, so it switches that step off; the test of the step switches it on.
+os.environ.setdefault("PS_STORYLINE_CONFIRM", "0")
 NODE = os.environ.get("RUNTIME_NODE") or shutil.which("node")
 
 WORKER = Path(__file__).resolve().parent / "probe-worker.mjs"
