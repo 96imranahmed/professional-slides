@@ -192,6 +192,44 @@ console.log(JSON.stringify({ v09: formOf(p, 'v09'), v04: formOf(p, 'v04'), unuse
         self.assertFalse(result["unused"]["blocks"])
 
 
+class PlanWriteTests(unittest.TestCase):
+    def test_the_plan_writes_its_choices_into_the_file_each_page_is_written_in(self):
+        """A hundred-page spine's allocation was copied into seven part files by a script; --write puts each
+        choice where its page is written, and leaves what a page declares as it is."""
+        home = Path(tempfile.mkdtemp(prefix="plan-write-"))
+        try:
+            def seed(doc):
+                doc["deck"]["variation"] = "s1"
+            file = stage(home, seed)
+            doc = json.loads(file.read_text(encoding="utf-8"))
+            # The second half of the pages moves to a part, written with two-space indents; one page keeps a declared form.
+            half = len(doc["pages"]) // 2
+            (home / "pages").mkdir()
+            part = {"pages": doc["pages"][half:]}
+            (home / "pages" / "back.pages.json").write_text(json.dumps(part, indent=2) + "\n", encoding="utf-8")
+            doc["pages"] = doc["pages"][:half] + [{"include": "pages/back.pages.json"}]
+            file.write_text(json.dumps(doc), encoding="utf-8")
+            plan = cli(file, "--plan", "--write")
+            printed = json.loads(plan.stdout)["plan"]
+            self.assertTrue(printed["satisfied"])
+            self.assertIn("written into", plan.stderr)
+            chosen = {line.split()[0]: line.split()[1].split("/")[1:] for line in printed["pages"]}
+            front = json.loads(file.read_text(encoding="utf-8"))["pages"][:half]
+            back = json.loads((home / "pages" / "back.pages.json").read_text(encoding="utf-8"))["pages"]
+            for page in front + back:
+                if page.get("type") and page.get("id") in chosen:
+                    with self.subTest(page=page["id"]):
+                        self.assertEqual([page.get("form"), page.get("commentary")], chosen[page["id"]])
+            # The part keeps its own indentation, and the include stays an include.
+            self.assertTrue((home / "pages" / "back.pages.json").read_text(encoding="utf-8").startswith('{\n  "pages"'))
+            self.assertEqual(json.loads(file.read_text(encoding="utf-8"))["pages"][-1], {"include": "pages/back.pages.json"})
+            # Run again, nothing is left to write.
+            again = cli(file, "--plan", "--write")
+            self.assertIn("written into nothing", again.stderr)
+        finally:
+            shutil.rmtree(home, ignore_errors=True)
+
+
 class PlanCommandTests(unittest.TestCase):
     """The seeded spine planned once, its allocation copied into the pages and drafted once: what each test below reads."""
 

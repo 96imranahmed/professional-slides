@@ -135,7 +135,7 @@ const LISTED = [
   ...codes("P", "POINT_UNMARKED", COPY),
   ...codes("P", `MAP_COARSE TOTAL_ROW_BLANK TABLE_TOO_SHORT TABLE_PANELS_MERGE TABLE_STACK COMPARISON_MEASURES_DIFFER TIME_AXIS_UNEVEN VERDICT_TABLE_PLAIN
     SCENARIO_PROSE PROSE_PARAGRAPH_LONG PROSE_UNSIGNPOSTED SHARES_IN_TILES PROFILE_UNPICTURED SCATTER_OVER_TIME SCATTER_CURVE LABELS_OFF GUTTER_UNEARNED PILL_NO_VERDICT TILES_ONE_MEASURE
-    STRIP_REPEATS_CHART NUMBER_CARDS`, ["layout", "copy", "view"]),
+    STRIP_REPEATS_CHART NUMBER_CARDS METRIC_WORD_VALUE`, ["layout", "copy", "view"]),
   // What each claim and exhibit rests on (dependency_gates.mjs): the declared facts the critique is bound to. A relation shown
   // on one scale is one exhibit in place of two, which on a page of panels is another page type.
   ...codes("P", "CLAIM_MEASURES_MISSING RELATION_UNDECLARED", ["settles"]),

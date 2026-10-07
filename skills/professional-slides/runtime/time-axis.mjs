@@ -11,7 +11,8 @@
 //
 // Only forms that read one way are parsed: a year (2025, 2025E, FY25), a
 // quarter or half (Q1 2025, 1Q25, H2 2025), a month with its year (Jan 2025,
-// Jan '25, Jan-25, 2025-01), a bare month run (Jan, Mar, Jun), an ISO date. A
+// Jan '25, Jan-25, 2025-01), a season (Summer 2019, Winter 2021-22, S19, W21),
+// a bare month run (Jan, Mar, Jun), an ISO date. A
 // label that parses as none of them, or a run that mixes kinds (years beside
 // quarters), is left on its categorical slots.
 
@@ -19,6 +20,8 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const monthOf = (name) => MONTHS.indexOf(name.slice(0, 3).toLowerCase());
 const year = (text) => { const n = Number(text); return text.length === 2 ? 2000 + n : n; };
+// Where a season stands in its schedule year, in months: spring and summer open it, autumn and winter close it.
+const SEASON_AT = Object.freeze({ spring: 0, summer: 0, autumn: 6, fall: 6, winter: 6 });
 
 /**
  * One period label as `{ kind, t }`: `t` in months from year zero, so every
@@ -49,6 +52,15 @@ export function parsePeriod(label) {
   if ((m = /^((?:19|20)\d{2})[-/](0[1-9]|1[0-2])$/.exec(s))) return { kind: "month", t: Number(m[1]) * 12 + Number(m[2]) - 1 };
   // An ISO date: 2025-01-15, as a fraction of its month.
   if ((m = /^((?:19|20)\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.exec(s))) return { kind: "day", t: Number(m[1]) * 12 + Number(m[2]) - 1 + (Number(m[3]) - 1) / 31 };
+  // A season, as an airline or a school schedule names it: Summer 2019, Winter 2021-22 (2021/22), the schedule's S19 and
+  // W21, Spring and Autumn or Fall. Each is placed as a half of its schedule year - summer, then the winter that follows
+  // it - so a run of seasons is evenly spaced: a schedule's summer and winter are its halves, whatever their months.
+  if ((m = /^(summer|winter|spring|autumn|fall)\s?((?:19|20)\d{2}|'?\d{2})(?:[-–/](\d{2}|\d{4}))?(?:\s+season)?$/i.exec(s))) {
+    const first = year(m[2].replace("'", ""));
+    if (m[3] !== undefined && year(m[3].length === 4 ? m[3] : m[3]) % 100 !== (first + 1) % 100) return null;
+    return { kind: "season", t: first * 12 + SEASON_AT[m[1].toLowerCase()] };
+  }
+  if ((m = /^([SW])\s?((?:19|20)\d{2}|\d{2})$/.exec(s))) return { kind: "season", t: year(m[2]) * 12 + (m[1] === "S" ? 0 : 6) };
   // A bare month: its year is the run's, read in order below.
   if ((m = new RegExp(`^${MONTH}\\.?$`, "i").exec(s))) return { kind: "bare-month", t: monthOf(m[1]) };
   return null;

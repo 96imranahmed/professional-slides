@@ -171,6 +171,22 @@ console.log(JSON.stringify({ fine: fine.length, unfit: unfit.map((f) => [f.id, f
         self.assertGreater(fits, 0)
         self.assertIn("TITLE_LINES", result["repair"])
 
+    def test_a_divider_that_plans_a_photograph_is_measured_with_one(self):
+        """A hundred-page deck's section titles fitted its dividers in the draft and were refused once the photographs
+        were fetched: a divider with a photograph keeps its title in a panel of 42% of the page."""
+        result = run_node(SPINE + '''
+const withPhotos = (d) => { for (const page of d.pages) if (page.kind === 'section') page.image = { alt: 'a regional branch', search: 'credit union branch' }; return d; };
+const room = (photos) => { const d = sectioned(['One', 'Two', 'Three']); const { spec } = compileDeck(photos ? withPhotos(d) : d, { insights, draft: true, partial: true }); return sectionTitleRoom(spec, dir); };
+const bare = room(false), pictured = room(true);
+const prose = 'the operator added capacity on the busiest routes before demand returned in full'.split(' ');
+const proseOf = (n) => Array.from({ length: n }, (_, i) => prose[i % prose.length]).join(' ');
+const fits = (n, photos) => { const d = sectioned([proseOf(n), 'Two', 'Three']); return spineFitFindings(compileDeck(photos ? withPhotos(d) : d, { insights, draft: true, partial: true }).spec, dir).filter((f) => f.id === 's1').length === 0; };
+console.log(JSON.stringify({ bare, pictured, between: [fits(bare.words, false), fits(bare.words, true)] }));
+''')
+        self.assertLess(result["pictured"]["words"], result["bare"]["words"], "the photograph's panel holds fewer words")
+        # A title the full-width divider holds is refused where the divider will carry its photograph.
+        self.assertEqual(result["between"], [True, False])
+
     def test_the_published_section_title_limit_is_the_one_the_deck_s_dividers_hold(self):
         result = run_node(SPINE + '''
 import { deckLimits } from './skills/professional-slides/runtime/limits.mjs';

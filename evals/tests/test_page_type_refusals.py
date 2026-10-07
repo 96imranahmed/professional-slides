@@ -389,6 +389,27 @@ console.log(JSON.stringify({{ down: compilePage(page('down')).metrics[0].better,
         self.assertEqual(result['kpi'], ['up', 'down'])
 
 
+class MetricValueTests(unittest.TestCase):
+    def test_a_metric_is_a_figure_not_a_word(self):
+        """Hundred-page review: a strip of "Below plan", "Asia" and "Strikes", none of which the record held."""
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+const chart = {{ type: 'chart.bar', heading: 'Web visit share, Aug 2026', unit: '%', categories: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], series: [{{ name: 's', values: [55, 10, 8, 7, 6, 5, 4, 3] }}] }};
+const strip = (values) => ({{ ...base, id: 'n', type: 'numbers', form: 'metric-strip', commentary: 'none', title: 'Capacity stayed below plan as engines ran short',
+  metrics: values.map((value, i) => ({{ value, label: ['Flying against plan', 'Region still below 2019', 'Earliest end of the squeeze'][i] }})), exhibit: chart }});
+console.log(JSON.stringify({{
+  words: error(() => compilePage(strip(['Below plan', '12%', '2030']))),
+  counted: error(() => compilePage(strip(['Seven', '12%', '2030']))),
+  figures: error(() => compilePage(strip(['-4%', '12%', '2030']))),
+}}));
+''')
+        # METRIC_WORD_VALUE, a chart-form refusal: its code travels beside the message, as the others' do.
+        self.assertIn('the metric "Below plan" ("Flying against plan") is a word where a figure belongs', result["words"])
+        self.assertIn('the metric "Seven"', result["counted"], "a count is written in digits")
+        self.assertIsNone(result["figures"], "a date and a percentage are figures")
+
+
 class ProseRefusalTests(unittest.TestCase):
     def test_scenarios_as_paragraphs_are_refused_and_an_argument_is_not(self):
         """Fifty-page review: three scenarios written as paragraphs."""

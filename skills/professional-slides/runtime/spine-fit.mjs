@@ -16,6 +16,8 @@ import { composeAll } from "./compose-all.mjs";
 import { registered } from "./errors.mjs";
 import { TEXT_LIMITS } from "./page-types.mjs";
 import { textWords } from "./text-contract.mjs";
+import { sourcedPicture } from "./compose-pictures.mjs";
+import { fileURLToPath } from "node:url";
 
 export const SPINE_FIT_CODES = Object.freeze({
   SPINE_UNFIT: "a title the storyline critique is bound to - a page's, a section's, on its divider, the contents page or the tracker - or the cover's, does not fit where the deck's design sets it",
@@ -41,8 +43,15 @@ const isSection = (slide) => slide?.kind === "section" || slide?.kind === "divid
  * neutral body, or as the closing page its form draws; a statement page, whose
  * sentence is copy still to write, as a page that draws no title at all.
  */
+// A divider or a cover that plans a photograph not fetched yet (`{ alt, search }`) is measured with one standing in: the
+// photograph takes the right of the page and the title keeps its panel, so a title measured across the full width fitted
+// the spine and was refused once the photographs were on disk.
+const STAND_IN = fileURLToPath(new URL("../examples/assets/harbour.jpg", import.meta.url));
+const withPlannedPicture = (holder) => (holder?.image && !sourcedPicture(holder.image) ? { ...holder, image: { path: STAND_IN, alt: holder.image.alt ?? "a planned photograph", credit: "a stand-in for the planned photograph, measured only" } } : holder);
+
 function probeOf(slide) {
   if (!slide || typeof slide !== "object") return slide;
+  if (slide.kind === "section") return withPlannedPicture(slide);
   if (slide.kind === "takeaways") return { id: slide.id, kind: "takeaways", title: slide.title, items: [BODY, BODY] };
   if (slide.kind === "statement") return { id: slide.id, kind: "statement", text: BODY };
   if (slide.kind) return slide;
@@ -69,7 +78,7 @@ function actionTitle(node) {
  * each analytical page's title sets in.
  */
 function composeProbe(spec, baseDir) {
-  const probe = { ...spec, slides: (spec.slides || []).map(probeOf), ...(spec.appendix ? { appendix: spec.appendix.map(probeOf) } : {}) };
+  const probe = { ...spec, ...(spec.cover ? { cover: withPlannedPicture(spec.cover) } : {}), slides: (spec.slides || []).map(probeOf), ...(spec.appendix ? { appendix: spec.appendix.map(probeOf) } : {}) };
   const errors = new Map(), lines = new Map();
   let composed = null;
   try { composed = composeAll(probe, baseDir, { partial: true }); }

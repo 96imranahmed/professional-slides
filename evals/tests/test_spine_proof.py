@@ -384,6 +384,19 @@ class DraftCliTests(unittest.TestCase):
     def run_cli(self, pages, *flags):
         return subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages), *flags], capture_output=True, text=True)
 
+    def test_the_plan_writes_the_disclosed_members_where_the_refusal_says(self):
+        # A bound chart of a peer set with a member the record does not disclose (f7): --plan says which members to plot,
+        # and with --write it writes them, so the next plan does not refuse the page.
+        pages = self.stage("withPage(two({ series: BOTH }))")
+        before = self.run_cli(pages, "--plan")
+        self.assertIn("SPINE_UNDRAWABLE", before.stderr)
+        wrote = self.run_cli(pages, "--plan", "--write")
+        self.assertIn("Written: the disclosed labels on f7 (exhibit 1", wrote.stderr)
+        page = next(p for p in json.loads(pages.read_text())["pages"] if p.get("id") == "f7")
+        self.assertIn("members", page["exhibit"]["select"])
+        after = self.run_cli(pages, "--plan")
+        self.assertNotIn("SPINE_UNDRAWABLE [f7]", after.stderr)
+
     def test_the_draft_and_the_plan_refuse_the_same_bound_facts(self):
         # One spine, two pages the layout cannot finish: a bound chart of a peer set with a member the record does not disclose
         # (f7), and a bound exhibit under a metric strip with no `type`, which the form does not set (x1).

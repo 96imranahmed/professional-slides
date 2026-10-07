@@ -107,3 +107,32 @@ export function readPagesFileSync(file) {
 
 /** `readPagesFileSync`, for callers that read asynchronously. */
 export const readPagesFile = async (file) => readPagesFileSync(file);
+
+/**
+ * `edit(page)` applied to each page of a pages file whose id is in `ids`, in
+ * the file the page is written in - the pages file itself or the part it is
+ * included from - and each file it changed written back in the indentation it
+ * was written in. A page `edit` leaves as it was writes nothing. Returns the
+ * files written, relative to the pages file's folder.
+ */
+export function editPagesSync(file, ids, edit) {
+  const root = path.resolve(file), base = path.dirname(root), wanted = new Set([...ids].map(String)), written = [];
+  const visit = (at) => {
+    const raw = fs.readFileSync(at, "utf8"), doc = JSON.parse(raw);
+    const lists = at === root ? ["pages", "appendix"].filter((key) => Array.isArray(doc?.[key])).map((key) => doc[key]) : [Array.isArray(doc) ? doc : doc?.pages].filter(Array.isArray);
+    let changed = false;
+    for (const list of lists) for (const entry of list) {
+      if (isInclude(entry)) { const target = path.resolve(path.dirname(at), entry.include); if (inside(base, target)) visit(target); continue; }
+      if (!entry || typeof entry !== "object" || !wanted.has(String(entry.id))) continue;
+      const before = JSON.stringify(entry);
+      edit(entry);
+      if (JSON.stringify(entry) !== before) changed = true;
+    }
+    if (!changed) return;
+    const indent = /^[[{]\r?\n([ \t]+)/.exec(raw)?.[1] ?? 1;
+    fs.writeFileSync(at, `${JSON.stringify(doc, null, indent)}${raw.endsWith("\n") ? "\n" : ""}`);
+    written.push(path.relative(base, at) || path.basename(at));
+  };
+  visit(root);
+  return written;
+}

@@ -305,7 +305,7 @@ Of the two aggregates only a render measures, the half-empty habit says so until
 - it proves every exhibit the spine determines drawable, as a draft does, and holds the dependency contract on declared facts: what it refuses is listed as `unlayable`;
 - where no allocation exists it names the unsatisfied rule, and says when the page types alone break it;
 - it composes the titles the critique will bind, as a draft does, and is refused on one that does not fit (`SPINE_UNFIT`);
-- it prints a proposal and writes nothing but a line of the run log. A spine is done when `--plan` and `--draft` both exit 0, which a spine of stubs can reach.
+- it prints a proposal and writes nothing but a line of the run log; with `--write`, once the allocation meets the structure rules, it writes its choices where a page declares none - the form and placement, and the kind of each untyped stub - into the file the page is written in (the pages file or its part), and leaves a declared choice it would change for the author. A spine is done when `--plan` and `--draft` both exit 0, which a spine of stubs can reach.
 
 A plan is not a guarantee: a rule that counts exhibit kinds can still be met or broken by the exhibits the estimated pages are given, and a change the plan proposes to a declared choice while pages are estimated mends a rule broken on the estimate - write those exhibits, or give each its `type`, and run it again. A form built for particular data (an indexed trend, a distribution, small multiples, aligned bars, labelled rows) and a diagram or schedule other than the type's first are the author's: the plan proposes one only where no other allocation meets a rule, and marks it with the data the form reads. Where a proposed form asks more of the data than the evidence holds (a dumbbell wants two series), declare the form the evidence can carry and run `--plan` again: it keeps declared choices and re-allocates the rest. Every compile reads the pages as written again.
 
@@ -620,6 +620,7 @@ A chart or figure drawn where another form says the finding is refused with that
 | `TILES_ONE_MEASURE` | one measure at two dates or for two members, set in separate tiles | plot it on one axis: a `trend` across the dates, a `ranking` across the members, or the chart the page carries; tiles are for measures that differ |
 | `STRIP_REPEATS_CHART` | a metric strip that prints what its chart already prints | the strip carries what the chart does not - the change, the rate, the gap, a share of the total - or the page is the chart alone |
 | `NUMBER_CARDS` | a one-column fact grid whose tiles carry no sentence | run the facts across (`columns` 2 to 4), or give every tile its `text` |
+| `METRIC_WORD_VALUE` | a metric strip's tile or a headline figure (`kpi`) whose value has no digit in it - "Below plan", "Asia", "Strikes", "Seven" | bind it to the measure that holds its number (`{ measure, format, label }`), write a count in digits or a date, or say the word in the copy and give the tile a measured figure |
 
 ### What a review found, refused where the page is written
 

@@ -969,6 +969,7 @@ export const CHART_FORM_CODES = Object.freeze({
   TILES_ONE_MEASURE: "one measure at two dates or for two members, in separate tiles",
   STRIP_REPEATS_CHART: "a metric strip that repeats the figures its chart prints",
   NUMBER_CARDS: "a one-column fact grid whose tiles carry no sentence",
+  METRIC_WORD_VALUE: "a metric or headline figure whose value is a word, not a number",
 });
 
 /**
@@ -1010,6 +1011,14 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
     const loud = table.rows.flatMap(rowCells).find((cell) => cell && typeof cell === "object" && cell.type === "rag" && cell.value !== "neutral" && NO_VERDICT.test(String(cell.text ?? "").trim()));
     if (loud && !skip.has("PILL_NO_VERDICT")) return { code: "PILL_NO_VERDICT", message: `${id}: the status pill "${loud.text}" is drawn as ${loud.value}, a status colour, on a row with no verdict; set it \`value: "neutral"\` (a grey pill), and keep green, amber and red for states` };
   }
+  // A metric is a figure: "Below plan", "Asia", "Strikes" or "Seven" set where
+  // a number belongs is a label in a number's place, which a hundred-page
+  // deck's self-check found rested on nothing the record held. A date is a
+  // figure (a milestone's "2030"); a count is written in digits.
+  const worded = [...(page.metrics || []), ...(page.kpi && typeof page.kpi === "object" ? [page.kpi] : [])]
+    .find((tile) => tile && typeof tile === "object" && tile.measure === undefined && typeof tile.value === "string" && tile.value.trim() && !/\d/.test(tile.value));
+  if (worded && !skip.has("METRIC_WORD_VALUE"))
+    return { code: "METRIC_WORD_VALUE", message: `${id}: the ${page.kpi === worded ? "headline figure" : "metric"} "${worded.value}" ("${worded.label ?? ""}") is a word where a figure belongs. Give it the number the record holds - \`{ "measure": "<insight>/<measure>@<period or member>", "format": "...", "label": "..." }\`, a count in digits, a date - or say it in the copy and give the tile a measured figure` };
   // Tiles of one measure at two dates or for two members: the reader
   // compares them, and a comparison belongs on one axis.
   const names = [...playerNames(players).keys()];

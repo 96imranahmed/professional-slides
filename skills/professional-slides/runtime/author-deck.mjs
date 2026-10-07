@@ -127,7 +127,7 @@ import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { SOURCE_TITLE_WORDS } from "./page-template.mjs";
-import { readPagesFile, withParts } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync } from "./pages-file.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { axisOf, hasMeasures, insightLogRefusal, isPercentUnit, measureConflicts, measureRegistry, readInsightLog, unmeasuredInsights, valuesOf } from "./measures.mjs";
@@ -1711,7 +1711,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1889,7 +1889,64 @@ function fitWords(page) {
 }
 
 /** `--plan`: the spine's structure rules on its declared types, and an allocation of form and placement that satisfies them. Returns the exit code. */
-async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
+/**
+ * The plan's choices written where the pages declare none (`--plan --write`):
+ * the form and placement of a page that declares neither or only its form,
+ * and the kind of each `basis` stub it leaves untyped. Returns the files
+ * written, the pages given a choice, and the declared choices the plan would
+ * change, which are left for the author.
+ */
+function writePlan(file, plan) {
+  const given = new Map(plan.pages.filter((page) => ["proposed", "placed"].includes(page.source) || page.kinds?.length).map((page) => [String(page.id), page]));
+  let pages = 0;
+  const files = editPagesSync(file, given.keys(), (page) => {
+    const choice = given.get(String(page.id)), before = JSON.stringify(page);
+    if (["proposed", "placed"].includes(choice.source)) { if (page.form === undefined) page.form = choice.form; if (page.commentary === undefined) page.commentary = choice.commentary; }
+    const exhibits = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object");
+    for (const { at, kind } of choice.kinds ?? []) if (exhibits[at] && exhibits[at].type === undefined) exhibits[at].type = kind;
+    if (JSON.stringify(page) !== before) pages += 1;
+  });
+  return { files, pages, changed: plan.pages.filter((page) => page.source === "changed").length };
+}
+
+/**
+ * The disclosed periods or members written where a SPINE_UNDRAWABLE finding
+ * says to write them (`--plan --write`): on a `basis` stub that shows a gapped
+ * measure, its `labels` or `members` without the undisclosed ones; on a bound
+ * exhibit plotted over them, a `select` of the ones its measures disclose. A
+ * view narrowed by `from` and `to` is left as it is, since which end to move
+ * is the author's. Returns `{ id, where, dropped }` for each view written.
+ */
+function writeDisclosed(file, unlayable, registry) {
+  const fixes = unlayable.filter((f) => f.code === "SPINE_UNDRAWABLE" && Array.isArray(f.measured?.undisclosed) && f.measured.undisclosed.length);
+  const done = [];
+  editPagesSync(file, fixes.map((f) => String(f.id)), (page) => {
+    const exhibits = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object");
+    for (const f of fixes.filter((x) => String(x.id) === String(page.id))) {
+      const holes = f.measured.undisclosed.map(String);
+      const ref = f.measured.measure ?? (f.measured.measures || [])[0], measure = registry.get(ref);
+      if (!measure) continue;
+      const axis = axisOf(measure), key = axis.kind === "periods" ? "periods" : "members";
+      if (f.measured.measure) {
+        const stub = exhibits.find((ex) => Array.isArray(ex.basis?.measures) && ex.basis.measures.includes(ref));
+        if (!stub) continue;
+        const field = axis.kind === "periods" ? "labels" : "members";
+        const shown = Array.isArray(stub.basis[field]) ? stub.basis[field].map(String) : axis.labels;
+        stub.basis[field] = shown.filter((label) => !holes.includes(label));
+        done.push({ id: page.id, where: `the basis of ${ref}`, dropped: holes });
+      } else {
+        const ex = exhibits[f.measured.exhibit - 1];
+        if (!ex || ex.select?.from !== undefined || ex.select?.to !== undefined) continue;
+        const shown = Array.isArray(ex.select?.[key]) ? ex.select[key].map(String) : axis.labels;
+        ex.select = { ...(ex.select ?? {}), [key]: shown.filter((label) => !holes.includes(label)) };
+        done.push({ id: page.id, where: `exhibit ${f.measured.exhibit}`, dropped: holes });
+      }
+    }
+  });
+  return done;
+}
+
+async function planCommand(doc, { dir, stem, file, say, refusal = [], write = false }) {
   let insights = null;
   try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { refusal.push({ code: "COMPILE", message: String(error.message).slice(0, 300) }); console.error(error.message); return 2; }
   // A slide a revision carries from its source deck is not the runtime's to give a form: the plan is of the pages it composes.
@@ -1946,6 +2003,13 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
   const read = (structure) => readStandings(structure.standings.filter((st) => classOf(st.code) === "S"));
   // The structure rules the draft of the proposal refuses that no form or placement decides: the allocation does not claim them.
   const ruled = [...new Set(unlayable.filter((f) => classOf(f.code) === "S").map((f) => f.code))];
+  // `--write`: the choices the plan makes where a page declares none - its form and placement, the kind of a stub it left
+  // untyped - written into the file the page is written in, the pages file or its part. A declared choice the plan would
+  // change is the author's to take, and is left as it is. Copied by hand into a hundred pages, a typo cost a run.
+  const wrote = write && plan.satisfied ? writePlan(file, plan) : null;
+  // A view that plots a period or member its measure does not disclose is refused with the labels to plot (SPINE_UNDRAWABLE);
+  // `--write` writes those labels where the refusal says, so a spine of stubs over gapped series is mended in one run.
+  const disclosed = write ? writeDisclosed(file, unlayable, measureRegistry(insights)) : [];
   const blockers = (structure) => inClassOrder(structure.findings.filter((f) => isBlocker(f) && classOf(f.code) === "S"));
   const count = (source) => plan.pages.filter((page) => page.source === source).length;
   const declared = plan.pages.every((page) => !["proposed", "placed"].includes(page.source)) ? { blocking: blockers(plan.declared).map((f) => f.code), standing: read(plan.declared).map((st) => st.line) } : null;
@@ -1955,7 +2019,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
     ...(declared ? [declared.blocking.length ? `As declared${estimated.length ? ", on that estimate," : ","} the deck's structure rules ${estimated.length ? "would refuse" : "refuse"} it: ${[...new Set(declared.blocking)].join(", ")}.`
       : `As declared${estimated.length ? ", on that estimate," : ","} the deck satisfies its structure rules.`] : ["Not every page declares a form and a placement, so the structure rules are read on the proposal."]),
     ...(unshaped.length ? ["", "Types the evidence cannot carry (choose another type, or find the data):", ...unshaped.map((line) => `  ${line}`)] : []),
-    "", plan.satisfied ? `Proposed allocation (${ruled.length ? `its forms and placements meet every structure rule they decide; the draft of it refuses ${ruled.join(", ")}, below` : `satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}`}; nothing was written - copy the choices you take into the pages file):`
+    "", plan.satisfied ? `Proposed allocation (${ruled.length ? `its forms and placements meet every structure rule they decide; the draft of it refuses ${ruled.join(", ")}, below` : `satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}`}; ${wrote ? `written into ${wrote.files.length ? wrote.files.join(", ") : "nothing: every page already declares its choices"} for ${wrote.pages} page${wrote.pages === 1 ? "" : "s"}${wrote.changed ? `, and the ${wrote.changed} change${wrote.changed === 1 ? "" : "s"} to a declared choice left for you` : ""}` : `nothing was written - copy the choices you take into the pages file, or rerun with --write`}):`
       : `No allocation of forms and placements satisfies ${plan.unsatisfied.map((u) => u.code).join(", ")}${plan.capped ? ` within the search's budget (${plan.steps} changes, ${plan.evaluations} readings of the structure)` : ""}; the closest found:`,
     ...plan.pages.map((page) => `  ${String(page.id).padEnd(8)} ${page.type.padEnd(13)} form ${String(page.form).padEnd(18)} commentary ${String(page.commentary).padEnd(12)} ${page.source === "placed" ? "form declared, placement proposed" : page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})` : ""}${page.imported && page.source !== "proposed" ? " - imported page, kept as drawn" : ""}${page.estimated ? " - exhibit estimated" : ""}` +
       (page.reads ? ` - taken to meet a structure rule; this form reads ${page.reads.join(", ")}: check the evidence holds it` : "") + fitWords(page)),
@@ -1966,6 +2030,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [] }) {
         (served.length ? ` ${mended.join(", ")} would be met only by drawing ${served.length === 1 ? "this page" : "these pages"} in a form that is not a best fit for ${served.length === 1 ? "its" : "their"} claim: ${served.slice(0, 12).map((page) => `${page.id} as ${page.form} (best fit: ${page.best.join(", ")})`).join("; ")}${served.length > 12 ? `; and ${served.length - 12} more` : ""}. That trades the picture for the rule, and the plan does not propose it: the sounder repair is evidence of another shape or a page of another type, made before the critique. A form you declare on a page is kept, and is named under VARIETY_FIT_UNUSED.`
           : mended.length ? ` ${mended.join(", ")} would be met by other placements or forms the catalogue allows these pages; declare them and run --plan again.` : " No form the catalogue allows these pages meets it either: the page types or the evidence have to change.")] : [])] : []),
     ...(unfit.length ? ["", `${unfit.length} title${unfit.length === 1 ? "" : "s"} the storyline critique will be bound to ${unfit.length === 1 ? "does" : "do"} not fit where this deck draws ${unfit.length === 1 ? "it" : "them"} (SPINE_UNFIT; the plan is refused until ${unfit.length === 1 ? "it does" : "they do"}):`, ...unfit.map((f) => `  ${f.repair}`)] : []),
+    ...(disclosed.length ? ["", `Written: the disclosed ${disclosed.length === 1 ? "labels" : "labels of each"} on ${disclosed.map((d) => `${d.id} (${d.where}: ${d.dropped.join(", ")} left out)`).join("; ")} - the SPINE_UNDRAWABLE below ${disclosed.length === 1 ? "is" : "are"} mended; run --plan again.`] : []),
     ...(unlayable.length ? ["", `${unlayable.length} thing${unlayable.length === 1 ? "" : "s"} the draft of this proposal refuses - the spine as it would stand once its choices are copied in, which the layout cannot mend (the plan is refused until ${unlayable.length === 1 ? "it is" : "they are"} mended; \`--draft\` refuses the same):`,
       ...inClassOrder(unlayable, typed.map((page) => String(page.id))).map((f) => `  ${f.code}${(f.id ?? f.page) === undefined ? "" : ` [${f.id ?? f.page}]`} ${f.repair}`)] : []),
     ...(readings.length ? ["", `${READINGS_NOTE}:`, ...readings.map((line) => `  ${line}`)] : []),
@@ -2016,7 +2081,7 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" } }, { usage: USAGE });
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2055,7 +2120,7 @@ async function main(argv) {
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];
-    const code = await planCommand(doc, { dir, stem, file, say, refusal });
+    const code = await planCommand(doc, { dir, stem, file, say, refusal, write: Boolean(values.write) });
     await fs.appendFile(logPath, JSON.stringify({ at: new Date().toISOString(), run: runs.length + 1, v: RUN_LOG_VERSION, mode: PLAN_MODE, pages: doc.pages.length + (doc.appendix || []).length, ok: code === 0, findings: refusal }) + "\n");
     return code;
   }
