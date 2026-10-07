@@ -376,3 +376,75 @@ print(infer.title_treatment(page(False).resize((640, 360)), (255, 255, 255)), in
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SiteDesignTests(unittest.TestCase):
+    """A deck about a company styled from its website: palette and typeface read off the site, the face measured from its installed files."""
+
+    def test_the_brand_colours_and_typefaces_are_read_off_the_stylesheets(self):
+        result = run_node('''
+import { siteDesign, stylesOf, readSite } from './skills/professional-slides/runtime/site-design.mjs';
+const css = `:root { --brand-primary: #021B41; --brand-accent: #3468AD; }
+@font-face { font-family: "Mylius Modern"; src: url(m.woff2); }
+@font-face { font-family: "Icons"; src: url(i.woff2); }
+body { font-family: "Open Sans", Arial, sans-serif; color: #333333; background: #FFFFFF; }
+p, li { font-family: "Open Sans", sans-serif; }
+h1, h2 { font-family: "Mylius Modern", Georgia, serif; color: #021B41; }
+.icon { font-family: Icons; }
+a { color: #3468AD; } a:hover { color: #3468AD; } .band { background: #021B41; } .rule { border-color: #EEEEEE; }`;
+const html = '<html><head><link rel="stylesheet" href="/css/site.css"><style>.x { color: #3468AD }</style></head><body style="font-family: Open Sans"></body></html>';
+const fetcher = async (url) => ({ ok: true, url, text: async () => (url.endsWith('site.css') ? css : html) });
+console.log(JSON.stringify({ design: siteDesign([css]), styles: stylesOf(html, 'https://www.example.com/home'), site: await readSite('https://www.example.com/home', { fetcher }) }));
+''')
+        design = result["design"]
+        self.assertEqual(design["brand"], {"primary": "#021B41", "accent": "#3468AD"})
+        # The face text is set in most, and the face the headings take; an icon face is never a candidate.
+        self.assertEqual(design["typography"], {"body": "Open Sans", "display": "Mylius Modern"})
+        self.assertFalse(any("Icons" in face for face in design["evidence"]["faces"]))
+        self.assertEqual(result["styles"]["linked"], ["https://www.example.com/css/site.css"])
+        self.assertEqual(result["site"]["brand"], {"primary": "#021B41", "accent": "#3468AD"})
+        self.assertEqual(result["site"]["sheets"], 1)
+
+    def test_a_face_measured_on_this_machine_is_read_from_the_users_fonts_folder(self):
+        with tempfile.TemporaryDirectory() as home:
+            fonts = Path(home) / "fonts"
+            fonts.mkdir()
+            table = json.loads((RUNTIME / "fonts" / "arial-metrics.json").read_text(encoding="utf-8"))
+            (fonts / "brand sans-metrics.json").write_text(json.dumps({**table, "family": "Brand Sans"}), encoding="utf-8")
+            # Its own process: the measuring backend is chosen once a process, from the environment.
+            probe = Path(home) / "probe.mjs"
+            probe.write_text(f'''
+import {{ fontContext }} from {json.dumps((RUNTIME / "font-metrics.mjs").as_uri())};
+const ctx = fontContext();
+ctx.font = 'normal 16px "Brand Sans"'; const brand = ctx.measureText('Heathrow handled 84.5 million').width;
+ctx.font = 'normal 16px "Arial"'; const arial = ctx.measureText('Heathrow handled 84.5 million').width;
+console.log(JSON.stringify({{ backend: ctx.backend, has: ctx.hasFont('Brand Sans'), brand, arial }}));
+''', encoding="utf-8")
+            run = subprocess.run([NODE, str(probe)], capture_output=True, text=True, timeout=60, env={**os.environ, "PS_TEXT_METRICS": "table", "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(run.returncode, 0, run.stderr)
+            result = json.loads(run.stdout)
+            self.assertEqual(result["backend"], "table")
+            self.assertTrue(result["has"])
+            self.assertAlmostEqual(result["brand"], result["arial"], places=6)
+
+    def test_the_font_table_tool_measures_an_installed_face_into_the_users_folder(self):
+        if not HAS_PILLOW:
+            self.skipTest("Pillow is not installed")
+        candidates = ["/System/Library/Fonts/Supplemental/Georgia.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/dejavu/DejaVuSans.ttf"]
+        regular = next((path for path in candidates if Path(path).exists()), None)
+        if not regular:
+            self.skipTest("no known font file on this machine")
+        with tempfile.TemporaryDirectory() as home:
+            run = subprocess.run([RUNTIME_PYTHON or sys.executable, str(RUNTIME / "font-table.py"), "--regular", regular, "--family", "Measured Face"],
+                                 capture_output=True, text=True, timeout=120, env={**os.environ, "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(run.returncode, 0, run.stderr)
+            written = json.loads(run.stdout)
+            table = json.loads(Path(written["table"]).read_text(encoding="utf-8"))
+            self.assertEqual(Path(written["table"]).parent, Path(home) / "fonts")
+            self.assertEqual(table["unitsPerEm"], 2048)
+            self.assertGreater(table["faces"]["regular"]["advances"][str(ord("W"))], table["faces"]["regular"]["advances"][str(ord("i"))])
+            self.assertIn("preferences.mjs set", written["next"])
+            missing = subprocess.run([RUNTIME_PYTHON or sys.executable, str(RUNTIME / "font-table.py"), "--family", "No Such Face Anywhere"],
+                                     capture_output=True, text=True, timeout=300, env={**os.environ, "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(missing.returncode, 2)
+            self.assertIn("is not installed on this machine", missing.stderr)

@@ -9,6 +9,7 @@
 //   node runtime/preferences.mjs deck-keys                  the deck-level keys the answers set
 //   node runtime/preferences.mjs apply <id>.pages.json      write those keys into a pages or deck file (an unset answer writes nothing)
 //   node runtime/preferences.mjs path                       where the file lives (which location, and why, on stderr)
+//   node runtime/preferences.mjs from-site <url>            the brand's colours and typefaces read off its website, as answers to set
 //
 // The intake (references/theming.md#design-intake) asks how a user's decks
 // should look: a reference deck, the design system, colours, tracker, title
@@ -27,6 +28,7 @@ import { createHash } from "node:crypto";
 import { UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "./cli.mjs";
 import { DESIGN_NAMES, SURFACES } from "./design-systems.mjs";
 import { PALETTES } from "./palettes.mjs";
+import { readSite } from "./site-design.mjs";
 
 export const PREFERENCES_SCHEMA = "professional-slides.preferences/v1";
 
@@ -292,9 +294,9 @@ function parseValue(raw) {
   try { return JSON.parse(raw); } catch { return raw; }
 }
 
-function main(argv) {
+async function main(argv) {
   const { values: flags, positionals: [command = "show", ...rest] } = parseCli(argv, { source: { type: "string" }, reference: { type: "string" }, "from-house": { type: "string" } },
-    { usage: "Usage: preferences.mjs show | get [key] | set key=value ... [--source asked|inferred|default] [--reference deck.pptx] [--from-house house.json] | clear [key ...] | deck-keys | apply <file> | path", strict: true });
+    { usage: "Usage: preferences.mjs show | get [key] | set key=value ... [--source asked|inferred|default] [--reference deck.pptx] [--from-house house.json] | clear [key ...] | deck-keys | apply <file> | path | from-site <url>", strict: true });
   const { file, location, reason } = preferencesLocation();
   const where = { location, ...(reason ? { locationReason: reason } : {}) };
   // Where a change is written: the file read, unless that file is read-only here.
@@ -303,6 +305,14 @@ function main(argv) {
   const print = (value) => console.log(typeof value === "string" ? value : JSON.stringify(value, null, 2));
   // The path alone on stdout, so a script can use it; where and why on stderr.
   if (command === "path") { console.error(`location: ${location}${reason ? ` (${reason})` : ""}`); return print(file); }
+  // A brand's site read for its palette and typefaces: proposed, never stored - the line to set them is printed for the user to run.
+  if (command === "from-site") {
+    if (!rest[0]) throw new Error("from-site takes the brand's website address");
+    const site = await readSite(rest[0]);
+    const set = [site.brand ? "colours=brand" : null, site.brand ? `'brand=${JSON.stringify(site.brand)}'` : null, site.typography ? `'typography=${JSON.stringify(site.typography)}'` : null].filter(Boolean);
+    return print({ ...site, ...(set.length ? { set: `node runtime/preferences.mjs set ${set.join(" ")} --source inferred` } : {}),
+      typeface: site.typography ? `A face the deck sets is measured from its installed files: python3 runtime/font-table.py --family "${site.typography.body}" (installing the face, where it is not installed, is the user's to do; the deck is otherwise set in Arial)` : null });
+  }
   const prefs = readPreferences(file);
   if (command === "show") return print({ file, ...where, ...prefs, missing: missingQuestions(prefs), unset: unsetAnswers(prefs), deckKeys: deckKeys(prefs), reuse: reuseLine(prefs, file) });
   // JSON even for a bare string, so a script can parse any answer the same way.
@@ -339,8 +349,8 @@ function main(argv) {
     writeJsonSync(rest[0], document);
     return print({ file: rest[0], preferences: file, ...where, set, kept, unset: unsetAnswers(prefs), reuse: reuseLine(prefs, file) });
   }
-  throw new Error(`Unknown command ${command}; use show, get, set, clear, deck-keys, apply or path`);
+  throw new Error(`Unknown command ${command}; use show, get, set, clear, deck-keys, apply, path or from-site`);
 }
 
 // Every failure is the command line's or the stored file's, said in one line.
-if (isMain(import.meta.url)) runCli((argv) => { try { main(argv); } catch (error) { throw error instanceof UsageError ? error : new UsageError(error.message); } });
+if (isMain(import.meta.url)) runCli(async (argv) => { try { await main(argv); } catch (error) { throw error instanceof UsageError ? error : new UsageError(error.message); } });
