@@ -260,6 +260,34 @@ console.log(JSON.stringify({{ pages: readPagesFileSync({json.dumps(str(deck / "d
                 self.assertEqual(len(run.stderr.strip().splitlines()), 1, run.stderr)
 
 
+class ResearchNoticeTests(unittest.TestCase):
+    def test_the_research_step_hears_the_registry_and_the_chart_floor_while_it_can_act(self):
+        """Hundred-page deck: source names written as caveats were refused at the first draft, after the research was closed."""
+        home = Path(tempfile.mkdtemp(prefix="research-notice-"))
+        try:
+            fixture = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+            for name in ("finance.pages.json", "finance.insights.json", "finance.analysis.json"):
+                (home / name).write_bytes((fixture / name).read_bytes())
+            doc = json.loads((home / "finance.pages.json").read_text(encoding="utf-8"))
+            doc["deck"]["targetPages"] = 60
+            key = next(iter(doc["sources"]))
+            doc["sources"][key]["name"] = "Regional regulator annual returns 2026, as filed by each union and read before the adjustment for the merger that closed in March"
+            (home / "finance.pages.json").write_text(json.dumps(doc), encoding="utf-8")
+            run = subprocess.run([NODE, str(RUNTIME / "analysis.mjs"), str(home / "finance.pages.json"), "--catalogue"], capture_output=True, text=True, timeout=120)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            research = json.loads(run.stdout)["research"]
+            self.assertIn("will be refused at the compile", run.stderr)
+            self.assertTrue(any(f'source "{key}": `name` runs to' in line for line in research["sourcesRegistry"]))
+            # A sixty-page deck needs fifteen chart pages; the fixture's log holds fewer insights a chart can draw.
+            self.assertEqual(research["chartFloor"], 15)
+            self.assertLess(research["charted"], 15)
+            self.assertIn("an outline cannot draw a chart from a fact", run.stderr)
+            self.assertIn("series", research["shapes"])
+        finally:
+            import shutil
+            shutil.rmtree(home, ignore_errors=True)
+
+
 class EvidenceMeasureTests(unittest.TestCase):
     def test_the_measure_says_what_it_does_not_catch_and_which_catches_only_advise(self):
         result = run_node('''

@@ -48,7 +48,9 @@ import { createHash } from "node:crypto";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { SHAPES } from "./evidence.mjs";
 import { axisOf, composeUnit, insightLogRefusal, isPercentUnit, measureRegistry, normalUnit, readInsightLog, valuesOf } from "./measures.mjs";
-import { notJson } from "./pages-file.mjs";
+import { notJson, readPagesFileSync } from "./pages-file.mjs";
+import { registryProblems } from "./sources-registry.mjs";
+import { PLAN } from "./weight.mjs";
 
 /** The operations an analysis can be: what each computes, and from how many measures. */
 export const ANALYSIS_OPS = Object.freeze({
@@ -738,6 +740,32 @@ export function catalogueHint(insights, { players = [], plan = null, stem = "<id
 
 const USAGE = "Usage: analysis.mjs <id>.pages.json [--catalogue]";
 
+// The shapes of evidence a chart is drawn from (page-types.mjs TYPE_SHAPES): a series, a peer set, a mix, two measures set
+// against each other, a bridge, places. A fact or a judgement is a number or a sentence on a page, never a chart's data.
+const CHARTED = Object.freeze(["series", "peer-set", "mix", "measure-pair", "bridge", "geography"]);
+
+/**
+ * What the research step is told while it can still widen the log: each
+ * shape's count, and where the deck's chart floor (weight.json plan.mix) asks
+ * for more chart pages than the log has insights a chart can draw. Read from
+ * the deck's `targetPages`, or 50 for an evaluation deck; none without one.
+ */
+export function shapeBalance(insights, deck = {}) {
+  const recorded = insights.filter((item) => item && !item.derived);
+  const counts = Object.fromEntries([...new Set(recorded.map((item) => String(item.shape ?? "unshaped")))].sort().map((shape) => [shape, recorded.filter((item) => String(item.shape ?? "unshaped") === shape).length]));
+  const target = Number.isFinite(deck?.targetPages) ? deck.targetPages : deck?.purpose === "evaluation" ? 50 : null;
+  const charted = recorded.filter((item) => CHARTED.includes(item.shape)).length, floor = target ? Math.ceil(target * PLAN.mix.chart.min) : null;
+  return { counts, charted, ...(floor !== null ? { chartFloor: floor } : {}),
+    advice: floor !== null && charted < floor ? [`The deck of ${target} pages needs at least ${floor} chart pages (a ${Math.round(PLAN.mix.chart.min * 100)}% floor) and the log holds ${charted} insights a chart can draw - ${CHARTED.join(", ")}. Record the series, the peer sets and the mixes behind the facts now, while the research is open: an outline cannot draw a chart from a fact`] : [] };
+}
+
+/** The pages file's `sources` registry as the compile will read it - its parts spliced in where they read - checked now. */
+function registryNow(file, doc) {
+  let sources = doc.sources;
+  try { sources = readPagesFileSync(file).sources ?? sources; } catch { /* a part still being written: the registry as the file holds it */ }
+  return registryProblems(sources);
+}
+
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { catalogue: { type: "boolean" } }, { usage: USAGE });
   if (!file) throw new UsageError(USAGE);
@@ -751,12 +779,17 @@ async function main(argv) {
   // A log this command runs over is one the pages compile over: it is held to the compile's own reading of it, here, first.
   const unread = insightLogRefusal(log.insights || []);
   if (unread) { console.error(`${unread}\nThe analyses run over the log author-deck.mjs compiles the pages over, so it is refused here for what the compile would refuse it for.`); return EXIT.refused; }
+  // While the research is open: the sources registry as the compile will refuse it, and the log's shapes against the chart floor.
+  const registry = registryNow(path.resolve(file), doc), balance = shapeBalance(log.insights || [], doc.deck);
+  if (registry.length) console.error(`The \`sources\` registry will be refused at the compile:\n- ${registry.join("\n- ")}`);
+  if (balance.advice.length) console.error(balance.advice.join("\n"));
+  const research = { shapes: balance.counts, ...(balance.chartFloor !== undefined ? { chartFloor: balance.chartFloor, charted: balance.charted } : {}), ...(registry.length ? { sourcesRegistry: registry } : {}) };
   if (values.catalogue) {
     // The analyses the measures allow, whether or not a plan exists yet: an invalid plan is still read for what it already runs.
     let written;
     try { written = await readPlan(dir, stem); } catch (error) { console.error(error.message); return EXIT.refused; }
     const { entries, capped, counts } = analysisCatalogue(log.insights || [], { players: doc.deck?.players, plan: written });
-    console.log(JSON.stringify({ catalogue: counts, capped, entries: entries.map((e) => ({ entry: e.entry, kind: e.kind, status: e.status, finding: e.finding, ...(e.boundaries.length ? { boundaries: e.boundaries } : {}), ...(e.players ? { players: true } : {}), inPlan: e.inPlan })) }, null, 1));
+    console.log(JSON.stringify({ research, catalogue: counts, capped, entries: entries.map((e) => ({ entry: e.entry, kind: e.kind, status: e.status, finding: e.finding, ...(e.boundaries.length ? { boundaries: e.boundaries } : {}), ...(e.players ? { players: true } : {}), inPlan: e.inPlan })) }, null, 1));
     return EXIT.ok;
   }
   let analysed;
@@ -765,7 +798,7 @@ async function main(argv) {
   if (!plan) { console.error(`${stem}.analysis.json is not beside the pages file: write the analyses to run - ${Object.entries(ANALYSIS_OPS).map(([op, about]) => `${op} (${about.does})`).join("; ")}`); return EXIT.refused; }
   if (problems.length) { console.error(`The analysis plan is not valid:\n- ${problems.join("\n- ")}`); return EXIT.refused; }
   await writeJson(path.join(dir, `${stem}.analysis-results.json`), { schema: "professional-slides.analysis-results/v1", id: stem, results });
-  console.log(JSON.stringify({ results: `${stem}.analysis-results.json`, computed: results.filter((r) => r.status === "computed").length, assumed: results.filter((r) => r.status === "assumed").length,
+  console.log(JSON.stringify({ research, results: `${stem}.analysis-results.json`, computed: results.filter((r) => r.status === "computed").length, assumed: results.filter((r) => r.status === "assumed").length,
     unavailable: results.filter((r) => r.status === "unavailable").map((r) => `${r.id}: ${r.reason}`), lines: results.map(analysisLine) }, null, 1));
   return EXIT.ok;
 }
