@@ -81,6 +81,7 @@ import { chartDraws } from "./charts.mjs";
 export const BINDING_CODES = Object.freeze({
   BINDING_UNRESOLVED: "an exhibit, a metric or a `{{...}}` token names a measure the runtime cannot bind: one the insight log does not hold, one from an insight the page does not rest on, or one whose axis, unit or format cannot fill what names it",
   NUMBER_UNTRACED: "a number typed on the page that is no value of any measure of the insights the page rests on",
+  TITLE_NUMBER_UNTRACED: "a number typed in a title that is no value of any measure of the insights the page rests on - refused, since the title is the claim the storyline critique reads",
 });
 
 const TOKEN = /\{\{([^{}]*)\}\}/g;

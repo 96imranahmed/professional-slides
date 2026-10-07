@@ -90,7 +90,7 @@ const LISTED = [
   // page is the user's slide, so what mends it is the page as authored.
   ...codes("S", "REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION", LAYOUT),
   ...codes("S", "CONTENTS_UNFIT", ["layout", "pages"]),
-  ...codes("S", "MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED", ["record"]),
+  ...codes("S", "MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED FINDING_RANK_UNBACKED", ["record"]),
   ...codes("S", "ANALYSIS_UNRESTED", ["evidence"]),
   ...codes("S", "SOURCES_UNFILED SOURCE_NUMBERS_UNREAD", ["record"]),
   // The argument as the storyline critique closed it (storyline.mjs spineLock): put back, or reopened on purpose.
@@ -148,6 +148,8 @@ const LISTED = [
   // A reference the runtime cannot write out, and a typed number no measure of the page's evidence holds (bind.mjs).
   ...codes("P", "BINDING_UNRESOLVED", ["basis", "view"]),
   ...codes("P", "NUMBER_UNTRACED", COPY),
+  // An absolute word or a title's number no record holds (claim-words.mjs, dependency_gates.mjs): narrowed in the words, or recorded.
+  ...codes("P", "CLAIM_UNBACKED TITLE_NUMBER_UNTRACED", ["title", "copy", "record"]),
   // What the critique binds, proven layable at the spine (spine-fit.mjs): a title that does not fit where the deck's design sets
   // it, an exhibit the spine fully determines that no chart can draw, and a summary that cannot fill its page as declared.
   ...codes("P", "SPINE_UNFIT", ["title"]),
@@ -282,7 +284,7 @@ export const LAYOUT_CODES = Object.freeze(new Set(["PAGE_DOES_NOT_COMPOSE", "SCE
 const reasons = (why, list) => list.split(/\s+/).filter(Boolean).map((code) => [code, why]);
 export const STANDING_FREE = Object.freeze(Object.fromEntries([
   ...reasons("holds or fails on a named statement, insight, analysis, section or file; nothing is counted toward a bar", `GENERATOR_SIGNATURE PILLAR_UNSUPPORTED
-    REVISION_UNMAPPED REVISION_INVENTORY_MISSING REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED ANALYSIS_UNRESTED SOURCES_UNFILED SOURCE_NUMBERS_UNREAD SPINE_LOCKED REQUEST_MISSING WAIVERS_INVALID STATEMENT_INVALID
+    REVISION_UNMAPPED REVISION_INVENTORY_MISSING REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED ANALYSIS_UNRESTED SOURCES_UNFILED SOURCE_NUMBERS_UNREAD FINDING_RANK_UNBACKED SPINE_LOCKED REQUEST_MISSING WAIVERS_INVALID STATEMENT_INVALID
     CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE STAGE_CONTRACT STAGE_MISSING SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
     NUMBERS_DISAGREE NUMBER_STALE WORDING_STALE NUMBER_FORMATS_DIFFER PROOF_REPEATS`),
   ...reasons("an advisory on the families a plan declares; the variety contract and the craft floors hold the same quantity on the compiled deck, and theirs is the standing", `PLAN_TITLE_LENGTH

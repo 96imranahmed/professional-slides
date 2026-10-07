@@ -123,8 +123,12 @@ function readNumber(source, hit) {
   const literal = hit[0].replace(/,/g, "");
   const n = Number(literal);
   const decimals = (literal.split(".")[1] || "").length;
-  const scale = SCALE_ATTACHED.exec(after) ?? SCALE_WORD.exec(after) ?? (decimals || currency || signChar ? SCALE_CAPITAL.exec(after) : null);
-  const percent = PERCENT.exec(after);
+  // The first figure of a range takes the scale or percent the range ends on: "€8.3-8.6bn" is 8.3 billion, "5-6%" five percent.
+  const range = /^[-\u2013]\d[\d,]*(?:\.\d+)?/.exec(after), tail = range ? after.slice(range[0].length) : null;
+  const ranged = tail !== null && (SCALE_ATTACHED.exec(tail) ?? SCALE_WORD.exec(tail) ?? PERCENT.exec(tail)) ? tail : null;
+  const own = SCALE_ATTACHED.exec(after) ?? SCALE_WORD.exec(after) ?? (decimals || currency || signChar ? SCALE_CAPITAL.exec(after) : null), ownPercent = PERCENT.exec(after);
+  const scale = own ?? (ranged ? SCALE_ATTACHED.exec(ranged) ?? SCALE_WORD.exec(ranged) : null);
+  const percent = ownPercent ?? (ranged && !own ? PERCENT.exec(ranged) : null);
   let unit = null;
   if (!scale && !percent && /^[A-Za-z]/.test(after)) {
     if (ORDINAL.test(after)) return label;
@@ -139,7 +143,8 @@ function readNumber(source, hit) {
   const day = !marked && n >= 1 && n <= 31 && (MONTH_AFTER.test(after) || MONTH_BEFORE.test(before));
   // "5-year", "20-minute": a count inside a compound word.
   const compound = /^-[A-Za-z]/.test(after);
-  const suffix = (scale ?? percent ?? unit)?.[0] ?? "";
+  // A figure that takes its scale from the end of its range prints none of its own.
+  const suffix = (own ?? ownPercent ?? (scale || percent ? null : unit))?.[0] ?? "";
   return { n, decimals, sign: signChar === "+" ? 1 : signChar ? -1 : 0, scaled: Boolean(scale), scale: scale ? SCALE_OF[scale[1].toLowerCase()] : null, percent: Boolean(percent), currency: Boolean(currency), ...(currency ? { currencyMark: currency } : {}),
     kind: year || day ? "period" : marked && !compound ? "measure" : "integer",
     shown: `${signChar}${currency}${hit[0]}${suffix}`.trim(), start: start - signChar.length - currency.length, end: end + suffix.length };
@@ -160,9 +165,12 @@ const half = (x) => 0.5 * 10 ** (Math.floor(Math.log10(Math.abs(x))) - 1);
  * place, since a percentage is read on a scale of a hundred whatever its
  * size - so -0.9% states -0.86%, and -1% does not.
  */
-export function matches(shown, recorded, { decimals = (String(shown).split(".")[1] || "").length, percent = false } = {}) {
+export function matches(shown, recorded, { decimals = (String(shown).split(".")[1] || "").length, percent = false, rounded = false } = {}) {
   if (recorded === null || recorded === undefined) return false;
   const printed = 0.5 * 10 ** -decimals;
+  // `rounded`: the value rounded at the precision printed, however few figures that keeps - a title's "4%" for 4.3%,
+  // never its "13%" for 13.7%.
+  if (rounded) return Math.abs(shown - recorded) <= printed + 1e-9;
   const kept = Math.max(recorded === 0 ? printed : half(recorded), percent ? 0.05 : 0);
   return Math.abs(shown - recorded) <= Math.min(printed, kept) + 1e-9;
 }
@@ -189,11 +197,11 @@ const SCALES = [1e3, 1e6, 1e9];
  * no unit says whether the value is a percentage (`percent`); the scale check
  * then has nothing to compare.
  */
-export function states(printed, recorded, { unit = null, percent = isPercentUnit(unit) } = {}) {
+export function states(printed, recorded, { unit = null, percent = isPercentUnit(unit), rounded = false } = {}) {
   if (recorded === null || recorded === undefined) return false;
   if (printed.sign && recorded !== 0 && Math.sign(recorded) !== printed.sign) return false;
   const kept = unitScale(unit);
-  const near = (factor = 1) => matches(printed.n, Math.abs(recorded) * factor, { decimals: printed.decimals, percent });
+  const near = (factor = 1) => matches(printed.n, Math.abs(recorded) * factor, { decimals: printed.decimals, percent, rounded });
   if (printed.scale && kept) return near(kept / printed.scale);
   if (near()) return true;
   if (printed.scaled && SCALES.some((f) => near(f) || near(1 / f))) return true;

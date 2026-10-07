@@ -30,7 +30,7 @@
  * dropped, a context exhibit unexplained, and a relation split across panels.
  * Then the numbers outside the exhibits: one typed cell of a table changed and
  * one number in a sentence changed, which the trace of typed numbers reports
- * (an advisory, `NUMBER_UNTRACED`); and the references a page writes its
+ * (an advisory, `NUMBER_UNTRACED`, or in a title a refusal, `TITLE_NUMBER_UNTRACED`); and the references a page writes its
  * numbers by: a bound exhibit naming a measure the log does not hold, and a
  * token whose measure comes from an insight the page does not rest on.
  *
@@ -212,7 +212,7 @@ export const SEEDED = Object.freeze({
   },
   "a typed number in a sentence changed": {
     // The first number the page's title, closing line or commentary writes as a measurement - "57%", "12.2 minutes", "41 million" - moved by 37.
-    expect: ["NUMBER_UNTRACED"],
+    expect: ["NUMBER_UNTRACED", "TITLE_NUMBER_UNTRACED"],
     plant(page) {
       const typed = typedNumber((number) => number.kind === "measure");
       const sentence = sentenceOf(page, typed);

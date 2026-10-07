@@ -275,11 +275,13 @@ console.log(JSON.stringify({ accepted: out.accepted, limits: out.limits, named: 
                 # None is caught today; a limit that starts being caught shows in its count, and never in acceptance.
                 self.assertEqual(counts["caught"], 0)
         self.assertTrue(result["accepted"])
-        self.assertEqual(result["advisory"], ["one typed cell of a table changed", "a typed number in a sentence changed"])
+        # A typed cell is advised; the fixture pages' sentence numbers are in their titles, where a number no record holds is refused.
+        self.assertEqual(result["advisory"], ["one typed cell of a table changed"])
         run = subprocess.run([NODE, str(ROOT / "evals" / "quality" / "evidence-validity.mjs")], cwd=ROOT, capture_output=True, text=True, timeout=300)
         self.assertEqual(run.returncode, 0)
         self.assertIn("Known limits (planted, not counted)", run.stdout)
-        self.assertIn("a typed number in a sentence changed (advisory)", run.stdout)
+        self.assertIn("one typed cell of a table changed (advisory)", run.stdout)
+        self.assertNotIn("a typed number in a sentence changed (advisory)", run.stdout)
         self.assertNotIn("one plotted number changed (advisory)", run.stdout)
 
 

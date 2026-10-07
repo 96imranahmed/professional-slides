@@ -47,7 +47,8 @@ const base = { id: 'p1', type: 'trend', form: 'line', commentary: 'so-what-bar',
 const bind = (o) => { const out = bindDeck({ deck: {}, pages: [{ ...base, ...o }] }, insights); return { page: out.doc.pages[0], says: out.findings.map((f) => f.repair), bound: out.bound }; };
 const says = (o) => bind(o).says;
 const codes = (o) => dependencyFindings({ deck: {}, pages: [{ ...base, ...o }] }, insights).map((f) => f.code);
-const untraced = (o) => dependencyFindings({ deck: {}, pages: [{ ...base, ...o }] }, insights).filter((f) => f.code === 'NUMBER_UNTRACED').flatMap((f) => f.measured);
+// A title's number no record holds is refused (TITLE_NUMBER_UNTRACED), any other advised (NUMBER_UNTRACED): both are read here as one trace.
+const untraced = (o) => dependencyFindings({ deck: {}, pages: [{ ...base, ...o }] }, insights).flatMap((f) => f.code === 'NUMBER_UNTRACED' ? f.measured : f.code === 'TITLE_NUMBER_UNTRACED' ? f.measured.map((shown) => `title: ${shown}`) : []);
 const rev = { heading: 'Revenue', series: [{ measure: 'i1/rev', name: 'Revenue' }] };
 '''
 

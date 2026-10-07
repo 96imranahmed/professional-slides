@@ -49,6 +49,11 @@
 //                                                        refuses a title the critique binds that does not fit and an
 //                                                        exhibit the spine determines that cannot be drawn; prints a
 //                                                        proposal, and writes nothing but its line of the run log
+//   node runtime/author-deck.mjs <id>.pages.json --claims [<id>[,<id>...]]
+//                                                        every sentence of the named pages (all, with no ids) as the
+//                                                        reader meets it, each number with the recorded value it
+//                                                        states and each absolute word with the finding that says
+//                                                        it - CHECK where nothing does: the writer's self-check
 //   node runtime/author-deck.mjs <id>.pages.json --repair-relation <page-id>
 //                                                        the one exhibit that sets a page's split measures on one
 //                                                        scale, built from the page's own exhibits, to paste in
@@ -99,7 +104,9 @@ import os from "node:os";
 import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
-  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems } from "./page-types.mjs";
+  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts } from "./page-types.mjs";
+import { unheldWords, rankProblem, claimWords, holds } from "./claim-words.mjs";
+import { claimSheet, claimSheetLines } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
@@ -164,6 +171,8 @@ export const AUTHORING_CODES = Object.freeze({
   ANALYSIS_REQUIRED: "a deck that compares declared players has no computed comparison of them on common measures",
   ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
+  FINDING_RANK_UNBACKED: "an insight's finding ranks a member its own measures do not rank there - blocking - or ranks with no measure over three or more members to rank in - advised",
+  CLAIM_UNBACKED: "an absolute word - a rank, every, never, only, no rival, most of - that no finding of the insights the page rests on says: refused in a title, advised in the copy",
   COMMENTARY_MOVED: "a page whose points are declared beside its exhibit and drawn under it, because they fill too little of the column beside a chart that uses its width - advised, with what holds the column",
   PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
@@ -555,6 +564,7 @@ export function deckSpineFindings(doc, insights = null) {
     if (unmeasured.length) out.push({ code: "MEASURES_MISSING", severity: "blocker", pages: unmeasured,
       repair: `${unmeasured.length} insight${unmeasured.length === 1 ? " records" : "s record"} numbers only as a sentence (${unmeasured.join(", ")}): give each its \`measures\` - { name: { unit, population, periods | members | period, values | value } } - the numbers its \`calculation\` describes, as data. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it (references/storylining.md#extract-the-insights-before-the-titles)` });
     out.push(...(insights.conflicts ?? []));
+    out.push(...claimFindings(doc, insights));
     const alternatives = alternativesOf(deck);
     const results = insights.analysis?.results ?? [];
     if (alternatives.length >= 2 && hasMeasures(insights)) {
@@ -626,6 +636,50 @@ function conflictFindings(items) {
     ...(agreeing.length ? [{ code: "MEASURES_CONFLICT", severity: "advisory", pages: [...new Set(agreeing.flatMap((c) => c.refs.map((ref) => ref.split("/")[0])))], measured: { repeated: agreeing.map((c) => c.refs) },
       repair: `The insight log records ${agreeing.length === 1 ? "a measure" : `${agreeing.length} measures`} twice: ${agreeing.map((c) => `${where(c, 0)} and ${where(c, 1)}${c.kind === "precision" ? ` at different precision (${cells(c)})` : ""}`).join(" | ")}. Keep one record of each and name it wherever the other was named: two records of one number drift apart at the next edit` }] : []),
   ];
+}
+
+/**
+ * The absolute words of the deck held to its records (claim-words.mjs): a
+ * finding's rank against the insight's own measures, and each page's
+ * "largest", "every", "only" or "most of" against the findings of the
+ * insights it rests on. A title is refused - it is the claim the critique
+ * reads, and a word in it is cheap to change before the critique closes; the
+ * copy is advised, and the self-check reads what remains.
+ */
+function claimFindings(doc, insights) {
+  const out = [];
+  const recorded = [...insights.values()].filter((item) => !item.derived);
+  const wrong = [], unranked = [];
+  for (const item of recorded) { const problem = rankProblem(item); if (problem) (problem.kind === "wrong" ? wrong : unranked).push({ id: item.id, ...problem }); }
+  if (wrong.length) out.push({ code: "FINDING_RANK_UNBACKED", severity: "blocker", pages: wrong.map((w) => w.id), measured: wrong,
+    repair: `${wrong.map((w) => `${w.id}'s finding calls ${w.member} "${w.word}", and its own measure ${w.measure} puts ${w.leader} there`).join("; ")}. Correct the finding to what the measure ranks, or the measure to what the source says` });
+  // A finding that ranks with nothing to rank in matters where a page's rank word rests on it alone.
+  const leaning = new Map();
+  for (const page of [...doc.pages, ...(doc.appendix || [])]) {
+    // A page resting on an insight or analysis the log does not hold is that finding's to report; its words are read once it rests on what it names.
+    if (!page?.type || !Array.isArray(page.evidence) || page.evidence.some((id) => !insights.has(id))) continue;
+    const findings = page.evidence.map((id) => insights.get(id)?.finding).filter((f) => typeof f === "string" && f.trim());
+    const said = (text) => unheldWords(text, findings);
+    const ranks = [page.title, page.subtitle, ...accentTexts(page)].filter((text) => typeof text === "string").flatMap((text) => claimWords(text)).filter((w) => w.family === "top" || w.family === "bottom");
+    for (const { family } of ranks) {
+      const by = page.evidence.filter((id) => holds(insights.get(id)?.finding ?? "", family));
+      if (by.length && by.every((id) => unranked.some((u) => u.id === id))) by.forEach((id) => leaning.set(id, [...(leaning.get(id) ?? []), page.id]));
+    }
+    const title = said(page.title);
+    const rested = page.evidence.join(", ");
+    if (title.length) out.push({ code: "CLAIM_UNBACKED", severity: "blocker", id: page.id, measured: title.map((w) => w.word),
+      repair: `${page.id}: the title says ${title.map((w) => `"${w.word}"`).join(" and ")}, and no finding of the insights it rests on (${rested}) says ${title.length === 1 ? "one" : "them"}. ` +
+        "Narrow it to what the record holds - the population (\"of the twelve airlines in the three big groups\"), the period, the measure - or rest the page on the insight whose finding states it" });
+    const copy = [page.subtitle, ...accentTexts(page)].filter((text) => typeof text === "string")
+      .flatMap((text) => said(text).map((w) => `"${w.word}" in "${text.length > 70 ? `${text.slice(0, 67)}...` : text}"`));
+    if (copy.length) out.push({ code: "CLAIM_UNBACKED", severity: "advisory", id: page.id, measured: copy,
+      repair: `${page.id}: ${copy.slice(0, 4).join("; ")}${copy.length > 4 ? "; ..." : ""} - no finding of the insights the page rests on (${rested}) says it. Narrow the sentence to what the record holds, or check it against the record before the self-check does` });
+  }
+  const leaned = unranked.filter((u) => leaning.has(u.id));
+  if (leaned.length) out.push({ code: "FINDING_RANK_UNBACKED", severity: "advisory", pages: leaned.map((u) => u.id), measured: leaned.map((u) => ({ ...u, pages: [...new Set(leaning.get(u.id))] })),
+    repair: `${leaned.map((u) => `${u.id} ("${u.word}", which ${[...new Set(leaning.get(u.id))].join(", ")} rest${leaning.get(u.id).length === 1 ? "s" : ""} a rank on)`).join("; ")}: the finding ranks with no measure over three or more members to rank in, so the page's rank rests on the source's say-so. ` +
+      "Record the population as a measure over its members (the rivals and their values), or say whose ranking it is and of what (\"Europe's largest by ACI's count of passengers\")" });
+  return out;
 }
 
 /** For each insight, the page types its data shape can carry. */
@@ -1657,7 +1711,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan | --log | --repair-relation <page-id>] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1962,7 +2016,7 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" } }, { usage: USAGE });
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -1990,6 +2044,13 @@ async function main(argv) {
     return 0;
   }
   if (values.log) { say(JSON.stringify(runCost(runs), null, 1)); return 0; }
+  // Each page's claims set out against the record, for its writer to check before the self-check does.
+  if (values.claims !== undefined) {
+    const insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) });
+    if (!insights) { console.error(`No insight log beside ${path.basename(file)}: the claims are checked against ${stem}.insights.json`); return 2; }
+    say(claimSheetLines(claimSheet(doc, insights, String(values.claims).split(",").map((id) => id.trim()).filter(Boolean))).join("\n"));
+    return 0;
+  }
   if (!doc || typeof doc !== "object" || !doc.deck || !Array.isArray(doc.pages)) { console.error("A pages file is { deck: {...}, pages: [...] }"); return 2; }
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
@@ -2341,7 +2402,7 @@ function movedLines(spec) {
 }
 
 // The advisories a run prints with their text: the consistency of what the pages state, and the build bars.
-const SAID_IN_FULL = /^(?:NUMBERS_DISAGREE|NUMBER_STALE|WORDING_STALE|NUMBER_FORMATS_DIFFER|PROOF_REPEATS|BAR_[A-Z_]+)$/;
+const SAID_IN_FULL = /^(?:NUMBERS_DISAGREE|NUMBER_STALE|WORDING_STALE|NUMBER_FORMATS_DIFFER|PROOF_REPEATS|FINDING_RANK_UNBACKED|BAR_[A-Z_]+)$/;
 
 function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, pageGatesError }) {
   const typed = spec.slides.filter((s) => s.pageType);
@@ -2357,6 +2418,7 @@ function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, 
   const drawn = structureMix([...spec.slides, ...(spec.appendix || [])], { drawnOf });
   const pct = (x) => `${Math.round(x * 100)}%`;
   const untraced = advisories.filter((f) => f.code === "NUMBER_UNTRACED");
+  const unbacked = advisories.filter((f) => f.code === "CLAIM_UNBACKED" && f.id);
   const hint = draft && insights ? catalogueHint(insights, { players: spec.players, plan: insights.analysis?.plan, stem: spec.id }) : null;
   const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), sequence, commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
     structure: { twoPlusExhibits: `${drawn.multi.pages} of ${drawn.pages} (${pct(drawn.multi.share)}; floor ${pct(VARIETY.multiShareMin)}, strong decks a quarter to a third)`,
@@ -2375,6 +2437,8 @@ function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, 
     ...(pageGatesRan ? {} : { pageGates: `did not run: ${pageGatesError || "no reason given"}` }),
     // Each typed number that is no value of a measure its page rests on, by page and field: the list the author checks by hand, or replaces with references.
     ...(untraced.length ? { untracedNumbers: Object.fromEntries(untraced.map((f) => [f.id, f.measured])) } : {}),
+    // Each absolute word in a page's copy that no finding of its evidence says, with the sentence it is in: checked against the record now, not by the self-check.
+    ...(unbacked.length ? { unbackedClaims: Object.fromEntries(unbacked.map((f) => [f.id, f.measured])) } : {}),
     // What a draft leaves to the full compile, grouped by what settles it - the copy, the layout or the fit - one line a code
     // with its count: none of it is about what the storyline critique is bound to, which a draft refuses instead.
     ...(draft && deferredLines(spec, advisories).length ? { deferred: deferredLines(spec, advisories) } : {}),

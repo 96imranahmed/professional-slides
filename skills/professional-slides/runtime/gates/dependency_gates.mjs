@@ -361,13 +361,27 @@ function untracedNumbers(page, pool) {
 // With no measure named, a number is matched across every measure the page rests on, so the units must agree: a
 // percentage states a percentage (or a recorded ratio or fraction, a hundred times over), and money or a scaled count states
 // neither. A number that prints a scale is held to the scale the unit names ("1,600bn" is not 1.6 kept in billions).
-const tracesValue = (number, m, value) => {
+const tracesValue = (number, m, value, { rounded = false } = {}) => {
   const percent = percentUnit(m.unit);
   if (percent && (number.scaled || number.currency)) return false;
-  if (!number.percent || percent) return states(number, value, { unit: m.unit });
-  return isRatioUnit(m.unit) && typeof value === "number" && states({ ...number, percent: false, scaled: false, scale: null }, value * 100);
+  if (!number.percent || percent) return states(number, value, { unit: m.unit, rounded });
+  return isRatioUnit(m.unit) && typeof value === "number" && states({ ...number, percent: false, scaled: false, scale: null }, value * 100, { rounded });
 };
-const traces = (number, m) => valuesOf(m).some((value) => tracesValue(number, m, value));
+const traces = (number, m, options) => valuesOf(m).some((value) => tracesValue(number, m, value, options));
+
+/**
+ * Is a title's typed number one its evidence holds: a value of a measure the
+ * page rests on, rounded at the precision the title prints it ("4%" for 4.3%,
+ * never "13%" for 13.7%), or a figure an evidence finding states ("£7bn" where
+ * the finding says "£7 billion"), at its scale and on the same footing - a
+ * percentage for a percentage.
+ */
+function titleHolds(number, pool, findings) {
+  if (pool.some((m) => traces(number, m, { rounded: true }))) return true;
+  const size = (n) => n.n * (n.scale ?? 1);
+  return findings.flatMap((finding) => measurementsIn(finding)).some((said) => Boolean(said.percent) === Boolean(number.percent)
+    && Math.abs(number.n - size(said) / (number.scale ?? 1)) <= 0.5 * 10 ** -number.decimals + 1e-9);
+}
 
 /**
  * The cells of `measures` (registry entries) a typed number states: each
@@ -488,7 +502,15 @@ export function dependencyFindings(doc, insights) {
     // The measures a typed number can state: those of the insights the page rests on, what they were computed from, and the assumptions they state.
     const pool = [...pagePool(page, registry),
       ...evidence.flatMap((owner) => (insights.get?.(owner)?.assumptions || []).filter((a) => typeof a?.value === "number").map((a) => ({ value: a.value, unit: a.unit })))];
-    const untraced = pool.length ? untracedNumbers(authored[index], pool) : [];
+    const typed = pool.length ? untracedNumbers(authored[index], pool) : [];
+    // The title is the claim the critique reads and the reader keeps: a number in it that no record holds is refused
+    // where the spine is drafted, before the critique reads it and while it is one word to change.
+    const findings = evidence.map((owner) => insights.get?.(owner)?.finding).filter((f) => typeof f === "string");
+    const titled = !pool.length ? [] : typedNumbers({ title: authored[index]?.title }).filter(({ number }) => !titleHolds(number, pool, findings)).map(({ number }) => ({ field: "title", shown: number.shown }));
+    const untraced = typed.filter((u) => u.field !== "title" || !titled.some((t) => t.shown === u.shown));
+    if (titled.length) out.push({ code: registered(BINDING_CODES, "TITLE_NUMBER_UNTRACED"), id, severity: "blocker", measured: titled.map((u) => u.shown), repair: `${id}: the title states ${titled.map((u) => u.shown).join(", ")}, which is no value of a measure the page rests on at the precision it is printed - ` +
+      "a rounding that is not the record's (\"about 13%\" for 13.7%), a scale the unit does not name, or a number nobody recorded. Print the recorded value by reference - \`{{<insight id>/<measure>@<period or member> | 0.0}}\` - or at its own precision, " +
+      "say it in words the record holds (\"a third\"), or record the measure it comes from in the insight the page rests on" });
     if (untraced.length) out.push({ code: registered(BINDING_CODES, "NUMBER_UNTRACED"), id, severity: "advisory", measured: untraced.map((u) => `${u.field}: ${u.shown}`),
       repair: `${id}: ${untraced.length} typed number${untraced.length === 1 ? " is" : "s are"} no value of a measure the page rests on - ${untraced.slice(0, 8).map((u) => `${u.shown} in \`${u.field}\``).join(", ")}${untraced.length > 8 ? ", ..." : ""}. ` +
         "Print a recorded or computed number by reference - `{{<insight id>/<measure>@<period or member> | 0.0}}` - so the runtime writes it; a number nobody recorded is a measure to add to the insight, an analysis to run, or an assumption to state" });

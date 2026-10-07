@@ -108,6 +108,8 @@ An insight whose evidence is numbers records them as `measures` as well as in it
 
 A page then writes its numbers by reference, not by hand: an exhibit names the measure and the runtime draws it (`series: [{ "measure": "i-launch-ramp/northvale" }]`), and `{{i-launch-ramp/northvale@M16}}` in a title prints the recorded value. Whatever is still typed is held to the measure it names, or traced to the measures the page rests on.
 
+A finding is the record a page's words are held to, so it says only what its measures show. A rank word in it - "largest", "lowest" - names a population its measures hold: a member called the largest is the largest of a measure over its members (`FINDING_RANK_UNBACKED`, refused where the measure ranks another member first), and a rank with no measure over three or more members to rank in is advised - record the rivals and their values, or say whose ranking it is ("Europe's largest by ACI's count"). Universals and exclusives - every, never, only, no rival, most of - are written into a finding only where its data shows them, since a page may use such a word only where a finding it rests on says one.
+
 A single value that is a limit, target or covenant other measures are tested against says so with `standard: true`: the analysis catalogue then offers every measure in its unit a `threshold` against it.
 
 Write the titles from the insights. Every analytical page names the insights it rests on in `evidence`, and each pillar rests on at least one `strong` insight (`PILLAR_UNSUPPORTED` otherwise). An insight with no page is either cut or missing a page; a page with no insight is either cut or missing its analysis. `author-deck.mjs --draft` prints, for each insight, the page types its shape can carry.

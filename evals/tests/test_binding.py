@@ -55,7 +55,8 @@ const bind = (p) => { const out = bindDeck(deckOf(p), insights); return { page: 
 const exhibitOf = (ex, o) => bind(page({ exhibit: ex, ...o })).page.exhibit;
 const problems = (p) => bind(p).findings.map((f) => f.repair);
 const codes = (p) => dependencyFindings(deckOf(p), insights).map((f) => f.code);
-const advised = (p) => dependencyFindings(deckOf(p), insights).filter((f) => f.code === 'NUMBER_UNTRACED').flatMap((f) => f.measured);
+// What the trace finds: a title's number no record holds is refused (TITLE_NUMBER_UNTRACED), any other advised (NUMBER_UNTRACED).
+const advised = (p) => dependencyFindings(deckOf(p), insights).flatMap((f) => f.code === 'NUMBER_UNTRACED' ? f.measured : f.code === 'TITLE_NUMBER_UNTRACED' ? f.measured.map((shown) => `title: ${shown}`) : []);
 '''
 
 
@@ -331,8 +332,9 @@ console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, 
   tokens: say({ title: 'Cash reached {{i-bal/cash@FY26 | 0.0}} million, or {{i-bal/perHead | 0%| x100}} of 99.9 million' }),
   qualitative: advised({ ...page({ exhibit: undefined, settles: undefined, type: 'argument', form: 'memo', title: 'A judgement with 12.5% in it' }), evidence: [] }) }));
 ''')
-        self.assertEqual(result["finding"], [["NUMBER_UNTRACED", "p1", "advisory", ["title: 56.5 million"]]])
-        self.assertIn("56.5 million in `title`", result["repair"])
+        # A title's number no record holds is refused where it is written, not advised.
+        self.assertEqual(result["finding"], [["TITLE_NUMBER_UNTRACED", "p1", "blocker", ["56.5 million"]]])
+        self.assertIn("the title states 56.5 million", result["repair"])
         self.assertIn("{{<insight id>/<measure>@<period or member> | 0.0}}", result["repair"])
         self.assertEqual(result["recorded"], [])  # recorded values in any dress: scaled, signed, with a currency, a ratio as a percentage
         self.assertEqual(result["wrong"], ["title: 57 million", "title: 15.5 million", "bar: 42.7%", "subtitle: CHF1.4bn", "subtitle: +0.9%"])
@@ -533,15 +535,23 @@ console.log(JSON.stringify({ bridge: of('bridge', insights.bridge), panels: of('
 
     def test_a_bad_reference_refuses_the_run_once_and_untraced_numbers_are_listed(self):
         with tempfile.TemporaryDirectory() as tmp:
-            def retitle(pages):
-                pages["f3"]["title"] = "The liquidity cushion narrowed from 43.5 million to 8 million"
+            def recell(pages):
                 pages["f0"]["exhibit"]["rows"][6][1] = "64.5%"
-            self.stage(tmp, retitle)
+            self.stage(tmp, recell)
             checked = self.author(tmp, "--check")
             self.assertEqual(checked.returncode, 0, checked.stderr)  # advice, not a refusal
             summary = json.loads(checked.stdout)
-            self.assertEqual(summary["untracedNumbers"], {"f0": ["exhibit.rows[6][1]: 64.5%"], "f3": ["title: 43.5 million"]})
-            self.assertIn("NUMBER_UNTRACED [f3]", summary["advisories"])
+            self.assertEqual(summary["untracedNumbers"], {"f0": ["exhibit.rows[6][1]: 64.5%"]})
+            self.assertIn("NUMBER_UNTRACED [f0]", summary["advisories"])
+
+            # In a title the same slip is refused: the title is the claim the critique reads.
+            def retitle(pages):
+                pages["f3"]["title"] = "The liquidity cushion narrowed from 43.5 million to 8 million"
+            self.stage(tmp, retitle)
+            titled = self.author(tmp, "--check")
+            self.assertEqual(titled.returncode, 2, titled.stderr[-1500:])
+            self.assertIn("TITLE_NUMBER_UNTRACED [f3]", titled.stderr)
+            self.assertIn('["43.5 million"]', titled.stderr)
 
             def unbind(pages):
                 pages["f3"]["exhibit"]["series"][0]["measure"] = "i-liquidity/liquidity"
