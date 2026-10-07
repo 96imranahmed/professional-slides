@@ -28,7 +28,7 @@ from text_stats import content_words
 # itself: its points, its paragraphs, its insight - and the finding set under
 # a panel as a caption (`insight-caption`), which is the page's sentence about
 # that panel, not a label on it.
-COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph",
+COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph", "paragraph-lead",
                     "panel-caption", "insight-caption", "statement-text"}
 EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text",
                       "data-label", "category-label", "category-note", "annotation-text",

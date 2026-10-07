@@ -401,8 +401,8 @@ const cards = {{ id: 'p2', type: 'parallel', form: 'cards', commentary: 'in-exhi
   exhibit: {{ items: [0, 1, 2].map((i) => ({{ title: 'Scenario ' + (i + 1), text: words(64, i) }})) }} }};
 console.log(JSON.stringify({{
   scenarios: error(() => compilePage(memo('Three scenarios divide value across models, apps and clouds', [words(171, 0), words(62, 3), words(61, 5)]))),
-  argument: error(() => compilePage(memo('The funding gap should be borrowed rather than cut', [words(70, 0), words(66, 3), words(64, 5)]))),
-  short: error(() => compilePage(memo('Three scenarios divide value across models, apps and clouds', [words(40, 0), words(35, 3), words(30, 5)]))),
+  argument: error(() => compilePage(memo('The funding gap should be borrowed rather than cut', [0, 3, 5].map((seed) => ({{ lead: 'Costs fall faster than prices', text: words(58, seed) }}))))),
+  short: error(() => compilePage(memo('Three scenarios divide value across models, apps and clouds', [40, 35, 30].map((n, i) => ({{ lead: 'Buyers retain both models', text: words(n, i * 3) }}))))),
   cards: error(() => compilePage(cards)),
 }}));
 ''')
@@ -412,6 +412,68 @@ console.log(JSON.stringify({{
         self.assertIsNone(result["argument"])
         self.assertIsNone(result["short"])
         self.assertIn("SCENARIO_PROSE", result["cards"])
+
+    def test_prose_is_signposted_by_leads_and_held_to_sixty_words_a_paragraph(self):
+        """BA review: a sidebar and a memo of 65 to 95-word paragraphs with no
+        heading or bold read as a wall of grey. Each paragraph of thirty words
+        or more opens under a lead, none runs past sixty, and each is marked."""
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+{PAGE}
+const words = (n, seed) => Array.from({{ length: n }}, (_, i) => ['buyers', 'retain', 'both', 'models', 'while', 'serving', 'costs', 'fall', 'faster', 'than', 'prices'][(i + seed) % 11]).join(' ') + '.';
+const panel = {{ text: 'Borrow the gap in tranches against the milestones: fares repay it within the asset life even on the low case, and cutting to the grant gives up the journeys.' }};
+const page = (paragraphs, extra = {{}}) => ({{ id: 'p1', type: 'argument', form: 'memo', commentary: 'none', ...base, title: 'The funding gap should be borrowed rather than cut', paragraphs, panel, ...extra }});
+const led = (n, seed, extra = {{}}) => ({{ lead: 'Costs fall faster than prices', text: words(n, seed), ...extra }});
+const ok = compilePage(page([
+  led(50, 0),
+  {{ lead: 'Revenue passes its old level', text: 'Fare revenue rose from £340m in FY20 to £512m in FY29 on the central case, the year the covenant is first tested, and repays the loan within the asset life.' }},
+  led(40, 5, {{ highlight: 'serving costs' }}),
+]));
+console.log(JSON.stringify({{
+  long: error(() => compilePage(page([words(80, 0), led(45, 3), words(66, 5)]))),
+  bare: error(() => compilePage(page([words(45, 0), led(45, 3), words(31, 5)]))),
+  wordy: error(() => compilePage(page([{{ lead: 'Costs fall faster than prices do in every one of the markets we studied', text: words(40, 0) }}, led(40, 3), led(40, 5)]))),
+  lost: error(() => compilePage(page([led(40, 0), led(40, 3), led(40, 5, {{ highlight: 'margin squeeze' }})]))),
+  short: error(() => compilePage(page([words(25, 0), led(45, 3), led(45, 5)]))),
+  highlight: ok.highlight,
+  paragraphs: ok.paragraphs,
+}}));
+''')
+        self.assertIn("PROSE_PARAGRAPH_LONG", result["long"])
+        self.assertIn("paragraphs 1 (80 words), 3 (66 words)", result["long"])
+        self.assertIn("PROSE_UNSIGNPOSTED", result["bare"])
+        self.assertIn("1 (45 words, no lead), 3 (31 words, no lead)", result["bare"])
+        self.assertIn("a lead of 14 words", result["wordy"])
+        self.assertIn('"margin squeeze" is not in its lead or its text', result["lost"])
+        self.assertIsNone(result["short"], "a paragraph under thirty words may run without a lead")
+        # The second paragraph is marked on the figure its range reaches, not the one it starts from.
+        self.assertIn("£512m", result["highlight"])
+        self.assertNotIn("£340m", result["highlight"])
+        self.assertEqual(result["paragraphs"][1]["lead"], "Revenue passes its old level")
+
+    def test_a_lead_is_drawn_as_a_bold_subheading_over_its_paragraph(self):
+        """The lead sits on its own line above the prose, in bold, with the
+        paragraph's figure in the accent - a column read by its leads first."""
+        result = run_node(PRELUDE + """
+const prose = [
+  { lead: 'Revenue passes its old level', text: 'Fare revenue rose from £340m in FY20 to £512m in FY29 on the central case, the year the covenant is first tested, and repays the loan within the asset life.' },
+  { lead: 'The real exposure is timing', text: 'A one-year slip in the power upgrade costs a year of payback and pushes fare revenue past the first covenant test, so the loan is drawn in tranches.' },
+  { lead: "The loan is the board's instrument", text: 'Each tranche is released against a milestone, so a stalled lever cannot draw ahead of its evidence, and the board sees the cost of a slip in the month it happens.' },
+];
+const [slide] = compose([{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', ...base, title: 'The funding gap should be borrowed rather than cut', paragraphs: prose,
+  panel: { kicker: 'The recommendation', text: 'Borrow the gap in tranches against the milestones: fares repay it within the asset life even on the low case, and cutting to the grant gives up the journeys.' } }]);
+const leads = slide.nodes.filter((n) => n.role === 'paragraph-lead'), texts = slide.nodes.filter((n) => n.role === 'paragraph');
+console.log(JSON.stringify({ leads: leads.map((n) => ({ text: n.text, bold: n.style.bold, y: n.frame.y, bottom: n.frame.y + n.frame.height })),
+  texts: texts.map((n) => ({ y: n.frame.y, x: n.frame.x, lit: (n.runs || []).filter((r) => r.accent).map((r) => r.text.trim()) })), leadX: leads.map((n) => n.frame.x) }));
+""")
+        self.assertEqual([l["text"] for l in result["leads"]], ["Revenue passes its old level", "The real exposure is timing", "The loan is the board's instrument"])
+        self.assertTrue(all(l["bold"] for l in result["leads"]))
+        for lead, text in zip(result["leads"], result["texts"]):
+            self.assertLessEqual(lead["bottom"], text["y"], "the lead sits above its paragraph")
+            self.assertLess(text["y"] - lead["bottom"], 12, "and close over it, not floating")
+        self.assertEqual(result["leadX"], [t["x"] for t in result["texts"]])
+        # The figure the range reaches is lit in the first paragraph.
+        self.assertIn("£512m", result["texts"][0]["lit"])
 
     def test_a_panel_beside_prose_alone_holds_more_than_a_sentence(self):
         """Fifty-page review: a twenty-word statement set a 700px column of tint that was mostly empty."""
@@ -501,6 +563,10 @@ const raised = {{
   VERDICT_TABLE_PLAIN: said(() => compilePage(lookup([{{ label: 'Criterion', type: 'category' }}, 'Current edge', 'Reason'], [['Consumer reach', 'OpenAI', 'Weekly users'], ['Enterprise adoption', 'Anthropic', 'Ramp panel'], ['Coding', 'No verdict', 'Units differ']]))),
   SCENARIO_PROSE: said(() => compilePage({{ ...base, id: 'a', type: 'argument', form: 'sidebar', commentary: 'none', title: 'Three scenarios divide value across models, apps and clouds',
     paragraphs: [words(171, 0), words(62, 3), words(61, 5)], panel: {{ text: 'The base case is split leadership with a contested middle: models consolidate, applications fragment, and the clouds take the margin that neither of the other two keeps.' }} }})),
+  PROSE_PARAGRAPH_LONG: said(() => compilePage({{ ...base, id: 'w', type: 'argument', form: 'sidebar', commentary: 'none', title: 'The funding gap should be borrowed rather than cut',
+    paragraphs: [{{ lead: 'Costs fall faster than prices', text: words(75, 0) }}, words(20, 3)], panel: {{ text: 'Borrow the gap in tranches against the milestones: fares repay it within the asset life even on the low case, and cutting to the grant gives up the journeys.' }} }})),
+  PROSE_UNSIGNPOSTED: said(() => compilePage({{ ...base, id: 'u', type: 'argument', form: 'sidebar', commentary: 'none', title: 'The funding gap should be borrowed rather than cut',
+    paragraphs: [words(45, 0), words(40, 3)], panel: {{ text: 'Borrow the gap in tranches against the milestones: fares repay it within the asset life even on the low case, and cutting to the grant gives up the journeys.' }} }})),
   SHARES_IN_TILES: said(() => compilePage(strip)),
   MAP_COARSE: said(() => compilePage(map)),
   TITLE_WORDS: said(() => compilePage(line({{ title: 'Revenue rose in every single year of the long eight year run from twenty nineteen to twenty twenty six across all of the regions we serve' }}))),

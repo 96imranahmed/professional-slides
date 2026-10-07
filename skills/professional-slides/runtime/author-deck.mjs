@@ -101,7 +101,7 @@ import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems } from "./page-types.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
-import { textWords } from "./text-contract.mjs";
+import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose-page.mjs";
@@ -1007,7 +1007,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   const withProseFill = (f) => {
     if (!["SCENE_VOID", "WORDS"].includes(f.code) || !proseSlides.has(String(f.id))) return f;
     const slide = proseSlides.get(String(f.id)), budget = (scene.budget ?? []).find((b) => String(b.id ?? "") === String(f.id));
-    const prose = (slide.paragraphs || []).reduce((sum, text) => sum + textWords(text), 0);
+    const prose = (slide.paragraphs || []).reduce((sum, p) => sum + textWords(proseText(p)), 0);
     // What the word ceiling leaves the prose: the page's other body words - its panel - count toward it too.
     const beside = budget ? Math.max(0, budget.body - prose) : 0, ceiling = budget?.ceiling ? Math.floor(budget.ceiling) - beside : undefined;
     const fill = proseFill(slide, slide.density ?? (appendixIds.has(String(f.id)) ? "appendix" : spec.density), ceiling && ceiling > 0 ? ceiling : undefined);

@@ -36,6 +36,23 @@ const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 // text split on whitespace, every token a word.
 export const textWordList = value => { const text = normalizeText(value); return text ? text.split(' ') : []; };
 export const textWords = value => textWordList(value).length;
+// A paragraph as authored: a string, or `{ lead, text }` - the subheading a
+// reader scans by and the prose under it. Every reader of `paragraphs` takes
+// it through these two, so a lead is counted, checked and drawn wherever the
+// prose is.
+export const proseParts = p => (p && typeof p === 'object')
+  ? { lead: typeof p.lead === 'string' ? p.lead.trim() : '', text: String(p.text ?? ''), highlight: [p.highlight ?? []].flat().filter(h => typeof h === 'string' && h.trim()) }
+  : { lead: '', text: String(p ?? ''), highlight: [] };
+// Prose a reader scans by its leads. A paragraph of PROSE_LEAD_FROM words or
+// more opens under a `lead` - a bold subheading of PROSE_LEAD_WORDS words -
+// and none runs past PROSE_PARAGRAPH_MAX: the longest block on a strong
+// deck's prose page is 44 words at the median and 79 at the upper quartile,
+// and a developed block 25 (weight.json textForm). Two memos of 65 to 95-word
+// paragraphs with nothing in bold read as one wall of grey
+// (page-types.mjs PROSE_UNSIGNPOSTED, PROSE_PARAGRAPH_LONG).
+export const PROSE_LEAD_FROM = 30, PROSE_PARAGRAPH_MAX = 60, PROSE_LEAD_WORDS = Object.freeze([2, 8]);
+/** A paragraph's words as the reader meets them: its lead, then its prose. */
+export const proseText = p => { const { lead, text } = proseParts(p); return lead ? `${lead} ${text}` : text; };
 const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}\}/g, (_, id) => {
   const numbers = scene.slides.flatMap((s,i)=>s.id===id || s.sourceSlideId===id ? [i+1] : []);
   return numbers.length ? numbers.length>1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]) : `{{page:${id}}}`;
@@ -122,7 +139,7 @@ export function checkTextPlan(content, {required = false, deck = null} = {}) {
     // table cell - is a wall however it is framed, so it counts here too.
     const runs = new Map();
     for (const b of blocks.filter(b=>['body','qualification','exhibit'].includes(b.role) && !NOTE_LINE.test(b.text))) {
-      const key = String(b.id).replace(/:lead:(\d+)$/, ':item:$1');
+      const key = String(b.id).replace(/:lead:(\d+)$/, ':item:$1').replace(/:lead$/, ':text');
       runs.set(key, (runs.get(key) || 0) + textWords(b.text));
     }
     const longest = runs.size ? Math.max(...runs.values()) : 0;

@@ -37,7 +37,7 @@ import { wordBudgetOf } from "./derive-content.mjs";
 import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
 import { POLARITIES } from "./tables.mjs";
 import { waivedRules, predatedRule, ruleIntroduced } from "./weight.mjs";
-import { textWordList, textWords } from "./text-contract.mjs";
+import { textWordList, textWords, proseParts, PROSE_LEAD_FROM, PROSE_PARAGRAPH_MAX, PROSE_LEAD_WORDS } from "./text-contract.mjs";
 import { deckSchema } from "./deck-keys.mjs";
 import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
@@ -438,7 +438,7 @@ const CONSTRUCTION_DATA = {
 };
 // Forms that read more than their component's sample says.
 const FORM_DATA = {
-  "argument/memo": ["paragraphs (150 to 330 words)", `panel ({ text, kicker }: the conclusion or the figures to keep, down the right; ${PANEL_WORDS_MIN} words or more)`],
+  "argument/memo": ["paragraphs (150 to 330 words; each `{ lead, text }`, the lead a 2-8 word subheading, the text 60 words at most)", `panel ({ text, kicker }: the conclusion or the figures to keep, down the right; ${PANEL_WORDS_MIN} words or more)`],
   "trend/indexed": ["categories", "series (raw values, the subject and three or more peers)", "indexBase (the period set to 100)", "subject (the series in colour)"],
   "ranking/distribution": ["categories (15 to 40 members, sorted by the value)", "series (one measure)", "highlights (the subject)"],
   "ranking/boxplot": ["categories (4 to 12 members)", "boxes (one { min, q1, median, q3, max } per member)", "highlights (the subject)"],
@@ -715,6 +715,8 @@ const REVIEW_RULES = [
   ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps", "a line or an area spaces dated categories by the time between them, so draw the series as one, or say \"snapshots\" or \"selected years\" in the heading"],
   ["VERDICT_TABLE_PLAIN", `on a lookup, options or matrix page, a column headed ${or(VERDICT_WORDS)} whose cells are words`, "give it a `type`: rag, harvey, check, lights, dot, or use a scorecard"],
   ["SCENARIO_PROSE", `two to four alternatives (scenarios, options, paths) as paragraphs of ${SCENARIO_WORDS} words or more each`, "set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal"],
+  ["PROSE_PARAGRAPH_LONG", `a paragraph of more than ${PROSE_PARAGRAPH_MAX} words`, "two led paragraphs, each its own claim"],
+  ["PROSE_UNSIGNPOSTED", `a paragraph of ${PROSE_LEAD_FROM} words or more with no \`lead\`, or a lead outside ${PROSE_LEAD_WORDS.join(" to ")} words`, "write it as `{ lead, text }`: the lead is the subheading the reader scans by, set in bold above the prose"],
 ];
 const ADVISED_RULES = [
   ["SHARES_IN_TILES", "shares of one measure more than five times apart in tiles of one size", "one 0-100% scale"],
@@ -776,7 +778,7 @@ function plainVerdict(headers, rows) {
 /** A page's parallel prose: its paragraphs, points, card texts or row blocks, each as one run with its lead. */
 function proseBlocks(page, exhibits) {
   const joined = (...parts) => parts.flat().filter(Boolean).map((p) => (typeof p === "string" ? p : `${p?.lead ?? ""} ${p?.text ?? ""}`)).join(" ");
-  if ((page.paragraphs || []).length) return page.paragraphs.map((p) => ({ lead: "", text: String(p) }));
+  if ((page.paragraphs || []).length) return page.paragraphs.map(proseParts);
   if ((page.points || []).length) return page.points.map((p) => ({ lead: typeof p === "object" ? String(p?.lead ?? "") : "", text: joined(p) }));
   if (page.form === "labelled-rows") return (page.blocks || []).map((b) => ({ lead: String(b?.label ?? ""), text: joined(b?.points || []) }));
   const items = exhibits.find((ex) => ex?.type === "cards")?.items || [];
@@ -876,11 +878,34 @@ function reviewedDefect(page, id, exhibits, skip = new Set()) {
     if (timePositions(chart.categories)) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
       "Plot the series as a line or an area (the runtime spaces dated points by the time between them), fill in the missing periods, or say in the heading that the columns are snapshots (\"selected years\", \"snapshots\")";
   }
+  const prose = proseDefect(page, id, skip);
+  if (prose) return prose;
   if (["lookup", "options", "matrix"].includes(page.type) && !skip.has("VERDICT_TABLE_PLAIN")) {
     const plain = [...tables, ...(page.type === "matrix" ? [page] : [])].map((ex) => plainVerdict(ex.columns || [], ex.rows)).find(Boolean);
     if (plain) return `${id}: VERDICT_TABLE_PLAIN - the "${plain.header}" column judges each row (${plain.examples.map((e) => `"${e}"`).join(", ")}) in plain text, where it reads as one more fact beside the evidence. ` +
       "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars). Where the column names who leads, declare the companies in the deck's `players`: a cell naming a player is drawn as its logo, which says who without spending a status colour";
   }
+  return null;
+}
+
+/**
+ * Prose a reader cannot scan: paragraphs past PROSE_PARAGRAPH_MAX words, or of
+ * PROSE_LEAD_FROM words or more with no lead to read them by. Every offending
+ * paragraph is named at once, so one rewrite clears the page.
+ */
+function proseDefect(page, id, skip) {
+  const parts = (page.paragraphs || []).map(proseParts);
+  if (!parts.length) return null;
+  const sized = parts.map((p, at) => ({ at: at + 1, lead: p.lead, words: words(p.text).length, leadWords: words(p.lead).length }));
+  const list = (items, say) => items.map((p) => `${p.at} (${say(p)})`).join(", ");
+  const long = sized.filter((p) => p.words > PROSE_PARAGRAPH_MAX);
+  if (long.length && !skip.has("PROSE_PARAGRAPH_LONG"))
+    return `${id}: PROSE_PARAGRAPH_LONG - paragraph${long.length === 1 ? "" : "s"} ${list(long, (p) => `${p.words} words`)} run${long.length === 1 ? "s" : ""} past the ${PROSE_PARAGRAPH_MAX} a strong deck sets in one block. ` +
+      "Split each into two paragraphs that make their own claim, each under its own `lead`, or cut what the exhibit or the panel already says - not the mechanism or the consequence";
+  const bare = sized.filter((p) => (!p.lead && p.words >= PROSE_LEAD_FROM) || (p.lead && (p.leadWords < PROSE_LEAD_WORDS[0] || p.leadWords > PROSE_LEAD_WORDS[1])));
+  if (bare.length && !skip.has("PROSE_UNSIGNPOSTED"))
+    return `${id}: PROSE_UNSIGNPOSTED - paragraph${bare.length === 1 ? "" : "s"} ${list(bare, (p) => (p.lead ? `a lead of ${p.leadWords} words` : `${p.words} words, no lead`))} give${bare.length === 1 ? "s" : ""} the reader nothing to scan by. ` +
+      `Write each as \`{ "lead": "...", "text": "..." }\`: the lead is a ${PROSE_LEAD_WORDS.join(" to ")}-word subheading saying what the paragraph establishes ("Off-peak fares are the weaker lever"), set in bold above it; the text is the reasoning under it`;
   return null;
 }
 
@@ -1132,7 +1157,11 @@ export const countOnlyTitle = (title) => { const t = String(title ?? ""); return
 // on it (and a point with no figure is named, not refused).
 const FIGURE = /(?<![\p{L}\d.,])(?:US\$|A\$|[$£€¥]|(?:AED|USD|EUR|GBP|SAR|QAR)\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:million|billion|trillion|percentage points|bn|mn|m|k|pp|pts|x)(?![\p{L}\d])|%|×)?/gu;
 export function pointFigure(text) {
-  const found = [...String(text ?? "").matchAll(FIGURE)].map((m) => m[0].trim()).filter((figure) => hasPhrase(text, figure));
+  const matches = [...String(text ?? "").matchAll(FIGURE)].map((m) => ({ figure: m[0].trim(), at: m.index })).filter(({ figure }) => hasPhrase(text, figure));
+  // "rose from £176m to £469m": the figure a range starts from is the base, not
+  // the finding, so the one it reaches is marked before it.
+  const from = ({ at }) => /\bfrom\s+$/i.test(String(text).slice(Math.max(0, at - 6), at));
+  const found = [...matches.filter((m) => !from(m)), ...matches.filter(from)].map((m) => m.figure);
   const unit = found.find((figure) => /[%×$£€¥]|[a-z]$|^(?:AED|USD|EUR|GBP|SAR|QAR)/i.test(figure));
   return unit ?? found.find((figure) => !/^(?:19|20)\d\d$/.test(figure)) ?? null;
 }
@@ -1704,6 +1733,19 @@ function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, wa
     });
     if (derived.length) slide.highlight = [...(Array.isArray(page.highlight) ? page.highlight : page.highlight ? [page.highlight] : []), ...derived];
   }
+  // A paragraph carries its colour as a point does: one that none of the
+  // page's phrases lands in is marked on its own figure. Its lead is already
+  // bold, so the accent goes to the number the paragraph turns on.
+  const prose = (page.paragraphs || []).filter((p) => !(p && typeof p === "object" && p.highlight)).map((p) => proseParts(p).text);
+  if ((page.paragraphs || []).length >= 2) {
+    const derived = prose.filter((text) => !phrases.some((p) => p && hasPhrase(text.toLowerCase(), p))).map(pointFigure).filter(Boolean);
+    const marked = slide.highlight ?? page.highlight;
+    if (derived.length) slide.highlight = [...(Array.isArray(marked) ? marked : marked ? [marked] : []), ...derived];
+  }
+  (page.paragraphs || []).map(proseParts).forEach((p, at) => {
+    const lost = p.highlight.find((phrase) => ![p.lead, p.text].some((text) => hasPhrase(text, phrase, { ignoreCase: true })));
+    if (lost) throw new Error(`${id}: paragraph ${at + 1}'s \`highlight\` "${lost}" is not in its lead or its text; use a phrase exactly as the paragraph writes it`);
+  });
   if (["beside", "beside-left", "below"].includes(page.commentary) && !points && !page.paragraphs)
     throw new Error(`${id}: commentary "${page.commentary}" needs the points it places`);
   if (page.commentary === "on-exhibit" && primary?.type?.startsWith("chart.") && !(primary.annotations || []).length && !numberMarked(primary))

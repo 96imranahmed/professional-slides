@@ -4,7 +4,7 @@
 // drawn to it, the so-what close, and how full a page should read (`fill`).
 import { resolveDensityTokens, TOKENS, token, tokenValue } from "./core.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
-import { textWords } from "./text-contract.mjs";
+import { textWords, proseParts, proseText, PROSE_PARAGRAPH_MAX } from "./text-contract.mjs";
 import { measureProse, proseMeasure, measureList } from "./registry-text.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { HUG, SIZE, BODY_HEIGHT, LAYOUT, BODY_WIDTH } from "./compose-body.mjs";
@@ -15,8 +15,15 @@ import { HUG, SIZE, BODY_HEIGHT, LAYOUT, BODY_WIDTH } from "./compose-body.mjs";
 // runs itself (registry-text.mjs paragraphRuns), so every paragraph a page draws
 // takes its emphasis one way, wherever it was built.
 export const paragraph = (id, text, highlight, props = {}) => ({ id, component: "paragraph", props: { text, ...(highlight == null ? {} : { highlight }), ...props }, size: HUG });
+/** One authored paragraph - a string or `{ lead, text }` - with its lead as the subheading above it. */
+export const ledParagraph = (id, p, highlight) => {
+  const { lead, text, highlight: own } = proseParts(p);
+  // A paragraph's own phrase joins the page's, as a point's does.
+  const marked = own.length ? [...[highlight ?? []].flat(), ...own] : highlight;
+  return paragraph(id, text, marked, lead ? { heading: lead } : {});
+};
 /** The page's authored `paragraphs`, each carrying the page's highlight. */
-export const proseOf = (slide, id) => (slide.paragraphs || []).map((text, at) => paragraph(`${id}-p${at}`, text, slide.highlight));
+export const proseOf = (slide, id) => (slide.paragraphs || []).map((p, at) => ledParagraph(`${id}-p${at}`, p, slide.highlight));
 // Points set in columns run up to three across, four two by two and more
 // three across, reading along each row: four across the body are 270px
 // columns, under the measure prose needs, and fail CPL for a placement
@@ -47,26 +54,26 @@ const DOCUMENT_COLUMN_WORDS = 110;
 export function documentItem(slide, id, pointCount) {
   const paragraphs = slide.paragraphs || [];
   if (!paragraphs.length || pointCount) return null;
-  const total = paragraphs.reduce((sum, p) => sum + textWords(p), 0);
+  const total = paragraphs.reduce((sum, p) => sum + textWords(proseText(p)), 0);
   const asked = slide.textColumns;
   if (asked !== undefined && ![1, 2, 3].includes(asked)) throw new Error(`${id}: textColumns is 1, 2 or 3`);
   const count = Math.min(asked ?? Math.min(3, Math.ceil(total / DOCUMENT_COLUMN_WORDS)), paragraphs.length) || 1;
   const columns = balancedColumns(paragraphs, count);
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4",
     size: { width: { fr: 1 }, height: "fill" },
-    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, slide.highlight)) });
+    items: texts.map((p, i) => ledParagraph(`${id}-doc-${c}-p${i}`, p, slide.highlight)) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6", size: SIZE,
     items: columns.filter((texts) => texts.length).map(column) };
 }
 
 /** Paragraphs into `count` columns balanced by words, whole and in reading order. */
 function balancedColumns(paragraphs, count) {
-  const total = paragraphs.reduce((sum, p) => sum + textWords(p), 0);
+  const total = paragraphs.reduce((sum, p) => sum + textWords(proseText(p)), 0);
   const columns = Array.from({ length: count }, () => []);
   let at = 0, filled = 0;
-  for (const text of paragraphs) {
+  for (const p of paragraphs) {
     if (at < count - 1 && filled >= total * (at + 1) / count) at += 1;
-    columns[at].push(text); filled += textWords(text);
+    columns[at].push(p); filled += textWords(proseText(p));
   }
   return columns.filter((texts) => texts.length);
 }
@@ -104,7 +111,7 @@ const atDensity = (density, measure) => (density && density !== "executive" ? wi
 function proseBesideAt(paragraphs, id, room, highlight) {
   const { columns, width, columnGap } = proseFit(paragraphs, room);
   const column = (texts, c) => ({ id: `${id}-doc-${c}`, layout: "flow.column", gap: "space.4", size: { width, height: "fill" },
-    items: texts.map((text, i) => paragraph(`${id}-doc-${c}-p${i}`, text, highlight)) });
+    items: texts.map((p, i) => ledParagraph(`${id}-doc-${c}-p${i}`, p, highlight)) });
   return { id: `${id}-document`, layout: "flow.row", textFlow: "columns", gap: "space.6",
     size: { width: columns.length * width + columnGap * (columns.length - 1), height: "fill" }, items: columns.map(column) };
 }
@@ -123,22 +130,28 @@ function proseBesideAt(paragraphs, id, room, highlight) {
  * a few words either side of the turn change which layout is drawn, not
  * whether it fills.
  */
-function proseFit(paragraphs, room) {
+function proseFit(authored, room) {
+  // Each paragraph as `{ lead, text }`: a lead is a line of its own above the
+  // prose, and a paragraph broken at a sentence keeps its lead on the first part.
+  const paragraphs = authored.map(proseParts);
   const { widest, narrowest } = proseMeasure();
   // The document columns' own gaps, at the density in force: space.4 between paragraphs, space.6 between columns.
   const PROSE_PARAGRAPH_GAP = tokenValue(token("space.4")), PROSE_COLUMN_GAP = tokenValue(token("space.6"));
-  const depth = (texts, width) => texts.reduce((sum, text) => sum + measureProse(text, width), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
+  const depth = (texts, width) => texts.reduce((sum, p) => sum + measureProse(p.text, width, p.lead), 0) + PROSE_PARAGRAPH_GAP * (texts.length - 1);
   // One column, or two broken where the deeper of them is shallowest at that
   // width: between paragraphs, or inside one at a sentence, as a column of
   // type runs on. Balanced by whole paragraphs alone, 91, 71 and 94 words go
   // left and 78 right, and the right column stops a quarter of the page short.
-  const sentences = (text) => text.split(/(?<=[.!?])\s+(?=[A-Z0-9£$€"“])/);
-  const breaks = paragraphs.flatMap((text, at) => {
-    const parts = sentences(text);
+  // A clause is a break too: under its leads a page's paragraphs move between
+  // the columns a heading line at a time, and at sentences alone the two
+  // columns of a 299-word memo stood 361 and 438px deep.
+  const sentences = (text) => text.split(/(?<=[.!?])\s+(?=[A-Z0-9£$€"“])|(?<=[,;:])\s+/);
+  const breaks = paragraphs.flatMap((p, at) => {
+    const parts = sentences(p.text);
     const whole = at ? [[paragraphs.slice(0, at), paragraphs.slice(at)]] : [];
     return [...whole, ...parts.slice(1).map((_, cut) => [
-      [...paragraphs.slice(0, at), parts.slice(0, cut + 1).join(" ")],
-      [parts.slice(cut + 1).join(" "), ...paragraphs.slice(at + 1)]])];
+      [...paragraphs.slice(0, at), { ...p, text: parts.slice(0, cut + 1).join(" ") }],
+      [{ ...p, lead: "", text: parts.slice(cut + 1).join(" ") }, ...paragraphs.slice(at + 1)]])];
   });
   const deepest = (columns, width) => Math.max(...columns.map((texts) => depth(texts, width)));
   const split = (count, width) => count === 1 || !breaks.length ? [paragraphs]
@@ -174,22 +187,37 @@ function proseFit(paragraphs, room) {
  * page's own words run shorter and longer in its own paragraphs, so the range
  * is the one the composer will fill: an author told a column stands empty is
  * told how long the prose has to be, not left to find it a run at a time.
- * `most` caps the search (the page's word ceiling, as words of prose).
+ * `most` caps the search (the page's word ceiling, as words of prose and
+ * their leads); the range is in words of prose, the leads aside.
  */
-export function proseFillRange(paragraphs, room, density, most = 600) {
-  const words = paragraphs.flatMap((text) => String(text).trim().split(/\s+/).filter(Boolean));
-  const shares = paragraphs.map((text) => textWords(text) / Math.max(1, words.length));
-  // The page's own prose at `n` words: its words in order, cycled where it has to run longer, cut into its own paragraphs' proportions.
+export function proseFillRange(authored, room, density, most = 600) {
+  // The leads stay as written; the prose under them is what runs shorter or longer.
+  const paragraphs = authored.map(proseParts);
+  const words = paragraphs.flatMap((p) => p.text.trim().split(/\s+/).filter(Boolean));
+  const shares = paragraphs.map((p) => textWords(p.text) / Math.max(1, words.length));
+  // The page's own prose at `n` words: its words in order, cycled where it has
+  // to run longer, cut into its own paragraphs' proportions - or, where those
+  // would run past PROSE_PARAGRAPH_MAX, into as many equal paragraphs as keep
+  // under it, each under one of the page's leads, as an author lengthening it would write it.
+  const leads = paragraphs.map((p) => p.lead).filter(Boolean);
   const proseOf = (n) => { const run = Array.from({ length: n }, (_, i) => words[i % words.length]); let at = 0;
-    return shares.map((share, p) => { const take = p === shares.length - 1 ? n - at : Math.round(n * share); const text = run.slice(at, at + take).join(" "); at += take; return text; }).filter(Boolean).map((text) => (/[.!?]$/.test(text) ? text : `${text}.`)); };
+    const count = Math.ceil(n / PROSE_PARAGRAPH_MAX), split = count > paragraphs.length && n * Math.max(...shares) > PROSE_PARAGRAPH_MAX;
+    const parts = split ? Array.from({ length: count }, (_, p) => ({ share: 1 / count, lead: leads.length ? leads[p % leads.length] : "" }))
+      : shares.map((share, p) => ({ share, lead: paragraphs[p].lead }));
+    return parts.map(({ share, lead }, p) => { const take = p === parts.length - 1 ? n - at : Math.round(n * share); const text = run.slice(at, at + take).join(" "); at += take; return { lead, text }; })
+      .filter((p) => p.text).map((p) => ({ ...p, text: /[.!?]$/.test(p.text) ? p.text : `${p.text}.` })); };
   return atDensity(density, () => {
     const fills = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.reach >= PROSE_FULL; };
     const fitsOne = (n) => { const fit = proseFit(proseOf(n), room); return fit.reach !== undefined && fit.columns.length === 1; };
     const first = (lo, hi, test) => { while (lo < hi) { const mid = Math.floor((lo + hi) / 2); if (test(mid)) hi = mid; else lo = mid + 1; } return lo; };
+    // `most` is the page's ceiling on body words, and the leads are body words
+    // too: the longest prose it allows is the longest whose leads still fit.
+    const total = (n) => proseOf(n).reduce((sum, p) => sum + textWords(proseText(p)), 0);
+    const cap = Math.max(1, first(1, most + 1, (n) => total(n) > most) - 1);
     // The shortest prose that fills one column at the measure's floor; a column deepens with every word.
-    const min = first(1, most, (n) => fills(n) || !fitsOne(n));
+    const min = first(1, cap, (n) => fills(n) || !fitsOne(n));
     // The longest that still fills: the cap where it fills there, otherwise the longest one column holds.
-    const max = fills(most) ? most : first(min, most, (n) => !fitsOne(n)) - 1;
+    const max = fills(cap) ? cap : first(min, cap, (n) => !fitsOne(n)) - 1;
     return { words: words.length, columns: proseFit(paragraphs, room).columns.length, min, max: Math.max(min, max) };
   });
 }

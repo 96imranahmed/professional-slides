@@ -2715,10 +2715,22 @@
    "adds": null,
    "title": "Northvale should borrow the £160 million gap rather than cut the plan",
    "paragraphs": [
-    "Only the £340 million grant is committed, so the tempting answer is to cut the programme to fit it. That answer drops electrification, which is 61% of the capital and carries 3.8 million of the 11.7 million new journeys, and it keeps the Eastern line running diesel units the rest of the network needs back.",
-    "Borrowing the £160 million is the better risk. The loan is repaid from fare revenue, which passes its FY20 level in FY29 on the central case, the year the covenant is first tested. Even the low demand case repays the whole programme within the 30-year life of the overhead line, in fifteen years rather than eleven.",
-    "The real exposure is timing, not scale. A one-year slip in the power upgrade costs a year of payback and pushes fare revenue past the first covenant test, so the loan should be drawn in tranches as the electrification milestones pass rather than all at the start.",
-    "That makes the loan the programme board's instrument as much as the treasurer's. Each tranche is released against a milestone, so a stalled lever cannot draw ahead of its evidence, and the board sees the cost of a slip in the month it happens."
+    {
+     "lead": "Cutting to the grant is the tempting answer",
+     "text": "Only the £340 million grant is committed. Cutting the programme to fit it drops electrification, which is 61% of the capital and carries 3.8 million of the 11.7 million new journeys, and keeps the Eastern line running diesel units the rest of the network needs back."
+    },
+    {
+     "lead": "Borrowing the £160 million is the better risk",
+     "text": "The loan is repaid from fare revenue, which passes its FY20 level in FY29 on the central case, the year the covenant is first tested. Even the low demand case repays the whole programme within the 30-year life of the overhead line, in fifteen years rather than eleven."
+    },
+    {
+     "lead": "The real exposure is timing, not scale",
+     "text": "A one-year slip in the power upgrade costs a year of payback and pushes fare revenue past the first covenant test, so the loan should be drawn in tranches as the electrification milestones pass rather than all at the start."
+    },
+    {
+     "lead": "The loan is the programme board's instrument",
+     "text": "Each tranche is released against a milestone, so a stalled lever cannot draw ahead of its evidence, and the board sees the cost of a slip in the month it happens."
+    }
    ],
    "source": "Source: illustrative data for a fictional operator; funding plan and demand model central case",
    "panel": {
@@ -3323,10 +3335,22 @@
    "title": "Fare reform should follow the new timetable, not lead it",
    "highlight": "So the order matters",
    "paragraphs": [
-    "Cheaper off-peak fares are the obvious lever, and the one most often proposed. On Northvale's evidence they are the weaker one: lapsed riders cite the wait for the next train twice as often as the fare, and the Coast line, which already sells the cheapest off-peak day return on the network, has the lowest off-peak growth.",
-    "A fare cut on an hourly service mostly discounts trips that would have been made anyway; the Coast line's cheaper day return found exactly that, as most of its tickets went to people already travelling. The same cut on a half-hourly service reaches riders who have just been given a reason to come back, and the revenue it gives up is partly repaid by the extra journeys.",
-    "So the order matters. Run the new Dales and Valley timetables for a full year, measure who they bring back, and then design the part-time season ticket and the off-peak return around the travel patterns that result.",
-    "The cost of waiting is small. Holding fare reform until 2030 forgoes at most 0.4 million journeys a year in FY28 and FY29, the whole of what a first-mover cut would buy, and it gives the demand model a full year of half-hourly data on which to price the new products. A fare designed on a year of evidence is also easier to defend to the regulator and to passengers than one designed on a forecast."
+    {
+     "lead": "Cheaper fares are the weaker lever",
+     "text": "Cheaper off-peak fares are the obvious lever, and the one most often proposed. But lapsed riders cite the wait for the next train twice as often as the fare, and the Coast line, which already sells the cheapest off-peak day return on the network, has the lowest off-peak growth."
+    },
+    {
+     "lead": "Fare cuts on hourly services discount existing trips",
+     "text": "The Coast line's cheaper day return found exactly that: most of its tickets went to people already travelling. The same cut on a half-hourly service reaches riders who have just been given a reason to come back, and the extra journeys partly repay the revenue it gives up."
+    },
+    {
+     "lead": "So the order matters",
+     "text": "Run the new Dales and Valley timetables for a full year, measure who they bring back, and then design the part-time season ticket and the off-peak return around the travel patterns that result."
+    },
+    {
+     "lead": "The cost of waiting is small",
+     "text": "Holding fare reform until 2030 forgoes at most 0.4 million journeys a year in FY28 and FY29, the whole of what a first-mover cut would buy, and gives the demand model a full year of half-hourly data on which to price the new products."
+    }
    ],
    "source": "Source: illustrative data for a fictional operator; fare elasticity from the demand model",
    "panel": {

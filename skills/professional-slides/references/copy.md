@@ -45,6 +45,8 @@ The title and exhibit may complete a simple page's argument without a separate c
 
 Use plain words, short sentences and explicit uncertainty, in complete sentences with the connective words the reasoning needs.
 
+Signpost every block of prose. A reader scans a page by its bold leads before reading a sentence, so each paragraph opens under a lead that says what it establishes ("Off-peak fares are the weaker lever", not "Fares"), carries one phrase in the accent - the number or claim it turns on - and stops by sixty words. Three or four short led paragraphs beside a panel read as an argument; the same words as three unbroken paragraphs read as a wall, whatever they say.
+
 Translate technical terms that can suggest a different ordinary meaning. Network subset capacity checks are not customer demand cuts; model states are not observed outcomes. Name the relevant entity in the visible wording. Column headings name their field concisely; avoid sentence-length headings that repeat the exhibit's purpose, while preserving qualifiers needed to interpret the values.
 
 | Instead of | Write |

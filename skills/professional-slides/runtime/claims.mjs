@@ -16,7 +16,7 @@ import { registered } from "./errors.mjs";
 
 // Text a reader takes as a statement, not a label. Data labels, table cells and
 // axes carry the evidence; the claims are made about it in these roles.
-export const CLAIM_ROLES = new Set(["action-title", "list-lead", "list-item", "list-subitem", "insight-body", "paragraph",
+export const CLAIM_ROLES = new Set(["action-title", "list-lead", "list-item", "list-subitem", "insight-body", "paragraph", "paragraph-lead",
   "footnote-text", "category-note", "fact-text", "spectrum-text", "arrow-row-text", "metric-label", "section-heading"]);
 export const CLAIM_CODES = Object.freeze({
   SUMMARY_UNPROVED: "a summary or close states a figure that no proving page prints",

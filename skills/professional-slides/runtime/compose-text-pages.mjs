@@ -2,7 +2,7 @@
 // (`sidebarPage`), and a page of words alone (`textPage`) - developed points
 // as a ledger, in columns or in rows, a memo's prose beside its panel, or a
 // document's columns of prose.
-import { textWords } from "./text-contract.mjs";
+import { textWords, proseParts } from "./text-contract.mjs";
 import { SIZE, PANEL_MIN_WIDTH, BODY_WIDTH, COLUMN_GAP, HUG, deckDensity } from "./compose-body.mjs";
 import { proseOf, proseBeside, proseFillRange, pointsItem, documentItem, summaryLedger, sideTreatment } from "./compose-points.mjs";
 import { exhibitItem } from "./compose-exhibits.mjs";
@@ -27,7 +27,7 @@ const fitsQuarter = (props) => { try { sideStatementLayout({ x: 0, y: 0, width: 
  * the page's word ceiling leaves it.
  */
 export function proseFill(slide, density, most) {
-  const paragraphs = (slide?.paragraphs || []).filter((text) => typeof text === "string" && text.trim());
+  const paragraphs = (slide?.paragraphs || []).filter((p) => proseParts(p).text.trim());
   const beside = typeof slide?.panel?.text === "string" && slide.panel.text.trim() && paragraphs.length && !(slide.points || []).length && !slide.exhibit && !(slide.exhibits || []).length;
   return beside ? proseFillRange(paragraphs, PROSE_ROOM, density, most) : null;
 }

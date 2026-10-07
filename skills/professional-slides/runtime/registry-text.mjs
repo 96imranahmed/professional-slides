@@ -26,7 +26,11 @@ function paragraphMeasure(frameWidth, props = {}) {
 export const proseMeasure = () => ({ widest: paragraphMeasure(Infinity), narrowest: Math.round(tokenValue(BODY) * 96 / 72 * 0.47 * 45) });
 /** A panel caption's height at a width: compact, the panel's full width (paragraph variant "caption"). */
 export const measureCaption = (text, width) => measureText(text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: false }).height;
-export const measureProse = (text, width) => measureText(text, paragraphMeasure(width), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false }).height;
+export const measureProse = (text, width, heading) => {
+  const body = measureText(text, paragraphMeasure(width), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false }).height;
+  const head = paragraphHeading({ heading }, paragraphMeasure(width));
+  return head ? head.layout.height + head.gap + body : body;
+};
 
 /**
  * The runs a paragraph is set in: its own `runs` where it was given them, else
@@ -468,8 +472,26 @@ function defineParagraph() {
     // insight, and its role says so: set at the foot of the body it is still
     // the page's own commentary, not a note in the footer.
     const caption = props.variant === "caption", runs = paragraphRuns(props);
-    return { nodes: [measuredTextNode({ id: stableId(id, "text"), role: caption ? "insight-caption" : "paragraph", frame: { ...frame, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") })] };
+    // `heading`: the paragraph's lead as a bold subheading on its own line
+    // above it, so a column of prose reads by its leads before its sentences.
+    const head = paragraphHeading(props, width);
+    const nodes = head ? [textPrimitive({ id: stableId(id, "lead"), role: "paragraph-lead", frame: { x: frame.x, y: frame.y, width, height: head.layout.height }, text: head.layout.text, ...(head.layout.runs ? { runs: head.layout.runs } : {}),
+      style: { ...textStyle(BODY, INK, true, props.align || "left", "top"), lineHeight: head.layout.lineHeight }, data: { textLayout: head.layout } })] : [];
+    const below = head ? head.layout.height + head.gap : 0;
+    nodes.push(measuredTextNode({ id: stableId(id, "text"), role: caption ? "insight-caption" : "paragraph", frame: { ...frame, y: frame.y + below, height: frame.height - below, width }, text: props.text, ...(runs ? { runs } : {}), style: textStyle(caption ? COMPACT : BODY, caption ? SECONDARY : INK, false, props.align || "left", "top") }));
+    return { nodes };
   } });
+}
+
+/** A paragraph's subheading measured at its width, and the gap under it; null for a paragraph without one. */
+function paragraphHeading(props, width) {
+  const heading = typeof props.heading === "string" ? props.heading.trim() : "";
+  if (!heading) return null;
+  // A highlight inside the lead is set in the accent on the lead's line, as a point's lead is.
+  const font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY) };
+  const runs = accentRuns(heading, [props.highlight ?? []].flat().filter((phrase) => typeof phrase === "string"), { bold: true, strict: false });
+  const layout = runs?.some((run) => run.accent) ? measureTextRuns(runs.map((run) => ({ ...run, bold: true })), width, font) : measureText(heading, width, { ...font, bold: true });
+  return { layout, gap: tokenValue(token("space.1")) };
 }
 
 function defineBulletList() {
@@ -626,7 +648,10 @@ export function registerTextBlocks(registry) {
       if (typeof props.text !== "string" || !props.text.trim()) throw new Error("paragraph requires a non-empty text string for measurement");
       const runs = paragraphRuns(props);
       if (runs && runs.map((r) => r.text).join("") !== props.text) throw new Error("Paragraph emphasis must preserve exact text");
-      return (runs ? measureTextRuns : measureText)(runs || props.text, paragraphMeasure(frame.width, props), { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false });
+      const width = paragraphMeasure(frame.width, props);
+      const body = (runs ? measureTextRuns : measureText)(runs || props.text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(BODY), bold: false });
+      const head = paragraphHeading(props, width);
+      return head ? { ...body, height: head.layout.height + head.gap + body.height } : body;
     };
     if (["insight", "evidence-note"].includes(definition.id)) definition.measureContent = ({ frame, props }) => { definition.resolveVariant(props); return insightLayout(frame, props); };
     if (definition.id === "callout") definition.measureContent = ({ frame, props }) => calloutLayout(frame, props);

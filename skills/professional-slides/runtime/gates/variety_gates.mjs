@@ -63,6 +63,8 @@ export const VARIETY_CODES = Object.freeze({
   TIME_AXIS_UNEVEN: "a column chart whose dated categories are unevenly spaced in time but drawn one slot apart",
   VERDICT_TABLE_PLAIN: "a lookup, options or matrix table whose judgement column (lead, verdict, confidence, status) is plain text",
   SCENARIO_PROSE: "two to four alternatives written as paragraphs of sixty words or more each",
+  PROSE_PARAGRAPH_LONG: "a paragraph of more than sixty words, longer than a strong deck sets one block",
+  PROSE_UNSIGNPOSTED: "a paragraph of thirty words or more with no bold lead to scan it by",
   // Advisory, raised by the page-type compiler and listed in the author's summary.
   SHARES_IN_TILES: "shares of one measure an order of magnitude apart set in tiles of one size",
   // Deck-level, read here from the compiled pages.
