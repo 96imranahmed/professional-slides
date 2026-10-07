@@ -101,7 +101,7 @@ import { UsageError, isMain, parseCli, pythonBin, readJson, readJsonSync, runCli
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
-import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts } from "./page-types.mjs";
@@ -1771,7 +1771,15 @@ async function renderCheck(compiled, { dir, stem, named }) {
       .map((f) => ({ ...f, ...(typeof f.slide === "number" && idOf(f.slide) ? { id: idOf(f.slide) } : {}), class: classOf(f.code) })));
     const profile = result.densityProfile?.report ? readJsonSync(result.densityProfile.report, { optional: true }) : null;
     const numbered = (st) => ({ ...st, ...(st.pages ? { pages: st.pages.map(idOf) } : {}), ...(st.each ? { each: Object.fromEntries(Object.entries(st.each).map(([key, value]) => [idOf(key) ?? key, value])) } : {}) });
-    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories,
+    // A page run keeps what it rendered, one image a page by its id: writers checking their own pages side by side each see
+    // theirs, where the render was otherwise thrown away with the run's working folder.
+    let saved = null;
+    if (named && result.render?.renders?.length) {
+      saved = path.join(dir, "out", "page-check");
+      mkdirSync(saved, { recursive: true });
+      result.render.renders.forEach((file, at) => { const id = idOf(at + 1); if (id) copyFileSync(file, path.join(saved, `${id}.png`)); });
+    }
+    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories, ...(saved ? { saved } : {}),
       standings: named || !result.gates ? [] : [...(result.gates.standings ?? []).map(numbered), ...(profile?.standings ?? [])] };
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
@@ -2251,7 +2259,7 @@ async function main(argv) {
   const summary = { ...deckSummary({ values, draft, insights, spec, advisories: shown, pageGatesRan, pageGatesError }), ...(compiled.assets ? { assets: compiled.assets } : {}), standing,
     ...(revision ? { revision: { ...revision, ...(unheld.size ? { notHeld: Object.fromEntries([...unheld].flatMap(([why, codes]) => codes.map((code) => [code, why]))) } : {}), ...(readAsChanged?.unheld.length ? { readAsChanged: readAsChanged.unheld } : {}) } } : {}),
     ...(share ? { pages: share } : {}), ...(beyond.length ? { structureElsewhere: beyond.map((f) => f.code) } : {}), ...(aggregatesBeyond.length ? { aggregatesElsewhere: aggregatesBeyond.map((f) => f.code) } : {}),
-    ...(rendered ? { render: rendered.ran ? { slides: rendered.slides, seconds: Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10, blockers: rendered.blockers.length } : { skipped: rendered.reason } } : {}) };
+    ...(rendered ? { render: rendered.ran ? { slides: rendered.slides, seconds: Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10, blockers: rendered.blockers.length, ...(rendered.saved ? { images: path.relative(dir, rendered.saved) } : {}) } : { skipped: rendered.reason } } : {}) };
   if (draft) content.textContract = "draft";
   console.error(`${tail}\n`);
   if (values.check || named) {

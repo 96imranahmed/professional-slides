@@ -290,7 +290,7 @@ console.log(JSON.stringify(Object.fromEntries(['CHF1.3bn in FY26, up 4.3% on 500
 ''')
         self.assertEqual(result["CHF1.3bn in FY26, up 4.3% on 500X routes"], ["CHF1.3bn:measure", "4.3%:measure"])
         self.assertEqual(result["US$4.3bn and £390m against SEK7.8bn"], ["US$4.3bn:measure", "£390m:measure", "SEK7.8bn:measure"])
-        self.assertEqual(result["GBP 1.2bn"], ["1.2bn:measure"])
+        self.assertEqual(result["GBP 1.2bn"], ["GBP 1.2bn:measure"])  # an ISO code set apart by a space is the figure's currency
         self.assertEqual(result["+900% (FY25: 47)"], ["+900%:measure", "47:integer"])
         self.assertEqual([result["FY26"], result["Q3 2024"]], [[], ["2024:period"]])
         self.assertEqual(result["4.3pp at 2.9x"], ["4.3pp:measure", "2.9x:measure"])

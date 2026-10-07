@@ -36,6 +36,29 @@ QATAR = """{heading:'Qatar airline passengers',unit:'million',categories:['FY24'
  series:[{name:'Passengers',values:[40,43.1,41.8,45.3,49.1,53.2]}],forecastFrom:'FY27'}"""
 
 
+
+class EventBandTests(unittest.TestCase):
+    def test_an_event_flag_takes_the_depth_its_label_needs(self):
+        """Hundred-page deck: a one-line event flag stood over some fifty pixels of empty band above the plot."""
+        result = run_node('''
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = { x: 0, y: 0, width: 900, height: 420 };
+const base = { categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], series: [{ name: 'Flights', values: [470, 200, 194, 380, 455, 476, 484] }], heading: 'Heathrow flights, thousands', unit: 'thousands' };
+const one = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid' }] } }).nodes;
+const two = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid grounds most flying' }, { at: '2022', label: 'Recovery begins across the network' }] } }).nodes;
+const flag = (nodes) => nodes.filter((n) => n.role === 'chart-event-label').map((n) => ({ y: n.frame.y, bottom: n.frame.y + n.frame.height }));
+const top = (nodes) => Math.min(...nodes.filter((n) => n.role === 'chart-area').map((n) => n.frame.y));
+console.log(JSON.stringify({ one: flag(one), two: flag(two), plotOne: top(one), plotTwo: top(two) }));
+''')
+        [flag] = result["one"]
+        # One flag of one line: its band is the line it takes and a small gap, not 70px.
+        self.assertLess(result["plotOne"] - flag["y"], 40, result)
+        # Two flags stagger into two rows, each as deep as its label, the second under the first.
+        first, second = result["two"]
+        self.assertGreaterEqual(second["y"], first["bottom"])
+        self.assertLessEqual(second["bottom"], result["plotTwo"] + 1)
+
+
 class AxisTests(unittest.TestCase):
     """A value axis holds its data, and a fitted domain leaves no dead band."""
 

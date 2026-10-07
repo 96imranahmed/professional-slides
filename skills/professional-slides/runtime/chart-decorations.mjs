@@ -66,7 +66,7 @@ export function normalizedHighlights(props, { categories = [], series = [], allo
  * `events: [{ at, label }]` drops a dashed line at a category from a flag above
  * the plot ("Mar 9: lockdown"). Both reserve their band in chartFrame.
  */
-const PERIOD_BAND = 34, EVENT_BAND = 70, EVENT_LABEL_WIDTH = 150;
+const PERIOD_BAND = 34, EVENT_LABEL_WIDTH = 150;
 export function normalizePeriods(props = {}, categories = []) {
   if (props.periods === undefined) return [];
   if (!Array.isArray(props.periods) || !props.periods.length) throw new Error("periods must be a nonempty array of { from, to, label }");
@@ -88,9 +88,19 @@ export function normalizeEvents(props = {}, categories = []) {
   });
 }
 const PERIOD_LABEL_GAP = 26;
+// Event flags stand in two staggered rows above the plot, each as deep as its tallest label: a band of fixed depth held a
+// one-line flag over some fifty pixels of nothing, which read as a strip left empty above the chart.
+const EVENT_ROW_GAP = 6;
+const eventLabel = (label) => measureText(label, EVENT_LABEL_WIDTH, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL) });
+function eventRows(events) {
+  const rows = [0, 0];
+  events.forEach((event, index) => { rows[index % 2] = Math.max(rows[index % 2], eventLabel(event.label).height); });
+  return rows;
+}
+const eventBandHeight = (events) => { if (!events.length) return 0; const [first, second] = eventRows(events); return first + EVENT_ROW_GAP + (events.length > 1 ? second + EVENT_ROW_GAP : 0); };
 export function periodBandHeight(props = {}, categories = []) {
   // The period band clears the value labels above the tallest column (26px).
-  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + (normalizeEvents(props, categories).length ? EVENT_BAND : 0);
+  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories));
 }
 function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   const periods = normalizePeriods(props, categories), events = normalizeEvents(props, categories);
@@ -102,7 +112,7 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   const centre = (i) => frames[i].labelCenter !== undefined ? frames[i].labelCenter : frames[i].x + frames[i].width / 2;
   // Above the plot, in order: value labels, any growth-arrow band, event flags, then periods.
   const changeBand = chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: null }).top;
-  const eventsTop = plot.y - (events.length ? EVENT_BAND : 0);
+  const eventsTop = plot.y - eventBandHeight(events), rows = eventRows(events);
   const periodsTop = eventsTop - changeBand - (periods.length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0);
   periods.forEach((period, index) => {
     const x1 = left(period.from) + 4, x2 = right(period.to) - 4, y = periodsTop + PERIOD_BAND - 8;
@@ -116,8 +126,8 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   });
   events.forEach((event, index) => {
     const x = centre(event.index);
-    const row = index % 2, labelTop = eventsTop + row * 34;
-    const label = measureText(event.label, EVENT_LABEL_WIDTH, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL) });
+    const row = index % 2, labelTop = eventsTop + (row ? rows[0] + EVENT_ROW_GAP : 0);
+    const label = eventLabel(event.label);
     if (label.lines.length > 2) throw new Error(`event label "${event.label}" exceeds two lines; shorten it`);
     // The flag sits to the right of its line, or to the left near the plot's edge.
     const fits = x + 6 + label.width <= plot.x + plot.width;

@@ -83,10 +83,22 @@ console.log(JSON.stringify({
   // A percentage typed for a recorded ratio, a hundred times over; not for a quantity that happens to hold the digits.
   ratio: title('Conversion reached 57% of the visits in the last year'), money: title('A share of 1.6% of the visits came in the last year') }));
 ''')
-        self.assertEqual(result["wrong"], ["title: 1600bn"])  # neither 1.6 kept in billions nor 1,600 kept in millions
+        self.assertEqual(result["wrong"], ["title: CHF 1600bn"])  # neither 1.6 kept in billions nor 1,600 kept in millions
         self.assertEqual([result["billions"], result["millions"], result["words"], result["unscaled"]], [[], [], [], []])
         self.assertEqual(result["ratio"], [])
         self.assertEqual(result["money"], ["title: 1.6%"])
+
+    def test_a_figure_in_one_currency_states_no_measure_kept_in_another(self):
+        # Hundred-page deck: "£7bn" (a plan, in pounds) was read as a euro fuel guide of 7,000 EUR m and printed "in two formats".
+        result = run_node(LOG + '''
+const title = (text) => untraced({ title: text });
+console.log(JSON.stringify({ francs: title('Revenue reached CHF 1.6bn by the end of the plan period'), pounds: title('Revenue reached £1.6bn by the end of the plan period'),
+  code: title('Revenue reached GBP 1.6bn by the end of the plan period'), bare: title('Revenue reached 1.6bn by the end of the plan period') }));
+''')
+        self.assertEqual(result["francs"], [])
+        self.assertEqual(result["pounds"], ["title: £1.6bn"])
+        self.assertEqual(result["code"], ["title: GBP 1.6bn"])
+        self.assertEqual(result["bare"], [], "a figure that names no currency is read in the unit's")
 
     def test_a_unit_that_names_no_scale_is_whole_units(self):
         # "visits", "employees" and "km" name no scale, and any scaled figure

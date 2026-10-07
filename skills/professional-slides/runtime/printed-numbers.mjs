@@ -21,7 +21,9 @@ import { isPercentUnit, isRatioUnit } from "./measures.mjs";
 const NUMBER = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
 // A currency directly before the digits: a symbol, with the letters that
 // qualify it ("US$", "A$"), or a two- or three-letter code ("CHF", "GBP").
-const LEAD = /([+\-−–])?((?:[A-Za-z]{1,3})?[$£€¥]|[A-Z]{2,3})?$/;
+// The sign and the currency before the digits: a symbol ("£", "US$"), a code set against them ("CHF26m"), or an ISO code
+// set apart by a space ("GBP 1.6bn"), which only the known codes are, so a capitalised word is not read as one.
+const LEAD = /([+\-−–])?((?:[A-Za-z]{1,3})?[$£€¥]|[A-Z]{2,3}|(?:USD|EUR|GBP|CHF|JPY|CNY|INR|AED|SAR|QAR|AUD|CAD|NZD|SGD|HKD|SEK|NOK|DKK) )?$/;
 // A scale set against the digits: "26m", "1.3bn", "40k". In capitals it is one only on a number otherwise marked as a
 // measurement ("$5M", "1.3BN"): "4K" and "5G" are names.
 const SCALE_ATTACHED = /^(k|mn|m|bn|b|tn)(?![A-Za-z])/, SCALE_CAPITAL = /^(K|MN|M|BN|B|TN)(?![A-Za-z])/;
@@ -197,12 +199,31 @@ const SCALES = [1e3, 1e6, 1e9];
  * no unit says whether the value is a percentage (`percent`); the scale check
  * then has nothing to compare.
  */
+// The currency a printed mark or a unit names: a symbol ("£", "US$", "€") or an ISO code ("GBP", "CHF"). A dollar
+// sign alone is any dollar - US, Australian, Canadian - so it is held against the unit's family, not its country.
+const CODES = /\b(USD|EUR|GBP|CHF|JPY|CNY|RMB|INR|AED|SAR|QAR|KWD|AUD|CAD|NZD|SGD|HKD|SEK|NOK|DKK|PLN|TRY|BRL|ZAR|KRW)\b/i;
+const DOLLARS = new Set(["USD", "AUD", "CAD", "NZD", "SGD", "HKD", "DOLLAR"]);
+function currencyOf(text) {
+  const said = String(text ?? "");
+  const code = CODES.exec(said)?.[1]?.toUpperCase();
+  if (code) return code === "RMB" ? "CNY" : code;
+  if (/£/.test(said)) return "GBP";
+  if (/€/.test(said)) return "EUR";
+  if (/¥/.test(said)) return "JPY";
+  if (/\$/.test(said)) return /^(?:US)?\$$/i.test(said.trim()) ? "DOLLAR" : null;
+  return null;
+}
+const sameCurrency = (a, b) => a === b || (DOLLARS.has(a) && DOLLARS.has(b) && (a === "DOLLAR" || b === "DOLLAR" || a === b));
+
 export function states(printed, recorded, { unit = null, percent = isPercentUnit(unit), rounded = false } = {}) {
   if (recorded === null || recorded === undefined) return false;
+  // "£7bn" states no measure kept in euros, whatever the digits: a deck's £7bn plan is not its €7.0bn fuel bill.
+  const marked = printed.currencyMark ? currencyOf(printed.currencyMark) : null, kept = unit ? currencyOf(unit) : null;
+  if (marked && kept && !sameCurrency(marked, kept)) return false;
   if (printed.sign && recorded !== 0 && Math.sign(recorded) !== printed.sign) return false;
-  const kept = unitScale(unit);
+  const scaleKept = unitScale(unit);
   const near = (factor = 1) => matches(printed.n, Math.abs(recorded) * factor, { decimals: printed.decimals, percent, rounded });
-  if (printed.scale && kept) return near(kept / printed.scale);
+  if (printed.scale && scaleKept) return near(scaleKept / printed.scale);
   if (near()) return true;
   if (printed.scaled && SCALES.some((f) => near(f) || near(1 / f))) return true;
   return Boolean(printed.percent) && isRatioUnit(unit) && near(100);
