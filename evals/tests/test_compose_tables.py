@@ -259,8 +259,12 @@ assert.equal(roles.filter(r=>r==='table-progress-fill').length,3);
 assert.equal(roles.filter(r=>r==='table-dot').length,3);
 assert.equal(roles.filter(r=>r==='table-check').length,3);
 const bands=nodes.filter(n=>n.role==='table-row-band');
-assert.deepEqual(bands.map(n=>n.data.rowStyle),['group','total']);
+assert.deepEqual(bands.map(n=>n.data.rowStyle),['total']);
 assert.ok(bands.every(n=>n.frame.width>frame.width-12&&n.frame.x===frame.x),'row bands run the full table width');
+// A group row is a subheading on one heavier rule across the table, not a band.
+const groupRule=nodes.find(n=>n.role==='table-group-rule');
+assert.equal(groupRule.data.row,1);assert.equal(groupRule.frame.x,frame.x);assert.ok(groupRule.frame.width>frame.width-12);
+assert.equal(groupRule.style.lineWidth.tokenId,'line.standard');
 const column=nodes.find(n=>n.role==='table-column-band');assert.equal(column.data.column,1);
 const pill=nodes.find(n=>n.role==='table-status-pill');assert.equal(pill.style.fill.tokenId,'color.negative');assert.equal(pill.style.radius.tokenId,'radius.round');
 const lit=nodes.filter(n=>n.role==='table-lamp'&&n.data.lit);assert.deepEqual(lit.map(n=>n.data.lamp),['red','green','amber']);
@@ -739,6 +743,43 @@ const short=styleTable({columns:['Market','Prize',{label:'Decision',implication:
 const shortAt=short.columns.findIndex(c=>c.type==='implication');
 assert.equal(short.columns[shortAt].divider,undefined);
 assert.ok(short.rows.every(r=>r[shortAt].draw===undefined));
+console.log('{}');
+''')
+
+
+class TableRowDeviceTests(unittest.TestCase):
+    def test_a_verdict_beside_stripes_and_groups_is_one_highlight_on_rows_that_read_across(self):
+        """A seven-group peer table drew every "What it means" cell as a grey box
+        over the stripes beside one highlighted row, split its row rules at the
+        implication gutter, and set its group subheadings in the stripes' grey."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {renderTable} from './skills/professional-slides/runtime/tables.mjs';
+import {styleTable} from './evals/support/compose.mjs';
+const frame={x:60,y:140,width:1160,height:420};
+const group=(text)=>({style:'group',cells:[{type:'text',text},'','','','']});
+const row=(n)=>[`Group ${n}`,`Airlines ${n}`,`${100+n}`,`${n}.5`,`Reads ${n} across`];
+const ex=styleTable({columns:['Group','Airlines',{label:'Fleet',unit:'aircraft'},{label:'Value',unit:'$bn'},{label:'What it means for BA',implication:true}],
+  rows:[group('Network groups'),row(1),row(2),row(3),group('Challengers'),row(4),row(5),row(6),row(7)],highlightRow:1});
+const nodes=renderTable({id:'t',frame,props:{...ex,zebra:true}}).nodes;
+// One highlight: the highlighted row's band; no verdict cell is boxed.
+assert.equal(nodes.filter(n=>n.role==='table-cell').length,0,'no verdict cell takes its own tint');
+assert.equal(nodes.filter(n=>n.role==='table-row-band').length,1);
+// Stripes and rules cross the gutter: every stripe runs the table's width.
+const stripes=nodes.filter(n=>n.role==='table-zebra-band');
+assert.ok(stripes.length>0&&stripes.every(n=>n.frame.x===frame.x&&n.frame.width>frame.width-12));
+const rules=renderTable({id:'r',frame,props:{...ex,zebra:false}}).nodes.filter(n=>n.role==='table-rule'&&n.data.rule==='row');
+assert.ok(rules.length>=5&&rules.every(n=>n.frame.x===frame.x&&n.frame.width>frame.width-12),'row rules are not split at the gutter');
+// Stripes restart under each subheading: the first row of a group is white.
+const stripedRows=stripes.map(n=>n.data.row);
+assert.ok(!stripedRows.includes(5),'the first challenger opens on a white row');
+assert.ok(stripedRows.includes(6));
+assert.equal(nodes.filter(n=>n.role==='table-group-rule').length,2);
+const label=nodes.find(n=>n.role==='table-cell-text'&&n.text==='Challengers');
+assert.equal(label.style.bold,true);
+// A plain verdict table with nothing else running down its rows keeps the tint.
+const plain=renderTable({id:'p',frame,props:{...styleTable({columns:['Option','Cost','Verdict'],rows:[['A','1','Pick this'],['B','2','Not this']]}),zebra:false}}).nodes;
+assert.equal(plain.filter(n=>n.role==='table-cell').length,2);
 console.log('{}');
 ''')
 

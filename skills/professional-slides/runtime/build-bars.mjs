@@ -99,7 +99,7 @@ export function rowBlockSmallTable(slide, instance) {
   const key = instance.instanceId ?? instance.id;
   const nodes = (slide.nodes || []).filter((n) => n.data?.componentInstance === key);
   if (!nodes.some((n) => (n.data?.componentAncestors || []).some((a) => ROW_BLOCK.test(String(a))))) return false;
-  const banded = new Set(nodes.filter((n) => n.role === "table-row-band" && ["total", "group"].includes(n.data?.rowStyle)).map((n) => n.data.row));
+  const banded = new Set(nodes.filter((n) => ["table-row-band", "table-group-rule"].includes(n.role) && ["total", "group"].includes(n.data?.rowStyle)).map((n) => n.data.row));
   const body = new Set(nodes.map((n) => n.data?.row).filter((row) => Number.isInteger(row) && !banded.has(row))).size;
   return body > 0 && body < ROW_BLOCK_TABLE_ROWS;
 }

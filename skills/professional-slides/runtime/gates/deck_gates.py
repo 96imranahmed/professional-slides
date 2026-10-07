@@ -114,7 +114,7 @@ def row_block_small_table(slide, instance):
         return False
     rows = {(n.get("data") or {}).get("row") for n in nodes}
     banded = {(n.get("data") or {}).get("row") for n in nodes
-              if n.get("role") == "table-row-band" and (n.get("data") or {}).get("rowStyle") in ("total", "group")}
+              if n.get("role") in ("table-row-band", "table-group-rule") and (n.get("data") or {}).get("rowStyle") in ("total", "group")}
     body = len({r for r in rows - banded if isinstance(r, int)})
     return 0 < body < ROW_BLOCK_TABLE_ROWS
 

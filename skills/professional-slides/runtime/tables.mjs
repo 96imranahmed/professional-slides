@@ -526,8 +526,10 @@ function heatFill(scale, value) {
   );
 }
 const foreground = onFill;
+// A group row is a subheading, not a band: drawn in the zebra's grey it read
+// as one more striped row, so it is a bold label on a heavier rule instead.
 const rowBand = (style) =>
-  style === "accented" ? t("color.accentTint") : style === "total" ? primary : style === "group" ? t("color.surfaceMuted") : null;
+  style === "accented" ? t("color.accentTint") : style === "total" ? primary : null;
 const categorySurface = (cell, props) =>
   cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
@@ -1539,8 +1541,16 @@ function drawRowBands(table) {
   // Zebra rows (house style): every second body row on a muted band, no row
   // rules, for open and standard tables that carry no filled category column.
   const zebra = (props.zebra ?? (houseStyle("style.tableRows") === "zebra")) && props.treatment !== "categories" && props.headerShape !== "chevron";
+  // The stripes restart under each group subheading, so every group opens on
+  // a white row rather than on whichever parity the rows above left it.
+  const striped = new Set();
+  let inGroup = 0;
+  m.rows.forEach((row, r) => {
+    if ((row.style ?? props.rowStyle) === "group") { inGroup = 0; return; }
+    if (inGroup++ % 2 === 1) striped.add(r);
+  });
   if (zebra) m.cells.forEach((row, r) => {
-    if (r % 2 === 0 || rowBand(m.rows[r].style ?? props.rowStyle)) return;
+    if (!striped.has(r) || rowBand(m.rows[r].style ?? props.rowStyle)) return;
     nodes.push(rectPrimitive({ id: stableId(id, "zebra", r), role: "table-zebra-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(t("color.surfaceMuted")), data: { row: r, zebra: true } }));
   });
   // The row labels on one filled column from the header to the last row, over
@@ -1564,6 +1574,21 @@ function drawRowBands(table) {
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
   });
+  // A group subheading: its bold label sits on one heavier rule across the
+  // whole table, as the reference decks split a table into its groups.
+  m.rows.forEach((row, r) => {
+    if ((row.style ?? props.rowStyle) !== "group") return;
+    const y = ys[r] + m.heights[r];
+    nodes.push(linePrimitive({ id: stableId(id, "group-rule", r), role: "table-group-rule", x1: frame.x, y1: y, x2: frame.x + frame.width - m.gap, y2: y,
+      style: { stroke: primary, lineWidth: t("line.standard") }, data: { row: r, rowStyle: "group" } }));
+  });
+  // A verdict column's tint is one highlight; on a table already carrying a
+  // row device - stripes, a highlighted row or column, group subheadings, an
+  // implication gutter - it boxed every verdict cell against the stripes and
+  // read as a second highlight on every row, so there it is set as text.
+  const quietVerdict = zebra || Number.isInteger(props.highlightColumn)
+    || m.rows.some((row) => ["accented", "group"].includes(row.style ?? props.rowStyle))
+    || m.columns.some((column) => column?.type === "implication");
   // The implication gutter as one device for the whole table: a dashed rule down
   // its own column with the disc centred on it, rather than a chevron sitting on
   // whichever row happens to be halfway down. On a twelve-market scorecard that
@@ -1600,7 +1625,7 @@ function drawRowBands(table) {
       id: stableId(id, "implication-chevron", c, part), role: "table-implication", x1, y1, x2, y2,
       style: { stroke: foreground(primary), lineWidth: t("line.standard") }, data: { ...data, arrowPart: part + 1 } })));
   });
-  return { zebra };
+  return { zebra, striped, quietVerdict };
 }
 
 /** Where cells sit: one pill per bubble column, and the rows whose cells centre on a picture or a filled label block. */
@@ -1673,7 +1698,7 @@ function drawTableCell(table, cell, r, c) {
   // tinted cell - the same device the change annotation uses on a chart, so
   // one column of an otherwise flat table carries the emphasis.
   const bubble = cell.type === "highlight" && cell.surface === "bubble";
-  if (cell.type === "highlight") fill = bubble ? primary : t("color.componentPrimaryTint");
+  if (cell.type === "highlight") fill = bubble ? primary : table.quietVerdict ? null : t("color.componentPrimaryTint");
   if (cell.type === "heatmap")
     fill = heatFill(cell.scaleRecord, cell.value);
   if (cell.highlight === true) {
@@ -1706,7 +1731,8 @@ function drawTableCell(table, cell, r, c) {
   // `tone: "positive" | "negative"` on a text cell colours a signed change
   // (the "difference to prior year" rows of the financial tables).
   const onLabel = labelTint && c === 0 && !band;
-  const color = fill ? foreground(fill) : band ? foreground(band) : onLabel ? foreground(tint) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
+  const groupLabel = (m.rows[r].style ?? props.rowStyle) === "group";
+  const color = fill ? foreground(fill) : band ? foreground(band) : groupLabel ? primary : onLabel ? foreground(tint) : cell.tone === "positive" ? t("color.positive") : cell.tone === "negative" ? t("color.negative") : ink;
   const inner = {
     x: area.x + m.padding,
     y: area.y + m.paddingY,
@@ -1750,20 +1776,22 @@ function drawCellMarkers(table, cell, at) {
 
 /** The rule under the cell's row: one continuous rule, split at the implication gutter, or none where zebra bands replace it. */
 function drawRowRule(table, cell, at) {
-  const { frame, props, m, nodes, runStart, runEndX, zebra } = table;
+  const { frame, props, m, nodes, zebra } = table;
   const { r, c, height, area, cellId, data } = at;
+  // A group subheading draws its own heavier rule (drawRowBands).
+  if ((m.rows[r].style ?? props.rowStyle) === "group") return;
   if (cell.type !== "implication" && r + cell.rowSpan < m.rows.length) {
     // One continuous rule per row unless the row is a run of filled
-    // category boxes, whose slits are part of the design.
-    const continuous = props.treatment !== "categories" && cell.rowSpan === 1 && !m.columns.some((col) => col.type === "implication");
-    // Split only at the implication gutter, as the header rule is.
-    const gutterRun = !continuous && props.treatment !== "categories" && cell.rowSpan === 1 && m.cells[r].every((other) => !other || (other.rowSpan ?? 1) === 1);
-    if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (gutterRun ? runStart(c) : (!continuous || c === 0)) nodes.push(
+    // category boxes, whose slits are part of the design. The rule crosses
+    // the implication gutter: split there, the verdict's rows stopped lining
+    // up with the evidence they are read from.
+    const continuous = props.treatment !== "categories" && cell.rowSpan === 1;
+    if (zebra && continuous) { /* zebra bands replace the row rules */ } else if (!continuous || c === 0) nodes.push(
       line(
         stableId(cellId, "rule"),
         area.x,
         area.y + height,
-        continuous ? frame.x + frame.width - m.gap : gutterRun ? runEndX(c) : area.x + area.width - m.gap,
+        continuous ? frame.x + frame.width - m.gap : area.x + area.width - m.gap,
         area.y + height,
         "table-rule",
         { ...data, rule: "row" },
@@ -1966,7 +1994,7 @@ function drawBars(table, cell, at) {
     xScale = value => inner.x + plot * (value - scale.min) / (scale.max - scale.min),
     zeroX = xScale(0),
     contentY = inner.y + (inner.height - l.height) / 2,
-    focusSurface = fill || band || (props.highlightColumn === c ? t("color.accentTint") : zebra && r % 2 ? t("color.surfaceMuted") : t("color.surface"));
+    focusSurface = fill || band || (props.highlightColumn === c ? t("color.accentTint") : zebra && table.striped.has(r) ? t("color.surfaceMuted") : t("color.surface"));
   if (scale.min < 0) nodes.push(line(stableId(cellId, "zero"), zeroX, area.y, zeroX, area.y + height, "table-bar-axis", { ...data, domain: [scale.min, scale.max] }));
   cell.values.forEach((value, i) => {
     const y = contentY + i * (l.rowHeight + m.gap),
