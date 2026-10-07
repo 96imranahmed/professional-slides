@@ -1711,7 +1711,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1910,6 +1910,21 @@ function writePlan(file, plan) {
 }
 
 /**
+ * The deck's planned logos and photographs fetched into assets/ before it is
+ * composed (`--fetch-assets`), as the build fetches them: the pages compiled
+ * once to find what they plan, then each placeholder without a file filled
+ * from the network. Returns the line the run prints.
+ */
+async function fetchAssets(doc, { insights, baseDir }) {
+  const { spec } = compileDeck(doc, { insights, partial: true });
+  const copy = structuredClone(spec);
+  const logos = await autoFillLogos(copy, baseDir, { hint: copy.playersHint, fetchMissing: true }).catch((error) => ({ failed: [error.message] }));
+  const pictures = await autoFillPictures(copy, baseDir, { fetchMissing: true }).catch((error) => ({ failed: [error.message] }));
+  const failed = [...(logos?.failed ?? []), ...(pictures?.failed ?? [])];
+  return `Assets fetched into assets/: ${logos?.fetched?.length ?? 0} logo${logos?.fetched?.length === 1 ? "" : "s"} and ${pictures?.filled ?? 0} photograph${pictures?.filled === 1 ? "" : "s"} placed${failed.length ? `; not fetched: ${failed.slice(0, 6).join("; ")}${failed.length > 6 ? "; ..." : ""}` : ""}. fetch-pictures.mjs <id>.deck.json --dry-run names each photograph before it is fetched`;
+}
+
+/**
  * The disclosed periods or members written where a SPINE_UNDRAWABLE finding
  * says to write them (`--plan --write`): on a `basis` stub that shows a gapped
  * measure, its `labels` or `members` without the undisclosed ones; on a bound
@@ -2081,7 +2096,7 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" } }, { usage: USAGE });
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2143,6 +2158,10 @@ async function main(argv) {
   let compiled, insights = null;
   try {
     insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) });
+    // `--fetch-assets`: the planned logos and photographs fetched now, into assets/, so this run and every check after it
+    // composes and renders the pages with them - a title that fits beside no photograph, a page whose picture is of the
+    // wrong thing, are seen at the compile rather than after the build. The choice is the build's (fetch-pictures.mjs).
+    if (values["fetch-assets"]) console.error(await fetchAssets(doc, { insights, baseDir: dir }));
     const fitCache = await openFitCache(path.join(dir, `${stem}.author-cache.json`), { doc, insights, fitCap });
     compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named });
     await fitCache.save();

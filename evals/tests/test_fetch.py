@@ -62,6 +62,38 @@ console.log(JSON.stringify({ chosen: chooseCommonsPhoto(pages, subject)?.title, 
         self.assertEqual(result["blind"], "File:Autumn in the park.jpg")   # with no subject, search order stands
 
 
+class PictureChoiceTests(unittest.TestCase):
+    def test_a_photograph_is_used_once_current_and_of_the_place_it_names(self):
+        """Hundred-page deck: one photograph fetched for two pages, an aircraft in a livery retired years before, and an
+        Istanbul lounge that was at the old airport. The dry run named other photographs than the fetch took."""
+        result = run_node('''
+import { chooseCommonsPhoto, choosePictures } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+const page = (index, title, description, date) => ({ index, title, imageinfo: [{ mime: 'image/jpeg', width: 2400, height: 1600, thumburl: 'u' + index, descriptionurl: 'd' + index,
+  extmetadata: { LicenseShortName: { value: 'CC BY 4.0' }, Artist: { value: 'Jo Bloggs' }, ImageDescription: { value: description }, ...(date ? { DateTimeOriginal: { value: date } } : {}) } }] });
+const jets = [page(1, 'File:BA 747 Landor.jpg', 'British Airways Boeing 747 at Heathrow', '1998:06:01'), page(2, 'File:BA 787 2023.jpg', 'British Airways Boeing 787 at Heathrow', '2023-04-11'),
+  page(3, 'File:BA A350.jpg', 'British Airways Airbus A350 at Heathrow')];
+const lounges = [page(1, 'File:Ataturk lounge.jpg', 'Turkish Airlines lounge, Istanbul Ataturk Airport', '2016'), page(2, 'File:IST lounge.jpg', 'Turkish Airlines lounge at Istanbul Airport', '2022')];
+// A search that answers every query from one result list: what choosePictures passes it is what is checked.
+const asked = [];
+const search = async (query, subject, options) => { asked.push({ query, exclude: [...options.exclude] }); return chooseCommonsPhoto(jets, subject, options); };
+const plan = [{ alt: 'A British Airways jet at Heathrow' }, { alt: 'British Airways aircraft at Heathrow', search: 'British Airways Heathrow' }];
+const chosen = await choosePictures(plan, { search });
+console.log(JSON.stringify({
+  latest: chooseCommonsPhoto(jets, 'British Airways Boeing at Heathrow')?.title,
+  after: chooseCommonsPhoto([jets[0], jets[2]], 'British Airways at Heathrow', { after: 2015 })?.title,
+  lounge: chooseCommonsPhoto(lounges, 'Turkish Airlines lounge Istanbul', { without: ['Ataturk'] })?.title,
+  once: plan.map((p) => chosen.get(p)?.title), excluded: asked.map((a) => a.exclude),
+  records: (await choosePictures([plan[1]], { search, records: new Map([['other', { alt: 'other', title: 'File:BA 787 2023.jpg' }]]) })).get(plan[1])?.title,
+}));
+''')
+        self.assertEqual(result["latest"], "File:BA 787 2023.jpg", "among equal matches the latest dated")
+        self.assertEqual(result["after"], "File:BA A350.jpg", "a photograph dated before `after` is not taken")
+        self.assertEqual(result["lounge"], "File:IST lounge.jpg", "nor one naming a word in `without`")
+        self.assertEqual(len(set(result["once"])), 2, "two pictures of a deck never take one file")
+        self.assertEqual(result["excluded"], [[], ["File:BA 787 2023.jpg"]])
+        self.assertNotEqual(result["records"], "File:BA 787 2023.jpg", "a file another picture already holds is passed over")
+
+
 class PlaceFetchTests(unittest.TestCase):
     def test_named_markers_are_placed_from_the_cache_offline(self):
         """62-page deck: map discs sat on country centres; named markers are placed from the places cache."""
