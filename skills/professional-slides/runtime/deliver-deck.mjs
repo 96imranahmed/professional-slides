@@ -321,11 +321,16 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
 
 // The answer's provenance against the packet delivery wrote for it: that packet
 // is the latest one for this deck, of the kind and pass the answer claims, and
-// the answer echoes its prompt hash.
+// its binding is the answer's. An answer that echoes all three answers that
+// packet, so its prompt hash is stamped by the runtime where the reviewer left
+// it out or copied it wrong (storyline.mjs stampProvenance); the backend and
+// model are still the reviewer's to say.
 async function answerProvenance(store, answer, { kind, pass = null }) {
   const record = await readPacketRecord(store);
   if (!record) return ["no review packet was written for this deck: request the review through deliver-deck, which writes the packet the answer must echo"];
   if (record.kind !== kind || (pass !== null && record.pass !== pass) || record.binding !== answer.binding) return [`the answer does not answer the latest packet (a ${record.kind}${record.pass ? ` for pass ${record.pass}` : ""} of this build): rerun deliver-deck without --review to write the packet this ${kind} answers`];
+  if (record.promptHash && answer && typeof answer === "object" && answer.provenance?.promptHash !== record.promptHash)
+    answer.provenance = { backend: "subagent", ...(answer.provenance && typeof answer.provenance === "object" ? answer.provenance : {}), promptHash: record.promptHash };
   return provenanceErrors(answer, record.promptHash);
 }
 

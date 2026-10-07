@@ -1166,6 +1166,7 @@ const STAKE_MIN = 30;
 const mendedLines = (mended) => mended.map((entry) => (entry.did === "range" ? `${entry.at}: "${entry.from}" read as ${entry.pages.join(", ")}`
   : entry.did === "dropped" ? `${entry.at}: a later pass adds only major or blocker findings, so this ${entry.was} point was left out of the record`
   : entry.did === "unconfirmed" ? `${entry.at}: filed ${entry.was}, and the second critic did not confirm it blocks (${entry.why}), so recorded as minor`
+  : entry.did === "stamped" ? `${entry.at}: ${entry.was ? `"${entry.was.slice(0, 12)}..." is not this packet's prompt hash` : "no prompt hash was given"}; ${entry.why}, so the runtime stamped it`
   : entry.did === "minor" ? `${entry.at}: ${entry.was === "no severity" ? "filed with no severity, so recorded as minor" : `filed ${entry.was} without \`ifUnfixed\` - what the decision-maker would get wrong - so recorded as minor`}`
   : `${entry.at}: ${entry.pages.join(", ")} added to its pages, since its text names ${entry.pages.length === 1 ? "it" : "them"}`));
 
@@ -2185,6 +2186,19 @@ async function writeResearchTasks(out, tasks) {
   return tasks.map((t) => `${t.id} [${t.kind}] (${t.severity}${t.blocking ? ", blocks" : ""}): ${t.analysis}${t.data ? ` - on ${t.data}` : ""}. Closes on: ${t.closes}`);
 }
 
+/**
+ * An answer that echoes a packet's binding and pass, given that packet's
+ * prompt hash: stamped where its own is missing or is not the packet's, and
+ * said in `said.mended`. Its backend and model are left as the critic wrote
+ * them - an unknown backend or a missing model is still the critic's to give.
+ */
+export function stampProvenance(review, packet, said = { mended: [] }) {
+  if (!packet?.promptHash || review?.provenance?.promptHash === packet.promptHash) return review;
+  const was = review?.provenance?.promptHash ?? null;
+  said.mended.push({ at: "provenance.promptHash", did: "stamped", was, why: "the answer echoes this packet's binding and pass, so it answers this packet's prompt" });
+  return { ...review, provenance: { backend: "subagent", ...(review?.provenance && typeof review.provenance === "object" ? review.provenance : {}), promptHash: packet.promptHash } };
+}
+
 async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
@@ -2215,6 +2229,10 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PAS
   if (review && !history.some((h) => h.binding === review.binding && h.pass === review.pass)) {
     if (!packet || packet.binding !== review.binding || packet.pass !== review.pass)
       return { status: "invalid", errors: [`storyline-review.json does not answer the latest packet (binding or pass differs): give ${packet?.staging ? path.join(packet.staging, "prompt.md") : "the packet's prompt.md"} to a fresh critic and save the answer`] };
+    // The answer echoes this packet's binding and pass, so it answers this packet: the prompt's hash is the runtime's to
+    // stamp, not a 64-character string a critic must copy. A critic reading a hundred-page prompt in chunks computed one of
+    // its own, and a right critique was refused for it. The model it names is still its own to say.
+    review = stampProvenance(review, packet, said);
     // The page lists are settled before the form is judged: a range expanded, a page the item's own text names added. What was
     // settled is written back to the answer, so every later reading of it is of the same lists, and kept on the pass's record.
     const context = { ...packetContext(packet), sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) };

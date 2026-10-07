@@ -298,7 +298,8 @@ const summary = (r) => [r.rejectedAt, [...new Set(r.blockers.map((b) => b.code))
 const lowClean = summary(await attempt('low.json', firstPass(rec, d.ids, [], { rating: 7.8, accepted: false })));
 const { provenance, ...bare } = firstPass(rec, d.ids);
 const noProvenance = summary(await attempt('bare.json', bare));
-const forged = summary(await attempt('forged.json', firstPass(rec, d.ids, [], { provenance: { ...provenanceOf(rec), promptHash: '0'.repeat(64) } })));
+// A wrong prompt hash on an answer that echoes the packet's binding is stamped by the runtime; a reviewer that names no model is not.
+const forged = summary(await attempt('forged.json', firstPass(rec, d.ids, [], { provenance: { backend: 'subagent', promptHash: '0'.repeat(64) } })));
 const rebuttal = summary(await attempt('rebuttal.json', firstPass(rec, d.ids, [], { authorResponse: 'The reviewer misread page two.' })));
 const oneOpened = summary(await attempt('glance.json', firstPass(rec, d.ids, [], { opened: ['p02'] })));
 await done(d);

@@ -706,10 +706,11 @@ const packet = JSON.parse(await fs.readFile(path.join(two.dir, 'packet.json'), '
 const verification = (o = {}) => ({ pass: 2, verifies: critique.binding, verdict: 'ready', rating: 8, binding: S.storylineBinding(revised), summary: 'The rewritten title now states the finding the count supports.',
   compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' },
   provenance: prov(packet.promptHash), statuses: [{ finding: 'F1', status: 'fixed', evidence: 'The title now states the rate against the nearest rival.' }], findings: [], topFixes: [], ...o });
-await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ provenance: prov('0'.repeat(64)) })));
+// An answer that echoes the packet's binding and pass has its prompt hash stamped by the runtime; one that names no model is still refused.
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ provenance: { backend: 'subagent', promptHash: '0'.repeat(64) } })));
 const forged = await S.prepareStoryline(specPath, out);
 // A minor point a later pass files anyway is left out of the record and said, and the pass stands: not sent back for one line.
-await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
+await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(verification({ provenance: prov('1'.repeat(64)), findings: [{ id: 'F2', scope: 'page', pages: ['p04'], check: 'consequence', severity: 'minor', problem: 'The page could say more about what follows.', fix: 'Add the consequence for the decision in one line.', basis: 'changed', justification: '', evidence: '' }] })));
 const ready = await S.prepareStoryline(specPath, out);
 const nit = ready;
 const gate = await S.storylineGate(revised, out, { deckPath: specPath });
@@ -728,7 +729,7 @@ const switched = await S.prepareStoryline(specPath, out, { mode: 'full' });
 const withReason = await S.prepareStoryline(specPath, out, { mode: 'full', reason: 'The user asked for a page-level critique before the copy.' });
 await cleanup(dir);
 console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revise.status, two: [two.status, two.pass], scope: [packet.scope.changed, packet.scope.mustInspect, 'ledger' in packet.scope, 'priorRating' in packet.scope],
-  nit: [nit.status, (nit.formMended || []).some((e) => e.includes('this minor point was left out'))], forged: [forged.status, forged.errors?.some((e) => e.includes('promptHash'))], ready: ready.status, gate, moved, capped: capped.capped,
+  nit: [nit.status, (nit.formMended || []).some((e) => e.includes('this minor point was left out'))], forged: [forged.status, forged.errors?.some((e) => e.includes('provenance is missing `model`'))], stamped: (nit.formMended || []).some((e) => e.includes('so the runtime stamped it')), ready: ready.status, gate, moved, capped: capped.capped,
   switched, withReason: [withReason.status, withReason.mode, withReason.pass], folded, conflict, foldedLedger }));
 ''')
         self.assertEqual(result['one'], ['packet-written', 1, 'spine'])
@@ -738,6 +739,8 @@ console.log(JSON.stringify({ one: [one.status, one.pass, one.mode], revise: revi
         self.assertEqual(result['scope'], [['p02'], [], False, False])
         self.assertEqual(result['nit'], ['ready', True])
         self.assertEqual(result['forged'], ['invalid', True])
+        # A critic that copied the prompt hash wrong is not sent back for it: the answer echoes this packet's binding and pass.
+        self.assertTrue(result['stamped'])
         self.assertEqual(result['ready'], 'ready')
         self.assertEqual(result['gate'], [])
         self.assertTrue(any('p03' in e and 're-run the storyline critique first' in e for e in result['moved']))
