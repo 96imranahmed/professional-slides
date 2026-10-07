@@ -1904,7 +1904,17 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
  * back to the critique. `{ closed, verdict, pass, spent, pages, deleted }`, or
  * null when the critique is still open or nothing it read has moved.
  */
-export async function spineLock(spec, directory, { deckPath = null, maxPasses = MAX_PASSES } = {}) {
+/**
+ * The passes a deck's critique may run: the three every deck has, or the
+ * allowance the user gave when approving the outline (`storylinePasses` on the
+ * deck, with their words), or what `--max-passes` asks for - the most of them.
+ * Asked for at the outline, a title narrowed after the self-check takes its
+ * pass without a second stop for the user's go-ahead.
+ */
+export const passCap = (spec, asked = MAX_PASSES) => Math.max(asked, Number.isInteger(spec?.storylinePasses?.max) ? spec.storylinePasses.max : 0);
+
+export async function spineLock(spec, directory, { deckPath = null, maxPasses: asked = MAX_PASSES } = {}) {
+  const maxPasses = passCap(spec, asked);
   if (spec?.purpose === "catalogue") return null;
   const history = await readStorylineHistory(await lineageStore(spec, directory, deckPath));
   const latest = history.at(-1);
@@ -2199,9 +2209,10 @@ export function stampProvenance(review, packet, said = { mended: [] }) {
   return { ...review, provenance: { backend: "subagent", ...(review?.provenance && typeof review.provenance === "object" ? review.provenance : {}), promptHash: packet.promptHash } };
 }
 
-async function advanceStoryline(specPath, outputDirectory, { maxPasses = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
+async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
+  const maxPasses = passCap(spec, asked);
   const out = path.resolve(outputDirectory);
   const request = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
   if (request.length) return { status: "refused", errors: request };

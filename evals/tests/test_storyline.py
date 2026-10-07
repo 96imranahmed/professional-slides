@@ -505,3 +505,22 @@ console.log(JSON.stringify({ noLog, wrongLog, logged: logged.status }));
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PassAllowanceTests(unittest.TestCase):
+    def test_the_passes_the_user_allowed_at_the_outline_are_the_critiques_cap(self):
+        """Hundred-page deck: a title narrowed after the self-check waited on the user's go-ahead for each pass past three."""
+        result = run_node('''
+import { passCap } from './skills/professional-slides/runtime/storyline.mjs';
+import { deckKeyProblems } from './skills/professional-slides/runtime/deck-keys.mjs';
+const granted = { max: 5, granted: 'Yes, allow two more passes', at: '2026-10-07' };
+console.log(JSON.stringify({
+  none: passCap({}), allowed: passCap({ storylinePasses: granted }), asked: passCap({ storylinePasses: granted }, 6), lower: passCap({ storylinePasses: { max: 4, granted: 'ok go' } }, 3),
+  valid: deckKeyProblems({ storylinePasses: granted }),
+  bare: deckKeyProblems({ storylinePasses: { max: 5 } }), many: deckKeyProblems({ storylinePasses: { max: 12, granted: 'as many as needed' } }),
+}));
+''')
+        self.assertEqual([result["none"], result["allowed"], result["asked"], result["lower"]], [3, 5, 6, 4])
+        self.assertEqual(result["valid"], [])
+        self.assertTrue(result["bare"] and "the user's words" in result["bare"][0], result["bare"])
+        self.assertTrue(result["many"], "an allowance past eight passes is refused")

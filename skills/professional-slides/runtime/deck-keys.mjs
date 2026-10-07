@@ -47,6 +47,9 @@ const DECK_KEYS = Object.freeze({
   brief: key("string | object", ["string", "object"], "the brief the request was read into: horizon, set compared, criteria, constraints"),
   criteria: key("array of strings", ["array"], "the brief's ranked criteria; each must be served by a page that carries an exhibit (`serves` on the page)"),
   targetPages: key("number", ["number"], "the length the request asks for; the storyline critique is told"),
+  storylinePasses: key("{ max, granted }", ["object"], "the storyline passes the user allowed when approving the outline - `max` of 4 to 8, past the three every deck has - with their words in `granted`; a later title change then takes its pass without asking again",
+    (value) => (Number.isInteger(value.max) && value.max >= 4 && value.max <= 8 && typeof value.granted === "string" && value.granted.trim().split(/\s+/).length >= 2 && Object.keys(value).every((k) => ["max", "granted", "at"].includes(k))
+      ? null : "is { max: 4 to 8, granted: \"the user's words\", at: \"a date\" } - set only on the user's say-so, quoting it")),
   // the answer
   answer: key("string", ["string"], "the governing thought: one answer to the request, sharp enough to be wrong; the opening page carries it"),
   answerStatus: key("\"final\" | \"provisional\"", ["string"], "provisional where the evidence in scope cannot settle the answer"),
