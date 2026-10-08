@@ -82,7 +82,7 @@ charts.mjs         registers the charts; they are drawn in chart-categorical, ch
 marks.mjs          the shared marker vocabulary: numberMarker, iconMarker, stateMarker (lists, cards, table cells, map pins, agenda)
 icons.mjs          56 named icons as path data, emitted as editable freeforms; `author-deck.mjs --icons` lists them with their aliases
 fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
-fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only (run by the build)
+fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only, each candidate looked at before it is taken (picture-shows; run by the build)
 fetch-places.mjs   coordinates for map markers that name a place, cached in the deck folder's assets/places.json (run by the build)
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV plus a chart block
 build-deck.mjs     assets -> plan -> scene -> claims -> pptx -> render -> readback -> page gates -> density profile; refusals are REFUSAL_CODES

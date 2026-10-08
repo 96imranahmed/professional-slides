@@ -361,6 +361,9 @@ def read_slide(slide, index: int, sid: str, assets: Path | None) -> dict:
                 text = joined(shape.text_frame)
                 if record[key] is None:
                     record[key] = text
+                    # A title set in the centred placeholder is a title slide's: the cover's, by the deck's own design.
+                    if kind == "CENTER_TITLE":
+                        record["centred"] = True
                     continue
             said = False
             for paragraph in shape.text_frame.paragraphs:
@@ -432,15 +435,14 @@ def mark_furniture(slides: list) -> list:
 
 
 def looks_like_cover(slide: dict) -> bool:
-    """Slide 1 is taken as the cover when it has a title and either sits on a
-    title layout (not a content, comparison or title-only one) or carries a
-    subtitle and nothing else."""
+    """Slide 1 is taken as the cover when it has a title and either sets it in
+    the centred title placeholder a title slide's layout carries, or carries a
+    subtitle and nothing else. Read off the placeholders, not the layout's
+    name, which a template may call anything."""
     if not slide["title"]:
         return False
-    layout = (slide["layout"] or "").lower()
-    title_layout = "title" in layout and not re.search(r"content|(?<![a-z])(?:and|only)(?![a-z])", layout)
     bare = slide["subtitle"] is not None and not (slide["paragraphs"] or slide["tables"] or slide["charts"])
-    return title_layout or bare
+    return bool(slide.get("centred")) or bare
 
 
 def draft_of(slide: dict) -> dict:

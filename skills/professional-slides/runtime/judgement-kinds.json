@@ -259,6 +259,29 @@
      "about": "how many of the labels carry what the title counts"
     }
    }
+  },
+  "picture-shows": {
+   "version": 1,
+   "asks": "Open the image. Is it a photograph that shows what the slide asks for, and could it stand on that slide as it is?",
+   "subject": "what the slide asks a picture to show, and the candidate file's title and description; the image is attached",
+   "verdicts": {
+    "shows": "a photograph of what is asked for",
+    "not-a-photo": "a map, diagram, chart, logo, scan, drawing or screenshot",
+    "other-subject": "a photograph of something other than what is asked for, or too generic to say it"
+   },
+   "quoteFor": []
+  },
+  "file-is-logo": {
+   "version": 1,
+   "asks": "Is this file, by its name and description, the logo or wordmark of the organisation named, rather than a photograph, a map or another picture of it?",
+   "subject": "the organisation and the file's name and description",
+   "verdicts": {
+    "logo": "the file is the organisation's logo or wordmark",
+    "not-logo": "the file is another picture"
+   },
+   "quoteFor": [
+    "logo"
+   ]
   }
  }
 }

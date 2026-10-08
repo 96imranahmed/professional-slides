@@ -25,70 +25,98 @@ console.log(JSON.stringify({ file: logoFileFrom(infobox), photoOnly: logoFileFro
         self.assertEqual(result['path'], 'assets/logos/emirates.png')
 
 
+# Whether a candidate shows what a picture is planned to show is looked at (picture-shows): a test's reader answers by file.
+READER = """
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
+const asked = [];
+const reader = (byFile, fallback = 'shows') => judgementSession({ oracle: (kind, q) => { asked.push(q); return kind === 'picture-shows' ? (byFile[q.file] === undefined ? fallback : byFile[q.file]) : null; } });
+"""
+
+
 class PictureFetchTests(unittest.TestCase):
     def test_commons_choice_keeps_free_landscape_photographs(self):
         """62-page deck: a Commons search must keep free, landscape photographs and carry their credit."""
-        result = run_node('''
-import { chooseCommonsPhoto, picturePlaceholders } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+        result = run_node(READER + '''
+import { commonsCandidates, judgedChoice, picturePlaceholders } from './skills/professional-slides/runtime/fetch-pictures.mjs';
 const page = (index, title, license, { mime = 'image/jpeg', width = 2400, height = 1600 } = {}) => ({ index, title, imageinfo: [{ mime, width, height, thumburl: 'u' + index, descriptionurl: 'd' + index, extmetadata: { LicenseShortName: { value: license }, Artist: { value: '<a href="x">Jo Bloggs</a>' } } }] });
 const pages = [page(1, 'File:Route map.jpg', 'CC BY 4.0'), page(2, 'File:Cabin.jpg', 'CC BY-NC 2.0'), page(3, 'File:Tail.png', 'CC0', { mime: 'image/png' }),
   page(4, 'File:Tall.jpg', 'CC BY-SA 4.0', { width: 1600, height: 2400 }), page(5, 'File:Small.jpg', 'CC0', { width: 800 }), page(6, 'File:Aircraft at LHR.jpg', 'CC BY 4.0')];
-const spec = { cover: { image: { alt: 'A 787 on approach', search: 'Riyadh Air 787' } }, players: [{ name: 'X', logo: { alt: 'X logo' } }], slides: [{ photo: { alt: 'Client site', fetch: false } }, { photo: { alt: 'Done', path: 'a.jpg' } }] };
-console.log(JSON.stringify({ choice: chooseCommonsPhoto(pages), none: chooseCommonsPhoto(pages.slice(0, 3)), wanted: picturePlaceholders(spec).map(p => p.alt) }));
+const spec = { cover: { image: { alt: 'A 787 on approach', search: 'Riyadh Air 787' } }, players: [{ name: 'X', logo: { alt: 'X logo' } }], slides: [{ photo: { alt: 'Client site', fetch: false } }, { photo: { alt: 'Done', path: 'a.jpg' } },
+  { exhibit: { categoryIcons: { Emirates: { image: { alt: 'Emirates tail fin' } } } } }, { exhibit: { rows: [[{ type: 'logo', media: { alt: 'Northwind mark' } }]] } }] };
+const plan = { alt: 'A 787 on approach' };
+const choose = (list) => withJudgements(reader({ 'File:Route map.jpg': 'not-a-photo' }), () => judgedChoice(commonsCandidates(list), plan));
+console.log(JSON.stringify({ candidates: commonsCandidates(pages).map((c) => c.title), choice: (await choose(pages)).choice, none: (await choose(pages.slice(0, 3))).choice,
+  wanted: picturePlaceholders(spec).map(p => p.alt) }));
 ''')
-        self.assertEqual(result['choice']['title'], 'File:Aircraft at LHR.jpg')  # landscape wins over the earlier portrait
+        # A non-commercial licence, a PNG and a file under 1200px are never candidates; landscape before portrait.
+        self.assertEqual(result['candidates'], ['File:Route map.jpg', 'File:Aircraft at LHR.jpg', 'File:Tall.jpg'])
+        self.assertEqual(result['choice']['title'], 'File:Aircraft at LHR.jpg')  # the map is looked at, and is not a photograph
         self.assertEqual(result['choice']['credit'], 'Photo: Jo Bloggs, CC BY 4.0, via Wikimedia Commons: d6')  # the source page travels with the credit
-        self.assertIsNone(result['none'])  # a map, a non-commercial licence and a PNG are all refused
+        self.assertIsNone(result['none'])
+        # A logo is planned where the deck plans one - a `logo` key, a logo cell, a chart's category marks - not by its alt's last word.
         self.assertEqual(result['wanted'], ['A 787 on approach'])
 
 
 class PictureSubjectTests(unittest.TestCase):
-    def test_a_photograph_is_taken_for_its_subject_not_for_its_search_rank(self):
+    def test_a_photograph_is_taken_for_what_it_shows_not_for_its_search_rank(self):
         """A search returns what matches its words: the first free landscape for "Park Avenue towers" can be a park."""
-        result = run_node('''
-import { chooseCommonsPhoto } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+        result = run_node(READER + '''
+import { commonsCandidates, judgedChoice, PREVIEWS_AT_ONCE } from './skills/professional-slides/runtime/fetch-pictures.mjs';
 const page = (index, title, description, categories) => ({ index, title, imageinfo: [{ mime: 'image/jpeg', width: 2400, height: 1600, thumburl: 'u' + index, descriptionurl: 'd' + index,
   extmetadata: { LicenseShortName: { value: 'CC BY 4.0' }, Artist: { value: 'Jo Bloggs' }, ImageDescription: { value: description }, Categories: { value: categories } } }] });
 const pages = [page(1, 'File:Autumn in the park.jpg', 'Leaves on a path', 'Parks in Brooklyn'),
   page(2, 'File:Seagram Building.jpg', 'The tower on Park Avenue, Midtown', 'Office buildings in Manhattan|Park Avenue'),
   page(3, 'File:Skyline.jpg', 'Office towers in Midtown Manhattan', 'Skylines of Manhattan')];
-const subject = 'Office towers on Park Avenue in Midtown Manhattan';
-console.log(JSON.stringify({ chosen: chooseCommonsPhoto(pages, subject)?.title, matched: chooseCommonsPhoto(pages, subject)?.matched,
-  none: chooseCommonsPhoto([pages[0]], 'Grand Central Terminal concourse'), blind: chooseCommonsPhoto(pages)?.title }));
+const plan = { alt: 'Office towers on Park Avenue in Midtown Manhattan' };
+const candidates = commonsCandidates(pages);
+const chosen = await withJudgements(reader({ 'File:Autumn in the park.jpg': 'other-subject' }), () => judgedChoice(candidates, plan));
+const none = await withJudgements(reader({}, 'other-subject'), () => judgedChoice(candidates, plan));
+// Unanswered, the first candidate is fetched as a preview and asked about, and none after it is taken until it is answered.
+const previews = [];
+const open = judgementSession({ oracle: (kind, q) => (q.file === 'File:Seagram Building.jpg' ? 'shows' : null) });
+const waiting = await withJudgements(open, () => judgedChoice(candidates, plan, { preview: async (c) => { previews.push(c.title); return '/tmp/' + c.page + '.jpg'; } }));
+console.log(JSON.stringify({ chosen: chosen.choice?.title, question: asked[0], none: none.choice, waiting: { choice: waiting.choice, waiting: waiting.waiting, previews,
+  pending: [...open.pending.values()].map((q) => [q.kind, q.subject.file, q.image, q.where]) }, atOnce: PREVIEWS_AT_ONCE }));
 ''')
-        self.assertEqual(result["chosen"], "File:Seagram Building.jpg")   # names park, avenue, midtown, manhattan, office
-        self.assertIn("avenue", result["matched"])
-        self.assertIsNone(result["none"])                                  # a result that names nothing of its subject is not taken
-        self.assertEqual(result["blind"], "File:Autumn in the park.jpg")   # with no subject, search order stands
+        self.assertEqual(result["chosen"], "File:Seagram Building.jpg")
+        self.assertEqual(result["question"], {"asked": "Office towers on Park Avenue in Midtown Manhattan", "file": "File:Autumn in the park.jpg", "description": "Leaves on a path"})
+        self.assertIsNone(result["none"])                                  # a candidate of something else is not taken
+        self.assertIsNone(result["waiting"]["choice"])
+        self.assertEqual(result["waiting"]["previews"], ["File:Autumn in the park.jpg", "File:Skyline.jpg"])
+        self.assertEqual(result["waiting"]["waiting"], 2)
+        self.assertEqual(result["waiting"]["pending"], [["picture-shows", "File:Autumn in the park.jpg", "/tmp/d1.jpg", ["Office towers on Park Avenue in Midtown Manhattan"]],
+                                                        ["picture-shows", "File:Skyline.jpg", "/tmp/d3.jpg", ["Office towers on Park Avenue in Midtown Manhattan"]]])
 
 
 class PictureChoiceTests(unittest.TestCase):
     def test_a_photograph_is_used_once_current_and_of_the_place_it_names(self):
         """Hundred-page deck: one photograph fetched for two pages, an aircraft in a livery retired years before, and an
         Istanbul lounge that was at the old airport. The dry run named other photographs than the fetch took."""
-        result = run_node('''
-import { chooseCommonsPhoto, choosePictures } from './skills/professional-slides/runtime/fetch-pictures.mjs';
+        result = run_node(READER + '''
+import { commonsCandidates, choosePictures } from './skills/professional-slides/runtime/fetch-pictures.mjs';
 const page = (index, title, description, date) => ({ index, title, imageinfo: [{ mime: 'image/jpeg', width: 2400, height: 1600, thumburl: 'u' + index, descriptionurl: 'd' + index,
   extmetadata: { LicenseShortName: { value: 'CC BY 4.0' }, Artist: { value: 'Jo Bloggs' }, ImageDescription: { value: description }, ...(date ? { DateTimeOriginal: { value: date } } : {}) } }] });
 const jets = [page(1, 'File:BA 747 Landor.jpg', 'British Airways Boeing 747 at Heathrow', '1998:06:01'), page(2, 'File:BA 787 2023.jpg', 'British Airways Boeing 787 at Heathrow', '2023-04-11'),
   page(3, 'File:BA A350.jpg', 'British Airways Airbus A350 at Heathrow')];
 const lounges = [page(1, 'File:Ataturk lounge.jpg', 'Turkish Airlines lounge, Istanbul Ataturk Airport', '2016'), page(2, 'File:IST lounge.jpg', 'Turkish Airlines lounge at Istanbul Airport', '2022')];
 // A search that answers every query from one result list: what choosePictures passes it is what is checked.
-const asked = [];
-const search = async (query, subject, options) => { asked.push({ query, exclude: [...options.exclude] }); return chooseCommonsPhoto(jets, subject, options); };
+const searched = [];
+const search = async (query, options) => { searched.push({ query, exclude: [...options.exclude] }); return commonsCandidates(jets, options); };
 const plan = [{ alt: 'A British Airways jet at Heathrow' }, { alt: 'British Airways aircraft at Heathrow', search: 'British Airways Heathrow' }];
-const chosen = await choosePictures(plan, { search });
+const all = reader({});
+const { chosen } = await withJudgements(all, () => choosePictures(plan, { search }));
+const held = await withJudgements(all, () => choosePictures([plan[1]], { search, records: new Map([['other', { alt: 'other', title: 'File:BA 787 2023.jpg' }]]) }));
 console.log(JSON.stringify({
-  latest: chooseCommonsPhoto(jets, 'British Airways Boeing at Heathrow')?.title,
-  after: chooseCommonsPhoto([jets[0], jets[2]], 'British Airways at Heathrow', { after: 2015 })?.title,
-  lounge: chooseCommonsPhoto(lounges, 'Turkish Airlines lounge Istanbul', { without: ['Ataturk'] })?.title,
-  once: plan.map((p) => chosen.get(p)?.title), excluded: asked.map((a) => a.exclude),
-  records: (await choosePictures([plan[1]], { search, records: new Map([['other', { alt: 'other', title: 'File:BA 787 2023.jpg' }]]) })).get(plan[1])?.title,
+  latest: commonsCandidates(jets)[0]?.title,
+  after: commonsCandidates([jets[0], jets[2]], { after: 2015 }).map((c) => c.title),
+  lounge: commonsCandidates(lounges, { without: ['Ataturk'] }).map((c) => c.title),
+  once: plan.map((p) => chosen.get(p)?.title), excluded: searched.slice(0, 2).map((a) => a.exclude),
+  records: held.chosen.get(plan[1])?.title,
 }));
 ''')
-        self.assertEqual(result["latest"], "File:BA 787 2023.jpg", "among equal matches the latest dated")
-        self.assertEqual(result["after"], "File:BA A350.jpg", "a photograph dated before `after` is not taken")
-        self.assertEqual(result["lounge"], "File:IST lounge.jpg", "nor one naming a word in `without`")
+        self.assertEqual(result["latest"], "File:BA 787 2023.jpg", "the latest dated is looked at first")
+        self.assertEqual(result["after"], ["File:BA A350.jpg"], "a photograph dated before `after` is not a candidate")
+        self.assertEqual(result["lounge"], ["File:IST lounge.jpg"], "nor one naming a word in `without`")
         self.assertEqual(len(set(result["once"])), 2, "two pictures of a deck never take one file")
         self.assertEqual(result["excluded"], [[], ["File:BA 787 2023.jpg"]])
         self.assertNotEqual(result["records"], "File:BA 787 2023.jpg", "a file another picture already holds is passed over")

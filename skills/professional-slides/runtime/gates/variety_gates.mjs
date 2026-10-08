@@ -665,7 +665,8 @@ function reviewedDeckFindings(spec, slides, stand) {
   const named = players.length >= 2 ? players : titleNames(analytical);
   if (named.length >= 2) {
     const early = [spec.cover, ...analytical.slice(0, REVIEWED.earlyPages)].filter(Boolean);
-    const marks = early.flatMap(logoTexts).join(" \n ").toLowerCase();
+    const conventional = new Set([...aliases.keys()].map((alias) => `${alias} logo`.toLowerCase()));
+    const marks = early.flatMap((page) => logoTexts(page, conventional)).join(" \n ").toLowerCase();
     // A logo under any of the player's names introduces it.
     const unmarked = named.filter((name) => ![name.toLowerCase(), ...[...aliases].filter(([, n]) => n === name).map(([alias]) => alias)].some((alias) => marks.includes(alias)));
     stand("PLAYERS_UNMARKED", `compared players with no logo on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
@@ -690,15 +691,20 @@ function reviewedDeckFindings(spec, slides, stand) {
   return findings;
 }
 
-/** Every logo a page draws, as the text that names it: `{ alt }` logos, logo cells, logos exhibits. */
-function logoTexts(page) {
+/**
+ * Every logo a page draws, as the text that names it: the `{ alt }` of a logo
+ * where the page plans one - under a `logo` key, in a logo cell, in a logos
+ * exhibit or a chart's category marks - and of a declared player's logo named
+ * the way the runtime names it ("<Name> logo"); logo cells; logos exhibits.
+ */
+function logoTexts(page, conventional = new Set()) {
   const found = [];
   const walk = (value, inLogo) => {
     if (Array.isArray(value)) return value.forEach((v) => walk(v, inLogo));
     if (!value || typeof value !== "object") return;
     for (const [key, v] of Object.entries(value)) {
-      if (key === "alt" && typeof v === "string" && (inLogo || /\blogo\b/i.test(v))) found.push(v);
-      else walk(v, inLogo || key === "logo" || (key === "exhibit" && v?.type === "logos"));
+      if (key === "alt" && typeof v === "string" && (inLogo || value.type === "logo" || conventional.has(v.trim().toLowerCase()))) found.push(v);
+      else walk(v, inLogo || key === "logo" || key === "categoryIcons" || (key === "exhibit" && v?.type === "logos"));
     }
     if (value.type === "logos") found.push(...(value.items || []).map((item) => String(item?.name ?? "")));
     // A logo cell that names its player marks that player, with a file to draw or without: the refusal tells the author to
