@@ -28,7 +28,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { runProcess } from "./process.mjs";
-import { readJson, readJsonSync, writeJson } from "./cli.mjs";
+import { hostCli, readJson, readJsonSync, writeJson } from "./cli.mjs";
 import { textWords } from "./text-contract.mjs";
 import { contentWords } from "./gates/content_gates.mjs";
 import { registered } from "./errors.mjs";
@@ -160,12 +160,6 @@ export const verdictOf = (severity) => (severity === "none" ? "ok" : severity);
 
 function hasCli(name) { return spawnSync("sh", ["-c", `command -v ${name}`], { stdio: "ignore" }).status === 0; }
 
-/** The agent CLI this process runs inside, when it runs inside one. */
-export function hostCli(env = process.env) {
-  if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return "claude";
-  if (env.CODEX_SANDBOX || env.CODEX_SANDBOX_NETWORK_DISABLED || env.CODEX_THREAD_ID || env.CODEX_MANAGED_BY_NPM) return "codex";
-  return null;
-}
 
 // `auto` runs a fresh reviewer through the host's own CLI first (claude inside
 // Claude Code, codex inside Codex: the one known to be logged in), then the

@@ -37,6 +37,8 @@ The three manifests carry the same name, version, description and author. Codex 
 
 Use Node 20.9 or newer and install development dependencies with `npm ci`. `node skills/professional-slides/runtime/doctor.mjs` checks the rest and prints the install lines this machine needs: a Python with python-pptx, lxml, Pillow, numpy and pypdf (`python3 -m pip install -r requirements.txt`), and `soffice`, `pdftoppm` and `pdftotext` for rendering. Set `RUNTIME_PYTHON` if the Python packages live in another environment.
 
+The skill also needs an agent CLI, installed and signed in, for the fresh readers it cannot do without - the storyline critique, the deck review and the copy judgements. Which one depends on where the skill is called from: under Claude Code (the CLI or the desktop app) it is `claude` (`npm install -g @anthropic-ai/claude-code`, then `claude auth login`; the desktop app's sign-in does not carry over), and under Codex it is `codex` (`npm install -g @openai/codex`, then `codex login`). The doctor checks it, and a first run stops at step 0 until it is set up.
+
 ```bash
 npm run check                                  # source checks (syntax, probes, dead exports) and the unit suite
 node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow]

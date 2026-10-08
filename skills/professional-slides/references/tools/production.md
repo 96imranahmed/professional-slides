@@ -19,7 +19,9 @@ An acceptance writes `out/<id>-DELIVERED.pptx` and `delivery.json`, which record
 
 ## Environment
 
-Run `node runtime/doctor.mjs` first (pipeline step 0). It checks Node 20.9 or newer; finds a Python that imports python-pptx, lxml, Pillow, numpy and pypdf, trying `RUNTIME_PYTHON`, `python3`, `/usr/bin/python3` and `/opt/homebrew/bin/python3`, and prints the `export RUNTIME_PYTHON=...` line when the one it finds is not the default; checks `soffice` (LibreOffice), `pdftoppm` and `pdftotext` (poppler); and reports the optional `@napi-rs/canvas`. Each missing piece gets an install line for the platform. It exits 0 when ready and 2 when not; `--no-render` checks for authoring and unrendered builds only, and `--json` prints the result as one object.
+Run `node runtime/doctor.mjs` first (pipeline step 0). The skill needs a fresh model for what it cannot count - the storyline critique, the deck review and the copy judgements - and reaches one through an agent CLI, installed and signed in: the one it is called from, `claude` under Claude Code and `codex` under Codex, or either from a plain terminal. The doctor checks it (`claude auth status`, `codex login status`) and prints the lines that set it up: `npm install -g @anthropic-ai/claude-code` then `claude auth login` - the desktop app's own sign-in does not carry over to the CLI - or `npm install -g @openai/codex` then `codex login`.
+
+It also checks Node 20.9 or newer; finds a Python that imports python-pptx, lxml, Pillow, numpy and pypdf, trying `RUNTIME_PYTHON`, `python3`, `/usr/bin/python3` and `/opt/homebrew/bin/python3`, and prints the `export RUNTIME_PYTHON=...` line when the one it finds is not the default; checks `soffice` (LibreOffice), `pdftoppm` and `pdftotext` (poppler); and reports the optional `@napi-rs/canvas`. Each missing piece gets an install line for the platform. It exits 0 when ready and 2 when not; `--no-render` checks for authoring and unrendered builds only, and `--json` prints the result as one object.
 
 ```bash
 python3 -m pip install -r requirements.txt          # python-pptx, lxml, Pillow, numpy, pypdf
@@ -27,7 +29,7 @@ brew install --cask libreoffice && brew install poppler                  # macOS
 sudo apt-get install -y libreoffice-impress poppler-utils                # Debian, Ubuntu
 ```
 
-Set `RUNTIME_PYTHON` when the packages live in an environment of their own. No Codex runtime and no PptxGenJS are needed; `@napi-rs/canvas`, when installed, measures text against the real fonts instead of the bundled metrics.
+Set `RUNTIME_PYTHON` when the packages live in an environment of their own. No PptxGenJS is needed; `@napi-rs/canvas`, when installed, measures text against the real fonts instead of the bundled metrics.
 
 ## Rendering
 

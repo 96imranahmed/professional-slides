@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Answer the questions the rules ask of a deck's copy (judgements.mjs).
 //
-//   node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run claude|codex [--parallel n]] [--model m] [--timeout seconds]
+//   node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]
 //
 // A rule that turns on what a piece of copy means - whether a column judges,
 // a title leads with a gap, four paragraphs are alternatives - asks a model
@@ -19,7 +19,9 @@
 // recorded in <id>.judgements.json; a packet whose answer has a problem stays
 // staged with the reasons printed, and the others are recorded. With --run,
 // the named backend is asked about every packet at once (`--parallel`, 4 at a
-// time), each in a clean folder, until every question is answered.
+// time), each in a clean folder, until every question is answered; `auto` is
+// the CLI the skill is called from (claude under Claude Code, codex under
+// Codex), as the reviews choose it (review-passes.mjs detectBackend).
 //
 // Exit codes: 0 every question the rules ask is answered; 2 an answer was
 // refused (its packet's reasons are printed; the other packets' answers are
@@ -32,9 +34,9 @@ import { fileURLToPath } from "node:url";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { readPagesFile } from "./pages-file.mjs";
 import { PACKET_DIR, recordAnswers, stageJudgements } from "./judgements.mjs";
-import { callReviewer, stageReview } from "./review-passes.mjs";
+import { callReviewer, detectBackend, stageReview } from "./review-passes.mjs";
 
-const USAGE = "Usage: judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run claude|codex [--parallel n]] [--model m] [--timeout seconds]";
+const USAGE = "Usage: judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]";
 // Every packet is asked at once, so a deck's questions are answered in a round or two: one that has not finished in this
 // many has met an answer that does not converge (a model that keeps failing the checks).
 const ROUNDS_MAX = 6;
@@ -121,14 +123,16 @@ async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { draft: { type: "boolean" }, "fetch-assets": { type: "boolean" }, run: { type: "string", valueName: "claude or codex" }, model: { type: "string" },
     timeout: { type: "string", valueName: "seconds" }, parallel: { type: "string", valueName: "a number of packets" } }, { usage: USAGE });
   if (!file) throw new UsageError(USAGE);
-  if (values.run !== undefined && !["claude", "codex"].includes(values.run)) throw new UsageError(`--run is claude or codex\n${USAGE}`);
+  if (values.run !== undefined && !["auto", "claude", "codex"].includes(values.run)) throw new UsageError(`--run is auto, claude or codex\n${USAGE}`);
+  // `auto`: the CLI the skill is called from, else whichever is installed; with none, the packets are staged for readers.
+  const backend = values.run === "auto" ? detectBackend("auto") : values.run;
   const timeout = values.timeout === undefined ? 600 : Number(values.timeout);
   if (!(timeout > 0)) throw new UsageError(`--timeout is a number of seconds\n${USAGE}`);
   if (values.draft && values["fetch-assets"]) throw new UsageError(`--draft reads the spine, which has no photographs to fetch\n${USAGE}`);
   const parallel = values.parallel === undefined ? PARALLEL : Number(values.parallel);
   if (!Number.isInteger(parallel) || parallel < 1) throw new UsageError(`--parallel is how many packets are asked at once: a whole number, 1 or more\n${USAGE}`);
   if (values.parallel !== undefined && !values.run) throw new UsageError(`--parallel goes with --run: without it, the packets are yours to hand out\n${USAGE}`);
-  return judge(file, { draft: Boolean(values.draft), fetchAssets: Boolean(values["fetch-assets"]), run: values.run ?? null, parallel, model: values.model ?? null, timeoutMs: timeout * 1000 });
+  return judge(file, { draft: Boolean(values.draft), fetchAssets: Boolean(values["fetch-assets"]), run: backend === "packet" ? null : backend ?? null, parallel, model: values.model ?? null, timeoutMs: timeout * 1000 });
 }
 
 if (isMain(import.meta.url)) runCli(main);

@@ -26,7 +26,7 @@ The user is asked twice at most: the design intake when answers are missing (STO
 
 Paths resolve from this skill's directory; write deck files to a task-owned folder, never into the skill. Every command exits 0 done, 1 crash or bad usage, 2 refused (fix what it prints, rerun), 3 waiting for a fresh reader (a packet was written). Read the linked section at each step.
 
-0. **Check the machine.** `node runtime/doctor.mjs`; at exit 2 give the user its install lines and stop. Use the `RUNTIME_PYTHON` it prints. [Environment](references/tools/production.md#environment)
+0. **Check the machine.** `node runtime/doctor.mjs`; at exit 2 give the user its install lines and stop. The skill needs a signed-in agent CLI: `claude` when called from Claude Code, `codex` from Codex. Use the `RUNTIME_PYTHON` it prints. [Environment](references/tools/production.md#environment)
 1. **Design intake.** `node runtime/preferences.mjs show`. **STOP (a)** when answers are `missing`: ask about a reference deck first (or a brand's website: `preferences.mjs from-site <url>` proposes its design), then the rest together, each with its sheet from `assets/design-options/` and a recommended default; store them with `preferences.mjs set`. Once the pages file exists, `preferences.mjs apply <id>.pages.json` and say in one line what was reused. A revision keeps its deck's design. [Design intake](references/theming.md#design-intake)
 2. **Brief.** In `<id>.pages.json` record the user's words verbatim as `deck.request`, then the audience, the decision and each sub-question; mark a reconstructed request and a closed evidence scope. `--schema deck` lists every deck key. A rebuild starts with `$RUNTIME_PYTHON runtime/import-deck.py deck.pptx <work>/`. Pick a [template](references/templates/index.md) when one matches. Done when every sub-question is written down. [The communication job](references/storylining.md#define-the-communication-job)
 3. **Data and insights.** Download the series, peer sets, shares and geography the question turns on into `sources/`; record each finding in `<id>.insights.json` with its `shape`, `strength`, `soWhat` and numbers as `measures`. `node runtime/analysis.mjs <id>.pages.json --catalogue` lists the analyses the measures allow, and flags what the compile would refuse in the `sources` registry and the log's charted evidence; write the ones the answer turns on in `<id>.analysis.json` and run `analysis.mjs` without the flag. Done when a strong insight backs every reason and the declared players are compared. [Find the data](references/storylining.md#find-the-data-before-the-dot-dash), [insights](references/storylining.md#extract-the-insights-before-the-titles), [analyses](references/storylining.md#run-the-analyses-before-the-outline)
@@ -63,13 +63,12 @@ The slides the request does not name are carried into the new file byte for byte
 - A form is never chosen for variety against the claim; among equals the plan takes the deck's draw. [Design systems](references/theming.md#design-systems)
 - A recognisable subject carries its pictures and logos; declared `players` are introduced before they are compared. [Make every exhibit earn its page](references/design.md#make-every-exhibit-earn-its-page)
 - Status red, amber and green mark a state or a verdict, never a series or decoration. [Status colour](references/design.md#status-colour)
-- At `JUDGEMENTS_PENDING`, `node runtime/judge.mjs <id>.pages.json` (`--draft` at the spine, `--fetch-assets` for photos) until exit 0, packets answered in parallel by fresh readers or `--run claude`; delivery refuses open questions.
+- At `JUDGEMENTS_PENDING`, `node runtime/judge.mjs <id>.pages.json --run auto` (`--draft` at the spine, `--fetch-assets` for photos) until exit 0; delivery refuses open questions.
 - Use subagents where the harness has them: research by workstream, copy by section, a fresh critic or reviewer for every pass. [Work in parallel](references/storylining.md#work-in-parallel-with-subagents)
 
 ## Hosts
 
-- **Claude Code:** answer each critique and review packet with fresh Task subagents given only the staged prompt; ask intake questions with `AskUserQuestion`.
-- **Codex:** invoke as `$professional-slides`; `--reviewer auto` runs the `codex` CLI.
-- The output is PowerPoint; a Google Slides import is the user's to verify.
+- **Claude Code:** the `claude` CLI, signed in (`claude auth login`); a packet left staged goes to fresh Task subagents given only its prompt. Ask intake questions with `AskUserQuestion`.
+- **Codex:** invoke as `$professional-slides`; the `codex` CLI, signed in (`codex login`).
 
 [Maintaining the skill](references/maintaining.md) covers iterating on the skill and its evaluation decks.

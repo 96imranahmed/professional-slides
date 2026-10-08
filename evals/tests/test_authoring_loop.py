@@ -519,7 +519,8 @@ class BuildParityTests(unittest.TestCase):
         result = run_node('''
 import { describe } from './skills/professional-slides/runtime/doctor.mjs';
 const binaries = { soffice: { found: true, path: '/usr/bin/soffice' }, pdftoppm: { found: true, path: '/usr/bin/pdftoppm' }, pdftotext: { found: true, path: '/usr/bin/pdftotext' } };
-const report = { ready: true, render: true, node: { version: '22.0.0', required: '>=20.9', ok: true }, python: { candidates: [], chosen: 'python3', export: null }, binaries, optional: {}, install: [] };
+const reviewer = { host: 'claude', wanted: ['claude'], chosen: 'claude', ok: true, clis: { claude: { path: '/usr/bin/claude', signedIn: true }, codex: { path: null, signedIn: false } } };
+const report = { ready: true, render: true, node: { version: '22.0.0', required: '>=20.9', ok: true }, python: { candidates: [], chosen: 'python3', export: null }, binaries, reviewer, optional: {}, install: [] };
 console.log(JSON.stringify({ lines: describe(report) }));
 ''')
         self.assertTrue(any("--check --render" in line for line in result["lines"]))

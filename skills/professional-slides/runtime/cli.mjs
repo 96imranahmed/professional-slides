@@ -112,6 +112,18 @@ export async function readJson(file, { optional = false } = {}) {
   return parseJson(text, file);
 }
 
+/**
+ * The agent CLI this process runs inside, when it runs inside one: "claude"
+ * under Claude Code (the CLI or the desktop app), "codex" under Codex, else
+ * null. The reviews, the storyline critique and the copy judgements run
+ * through that CLI (doctor.mjs checks it is installed and signed in).
+ */
+export function hostCli(env = process.env) {
+  if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return "claude";
+  if (env.CODEX_SANDBOX || env.CODEX_SANDBOX_NETWORK_DISABLED || env.CODEX_THREAD_ID || env.CODEX_MANAGED_BY_NPM) return "codex";
+  return null;
+}
+
 /** readJson, synchronously. */
 export function readJsonSync(file, { optional = false } = {}) {
   let text;
