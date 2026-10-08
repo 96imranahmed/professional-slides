@@ -24,6 +24,7 @@ import zipfile
 from pathlib import Path
 
 from node_probe import HAS_PPTX, NODE, ROOT, RUNTIME, RUNTIME_PYTHON, run_node
+from judgement_oracle import answer_everything
 
 PYTHON = RUNTIME_PYTHON or sys.executable
 IMPORT = RUNTIME / "import-deck.py"
@@ -414,6 +415,8 @@ class DeckRulesBesideACarriedSlideTests(unittest.TestCase):
 
     def test_the_whole_deck_beside_a_carried_slide_compiles_and_the_critic_is_told_what_it_is_made_of(self):
         work = self.deck()
+        # The critique waits for the questions the rules ask of the spine: answered first, then the deck compiled again.
+        answer_everything(NODE, work / "one.pages.json")
         done = sh(NODE, AUTHOR, work / "one.pages.json")
         self.assertEqual(done.returncode, 0, done.stderr[:2500])
         staged = sh(NODE, RUNTIME / "storyline.mjs", work / "one.deck.json", work / "out")

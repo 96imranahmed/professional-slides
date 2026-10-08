@@ -33,16 +33,23 @@ class ChartHeadingTests(unittest.TestCase):
     def test_a_member_count_a_designation_and_a_possessive_year_are_not_results_and_results_still_are(self):
         result = run_node('''
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
+// A figure the notation leaves is read (heading-states-result): this reader takes a count of the members for what
+// defines the measure, and every other figure for a result. A designation and a possessive year are never asked about.
+const asked = [];
+const reader = judgementSession({ oracle: (kind, said) => { asked.push(said.text); return /suppliers|markets/.test(said.text) ? 'describes' : 'result'; } });
 const frame = { x: 72, y: 162, width: 1136, height: 431 };
-const said = (heading) => { try { REGISTRY.get('chart.column').render({ id: 'c', frame, props: { heading, unit: 'units', categories: ['A', 'B', 'C', 'D'], series: [{ name: 's', values: [1, 2, 3, 4] }] } }); return null; } catch (error) { return error.message; } };
+const said = (heading) => withJudgements(reader, () => { try { REGISTRY.get('chart.column').render({ id: 'c', frame, props: { heading, unit: 'units', categories: ['A', 'B', 'C', 'D'], series: [{ name: 's', values: [1, 2, 3, 4] }] } }); return null; } catch (error) { return error.message; } });
 const names = ['Depots in service, 20 suppliers', "Regional museum visitors at 2025's growth rate", 'Model 505X in service with the supplier, assumed path', 'Lines open (12 markets)', 'Units of the X77 on order'];
 const results = ['Visitors, 20 million', 'Visitors up 20 points', 'Growth of 12x since launch', 'Revenue, 5 pounds', 'Visitors: 2025', 'Visitors fell 20 halls', 'Stock, 500M'.replace('M', 'm')];
-console.log(JSON.stringify({ names: names.map(said), results: results.map((heading) => (said(heading) ?? '').slice(0, 60)), message: said('Visitors up 20 points') }));
+const named = names.map(said), unasked = names.filter((name) => !asked.includes(name));
+console.log(JSON.stringify({ names: named, unasked, results: results.map((heading) => (said(heading) ?? '').slice(0, 60)), message: said('Visitors up 20 points') }));
 ''')
         self.assertEqual(result["names"], [None] * 5)
+        self.assertEqual(result["unasked"], ["Regional museum visitors at 2025's growth rate", "Model 505X in service with the supplier, assumed path", "Units of the X77 on order"])
         self.assertTrue(all(text.startswith("Chart title heading must not contain statistics") for text in result["results"]), result["results"])
-        # The refusal lists what a heading may name, the three among it.
-        for said in ('"at 2025\'s rate"', '"20 suppliers"', '"505X"'):
+        # The refusal lists what a heading may name, the two among it.
+        for said in ('"20 suppliers"', '"505X"'):
             self.assertIn(said, result["message"])
 
 
@@ -50,22 +57,30 @@ class SourceRecordTests(unittest.TestCase):
     def test_a_declared_record_named_as_a_ledger_is_the_source_named_and_a_pointer_to_a_ledger_is_still_refused(self):
         result = run_node('''
 import { craftFindings } from './skills/professional-slides/runtime/gates/craft_gates.mjs';
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const sources = { ledger: { name: 'Official-source ledger supplied with the brief', short: 'Source ledger of the brief', status: 'company-reported' } };
 const trend = { type: 'chart.line', categories: ['2020', '2021', '2022', '2023', '2024'], series: [{ name: 'Revenue', values: [1, 2, 3, 4, 5] }] };
+// A line the compiler set from the registry carries its `sourceForms`; a line typed as text is read (source-cites-pointer).
+const page = (line) => (typeof line === 'string' ? { source: line } : line);
 const pages = (line) => [...Array.from({ length: 8 }, (_, i) => ({ id: 'p' + i, title: 'A finding on page ' + i, exhibit: trend, source: 'Source: Northvale Rail Annual Report 2025-26' })),
-  ...Array.from({ length: 6 }, (_, i) => ({ id: 'q' + i, title: 'Text page ' + i, source: i ? 'Source: Office of Rail Statistics, Feb 2026' : line }))];
-const coded = (spec) => craftFindings(spec, { slides: [] }).filter((f) => f.code === 'CRAFT_SOURCE_CODES').map((f) => [f.severity, f.repair]);
-console.log(JSON.stringify({
-  declared: coded({ sources, slides: pages('Sources: Official-source ledger supplied with the brief (company-reported)') }),
-  short: coded({ sources, slides: pages('Sources: Source ledger of the brief; Office of Rail Statistics') }),
-  undeclared: coded({ slides: pages('Sources: Official-source ledger supplied with the brief (company-reported)') }),
+  ...Array.from({ length: 6 }, (_, i) => ({ id: 'q' + i, title: 'Text page ' + i, ...(i ? { source: 'Source: Office of Rail Statistics, Feb 2026' } : page(line)) }))];
+const asked = [];
+const reader = judgementSession({ oracle: (kind, line) => { asked.push(line); return /see ledger/.test(line) ? { verdict: 'pointer', quote: 'see ledger' } : 'names-source'; } });
+const coded = (spec) => withJudgements(reader, () => craftFindings(spec, { slides: [] }).filter((f) => f.code === 'CRAFT_SOURCE_CODES').map((f) => [f.severity, f.repair]));
+const built = 'Sources: Official-source ledger supplied with the brief (company-reported)';
+const out = {
+  declared: coded({ sources, slides: pages({ source: built, sourceForms: [built, 'Sources: Source ledger of the brief'] }) }),
+  typed: coded({ slides: pages(built) }),
   pointer: coded({ sources, slides: pages('Source: K26+DEP+RTE; exact URL in source ledger') }),
-  both: coded({ sources, slides: pages('Sources: Official-source ledger supplied with the brief; see ledger') }) }));
+  both: coded({ sources, slides: pages('Sources: Official-source ledger supplied with the brief; see ledger') }) };
+console.log(JSON.stringify({ ...out, askedBuilt: asked.filter((line) => line === built).length }));
 ''')
+        # A line the compiler set from the registry is never asked about; the same words typed are read, and name a source.
         self.assertEqual(result["declared"], [])
-        self.assertEqual(result["short"], [])
-        # The same words typed with no record behind them, and a pointer to a ledger with or without one, are still refused.
-        for name in ("undeclared", "pointer", "both"):
+        self.assertEqual(result["typed"], [])
+        self.assertEqual(result["askedBuilt"], 1)
+        # Codes joined by "+" are refused as written; a pointer to a ledger in words is read as one.
+        for name in ("pointer", "both"):
             self.assertEqual([severity for severity, _ in result[name]], ["blocker"], name)
         self.assertIn("declaring it in the pages file's `sources` registry", result["pointer"][0][1])
 
@@ -114,18 +129,21 @@ class TableRuleTests(unittest.TestCase):
     def test_the_headers_an_implication_column_takes_and_what_typed_numbers_ask_are_printed_with_the_limits(self):
         result = run_node(WORKED + '''
 import { pageLimits } from './skills/professional-slides/runtime/limits.mjs';
-import { INFERENCE_WORDS } from './skills/professional-slides/runtime/page-types.mjs';
-const headed = (label) => { const page = pageOf('profiles/logo-table'); page.exhibit.columns = page.exhibit.columns.map((c) => (c && c.implication ? { ...c, label } : c));
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
+// Whether a header names the inference its row draws is read (header-concludes): this reader takes "What it rests on" for a fact.
+const reader = judgementSession({ oracle: (kind, header) => (kind === 'header-concludes' ? (header === 'What it rests on' ? 'names-a-fact' : 'concludes') : null) });
+const compiled = (label) => { const page = pageOf('profiles/logo-table'); page.exhibit.columns = page.exhibit.columns.map((c) => (c && c.implication ? { ...c, label } : c));
   return compileDeck(deckOf([page]), { partial: true }).failed.map((f) => f.message); };
+const headed = (label) => withJudgements(reader, () => compiled(label));
 const limits = pageLimits('lookup', 'table');
-console.log(JSON.stringify({ words: INFERENCE_WORDS, listed: limits.table.implicationColumn.headerHoldsOneOf, taken: INFERENCE_WORDS.map((word) => headed(`The ${word} for the supplier`).length),
-  refused: headed('What it rests on'), numbers: limits.table.numbers }));
+console.log(JSON.stringify({ note: limits.table.implicationColumn.note, taken: headed('What it means for the supplier').length,
+  refused: headed('What it rests on'), unanswered: compiled('What it rests on').length, numbers: limits.table.numbers }));
 ''')
-        self.assertEqual(result["listed"], result["words"])
-        self.assertEqual(result["taken"], [0] * len(result["words"]))           # every header the limits print is one the compile takes
+        self.assertIn("names the inference the row draws", result["note"])     # the limits say what the header is held to
+        self.assertEqual(result["taken"], 0)
         [refusal] = result["refused"]
-        for word in result["words"]:
-            self.assertIn(f'"{word}"', refusal)                                  # and the refusal lists them all
+        self.assertIn("names another fact", refusal)
+        self.assertEqual(result["unanswered"], 0)                                # a question not answered refuses nothing
         self.assertEqual(result["numbers"]["codes"], ["BASIS_MISSING"])
         self.assertIn("a change or a share computed from recorded measures is an analysis", result["numbers"]["note"])
 

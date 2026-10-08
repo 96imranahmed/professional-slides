@@ -36,10 +36,12 @@ const repeated = content.filter((p, i) => titles.indexOf(p.title) !== i);
 const context = content.filter((p) => (p.measures || []).some((m) => m.role === "context") && !(p.measures || []).some((m) => m.role === "proof"));
 const compared = (packet.analyses || []).some((a) => a.op === "compare" && a.status !== "unavailable");
 
+// The calibration's planted answer declines both questions in so many words: this stand-in for a critic reads it as one would.
+const declines = /\bcannot rank\b|\bno defensible call\b/i.test(String(packet.answer ?? ""));
 const findings = [], missingAnalyses = [], cutOrMerge = [];
 const stake = "The committee would act on a claim the deck does not show.";
 if (!blind) {
-  if ((packet.declines || []).length) findings.push({ id: "F1", scope: "spine", pages: ids, check: "answer", severity: "major", ifUnfixed: stake,
+  if (declines) findings.push({ id: "F1", scope: "spine", pages: ids, check: "answer", severity: "major", ifUnfixed: stake,
     problem: "The governing answer declines the request rather than answering it.", fix: "Commit to the lean the evidence supports, with its confidence and reversal." });
   if ((packet.players || []).length >= 2 && !compared) missingAnalyses.push({ id: "M1", analysis: "The declared players on common measures", why: "The answer compares them and no page sets them side by side.",
     data: "The peer measures already in the insight log", public: "speculative", remedy: "computable", severity: "major", ifUnfixed: stake });
@@ -66,7 +68,7 @@ const critique = { pass: 1, verifies: null, verdict: open ? "revise" : "ready", 
   sufficiency: { verdict: open ? "insufficient" : "sufficient", note: open ? "The answer outruns its evidence while the item is open." : "The evidence supports the answer as it is stated." },
   provenance: { backend: "subagent", model: "fake-critic", promptHash: packet.promptHash },
   spine: "Read alone, the titles build from the evidence to the answer in the order a reader follows.", answer: "The answer as it should read, committing to the lean the evidence supports.",
-  answerParts: [{ part: "the request", verdict: (packet.declines || []).length && !blind ? "declined" : "answered", missingEvidence: "" }],
+  answerParts: [{ part: "the request", verdict: declines && !blind ? "declined" : "answered", missingEvidence: "" }],
   pillars: [{ pillar: "The argument", pages: ids, verdict: open ? "weak" : "holds", overlap: "One pillar; nothing overlaps.", strongestCounter: "The base may be too small to generalise.", reversal: "The lead measure reverses for two periods.", answered: !open }],
   numbers: "The figures agree across the pages that print them.", sectionFlow: "The pages open, develop and close in order.", execSummary: "No summary page in this short spine; the titles carry the answer.",
   missingAnalyses, cutOrMerge, findings, topFixes: [open ? "Repair the items filed" : "None material"],

@@ -5,6 +5,7 @@
 import { houseStyle, token, tokenValue, rectPrimitive, stableId, textPrimitive, STYLE_TOKENS } from "./core.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { textWordList } from "./text-contract.mjs";
+import { judged } from "./judgements.mjs";
 import { FONT, COMPACT, INK, SECONDARY, WHITE, HAIRLINE, textStyle, boxStyle, openLine, SECTION_HEADING_TOKENS } from "./registry-shared.mjs";
 
 function resolveChartTitleVariant(props = {}) {
@@ -16,84 +17,53 @@ function resolveChartTitleVariant(props = {}) {
   return variant;
 }
 // Chart titles identify the measure, population and period. Values and changes
-// belong on chart marks/annotations, never in this shared title band. Keep this
-// fail-closed: numeric context must use an unambiguous period or unit spelling.
+// belong on chart marks/annotations, never in this shared title band. What a
+// figure in the band is for is read: the notation that names a period, a
+// date, an index base, a sample, a scale or a model is set aside, and a figure
+// left over - "382 to 305", "top 40", "+12%", "below 60% of income" - is asked
+// about (heading-states-result): a result is refused, a population or a
+// threshold that defines the measure is not. A question not yet answered
+// refuses nothing; the compile lists it.
 function assertChartTitleCopy(props = {}) {
   for (const [field, value] of [["heading", props.heading || props.text], ["unit", props.unit]]) {
     if (typeof value !== "string") continue;
     let copy = value.normalize("NFKC");
     // A complete index-scale definition may use a scenario baseline rather
-    // than a calendar year. Anchor the whole unit so appended results reject.
+    // than a calendar year. Anchor the whole unit so appended results are read.
     if (field === "unit" && /^(?:index\s*[,;:]?\s*)?(?:base|baseline)\s*=\s*(?:1|100)\s*$/i.test(copy.trim())) continue;
     const year = "(?:19|20)\\d{2}";
     const fiscalYear = `(?:${year}|\\d{2})`;
     const month = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)";
-    // "March 2026" is the date the measure is taken at, as "FY26" is.
-    // "31 March 2026", "calendar 2025": the date or year the measure is taken at.
-    // "Feb-2020" and "Q3-2019" join the month or quarter to its year with a hyphen, and are periods as their spaced spellings are.
+    // Dates: "March 2026", "31 March 2026", "Feb-2020", 2026-03-31, 31/03/2026, March 31, 2026.
     copy = copy.replace(new RegExp(`\\b(?:\\d{1,2}\\s+)?${month}\\.?(?:\\s+|-)${year}\\b`, "gi"), "period");
-    copy = copy.replace(new RegExp(`\\b(?:calendar|fiscal|financial)\\s+(?:year\\s+)?${year}\\b`, "gi"), "period");
-    // Dates written as numbers: 2026-03-31, 31/03/2026, March 31, 2026.
     copy = copy.replace(new RegExp(`\\b${year}-\\d{1,2}-\\d{1,2}\\b|\\b\\d{1,2}/\\d{1,2}/(?:${year}|\\d{2})\\b|\\b${month}\\.?\\s+\\d{1,2},?\\s+${year}\\b`, "gi"), "period");
+    // Periods: FY26, FY14-17, Q3 2025, H1, 2024-2025, 2025-26.
     const period = `(?:FY\\s*${fiscalYear}(?:\\s*[-–/]\\s*(?:FY\\s*)?${fiscalYear})?|[QH][1-4](?:(?:\\s+|-)${year})?|${month}\\.?\\s+${year}|${year}\\s*[-–/]\\s*(?:${year}|\\d{2}))`;
-    // "Index, 2021 = 100", "Index, FY19 = 100" and the bare "2018 = 100" a
-    // heading ends on ("Passengers carried, 2018 = 100") name the base, not a
-    // result: a period set equal to 100 is an index base whether or not the
-    // word "index" stands before it. A figure appended to it still rejects.
-    copy = copy.replace(new RegExp(`(?:\\bindex(?:ed)?\\b[^\\d]*?)?(?:${period}|\\b${year})\\s*=\\s*100\\b(?![.,]?\\d)`, "gi"), "index base");
-    // "% of 2019", "% of Feb-2020 baseline", "% vs Q3-2019": a share of a base period, as an index base is.
-    copy = copy.replace(new RegExp(`(?:%|\\bpercent|\\bshare)\\s+(?:of|vs\\.?|versus)\\s+(?:${period}|${year})\\b(?![\\d.,%])`, "gi"), "share of base period");
+    // An index base - "2019 = 100", "FY19 = 100" - names the base, not a result.
+    copy = copy.replace(new RegExp(`(?:${period}|\\b${year})\\s*=\\s*100\\b(?![.,]?\\d)`, "gi"), "index base");
+    // "% of 2019", "% vs Q3-2019": a percentage of a base period, as an index base is.
+    copy = copy.replace(new RegExp(`%\\s+(?:of|vs\\.?)\\s+(?:${period}|${year})\\b(?![\\d.,%])`, "gi"), "share of base period");
     copy = copy.replace(/\b[nN]\s*=\s*[\d,.]+\b/g, "sample size"); // "n = 240" is the population, not a result
     copy = copy.replace(new RegExp(`\\b${period}\\b(?![\\d.%])`, "gi"), "period");
-    // A year in the possessive names whose period it is - "at 2025's growth rate" - whatever word stands before it.
-    copy = copy.replace(new RegExp(`\\b${year}(?=['\u2019]s\\b)`, "g"), "period");
-    copy = copy.replace(new RegExp(`\\b(?:in|during|for|since|through|to|versus|vs\\.?|year)\\s+${year}\\b(?![\\d.%])`, "gi"), "period");
-    copy = copy.replace(new RegExp(`([,(]\\s*)${year}(?=\\s*(?:$|[,) ;]))`, "g"), "$1period");
-    copy = copy.replace(new RegExp(`^\\s*${year}(?=\\s*(?:$|[,;) ]))`), "period"); // a unit line that opens with its period
-    // A year anywhere else is the period the heading asks for - "today and
-    // 2030 goal", "2030 target" - not a result. It reads as a value only when
-    // it is one: after a colon ("NYPD: 2025"), a currency or sign, a verb of
-    // change ("fell 2015"), or carrying a decimal, percent or multiplier.
-    copy = copy.replace(new RegExp(`(?<![:$€£¥₹+\\-−=.,\\d]\\s*)(?<!\\b(?:fell|rose|grew|declined|increased|decreased|dropped|reached|hit|totall?ed|of|at|was|were|is|are|up|down)\\s+)\\b${year}\\b(?![\\d.,]*\\s*(?:%|[xX]\\b|bn\\b|mn\\b|[mkb]\\b|pp\\b|pts?\\b|bps\\b|percent\\b|points?\\b|times\\b|fold\\b))(?![.,]\\d)`, "g"), "period");
-    // A bounded observation window describes the measure. Mask only the
-    // complete duration phrase so adjoining result values still reject.
-    copy = copy.replace(/\bwithin\s+(?:one|1)\s+year\b/gi, "within observation period");
-    // Scale denominators and named budgets/thresholds describe the measure, not a result.
-    copy = copy.replace(/\bper\s+(?:100[,. ]?000|100k|1[,. ]?000|1k|100|10|1)\b(?:\s+(?:residents|people|employees|units|capita))?/gi, "per population");
-    copy = copy.replace(/\b\d+(?:\.\d+)?\s*(?:-|–)\s*(?:minute|min|hour|day|week|month|year)\b/gi, "duration"); // "45-minute limit" names a threshold
-    copy = copy.replace(/\b(?:above|below|under|over|at least|at most)\s+[$€£]?\d+(?:[.,]\d+)?\s*(?:bn|billion|million|m|k|%|hours?|minutes?)\b/gi, "population threshold");
-    // Model and product designations name a thing, not a result: A350-1000,
-    // A321neo, 787-9, 737 MAX 8, iPhone 15. A token that mixes letters and
-    // digits, or a three-digit model with a short variant, is masked.
-    // A figure with its multiplier or magnitude ("12x", "5bn", "40pp") mixes
-    // letters and digits too, and is a result, so it is left to reject.
+    // A year is the period the heading asks for ("in 2025", "2030 target", "at 2025's rate") unless its notation makes it a
+    // value: set after a colon, a sign, a currency or "=", or carrying a decimal, a percent or a multiplier.
+    copy = copy.replace(new RegExp(`(?<![:$€£¥₹+\\-−=]\\s*)(?<![\\d.,])\\b${year}\\b(?![\\d.,]*\\s*(?:%|[xX]\\b|bn\\b|mn\\b|[mkb]\\b|pp\\b|pts?\\b|bps\\b))(?![.,]\\d)`, "g"), "period");
+    // Model and product designations name a thing: A350-1000, A321neo, 787-9, 737 MAX 8, 505X. A figure with its multiplier
+    // or magnitude ("12x", "5bn", "40pp") mixes letters and digits too, and is left to be read.
     copy = copy.replace(/\b(?!\d+(?:[xX]|bn|mn|[mkb]|pp|pts?|bps)\b)(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{2,}(?:-[A-Za-z0-9]+)*\b/g, "designation");
     copy = copy.replace(/\b\d{3}(?:-\d{1,2}[A-Za-z]*|\s+MAX(?:\s+\d{1,2})?)\b/g, "designation");
-    // So is a three-digit model with a capital letter for its variant ("505X", "220F"): a multiplier is written with a small x
-    // and a magnitude with M, K or B, which are left to reject.
     copy = copy.replace(/\b\d{3}(?![MKB]\b)[A-Z]\b/g, "designation");
-    // A rank scale says which end is best ("rank, 1 = best"), and a set size
-    // says how many members the chart shows ("top 40", "World's Top 100"):
-    // both describe the measure. A figure after them - "top 40%", "top 3.5x" -
-    // is still a result.
-    copy = copy.replace(/\brank(?:ed|ing)?\b\s*[,;:]?\s*\(?\s*1\s*=\s*(?:best|top|highest|largest|first|lowest|worst)\s*\)?/gi, "rank scale");
-    copy = copy.replace(/\b(?:top|bottom|largest|biggest|busiest|leading|first|last)\s+\d{1,4}\b(?![.,]\d)(?!\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b|percent\b|points?\b|times\b|fold\b))/gi, "member set");
-    // And so does a count of the members set off as the population - "Depots in service, 20 suppliers", "(12
-    // markets)": a whole number before a plural noun, after the comma or bracket that opens the population (or opening a unit
-    // line), with nothing after the noun. A magnitude or a currency there is a value, and is left to reject.
-    copy = copy.replace(/(^\s*|[,;(]\s*)\d{1,4}\s+(?!(?:percent|points?|pts|times|fold|millions?|billions?|thousands?|hundreds?|bn|mn|pp|bps|dollars|pounds|euros|cents|pence)\b)(?:[a-z][a-z-]*\s+){0,2}[a-z][a-z-]*s\b(?=\s*(?:$|[,;)]))/gi, "$1member set");
-    const numberWords = "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)";
-    // A number word is a result only when it quantifies a change or share ("twenty percent", "one point"),
-    // not when it counts things the chart shows ("three monthly budgets").
-    // The refusal names the figure it read as a result, so the author knows
-    // which words to move rather than guessing at the heading.
-    const result = copy.match(/[$€£¥₹+\-−]?\p{N}[\p{N}.,/]*\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b)?/u)?.[0]
-      ?? copy.match(/\b(?:doubled|tripled|halved)\b/i)?.[0] ?? copy.match(new RegExp(`\\b${numberWords}\\s+(?:percent|per\\s*cent|points?|pts|x|times|fold|percentage)\\b`, "i"))?.[0];
-    if (result) {
-      throw new Error(
-        `Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)} carries "${result.trim()}", which reads as a value the chart shows. Put it on the mark, a label or an annotation, and keep the ${field} to the measure, population and period. A ${field} may name a period ("FY26", "2 August 2026", "at 2025's rate"), a sample ("n = 240"), a set size ("top 40", or the members counted, set off by a comma: "20 suppliers"), a model by its designation ("X77", "505X"), an index base ("2019 = 100") or a rank scale ("1 = best").`
-      );
-    }
+    // A rank scale says which end is first: "1 = best", "(1 = highest)".
+    copy = copy.replace(/\(?\s*\b1\s*=\s*[A-Za-z]+\s*\)?/g, "rank scale");
+    const figure = copy.match(/[$€£¥₹+\-−]?\p{N}[\p{N}.,/]*\s*(?:%|[xX]\b|bn\b|mn\b|[mkb]\b|pp\b|pts?\b|bps\b)?/u)?.[0]?.trim()
+      ?? copy.match(/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\s+(?:percent|per\s*cent|points?|percentage)\b/i)?.[0];
+    if (!figure) continue;
+    const read = judged("heading-states-result", { field, text: value.trim() });
+    if (read?.verdict !== "result") continue;
+    // The refusal names the figure it read as a result, so the author knows which words to move.
+    throw new Error(
+      `Chart title ${field} must not contain statistics or chart results: ${JSON.stringify(value)} carries "${String(read.quote ?? figure).trim()}", which reads as a value the chart shows. Put it on the mark, a label or an annotation, and keep the ${field} to the measure, population and period. A ${field} may name a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set or a threshold that defines the measure ("top 40", "20 suppliers", "below 60% of median income"), a model by its designation ("X77", "505X"), an index base ("2019 = 100") or a rank scale ("1 = best").`
+    );
   }
 }
 // Chart headings default to measure plus inline unit in one ruled band.

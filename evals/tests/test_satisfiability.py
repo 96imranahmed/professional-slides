@@ -152,10 +152,15 @@ console.log(JSON.stringify({ out }));
 class RepairTextTests(unittest.TestCase):
     """Where a refusal says what is allowed, the code allows it."""
 
+    # A figure the notation does not account for is asked about (heading-states-result); this reader takes every figure it
+    # is asked about for a result, except the ones a test names, so what the notation sets aside is what passes unasked.
     PROBE = '''
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const title = REGISTRY.get('chart-title');
-const refusal = (props) => { try { title.resolveVariant(props); return null; } catch (error) { return error.message; } };
+const describes = new Set(), asked = [];
+const reader = judgementSession({ oracle: (kind, said) => { asked.push(said.text); return describes.has(said.text) ? 'describes' : 'result'; } });
+const refusal = (props) => withJudgements(reader, () => { try { title.resolveVariant(props); return null; } catch (error) { return error.message; } });
 '''
 
     def test_an_index_base_in_a_chart_heading_is_allowed_as_the_message_says(self):
@@ -177,27 +182,37 @@ console.log(JSON.stringify({
     def test_a_share_of_a_base_period_is_a_unit_and_a_figure_after_it_is_still_a_result(self):
         result = run_node(self.PROBE + '''
 const units = { year: '% of 2019', month: '% of Feb-2020 baseline', quarter: '% vs Q3-2019', share: 'Share of 2019 rent',
-  appended: '% of 2019, up 12%', equated: '% of 2019 = 85', decimal: '% of 2019.5', value: 'value of 2019' };
+  appended: '% of 2019, up 12%', equated: '% of 2019 = 85', decimal: '% of 2019.5' };
+describes.add('Share of 2019 rent');
 console.log(JSON.stringify(Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, refusal({ heading: 'Weekly office attendance', unit })]))));
 ''')
+        # A percentage of a base period is notation, set aside; a share of a base year in words is read, and described.
         for allowed in ("year", "month", "quarter", "share"):
             self.assertIsNone(result[allowed], f"{allowed}: {result[allowed]}")
-        for refused in ("appended", "equated", "decimal", "value"):
+        # A year in words ("value of 2019") is a period: only its notation - a colon, a sign, a decimal - makes it a value.
+        for refused in ("appended", "equated", "decimal"):
             self.assertIn("must not contain statistics", result[refused])
 
     def test_every_example_the_message_lists_as_allowed_is_allowed(self):
-        # The refusal ends: a heading may name a period ("FY26", "2 August 2026", "at 2025's rate"), a sample ("n = 240"),
-        # a set size ("top 40", or the members counted: "20 suppliers"), a model by its designation ("X77", "505X"),
-        # an index base ("2019 = 100") or a rank scale ("1 = best").
+        # The refusal ends: a heading may name a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set or a threshold
+        # that defines the measure ("top 40", "20 suppliers", "below 60% of median income"), a model by its designation
+        # ("X77", "505X"), an index base ("2019 = 100") or a rank scale ("1 = best"). The notation is set aside unasked; a set
+        # or a threshold is read, and a reader takes it for what defines the measure.
         result = run_node(self.PROBE + '''
 const message = refusal({ heading: 'Revenue up 12%' });
 const listed = [...message.slice(message.indexOf('may name')).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 const scale = (text) => (/^1 = /.test(text) ? `rank, ${text}` : text);
-console.log(JSON.stringify({ listed, headings: listed.map((text) => refusal({ heading: `Operators by size, ${scale(text)}` })), units: listed.map((text) => refusal({ heading: 'Operators by size', unit: scale(text) })) }));
+const read = ['top 40', '20 suppliers', 'below 60% of median income'];
+for (const text of read) { describes.add(`Operators by size, ${text}`); describes.add(text); }
+asked.length = 0;
+const headings = listed.map((text) => refusal({ heading: `Operators by size, ${scale(text)}` })), units = listed.map((text) => refusal({ heading: 'Operators by size', unit: scale(text) }));
+console.log(JSON.stringify({ listed, headings, units, asked: [...new Set(asked)] }));
 ''')
-        self.assertEqual(result["listed"], ["FY26", "2 August 2026", "at 2025's rate", "n = 240", "top 40", "20 suppliers", "X77", "505X", "2019 = 100", "1 = best"])
+        self.assertEqual(result["listed"], ["FY26", "2 August 2026", "n = 240", "top 40", "20 suppliers", "below 60% of median income", "X77", "505X", "2019 = 100", "1 = best"])
         self.assertEqual(result["headings"], [None] * 10)
         self.assertEqual(result["units"], [None] * 10)
+        self.assertEqual(sorted(result["asked"]), sorted(["Operators by size, top 40", "Operators by size, 20 suppliers", "Operators by size, below 60% of median income",
+                                                          "top 40", "20 suppliers", "below 60% of median income"]))
 
     def test_a_form_the_catalogue_offers_is_not_refused_by_its_own_type(self):
         # The three forms no page could satisfy, each compiled at its least.

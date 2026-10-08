@@ -16,13 +16,21 @@ import page_gates  # noqa: E402
 
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 
-PAGE = """
-const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
-const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
-const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+# The rules that read what copy means ask a question (runtime/judgements.mjs); a test answers each kind in `answers`, as a
+# reader of its fixture would, and `asked` lists every question put.
+ORACLE = """
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
+const answers = {}, asked = [];
+const reader = judgementSession({ oracle: (kind, subject, context) => { asked.push({ kind, subject }); const a = answers[kind]; return typeof a === 'function' ? a(subject, context) : a ?? null; } });
 """
 
-PRELUDE = """
+PAGE = ORACLE + """
+const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
+const error = (fn) => withJudgements(reader, () => { try { fn(); return null; } catch (e) { return e.message; } });
+"""
+
+PRELUDE = ORACLE + """
 import assert from 'node:assert/strict';
 import { compilePage, describeTypes } from './skills/professional-slides/runtime/page-types.mjs';
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
@@ -30,7 +38,7 @@ import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const S = { kind: 'comparison', what: 'The operator annual reports' };
 const base = { takeaway: false, why: 'The page type fits the claim this page makes', settles: S, adds: 'The commentary names the mechanism the exhibit cannot show' };
 const compose = (pages) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: pages.map((p, i) => compilePage(p, i)) }, '.').deck.slides;
-const error = (fn) => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } };
+const error = (fn) => withJudgements(reader, () => { try { fn(); return null; } catch (e) { return (e.pageErrors ?? [e.message]).join(' | '); } });
 // The emphasised text of a composed page, runs joined across line breaks.
 const lit = (slide) => slide.nodes.map((n) => (n.runs || []).map((r) => (r.text === '\\n' ? ' ' : r.accent || r.bold ? r.text.replace(/\\n/g, ' ') : ' | ')).join('')).join(' | ');
 const years = ['2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'];
@@ -68,8 +76,10 @@ const matrix = {{ id: 'p2', type: 'matrix', form: 'findings-matrix', commentary:
 const text = {{ columns: ['Control', 'OpenAI', 'Anthropic'], rows: [['Residency', 'US only', 'Varies'], ['Retention', 'Not eligible', 'Eligible'], ['Audit logs', 'Enterprise tier', 'All tiers']] }};
 const counts = {{ columns: ['Route', 'Flights', 'Seats'], rows: [['A', '12', '2400'], ['B', '8', '1600'], ['C', '6', '1200']] }};
 const rows = (ex) => ex.rows.map((row) => (Array.isArray(row) ? row : row.cells).map((c) => String(c?.text ?? c)));
+answers['row-is-total'] = (label) => (['Total', 'Overall'].includes(label) ? 'total' : 'not-total');
 console.log(JSON.stringify({{
   blank: error(() => compilePage(table([...body, ['Total', '', ' ']]))),
+  heading: error(() => compilePage(table([...body, ['Europe', '', ' ']]))),
   styled: error(() => compilePage(table([...body, {{ style: 'total', cells: ['All', '-', '-'] }}]))),
   filled: error(() => compilePage(table([...body, ['Total', '$126.7B', '$80B']]))),
   matrix: error(() => compilePage(matrix)),
@@ -80,6 +90,7 @@ console.log(JSON.stringify({{
 ''')
         self.assertIn("TOTAL_ROW_BLANK", result["blank"])
         self.assertIn("carries its computed total", result["blank"])
+        self.assertIsNone(result["heading"])  # a blank row a reader takes for a group's heading is not a total
         self.assertIn("TOTAL_ROW_BLANK", result["styled"])
         self.assertIsNone(result["filled"])
         self.assertIn("TOTAL_ROW_BLANK", result["matrix"])
@@ -164,6 +175,7 @@ import {{ compilePage }} from '{KIT}';
 {self.TABLES}
 const roster = (n) => ({{ ...base, id: 'r', type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', title: 'Two carriers set the terms of the market',
   exhibit: {{ columns: [{{ label: '', type: 'logo' }}, 'Carrier', 'Fleet'], rows: [[{{ media: {{ alt: 'Northwind logo' }} }}, 'Northwind', '260'], [{{ media: {{ alt: 'Southgate logo' }} }}, 'Southgate', '140']].slice(0, n) }} }});
+answers['row-is-total'] = 'total';
 console.log(JSON.stringify({{
   logoTotal: error(() => compilePage(lookup([...body, ['Overall', 'Northwind', 'Southgate']]), 0, opts)),
   blankTotal: error(() => compilePage(lookup([...body, ['Overall', '', '-']]), 0, opts)),
@@ -207,6 +219,7 @@ const matrix = {{ id: 'p2', type: 'matrix', form: 'findings-matrix', commentary:
   columns: ['Workload', 'Current signal / Winner call', 'Caveat'], rows: [
     {{ label: 'Composite', cells: ['Opus 5.5 at 58 | Anthropic', 'One configuration'] }}, {{ label: 'Coding cost', cells: ['Astra 40% lower | OpenAI', 'Task mix varies'] }},
     {{ label: 'Terminal', cells: ['Near parity | No durable gap', 'Harness matters'] }}] }};
+answers['column-judges'] = (column) => (['Current edge', 'Confidence', 'Winner call'].includes(column.header) ? 'judges' : 'states-facts');
 console.log(JSON.stringify({{
   edge: error(() => compilePage(lookup('Current edge', ['OpenAI', 'Anthropic', 'No verdict']))),
   confidence: error(() => compilePage(lookup('Confidence', ['High', 'Medium', 'Low']))),
@@ -215,9 +228,13 @@ console.log(JSON.stringify({{
   numbers: error(() => compilePage(lookup('Score', ['72', '64%', '8.1']))),
   prose: error(() => compilePage(lookup('Status', ['Approved in the EU and pending in the US', 'Filed in March with a decision due in the autumn', 'Not yet filed anywhere this year']))),
   matrix: error(() => compilePage(matrix)),
+  facts: error(() => compilePage(lookup('Leader', ['OpenAI', 'Anthropic', 'No verdict']))),
+  asked: asked.filter((q) => q.kind === 'column-judges').map((q) => q.subject.header),
 }}));
 ''')
         self.assertIn("VERDICT_TABLE_PLAIN", result["edge"])
+        self.assertIsNone(result["facts"])  # the same cells under a column a reader takes as a fact
+        self.assertNotIn("Score", result["asked"])  # numbers and prose are never asked about
         self.assertIn('"Current edge"', result["edge"])
         self.assertIn("scorecard", result["edge"])
         self.assertIn("VERDICT_TABLE_PLAIN", result["confidence"])
@@ -254,6 +271,7 @@ import {{ compilePage }} from '{KIT}';
 const trend = (categories, heading = 'Revenue, $B') => ({{ id: 'p1', type: 'trend', form: 'column', commentary: 'on-exhibit', ...base, title: 'Revenue rose sixfold in five years',
   exhibit: {{ heading, categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
     annotations: [{{ category: categories[1], text: 'The launch year doubled revenue as the new product reached every region' }}] }} }});
+answers['heading-says-snapshots'] = (said) => (said.heading.includes('selected years') ? 'says-snapshots' : 'reads-as-series');
 console.log(JSON.stringify({{
   uneven: error(() => compilePage(trend(['2015', '2018', '2019', '2020', '2021']))),
   snapshots: error(() => compilePage(trend(['2015', '2018', '2019', '2020', '2021'], 'Revenue in selected years, $B'))),
@@ -273,6 +291,7 @@ import {{ compilePage }} from '{KIT}';
 const trend = (categories) => ({{ id: 'p1', type: 'trend', form: 'column', commentary: 'on-exhibit', ...base, title: 'Revenue rose sixfold in five years',
   exhibit: {{ heading: 'Revenue, $B', categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
     annotations: [{{ category: categories[1], text: 'The launch year doubled revenue as the new product reached every region' }}] }} }});
+answers['heading-says-snapshots'] = 'reads-as-series';
 console.log(JSON.stringify({{ three: error(() => compilePage(trend(['2015', '2018', '2019']))), four: error(() => compilePage(trend(['2015', '2018', '2019', '2020']))) }}));
 ''')
         self.assertNotIn("TIME_AXIS_UNEVEN", result["three"] or "")
@@ -287,6 +306,7 @@ const scatter = (exhibit) => ({{ ...base, id: 'p1', type: 'relationship', form: 
   exhibit: {{ heading: 'Hurdle', annotations: [{{ category: 'p3', text: 'At equal contribution the hurdle is half of all the paid tasks' }}], ...exhibit }} }});
 const curve = [0.2, 0.5, 1, 1.5, 2, 3, 4, 5].map((x, i) => ({{ name: 'p' + i, x, y: Math.round(100 / (1 + x)) }}));
 const cloud = [[1, 5], [2, 3], [3, 6], [4, 2], [5, 7], [6, 4], [7, 6], [8, 3]].map(([x, y], i) => ({{ name: 'p' + i, x, y }}));
+answers['axis-measures-time'] = (label) => (label.startsWith('Months since') ? 'time' : 'not-time');
 console.log(JSON.stringify({{
   time: error(() => compilePage(scatter({{ xLabel: 'Months since Jan 2025', points: cloud }}))),
   curve: error(() => compilePage(scatter({{ xLabel: 'Contribution ratio', points: curve }}))),
@@ -336,6 +356,7 @@ import {{ compilePage }} from '{KIT}';
 const facts = (items) => ({{ ...base, id: 'p1', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Claude retention improved over the year', exhibit: {{ items }} }});
 const strip = (metrics) => ({{ ...base, id: 'p2', type: 'numbers', form: 'metric-strip', commentary: 'none', title: 'OpenAI pace rose through the year', metrics,
   exhibit: {{ type: 'chart.column', heading: 'Pace, $B', categories: ['2023', '2024', '2025', 'Mar 2026', 'Aug 2026'], series: [{{ name: 'Pace', values: [2, 6, 20, 24, 40] }}] }} }});
+answers['tiles-one-measure'] = (tiles) => (tiles[0].label.includes('cohort retained') ? {{ verdict: 'one-measure', pair: ['t1', 't2'] }} : 'different-measures');
 console.log(JSON.stringify({{
   dates: error(() => compilePage(facts([{{ value: '25.8%', label: 'Claude Jan 2025 cohort retained at six months' }}, {{ value: '45%', label: 'Claude Feb 2026 cohort retained at six months' }}, {{ value: '14pp', label: 'Gap to ChatGPT, latest' }}]))),
   distinct: error(() => compilePage(facts([{{ value: '$1B', label: 'Ads annualized run rate' }}, {{ value: '<200d', label: 'Time from launch to the milestone' }}, {{ value: '>1B', label: 'Weekly ChatGPT users' }}]))),
@@ -420,6 +441,7 @@ const words = (n, seed) => Array.from({{ length: n }}, (_, i) => ['buyers', 'ret
 const memo = (title, paragraphs) => ({{ id: 'p1', type: 'argument', form: 'sidebar', commentary: 'none', ...base, title, paragraphs, panel: {{ text: 'The base case is split leadership with a contested middle: models consolidate, applications fragment, and the clouds take the margin that neither of the other two keeps.' }} }});
 const cards = {{ id: 'p2', type: 'parallel', form: 'cards', commentary: 'in-exhibit', ...base, title: 'Three market structures divide the value differently',
   exhibit: {{ items: [0, 1, 2].map((i) => ({{ title: 'Scenario ' + (i + 1), text: words(64, i) }})) }} }};
+answers['prose-alternatives'] = (page) => (page.title === 'The funding gap should be borrowed rather than cut' ? 'one-argument' : 'alternatives');
 console.log(JSON.stringify({{
   scenarios: error(() => compilePage(memo('Three scenarios divide value across models, apps and clouds', [words(171, 0), words(62, 3), words(61, 5)]))),
   argument: error(() => compilePage(memo('The funding gap should be borrowed rather than cut', [0, 3, 5].map((seed) => ({{ lead: 'Costs fall faster than prices', text: words(58, seed) }}))))),
@@ -552,7 +574,7 @@ import {{ VARIETY_CODES }} from './skills/professional-slides/runtime/gates/vari
 import {{ AUTHORING_CODES }} from './skills/professional-slides/runtime/author-deck.mjs';
 import {{ wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
 {PAGE}
-const said = (fn) => {{ try {{ const page = fn(); return (page.pageType?.advisories ?? []).join(' | '); }} catch (e) {{ return e.message; }} }};
+const said = (fn) => withJudgements(reader, () => {{ try {{ const page = fn(); return (page.pageType?.advisories ?? []).join(' | '); }} catch (e) {{ return e.message; }} }});
 const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
 const table = (heading, rows) => ({{ type: 'table', heading, columns: ['Measure', 'Value', 'Date'], rows }});
 const three = [['Revenue run rate', '>$2.5B', 'Feb 2026'], ['Enterprise share', 'More than half', 'Feb 2026'], ['Weekly users', 'n/a', 'Feb 2026']];
@@ -573,6 +595,9 @@ const strip = {{ ...base, id: 'n', type: 'numbers', form: 'metric-strip', commen
 const map = {{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points: ['A point.'], takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Where the network runs is the claim',
   settles: {{ kind: 'structure', what: 'The operator route map' }}, title: 'The network is three cities', exhibit: {{ geography: 'europe', crop: 'fit',
     markers: [{{ label: 'Leeds', longitude: -1.55, latitude: 53.8 }}, {{ label: 'York', longitude: -1.08, latitude: 53.96 }}, {{ label: 'Hull', longitude: -0.34, latitude: 53.74 }}] }} }};
+// The battery's questions answered as a reader of each page would: the total row is a total, the edge column judges,
+// the dates read as a series, the paragraphs are scenarios.
+Object.assign(answers, {{ 'row-is-total': 'total', 'column-judges': (c) => (c.header === 'Current edge' ? 'judges' : 'states-facts'), 'heading-says-snapshots': 'reads-as-series', 'prose-alternatives': 'alternatives' }});
 const raised = {{
   TABLE_TOO_SHORT: said(() => compilePage({{ ...lookup(['Measure', 'Value', 'Date'], three.slice(0, 2)), exhibit: table('First product', three.slice(0, 2)) }})),
   TABLE_PANELS_MERGE: said(() => compilePage(panels('stack', [table('First product', three), table('Second product', three)]))),
@@ -607,7 +632,6 @@ console.log(JSON.stringify({{ raised, types: describeTypes(), codes: [...Object.
         # Every compile refusal is in the deck's vocabulary but the title's and
         # the takeaway's, page-gate codes checked early.
         self.assertEqual(set(result["raised"]) - set(result["codes"]), {"TITLE_WORDS", "TAKEAWAY_LONG"})
-        self.assertIn("leads, leader, winner, wins", result["types"])  # every verdict word the check reads
         self.assertIn(f"({result['summary']} body words)", result["types"])  # the summary ceiling the budget sets
 
 

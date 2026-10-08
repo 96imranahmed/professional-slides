@@ -41,6 +41,7 @@ import { textWordList, textWords, proseParts, PROSE_LEAD_FROM, PROSE_PARAGRAPH_M
 import { deckSchema } from "./deck-keys.mjs";
 import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
+import { judged } from "./judgements.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing, and checked at
@@ -687,14 +688,11 @@ function checkBlocks(page, id, exhibits) {
 // rather than left for the review to find.
 const BLANK = /^[\s\-–—]*$/;
 const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
-// A heading that says the columns are snapshots, not a series: the gaps are then the point.
-const SNAPSHOTS = /\b(snapshots?|selected (?:years|dates|months|quarters|periods)|observations?|as (?:of|at)\b)/i;
-// A column that judges: who leads, the verdict, how sure, the state. The
-// catalogue prints this list, so the words it names are the words refused.
-const VERDICT_WORDS = ["lead", "leads", "leader", "winner", "wins", "edge", "verdict", "confidence", "status", "rating", "score", "ahead", "behind", "rag", "assessment"];
-const VERDICT_HEADER = new RegExp(`\\b(${VERDICT_WORDS.join("|")})\\b`, "i");
-// What makes a page's paragraphs alternatives rather than one argument.
-const SCENARIO_TERMS = /\b(scenarios?|options|alternatives|futures|outcomes|pathways|paths to|market structures|base case|bull case|bear case|upside case|downside case)\b/i;
+// What a heading, a column, a row label or a set of paragraphs means is read,
+// not matched against a list of words: each rule below that turns on it asks
+// its question of a model once (judgements.mjs, judgement-kinds.json) and
+// holds where the recorded answer is the defect. A question not yet answered
+// does not hold, and the compile lists it as pending.
 const SCENARIO_WORDS = 60;
 const PROSE_TYPES = new Set(["options", "scorecard", "lookup", "matrix", "summary", "statement"]);
 // A table earns its grid at three rows; a logo table introducing two players
@@ -704,17 +702,16 @@ const TABLE_ROWS = 3, ROSTER_ROWS = 2;
 // The review's refusals as the catalogue prints them - the code, what it
 // refuses, what to draw instead. `--types` is built from these lists and a
 // test holds them to the codes the compiler raises, so the catalogue names
-// every refusal and every verdict word the check reads.
-const or = (list) => `${list.slice(0, -1).join(", ")} or ${list.at(-1)}`;
+// every refusal.
 const REVIEW_RULES = [
   ["TABLE_TOO_SHORT", `a table of fewer than ${TABLE_ROWS} body rows (a logo table introducing two players, and a row block's small table, are exempt)`, "two or three figures are a numbers page"],
   ["TABLE_PANELS_MERGE", "two tables with the same columns on one page, whether their rows name the same measures or different ones", "one table, the members as columns and every measure as a row, \"n/a\" where a member does not disclose one"],
   ["TABLE_STACK", "two or more tables set one above another (panels form stack, or in both rows of a grid)", "one table with the members as columns, or one table with the other evidence as a chart or a strip of numbers beside or above it; tables side by side in a row pass"],
   ["COMPARISON_MEASURES_DIFFER", "panels headed by different declared players, each on a measure of its own", "one panel per measure, the players as its bars or series"],
-  ["TOTAL_ROW_BLANK", "a table row labelled Total, Sum or Overall with nothing in its result cells", "a measure table adds its own total only where a column sums, and `total: true` where none does is refused"],
-  ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps", "a line or an area spaces dated categories by the time between them, so draw the series as one, or say \"snapshots\" or \"selected years\" in the heading"],
-  ["VERDICT_TABLE_PLAIN", `on a lookup, options or matrix page, a column headed ${or(VERDICT_WORDS)} whose cells are words`, "give it a `type`: rag, harvey, check, lights, dot, or use a scorecard"],
-  ["SCENARIO_PROSE", `two to four alternatives (scenarios, options, paths) as paragraphs of ${SCENARIO_WORDS} words or more each`, "set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal"],
+  ["TOTAL_ROW_BLANK", "a table row that closes the table as a total (`style: \"total\"`, or a label that reads as one) with nothing in its result cells", "a measure table adds its own total only where a column sums, and `total: true` where none does is refused"],
+  ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps, whose heading does not tell the reader they are chosen dates", "a line or an area spaces dated categories by the time between them, so draw the series as one, or say \"snapshots\" or \"selected years\" in the heading"],
+  ["VERDICT_TABLE_PLAIN", "on a lookup, options or matrix page, a column whose cells judge each row - who leads, a verdict, a rating, a status - in plain words", "give it a `type`: rag, harvey, check, lights, dot, or use a scorecard"],
+  ["SCENARIO_PROSE", `two to four alternatives (scenarios, options, paths) the reader is to compare, as paragraphs of ${SCENARIO_WORDS} words or more each`, "set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal"],
   ["PROSE_PARAGRAPH_LONG", `a paragraph of more than ${PROSE_PARAGRAPH_MAX} words`, "two led paragraphs, each its own claim"],
   ["PROSE_UNSIGNPOSTED", `a paragraph of ${PROSE_LEAD_FROM} words or more with no \`lead\`, or a lead outside ${PROSE_LEAD_WORDS.join(" to ")} words`, "write it as `{ lead, text }`: the lead is the subheading the reader scans by, set in bold above the prose"],
 ];
@@ -729,13 +726,17 @@ const printRules = (rules) => rules.map(([code, rule, repair]) => `${rule} (${co
  * compose-tables.mjs totalRow adds a total only where a column sums, and a row the
  * author writes is held to the same: labelled a total, it carries one.
  */
-function blankTotal(rows) {
-  for (const row of rows || []) {
-    const label = cellText(rowLabel(row)).trim(), results = resultCells(row);
-    if ((row?.style === "total" || /^(?:grand\s+)?(?:totals?|sum|overall)\b/i.test(label)) && results.length && results.every((c) => BLANK.test(cellText(c)))) return { label: label || "total" };
+function blankTotal(rows, headers, id) {
+  const labels = (rows || []).map((row) => cellText(rowLabel(row)).trim());
+  for (const [at, row] of (rows || []).entries()) {
+    const label = labels[at], results = resultCells(row);
+    if (!results.length || !results.every((c) => BLANK.test(cellText(c)))) continue;
+    // A row styled as the total says so; a row whose label reads as one is asked (row-is-total) - a blank row is as often a group's heading.
+    if (row?.style === "total" || (label && judged("row-is-total", label, { headers: (headers || []).map(headerText), rows: labels }, id)?.verdict === "total")) return { label: label || "total" };
   }
   return null;
 }
+const headerText = (column) => (typeof column === "string" ? column : String(column?.label ?? ""));
 
 /** The chart exhibits an exhibit carries: itself, or the charts of a chart group. */
 const chartsIn = (ex) => (ex?.type === "chart-group" ? (ex.charts || []).map((c) => ({ type: c?.component, heading: c?.heading, unit: c?.unit, ...(c?.props || {}) })) : [ex]);
@@ -763,14 +764,17 @@ function tableColumns(headers, rows) {
  * fact. A coded column (a type, or words the composer codes on its
  * own: on track, wins, ✓) passes; numbers are measures, not verdicts.
  */
-function plainVerdict(headers, rows) {
+function plainVerdict(headers, rows, id) {
+  const all = (headers || []).map(headerText);
   for (const { column, header, cells } of tableColumns(headers, rows)) {
-    if (!VERDICT_HEADER.test(header)) continue;
     if (column && typeof column === "object" && (CODED.has(column.type) || column.heat || column.bar || column.harvey)) continue;
     const written = cells.filter((cell) => !BLANK.test(cellText(cell)));
     const plain = written.filter((cell) => !(cell && typeof cell === "object" && cell.type) && typeof verdictCell(cellText(cell), header) === "string"
       && !NUMERIC.test(cellText(cell)) && words(cellText(cell)).length <= 5);
-    if (plain.length >= 2 && plain.length * 2 >= written.length) return { header, examples: plain.slice(0, 3).map(cellText) };
+    if (plain.length < 2 || plain.length * 2 < written.length) continue;
+    // A column of short words is a judgement or a fact by what it says: asked (column-judges).
+    const said = [...new Set(plain.map(cellText))];
+    if (judged("column-judges", { header, cells: said }, { headers: all }, id)?.verdict === "judges") return { header, examples: said.slice(0, 3) };
   }
   return null;
 }
@@ -852,8 +856,9 @@ function reshapeDefect(page, id, exhibits, players, skip = new Set()) {
   }
   if (!PROSE_TYPES.has(page.type) && !skip.has("SCENARIO_PROSE")) {
     const blocks = proseBlocks(page, exhibits), long = blocks.filter((b) => words(b.text).length >= SCENARIO_WORDS);
-    const about = `${page.title ?? ""} ${page.why ?? ""} ${page.settles?.what ?? ""} ${blocks.map((b) => b.lead).join(" ")}`;
-    if (long.length >= 2 && long.length <= 4 && long.length === blocks.length && (SCENARIO_TERMS.test(about) || blocks.every((b) => /^(scenario|option|case|path)\b/i.test(b.lead || b.text))))
+    // Whether the paragraphs are alternatives or the steps of one argument is read (prose-alternatives).
+    const alternatives = () => judged("prose-alternatives", { title: String(page.title ?? ""), purpose: String(page.why ?? ""), paragraphs: blocks.map((b) => ({ lead: b.lead, text: b.text })) }, null, id)?.verdict === "alternatives";
+    if (long.length >= 2 && long.length <= 4 && long.length === blocks.length && alternatives())
       return `${id}: SCENARIO_PROSE - ${long.length} alternatives are set as paragraphs of ${long.map((b) => words(b.text).length).join(", ")} words, which a reader has to hold in mind to compare. ` +
         "Set them side by side on the same terms: type `options` (form compare or table-halves), `parallel` form `labelled-rows`, or a comparison table whose columns are what each is judged on - the trigger, who captures the value, the test that would show it, the signal against it";
   }
@@ -868,20 +873,23 @@ function reshapeDefect(page, id, exhibits, players, skip = new Set()) {
  */
 function reviewedDefect(page, id, exhibits, skip = new Set()) {
   const tables = exhibits.filter(isTable);
-  const total = !skip.has("TOTAL_ROW_BLANK") && [...tables.map((ex) => ex.rows), page.type === "matrix" ? page.rows : null].map(blankTotal).find(Boolean);
+  const total = !skip.has("TOTAL_ROW_BLANK") && [...tables.map((ex) => [ex.rows, ex.columns]), page.type === "matrix" ? [page.rows, page.columns] : [null]].map(([rows, headers]) => blankTotal(rows, headers, id)).find(Boolean);
   if (total) return `${id}: TOTAL_ROW_BLANK - the row "${total.label}" closes the table as a total with no value in any result cell; a total row carries its computed total - or delete it. ` +
     "Totals belong only where the columns share a basis (counts, amounts); `total: true` on a measure table sums the columns that add up";
   for (const chart of exhibits.flatMap(chartsIn)) {
     // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
     // trough, now); four or more read as a series, and the eye reads the rhythm.
-    if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || SNAPSHOTS.test(`${chart.heading ?? ""} ${chart.unit ?? ""}`)) continue;
-    if (timePositions(chart.categories)) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
+    if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || !timePositions(chart.categories)) continue;
+    // A heading may tell the reader the columns are chosen dates (heading-says-snapshots); one that says nothing does not.
+    const told = { heading: String(chart.heading ?? "").trim(), unit: String(chart.unit ?? "").trim() };
+    const series = !told.heading && !told.unit ? true : judged("heading-says-snapshots", told, { categories: chart.categories.map(String) }, id)?.verdict === "reads-as-series";
+    if (series) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
       "Plot the series as a line or an area (the runtime spaces dated points by the time between them), fill in the missing periods, or say in the heading that the columns are snapshots (\"selected years\", \"snapshots\")";
   }
   const prose = proseDefect(page, id, skip);
   if (prose) return prose;
   if (["lookup", "options", "matrix"].includes(page.type) && !skip.has("VERDICT_TABLE_PLAIN")) {
-    const plain = [...tables, ...(page.type === "matrix" ? [page] : [])].map((ex) => plainVerdict(ex.columns || [], ex.rows)).find(Boolean);
+    const plain = [...tables, ...(page.type === "matrix" ? [page] : [])].map((ex) => plainVerdict(ex.columns || [], ex.rows, id)).find(Boolean);
     if (plain) return `${id}: VERDICT_TABLE_PLAIN - the "${plain.header}" column judges each row (${plain.examples.map((e) => `"${e}"`).join(", ")}) in plain text, where it reads as one more fact beside the evidence. ` +
       "Code the judgement: give the column a `type` - \"rag\" (a status pill), \"harvey\" (a rating), \"check\", \"lights\" or \"dot\" - or make the page a `scorecard` (forms harvey, rag, check, lights, dot, heatmap, bars). Where the column names who leads, declare the companies in the deck's `players`: a cell naming a player is drawn as its logo, which says who without spending a status colour";
   }
@@ -909,19 +917,10 @@ function proseDefect(page, id, skip) {
   return null;
 }
 
-// An x axis that measures time: a scatter over "months since launch" is a
-// trend drawn without its line.
-const TIME_AXIS_WORDS = /\b(?:months?|years?|quarters?|weeks?|days?|dates?|since|elapsed|time|periods?)\b/i;
 // Categorical charts whose marks a reader reads by value.
 const VALUE_CHARTS = new Set(["chart.column", "chart.bar", "chart.line", "chart.area", "chart.stacked-column", "chart.stacked-bar",
   "chart.grouped-column", "chart.lollipop", "chart.dumbbell", "chart.slope", "chart.combo"]);
 const LABELLED_MARKS_MAX = 12;
-// A header that reads the row: what an implication gutter points at.
-const INFERENCE_HEADER = /\b(?:implications?|impl(?:y|ies)|meaning|means|so what|therefore|verdict|decisions?|decide|recommend\w*|actions?|takeaways?|consequences?|reading|conclusions?|what follows)\b/i;
-/** The words one of which heads an `implication: true` column (INFERENCE_HEADER reads these and their plurals), as the refusal and `--limits` list them. */
-export const INFERENCE_WORDS = Object.freeze(["implication", "implies", "meaning", "means", "so what", "therefore", "verdict", "decision", "recommendation", "action", "takeaway", "consequence", "reading", "conclusion", "what follows"]);
-// A pill's words that say there is no verdict to colour.
-const NO_VERDICT = /^(?:split|mixed|even|parity|unranked|no (?:rank|verdict|lead|leader|winner|call|data)|not (?:ranked|comparable|disclosed)|n\/?a|measured only|unclear|undecided|open|timing differs|too early)$/i;
 const seriesOf = (points) => [...(points || []).reduce((groups, point) => {
   const key = typeof point?.series === "string" && point.series.trim() ? point.series : "";
   return groups.set(key, [...(groups.get(key) || []), point]);
@@ -936,10 +935,6 @@ const figureOf = (value) => { const m = /-?\d[\d,]*(?:\.\d+)?/.exec(String(value
 // name ("Since 2019") without repeating a result.
 const figuresIn = (text) => [...String(text ?? "").matchAll(/\d[\d,]*(?:\.\d+)?/g)].map((m) => Number(m[0].replace(/,/g, "")))
   .filter((v) => Number.isFinite(v) && !(Number.isInteger(v) && v >= 1900 && v <= 2100));
-// What a tile's label measures once the dates and the members are taken out:
-// "Jan 2025 cohort retained at six months" and "Feb 2026 cohort retained at
-// six months" measure one thing.
-const DATE_WORDS = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|q[1-4]|h[12]|fy\d*|\d{4}|latest|current|today|now|previous|prior)\b/gi;
 const unitOf = (value) => (/%/.test(String(value)) ? "%" : /[$€£]/.test(String(value)) ? "$" : /pp\b/i.test(String(value)) ? "pp" : /x\b|×/i.test(String(value)) ? "x" : "n");
 
 /**
@@ -983,7 +978,10 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
     if (["chart.scatter", "chart.bubble"].includes(chart?.type)) {
       const xs = (chart.points || []).map((p) => Number(p?.x)).filter(Number.isFinite);
       const years = xs.length >= 3 && xs.every((x) => Number.isInteger(x) && x >= 1900 && x <= 2100);
-      if ((TIME_AXIS_WORDS.test(String(chart.xLabel ?? "")) || years) && !skip.has("SCATTER_OVER_TIME"))
+      // An x axis that measures time - years as numbers, or a label that reads as time (axis-measures-time): a scatter over
+      // "months since launch" is a trend drawn without its line.
+      const timed = () => years || (String(chart.xLabel ?? "").trim() && judged("axis-measures-time", String(chart.xLabel).trim(), null, id)?.verdict === "time");
+      if (!skip.has("SCATTER_OVER_TIME") && timed())
         return { code: "SCATTER_OVER_TIME", message: `${id}: the scatter plots against time ("${chart.xLabel ?? `x from ${Math.min(...xs)} to ${Math.max(...xs)}`}"), which is a trend drawn without its line; set it as a \`trend\` page (form line), the dates as its categories and each series as a line, with a \`referenceLines\` entry for the level it is read against` };
       if (chart.connect !== true && !skip.has("SCATTER_CURVE")) {
         const curve = seriesOf(chart.points).find(monotone);
@@ -1004,12 +1002,15 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
     // The chevron gutter says "therefore": it belongs before a column that
     // reads the row ("Competitive meaning"), not before one more fact
     // ("Conversion known?").
-    const inferred = (table.columns || []).find((c) => c && typeof c === "object" && c.implication === true && !INFERENCE_HEADER.test(String(c.label ?? "")));
-    if (inferred && !skip.has("GUTTER_UNEARNED")) return { code: "GUTTER_UNEARNED", message: `${id}: the column "${inferred.label}" is marked \`implication: true\`, which draws a "therefore" chevron before it, but its header names another fact, not what the row implies; drop \`implication\`, or head the column with the inference it draws - a header that holds one of ${INFERENCE_WORDS.map((word) => `"${word}"`).join(", ")} ("What it means", "Verdict", "Recommended action")` };
+    const headers = (table.columns || []).map(headerText);
+    const inferred = skip.has("GUTTER_UNEARNED") ? null : (table.columns || []).find((c) => c && typeof c === "object" && c.implication === true
+      && (!String(c.label ?? "").trim() || judged("header-concludes", String(c.label).trim(), { headers }, id)?.verdict === "names-a-fact"));
+    if (inferred) return { code: "GUTTER_UNEARNED", message: `${id}: the column "${inferred.label ?? ""}" is marked \`implication: true\`, which draws a "therefore" chevron before it, but its header names another fact, not what the row implies; drop \`implication\`, or head the column with the inference it draws ("What it means", "Verdict", "Recommended action")` };
     // A status colour on a row that has no status: amber for "Split" and
     // "Unranked" says the row is behind.
-    const loud = table.rows.flatMap(rowCells).find((cell) => cell && typeof cell === "object" && cell.type === "rag" && cell.value !== "neutral" && NO_VERDICT.test(String(cell.text ?? "").trim()));
-    if (loud && !skip.has("PILL_NO_VERDICT")) return { code: "PILL_NO_VERDICT", message: `${id}: the status pill "${loud.text}" is drawn as ${loud.value}, a status colour, on a row with no verdict; set it \`value: "neutral"\` (a grey pill), and keep green, amber and red for states` };
+    const loud = skip.has("PILL_NO_VERDICT") ? null : table.rows.flatMap(rowCells).find((cell) => cell && typeof cell === "object" && cell.type === "rag" && cell.value !== "neutral"
+      && String(cell.text ?? "").trim() && judged("pill-states-status", String(cell.text).trim(), null, id)?.verdict === "no-verdict");
+    if (loud) return { code: "PILL_NO_VERDICT", message: `${id}: the status pill "${loud.text}" is drawn as ${loud.value}, a status colour, on a row with no verdict; set it \`value: "neutral"\` (a grey pill), and keep green, amber and red for states` };
   }
   // A metric is a figure: "Below plan", "Asia", "Strikes" or "Seven" set where
   // a number belongs is a label in a number's place, which a hundred-page
@@ -1020,17 +1021,17 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
   if (worded && !skip.has("METRIC_WORD_VALUE"))
     return { code: "METRIC_WORD_VALUE", message: `${id}: the ${page.kpi === worded ? "headline figure" : "metric"} "${worded.value}" ("${worded.label ?? ""}") is a word where a figure belongs. Give it the number the record holds - \`{ "measure": "<insight>/<measure>@<period or member>", "format": "...", "label": "..." }\`, a count in digits, a date - or say it in the copy and give the tile a measured figure` };
   // Tiles of one measure at two dates or for two members: the reader
-  // compares them, and a comparison belongs on one axis.
-  const names = [...playerNames(players).keys()];
-  const scrub = (label) => names.reduce((text, name) => text.replace(new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), " "), String(label ?? ""))
-    .replace(DATE_WORDS, " ").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+  // compares them, and a comparison belongs on one axis. Two tiles in one unit
+  // under different labels may be one measure or two, which is read
+  // (tiles-one-measure); tiles in different units never are.
   const tiles = [...(page.metrics || []), ...exhibits.filter((ex) => ["fact-grid", "stat-list"].includes(ex?.type)).flatMap((ex) => ex.items || [])]
     .filter((item) => item && typeof item === "object" && figureOf(item.value) !== null);
-  for (const [i, a] of tiles.entries()) for (const b of tiles.slice(i + 1)) {
-    if (unitOf(a.value) !== unitOf(b.value) || String(a.label ?? "").trim().toLowerCase() === String(b.label ?? "").trim().toLowerCase()) continue;
-    const x = new Set(scrub(a.label)), y = new Set(scrub(b.label));
-    const shared = [...x].filter((w) => y.has(w)).length, union = new Set([...x, ...y]).size;
-    if (union >= 2 && shared / union >= 0.75 && !skip.has("TILES_ONE_MEASURE"))
+  const label = (tile) => String(tile.label ?? "").trim();
+  const paired = tiles.some((a, i) => tiles.slice(i + 1).some((b) => unitOf(a.value) === unitOf(b.value) && label(a) && label(b) && label(a).toLowerCase() !== label(b).toLowerCase()));
+  if (paired && !skip.has("TILES_ONE_MEASURE")) {
+    const read = judged("tiles-one-measure", tiles.map((tile, at) => ({ id: `t${at + 1}`, value: String(tile.value), label: label(tile) })), null, id);
+    const [a, b] = read?.verdict === "one-measure" ? (read.pair || []).map((tid) => tiles[Number(String(tid).slice(1)) - 1]) : [];
+    if (a && b)
       return { code: "TILES_ONE_MEASURE", message: `${id}: the tiles ${a.value} ("${a.label}") and ${b.value} ("${b.label}") are one measure at two dates or for two members, which the reader has to compare in separate boxes; plot the measure on one axis - a \`trend\` page across the dates, a \`ranking\` across the members, or the chart the page already carries - and keep tiles for measures that differ` };
   }
   // A strip over a chart that prints the same figures says them twice.
@@ -1148,17 +1149,22 @@ const typesLine = (shapes) => {
 // A title leads with the finding. One that states a gap or a method note -
 // what the evidence lacks, cannot settle or leaves undisclosed - puts the
 // limitation where the answer belongs; the limitation goes in the `subtitle`
-// or a footnote, and the title says which way the evidence leans.
-export const TITLE_GAP = /\b(lacks?|lacking|unproven|undisclosed|unranked|unresolved|unverified|unpublished|unknown|unclear|uncertain|unsettled|inconclusive|cannot (?:settle|rank|tell|say|prove|establish|determine|confirm|show|be (?:ranked|settled|compared|determined))|can't|neither|no (?:public|matched|disclosed|comparable|published|audited|clear|single|defensible|provabl\w*)|not (?:yet )?(?:disclosed|published|public|proven|known|comparable|like-for-like|provabl\w*|settled|ranked|clear)|too early|insufficient|remains? (?:open|split|a gap)|(?:verdict|leadership|signals?|call|evidence|picture) (?:is |are |remains? )?split|mix(?:es)? (?:company|sources|disclosures)|different (?:denominators?|bases|definitions)|incompatible|(?:require|need)s? (?:[\w-]+ )?verification)\b/i;
-export const titleGap = (title) => TITLE_GAP.exec(String(title ?? ""))?.[0] ?? null;
+// or a footnote, and the title says which way the evidence leans. Whether a
+// title leads with its gap is read (title-leads-with-gap): the words it
+// rests on, where it does; null where it does not or is not yet read.
+export const titleGap = (title, where = null) => {
+  const text = String(title ?? "").trim();
+  if (!text) return null;
+  const read = judged("title-leads-with-gap", text, null, where);
+  return read?.verdict === "gap" ? read.quote ?? text : null;
+};
 
 // A title that is only a measurement - "The fleet is 116 aircraft": a count
-// stated with a verb of state, no comparator and no consequence. It tells the
-// reader how many, not against what or so what.
+// with no comparator and no consequence. It tells the reader how many, not
+// against what or so what. A title with a number that is not a year is read
+// (title-count-only).
 const COUNT = /(?<![\p{L}\d])(?!(?:19|20)\d\d(?![\d.,]))\d[\d,.]*/u;
-const STATIVE = /\b(is|are|was|were|has|have|had|holds?|flies|fly|operates?|carries|carry|employs?|serves?|reports?|counts?|totals?|stands?|numbers?|runs?|owns?|lists?|remains?)\b/i;
-const COMPARATOR = /\b(than|vs\.?|versus|against|while|but|yet|so|because|since|though|although|despite|which|leaving|making|putting|giving|cutting|turning|driving|means?|enough|too|only|still|ahead|behind|leads?|led|leading|trails?|gap|twice|times|doubl\w*|tripl\w*|half|halv\w*|more|fewer|less|above|below|beyond|under|over|outpac\w*|faster|slower|higher|lower|larger|smaller|biggest|largest|smallest|most|least|top|first|last|record|peak|rank\w*|rose|fell|grew|shrank|passed|overtook|slipped|climbed|dropped|jumped|gained|lost|won|wins|rising|falling|growing|widen\w*|narrow\w*|clos\w*|exceed\w*|miss\w*|beat\w*|without|unless|if|until|before|after|share|every|none|nearly|almost|per|not)\b|%|×|→/i;
-export const countOnlyTitle = (title) => { const t = String(title ?? ""); return COUNT.test(t) && STATIVE.test(t) && !COMPARATOR.test(t); };
+export const countOnlyTitle = (title, where = null) => { const t = String(title ?? "").trim(); return COUNT.test(t) && judged("title-count-only", t, null, where)?.verdict === "count-only"; };
 
 // A point's own figure: its first quantity with a currency, a percentage or a
 // unit, else its first number that is not a year. In a point of evidence the
@@ -1204,19 +1210,15 @@ export function citationOf(source, registry, id = "page") {
  * many records is never refused for the citation the runtime derived, and
  * whatever the footer leaves out is kept whole in the speaker notes. A citation typed as text has one form, the author's.
  */
-// A source status that records only when it was read, not what kind of figure it gives.
-const RETRIEVAL_STATUS = /^(?:retrieved|accessed|downloaded|read)\b/i;
-
 export function citationForms(keys, registry) {
   const entries = keys.map((key) => registry[key]);
   const label = entries.length > 1 ? "Sources" : "Source";
   const line = (names) => `${label}: ${names.join("; ")}`;
   // Several articles of one publisher share its short name: a short form says it once, and the fullest form names each.
-  // A status that is only when the source was read ("retrieved 2026-10-05") changes nothing about how its number reads: it
-  // stays in the registry, and no form prints it - on a deck whose every source was retrieved one day, it was a third of
-  // every footer.
+  // When a source was read changes nothing about how its number reads: it is the registry's `retrieved`, which no form
+  // prints - on a deck whose every source was retrieved one day, it was a third of every footer.
   const named = (short, status) => [...new Set(entries.map((e) => { const name = short && typeof e.short === "string" && e.short.trim() ? e.short.trim() : e.name;
-    const said = status && e.status && !RETRIEVAL_STATUS.test(e.status); return said ? `${name} (${e.status})` : name; }))];
+    return status && e.status ? `${name} (${e.status})` : name; }))];
   const brief = named(true, false);
   const counted = Array.from({ length: Math.max(0, brief.length - 1) }, (_, i) => brief.length - 1 - i)
     .map((shown) => `${line(brief.slice(0, shown))}; +${brief.length - shown} more in the notes`);
@@ -1337,7 +1339,7 @@ function spineOf(page, id, { insights = null, sources = null, rules = null, waiv
     if (measured && settles.kind === "qualitative")
       throw new Error(`${id}: a ${page.type} page ${familyOf(page.type, page.form) === "table" ? "tabulates" : "plots"} a measure, so its claim is not settled by a "qualitative" judgement; name what the ${familyOf(page.type, page.form) === "table" ? "table" : "chart"} settles - ${SETTLES_KINDS.filter((k) => k !== "qualitative").join(", ")} - or, where the evidence is statements rather than measures, choose the type that carries them (matrix, mechanism, argument, parallel)`);
   }
-  const titleAdvisories = countOnlyTitle(page.title)
+  const titleAdvisories = countOnlyTitle(page.title, id)
     ? [`TITLE_COUNT_ONLY: the title states a number without a comparator or consequence ("${page.title}"); say against what, or what follows - the finding, not only the measurement`] : [];
   return { type, settles, evidence, titleAdvisories };
 }
@@ -2086,7 +2088,7 @@ export function describeTypes() {
     "`better` - on a metric (a strip's `metrics`, a hero's `kpi`, a row block's `metric`), a table column, a table row or one trend cell: the direction that is good news for the measure, \"up\" (the default) or \"down\" (a cost, churn, a wait). A delta and a trend arrow are coloured by it - a rising cost is red - not by their sign.", "",
     `Refused at compile, because a review found each on a finished deck: ${printRules(REVIEW_RULES)}. Advised: ${printRules(ADVISED_RULES)}. Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across, one only when every tile carries its \`text\`; two rows or more fill the frame, one row grows by a third, a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
-    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - the finding and its comparator, ${TEXT_LIMITS.titleTarget} words the norm, with the period, population and scope moved to the \`subtitle\`; a title that states a gap (lacks, unproven, undisclosed, cannot settle, neither) on more than 15% of the analytical pages is refused (TITLE_GAP_SHARE), and a bare count ("The fleet is 116 aircraft") is advised (TITLE_COUNT_ONLY); a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best").`, "",
+    `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - the finding and its comparator, ${TEXT_LIMITS.titleTarget} words the norm, with the period, population and scope moved to the \`subtitle\`; a title that leads with a gap - what the evidence lacks, leaves unproven or cannot settle - on more than 15% of the analytical pages is refused (TITLE_GAP_SHARE), and a bare count ("The fleet is 116 aircraft") is advised (TITLE_COUNT_ONLY), each title read by a model (judge.mjs); a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best"); a figure that notation does not settle is read by a model (judge.mjs).`, "",
     ...(() => { const names = distributionLabelCapacity(); return [
     `A \`distribution\` (or any bar chart of many rows) names every member while its rows hold a line: at the chart's 10pt up to about ${names.full} members at full height, at 8pt up to about ${names.small}; past that it names every second member (every nth when the rows are thinner still) and reads the field's shape from the bars. The subject, any highlighted member and any member a callout names are always named, and the rows beside them go unnamed so their labels do not touch. To name them all, give the chart the page's height (commentary "rail" or "none"), or cut the field to the members that matter.`, ""]; })(),
     ...(() => { const columns = panelColumnCapacity(); return [

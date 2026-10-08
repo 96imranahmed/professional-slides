@@ -76,6 +76,7 @@ export const DELIVERY_CODES = Object.freeze({
   REVIEW_PROVENANCE: "the review does not say which backend and model wrote it, or does not echo the prompt hash of the packet delivery wrote for it",
   REVIEW_UNCONFIRMED: "the fresh confirmation read of the final artifact did not accept it",
   LINEAGE_RESTART: "a new review lineage asked for without a reason, or a second one without the user's approval",
+  JUDGEMENTS_OPEN: "a question a rule asks of the copy (judgements.mjs) has no recorded answer at the compile or the build, so the rule that asks it was not held",
 });
 
 // What a gate measured, or the bar it measured against, in words: a number or
@@ -169,6 +170,14 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
     .map((b) => ({ slide: b.slide ?? null, code: b.code, severity: "blocker", reason: `${b.source} ${b.code}${b.id ? ` on ${b.id}` : ""}${b.text ? `: "${b.text}"` : ""}`, repair: b.repair || "Fix the page so the saved deck carries every planned text, then rebuild" })));
   if (build.status !== "built" && !blockers.length) blockers.push({slide:null, code:"BROKEN_GEOMETRY", severity:"blocker", reason:`Build is not complete: ${build.status}`, repair:"Complete the build and all gates before delivery"});
   if (blockers.length) return refuse("page gates", blockers);
+
+  // A rule that reads what the copy means holds only where its question is answered (judgements.mjs): a deck compiled or
+  // built with questions open was not held to those rules, and is not delivered until they are answered.
+  report.stage = "judgements";
+  const open = { compile: spec.judgements?.pending ?? 0, build: build.judgements?.pending ?? 0 };
+  if (open.compile || open.build) return refuse("judgements", [{ slide: null, code: "JUDGEMENTS_OPEN", severity: "blocker",
+    reason: `Questions the rules ask of the copy are not answered (${[open.compile ? `${open.compile} at the compile` : null, open.build ? `${open.build} at the build` : null].filter(Boolean).join(", ")}), so the rules that ask them were not held`,
+    repair: "Run node runtime/judge.mjs <id>.pages.json until it exits 0, recompile with author-deck.mjs, rebuild and rerun" }]);
 
   // The deck's own statements the reviews rest on - the user's request, word
   // for word, and the build bars it says it is right to miss - checked as the

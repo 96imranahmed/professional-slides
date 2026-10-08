@@ -24,6 +24,7 @@ import { trivialChart, trendChart } from "../evidence.mjs";
 import { registered } from "../errors.mjs";
 import { assetsDeclaration } from "../asset-needs.mjs";
 import { playerNames } from "./variety_gates.mjs";
+import { judged } from "../judgements.mjs";
 
 export { trivialChart, trendChart };
 
@@ -42,8 +43,14 @@ export const CRAFT_CODES = Object.freeze({
 
 // "Source: E26+DXB+SKY+B777; exact URL in source ledger". A reader cannot look
 // up E26; the source line names the publisher, the document and the date.
-const SOURCE_CODE = /\b[A-Z][A-Z0-9]{1,6}(?:\+[A-Z][A-Z0-9]{1,6})+\b|\b(?:source|evidence|citation) (?:ledger|register)\b|\bsee ledger\b/i;
-export const codedSource = (text) => SOURCE_CODE.test(String(text ?? ""));
+// Codes joined by "+" are a notation, refused as written; a line that points
+// the reader at a ledger, a register or a code in words is read
+// (source-cites-pointer).
+const SOURCE_CODES = /\b[A-Z][A-Z0-9]{1,6}(?:\+[A-Z][A-Z0-9]{1,6})+\b/;
+export const codedSource = (text, where = null) => {
+  const line = String(text ?? "").trim();
+  return Boolean(line) && (SOURCE_CODES.test(line) || judged("source-cites-pointer", line, null, where)?.verdict === "pointer");
+};
 
 // Decks shorter than DECK_LENGTH.craft are diagnostics and probes; the floors
 // are about a deck's rhythm, which a handful of pages does not have. The
@@ -248,12 +255,11 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
   }
 
   // One coded source is one too many, so this is a count, not a share.
-  // A source the deck's registry declares is cited by the name its record gives it, and a record may be of a document that is
-  // itself called a ledger ("Official-source ledger supplied with the brief"): that is the source named, not a pointer to one the
-  // reader lacks. So the names the registry declares are set aside before a line is read for codes.
-  const declared = Object.values(spec.sources && typeof spec.sources === "object" ? spec.sources : {}).flatMap((entry) => [entry?.name, entry?.short]).filter((name) => typeof name === "string" && name.trim().length > 3).sort((x, y) => y.length - x.length);
-  const typed = (text) => declared.reduce((line, name) => line.split(name).join(" "), String(text ?? ""));
-  const coded = [...(spec.slides || []), ...(spec.appendix || [])].filter((slide) => codedSource(typed(slide.source)) || (slide.footnotes || []).some((note) => codedSource(typed(note))));
+  // A line the compiler set from the deck's registry (its `sourceForms`) names declared sources - a record may be of a document
+  // that is itself called a ledger ("Official-source ledger supplied with the brief"), which is the source named - and is not read.
+  const noteText = (note) => (typeof note === "string" ? note : note?.text ?? "");
+  const coded = [...(spec.slides || []), ...(spec.appendix || [])].filter((slide) => (!Array.isArray(slide.sourceForms) && codedSource(slide.source, slide.id))
+    || (slide.footnotes || []).some((note) => codedSource(noteText(note), slide.id)));
   if (coded.length) {
     block("CRAFT_SOURCE_CODES", { pages: coded.length, example: String(coded[0].source ?? "").slice(0, 80) }, 0,
       `${coded.length} source line${coded.length === 1 ? "" : "s"} cite ledger codes ("${String(coded[0].source ?? "").slice(0, 60)}"). ` +

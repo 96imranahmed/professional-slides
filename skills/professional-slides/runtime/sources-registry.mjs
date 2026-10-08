@@ -1,6 +1,7 @@
 // The pages file's `sources` registry checked on its own: what a source is
 // (its name, short form, URL and status, each held to the length of what it
-// is) and what it may be declared not to name. The compile refuses a registry
+// is; when it was read, `retrieved`, which no citation prints) and what it may
+// be declared not to name. The compile refuses a registry
 // with a problem (author-deck.mjs compileDeck); the research step reads the
 // same check (analysis.mjs), so a source written as a caveat is caught by the
 // worker who wrote it, not at the first draft of the spine.
@@ -17,7 +18,7 @@ export function registryProblems(sources) {
   if (!sources || typeof sources !== "object" || Array.isArray(sources)) return ["`sources` is a registry - { key: { name, url, status } }"];
   return Object.entries(sources).flatMap(([key, entry]) => {
     if (!entry || typeof entry !== "object" || typeof entry.name !== "string" || !entry.name.trim()) return [`source "${key}" needs its \`name\` - the publisher and title as the citation prints them`];
-    const extra = Object.keys(entry).filter((k) => !["name", "short", "url", "status", "missing", "reason"].includes(k));
+    const extra = Object.keys(entry).filter((k) => !["name", "short", "url", "status", "retrieved", "missing", "reason"].includes(k));
     // A record that names no publisher, no date or no document says so once, here, with the reason: the deck then states the
     // limit once (compose-deck.mjs sourceLimitPages) and each page that cites the record carries it for the reviewers, rather
     // than every such page being found wanting on its own. It is not a way to leave a source unnamed: `name` still says what it is.
@@ -32,8 +33,8 @@ export function registryProblems(sources) {
     const kind = { name: "its title - the publisher, the publication and its year -", short: "its title in brief", status: "the kind of record it is (\"audited\", \"company-reported\") -" };
     const wordy = Object.entries(SOURCE_TITLE_WORDS).filter(([k, max]) => typeof entry[k] === "string" && textWords(entry[k]) > max)
       .map(([k, max]) => `source "${key}": \`${k}\` runs to ${textWords(entry[k])} words, and a source's \`${k}\` is ${kind[k]} in ${max} words or fewer. A caveat, a scope or a method is a note, not a source: write it in the page's \`note\`, where it is counted (NOTE_HEAVY) and fitted to the footer`);
-    return [...(extra.length ? [`source "${key}": unknown key${extra.length === 1 ? "" : "s"} ${extra.join(", ")} - a source is { name, short, url, status }, with { missing: ["publisher" | "date" | "document"], reason } where the record does not name one`] : []),
-      ...["short", "url", "status"].filter((k) => entry[k] !== undefined && typeof entry[k] !== "string").map((k) => `source "${key}": \`${k}\` is text`), ...wordy, ...provenance];
+    return [...(extra.length ? [`source "${key}": unknown key${extra.length === 1 ? "" : "s"} ${extra.join(", ")} - a source is { name, short, url, status, retrieved }, with { missing: ["publisher" | "date" | "document"], reason } where the record does not name one`] : []),
+      ...["short", "url", "status", "retrieved"].filter((k) => entry[k] !== undefined && typeof entry[k] !== "string").map((k) => `source "${key}": \`${k}\` is text`), ...wordy, ...provenance];
   });
 }
 

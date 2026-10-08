@@ -25,10 +25,6 @@ export const CLAIM_CODES = Object.freeze({
 // Pages whose claims restate the argument rather than prove it.
 export const SUMMARY_ROLES = new Set(["executive-summary", "conclusion", "summary", "recommendation", "verdict"]);
 
-// A number, or a word that makes a statement universal, ranked or comparative.
-// These are the statements a single counterexample in the data can break.
-const QUANTIFIER = /\b(only|every|each|all|none|no|never|always|any|highest|lowest|largest|smallest|biggest|most|least|fewest|first|last|best|worst|top|bottom|beats?|leads?|led|ahead|behind|above|below|exceeds?|more|less|fewer|than|unlike|matches|ranks?|ranked|record|twice|half|double|doubled|tripled|rose|fell|grew|declined)\b/i;
-const NUMBER = /\d/;
 
 const normalize = (text) => String(text ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
 const textOf = (node) => normalize(node.data?.textLayout?.source ?? node.text);
@@ -39,7 +35,12 @@ export function sentences(text) {
   return normalize(text).split(/(?<=[.!?;])\s+(?=[A-Z0-9$£€"'(])/).map((s) => s.trim()).filter(Boolean);
 }
 
-export const isClaim = (sentence) => NUMBER.test(sentence) || QUANTIFIER.test(sentence);
+// Every sentence of three words or more in a claim role is a statement the
+// author reproduces: a number, a rank, a universal or a cause can each be
+// broken by one counterexample in the data, and which of them a sentence makes
+// is the self-check's to read, not a list of words to guess. A shorter run
+// is one where it carries a figure; a bare label states nothing.
+export const isClaim = (sentence) => /\d/.test(String(sentence ?? "")) || String(sentence ?? "").trim().split(/\s+/).filter(Boolean).length >= 3;
 export const claimId = (slideId, text) => hash(`${slideId}\u0000${normalize(text)}`, 12);
 
 // Numeric tokens as a reader would compare them: "$1,311.8m" → 1311.8, one decimal.

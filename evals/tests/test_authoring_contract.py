@@ -121,12 +121,16 @@ const once = base.map((p, i) => (i < 1 ? { ...p, title: 'Long-run leadership can
 const stamped = base.map((p) => ({ ...p, why: 'Chosen because it fits the claim on this page' }));
 // A stamped settles sentence is a signature even where each page's measures differ.
 const stampedWhat = base.map((p, i) => (p.settles ? { ...p, settles: { ...p.settles, what: 'the measures the page names, as recorded', measures: [`i-${i}/m`] } } : p));
-const codes = (doc) => compileDeck(doc, { draft: true, partial: true }).spineFindings.map((f) => f.code);
+// Whether a title leads with its gap is a question (title-leads-with-gap); a reader answers it for these fixtures' titles.
+const { judgementSession, withJudgements } = await import('./skills/professional-slides/runtime/judgements.mjs');
+const reader = judgementSession({ oracle: (kind, title) => (kind === 'title-leads-with-gap' ? (/unproven|cannot be ranked/.test(title) ? { verdict: 'gap', quote: title.match(/remains unproven|cannot be ranked/)[0] } : 'finding') : null) });
+const compiled = (doc) => withJudgements(reader, () => compileDeck(doc, { draft: true, partial: true }));
+const codes = (doc) => compiled(doc).spineFindings.map((f) => f.code);
 const deck = (extra = {}) => ({ ...example.deck, ...extra });
-const gap = compileDeck({ deck: deck(), pages: gapped }, { draft: true, partial: true }).spineFindings.find((f) => f.code === 'TITLE_GAP_SHARE');
+const gap = compiled({ deck: deck(), pages: gapped }).spineFindings.find((f) => f.code === 'TITLE_GAP_SHARE');
 console.log(JSON.stringify({
   gapped: codes({ deck: deck(), pages: gapped }), once: codes({ deck: deck(), pages: once }), stamped: codes({ deck: deck(), pages: stamped }),
-  stampedWhat: compileDeck({ deck: deck(), pages: stampedWhat }, { draft: true, partial: true }).spineFindings.filter((f) => f.code === 'GENERATOR_SIGNATURE').flatMap((f) => f.measured),
+  stampedWhat: compiled({ deck: deck(), pages: stampedWhat }).spineFindings.filter((f) => f.code === 'GENERATOR_SIGNATURE').flatMap((f) => f.measured),
   gapRepair: gap?.repair ?? '',
   newDeck: codes({ deck: deck({ workflow: 'new_deck', request: undefined }), pages: base }),
   asked: codes({ deck: deck({ workflow: 'new_deck', request: 'Make me a deck on whether Northvale can reach 60 million journeys' }), pages: base }),

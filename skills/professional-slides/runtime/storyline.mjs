@@ -76,6 +76,7 @@ import { VIEW_CLASSES, declaredLabels, declaresView, dependencyNotes, metricsOf,
 import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 import { carriedSaid, withCarriedPages } from "./revision.mjs";
 import { naturalClass } from "./spine-witness.mjs";
+import { JUDGEMENT_KINDS } from "./judgements.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
 // scope allows and whose answer is offered as provisional: the decisive gaps
@@ -872,13 +873,6 @@ const PACKET_RECORD = "storyline-packet.json";
 /** The recorded passes of a deck's storyline lineage, from its lineage store (lineageStore). */
 export const readStorylineHistory = (store) => readPasses(path.join(store, HISTORY));
 
-// Phrases with which an answer declines to answer, in a negated sentence
-// ("neither has a provably superior ... or a defensible long-run win"):
-// counted and shown to the critic, who judges them against the request's parts.
-const DECLINE = /\b(?:cannot|can't|could not|unable to|not possible to|too early to)\s+(?:be\s+)?(?:rank|say|tell|call|determine|decide|conclude)\w*|\bunranked\b|\b(?:provabl\w*|defensibl\w*|clear)\s+(?:[\w-]+\s+){0,3}?(?:superior|win|winner|lead|leader|advantage|call|ranking)\b/gi;
-export const declinesIn = (text) => String(text ?? "").split(/(?<=[.;!?])\s+/).filter((s) => /\b(?:neither|no|not|nor|cannot|can't|unranked)\b/i.test(s))
-  .flatMap((s) => [...s.matchAll(DECLINE)].map((m) => m[0]));
-
 /**
  * Write the next critique packet: the spine packet by default (small - the
  * request, the answer, the sections, and a line per page), or the page-level
@@ -908,7 +902,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     analysisProblems: analysis.problems,
     // Each analysis result and insight by the hash of its content: what a later pass compares to say an item closed on something that changed.
     artifacts: Object.fromEntries([...analysis.results.map((r) => [r.id, r.hash]), ...(log?.insights || []).filter((item) => item?.id && !item.derived).map((item) => [item.id, sha256(JSON.stringify(item))])]),
-    question: spec.question ?? content?.question ?? null, answer, declines: declinesIn(answer),
+    question: spec.question ?? content?.question ?? null, answer,
     // What a title is held to, so a fix that proposes one stays inside it.
     limits: titleLimits(spec, base),
     // Measures that may be one quantity recorded twice: where a revision or a later pass reads part of the deck, the pairs a page it reads shows.
@@ -1230,7 +1224,7 @@ function requestLines(packet) {
   const request = packet.request
     ? `THE USER'S REQUEST (${said.label ?? "verbatim - the yardstick; judge the storyline against it, not against the team's framing"}):\n"""\n${packet.request}\n"""`
     : `THE USER'S REQUEST: not recorded. Judge against the team's question and say so in the summary. THE TEAM'S QUESTION: ${packet.question || "(not stated)"}`;
-  return `${request}${said.scope ? `\n${said.scope}` : ""}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${said.offered ? `\n${said.offered}` : ""}${packet.declines?.length ? `\nTHE ANSWER DECLINES ${packet.declines.length} TIME${packet.declines.length === 1 ? "" : "S"}: ${packet.declines.map((d) => `"${d}"`).join(", ")} - check each against the parts of the request.` : ""}`;
+  return `${request}${said.scope ? `\n${said.scope}` : ""}\nTHE TEAM'S ANSWER: ${packet.answer || "(not stated)"}${said.offered ? `\n${said.offered}` : ""}`;
 }
 
 // A deck with no dividers has no drawn pillars: it is not one pillar called "Opening", and the critic is told so.
@@ -2216,6 +2210,10 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   const out = path.resolve(outputDirectory);
   const request = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
   if (request.length) return { status: "refused", errors: request };
+  // A rule that reads the spine's copy - a title leading with a gap, a page against the answer - holds only where its question
+  // is answered (judgements.mjs): a critique of a spine with one open would be bound to titles a rule may yet refuse.
+  const open = Object.entries(spec.judgements?.kinds ?? {}).filter(([kind, n]) => n > 0 && JUDGEMENT_KINDS[kind]?.spine);
+  if (open.length) return { status: "refused", errors: [`The compile left questions about the spine unanswered (${open.map(([kind, n]) => `${kind} ${n}`).join(", ")}), so the rules that ask them did not hold: run node runtime/judge.mjs <id>.pages.json --draft until it exits 0, compile the draft again and rerun this`] };
   const store = await lineageStore(spec, out, specPath);
   const historyDir = path.join(store, HISTORY);
   let history = await readPasses(historyDir);

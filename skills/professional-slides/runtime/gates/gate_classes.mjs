@@ -100,6 +100,9 @@ const LISTED = [
   ...codes("S", "REVISION_INVENTORY_MISSING WAIVERS_INVALID", LAYOUT),
   // What the build would fetch for the deck, and its declaration that it is built without the network (asset-needs.mjs).
   ...codes("S", "ASSETS_NEEDED ASSETS_OFFLINE", LAYOUT),
+  // The questions the rules asked of the copy that no recorded judgement answers yet (judgements.mjs): answered by judge.mjs,
+  // which writes nothing of the deck's.
+  ...codes("S", "JUDGEMENTS_PENDING", COPY),
   // The content plan's rules on the claims the pages make between them (content_gates.mjs).
   ...codes("S", "CONTENT_UNMEASURED", ["settles"]),
   ...codes("S", "CONTENT_CLAIM_REPEATS", ["title", "pages"]),
@@ -178,7 +181,7 @@ const LISTED = [
   // --- G: deck aggregates ------------------------------------------------
   // What the chart pages plot is what the spine says each shows of its measures; a form that reads more of them is the layout's.
   ...codes("G", "EVIDENCE_DEPTH", ["layout", "view"]),
-  ...codes("G", "CONTENT_NO_HIGHLIGHT DECK_FLAT DECK_CRAFT TEXT_FRAGMENTED COMMENTARY_UNDEVELOPED FAMILY_LIGHT CRAFT_CHARTS_BARE CAVEAT_DENSE", COPY),
+  ...codes("G", "CONTENT_NO_HIGHLIGHT DECK_FLAT DECK_CRAFT TEXT_FRAGMENTED COMMENTARY_UNDEVELOPED FAMILY_LIGHT CRAFT_CHARTS_BARE", COPY),
   ...codes("G", `LAYOUT_MONOTONY PAGE_VARIETY COLUMN_MONOTONY EVIDENCE_MIX IMAGE_BUDGET IMAGE_RUN TABLE_SCHEMA_FLAT DECK_VOCABULARY
     CRAFT_TRIVIAL_CHARTS CRAFT_NO_TREND CRAFT_TABLES_PLAIN CRAFT_NO_ICONS CRAFT_NO_PICTURES CRAFT_PLAYERS_UNINTRODUCED
     CRAFT_EXHIBIT_VARIETY BAR_EXHIBIT_VARIETY BAR_TABLES_TREATED BAR_CHARTS_ANNOTATED BAR_DRAWINGS_PER_PAGE BAR_UNSOURCED_PICTURES
@@ -188,7 +191,7 @@ const LISTED = [
   // --- R: review and delivery --------------------------------------------
   // The storyline critique, the claim ledger and delivery (storyline.mjs, claims.mjs, deliver-deck.mjs).
   ...codes("R", `MISSING_ANALYSIS CUT_PAGE MERGE_PAGES SUMMARY_UNPROVED SELF_CHECK_INCOMPLETE MISSING_RENDERED_GATES STORYLINE_UNREVIEWED
-    REVIEW_PASS_CAP INVALID_REVIEW REVIEW_RATING REVIEW_PROVENANCE REVIEW_UNCONFIRMED LINEAGE_RESTART`),
+    REVIEW_PASS_CAP INVALID_REVIEW REVIEW_RATING REVIEW_PROVENANCE REVIEW_UNCONFIRMED LINEAGE_RESTART JUDGEMENTS_OPEN`),
   // What a reviewer raises reading the rendered deck (reviewer.mjs).
   ...codes("R", `FACTUAL_ERROR UNSUPPORTED_CLAIM MISLEADING_COMPARISON UNCLEAR_ARGUMENT UNREADABLE OVERFLOW BROKEN_GEOMETRY PROVENANCE DEAD_SPACE
     NO_HERO_EXHIBIT OVERSIZED_TYPE WALL_OF_TEXT BURIED_NUMBER HEDGED_TITLE INCONSISTENT_ENCODING NO_VISUAL_ANCHOR UNANNOTATED_PLOT TABLE_MONOTONY
@@ -291,6 +294,7 @@ export const STANDING_FREE = Object.freeze(Object.fromEntries([
     PLAN_TABLE_SHARE PLAN_MEASURED_PAGES PLAN_EXHIBIT_MIX PLAN_EXHIBIT_RUN PLAN_NO_PICTURES PLAN_NO_ICONS PLAN_NO_INSIGHT PLAN_TABLE_DEPTH PLAN_TABLE_MONOTONY
     PLAN_UNANNOTATED_CHARTS PLAN_NO_HIGHLIGHT PLAN_EXHIBIT_VARIETY PLAN_CHART_MONOTONY`),
   ...reasons("a statement of the files the build would fetch, each named in the finding; the floor on what is drawn (CRAFT_PLAYERS_UNINTRODUCED) holds the standing", "ASSETS_NEEDED ASSETS_OFFLINE"),
+  ...reasons("a statement of the questions the rules asked that no recorded judgement answers, each counted by kind in the finding; it is a step to take, not a bar the deck stands against", "JUDGEMENTS_PENDING"),
   ...reasons("the build's refusal of a stage whose own findings carry the standing", "CONTENT_REJECTED PLAN_REJECTED VARIETY_REJECTED"),
   ...reasons("the lower floor of a rate whose build bar (BAR_TABLES_TREATED, BAR_CHARTS_ANNOTATED) writes the standing, against the delivery floor", "CRAFT_TABLES_PLAIN CRAFT_CHARTS_BARE"),
   ...reasons("a stage of the build that failed without a finding of its own", "READBACK_MISSING PREFLIGHT_FAILED GATES_FAILED"),

@@ -111,7 +111,6 @@ Printed by `python3 runtime/gates/page_gates.py --thresholds-markdown` from the 
 | `COLUMN_MONOTONY` | consecutive pages whose commentary column shares one device, at most | 3 |
 | `RESTATEMENT` | commentary content words already in the exhibit, at most: the column (from 12 words); one block (from 6 words) | 47%; 66% |
 | `CAVEAT_HEAVY` | caveat lines a page, at most | 2 |
-| `CAVEAT_DENSE` | caveat words a hundred above the footer, deck-wide, advisory over (from 12 pages) | 0.52 |
 | `TABLE_SCHEMA_FLAT` | tables opening on the same headers, at most (from 6 tables) | 3 |
 | `DECK_CRAFT` | advisory rates across analytical pages (from 5 pages), at least: a phrase emphasised; a source line; drawn marks a page; tables treated; charts annotated | 35%; 50%; 11; 75%; 65% |
 | `DECK_CRAFT` | and at most: one table device's share of the tables (from 4 tables); pages drawing a mark between exhibit and commentary (from 5) | 60%; 40% |
@@ -135,8 +134,7 @@ Version 7 holds two shares to strong decks': points under the exhibit on at most
 | Compared columns that agree | `TWIN_CELLS` | two or more rows, over 40% of the table, where two compared cells are the same words |
 | Commentary against its exhibit | `RESTATEMENT` | at most 47% of the column's content words already in the exhibit (well-made decks run 25–36%), and at most 66% of any one block's - a column does not average out the block a reader stops at |
 | Planning language on the page | `PLANNING_VOICE` | no sentence opens `Interpretation:`, `Takeaway:`, `So what:` or `Key insight —` |
-| Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page; a finding in contrastive form ("not X; it Y") is not a caveat |
-| Limits across the deck | `CAVEAT_DENSE` | advisory: caveat words (not, cannot, neither, undisclosed, unverified, unproven...) a hundred words above the footer, deck-wide, at most 0.52 - strong decks' p90 (median 0.27). A footnote's words are not counted: that is where a qualification goes |
+| Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page, the lines read as caveats by a model (`commentary-caveats`, recorded with `judge.mjs`); a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |
 | A share the page's own counts do not give | `CONTRADICTED_SHARE` | where a page prints "N of M", every percentage on it is a subset of those counts over M, within one count |
 | What the deck draws, by device family | `DECK_VOCABULARY` | advisory: how many of ten device families (icon, picture, score, value pill, in-cell bar, heat, state, growth, reference, annotation) a long deck draws somewhere. A vocabulary floor, not a target rate: what share of pages carry a harvey ball cannot be read off a render. Measured on the composed scene, because a plan can record a treatment the page never draws |

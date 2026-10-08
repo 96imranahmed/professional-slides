@@ -41,7 +41,6 @@ CONTENT_WORD = re.compile(r"[a-z][a-z']+")
 
 STOPWORD_LISTS = json.loads((Path(__file__).resolve().parent / "stopwords.json").read_text(encoding="utf-8"))
 STOPWORDS = frozenset(STOPWORD_LISTS["content"])
-TITLE_STOPWORDS = frozenset(STOPWORD_LISTS["title"])
 
 
 def normalize_text(value) -> str:

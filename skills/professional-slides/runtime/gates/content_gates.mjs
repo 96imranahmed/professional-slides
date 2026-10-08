@@ -30,6 +30,7 @@
 import { EXIT, UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "../cli.mjs";
 import { checkTextPlan, textWords } from "../text-contract.mjs";
 import { DECK_LENGTH, PLAN, applyRulesVersion, waivedRules } from "../weight.mjs";
+import { judged } from "../judgements.mjs";
 
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
@@ -129,41 +130,25 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   answerLeadWordsMin: 3,
 });
 
-// The words a recommendation is made in, and the words that make one
-// conditional. An answer that says "start with Marvel" and a page that says
-// "start with The Dark Knight" are not two findings, they are one unresolved
-// question - unless the answer says who each is for.
-const RECOMMENDS = /\b(start with|begin with|recommend|choose|pick|go with|watch first|buy|adopt|select|the answer is|should watch|should start|best entry|entry point)\b/i;
-const CONDITIONAL = /\b(unless|except|if you|for the|for a|for those|whereas|while|but only|depending|either)\b/i;
 /**
  * The pages that recommend something other than what the deck's answer
- * recommends, while the answer names no condition.
- *
- * The named things in a sentence are its capitalised words, less the ones that
- * also appear in lower case somewhere in the deck - which is what tells
- * "Marvel" apart from a "Start" that is only capitalised because it opens a
- * sentence. A claim that puts forward a different name is not wrong, and the
+ * recommends, while the answer names no condition. An answer that says "start
+ * with Marvel" and a page that says "start with The Dark Knight" are not two
+ * findings, they are one unresolved question - unless the answer says who each
+ * is for. A claim that puts forward a different choice is not wrong, and the
  * deck is usually right to make it; what is wrong is an answer that does not
  * admit it. Consulting writes that as the condition: "Marvel, unless you have
- * one evening, in which case The Dark Knight."
+ * one evening, in which case The Dark Knight." Whether a page recommends what
+ * the answer rules out is read (answer-contradicted), over the answer and
+ * every page's claim at once.
  */
 function contradictions(answer, pages) {
-  if (!RECOMMENDS.test(answer) || CONDITIONAL.test(answer)) return [];
-  const argument = [answer, ...pages.map((p) => String(p.claim ?? ""))].join(" ");
-  const lowercased = new Set(argument.match(/\b[a-z][a-z']+\b/g) ?? []);
-  const names = (text) => new Set((String(text ?? "").match(/\b[A-Z][A-Za-z']{2,}\b/g) ?? [])
-    .filter((word) => !STOPWORDS.has(word.toLowerCase()) && !lowercased.has(word.toLowerCase())));
-  const answerNames = names(answer);
-  if (!answerNames.size) return [];
-  const against = [];
-  for (const page of pages) {
-    const claim = String(page.claim ?? "");
-    if (!RECOMMENDS.test(claim)) continue;
-    const claimed = names(claim);
-    if (!claimed.size || [...claimed].some((name) => answerNames.has(name))) continue;
-    against.push({ page: page.n ?? null, claim: claim.slice(0, 80), recommends: [...claimed].slice(0, 3) });
-  }
-  return against;
+  const claims = pages.filter((p) => String(p.claim ?? "").trim()).map((p) => ({ id: String(p.id ?? p.n), claim: String(p.claim).trim() }));
+  if (!claims.length) return [];
+  const read = judged("answer-contradicted", { answer: answer.trim(), pages: claims });
+  if (read?.verdict !== "contradicted") return [];
+  return (read.pages || []).map((id) => claims.find((c) => c.id === String(id))).filter(Boolean)
+    .map((c) => ({ page: pages.find((p) => String(p.id ?? p.n) === c.id)?.n ?? null, id: c.id, claim: c.claim.slice(0, 80) }));
 }
 
 // A field that decides how the page looks has no home here.

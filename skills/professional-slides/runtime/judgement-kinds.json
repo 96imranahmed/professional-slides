@@ -1,0 +1,264 @@
+{
+ "about": "The questions a rule may ask of a model in place of a list of words (judgements.mjs). Each kind is one question about one subject: `asks` is the question, `subject` what it is asked of, `verdicts` the answers it takes with what each means, `quoteFor` the verdicts whose answer quotes the words of the subject they rest on, and `fields` what an answer carries beside its verdict. A recorded answer is replayed under a key of the kind, its `version`, the subject and the context: raise the version when the question's meaning changes, and every subject is asked again. A kind marked `spine` reads what the storyline critique is bound to: the critique waits until its questions are answered.",
+ "kinds": {
+  "column-judges": {
+   "version": 1,
+   "asks": "Does this table column give a judgement on each row - who leads or wins, a verdict, a rating, a status, how confident the call is - rather than another fact about the row?",
+   "subject": "the column's header and the words in its cells; the context is the table's other headers",
+   "verdicts": {
+    "judges": "the cells are judgements on the rows",
+    "states-facts": "the cells are facts, descriptions or evidence, not a judgement"
+   },
+   "quoteFor": [
+    "judges"
+   ]
+  },
+  "prose-alternatives": {
+   "version": 1,
+   "asks": "Are these paragraphs alternatives the reader is asked to compare - scenarios, options, paths, cases, futures - rather than the steps of one argument?",
+   "subject": "the page's title and purpose, and each paragraph with its lead",
+   "verdicts": {
+    "alternatives": "each paragraph sets out one alternative to be weighed against the others",
+    "one-argument": "the paragraphs build one argument, or are not alternatives"
+   },
+   "quoteFor": [
+    "alternatives"
+   ]
+  },
+  "row-is-total": {
+   "version": 1,
+   "asks": "Is this table row a total - a sum, a grand total, an overall figure for the rows above it - rather than a group heading or a row of its own?",
+   "subject": "the row's label; the context is the table's headers and the labels of the rows around it",
+   "verdicts": {
+    "total": "the row closes the table as a total of the rows",
+    "not-total": "the row heads a group, or is a row of its own"
+   },
+   "quoteFor": [
+    "total"
+   ]
+  },
+  "axis-measures-time": {
+   "version": 1,
+   "asks": "Does this chart axis measure time - dates, years, months, time elapsed since an event?",
+   "subject": "the axis label",
+   "verdicts": {
+    "time": "the axis is a time scale",
+    "not-time": "the axis measures something other than time"
+   },
+   "quoteFor": [
+    "time"
+   ]
+  },
+  "header-concludes": {
+   "version": 1,
+   "asks": "Does this table column header name an inference drawn from the row - what it means, implies, recommends or decides - rather than one more fact about the row?",
+   "subject": "the column's header; the context is the table's other headers",
+   "verdicts": {
+    "concludes": "the header names what follows from the row",
+    "names-a-fact": "the header names a fact or measure about the row"
+   },
+   "quoteFor": [
+    "concludes"
+   ]
+  },
+  "pill-states-status": {
+   "version": 1,
+   "asks": "Does the text of this status pill state a status or verdict that a status colour can carry (on track, at risk, leads, behind), rather than say there is no verdict (split, mixed, unranked, not comparable, too early, not disclosed)?",
+   "subject": "the pill's text; the context is the colour it is drawn in",
+   "verdicts": {
+    "status": "the text states a status or verdict",
+    "no-verdict": "the text says there is no verdict to colour"
+   },
+   "quoteFor": [
+    "no-verdict"
+   ]
+  },
+  "heading-says-snapshots": {
+   "version": 1,
+   "asks": "Does this chart heading or unit tell the reader that its columns are separate snapshots at chosen dates rather than an evenly spaced series?",
+   "subject": "the chart's heading and unit; the context is its categories",
+   "verdicts": {
+    "says-snapshots": "the reader is told the columns are chosen dates",
+    "reads-as-series": "nothing tells the reader the gaps between the columns differ"
+   },
+   "quoteFor": [
+    "says-snapshots"
+   ]
+  },
+  "tiles-one-measure": {
+   "version": 1,
+   "asks": "Do two of these figure tiles give one measure at two dates, or for two members, so that the reader compares them across the boxes?",
+   "subject": "the tiles, each an id with its figure and label; the context is the players the deck names",
+   "verdicts": {
+    "one-measure": "two tiles are one measure at two dates or for two members",
+    "different-measures": "every tile gives a different measure"
+   },
+   "fields": {
+    "pair": {
+     "type": "list",
+     "of": "id",
+     "for": [
+      "one-measure"
+     ],
+     "about": "the ids of the two tiles that give one measure",
+     "size": 2
+    }
+   }
+  },
+  "title-leads-with-gap": {
+   "version": 1,
+   "asks": "Does this slide title lead with a gap in the evidence - what it lacks, cannot settle, leaves undisclosed or unproven, or that the call is split - rather than with a finding?",
+   "subject": "the title",
+   "verdicts": {
+    "gap": "the title's main statement is what the evidence cannot show",
+    "finding": "the title states a finding, whatever limit it also names"
+   },
+   "quoteFor": [
+    "gap"
+   ],
+   "spine": true
+  },
+  "title-count-only": {
+   "version": 1,
+   "asks": "Does this slide title only state how many or how much - a count or measurement with no comparator (against a peer, a target, a prior period) and no consequence?",
+   "subject": "the title",
+   "verdicts": {
+    "count-only": "the title states a measurement and nothing it is against or what follows",
+    "compares": "the title says what the number is against, or what follows from it"
+   },
+   "quoteFor": [
+    "count-only"
+   ]
+  },
+  "heading-states-result": {
+   "version": 1,
+   "asks": "Does this chart heading or unit state a result the chart shows - a value, a change, a share, a rank reached - rather than only name the measure, its population, its period or its scale?",
+   "subject": "the heading or unit text, and which of the two it is",
+   "verdicts": {
+    "result": "the text states a value or change the chart's marks show",
+    "describes": "the text names the measure, population, period, sample, set or scale"
+   },
+   "quoteFor": [
+    "result"
+   ]
+  },
+  "qualification-says-approximate": {
+   "version": 1,
+   "asks": "Does this qualification tell the reader that the interval's figures are approximate readings rather than exact source values?",
+   "subject": "the qualification text",
+   "verdicts": {
+    "approximate": "the reader is told the figures are approximate",
+    "unqualified": "the text does not say the figures are approximate"
+   },
+   "quoteFor": [
+    "approximate"
+   ]
+  },
+  "answer-contradicted": {
+   "version": 1,
+   "asks": "Does the deck's answer recommend one thing without condition, while one or more pages recommend something else that the answer does not admit?",
+   "subject": "the deck's answer, and each page's claim with its id",
+   "verdicts": {
+    "contradicted": "a page recommends what the unconditional answer rules out",
+    "consistent": "the pages' recommendations agree with the answer, or the answer names the condition under which each holds, or the answer recommends nothing"
+   },
+   "quoteFor": [
+    "contradicted"
+   ],
+   "fields": {
+    "pages": {
+     "type": "list",
+     "of": "id",
+     "for": [
+      "contradicted"
+     ],
+     "about": "the ids of the pages whose claims recommend what the answer rules out"
+    }
+   },
+   "spine": true
+  },
+  "source-cites-pointer": {
+   "version": 1,
+   "asks": "Does this source line or note cite an internal code or pointer the reader cannot look up - a ledger entry, a register reference, a code such as 'S3+S7' - instead of naming the source?",
+   "subject": "the source line or note",
+   "verdicts": {
+    "pointer": "the line points at a code or ledger the reader does not have",
+    "names-source": "the line names its sources, or is a note that cites nothing"
+   },
+   "quoteFor": [
+    "pointer"
+   ]
+  },
+  "planning-label": {
+   "version": 1,
+   "asks": "Does this line of a slide open with a planning label - a word that names the kind of sentence it is (Interpretation, Takeaway, Insight, So what, Caveat, Note that) - rather than with its content?",
+   "subject": "the line",
+   "verdicts": {
+    "planning-label": "the line opens by labelling itself",
+    "content": "the line's opening words are content"
+   },
+   "quoteFor": [
+    "planning-label"
+   ]
+  },
+  "commentary-caveats": {
+   "version": 1,
+   "asks": "Which of these lines of a slide's commentary state what the evidence does not show, settle or establish, rather than a finding? A finding in contrastive form ('X does not decide the city; it decides the neighbourhood') is a finding.",
+   "subject": "the commentary lines, each with its id",
+   "verdicts": {
+    "some-caveats": "one or more lines are caveats",
+    "no-caveats": "every line states a finding"
+   },
+   "fields": {
+    "caveats": {
+     "type": "list",
+     "of": "id",
+     "for": [
+      "some-caveats"
+     ],
+     "about": "the ids of the lines that are caveats"
+    }
+   }
+  },
+  "shares-in-words": {
+   "version": 1,
+   "asks": "Which shares do these lines state in words rather than as a percentage - 'half', 'two thirds', 'one in four', 'most'? Give each with the fraction it states; leave out shares written as a percentage and words that state no definite share.",
+   "subject": "the lines of the slide, each with its id",
+   "verdicts": {
+    "states-shares": "one or more lines state a definite share in words",
+    "no-shares": "no line states a definite share in words"
+   },
+   "fields": {
+    "shares": {
+     "type": "list",
+     "of": "quoted",
+     "for": [
+      "states-shares"
+     ],
+     "about": "each share as { \"phrase\": the words, copied exactly, \"share\": the fraction from 0 to 1 }"
+    }
+   }
+  },
+  "title-count-check": {
+   "version": 1,
+   "asks": "The title counts something ('three of four ...'). Counting it off these labels the page draws, does the page show the count the title states?",
+   "subject": "the title and the labels of the set the title counts across",
+   "verdicts": {
+    "agrees": "the labels show the count the title states, or they are not what the title counts",
+    "disagrees": "the labels show a different count"
+   },
+   "quoteFor": [
+    "disagrees"
+   ],
+   "fields": {
+    "counted": {
+     "type": "number",
+     "for": [
+      "disagrees"
+     ],
+     "about": "how many of the labels carry what the title counts"
+    }
+   }
+  }
+ }
+}

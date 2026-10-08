@@ -57,6 +57,7 @@ import gate_config  # noqa: E402
 import render_gates  # noqa: E402
 import scene_gates  # noqa: E402
 import semantic_gates  # noqa: E402
+import judgements  # noqa: E402
 from gate_config import *  # noqa: E402,F401,F403
 from render_gates import *  # noqa: E402,F401,F403
 from scene_gates import *  # noqa: E402,F401,F403
@@ -434,8 +435,6 @@ def deck_level_gates(run, slides, content_indexes, fill, rendered):
         run.report(deck)
     if wanted("DECK_INK"):
         gate_deck_ink(slides, content_indexes, findings, run.ink_of)
-    if wanted("CAVEAT_DENSE"):
-        gate_caveat_dense(slides, content_indexes, findings)
 
 
 def median(values):
@@ -646,7 +645,6 @@ def thresholds_markdown():
             THRESHOLDS["restatement_words_min"], THRESHOLDS["restatement_block_words_min"]),
          "{}; {}".format(_share(THRESHOLDS["restatement_max"]), _share(THRESHOLDS["restatement_block_max"]))),
         ("CAVEAT_HEAVY", "caveat lines a page, at most", str(THRESHOLDS["caveats_max"])),
-        ("CAVEAT_DENSE", "caveat words a hundred above the footer, deck-wide, advisory over (from {} pages)".format(DECK_HABIT["from"]), str(THRESHOLDS["caveat_words_max"])),
         ("TABLE_SCHEMA_FLAT", "tables opening on the same headers, at most (from {} tables)".format(THRESHOLDS["schema_from"]), str(THRESHOLDS["schema_repeat_max"])),
         ("DECK_CRAFT", "advisory rates across analytical pages (from {} pages), at least: a phrase emphasised; a source line; drawn marks a page; "
          "tables treated; charts annotated".format(CRAFT["from"]["min"]),
@@ -702,6 +700,9 @@ def main(argv=None):
     parser.add_argument("--rules-version", default=None, type=float, help="The rules version the deck records")
     parser.add_argument("--thresholds-markdown", action="store_true",
                         help="Print the gate thresholds as the evaluation reference's table and exit")
+    parser.add_argument("--judgements", default=None,
+                        help="The deck's recorded judgements (<id>.judgements.json): the gates that read a line's meaning hold "
+                             "only where it is answered, and list what is not in the report's `judgementsNeeded`")
     args = parser.parse_args(argv)
 
     if args.thresholds_markdown:
@@ -715,7 +716,9 @@ def main(argv=None):
         return 0
     gates = {c.strip() for c in args.only.split(",")} if args.only else None
     deck = {"workflow": args.workflow, "rulesVersion": args.rules_version} if args.workflow or args.rules_version is not None else None
+    judgements.load(args.judgements)
     report = run_gates(scene, args.render_dir, args.profile, gates, deck)
+    report["judgementsNeeded"] = judgements.needed()
     write_json(report, args.report)
     if args.budget_report:
         write_json(page_budget(scene, args.profile), args.budget_report)

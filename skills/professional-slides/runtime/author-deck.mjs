@@ -135,6 +135,7 @@ import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
 import { claimMarks, dependencyFindings, metricsOf, relationRepair, requiredCitations } from "./gates/dependency_gates.mjs";
 import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
+import { activeJudgements, addPending, loadJudgements, pendingFinding, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
@@ -173,6 +174,7 @@ export const AUTHORING_CODES = Object.freeze({
   PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
   SOURCE_NUMBERS_UNREAD: "an insight measure more than half of whose recorded values its own source files do not print - a slipped transcription, or a file that is not the one the number came from - advised, with the values",
+  JUDGEMENTS_PENDING: "questions the rules ask of the copy - whether a column judges, a title leads with a gap, a picture shows what was asked - that no recorded judgement answers yet, so the rules that ask them did not hold: advised, until judge.mjs records the answers (delivery refuses a deck with any open)",
   SOURCES_UNFILED: "an insight whose `sources` are not files under sources/ - a name or a registry key where the path of the file the finding was read from belongs, or none at all - advised at the compile, and told to the storyline critic as a problem of the log",
   // Advisories, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
@@ -505,7 +507,7 @@ export function deckSpineFindings(doc, insights = null) {
       ? `The deck names \`agendaStyle: "columns"\` and has ${contents.sections} sections${doc.appendix?.length ? " (the appendix divider is one)" : ""}; the column contents page holds ${contents.min} to ${contents.max}. Remove \`agendaStyle\` - the runtime then sets the list, which holds up to ${AGENDA_LIMITS.list.max} - or merge sections`
       : `The deck has ${contents.sections} sections${doc.appendix?.length ? " (the appendix divider is one)" : ""} and the contents page lists at most ${contents.max}. Merge sections - a deck reads in two to five - or set \`contents: false\` on \`deck\`` });
   const typed = [...doc.pages, ...(doc.appendix || [])].filter((p) => p && typeof p === "object" && p.type);
-  const gaps = typed.map((p) => ({ id: p.id, title: String(p.title ?? ""), gap: titleGap(p.title) })).filter((p) => p.gap);
+  const gaps = typed.map((p) => ({ id: p.id, title: String(p.title ?? ""), gap: titleGap(p.title, p.id) })).filter((p) => p.gap);
   const allowed = Math.max(1, Math.floor(TITLE_GAP_SHARE * typed.length));
   if (gaps.length > allowed)
     out.push({ code: "TITLE_GAP_SHARE", severity: "blocker", measured: { gapTitles: gaps.length, of: typed.length }, pages: gaps.map((g) => g.id),
@@ -629,11 +631,15 @@ export function sceneGateFindings(deck, python = pythonBin(), spec = {}) {
     writeFileSync(scene, JSON.stringify(deck));
     // A deck that records no version (absent, or null) is held to the current rules, so no flag is sent.
     const rules = [...(spec.workflow ? ["--workflow", String(spec.workflow)] : []), ...(spec.rulesVersion !== undefined && spec.rulesVersion !== null ? ["--rules-version", String(spec.rulesVersion)] : [])];
-    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out, "--budget-report", budgetOut, ...rules], { encoding: "utf8" });
+    // The gates that read a line's meaning read the run's judgements, and say which questions they found unanswered.
+    const session = activeJudgements(), verdicts = path.join(dir, "judgements.json");
+    if (session) writeFileSync(verdicts, JSON.stringify({ verdicts: Object.fromEntries(session.verdicts) }));
+    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out, "--budget-report", budgetOut, ...rules, ...(session ? ["--judgements", verdicts] : [])], { encoding: "utf8" });
     if (run.error || ![0, 2].includes(run.status) || !existsSync(out))
       return { findings: [], advisories: [], all: [], standings: [], architectures: [], budget: [], ran: false, reason: String(run.error?.message ?? run.stderr ?? `exit ${run.status}`).trim().split("\n").slice(-3).join(" ") || `exit ${run.status}` };
     const report = readJsonSync(out);
     const withId = (f) => { const slide = f.slide ? deck.slides[f.slide - 1] : null; return { ...f, id: slide ? slide.sourceSlideId ?? slide.id : undefined }; };
+    for (const request of report.judgementsNeeded ?? []) addPending(session, { ...request, where: (request.where ?? []).map((n) => deck.slides[Number(n) - 1]?.sourceSlideId ?? deck.slides[Number(n) - 1]?.id ?? n) });
     // Each page's budget as the build measures it: words against its floor and
     // ceiling, the footer's share, how much of the body it fills. Printed before
     // the author edits, so a fix does not push the page across a line unseen.
@@ -1070,7 +1076,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   if (contents) standings.push({ code: "CONTENTS_UNFIT", what: `sections on the contents page (${contents.style === "columns" ? "the column style the deck names" : "a list"})`, value: contents.sections, bar: contents.max, side: "max", unit: "sections", applies: true, blocks: true });
   // The titles that lead with a gap, against the share the spine allows (deckSpineFindings).
   const titled = [...doc.pages, ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && page.type);
-  if (titled.length) { const gaps = titled.filter((page) => titleGap(page.title));
+  if (titled.length) { const gaps = titled.filter((page) => titleGap(page.title, page.id));
     standings.push({ code: "TITLE_GAP_SHARE", what: "titles stating what the evidence cannot settle", value: gaps.length, bar: Math.max(1, Math.floor(TITLE_GAP_SHARE * titled.length)), side: "max", unit: "pages", applies: true, blocks: true, pages: gaps.map((page) => page.id) }); }
 
   // --- G: the deck's aggregates, on the pages that composed ----------------
@@ -1636,7 +1642,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1656,7 +1662,9 @@ async function openFitCache(file, { doc, insights, fitCap }) {
   const runtime = path.dirname(fileURLToPath(import.meta.url));
   const stamp = [runtime, path.join(runtime, "gates")].flatMap((dir) => readdirSync(dir).filter((name) => /\.(mjs|py|json)$/.test(name)).sort().map((name) => { const at = statSync(path.join(dir, name)); return `${name}:${at.size}:${Math.round(at.mtimeMs)}`; }));
   const pages = [...doc.pages, ...(doc.appendix || [])];
-  const context = digest([doc.deck, doc.sources ?? null, pages.filter((page) => page?.kind).map((page) => [page.kind, page.title]), insights ? [...insights.values()] : null, insights?.analysis?.results ?? null, fitCap, stamp]);
+  // A recorded judgement can change what a page is refused for, so the verdicts are part of what a search's verdict rests on.
+  const judged = [...(activeJudgements()?.verdicts ?? new Map())].map(([key, said]) => `${key}:${said?.verdict}`).sort();
+  const context = digest([doc.deck, doc.sources ?? null, pages.filter((page) => page?.kind).map((page) => [page.kind, page.title]), insights ? [...insights.values()] : null, insights?.analysis?.results ?? null, fitCap, stamp, judged]);
   const keyOf = (target) => digest([context, pages[target.index - 2] ?? null, pages[target.index - 1] ?? null, target.page]);
   // An entry outlives the run that wrote it only while its page is still in the deck; its key is checked whenever it is read.
   const ids = new Set(pages.map((page, index) => String(page?.id ?? `page-${index + 1}`)));
@@ -2029,7 +2037,8 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" } }, { usage: USAGE });
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" },
+    pending: { type: "string", valueName: "a file" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2046,6 +2055,15 @@ async function main(argv) {
   // skill as a published budget or a better check (taste-review.md).
   const logPath = path.join(dir, `${stem}.author-log.jsonl`);
   const runs = readRunLog(logPath);
+  // The rules that read what copy means ask it of the deck's recorded judgements (judgements.mjs), for the whole run.
+  // `--pending <file>`: the questions this run found unanswered, written whatever the run's outcome, for judge.mjs to stage.
+  const session = await loadJudgements(dir, stem);
+  try { return await withJudgements(session, () => authorRun({ values, file, doc, dir, stem, logPath, runs, say })); }
+  finally { if (values.pending) await writeJson(path.resolve(values.pending), [...session.pending.values()]); }
+}
+
+/** One run of the command on a pages file, with the deck's judgements the rules read. */
+async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   // The one exhibit that shows a page's split measures on one basis, built
   // from the page's own exhibits and checked to keep every number they plot.
   if (values["repair-relation"] !== undefined) {
@@ -2136,7 +2154,9 @@ async function main(argv) {
   const keyOf = (f) => `${f.code}|${f.id ?? ""}`;
   const merge = (ours, theirs) => { const seen = new Set(ours.map(keyOf)); return inClassOrder([...ours, ...theirs.filter((f) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))], order); };
   // A finding on a page that came from a part names the part file to edit (pages-file.mjs).
-  const everything = withParts(doc, merge([...locked, ...compiled.blocking], rendered?.blockers ?? [])), advice = withParts(doc, merge(compiled.advisories, rendered?.advisories ?? []));
+  // The questions the rules asked that no recorded judgement answers yet: those rules did not hold this run (judgements.mjs).
+  const open = pendingFinding(activeJudgements(), { pagesFile: path.basename(file) });
+  const everything = withParts(doc, merge([...locked, ...compiled.blocking], rendered?.blockers ?? [])), advice = withParts(doc, merge([...compiled.advisories, ...(open ? [open] : [])], rendered?.advisories ?? []));
   // What the render measured replaces what the scene estimated of the same rule.
   const measured = new Set((rendered?.standings ?? []).map((st) => st.code));
   const standings = rendered?.standings?.length ? readStandings([...compiled.standings.filter((st) => !measured.has(st.code) && !(st.code === "DECK_SCENE_VOID" && measured.has("DECK_THIN_PAGES"))), ...rendered.standings]) : compiled.standings;
@@ -2157,6 +2177,8 @@ async function main(argv) {
   // What a revision's change may have left standing elsewhere is said in full where it only advises: the author checks each slide named.
   const stale = advice.filter((f) => ["NUMBER_STALE", "WORDING_STALE"].includes(f.code) && !f.deferred);
   const tail = [
+    // A run with questions open held fewer rules than the deck is held to: said on every run, blocked or not.
+    ...(open ? [`Questions open (JUDGEMENTS_PENDING): ${open.repair}`] : []),
     ...(stale.length ? [`To check (advisories):\n${stale.map((f) => `  ${f.code} [${f.id ?? (f.pages || []).join(", ")}]\n    ${f.repair}`).join("\n")}`] : []),
     ...(notHeldLine ? [notHeldLine] : []),
     ...(beyond.length ? [`Deck structure findings these pages are not named in (not counted in this run's exit code; the whole-deck run holds them):\n${findingsText(beyond, order)}`] : []),
@@ -2192,6 +2214,8 @@ async function main(argv) {
     if (!values.render && !draft && !named && rendererInstalled()) console.error("A renderer is installed: make the final check before the build with `--check --render`, which renders the deck with the build's own stages and reports what only the render shows.\n");
     say(JSON.stringify({ ok: true, ...summary }, null, 1)); return 0;
   }
+  // A deck written with questions open says so: delivery refuses it until they are answered and the deck compiled again.
+  if (open) spec.judgements = { pending: open.measured.pending, kinds: open.measured.kinds }; else delete spec.judgements;
   await writeJson(path.join(dir, `${stem}.deck.json`), spec);
   await writeJson(path.join(dir, `${stem}.plan.json`), planOf(spec));
   await writeJson(path.join(dir, `${stem}.content.json`), content);

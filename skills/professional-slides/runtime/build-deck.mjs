@@ -50,6 +50,7 @@ import { storylineWarning } from "./storyline.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { applyRulesVersion, carriedCount, notHeldOn } from "./weight.mjs";
 import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE, REVISION_CODES, assemblyOrder, carriedSaid, sourceDeckPath } from "./revision.mjs";
+import { activeJudgements, addPending, loadJudgements, withJudgements } from "./judgements.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -123,6 +124,24 @@ const rulesArgs = (spec) => [...(spec.workflow ? ["--workflow", String(spec.work
   ...(Number.isFinite(Number(spec.rulesVersion)) && spec.rulesVersion !== null && spec.rulesVersion !== "" ? ["--rules-version", String(spec.rulesVersion)] : [])];
 
 /**
+ * The flag that gives a Python gate the build's judgements (judgements.mjs):
+ * the deck's judgements file, or - for judgements held in memory, as a test's
+ * are - a copy of them written with the reports.
+ */
+async function judgementArgs(directory) {
+  const session = activeJudgements();
+  if (!session) return [];
+  if (session.file) return ["--judgements", session.file];
+  const copy = path.join(directory, "judgements-read.json");
+  await writeJson(copy, { verdicts: Object.fromEntries(session.verdicts) });
+  return ["--judgements", copy];
+}
+/** The questions a gate report found unanswered, added to the build's pending ones by the page ids they were asked on. */
+function notePending(report, deck) {
+  for (const request of report?.judgementsNeeded ?? []) addPending(activeJudgements(), { ...request, where: (request.where ?? []).map((n) => deck.slides[Number(n) - 1]?.sourceSlideId ?? deck.slides[Number(n) - 1]?.id ?? n) });
+}
+
+/**
  * Build the deck at `specPath` into `outputDirectory`.
  *
  * `source` builds a deck held in memory instead - `{ spec, baseDir, content,
@@ -136,7 +155,14 @@ const rulesArgs = (spec) => [...(spec.workflow ? ["--workflow", String(spec.work
  * deck as a whole is then about a part of it, and the caller reads the page
  * findings alone.
  */
-export async function buildDeck(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null } = {}) {
+export async function buildDeck(specPath, outputDirectory, options = {}) {
+  // The rules that read what copy means read the deck's recorded judgements: the compile's, when it is the compile that
+  // builds (an author's check), or the file beside the deck.
+  const session = activeJudgements() ?? await loadJudgements(options.source?.baseDir ?? path.dirname(path.resolve(specPath)), deckStem(options.source ? options.source.spec : await readJson(specPath)));
+  return withJudgements(session, () => buildWith(specPath, outputDirectory, options));
+}
+
+async function buildWith(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null } = {}) {
   const started = Date.now();
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
   const stem = deckStem(spec);
@@ -358,9 +384,11 @@ async function preflightScene({ preflight, spec, stem, baseDir, directory, py, r
   // Beside carried slides the composed pages are a file of their own; the deck is assembled from it afterwards.
   const pptxPath = path.join(directory, composedOnly ? `${stem}.composed.pptx` : `${stem}.pptx`);
   const [pre, emitted] = await together(
-    py("preflightMs", [gates, scenePath, "--report", preflightReport, ...rulesArgs(spec)], { expect: [0, 2] }),
+    py("preflightMs", [gates, scenePath, "--report", preflightReport, ...rulesArgs(spec), ...(await judgementArgs(directory))], { expect: [0, 2] }),
     preflight ? null : py("emitMs", [path.join(runtime, "emit", "emit_pptx.py"), scenePath, pptxPath]));
   result.preflight = judged({ ...(await readReport(preflightReport)), report: preflightReport, passed: pre.code === 0 }, spec);
+  notePending(result.preflight, deck);
+  delete result.preflight.judgementsNeeded;
   const coverage = coverageFindings(spec);
   if (coverage.length) { result.preflight.findings = [...(result.preflight.findings || []), ...coverage]; result.preflight.passed = false; result.preflight.accepted = false; result.preflight.countsByCode = { ...(result.preflight.countsByCode || {}), MISSING_EVIDENCE: coverage.length }; }
   // Deck craft floors, read off the spec and the composed scene. A blocker
@@ -431,7 +459,7 @@ async function readBackAndRender({ render, spec, stem, baseDir, directory, py, r
       if (fromMemory && stages.content) await writeJson(contentAt, stages.content);
       const withContent = result.stages.content?.state === "accepted" ? [contentAt] : [];
       const [gated, profiled, sheets] = await together(
-        py("gatesMs", [gates, scenePath, renderDirectory, "--report", gateReport, ...rulesArgs(spec)], { expect: [0, 2] }),
+        py("gatesMs", [gates, scenePath, renderDirectory, "--report", gateReport, ...rulesArgs(spec), ...(await judgementArgs(directory))], { expect: [0, 2] }),
         // The density profile: the rendered pages measured against the
         // skill's density targets. A page's flags are the review's density
         // pass to judge (references/taste-review.md); the deck's words a block
@@ -439,6 +467,8 @@ async function readBackAndRender({ render, spec, stem, baseDir, directory, py, r
         py("densityMs", [path.join(runtime, "gates", "density_profile.py"), result.render.pdf, scenePath, ...withContent, "--report", profileReport, ...rulesArgs(spec)]),
         py("sheetsMs", [path.join(runtime, "emit", "render_pptx.py"), "--sheets", renderDirectory]));
       result.gates = withFindings(judged({ ...(await readReport(gateReport)), report: gateReport, passed: gated.code === 0 }, spec), design);
+      notePending(result.gates, deck);
+      delete result.gates.judgementsNeeded;
       if (design.length) { const { report: _, passed: __, ...written } = result.gates; await writeJson(gateReport, written); }
       result.densityProfile = { report: profileReport, ...lastJson(profiled.stdout), findings: applyRulesVersion((await readReport(profileReport)).findings ?? [], spec) };
       Object.assign(result.render, lastJson(sheets.stdout) ?? {});
@@ -550,6 +580,9 @@ async function finish(result, directory, started) {
   // Wall time, start to finish: stages that ran side by side are timed whole,
   // so their sum is not how long the build took.
   result.timings.wallMs = Date.now() - started;
+  // The questions the build's rules asked that no recorded judgement answers: delivery refuses the build until they are.
+  const open = [...(activeJudgements()?.pending?.values() ?? [])];
+  if (open.length) result.judgements = { pending: open.length, kinds: open.reduce((n, item) => ({ ...n, [item.kind]: (n[item.kind] ?? 0) + 1 }), {}) };
   await writeJson(path.join(directory, "build-result.json"), result);
   return result;
 }

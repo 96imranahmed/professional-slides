@@ -116,13 +116,9 @@ class OneDefinitionTests(unittest.TestCase):
     def test_the_stopwords_live_in_one_file(self):
         lists = json.loads((GATES / "stopwords.json").read_text(encoding="utf-8"))
         self.assertEqual(text_stats.STOPWORDS, frozenset(lists["content"]))
-        self.assertEqual(text_stats.TITLE_STOPWORDS, frozenset(lists["title"]))
-        self.assertTrue(text_stats.TITLE_STOPWORDS <= text_stats.STOPWORDS)
         # Every reader takes the file's list rather than a copy: the Python
         # gates hold the very objects, and the Node gate drops every listed word.
-        import scene_gates
         import semantic_gates
-        self.assertIs(scene_gates.TITLE_STOPWORDS, text_stats.TITLE_STOPWORDS)
         self.assertIs(semantic_gates.content_words, text_stats.content_words)
         kept = run_node(f"""
 import {{ contentWords }} from './skills/professional-slides/runtime/gates/content_gates.mjs';

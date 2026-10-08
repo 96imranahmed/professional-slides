@@ -13,6 +13,7 @@ node runtime/author-deck.mjs --types | --schema [<type> | deck] | --example <typ
 node runtime/author-deck.mjs [<id>.pages.json] --scaffold <type>[/<form>] [--evidence <insight-id>] [--id <page-id>]
 node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
 node runtime/analysis.mjs <id>.pages.json [--catalogue]
+node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run claude|codex] [--model m] [--timeout seconds]
 node runtime/storyline.mjs [merge] <id>.deck.json out/ [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]
 node runtime/build-deck.mjs <id>.deck.json out/ [--no-fetch] [--no-render] [--preflight]
 node runtime/deliver-deck.mjs <id>.deck.json out/ [--reviewer auto|codex|claude|packet] [--model m]
@@ -97,13 +98,15 @@ run-log.mjs        what authoring a deck cost, counted from `<id>.author-log.jso
 asset-needs.mjs    what the build would fetch for a deck, the choices, and the deck's declaration that it is built without the network (ASSET_CODES)
 table-variants.mjs the table variants a deck may name, in the component gallery's order
 claims.mjs         the claim ledger (claims.json) for the author's self-check, and its validation
+judgements.mjs     the questions a rule asks of the copy (judgement-kinds.json) in place of a list of words: asked of a model once, recorded in <id>.judgements.json under a key of the kind, its version, the subject and the context, and replayed; an unanswered one holds nothing and is listed (JUDGEMENTS_PENDING); gates/judgements.py reads the same file by the same key
+judge.mjs          the questions the compile asked and no judgement answers, staged in judgements/ for a fresh model (or `--run`), its answer checked and recorded until none is open
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
 gates/gate_config.py    the thresholds, the weight floors, the code tables (GATE_CODES, ADVISORY_CODES, COMPOSE_CODES), severity rules and the scene readers every gate shares
 gates/render_gates.py   the page's own gates: ink and bands on the render, and the title, type, measure, words and pictures
 gates/scene_gates.py    the gates read off the composed scene, so they run at authoring as well as the build (SCENE_VOID, SCENE_INK)
-gates/semantic_gates.py what the page says: restatement, planning voice, caveats, twin cells, contradicted shares, repeated table schemas
+gates/semantic_gates.py what the page says: restatement, planning voice, caveats, twin cells, contradicted shares, repeated table schemas (a line's meaning read through gates/judgements.py)
 gates/deck_gates.py     the deck-wide gates: photographs, craft rates, device vocabulary, evidence mix, front matter, page weight, architectures, thin-page habit
-gates/text_stats.py     the one word count (text-contract.mjs textWords, ported), printed words for the density profile, content words; stopwords.json the shared stopword lists
+gates/text_stats.py     the one word count (text-contract.mjs textWords, ported), printed words for the density profile, content words; stopwords.json the shared stopword list
 gates/density_profile.py  words as a reader meets them on the rendered PDF; TEXT_FRAGMENTED
 gates/variety_gates.mjs, gates/content_gates.mjs, gates/plan_gates.mjs, gates/craft_gates.mjs  the variety contract, the content plan, the plan record, the craft floors and the build bars as the compile holds them
 gates/consistency_gates.mjs  what the pages state between them: one number given two values, a number a revision changed that another page still states, a proof another page already gave

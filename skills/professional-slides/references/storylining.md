@@ -34,7 +34,7 @@ A deck that will not answer is not finished. Every sub-question in the request g
 - **The confidence** - high, medium or low, and why, in the subtitle, a note or the summary.
 - **The reversal trigger** - the observation that would flip the lean, named so the reader can watch for it.
 
-"Cannot rank" is allowed at most once in a deck, and only when it names the decisive missing evidence and what the reader would need to see. An evidence gap is a finding about the evidence, not a title: lead with what the evidence does show and put the limitation in the `subtitle` or a note. `author-deck.mjs` refuses a deck whose titles state gaps - lacks, unproven, undisclosed, cannot settle, neither - on more than 15% of its analytical pages (`TITLE_GAP_SHARE`).
+"Cannot rank" is allowed at most once in a deck, and only when it names the decisive missing evidence and what the reader would need to see. An evidence gap is a finding about the evidence, not a title: lead with what the evidence does show and put the limitation in the `subtitle` or a note. `author-deck.mjs` refuses a deck whose titles lead with a gap - what the evidence lacks, leaves unproven or cannot settle, each title read by a model (`judge.mjs`) - on more than 15% of its analytical pages (`TITLE_GAP_SHARE`).
 
 | Instead of | Write |
 | --- | --- |

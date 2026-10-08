@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import re
 
-from gate_config import DECK_HABIT, THRESHOLDS, finding, lines_of, source_text, standing, text_nodes
-from render_gates import FOOTER_ROLES
-from scene_gates import analytical
+from gate_config import THRESHOLDS, finding, source_text, standing, text_nodes
 # Two sentences share what they say in their content words (stopwords.json).
 from text_stats import content_words
+# What a line means - a planning label, a caveat, a share stated in words - is read, not matched (judgements.py).
+from judgements import judged
 
 
 # The roles a page's own sentences are drawn under, as the renderer names them
@@ -35,18 +35,10 @@ EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text"
                       "legend-label", "chart-unit", "metric-value", "metric-label",
                       "card-title", "card-text", "node-label", "node-text",
                       "step-title", "step-text", "phase-label", "table-status-label"}
-CAVEAT_RE = re.compile(
-    r"(\bdoes not\b|\bdo not\b|\bis not\b|\bare not\b|\bcannot\b|\bnot a\b|\bno[t]? (?:establish|imply|prove|measure|rank)\b"
-    r"|\brather than a\b|\blimit of inference\b|\bboundary\b|\bnot an? (?:exact|equivalence|estimate|ranking|verdict)\b)", re.I)
-# "Education does not decide the city; it decides the neighborhood" is a finding
-# in contrastive form, not a caveat. The negation sets up the positive clause
-# that follows it, and counting it as a hedge punishes the sharpest sentence on
-# the page - which it did, on a well-made deck, the first time this gate ran.
-CONTRAST_RE = re.compile(r"(;\s*it\b|,\s*it\b|\bbut\b|\brather,|\binstead\b|\bwhat it does\b|\bit is\b)", re.I)
-# Planning language: the vocabulary of the dot-dash, which belongs in the plan.
-PLANNING_PREFIX_RE = re.compile(
-    r"^\s*(interpretation|takeaway|key insight|insight|implication|so what|dash|dot|note that|read this as|"
-    r"caveat|limitation|evidence state|inference limit|editorial stance)\s*[:—-]", re.I)
+# A line that opens on a short label set off by a colon or a dash: whether the
+# label is planning language ("Interpretation:", "So what -") or the line's
+# content ("Revenue: up 4%") is read (planning-label).
+LABELLED_RE = re.compile(r"^\s*(?:[^\W\d_][\w'’]*\s+){0,3}[^\W\d_][\w'’]*\s*(?::|—|–|\s-\s)")
 
 
 def page_voices(slide):
@@ -123,17 +115,21 @@ def gate_planning_voice(slide_no, slide, findings):
 
     Planning language belongs in the plan, not the rendered deck: a sentence
     that opens "Interpretation:" tells the reader which column of the dot-dash
-    they are reading.
+    they are reading. A line that opens on a short label is asked whether the
+    label is planning language (planning-label).
     """
     offenders = []
     for node in text_nodes(slide):
         role = str(node.get("role") or "")
         if role not in COMMENTARY_ROLES and role != "insight-body":
             continue
-        for line in lines_of(node):
-            hit = PLANNING_PREFIX_RE.match(line)
-            if hit and line.strip()[:70] not in offenders:
-                offenders.append(line.strip()[:70])
+        for line in str(source_text(node)).split("\n"):
+            line = line.strip()
+            if not LABELLED_RE.match(line) or line[:70] in offenders:
+                continue
+            said = judged("planning-label", line, None, slide_no)
+            if said and said.get("verdict") == "planning-label":
+                offenders.append(line[:70])
     for text in offenders[:3]:
         findings.append(finding(
             slide_no, "PLANNING_VOICE", text, "no planning label on the page",
@@ -153,8 +149,16 @@ def gate_caveat_heavy(slide_no, slide, findings):
     caveat is a boundary; five is the page.
     """
     commentary, _ = page_voices(slide)
-    lines = [ln for text in commentary for ln in str(text).split("\n") if ln.strip()]
-    hits = [ln.strip()[:70] for ln in lines if CAVEAT_RE.search(ln) and not CONTRAST_RE.search(ln)]
+    lines = [ln.strip() for text in commentary for ln in str(text).split("\n") if ln.strip()]
+    if len(lines) <= THRESHOLDS["caveats_max"]:
+        return
+    # Which lines state a limit rather than a finding is read (commentary-caveats): "Education does not decide the city; it
+    # decides the neighborhood" is a finding in contrastive form, which a count of negations punished as a hedge.
+    said = judged("commentary-caveats", [{"id": f"l{at + 1}", "text": line} for at, line in enumerate(lines)], None, slide_no)
+    if not said or said.get("verdict") != "some-caveats":
+        return
+    picked = {str(i) for i in said.get("caveats") or []}
+    hits = [line[:70] for at, line in enumerate(lines) if f"l{at + 1}" in picked]
     if len(hits) <= THRESHOLDS["caveats_max"]:
         return
     findings.append(finding(
@@ -163,38 +167,6 @@ def gate_caveat_heavy(slide_no, slide, findings):
         "Keep one statement of what this evidence does not settle, in the note or "
         "the insight, and give the commentary back to what it does settle. A page "
         "that qualifies itself three times reads as a page with nothing to say.",
-    ))
-
-
-# The words a sentence states a limit in: a negation, or what the evidence
-# leaves unverified, undisclosed or unproven.
-CAVEAT_WORD_RE = re.compile(r"^(?:not|cannot|neither|nor|\w+n't|unverified|undisclosed|unproven|unconfirmed|unpublished|unknown|unclear|uncertain|"
-                            r"inconclusive|insufficient)$", re.I)
-
-
-def gate_caveat_dense(slides, content_indexes, findings):
-    """CAVEAT_DENSE. Advisory. The deck's caveat words for each hundred words
-    its pages print above the footer. Strong decks state findings in the
-    body and keep their qualifications to numbered footnotes, source notes
-    and stamps ("Preliminary", "Illustrative"): their median deck sets 0.27
-    caveat words in a hundred, nine in ten under `caveat_words_max`. A deck
-    past that argues with itself on every page, though no one page is
-    CAVEAT_HEAVY. A footnote's words are not counted: that is where a
-    qualification goes. Read, as DECK_INK is, from DECK_HABIT `from` pages."""
-    pages = [slides[index] for index in content_indexes if analytical(slides[index], index)]
-    said = [w for slide in pages for node in text_nodes(slide) if str(node.get("role") or "") not in FOOTER_ROLES for w in str(source_text(node)).split()]
-    if not said:
-        return
-    rate = round(100 * sum(1 for w in said if CAVEAT_WORD_RE.match(w.strip(".,;:()\"'"))) / len(said), 2)
-    standing("CAVEAT_DENSE", "caveat words a hundred words above the footer", rate, THRESHOLDS["caveat_words_max"], "max", unit="words",
-             applies=len(pages) >= DECK_HABIT["from"])
-    if len(pages) < DECK_HABIT["from"] or rate <= THRESHOLDS["caveat_words_max"]:
-        return
-    findings.append(finding(
-        None, "CAVEAT_DENSE", rate, THRESHOLDS["caveat_words_max"],
-        "The pages state their limits in the argument. Let the title and the body say what the evidence shows, "
-        "and move each qualification - what is undisclosed, unverified or not like for like - to a numbered "
-        "`footnotes` entry on its page or the source note, where strong decks keep them.",
     ))
 
 
@@ -246,11 +218,6 @@ def gate_twin_cells(slide_no, slide, findings):
     ))
 
 
-WORD_SHARES = {"half": 0.5, "a third": 1 / 3, "one third": 1 / 3, "two thirds": 2 / 3,
-               "a quarter": 0.25, "three quarters": 0.75, "a fifth": 0.2, "two fifths": 0.4,
-               "three fifths": 0.6, "four fifths": 0.8, "two in five": 0.4, "three in five": 0.6,
-               "four in five": 0.8, "one in five": 0.2, "one in four": 0.25, "three in four": 0.75,
-               "one in three": 1 / 3, "two in three": 2 / 3, "one in two": 0.5}
 OF_COUNT_RE = re.compile(r"\b(\d{1,4})\s+of\s+(\d{1,4})\b")
 PERCENT_RE = re.compile(r"(\d{1,3}(?:\.\d)?)\s?%")
 
@@ -284,7 +251,7 @@ def gate_contradicted_share(slide_no, slide, findings):
         reachable |= {r + count for r in list(reachable) if r + count <= total}
     # A share is honest when some subset of the page's own counts rounds to it.
     ok = {round(100 * r / total) for r in reachable}
-    stated, bad = [], []
+    stated, bad, said = [], [], []
     for node in text_nodes(slide):
         role = str(node.get("role") or "")
         if role not in COMMENTARY_ROLES and role not in {"metric-value", "metric-label", "insight-body"}:
@@ -292,10 +259,14 @@ def gate_contradicted_share(slide_no, slide, findings):
         text = source_text(node)
         for raw in PERCENT_RE.findall(text):
             stated.append((f"{raw}%", round(float(raw))))
-        lowered = " " + text.lower()
-        for phrase, fraction in WORD_SHARES.items():
-            if f" {phrase} " in lowered or lowered.rstrip().endswith(" " + phrase):
-                stated.append((phrase, round(100 * fraction)))
+        if str(text).strip():
+            said.append(str(text).strip())
+    # A share stated in words - "half", "two in three" - is read off the lines with the fraction it states (shares-in-words).
+    read = judged("shares-in-words", [{"id": f"l{at + 1}", "text": line} for at, line in enumerate(said)], None, slide_no) if said else None
+    if read and read.get("verdict") == "states-shares":
+        for share in read.get("shares") or []:
+            if isinstance(share, dict) and isinstance(share.get("share"), (int, float)):
+                stated.append((str(share.get("phrase")), round(100 * share["share"])))
     # The page's own resolution is one count: with 33 institutions, one of them
     # is three percentage points, and a share inside that is the author rounding
     # or a second question over the same base rather than a contradiction. Eight

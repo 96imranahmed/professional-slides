@@ -26,6 +26,7 @@ from node_probe import NODE, ROOT, run_node
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+from judgement_oracle import answering  # noqa: E402
 
 
 def block(index):
@@ -124,7 +125,9 @@ if __name__ == "__main__":
 
 
 class TitleCountTests(unittest.TestCase):
-    """A title that counts is a title a reader checks, in about a second."""
+    """A title that counts is a title a reader checks, in about a second. What
+    it counts, and how many of the set carry it, is a question (title-count-check)
+    put only of a set the size of the count, answered here as a reader would."""
 
     @staticmethod
     def quadrants(headings, title="Three of four common tastes point at DC; the fourth carries the money"):
@@ -136,23 +139,29 @@ class TitleCountTests(unittest.TestCase):
                 "An argument about power: DC", "Company and comedy: Marvel"]
 
     def test_a_title_its_own_exhibit_contradicts_is_reported(self):
-        findings = run(page_gates.gate_title_count, 30, self.quadrants(self.HEADINGS))
+        disagrees = {"verdict": "disagrees", "counted": 2, "quote": "Three of four"}
+        with answering({"title-count-check": disagrees}) as asked:
+            findings = run(page_gates.gate_title_count, 30, self.quadrants(self.HEADINGS))
         self.assertEqual([f["code"] for f in findings], ["TITLE_COUNT"])
         self.assertEqual(findings[0]["measured"]["counted"], 2)
         self.assertEqual(findings[0]["threshold"], 3)
+        # Asked of the four headings: the set as large as the count's whole.
+        self.assertEqual(asked, [("title-count-check", {"title": "Three of four common tastes point at DC; the fourth carries the money", "labels": self.HEADINGS})])
 
     def test_a_title_the_exhibit_supports_passes(self):
         headings = list(self.HEADINGS)
         headings[1] = "A long story that pays off: DC"
-        self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(headings)), [])
+        with answering({"title-count-check": "agrees"}):
+            self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(headings)), [])
 
-    def test_a_count_of_something_the_page_does_not_name_is_not_measured(self):
-        # "Four of the six measures are countable" over panels that say neither
-        # "measures" nor anything else countable: there is nothing to count, and
-        # a gate that guesses here is a gate that fires on good work.
-        self.assertEqual(run(page_gates.gate_title_count, 5, self.quadrants(
-            self.HEADINGS, title="Three of four common tastes point at Neither house")), [])
+    def test_a_count_with_no_set_its_size_on_the_page_is_not_asked_about(self):
+        with answering({"title-count-check": {"verdict": "disagrees", "counted": 1}}) as asked:
+            self.assertEqual(run(page_gates.gate_title_count, 5, self.quadrants(
+                self.HEADINGS, title="Three of six common tastes point at DC")), [])
+        self.assertEqual(asked, [])
 
     def test_a_title_that_states_no_count_is_left_alone(self):
-        self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(
-            self.HEADINGS, title="Common tastes point at DC more often than at Marvel")), [])
+        with answering({"title-count-check": {"verdict": "disagrees", "counted": 1}}) as asked:
+            self.assertEqual(run(page_gates.gate_title_count, 30, self.quadrants(
+                self.HEADINGS, title="Common tastes point at DC more often than at Marvel")), [])
+        self.assertEqual(asked, [])

@@ -29,7 +29,9 @@ from render_gates import (
 # scene's colours read the one way both scene measures read them.
 from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of
 from scene_ink import estimate as scene_ink_estimate
-from text_stats import TITLE_STOPWORDS, word_count
+from text_stats import word_count
+# What a title counts is read, not matched (judgements.py).
+from judgements import judged
 
 
 # A shape that holds text is a container: a card, a panel, a tile, a table
@@ -602,8 +604,10 @@ def gate_unannotated(slide_no, slide, findings):
 # blocks on purpose - they say order, not magnitude - which is right until the
 # author prints quantities on them.
 FIGURE_GROUND = re.compile(r"^([a-z]+)-(baseline|axis|rail)$")
-QUANTITY = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(min(?:ute)?s?|hours?|hrs?|days?|weeks?|months?|years?"
-                      r"|%|bn|m|k|pts?|points?|films?|people|staff|sites?|stores?)\b", re.I)
+# A quantity is a number and what it counts or measures: the symbol or the word
+# written after it ("126 minutes", "40%", "12 stores"). Numbers read in one
+# unit are compared; the unit is read as written, a plural's "s" aside.
+QUANTITY = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(%|[^\W\d_]+)")
 
 
 def gate_unscaled_figure(slide_no, slide, findings):
@@ -636,7 +640,8 @@ def gate_unscaled_figure(slide_no, slide, findings):
                 continue
             match = QUANTITY.search(source_text(node))
             if match:
-                values.setdefault(match.group(2).lower(), []).append(float(match.group(1).replace(",", "")))
+                unit = match.group(2).lower()
+                values.setdefault(unit[:-1] if len(unit) > 2 and unit.endswith("s") else unit, []).append(float(match.group(1).replace(",", "")))
         for unit, found in values.items():
             if len(found) < 3 or min(found) <= 0:
                 continue
@@ -678,8 +683,8 @@ def gate_title_count(slide_no, slide, findings):
 
     Only a title that names both parts of a count is measured, and only against
     a set of peers the page actually draws - four panel headings, six rows, ten
-    cards. Where the named thing appears in none of them there is nothing to
-    count and the page passes.
+    cards. What the title counts, and how many of the set carry it, is read
+    (title-count-check): a set that is not what the title counts passes.
     """
     title = ""
     for node in text_nodes(slide):
@@ -694,33 +699,28 @@ def gate_title_count(slide_no, slide, findings):
     part, whole = _count_word(claim.group("part")), _count_word(claim.group("whole"))
     if not part or not whole or part > whole or whole < 2 or whole > 12:
         return
-    # The named thing: a capitalised word the title uses that is not its first.
-    words = re.findall(r"[A-Za-z][\w'’-]*", title)
-    terms = [word for word in words[1:] if word[0].isupper() and word.lower() not in TITLE_STOPWORDS]
-    if not terms:
-        return
     groups = {}
     for node in text_nodes(slide):
         role = str(node.get("role") or "")
         if role in TITLE_ROLES or role in SOURCE_ROLES:
             continue
-        groups.setdefault(role, []).append(source_text(node))
-    for term in terms:
-        for role, texts in groups.items():
-            if len(texts) != whole:
-                continue
-            found = sum(1 for text in texts if re.search(rf"\b{re.escape(term)}\b", text))
-            if not found or found == part:
-                continue
-            findings.append(finding(
-                slide_no, "TITLE_COUNT", {"title": title[:70], "term": term, "counted": found, "of": whole},
-                part,
-                f"The title says {claim.group(0)} and the page draws {found} of {whole} carrying "
-                f"\"{term}\". A reader checks a count like this without meaning to, in about a second, and a "
-                "title its own exhibit contradicts costs the page every other number on it. Count it off "
-                "the exhibit and rewrite whichever is wrong.",
-            ))
-            return
+        groups.setdefault(role, []).append(source_text(node).strip())
+    for role, texts in groups.items():
+        if len(texts) != whole:
+            continue
+        said = judged("title-count-check", {"title": title.strip(), "labels": texts}, None, slide_no)
+        if not said or said.get("verdict") != "disagrees":
+            continue
+        found = said.get("counted")
+        findings.append(finding(
+            slide_no, "TITLE_COUNT", {"title": title[:70], "counted": found, "of": whole},
+            part,
+            f"The title says {claim.group(0)} and the page draws {found:g} of {whole} carrying what it counts. "
+            "A reader checks a count like this without meaning to, in about a second, and a "
+            "title its own exhibit contradicts costs the page every other number on it. Count it off "
+            "the exhibit and rewrite whichever is wrong.",
+        ))
+        return
 
 
 def gate_heading_wraps(slide_no, slide, findings):

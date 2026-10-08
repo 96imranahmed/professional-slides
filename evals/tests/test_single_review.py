@@ -26,7 +26,8 @@ console.log(JSON.stringify({ claims: ledger.claims.map(c => c.slide + ':' + c.te
         # $1.34bn is shown as 1,337 ($m); the 85% bar is shown nowhere.
         self.assertEqual(result['findings'], [['85']])
         self.assertIn('floor:The weakest film is the highest floor', result['claims'])
-        self.assertNotIn('plain', result['pages'])
+        # Every sentence of three words or more is a statement to reproduce: what it asserts is the self-check's to read.
+        self.assertIn('plain:Records come from public trackers.', result['claims'])
         self.assertEqual(result['spine'], 3)
 
     def test_self_check_needs_a_current_verdict_for_each_page_with_claims(self):

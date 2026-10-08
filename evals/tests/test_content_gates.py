@@ -36,6 +36,7 @@ GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 from node_probe import example_scene  # noqa: E402
+from judgement_oracle import answering  # noqa: E402
 
 
 def text(role, body, **data):
@@ -156,31 +157,49 @@ class RestatementTests(unittest.TestCase):
 
 
 class PlanningVoiceTests(unittest.TestCase):
-    """The dot-dash, left on the page."""
+    """The dot-dash, left on the page. Whether a line's opening label is planning
+    language is a question (planning-label), answered here as a reader would."""
 
     def test_a_planning_label_on_a_sentence_is_reported(self):
         for line in ["Interpretation: the team can generate drama before a villain arrives.",
                      "Takeaway: both libraries support billion-dollar films.",
                      "So what: the order of introduction is not a quality verdict.",
                      "Key insight - responsibility connects the two brands."]:
-            with self.subTest(line=line):
+            with self.subTest(line=line), answering({"planning-label": "planning-label"}) as asked:
                 findings = run(page_gates.gate_planning_voice, 8, page([text("list-item", line)]))
+                self.assertEqual(asked, [("planning-label", line)])
                 self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
                 self.assertIn("Delete the label and keep the sentence", findings[0]["repair"])
+
+    def test_a_label_that_is_the_lines_content_is_left_alone(self):
+        with answering({"planning-label": "content"}) as asked:
+            self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", "Revenue: up 4% on the year.")])), [])
+        self.assertEqual(len(asked), 1)
 
     def test_a_caption_under_a_panel_is_the_pages_own_sentence(self):
         # A finding set under its panel is drawn as `insight-caption`; the gates
         # read it with the page's commentary, not as a label on the exhibit.
         self.assertIn("insight-caption", page_gates.COMMENTARY_ROLES)
-        findings = run(page_gates.gate_planning_voice, 8, page([text("insight-caption", "Interpretation: the cheaper line grows first.")]))
+        with answering({"planning-label": "planning-label"}):
+            findings = run(page_gates.gate_planning_voice, 8, page([text("insight-caption", "Interpretation: the cheaper line grows first.")]))
         self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
 
-    def test_the_same_words_inside_a_sentence_are_left_alone(self):
+    def test_a_line_with_no_label_is_not_asked_about(self):
         for line in ["The interpretation a reader brings decides which version they prefer.",
                      "Its takeaway is cheaper to state than to prove.",
                      "Note the eleven-month clock: it is the only one that cannot be recovered."]:
-            with self.subTest(line=line):
+            with self.subTest(line=line), answering({"planning-label": "planning-label"}) as asked:
                 self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", line)])), [])
+                self.assertEqual(asked, [])
+
+    def test_an_unanswered_question_holds_nothing_and_is_listed(self):
+        import judgements
+        judgements.load()
+        try:
+            self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", "Takeaway: both libraries support billion-dollar films.")])), [])
+            self.assertEqual([(q["kind"], q["where"]) for q in judgements.needed()], [("planning-label", ["8"])])
+        finally:
+            judgements.unload()
 
 
 class CaveatTests(unittest.TestCase):
@@ -194,9 +213,12 @@ class CaveatTests(unittest.TestCase):
                                   "earlier screen adaptations."),
                 text("list-item", "Dates establish an order. They do not establish artistic quality."),
                 text("list-item", "The comparison boundary is the two selected titles and nothing wider.")]
-        findings = run(page_gates.gate_caveat_heavy, 33, page(said))
+        caveats = {"verdict": "some-caveats", "caveats": ["l2", "l3", "l4"]}
+        with answering({"commentary-caveats": caveats}) as asked:
+            findings = run(page_gates.gate_caveat_heavy, 33, page(said))
         self.assertEqual([f["code"] for f in findings], ["CAVEAT_HEAVY"])
         self.assertGreater(findings[0]["measured"]["caveats"], page_gates.THRESHOLDS["caveats_max"])
+        self.assertEqual([line["id"] for line in asked[0][1]], ["l1", "l2", "l3", "l4"])
 
     def test_a_finding_in_contrastive_form_is_not_a_hedge(self):
         """The first version of this gate fired on the sharpest line in a
@@ -205,21 +227,14 @@ class CaveatTests(unittest.TestCase):
         said = [text("list-item", "Education does not decide the city; it decides the neighborhood."),
                 text("list-item", "The two state scales are set separately and are not comparable."),
                 text("list-item", "Pay bands overlap; the role, not the salary, separates the offers.")]
-        self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
+        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l2"]}}):
+            self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
 
-    def test_a_deck_that_qualifies_every_page_is_advised_and_its_footnotes_are_not_counted(self):
-        # No one page is CAVEAT_HEAVY, but one limit on every page is twice the rate strong decks keep to their body.
-        def deck(limit, role="list-item"):
-            return [{"id": f"p{i}", "readingTask": "chart-with-commentary", "nodes": [
-                text("action-title", "Peak trains run full while the off-peak runs half empty"),
-                text("list-item", "Off-peak journeys grew 16% where trains ran half-hourly and 4% where they ran hourly, across ten stations."),
-                text(role, limit)]} for i in range(1, 14)]
-        limit = "The survey is unverified and does not cover weekend riders."
-        dense = run(page_gates.gate_caveat_dense, deck(limit), list(range(13)))
-        self.assertEqual([(f["code"], page_gates.severity(f)["severity"]) for f in dense], [("CAVEAT_DENSE", "advisory")])
-        self.assertGreater(dense[0]["measured"], page_gates.THRESHOLDS["caveat_words_max"])
-        self.assertEqual(run(page_gates.gate_caveat_dense, deck(limit, "footnote-text"), list(range(13))), [])
-        self.assertEqual(run(page_gates.gate_caveat_dense, deck(limit)[:5], list(range(5))), [])  # too few pages to read a rate
+    def test_a_page_with_no_more_lines_than_the_caveats_it_may_carry_is_not_asked_about(self):
+        said = [text("list-item", "The survey is unverified."), text("list-item", "It does not cover weekend riders.")]
+        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l1", "l2"]}}) as asked:
+            self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
+        self.assertEqual(asked, [])
 
 
 class TableSchemaTests(unittest.TestCase):
@@ -292,7 +307,9 @@ class ContradictedShareTests(unittest.TestCase):
         self.assertEqual(run(page_gates.gate_contradicted_share, 16, self.page_with("38%")), [])
 
     def test_shares_written_as_words_are_read_too(self):
-        findings = run(page_gates.gate_contradicted_share, 16, self.page_with("Three quarters of institutions gate access"))
+        shares = {"verdict": "states-shares", "shares": [{"phrase": "Three quarters", "share": 0.75}]}
+        with answering({"shares-in-words": shares}):
+            findings = run(page_gates.gate_contradicted_share, 16, self.page_with("Three quarters of institutions gate access"))
         self.assertEqual([f["code"] for f in findings], ["CONTRADICTED_SHARE"])
 
     def test_a_page_that_publishes_no_denominator_is_not_measured(self):

@@ -290,13 +290,16 @@ class CompileRulesVersionTests(unittest.TestCase):
         return run_node(f'''
 import {{ compilePage }} from './skills/professional-slides/runtime/page-types.mjs';
 import {{ scaffoldPage }} from './skills/professional-slides/runtime/author-deck.mjs';
+import {{ judgementSession, withJudgements }} from './skills/professional-slides/runtime/judgements.mjs';
+// A reader of the page: "Depot plans" names another fact, not the inference an implication column draws.
+const reader = judgementSession({{ oracle: (kind, subject) => (kind === 'header-concludes' ? (subject === 'Depot plans' ? 'names-a-fact' : 'concludes') : null) }});
 const base = scaffoldPage('lookup');
 Object.assign(base, {{ title: 'Eastern costs a third more to run than the electric lines',
   why: 'A lookup page holds the measures a reader compares line by line', settles: {{ kind: 'structure', what: 'Line operating statistics for FY26' }},
   adds: 'The implication column says which line grows first and why' }});
 const edit = {edit};
 const page = edit(structuredClone(base));
-const run = (rules) => {{ try {{ const s = compilePage(page, 0, {{ rules }}); return {{ ok: true, advisories: (s.pageType.advisories || []).map((a) => a.split(':')[0]) }}; }} catch (e) {{ return {{ ok: false, error: e.message.split(' - ')[0] }}; }} }};
+const run = (rules) => withJudgements(reader, () => {{ try {{ const s = compilePage(page, 0, {{ rules }}); return {{ ok: true, advisories: (s.pageType.advisories || []).map((a) => a.split(':')[0]) }}; }} catch (e) {{ return {{ ok: false, error: e.message.split(' - ')[0] }}; }} }});
 const revision = (v) => ({{ workflow: 'existing_deck_revision', rulesVersion: v }});
 console.log(JSON.stringify({{ now: run(null), v1: run(revision(1)), v2: run(revision(2)), v3: run(revision(3)), fresh: run({{ workflow: 'new_deck', rulesVersion: 1 }}) }}));
 ''')

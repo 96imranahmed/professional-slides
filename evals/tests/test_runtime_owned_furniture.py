@@ -198,7 +198,7 @@ console.log(JSON.stringify({ ok: registryProblems({ a: { name: 'Annual report', 
 ''')
         self.assertEqual(result["ok"], [])
         self.assertEqual(result["bad"], ['source "reports": `short` is text'])
-        self.assertIn("{ name, short, url, status }", result["unknown"][0])
+        self.assertIn("{ name, short, url, status, retrieved }", result["unknown"][0])
         self.assertIn("written by the compiler", result["written"])
 
     def test_the_page_gate_counts_a_derived_source_like_a_typed_one(self):

@@ -8,7 +8,7 @@
 // a test holds each to the gate that enforces it (test_published_limits.py).
 // `measured` marks a capacity the renderer measures in pixels, given here as
 // the words of ordinary prose it holds: a guide to write to, not the test.
-import { INFERENCE_WORDS, PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
+import { PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
   railCapacity, calloutCapacity } from "./page-types.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
@@ -98,7 +98,7 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
     ...(type === "picture" ? { pictureRelief: { floorShare: { min: 1 - PICTURE_SHARE_MAX }, note: "bodyWords.min falls by the share of the body the photograph holds" } } : {}),
     // What a table on the page is held to that no count says: rules a run otherwise meets only by breaking them.
     ...(hi > 0 ? { table: {
-      implicationColumn: { headerHoldsOneOf: [...INFERENCE_WORDS], codes: ["GUTTER_UNEARNED"], note: "a column marked `implication: true` draws a \"therefore\" chevron before it, so its header names the inference, not another fact" },
+      implicationColumn: { codes: ["GUTTER_UNEARNED"], note: "a column marked `implication: true` draws a \"therefore\" chevron before it, so its header names the inference the row draws (\"What it means\", \"Verdict\", \"Recommended action\"), not another fact - read as a question of the copy (judge.mjs)" },
       numbers: { codes: ["BASIS_MISSING"], note: "a table that prints one recorded number by token prints every measurement by token - a change or a share computed from recorded measures is an analysis (`growth`, `gap`, `share` in <id>.analysis.json), printed by its own token - or declares `basis: { measures, role }` naming every measure it shows; a year, a period label, an ordinal and a count in a phrase are not measurements" } } } : {}),
     ...(type === "numbers" ? { tiles: { codes: ["TILES_ONE_MEASURE", "SHARES_IN_TILES"], note: "each tile, strip figure or grid item states a different measure: one measure at two dates or for two members is plotted on one axis (a trend, a ranking, or the page's own chart), not set in two tiles; a strip takes the height its tallest tile needs, so five tiles with sublabels hold short labels" } } : {}),
     ...(form ? perForm(form) : { forms: Object.fromEntries(forms.map((f) => [f, perForm(f)])) }),

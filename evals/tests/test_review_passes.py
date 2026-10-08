@@ -673,8 +673,7 @@ const missing = (pub) => storyReady(spec, { verdict: 'revise', missingAnalyses: 
 const m = (r) => { r.completeness.find((c) => c.check === 'missing').result = 'findings'; return r; };
 console.log(JSON.stringify({ eleven: S.validateStorylineReview(eleven, spec), twoUnranked: S.validateStorylineReview(twoUnranked, spec), flagged: S.validateStorylineReview(flagged, spec),
   oneUnranked: S.validateStorylineReview(oneUnranked, spec), unnamed: S.validateStorylineReview(unnamed, spec),
-  speculative: S.validateStorylineReview(m(missing('speculative')), spec), known: S.validateStorylineReview(m(missing('known')), spec),
-  declines: S.declinesIn('OpenAI leads reach; Anthropic leads enterprise. Neither has a provably superior capital structure, and the long run cannot be ranked.') }));
+  speculative: S.validateStorylineReview(m(missing('speculative')), spec), known: S.validateStorylineReview(m(missing('known')), spec) }));
 ''')
         self.assertTrue(any('at most 10 items' in e for e in result['eleven']), result['eleven'])
         self.assertTrue(any('answer check fails' in e for e in result['twoUnranked']), result['twoUnranked'])
@@ -684,7 +683,6 @@ console.log(JSON.stringify({ eleven: S.validateStorylineReview(eleven, spec), tw
         self.assertTrue(any('missingEvidence' in e for e in result['unnamed']))
         self.assertTrue(any('known to be public' in e for e in result['speculative']), result['speculative'])
         self.assertTrue(result['known'] and all('says revise' in e for e in result['known']), result['known'])
-        self.assertEqual(len(result['declines']), 2)
 
     def test_the_storyline_loop_verifies_changed_pages_and_converges(self):
         result = run_node(FIXTURES + '''
