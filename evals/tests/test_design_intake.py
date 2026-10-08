@@ -390,7 +390,7 @@ const css = `:root { --brand-primary: #021B41; --brand-accent: #3468AD; }
 body { font-family: "Open Sans", Arial, sans-serif; color: #333333; background: #FFFFFF; }
 p, li { font-family: "Open Sans", sans-serif; }
 h1, h2 { font-family: "Mylius Modern", Georgia, serif; color: #021B41; }
-.icon { font-family: Icons; }
+.icon::before { font-family: Icons; }
 a { color: #3468AD; } a:hover { color: #3468AD; } .band { background: #021B41; } .rule { border-color: #EEEEEE; }`;
 const html = '<html><head><link rel="stylesheet" href="/css/site.css"><style>.x { color: #3468AD }</style></head><body style="font-family: Open Sans"></body></html>';
 const fetcher = async (url) => ({ ok: true, url, text: async () => (url.endsWith('site.css') ? css : html) });
@@ -398,7 +398,7 @@ console.log(JSON.stringify({ design: siteDesign([css]), styles: stylesOf(html, '
 ''')
         design = result["design"]
         self.assertEqual(design["brand"], {"primary": "#021B41", "accent": "#3468AD"})
-        # The face text is set in most, and the face the headings take; an icon face is never a candidate.
+        # The face the running text is set in, and the face the headings take; a face set only on generated content draws icons.
         self.assertEqual(design["typography"], {"body": "Open Sans", "display": "Mylius Modern"})
         self.assertFalse(any("Icons" in face for face in design["evidence"]["faces"]))
         self.assertEqual(result["styles"]["linked"], ["https://www.example.com/css/site.css"])

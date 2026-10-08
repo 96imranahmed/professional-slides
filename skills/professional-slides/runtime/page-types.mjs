@@ -1166,11 +1166,7 @@ export const countOnlyTitle = (title) => { const t = String(title ?? ""); return
 // on it (and a point with no figure is named, not refused).
 const FIGURE = /(?<![\p{L}\d.,])(?:US\$|A\$|[$£€¥]|(?:AED|USD|EUR|GBP|SAR|QAR)\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:million|billion|trillion|percentage points|bn|mn|m|k|pp|pts|x)(?![\p{L}\d])|%|×)?/gu;
 export function pointFigure(text) {
-  const matches = [...String(text ?? "").matchAll(FIGURE)].map((m) => ({ figure: m[0].trim(), at: m.index })).filter(({ figure }) => hasPhrase(text, figure));
-  // "rose from £176m to £469m": the figure a range starts from is the base, not
-  // the finding, so the one it reaches is marked before it.
-  const from = ({ at }) => /\bfrom\s+$/i.test(String(text).slice(Math.max(0, at - 6), at));
-  const found = [...matches.filter((m) => !from(m)), ...matches.filter(from)].map((m) => m.figure);
+  const found = [...String(text ?? "").matchAll(FIGURE)].map((m) => m[0].trim()).filter((figure) => hasPhrase(text, figure));
   const unit = found.find((figure) => /[%×$£€¥]|[a-z]$|^(?:AED|USD|EUR|GBP|SAR|QAR)/i.test(figure));
   return unit ?? found.find((figure) => !/^(?:19|20)\d\d$/.test(figure)) ?? null;
 }

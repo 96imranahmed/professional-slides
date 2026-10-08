@@ -9,8 +9,6 @@
 
 const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace",
   "-apple-system", "blinkmacsystemfont", "inherit", "initial", "unset", "revert", "emoji", "math", "fangsong"]);
-// Faces that draw icons, not words: a stylesheet sets them on every icon, and they are counted as often as the brand face.
-const ICON_FAMILIES = /icon|awesome|material|glyph|symbol|dashicons|fontello|feather/i;
 
 /** A colour as `#RRGGBB` and its hue (degrees), saturation and lightness (0-1); null for what is not a colour. */
 function colourOf(match) {
@@ -26,30 +24,39 @@ function colourOf(match) {
   return { hex: `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`, hue: (hue + 360) % 360, sat, light };
 }
 
-/** Each colour a stylesheet writes, with how often: a brand's own custom property (`--brand-primary: #...`) counted five times. */
+/** Each colour a stylesheet writes, with how often it writes it. */
 function colourCounts(css) {
   const counts = new Map();
-  const add = (colour, weight) => { if (colour) counts.set(colour.hex, { ...colour, count: (counts.get(colour.hex)?.count ?? 0) + weight }); };
-  for (const m of css.matchAll(/(--[\w-]*(?:brand|primary|accent|main|theme)[\w-]*)\s*:\s*#([0-9a-f]{6}|[0-9a-f]{3})\b/gi)) add(colourOf({ hex: m[2] }), 4);
-  for (const m of css.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi)) add(colourOf({ hex: m[1] }), 1);
-  for (const m of css.matchAll(/rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/gi)) add(colourOf({ rgb: [m[1], m[2], m[3]] }), 1);
+  const add = (colour) => { if (colour) counts.set(colour.hex, { ...colour, count: (counts.get(colour.hex)?.count ?? 0) + 1 }); };
+  for (const m of css.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi)) add(colourOf({ hex: m[1] }));
+  for (const m of css.matchAll(/rgba?\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})/gi)) add(colourOf({ rgb: [m[1], m[2], m[3]] }));
   return [...counts.values()];
 }
 
-/** Each typeface a stylesheet sets text in, with how often: one it declares with @font-face counted three times over. */
+/**
+ * Each typeface a stylesheet sets text in, with how often, read off the rules'
+ * structure: the elements a rule styles say what the face is for - running
+ * text (body, paragraphs, list items, cells) or headings (h1 to h3) - and a
+ * face set only on `::before` or `::after` draws glyphs into generated
+ * content, which is how icon faces are drawn, not text. One a sheet declares
+ * with @font-face, and sets on text, counts three times over.
+ */
 function faceCounts(css) {
-  const counts = new Map(), heading = new Map(), running = new Map();
+  const counts = new Map(), heading = new Map(), running = new Map(), declared = new Map(), textual = new Set();
   const first = (list) => String(list).split(",").map((name) => name.trim().replace(/^["']|["']$/g, "").trim()).find((name) => name && !GENERIC_FAMILIES.has(name.toLowerCase()) && !/^var\(/i.test(name));
-  const add = (map, name, weight) => { if (name && !ICON_FAMILIES.test(name)) map.set(name, (map.get(name) ?? 0) + weight); };
-  for (const m of css.matchAll(/@font-face\s*\{[^}]*font-family\s*:\s*([^;}]+)/gi)) add(counts, first(m[1]), 3);
+  const add = (map, name, weight) => { if (name) map.set(name, (map.get(name) ?? 0) + weight); };
+  for (const m of css.matchAll(/@font-face\s*\{[^}]*font-family\s*:\s*([^;}]+)/gi)) add(declared, first(m[1]), 2);
   for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const family = /font-family\s*:\s*([^;}]+)/i.exec(m[2]);
-    if (!family || /@font-face/i.test(m[1])) continue;
-    add(counts, first(family[1]), 1);
-    if (/\bh[1-3]\b|heading|title|display|hero|headline/i.test(m[1])) add(heading, first(family[1]), 1);
-    if (/(^|[\s,>+~])(html|body|p|li|main|article|td)(?![\w-])/i.test(m[1])) add(running, first(family[1]), 1);
+    const family = /font-family\s*:\s*([^;}]+)/i.exec(m[2]), name = family ? first(family[1]) : null;
+    if (!name || /@font-face/i.test(m[1])) continue;
+    // A selector list styles text where any of its selectors ends on an element rather than on generated content.
+    if (m[1].split(",").some((selector) => !/::?(?:before|after)\s*$/i.test(selector.trim()))) textual.add(name);
+    add(counts, name, 1);
+    if (/(^|[\s,>+~])h[1-3](?![\w-])/i.test(m[1])) add(heading, name, 1);
+    if (/(^|[\s,>+~])(html|body|p|li|main|article|td)(?![\w-])/i.test(m[1])) add(running, name, 1);
   }
-  const ranked = (map) => [...map].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+  for (const [name, extra] of declared) if (counts.has(name)) add(counts, name, extra);
+  const ranked = (map) => [...map].filter(([name]) => textual.has(name)).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
   return { all: ranked(counts), heading: ranked(heading), running: ranked(running) };
 }
 

@@ -467,9 +467,8 @@ console.log(JSON.stringify({{
         self.assertIn("a lead of 14 words", result["wordy"])
         self.assertIn('"margin squeeze" is not in its lead or its text', result["lost"])
         self.assertIsNone(result["short"], "a paragraph under thirty words may run without a lead")
-        # The second paragraph is marked on the figure its range reaches, not the one it starts from.
-        self.assertIn("£512m", result["highlight"])
-        self.assertNotIn("£340m", result["highlight"])
+        # The second paragraph, which no phrase of the page's lands in, is marked on its own figure.
+        self.assertIn("£340m", result["highlight"])
         self.assertEqual(result["paragraphs"][1]["lead"], "Revenue passes its old level")
 
     def test_a_lead_is_drawn_as_a_bold_subheading_over_its_paragraph(self):
@@ -493,8 +492,8 @@ console.log(JSON.stringify({ leads: leads.map((n) => ({ text: n.text, bold: n.st
             self.assertLessEqual(lead["bottom"], text["y"], "the lead sits above its paragraph")
             self.assertLess(text["y"] - lead["bottom"], 12, "and close over it, not floating")
         self.assertEqual(result["leadX"], [t["x"] for t in result["texts"]])
-        # The figure the range reaches is lit in the first paragraph.
-        self.assertIn("£512m", result["texts"][0]["lit"])
+        # The first paragraph is lit on its own figure.
+        self.assertIn("£340m", result["texts"][0]["lit"])
 
     def test_a_panel_beside_prose_alone_holds_more_than_a_sentence(self):
         """Fifty-page review: a twenty-word statement set a 700px column of tint that was mostly empty."""
