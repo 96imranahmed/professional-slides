@@ -94,11 +94,12 @@ J.withJudgements(open, () => {
   J.judged('title-leads-with-gap', 'Leadership cannot be ranked on public evidence', null, 'p3');
   J.judged('tiles-one-measure', [{ id: 't1', value: '25.8%', label: 'Jan 2025 cohort retained' }, { id: 't2', value: '45%', label: 'Feb 2026 cohort retained' }], null, 'p7');
 });
-const { packet } = await J.stageJudgements(dir, [...open.pending.values()]);
+const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, [...open.pending.values()]);
 const [tiles, title] = packet.items;
-const answer = async (judgements, batch = packet.batch) => { await fs.writeFile(path.join(dir, 'judgements', 'answer.json'), JSON.stringify({ batch, judgements })); return J.recordAnswer(dir, 'deck'); };
+const answer = async (judgements, batch = packet.batch) => { await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch, judgements })); return J.recordAnswers(dir, 'deck'); };
 const good = [{ key: title.key, verdict: 'gap', reason: 'The title leads with what cannot be ranked.', quote: 'cannot be ranked' },
   { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'] }];
+const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
 const refused = {
   unknown: await answer([{ ...good[0], verdict: 'maybe' }, good[1]]),
   misquoted: await answer([{ ...good[0], quote: 'cannot rank them' }, good[1]]),
@@ -112,30 +113,80 @@ const recorded = await answer(good);
 const replay = await J.loadJudgements(dir, 'deck');
 const read = J.withJudgements(replay, () => J.judged('title-leads-with-gap', 'Leadership cannot be ranked on public evidence'));
 const edited = J.withJudgements(replay, () => J.judged('title-leads-with-gap', 'Leadership cannot yet be ranked on public evidence'));
-const packetLeft = await fs.access(path.join(dir, 'judgements', 'packet.json')).then(() => true, () => false);
-const prompt = await fs.readFile(path.join(dir, 'judgements', 'prompt.md'), 'utf8');
-const big = await J.stageJudgements(dir, Array.from({ length: 70 }, (_, i) => ({ key: `k${String(i).padStart(2, '0')}`, kind: 'title-count-only', subject: `The fleet is ${i} aircraft` })));
+const packetLeft = await fs.access(folder).then(() => true, () => false);
 await fs.rm(dir, { recursive: true, force: true });
-console.log(JSON.stringify({ refused: Object.fromEntries(Object.entries(refused).map(([k, v]) => [k, [v.recorded, v.problems.join(' | ')]])), storedBefore: stored,
-  recorded: recorded.recorded, read: read?.verdict, quote: read?.quote, edited, pendingAfter: replay.pending.size, packetLeft,
-  where: packet.items.map((item) => item.where), prompt: ['## title-leads-with-gap', '## tiles-one-measure', `"batch": "${packet.batch}"`, 'copied exactly'].map((said) => prompt.includes(said)),
-  big: [big.packet.items.length, big.left] }));
+console.log(JSON.stringify({ refused: Object.fromEntries(Object.entries(refused).map(([k, v]) => [k, [v.recorded, v.problems.join(' | '), v.refused.length]])), storedBefore: stored,
+  recorded: recorded.recorded, read: read?.verdict, quote: read?.quote, edited, pendingAfter: replay.pending.size, packetLeft, name: path.basename(folder),
+  where: packet.items.map((item) => item.where), prompt: ['## title-leads-with-gap', '## tiles-one-measure', `"batch": "${packet.batch}"`, 'copied exactly'].map((said) => prompt.includes(said)) }));
 """)
         for name, needle in (("unknown", 'verdict "maybe" is none of "gap", "finding"'), ("misquoted", "quotes the words of the subject"),
-                             ("stranger", 'names "t9"'), ("missing", "not answered"), ("twice", "answered twice"), ("stale", "the staged packet is")):
+                             ("stranger", 'names "t9"'), ("missing", "not answered"), ("twice", "answered twice"), ("stale", "the packet is")):
             with self.subTest(refusal=name):
-                recorded, problems = result["refused"][name]
-                self.assertEqual(recorded, 0)
+                recorded, problems, refused = result["refused"][name]
+                self.assertEqual((recorded, refused), (0, 1))
+                self.assertIn("packet-01: ", problems)
                 self.assertIn(needle, problems)
         self.assertIsNone(result["storedBefore"], "nothing is recorded from an answer with a problem")
         self.assertEqual(result["recorded"], 2)
         self.assertEqual([result["read"], result["quote"]], ["gap", "cannot be ranked"])
         self.assertIsNone(result["edited"], "a title edited since is asked again")
         self.assertEqual(result["pendingAfter"], 1)
-        self.assertFalse(result["packetLeft"])
+        self.assertFalse(result["packetLeft"], "a recorded packet's folder is removed")
+        self.assertEqual(result["name"], "packet-01")
         self.assertEqual(result["where"], [["p7"], ["p3"]])
         self.assertEqual(result["prompt"], [True] * 4)
-        self.assertEqual(result["big"], [60, 10])
+
+    def test_every_question_is_staged_at_once_and_each_packet_stands_on_its_own(self):
+        result = run_node(CORE + """
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'judgements-'));
+const ask = (n, from = 0) => Array.from({ length: n }, (_, i) => { const subject = `The fleet is ${i + from} aircraft`; return { key: J.judgementKey('title-count-only', subject), kind: 'title-count-only', subject }; });
+const first = await J.stageJudgements(dir, ask(130));
+const sizes = first.packets.map(({ packet }) => packet.items.length), names = first.packets.map(({ folder }) => path.basename(folder));
+// One packet answered, one answered wrongly, one not yet: the right one is recorded alone, the wrong one stays with its answer.
+const answer = async ({ folder, packet }, verdict) => fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch: packet.batch,
+  judgements: packet.items.map((item) => ({ key: item.key, verdict, reason: 'The title says how many and nothing more.', quote: verdict === 'count-only' ? item.subject : null })) }));
+await answer(first.packets[0], 'count-only');
+await answer(first.packets[1], 'maybe');
+const recorded = await J.recordAnswers(dir, 'deck');
+const batches = Object.fromEntries((await J.stagedPackets(dir)).map(({ folder, packet }) => [path.basename(folder), packet.batch]));
+const left = (await J.stagedPackets(dir)).map(({ folder, answered }) => [path.basename(folder), answered]);
+// Staged again over what is still open, plus ten new questions: the waiting packets keep their folders and batches, the new go after them.
+const replay = await J.loadJudgements(dir, 'deck');
+const again = await J.stageJudgements(dir, [...ask(130).filter((q) => !replay.verdicts.has(q.key)), ...ask(10, 500)]);
+const kept = again.packets.filter(({ folder, packet }) => batches[path.basename(folder)] === packet.batch).map(({ folder }) => path.basename(folder));
+// One question of a waiting packet answered elsewhere: that packet is no longer the open questions, and is staged afresh.
+const fewer = await J.stageJudgements(dir, [...ask(130).filter((q) => !replay.verdicts.has(q.key)).slice(1), ...ask(10, 500)]);
+const emptied = await J.stageJudgements(dir, []);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ sizes, names, recorded: [recorded.recorded, recorded.refused.map((f) => path.basename(f)), recorded.waiting, recorded.problems.length > 0], left,
+  again: again.packets.map(({ folder, packet }) => [path.basename(folder), packet.items.length]), fresh: again.fresh, kept,
+  fewer: fewer.packets.map(({ folder, packet }) => [path.basename(folder), packet.items.length]), emptied: emptied.packets.length }));
+""")
+        self.assertEqual(result["sizes"], [44, 44, 42], "as few packets as hold them, of even sizes")
+        self.assertEqual(result["names"], ["packet-01", "packet-02", "packet-03"])
+        self.assertEqual(result["recorded"], [44, ["packet-02"], 1, True])
+        self.assertEqual(result["left"], [["packet-02", True], ["packet-03", False]])
+        self.assertEqual(result["again"], [["packet-02", 44], ["packet-03", 42], ["packet-04", 10]])
+        self.assertEqual(result["fresh"], 1)
+        self.assertEqual(result["kept"], ["packet-02", "packet-03"], "a packet a reader may be answering keeps its folder and its batch")
+        self.assertEqual(result["fewer"], [["packet-03", 42], ["packet-04", 10], ["packet-05", 43]])
+        self.assertEqual(result["emptied"], 0, "with nothing open, nothing stays staged")
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class DeckQuestionTests(unittest.TestCase):
+    def test_a_question_about_the_whole_deck_waits_until_every_page_compiles(self):
+        # A validation run asked "does a page contradict the answer?" over the 43 pages that compiled, and again over all 49
+        # once the rest did: a question over part of the deck is asked twice.
+        result = run_node(CORE + """
+import { runContentGates } from './skills/professional-slides/runtime/gates/content_gates.mjs';
+const content = { schema: 'professional-slides.content/v1', question: 'How should Northvale grow its journeys?', answer: 'Add off-peak frequency first and reform fares last.',
+  pages: [{ id: 'p1', n: 1, claim: 'Off-peak frequency wins back lapsed riders first', settles: { kind: 'comparison', what: 'survey' }, adds: 'x', highlight: 'x' },
+          { id: 'p2', n: 2, claim: 'Northvale should reform fares first, before adding trains', settles: { kind: 'comparison', what: 'model' }, adds: 'x', highlight: 'x' }] };
+const asked = (options) => { const session = J.judgementSession(); J.withJudgements(session, () => runContentGates(content, options)); return [...session.pending.values()].filter((q) => q.kind === 'answer-contradicted').length; };
+console.log(JSON.stringify({ whole: asked({}), partial: asked({ uncomposed: new Set(['p3']) }) }));
+""")
+        self.assertEqual(result, {"whole": 1, "partial": 0})
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")
@@ -162,27 +213,112 @@ class PythonGateTests(unittest.TestCase):
         self.assertEqual(second["judgementsNeeded"], [])
 
 
+# A stand-in for the `claude` CLI judge.mjs --run calls: it reads the packet's prompt from stdin, answers every question with
+# its kind's passing verdict (quoting the subject where that verdict is quoted), and logs where and when it ran. Its first
+# answer is refused on purpose (a verdict no kind has), so the packet it was for must be asked again.
+FAKE_CLAUDE = r"""#!/usr/bin/env node
+const fs = require('node:fs');
+const prompt = fs.readFileSync(0, 'utf8');
+const passing = JSON.parse(fs.readFileSync(process.env.FAKE_PASSING, 'utf8'));
+const first = !fs.existsSync(process.env.FAKE_LOG);
+const words = (v) => (typeof v === 'string' ? (v.trim() ? [v] : []) : Array.isArray(v) ? v.flatMap(words) : v && typeof v === 'object' ? Object.values(v).flatMap(words) : []);
+const judgements = []; let kind = null, key = null;
+for (const line of prompt.split('\n')) {
+  if (line.startsWith('## ') && line !== '## Answer') kind = line.slice(3).trim();
+  else if (line.startsWith('### ')) key = line.slice(4).trim();
+  else if (line.startsWith('Subject: {') || line.startsWith('Subject: [') || line.startsWith('Subject: "')) {
+    if (!key) continue;
+    const [verdict, quoted] = passing[kind];
+    judgements.push({ key, verdict: first ? 'maybe' : verdict, reason: 'The stand-in reader answers each question so its rule passes.', quote: quoted ? words(JSON.parse(line.slice(9)))[0] : null });
+    key = null;
+  }
+}
+const batch = /"batch": "([0-9a-f]+)"/.exec(prompt)[1];
+const start = Date.now();
+while (Date.now() - start < 400) {}
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ start, end: Date.now(), cwd: fs.readdirSync('.').sort() }) + '\n');
+process.stdout.write(JSON.stringify({ type: 'result', result: JSON.stringify({ batch, judgements }) }));
+"""
+
+
 @unittest.skipUnless(NODE, "Node.js is not available")
 class JudgeCommandTests(unittest.TestCase):
-    def test_the_compile_lists_what_it_asked_and_judge_records_the_answers_until_none_is_open(self):
-        env = {**os.environ}
+    def deck(self, tmp):
+        pages = Path(tmp, "example.pages.json")
+        shutil.copy(EXAMPLE, pages)
+        shutil.copytree(EXAMPLE.parent / "assets", Path(tmp, "assets"))
+        return pages
+
+    def test_the_compile_lists_what_it_asked_and_judge_records_every_packet_answered_side_by_side(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = self.deck(tmp)
+            check = lambda: subprocess.run([NODE, str(AUTHOR), str(pages), "--check"], capture_output=True, text=True, timeout=600)
+            before = check()
+            staged = subprocess.run([NODE, str(JUDGE), str(pages)], capture_output=True, text=True, timeout=600)
+            folders = sorted(p.name for p in Path(tmp, "judgements").glob("packet-*"))
+            packets, done = answer_everything(NODE, pages)
+            after = check()
+            store = json.loads(Path(tmp, f"{json.loads(pages.read_text())['deck']['id']}.judgements.json").read_text())
+            left = Path(tmp, "judgements").exists()
+        self.assertIn("JUDGEMENTS_PENDING", before.stdout + before.stderr)
+        self.assertEqual(staged.returncode, 3, staged.stderr)
+        self.assertGreaterEqual(len(folders), 2, "every open question is staged at once, in as many packets as it takes")
+        self.assertIn("side by side", staged.stderr)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("JUDGEMENTS_PENDING", after.stdout + after.stderr)
+        self.assertEqual(after.returncode, 0, after.stderr[-1500:])  # every answer the passing one: the deck holds as before
+        self.assertEqual(len(store["verdicts"]), len({item["key"] for p in packets for item in p["items"]}))
+        self.assertTrue(all(len(p["items"]) <= 60 for p in packets))
+        self.assertIn("title-leads-with-gap", {item["kind"] for p in packets for item in p["items"]})
+        self.assertFalse(left, "with every question answered, nothing is left staged")
+
+    def test_run_asks_about_every_packet_at_once_each_in_a_clean_folder_and_asks_again_after_a_refusal(self):
+        from judgement_oracle import PASSING
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = self.deck(tmp)
+            bin_dir = Path(tmp, "bin")
+            bin_dir.mkdir()
+            fake = bin_dir / "claude"
+            fake.write_text(FAKE_CLAUDE)
+            fake.chmod(0o755)
+            log, table = Path(tmp, "calls.jsonl"), Path(tmp, "passing.json")
+            table.write_text(json.dumps({kind: [verdict, verdict in (KINDS[kind].get("quoteFor") or [])] for kind, verdict in PASSING.items()}))
+            env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{Path(NODE).parent}{os.pathsep}{os.environ.get('PATH', '')}", "FAKE_LOG": str(log), "FAKE_PASSING": str(table)}
+            done = subprocess.run([NODE, str(JUDGE), str(pages), "--run", "claude", "--parallel", "3"], capture_output=True, text=True, env=env, timeout=900)
+            calls = [json.loads(line) for line in log.read_text().splitlines()]
+            store = json.loads(Path(tmp, f"{json.loads(pages.read_text())['deck']['id']}.judgements.json").read_text())
+        self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+        self.assertIn("Answers refused, asked again", done.stderr)
+        # Packets ran side by side: some call started before another had ended.
+        overlapping = any(a is not b and a["start"] < b["end"] and b["start"] < a["end"] for a in calls for b in calls)
+        self.assertTrue(overlapping, calls)
+        # Each in a folder holding its packet's prompt and schema alone.
+        self.assertTrue(all(call["cwd"] == ["prompt.md", "schema.json"] for call in calls), calls)
+        self.assertTrue(store["verdicts"])
+        self.assertTrue(all(v.get("by", {}).get("backend") == "claude" for v in store["verdicts"].values()))
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class BackendDownTests(unittest.TestCase):
+    def test_a_backend_that_answers_nothing_is_said_in_its_own_words_and_not_asked_again(self):
+        # The first real `--run claude` met a CLI that was not logged in: it exited 1 every round, its reason was hidden behind
+        # "exited 1", and the deck was compiled six times for nothing.
         with tempfile.TemporaryDirectory() as tmp:
             pages = Path(tmp, "example.pages.json")
             shutil.copy(EXAMPLE, pages)
             shutil.copytree(EXAMPLE.parent / "assets", Path(tmp, "assets"))
-            check = lambda: subprocess.run([NODE, str(AUTHOR), str(pages), "--check"], capture_output=True, text=True, env=env, timeout=600)
-            before = check()
-            packets, staged = answer_everything(NODE, pages)
-            after = check()
-            store = json.loads(Path(tmp, f"{json.loads(pages.read_text())['deck']['id']}.judgements.json").read_text())
-        self.assertIn("JUDGEMENTS_PENDING", before.stdout + before.stderr)
-        self.assertTrue(packets, staged.stderr)
-        self.assertEqual(staged.returncode, 0, staged.stderr)
-        self.assertNotIn("JUDGEMENTS_PENDING", after.stdout + after.stderr)
-        self.assertEqual(after.returncode, 0, after.stderr[-1500:])  # every answer the passing one: the deck holds as before
-        self.assertEqual(len(store["verdicts"]), sum(len(p["items"]) for p in packets))
-        self.assertTrue(all(len(p["items"]) <= 60 for p in packets))
-        self.assertIn("title-leads-with-gap", {item["kind"] for p in packets for item in p["items"]})
+            bin_dir = Path(tmp, "bin")
+            bin_dir.mkdir()
+            fake = bin_dir / "claude"
+            fake.write_text('#!/bin/sh\ncat >/dev/null\necho \'{"type":"result","is_error":true,"result":"Not logged in \u00b7 Please run /login"}\'\nexit 1\n')
+            fake.chmod(0o755)
+            env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{Path(NODE).parent}{os.pathsep}{os.environ.get('PATH', '')}"}
+            done = subprocess.run([NODE, str(JUDGE), str(pages), "--run", "claude"], capture_output=True, text=True, env=env, timeout=600)
+            staged = sorted(p.name for p in Path(tmp, "judgements").glob("packet-*"))
+        self.assertEqual(done.returncode, 3, done.stderr[-1500:])
+        self.assertIn("Not logged in", done.stderr)
+        self.assertEqual(done.stderr.count("Round "), 1, "asked once, not round after round")
+        self.assertTrue(staged, "the packets stay staged for readers")
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")

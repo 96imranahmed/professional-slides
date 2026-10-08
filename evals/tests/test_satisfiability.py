@@ -114,7 +114,8 @@ console.log(JSON.stringify({ catalogue, out, others }));
         self.assertIn("Northvale", examples["deck"]["answer"])
         ids = [page["id"] for page in examples["pages"]]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertTrue(all("illustrative" in page["source"].lower() or "examples/assets" in page["source"] for page in examples["pages"]))
+        # Every source line names its source: a folder path is nothing a reader can look up (source-cites-pointer read one so).
+        self.assertTrue(all("illustrative" in page["source"].lower() for page in examples["pages"]))
 
 
 class ScaffoldTests(unittest.TestCase):

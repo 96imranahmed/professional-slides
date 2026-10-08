@@ -180,7 +180,9 @@ export function runContentGates(content, options = {}) {
   const standings = [];
   checkPages(findings, pages);
   checkDeckSpread(findings, pages, standings);
-  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content);
+  // The answer is read against every page's claim at once (answer-contradicted): asked of the whole deck, so not while a
+  // page has not compiled or composed - a question over part of the deck would be asked again over the rest.
+  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content, { whole: !options.uncomposed?.size });
   return {...report(content, findings, pages, options.deck), textCoverage: textCheck, standings};
 }
 
@@ -391,7 +393,7 @@ function openingPage(pages) {
 // the reader gets twenty proofs of things nobody promised. It is also the
 // cheapest place to catch it - before a page exists, against two fields the
 // author has already written.
-function checkAnswerCarried(findings, content, pages, standings = [], deck = content) {
+function checkAnswerCarried(findings, content, pages, standings = [], deck = content, { whole = true } = {}) {
   const answer = String(content.answer ?? "").trim();
   const question = String(content.question ?? "").trim();
   if (!answer || !question) {
@@ -462,7 +464,7 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
           + `The claims between them cover it, which means the reader can assemble it - but a deck leads with its answer rather than leaving it to be inferred. State it in the title of ${named}. `
           + "(A deck recorded under the current rules is held to the answer up front on its opening page instead; this deck hears that rule as an advisory.)") });
     }
-    const against = contradictions(answer, pages);
+    const against = whole ? contradictions(answer, pages) : [];
     if (against.length) {
       findings.push(finding(against[0].page, "CONTENT_ANSWER_CONTRADICTED",
         { answer: answer.slice(0, 70), pages: against.slice(0, 3) }, "one answer, or a condition on it",

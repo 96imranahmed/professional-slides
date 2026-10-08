@@ -28,7 +28,8 @@ const DEFINITIONS = readJsonSync(new URL("./judgement-kinds.json", import.meta.u
 export const JUDGEMENT_KINDS = Object.freeze(DEFINITIONS.kinds);
 export const JUDGEMENTS_SCHEMA = "professional-slides.judgements/v1";
 export const PACKET_DIR = "judgements";
-// A packet holds this many questions at most: a reader answers a short list well, and the rest follow in the next packet.
+// A packet holds this many questions at most: a reader answers a short list well, and a deck's questions are split across
+// packets that fresh readers answer side by side.
 export const PACKET_ITEMS_MAX = 60;
 
 /** `value` with every object's keys in sorted order: the one text a key is hashed from (gates/judgements.py canonical). */
@@ -187,51 +188,71 @@ export function judgementPrompt(packet) {
     `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null.\n`;
 }
 
-/**
- * The pending questions staged as a packet in <dir>/judgements/: packet.json
- * (the questions, keyed), prompt.md, schema.json, and an images/ folder where
- * a question is about a picture. At most PACKET_ITEMS_MAX questions; the rest
- * wait for the next packet. Returns the packet and how many are left.
- */
-export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } = {}) {
-  const folder = path.join(dir, PACKET_DIR);
-  await fs.mkdir(folder, { recursive: true });
-  await fs.rm(path.join(folder, "images"), { recursive: true, force: true });
-  const items = [];
-  for (const { key, kind, subject, context, where, image } of [...requests].sort((a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key)).slice(0, max)) {
-    // A question about a picture carries a copy of it in the packet, named by the question's key.
-    let staged = null;
-    if (image) {
-      staged = `images/${key}${path.extname(image).toLowerCase() || ".jpg"}`;
-      await fs.mkdir(path.join(folder, "images"), { recursive: true });
-      await fs.copyFile(image, path.join(folder, staged));
-    }
-    items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}) });
+/** The packets staged in <dir>/judgements/, in order: `{ folder, packet, answered }`, `answered` where an answer.json waits beside it. */
+export async function stagedPackets(dir) {
+  const root = path.join(dir, PACKET_DIR);
+  const names = (await fs.readdir(root, { withFileTypes: true }).catch(() => [])).filter((entry) => entry.isDirectory() && /^packet-\d+$/.test(entry.name)).map((entry) => entry.name).sort();
+  const found = [];
+  for (const name of names) {
+    const folder = path.join(root, name);
+    const packet = await fs.readFile(path.join(folder, "packet.json"), "utf8").then(JSON.parse, () => null);
+    if (packet) found.push({ folder, packet, answered: await fs.access(path.join(folder, "answer.json")).then(() => true, () => false) });
   }
-  const packet = { schema: JUDGEMENTS_SCHEMA, batch: createHash("sha256").update(items.map((item) => item.key).join("\n")).digest("hex").slice(0, 16), items };
-  await fs.writeFile(path.join(folder, "packet.json"), `${JSON.stringify(packet, null, 1)}\n`);
-  await fs.writeFile(path.join(folder, "prompt.md"), judgementPrompt(packet));
-  await fs.writeFile(path.join(folder, "schema.json"), `${JSON.stringify(answerSchema(items), null, 1)}\n`);
-  return { packet, folder, left: Math.max(0, requests.length - items.length) };
+  return found;
 }
 
 /**
- * The answer to the staged packet (<dir>/judgements/answer.json, or `file`)
- * checked against it and recorded in the deck's judgements file: every
- * question answered once, each verdict one of its kind's, each quote words of
- * its subject. Nothing is recorded from an answer with a problem. Returns
- * `{ recorded, problems }`; with no answer waiting, `{ recorded: 0, problems: [] }`.
+ * Every pending question staged at once, in as few packets of
+ * PACKET_ITEMS_MAX at most as hold them, of even sizes, each in its own folder (judgements/packet-01/, packet-02/, ...) with
+ * its packet.json, prompt.md, schema.json and, where a question is about a
+ * picture, images/. The packets are independent, so fresh readers answer them
+ * side by side. A packet already staged whose questions are all still open is
+ * kept as it is - a reader may be answering it now - and one that is not is
+ * removed, its open questions staged again with the rest. Returns `{ packets,
+ * fresh }`: every packet waiting, and how many were staged by this call.
  */
-export async function recordAnswer(dir, stem, { file = null, by = null } = {}) {
-  const folder = path.join(dir, PACKET_DIR), answerFile = file ?? path.join(folder, "answer.json");
-  let answer;
-  try { answer = JSON.parse(await fs.readFile(answerFile, "utf8")); }
-  catch (error) { if (error.code === "ENOENT") return { recorded: 0, problems: [] }; return { recorded: 0, problems: [`${answerFile} is not valid JSON`] }; }
-  let packet;
-  try { packet = JSON.parse(await fs.readFile(path.join(folder, "packet.json"), "utf8")); }
-  catch { return { recorded: 0, problems: [`${answerFile} answers no staged packet: run judge.mjs to stage the questions first`] }; }
+export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } = {}) {
+  const root = path.join(dir, PACKET_DIR);
+  await fs.mkdir(root, { recursive: true });
+  const open = new Map(requests.map((request) => [request.key, request]));
+  const kept = [];
+  for (const staged of await stagedPackets(dir)) {
+    if (staged.packet.items.every((item) => open.has(item.key))) { kept.push(staged); for (const item of staged.packet.items) open.delete(item.key); }
+    else await fs.rm(staged.folder, { recursive: true, force: true });
+  }
+  let number = Math.max(0, ...kept.map(({ folder }) => Number(path.basename(folder).slice("packet-".length))));
+  const rest = [...open.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
+  // As few packets as `max` allows, of even sizes, so readers working side by side finish together.
+  const size = rest.length ? Math.ceil(rest.length / Math.ceil(rest.length / max)) : max;
+  const fresh = [];
+  for (let at = 0; at < rest.length; at += size) {
+    number += 1;
+    const folder = path.join(root, `packet-${String(number).padStart(2, "0")}`);
+    await fs.mkdir(folder, { recursive: true });
+    const items = [];
+    for (const { key, kind, subject, context, where, image } of rest.slice(at, at + size)) {
+      // A question about a picture carries a copy of it in the packet, named by the question's key.
+      let staged = null;
+      if (image) {
+        staged = `images/${key}${path.extname(image).toLowerCase() || ".jpg"}`;
+        await fs.mkdir(path.join(folder, "images"), { recursive: true });
+        await fs.copyFile(image, path.join(folder, staged));
+      }
+      items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}) });
+    }
+    const packet = { schema: JUDGEMENTS_SCHEMA, batch: createHash("sha256").update(items.map((item) => item.key).join("\n")).digest("hex").slice(0, 16), items };
+    await fs.writeFile(path.join(folder, "packet.json"), `${JSON.stringify(packet, null, 1)}\n`);
+    await fs.writeFile(path.join(folder, "prompt.md"), judgementPrompt(packet));
+    await fs.writeFile(path.join(folder, "schema.json"), `${JSON.stringify(answerSchema(items), null, 1)}\n`);
+    fresh.push({ folder, packet, answered: false });
+  }
+  return { packets: [...kept, ...fresh], fresh: fresh.length };
+}
+
+/** Every problem with one packet's answer, as sentences: every question answered once, a verdict of its kind, quotes of its subject. */
+function packetProblems(packet, answer) {
   const problems = [];
-  if (answer?.batch !== packet.batch) problems.push(`the answer is for batch "${answer?.batch}", and the staged packet is "${packet.batch}": answer the packet staged now`);
+  if (answer?.batch !== packet.batch) problems.push(`the answer is for batch "${answer?.batch}", and the packet is "${packet.batch}": answer the packet staged in this folder`);
   const given = new Map();
   for (const entry of Array.isArray(answer?.judgements) ? answer.judgements : []) {
     if (given.has(entry?.key)) problems.push(`${entry.key}: answered twice`);
@@ -239,17 +260,39 @@ export async function recordAnswer(dir, stem, { file = null, by = null } = {}) {
   }
   for (const key of given.keys()) if (!packet.items.some((item) => item.key === key)) problems.push(`${key}: no such question in the packet`);
   for (const item of packet.items) problems.push(...(given.has(item.key) ? answerProblems(item, given.get(item.key)) : [`${item.key} (${item.kind}): not answered`]));
-  if (problems.length) return { recorded: 0, problems };
+  return { problems, given };
+}
+
+/**
+ * The answers waiting in the staged packets' folders (answer.json beside each
+ * packet.json), each checked against its packet and recorded in the deck's
+ * judgements file. A packet is recorded whole or not at all: one whose answer
+ * has a problem is left staged with its answer, and the problems are returned
+ * under its folder's name; the others are recorded and their folders removed.
+ * Returns `{ recorded, problems, refused, waiting }`: `refused`, the folders
+ * whose answers were not recorded; `waiting`, the packets still without one.
+ */
+export async function recordAnswers(dir, stem, { by = null } = {}) {
   const store = await readJudgementStore(dir, stem);
-  const at = new Date().toISOString();
-  for (const item of packet.items) {
-    const { key: _key, ...said } = given.get(item.key);
-    store.verdicts[item.key] = { kind: item.kind, version: JUDGEMENT_KINDS[item.kind].version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+  const at = new Date().toISOString(), problems = [], refused = [];
+  let recorded = 0, waiting = 0;
+  for (const { folder, packet, answered } of await stagedPackets(dir)) {
+    if (!answered) { waiting += 1; continue; }
+    const name = path.basename(folder);
+    let answer;
+    try { answer = JSON.parse(await fs.readFile(path.join(folder, "answer.json"), "utf8")); }
+    catch { problems.push(`${name}/answer.json is not valid JSON`); refused.push(folder); continue; }
+    const checked = packetProblems(packet, answer);
+    if (checked.problems.length) { problems.push(...checked.problems.map((problem) => `${name}: ${problem}`)); refused.push(folder); continue; }
+    for (const item of packet.items) {
+      const { key: _key, ...said } = checked.given.get(item.key);
+      store.verdicts[item.key] = { kind: item.kind, version: JUDGEMENT_KINDS[item.kind].version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+    }
+    recorded += packet.items.length;
+    await fs.rm(folder, { recursive: true, force: true });
   }
-  await fs.writeFile(judgementStorePath(dir, stem), `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: store.verdicts }, null, 1)}\n`);
-  await fs.rm(answerFile, { force: true });
-  await fs.rm(path.join(folder, "packet.json"), { force: true });
-  return { recorded: packet.items.length, problems: [] };
+  if (recorded) await fs.writeFile(judgementStorePath(dir, stem), `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: store.verdicts }, null, 1)}\n`);
+  return { recorded, problems, refused, waiting };
 }
 
 /** The pending questions of a session, as a finding: JUDGEMENTS_PENDING, with how many of each kind and where. */
@@ -259,5 +302,5 @@ export function pendingFinding(session, { pagesFile = "<id>.pages.json" } = {}) 
   const kinds = Object.entries(open.reduce((n, item) => ({ ...n, [item.kind]: (n[item.kind] ?? 0) + 1 }), {})).map(([kind, count]) => `${kind} ${count}`);
   return { code: "JUDGEMENTS_PENDING", severity: "advisory", measured: { pending: open.length, kinds: Object.fromEntries(kinds.map((k) => k.split(" ")).map(([k, v]) => [k, Number(v)])) },
     pages: [...new Set(open.flatMap((item) => item.where))].slice(0, 40),
-    repair: `${open.length} question${open.length === 1 ? "" : "s"} the rules ask of the copy ${open.length === 1 ? "is" : "are"} not answered yet (${kinds.join(", ")}), so the rules that ask ${open.length === 1 ? "it do" : "them do"} not hold. Run node runtime/judge.mjs ${pagesFile}: give its prompt to a fresh model, save the answer and run it again until it exits 0. Delivery refuses a deck with questions open` };
+    repair: `${open.length} question${open.length === 1 ? "" : "s"} the rules ask of the copy ${open.length === 1 ? "is" : "are"} not answered yet (${kinds.join(", ")}), so the rules that ask ${open.length === 1 ? "it do" : "them do"} not hold. Run node runtime/judge.mjs ${pagesFile}: it stages them as packets of at most ${PACKET_ITEMS_MAX}, each answered by its own fresh model, side by side (or --run claude), and records the answers when run again, until it exits 0. Delivery refuses a deck with questions open` };
 }

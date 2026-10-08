@@ -1185,7 +1185,8 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
       // The mark a bare chart's own finding names (provenMarks) goes with every alternative that draws it: a form that fits is not offered as a chart still bare.
       marks: (target) => marks.get(String(target.id)) ?? null, marked: withMarks, marksDrawn: (slides) => slides.length > 0 && slides.every((slide) => pageChartAnnotated(slide) !== false) && slides.some((slide) => pageChartAnnotated(slide) === true),
       localFindings: (variant, deck, pages) => { const swap = (list) => (list || []).map((page) => pages.get(String(page?.id)) ?? page);
-        const found = localFindings({ doc: { ...doc, pages: swap(doc.pages), appendix: swap(doc.appendix) }, structural: variant, deck, spec: variant, insights, uncomposed: new Set(), uncompiled: new Set() });
+        // The pages that did not compile are missing from the variant too: the rules read over the whole deck are told so, and wait.
+        const found = localFindings({ doc: { ...doc, pages: swap(doc.pages), appendix: swap(doc.appendix) }, structural: variant, deck, spec: variant, insights, uncomposed: new Set(), uncompiled: new Set(uncompiled) });
         return [...found.depends, ...found.design, ...found.kept, ...found.copy].filter((f) => f.id !== undefined && classOf(f.code) === "P"); },
       // The structure rules a swap would newly break: the contract and the plan's gates on the swapped deck, and the page's architecture in PAGE_SHAPE_FLAT.
       structure: (id, slide) => { const after = [...declaredStructure(swapped(id, slide), { planOf }).findings, ...shapeStructure(shapesWith({ id, slide }), { airy }).findings];

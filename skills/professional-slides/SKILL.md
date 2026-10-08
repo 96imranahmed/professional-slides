@@ -63,7 +63,7 @@ The slides the request does not name are carried into the new file byte for byte
 - A form is never chosen for variety against the claim; among equals the plan takes the deck's draw. [Design systems](references/theming.md#design-systems)
 - A recognisable subject carries its pictures and logos; declared `players` are introduced before they are compared. [Make every exhibit earn its page](references/design.md#make-every-exhibit-earn-its-page)
 - Status red, amber and green mark a state or a verdict, never a series or decoration. [Status colour](references/design.md#status-colour)
-- At `JUDGEMENTS_PENDING` run `node runtime/judge.mjs <id>.pages.json` (`--draft` at the spine, `--fetch-assets` for photos) until exit 0, each packet answered by a fresh reader or `--run claude`; delivery refuses open questions.
+- At `JUDGEMENTS_PENDING`, `node runtime/judge.mjs <id>.pages.json` (`--draft` at the spine, `--fetch-assets` for photos) until exit 0, packets answered in parallel by fresh readers or `--run claude`; delivery refuses open questions.
 - Use subagents where the harness has them: research by workstream, copy by section, a fresh critic or reviewer for every pass. [Work in parallel](references/storylining.md#work-in-parallel-with-subagents)
 
 ## Hosts

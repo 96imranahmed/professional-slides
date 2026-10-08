@@ -13,7 +13,7 @@ node runtime/author-deck.mjs --types | --schema [<type> | deck] | --example <typ
 node runtime/author-deck.mjs [<id>.pages.json] --scaffold <type>[/<form>] [--evidence <insight-id>] [--id <page-id>]
 node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
 node runtime/analysis.mjs <id>.pages.json [--catalogue]
-node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run claude|codex] [--model m] [--timeout seconds]
+node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--run claude|codex [--parallel n]] [--model m] [--timeout seconds]
 node runtime/storyline.mjs [merge] <id>.deck.json out/ [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]
 node runtime/build-deck.mjs <id>.deck.json out/ [--no-fetch] [--no-render] [--preflight]
 node runtime/deliver-deck.mjs <id>.deck.json out/ [--reviewer auto|codex|claude|packet] [--model m]
@@ -99,7 +99,7 @@ asset-needs.mjs    what the build would fetch for a deck, the choices, and the d
 table-variants.mjs the table variants a deck may name, in the component gallery's order
 claims.mjs         the claim ledger (claims.json) for the author's self-check, and its validation
 judgements.mjs     the questions a rule asks of the copy (judgement-kinds.json) in place of a list of words: asked of a model once, recorded in <id>.judgements.json under a key of the kind, its version, the subject and the context, and replayed; an unanswered one holds nothing and is listed (JUDGEMENTS_PENDING); gates/judgements.py reads the same file by the same key
-judge.mjs          the questions the compile asked and no judgement answers, staged in judgements/ for a fresh model (or `--run`), its answer checked and recorded until none is open
+judge.mjs          the questions the compile asked and no judgement answers, staged at once in judgements/packet-NN/ for fresh models to answer side by side (or `--run`, several at a time), each answer checked and recorded until none is open
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
 gates/gate_config.py    the thresholds, the weight floors, the code tables (GATE_CODES, ADVISORY_CODES, COMPOSE_CODES), severity rules and the scene readers every gate shares
 gates/render_gates.py   the page's own gates: ink and bands on the render, and the title, type, measure, words and pictures

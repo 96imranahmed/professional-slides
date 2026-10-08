@@ -72,15 +72,16 @@ def passing(item) -> dict:
 
 
 def answer_everything(node, pages, *flags, rounds=6, answer=passing):
-    """Run judge.mjs on a pages file and answer each packet it stages - each question with `answer(item)` - until it
+    """Run judge.mjs on a pages file and answer every packet it stages - each question with `answer(item)` - until it
     exits 0; returns the packets answered and the last run. A deck compiled after it holds every rule that reads copy."""
-    folder, packets = Path(pages).parent / "judgements", []
+    root, packets = Path(pages).parent / "judgements", []
     run = lambda: subprocess.run([str(node), str(JUDGE), str(pages), *flags], capture_output=True, text=True, timeout=600)
-    done = run()
-    while done.returncode == 3 and len(packets) < rounds:
-        packet = json.loads((folder / "packet.json").read_text())
-        packets.append(packet)
-        said = [{"key": item["key"], **answer(item)} for item in packet["items"]]
-        (folder / "answer.json").write_text(json.dumps({"batch": packet["batch"], "judgements": said}))
-        done = run()
+    done, round_ = run(), 0
+    while done.returncode == 3 and round_ < rounds:
+        for folder in sorted(root.glob("packet-*")):
+            packet = json.loads((folder / "packet.json").read_text())
+            packets.append(packet)
+            said = [{"key": item["key"], **answer(item)} for item in packet["items"]]
+            (folder / "answer.json").write_text(json.dumps({"batch": packet["batch"], "judgements": said}))
+        done, round_ = run(), round_ + 1
     return packets, done
