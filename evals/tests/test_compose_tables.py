@@ -216,7 +216,14 @@ console.log('{}');
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable, paginateTable} from './evals/support/compose.mjs';
-const t=styleTable({columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]});
+import {judgementSession, withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
+// What each column gives its rows is read (column-reads): here a reader says the status column states a state of each row
+// and the percentages are progress. Unanswered, the words stay words.
+const reader=judgementSession({oracle:(kind,subject)=>kind!=='column-reads'?null:subject.header==='Overall status'?{verdict:'status',states:[{cell:'At risk',value:'negative'},{cell:'On track',value:'positive'}]}
+  :subject.header==='% complete'?'progress':'facts'});
+const table={columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]};
+const t=withJudgements(reader,()=>styleTable(table));
+assert.deepEqual(styleTable(table).rows[0][2],'At risk');
 assert.equal(t.rows[0][0].sectionNumber,1);assert.equal(t.rows[0][0].surface,'plain');
 assert.deepEqual(t.rows[0][2],{type:'rag',value:'at-risk',text:'At risk'});
 assert.deepEqual(t.rows[0][3],{type:'progress',value:40});

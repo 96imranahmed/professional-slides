@@ -141,13 +141,17 @@ console.log(JSON.stringify({ first: tell(first), second: tell(second), declared:
         result = run_node(PLANTED + '''
 const only = structuredClone(clean);
 delete page(only, 'p01').points;
-const run = await authorDeck(only, { baseDir: dir });
+// A reader quotes the answer's first clause as its verdict (answer-lead).
+const { judgementSession, withJudgements } = await import('./skills/professional-slides/runtime/judgements.mjs');
+const reader = judgementSession({ oracle: (kind, answer) => (kind === 'answer-lead' ? { verdict: 'verdict', lead: answer.split(/[.;:,]/)[0] } : null) });
+const run = await withJudgements(reader, () => authorDeck(only, { baseDir: dir }));
 console.log(JSON.stringify({ blocking: tell(run), summary: run.standings.find((s) => s.code === 'NO_SUMMARY').line,
-  answer: run.standings.filter((s) => s.code === 'CONTENT_ANSWER_UNCARRIED').map((s) => s.state) }));
+  answer: run.standings.filter((s) => s.code === 'CONTENT_ANSWER_UNCARRIED').map((s) => [s.key, s.state]) }));
 ''')
         self.assertEqual([(f["code"], f["id"]) for f in result["blocking"]], [("COMPILE", "p01")])
         self.assertIn("present: ok", result["summary"])
-        self.assertEqual(result["answer"], ["ok", "ok", "ok"])  # the titles' coverage, the opening title's lead, and its share of the whole answer
+        # The titles' coverage, the opening title's lead, and its share of the whole answer.
+        self.assertEqual(sorted(result["answer"]), [["coverage", "ok"], ["lead", "ok"], ["title", "ok"]])
 
     def test_a_page_that_does_not_compile_still_answers_for_what_it_rests_on(self):
         # Dependencies are read from the page as written, so a compile refusal on a page does not hold back

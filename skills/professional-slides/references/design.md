@@ -215,7 +215,7 @@ This is the one statement of the rule; other references link here. Status red, a
 
 | A cell or mark that states | The runtime draws it as |
 | --- | --- |
-| a delivery status or an adjudication: on track, behind, at risk, wins, ties, loses | a state pill: scorecard form `rag`, or a column of cells of `type: "rag"`; the composer pills those words on its own |
+| a delivery status or an adjudication: on track, behind, at risk, wins, ties, loses | a state pill: scorecard form `rag`, or a column of cells of `type: "rag"`; the composer pills a column a model reads as a status on its own (`column-reads`) |
 | a traffic-light judgement | scorecard form `lights` |
 | a verdict in words: Cleared, Missed | a text cell with `tone: "positive"` or `"negative"`, the word kept so colour is supplementary |
 | met or missed, yes or no against a criterion | a check or a cross (scorecard form `check` or `binary`; a `checklist` point's `state`) |

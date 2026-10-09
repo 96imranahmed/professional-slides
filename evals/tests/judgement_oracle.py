@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -46,12 +47,14 @@ def answering(answers):
 
 
 # The verdict of each kind under which its rule refuses nothing: what a test's reader answers when the answer is not the point.
-PASSING = {"column-judges": "states-facts", "prose-alternatives": "one-argument", "row-is-total": "not-total", "axis-measures-time": "not-time",
+PASSING = {"column-reads": "facts", "prose-alternatives": "one-argument", "row-is-total": "not-total", "axis-measures-time": "not-time",
            "header-concludes": "concludes", "pill-states-status": "status", "heading-says-snapshots": "says-snapshots",
            "tiles-one-measure": "different-measures", "title-leads-with-gap": "finding", "title-count-only": "compares",
            "heading-states-result": "describes", "qualification-says-approximate": "approximate", "answer-contradicted": "consistent",
            "source-cites-pointer": "names-source", "planning-label": "content", "commentary-caveats": "no-caveats",
-           "shares-in-words": "no-shares", "title-count-check": "agrees", "picture-shows": "shows", "file-is-logo": "logo"}
+           "shares-in-words": "no-shares", "title-count-check": "agrees", "picture-shows": "shows", "file-is-logo": "logo",
+           "answer-lead": "no-verdict", "claims-repeat": "distinct", "same-quantity": "different", "number-replaced-by": "not-replaced",
+           "commentary-restates": "adds"}
 
 
 def _words(value):
@@ -69,6 +72,45 @@ def passing(item) -> dict:
     verdict = PASSING[item["kind"]]
     quoted = verdict in (judgements.KINDS[item["kind"]].get("quoteFor") or [])
     return {"verdict": verdict, "reason": "The fixture's reader answers each question so its rule passes.", **({"quote": _words(item["subject"])[0]} if quoted else {})}
+
+
+def _quantity(things, said):
+    """The quantity a passage states, as a fixture's reader reads it: the name of the first of `things` - (pattern, name)
+    pairs - whose pattern the passage matches, read without case; None where it names none of them."""
+    return next((name for pattern, name in things if re.search(pattern, said, re.I)), None)
+
+
+def reading_quantities(things, otherwise=passing):
+    """An `answer` for answer_everything that reads numbers as the model would for a fixture: two passages state one
+    quantity where they state the same one of `things`, and the number that replaced another is the first that states its
+    quantity. Every other question is answered by `otherwise`."""
+    def answer(item):
+        subject, reason = item["subject"], {"reason": "The fixture's reader reads what each passage states."}
+        if item["kind"] == "same-quantity":
+            a, b = (_quantity(things, part["said"]) for part in subject)
+            return {"verdict": "same" if a and a == b else "different", **reason}
+        if item["kind"] == "number-replaced-by":
+            want = _quantity(things, subject["number"]["said"])
+            by = next((number["id"] for number in subject["numbers"] if want and _quantity(things, number["said"]) == want), None)
+            return {"verdict": "replaced", "by": [by], **reason} if by else {"verdict": "not-replaced", **reason}
+        return otherwise(item)
+    return answer
+
+
+def quantity_reader_js(things):
+    """The same reader for a probe that compiles in-process: JavaScript defining `quantityReader`, a judgement session
+    (runtime/judgements.mjs) answering same-quantity and number-replaced-by as reading_quantities does, and nothing else."""
+    return f"""
+import {{ judgementSession as quantitySession }} from './skills/professional-slides/runtime/judgements.mjs';
+const QUANTITIES = {json.dumps(things)}.map(([pattern, name]) => [new RegExp(pattern, 'i'), name]);
+const quantityOf = (said) => QUANTITIES.find(([pattern]) => pattern.test(said))?.[1] ?? null;
+const quantityReader = () => quantitySession({{ oracle: (kind, subject) => {{
+  if (kind === 'same-quantity') {{ const [a, b] = subject.map((part) => quantityOf(part.said)); return a && a === b ? 'same' : 'different'; }}
+  if (kind !== 'number-replaced-by') return null;
+  const want = quantityOf(subject.number.said), by = subject.numbers.find((number) => want && quantityOf(number.said) === want);
+  return by ? {{ verdict: 'replaced', by: [by.id] }} : 'not-replaced';
+}} }});
+"""
 
 
 def answer_everything(node, pages, *flags, rounds=6, answer=passing):

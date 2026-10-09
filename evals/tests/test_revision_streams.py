@@ -33,6 +33,7 @@ from pathlib import Path
 
 from node_probe import HAS_PILLOW, HAS_PPTX, HAS_RENDERER, NODE, ROOT, RUNTIME, RUNTIME_PYTHON, run_node
 from test_revision_carry import CarriedDeck, DONUT, IMPORT, last_json, load, sh
+from judgement_oracle import answer_everything, reading_quantities
 
 PYTHON = RUNTIME_PYTHON or sys.executable
 BENCH = ROOT / "evals" / "point-change"
@@ -102,11 +103,23 @@ NETWORK = {"id": "s03", "sourceSlide": 3, "type": "composition", "form": "donut"
                       "The North holds 58 clinics and has opened none since FY24, so its share of the network falls each year",
                       "Project Falcon adds twelve clinics in the South, which takes the region past two thirds of the network"]}
 
+# What the benchmark deck's passages state, as a reader reads them.
+QUANTITIES = [["network reached|clinics open|\"Total\"", "the network's clinics in FY26"], ["wholesale", "wholesale's share of sales"]]
+
+
+def answered(work):
+    """The revision in `work` with every question its compile asks answered: the numbers by the bench's reader."""
+    _, done = answer_everything(NODE, work / "deck.pages.json", answer=reading_quantities(QUANTITIES))
+    assert done.returncode == 0, done.stderr[-1500:]
+    return work
+
+
 PROBE = '''
 import fs from 'node:fs';
 import path from 'node:path';
 import { authorDeck, readInsights } from './skills/professional-slides/runtime/author-deck.mjs';
 import { readPagesFile } from './skills/professional-slides/runtime/pages-file.mjs';
+import { loadJudgements, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const dir = DIR;
 const doc = (await readPagesFile(path.join(dir, 'deck.pages.json'))).doc ?? JSON.parse(fs.readFileSync(path.join(dir, 'deck.pages.json'), 'utf8'));
 const insights = await readInsights(dir, 'deck', {}).catch(() => null);
@@ -209,9 +222,9 @@ class OneStaleRuleTests(ContentsDeck):
         def change(doc):
             self.compose(doc, NETWORK)
             self.page(doc, "s04")["replace"] = [{"old": "158", "new": "160"}]
-        work = self.revise(change)
+        work = answered(self.revise(change))
         result = run_node(PROBE.replace("DIR", json.dumps(str(work))) + '''
-const result = await authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false });
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false }));
 console.log(JSON.stringify([...result.blocking, ...result.advisories].filter((f) => f.code === 'NUMBER_STALE').map(brief)));
 ''')
         naming = [f for f in result if "s05" in f["pages"]]
@@ -220,9 +233,9 @@ console.log(JSON.stringify([...result.blocking, ...result.advisories].filter((f)
         self.assertIn('s05 still prints "158"', naming[0]["repair"])
 
         # With no text edit, the composed page's own change is what finds it: neither case falls between the two.
-        work = self.revise(lambda doc: self.compose(doc, NETWORK))
+        work = answered(self.revise(lambda doc: self.compose(doc, NETWORK)))
         result = run_node(PROBE.replace("DIR", json.dumps(str(work))) + '''
-const result = await authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false });
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false }));
 console.log(JSON.stringify([...result.blocking, ...result.advisories].filter((f) => f.code === 'NUMBER_STALE').map(brief)));
 ''')
         naming = [f for f in result if "s05" in f["pages"]]
@@ -249,17 +262,17 @@ class ComposedPagesAloneTests(CarriedDeck):
             page["points"] = ["Wholesale is 24% of sales, up from 16% in FY22, and it is the one channel that grows without a new lease",
                               "In store and takeaway together are 68% of sales, so the estate still carries the business",
                               "Delivery is the smallest channel at 8% and the only one that pays a commission to a platform"]
-        work = self.revise(redraw)
+        work = answered(self.revise(redraw))
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 2)
         self.assertEqual([code for code, _ in self.refused(work)], ["NUMBER_STALE"])
         # The summary slide is carried, never compiled: what it states is the inventory's record of it.
-        self.assertIn('s02 still states 22% of the same thing ("Wholesale is now 22% of sales")', done.stderr)
+        self.assertIn('s02 still states 22% - the same quantity, as a reader reads the two ("Wholesale is now 22% of sales")', done.stderr)
 
         def everywhere(doc):
             redraw(doc)
             self.page(doc, "s02")["replace"] = [{"old": "22%", "new": "24%"}]
-        work = self.revise(everywhere)
+        work = answered(self.revise(everywhere))
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 0, done.stderr[:1500])
         summary = last_json(done.stdout)
@@ -285,11 +298,11 @@ class ComposedPagesAloneTests(CarriedDeck):
             if version:
                 doc["deck"]["rulesVersion"] = version
         probe = '''
-const result = await authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false });
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false }));
 console.log(JSON.stringify({ blocking: result.blocking.map((f) => [f.class, f.code]), stale: result.advisories.filter((f) => f.code === 'NUMBER_STALE').map(brief),
   notHeld: result.advisories.filter((f) => f.waived?.imported).map((f) => f.code) }));
 '''
-        now = run_node(PROBE.replace("DIR", json.dumps(str(self.revise(redraw)))) + probe)
+        now = run_node(PROBE.replace("DIR", json.dumps(str(answered(self.revise(redraw))))) + probe)
         classes = [cls for cls, _ in now["blocking"]]
         # Deck structure, then the page's own findings, then the aggregates: one order, whichever stream raised the finding.
         self.assertEqual(classes, sorted(classes, key="SPG".index))
@@ -300,7 +313,7 @@ console.log(JSON.stringify({ blocking: result.blocking.map((f) => [f.class, f.co
         self.assertFalse([code for code in now["notHeld"] if code.startswith("BAR_")])
         # Recorded under the rules before version 6, the same stale number still blocks: the rule judges only what this revision
         # changed, so no version excuses it (weight.json rules.always) - and a version below the import's is itself asked for its reason.
-        older = run_node(PROBE.replace("DIR", json.dumps(str(self.revise(lambda doc: redraw(doc, 5))))) + probe)
+        older = run_node(PROBE.replace("DIR", json.dumps(str(answered(self.revise(lambda doc: redraw(doc, 5)))))) + probe)
         self.assertIn("NUMBER_STALE", [code for _, code in older["blocking"]])
         self.assertIn("REVISION_RULES_VERSION", [code for _, code in older["blocking"]])
         self.assertEqual(older["stale"], [])
@@ -314,7 +327,7 @@ console.log(JSON.stringify({ blocking: result.blocking.map((f) => [f.class, f.co
             doc["pages"].insert(next(at for at, page in enumerate(doc["pages"]) if page["id"] == "s07") + 1, again)
         work = self.revise(twice)
         result = run_node(PROBE.replace("DIR", json.dumps(str(work))) + '''
-const result = await authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false });
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false }));
 console.log(JSON.stringify({ repeats: [...result.blocking, ...result.advisories].filter((f) => f.code === 'PROOF_REPEATS').map(brief), carried: result.spec.carried.map((c) => c.id) }));
 ''')
         self.assertEqual([(f["severity"], f["pages"]) for f in result["repeats"]], [("advisory", ["s07", "s07b"])])
@@ -325,7 +338,7 @@ console.log(JSON.stringify({ repeats: [...result.blocking, ...result.advisories]
         work = self.revise(lambda doc: self.donut(doc, points=["Wholesale is 22% of sales"]))
         result = run_node(PROBE.replace("DIR", json.dumps(str(work))) + '''
 let composed = 0;
-const result = await authorDeck(doc, { baseDir: dir, insights, fit: false });
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false }));
 const filled = [...result.blocking, ...result.advisories].filter((f) => f.fills).map(brief);
 console.log(JSON.stringify({ filled, composed: result.deck.slides.map((s) => s.sourceSlideId ?? s.id), carried: result.spec.carried.length }));
 ''')

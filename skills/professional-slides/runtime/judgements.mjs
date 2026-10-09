@@ -147,6 +147,10 @@ export function answerProblems(item, answer) {
         if (field.of === "id" && !flat(item.subject).includes(String(entry))) problems.push(`${at}: \`${name}\` names "${entry}", which is not one of the subject's ids`);
         if (field.of === "quoted" && !quotes(item.subject, entry?.phrase)) problems.push(`${at}: \`${name}\` entry "${entry?.phrase}" is not words of the subject`);
         if (field.of === "quoted" && !(typeof entry?.share === "number" && entry.share >= 0 && entry.share <= 1)) problems.push(`${at}: \`${name}\` entry "${entry?.phrase}" gives its share as a fraction from 0 to 1`);
+        if (field.of === "pair" && !(Array.isArray(entry) && entry.length === 2 && entry[0] !== entry[1] && entry.every((id) => flat(item.subject).includes(String(id)))))
+          problems.push(`${at}: \`${name}\` entry ${JSON.stringify(entry)} is two different ids of the subject`);
+        if (field.of === "cells" && !flat(item.subject).some((text) => squeeze(text) === squeeze(entry?.cell))) problems.push(`${at}: \`${name}\` names the cell "${entry?.cell}", which is not one of the subject's cells`);
+        if (field.of === "cells" && !(field.values || []).includes(entry?.value)) problems.push(`${at}: \`${name}\` gives "${entry?.cell}" the value "${entry?.value}", which is none of ${(field.values || []).map((v) => `"${v}"`).join(", ")}`);
       }
     }
   }
@@ -163,6 +167,8 @@ export function answerSchema(items) {
   const typed = (field) => (field.type === "number" ? { type: ["number", "null"] } : field.type === "string" ? { type: ["string", "null"] }
     : { type: ["array", "null"], items: field.of === "quoted"
       ? { type: "object", additionalProperties: false, required: ["phrase", "share"], properties: { phrase: { type: "string" }, share: { type: "number" } } }
+      : field.of === "cells" ? { type: "object", additionalProperties: false, required: ["cell", "value"], properties: { cell: { type: "string" }, value: { type: "string", enum: field.values } } }
+      : field.of === "pair" ? { type: "array", items: { type: "string" } }
       : { type: "string" } });
   const fields = Object.fromEntries(kinds.flatMap((kind) => Object.entries(JUDGEMENT_KINDS[kind].fields || {})).map(([name, field]) => [name, typed(field)]));
   const properties = { key: { type: "string", enum: items.map((item) => item.key) }, verdict: { type: "string", enum: [...new Set(kinds.flatMap((kind) => Object.keys(JUDGEMENT_KINDS[kind].verdicts)))] },

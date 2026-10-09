@@ -54,9 +54,9 @@
 //                                read against that slide: the page shows what
 //                                the number was changed to and another page
 //                                still states the old value of the same thing,
-//                                under the same names or in the same words
-//                                (blocks); the old value still standing in
-//                                words that are only alike, with no replacement
+//                                under the same names or as the same quantity
+//                                in a model's reading (blocks); the old value
+//                                read as the same quantity with no replacement
 //                                shown, or in its digits alone (advisory)
 //   PROOF_REPEATS                a page that plots, as proof, a measure over the
 //                                same periods or members as the page before
@@ -87,8 +87,9 @@
 // under it advises unless both exhibits name the same measure, and a stale
 // value blocks under it only where the other page holds the very number the
 // revision replaced - and one thing under two spellings ("FY26", "2025-26") is
-// not seen at all. A number in a sentence is matched by the words it is said
-// of (sameLabel), which is narrower still.
+// not seen at all. Whether a number in a sentence states the quantity another
+// number states is read by a model (same-quantity, number-replaced-by), never
+// matched on the words around the two.
 import { bindDeck, withoutTokens } from "../bind.mjs";
 import { cellText, isTable, rowCells } from "../evidence.mjs";
 import { measureConflicts, measureNeighbours, measureRegistry, normalUnit, valuesAgree } from "../measures.mjs";
@@ -98,6 +99,7 @@ import { registered } from "../errors.mjs";
 import { readJsonSync } from "../cli.mjs";
 import { carriedStated, printsWords } from "../revision.mjs";
 import { pagePool, pageTexts, refsOf, statedCells, typedNumbers } from "./dependency_gates.mjs";
+import { judged } from "../judgements.mjs";
 
 export const CONSISTENCY_CODES = Object.freeze({
   NUMBERS_DISAGREE: "two pages state different values for one measure at one period or member; as an advisory, for what reads as one quantity under two measures, or under one pair of names in two exhibits",
@@ -219,28 +221,18 @@ const agreeAt = (a, b) => (a.unit && b.unit ? [1] : SCALES).some((scale) => valu
 const apart = (a, b) => sameUnit(a, b) && !agreeAt(a, b);
 
 // --- a number where it stands: what a revision's stale copies are found by ---
-// A label is the words a number is said of: what is measured, and when. Two numbers are said of one thing where every word of
-// the shorter label is a word of the longer and the two share two or more - "Operating cash flow" in a table row and
-// "operating cash flow fell to 66 million" in a caption; not "revenue grew 12%" and "costs grew 12%", which share a verb and a
-// number and nothing they are about. A period ("FY26", "2025", "Q3") counts as one shared word, and where both labels name
-// one they must name the same: a row at FY25 is not the sentence about FY26.
-const SAME_LABEL_WORDS = 2;
-// How many words either side of a number, within its clause, are read as its label.
+// Whether two numbers state one quantity is a reader's judgement (same-quantity, number-replaced-by); what is read here is only
+// what puts a pair to the reader: the value, the kind of number each says it is, and, for a bare whole number in a sentence,
+// the thing it counts - "158 clinics" is not a table's 158 under "Branches". A number's words are the content words around it
+// in its clause, with a plural's "s" taken off: what a count is looked for among.
+// How many words either side of a number, within its clause, are read as its words.
 const LABEL_WINDOW = 6;
 const STOPWORDS = new Set(readJsonSync(new URL("./stopwords.json", import.meta.url)).content);
 const PERIOD_WORD = /^(?:fy)?\d{2,4}$|^[qh][1-4]$/;
-// A label's words: content words with a plural's "s" taken off, and period names.
 const labelWords = (text) => String(text ?? "").normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => PERIOD_WORD.test(word) || (/^\p{L}{3,}$/u.test(word) && !STOPWORDS.has(word)))
   .map((word) => (/^\p{L}{5,}s$/u.test(word) && !word.endsWith("ss") ? word.slice(0, -1) : word));
 // A clause ends where the sentence turns to something else.
 const CLAUSE = /\.(?!\d)|[;!?()]|:(?!\d)|,\s|\s[\u2013\u2014-]\s|\b(?:while|whereas|but|against|versus|vs)\b/giu;
-const termsOf = (words) => [...words].filter((word) => !PERIOD_WORD.test(word)), periodsOf = (words) => [...words].filter((word) => PERIOD_WORD.test(word));
-function sameLabel(a, b) {
-  const [few, many] = termsOf(a.words).length <= termsOf(b.words).length ? [a.words, b.words] : [b.words, a.words];
-  const [when, then] = [periodsOf(a.words), periodsOf(b.words)], dated = when.length > 0 && then.length > 0;
-  if (dated && !(when.length <= then.length ? when.every((word) => then.includes(word)) : then.every((word) => when.includes(word)))) return false;
-  return termsOf(few).length + (dated ? 1 : 0) >= SAME_LABEL_WORDS && termsOf(few).length > 0 && termsOf(few).every((word) => many.has(word));
-}
 // The unit a column's header states beside its name - "Revenue (£m)", "Share, %" - where it is one a number's kind can be read
 // from: a currency, a scale word or a percent sign. "Length (m)" is metres, and says nothing of scale.
 const STATED_UNIT = /[$£€¥%]|\b(?:thousands?|millions?|billions?|trillions?|mn|bn)\b|\b[A-Z]{3}\s?(?:k|m|mn|bn)\b/;
@@ -283,12 +275,6 @@ function occurrences(texts, exhibits) {
 }
 // A count in a sentence is the same count elsewhere only where it counts the same thing.
 const sameCount = (a, b) => (!a.counted || b.words.has(a.counted)) && (!b.counted || a.words.has(b.counted));
-const sameThing = (a, b) => sameKind(a, b) && sameLabel(a, b) && sameCount(a, b);
-// Two sentences rarely put one label in the same words, so neither holds every word of the other: three words in common (a
-// shared period is one) say they may be about one thing, which is enough to ask and not enough to refuse.
-const NEAR_LABEL_WORDS = 3;
-const nearThing = (a, b) => sameKind(a, b) && sameCount(a, b) && !(periodsOf(a.words).length && periodsOf(b.words).length && !periodsOf(a.words).some((word) => b.words.has(word)))
-  && termsOf(a.words).filter((word) => b.words.has(word)).length + (periodsOf(a.words).some((word) => b.words.has(word)) ? 1 : 0) >= NEAR_LABEL_WORDS;
 
 /**
  * What every page states, read once: `byMeasure` the numbers each page states
@@ -467,47 +453,63 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
           `This revision changed "${now.name}" at "${now.label}" on ${page.id} from ${shownOf(was)} to ${shownOf(now)}, and ${listed([...new Set(still.map((entry) => entry.page))], ", ")} still print${new Set(still.map((entry) => entry.page)).size === 1 ? "s" : ""} ${shownOf(still[0])} under the same names: the deck now gives one thing two values. Change it there too - the new value on a composed page; on a carried slide \`replace\` for a table's cell, and a \`type\` in place of \`carry\` for a chart's values - or, where the other page states a different thing, name its series or label apart`,
           { name: now.name, label: now.label, was: was.value, now: now.value });
       }
-      // What the slide stated and the page changed: a number under whose label the page now states another (the page shows
-      // what it was changed to), or one the page no longer prints anywhere. Another page that still states the old number under
-      // the same label blocks where the page shows what it was changed to. Everything less is asked, not refused: the same
-      // label with no replacement shown, a sentence that shares words with the changed one, or the same digits alone.
+      // What the slide stated and the page changed. Whether two numbers state one quantity is read, not matched on the words
+      // around them: two sentences rarely put one quantity in the same words, and two about different things often share most
+      // of theirs. So a number the slide stated and the page no longer states is put to a reader with the page's numbers of its
+      // kind (number-replaced-by), and the one it names is what it was changed to; and another page's number of the old value
+      // and kind is put to a reader beside it (same-quantity). One the reader says states the same quantity blocks where the
+      // page shows what it was changed to, and is asked of the author where it does not; the same quantity in a notation that
+      // says its kind blocks too, and the same digits alone are asked - unless a reader has said they are another thing.
+      // A number said with no words around it - a tile's "+4.3%" - gives a reader nothing to judge it by, and is not put to one.
       const kept = new Set(page.prints), was = occurrences(slideTexts(page.source), slideExhibits(page.source));
-      const stands = (old) => page.stands.some((now) => valuesAgree(now.n, old.n) && sameThing(old, now));
-      // What it was changed to is the number that now stands under the nearest label: the one that shares the period and the
-      // most words, and is the same kind of number - a level is not replaced by the percentage it moved.
-      const nearness = (old, now) => termsOf(now.words).filter((word) => old.words.has(word)).length + (periodsOf(now.words).some((word) => old.words.has(word)) ? SAME_LABEL_WORDS : 0);
-      const changedTo = (old) => (stands(old) ? null : page.stands.filter((now) => sameThing(old, now) && (old.percent === true) === (now.percent === true) && !valuesAgree(old.n, now.n))
-        .reduce((best, now) => (!best || nearness(old, now) > nearness(old, best) ? now : best), null));
-      const digits = (old, other) => (old.marked ? other.stands.find((there) => there.marked && there.n === old.n && sameKind(old, there)) ?? null : null);
+      const told = (item) => ({ number: item.shown, said: item.said });
+      const worded = (item) => item.said.replace(/^"|"$/g, "").trim() !== item.shown;
+      const alike = (old, there) => valuesAgree(there.n, old.n) && sameKind(old, there) && sameCount(old, there);
+      const oneQuantity = (old, there) => (worded(old) && worded(there) ? judged("same-quantity", [told(old), told(there)], null, page.id)?.verdict ?? null : "different");
+      // A number stands where the page still says it in the same words; where the page has it only in other words, a reader
+      // says whether that is the same quantity, and until it is answered it is taken to stand.
+      const stands = (old) => page.stands.filter((now) => alike(old, now)).some((now, _, all) => now.said === old.said
+        || (!all.some((other) => other.said === old.said) && worded(old) && oneQuantity(old, now) !== "different"));
+      const changedTo = (old) => {
+        const options = worded(old) ? page.stands.filter((now) => worded(now) && sameKind(old, now) && sameCount(old, now) && (old.percent === true) === (now.percent === true) && !valuesAgree(old.n, now.n)) : [];
+        if (!options.length) return null;
+        const numbers = options.map((now, at) => ({ id: `n${at + 1}`, ...told(now) }));
+        const read = judged("number-replaced-by", { number: told(old), numbers }, null, page.id);
+        return read?.verdict === "replaced" ? options[numbers.findIndex((item) => item.id === String(read.by?.[0] ?? ""))] ?? null : null;
+      };
+      const digits = (old, other, apartFrom) => (old.marked ? other.stands.find((there) => !apartFrom.has(there) && there.marked && there.n === old.n && sameKind(old, there)) ?? null : null);
       // The same quantity in whatever notation: the value, with a kind both say - a percentage, or one stated scale ("12.4" under
       // "Revenue (£m)" is "£12.4m", "£12.4 million" and "GBP 12.40m").
-      const quantity = (old, other) => (old.percent !== null && (old.percent || old.scale !== null) ? other.stands.find((there) => there.n === old.n && there.percent === old.percent && (old.percent || there.scale === old.scale)) ?? null : null);
+      const quantity = (old, other, apartFrom) => (old.percent !== null && (old.percent || old.scale !== null) ? other.stands.find((there) => !apartFrom.has(there) && there.n === old.n && there.percent === old.percent && (old.percent || there.scale === old.scale)) ?? null : null);
       const certain = [], loose = [];
       for (const old of was) {
+        if (stands(old)) continue;
         const now = changedTo(old);
         if (!now && kept.has(old.n)) continue;
         // A page this one says states the same figure of another thing (`only`) is not looked at.
         for (const other of pages.filter((item) => item.id !== page.id && !page.only?.includes(item.id))) {
           if (stale.has(`${other.id}|${old.n}`)) continue;
-          const labelled = other.stands.find((there) => valuesAgree(there.n, old.n) && sameThing(old, there)) ?? null;
-          // Where no label says so, the quantity itself does - once the page shows what it was changed to and no longer prints it.
-          const same = labelled ?? (now && !kept.has(old.n) ? quantity(old, other) : null);
-          const near = same ?? other.stands.find((there) => valuesAgree(there.n, old.n) && nearThing(old, there)) ?? null;
+          const read = other.stands.filter((there) => alike(old, there) && worded(old) && worded(there)).map((there) => ({ there, verdict: oneQuantity(old, there) }));
+          const labelled = read.find((item) => item.verdict === "same")?.there ?? null;
+          const apartFrom = new Set(read.filter((item) => item.verdict === "different").map((item) => item.there));
+          // Where no reader says so, the quantity itself does - once the page shows what it was changed to and no longer prints it.
+          const same = labelled ?? (now && !kept.has(old.n) ? quantity(old, other, apartFrom) : null);
+          const there = labelled ?? (!kept.has(old.n) ? digits(old, other, apartFrom) : null);
           if (same && now) certain.push({ old, now, page: other.id, there: same, by: labelled ? "label" : "quantity" });
-          else if (near || (!kept.has(old.n) && digits(old, other))) loose.push({ old, now, page: other.id, there: near ?? digits(old, other), labelled: Boolean(near) });
+          else if (there) loose.push({ old, now, page: other.id, there, labelled: Boolean(labelled) });
         }
       }
       for (const item of certain) stale.add(`${item.page}|${item.old.n}`);
       for (const [key, items] of Map.groupBy(certain, (item) => `${item.old.n}|${item.now.n}`)) {
         const { old, now } = items[0], each = items.filter((item, at) => items.findIndex((other) => other.page === item.page) === at);
         finding("NUMBER_STALE", "blocker", [page.id, ...each.map((item) => item.page)],
-          `This revision changed ${old.shown} to ${now.shown} on ${page.id} (${now.said}; the slide said ${old.said}), and ${listed(each.map((item) => `${item.page} still states ${item.there.shown} ${item.by === "label" ? "of the same thing" : "- the same quantity, whatever it is said of there"} (${item.there.said})`))}: the deck now gives one number two values${each.some((item) => item.by === "quantity") ? ", unless the other page means another thing by it" : ""}. Change it there too - \`replace: [{ old, new }]\` on a carried slide, the new number on a composed page - or, where the other page states a different thing, say so on ${page.id}: \`"only": [${each.map((item) => `"${item.page}"`).join(", ")}]\` names the pages whose figure is another thing, and each is listed for the reviewer`,
+          `This revision changed ${old.shown} to ${now.shown} on ${page.id} (${now.said}; the slide said ${old.said}), and ${listed(each.map((item) => `${item.page} still states ${item.there.shown} ${item.by === "label" ? "- the same quantity, as a reader reads the two" : "- the same quantity, whatever it is said of there"} (${item.there.said})`))}: the deck now gives one number two values${each.some((item) => item.by === "quantity") ? ", unless the other page means another thing by it" : ""}. Change it there too - \`replace: [{ old, new }]\` on a carried slide, the new number on a composed page - or, where the other page states a different thing, say so on ${page.id}: \`"only": [${each.map((item) => `"${item.page}"`).join(", ")}]\` names the pages whose figure is another thing, and each is listed for the reviewer`,
           { was: old.n, now: now.n, key });
       }
       const open = loose.filter((item) => !stale.has(`${item.page}|${item.old.n}`)).filter((item, at, all) => all.findIndex((other) => other.page === item.page && other.old.n === item.old.n) === at);
       if (open.length) finding("NUMBER_STALE", "advisory", [page.id, ...open.map((item) => item.page)],
         `${page.id} no longer states ${listed([...new Set(open.map((item) => `${item.old.shown}${item.now ? ` (now ${item.now.shown})` : ""}`))], ", ")}, which the slide it was imported from did (${listed([...new Set(open.map((item) => item.old.said))].slice(0, 3))}), and ${listed([...new Set(open.map((item) => `${item.page} still states ${item.there.shown} (${item.there.said})`))])}. ` +
-        `${open.some((item) => item.labelled) ? "The words around them are alike, which is not enough to say they are one figure" : "Nothing but the digits says these are the figure the revision changed"}, so check each: where it is, change it there too`,
+        `${open.some((item) => item.labelled) ? `A reader reads ${open.filter((item) => item.labelled).length === 1 ? "it" : "them"} as the same quantity, but ${page.id} shows no number that replaced it` : "Nothing but the digits says these are the figure the revision changed"}, so check each: where it is, change it there too`,
         [...new Set(open.map((item) => item.old.shown))].slice(0, LISTED));
       out.push(...staleWording(page, pages, registered(CONSISTENCY_CODES, "WORDING_STALE")));
     }

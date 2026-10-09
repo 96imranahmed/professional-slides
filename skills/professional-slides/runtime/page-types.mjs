@@ -27,9 +27,9 @@ import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
-import { SCALAR_FIGURE as NUMERIC } from "./value-format.mjs";
 import { timePositions, describeGaps, isPeriodLabel, readablePeriod } from "./time-axis.mjs";
-import { verdictCell } from "./compose-tables.mjs";
+import { columnQuestion } from "./compose-tables.mjs";
+import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
 import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
@@ -761,20 +761,19 @@ function tableColumns(headers, rows) {
  * A column of judgements set as words. A column headed lead, winner,
  * confidence or status that sets "Firm A", "Medium", "No verdict" in the same
  * grey text as the evidence beside it reads the page's answer as one more
- * fact. A coded column (a type, or words the composer codes on its
- * own: on track, wins, ✓) passes; numbers are measures, not verdicts.
+ * fact. What the column says is asked (column-reads), the question the
+ * composer asks of it: a status, a direction or progress is coded by the
+ * composer and passes, as do facts; a judgement that is none of those, in
+ * words, is the defect. A typed column passes.
  */
 function plainVerdict(headers, rows, id) {
   const all = (headers || []).map(headerText);
   for (const { column, header, cells } of tableColumns(headers, rows)) {
     if (column && typeof column === "object" && (CODED.has(column.type) || column.heat || column.bar || column.harvey)) continue;
-    const written = cells.filter((cell) => !BLANK.test(cellText(cell)));
-    const plain = written.filter((cell) => !(cell && typeof cell === "object" && cell.type) && typeof verdictCell(cellText(cell), header) === "string"
-      && !NUMERIC.test(cellText(cell)) && words(cellText(cell)).length <= 5);
-    if (plain.length < 2 || plain.length * 2 < written.length) continue;
-    // A column of short words is a judgement or a fact by what it says: asked (column-judges).
-    const said = [...new Set(plain.map(cellText))];
-    if (judged("column-judges", { header, cells: said }, { headers: all }, id)?.verdict === "judges") return { header, examples: said.slice(0, 3) };
+    // A column of figures alone is measures, or progress, and never a verdict in words: it is not asked here.
+    const asked = columnQuestion(header, cells, all);
+    if (!asked || asked.subject.cells.every((cell) => SCALAR_FIGURE.test(cell))) continue;
+    if (judged("column-reads", asked.subject, asked.context, id)?.verdict === "judges") return { header, examples: asked.subject.cells.slice(0, 3) };
   }
   return null;
 }

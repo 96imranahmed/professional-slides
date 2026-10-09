@@ -134,7 +134,7 @@ import {SCALAR_FIGURE} from './skills/professional-slides/runtime/value-format.m
 import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
 import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
 // A column of words is asked whether it judges its rows: a reader says "Confidence" does. A column of figures is never asked.
-const reader=judgementSession({oracle:(kind,subject)=>kind==='column-judges'?(subject.header==='Confidence'?'judges':'states-facts'):null});
+const reader=judgementSession({oracle:(kind,subject)=>kind==='column-reads'?(subject.header==='Confidence'?'judges':'facts'):null});
 const base={takeaway:false,why:'The page compares the two firms on the same terms',settles:{kind:'comparison',what:'Company filings, 2025 to 2026'},adds:'The commentary names what the exhibit cannot'};
 const page=(cell)=>({...base,id:'p1',type:'lookup',form:'table',commentary:'none',title:'The near-term commercial call is split between the two firms',
   exhibit:{columns:[{label:'Criterion',type:'category'},'Confidence','Reason'],rows:[['Consumer reach',cell,'Weekly users'],['Enterprise adoption',cell,'Ramp panel'],['Coding',cell,'Units differ']]}});

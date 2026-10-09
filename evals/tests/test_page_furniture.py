@@ -190,8 +190,10 @@ assert.equal(marks.length,4);
 const widthA=marks.find(n=>n.data.category==='A').frame.width, widthB=marks.find(n=>n.data.category==='B').frame.width;
 assert.ok(Math.abs(widthA/widthB-1.5)<0.01,'A is 60 wide to B 40');
 assert.ok(m.some(n=>n.role==='data-label'&&n.text==='50%'));
-// Outlook headings infer trend cells; numeric change stays neutral without a verdict.
-const t=styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]});
+// A column a reader reads as a direction becomes trend cells (column-reads); numeric change stays neutral without a verdict.
+const {judgementSession,withJudgements}=await import('./skills/professional-slides/runtime/judgements.mjs');
+const outlook=judgementSession({oracle:(kind,subject)=>kind==='column-reads'&&subject.header==='Outlook'?{verdict:'direction',directions:[{cell:'up',value:'up'},{cell:'↓',value:'down'}]}:null});
+const t=withJudgements(outlook,()=>styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]}));
 assert.equal(t.rows[0][1],'+20%');assert.deepEqual(t.rows[1][2],{type:'trend',value:'down'});
 const table=registry.get('table');
 const tn=table.render({id:'t',frame:{x:0,y:0,width:600,height:200},props:{...t,density:'body'}}).nodes;

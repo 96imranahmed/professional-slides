@@ -9,9 +9,9 @@ gate - shorter words, fewer of them - rather than writing it.
 What is measured now: the executive summary (the first analytical page of a
 deck without one) carries the answer as a whole page - title, points,
 highlight, exhibit cells - and its title carries the answer's leading clause,
-the verdict, and of the whole answer 35% of its content words or the seven a
-full-length title holds, whichever is fewer: a lead that states no verdict is
-not carried by repeating it. The deck's titles between them still cover the
+the verdict as a reader quotes it (answer-lead), and of the whole answer 35%
+of its content words or the seven a full-length title holds, whichever is
+fewer: an opener that states no verdict is not carried by repeating it. The deck's titles between them still cover the
 answer. The message names the fields the gate reads and the page it tested.
 """
 from __future__ import annotations
@@ -22,6 +22,7 @@ import unittest
 from node_probe import ROOT, run_node
 
 GATES = "file://" + str(ROOT / "skills" / "professional-slides" / "runtime" / "gates" / "content_gates.mjs")
+JUDGEMENTS = "file://" + str(ROOT / "skills" / "professional-slides" / "runtime" / "judgements.mjs")
 
 # A reasoned answer: the verdict, its reasons, the rivals by name and the
 # thresholds - 36 content words, which no twelve-word title carries 35% of.
@@ -64,12 +65,39 @@ def plan(titles=TITLES, points=SUMMARY_POINTS, answer=ANSWER, role="executive-su
     return {"schema": "professional-slides.content/v1", "id": "t", "question": QUESTION, "answer": answer, "pages": pages, **over}
 
 
-def answer_findings(content, options="{}"):
-    return run_node(f"""
+# Each answer's leading clause as a reader quotes it (answer-lead): the verdict, a label read with the verdict after it, an
+# opener with nothing in it passed over. None is an answer the reader finds no verdict in.
+HARBOUR = ("Harbour remains the region's strongest all-round lending group: it leads every rival that reports on deposits, branch network, profit, margin "
+           "and card volume, while Tideway Mutual leads on rated service and Westmoor on growth; the lead is narrowing and rests on four conditions.")
+NORTHFIELD = ("Northfield: expand capacity in the northern region now because margins there are double the southern margins "
+              "and the depot has spare capacity.")
+VERDICT_LABEL = ("Verdict after all three tests: expand capacity in the northern region now because margins there are double the southern margins "
+                 "and the depot has spare capacity.")
+BODY = ("expand northern capacity now, because northern margins double southern margins, the depot holds spare shifts, competitors announced nothing, "
+        "staffing exists locally, the lease runs past 2031 and contracts renew annually.")
+LEADS = {ANSWER: "Northvale can reach sixty million journeys by filling the off-peak", HARBOUR: "Harbour remains the region's strongest all-round lending group",
+         NORTHFIELD: "Northfield: expand capacity in the northern region now", VERDICT_LABEL: "Verdict after all three tests: expand capacity in the northern region now",
+         "The board has a clear decision ahead: " + BODY: "expand northern capacity now",
+         "Northfield management must now decide between three options. " + BODY[0].upper() + BODY[1:]: "Expand northern capacity now",
+         BODY[0].upper() + BODY[1:]: "Expand northern capacity now"}
+
+
+def answer_findings(content, options="{}", leads=None, asked=False):
+    """The deck's CONTENT_ANSWER_UNCARRIED findings, with each answer's lead read as `leads` gives it (LEADS by default; an
+    answer not in it is not answered yet)."""
+    result = run_node(f"""
 import {{ runContentGates }} from '{GATES}';
-const report = runContentGates({json.dumps(content)}, {options});
-console.log(JSON.stringify({{ findings: report.findings.filter((f) => f.code === 'CONTENT_ANSWER_UNCARRIED') }}));
-""")["findings"]
+import {{ judgementSession, withJudgements }} from '{JUDGEMENTS}';
+const leads = {json.dumps(LEADS if leads is None else leads)}, asked = [];
+const session = judgementSession({{ oracle: (kind, subject) => {{
+  if (kind !== 'answer-lead') return null;
+  asked.push(subject);
+  return !Object.hasOwn(leads, subject) ? null : leads[subject] === null ? 'no-verdict' : {{ verdict: 'verdict', lead: leads[subject] }};
+}} }});
+const report = withJudgements(session, () => runContentGates({json.dumps(content)}, {options}));
+console.log(JSON.stringify({{ findings: report.findings.filter((f) => f.code === 'CONTENT_ANSWER_UNCARRIED'), asked }}));
+""")
+    return (result["findings"], result["asked"]) if asked else result["findings"]
 
 
 class AnswerUpFrontTests(unittest.TestCase):
@@ -158,104 +186,31 @@ console.log(JSON.stringify({{ words: answer.size, best }}));
         coverage = next(f for f in findings if f["rule"].endswith("coverage"))
         self.assertLess(coverage["measured"]["coverage"], 0.6)
 
-    def test_the_lead_is_the_verdict_before_the_reasons(self):
-        result = run_node(f"""
-import {{ answerLead }} from '{GATES}';
-const leads = [{json.dumps(ANSWER)}, 'Choose the Park Slope flat, unless the role is in the city', 'Alder leads on reach and price; Birch can pass it by FY31', 'The annual price should hold: the margin is in the service contract'].map(answerLead);
-console.log(JSON.stringify({{ leads }}));
-""")
-        self.assertEqual(result["leads"], ["Northvale can reach sixty million journeys by filling the off-peak", "Choose the Park Slope flat",
-                                           "Alder leads on reach and price", "The annual price should hold"])
+    def test_the_lead_is_asked_of_the_answer_and_the_title_is_held_to_the_words_quoted(self):
+        # Which words of the answer state its verdict is read (answer-lead), once; the title is held to the words the reader quoted.
+        findings, asked = answer_findings(plan(), asked=True)
+        self.assertEqual(findings, [])
+        self.assertEqual(set(asked), {ANSWER})
+        # Quoted as another clause, the same title no longer carries the lead.
+        findings = answer_findings(plan(), leads={ANSWER: "Electrification follows once the power upgrade is delivered"})
+        [finding] = findings
+        self.assertLess(finding["measured"]["lead"], 0.5)
+        self.assertIn('the answer\'s leading clause ("Electrification follows once the power upgrade is delivered")', finding["repair"])
 
-    def test_the_lead_is_a_clause_with_a_verdict_not_the_subject_before_a_break(self):
-        # "Subject: verdict" led with the subject alone, so a title that only
-        # named the subject carried all of the lead. A lead too short to say
-        # anything, and a label before a colon, is read on with the next clause.
-        result = run_node(f"""
-import {{ answerLead, CONTENT_THRESHOLDS }} from '{GATES}';
-const leads = ['Northfield: expand capacity in the northern region now because margins there are double', 'The northern depot expansion programme: approve the second shift now',
-  'Park Slope, unless the role is in the city', 'Hold the price: the margin is in the service contract', 'Yes. Northfield - expand in the north now, because margins are double',
-  'It depends: if demand holds then expand', 'Northfield'].map(answerLead);
-console.log(JSON.stringify({{ leads, floor: CONTENT_THRESHOLDS.answerLeadWordsMin }}));
-""")
-        self.assertEqual(result["floor"], 3)
-        self.assertEqual(result["leads"], [
-            "Northfield: expand capacity in the northern region now",                # one word before the colon is a name
-            "The northern depot expansion programme: approve the second shift now",  # four content words and no verb: still a label
-            "Park Slope, unless the role is in the city",                            # two content words say too little alone
-            "Hold the price: the margin is in the service contract",
-            "Northfield - expand in the north now",                                  # the opener passed over, the name read on
-            "It depends: if demand holds then expand",
-            "Northfield"])                                                           # nothing follows: the whole answer
-
-    def test_a_clause_before_a_colon_is_told_from_a_label_by_its_shape_not_by_a_list_of_verbs(self):
-        # A run's answer opened "Harbour remains the region's strongest all-round lending group: it leads ...", and the gate
-        # read past the colon because "remains" was not on its closed list of verbs: the title was asked for a share of two
-        # clauses and refused. Whether the text before a colon says something is read off its shape - an auxiliary or a
-        # negation, a second noun phrase opening inside it, the next clause taking it up with a pronoun - so a verb needs
-        # no list to be one, and a noun phrase that names the subject is still read on.
-        clauses = {
-            "Harbour remains the region's strongest all-round lending group: it leads every rival that reports on deposits and profit": "Harbour remains the region's strongest all-round lending group",
-            "Harbour remains the region's strongest all-round lending group: among five lenders the lead holds on four conditions": "Harbour remains the region's strongest all-round lending group",
-            "Harbour keeps its lead in the region: scale, margin and card volume all favour it": "Harbour keeps its lead in the region",
-            "The merger creates no value for shareholders: decline the offer": "The merger creates no value for shareholders",
-            "Renting costs less than buying over ten years: rent the Park Slope flat": "Renting costs less than buying over ten years",
-            "Three lenders outgrew their deposits: funding, not demand, limits growth": "Three lenders outgrew their deposits",
-            "Northern capacity repays every pound inside two years: expand now": "Northern capacity repays every pound inside two years",
-            "The annual price should hold: the margin is in the service contract": "The annual price should hold",
-            "Northern margins doubled southern margins: they justify the second shift": "Northern margins doubled southern margins",
-        }
-        labels = [
-            "Northfield: expand capacity in the northern region now",
-            "The northern depot expansion programme: approve the second shift now",
-            "Harbour Credit Union: funding first",
-            "Our recommendation for the northern region: add the second shift",
-            "Funding costs and deposit growth in the northern region: the margin narrows from FY27",
-            "Recommendation: expand",
-            # A bare verb over a bare noun shows none of the three signs, and is read on: the stricter reading.
-            "Alder beats Birch: reach and price both favour Alder",
-        ]
-        result = run_node(f"""
-import {{ answerLead }} from '{GATES}';
-console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLead), labels: {json.dumps(labels)}.map(answerLead) }}));
-""")
-        self.assertEqual(result["clauses"], list(clauses.values()))
-        self.assertEqual(result["labels"], labels)
-
-    def test_a_label_is_told_from_its_own_phrase_whatever_preposition_or_date_it_carries(self):
-        # A review found labels read as the answer's whole lead: a preposition the list of governors lacked ("after",
-        # "versus", "before") left the determiner behind it looking like a verb's object, a determiner over a calendar unit
-        # ("this quarter") looked like one too, and a possessive opening the next clause ("its lead is narrow") was taken for
-        # a pronoun taking the label up as a subject. Each is decided from the phrase: a title that only repeats the label
-        # then carries a share of the verdict, not all of the lead.
-        labels = [
-            "Verdict after all three tests: Northfield should expand in the north and exit the south",
-            "Position versus the peers on cost: Alder leads on scale and trails on margin",
-            "Outcome before any restructuring charge: profit rises 12% on flat revenue",
-            "Answer this quarter for lending: hold the rate and widen the book in the north",
-            "Northfield retail banking division: its lead is narrow and rests on two branches",
-            "Findings since the last board meeting: demand held and costs fell",
-            "Outlook despite the new entrant: the lead holds for two more years",
-        ]
-        clauses = {
-            # A verb's object is still an object behind a longer phrase, and a subject pronoun still takes a clause up.
-            "Harbour keeps its lead despite the new entrant: defend the northern branches": "Harbour keeps its lead despite the new entrant",
-            "Three lenders outgrew their deposits after the rate rise: funding limits growth": "Three lenders outgrew their deposits after the rate rise",
-            "Northern margins doubled southern margins: they justify the second shift": "Northern margins doubled southern margins",
-            "Harbour won every tender this year: it should bid for the northern contract": "Harbour won every tender this year",
-        }
-        result = run_node(f"""
-import {{ answerLead }} from '{GATES}';
-console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLead), labels: {json.dumps(labels)}.map(answerLead) }}));
-""")
-        self.assertEqual(result["labels"], labels)
-        self.assertEqual(result["clauses"], list(clauses.values()))
+    def test_an_answer_with_no_verdict_read_or_none_read_yet_holds_the_title_to_its_share_alone(self):
+        titles = ["Three levers, in order, over five years"] + TITLES[1:] + [TITLES[0]]
+        for leads in ({ANSWER: None}, {}):
+            [finding] = answer_findings(plan(titles=titles), leads=leads)
+            self.assertNotIn("lead", finding["measured"], leads)
+            self.assertNotIn("leadMissing", finding["measured"], leads)
+            self.assertIn("titleMissing", finding["measured"], leads)
+        # Where the title carries its share of the whole answer, nothing is left to hold it to.
+        self.assertEqual(answer_findings(plan(), leads={ANSWER: None}), [])
 
     def test_a_title_that_repeats_a_label_does_not_lead_a_revision_with_its_answer_either(self):
         # The lead is read the same way for a deck being revised: under the current rules a title that only repeats the
         # label before the colon is refused, and a revision recorded before the up-front rule hears it as an advisory.
-        answer = ("Verdict after all three tests: expand capacity in the northern region now because margins there are double the southern margins "
-                  "and the depot has spare capacity.")
+        answer = VERDICT_LABEL
         titles = ["The verdict after all three tests is set out below", "Margins in the northern region are double the southern margins",
                   "The depot has spare capacity for another shift", "Expand costs are recovered inside two years on current volumes"] + TITLES[4:]
         points = ["Expand capacity in the northern region now: margins there are double the southern margins.", "The depot has spare capacity for the added shift."]
@@ -268,8 +223,7 @@ console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLea
             self.assertIn("expand", upfront[0]["measured"]["leadMissing"], options)
 
     def test_the_answer_the_run_wrote_is_carried_by_the_title_that_states_its_verdict(self):
-        answer = ("Harbour remains the region's strongest all-round lending group: it leads every rival that reports on deposits, branch network, profit, margin "
-                  "and card volume, while Tideway Mutual leads on rated service and Westmoor on growth; the lead is narrowing and rests on four conditions.")
+        answer = HARBOUR
         titles = ["Harbour remains the region's strongest all-round lending group, on four conditions", "Harbour leads every rival that reports on deposits and branch network",
                   "Profit and margin put Harbour ahead of every rival that reports", "Card volume at Harbour is the largest of any regional lender",
                   "Tideway Mutual leads on rated service and Westmoor on growth", "The lead is narrowing as rivals add branches faster"] + TITLES[6:]
@@ -279,8 +233,7 @@ console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLea
         self.assertEqual([f for f in findings if f["rule"].endswith("upfront")], [])
 
     def test_a_title_that_only_names_the_subject_does_not_lead_with_the_answer(self):
-        answer = ("Northfield: expand capacity in the northern region now because margins there are double the southern margins "
-                  "and the depot has spare capacity.")
+        answer = NORTHFIELD
         titles = ["Northfield has three options and a board meeting in March", "Margins in the northern region are double the southern margins",
                   "The depot has spare capacity for another shift", "Expand costs are recovered inside two years on current volumes"] + TITLES[4:]
         points = ["Expand capacity in the northern region now: margins there are double the southern margins.", "The depot has spare capacity for the added shift."]
@@ -295,30 +248,28 @@ console.log(JSON.stringify({{ clauses: {json.dumps(list(clauses))}.map(answerLea
 
 
     def test_a_title_that_repeats_an_opener_which_states_no_verdict_is_refused(self):
-        # A lead can be a clause that says nothing: "The board has a clear
-        # decision ahead: expand ...". A title repeating it carried the whole
-        # lead and passed, where the single-title rule had refused it. The
-        # opening title also carries its share of the whole answer.
-        body = ("expand northern capacity now, because northern margins double southern margins, the depot holds spare shifts, competitors announced nothing, "
-                "staffing exists locally, the lease runs past 2031 and contracts renew annually.")
+        # A lead can open on a clause that says nothing: "The board has a clear decision ahead: expand ...". Read by words,
+        # a title repeating that clause carried the whole lead and passed. A reader quotes the verdict past it, so the
+        # title is held to the verdict - and the opening title still carries its share of the whole answer.
         rest = ["Northern margins double southern margins on every product", "The depot holds spare shifts through next winter", "Competitors announced nothing for the next two years",
                 "Staffing exists locally for a second shift today", "The lease runs past 2031 without a break clause", "Contracts renew annually on rolling notice periods",
                 "Expand costs come back inside two years", "Fuel and wage inflation are the two exposures", "Capacity now is cheaper than capacity later"]
         points = ["Expand northern capacity now: northern margins double southern margins and the depot holds spare shifts.",
                   "Competitors announced nothing, staffing exists locally, the lease runs past 2031 and contracts renew annually."]
-        cases = {"The board has a clear decision ahead: " + body: "The board has a clear decision ahead of the March meeting",
-                 "Northfield management must now decide between three options. " + body[0].upper() + body[1:]: "Northfield management must now decide between three options"}
+        cases = {"The board has a clear decision ahead: " + BODY: "The board has a clear decision ahead of the March meeting",
+                 "Northfield management must now decide between three options. " + BODY[0].upper() + BODY[1:]: "Northfield management must now decide between three options"}
         for answer, title in cases.items():
             [finding] = answer_findings(plan(titles=[title] + rest, points=points, answer=answer))
             self.assertEqual([finding["rule"], finding["severity"], finding["id"]], ["CONTENT_ANSWER_UNCARRIED.upfront", "blocking", "p01"])
-            self.assertEqual(finding["measured"]["lead"], 1)        # the title carries the whole lead,
+            self.assertEqual(finding["measured"]["lead"], 0)         # the title carries none of the verdict,
+            self.assertEqual(finding["measured"]["leadMissing"], ["expand", "northern", "capacity"])
             self.assertNotIn("pageMissing", finding["measured"])     # the page the whole answer,
             self.assertLess(finding["measured"]["title"], 0.35)      # and the title too little of it
             self.assertIn("expand", finding["measured"]["titleMissing"])
             self.assertIn("a title that repeats an opening clause which states no verdict leads with nothing", finding["repair"])
             self.assertRegex(finding["repair"], r"carries \d+ of the answer's \d+ content words and is held to 7 - 35% of them, or the 7 a full-length title holds where that is fewer")
         # An answer that leads with its verdict, and a title that states it, clear it, whatever the answer's length.
-        verdict = body[0].upper() + body[1:]
+        verdict = BODY[0].upper() + BODY[1:]
         self.assertEqual(answer_findings(plan(titles=["Expand northern capacity now: margins double southern, depot holds spare shifts"] + rest, points=points, answer=verdict)), [])
 
     def test_the_title_s_share_is_35_percent_or_what_a_full_length_title_holds(self):

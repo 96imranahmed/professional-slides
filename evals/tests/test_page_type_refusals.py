@@ -219,7 +219,8 @@ const matrix = {{ id: 'p2', type: 'matrix', form: 'findings-matrix', commentary:
   columns: ['Workload', 'Current signal / Winner call', 'Caveat'], rows: [
     {{ label: 'Composite', cells: ['Opus 5.5 at 58 | Anthropic', 'One configuration'] }}, {{ label: 'Coding cost', cells: ['Astra 40% lower | OpenAI', 'Task mix varies'] }},
     {{ label: 'Terminal', cells: ['Near parity | No durable gap', 'Harness matters'] }}] }};
-answers['column-judges'] = (column) => (['Current edge', 'Confidence', 'Winner call'].includes(column.header) ? 'judges' : 'states-facts');
+// A reader of each column: the edge, the confidence and the winner call judge their rows; a status column states a state.
+answers['column-reads'] = (column) => (['Current edge', 'Confidence', 'Winner call'].includes(column.header) ? 'judges' : column.header === 'Status' ? 'status' : 'facts');
 console.log(JSON.stringify({{
   edge: error(() => compilePage(lookup('Current edge', ['OpenAI', 'Anthropic', 'No verdict']))),
   confidence: error(() => compilePage(lookup('Confidence', ['High', 'Medium', 'Low']))),
@@ -229,7 +230,7 @@ console.log(JSON.stringify({{
   prose: error(() => compilePage(lookup('Status', ['Approved in the EU and pending in the US', 'Filed in March with a decision due in the autumn', 'Not yet filed anywhere this year']))),
   matrix: error(() => compilePage(matrix)),
   facts: error(() => compilePage(lookup('Leader', ['OpenAI', 'Anthropic', 'No verdict']))),
-  asked: asked.filter((q) => q.kind === 'column-judges').map((q) => q.subject.header),
+  asked: asked.filter((q) => q.kind === 'column-reads').map((q) => q.subject.header),
 }}));
 ''')
         self.assertIn("VERDICT_TABLE_PLAIN", result["edge"])
@@ -239,7 +240,7 @@ console.log(JSON.stringify({{
         self.assertIn("scorecard", result["edge"])
         self.assertIn("VERDICT_TABLE_PLAIN", result["confidence"])
         self.assertIsNone(result["coded"])
-        self.assertIsNone(result["words"])  # words the composer codes as status pills
+        self.assertIsNone(result["words"])  # a status in words: the composer codes it as status pills
         self.assertIsNone(result["numbers"])  # a score in numbers is a measure
         self.assertIsNone(result["prose"])  # a status described is not a verdict
         self.assertIn('"Winner call"', result["matrix"])
@@ -597,7 +598,7 @@ const map = {{ id: 'm', type: 'place', form: 'map', commentary: 'beside', points
     markers: [{{ label: 'Leeds', longitude: -1.55, latitude: 53.8 }}, {{ label: 'York', longitude: -1.08, latitude: 53.96 }}, {{ label: 'Hull', longitude: -0.34, latitude: 53.74 }}] }} }};
 // The battery's questions answered as a reader of each page would: the total row is a total, the edge column judges,
 // the dates read as a series, the paragraphs are scenarios.
-Object.assign(answers, {{ 'row-is-total': 'total', 'column-judges': (c) => (c.header === 'Current edge' ? 'judges' : 'states-facts'), 'heading-says-snapshots': 'reads-as-series', 'prose-alternatives': 'alternatives' }});
+Object.assign(answers, {{ 'row-is-total': 'total', 'column-reads': (c) => (c.header === 'Current edge' ? 'judges' : 'facts'), 'heading-says-snapshots': 'reads-as-series', 'prose-alternatives': 'alternatives' }});
 const raised = {{
   TABLE_TOO_SHORT: said(() => compilePage({{ ...lookup(['Measure', 'Value', 'Date'], three.slice(0, 2)), exhibit: table('First product', three.slice(0, 2)) }})),
   TABLE_PANELS_MERGE: said(() => compilePage(panels('stack', [table('First product', three), table('Second product', three)]))),

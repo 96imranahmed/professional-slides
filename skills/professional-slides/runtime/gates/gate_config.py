@@ -203,27 +203,14 @@ THRESHOLDS = {
     # What the page says. Set on the four example decks in the repository -
     # `--report` prints the measured value beside the floor so the number can
     # be argued with.
-    # Share of the commentary's own content words already printed in the exhibit
-    # beside it. Strong commentary runs a median of 0.25-0.36 and a p90 of 0.47;
-    # at 0.47 it flags the worst tenth, which is what a gate about a tail is for.
-    "restatement_max": 0.47,
-    "restatement_words_min": 12,  # below this the overlap is noise, not a pattern
-    # One block is read on its own, so it is judged on its own, and a sentence
-    # is shorter than a column: six content words is a sentence with something
-    # in it. The bar is higher than the column's, because a short sentence that
-    # names two categories shares their words by naming them - "asset
-    # valuations and public debt sit mid-table and moved little" is a reading,
-    # not a restatement, and runs 0.57 on a well-made page. Past two thirds
-    # there is nothing left in the sentence that the exhibit did not supply.
-    "restatement_block_words_min": 6,
-    "restatement_block_max": 0.66,
     # DECK_CRAFT's own floors are not here: they live beside the observations
     # they rest on, in `weight.json` under `plan.craft`, read through CONTRACT,
     # and `test_weight_contract` holds them to that one home.
     #
     # Commentary on most pages is not a defect, so nothing caps commentary
     # columns per page; commentary that says the exhibit again is, and
-    # RESTATEMENT measures exactly that. One question, one instrument.
+    # RESTATEMENT asks exactly that, of a model, line by line
+    # (commentary-restates). One question, one instrument.
     "caveats_max": 2,           # caveat lines per page; a strong deck runs at most two
     "schema_repeat_max": 3,     # pages that may open their table with the same column headers
     "schema_from": 6,           # tables in a deck before schema repetition is worth reporting

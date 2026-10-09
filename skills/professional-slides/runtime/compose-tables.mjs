@@ -1,13 +1,15 @@
 // Table treatment and inference: what the composer does to an authored
-// table before the renderer sees it (`styleTable`). It reads verdict words as
-// RAG cells, derives and totals columns where the figures add up, infers the
-// treatment a column's figures want - bars on one shared scale, open-ended
-// and range bars, ratings, icons - and leaves untreated a grid that reads as
-// text. `heavyTable` says when a table needs a page of its own.
+// table before the renderer sees it (`styleTable`). It sets a status
+// column's cells as RAG pills by what a model reads them to say, derives and
+// totals columns where the figures add up, infers the treatment a column's
+// figures want - bars on one shared scale, open-ended and range bars,
+// ratings, icons - and leaves untreated a grid that reads as text. `heavyTable` says when a table needs a page of its own.
 import { groupThousands } from "./draw.mjs";
-import { figureUnit, withUnit } from "./value-format.mjs";
+import { SCALAR_FIGURE, figureUnit, withUnit } from "./value-format.mjs";
 import { decade } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
+import { resultCells } from "./evidence.mjs";
+import { judged } from "./judgements.mjs";
 
 /**
  * Table treatment is chosen from what the table says, not from the first option
@@ -18,47 +20,68 @@ import { measureText } from "./text-layout.mjs";
  *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
  *   listing   (anything else)                                      → open rules only
  */
-const RAG_WORDS = [
-  [/^(on[\s-]?track|green|ok|on plan|on schedule)$/i, "on-track"],
-  [/^(complete|completed|done|delivered)$/i, "complete"],
-  [/^(behind|behind plan|delayed|amber|yellow|slipping|watch)$/i, "behind"],
-  [/^(at[\s-]?risk|overdue|red|blocked|off[\s-]?track|critical)$/i, "at-risk"],
-  [/^(not started|planned|pending|to do|todo)$/i, "not-started"],
-  // The verdict triad. A comparison scorecard's closing column says whether the
-  // subject won, drew or lost, and those are a positive, a middling and a
-  // negative state exactly as much as on-track/behind/at-risk are. Set as
-  // plain text, the column that carries the page's answer looks like the
-  // columns that carry its inputs.
-  // Only words that are themselves an adjudication. "Yes", "first" and "best"
-  // are not: a column recording that an arm used the draft, or that a film came
-  // first by release order, states a fact, and colouring it would assert an
-  // outcome the page has not established. The neutrality rule below governs.
-  [/^(wins?|won)$/i, "won"],
-  [/^(ties?|tied|draws?|drawn)$/i, "drawn"],
-  [/^(loses?|lost)$/i, "lost"],
-];
-/** Verdict cells: ✓/✗, status words and "45 %" under a progress heading become typed cells. */
-export function verdictCell(value, header) {
-  // A cell the highlight pass has already claimed arrives as {text, highlight}
-  // rather than as a string, and is still read for its state: a scorecard
-  // whose highlight phrase is its own verdict word keeps the pill on the rows
-  // it names. A state is worth more than an accent, and a pill emphasises the
-  // word more than the accent would, so the typed cell wins and the redundant
-  // accent is dropped.
-  const claimed = value !== null && typeof value === "object" && value.type === undefined
-    && typeof value.text === "string" && value.highlight !== undefined;
-  const source = claimed ? value.text : value;
-  if (typeof source !== "string") return value;
-  const text = source.trim();
+// What a column of words says of each row - a status, a direction, a
+// judgement or a fact - is read, not matched against a list of status words:
+// the column's header and its words are put to a model once (column-reads,
+// judgements.mjs) and the recorded answer sets the cells. A status column's
+// cells become pills in the colour of each cell's state, keeping the author's
+// words; a direction column's become trend rings; a progress column's
+// percentages become progress bars. A column not yet answered stays text, and
+// the compile lists its question as pending. Ticks and crosses are marks, not
+// words, and are read as such.
+const CELL_WORDS_MAX = 5;
+const BLANK_CELL = /^[\s\-–—]*$/;
+const PERCENT = /^(\d{1,3}(?:\.\d+)?)\s*%$/;
+const STATE_RAG = { positive: "on-track", caution: "behind", negative: "at-risk", neutral: "neutral" };
+const squeezed = (text) => String(text ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+// A cell the highlight pass has already claimed arrives as {text, highlight}
+// rather than as a string, and is still read for its state: a scorecard
+// whose highlight phrase is its own verdict word keeps the pill on the rows
+// it names. A state is worth more than an accent, and a pill emphasises the
+// word more than the accent would, so the typed cell wins and the redundant
+// accent is dropped.
+const claimedText = (value) => (value !== null && typeof value === "object" && value.type === undefined && typeof value.text === "string" && value.highlight !== undefined ? value.text : value);
+const wordsOf = (cell) => {
+  const text = claimedText(cell);
+  return typeof text === "string" || typeof text === "number" ? String(text).trim() : null;
+};
+
+/**
+ * The column-reads question a column puts: its header and the distinct words
+ * of its short cells, with the table's headers as context. Null where it is
+ * not asked: a column with fewer than two cells of five words or less, or
+ * fewer such cells than half its written ones, is prose or figures, and a
+ * figure other than a percentage (which may be progress) is a measure.
+ */
+export function columnQuestion(header, cells, headers) {
+  const written = (cells || []).filter((cell) => !(cell === null || cell === undefined || (typeof cell !== "object" && BLANK_CELL.test(String(cell)))));
+  const plain = written.map(wordsOf).filter((text) => text && !BLANK_CELL.test(text) && !/^(✓|✔|✗|✘|✕)$/.test(text)
+    && text.split(/\s+/).length <= CELL_WORDS_MAX && (!SCALAR_FIGURE.test(text) || PERCENT.test(text)));
+  if (plain.length < 2 || plain.length * 2 < written.length) return null;
+  return { subject: { header: String(header ?? ""), cells: [...new Set(plain)] }, context: { headers: (headers || []).map((h) => String(h ?? "")) } };
+}
+
+/** A cell as its column's reading sets it: ✓/✗ as a check, and a status, direction or progress cell as its typed cell. */
+export function readCell(value, reading) {
+  const text = wordsOf(value);
+  if (text === null) return value;
   if (/^(✓|✔)$/.test(text)) return { type: "check", value: "yes" };
   if (/^(✗|✘|✕)$/.test(text)) return { type: "check", value: "no" };
-  for (const [re, state] of RAG_WORDS) if (re.test(text)) return { type: "rag", value: state, text: /^(green|amber|yellow|red|ok)$/i.test(text) ? undefined : text };
-  if (/^\d{1,3}\s*%$/.test(text) && /(complete|progress|done|achiev)/i.test(String(header || ""))) return { type: "progress", value: Number(text.replace(/[^\d]/g, "")) };
-  // Presence, use and numeric direction do not establish a favorable outcome.
-  // Authors opt into evaluative colour with typed cells or explicit text tones.
-  // Outlook columns: arrows or the outlook words become trend rings.
-  if (/(outlook|trend|momentum|direction)/i.test(String(header || "")) && /^(↑|↗|up|positive|strong|improving|→|flat|neutral|moderate|stable|↓|↘|down|negative|weak|declining)$/i.test(text)) return { type: "trend", value: /^(↑|↗|up|positive|strong|improving)$/i.test(text) ? "up" : /^(↓|↘|down|negative|weak|declining)$/i.test(text) ? "down" : "flat" };
+  const read = (list) => (list || []).find((entry) => squeezed(entry?.cell) === squeezed(text))?.value;
+  if (reading?.verdict === "status" && STATE_RAG[read(reading.states)]) return { type: "rag", value: STATE_RAG[read(reading.states)], text };
+  if (reading?.verdict === "direction" && ["up", "flat", "down"].includes(read(reading.directions))) return { type: "trend", value: read(reading.directions) };
+  if (reading?.verdict === "progress" && PERCENT.test(text) && Number(text.match(PERCENT)[1]) <= 100) return { type: "progress", value: Number(text.match(PERCENT)[1]) };
   return value;
+}
+
+/** Each column's recorded reading (column-reads), by column index; the label column and a typed column are not read. */
+function columnReadings(ex) {
+  const headers = (ex.columns || []).map(columnLabel);
+  return (ex.columns || []).map((column, c) => {
+    if (!c || (column && typeof column === "object" && ((column.type && column.type !== "text") || column.heat || column.bar || column.harvey))) return null;
+    const asked = columnQuestion(headers[c], (ex.rows || []).map((row) => resultCells(row)[c - 1]), headers);
+    return asked && judged("column-reads", asked.subject, asked.context);
+  });
 }
 const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
 
@@ -906,7 +929,8 @@ export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string"
     ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
     : { width: columnWeight(ex, i), ...c });
-  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => verdictCell(cell, columnLabel(ex.columns[i]))))));
+  const readings = columnReadings(ex);
+  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => readCell(cell, readings[i + (Array.isArray(row) || row?.label === undefined ? 0 : 1)])))));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
   // The recommended option's column is tinted end to end.

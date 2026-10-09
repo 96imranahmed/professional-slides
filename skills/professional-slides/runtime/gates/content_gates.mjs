@@ -88,7 +88,6 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   qualitativeBlock: 0.5,
   addsOverlapMax: 0.5,    // `adds` built from the words of what it adds to
   claimWordsMin: 6,       // "Origins" is a topic; a claim is a sentence
-  claimOverlapMax: 0.7,   // two pages proving the same thing
   highlightMin: 1,
   // The answer gate, three measures on the answer's own content words.
   // `coverage` is the share of them that appear somewhere in the claims: an
@@ -125,9 +124,6 @@ export const CONTENT_THRESHOLDS = Object.freeze({
   // sentence holds seven of them
   // (test_answer_up_front.py measures the examples against it).
   titleContentShare: 0.6,
-  // The fewest content words a leading clause has: under them it is a name or
-  // an opener, not a verdict, and the next clause is read with it (answerLead).
-  answerLeadWordsMin: 3,
 });
 
 /**
@@ -179,10 +175,12 @@ export function runContentGates(content, options = {}) {
   // (the record variety_gates.mjs writes), for the author's report.
   const standings = [];
   checkPages(findings, pages);
-  checkDeckSpread(findings, pages, standings);
-  // The answer is read against every page's claim at once (answer-contradicted): asked of the whole deck, so not while a
-  // page has not compiled or composed - a question over part of the deck would be asked again over the rest.
-  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content, { whole: !options.uncomposed?.size });
+  // The claims are read against one another (claims-repeat), and the answer against every page's claim (answer-contradicted),
+  // at once: asked of the whole deck, so not while a page has not compiled or composed - a question over part of the deck
+  // would be asked again over the rest.
+  const whole = !options.uncomposed?.size;
+  checkDeckSpread(findings, pages, standings, { whole });
+  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content, { whole });
   return {...report(content, findings, pages, options.deck), textCoverage: textCheck, standings};
 }
 
@@ -237,7 +235,7 @@ function checkPages(findings, pages) {
 }
 
 /** Across a deck long enough to judge: the share of pages that settle nothing measurable, the highlights, and claims that repeat. */
-function checkDeckSpread(findings, pages, standings = []) {
+function checkDeckSpread(findings, pages, standings = [], { whole = true } = {}) {
   const applies = pages.length >= CONTENT_THRESHOLDS.from;
   const unmeasured = pages.filter((p) => String(p.settles?.kind ?? "qualitative") === "qualitative");
   if (pages.length) standings.push({ code: "CONTENT_UNMEASURED", what: "pages declaring their evidence qualitative", value: round(unmeasured.length / pages.length), bar: CONTENT_THRESHOLDS.qualitativeBlock, side: "max",
@@ -268,90 +266,53 @@ function checkDeckSpread(findings, pages, standings = []) {
         "Review whether a specific finding needs emphasis. Explicitly neutral pages are valid; "
         + "add a highlight only where the claim identifies its exact target."));
     }
-    for (let i = 0; i < pages.length; i += 1) {
-      for (let j = i + 1; j < pages.length; j += 1) {
-        if (overlap(pages[i].claim, pages[j].claim) > CONTENT_THRESHOLDS.claimOverlapMax
-            && overlap(pages[j].claim, pages[i].claim) > CONTENT_THRESHOLDS.claimOverlapMax) {
-          findings.push(finding(pages[j].n ?? null, "CONTENT_CLAIM_REPEATS",
-            { pages: [pages[i].n ?? i + 1, pages[j].n ?? j + 1], claim: String(pages[j].claim).slice(0, 70) },
-            CONTENT_THRESHOLDS.claimOverlapMax,
-            "Two pages prove the same thing. Merge them, or make the second one prove the next "
-            + "step rather than the same step with different evidence."));
-        }
-      }
+    for (const [i, j] of claimRepeats(pages, whole)) {
+      findings.push(finding(pages[j].n ?? null, "CONTENT_CLAIM_REPEATS",
+        { pages: [pages[i].n ?? i + 1, pages[j].n ?? j + 1], claim: String(pages[j].claim).slice(0, 70) },
+        "one page per claim",
+        "Two pages prove the same thing. Merge them, or make the second one prove the next "
+        + "step rather than the same step with different evidence."));
     }
   }
 }
 
-// The clause an answer leads with: its verdict, before the reasons and the
-// conditions. It ends at the first sentence end, colon, semicolon or dash, or
-// at the conjunction that opens a reason or a condition; an opener with no
-// content of its own ("Yes.") is passed over.
-//
-// The lead is a clause with a verdict in it, not the subject it is about. An
-// answer that opens "Subject: verdict" would otherwise lead with the subject
-// alone, and a title that only names the subject would carry all of it. So
-// the text before a break is read on with the next clause where it is too
-// short to say anything (under `answerLeadWordsMin` content words), and the
-// text before a colon - a label by construction - wherever it is just a noun
-// phrase naming what the answer is about: "Northfield: expand in the north"
-// leads with both halves, "The northern lead is narrow: ..." with the first.
-//
-// Whether the text before a colon says something of its subject is read off
-// its shape, not off a list of verbs - verbs are an open class, and a list of
-// them read "Harbour remains the region's strongest lender: ..." as a
-// label because "remains" was not on it. A noun phrase is one determiner and
-// what it governs; a clause carries a predicate, which shows as one of three
-// things only a predicate brings, each told by closed-class words:
-//   - an auxiliary, a copula, a modal or a negation ("is", "should", "not"),
-//     or the "than" of a comparison;
-//   - a second noun phrase opening inside it - a determiner, possessive or
-//     quantifier that is not its first word and that no preposition or
-//     conjunction governs: the object or complement of a verb ("remains THE
-//     strongest", "keeps ITS lead", "leads EVERY rival");
-//   - the next clause taking its subject up with a subject pronoun ("...: it
-//     leads every rival"). A possessive does not: "Northfield retail banking
-//     division: its lead is narrow" opens a new subject, of the thing a label
-//     has just named.
-// A clause that shows none of them - a bare verb over a bare noun, "Alder
-// beats Birch: ..." - is read on with the next clause, the stricter reading.
-//
-// What governs a noun phrase is read off the phrase too, and prepositions are a
-// closed class: the list holds all of the common ones, since one left off it
-// ("Verdict AFTER all three tests", "Position VERSUS the peers") made a label
-// read as a clause. And a determiner over a calendar unit is when, not what: in
-// "Answer this quarter for lending", "this quarter" is an adverbial, as
-// "last year" or "every month" is, and no verb's object.
-const CLAUSE_END = /[.!?;:](?=\s|$)|\s[—–-]\s|,?\s+(?:because|unless|although|though|whereas|provided|given that|so that|as long as|only if|if)\b/i;
-const PREDICATE_WORD = /\b(?:is|are|was|were|be|been|has|have|had|will|would|can|cannot|could|should|must|may|might|shall|does|did|do|not|never|than)(?:n't)?\b/i;
-const DETERMINERS = new Set(["the", "a", "an", "its", "their", "his", "her", "our", "your", "my", "this", "that", "these", "those", "every", "each", "all", "both", "no", "any", "some", "most", "more", "fewer", "less", "neither", "either", "another"]);
-const GOVERNORS = new Set(["of", "in", "on", "at", "by", "for", "with", "to", "from", "into", "onto", "over", "under", "across", "between", "among", "amongst", "amid", "through", "throughout", "during", "against", "within",
-  "without", "about", "above", "below", "behind", "beneath", "beside", "besides", "beyond", "per", "via", "as", "and", "or", "nor", "but", "than",
-  "after", "before", "since", "until", "till", "versus", "vs", "despite", "toward", "towards", "upon", "around", "along", "alongside", "near", "off", "outside", "inside", "past", "up", "down",
-  "underneath", "except", "excluding", "including", "regarding", "concerning", "following", "given", "like", "unlike", "plus", "minus"]);
-const CALENDAR_UNITS = new Set(["year", "years", "quarter", "quarters", "month", "months", "week", "weeks", "day", "days", "decade", "decades", "season", "seasons", "half", "term", "period", "cycle", "time"]);
-const TAKES_UP = /^\s*(?:it|they|this|these|those|both|each)\b/i;
-/** Does `text` say something of its subject - is it a clause, not just a noun phrase naming one (see above). `next` is the text after the colon that ends it. */
-function predicates(text, next = "") {
-  if (PREDICATE_WORD.test(text) || TAKES_UP.test(next)) return true;
-  const words = String(text).toLowerCase().match(/[a-z][a-z']*/g) ?? [];
-  return words.some((word, at) => at > 0 && DETERMINERS.has(word) && !GOVERNORS.has(words[at - 1]) && !DETERMINERS.has(words[at - 1]) && !CALENDAR_UNITS.has(words[at + 1]));
-}
-export function answerLead(answer) {
-  const whole = String(answer ?? "").trim();
-  let from = 0, at = 0;
-  while (at < whole.length) {
-    const end = CLAUSE_END.exec(whole.slice(at));
-    const stop = end ? at + end.index : whole.length;
-    const lead = whole.slice(from, stop).trim();
-    const words = contentWords(lead).size;
-    // An opener with nothing in it is passed over; a clause that has begun is kept and read on.
-    if (!words) from = end ? stop + end[0].length : stop;
-    else if (!end || (words >= CONTENT_THRESHOLDS.answerLeadWordsMin && !(end[0].startsWith(":") && !predicates(lead, whole.slice(stop + end[0].length))))) return lead;
-    if (!end) break;
-    at = stop + end[0].length;
+/**
+ * The pairs of pages, as indexes, that make the same claim. Two claims
+ * written word for word alike repeat on their face. Otherwise whether two
+ * claims are one finding is read, not counted in shared words: two claims
+ * about one subject share most of their words and find different things, and
+ * one finding put two ways shares few. So every claim is put to a reader at
+ * once (claims-repeat) - asked of the whole deck, so not while a page has not
+ * compiled, since a question over part of the deck would be asked again over
+ * the rest - and the pairs it names are the repeats.
+ */
+function claimRepeats(pages, whole) {
+  const said = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}%]+/gu, " ").trim();
+  const claims = pages.map((p, at) => ({ at, id: String(p.id ?? p.n ?? at + 1), claim: String(p.claim ?? "").trim() })).filter((c) => c.claim);
+  const pairs = [];
+  const add = (i, j) => { const pair = [Math.min(i, j), Math.max(i, j)]; if (i !== j && !pairs.some(([a, b]) => a === pair[0] && b === pair[1])) pairs.push(pair); };
+  for (const [k, a] of claims.entries()) for (const b of claims.slice(k + 1)) if (said(a.claim) === said(b.claim)) add(a.at, b.at);
+  if (whole && claims.length > 1) {
+    const read = judged("claims-repeat", claims.map(({ id, claim }) => ({ id, claim })));
+    const at = (id) => claims.find((c) => c.id === String(id))?.at;
+    if (read?.verdict === "repeats") for (const [a, b] of read.pairs || []) if (at(a) !== undefined && at(b) !== undefined) add(at(a), at(b));
   }
-  return whole;
+  return pairs.sort((x, y) => x[1] - y[1] || x[0] - y[0]);
+}
+
+// The clause an answer leads with: its verdict, before the reasons and the
+// conditions. Which words of the answer state it is read, not parsed: an
+// answer may open with a label naming its subject ("Northfield: expand in the
+// north"), a clause that is itself the verdict ("Harbour remains the region's
+// strongest lender: ..."), or an opener with nothing in it ("Yes."), and a
+// parser of clause ends and closed-class words told them apart only as far as
+// its lists reached. So it is asked (answer-lead), once per answer, and the
+// lead is the words the reader quoted. An answer the reader finds no verdict
+// in, or one not yet answered, has no lead to hold: the opening title is then
+// held to its share of the whole answer alone.
+export function answerLead(answer) {
+  const read = judged("answer-lead", String(answer ?? "").trim());
+  return read?.verdict === "verdict" && String(read.lead ?? "").trim() ? String(read.lead).trim() : null;
 }
 
 /** The content words a full-length title can hold: the title word limit, at the content-word share of a title's words. */
@@ -407,8 +368,9 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
     const { share: coverage, missing } = carriedBy(answerWords, claims.join(" \n "));
     const opening = openingPage(pages);
     const named = opening ? `${opening.pages.map((id) => `\`${id}\``).join(" and ")} (${opening.summary ? `the executive summary${opening.pages.length > 1 ? `, ${opening.pages.length} pages read as one` : ""}` : "the opening page"})` : "the opening page";
+    // The answer's leading clause, as a reader quotes it (answer-lead); null where none is read yet.
     const lead = answerLead(answer);
-    const titled = carriedBy(contentWords(lead), opening?.title ?? "");
+    const titled = lead === null ? null : carriedBy(contentWords(lead), opening?.title ?? "");
     const upFront = opening?.whole === null ? null : carriedBy(answerWords, opening?.whole ?? "");
     // The opening title's own share of the whole answer, and the share it is held to: `answerCarriedMin`, or what a full-length title can hold where that is less.
     const inTitle = carriedBy(answerWords, opening?.title ?? "");
@@ -424,7 +386,7 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
     // is there to read.
     const blocks = severity === "blocking";
     standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "coverage", what: "the answer's content words some claim carries", value: round(coverage), bar: CONTENT_THRESHOLDS.answerCoverageMin, side: "min", unit: "share", applies: true, blocks });
-    if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "lead", what: "the answer's leading clause the opening title carries", value: round(titled.share), bar: CONTENT_THRESHOLDS.answerLeadMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
+    if (opening && titled) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "lead", what: "the answer's leading clause the opening title carries", value: round(titled.share), bar: CONTENT_THRESHOLDS.answerLeadMin, side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
     if (opening && upFront) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "upfront", what: "the answer's content words the opening page carries", value: round(upFront.share), bar: CONTENT_THRESHOLDS.answerUpFrontMin, side: "min", unit: "share", applies: true, blocks, pages: opening.pages });
     if (opening) standings.push({ code: "CONTENT_ANSWER_UNCARRIED", key: "title", what: "the answer's content words the opening title carries", value: round(inTitle.share), bar: round(titleBar), side: "min", unit: "share", applies: true, blocks, pages: [opening.id] });
     const quoted = (words) => words.slice(0, 6).map((w) => `"${w}"`).join(", ");
@@ -437,14 +399,14 @@ function checkAnswerCarried(findings, content, pages, standings = [], deck = con
     // The answer up front. The title is asked for the verdict and the page
     // for the rest, so an answer with its reasons and thresholds is carried
     // by a summary that states them, whatever its length.
-    const short = titled.share < CONTENT_THRESHOLDS.answerLeadMin;
+    const short = titled !== null && titled.share < CONTENT_THRESHOLDS.answerLeadMin;
     const thin = upFront !== null && upFront.share < CONTENT_THRESHOLDS.answerUpFrontMin;
     // Compared as counts, so the bar is exact: the title carries `answerCarriedMin` of the answer's words, or as many as a full-length title holds.
     const titleNeeds = Math.min(CONTENT_THRESHOLDS.answerCarriedMin * answerWords.size, titleContentWords());
     const bare = answerWords.size - inTitle.missing.length < titleNeeds - 1e-9;
     if (opening && (short || thin || bare))
       findings.push({ rule: "CONTENT_ANSWER_UNCARRIED.upfront", severity, id: opening.id, ...finding(opening.page.n ?? null, "CONTENT_ANSWER_UNCARRIED",
-        { page: opening.id, lead: round(titled.share), title: round(inTitle.share), ...(upFront ? { upFront: round(upFront.share) } : {}), ...(short ? { leadMissing: titled.missing.slice(0, 8) } : {}), ...(bare ? { titleMissing: inTitle.missing.slice(0, 8) } : {}), ...(thin ? { pageMissing: upFront.missing.slice(0, 8) } : {}) },
+        { page: opening.id, ...(titled ? { lead: round(titled.share) } : {}), title: round(inTitle.share), ...(upFront ? { upFront: round(upFront.share) } : {}), ...(short ? { leadMissing: titled.missing.slice(0, 8) } : {}), ...(bare ? { titleMissing: inTitle.missing.slice(0, 8) } : {}), ...(thin ? { pageMissing: upFront.missing.slice(0, 8) } : {}) },
         { lead: CONTENT_THRESHOLDS.answerLeadMin, title: round(titleBar), upFront: CONTENT_THRESHOLDS.answerUpFrontMin },
         `The deck does not lead with its answer on ${named}. `
         + (short ? `Its title ("${opening.title.slice(0, 90)}") carries ${Math.round(titled.share * 100)}% of the answer's leading clause ("${lead.slice(0, 110)}") and is held to ${Math.round(CONTENT_THRESHOLDS.answerLeadMin * 100)}%: write the verdict in the title in the answer's own words (missing: ${quoted(titled.missing)}). ` : "")

@@ -105,11 +105,9 @@ class OneDefinitionTests(unittest.TestCase):
         import page_gates
         import render_gates
         import scene_gates
-        import semantic_gates
         self.assertIs(page_gates.word_count, text_stats.word_count)
         self.assertIs(render_gates.word_count, text_stats.word_count)
         self.assertIs(scene_gates.word_count, text_stats.word_count)
-        self.assertIs(semantic_gates.content_words, text_stats.content_words)
         self.assertIs(density_profile.printed_words, text_stats.printed_words)
         self.assertEqual(density_profile.words("• Revenue — up 12%"), 3)
 
@@ -118,8 +116,6 @@ class OneDefinitionTests(unittest.TestCase):
         self.assertEqual(text_stats.STOPWORDS, frozenset(lists["content"]))
         # Every reader takes the file's list rather than a copy: the Python
         # gates hold the very objects, and the Node gate drops every listed word.
-        import semantic_gates
-        self.assertIs(semantic_gates.content_words, text_stats.content_words)
         kept = run_node(f"""
 import {{ contentWords }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
 console.log(JSON.stringify([...contentWords({json.dumps(" ".join(sorted(lists["content"])) + " revenue")})]));

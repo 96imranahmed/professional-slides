@@ -24,7 +24,7 @@ import zipfile
 from pathlib import Path
 
 from node_probe import HAS_PPTX, NODE, ROOT, RUNTIME, RUNTIME_PYTHON, run_node
-from judgement_oracle import answer_everything
+from judgement_oracle import answer_everything, reading_quantities
 
 PYTHON = RUNTIME_PYTHON or sys.executable
 IMPORT = RUNTIME / "import-deck.py"
@@ -42,8 +42,10 @@ PROBE = """
 import fs from 'node:fs';
 import path from 'node:path';
 import { authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+import { loadJudgements, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const dir = DIR, doc = JSON.parse(fs.readFileSync(path.join(dir, NAME + '.pages.json'), 'utf8'));
-const result = await authorDeck(doc, { baseDir: dir, insights: null, fit: false, fill: false });
+// The answers recorded beside the pages file are read, as the compile reads them.
+const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? NAME), () => authorDeck(doc, { baseDir: dir, insights: null, fit: false, fill: false }));
 const brief = (f) => ({ code: f.code, id: f.id ?? null, severity: f.severity, pages: f.pages ?? null, measured: f.measured ?? null, waived: f.waived ?? null, repair: f.repair ?? f.reason ?? '' });
 console.log(JSON.stringify({ blocking: result.blocking.map(brief), advisories: result.advisories.map(brief) }));
 """
@@ -251,6 +253,10 @@ console.log(JSON.stringify({json.dumps(self.CASES)}.map(([text, words]) => {{ co
         self.assertEqual(body, "Sales reached £31.9m in the year, up 9% on the year before\nCost per loaf was £131.75 against a plan of £131.7\nShop margin held at 31.7% across the estate")
 
 
+# What the orchard deck's passages state, as a reader reads them.
+ORCHARD = [["margin", "the shop margin"], ["last year", "last year's sales"], ["sales|total", "this year's sales"]]
+
+
 class StaleByQuantityTests(RevisedDeck):
     """A changed figure is looked for as a quantity: its value, its kind and its scale, whatever the notation, wherever the deck says it."""
 
@@ -304,6 +310,9 @@ class StaleByQuantityTests(RevisedDeck):
                 "settles": {"kind": "structure", "what": "sales by region for the year"},
                 "exhibit": {"columns": ["Region", "Sales (£m)"], "rows": [["Coast", "9.4"], ["Hills", "10.2"], ["Valley", "12.3"], ["Total", "31.9"]]}}
         work = self.revise(redrawn)
+        # A reader says which of the page's numbers replaced the old total, and which slides still state it.
+        _, answered = answer_everything(NODE, work / "deck.pages.json", answer=reading_quantities(ORCHARD))
+        self.assertEqual(answered.returncode, 0, answered.stderr[-1500:])
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 2)
         stale = [f for f in self.log(work) if f["code"] == "NUMBER_STALE"]
@@ -313,6 +322,7 @@ class StaleByQuantityTests(RevisedDeck):
         self.assertIn('say so on s04: `"only": [', stale[0]["repair"])
         # Named, the pages are excused - and listed for the reviewer.
         named = self.revise(lambda doc: (redrawn(doc), self.page(doc, "s04").update(only=stale[0]["pages"][1:])))
+        answer_everything(NODE, named / "deck.pages.json", answer=reading_quantities(ORCHARD))
         self.assertEqual([f for f in self.log(named) if f["code"] == "NUMBER_STALE"], [])
         done = self.author(named, "--check")
         self.assertIn("Left standing on purpose (`only`), for the reviewer to check: s04 not looked for on", done.stderr)

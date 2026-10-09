@@ -22,6 +22,7 @@ import unittest
 from pathlib import Path
 
 from node_probe import NODE, ROOT, RUNTIME, RUNTIME_PYTHON, requires_python_package, run_node
+from judgement_oracle import answer_everything, quantity_reader_js, reading_quantities
 
 PYTHON = RUNTIME_PYTHON or sys.executable
 FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
@@ -204,7 +205,10 @@ console.log(JSON.stringify({ untouched: repeats(pages, revision, { changed: ['p3
         self.assertEqual(result["changed"], [["p1", "p4"]])
 
 
-REVISION = '''
+# What the finance deck's passages state, as a reader reads them: the year a caption names, or the latest where it names none.
+FINANCE = [["operating cash flow.*FY26", "operating cash flow in FY26"], ["profit after tax(?!.*FY2[0-5])", "profit after tax in FY26"]]
+REVISION = quantity_reader_js(FINANCE) + '''
+import { withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { authorDeck, readInsights } from './skills/professional-slides/runtime/author-deck.mjs';
@@ -222,7 +226,7 @@ const base = { deck: { ...deck, workflow: 'existing_deck_revision', inventory: '
   pages: written.pages.map((page) => ({ ...strip(page), sourceSlide: inventory.slides.find((slide) => slide.title === page.title).index })) };
 const page = (d, id) => d.pages.find((p) => p.id === id);
 const revised = async (mutate) => { const d = structuredClone(base); mutate?.(d);
-  const r = await authorDeck(d, { baseDir: path.join(dir, 'rev'), fit: false });
+  const r = await withJudgements(quantityReader(), () => authorDeck(d, { baseDir: path.join(dir, 'rev'), fit: false }));
   const of = (list) => list.filter((f) => /^(NUMBERS_DISAGREE|NUMBER_STALE|NUMBER_FORMATS_DIFFER|WORDING_STALE|PROOF_REPEATS|BAR_.*)$/.test(f.code)).map((f) => ({ code: f.code, severity: f.severity, pages: f.pages ?? null, measured: f.measured ?? null, repair: f.repair }));
   return { doc: d, changed: revisionChanges(r.spec, inventory), blocking: of(r.blocking), advisories: of(r.advisories), refused: r.blocking.map((f) => f.code) }; };
 // The one number a point change moves: operating cash flow in FY26, in the chart, its caption and the figure above it.
@@ -277,7 +281,7 @@ console.log(JSON.stringify({ log: fs.existsSync(path.join(dir, 'rev', 'finance.i
         self.assertEqual([stale[0]["measured"]["was"], stale[0]["measured"]["now"]], [66, 61])
         # Both pages, both wordings: the page that changed with what it said before, and the page that still says it.
         self.assertIn('This revision changed 66 million to 61 million on f2 ("Operating cash flow fell to 61 million in FY26"; the slide said "Operating cash flow fell to 66 million in FY26")', stale[0]["repair"])
-        self.assertIn('f0 still states 66m of the same thing ("Operating cash flow" under "FY26")', stale[0]["repair"])
+        self.assertIn('f0 still states 66m - the same quantity, as a reader reads the two ("Operating cash flow" under "FY26")', stale[0]["repair"])
         # It is the one finding the change raises: the chart's 66 at FY22, which the page still plots, is not read as the old value.
         self.assertEqual([f["code"] for f in result["changed"]["blocking"]], ["NUMBER_STALE"])
         self.assertEqual(result["both"], [])
@@ -294,7 +298,7 @@ console.log(JSON.stringify({ restated: stale(restated), dropped: stale(dropped),
         restated = result["restated"]
         self.assertEqual([[severity, pages] for severity, pages, _ in restated], [["blocker", ["f2", "f0"]]], restated)
         self.assertIn("changed 49 million to 52 million on f2", restated[0][2])
-        self.assertIn('f0 still states 49m of the same thing ("Profit after tax" under "FY26")', restated[0][2])
+        self.assertIn('f0 still states 49m - the same quantity, as a reader reads the two ("Profit after tax" under "FY26")', restated[0][2])
         # A number the page stopped printing that had no label: said as a question, never refused.
         dropped = result["dropped"]
         # Every page that prints the digits is asked about, here f3's "4.3 points above the minimum" too: digits alone say no more.
@@ -321,11 +325,14 @@ fs.writeFileSync(path.join(dir, 'rev', 'finance.pages.json'), JSON.stringify(d))
 console.log(JSON.stringify({ written: true }));
 ''')
         self.assertTrue(probe["written"])
+        # The compile reads the answers judge.mjs records: a reader is asked which number replaced the old one and whether f0's states it.
+        _, judged = answer_everything(NODE, self.dir / "rev" / "finance.pages.json", answer=reading_quantities(FINANCE))
+        self.assertEqual(judged.returncode, 0, judged.stderr[-1500:])
         run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(self.dir / "rev" / "finance.pages.json"), "--check"], capture_output=True, text=True, cwd=ROOT, timeout=600)
         self.assertEqual(run.returncode, 2, run.stderr[:600])
         findings = run.stderr.split("Where the deck stands")[0]
         self.assertIn("NUMBER_STALE", findings)
-        self.assertIn("f0 still states 66m of the same thing", findings)
+        self.assertIn("f0 still states 66m - the same quantity, as a reader reads the two", findings)
         # One finding to fix: the point change is refused for what it left inconsistent, and for nothing else about the deck.
         self.assertIn("1 finding to fix", findings)
 
@@ -355,20 +362,24 @@ console.log(JSON.stringify({ untouched: run(pages, []), stale: run([pages[0], pa
 
 
     def test_a_number_in_a_sentence_is_matched_by_what_it_is_said_of(self):
-        result = run_node(LOG + '''
+        # Whether two sentences state one quantity is the reader's: here, a reader that knows which network each is about.
+        result = run_node(LOG + quantity_reader_js([["Boreal", "the clinics Boreal closed"], ["Cinder", "Cinder's estate"]]) + '''
+import { withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const memo = (id, sourceSlide, text) => ({ id, sourceSlide, type: 'argument', form: 'memo', commentary: 'none', why: 'A reasoned case in prose beside the claim it argues', settles: { kind: 'qualitative', what: 'the estate each network runs' },
   title: `What the estate counts say about the entrant, page ${id}`, panel: { text: 'The entrant is small today' }, paragraphs: [text] });
 const slide = (index, text) => ({ index, id: `s0${index}`, title: `What the estate counts say about the entrant, page p${index}`, paragraphs: [{ text: 'The entrant is small today', level: 0 }, { text, level: 0 }], tables: [], charts: [], pictures: [] });
 const WAS = 'Cinder operates an estate of 158 clinics today, which is the base its plans are read against.';
 const inventory = (second) => ({ slides: [slide(1, WAS), slide(2, second)] });
-const run = (now, second) => find([memo('p1', 1, now), memo('p2', 2, second)], { inventory: inventory(second), changed: ['p1'] }, null, { workflow: 'existing_deck_revision' }).filter((f) => f.code === 'NUMBER_STALE').map((f) => [f.severity, f.pages, f.repair]);
+const run = (now, second) => withJudgements(quantityReader(), () => find([memo('p1', 1, now), memo('p2', 2, second)], { inventory: inventory(second), changed: ['p1'] }, null, { workflow: 'existing_deck_revision' }))
+  .filter((f) => f.code === 'NUMBER_STALE').map((f) => [f.severity, f.pages, f.repair]);
 const NOW = WAS.replace('158', '171');
 console.log(JSON.stringify({
-  // The same label in fewer words: every word of it stands in the changed sentence.
+  // The same quantity in fewer words.
   same: run(NOW, 'The Cinder estate is 158 clinics.'),
-  // Another sentence about the same thing, in words of its own: alike, which is asked and not refused.
+  // The same quantity in words of its own, which shared words alone could only ask about: a reader says it is the one.
   alike: run(NOW, 'The estate of 158 clinics at Cinder is a third of what the leader runs.'),
-  // The same count of another thing, and the same digits counting something else, are not the figure that changed.
+  // The same count of another thing, and the same digits counting something else, are not the figure that changed: the
+  // first a reader says is another thing, the second is not put to one, since it counts towns.
   other: run(NOW, 'Boreal closed 158 clinics over the decade, more than any rival.'),
   towns: run(NOW, 'Cinder serves 158 towns with the estate it has.'),
   // The sentence dropped, nothing in its place: the same thing still stated elsewhere is a question, not a refusal.
@@ -377,14 +388,14 @@ console.log(JSON.stringify({
 ''')
         self.assertEqual([[severity, pages] for severity, pages, _ in result["same"]], [["blocker", ["p1", "p2"]]], result["same"])
         self.assertIn("This revision changed 158 to 171 on p1", result["same"][0][2])
-        self.assertIn('p2 still states 158 of the same thing ("The Cinder estate is 158 clinics")', result["same"][0][2])
-        self.assertEqual([[severity, pages] for severity, pages, _ in result["alike"]], [["advisory", ["p1", "p2"]]], result["alike"])
-        self.assertIn("p1 no longer states 158 (now 171)", result["alike"][0][2])
-        self.assertIn("The words around them are alike, which is not enough to say they are one figure", result["alike"][0][2])
+        self.assertIn('p2 still states 158 - the same quantity, as a reader reads the two ("The Cinder estate is 158 clinics")', result["same"][0][2])
+        self.assertEqual([[severity, pages] for severity, pages, _ in result["alike"]], [["blocker", ["p1", "p2"]]], result["alike"])
+        self.assertIn('p2 still states 158 - the same quantity, as a reader reads the two ("The estate of 158 clinics at Cinder is a third of what the leader runs")', result["alike"][0][2])
         self.assertEqual(result["other"], [])
         self.assertEqual(result["towns"], [])
         self.assertEqual([[severity, pages] for severity, pages, _ in result["dropped"]], [["advisory", ["p1", "p2"]]], result["dropped"])
         self.assertIn("p1 no longer states 158, which the slide it was imported from did", result["dropped"][0][2])
+        self.assertIn("A reader reads it as the same quantity, but p1 shows no number that replaced it", result["dropped"][0][2])
         self.assertEqual(result["unchanged"], [])
 
 

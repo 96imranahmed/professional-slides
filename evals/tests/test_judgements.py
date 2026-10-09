@@ -56,7 +56,7 @@ class KindTests(unittest.TestCase):
 @unittest.skipUnless(NODE, "Node.js is not available")
 class KeyTests(unittest.TestCase):
     SUBJECTS = [
-        ("column-judges", {"header": "Current edge", "cells": ["OpenAI", "Anthropic", "No verdict"]}, {"headers": ["Criterion", "Current edge", "Reason"]}),
+        ("column-reads", {"header": "Current edge", "cells": ["Northfield", "Harbour", "No verdict"]}, {"headers": ["Criterion", "Current edge", "Reason"]}),
         ("title-leads-with-gap", "Leadership cannot be ranked without matched retention", None),
         ("commentary-caveats", [{"id": "l1", "text": "Café revenue rose 12% – a record"}, {"id": "l2", "text": "“Quoted” and naïve"}], None),
         ("tiles-one-measure", [{"id": "t1", "value": "25.8%", "label": "Jan 2025 cohort"}, {"id": "t2", "value": "45%", "label": "Feb 2026 cohort"}], None),
@@ -135,6 +135,34 @@ console.log(JSON.stringify({ refused: Object.fromEntries(Object.entries(refused)
         self.assertEqual(result["name"], "packet-01")
         self.assertEqual(result["where"], [["p7"], ["p3"]])
         self.assertEqual(result["prompt"], [True] * 4)
+
+    def test_a_pair_of_ids_and_a_value_for_each_cell_are_checked_against_the_subject(self):
+        result = run_node(CORE + """
+const claims = [{ id: 'p1', claim: 'Northfield leads on reach' }, { id: 'p2', claim: 'Reach puts Northfield first' }];
+const column = { header: 'Status', cells: ['On track', 'At risk'] };
+const items = [{ key: 'k1', kind: 'claims-repeat', subject: claims }, { key: 'k2', kind: 'column-reads', subject: column, context: { headers: ['Workstream', 'Status'] } }];
+const reason = 'A reason given in a sentence.';
+const problems = (item, answer) => J.answerProblems(item, { reason, ...answer });
+const schema = J.answerSchema(items).properties.judgements.items.properties;
+console.log(JSON.stringify({
+  pair: problems(items[0], { verdict: 'repeats', pairs: [['p1', 'p2']] }),
+  same: problems(items[0], { verdict: 'repeats', pairs: [['p1', 'p1']] }),
+  stranger: problems(items[0], { verdict: 'repeats', pairs: [['p1', 'p9']] }),
+  states: problems(items[1], { verdict: 'status', states: [{ cell: 'On track', value: 'positive' }, { cell: 'at risk', value: 'negative' }] }),
+  unknownCell: problems(items[1], { verdict: 'status', states: [{ cell: 'Late', value: 'negative' }] }),
+  unknownValue: problems(items[1], { verdict: 'status', states: [{ cell: 'On track', value: 'green' }] }),
+  facts: problems(items[1], { verdict: 'facts' }),
+  schema: { pairs: schema.pairs.items, states: schema.states.items.properties.value.enum },
+}));
+""")
+        self.assertEqual(result["pair"], [])
+        self.assertIn("two different ids of the subject", " ".join(result["same"]))
+        self.assertIn("two different ids of the subject", " ".join(result["stranger"]))
+        self.assertEqual(result["states"], [], "a cell is named in its words, read without case")
+        self.assertIn('names the cell "Late"', " ".join(result["unknownCell"]))
+        self.assertIn('the value "green"', " ".join(result["unknownValue"]))
+        self.assertEqual(result["facts"], [])
+        self.assertEqual(result["schema"], {"pairs": {"type": "array", "items": {"type": "string"}}, "states": ["positive", "caution", "negative", "neutral"]})
 
     def test_every_question_is_staged_at_once_and_each_packet_stands_on_its_own(self):
         result = run_node(CORE + """

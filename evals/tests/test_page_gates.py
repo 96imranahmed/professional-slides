@@ -25,6 +25,7 @@ sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
 from node_probe import requires_python_package, example_scene, example_scene_file  # noqa: E402
+from judgement_oracle import answering  # noqa: E402
 
 # The three gates that read the renders need Pillow (see requirements.txt).
 # Everything else in this file works off the scene.
@@ -520,11 +521,17 @@ class RestatementGateTests(unittest.TestCase):
             nodes.append(self.node("annotation-text", callout))
         return {"nodes": nodes, "componentInstances": []}
 
-    def test_naming_the_members_is_not_restating_the_chart(self):
-        """Fifty-six-page re-author: naming a chart's members was read as restating it."""
-        findings = []
-        page_gates.gate_restatement(1, self.page("Europe and East Asia earn 59% of all revenue"), findings)
-        self.assertEqual(findings, [], "the names are the subject; the callout alone is too short to be a pattern")
+    def test_the_callouts_are_put_to_the_reader_apart_from_the_exhibit(self):
+        """Fifty-six-page re-author: naming a chart's members was read as restating it, by a share of shared words. The
+        reader is given the members, the callout and the caption apart, and judges whether the caption reads them back."""
+        with answering({"commentary-restates": "adds"}) as asked:
+            findings = []
+            page_gates.gate_restatement(1, self.page("Europe and East Asia earn 59% of all revenue"), findings)
+        self.assertEqual(findings, [])
+        [(_, subject)] = asked
+        self.assertIn("Africa", subject["exhibit"])
+        self.assertEqual(subject["callouts"], ["Europe and East Asia earn 59% of all revenue"])
+        self.assertNotIn("Europe and East Asia earn 59% of all revenue", subject["exhibit"])
 
     def test_a_caption_that_repeats_the_callout_is_told_so(self):
         """Fifty-six-page re-author: a caption became a restatement the moment a callout was added."""
@@ -534,7 +541,8 @@ class RestatementGateTests(unittest.TestCase):
         slide["nodes"] = [n for n in slide["nodes"] if n["role"] != "panel-caption"] + [
             self.node("panel-caption", "Premium cabins earn the widest yield and cargo bellies lift winter margin")]
         findings = []
-        page_gates.gate_restatement(1, slide, findings)
+        with answering({"commentary-restates": {"verdict": "restates", "lines": ["c1"]}}):
+            page_gates.gate_restatement(1, slide, findings)
         self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
         self.assertIn("callout", findings[0]["measured"])
         self.assertIn("callout", findings[0]["repair"])

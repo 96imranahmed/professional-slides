@@ -127,9 +127,12 @@ console.log(JSON.stringify({ classes: Object.fromEntries(codes.map((code) => [co
             self.assertIn("PAGE_SHAPE_FLAT.share: pages on the commonest architecture (evidence-only) 4 of 7 pages", standing)
             self.assertIn("(provisional)", standing.split("Deck aggregates")[0])
             self.assertIn("(measured on the 6 pages that composed)", standing.split("Deck aggregates")[1])
-            # The answer rule's three bars each say where the deck stands (the summary's title and the page as a whole).
-            for key in ("CONTENT_ANSWER_UNCARRIED.coverage", "CONTENT_ANSWER_UNCARRIED.lead", "CONTENT_ANSWER_UNCARRIED.upfront"):
+            # The answer rule's bars each say where the deck stands (the titles, the summary's title and the page as a whole);
+            # the bar on the answer's leading clause waits for a reader to say which words state the verdict (answer-lead).
+            for key in ("CONTENT_ANSWER_UNCARRIED.coverage", "CONTENT_ANSWER_UNCARRIED.title", "CONTENT_ANSWER_UNCARRIED.upfront"):
                 self.assertIn(key, report)
+            self.assertNotIn("CONTENT_ANSWER_UNCARRIED.lead", report)
+            self.assertIn("answer-lead 1", report)
             entry = log_of(file)[-1]
             self.assertEqual([entry["v"], entry["mode"], entry["pages"], entry["ok"]], [2, "check", 7, False])
             self.assertEqual(sorted((f["code"], f["class"]) for f in entry["findings"]), [("BINDING_UNRESOLVED", "P"), ("MEASURES_CONFLICT", "S")])

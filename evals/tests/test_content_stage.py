@@ -25,6 +25,7 @@ import unittest
 from node_probe import ROOT, run_node
 
 GATES = "file://" + str(ROOT / "skills" / "professional-slides" / "runtime" / "gates" / "content_gates.mjs")
+JUDGEMENTS = "file://" + str(ROOT / "skills" / "professional-slides" / "runtime" / "judgements.mjs")
 
 
 def gate(content):
@@ -88,6 +89,26 @@ class ClaimTests(unittest.TestCase):
         pages[6]["claim"] = same
         codes = [f["code"] for f in gate(deck(pages))["findings"]]
         self.assertIn("CONTENT_CLAIM_REPEATS", codes)
+
+    def test_one_claim_in_other_words_is_a_repeat_where_a_reader_says_so(self):
+        # Shared words do not say two claims are one finding: every claim is put to a reader at once (claims-repeat), and
+        # the pairs it names are the repeats. Unanswered, only claims written word for word alike repeat.
+        pages = [page(i) for i in range(1, 10)]
+        pages[6]["claim"] = "Only three markets have the data, and readiness picks the first wave"
+        result = run_node(f"""
+import {{ runContentGates }} from '{GATES}';
+import {{ judgementSession, withJudgements }} from '{JUDGEMENTS}';
+const content = {json.dumps(deck(pages))}, asked = [];
+const run = (said, options = {{}}) => withJudgements(judgementSession({{ oracle: (kind, subject) => (kind === 'claims-repeat' ? (asked.push(subject), said) : null) }}),
+  () => runContentGates(content, options).findings.filter((f) => f.code === 'CONTENT_CLAIM_REPEATS').map((f) => f.measured.pages));
+console.log(JSON.stringify({{ named: run({{ verdict: 'repeats', pairs: [['7', '1']] }}), distinct: run('distinct'), open: run(null),
+  part: run({{ verdict: 'repeats', pairs: [['7', '1']] }}, {{ uncomposed: new Set([3]) }}), asked: asked.length, subject: asked[0] }}));
+""")
+        self.assertEqual(result["named"], [[1, 7]])
+        self.assertEqual([result["distinct"], result["open"]], [[], []])
+        self.assertEqual(result["part"], [], "asked of the whole deck: not while a page has not composed")
+        self.assertEqual(result["asked"], 3)
+        self.assertEqual(result["subject"][6], {"id": "7", "claim": pages[6]["claim"]})
 
 
 class EvidenceKindTests(unittest.TestCase):

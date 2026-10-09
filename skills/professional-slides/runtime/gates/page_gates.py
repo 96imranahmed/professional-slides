@@ -641,9 +641,6 @@ def thresholds_markdown():
         ("PAGE_SHAPE_FLAT", "from {} analytical pages: architectures per ten pages, at least; the commonest's share, at most".format(THRESHOLDS["shape_variety_from"]),
          "{:g}; {}".format(THRESHOLDS["shapes_per_ten_min"], _share(THRESHOLDS["shape_share_max"]))),
         ("COLUMN_MONOTONY", "consecutive pages whose commentary column shares one device, at most", str(THRESHOLDS["column_run_max"] - 1)),
-        ("RESTATEMENT", "commentary content words already in the exhibit, at most: the column (from {} words); one block (from {} words)".format(
-            THRESHOLDS["restatement_words_min"], THRESHOLDS["restatement_block_words_min"]),
-         "{}; {}".format(_share(THRESHOLDS["restatement_max"]), _share(THRESHOLDS["restatement_block_max"]))),
         ("CAVEAT_HEAVY", "caveat lines a page, at most", str(THRESHOLDS["caveats_max"])),
         ("TABLE_SCHEMA_FLAT", "tables opening on the same headers, at most (from {} tables)".format(THRESHOLDS["schema_from"]), str(THRESHOLDS["schema_repeat_max"])),
         ("DECK_CRAFT", "advisory rates across analytical pages (from {} pages), at least: a phrase emphasised; a source line; drawn marks a page; "

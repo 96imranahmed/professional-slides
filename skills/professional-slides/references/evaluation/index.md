@@ -109,7 +109,6 @@ Printed by `python3 runtime/gates/page_gates.py --thresholds-markdown` from the 
 | `DECK_FLAT` | analytical pages from which one page must carry the detail | 8 |
 | `PAGE_SHAPE_FLAT` | from 10 analytical pages: architectures per ten pages, at least; the commonest's share, at most | 3; 40% |
 | `COLUMN_MONOTONY` | consecutive pages whose commentary column shares one device, at most | 3 |
-| `RESTATEMENT` | commentary content words already in the exhibit, at most: the column (from 12 words); one block (from 6 words) | 47%; 66% |
 | `CAVEAT_HEAVY` | caveat lines a page, at most | 2 |
 | `TABLE_SCHEMA_FLAT` | tables opening on the same headers, at most (from 6 tables) | 3 |
 | `DECK_CRAFT` | advisory rates across analytical pages (from 5 pages), at least: a phrase emphasised; a source line; drawn marks a page; tables treated; charts annotated | 35%; 50%; 11; 75%; 65% |
@@ -132,7 +131,7 @@ Version 7 holds two shares to strong decks': points under the exhibit on at most
 | What is measured | Code | The bar |
 | --- | --- | --- |
 | Compared columns that agree | `TWIN_CELLS` | two or more rows, over 40% of the table, where two compared cells are the same words |
-| Commentary against its exhibit | `RESTATEMENT` | at most 47% of the column's content words already in the exhibit (well-made decks run 25–36%), and at most 66% of any one block's - a column does not average out the block a reader stops at |
+| Commentary against its exhibit | `RESTATEMENT` | no line of the commentary only reads the exhibit back - its headings, labels, cells or callouts - as a model reads each line against the exhibit (`commentary-restates`, recorded with `judge.mjs`); a line that names the exhibit's members to say something new of them is not a read-back |
 | Planning language on the page | `PLANNING_VOICE` | no sentence opens `Interpretation:`, `Takeaway:`, `So what:` or `Key insight —` |
 | Limits against findings | `CAVEAT_HEAVY` | at most 2 caveat lines a page, the lines read as caveats by a model (`commentary-caveats`, recorded with `judge.mjs`); a finding in contrastive form ("not X; it Y") is not a caveat |
 | The same table, repeated | `TABLE_SCHEMA_FLAT` | at most 3 tables in a deck open with the same column headers |

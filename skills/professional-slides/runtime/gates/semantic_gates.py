@@ -12,8 +12,6 @@ from __future__ import annotations
 import re
 
 from gate_config import THRESHOLDS, finding, source_text, standing, text_nodes
-# Two sentences share what they say in their content words (stopwords.json).
-from text_stats import content_words
 # What a line means - a planning label, a caveat, a share stated in words - is read, not matched (judgements.py).
 from judgements import judged
 
@@ -60,53 +58,36 @@ def gate_restatement(slide_no, slide, findings):
     """RESTATEMENT. The commentary reads the exhibit back to the reader.
 
     A commentary column is there to say what the exhibit does not - what follows,
-    what it costs, what to do - and a gate can tell the difference, because
-    restatement reuses the exhibit's vocabulary and a finding brings its own.
+    what it costs, what to do. Whether a line does is read, not counted in the
+    exhibit's words it reuses: a line has to name the members it is about
+    ("Africa grew fastest" names Africa), and a reading of two categories shares
+    their words by naming them, while a line that only reads a cell back can do
+    it in words of its own. So the exhibit and the commentary's lines are put to
+    a reader (commentary-restates), and the lines it names are the finding.
     """
     commentary, exhibit = page_voices(slide)
     if not commentary or not exhibit:
         return
-    # A chart's member and series names are what the commentary is about, not
-    # what it says: "Africa grew fastest" has to name Africa. Counted as the
-    # exhibit's vocabulary, a six-region chart's names ("Europe", "East Asia",
-    # "Middle East") would make a caption naming two regions half restatement.
-    names = content_words(" ".join(source_text(n) for n in text_nodes(slide) if n.get("role") in ("category-label", "legend-label")))
-    shown = content_words(" ".join(exhibit)) - names
-    if len(shown) < THRESHOLDS["restatement_words_min"]:
-        return
-    # The column is measured pooled, and each block on its own below.
-    said = content_words(" ".join(commentary)) - names
-    share = len(said & shown) / len(said) if said else 0.0
-    quoted = " ".join(commentary)[:70]
-    pooled = len(said) >= THRESHOLDS["restatement_words_min"] and share > THRESHOLDS["restatement_max"]
-    # Pooled, a column dilutes itself: three blocks that say something new and
-    # one that reads the table back average out under the threshold, and the
-    # page ships with the one block a reader stops at. A block is read on its
-    # own, so it is also measured on its own, against a higher bar.
-    blocks = [(block, content_words(block) - names) for block in commentary]
-    measurable = [(block, words) for block, words in blocks
-                  if len(words) >= THRESHOLDS["restatement_block_words_min"]]
-    worst = max(measurable, key=lambda entry: len(entry[1] & shown) / len(entry[1]), default=None)
-    if worst and len(worst[1] & shown) / len(worst[1]) > THRESHOLDS["restatement_block_max"] and not pooled:
-        share, quoted, said = len(worst[1] & shown) / len(worst[1]), worst[0][:70], worst[1]
-    elif not pooled:
-        return
-    # A callout's words are the exhibit's (it is fixed to a mark), so a caption
-    # that says what a callout says reads as a restatement though only the chart
-    # changed. When the callout is what tips it, say so.
+    # A callout's words are the exhibit's (it is fixed to a mark), so a line that says what a callout says reads it back too.
     callouts = [source_text(n) for n in text_nodes(slide) if n.get("role") == "annotation-text" and source_text(n).strip()]
-    unmarked = content_words(" ".join(t for t in exhibit if t not in callouts)) - names
-    by_callout = bool(callouts) and bool(said) and len(said & unmarked) / len(said) <= THRESHOLDS["restatement_max"]
+    lines = [{"id": f"c{at + 1}", "text": text} for at, text in enumerate(commentary)]
+    shown = list(dict.fromkeys(t for t in exhibit if t not in callouts))
+    said = judged("commentary-restates", {"exhibit": shown, "callouts": list(dict.fromkeys(callouts)), "lines": lines}, None, slide_no)
+    if not said or said.get("verdict") != "restates":
+        return
+    restated = [line["text"] for line in lines if line["id"] in (said.get("lines") or [])]
+    if not restated:
+        return
     findings.append(finding(
-        slide_no, "RESTATEMENT", {"share": round(share, 2), "block": quoted, **({"callout": callouts[0][:70]} if by_callout else {})}, THRESHOLDS["restatement_max"],
-        (f"The commentary repeats the chart's callout (\"{callouts[0][:60]}\"): the callout is read as part of "
-         "the exhibit, so a caption or point saying the same finding reads it back. Let the callout carry the "
-         "figure and the commentary say what follows from it - or drop the callout." if by_callout else
-         "The commentary is built from the exhibit's own words, so the reader learns "
-         "nothing by reading it. Say what the exhibit cannot: what follows from the "
-         "number, what it costs, which option it settles, what would change it. If "
-         "the only honest sentence is the one already in the table, the page does "
-         "not need a commentary column."),
+        slide_no, "RESTATEMENT", {"lines": len(restated), "of": len(lines), "block": restated[0][:70], **({"callout": callouts[0][:70]} if callouts else {})},
+        "commentary that says what the exhibit does not",
+        ("The commentary reads the exhibit back: " + ", ".join(f"\"{text[:60]}\"" for text in restated[:3]) + ". "
+         "Say what the exhibit cannot: what follows from the number, what it costs, which option it settles, "
+         "what would change it. If the only honest sentence is the one already in the table, the page does not "
+         "need a commentary column."
+         + (f" The chart's callout (\"{callouts[0][:60]}\") is read as part of the exhibit, so a line saying the same "
+            "finding reads it back: let the callout carry the figure and the commentary say what follows from it - or drop the callout."
+            if callouts else "")),
     ))
 
 
