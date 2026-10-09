@@ -125,6 +125,18 @@ class SourceDateEpochTests(unittest.TestCase):
     def test_an_epoch_inside_the_range_stamps_both_alike(self):
         self.assert_stamped("1700000000", b"2023-11-14T22:13:20Z", (2023, 11, 14, 22, 13, 20))
 
+    def test_a_revision_assembled_at_an_epoch_before_1980_stamps_its_new_entries_at_1980(self):
+        # The assembler writes the parts it rewrites - the slide order, the content types - at the epoch too, held to the same range.
+        source = self.emit("0", "assemble-source.pptx")
+        plan = Path(self.tmp_dir.name) / "assemble-plan.json"
+        plan.write_text(json.dumps({"source": source.name, "sha256": None, "composed": None, "slides": [{"carry": 2}, {"carry": 1}]}))
+        out = Path(self.tmp_dir.name) / "assembled.pptx"
+        run = subprocess.run([PYTHON, str(EMIT / "assemble_pptx.py"), str(plan), str(out)], capture_output=True, text=True,
+                             env={**os.environ, "SOURCE_DATE_EPOCH": "0"}, timeout=240)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        with zipfile.ZipFile(out) as package:
+            self.assertEqual({info.date_time for info in package.infolist()}, {(1980, 1, 1, 0, 0, 0)})
+
 
 @requires_python_package("pptx")
 class OnFillParityTests(unittest.TestCase):
