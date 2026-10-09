@@ -48,3 +48,7 @@ python3 evals/scripts/package_plugin.py
 ```
 
 `--slow` adds the LibreOffice end-to-end render; `--strict` fails when a test was skipped for a missing dependency. [evals/README.md](evals/README.md) covers the quality runner, calibration and the page gates. None of these checks alone proves a deck's argument, factual accuracy or visual quality: inspect every final render and the saved PPTX before claiming acceptance, and after changing plugin source, reinstall it and compare the installed files with the source.
+
+## Contributors
+
+- [Patrick O'Brien](https://github.com/psobrien)
