@@ -12,18 +12,19 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "professional-slides"
-COMPOSE = "./skills/professional-slides/runtime/compose.mjs"
+COMPOSE = "./evals/support/compose.mjs"
 
 sys.path.insert(0, str(SKILL / "runtime" / "gates"))
 import page_gates  # noqa: E402
 
 
-class PageShapeTests(unittest.TestCase):
+class PageShapeRepertoireTests(unittest.TestCase):
     def test_a_page_composed_alone_keeps_its_established_shape(self):
         # Scoring must not change what a single page does: with no history the
         # order is best fit, then the declared order, and exhibit-left is first.
@@ -82,7 +83,7 @@ class ColumnShapeTests(unittest.TestCase):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {POINT_STYLE_NAMES} from './skills/professional-slides/runtime/compose.mjs';
+import {POINT_STYLE_NAMES} from './evals/support/compose.mjs';
 const R=createRegistry();
 const items=[{lead:'Renewals',text:'held at 91%, four points above plan',icon:'check'},
              {lead:'Pipeline',text:'is 3.1x against a 3.5x target'}];
@@ -191,19 +192,13 @@ console.log(JSON.stringify({gaps: items.slice(1).map((n,i)=>Math.round(n.frame.y
             self.assertLessEqual(gap, 80, f"the messages are adrift: {result['gaps']}")
 
 
-class GateVocabularyTests(unittest.TestCase):
+class PageArchitectureTests(unittest.TestCase):
     def test_calendar_and_network_evidence_remain_in_architecture_mix(self):
         for component in ("gantt", "relationship-network"):
             diagram = {"component": component, "frame": {"x": 60, "y": 140, "width": 550, "height": 400}}
             self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram]}), component)
             chart = {"component": "chart.bar", "frame": {"x": 650, "y": 140, "width": 550, "height": 400}}
             self.assertEqual(page_gates.page_architecture({"componentInstances": [diagram, chart]}), "paired-evidence")
-
-    def test_the_new_deck_gates_are_registered_and_documented(self):
-        index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
-        for code in ("PAGE_SHAPE_FLAT", "COLUMN_MONOTONY", "NO_CONTENTS", "NO_SUMMARY"):
-            self.assertIn(code, page_gates.GATE_CODES, code)
-            self.assertIn(f"`{code}`", index, f"{code} is not in the evaluation table")
 
     def test_chart_plus_process_counts_as_composite_evidence(self):
         chart = {"component": "chart.bar", "frame": {"x": 60, "y": 140, "width": 1160, "height": 220}}
@@ -301,7 +296,7 @@ class TableHalvesTests(unittest.TestCase):
     def test_a_long_narrow_ranking_halves_and_everything_else_does_not(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows = (n) => Array.from({length: n}, (_, i) => [String(i+1), `Segment ${i+1}`, String(1240 - i*90)]);
 const page = (exhibit, extra = {}) => composeSlide({id:'s1', title:'Twelve segments ranked by the pool they carry', exhibit, ...extra}, 0);
 // Several shapes build an `s1-row`; only this one builds the two halves.
@@ -349,9 +344,8 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
         slide = {'componentInstances': [{'component': 'chart.column', 'frame': frame}], 'nodes': [
             {'role': 'chart-mark', 'frame': {'x': 100+i*200, 'y': 440, 'width': 100, 'height': 100}}
             for i in range(2)]}
-        before = page_gates.WEIGHT
-        page_gates.WEIGHT = {'plotSpan': .6}
-        try:
+        # WEIGHT is one dict shared by every gate module; patch it in place.
+        with mock.patch.dict(page_gates.WEIGHT, {'plotSpan': .6}, clear=True):
             findings = []
             page_gates.gate_plot_span(1, slide, findings)
             self.assertTrue(any(f['code'] == 'PLOT_SPAN' for f in findings))
@@ -359,8 +353,6 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
             findings = []
             page_gates.gate_plot_span(1, slide, findings)
             self.assertFalse(findings)
-        finally:
-            page_gates.WEIGHT = before
 
     def test_only_a_standalone_bridge_has_the_reconciliation_relationship(self):
         def page(component, comments=False):
@@ -373,3 +365,20 @@ class ReferenceAndRelationshipTests(unittest.TestCase):
         self.assertEqual(page_gates.page_architecture(page('chart.line')), 'evidence-only')
         self.assertEqual(page_gates.page_architecture(page('chart.waterfall', True)),
                          page_gates.page_architecture(page('chart.bar', True)))
+
+    def test_a_standalone_horizons_figure_is_its_own_architecture(self):
+        # The figure's component id is `chart.horizons`: listed as `horizons`
+        # it never matched, and a horizons page read as any lone chart.
+        registry = run_node('''
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+console.log(JSON.stringify([...REGISTRY.keys()]));
+''')
+        self.assertTrue(set(page_gates.DIAGRAM_COMPONENTS) <= set(registry), set(page_gates.DIAGRAM_COMPONENTS) - set(registry))
+        alone = {'componentInstances': [{'component': 'chart.horizons', 'frame': {'x': 60, 'y': 140, 'width': 1160, 'height': 480}}]}
+        self.assertEqual(page_gates.page_architecture(alone), 'chart.horizons')
+        # A diagram that draws as a chart is one exhibit: stacked over a bar
+        # chart it makes a stack of two, not a grid of three.
+        stacked = {'componentInstances': [
+            {'component': 'chart.horizons', 'frame': {'x': 60, 'y': 140, 'width': 1160, 'height': 230}},
+            {'component': 'chart.bar', 'frame': {'x': 60, 'y': 390, 'width': 1160, 'height': 230}}]}
+        self.assertEqual(page_gates.page_architecture(stacked), 'evidence-stack')

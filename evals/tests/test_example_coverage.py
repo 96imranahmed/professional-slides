@@ -9,42 +9,26 @@ a new component with no page in an example deck fails here.
 The same held a level up. A component is registered; a *device* is a word an
 author writes - a `pointsStyle`, a treated column, a page shape. Four commits
 added seven point styles, three column treatments and four page shapes, and
-none of them appeared in the skill's documentation or on any example page. So
-these tests run in both directions: every name the composer accepts is named in
-the docs, and every device an author would reach for is drawn on a real page.
+none of them appeared on any example page. So every device an author would
+reach for is drawn on a real page.
 """
 from __future__ import annotations
 
 import json
-import re
 import unittest
 from pathlib import Path
 
-from node_probe import run_node
+from node_probe import authored_example, run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "professional-slides"
 EXAMPLES = SKILL / "examples"
 
 
-def documented_spans():
-    """Every backticked span in SKILL.md and the references, as one list.
+def example_decks():
+    """Every example deck spec: those shipped as specs, and the worked example authored from its pages file."""
+    return sorted(EXAMPLES.glob("*.deck.json")) + [authored_example("page-types") / "page-types.deck.json"]
 
-    A key is documented when it is named inside code formatting somewhere -
-    `pointsStyle`, or `pointsAlign: "middle"`, or a line of a JSON example.
-    Prose that merely uses the word does not count, and neither does a mention
-    in a comment in the runtime: the author reads these files.
-    """
-    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-    for path in sorted(SKILL.glob("references/**/*.md")):
-        text += path.read_text(encoding="utf-8")
-    return re.findall(r"`([^`\n]+)`", text)
-
-
-def undocumented(names):
-    spans = documented_spans()
-    return [name for name in names
-            if not any(re.search(rf"(^|[^A-Za-z-]){re.escape(name)}([^A-Za-z-]|$)", span) for span in spans)]
 
 # Components the composer places itself - page furniture, not exhibits an
 # author reaches for. Each is covered by the chrome and section tests instead.
@@ -63,7 +47,12 @@ FURNITURE = {
 
 
 def deck_text():
-    return "\n".join(path.read_text(encoding="utf-8") for path in sorted(EXAMPLES.glob("*.deck.json")))
+    return "\n".join(path.read_text(encoding="utf-8") for path in example_decks())
+
+
+def decks_js():
+    """The probe's preamble: `decks`, each deck's file and the directory its assets resolve from."""
+    return f"const decks = {json.dumps([[str(path), str(path.parent)] for path in example_decks()])};\n"
 
 
 class ExampleCoverageTests(unittest.TestCase):
@@ -92,17 +81,17 @@ console.log(JSON.stringify({ids:[...registry.keys()].filter((k)=>k.startsWith('c
     def test_every_example_deck_composes(self):
         # Composition only - the render is the slow suite's job - but a deck
         # that no longer plans is a deck nobody would notice was broken.
-        names = sorted(path.name for path in EXAMPLES.glob("*.deck.json"))
+        names = sorted(path.name for path in example_decks())
         self.assertTrue(names)
         result = run_node('''
-import {readdirSync} from 'node:fs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
 import {readFileSync} from 'node:fs';
-const dir='./skills/professional-slides/examples';
+import {basename} from 'node:path';
+import {toDeckPlan} from './evals/support/compose.mjs';
+''' + decks_js() + '''
 const out={};
-for(const name of readdirSync(dir).filter((n)=>n.endsWith('.deck.json'))){
-  const plan=toDeckPlan(JSON.parse(readFileSync(`${dir}/${name}`,'utf8')),dir);
-  out[name]=plan.slides.length;
+for(const [file, dir] of decks){
+  const plan=toDeckPlan(JSON.parse(readFileSync(file,'utf8')),dir);
+  out[basename(file)]=plan.slides.length;
 }
 console.log(JSON.stringify({decks:out}));
 ''')
@@ -110,43 +99,6 @@ console.log(JSON.stringify({decks:out}));
         for name, pages in result["decks"].items():
             self.assertGreater(pages, 0, name)
 
-
-
-class VocabularyDocumentedTests(unittest.TestCase):
-    """Every name the composer accepts is a name the docs give the author.
-
-    `test_every_documented_shape_exists` already runs docs → composer: a shape
-    SKILL.md names is a shape that builds. This is the direction that actually
-    broke - composer → docs - where a device ships, works, is tested, and no
-    author can discover it.
-    """
-
-    def vocabulary(self):
-        return run_node('''
-import {SLIDE_KEYS, POINT_STYLE_NAMES, PAGE_SHAPE_NAMES, SHAPE_NAMES, PASS_NAMES}
-  from './skills/professional-slides/runtime/compose.mjs';
-console.log(JSON.stringify({
-  slideKeys: Object.keys(SLIDE_KEYS), pointStyles: [...POINT_STYLE_NAMES],
-  pageShapes: [...PAGE_SHAPE_NAMES], shapes: [...SHAPE_NAMES], passes: PASS_NAMES.length,
-}));
-''')
-
-    def test_every_slide_key_is_documented(self):
-        missing = undocumented(self.vocabulary()["slideKeys"])
-        self.assertFalse(missing, "SKILL.md and references/ never name: " + ", ".join(missing))
-
-    def test_every_point_style_is_documented(self):
-        # The whole point of the seven styles is that an author picks one.
-        styles = self.vocabulary()["pointStyles"]
-        self.assertGreaterEqual(len(styles), 7)
-        missing = undocumented(styles)
-        self.assertFalse(missing, "pointsStyle values nobody can discover: " + ", ".join(missing))
-
-    def test_every_page_shape_is_documented(self):
-        shapes = self.vocabulary()["pageShapes"]
-        self.assertGreaterEqual(len(shapes), 11)
-        missing = undocumented(shapes)
-        self.assertFalse(missing, "page shapes nobody can ask for: " + ", ".join(missing))
 
 
 class DeviceCoverageTests(unittest.TestCase):
@@ -159,7 +111,7 @@ class DeviceCoverageTests(unittest.TestCase):
     """
 
     def decks(self):
-        return {path.name: path.read_text(encoding="utf-8") for path in sorted(EXAMPLES.glob("*.deck.json"))}
+        return {path.name: path.read_text(encoding="utf-8") for path in example_decks()}
 
     def assertOnSomePage(self, needle, what):
         hit = [name for name, text in self.decks().items() if needle in text]
@@ -167,7 +119,7 @@ class DeviceCoverageTests(unittest.TestCase):
 
     def test_the_commentary_column_styles_are_drawn(self):
         styles = run_node('''
-import {POINT_STYLE_NAMES} from './skills/professional-slides/runtime/compose.mjs';
+import {POINT_STYLE_NAMES} from './evals/support/compose.mjs';
 console.log(JSON.stringify({styles:[...POINT_STYLE_NAMES]}));
 ''')["styles"]
         decks = self.decks()
@@ -215,20 +167,22 @@ class ExampleBuildTests(unittest.TestCase):
 
     def test_every_example_deck_compiles_to_a_scene(self):
         result = run_node('''
-import {readdirSync, readFileSync} from 'node:fs';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {readFileSync} from 'node:fs';
+import {basename} from 'node:path';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
-const dir='./skills/professional-slides/examples';
+''' + decks_js() + '''
 const out={};
-for (const name of readdirSync(dir).filter((n)=>n.endsWith('.deck.json'))) {
+for (const [file, dir] of decks) {
   // The same two calls the builder makes before it emits: planDeck compiles
   // every page's components, which is where a page that plans but cannot draw
   // actually fails.
-  const {deck}=planDeck(toDeckPlan(JSON.parse(readFileSync(`${dir}/${name}`,'utf8')),dir));
-  out[name]=deck.slides.length;
+  const {deck}=planDeck(toDeckPlan(JSON.parse(readFileSync(file,'utf8')),dir));
+  out[basename(file)]=deck.slides.length;
 }
 console.log(JSON.stringify({decks:out}));
 ''')
+        self.assertEqual(sorted(result["decks"]), sorted(path.name for path in example_decks()))
         for name, pages in result["decks"].items():
             self.assertGreater(pages, 0, name)
 

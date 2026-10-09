@@ -2,7 +2,6 @@ import {
   linePrimitive,
   rectPrimitive,
   stableId,
-  textPrimitive,
   token,
   tokenValue,
   onFill
@@ -233,7 +232,7 @@ function renderCurves({ id, frame, props, horizons }) {
 }
 
 function renderDetailRow({ id, horizon, index, frame, label, value }) {
-  const labelLayout = measureText(`${label}:`, frame.width, { fontFamily: tokenValue(BODY_FONT), fontSize: tokenValue(BODY), bold: true, wrapWidthRatio: 1 });
+  const labelLayout = measureText(`${label}:`, frame.width, { fontFamily: tokenValue(BODY_FONT), fontSize: tokenValue(BODY), bold: true });
   const labelWidth = Math.min(frame.width * 0.48, labelLayout.width + 5);
   if (frame.width - labelWidth < 24) throw new Error(`${id} detail label leaves insufficient value width`);
   return [
@@ -250,7 +249,15 @@ function renderStepped({ id, frame, horizons, minimal }) {
   const columnWidth = (frame.width - gutter * (horizons.length - 1)) / horizons.length;
   if (columnWidth < 72) throw new Error("Stepped horizons leave insufficient width per horizon; enlarge or split the exhibit");
   const contentReserve = minimal ? 92 : 180;
-  const rise = Math.min(66, frame.height * 0.14, (frame.height - 22 - contentReserve) / Math.max(1, horizons.length - 1));
+  // The steps climb as far as the frame lets the lowest column's text still
+  // end on the frame's foot. Held to 66px a step, three horizons in a body
+  // draw their lines and text in the top half and leave the lower half empty:
+  // the figure is a stair, and a stair takes the height it is given.
+  const narrativeOf = (horizon) => (minimal ? horizon.summary || horizon.description : horizon.description);
+  const content = Math.max(contentReserve, ...horizons.map((horizon) => 18 + 28 + (horizon.timeframe ? (!minimal && horizon.details.length ? 24 : 28) : 0)
+    + (!minimal && horizon.details.length ? 2 * sectionGap + horizon.details.length * 26 - 2 : 0)
+    + (narrativeOf(horizon) ? measureText(narrativeOf(horizon), columnWidth - 16, { fontFamily: tokenValue(BODY_FONT), fontSize: tokenValue(BODY) }).height + 6 : 0)));
+  const rise = Math.min(frame.height * 0.3, (frame.height - 22 - content) / Math.max(1, horizons.length - 1));
   if (rise < 14) throw new Error("Stepped horizons leave insufficient vertical progression; enlarge or split the exhibit");
   const top = frame.y + 22;
   horizons.forEach((horizon, index) => {

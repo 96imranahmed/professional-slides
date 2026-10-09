@@ -6,7 +6,9 @@ Every sentence on a page adds a claim, evidence, interpretation, decision, actio
 
 Prefer readable numerals and precise nouns to long spelled-out quantities. The title should foreground the decision-relevant result; a calculation method belongs there only when explaining the method is the page's job.
 
-State the answer, not the topic: `[subject] [verb of change or state] [magnitude or comparator] [period or condition]`, within 14 words and two lines. Use the most decision-relevant supported comparison, magnitude, period, segment or threshold. Match the verb to the evidence: measured exposure supports *is exposed*, a sensitivity supports *could reach*, an approved minute supports *will proceed*. Narrow the title when the evidence is thinner than the wording.
+State the answer, not the topic: `[subject] [verb of change or state] [magnitude or comparator]`, in 15 words at most (`TITLE_WORDS`, refused at compile) and two lines at most (`TITLE_LINES`), about 10 as the norm, so it sets on one line; strong decks run two titles in five past twelve words, for the comparator and the cause a finding needs. This is the one statement of the title limit; other references cite the gate. The period, population and scope go in the `subtitle` ([the standfirst](page-types.md#the-standfirst)). Use the most decision-relevant supported comparison, magnitude, segment or threshold. Match the verb to the evidence: measured exposure supports *is exposed*, a sensitivity supports *could reach*, an approved minute supports *will proceed*.
+
+The title leads with the finding. When the evidence is thinner than the wording, narrow the claim - a segment, a period, a measure, a softer verb - and keep its direction; the limitation goes in the subtitle or a note, never in place of the finding. A title that says what the evidence lacks, cannot settle or leaves undisclosed is a gap, not an answer ([Answer under uncertainty](storylining.md#answer-under-uncertainty)); more than 15% of them is refused (`TITLE_GAP_SHARE`). A count with no comparator ("The fleet is 116 aircraft") says how many, not against what; it is advised (`TITLE_COUNT_ONLY`).
 
 | Instead of | Write |
 | --- | --- |
@@ -14,6 +16,7 @@ State the answer, not the topic: `[subject] [verb of change or state] [magnitude
 | Workforce and productivity | Workforce fell from 26,000 to 22,000 while mail per employee neared the 330,000 ceiling |
 | The 45-minute limit looks plausible for some central-office journeys | Transit rides use only 15-28 of the 45 minutes; walking and waiting decide which locations qualify |
 | Four neighborhoods offer distinct combinations of schools and everyday activity | All six locations clear the school screen; commute and rent cut the list to two |
+| Enterprise depth remains unproven | Firm A leads large accounts, 500 to 320; retention is not yet published |
 
 Hedges mark a finding that has not been written yet: *looks plausible, some, may, offers, distinct combinations, requires verification, potentially, a range of, various, considerations*. Replace each with the measured fact.
 
@@ -24,11 +27,13 @@ Structural pages use their fixed heading. An executive summary may use `Executiv
 A synthesis explains its scoped answer to the depth the communication job needs.
 
 1. Develop the distinct claims and decisive evidence that support the answer, with the material limitations and the conditions that would change the decision. One developed statement may carry a branch while another needs three.
-2. Choose the composition from the relationship: a connected narrative, label and body rows, parallel domains, an ordered situation-outlook-action sequence, or an exhibit that carries the synthesis itself.
+2. Choose the composition from the relationship: developed points (`summary` form `executive-summary`), label and body rows (`parallel` form `labelled-rows`), parallel domains, an ordered situation-outlook-action sequence, or an exhibit that carries the synthesis itself.
 3. Integrate the recommendation or condition where it belongs in the argument, preserving the alternatives and the criterion that changes their preference.
 4. Read the summary alone: can the reader explain the governing answer, the supporting case and the material countercase?
 
-Write it dense. The executive summary is the fullest text page in a well-made deck: a strong summary can run to two pages of 243 and 252 words, each four developed statements of about sixty words with their parts set as sub-points, and no closing insight box. Three one-line bullets and a takeaway band is a table of contents for the argument, not the argument. Give each statement its evidence, its qualification and what follows, and use a point's `points` for the parts it lists (the options compared, the criteria, the conditions). A closing band is optional; the page's last statement can carry the consequence. The density profile will mark a summary this full as dense for a text page, and the review judges it against this job rather than the text-page median.
+Write it dense: four to six developed statements, each a claim with its evidence and what follows - its qualification in a footnote - in 204 body words at most - the text page's upper quartile, which `WORDS` holds the summary to. The first statements carry the situation, the complication and the question it raises; the rest answer it, one per pillar. Three one-line bullets and a takeaway band is a table of contents for the argument, not the argument. Use a point's `points` for the parts it lists (the options compared, the criteria, the conditions). A closing band is optional; the last statement can carry the consequence.
+
+A summary runs to a second page only when the content needs it - a request with several questions, each with its own lean and reversal trigger - and each page is held to the same ceiling. Answer every sub-question of the request here with its lean and confidence ([Answer under uncertainty](storylining.md#answer-under-uncertainty)).
 
 Summary theme headings state substantive conclusions - "Career and industry", not "Chapter 1".
 
@@ -36,9 +41,15 @@ Summary theme headings state substantive conclusions - "Career and industry", no
 
 Develop enough text for the reader to understand the evidence, reasoning, material qualifications and decision consequence without narration. Do not impose a universal word ceiling: a decision pre-read often needs developed paragraphs or lead-and-body rows alongside its exhibit. Short labels and an action title cannot substitute for an explanation of why the result matters or when it holds. Compare substantive text coverage with strong reference pages serving the same reading task. Fit the composition to necessary copy at readable type, then remove redundancy; do not abbreviate away the reasoning to preserve an oversized visual or whitespace.
 
-The title and exhibit may complete a simple page's argument without a separate closing sentence. Add a consequence only when it advances that argument, and keep qualifications beside the claims they limit. Text volume is not a quota: definitions, repeated headlines and generic advice do not make a thin argument more complete.
+The title and exhibit may complete a simple page's argument without a separate closing sentence. Add a consequence only when it advances that argument. The body states findings; their qualifications go where strong decks set them - a numbered footnote on the label it limits (`footnotes: [{ on, text }]`), the source note, or a stamp in the subtitle band (`evidenceStatus`: "Preliminary", "Illustrative", "Estimate"). A limit that changes the decision is said once in the argument, not on every page: strong decks keep their qualifications to footnotes and source notes, and a page whose commentary spends more than two lines on what the evidence does not settle is reported (`CAVEAT_HEAVY`). Text volume is not a quota: definitions, repeated headlines and generic advice do not make a thin argument more complete.
 
 Use plain words, short sentences and explicit uncertainty, in complete sentences with the connective words the reasoning needs.
+
+Say only what the record holds. A rank, a universal, an exclusive claim or a majority is a claim about a whole population: narrow it to the population, period and measure the record covers - "the largest of the twelve airlines in the three big groups", "in each of the nine seasons published" - and read it against the findings the page rests on before the self-check does.
+
+A number in a title is the record's value rounded at the precision printed, or a figure an evidence finding states (`TITLE_NUMBER_UNTRACED`): "4%" for 4.3%, never "about 13%" for 13.7%. Before handing a page on, read `author-deck.mjs <id>.pages.json --claims <ids>`: every sentence as the reader meets it, beside the findings of the insights the page rests on, each number with the recorded value it states, and `CHECK` against a line whose number no record holds.
+
+Signpost every block of prose. A reader scans a page by its bold leads before reading a sentence, so each paragraph opens under a lead that says what it establishes ("Off-peak fares are the weaker lever", not "Fares"), carries one phrase in the accent - the number or claim it turns on - and stops by sixty words. Three or four short led paragraphs beside a panel read as an argument; the same words as three unbroken paragraphs read as a wall, whatever they say.
 
 Translate technical terms that can suggest a different ordinary meaning. Network subset capacity checks are not customer demand cuts; model states are not observed outcomes. Name the relevant entity in the visible wording. Column headings name their field concisely; avoid sentence-length headings that repeat the exhibit's purpose, while preserving qualifiers needed to interpret the values.
 
@@ -57,22 +68,29 @@ Numbers belong on marks. Replace a sentence that transcribes the chart with labe
 
 ### How much prose in one run
 
-Word count is not shape. A deck can clear its text-coverage score with one long paragraph per page and still read as an essay with pictures, and one did: forty pages whose commentary was a single block of 150 to 200 words.
+Word count is not shape. A deck can clear its text-coverage score with one block of 150 to 200 words per page and still read as an essay with pictures.
 
-The skill's targets for an analytic page (the numbers live in `runtime/weight.json`):
+The skill's targets for a page that carries prose (the numbers live in `runtime/weight.json`), read by column - a block is a run of lines in one column with no gap between them, so a bullet, a paragraph, a chart's heading and each callout are blocks of their own:
 
 | | Typical well-made page | Write to |
 | --- | --- | --- |
-| Text blocks per page | median 4 (quartiles 2 and 5) | two or three, more when the evidence has that many findings |
-| Words per block | median 56 (quartiles 41 and 87) | 40-90 |
-| Longest block on a page | median 128, third quartile 152 | never past 152 |
-| Pages with a single block | about one in seven | rare, and only when one finding is the whole page |
+| Text blocks per page | median 10 (quartiles 6 and 13), labels and headings included | the exhibit's labels and callouts, and the commentary's points |
+| Developed blocks (fifteen words or more) | three a page, a median of 25 words each (quartiles 19 and 40) | three developed points on most pages, two where the exhibit carries a sentence callout |
+| Words per block | median 15 (quartiles 10 and 23) | the band `TEXT_FRAGMENTED` holds the prose pages' median to; a chart's heading and label rows count as blocks, as they did on the reference pages |
+| Longest block on a page | median 44, ninetieth percentile 127 | never past 127 |
+| Pages with a single block | about one in a hundred | only when one finding is the whole page |
 
-`TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 152 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
+`TEXT_BLOCK_TOO_LONG` fails a dot-dash whose longest planned run passes 127 words, and the same plan is checked again on the composed scene, so the shape cannot be lost between stages.
 
 The repair is not a shorter sentence. It is two or three points that each make their own claim: split the run at the place where it stops proving one thing and starts proving the next, and give the second half its own lead. A page whose commentary is one block is asserting that its evidence supports exactly one finding, which is sometimes true and usually not.
 
-The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them. A fifty-page evaluation deck written this way carried the target word volume at 17 words a block against a target of 56, and its review called fourteen pages the wrong shape. Develop each point to 40-90 words: the finding, the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments. The build's density profile measures the rendered blocks and the review's density pass judges the pages it flags ([Taste review](taste-review.md#density-pass)); the one-to-two-line limit on takeaway bands is a separate rule and still holds.
+The opposite failure is the fragment: a bold lead and one sentence of twenty words, three to a column, each restating a value the exhibit already prints. It clears the word floor by adding points rather than developing them.
+
+Commentary is three developed points of about 20 to 40 words each - two where the exhibit carries a sentence callout of its own. A developed point has three parts: the finding (with the number the reader should see first - an unmarked point is marked on its own figure), the mechanism or basis behind it (the sample it rests on, what drives it), and what the reader should do about it. Two developed points beat three fragments; a third developed point beats a second one stretched to sixty words.
+
+A deck whose prose pages run a median words-per-block outside the band is refused at the build (`TEXT_FRAGMENTED`), and so is one whose prose pages carry a median of fewer than three developed blocks (`COMMENTARY_UNDEVELOPED`). The review's density pass judges the pages the density profile flags ([Taste review](taste-review.md#density-pass)). How this relates to the page's word floor and ceiling is in [Word measures](evaluation/index.md#word-measures).
+
+A takeaway band is a separate rule: one or two lines (`TAKEAWAY_LONG`, refused at compile).
 
 ## Where each kind of sentence goes
 
@@ -99,7 +117,7 @@ Keep the analytical argument on the slide and put routine arithmetic, familiar m
 
 ## Punctuation and voice
 
-Watch dot separators. A bullet or middle dot joining two labels - `1939 • Marvel Comics #1`, `Investor pulse · Q4` - spreads through every eyebrow, footer and caption until the deck reads as a menu. Well-made decks do use it, so this is a matter of restraint rather than a rule: write the qualifier in brackets, after a comma, on its own eyebrow line or as a column, and separate sources with a semicolon.
+Watch dot separators. A bullet or middle dot joining two labels - `1972 • First annual report`, `Investor pulse · Q4` - spreads through every eyebrow, footer and caption until the deck reads as a menu. Well-made decks do use it, so this is a matter of restraint rather than a rule: write the qualifier in brackets, after a comma, on its own eyebrow line or as a column, and separate sources with a semicolon.
 
 Audience-facing copy uses commas, full stops, parentheses and clear connectors in place of em dashes; a sourced quotation containing one is replaced by another exact excerpt or an attributed paraphrase. Use the punctuation a clear list, qualification or notation needs, and rewrite a sentence that collects colons, semicolons and parenthetical asides. Watch for repeated *not just X, but Y* constructions, false contrasts, rhetorical questions and unsupported superlatives such as *transformative*.
 

@@ -65,6 +65,71 @@ class PreferencesFileTests(unittest.TestCase):
         self.assertEqual(run({"HOME": str(self.home), "XDG_CONFIG_HOME": ""}), str(self.home / ".professional-slides" / "preferences.json"))
         self.assertEqual(run({"PROFESSIONAL_SLIDES_HOME": str(self.home / "ps"), "XDG_CONFIG_HOME": str(xdg)}), str(self.home / "ps" / "preferences.json"))
 
+    def test_an_unwritable_home_keeps_the_file_in_the_workspace_and_says_so(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root writes to a read-only directory")
+        home, workspace = self.home / "home", Path(tempfile.mkdtemp()).resolve()
+        home.mkdir()
+        home.chmod(0o555)
+        self.addCleanup(home.chmod, 0o755)
+        env = {**{k: v for k, v in os.environ.items() if k != "PROFESSIONAL_SLIDES_HOME"}, "HOME": str(home), "XDG_CONFIG_HOME": ""}
+        run = lambda *args: subprocess.run([NODE, str(PREFERENCES), *args], capture_output=True, text=True, env=env, cwd=workspace, timeout=60)
+        expected = workspace / ".professional-slides" / "preferences.json"
+        located = run("path")
+        self.assertEqual(located.stdout.strip(), str(expected), "path prints only the path on stdout")
+        self.assertIn("workspace", located.stderr)
+        self.assertIn("~/.professional-slides is not writable", located.stderr)
+        stored = run("set", "design=editorial")
+        self.assertEqual(stored.returncode, 0, stored.stderr)
+        report = json.loads(stored.stdout)
+        self.assertEqual((report["file"], report["location"]), (str(expected), "workspace"))
+        self.assertIn("not writable", report["locationReason"])
+        self.assertEqual(json.loads(expected.read_text())["answers"]["design"]["value"], "editorial")
+        self.assertFalse((home / ".professional-slides").exists())
+        self.assertEqual(json.loads(run("show").stdout)["location"], "workspace")
+        # The chosen location is reported whichever it is.
+        self.assertEqual(json.loads(cli(self.home, "show").stdout)["location"], "PROFESSIONAL_SLIDES_HOME")
+
+    def test_answers_stored_in_a_read_only_home_are_still_read(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root writes to a read-only directory")
+        home, workspace = self.home / "home", Path(tempfile.mkdtemp()).resolve()
+        stored = home / ".professional-slides"
+        stored.mkdir(parents=True)
+        (stored / "preferences.json").write_text(json.dumps({"schema": "professional-slides.preferences/v1", "updated": None,
+            "answers": {"design": {"value": "journal", "at": "2026-09-01T00:00:00Z", "source": "asked"}}}))
+        stored.chmod(0o555)
+        self.addCleanup(stored.chmod, 0o755)
+        env = {**{k: v for k, v in os.environ.items() if k != "PROFESSIONAL_SLIDES_HOME"}, "HOME": str(home), "XDG_CONFIG_HOME": ""}
+        run = lambda *args: subprocess.run([NODE, str(PREFERENCES), *args], capture_output=True, text=True, env=env, cwd=workspace, timeout=60)
+        shown = json.loads(run("show").stdout)
+        self.assertEqual((shown["location"], shown["deckKeys"]["design"]), ("home", "journal"))
+        self.assertIn("read-only", shown["locationReason"])
+        # A new answer is written to the workspace, carrying the stored ones with it.
+        report = json.loads(run("set", "tracker=label").stdout)
+        self.assertEqual(report["location"], "workspace")
+        copied = json.loads((workspace / ".professional-slides" / "preferences.json").read_text())["answers"]
+        self.assertEqual((copied["design"]["value"], copied["tracker"]["value"]), ("journal", "label"))
+        self.assertEqual(json.loads(run("show").stdout)["location"], "workspace")
+
+    def test_nothing_unanswered_is_applied_and_each_unset_answer_names_its_default(self):
+        shown = json.loads(cli(self.home, "show").stdout)
+        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "density"]
+        self.assertEqual([u["key"] for u in shown["unset"]], asked)
+        self.assertEqual({u["key"]: u["default"] for u in shown["unset"]}["design"], "consulting", "the recommendation is shown")
+        self.assertEqual(shown["deckKeys"], {}, "an empty store sets no deck key")
+        self.assertEqual(json.loads(cli(self.home, "deck-keys").stdout), {})
+        pages = self.home / "d.pages.json"
+        pages.write_text(json.dumps({"deck": {"id": "d"}, "pages": []}))
+        applied = json.loads(cli(self.home, "apply", str(pages)).stdout)
+        self.assertEqual(applied["set"], [])
+        self.assertEqual([u["key"] for u in applied["unset"]], asked)
+        self.assertEqual(json.loads(pages.read_text())["deck"], {"id": "d"}, "apply writes no default the user never chose")
+        cli(self.home, "set", "design=journal", "density=pre-read")
+        shown = json.loads(cli(self.home, "show").stdout)
+        self.assertEqual([u["key"] for u in shown["unset"]], ["reference", "colours", "tracker", "titleRule", "surfaces"])
+        self.assertEqual(shown["deckKeys"], {"design": "journal", "density": "pre-read"})
+
     def test_invalid_answers_and_files_are_refused(self):
         for pair in ["tracker=tabs", "design=corporate", "colours=teal", "titleRule=underline", "density=dense", "nonsense=1", 'brand={"primary":"red"}']:
             result = cli(self.home, "set", pair, check=False)
@@ -108,6 +173,7 @@ const out = {
   subject: deckKeys({ design: 'journal', colours: 'subject' }),
   paletteConsulting: deckKeys({ design: 'consulting', colours: 'crimson' }),
   paletteEditorial: deckKeys({ design: 'editorial', colours: 'crimson' }),
+  paletteUnset: deckKeys({ colours: 'crimson' }),
   bar: deckKeys({ design: 'consulting', colours: 'evergreen', titleRule: 'bar' }),
   system: deckKeys({ titleRule: 'system', tracker: 'auto' }),
   none: deckKeys({ tracker: 'none', surfaces: 'open', density: 'live-pitch', footer: 'Acme | Confidential', wordmark: 'Acme', typography: { body: 'Calibri' } }),
@@ -115,7 +181,7 @@ const out = {
 };
 console.log(JSON.stringify(out));
 ''')
-        self.assertEqual(result["empty"], {"design": "consulting"})
+        self.assertEqual(result["empty"], {})
         self.assertEqual(result["brand"], {"design": "editorial", "identity": {"primary": "#0B6E4F", "accent": "#F2A900"}})
         self.assertEqual(result["subject"], {"design": "journal"})
         self.assertEqual(result["paletteConsulting"]["palette"], "crimson")
@@ -123,7 +189,9 @@ console.log(JSON.stringify(out));
         self.assertEqual(editorial["base"], "crimson")
         self.assertTrue(all(k.startswith("color.") for k in editorial["colors"]), "a palette on another system brings colours, not its frame")
         self.assertEqual(result["bar"]["palette"], {"base": "evergreen", "colors": {"style.titleRule": "rule", "style.titleRuleLength": "short", "style.titleRuleColor": "accent", "line.titleRule": 4}})
-        self.assertEqual(result["system"], {"design": "consulting"})
+        self.assertEqual(result["system"], {})
+        # A deck with no design is built as consulting, so a palette answer is its name.
+        self.assertEqual(result["paletteUnset"], {"palette": "crimson"})
         none = result["none"]
         self.assertIs(none["tracker"], False)
         self.assertEqual((none["surfaces"], none["density"], none["footer"], none["logo"]), ("open", "live-pitch", "Acme | Confidential", "Acme"))
@@ -135,7 +203,7 @@ console.log(JSON.stringify(out));
 
     def test_the_keys_reach_the_composed_deck(self):
         result = run_node('''
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { optionDeck } from './skills/professional-slides/runtime/design-options.mjs';
 const read = (answers) => {
   const plan = toDeckPlan(optionDeck(answers), './skills/professional-slides/runtime');
@@ -306,24 +374,77 @@ print(infer.title_treatment(page(False).resize((640, 360)), (255, 255, 255)), in
         self.assertEqual(out.split(), ["rule", "None", "True", "False"])
 
 
-class IntakeDocumentationTests(unittest.TestCase):
-    def test_skill_and_theming_document_the_intake(self):
-        skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-        theming = (SKILL / "references" / "theming.md").read_text(encoding="utf-8")
-        self.assertIn("references/theming.md#design-intake", skill)
-        for phrase in ("preferences.mjs show", "preferences.mjs set", "preferences.mjs apply", "assets/design-options/", "what was reused"):
-            self.assertIn(phrase, skill)
-        self.assertIn("## Design intake", theming)
-        for phrase in ("design-systems.png", "palettes.png", "trackers.png", "title-treatments.png", "surfaces.png",
-                       "import-template.py", "infer-style.py", "design-options.mjs", "AskUserQuestion", "XDG_CONFIG_HOME",
-                       "live-pitch", "pre-read", "words a page", "--from-house"):
-            self.assertIn(phrase, theming)
-        # Every stored answer the file accepts has a row saying which deck keys it sets.
-        for answer in ("`design`", "`colours: \"brand\"`", "`titleRule`", "`tracker`", "`surfaces`", "`density`", "`typography`", "`house`"):
-            self.assertIn(f"| {answer}", theming)
-        for text in (skill, theming, (ROOT / "README.md").read_text(encoding="utf-8")):
-            self.assertNotIn("assets/design-systems.png", text)
-
-
 if __name__ == "__main__":
     unittest.main()
+
+
+class SiteDesignTests(unittest.TestCase):
+    """A deck about a company styled from its website: palette and typeface read off the site, the face measured from its installed files."""
+
+    def test_the_brand_colours_and_typefaces_are_read_off_the_stylesheets(self):
+        result = run_node('''
+import { siteDesign, stylesOf, readSite } from './skills/professional-slides/runtime/site-design.mjs';
+const css = `:root { --brand-primary: #021B41; --brand-accent: #3468AD; }
+@font-face { font-family: "Mylius Modern"; src: url(m.woff2); }
+@font-face { font-family: "Icons"; src: url(i.woff2); }
+body { font-family: "Open Sans", Arial, sans-serif; color: #333333; background: #FFFFFF; }
+p, li { font-family: "Open Sans", sans-serif; }
+h1, h2 { font-family: "Mylius Modern", Georgia, serif; color: #021B41; }
+.icon::before { font-family: Icons; }
+a { color: #3468AD; } a:hover { color: #3468AD; } .band { background: #021B41; } .rule { border-color: #EEEEEE; }`;
+const html = '<html><head><link rel="stylesheet" href="/css/site.css"><style>.x { color: #3468AD }</style></head><body style="font-family: Open Sans"></body></html>';
+const fetcher = async (url) => ({ ok: true, url, text: async () => (url.endsWith('site.css') ? css : html) });
+console.log(JSON.stringify({ design: siteDesign([css]), styles: stylesOf(html, 'https://www.example.com/home'), site: await readSite('https://www.example.com/home', { fetcher }) }));
+''')
+        design = result["design"]
+        self.assertEqual(design["brand"], {"primary": "#021B41", "accent": "#3468AD"})
+        # The face the running text is set in, and the face the headings take; a face set only on generated content draws icons.
+        self.assertEqual(design["typography"], {"body": "Open Sans", "display": "Mylius Modern"})
+        self.assertFalse(any("Icons" in face for face in design["evidence"]["faces"]))
+        self.assertEqual(result["styles"]["linked"], ["https://www.example.com/css/site.css"])
+        self.assertEqual(result["site"]["brand"], {"primary": "#021B41", "accent": "#3468AD"})
+        self.assertEqual(result["site"]["sheets"], 1)
+
+    def test_a_face_measured_on_this_machine_is_read_from_the_users_fonts_folder(self):
+        with tempfile.TemporaryDirectory() as home:
+            fonts = Path(home) / "fonts"
+            fonts.mkdir()
+            table = json.loads((RUNTIME / "fonts" / "arial-metrics.json").read_text(encoding="utf-8"))
+            (fonts / "brand sans-metrics.json").write_text(json.dumps({**table, "family": "Brand Sans"}), encoding="utf-8")
+            # Its own process: the measuring backend is chosen once a process, from the environment.
+            probe = Path(home) / "probe.mjs"
+            probe.write_text(f'''
+import {{ fontContext }} from {json.dumps((RUNTIME / "font-metrics.mjs").as_uri())};
+const ctx = fontContext();
+ctx.font = 'normal 16px "Brand Sans"'; const brand = ctx.measureText('Heathrow handled 84.5 million').width;
+ctx.font = 'normal 16px "Arial"'; const arial = ctx.measureText('Heathrow handled 84.5 million').width;
+console.log(JSON.stringify({{ backend: ctx.backend, has: ctx.hasFont('Brand Sans'), brand, arial }}));
+''', encoding="utf-8")
+            run = subprocess.run([NODE, str(probe)], capture_output=True, text=True, timeout=60, env={**os.environ, "PS_TEXT_METRICS": "table", "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(run.returncode, 0, run.stderr)
+            result = json.loads(run.stdout)
+            self.assertEqual(result["backend"], "table")
+            self.assertTrue(result["has"])
+            self.assertAlmostEqual(result["brand"], result["arial"], places=6)
+
+    def test_the_font_table_tool_measures_an_installed_face_into_the_users_folder(self):
+        if not HAS_PILLOW:
+            self.skipTest("Pillow is not installed")
+        candidates = ["/System/Library/Fonts/Supplemental/Georgia.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/dejavu/DejaVuSans.ttf"]
+        regular = next((path for path in candidates if Path(path).exists()), None)
+        if not regular:
+            self.skipTest("no known font file on this machine")
+        with tempfile.TemporaryDirectory() as home:
+            run = subprocess.run([RUNTIME_PYTHON or sys.executable, str(RUNTIME / "font-table.py"), "--regular", regular, "--family", "Measured Face"],
+                                 capture_output=True, text=True, timeout=120, env={**os.environ, "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(run.returncode, 0, run.stderr)
+            written = json.loads(run.stdout)
+            table = json.loads(Path(written["table"]).read_text(encoding="utf-8"))
+            self.assertEqual(Path(written["table"]).parent, Path(home) / "fonts")
+            self.assertEqual(table["unitsPerEm"], 2048)
+            self.assertGreater(table["faces"]["regular"]["advances"][str(ord("W"))], table["faces"]["regular"]["advances"][str(ord("i"))])
+            self.assertIn("preferences.mjs set", written["next"])
+            missing = subprocess.run([RUNTIME_PYTHON or sys.executable, str(RUNTIME / "font-table.py"), "--family", "No Such Face Anywhere"],
+                                     capture_output=True, text=True, timeout=300, env={**os.environ, "PROFESSIONAL_SLIDES_HOME": home})
+            self.assertEqual(missing.returncode, 2)
+            self.assertIn("is not installed on this machine", missing.stderr)

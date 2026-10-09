@@ -1,5 +1,5 @@
 import unittest
-from node_probe import run_node
+from node_probe import requires_chromium, run_node
 
 
 class SectionBoundaryTests(unittest.TestCase):
@@ -8,7 +8,7 @@ class SectionBoundaryTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {compileDeck,TOKENS} from './skills/professional-slides/runtime/core.mjs';
-import {componentFixtureSpecs,componentVariantFixtureSpecs,layoutFixtureSpecs} from './skills/professional-slides/runtime/fixtures.mjs';
+import {componentFixtureSpecs,componentVariantFixtureSpecs,layoutFixtureSpecs} from './evals/support/fixtures.mjs';
 const owner=REGISTRY.get('section-boundary'),frame={x:760,y:150,width:54,height:484};
 assert.equal(owner.resolveVariant({}),'related');
 assert.throws(()=>owner.render({id:'x',frame,props:{variant:'causal'}}),/Unknown/);
@@ -73,14 +73,15 @@ console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
 
+    @requires_chromium
     def test_marker_layers_do_not_exempt_foreign_objects_or_text(self):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {textPrimitive,token} from './skills/professional-slides/runtime/core.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
-import {auditSlideOverlaps} from './skills/professional-slides/runtime/validate-overlap.mjs';
+import {renderSlideHtml} from './evals/support/html.mjs';
+import { auditSlideOverlaps } from './evals/support/overlap-audit.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(require.resolve('playwright',{paths:[process.env.RUNTIME_NODE_MODULES]}));
 const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1280,height:720}});
 const nodes=REGISTRY.get('section-boundary').render({id:'boundary',frame:{x:760,y:150,width:54,height:484},props:{variant:'inference'}}).nodes;

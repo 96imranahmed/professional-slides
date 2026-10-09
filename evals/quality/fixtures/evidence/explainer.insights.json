@@ -1,0 +1,79 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "x-faults",
+   "finding": "Signal faults ran about 60 a quarter under fixed blocks and fell to 19 after the section switched to moving blocks in 2023 Q3",
+   "shape": "series",
+   "calculation": "signal faults by quarter on the converted section, four quarters under fixed blocks and six after the switch to moving blocks in 2023 Q3",
+   "sources": [
+    "sources/x-faults.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 10,
+    "series": 1
+   },
+   "measures": {
+    "faults": {
+     "unit": "faults a quarter",
+     "population": "Line 2, converted section",
+     "periods": [
+      "2022 Q3",
+      "2022 Q4",
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "values": [
+      62,
+      60,
+      61,
+      58,
+      41,
+      32,
+      27,
+      23,
+      21,
+      19
+     ],
+     "better": "down",
+     "events": {
+      "2023 Q3": "Switch to moving blocks"
+     }
+    }
+   },
+   "cite": [
+    "tram-ops"
+   ]
+  },
+  {
+   "id": "x-how",
+   "finding": "The new system moves the block boundary with the tram rather than fixing it to the track",
+   "shape": "qualitative",
+   "calculation": "engineering description",
+   "sources": [
+    "sources/x-how.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong"
+  },
+  {
+   "id": "x-plan",
+   "finding": "Conversion runs section by section over three years",
+   "shape": "schedule",
+   "calculation": "programme plan",
+   "sources": [
+    "sources/x-plan.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "supporting"
+  }
+ ]
+}

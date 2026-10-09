@@ -1,19 +1,17 @@
 // Design systems: the page frame a deck is built in, not only its colours.
 //
-// Two decks on unrelated subjects used to come out with the same cover, the
-// same numbered chapter pages, the same title in the same place, the same
-// commentary rail on the right and the same grey takeaway band at the foot of
-// half their pages - only the accent differed. A design system sets all of
-// that at once: canvas and typefaces, title size and treatment, margins, where
-// the takeaway goes, which side the commentary takes, and how the cover and
-// chapter pages are built. `identity` then takes the colours from the subject.
+// A design system sets the whole frame at once, so two decks on unrelated
+// subjects differ in more than their accent: canvas and typefaces, title size
+// and treatment, margins, where the takeaway goes, which side the commentary
+// takes, and how the cover and chapter pages are built. `identity` then takes
+// the colours from the subject.
 //
 //   { "design": "editorial", "identity": { "primary": "#740001", "accent": "#D3A625" } }
 //
 // Everything resolves to things the pipeline already reads: a palette object
 // (colour, `style.*`, `font.*` and `type.*` tokens), `chrome`, `tracker`, the
 // cover layout, and two composition choices (`takeaway`, `commentary`).
-import { contrastRatio } from "./palettes.mjs";
+import { contrastRatio, mix } from "./color.mjs";
 
 export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
@@ -84,8 +82,8 @@ export const DESIGN_NAMES = Object.freeze(Object.keys(DESIGN_SYSTEMS));
 // Surface treatments. Pages drawn as type on the canvas with hairlines - a
 // table with an open header and no label column, white cards outlined on a
 // cream page, one thin line across an empty plot, roadmap dots on a rail -
-// carried a median of 0.18 of their body as ink where strong analytical decks
-// carry about 0.26, at the same word count: the gap was surfaces, not words.
+// carry a median of 0.18 of their body as ink where strong analytical decks
+// carry about 0.26, at the same word count: the gap is surfaces, not words.
 // `reference` is that weight and every system's default; `open` is the light
 // construction, kept for a house whose own pages are drawn that way. A system
 // may still take single treatments from `open` (its `surfaces` overrides).
@@ -104,8 +102,6 @@ export function surfaceTokens(name, set = "reference") {
 }
 
 const hex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
-const channels = (color) => [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-export const mix = (a, b, f) => "#" + channels(a).map((c, i) => Math.round(c * (1 - f) + channels(b)[i] * f).toString(16).padStart(2, "0")).join("").toUpperCase();
 /** Darken a colour toward ink until it reads at `ratio` against `ground`. */
 export function readable(color, ground, ratio = 4.5) {
   let out = color;
@@ -126,11 +122,10 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
   // Emphasis is the subject's own colour. A chart marks the bar the title is
-  // about in `color.accent` and draws the rest in series 1; with the brand red
-  // as series 1 and a soft secondary as the accent, an Emirates deck drew every
-  // rival bar in Emirates red and Emirates itself in tan - the emphasis upside
-  // down. Series 1 is now a dark neutral warmed by the brand, the accent is the
-  // brand colour, and the secondary colour is the second series.
+  // about in `color.accent` and draws the rest in series 1, so series 1 is a
+  // dark neutral warmed by the brand, the accent is the brand colour, and the
+  // secondary colour is the second series - with the brand as series 1, every
+  // rival bar would take the brand colour and the subject a soft secondary.
   const base = mix("#3A3A3A", identity.primary, 0.08);
   return {
     "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
@@ -141,7 +136,7 @@ export function identityColors(identity, canvas = "#FFFFFF") {
 }
 
 // Run-to-run variation. The runtime is deterministic, so the same brief
-// planned twice came out with the same shapes in the same order and the same
+// planned twice comes out with the same shapes in the same order and the same
 // secondary styles. `variation` (any string or number; a new deck takes a fresh
 // one) draws, once per deck and reproducibly, from choices the system allows:
 // list markers, table rows, the tracker, the contents page, how lead-in points
@@ -169,6 +164,89 @@ export function seededRandom(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * Where one choice falls in a deck's draw: a number from 0 to 1 fixed by the
+ * seed and what is being chosen - a page's id and the form or exhibit kind
+ * put to it. It orders the choices a deck is free to make between forms that
+ * carry a page's claim equally well (deck-structure.mjs allocateStructure, a
+ * scaffold's form), and nothing else: a form that fits better is never passed
+ * over for it. Keyed by the page, not its place, so a page added to a deck
+ * leaves every other page's draw as it was.
+ */
+export function drawRank(seed, ...what) {
+  let h = 2166136261;
+  for (const ch of `${seed}:choice:${what.join(":")}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  // The hash leaves a string's last characters - the form, which is all that differs between two choices for one page - in a
+  // few of its bits, so two forms would rank in one order under most seeds. The finaliser spreads them over all thirty-two.
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * The page types each system is built from (references/theming.md#design-systems),
+ * each as the author reads it (`say`) and, where the entry names forms of the
+ * catalogue or exhibit kinds, as the plan reads it: the `forms`
+ * (`<type>/<form>`) and `kinds` a deck that features the entry prefers among
+ * the choices that carry a page's claim equally well. An entry that names a
+ * page type, a placement or a way of writing - a text page, commentary first,
+ * a photograph - steers nothing the plan chooses: the type of a page is set by
+ * its claim, at the spine. Few entries name a form that competes with another
+ * of equal fit - a strip against a hero number, bars in cells against a heat
+ * map, small multiples against six lines on one scale, a bullet against a bar
+ * - so the draw's hold on a plan is small by construction: the system frames
+ * the page, and the claim chooses the exhibit.
+ */
+export const REPERTOIRE = Object.freeze({
+  consulting: [
+    { say: "a table with a treatment (ratings, bars in cells, status)", forms: ["scorecard/bars", "lookup/table"] },
+    { say: "metrics over their exhibit", forms: ["numbers/metric-strip"] },
+    { say: "a tracker or roadmap" },
+    { say: "evidence beside developed commentary" },
+    { say: "matched small multiples", forms: ["trend/sparklines", "panels/grid"], kinds: ["chart.sparklines"] },
+    { say: "a reconciliation (waterfall or bridge)", forms: ["bridge/waterfall"], kinds: ["chart.waterfall"] },
+  ],
+  editorial: [
+    { say: "a text page that carries an argument" },
+    { say: "a photograph beside prose" },
+    { say: "a quotation page" },
+    { say: "one large exhibit with commentary first" },
+    { say: "a statement page between parts" },
+    { say: "an annotated specimen" },
+  ],
+  journal: [
+    { say: "a full-width annotated chart with columns beneath" },
+    { say: "small multiples on one scale", forms: ["trend/sparklines", "panels/grid"], kinds: ["chart.sparklines"] },
+    { say: "metrics over their exhibit", forms: ["numbers/metric-strip"] },
+    { say: "a record table", forms: ["lookup/measure-table", "scorecard/heatmap"] },
+    { say: "a threshold or frontier chart", forms: ["ranking/bullet", "relationship/scatter"], kinds: ["chart.bullet", "chart.scatter"] },
+    { say: "a distribution with the focal case marked", forms: ["ranking/distribution", "ranking/boxplot"], kinds: ["chart.boxplot"] },
+  ],
+  keynote: [
+    { say: "a hero number with its proof", forms: ["numbers/hero-number"] },
+    { say: "metrics over their exhibit", forms: ["numbers/metric-strip"] },
+    { say: "a split-tone comparison" },
+    { say: "a statement page" },
+    { say: "a full-bleed picture page" },
+    { say: "one idea with one chart" },
+  ],
+});
+
+/**
+ * What a deck features from its design system's repertoire: two entries the
+ * seed draws, to use where the evidence allows. `say` is the two as the author
+ * reads them; `forms` and `kinds` what the plan prefers among choices of equal
+ * fit (deck-structure.mjs allocateStructure). The same seed and system always
+ * give the same draw.
+ */
+export function featuredDraw(seed, design = "consulting") {
+  const entries = REPERTOIRE[Object.hasOwn(REPERTOIRE, design ?? "") ? design : "consulting"];
+  // Two entries drawn each pair as likely as another (Fisher-Yates): a sort by a random comparison favours the entries listed first.
+  const random = seededRandom(`${seed}:repertoire`), drawn = [...entries];
+  for (let i = drawn.length - 1; i > 0; i -= 1) { const j = Math.floor(random() * (i + 1)); [drawn[i], drawn[j]] = [drawn[j], drawn[i]]; }
+  drawn.length = 2;
+  return { say: drawn.map((entry) => entry.say), forms: new Set(drawn.flatMap((entry) => entry.forms ?? [])), kinds: new Set(drawn.flatMap((entry) => entry.kinds ?? [])) };
 }
 
 /** The deck's draws for a seed; the same seed always gives the same deck. */

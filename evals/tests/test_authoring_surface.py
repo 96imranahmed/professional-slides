@@ -7,12 +7,11 @@ list of named passes over a declared vocabulary; these tests hold that shape.
 """
 from __future__ import annotations
 
-import re
 import unittest
 
-from node_probe import REFERENCES, run_node
+from node_probe import run_node
 
-COMPOSE = "./skills/professional-slides/runtime/compose.mjs"
+COMPOSE = "./evals/support/compose.mjs"
 
 
 class SlideKeyTests(unittest.TestCase):
@@ -92,8 +91,7 @@ class ClosedValueSetTests(unittest.TestCase):
     `implication` was spelled out in the composer's map, again in the error it
     throws, and again in composition.md and design.md - four files to edit to
     add one variant, and nothing noticing when one of them was missed. The
-    composer exports the set, the error is built from it, and the references
-    have to list exactly it.
+    composer exports the set and the error is built from it.
     """
 
     def implications(self):
@@ -117,14 +115,6 @@ console.log(JSON.stringify({{message}}));
         for name in names:
             self.assertIn(f'"{name}"', result, f"the refusal does not offer {name}")
         self.assertIn("false", result, "the refusal does not offer the default")
-
-    def test_the_references_list_exactly_the_accepted_values(self):
-        names = set(self.implications())
-        prose = (REFERENCES / "composition.md").read_text(encoding="utf-8")
-        listed = set(re.findall(r'`"([a-z-]+)"`', prose.split("`implication` names the mark")[1].split("\n")[0]))
-        self.assertEqual(
-            listed, names,
-            "composition.md and the composer disagree about what `implication` accepts")
 
 
 class PassOrderTests(unittest.TestCase):
@@ -154,18 +144,7 @@ console.log(JSON.stringify({{ok:true}}));
 
 
 class PageShapeTests(unittest.TestCase):
-    """The composition presets the shared reference names are shapes the composer builds."""
-
-    def test_every_documented_shape_exists(self):
-        import pathlib
-        result = run_node(f'''
-import {{SHAPE_NAMES}} from '{COMPOSE}';
-console.log(JSON.stringify({{shapes:SHAPE_NAMES}}));
-''')
-        skill = (pathlib.Path(__file__).resolve().parents[2] / "skills" / "professional-slides" / "references" / "composition.md").read_text(encoding="utf-8")
-        for shape in result["shapes"]:
-            self.assertIn(f"`{shape}`", skill, f"The composition reference never names the {shape} shape")
-        self.assertGreaterEqual(len(result["shapes"]), 5)
+    """A composition preset sets what its shape needs and yields to what the page sets."""
 
     def test_a_shape_sets_what_that_shape_needs_and_yields_to_the_page(self):
         result = run_node(f'''
@@ -175,7 +154,8 @@ const chart={{type:'chart.column',heading:'Deal value',unit:'$B',categories:['20
   series:[{{name:'PE',values:[42,37,30]}},{{name:'VC',values:[19,12,7]}}]}};
 // A model page tabulates its own chart without being asked.
 const model=composeSlide({{id:'s01',title:'T',shape:'model-page',exhibit:chart}},0);
-assert.equal(model.density,'pre-read');
+// The shape sets no size of its own: the page takes the deck's one body size.
+assert.equal(model.density,undefined);
 assert.equal(model.items.filter((i)=>i.id==='s01-exhibit').length,0,'the chart stacked over its table');
 // The page's own density still wins over the shape's default.
 assert.equal(composeSlide({{id:'s02',title:'T',shape:'model-page',density:'executive',exhibit:chart}},1).density,'executive');

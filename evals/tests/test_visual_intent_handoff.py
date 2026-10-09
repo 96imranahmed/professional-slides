@@ -7,7 +7,7 @@ class VisualIntentHandoffTests(unittest.TestCase):
     def test_nested_categories_icons_and_reference_labels_cannot_silently_disappear(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {auditContent} from './skills/professional-slides/runtime/content-audit.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'handoff',slides:[

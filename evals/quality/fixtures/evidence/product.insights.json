@@ -1,0 +1,256 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "p-retention",
+   "finding": "Users given the new onboarding are 37% retained by March against 22% on the old one",
+   "shape": "series",
+   "calculation": "share of the August 2025 signups still active each month, by onboarding version; the August signups were assigned at random, half to each version",
+   "sources": [
+    "sources/p-retention.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "new-onboarding": {
+     "unit": "% of cohort",
+     "population": "Lumen August 2025 signups, assigned at random half to each onboarding",
+     "periods": [
+      "Aug 2025",
+      "Sep 2025",
+      "Oct 2025",
+      "Nov 2025",
+      "Dec 2025",
+      "Jan 2026",
+      "Feb 2026",
+      "Mar 2026"
+     ],
+     "values": [
+      100,
+      62,
+      51,
+      45,
+      41,
+      39,
+      38,
+      37
+     ]
+    },
+    "old-onboarding": {
+     "unit": "% of cohort",
+     "population": "Lumen August 2025 signups, assigned at random half to each onboarding",
+     "periods": [
+      "Aug 2025",
+      "Sep 2025",
+      "Oct 2025",
+      "Nov 2025",
+      "Dec 2025",
+      "Jan 2026",
+      "Feb 2026",
+      "Mar 2026"
+     ],
+     "values": [
+      100,
+      55,
+      41,
+      33,
+      28,
+      25,
+      23,
+      22
+     ]
+    }
+   },
+   "cite": [
+    "lumen-analytics"
+   ]
+  },
+  {
+   "id": "p-rollout",
+   "finding": "Every signup since 1 September 2025 has been given the new onboarding",
+   "shape": "qualitative",
+   "calculation": "release log of the onboarding rollout, read against signups by onboarding version",
+   "sources": [
+    "sources/p-rollout.csv"
+   ],
+   "soWhat": "The retention lift the August test measured now applies to every new user",
+   "strength": "strong",
+   "cite": [
+    "lumen-analytics"
+   ]
+  },
+  {
+   "id": "p-usage",
+   "finding": "Capture and search are 73% of sessions",
+   "shape": "mix",
+   "calculation": "sessions by first feature used",
+   "sources": [
+    "sources/p-usage.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "parts": 4
+   },
+   "measures": {
+    "sessions": {
+     "unit": "% of sessions",
+     "population": "Lumen sessions",
+     "period": "March 2026",
+     "members": [
+      "Capture",
+      "Search",
+      "Sharing",
+      "Templates"
+     ],
+     "values": [
+      46,
+      27,
+      18,
+      9
+     ]
+    }
+   },
+   "cite": [
+    "lumen-analytics"
+   ]
+  },
+  {
+   "id": "p-rivals",
+   "finding": "On its new onboarding Lumen out-retains Quill, and it trails both rivals on price and integrations",
+   "shape": "fact",
+   "calculation": "share of each app's August 2025 signups still active in March 2026, on its current onboarding; monthly price of the entry paid plan; integrations listed",
+   "sources": [
+    "sources/p-rivals.csv"
+   ],
+   "soWhat": "Retention is the one lead Lumen holds, and only over the rival that publishes it",
+   "strength": "strong",
+   "measures": {
+    "retention": {
+     "unit": "% of cohort",
+     "population": "August signups on each app's current onboarding",
+     "period": "March 2026",
+     "members": [
+      "Lumen",
+      "Quill",
+      "Paperly"
+     ],
+     "values": [
+      37,
+      31,
+      null
+     ],
+     "unavailable": {
+      "Paperly": "publishes no retention figure"
+     }
+    },
+    "price": {
+     "unit": "USD a month",
+     "population": "note-taking apps",
+     "period": "March 2026",
+     "members": [
+      "Lumen",
+      "Quill",
+      "Paperly"
+     ],
+     "values": [
+      12,
+      8,
+      10
+     ],
+     "better": "down"
+    },
+    "integrations": {
+     "unit": "integrations",
+     "population": "note-taking apps",
+     "period": "March 2026",
+     "members": [
+      "Lumen",
+      "Quill",
+      "Paperly"
+     ],
+     "values": [
+      14,
+      41,
+      26
+     ]
+    }
+   },
+   "cite": [
+    "public-pricing"
+   ]
+  },
+  {
+   "id": "p-paid",
+   "finding": "Paying users rose from 4% to 9% of actives in eight months",
+   "shape": "series",
+   "calculation": "paying and active users by month",
+   "sources": [
+    "sources/p-paid.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   },
+   "measures": {
+    "paying": {
+     "unit": "thousand users",
+     "population": "Lumen",
+     "periods": [
+      "Aug 2025",
+      "Sep 2025",
+      "Oct 2025",
+      "Nov 2025",
+      "Dec 2025",
+      "Jan 2026",
+      "Feb 2026",
+      "Mar 2026"
+     ],
+     "values": [
+      3.1,
+      3.9,
+      4.8,
+      5.9,
+      7.2,
+      8.4,
+      9.9,
+      11.6
+     ]
+    },
+    "active": {
+     "unit": "thousand users",
+     "population": "Lumen",
+     "periods": [
+      "Aug 2025",
+      "Sep 2025",
+      "Oct 2025",
+      "Nov 2025",
+      "Dec 2025",
+      "Jan 2026",
+      "Feb 2026",
+      "Mar 2026"
+     ],
+     "values": [
+      78,
+      86,
+      95,
+      102,
+      110,
+      117,
+      124,
+      129
+     ]
+    }
+   },
+   "cite": [
+    "lumen-analytics"
+   ]
+  }
+ ]
+}

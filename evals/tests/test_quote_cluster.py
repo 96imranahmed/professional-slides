@@ -9,7 +9,7 @@ class QuoteClusterTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { renderSlideHtml } from './skills/professional-slides/runtime/adapters/html.mjs';
+import { renderSlideHtml } from './evals/support/html.mjs';
 const definition=REGISTRY.get('quote-cluster');
 const deck=compileDeck({palette:'midnight',slides:[{id:'quotes',frame:{x:60,y:150,width:1160,height:480},composition:component({id:'cluster',component:'quote-cluster',frame:{x:60,y:150,width:1160,height:480},props:definition.sample})}]},REGISTRY);
 const slide=deck.slides[0],surfaces=slide.nodes.filter(node=>node.role==='quote-surface'),marks=slide.nodes.filter(node=>node.role==='quote-mark'),attributions=slide.nodes.filter(node=>node.role==='quote-attribution');

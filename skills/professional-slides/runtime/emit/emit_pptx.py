@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Emit an editable PowerPoint from a resolved scene.
 
-Design goals (see deep-audit-and-revamp.md, items 1, 2, 3, 18):
+Design goals:
   * The action title is a real title placeholder, so Outline view, Reset Slide and
     template swaps work.
   * Every text box wraps (`wrap="square"`) and carries `<a:normAutofit/>`; paragraphs
@@ -11,8 +11,11 @@ Design goals (see deep-audit-and-revamp.md, items 1, 2, 3, 18):
     PowerPoint can express; assembled-shape diagrams are grouped so they move as one.
   * No vendor runtime: python-pptx only. Theme fonts and colours are patched into
     theme1.xml after save so the deck's palette is the PowerPoint theme.
+  * The same scene writes the same bytes: the review binds itself to the file's
+    hash, so every date the package and its chart workbooks would stamp is set to
+    one fixed instant (`finish`).
 
-Usage: emit_pptx.py scene.json out.pptx [--no-native-charts] [--no-groups]
+Usage: emit_pptx.py scene.json out.pptx
 """
 from __future__ import annotations
 
@@ -20,9 +23,11 @@ import argparse
 import base64
 import io
 import json
+import os
 import re
 import sys
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pptx import Presentation
@@ -32,14 +37,23 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
+from pptx.shapes.freeform import FreeformBuilder
 from pptx.util import Emu, Pt
 from lxml import etree
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent / "gates"))
+# A label on a fill takes the colour the scene gave it (core.mjs onFill).
+from color import on_fill  # noqa: E402
+# The renderer's axis ladder (charts.mjs range()).
+from nice_ticks import nice_range  # noqa: E402
 
 PX = 914400 / 96  # EMU per CSS px at 96 px/in; slide is 1280x720 px = 13.333x7.5 in
 
 # Roles a native chart replaces. Headings, units and rules stay as editable text.
 CHART_PLOT_ROLES = {"chart-mark", "data-label", "category-label", "chart-axis", "axis-label", "chart-gridline",
-                    "legend-swatch", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
+                    "legend-swatch", "legend-marker", "legend-label", "chart-line", "chart-point", "chart-segment", "chart-area",
                     "chart-wedge", "pie-label", "pie-leader", "chart-baseline", "chart-tick", "reference-line",
                     "reference-label", "chart-annotation", "annotation-leader", "chart-callout", "chart-highlight",
                     "value-label", "series-label", "end-label", "stack-label", "total-label", "axis-title",
@@ -69,19 +83,12 @@ NATIVE = {
 LABEL_HEADROOM = 1.12
 
 
-def _nice_ceiling(value):
-    """The smallest round number at or above `value` (1, 1.2, 1.5, 2, 2.5, 3, 4,
-    5, 6, 8 x a power of ten), so a headroom stop stays a number a reader
-    recognises when the axis is shown."""
-    import math
-
-    if not value or value <= 0:
-        return 1
-    magnitude = 10 ** math.floor(math.log10(value))
-    for rung in (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10):
-        if rung * magnitude >= value - 1e-9:
-            return rung * magnitude
-    return 10 * magnitude
+def headroom_stop(largest):
+    """The hidden value axis's maximum for bars whose largest value is
+    `largest`: the domain the renderer draws (nice_ticks.nice_range,
+    charts.mjs range()) from zero to the largest value and its label's
+    headroom, so the stop is on the ladder the drawn charts use."""
+    return nice_range([0, largest * LABEL_HEADROOM], include_zero=True)["max"]
 
 
 def line_label_sides(values):
@@ -110,15 +117,135 @@ def line_label_sides(values):
     return sides
 
 
-def _luminance(hex_color):
-    """Relative luminance (0..1) of a #RRGGBB colour, for label contrast."""
-    try:
-        h = str(hex_color).lstrip("#")
-        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-    except Exception:
-        return 1.0
-    lin = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
-    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+def chart_frame(spec: dict, instance: dict) -> dict:
+    """Where the native chart sits: under the heading band the scene drew
+    over it, and square for a pie or a donut."""
+    f = dict(spec.get("frame") or instance["frame"])
+    band = instance.get("_headingBottom")
+    if band is not None and band > f["y"]:
+        gap = 8
+        f["height"] -= (band + gap - f["y"]); f["y"] = band + gap
+    if spec["type"] in ("pie", "donut"):
+        # A square frame keeps the hole at the frame centre in every renderer,
+        # so the centre KPI box lands in the hole.
+        side = min(f["width"], f["height"])
+        f = {"x": f["x"] + (f["width"] - side) / 2, "y": f["y"] + (f["height"] - side) / 2, "width": side, "height": side}
+    return f
+
+
+def chart_data(spec: dict):
+    """The chart's workbook data: its points, or its categories and series."""
+    if spec["type"] == "scatter":
+        cd = XyChartData()
+        for s in spec.get("series") or [{"name": "", "values": []}]:
+            ser = cd.add_series(s.get("name") or "Series")
+            for p in spec.get("points") or []:
+                ser.add_data_point(p.get("x"), p.get("y"))
+        return cd
+    cd = CategoryChartData()
+    # Categories the scene left unlabelled (a crowded period axis, a
+    # long ranking) are blank here, so the chart prints what the page
+    # planned (core.mjs nativeChartSpec).
+    hidden = set(spec.get("hiddenCategoryIndices") or [])
+    cd.categories = ["" if i in hidden else c for i, c in enumerate(spec["categories"])]
+    for s in spec["series"]:
+        cd.add_series(s.get("name") or "Series", s["values"])
+    return cd
+
+
+def label_format(spec: dict):
+    """(decimals, number format, grouped): the one precision every value
+    label in the chart carries, and whether its numbers take a thousands
+    separator."""
+    fmt = spec.get("valueFormat") or {}
+    if isinstance(fmt, dict) and "decimals" in fmt:
+        decimals = int(fmt["decimals"])
+    elif isinstance(spec.get("labelDecimals"), int):
+        # The precision the drawn chart printed (core.mjs nativeChartSpec).
+        decimals = spec["labelDecimals"]
+    else:
+        # No declared format: labels read the way the drawn charts write them
+        # (value-format.mjs decimalsFor). A series rounds as one: whole
+        # numbers once any value reaches 100, otherwise one decimal when any
+        # value has one.
+        values = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
+        fractional = [v for v in values if abs(v - round(v)) > 1e-9]
+        if len(values) > 1:
+            decimals = 0 if max(abs(v) for v in values) >= 100 else 1 if fractional else 0
+        else:
+            decimals = 1 if fractional and abs(fractional[0]) < 10 else 0
+    # Four figures and up read with a thousands separator, the way the drawn
+    # charts write them and every well-made page prints them.
+    values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
+    grouped = any(abs(v) >= 1000 for v in values_all)
+    base = "#,##0" if grouped else "0"
+    # A fixed format, never "General": every label in the series carries the
+    # one precision, so 12 prints as 12.0 beside 35.8, as the drawn chart
+    # prints it.
+    number_format = base if decimals == 0 else base + "." + "0" * decimals
+    return decimals, number_format, grouped
+
+
+class CachedFreeform(FreeformBuilder):
+    """A freeform whose offset is measured once. python-pptx measures the
+    path's offset again for every vertex it writes, which is quadratic in the
+    vertices: a coastline of 9,000 points took most of a map-heavy deck's
+    emit. The path is complete when it is written, so its offset cannot move."""
+
+    _offset = None
+
+    def convert_to_shape(self, origin_x=Emu(0), origin_y=Emu(0)):
+        self._offset = (FreeformBuilder.shape_offset_x.fget(self), FreeformBuilder.shape_offset_y.fget(self))
+        try:
+            return super().convert_to_shape(origin_x, origin_y)
+        finally:
+            self._offset = None
+
+    @property
+    def shape_offset_x(self):
+        return self._offset[0] if self._offset else FreeformBuilder.shape_offset_x.fget(self)
+
+    @property
+    def shape_offset_y(self):
+        return self._offset[1] if self._offset else FreeformBuilder.shape_offset_y.fget(self)
+
+
+# The instant every date in the package is set to: SOURCE_DATE_EPOCH when the
+# caller sets one (the reproducible-builds convention), else the earliest time
+# a zip entry can record.
+EPOCH = datetime.fromtimestamp(int(os.environ["SOURCE_DATE_EPOCH"]), timezone.utc) if os.environ.get("SOURCE_DATE_EPOCH") else datetime(1980, 1, 1, tzinfo=timezone.utc)
+# The dates a zip entry can record: its DOS date counts years from 1980 in
+# seven bits and seconds in two-second steps. An epoch outside them - the
+# common SOURCE_DATE_EPOCH=0 is 1970 - stamps the entries at the nearer end,
+# and the XML dates, which hold any year, keep the epoch itself.
+ZIP_FIRST, ZIP_LAST = (1980, 1, 1, 0, 0, 0), (2107, 12, 31, 23, 59, 58)
+CORE_DATE = re.compile(rb"(<dcterms:(created|modified)\b[^>]*>)[^<]*(</dcterms:\2>)")
+
+
+def zip_stamp(moment: datetime) -> tuple:
+    """`moment` as a zip entry's date_time, held to the range a zip records."""
+    return min(max(moment.timetuple()[:6], ZIP_FIRST), ZIP_LAST)
+
+
+def fixed_dates(xml: bytes) -> bytes:
+    """docProps/core.xml with its created and modified dates at EPOCH."""
+    return CORE_DATE.sub(lambda m: m.group(1) + EPOCH.strftime("%Y-%m-%dT%H:%M:%SZ").encode() + m.group(3), xml)
+
+
+def repack(data: bytes, rewrite) -> bytes:
+    """The zip `data` rewritten entry by entry at EPOCH (zip_stamp):
+    `rewrite(name, bytes)` returns each entry's new bytes. Entry times are the
+    only other thing a zip stamps with the clock, so a package repacked here is
+    a function of its content."""
+    buf = io.BytesIO()
+    stamp = zip_stamp(EPOCH)
+    with zipfile.ZipFile(io.BytesIO(data)) as zin, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            info = zipfile.ZipInfo(item.filename, date_time=stamp)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o600 << 16
+            zout.writestr(info, rewrite(item.filename, zin.read(item.filename)))
+    return buf.getvalue()
 
 
 def emu(px: float) -> int:
@@ -147,10 +274,8 @@ def token_colors(scene: dict) -> dict:
 
 
 class Emitter:
-    def __init__(self, scene: dict, *, native_charts=True, groups=True):
+    def __init__(self, scene: dict):
         self.scene = scene
-        self.native_charts = native_charts
-        self.groups = groups
         self.prs = Presentation()
         self.prs.slide_width = emu(1280)
         self.prs.slide_height = emu(720)
@@ -325,9 +450,7 @@ class Emitter:
         "pentagon": MSO_SHAPE.REGULAR_PENTAGON, "hexagon": MSO_SHAPE.HEXAGON, "parallelogram": MSO_SHAPE.PARALLELOGRAM,
         "trapezoid": MSO_SHAPE.TRAPEZOID, "downArrow": MSO_SHAPE.DOWN_ARROW, "upArrow": MSO_SHAPE.UP_ARROW,
     }
-    # `homePlate` and `roundRect` were listed here and nowhere else: no component
-    # emits either, and the HTML adapter cannot draw them, so a component that
-    # started would have thrown in every HTML-based test in the suite.
+    # Only geometries the HTML adapter can also draw belong here;
     # test_geometry_parity keeps the two vocabularies in step.
 
     def _paint(self, shape, style: dict):
@@ -365,7 +488,7 @@ class Emitter:
         """paths: list of point lists in scene px (absolute). One freeform, several subpaths."""
         f = node["frame"]
         first = paths[0][0]
-        fb = slide.shapes.build_freeform(emu(first[0]), emu(first[1]), scale=1.0)
+        fb = CachedFreeform.new(slide.shapes, emu(first[0]), emu(first[1]), 1.0, 1.0)
         for i, path in enumerate(paths):
             pts = [(emu(x), emu(y)) for x, y in path]
             if i:
@@ -391,7 +514,7 @@ class Emitter:
             pts = [[(f["x"] + float(x) * f["width"], f["y"] + float(y) * f["height"]) for x, y in path["points"]] for path in paths]
             closed = [bool(path.get("closed")) for path in paths]
             first = pts[0][0]
-            fb = slide.shapes.build_freeform(emu(first[0]), emu(first[1]), scale=1.0)
+            fb = CachedFreeform.new(slide.shapes, emu(first[0]), emu(first[1]), 1.0, 1.0)
             for i, path in enumerate(pts):
                 ep = [(emu(x), emu(y)) for x, y in path]
                 if i:
@@ -511,35 +634,11 @@ class Emitter:
     # --------------------------------------------------------------- charts
     def add_native_chart(self, slide, instance: dict):
         spec = instance["nativeChart"]
-        f = dict(spec.get("frame") or instance["frame"])
-        band = instance.get("_headingBottom")
-        if band is not None and band > f["y"]:
-            gap = 8
-            f["height"] -= (band + gap - f["y"]); f["y"] = band + gap
         ctype = NATIVE.get(spec["type"])
         if ctype is None:
             return None
-        if spec["type"] in ("pie", "donut"):
-            # A square frame keeps the hole at the frame centre in every renderer,
-            # so the centre KPI box lands in the hole.
-            side = min(f["width"], f["height"])
-            f = {"x": f["x"] + (f["width"] - side) / 2, "y": f["y"] + (f["height"] - side) / 2, "width": side, "height": side}
-        if spec["type"] == "scatter":
-            cd = XyChartData()
-            for s in spec.get("series") or [{"name": "", "values": []}]:
-                ser = cd.add_series(s.get("name") or "Series")
-                for p in spec.get("points") or []:
-                    ser.add_data_point(p.get("x"), p.get("y"))
-        else:
-            cd = CategoryChartData()
-            # Categories the scene left unlabelled (a crowded period axis, a
-            # long ranking) are blank here, so the chart prints what the page
-            # planned (core.mjs nativeChartSpec).
-            hidden = set(spec.get("hiddenCategoryIndices") or [])
-            cd.categories = ["" if i in hidden else c for i, c in enumerate(spec["categories"])]
-            for s in spec["series"]:
-                cd.add_series(s.get("name") or "Series", s["values"])
-        gf = slide.shapes.add_chart(ctype, emu(f["x"]), emu(f["y"]), emu(f["width"]), emu(f["height"]), cd)
+        f = chart_frame(spec, instance)
+        gf = slide.shapes.add_chart(ctype, emu(f["x"]), emu(f["y"]), emu(f["width"]), emu(f["height"]), chart_data(spec))
         gf.name = f"ps:{instance['instanceId']}:chart"
         chart = gf.chart
         chart.font.name = self.body_font
@@ -552,289 +651,312 @@ class Emitter:
             chart.legend.font.size = Pt(10)
         plot = chart.plots[0]
         kind = spec["type"]
-        is_range = kind == "range"
-        fmt = spec.get("valueFormat") or {}
-        if isinstance(fmt, dict) and "decimals" in fmt:
-            decimals = int(fmt["decimals"])
-        elif isinstance(spec.get("labelDecimals"), int):
-            # The precision the drawn chart printed (core.mjs nativeChartSpec).
-            decimals = spec["labelDecimals"]
-        else:
-            # No declared format: labels read the way the drawn charts write them
-            # (value-format.mjs decimalsFor). A series rounds as one: whole
-            # numbers once any value reaches 100, otherwise one decimal when any
-            # value has one. This used to give the decimal only to values under
-            # ten, so a 100% stack printed 35.8 in its scene and 36 in PowerPoint.
-            values = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
-            fractional = [v for v in values if abs(v - round(v)) > 1e-9]
-            if len(values) > 1:
-                decimals = 0 if max(abs(v) for v in values) >= 100 else 1 if fractional else 0
-            else:
-                decimals = 1 if fractional and abs(fractional[0]) < 10 else 0
-        # Four figures and up read with a thousands separator, the way the drawn
-        # charts write them and every well-made page prints them.
-        values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
-        grouped = any(abs(v) >= 1000 for v in values_all)
-        base = "#,##0" if grouped else "0"
-        # A fixed format, never "General": every label in the series carries the
-        # one precision, so 12 prints as 12.0 beside 35.8, as the drawn chart
-        # prints it.
-        number_format = base if decimals == 0 else base + "." + "0" * decimals
+        decimals, number_format, grouped = label_format(spec)
         if kind not in ("pie", "donut", "scatter"):
-            # Bar weight follows the category count, as in the drawn charts:
-            # few categories take fat bars, many take thinner ones.
-            categories = len(spec.get("categories") or [])
-            plot.gap_width = 80 if is_range else 35 if categories <= 3 else 45 if categories <= 6 else 60
-            if kind in ("column", "bar"):
-                plot.overlap = 0
-            if is_range:
-                plot.overlap = 100
-            va = chart.value_axis
-            va.has_major_gridlines = bool(spec.get("gridlines"))
-            va.visible = spec.get("showValueAxis", not spec.get("dataLabels", True))
-            va.tick_labels.font.size = Pt(10)  # chart furniture floor is 10 pt
-            if spec.get("yMin") is not None:
-                va.minimum_scale = spec["yMin"]
-            if spec.get("yMax") is not None:
-                va.maximum_scale = spec["yMax"]
-            elif kind in ("column", "bar") and spec.get("dataLabels", True):
-                # Value labels belong outside the mark, so the longest bar needs
-                # room past its end: give the hidden value axis a headroom stop
-                # above the largest value. Without it PowerPoint runs the bar to
-                # the plot edge and the label has nowhere to go but inside.
-                vals = [v for s in spec.get("series", []) for v in (s.get("values") or []) if isinstance(v, (int, float))]
-                if vals and min(vals) >= 0 and max(vals) > 0:
-                    va.maximum_scale = _nice_ceiling(max(vals) * LABEL_HEADROOM)
-            if spec.get("yMajorUnit") is not None:
-                va.major_unit = spec["yMajorUnit"]
-                # One precision down the axis, as the drawn axis prints it:
-                # 0.0, 2.5, 5.0 rather than General's 0, 2.5, 5.
-                ticks = [spec.get("yMin") or 0, spec.get("yMax") or 0, spec["yMajorUnit"]]
-                places = max(len(f"{float(t):.12g}".partition(".")[2]) for t in ticks)
-                if places:
-                    va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
-                    va.tick_labels.number_format_is_linked = False
-            ca = chart.category_axis
-            # A crowded row of bars names every member at 8pt in the scene
-            # (charts.mjs ROW_LABEL_MIN); the native chart sets the same size.
-            ca.tick_labels.font.size = Pt(min(10, spec.get("labelPt") or 10))
-            if kind not in ("bar", "stacked-bar", "range"):
-                # Keep category labels below the plot when zero crosses signed
-                # data; labels at the zero line collide with near-zero marks.
-                ca.tick_label_position = XL_TICK_LABEL_POSITION.LOW
-            if kind in ("bar", "stacked-bar", "range"):
-                ca.reverse_order = True  # first category at the top, as authored
-                va.crosses = XL_AXIS_CROSSES.MAXIMUM if False else va.crosses
-            ca.has_major_gridlines = False
-            ca.major_tick_mark = XL_TICK_MARK.NONE
-            va.major_tick_mark = XL_TICK_MARK.NONE
-            ca.format.line.color.rgb = rgb(self.colors.get("color.rule", "#929BA3"))
-            va.format.line.fill.background()
-        if spec.get("dataLabels", True) and not is_range:
-            plot.has_data_labels = True
-            dl = plot.data_labels
-            dl.font.size = Pt(min(11, spec.get("labelPt") or 11))   # data labels are the chart's loudest number
-            dl.font.bold = bool(spec.get("labelBold", True))
-            dl.number_format = number_format
-            dl.number_format_is_linked = False
-            if kind in ("column", "bar"):
-                dl.position = XL_LABEL_POSITION.OUTSIDE_END
-            elif kind == "line":
-                # Office's default right-of-point labels intersect rising
-                # segments. Values belong above the markers; explicit series
-                # end labels retain their separate right-side placement below.
-                dl.position = XL_LABEL_POSITION.ABOVE
-            elif kind in ("pie", "donut"):
-                # The scene prints each slice's share ("54%") inside the slice,
-                # measured to fit it (charts.mjs partToWhole). The native chart
-                # printed the raw value outside the rim instead, where
-                # LibreOffice gives an outside label only the sliver between
-                # the pie and the frame edge: "75.8" wrapped one character per
-                # line down the side of a Saudia pie. The native labels now say
-                # what the scene says, where it says it; a scene that had to
-                # set a share outside stays drawn (core.mjs nativeChartSpec).
-                dl.show_value = False
-                dl.show_percentage = True
-                dl.number_format = "0%"
-                dl.position = XL_LABEL_POSITION.CENTER
-        # series colours from the palette (comparator series grey when the runtime would)
+            self._chart_axes(chart, plot, spec, grouped)
+        if spec.get("dataLabels", True) and kind != "range":
+            self._plot_labels(plot, spec, number_format)
+        for i, ser in enumerate(plot.series):
+            self._style_series(ser, i, spec, number_format, decimals)
+        if kind == "donut" and spec.get("center"):
+            self._donut_center(slide, f, spec, instance)
+        self.stats["native_charts"] += 1
+        return gf
+
+    def _chart_axes(self, chart, plot, spec: dict, grouped: bool):
+        """Bar weight, the value axis on the scene's domain and step, and the
+        category axis, for every native chart with axes."""
+        kind = spec["type"]
+        is_range = kind == "range"
+        # Bar weight follows the category count, as in the drawn charts:
+        # few categories take fat bars, many take thinner ones.
+        categories = len(spec.get("categories") or [])
+        plot.gap_width = 80 if is_range else 35 if categories <= 3 else 45 if categories <= 6 else 60
+        if kind in ("column", "bar"):
+            plot.overlap = 0
+        if is_range:
+            plot.overlap = 100
+        va = chart.value_axis
+        va.has_major_gridlines = bool(spec.get("gridlines"))
+        va.visible = spec.get("showValueAxis", not spec.get("dataLabels", True))
+        va.tick_labels.font.size = Pt(10)  # chart furniture floor is 10 pt
+        if spec.get("yMin") is not None:
+            va.minimum_scale = spec["yMin"]
+        if spec.get("yMax") is not None:
+            va.maximum_scale = spec["yMax"]
+        elif kind in ("column", "bar") and spec.get("dataLabels", True):
+            # Value labels belong outside the mark, so the longest bar needs
+            # room past its end: give the hidden value axis a headroom stop
+            # above the largest value. Without it PowerPoint runs the bar to
+            # the plot edge and the label has nowhere to go but inside.
+            vals = [v for s in spec.get("series", []) for v in (s.get("values") or []) if isinstance(v, (int, float))]
+            if vals and min(vals) >= 0 and max(vals) > 0:
+                va.maximum_scale = headroom_stop(max(vals))
+        if spec.get("yMajorUnit") is not None:
+            va.major_unit = spec["yMajorUnit"]
+            # One precision down the axis, as the drawn axis prints it:
+            # 0.0, 2.5, 5.0 rather than General's 0, 2.5, 5.
+            ticks = [spec.get("yMin") or 0, spec.get("yMax") or 0, spec["yMajorUnit"]]
+            places = max(len(f"{float(t):.12g}".partition(".")[2]) for t in ticks)
+            if places:
+                va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
+                va.tick_labels.number_format_is_linked = False
+        ca = chart.category_axis
+        # A crowded row of bars names every member at 8pt in the scene
+        # (charts.mjs ROW_LABEL_MIN); the native chart sets the same size.
+        ca.tick_labels.font.size = Pt(min(10, spec.get("labelPt") or 10))
+        if kind not in ("bar", "stacked-bar", "range"):
+            # Keep category labels below the plot when zero crosses signed
+            # data; labels at the zero line collide with near-zero marks.
+            ca.tick_label_position = XL_TICK_LABEL_POSITION.LOW
+        if kind in ("bar", "stacked-bar", "range"):
+            ca.reverse_order = True  # first category at the top, as authored
+            va.crosses = XL_AXIS_CROSSES.MAXIMUM if False else va.crosses
+        ca.has_major_gridlines = False
+        ca.major_tick_mark = XL_TICK_MARK.NONE
+        va.major_tick_mark = XL_TICK_MARK.NONE
+        ca.format.line.color.rgb = rgb(self.colors.get("color.rule", "#929BA3"))
+        va.format.line.fill.background()
+
+    @staticmethod
+    def _plot_labels(plot, spec: dict, number_format: str):
+        """The plot's data labels: the chart's loudest number, placed as the
+        scene placed its labels for this kind of chart."""
+        kind = spec["type"]
+        plot.has_data_labels = True
+        dl = plot.data_labels
+        dl.font.size = Pt(min(11, spec.get("labelPt") or 11))   # data labels are the chart's loudest number
+        dl.font.bold = bool(spec.get("labelBold", True))
+        dl.number_format = number_format
+        dl.number_format_is_linked = False
+        if kind in ("column", "bar"):
+            dl.position = XL_LABEL_POSITION.OUTSIDE_END
+        elif kind == "line":
+            # Office's default right-of-point labels intersect rising
+            # segments. Values belong above the markers; explicit series
+            # end labels retain their separate right-side placement below.
+            dl.position = XL_LABEL_POSITION.ABOVE
+        elif kind in ("pie", "donut"):
+            # The scene prints each slice's share ("54%") inside the slice,
+            # measured to fit it (charts.mjs partToWhole). LibreOffice gives an
+            # outside label only the sliver between the pie and the frame edge,
+            # where a value wraps one character a line, so the native labels
+            # say what the scene says, where it says it; a scene that had to
+            # set a share outside stays drawn (core.mjs nativeChartSpec).
+            dl.show_value = False
+            dl.show_percentage = True
+            dl.number_format = "0%"
+            dl.position = XL_LABEL_POSITION.CENTER
+
+    def _series_color(self, spec: dict, i: int):
+        """Series `i`'s colour from the palette, the comparator grey where the runtime would."""
         idx = spec.get("colorIndices")
+        ci = idx[i] if idx and i < len(idx) else i
+        color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
+        if len(spec["series"]) == 2 and not idx and spec["type"] not in ("range", "line", "area"):
+            # The scene decides which peer is the point (focusIndex, from
+            # its painted marks); without one the second is the grey.
+            focus = spec.get("focusIndex")
+            if focus is not None and i == focus:
+                color = self.colors.get("color.componentPrimary", color)
+            elif i == (1 if focus is None else 1 - focus):
+                color = self.colors.get("color.chartComparator", color)
+        return color
+
+    def _style_series(self, ser, i: int, spec: dict, number_format: str, decimals: int):
+        """Series `i`'s fill and labels, and its points', as the scene drew them."""
+        kind = spec["type"]
+        color = self._series_color(spec, i)
+        if kind == "range" and i == 0:
+            # invisible base: the bar floats from low to high
+            ser.format.fill.background(); ser.format.line.fill.background()
+            return
+        if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
+            # A zero segment has no area. Preserve its workbook value,
+            # but do not let Office place a label on the category axis.
+            labels = ser._element.get_or_add_dLbls()
+            for j, value in enumerate(spec["series"][i]["values"]):
+                if value == 0 and labels is not None:
+                    label = etree.SubElement(labels, qn("c:dLbl"))
+                    etree.SubElement(label, qn("c:idx")).set("val", str(j))
+                    etree.SubElement(label, qn("c:delete")).set("val", "1")
+        if color and kind not in ("pie", "donut"):
+            fill = ser.format.fill
+            fill.solid(); fill.fore_color.rgb = rgb(color)
+            bars = kind in ("column", "bar", "stacked-column", "stacked-bar")
+            single = len(spec["series"]) == 1
+            if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
+                self._segment_labels(ser, spec, color, number_format)
+            if kind == "line":
+                self._line_labels(ser, spec, i, color, number_format)
+            if bars and single and spec.get("dataLabels", True):
+                self._bar_labels(ser, spec, number_format)
+            if bars and single:
+                self._bar_point_fills(ser, spec, color)
+            if kind == "line" and spec.get("endLabels"):
+                self._end_label(ser, spec, i, color, decimals)
+            if kind == "range":
+                self._range_labels(ser, spec)
+        elif kind in ("pie", "donut"):
+            self._slice_fills(ser, spec)
+
+    def _segment_labels(self, ser, spec: dict, color, number_format: str):
+        # Segment labels sit inside their segment, in whichever of
+        # white and ink reads better on it (on_fill), so every segment reads.
+        sdl = ser.data_labels
+        sdl.show_value = True
+        sdl.number_format = number_format; sdl.number_format_is_linked = False
+        sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
+        sdl.position = XL_LABEL_POSITION.CENTER
+        sdl.font.color.rgb = rgb(on_fill(color, self.colors.get("color.onPrimary", "#FFFFFF"), self.colors.get("color.ink", "#000000")))
+
+    @staticmethod
+    def _line_labels(ser, spec: dict, i: int, color, number_format: str):
+        ser.format.line.color.rgb = rgb(color)
+        ser.format.line.width = Pt(2.25)
+        ser.smooth = False
+        # A per-point endpoint override creates a series label block
+        # in Office. Set its value policy before adding that override.
+        sdl = ser.data_labels
+        sdl.show_value = bool(spec.get("pointDataLabels", spec.get("dataLabels", True)))
+        sdl.number_format = number_format; sdl.number_format_is_linked = False
+        sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
+        sdl.position = XL_LABEL_POSITION.ABOVE
+        # Above every marker put a trough's label on the two
+        # segments meeting under it; each point takes the side its
+        # segments leave free (line_label_sides, as the scene does).
+        if not sdl.show_value:
+            return
+        values = spec["series"][i]["values"]
+        for j, side in enumerate(line_label_sides(values)):
+            if side == "above" or (spec.get("endLabels") and j == len(values) - 1):
+                continue
+            lab = ser.points[j].data_label
+            lab.position = {"below": XL_LABEL_POSITION.BELOW, "left": XL_LABEL_POSITION.LEFT, "right": XL_LABEL_POSITION.RIGHT}[side]
+            lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
+            dlbl = lab._dLbl
+            if dlbl is not None and dlbl.find(qn("c:numFmt")) is None:
+                fmt = etree.Element(qn("c:numFmt")); fmt.set("formatCode", number_format); fmt.set("sourceLinked", "0")
+                dlbl.find(qn("c:idx")).addnext(fmt)
+            if dlbl is not None and dlbl.find(qn("c:showVal")) is not None:
+                dlbl.find(qn("c:showVal")).set("val", "1")
+
+    def _bar_labels(self, ser, spec: dict, number_format: str):
+        # Series-level labels first (a per-point override otherwise
+        # creates a series block that hides the other labels), then
+        # highlight the answer, lighten the forecast, and put the label
+        # inside a bar that is wide enough to carry it in white.
+        sdl = ser.data_labels
+        sdl.show_value = True
+        sdl.number_format = number_format; sdl.number_format_is_linked = False
+        sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
+        sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
+        if spec["type"] in ("column", "bar"):
+            sdl.position = XL_LABEL_POSITION.OUTSIDE_END
+        # Values the scene left unprinted (a ranking labelled on
+        # the rows it names) are deleted point by point, as above.
+        # A point's dLbl leads the dLbls block (schema order).
+        for j in spec.get("hiddenLabelIndices") or []:
+            labels = ser._element.get_or_add_dLbls()
+            label = etree.Element(qn("c:dLbl"))
+            etree.SubElement(label, qn("c:idx")).set("val", str(j))
+            etree.SubElement(label, qn("c:delete")).set("val", "1")
+            points = labels.findall(qn("c:dLbl"))
+            if points:
+                points[-1].addnext(label)
+            else:
+                labels.insert(0, label)
+
+    def _bar_point_fills(self, ser, spec: dict, color):
+        """The highlighted bar in the accent, the forecast lightened, and a
+        two-bar contrast painted as the scene painted it."""
+        kind = spec["type"]
         accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
         forecast = self.colors.get("color.chartSeries6")
         highlight_indices = set(spec.get("highlightIndices") or [])
         forecast_index = spec.get("forecastIndex", -1)
-        single = len(spec["series"]) == 1
-        for i, ser in enumerate(plot.series):
-            ci = idx[i] if idx and i < len(idx) else i
-            color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
-            if len(spec["series"]) == 2 and not idx and not is_range and kind not in ("line", "area"):
-                # The scene decides which peer is the point (focusIndex, from
-                # its painted marks); without one the second is the grey.
-                focus = spec.get("focusIndex")
-                if focus is not None and i == focus:
-                    color = self.colors.get("color.componentPrimary", color)
-                elif i == (1 if focus is None else 1 - focus):
-                    color = self.colors.get("color.chartComparator", color)
-            if is_range and i == 0:
-                # invisible base: the bar floats from low to high
-                ser.format.fill.background(); ser.format.line.fill.background()
-                continue
-            if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
-                # A zero segment has no area. Preserve its workbook value,
-                # but do not let Office place a label on the category axis.
-                labels = ser._element.get_or_add_dLbls()
-                for j, value in enumerate(spec["series"][i]["values"]):
-                    if value == 0 and labels is not None:
-                        label = etree.SubElement(labels, qn("c:dLbl"))
-                        etree.SubElement(label, qn("c:idx")).set("val", str(j))
-                        etree.SubElement(label, qn("c:delete")).set("val", "1")
-            if color and kind not in ("pie", "donut"):
-                fill = ser.format.fill
-                fill.solid(); fill.fore_color.rgb = rgb(color)
-                if kind in ("stacked-column", "stacked-bar") and spec.get("dataLabels", True):
-                    # Segment labels sit inside their segment, white on a dark
-                    # fill and ink on a light one, so every segment reads.
-                    sdl = ser.data_labels
-                    sdl.show_value = True
-                    sdl.number_format = number_format; sdl.number_format_is_linked = False
-                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
-                    sdl.position = XL_LABEL_POSITION.CENTER
-                    sdl.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF") if _luminance(color) < 0.45 else self.colors.get("color.ink", "#000000"))
-                if kind == "line":
-                    ser.format.line.color.rgb = rgb(color)
-                    ser.format.line.width = Pt(2.25)
-                    ser.smooth = False
-                    # A per-point endpoint override creates a series label block
-                    # in Office. Set its value policy before adding that override.
-                    sdl = ser.data_labels
-                    sdl.show_value = bool(spec.get("pointDataLabels", spec.get("dataLabels", True)))
-                    sdl.number_format = number_format; sdl.number_format_is_linked = False
-                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
-                    sdl.position = XL_LABEL_POSITION.ABOVE
-                    # Above every marker put a trough's label on the two
-                    # segments meeting under it; each point takes the side its
-                    # segments leave free (line_label_sides, as the scene does).
-                    if sdl.show_value:
-                        values = spec["series"][i]["values"]
-                        for j, side in enumerate(line_label_sides(values)):
-                            if side == "above" or (spec.get("endLabels") and j == len(values) - 1):
-                                continue
-                            lab = ser.points[j].data_label
-                            lab.position = {"below": XL_LABEL_POSITION.BELOW, "left": XL_LABEL_POSITION.LEFT, "right": XL_LABEL_POSITION.RIGHT}[side]
-                            lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
-                            dlbl = lab._dLbl
-                            if dlbl is not None and dlbl.find(qn("c:numFmt")) is None:
-                                fmt = etree.Element(qn("c:numFmt")); fmt.set("formatCode", number_format); fmt.set("sourceLinked", "0")
-                                dlbl.find(qn("c:idx")).addnext(fmt)
-                            if dlbl is not None and dlbl.find(qn("c:showVal")) is not None:
-                                dlbl.find(qn("c:showVal")).set("val", "1")
-                if kind in ("column", "bar", "stacked-column", "stacked-bar") and single and spec.get("dataLabels", True):
-                    # Series-level labels first (a per-point override otherwise
-                    # creates a series block that hides the other labels), then
-                    # highlight the answer, lighten the forecast, and put the label
-                    # inside a bar that is wide enough to carry it in white.
-                    sdl = ser.data_labels
-                    sdl.show_value = True
-                    sdl.number_format = number_format; sdl.number_format_is_linked = False
-                    sdl.font.size = Pt(11); sdl.font.bold = bool(spec.get("labelBold", True))
-                    sdl.font.color.rgb = rgb(self.colors.get("color.ink", "#000000"))
-                    if kind in ("column", "bar"):
-                        sdl.position = XL_LABEL_POSITION.OUTSIDE_END
-                    # Values the scene left unprinted (a ranking labelled on
-                    # the rows it names) are deleted point by point, as above.
-                    # A point's dLbl leads the dLbls block (schema order).
-                    for j in spec.get("hiddenLabelIndices") or []:
-                        labels = ser._element.get_or_add_dLbls()
-                        label = etree.Element(qn("c:dLbl"))
-                        etree.SubElement(label, qn("c:idx")).set("val", str(j))
-                        etree.SubElement(label, qn("c:delete")).set("val", "1")
-                        points = labels.findall(qn("c:dLbl"))
-                        if points:
-                            points[-1].addnext(label)
-                        else:
-                            labels.insert(0, label)
-                if kind in ("column", "bar", "stacked-column", "stacked-bar") and single:
-                    two_mark_contrast = kind in ("column", "bar") and len(spec["categories"]) == 2 and idx is None and not highlight_indices
-                    for j, pt in enumerate(ser.points):
-                        point_color = None
-                        if j in highlight_indices and accent:
-                            point_color = accent
-                        elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
-                            point_color = forecast
-                        elif two_mark_contrast:
-                            point_color = self.colors.get("color.componentPrimary" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
-                        if point_color:
-                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
-                if kind == "line" and spec.get("endLabels"):
-                    # Preserve both the series identity and its endpoint value.
-                    last = len(spec["series"][i]["values"]) - 1
-                    if last >= 0:
-                        lab = ser.points[last].data_label
-                        lab.position = XL_LABEL_POSITION.RIGHT
-                        tf = lab.text_frame
-                        value = spec["series"][i]["values"][last]
-                        # The chart's one precision, not a whole-number default
-                        # that rounded 40.8 to "41" beside point labels of 40.8.
-                        tf.text = f'{spec["series"][i].get("name") or ""} {value:,.{decimals}f}'
-                        for p in tf.paragraphs:
-                            for r in p.runs:
-                                r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(color)
-                if is_range:
-                    lows, highs = spec.get("low") or [], spec.get("high") or []
-                    for j, pt in enumerate(ser.points):
-                        if j in highlight_indices and accent:
-                            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
-                        lab = pt.data_label
-                        lab.position = XL_LABEL_POSITION.INSIDE_END
-                        tf = lab.text_frame
-                        lo = lows[j] if j < len(lows) else ""; hi = highs[j] if j < len(highs) else ""
-                        tf.text = f"{lo:g}–{hi:g}" if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) else f"{lo}–{hi}"
-                        for p in tf.paragraphs:
-                            for r in p.runs:
-                                r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
-            elif kind in ("pie", "donut"):
-                for j, pt in enumerate(ser.points):
-                    c = self.series_colors[j % len(self.series_colors)]
-                    if c:
-                        pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(c)
-                    if c and spec.get("dataLabels", True):
-                        # A share sits on its slice: white on a dark fill, ink
-                        # on a light one, as the scene chose. The per-point
-                        # label python-pptx creates shows the value and no
-                        # percentage, so it is set back to the series policy.
-                        lab = pt.data_label
-                        lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
-                        # The scene's rule (strongest contrast of the two),
-                        # not a luminance cut: a tan slice took white at 2.5:1
-                        # where ink reads at 6:1.
-                        on, ink = self.colors.get("color.onPrimary", "#FFFFFF"), self.colors.get("color.ink", "#000000")
-                        ratio = lambda a, b: (max(_luminance(a), _luminance(b)) + 0.05) / (min(_luminance(a), _luminance(b)) + 0.05)
-                        lab.font.color.rgb = rgb(on if ratio(c, on) >= ratio(c, ink) else ink)
-                        dlbl = lab._dLbl
-                        if dlbl is not None:
-                            if dlbl.find(qn("c:numFmt")) is None:
-                                fmt_el = etree.Element(qn("c:numFmt")); fmt_el.set("formatCode", "0%"); fmt_el.set("sourceLinked", "0")
-                                dlbl.find(qn("c:idx")).addnext(fmt_el)
-                            for tag, val in (("c:showVal", "0"), ("c:showPercent", "1")):
-                                if dlbl.find(qn(tag)) is not None:
-                                    dlbl.find(qn(tag)).set("val", val)
-        if kind == "donut" and spec.get("center"):
-            # The centre KPI: a text box over the hole (value bold, label under).
-            center = spec["center"] if isinstance(spec["center"], dict) else {"value": str(spec["center"])}
-            w, h = f["width"] * 0.34, f["height"] * 0.3
-            box = slide.shapes.add_textbox(emu(f["x"] + (f["width"] - w) / 2), emu(f["y"] + (f["height"] - h) / 2), emu(w), emu(h))
-            box.name = f"ps:{instance['instanceId']}:center"
-            tf = box.text_frame; tf.word_wrap = True
-            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-            r = p.add_run(); r.text = str(center.get("value", ""))
-            self._font(r.font, self.body_font, 20, True, rgb(self.colors.get("color.ink", "#000000")))
-            if center.get("label"):
-                p2 = tf.add_paragraph(); p2.alignment = PP_ALIGN.CENTER
-                r2 = p2.add_run(); r2.text = str(center["label"])
-                self._font(r2.font, self.body_font, 10, False, rgb(self.colors.get("color.textSecondary", "#404040")))
-        self.stats["native_charts"] += 1
-        return gf
+        two_mark_contrast = kind in ("column", "bar") and len(spec["categories"]) == 2 and spec.get("colorIndices") is None and not highlight_indices
+        for j, pt in enumerate(ser.points):
+            point_color = None
+            if j in highlight_indices and accent:
+                point_color = accent
+            elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
+                point_color = forecast
+            elif two_mark_contrast:
+                point_color = self.colors.get("color.componentPrimary" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
+            if point_color:
+                pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
+
+    @staticmethod
+    def _end_label(ser, spec: dict, i: int, color, decimals: int):
+        # Preserve both the series identity and its endpoint value.
+        last = len(spec["series"][i]["values"]) - 1
+        if last < 0:
+            return
+        lab = ser.points[last].data_label
+        lab.position = XL_LABEL_POSITION.RIGHT
+        tf = lab.text_frame
+        value = spec["series"][i]["values"][last]
+        # The chart's one precision, not a whole-number default.
+        tf.text = f'{spec["series"][i].get("name") or ""} {value:,.{decimals}f}'
+        for p in tf.paragraphs:
+            for r in p.runs:
+                r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(color)
+
+    def _range_labels(self, ser, spec: dict):
+        """A floating band's low and high, inside its end."""
+        accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
+        highlight_indices = set(spec.get("highlightIndices") or [])
+        lows, highs = spec.get("low") or [], spec.get("high") or []
+        for j, pt in enumerate(ser.points):
+            if j in highlight_indices and accent:
+                pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(accent)
+            lab = pt.data_label
+            lab.position = XL_LABEL_POSITION.INSIDE_END
+            tf = lab.text_frame
+            lo = lows[j] if j < len(lows) else ""; hi = highs[j] if j < len(highs) else ""
+            tf.text = f"{lo:g}–{hi:g}" if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) else f"{lo}–{hi}"
+            for p in tf.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(10); r.font.bold = True; r.font.color.rgb = rgb(self.colors.get("color.onPrimary", "#FFFFFF"))
+
+    def _slice_fills(self, ser, spec: dict):
+        for j, pt in enumerate(ser.points):
+            c = self.series_colors[j % len(self.series_colors)]
+            if c:
+                pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(c)
+            if c and spec.get("dataLabels", True):
+                # A share sits on its slice: white on a dark fill, ink
+                # on a light one, as the scene chose. The per-point
+                # label python-pptx creates shows the value and no
+                # percentage, so it is set back to the series policy.
+                lab = pt.data_label
+                lab.font.size = Pt(11); lab.font.bold = bool(spec.get("labelBold", True))
+                lab.font.color.rgb = rgb(on_fill(c, self.colors.get("color.onPrimary", "#FFFFFF"), self.colors.get("color.ink", "#000000")))
+                dlbl = lab._dLbl
+                if dlbl is not None:
+                    if dlbl.find(qn("c:numFmt")) is None:
+                        fmt_el = etree.Element(qn("c:numFmt")); fmt_el.set("formatCode", "0%"); fmt_el.set("sourceLinked", "0")
+                        dlbl.find(qn("c:idx")).addnext(fmt_el)
+                    for tag, val in (("c:showVal", "0"), ("c:showPercent", "1")):
+                        if dlbl.find(qn(tag)) is not None:
+                            dlbl.find(qn(tag)).set("val", val)
+
+    def _donut_center(self, slide, f: dict, spec: dict, instance: dict):
+        # The centre KPI: a text box over the hole (value bold, label under).
+        center = spec["center"] if isinstance(spec["center"], dict) else {"value": str(spec["center"])}
+        w, h = f["width"] * 0.34, f["height"] * 0.3
+        box = slide.shapes.add_textbox(emu(f["x"] + (f["width"] - w) / 2), emu(f["y"] + (f["height"] - h) / 2), emu(w), emu(h))
+        box.name = f"ps:{instance['instanceId']}:center"
+        tf = box.text_frame; tf.word_wrap = True
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
+        r = p.add_run(); r.text = str(center.get("value", ""))
+        self._font(r.font, self.body_font, 20, True, rgb(self.colors.get("color.ink", "#000000")))
+        if center.get("label"):
+            p2 = tf.add_paragraph(); p2.alignment = PP_ALIGN.CENTER
+            r2 = p2.add_run(); r2.text = str(center["label"])
+            self._font(r2.font, self.body_font, 10, False, rgb(self.colors.get("color.textSecondary", "#404040")))
 
     # ---------------------------------------------------------------- slide
     def emit_slide(self, sl: dict):
@@ -842,17 +964,19 @@ class Emitter:
         instances = {ci["instanceId"]: ci for ci in sl.get("componentInstances", [])}
         title_node = next((n for n in nodes if n["type"] == "text" and n.get("role") in ("action-title", "cover-title", "deck-title", "section-title")), None)
         slide = self.prs.slides.add_slide(self.title_layout if title_node else self.blank_layout)
+        if sl.get("hidden"):
+            # Out of the slide show (PowerPoint's Hide Slide), still in the file.
+            slide._element.set("show", "0")
         canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or self.colors.get("color.canvas", "#FFFFFF")
         slide.background.fill.solid()
         slide.background.fill.fore_color.rgb = rgb(canvas)
         skip_instances = set()
-        if self.native_charts:
-            for iid, ci in instances.items():
-                if ci.get("nativeChart"):
-                    heads = [n for n in nodes if (n.get("data") or {}).get("componentInstance") == iid
-                             and n.get("role") in ("section-heading", "section-heading-rule", "chart-unit", "chart-heading", "chart-title")]
-                    ci["_headingBottom"] = max((n["frame"]["y"] + n["frame"]["height"] for n in heads), default=None)
-                    skip_instances.add(iid)
+        for iid, ci in instances.items():
+            if ci.get("nativeChart"):
+                heads = [n for n in nodes if (n.get("data") or {}).get("componentInstance") == iid
+                         and n.get("role") in ("section-heading", "section-heading-rule", "chart-unit", "chart-heading", "chart-title")]
+                ci["_headingBottom"] = max((n["frame"]["y"] + n["frame"]["height"] for n in heads), default=None)
+                skip_instances.add(iid)
         # group membership: diagram-like components with several primitives
         member_shapes: dict[str, list] = {}
         title_shape = None
@@ -889,11 +1013,10 @@ class Emitter:
             # (a dark cover) would hide it. Put it on top of the z-order.
             tree = title_shape._element.getparent()
             tree.remove(title_shape._element); tree.append(title_shape._element)
-        if self.groups:
-            for iid, shapes in member_shapes.items():
-                comp = instances.get(iid, {}).get("component", "")
-                if len(shapes) >= 3 and comp not in CHROME_COMPONENTS and not comp.startswith("chart-"):
-                    self._group(slide, shapes, f"ps:{iid}:group")
+        for iid, shapes in member_shapes.items():
+            comp = instances.get(iid, {}).get("component", "")
+            if len(shapes) >= 3 and comp not in CHROME_COMPONENTS and not comp.startswith("chart-"):
+                self._group(slide, shapes, f"ps:{iid}:group")
         if sl.get("notes"):
             slide.notes_slide.notes_text_frame.text = str(sl["notes"])
         self.stats["slides"] += 1
@@ -904,51 +1027,58 @@ class Emitter:
         self.stats["grouped"] += 1
 
     # ---------------------------------------------------------------- theme
-    def patch_theme(self, path: Path):
-        """Write the scene palette into theme1.xml so the deck's theme *is* the palette."""
+    def theme(self, data: bytes) -> bytes:
+        """theme1.xml with the scene palette written in, so the deck's theme *is* the palette."""
         slots = {}
         tokens = self.scene["slides"][0]["tokens"] if self.scene.get("slides") else {}
         for tid, t in tokens.items():
             if t.get("kind") == "color" and t.get("themeSlot"):
                 slots[t["themeSlot"]] = t["value"].lstrip("#").upper()
-        buf = io.BytesIO()
-        with zipfile.ZipFile(path) as zin:
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
-                for item in zin.infolist():
-                    data = zin.read(item.filename)
-                    if item.filename == "ppt/theme/theme1.xml":
-                        root = etree.fromstring(data)
-                        ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
-                        for slot, hexv in slots.items():
-                            el = root.find(f".//a:clrScheme/a:{slot}", ns)
-                            if el is not None:
-                                for child in list(el):
-                                    el.remove(child)
-                                etree.SubElement(el, qn("a:srgbClr")).set("val", hexv)
-                        for tag, family in (("majorFont", self.display_font), ("minorFont", self.body_font)):
-                            latin = root.find(f".//a:fontScheme/a:{tag}/a:latin", ns)
-                            if latin is not None:
-                                latin.set("typeface", family)
-                        data = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
-                    zout.writestr(item, data)
-        path.write_bytes(buf.getvalue())
+        root = etree.fromstring(data)
+        ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+        for slot, hexv in slots.items():
+            el = root.find(f".//a:clrScheme/a:{slot}", ns)
+            if el is not None:
+                for child in list(el):
+                    el.remove(child)
+                etree.SubElement(el, qn("a:srgbClr")).set("val", hexv)
+        for tag, family in (("majorFont", self.display_font), ("minorFont", self.body_font)):
+            latin = root.find(f".//a:fontScheme/a:{tag}/a:latin", ns)
+            if latin is not None:
+                latin.set("typeface", family)
+        return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+    def finish(self, path: Path):
+        """The saved package, finished: the palette in its theme, and every date
+        it and its chart workbooks carry set to EPOCH. python-pptx stamps each
+        zip entry with the clock and writes each chart's workbook through
+        XlsxWriter, which stamps the workbook's creation date, so two builds of
+        one scene differed in those bytes alone and every review bound to the
+        first was void for the second."""
+        def rewrite(name, data):
+            if name == "ppt/theme/theme1.xml":
+                return self.theme(data)
+            if name == "docProps/core.xml":
+                return fixed_dates(data)
+            if name.startswith("ppt/embeddings/") and name.endswith(".xlsx"):
+                return repack(data, lambda inner, blob: fixed_dates(blob) if inner == "docProps/core.xml" else blob)
+            return data
+        path.write_bytes(repack(path.read_bytes(), rewrite))
 
     def run(self, out: Path):
         for sl in self.scene["slides"]:
             self.emit_slide(sl)
         self.prs.save(str(out))
-        self.patch_theme(out)
+        self.finish(out)
         return self.stats
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("scene"); ap.add_argument("out")
-    ap.add_argument("--no-native-charts", action="store_true")
-    ap.add_argument("--no-groups", action="store_true")
     a = ap.parse_args(argv)
     scene = json.loads(Path(a.scene).read_text())
-    stats = Emitter(scene, native_charts=not a.no_native_charts, groups=not a.no_groups).run(Path(a.out))
+    stats = Emitter(scene).run(Path(a.out))
     print(json.dumps({"out": a.out, **stats}))
 
 

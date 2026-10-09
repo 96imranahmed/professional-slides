@@ -16,8 +16,10 @@ matters most - a refusal to score anything the plan does not actually record.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -47,7 +49,10 @@ def deck(pages):
 
 class PlanGateTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path("/tmp/claude-plan-gate-test.plan.json")
+        # A folder of this test's own: two runs of the suite on one machine never write one file.
+        self.work = Path(tempfile.mkdtemp(prefix="plan-gate-"))
+        self.addCleanup(shutil.rmtree, self.work, ignore_errors=True)
+        self.tmp = self.work / "test.plan.json"
 
     def codes(self, plan):
         return set(run_plan(plan, self.tmp)["countsByCode"])

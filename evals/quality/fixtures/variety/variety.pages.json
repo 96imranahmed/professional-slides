@@ -1,0 +1,553 @@
+{
+ "deck": {
+  "schema": "professional-slides.deck/v3",
+  "id": "variety",
+  "workflow": "new_deck",
+  "request": "Has Northvale Rail recovered, how does it compare with other operators, and what should it buy next?",
+  "brief": "Has Northvale Rail recovered, and what should it buy next?",
+  "answer": "Northvale has recovered past its FY19 level and leads its peers, so it should buy frequency on its four busiest lines.",
+  "design": "consulting",
+  "density": "executive"
+ },
+ "pages": [
+  {
+   "id": "v01",
+   "type": "summary",
+   "title": "Northvale has recovered its passengers and should now buy frequency",
+   "why": "The opening states the answer and its proof, which is what a summary page is for",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the argument the page sets out, from the findings before it"
+   }
+  },
+  {
+   "kind": "section",
+   "title": "Demand has recovered past its FY19 level"
+  },
+  {
+   "id": "v02",
+   "type": "trend",
+   "title": "Journeys are 28% above their FY19 level",
+   "why": "One series over eight years, read for its recovery, which is what a trend page is for",
+   "evidence": [
+    "i-journeys"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "journeys each year against the FY19 level",
+    "measures": [
+     "i-journeys/journeys"
+    ]
+   }
+  },
+  {
+   "id": "v03",
+   "type": "trend",
+   "title": "Every operator grew, and Lakes grew fastest",
+   "why": "Six series over the same years, which is what a trend page is for",
+   "evidence": [
+    "i-operators"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "journeys by year for six operators",
+    "measures": [
+     "i-operators/northvale",
+     "i-operators/coast",
+     "i-operators/midland",
+     "i-operators/harbour",
+     "i-operators/ridge",
+     "i-operators/lakes"
+    ]
+   }
+  },
+  {
+   "id": "v04",
+   "type": "ranking",
+   "title": "Seven of ten operators carry more than in FY19",
+   "why": "Two dates for each of ten operators, which is what a ranking page is for",
+   "evidence": [
+    "i-then-now"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "each operator's journeys in FY19 and FY26",
+    "measures": [
+     "i-then-now/fy19",
+     "i-then-now/fy26"
+    ],
+    "relation": {
+     "kind": "gap"
+    }
+   }
+  },
+  {
+   "id": "v05",
+   "type": "numbers",
+   "title": "The recovery took six years from the FY20 low",
+   "why": "One figure over the series that produced it, which is what a numbers page is for",
+   "evidence": [
+    "i-journeys"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "journeys since the FY20 low and the growth that recovered them",
+    "measures": [
+     "i-journeys/growth",
+     "i-journeys/journeys"
+    ]
+   }
+  },
+  {
+   "id": "v06",
+   "type": "composition",
+   "title": "Weekend travel grew from a quarter to a third of journeys",
+   "why": "Three parts of one whole over eight years, which is what a composition page is for",
+   "evidence": [
+    "i-daypart"
+   ],
+   "settles": {
+    "kind": "share",
+    "what": "the peak, off-peak and weekend shares of journeys by year",
+    "measures": [
+     "i-daypart/peak",
+     "i-daypart/off-peak",
+     "i-daypart/weekend"
+    ]
+   }
+  },
+  {
+   "id": "v07",
+   "type": "bridge",
+   "title": "The new timetable added most of the journeys gained in FY26",
+   "why": "A change between two totals and what it is made of, which is what a bridge page is for",
+   "evidence": [
+    "i-bridge"
+   ],
+   "settles": {
+    "kind": "structure",
+    "what": "the steps from FY25 journeys to FY26",
+    "measures": [
+     "i-bridge/journeys"
+    ]
+   }
+  },
+  {
+   "id": "v08",
+   "type": "mechanism",
+   "title": "More trains an hour bring passengers who did not plan the trip",
+   "why": "How frequency turns into demand, as a sequence of causes, which is what a mechanism page is for",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the argument the page sets out, from the findings before it"
+   }
+  },
+  {
+   "kind": "section",
+   "title": "Northvale leads its peers on service and cost"
+  },
+  {
+   "id": "v09",
+   "type": "ranking",
+   "title": "Northvale is the most punctual of ten operators",
+   "why": "Ten members on one measure, which is what a ranking page is for",
+   "evidence": [
+    "i-punctual"
+   ],
+   "settles": {
+    "kind": "rank",
+    "what": "punctuality for ten operators",
+    "measures": [
+     "i-punctual/punctuality"
+    ]
+   }
+  },
+  {
+   "id": "v10",
+   "type": "panels",
+   "title": "Northvale leads on punctuality and cost with the youngest fleet",
+   "why": "Three measures in three units, each ranked on its own, which is what a panels page is for",
+   "evidence": [
+    "i-profile"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "punctuality, cost and fleet age for the operators side by side",
+    "measures": [
+     "i-profile/punctuality",
+     "i-profile/cost",
+     "i-profile/fleet-age"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "each is in its own unit and read as its own ranking"
+    }
+   }
+  },
+  {
+   "id": "v11",
+   "type": "ranking",
+   "title": "Northvale sits fifth of twenty on cost per journey",
+   "why": "Where the subject sits in a field of twenty, which is what a ranking page is for",
+   "evidence": [
+    "i-cost-field"
+   ],
+   "settles": {
+    "kind": "rank",
+    "what": "cost per journey for twenty operators",
+    "measures": [
+     "i-cost-field/cost"
+    ]
+   }
+  },
+  {
+   "id": "v12",
+   "type": "lookup",
+   "title": "The eight operators on the three measures the board asked for",
+   "why": "Exact values a reader looks up, which is what a lookup page is for",
+   "evidence": [
+    "i-profile"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "the three measures the board asked for, operator by operator",
+    "measures": [
+     "i-profile/punctuality",
+     "i-profile/cost",
+     "i-profile/fleet-age"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "exact values in three units, looked up row by row"
+    }
+   }
+  },
+  {
+   "id": "v13",
+   "type": "ranking",
+   "title": "Northvale holds the narrowest spread of monthly punctuality",
+   "why": "Each operator's own range, middle half and median, which is what a ranking page is for",
+   "evidence": [
+    "i-spread"
+   ],
+   "settles": {
+    "kind": "rank",
+    "what": "the spread of monthly punctuality for each operator",
+    "measures": [
+     "i-spread/min",
+     "i-spread/q1",
+     "i-spread/median",
+     "i-spread/q3",
+     "i-spread/max"
+    ]
+   }
+  },
+  {
+   "id": "v14",
+   "type": "relationship",
+   "title": "Lines with more trains a day grew faster",
+   "why": "Two measures set against each other, line by line, which is what a relationship page is for",
+   "evidence": [
+    "i-frequency"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "trains a day against journey growth, line by line",
+    "measures": [
+     "i-frequency/frequency",
+     "i-frequency/growth"
+    ]
+   }
+  },
+  {
+   "id": "v15",
+   "type": "scorecard",
+   "title": "Northvale is ahead of seven peers on all three measures",
+   "why": "Recorded measures over the same members, coded in their cells, which is what a scorecard page is for",
+   "evidence": [
+    "i-profile"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "the operators graded on punctuality, cost and fleet age",
+    "measures": [
+     "i-profile/punctuality",
+     "i-profile/cost",
+     "i-profile/fleet-age"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "each measure is coded on its own range"
+    }
+   }
+  },
+  {
+   "id": "v16",
+   "type": "options",
+   "title": "Buy frequency on four lines or spread it across twelve",
+   "why": "Two options compared on the same terms, which is what a options page is for",
+   "settles": {
+    "kind": "structure",
+    "what": "the two ways of spending the same order, on the same terms"
+   }
+  },
+  {
+   "kind": "section",
+   "title": "The money and the fleet allow the purchase"
+  },
+  {
+   "id": "v17",
+   "type": "trend",
+   "title": "Revenue reached GBP 398m with punctuality held near 90%",
+   "why": "Two measures in two units over the same years, which is what a trend page is for",
+   "evidence": [
+    "i-money"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "revenue and punctuality by year",
+    "measures": [
+     "i-money/revenue",
+     "i-money/punctuality"
+    ]
+   }
+  },
+  {
+   "id": "v18",
+   "type": "composition",
+   "title": "Fares are 57% of revenue",
+   "why": "One whole and its four parts, which is what a composition page is for",
+   "evidence": [
+    "i-revenue-parts"
+   ],
+   "settles": {
+    "kind": "share",
+    "what": "revenue split by source",
+    "measures": [
+     "i-revenue-parts/revenue"
+    ]
+   }
+  },
+  {
+   "id": "v19",
+   "type": "panels",
+   "title": "Revenue rose while punctuality held",
+   "why": "Two series in two units, one above the other, which is what a panels page is for",
+   "evidence": [
+    "i-money"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "revenue and punctuality, each on its own panel",
+    "measures": [
+     "i-money/revenue",
+     "i-money/punctuality"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "pounds and per cent share no scale"
+    }
+   }
+  },
+  {
+   "id": "v20",
+   "type": "composition",
+   "title": "Northvale carries the largest weekend share of five operators",
+   "why": "The mix of one whole, operator by operator, which is what a composition page is for",
+   "evidence": [
+    "i-daypart-peers"
+   ],
+   "settles": {
+    "kind": "share",
+    "what": "the peak, off-peak and weekend shares for five operators",
+    "measures": [
+     "i-daypart-peers/peak",
+     "i-daypart-peers/off-peak",
+     "i-daypart-peers/weekend"
+    ]
+   }
+  },
+  {
+   "id": "v21",
+   "type": "numbers",
+   "title": "The network is 214 stations on 12 lines",
+   "why": "Four single figures, which is what a numbers page is for",
+   "evidence": [
+    "i-estate"
+   ],
+   "settles": {
+    "kind": "count",
+    "what": "the stations, staff, depots and lines the network runs",
+    "measures": [
+     "i-estate/stations",
+     "i-estate/staff",
+     "i-estate/depots",
+     "i-estate/lines"
+    ]
+   }
+  },
+  {
+   "id": "v22",
+   "type": "composition",
+   "title": "Two classes are 43% of the fleet",
+   "why": "One whole and its seven parts, which is what a composition page is for",
+   "evidence": [
+    "i-fleet"
+   ],
+   "settles": {
+    "kind": "share",
+    "what": "the fleet split by class",
+    "measures": [
+     "i-fleet/fleet"
+    ]
+   }
+  },
+  {
+   "id": "v23",
+   "type": "parallel",
+   "title": "Three things the order has to settle before it is placed",
+   "why": "Three parallel conditions, each headed, which is what a parallel page is for",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the argument the page sets out, from the findings before it"
+   }
+  },
+  {
+   "id": "v24",
+   "type": "panels",
+   "title": "Punctuality leads the peers and fares carry the revenue",
+   "why": "A rank and the parts of a whole, side by side, which is what a panels page is for",
+   "evidence": [
+    "i-punctual",
+    "i-revenue-parts"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "punctuality against the peers beside the revenue split",
+    "measures": [
+     "i-punctual/punctuality",
+     "i-revenue-parts/revenue"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "a ranking in per cent and a split of pounds"
+    }
+   }
+  },
+  {
+   "id": "v25",
+   "type": "ranking",
+   "title": "Five of eight districts miss the nine-minute standard",
+   "why": "Each member against a standard, which is what a ranking page is for",
+   "evidence": [
+    "i-response"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "response times in eight districts against the nine-minute standard",
+    "measures": [
+     "i-response/response",
+     "i-response/standard"
+    ]
+   }
+  },
+  {
+   "id": "v26",
+   "type": "numbers",
+   "title": "Three districts meet the standard and five do not",
+   "why": "One standard over the districts it is set for, which is what a numbers page is for",
+   "evidence": [
+    "i-response"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "how many districts meet the standard",
+    "measures": [
+     "i-response/standard",
+     "i-response/response"
+    ]
+   }
+  },
+  {
+   "id": "v27",
+   "type": "argument",
+   "title": "Frequency is the purchase that the evidence supports",
+   "why": "The reasoning is the evidence, which is what a argument page is for",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the argument the page sets out, from the findings before it"
+   }
+  },
+  {
+   "id": "v28",
+   "type": "relationship",
+   "title": "Peak journeys are spread evenly across eight lines",
+   "why": "Three measures in one unit across the lines, which is what a relationship page is for",
+   "evidence": [
+    "i-lines"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "peak, off-peak and weekend journeys on eight lines",
+    "measures": [
+     "i-lines/peak",
+     "i-lines/off-peak",
+     "i-lines/weekend"
+    ]
+   }
+  },
+  {
+   "id": "v29",
+   "type": "panels",
+   "title": "Journeys recovered on a fleet two classes dominate",
+   "why": "A trend and the parts of a whole, side by side, which is what a panels page is for",
+   "evidence": [
+    "i-journeys",
+    "i-fleet"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by year beside the fleet split by class",
+    "measures": [
+     "i-journeys/journeys",
+     "i-fleet/fleet"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "journeys over time and trains by class"
+    }
+   }
+  },
+  {
+   "id": "v30",
+   "type": "lookup",
+   "title": "Journeys by operator, year by year",
+   "why": "Exact values in one unit, which is what a lookup page is for",
+   "evidence": [
+    "i-operators"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "journeys by operator and year",
+    "measures": [
+     "i-operators/northvale",
+     "i-operators/coast",
+     "i-operators/midland",
+     "i-operators/harbour",
+     "i-operators/ridge",
+     "i-operators/lakes"
+    ]
+   }
+  },
+  {
+   "id": "v31",
+   "type": "summary",
+   "title": "Buy frequency on the four busiest lines first",
+   "why": "What to keep, at the close, which is what a summary page is for",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the argument the page sets out, from the findings before it"
+   }
+  }
+ ]
+}

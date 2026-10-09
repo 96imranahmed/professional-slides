@@ -27,7 +27,11 @@ const visible={changeAnnotations:[{...interval,showQualification:true}]};
 assert.ok(renderChangeAnnotations({id:'visible',plot:{x:100,y:140,width:600,height:300},props:visible,pointMap}).find(n=>n.type==='text').text.includes('Approximate source levels'));
 assert.ok(chartAnnotationBands(visible).top>=chartAnnotationBands(props).top);
 assert.throws(()=>normalizeChangeAnnotations({changeAnnotations:[{...interval,basis:undefined}]}),/basis/);
-assert.throws(()=>normalizeChangeAnnotations({changeAnnotations:[{...interval,qualification:'precise'}]}),/Approximate/);
+// Whether a qualification says its readings are approximate is read (qualification-says-approximate); a reader answers here.
+const {judgementSession,withJudgements}=await import('./skills/professional-slides/runtime/judgements.mjs');
+const reader=judgementSession({oracle:(kind,text)=>kind==='qualification-says-approximate'?(text==='precise'?'unqualified':'approximate'):null});
+withJudgements(reader,()=>assert.throws(()=>normalizeChangeAnnotations({changeAnnotations:[{...interval,qualification:'precise'}]}),/Approximate/));
+withJudgements(reader,()=>assert.doesNotThrow(()=>normalizeChangeAnnotations({changeAnnotations:[{...interval,qualification:'~ levels read off the chart'}]})));
 assert.throws(()=>normalizeChangeAnnotations({changeAnnotations:[{...interval,style:'bracket'}]}),/numeric/);
 assert.throws(()=>renderChangeAnnotations({id:'bad',plot:{x:100,y:140,width:600,height:300},props:{changeAnnotations:[{...interval,end:'missing'}]},pointMap}),/unknown category/);
 for(const text of ['~50,000','≈ 12.5%','~$4.2M','N/A'])assert.equal(normalizeAnnotationRail({annotationRail:{items:[{category:'A',text}]}}).rows[0].items[0].text,text);

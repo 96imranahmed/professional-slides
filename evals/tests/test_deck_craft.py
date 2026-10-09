@@ -152,7 +152,7 @@ class PageHighlightTests(unittest.TestCase):
     def test_a_page_highlight_reaches_the_points_that_say_it(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const slide = composeSlide({id:'s1', title:'Freight repricing took four points of margin',
   highlight:'four points',
   exhibit:{type:'table', columns:['Lane','Margin'], rows:[['North','12'],['South','8']]},
@@ -171,7 +171,7 @@ console.log(JSON.stringify(points.props.items.map(p => p.highlight ?? null)));
         case, and making it one is what kept the phrase off the page."""
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const slide = composeSlide({id:'s1', title:'Freight repricing took four points of margin',
   highlight:'a phrase this page never says',
   exhibit:{type:'table', columns:['Lane','Margin'], rows:[['North','12'],['South','8']]},

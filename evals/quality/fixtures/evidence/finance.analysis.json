@@ -1,0 +1,126 @@
+{
+ "schema": "professional-slides.analysis/v1",
+ "analyses": [
+  {
+   "id": "A-ocf",
+   "op": "growth",
+   "inputs": [
+    "i-cash/ocf"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Cash generation fell while profit rose",
+   "strength": "strong"
+  },
+  {
+   "id": "A-earn",
+   "op": "growth",
+   "inputs": [
+    "i-earn/pat"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Profit growth continued through the cash decline",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-cushion",
+   "op": "gap",
+   "inputs": [
+    "i-liquidity/liquid",
+    "i-liquidity/short-liabilities"
+   ],
+   "soWhat": "The liquidity cushion has narrowed to a third of its peak",
+   "strength": "strong"
+  },
+  {
+   "id": "A-peers",
+   "op": "compare",
+   "inputs": [
+    "i-peers/margin",
+    "i-peers/loan-growth",
+    "i-peers/capital",
+    "i-peers/liquidity-cover"
+   ],
+   "soWhat": "No union leads on all four measures, and the two fastest lenders hold the thinnest liquidity",
+   "strength": "strong"
+  },
+  {
+   "id": "A-cover",
+   "op": "ratio",
+   "inputs": [
+    "i-liquidity/liquid",
+    "i-liquidity/short-liabilities"
+   ],
+   "percent": true,
+   "soWhat": "Liquid assets have covered a smaller share of the liabilities due within a year every year since FY22",
+   "strength": "strong"
+  },
+  {
+   "id": "A-floor",
+   "op": "threshold",
+   "inputs": [
+    "A-cover/result"
+   ],
+   "threshold": {
+    "ref": "i-rule/minimum"
+   },
+   "soWhat": "Four points of cover remain above the regulatory minimum",
+   "strength": "strong"
+  },
+  {
+   "id": "A-loans",
+   "op": "growth",
+   "inputs": [
+    "i-loans/loans"
+   ],
+   "soWhat": "The book grew by more than half in seven years",
+   "strength": "strong"
+  },
+  {
+   "id": "A-loans-year",
+   "op": "growth",
+   "inputs": [
+    "i-loans/loans"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Lending grew faster in the latest year than profit did",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-liquid-year",
+   "op": "growth",
+   "inputs": [
+    "i-liquidity/liquid"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Liquid assets rose in the latest year",
+   "strength": "context"
+  },
+  {
+   "id": "A-index",
+   "op": "index",
+   "inputs": [
+    "i-loans/loans",
+    "i-liquidity/liquid",
+    "i-liquidity/short-liabilities",
+    "i-cash/ocf"
+   ],
+   "soWhat": "Liabilities due within a year nearly doubled while loans, liquid assets and cash flow grew far less",
+   "strength": "supporting"
+  },
+  {
+   "id": "A-short-year",
+   "op": "growth",
+   "inputs": [
+    "i-liquidity/short-liabilities"
+   ],
+   "from": "FY25",
+   "to": "FY26",
+   "soWhat": "Liabilities due within a year rose by as much as liquid assets did",
+   "strength": "context"
+  }
+ ]
+}

@@ -152,7 +152,7 @@ class ComposerTests(unittest.TestCase):
     def test_a_lone_metric_over_a_table_becomes_the_side_column_number(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide, composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide, composeDeck} from './evals/support/compose.mjs';
 const table={type:'table',columns:['Criterion','Marvel','DC'],rows:[['Gross','$10.1bn','$2.8bn'],['Films','27','15']]};
 // One tile above a table floats; it becomes the hero number beside its evidence.
 const page=composeSlide({title:'T',metrics:[{value:'78%',label:'MCU share of combined gross'}],exhibit:table,soWhat:'The cohort decides it.'},0);
@@ -195,21 +195,47 @@ class OutsideLabelTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "emit"))
         import emit_pptx
 
-        self.assertEqual(emit_pptx._nice_ceiling(619 * emit_pptx.LABEL_HEADROOM), 800)
-        self.assertEqual(emit_pptx._nice_ceiling(4.2 * emit_pptx.LABEL_HEADROOM), 5)
+        # The stop is the renderer's own domain (charts.mjs range()) over the
+        # largest bar and its label's room: three steps of 250, one of five.
+        self.assertEqual(emit_pptx.headroom_stop(619), 750)
+        self.assertEqual(emit_pptx.headroom_stop(4.2), 5)
         self.assertGreater(emit_pptx.LABEL_HEADROOM, 1.0)
-        source = (ROOT / "skills" / "professional-slides" / "runtime" / "emit" / "emit_pptx.py").read_text()
-        inside = [line for line in source.splitlines() if "INSIDE_END" in line]
-        # Only a floating range band keeps an inside label: it has no outside.
-        self.assertEqual(len(inside), 1)
-        self.assertIn("lab.position = XL_LABEL_POSITION.INSIDE_END", inside[0])
+        for largest in (0.37, 4.2, 58, 619, 902, 4119):
+            self.assertGreaterEqual(emit_pptx.headroom_stop(largest), largest * emit_pptx.LABEL_HEADROOM)
+        # Read off the saved charts: no bar, column, stack, line or area label
+        # sits inside its mark's end. Only a floating range band keeps an
+        # inside label: it has no outside.
+        import re
+        import tempfile
+        from pptx import Presentation
+        frame = {"x": 60, "y": 160, "width": 1000, "height": 460}
+        two = [{"name": "A", "values": [3, 5]}, {"name": "B", "values": [2, 4]}]
+        specs = {kind: {"type": kind, "frame": frame, "categories": ["X", "Y"], "series": two if kind.startswith("stacked") else two[:1], "dataLabels": True}
+                 for kind in ("column", "bar", "stacked-column", "stacked-bar", "line", "area")}
+        specs["range"] = {"type": "range", "frame": frame, "categories": ["X", "Y"], "dataLabels": True,
+                          "series": [{"name": "Low", "values": [1, 2]}, {"name": "Range", "values": [3, 3]}], "low": [1, 2], "high": [4, 5]}
+        colours = {f"color.chartSeries{i}": {"kind": "color", "value": value} for i, value in enumerate(["#06202E", "#2F6F8F", "#86BC25"], 1)}
+        scene = {"typography": {"body": "Arial", "display": "Arial"}, "tokens": colours, "slides": [
+            {"id": kind, "tokens": {}, "componentInstances": [{"instanceId": kind, "component": "chart", "frame": frame, "nativeChart": spec}],
+             # The chart is painted where the scene drew its marks.
+             "nodes": [{"id": f"{kind}-plot", "type": "rect", "role": "chart-mark", "frame": frame, "data": {"componentInstance": kind}, "style": {"fill": "#000000"}}]}
+            for kind, spec in specs.items()]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "labels.pptx"
+            emit_pptx.Emitter(scene).run(path)
+            charts = [next(shape.chart for shape in slide.shapes if shape.has_chart) for slide in Presentation(path).slides]
+        positions = {kind: set(re.findall(r'<c:dLblPos val="(\w+)"/>', chart._chartSpace.xml)) for kind, chart in zip(specs, charts)}
+        self.assertEqual(positions["column"], {"outEnd"})  # labelled, and past the end of the bar
+        for kind, found in positions.items():
+            with self.subTest(kind=kind):
+                (self.assertIn if kind == "range" else self.assertNotIn)("inEnd", found)
 
 
 if __name__ == "__main__":
     unittest.main()
 
 
-class WeightContractTests(unittest.TestCase):
+class DensityFloorGateTests(unittest.TestCase):
     """The density floors a deck (or its template) sets, and the gates that read
     them. Density is not the defect the gates exist for; empty is."""
 
@@ -262,7 +288,7 @@ class WeightContractTests(unittest.TestCase):
         result = run_node('''
 import assert from 'node:assert/strict';
 import {resolveWeight, WEIGHT_BY_FILL, normalizeWeight} from './skills/professional-slides/runtime/weight.mjs';
-import {composeDeck, applyTemplate} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck, applyTemplate} from './evals/support/compose.mjs';
 // Fill sets the floors; the deck overrides them; a bad key is refused.
 assert.equal(resolveWeight({}, 'full').pageWords, WEIGHT_BY_FILL.full.pageWords);
 assert.equal(resolveWeight({weight:{pageWords:150}}, 'balanced').pageWords, 150);
@@ -290,7 +316,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_the_side_column_fills_its_track_on_every_deck(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 const side=(slide,fill)=>composeSlide(slide,0,process.cwd(),fill).items.find(i=>i.id==='s01-row').items.find(i=>i.id==='s01-side');
 const page={title:'T',exhibit:chart,points:['one','two','three']};
@@ -482,7 +508,7 @@ class CorpusCalibrationTests(unittest.TestCase):
     def test_a_page_carries_numbered_notes(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'T',points:['a','b'],note:['Excludes the 2019 disposal','FY22 basis; figures may not sum']},0);
 assert.equal(page.note,'Notes: 1. Excludes the 2019 disposal   2. FY22 basis; figures may not sum');
 assert.equal(composeSlide({title:'T',points:['a'],note:'Single line'},0).note,'Note: Single line');
@@ -500,7 +526,7 @@ class FurnitureTests(unittest.TestCase):
     def test_footnotes_mark_their_label_and_print_numbered(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.column',heading:'Annual investment',unit:'$B',categories:['2019','2020','2021','2022','2023'],series:[{name:'Deal value',values:[48,62,70,62,39]}],change:{from:'2022',to:'2023'}};
 const page=composeSlide({title:'Activity declined between 2022 and 2023',exhibit:chart,points:['Deal value fell by a third'],
   footnotes:[{on:'2022',text:'2022 includes two $4B+ deals that did not repeat'},{text:'Values are announced enterprise values'}]},0);
@@ -523,15 +549,16 @@ console.log(JSON.stringify({accepted:true}));
     def test_a_chart_can_tabulate_itself(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'T',points:['a','b'],exhibit:{type:'chart.column',heading:'Revenue',unit:'$m',
   categories:['FY23','FY24','FY25'],series:[{name:'Revenue',values:[52,58.4,61]},{name:'Cost',values:[47,51,55]}],dataTable:true}},0);
 const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
 const parts=page.items.flatMap(find);
 assert.ok(parts.find(i=>String(i.component||'').startsWith('chart.')),'the chart stays the hero');
 const table=parts.find(i=>i.component==='table');
-// Values print the way the chart's own labels do: whole numbers from ten up.
-assert.deepEqual(table.props.rows,[['Revenue','52','58','61'],['Cost','47','51','55']]);
+// Values print the way the chart's own labels do: one precision for the
+// chart, a decimal while its largest value is under a hundred and any has one.
+assert.deepEqual(table.props.rows,[['Revenue','52.0','58.4','61.0'],['Cost','47.0','51.0','55.0']]);
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result["accepted"])
@@ -642,7 +669,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_two_statements_read_as_a_pair_centred_on_the_exhibit(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
             {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
 const side=(page)=>{const walk=(item)=>String(item.id||'').endsWith('-side')?[item]:(item.items||[]).flatMap(walk);
@@ -676,7 +703,7 @@ console.log(JSON.stringify({accepted:true}));
         author's to ask for."""
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
   categories:['Highland','Central','East','Coast'],
   series:[{name:'Normal',values:[40,65,42,48]},{name:'Design Dry',values:[28,47,27,33]}]};
@@ -709,7 +736,7 @@ console.log(JSON.stringify({accepted:true}));
         it: across a gutter between columns, down a band across the page."""
         result = run_node("""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const exhibit={type:'chart.column',heading:'Local supply by weather case',unit:'ML/day',
   categories:['Highland','Central'],series:[{name:'Normal',values:[40,65]}]};
@@ -760,7 +787,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_a_label_table_heads_its_columns(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const rows=[{label:'Passenger vehicle drivers',text:'2.1k jobs, 82% Black or African American'},
             {label:'Light truck drivers',text:'0.3k jobs, 77% Black or African American'}];
 const headed=composeSlide({title:'T',columns:['Occupation','What the data shows'],rows,soWhat:'The exposure is concentrated'},0);
@@ -778,7 +805,7 @@ console.log(JSON.stringify({accepted:true}));
     def test_chart_data_tables_require_an_authored_request_at_any_deck_weight(self):
         result = run_node('''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const chart={type:'chart.column',heading:'Revenue and cost',unit:'$m',categories:['FY21','FY22','FY23','FY24','FY25'],
   series:[{name:'Revenue',values:[44,49,52,58,61]},{name:'Cost',values:[40,44,47,51,55]}]};
 const kinds=(page)=>{const find=(item)=>item.component?[item]:(item.items||[]).flatMap(find);
@@ -815,7 +842,7 @@ class HeavyPageTests(unittest.TestCase):
     def test_a_row_matrix_carries_bulleted_cells_under_a_lead(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const page=composeSlide({title:'Five challenges shape the sector',
   columns:['Challenge','A - Pre-COVID trends','B - Impacts'],
   rows:[{label:'Health of transit',icon:'people',cells:[
@@ -1018,7 +1045,7 @@ class DerivedColumnTests(unittest.TestCase):
     def test_share_rank_and_change_are_computed_from_the_table(self):
         result = run_node("""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const styled=styleTable({type:'table',treatment:'open',derive:['share','rank','change'],
   deriveFrom:'Jobs, 2019',deriveAgainst:'Jobs, 2014',total:true,
   columns:[{label:'Subsector',type:'text'},{label:'Jobs, 2014',type:'text',align:'right'},{label:'Jobs, 2019',type:'text',align:'right'}],

@@ -23,7 +23,7 @@ class VisualTruthExportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.scene = run_node(r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const slides=[
  {id:'signed',title:'A loss and a gain must retain their direction and common scale',arrange:'row',exhibits:[[8,-12],[39,8]].map((values,i)=>({type:'chart.bar',heading:i?'Alternative B':'Alternative A',unit:'£k',categories:['First','Second'],series:[{name:'Residual',values}],dataTable:false}))},

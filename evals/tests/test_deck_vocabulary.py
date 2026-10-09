@@ -112,12 +112,12 @@ const result = checkTextPlan(content);
 console.log(JSON.stringify({{codes: result.findings.map(f=>f.code), scores: result.scores}}));
 ''')
 
-    def test_a_block_past_the_client_third_quartile_is_refused(self):
+    def test_a_block_past_the_reference_ninetieth_percentile_is_refused(self):
         result = self.check(200)
         self.assertIn("TEXT_BLOCK_TOO_LONG", result["codes"])
 
     def test_a_block_inside_it_passes(self):
-        result = self.check(150)
+        result = self.check(120)
         self.assertNotIn("TEXT_BLOCK_TOO_LONG", result["codes"])
 
     def test_the_score_records_the_shape_as_well_as_the_volume(self):
@@ -128,7 +128,7 @@ console.log(JSON.stringify({{codes: result.findings.map(f=>f.code), scores: resu
     def test_the_cap_comes_from_the_measured_corpus(self):
         contract = json.loads((RUNTIME / "weight.json").read_text(encoding="utf-8"))
         form = contract["plan"]["textForm"]
-        self.assertEqual(form["longestBlockMax"], form["longestBlock"]["q3"])
+        self.assertEqual(form["longestBlockMax"], form["longestBlock"]["p90"])
         self.assertGreaterEqual(form["pagesMeasured"], 30)
 
 
@@ -142,7 +142,7 @@ class TrackerChoiceTests(unittest.TestCase):
                   points:[{{text:'A developed point that carries this page on its own.'}}]}}'''
             for i, t in enumerate(titles))
         return run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[
   {{id:'sum',title:'The answer is stated first',role:'executive-summary',layout:'text',
     points:[{{text:'A finding that carries the page and says something.'}}]}},
@@ -189,7 +189,7 @@ class TableDensityTests(unittest.TestCase):
 
     def densest(self, rows, palette):
         sizes = run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 import {{planDeck}} from './skills/professional-slides/runtime/planner.mjs';
 const deck = planDeck(toDeckPlan({{schema:'professional-slides.deck/v3', id:'t',
   palette:{json.dumps(palette)}, density:'pre-read', slides:[{{
@@ -225,18 +225,21 @@ class HighlightedVerdictTests(unittest.TestCase):
             ["Quality floor", "Lowest critic score in the run", "Loses"]]
 
     def verdict_column(self, highlight):
-        """The last cell of every row, as the composer leaves it."""
+        """The last cell of every row, as the composer leaves it, with the verdict column read as a status (column-reads)."""
         return run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
-const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
+import {{toDeckPlan}} from './evals/support/compose.mjs';
+import {{judgementSession, withJudgements}} from './skills/professional-slides/runtime/judgements.mjs';
+const reader = judgementSession({{oracle:(kind, subject) => kind === 'column-reads' && subject.header === 'Verdict'
+  ? {{verdict:'status', states:[{{cell:'Wins', value:'positive'}}, {{cell:'Ties', value:'caution'}}, {{cell:'Loses', value:'negative'}}]}} : null}});
+const plan = withJudgements(reader, () => toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
   id:'p', title:'A scorecard whose last column states the verdict',
   layout:'exhibit-top', highlight:{json.dumps(highlight)},
   exhibit:{{type:'table', columns:[
     {{label:'Test', width:1.4}}, {{label:'Measure', width:2.2}}, {{label:'Verdict', width:1.0}}],
     rows:{json.dumps(self.ROWS)}}},
-  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
+  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}}));
 const table = JSON.parse(JSON.stringify(plan)).slides[0];
-const rows = JSON.stringify(table).match(/"rows":(\[\[.*?\]\])/)[1];
+const rows = JSON.stringify(table).match(/"rows":(\\[\\[.*?\\]\\])/)[1];
 console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
 ''')
 
@@ -244,11 +247,15 @@ console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
         return [c.get("value") if isinstance(c, dict) else None
                 for c in self.verdict_column(highlight)]
 
+    # A win, a tie and a loss are a good, a middling and a bad state: pills in those colours, each keeping its word.
+    STATES = ["on-track", "behind", "at-risk"]
+
     def test_every_verdict_is_typed_when_none_is_highlighted(self):
-        self.assertEqual(self.states(None), ["won", "drawn", "lost"])
+        self.assertEqual(self.states(None), self.STATES)
+        self.assertEqual([cell["text"] for cell in self.verdict_column(None)], ["Wins", "Ties", "Loses"])
 
     def test_the_highlighted_verdict_is_typed_like_the_rest(self):
-        self.assertEqual(self.states("Wins"), ["won", "drawn", "lost"])
+        self.assertEqual(self.states("Wins"), self.STATES)
 
     def test_the_pill_replaces_the_accent_rather_than_carrying_both(self):
         first = self.verdict_column("Wins")[0]
@@ -257,19 +264,22 @@ console.log(JSON.stringify(JSON.parse(rows).map(r => r[r.length - 1])));
 
     def test_a_highlight_on_an_ordinary_cell_still_marks_it(self):
         marked = run_node(f'''
-import {{toDeckPlan}} from './skills/professional-slides/runtime/compose.mjs';
-const plan = toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
+import {{toDeckPlan}} from './evals/support/compose.mjs';
+import {{judgementSession, withJudgements}} from './skills/professional-slides/runtime/judgements.mjs';
+const reader = judgementSession({{oracle:(kind, subject) => kind === 'column-reads' && subject.header === 'Verdict'
+  ? {{verdict:'status', states:[{{cell:'Wins', value:'positive'}}, {{cell:'Ties', value:'caution'}}, {{cell:'Loses', value:'negative'}}]}} : null}});
+const plan = withJudgements(reader, () => toDeckPlan({{schema:'professional-slides.deck/v3', id:'t', slides:[{{
   id:'p', title:'A scorecard whose last column states the verdict',
   layout:'exhibit-top', highlight:'Lowest critic score',
   exhibit:{{type:'table', columns:[
     {{label:'Test', width:1.4}}, {{label:'Measure', width:2.2}}, {{label:'Verdict', width:1.0}}],
     rows:{json.dumps(self.ROWS)}}},
-  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}});
-const rows = JSON.stringify(plan).match(/"rows":(\[\[.*?\]\])/)[1];
+  points:[{{text:'A developed point that carries this page on its own and says something.'}}]}}]}}));
+const rows = JSON.stringify(plan).match(/"rows":(\\[\\[.*?\\]\\])/)[1];
 console.log(JSON.stringify(JSON.parse(rows)[2]));
 ''')
         self.assertEqual(marked[1]["highlight"], ["Lowest critic score"])
-        self.assertEqual(marked[2]["value"], "lost")
+        self.assertEqual(marked[2]["value"], "at-risk")
 
 
 class TakeawayLengthTests(unittest.TestCase):
@@ -289,8 +299,9 @@ class TakeawayLengthTests(unittest.TestCase):
     def test_two_lines_pass(self):
         self.assertEqual(self.codes(2), [])
 
-    def test_three_lines_are_tolerated(self):
-        self.assertEqual(self.codes(3), [])
+    def test_three_lines_are_a_paragraph_too(self):
+        # The band held three lines until rules version 3; two say the reading once.
+        self.assertEqual(self.codes(3), ["TAKEAWAY_LONG"])
 
     def test_four_lines_are_a_paragraph(self):
         self.assertEqual(self.codes(4), ["TAKEAWAY_LONG"])

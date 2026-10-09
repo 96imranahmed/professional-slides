@@ -18,7 +18,7 @@ from node_probe import run_node
 
 
 PAGE = r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const build=slide=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'fill',tracker:false,slides:[{id:'s',...slide}]})).deck.slides[0];
 const bottom=ns=>Math.max(...ns.map(n=>n.frame.y+n.frame.height));
@@ -196,7 +196,7 @@ console.log(JSON.stringify({today:today.data.x1,labels,marks,bars}));
 class StatusPillColumnTests(unittest.TestCase):
     def test_a_status_column_reserves_its_pill_before_sharing_the_width(self):
         result = run_node(r"""
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const ex={columns:['Check and next reading','Reverses the finding if','Reading today',{label:'Status',type:'rag'}],rows:[
  ['Traffic, May 2027','The passenger gap on the same March year is zero or negative','+11.4m in FY2025-26; Qatar fell 3%','on-track'],

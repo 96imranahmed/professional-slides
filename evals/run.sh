@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Run the eval suite.
 #
-#   evals/run.sh            unit tests + the deterministic page gates
+#   evals/run.sh            unit tests, the example decks' content stage and
+#                           the node-side source checks
 #   evals/run.sh --slow     also the LibreOffice end-to-end render
+#                           (PS_RUN_SLOW=1, read by test_end_to_end_render.py)
 #
 # Everything here is vendor-neutral: python3 with Pillow, numpy and python-pptx,
 # plus node and Playwright Chromium for the rendered geometry probes.
@@ -30,8 +32,16 @@ echo "== content stage (example plans) =="
 # example decks carry one. `plan_gates.mjs` and `content_gates.mjs` spent weeks
 # wired into nothing: a grep for either returned one hit, a sentence in a
 # reference document, while the deck they would have caught reached a reader.
+# The worked example ships as its pages file, so it is authored into a scratch
+# directory first and its content plan read from there.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+cp -R skills/professional-slides/examples/assets "$work/"
+cp skills/professional-slides/examples/page-types.pages.json "$work/"
+"$NODE" skills/professional-slides/runtime/author-deck.mjs "$work/page-types.pages.json" >/dev/null 2>&1 \
+  || echo "  page-types.pages.json did not author; its content plan is not shown"
 found=0
-for plan in skills/professional-slides/examples/*.content.json; do
+for plan in skills/professional-slides/examples/*.content.json "$work"/*.content.json; do
   [ -e "$plan" ] || continue
   found=1
   printf '  %-28s ' "$(basename "$plan")"
@@ -47,22 +57,6 @@ print("%s | %d pages, %d%% quantitative kinds, %d%% structured kinds, kinds %s"
 ' || true
 done
 [ "$found" = 1 ] || echo "  none: no example deck carries its content stage"
-
-echo "== cold-run baseline =="
-# The same harness a cold run is scored with, pointed at the example decks. It
-# prints rather than fails: where a hand-authored deck misses a bar that is a
-# finding about the deck, and the number moving is the thing to notice.
-for deck in gallery-acceptance house-style nyc-or-sf; do
-  if [ -d "/tmp/ps-build-$deck" ]; then
-    printf '  %-20s ' "$deck"
-    # `|| true`: the scorer exits 2 on a deck that misses a bar, and under
-    # `set -e` with pipefail that would end the run at the first one - which is
-    # exactly the deck worth printing.
-    { "$NODE" evals/cold-run/score.mjs - "/tmp/ps-build-$deck" 2>/dev/null || true; } | sed -n 's/^ *\(pass\|FAIL\) *\([a-zA-Z]*\) *\([0-9.]*\).*/\2=\3/p' | tr '\n' ' '
-    echo
-  fi
-done
-[ -d /tmp/ps-build-gallery-acceptance ] || echo "  (build the example decks into /tmp/ps-build-<name> to populate this)"
 
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs

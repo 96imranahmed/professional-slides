@@ -1,0 +1,626 @@
+{
+ "deck": {
+  "schema": "professional-slides.deck/v3",
+  "id": "finance",
+  "workflow": "new_deck",
+  "request": "Is Harbour Credit Union growing safely, and how does it compare with its regional peers?",
+  "brief": "Is Harbour Credit Union growing safely against its regional peers?",
+  "answer": "Harbour is growing fast but not safely funded: it grows loans second-fastest of eight peers on the thinnest liquidity cover among them, 4.3 points above the regulatory minimum; its cost-to-income ratio keeps falling but its margin and capital sit mid-table, so term funding must come before further lending.",
+  "players": [
+   "Harbour",
+   "Northgate",
+   "Millrace",
+   "Castlefield",
+   "Dunmore",
+   "Eastbank",
+   "Ferrybridge",
+   "Greyfriars"
+  ],
+  "design": "consulting",
+  "density": "executive"
+ },
+ "sources": {
+  "harbour-ar": {
+   "name": "Harbour Credit Union annual report 2026",
+   "status": "illustrative"
+  },
+  "regulator-returns": {
+   "name": "Regional regulator annual returns 2026",
+   "status": "illustrative"
+  },
+  "regulator-rules": {
+   "name": "Regional regulator prudential rules for credit unions 2026",
+   "status": "illustrative"
+  }
+ },
+ "pages": [
+  {
+   "id": "f0",
+   "type": "summary",
+   "form": "executive-summary",
+   "commentary": "none",
+   "takeaway": false,
+   "title": "Harbour is growing fast but not safely funded, so term funding must come first",
+   "why": "The opening states the answer and the three findings behind it, each with what it means for the plan",
+   "evidence": [
+    "i-loans",
+    "i-cash",
+    "i-earn",
+    "i-liquidity",
+    "i-efficiency",
+    "i-peers",
+    "i-rule",
+    "A-ocf",
+    "A-earn",
+    "A-cover",
+    "A-floor",
+    "A-peers",
+    "A-loans",
+    "A-loans-year",
+    "A-liquid-year",
+    "A-short-year"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "growth, cash generation, liquidity cover and peer position against seven regional peers",
+    "measures": [
+     "i-loans/loans",
+     "i-cash/ocf",
+     "i-earn/pat",
+     "i-efficiency/cost-income",
+     "i-liquidity/liquid",
+     "i-liquidity/short-liabilities",
+     "A-cover/result",
+     "i-rule/minimum",
+     "A-peers/margin"
+    ]
+   },
+   "adds": "Each point carries what its finding means for the plan, which the table does not show",
+   "exhibit": {
+    "type": "table",
+    "treatment": "dimensions",
+    "columns": [
+     "Measure",
+     "FY25",
+     "FY26",
+     "Read"
+    ],
+    "rows": [
+     [
+      "Loan book",
+      "{{i-loans/loans@FY25 | 0m}}",
+      "{{i-loans/loans@FY26 | 0m}}",
+      "Up {{A-loans-year/percent | 0.0%}}, second of eight"
+     ],
+     [
+      "Profit after tax",
+      "{{i-earn/pat@FY25 | 0m}}",
+      "{{i-earn/pat@FY26 | 0m}}",
+      "Up {{A-earn/percent | 0.0%}}"
+     ],
+     [
+      "Operating cash flow",
+      "{{i-cash/ocf@FY25 | 0m}}",
+      "{{i-cash/ocf@FY26 | 0m}}",
+      "Down {{A-ocf/percent | 0.0% | abs}}"
+     ],
+     [
+      "Liquid assets",
+      "{{i-liquidity/liquid@FY25 | 0m}}",
+      "{{i-liquidity/liquid@FY26 | 0m}}",
+      "Up {{A-liquid-year/change | 0m}}"
+     ],
+     [
+      "Short-term liabilities",
+      "{{i-liquidity/short-liabilities@FY25 | 0m}}",
+      "{{i-liquidity/short-liabilities@FY26 | 0m}}",
+      "Up {{A-short-year/change | 0m}}"
+     ],
+     [
+      "Liquidity cover",
+      "{{A-cover/result@FY25 | 0%}}",
+      "{{A-cover/result@FY26 | 0%}}",
+      "Minimum {{i-rule/minimum | 0%}}; lowest of eight"
+     ],
+     [
+      "Net interest margin",
+      "n/a",
+      "2.9%",
+      "Fourth of eight"
+     ],
+     [
+      "Cost-to-income ratio",
+      "63%",
+      "62%",
+      "FY19 71%"
+     ]
+    ],
+    "basis": {
+     "measures": [
+      "i-loans/loans",
+      "i-cash/ocf",
+      "i-earn/pat",
+      "i-efficiency/cost-income",
+      "i-liquidity/liquid",
+      "i-liquidity/short-liabilities",
+      "A-cover/result",
+      "i-rule/minimum",
+      "A-peers/margin"
+     ],
+     "role": "proof"
+    }
+   },
+   "highlight": "term funding must come before further lending",
+   "points": [
+    "Loans grew {{A-loans/percent | 0%}} in seven years and {{A-loans-year/percent | 0.0%}} in FY26. Profit kept rising, but operating cash flow fell {{A-ocf/percent | 0.0% | abs}}, so earnings no longer pay for the growth.",
+    "Liquid assets now cover {{A-cover/result@FY26 | 0%}} of the liabilities due within a year, down every year from {{A-cover/result@FY22 | 0%}} in FY22 to {{A-floor/headroom | 0.0}} points above the regulatory minimum. Each loan funded with money due within a year lowers it again, so term funding must come before further lending.",
+    "Against its peers Harbour lends faster on thinner liquidity: second of eight on loan growth, last on cover, and fourth on margin and capital. Costs are not the risk: the cost-to-income ratio fell nine points.",
+    "The ranking rests on one year of regulatory returns, one union without a capital ratio: a guide to position, not a forecast."
+   ]
+  },
+  {
+   "id": "f1",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Loans grew {{A-loans/percent | 0%}} in seven years to {{i-loans/loans@FY26}} million",
+   "why": "The growth of the book over time is the claim, so the series is drawn",
+   "evidence": [
+    "i-loans",
+    "A-loans",
+    "i-credit"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "loan book at year end FY19 to FY26",
+    "measures": [
+     "i-loans/loans"
+    ]
+   },
+   "exhibit": {
+    "heading": "Loan book at year end",
+    "unit": "GBP m",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Loans",
+      "values": [
+       412,
+       438,
+       451,
+       476,
+       520,
+       566,
+       601,
+       648
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "i-loans/loans"
+     ],
+     "role": "proof"
+    },
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   },
+   "bar": "The book grew without weaker lending - arrears stayed at {{i-credit/arrears@FY26 | 0.0%}} of loans - so what it needs is funding grown at the same pace, which the next pages test"
+  },
+  {
+   "id": "f2",
+   "type": "numbers",
+   "form": "metric-strip",
+   "commentary": "none",
+   "title": "Profit rose again while operating cash flow fell 21%",
+   "why": "Two year-on-year movements set against the cash series that produced one of them",
+   "evidence": [
+    "i-cash",
+    "i-earn",
+    "A-ocf",
+    "A-earn"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "profit after tax and operating cash flow, FY25 to FY26",
+    "measures": [
+     "i-cash/ocf",
+     "i-earn/pat"
+    ]
+   },
+   "metrics": [
+    {
+     "value": "+4.3%",
+     "label": "Profit after tax",
+     "sublabel": "47 to 49",
+     "basis": {
+      "measures": [
+       "A-earn/percent"
+      ]
+     }
+    },
+    {
+     "measure": "A-ocf/percent",
+     "format": "+0.0%",
+     "label": "Operating cash flow",
+     "sublabel": "84 to 66"
+    }
+   ],
+   "exhibit": {
+    "heading": "Operating cash flow",
+    "unit": "GBP m",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Operating cash flow",
+      "values": [
+       58,
+       61,
+       49,
+       66,
+       72,
+       81,
+       84,
+       66
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "i-cash/ocf"
+     ],
+     "role": "proof"
+    },
+    "type": "chart.column",
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ],
+    "caption": "Operating cash flow fell to 66 million in FY26, the first decline in five years, while profit after tax rose to 49 million: growth in lending absorbed the cash that earnings produced"
+   }
+  },
+  {
+   "id": "f3",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Short-term liabilities closed on liquid assets, leaving cover 4.3 points above the minimum",
+   "why": "Two series in one unit on one scale, so the reader sees liabilities due within a year closing on the liquid assets that cover them",
+   "evidence": [
+    "i-liquidity",
+    "i-rule",
+    "A-cover",
+    "A-floor",
+    "A-cushion"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "liquid assets as a share of liabilities due within a year, at year end, against the regulatory minimum",
+    "measures": [
+     "i-liquidity/liquid",
+     "i-liquidity/short-liabilities"
+    ],
+    "relation": {
+     "kind": "ratio"
+    }
+   },
+   "exhibit": {
+    "heading": "Liquid assets and liabilities due within a year",
+    "series": [
+     {
+      "measure": "i-liquidity/liquid",
+      "name": "Liquid assets"
+     },
+     {
+      "measure": "i-liquidity/short-liabilities",
+      "name": "Short-term liabilities"
+     }
+    ],
+    "role": "proof",
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   },
+   "bar": "Liquid assets now exceed what falls due within a year by only {{A-cushion/result@FY26 | 0}} million, so new lending needs term funding first"
+  },
+  {
+   "id": "f4",
+   "type": "panels",
+   "form": "row",
+   "commentary": "captions",
+   "title": "Cost-to-income fell nine points while only two of 42 branches closed",
+   "why": "A ratio and a count in different units, each read on its own panel",
+   "evidence": [
+    "i-efficiency"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "cost-to-income and branches open",
+    "measures": [
+     "i-efficiency/cost-income"
+    ]
+   },
+   "adds": "The captions say the efficiency gain did not come from shrinking the network",
+   "exhibits": [
+    {
+     "heading": "Cost-to-income ratio",
+     "unit": "%",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Cost-to-income",
+       "values": [
+        71,
+        70,
+        74,
+        69,
+        67,
+        65,
+        63,
+        62
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "i-efficiency/cost-income"
+      ],
+      "role": "proof"
+     },
+     "type": "chart.line",
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ],
+     "caption": "The ratio fell from 71 to 62 percent over seven years of rising income"
+    },
+    {
+     "heading": "Branches open at year end",
+     "unit": "branches",
+     "categories": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Branches",
+       "values": [
+        42,
+        42,
+        41,
+        41,
+        40,
+        40,
+        40,
+        40
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "i-efficiency/branches"
+      ],
+      "role": "context",
+      "relevance": "It shows branch closures are too few to explain the cost saving"
+     },
+     "type": "chart.column",
+     "caption": "The network lost two branches in seven years, far too few to explain the saving"
+    }
+   ]
+  },
+  {
+   "id": "f5",
+   "type": "scorecard",
+   "form": "heatmap",
+   "commentary": "in-exhibit",
+   "title": "Harbour grows second-fastest of eight on the thinnest liquidity cover, mid-table on margin and capital",
+   "subtitle": "FY26 regulatory returns; Eastbank publishes no capital ratio, Dunmore's is for the calendar year",
+   "why": "Eight credit unions on four common measures, each read on its own scale, with the undisclosed cell kept as n/a",
+   "evidence": [
+    "i-peers",
+    "A-peers"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "loan growth, liquidity cover, net interest margin and capital ratio across eight credit unions, FY26",
+    "measures": [
+     "A-peers/loan-growth",
+     "A-peers/liquidity-cover",
+     "A-peers/margin",
+     "A-peers/capital"
+    ]
+   },
+   "exhibit": {
+    "columns": [
+     {
+      "label": "Credit union",
+      "type": "category"
+     },
+     {
+      "label": "Loan growth",
+      "unit": "% a year",
+      "heat": true
+     },
+     {
+      "label": "Liquidity cover",
+      "unit": "%",
+      "heat": true
+     },
+     {
+      "label": "Net interest margin",
+      "unit": "%",
+      "heat": true
+     },
+     {
+      "label": "Capital ratio",
+      "unit": "% of risk-weighted assets",
+      "heat": true
+     },
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dunmore",
+      "{{A-peers/loan-growth@Dunmore | 0.0}}",
+      "{{A-peers/liquidity-cover@Dunmore | 0}}",
+      "{{A-peers/margin@Dunmore | 0.0}}",
+      "{{A-peers/capital@Dunmore | 0.0}}",
+      "Fastest growth on the thinnest capital and margin"
+     ],
+     [
+      "Harbour",
+      "{{A-peers/loan-growth@Harbour | 0.0}}",
+      "{{A-peers/liquidity-cover@Harbour | 0}}",
+      "{{A-peers/margin@Harbour | 0.0}}",
+      "{{A-peers/capital@Harbour | 0.0}}",
+      "Second-fastest growth on the thinnest liquidity"
+     ],
+     [
+      "Millrace",
+      "{{A-peers/loan-growth@Millrace | 0.0}}",
+      "{{A-peers/liquidity-cover@Millrace | 0}}",
+      "{{A-peers/margin@Millrace | 0.0}}",
+      "{{A-peers/capital@Millrace | 0.0}}",
+      "Fast growth on a low margin"
+     ],
+     [
+      "Greyfriars",
+      "{{A-peers/loan-growth@Greyfriars | 0.0}}",
+      "{{A-peers/liquidity-cover@Greyfriars | 0}}",
+      "{{A-peers/margin@Greyfriars | 0.0}}",
+      "{{A-peers/capital@Greyfriars | 0.0}}",
+      "Middling growth on a thin margin"
+     ],
+     [
+      "Ferrybridge",
+      "{{A-peers/loan-growth@Ferrybridge | 0.0}}",
+      "{{A-peers/liquidity-cover@Ferrybridge | 0}}",
+      "{{A-peers/margin@Ferrybridge | 0.0}}",
+      "{{A-peers/capital@Ferrybridge | 0.0}}",
+      "Middling growth on a firm capital ratio"
+     ],
+     [
+      "Northgate",
+      "{{A-peers/loan-growth@Northgate | 0.0}}",
+      "{{A-peers/liquidity-cover@Northgate | 0}}",
+      "{{A-peers/margin@Northgate | 0.0}}",
+      "{{A-peers/capital@Northgate | 0.0}}",
+      "Slower growth, the strongest buffers"
+     ],
+     [
+      "Castlefield",
+      "{{A-peers/loan-growth@Castlefield | 0.0}}",
+      "{{A-peers/liquidity-cover@Castlefield | 0}}",
+      "{{A-peers/margin@Castlefield | 0.0}}",
+      "{{A-peers/capital@Castlefield | 0.0}}",
+      "Slowest but one, with strong buffers"
+     ],
+     [
+      "Eastbank",
+      "{{A-peers/loan-growth@Eastbank | 0.0}}",
+      "{{A-peers/liquidity-cover@Eastbank | 0}}",
+      "{{A-peers/margin@Eastbank | 0.0}}",
+      "n/a",
+      "Slowest growth; publishes no capital ratio"
+     ]
+    ]
+   },
+   "adds": "The last column reads each union's position, which shows the fastest lenders hold the thinnest buffers"
+  },
+  {
+   "id": "f6",
+   "type": "trend",
+   "form": "indexed",
+   "commentary": "so-what-bar",
+   "title": "Liabilities due within a year nearly doubled since FY19, outgrowing loans and liquid assets",
+   "why": "Four measures in one unit but of very different size, compared on growth since FY19, so each is rebased to 100",
+   "evidence": [
+    "A-index"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "loans, liquid assets, liabilities due within a year and operating cash flow, FY19 to FY26, each indexed to FY19",
+    "measures": [
+     "A-index/loans",
+     "A-index/liquid",
+     "A-index/short-liabilities",
+     "A-index/ocf"
+    ],
+    "relation": {
+     "kind": "index"
+    }
+   },
+   "exhibit": {
+    "heading": "Growth since FY19",
+    "series": [
+     {
+      "measure": "A-index/loans",
+      "name": "Loans"
+     },
+     {
+      "measure": "A-index/liquid",
+      "name": "Liquid assets"
+     },
+     {
+      "measure": "A-index/short-liabilities",
+      "name": "Short-term liabilities"
+     },
+     {
+      "measure": "A-index/ocf",
+      "name": "Operating cash flow"
+     }
+    ],
+    "subject": "Short-term liabilities",
+    "highlights": [
+     {
+      "category": "FY26"
+     }
+    ]
+   },
+   "bar": "Short-term money has outgrown the loans it funds and the liquid assets that cover it, so new loans need term funding"
+  }
+ ]
+}

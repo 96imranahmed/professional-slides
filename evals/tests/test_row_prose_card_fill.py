@@ -43,7 +43,7 @@ SENTENCES = [
 def plan(slides):
     """The planned scene of a v3 deck of `slides`."""
     return run_node(f"""
-import {{toDeckPlan}} from '{RUNTIME}/compose.mjs';
+import {{toDeckPlan}} from './evals/support/compose.mjs';
 import {{planDeck}} from '{RUNTIME}/planner.mjs';
 const {{deck}}=planDeck(toDeckPlan({{schema:'professional-slides.deck/v3',id:'d',tracker:false,slides:{json.dumps(slides)}}}));
 console.log(JSON.stringify(deck));
@@ -197,7 +197,7 @@ console.log(JSON.stringify({{
 
     def test_the_page_phrase_is_not_pushed_into_half_a_word(self):
         result = run_node(f"""
-import {{composeSlide}} from '{RUNTIME}/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const find=(items,pred)=>{{for(const it of items){{if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}}return null;}};
 const page=composeSlide({{title:'T',layout:'text',highlight:['22'],points:['Journeys peaked in FY22 at 52 million.','They fell 22% in the first year of hybrid working.']}},0);
 console.log(JSON.stringify(find(page.items,i=>i.component==='bullet-list').props.items));
@@ -210,7 +210,7 @@ console.log(JSON.stringify(find(page.items,i=>i.component==='bullet-list').props
 import {{compileDeck}} from '{RUNTIME}/author-deck.mjs';
 const years=['2019','2020','2021','2022','2023','2024','2025','2026'];
 const page={{id:'p',type:'trend',form:'line',commentary:'below',takeaway:false,why:'The trend is the claim',
-  settles:{{kind:'qualitative',what:'journeys by year'}},adds:'The points say why',title:'Journeys peaked in FY22 and have not recovered since',
+  settles:{{kind:'rate',what:'journeys by year'}},adds:'The points say why the peak has not returned',title:'Journeys peaked in FY22 and have not recovered since',
   exhibit:{{categories:years,series:[{{name:'x',values:[1,2,3,4,5,6,7,8]}}],annotations:[{{category:'2022',text:'The peak year before hybrid working took hold'}}]}},
   points:['Journeys peaked in FY22 at 52 million.','They have recovered to 48 million since.'],highlight:['22','48 million']}};
 let message='';

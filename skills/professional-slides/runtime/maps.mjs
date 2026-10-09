@@ -11,7 +11,8 @@ import {
   wedgePrimitive
 } from "./core.mjs";
 import { NATURAL_EARTH_COUNTRIES, NATURAL_EARTH_SOURCE } from "./natural-earth-map-data.mjs";
-import { measureText } from './text-layout.mjs';
+import { ENGINE_RESERVE, measureText } from './text-layout.mjs';
+import { niceCeiling } from './nice-numbers.mjs';
 import { MARK_TOKENS, markerSize, numberMarker } from './marks.mjs';
 import { normalizeQuantitativeScale, quantitativeScaleColor, quantitativeLegendNodes, QUANTITATIVE_SCALE_TOKENS } from './legends.mjs';
 
@@ -157,7 +158,8 @@ function customGeography(value) {
   });
   const points = countries.flatMap(c => c.polygons.flat());
   const [minX,minY,maxX,maxY] = points.reduce((b,p) => [Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
-  const padX = Math.max(.001, (maxX-minX)*.08), padY = Math.max(.001, (maxY-minY)*.08);
+  // A hair of margin: the projection keeps its own padding, and the two together drew a city a fifth smaller than its frame.
+  const padX = Math.max(.001, (maxX-minX)*.02), padY = Math.max(.001, (maxY-minY)*.02);
   const bounds = value.bounds || [Math.max(-180,minX-padX),Math.max(-90,minY-padY),Math.min(180,maxX+padX),Math.min(90,maxY+padY)];
   if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(Number.isFinite) || bounds[0]>=bounds[2] || bounds[1]>=bounds[3] || bounds[0]<-180 || bounds[2]>180 || bounds[1]<-90 || bounds[3]>90) throw new Error("Invalid custom geography bounds");
   return { id: `custom:${id}`, title, bounds, countries, source, custom: true };
@@ -245,6 +247,52 @@ function projection(frame, bounds) {
   return { plot, project, contains: ([longitude, latitude]) => longitude >= minLon && longitude <= maxLon && latitude >= minLat && latitude <= maxLat };
 }
 
+// The longer side of an outline's intrinsic box: what a mark's slot reads as its aspect, as a logo's pixel size is.
+const OUTLINE_SIDE = 512;
+// A ring narrower and shorter than this share of the outline's longer side is a speck at a mark's size, and is left out.
+const OUTLINE_SPECK = 0.01;
+
+/**
+ * A place's outline, drawn as a mark: the features `region` names in
+ * `geography` - a country's ISO code or name, a list of them, or an imported
+ * geography's feature ids; every feature where it names none - clipped to the
+ * geography's bounds and set in the maps' projection (longitude scaled by the
+ * cosine of the place's middle latitude). So `{ geography: "europe", region:
+ * "FRA" }` is metropolitan France, `{ geography: "gcc" }` the six Gulf states as
+ * one silhouette, and an imported city's borough its own feature. Returns the
+ * rings as paths in a unit box, the box's intrinsic `width` and `height` (its
+ * longer side 512, as a mark's aspect is read off a logo's pixels), and the
+ * data's source. Throws where a region is not in the geography or nothing of
+ * it falls inside the bounds. No network: the geography is the runtime's own
+ * data, or one imported by import-geography.mjs.
+ */
+export function placeOutline({ geography = "world", region = null } = {}) {
+  const resolved = resolveGeography(geography);
+  const asked = region === null || region === undefined ? [] : (Array.isArray(region) ? region : [region]).map((value) => String(value).trim()).filter(Boolean);
+  const idOf = (value) => {
+    if (resolved.custom) return resolved.countries.find((feature) => feature.id === value || normalizedKey(feature.name) === normalizedKey(value))?.id ?? null;
+    try { return resolveCountryId(value); } catch { return null; }
+  };
+  const ids = asked.map(idOf);
+  const unknown = asked.filter((_, at) => !ids[at] || !resolved.countries.some((feature) => feature.id === ids[at]));
+  if (unknown.length) throw new Error(`${unknown.map((value) => `"${value}"`).join(", ")} ${unknown.length === 1 ? "is" : "are"} not a region of the ${resolved.title} geography (${resolved.id}): name ${resolved.custom ? "a feature id of the imported geography" : "a country by its ISO code or name"}, or leave \`region\` out for the whole geography`);
+  const features = ids.length ? resolved.countries.filter((feature) => ids.includes(feature.id)) : resolved.countries;
+  const rings = features.flatMap((feature) => feature.polygons.map((ring) => clipRing(ring, resolved.bounds)).filter((ring) => ring.length >= 3));
+  if (!rings.length) throw new Error(`Nothing of ${asked.join(", ") || resolved.title} falls inside the ${resolved.title} geography's bounds: name the geography the place is drawn in`);
+  const points = rings.flat();
+  const [minLon, minLat, maxLon, maxLat] = points.reduce((b, [x, y]) => [Math.min(b[0], x), Math.min(b[1], y), Math.max(b[2], x), Math.max(b[3], y)], [Infinity, Infinity, -Infinity, -Infinity]);
+  const longitudeScale = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+  const width = Math.max(1e-6, (maxLon - minLon) * longitudeScale), height = Math.max(1e-6, maxLat - minLat);
+  const side = Math.max(width, height);
+  const projected = rings.map((ring) => ring.map(([x, y]) => [Number((((x - minLon) * longitudeScale) / width).toFixed(5)), Number(((maxLat - y) / height).toFixed(5))]));
+  const paths = projected.filter((ring) => {
+    const xs = ring.map((p) => p[0] * width), ys = ring.map((p) => p[1] * height);
+    return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= OUTLINE_SPECK * side;
+  });
+  const source = resolved.custom ? `${resolved.title}: ${resolved.source.url} (${resolved.source.license})` : `${NATURAL_EARTH_SOURCE.name} ${NATURAL_EARTH_SOURCE.scale}, public domain (${NATURAL_EARTH_SOURCE.url})`;
+  return { paths, width: Math.max(1, Math.round((OUTLINE_SIDE * width) / side)), height: Math.max(1, Math.round((OUTLINE_SIDE * height) / side)), geography: resolved.id, regions: features.map((feature) => feature.id), source };
+}
+
 function polygonNode({ id, country, paths, highlighted, quantitative, recede = false }) {
   const points = paths.flat();
   const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);
@@ -253,7 +301,7 @@ function polygonNode({ id, country, paths, highlighted, quantitative, recede = f
   const normalized = paths.map((path) => path.map(([px, py]) => [Number(((px - x) / width).toFixed(6)), Number(((py - y) / height).toFixed(6))]));
   // Under markers or routes a highlighted country recedes to the tint: the
   // points are the subject, and a navy country under a navy dot hides both.
-  // Land in the muted surface sat 8 grey levels off a cream page: the map read
+  // Land in the muted surface sits 8 grey levels off a cream page: the map reads
   // as routes and dots floating on nothing. Under the reference mark weight
   // (core.mjs `style.marks`) land is the filled surface, the ground the
   // markers and routes stand on.
@@ -327,7 +375,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       nodes.push(...numberMarker({ id: stableId(id, "marker-base", index), role: "map-marker", labelRole: "map-marker-number", x: pinFrame.x, y: pinFrame.y, size: disc, number: marker.number, reverse: onHighlight, data: { geography: geography.id, number: marker.number } }));
       if (marker.label) {
         // The label sits on a white pill so it reads over land, sea or a filled country.
-        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+        const measured = measureText(marker.label, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
         const width = Math.ceil(measured.width) + 12, height = 22;
         const placeRight = pinFrame.x + disc + 4 + width <= frame.x + frame.width;
         const lx = placeRight ? pinFrame.x + disc + 4 : pinFrame.x - 4 - width;
@@ -355,7 +403,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       // the labels already placed - right, left, above, below, then the
       // diagonals - and sits on a patch of canvas, so a route passing under it
       // does not strike through the name.
-      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 });
+      const measured = measureText(marker.label, 220, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
       const width = Math.ceil(measured.width) + 4, height = Math.max(14, Math.ceil(measured.height));
       const gap = 3, half = size / 2;
       const candidates = [
@@ -375,10 +423,12 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       if (!chosen) {
         // A dense cluster (a regional network's neighbouring towns) takes
         // every position touching the marker. The label moves further out -
-        // rings of 28, 44 and 64px in eight directions - with a hairline
-        // leader back to its marker, rather than printing over a neighbour.
+        // rings of 28 to 160px in eight directions - with a hairline leader
+        // back to its marker, rather than printing over a neighbour. A city's
+        // buildings a block apart need the far rings; what still overlaps is
+        // refused on the scene (validate-overlap.mjs TEXT_ON_TEXT).
         const pathClear = (x1, y1, x2, y2) => { for (let t = 0.1; t < 1; t += 0.1) { const x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t; if (occupied.some((o) => x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height)) return false; } return true; };
-        ring: for (const reach of [28, 44, 64]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
+        ring: for (const reach of [28, 44, 64, 96, 128, 160]) for (const degrees of [0, 180, -45, 45, -135, 135, -90, 90]) {
           const ux = Math.cos(degrees * Math.PI / 180), uy = Math.sin(degrees * Math.PI / 180);
           const cx = centerX + ux * (half + reach + width / 2 * Math.abs(ux)), cy = centerY + uy * (half + reach + height / 2 * Math.abs(uy));
           const f = { x: cx - width / 2, y: cy - height / 2, width, height };
@@ -404,23 +454,28 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
 // `crop: "fit"` frames the map on its markers: a network from one hub read on
 // a map of the whole world is a cluster of dots in a tenth of the frame.
 //
-// The crop follows the network's own extent. It used never to narrow below 36
-// degrees of longitude, so a regional network - a UK operator's routes over
-// six degrees - rendered at the scale of Europe: markers on top of each
-// other, labels clipped at the frame and routes too short to draw, silently.
-// Now the span keeps a margin of a sixth of itself (at least half a degree),
-// a single place gets a 6 by 4 degree window around it, and the window then
-// widens on its shorter side to the frame's shape, so the map fills the
-// frame with context rather than letterboxing inside it.
-const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4];
+// The crop follows the network's own extent: a regional network - a UK
+// operator's routes over six degrees - at the scale of Europe would put its
+// markers on top of each other, clip its labels at the frame and leave routes
+// too short to draw. The span keeps a margin of a sixth of itself (at least
+// half a degree), a single place gets a 6 by 4 degree window around it, and
+// the window then widens on its shorter side to the frame's shape, so the map
+// fills the frame with context rather than letterboxing inside it.
+// The floors are degrees for a country's or a region's network and a share of
+// the geography's own span for anything smaller: a city's buildings sit a few
+// hundredths of a degree apart, and a degree's window around them is the whole
+// city with the markers piled in a corner of it.
+const FIT_MIN_LON = 1.5, FIT_MIN_LAT = 1, FIT_SINGLE = [6, 4], FIT_PAD = 0.5, FIT_SHARE = 0.25;
 function fitBounds(markers, geography, frame = null) {
   const points = markers.filter((m) => Number.isFinite(m?.longitude) && Number.isFinite(m?.latitude)).map((m) => [m.longitude, m.latitude]);
   if (!points.length) throw new Error('crop: "fit" needs at least one marker with longitude and latitude; give the markers coordinates or drop crop');
   let [minLon, minLat, maxLon, maxLat] = points.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [Infinity, Infinity, -Infinity, -Infinity]);
   const grow = (lo, hi, min) => { const span = Math.max(hi - lo, min), mid = (lo + hi) / 2; return [mid - span / 2, mid + span / 2]; };
+  const [gw0, gs0, ge0, gn0] = geography.bounds;
+  const floorLon = (degrees) => Math.min(degrees, (ge0 - gw0) * FIT_SHARE), floorLat = (degrees) => Math.min(degrees, (gn0 - gs0) * FIT_SHARE);
   const single = points.length === 1 || (maxLon - minLon < 1e-6 && maxLat - minLat < 1e-6);
-  [minLon, maxLon] = grow(minLon, maxLon, single ? FIT_SINGLE[0] : FIT_MIN_LON); [minLat, maxLat] = grow(minLat, maxLat, single ? FIT_SINGLE[1] : FIT_MIN_LAT);
-  const padLon = Math.max(0.5, (maxLon - minLon) / 6), padLat = Math.max(0.5, (maxLat - minLat) / 6);
+  [minLon, maxLon] = grow(minLon, maxLon, floorLon(single ? FIT_SINGLE[0] : FIT_MIN_LON)); [minLat, maxLat] = grow(minLat, maxLat, floorLat(single ? FIT_SINGLE[1] : FIT_MIN_LAT));
+  const padLon = Math.max(floorLon(FIT_PAD) / 2, (maxLon - minLon) / 6), padLat = Math.max(floorLat(FIT_PAD) / 2, (maxLat - minLat) / 6);
   minLon -= padLon; maxLon += padLon; minLat -= padLat; maxLat += padLat;
   if (frame && frame.width > 0 && frame.height > 0) {
     const k = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
@@ -482,12 +537,7 @@ export function valueDiameter(value, maxValue) {
   return Math.max(VALUE_MIN_DIAMETER, VALUE_MAX_DIAMETER * Math.sqrt(Math.max(0, value) / maxValue));
 }
 
-function niceValue(v) {
-  if (!(v > 0)) return 0;
-  const power = 10 ** Math.floor(Math.log10(v));
-  const step = [1, 2, 2.5, 5, 10].find((n) => n * power >= v * 0.999) ?? 10;
-  return step * power;
-}
+const niceValue = (v) => (v > 0 ? niceCeiling(v, { slack: 0.999 }) : 0);
 const formatLegendValue = (v) => Number.isInteger(v) ? v.toLocaleString("en-US") : String(Math.round(v * 100) / 100);
 
 /**
@@ -516,7 +566,7 @@ function sizeLegendNodes(id, legend, box) {
   const nodes = [];
   const text = (key, x, y, width, value, align = "left", bold = false, color = SECONDARY) => nodes.push(textPrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-label", frame: { x, y, width, height: 14 }, text: value, style: { fontFamily: FONT, fontSize: LABEL, color, bold, align, valign: "mid" } }));
   const circle = (key, cx, cy, d) => nodes.push(ellipsePrimitive({ id: stableId(id, "size-legend", key), role: "map-size-legend-circle", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: { fill: "none", stroke: INK, lineWidth: HAIRLINE, radius: token("radius.round") } }));
-  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true, wrapWidthRatio: 1 }).width) + 4;
+  const measure = (value) => Math.ceil(measureText(value, 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true }).width) + 4;
   const titleWidth = measure(legend.label);
   text("title", box.x, box.y, titleWidth, legend.label, "left", true, INK);
   const baseline = box.y + box.height;
@@ -575,6 +625,9 @@ export function mapNodes({ id, frame, props = {} }) {
   return nodes;
 }
 
+// The narrowest a choropleth's scale is set: its two end labels and the steps between them read at this width.
+const LEGEND_MIN_WIDTH = 360;
+
 function choroplethNodes({id,frame,props,geography}) {
   const spec=props.choropleth,scale=normalizeQuantitativeScale(spec.scale);
   if ((props.highlightCountries||[]).length || (props.markers||[]).length) throw new Error('Choropleth cannot combine quantitative fill with highlights or markers');
@@ -584,11 +637,11 @@ function choroplethNodes({id,frame,props,geography}) {
     if (!item || typeof item.featureId!=='string'||values.has(item.featureId)||!geography.countries.some(c=>c.id===item.featureId)) throw new Error('Choropleth value needs a unique known featureId');
     quantitativeScaleColor(scale,item.value);
     values.set(item.featureId,item.value);
-    // `note`: what this region's sentence says. The lane has always carried the
-    // feature's name and nothing else, so a page whose subject was five named
-    // places had to put the sentences in a column beside a photograph and leave
-    // the reader to match them up. With the note the map *is* the page: the
-    // boundary, the value and what it means, keyed by a leader to the region.
+    // `note`: what this region's sentence says. Without it the lane carries the
+    // feature's name and nothing else, and a page about five named places has
+    // to set its sentences apart and leave the reader to match them up. With
+    // the note the map *is* the page: the boundary, the value and what it
+    // means, keyed by a leader to the region.
     if (item.note!==undefined) {
       if (typeof item.note!=='string'||!item.note.trim()) throw new Error('A choropleth note is a sentence about that region');
       notes.set(item.featureId,item.note.trim());
@@ -621,9 +674,9 @@ function choroplethNodes({id,frame,props,geography}) {
     if (!node) throw new Error(`Choropleth feature ${country.id} is not visible at this scale`);
     nodes.push(node);
     const [x,y]=projected.project(country.label),side=x<centerFrame.x+centerFrame.width/2?'left':'right';
-    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size),wrapWidthRatio:1});
+    const measured=measureText(country.labelText ?? country.name,labelWidth,{fontSize,bold:Boolean(notes.size)});
     const note=notes.get(country.id);
-    const noteLayout=note?measureText(note,labelWidth,{fontSize}):null;
+    const noteLayout=note?measureText(note,labelWidth,{fontSize,wrapWidthRatio:ENGINE_RESERVE}):null;
     const height=measured.height+(noteLayout?gap/2+noteLayout.height:0);
     labels.push({country,x,y,side,measured,noteLayout,height});
   }
@@ -636,10 +689,12 @@ function choroplethNodes({id,frame,props,geography}) {
     let bottom=mapFrame.y+mapFrame.height;
     for (const label of [...lane].reverse()) {label.top=Math.min(label.top,bottom-label.height);bottom=label.top-gap;}
     for (const label of lane) {
-      const x=side==='left'?frame.x:frame.x+frame.width-labelWidth;
+      // The lanes stand beside the map as drawn, not at the frame's edges: a tall city in a wide frame drew its labels a
+      // third of the page away, every leader a long run across empty paper.
+      const x=side==='left'?Math.max(frame.x,projected.plot.x-2*gap-labelWidth):Math.min(frame.x+frame.width-labelWidth,projected.plot.x+projected.plot.width+2*gap);
       const edge=side==='left'?x+labelWidth:x;
       const data={featureId:label.country.id,value:values.get(label.country.id),unit:scale.unit,geography:geography.id,labelPoint:label.country.label,dependencies:[stableId(id,'land',label.country.id)]};
-      const elbow=side==='left'?centerFrame.x:centerFrame.x+centerFrame.width;
+      const elbow=side==='left'?Math.max(edge,projected.plot.x-gap):Math.min(edge,projected.plot.x+projected.plot.width+gap);
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'anchor'),role:'map-label-leader',x1:label.x,y1:label.y,x2:elbow,y2:label.y,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
       nodes.push(linePrimitive({id:stableId(id,'feature-label-leader',label.country.id,'lane'),role:'map-label-leader',x1:elbow,y1:label.y,x2:edge,y2:label.top+label.measured.height/2,style:{stroke:SECONDARY,lineWidth:HAIRLINE},data}));
       const align=side==='left'?'right':'left';
@@ -647,7 +702,11 @@ function choroplethNodes({id,frame,props,geography}) {
       if (label.noteLayout) nodes.push(textPrimitive({id:stableId(id,'feature-note',label.country.id),role:'map-note',frame:{x,y:label.top+label.measured.height+gap/2,width:labelWidth,height:label.noteLayout.height},text:label.noteLayout.text,style:{fontFamily:FONT,fontSize:LABEL,color:SECONDARY,align,valign:'top',lineHeight:label.noteLayout.lineHeight,wrap:true},data:{...data,note:true,textLayout:label.noteLayout}}));
     }
   }
-  nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:frame.x,y:frame.y,width:frame.width,height:legendHeight},props:{scale}}));
+  // The scale sits over the map it keys, not across the page: over a narrow geography a page-wide bar reads as a
+  // separate exhibit, with the map small and alone beneath it.
+  const legendWidth=Math.min(frame.width,Math.max(LEGEND_MIN_WIDTH,projected.plot.width+2*gap));
+  const legendX=Math.max(frame.x,Math.min(frame.x+frame.width-legendWidth,projected.plot.x+projected.plot.width/2-legendWidth/2));
+  nodes.push(...quantitativeLegendNodes({id:stableId(id,'legend'),frame:{x:legendX,y:frame.y,width:legendWidth,height:legendHeight},props:{scale}}));
   return nodes;
 }
 

@@ -1,0 +1,1196 @@
+{
+ "schema": "professional-slides.insights/v1",
+ "insights": [
+  {
+   "id": "i-journeys",
+   "finding": "Journeys recovered from 30.2m in FY20 to 52.3m in FY26, 28% above FY19",
+   "shape": "series",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-journeys.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "journeys": {
+     "unit": "m journeys",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      41,
+      30.2,
+      33.5,
+      38.1,
+      42.4,
+      45.9,
+      48.8,
+      52.3
+     ]
+    },
+    "growth": {
+     "unit": "%",
+     "population": "Northvale Rail journeys, FY19 to FY26",
+     "period": "FY19 to FY26",
+     "value": 27.6
+    }
+   },
+   "breadth": {
+    "periods": 8,
+    "series": 1
+   }
+  },
+  {
+   "id": "i-money",
+   "finding": "Revenue rose to GBP 398m while punctuality held near 90%",
+   "shape": "series",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-money.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "revenue": {
+     "unit": "GBP m",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      310,
+      240,
+      262,
+      301,
+      333,
+      351,
+      372,
+      398
+     ]
+    },
+    "punctuality": {
+     "unit": "%",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      88.1,
+      91.2,
+      90.4,
+      89.3,
+      88.7,
+      89.9,
+      90.6,
+      91.4
+     ]
+    }
+   },
+   "breadth": {
+    "periods": 8,
+    "series": 2
+   }
+  },
+  {
+   "id": "i-operators",
+   "finding": "All six operators grew, Lakes fastest",
+   "shape": "series",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-operators.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "northvale": {
+     "unit": "m journeys",
+     "population": "Northvale",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      20.0,
+      21.5,
+      23.0,
+      24.5,
+      26.0,
+      27.5,
+      29.0,
+      30.5
+     ]
+    },
+    "coast": {
+     "unit": "m journeys",
+     "population": "Coast",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      26.0,
+      27.9,
+      29.8,
+      31.7,
+      33.6,
+      35.5,
+      37.4,
+      39.3
+     ]
+    },
+    "midland": {
+     "unit": "m journeys",
+     "population": "Midland",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      32.0,
+      34.3,
+      36.6,
+      38.9,
+      41.2,
+      43.5,
+      45.8,
+      48.1
+     ]
+    },
+    "harbour": {
+     "unit": "m journeys",
+     "population": "Harbour",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      38.0,
+      40.7,
+      43.4,
+      46.1,
+      48.8,
+      51.5,
+      54.2,
+      56.9
+     ]
+    },
+    "ridge": {
+     "unit": "m journeys",
+     "population": "Ridge",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      44.0,
+      47.1,
+      50.2,
+      53.3,
+      56.4,
+      59.5,
+      62.6,
+      65.7
+     ]
+    },
+    "lakes": {
+     "unit": "m journeys",
+     "population": "Lakes",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      50.0,
+      53.5,
+      57.0,
+      60.5,
+      64.0,
+      67.5,
+      71.0,
+      74.5
+     ]
+    }
+   },
+   "breadth": {
+    "periods": 8,
+    "series": 6
+   }
+  },
+  {
+   "id": "i-daypart",
+   "finding": "Weekend travel grew from a quarter to a third of journeys",
+   "shape": "mix",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-daypart.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "peak": {
+     "unit": "m journeys",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17
+     ]
+    },
+    "off-peak": {
+     "unit": "m journeys",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      13,
+      15,
+      17,
+      19,
+      21,
+      23,
+      25,
+      27
+     ]
+    },
+    "weekend": {
+     "unit": "m journeys",
+     "population": "Northvale Rail",
+     "periods": [
+      "FY19",
+      "FY20",
+      "FY21",
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "values": [
+      16,
+      19,
+      22,
+      25,
+      28,
+      31,
+      34,
+      37
+     ]
+    }
+   },
+   "breadth": {
+    "parts": 3
+   }
+  },
+  {
+   "id": "i-punctual",
+   "finding": "Northvale is the most punctual of ten operators at 91.4%",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-punctual.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "punctuality": {
+     "unit": "%",
+     "population": "ten operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale",
+      "Fen",
+      "Moor"
+     ],
+     "values": [
+      91.4,
+      89.2,
+      88.7,
+      87.9,
+      86.5,
+      85.1,
+      84.8,
+      83.3,
+      82.9,
+      81.0
+     ]
+    }
+   },
+   "breadth": {
+    "members": 10
+   }
+  },
+  {
+   "id": "i-then-now",
+   "finding": "Seven of ten operators carry more journeys than in FY19",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-then-now.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "fy19": {
+     "unit": "m journeys",
+     "population": "ten operators",
+     "period": "FY19",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale",
+      "Fen",
+      "Moor"
+     ],
+     "values": [
+      41,
+      56,
+      52,
+      48,
+      44,
+      40,
+      36,
+      32,
+      28,
+      24
+     ]
+    },
+    "fy26": {
+     "unit": "m journeys",
+     "population": "ten operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale",
+      "Fen",
+      "Moor"
+     ],
+     "values": [
+      52.3,
+      61,
+      56,
+      51,
+      46,
+      41,
+      36,
+      31,
+      26,
+      21
+     ]
+    }
+   },
+   "breadth": {
+    "members": 10
+   }
+  },
+  {
+   "id": "i-cost-field",
+   "finding": "Northvale sits fifth of twenty on cost per journey",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-cost-field.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "cost": {
+     "unit": "GBP per journey",
+     "population": "twenty operators",
+     "period": "FY26",
+     "members": [
+      "Operator A",
+      "Operator B",
+      "Operator C",
+      "Operator D",
+      "Operator E",
+      "Operator F",
+      "Operator G",
+      "Operator H",
+      "Operator I",
+      "Operator J",
+      "Operator K",
+      "Operator L",
+      "Operator M",
+      "Operator N",
+      "Operator O",
+      "Operator P",
+      "Operator Q",
+      "Operator R",
+      "Operator S",
+      "Operator T"
+     ],
+     "values": [
+      9.5,
+      9.2,
+      8.9,
+      8.6,
+      8.3,
+      8.0,
+      7.7,
+      7.4,
+      7.1,
+      6.8,
+      6.5,
+      6.2,
+      5.9,
+      5.6,
+      5.3,
+      5.0,
+      4.7,
+      4.4,
+      4.1,
+      3.8
+     ]
+    }
+   },
+   "breadth": {
+    "members": 20
+   }
+  },
+  {
+   "id": "i-response",
+   "finding": "Five of eight districts miss the nine-minute standard",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-response.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "response": {
+     "unit": "minutes",
+     "population": "eight districts",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      7.2,
+      8.1,
+      8.8,
+      9.4,
+      9.9,
+      10.3,
+      11.2,
+      12.6
+     ]
+    },
+    "standard": {
+     "unit": "minutes",
+     "population": "eight districts",
+     "period": "FY26",
+     "value": 9,
+     "standard": true
+    }
+   },
+   "breadth": {
+    "members": 8
+   }
+  },
+  {
+   "id": "i-profile",
+   "finding": "Northvale leads on punctuality and cost, and runs the youngest fleet",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-profile.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "punctuality": {
+     "unit": "%",
+     "population": "eight operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      91,
+      89,
+      88,
+      87,
+      86,
+      85,
+      84,
+      83
+     ]
+    },
+    "cost": {
+     "unit": "GBP per journey",
+     "population": "eight operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      6.1,
+      6.8,
+      7.2,
+      7.9,
+      8.4,
+      8.8,
+      9.1,
+      9.9
+     ]
+    },
+    "fleet-age": {
+     "unit": "years",
+     "population": "eight operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      9,
+      12,
+      14,
+      11,
+      16,
+      18,
+      13,
+      21
+     ]
+    }
+   },
+   "breadth": {
+    "members": 8
+   }
+  },
+  {
+   "id": "i-frequency",
+   "finding": "Lines with more trains a day grew faster",
+   "shape": "measure-pair",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-frequency.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "frequency": {
+     "unit": "trains a weekday",
+     "population": "ten lines",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale",
+      "Fen",
+      "Moor"
+     ],
+     "values": [
+      58,
+      54,
+      38,
+      36,
+      32,
+      18,
+      16,
+      14,
+      44,
+      26
+     ]
+    },
+    "growth": {
+     "unit": "%",
+     "population": "ten lines",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale",
+      "Fen",
+      "Moor"
+     ],
+     "values": [
+      19,
+      17,
+      14,
+      18,
+      15,
+      5,
+      6,
+      4,
+      9,
+      12
+     ]
+    }
+   },
+   "breadth": {
+    "members": 10
+   }
+  },
+  {
+   "id": "i-revenue-parts",
+   "finding": "Fares are 57% of revenue",
+   "shape": "mix",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-revenue-parts.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "revenue": {
+     "unit": "GBP m",
+     "population": "Northvale Rail revenue",
+     "period": "FY26",
+     "members": [
+      "Fares",
+      "Subsidy",
+      "Freight access",
+      "Property"
+     ],
+     "values": [
+      228,
+      96,
+      44,
+      30
+     ]
+    }
+   },
+   "breadth": {
+    "parts": 4
+   }
+  },
+  {
+   "id": "i-fleet",
+   "finding": "Two classes are 43% of the fleet",
+   "shape": "mix",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-fleet.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "fleet": {
+     "unit": "trains",
+     "population": "Northvale Rail fleet",
+     "period": "FY26",
+     "members": [
+      "Class 150",
+      "Class 158",
+      "Class 170",
+      "Class 195",
+      "Class 331",
+      "Class 769",
+      "Class 802"
+     ],
+     "values": [
+      42,
+      38,
+      30,
+      58,
+      43,
+      8,
+      19
+     ]
+    }
+   },
+   "breadth": {
+    "parts": 7
+   }
+  },
+  {
+   "id": "i-daypart-peers",
+   "finding": "Northvale carries the largest weekend share of five operators",
+   "shape": "mix",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-daypart-peers.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "peak": {
+     "unit": "m journeys",
+     "population": "five operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge"
+     ],
+     "values": [
+      8,
+      10,
+      12,
+      14,
+      16
+     ]
+    },
+    "off-peak": {
+     "unit": "m journeys",
+     "population": "five operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge"
+     ],
+     "values": [
+      11,
+      13,
+      15,
+      17,
+      19
+     ]
+    },
+    "weekend": {
+     "unit": "m journeys",
+     "population": "five operators",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge"
+     ],
+     "values": [
+      14,
+      16,
+      18,
+      20,
+      22
+     ]
+    }
+   },
+   "breadth": {
+    "parts": 3
+   }
+  },
+  {
+   "id": "i-bridge",
+   "finding": "The new timetable added 2.6m of the 3.5m journeys gained",
+   "shape": "bridge",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-bridge.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "journeys": {
+     "unit": "m journeys",
+     "population": "Northvale Rail",
+     "period": "FY25 to FY26",
+     "members": [
+      "FY25",
+      "New timetable",
+      "Fares",
+      "Strikes",
+      "Weather",
+      "Events",
+      "FY26"
+     ],
+     "values": [
+      48.8,
+      2.6,
+      0.9,
+      -1.1,
+      -0.4,
+      1.5,
+      52.3
+     ]
+    }
+   },
+   "breadth": {
+    "steps": 5
+   }
+  },
+  {
+   "id": "i-spread",
+   "finding": "Northvale has the narrowest month-to-month spread of six operators",
+   "shape": "peer-set",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-spread.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "min": {
+     "unit": "%",
+     "population": "six operators' monthly punctuality",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes"
+     ],
+     "values": [
+      78,
+      79,
+      80,
+      81,
+      82,
+      83
+     ]
+    },
+    "q1": {
+     "unit": "%",
+     "population": "six operators' monthly punctuality",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes"
+     ],
+     "values": [
+      81,
+      82,
+      83,
+      84,
+      85,
+      86
+     ]
+    },
+    "median": {
+     "unit": "%",
+     "population": "six operators' monthly punctuality",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes"
+     ],
+     "values": [
+      84,
+      85,
+      86,
+      87,
+      88,
+      89
+     ]
+    },
+    "q3": {
+     "unit": "%",
+     "population": "six operators' monthly punctuality",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes"
+     ],
+     "values": [
+      87,
+      88,
+      89,
+      90,
+      91,
+      92
+     ]
+    },
+    "max": {
+     "unit": "%",
+     "population": "six operators' monthly punctuality",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes"
+     ],
+     "values": [
+      90,
+      91,
+      92,
+      93,
+      94,
+      95
+     ]
+    }
+   },
+   "breadth": {
+    "members": 6
+   }
+  },
+  {
+   "id": "i-lines",
+   "finding": "Peak journeys are spread evenly across eight lines",
+   "shape": "measure-pair",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-lines.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "strong",
+   "measures": {
+    "peak": {
+     "unit": "m journeys",
+     "population": "eight lines",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      8,
+      10,
+      12,
+      9,
+      11,
+      8,
+      10,
+      12
+     ]
+    },
+    "off-peak": {
+     "unit": "m journeys",
+     "population": "eight lines",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      11,
+      13,
+      15,
+      12,
+      14,
+      11,
+      13,
+      15
+     ]
+    },
+    "weekend": {
+     "unit": "m journeys",
+     "population": "eight lines",
+     "period": "FY26",
+     "members": [
+      "Northvale",
+      "Coast",
+      "Midland",
+      "Harbour",
+      "Ridge",
+      "Lakes",
+      "Summit",
+      "Vale"
+     ],
+     "values": [
+      14,
+      16,
+      18,
+      15,
+      17,
+      14,
+      16,
+      18
+     ]
+    }
+   },
+   "breadth": {
+    "members": 8
+   }
+  },
+  {
+   "id": "i-estate",
+   "finding": "The network is 214 stations on 12 lines",
+   "shape": "fact",
+   "calculation": "as recorded in the operator returns",
+   "sources": [
+    "sources/i-estate.csv"
+   ],
+   "soWhat": "It bears directly on the decision the deck is for",
+   "strength": "supporting",
+   "measures": {
+    "stations": {
+     "unit": "stations",
+     "population": "Northvale Rail",
+     "period": "FY26",
+     "value": 214
+    },
+    "staff": {
+     "unit": "staff",
+     "population": "Northvale Rail",
+     "period": "FY26",
+     "value": 6120
+    },
+    "depots": {
+     "unit": "depots",
+     "population": "Northvale Rail",
+     "period": "FY26",
+     "value": 9
+    },
+    "lines": {
+     "unit": "lines",
+     "population": "Northvale Rail",
+     "period": "FY26",
+     "value": 12
+    }
+   }
+  }
+ ]
+}

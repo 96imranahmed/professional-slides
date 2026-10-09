@@ -50,7 +50,7 @@ console.log(JSON.stringify({plainHeadings:role(plain,'process-heading'),datedHea
             """
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { CHART_IDS } from './skills/professional-slides/runtime/charts.mjs';
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const { deck, fixtures } = buildFixtureDeck();
 const visual = new Set(['fill','stroke','color','fontFamily','fontSize','lineWidth','radius']);
 const missing = deck.slides.flatMap(slide => slide.nodes.flatMap(node => Object.entries(node.style || {})
@@ -102,7 +102,7 @@ const by = role => dark.slides[0].nodes.find(n=>n.role===role);
 assert.equal(by('cover-surface').style.fill.tokenId,'color.ink');
 assert.equal(by('cover-title').style.color.tokenId,'color.onPrimary');
 assert.equal(by('cover-title').style.fontFamily.tokenId,'font.display');
-assert.equal(by('cover-title').style.fontSize.tokenId,'type.deckTitle');
+assert.equal(by('cover-title').style.fontSize.tokenId,'type.coverTitle'); // a step over the deck title
 assert.equal(by('cover-subtitle').style.fontSize.tokenId,'type.heading');
 assert.equal(by('cover-title').frame.x,60);
 assert.equal(by('cover-logo').frame.y,44);
@@ -229,7 +229,8 @@ const results = ids.map(id => {
   const swatches = nodes.filter(node => node.role === 'legend-swatch');
   const labels = nodes.filter(node => node.role === 'legend-label');
   const plotNodes = nodes.filter(node => ['chart-gridline','chart-mark','chart-line'].includes(node.role));
-  const legendRows = new Set(swatches.map(node => Math.round(node.frame.y)));
+  // One row whatever each key is drawn as: a square and a combo's line key share a centre, not a top.
+  const legendRows = new Set(swatches.map(node => Math.round(node.frame.y + node.frame.height / 2)));
   const top = Math.min(...swatches.map(node => node.frame.y));
   const plotTop = Math.min(...plotNodes.map(node => node.frame.y));
   const right = Math.max(...labels.map(node => node.frame.x + node.frame.width));
@@ -269,7 +270,7 @@ console.log(JSON.stringify({
 import assert from 'node:assert/strict';
 import { REGISTRY, registryManifest } from './skills/professional-slides/runtime/registry.mjs';
 import { compileDeck, component } from './skills/professional-slides/runtime/core.mjs';
-import { componentFixtureSpecs, componentVariantFixtureSpecs } from './skills/professional-slides/runtime/fixtures.mjs';
+import { componentFixtureSpecs, componentVariantFixtureSpecs } from './evals/support/fixtures.mjs';
 const results = [];
 for (const id of ['action-title','section-title','slide-chrome']) {
   const definition = REGISTRY.get(id), chrome = id === 'slide-chrome';
@@ -413,7 +414,7 @@ console.log(JSON.stringify({total:cases.length,rejected:cases.filter(Boolean).le
         result = run_node(
             """
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const frame = {x:60,y:100,width:720,height:100};
 const definition = REGISTRY.get('section-heading');
 const render = rule => definition.render({id:'test',frame,props:{...definition.sample,rule}}).nodes;
@@ -505,7 +506,7 @@ console.log(JSON.stringify({
 
     def test_wrapped_headings_share_top_line_and_one_rule(self):
         result = run_node("""
-import { buildFixtureDeck } from './skills/professional-slides/runtime/fixtures.mjs';
+import { buildFixtureDeck } from './evals/support/fixtures.mjs';
 const slide = buildFixtureDeck().deck.slides.find(s => s.id === 'fixture-layout-wrapped-headings');
 const headings = slide.nodes.filter(n => n.role === 'section-heading');
 const rules = slide.nodes.filter(n => n.role === 'section-heading-rule');
@@ -624,6 +625,65 @@ console.log(JSON.stringify({results, referenceOverlapsAnnotation}));
             self.assertFalse(chart["covered"], chart["id"])
             self.assertTrue(chart["overlay"], chart["id"])
         self.assertFalse(result["referenceOverlapsAnnotation"])
+
+
+class DiagramComponentTests(unittest.TestCase):
+    """Registry diagrams: a matrix's axes, a proportional funnel, a decision tree's floor."""
+
+    def check_js(self, script):
+        result = run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {planDeck,validateSlidePlan} from './skills/professional-slides/runtime/planner.mjs';
+import {legendNodes} from './skills/professional-slides/runtime/legends.mjs';
+const frame={x:0,y:0,width:1000,height:500};
+const render=(id,props,box=frame)=>REGISTRY.get(id).render({id:'review',frame:box,props}).nodes;
+""" + script + "\nconsole.log(JSON.stringify({accepted:true}));")
+        self.assertTrue(result['accepted'])
+
+    def test_matrix_axes_and_proportional_funnel(self):
+        """PR #4 review: a matrix needs both axes' titles and end labels, and a funnel's stages are proportional."""
+        self.check_js("""
+const sample=REGISTRY.get('matrix').sample;
+const nodes=render('matrix',sample);
+assert.equal(nodes.filter(n=>n.role==='matrix-axis-label').length,6); // two titles and four end labels
+assert.throws(()=>render('matrix',{points:sample.points}),/xAxis/);
+const stages=render('funnel',{stages:[{label:'Start',value:100},{label:'Half',value:50},{label:'None',value:0}]});
+const marks=stages.filter(n=>n.role==='funnel-stage');
+assert.equal(marks.length,2);
+assert.equal(marks[1].frame.width/marks[0].frame.width,0.5);
+assert.equal(stages.filter(n=>n.role==='funnel-label').length,3);
+""")
+
+    def test_decision_tree_minimum_frame_separates_conclusion(self):
+        """Variant review: a decision tree below its minimum frame ran its boxes into the conclusion."""
+        run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const owner=REGISTRY.get('tree');
+const render=height=>owner.render({id:'tree',frame:{x:0,y:0,width:1160,height},props:owner.sample}).nodes;
+for(const h of [419,420,439]) assert.throws(()=>render(h),/height|440|frame|space/i);
+const nodes=render(440), conclusion=nodes.find(n=>n.role==='decision-conclusion-surface');
+for(const box of nodes.filter(n=>n.role==='decision-box')) assert.ok(box.frame.y+box.frame.height<=conclusion.frame.y);
+console.log('{}');
+""")
+
+
+class CoverTests(unittest.TestCase):
+    def test_the_cover_title_is_a_step_up_and_carries_the_players_marks(self):
+        """Fifty-page audit: a small, low cover title that showed none of the players."""
+        result = run_node(f"""
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const mark = (name) => ({{ dataUri: png, width: 1, height: 1, alt: name + ' logo', authorization: name + ' logo' }});
+const nodes = REGISTRY.get('cover').render({{ id: 'c', frame: {{ x: 0, y: 0, width: 1280, height: 720 }}, props: {{ title: 'Anthropic versus OpenAI', marks: [mark('A'), mark('B')] }} }}).nodes;
+const title = nodes.find((n) => n.role === 'cover-title');
+console.log(JSON.stringify({{ size: title.style.fontSize.tokenId, marks: nodes.filter((n) => n.role === 'cover-mark').length, tiles: nodes.filter((n) => n.role === 'cover-mark-tile').length }}));
+""")
+        self.assertEqual(result["size"], "type.coverTitle")
+        self.assertEqual(result["marks"], 2)
+        self.assertEqual(result["tiles"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,8 @@
 import { linePrimitive, stableId, token } from "./core.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
-import { barLabelColumn, numericBounds } from "./charts.mjs";
+import { barLabelColumn } from "./chart-categorical.mjs";
+import { numericBounds } from "./chart-axes.mjs";
 
 function assertEquivalentComparisons(props) {
   if (!props.comparison) return;

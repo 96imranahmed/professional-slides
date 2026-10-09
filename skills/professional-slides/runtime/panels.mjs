@@ -3,14 +3,18 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
+import { mediaNode, markDrawable } from "./media.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
-const FONT = token("font.body"), DISPLAY = token("font.display");
+const FONT = token("font.body");
+// Metric values and agenda numbers are figures: the body face, bold, whose
+// digits line up (the display serif's old-style figures do not).
+const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
@@ -28,8 +32,32 @@ function normalizeCards(props) {
   return props.items.map((item, index) => {
     if (!item || typeof item.title !== "string" || !item.title.trim()) throw new Error(`Card ${index + 1} requires a title`);
     const points = Array.isArray(item.points) ? item.points.map((p) => (typeof p === "string" ? p : p?.text)).filter((p) => typeof p === "string" && p.trim()) : [];
-    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
+    // A card about a recognisable subject (a product, a company, a place)
+    // carries its mark: an embedded `logo` - or a declared player's outline or
+    // photograph, the mark it declares (players.mjs) - takes the icon's place.
+    // One with no file yet keeps the icon until the build fills it
+    // (fetch-logos.mjs, fetch-pictures.mjs).
+    const logo = item.logo && typeof item.logo === "object" && markDrawable(item.logo) ? item.logo : null;
+    return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, logo, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
   });
+}
+
+// A card's mark in the icon's slot, its proportions kept. Every mark gets one
+// visual area (as chart and table logos do), so a long wordmark and a squat
+// one read at one weight across a row; none is taller than the slot or wider
+// than three times it. On a dark card it sits on a white chip, since a mark
+// drawn for a white page can vanish on the fill.
+function cardLogo(cid, logo, slot, centred, onDark) {
+  const aspect = logo.width > 0 && logo.height > 0 ? logo.width / logo.height : 1;
+  const area = slot.height * slot.height * 2;
+  const shrink = Math.min(1, slot.height / Math.sqrt(area / aspect), Math.min(slot.width, slot.height * 3) / Math.sqrt(area * aspect));
+  const width = Math.sqrt(area * aspect) * shrink, height = Math.sqrt(area / aspect) * shrink;
+  const frame = { x: centred ? slot.x + (slot.width - width) / 2 : slot.x, y: slot.y + (slot.height - height) / 2, width, height };
+  const pad = v("space.1");
+  return [
+    ...(onDark ? [rect(stableId(cid, "logo-chip"), "card-logo-chip", { x: frame.x - pad, y: frame.y - pad, width: width + 2 * pad, height: height + 2 * pad }, SURFACE, "none", "radius.small")] : []),
+    mediaNode({ id: stableId(cid, "logo"), frame, props: logo, role: "card-logo" }),
+  ];
 }
 
 /**
@@ -43,19 +71,18 @@ export const CARD_TONES = Object.freeze(["outline", "header", "numbered", "plain
 export const ICON_CARD_TONES = Object.freeze(["dark", "outline", "plain", "disc"]);
 export function cardsLayout(frame, props, rhythm = 0) {
   const items = normalizeCards(props);
-  const tone = props.tone ?? (items.some((i) => i.icon) ? "outline" : "numbered");
+  const tone = props.tone ?? (items.some((i) => i.icon || i.logo) ? "outline" : "numbered");
   if (!CARD_TONES.includes(tone)) throw new Error(`Unknown cards tone: ${tone}; use one of ${CARD_TONES.join(", ")}`);
-  // Only the tones below draw one. A deck asked for four cards with an icon
-  // each under `tone: "header"`, got four cards and no icons, and nothing said
-  // so - the page looked finished and the authored intent was gone. An icon a
-  // tone cannot draw is refused here rather than dropped.
-  if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon)) {
+  // Only the tones below draw one. An icon a tone cannot draw is refused here
+  // rather than dropped: a page that loses its icons silently looks finished
+  // with the authored intent gone.
+  if (!ICON_CARD_TONES.includes(tone) && items.some((item) => item.icon || item.logo)) {
     throw new Error(
       `cards tone "${tone}" does not draw icons; use ${ICON_CARD_TONES.join(" or ")} for an icon per card, `
       + "or drop the icon. A tone that cannot show one should not be handed one.");
   }
   // Icon cards with a line of text each read centred (the "three principles" page).
-  const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => i.icon && !i.points.length) || tone === "disc" || tone === "dark"));
+  const centred = props.align === "center" || (props.align === undefined && ((tone === "outline" || tone === "plain") && items.every((i) => (i.icon || i.logo) && !i.points.length) || tone === "disc" || tone === "dark"));
   const open = ["plain", "disc", "big-number", "columns"].includes(tone);
   if (tone === "stat" && items.some((i) => !i.value)) throw new Error("Stat cards need a value on every card (the figure before the statement)");
   const gap = tone === "big-number" ? v("space.5") + v("space.4") : v("space.4"), pad = open ? 0 : v("space.4");
@@ -79,9 +106,9 @@ export function cardsLayout(frame, props, rhythm = 0) {
     // Header zone: icon (outline/plain/disc), filled band (header), disc + title
     // (numbered), big numeral + title (big-number), dark tile (dark) or a ruled
     // column heading (columns).
-    const iconBlock = ["outline", "plain", "disc"].includes(tone) && item.icon ? iconSize + headGap : 0;
+    const iconBlock = ["outline", "plain", "disc"].includes(tone) && (item.icon || item.logo) ? iconSize + headGap : 0;
     const numberBlock = number ? number.height + headGap : 0;
-    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : tone === "dark" ? Math.max(150, (item.icon ? iconSize + headGap : 0) + title.height + 2 * v("space.4")) : 0;
+    const bandHeight = tone === "header" ? title.height + 2 * v("space.2") : tone === "dark" ? Math.max(150, (item.icon || item.logo ? iconSize + headGap : 0) + title.height + 2 * v("space.4")) : 0;
     const titleHeight = tone === "header" || tone === "dark" ? 0 : title.height + (tone === "columns" ? v("space.2") + v("space.1") : 0);
     const valueHeight = value ? bodyGap + value.height : 0;
     const bodyHeight = (tone === "big-number" ? v("space.3") : 0) + (body ? bodyGap + body.height : 0) + points.reduce((sum, p) => sum + v("space.1") + p.height, points.length ? bodyGap - v("space.1") : 0) + (tone === "big-number" ? v("space.3") : 0);
@@ -122,10 +149,8 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   const natural = cardsLayout(frame, props);
   if (natural.height > frame.height + 0.01) throw new Error(`Cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the card copy or use fewer cards`);
   // Cards are as tall as their copy, at the top of their frame, the copy
-  // starting under the box's top edge. They used to grow to half as much
-  // again as they needed and centre the copy in the box, so four cards
-  // running the page's height carried 80px of air above every icon and as
-  // much under the last line: the short group centred in its region that the
+  // starting under the box's top edge: cards grown past their copy with the
+  // copy centred carry air above every icon and under the last line, which the
   // columns check reads as a hole. The room goes to the card's rhythm first -
   // the gaps between icon, title, figure and text open by up to 12px each -
   // and what is left is the frame's, below the row, for the flow to give to
@@ -158,9 +183,10 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
       nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
-      const block = (m.item.icon ? L.iconSize + L.headGap : 0) + m.title.height;
+      const block = (m.item.icon || m.item.logo ? L.iconSize + L.headGap : 0) + m.title.height;
       let ty = top + (m.bandHeight - block) / 2;
-      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
+      if (m.item.logo) { nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y: ty, width: L.inner, height: L.iconSize }, true, true)); ty += L.iconSize + L.headGap; }
+      else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
     } else if (L.tone === "big-number") {
       // "01 / 02 / 03": the numeral in display type, the title beside the next
@@ -175,7 +201,7 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       const ry = y + m.title.height + v("space.2");
       nodes.push(linePrimitive({ id: stableId(cid, "title-rule"), role: "card-rule", x1: cx, y1: ry, x2: cx + L.inner, y2: ry, style: { stroke: INK, lineWidth: token("line.hairline") } }));
       // The rule separates two columns of type, so it ends where the type
-      // does. Drawn to the card's height it ran a quarter of its length past
+      // does. Drawn to the card's height it runs a quarter of its length past
       // the last line on both sides, dividing nothing.
       if (index) {
         const written = Math.max(...L.items.map((entry) => entry.height));
@@ -195,7 +221,8 @@ export function cardsNodes({ id, frame: frameIn, props }) {
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx + L.disc + v("space.3"), y, width: L.inner - L.disc - v("space.3") }, m.title, text("type.heading", INK, true)));
       y += m.title.height;
     } else {
-      if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
+      if (m.item.logo) nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y, width: L.inner, height: L.iconSize }, L.centred, false));
+      else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: L.centred ? cx + (L.inner - L.iconSize) / 2 : cx, y, size: L.iconSize, icon: m.item.icon, tone: L.tone === "disc" ? "filled" : "outline" })); }
       y += m.iconBlock;
       nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y, width: L.inner }, m.title, text("type.heading", INK, true, align)));
       y += m.title.height;
@@ -288,12 +315,28 @@ function ringMetricNodes({ id, frame, props }) {
   // The value takes the largest type that fits inside the hole.
   let valueSize = "type.metric", value = null;
   for (const candidate of ["type.metric", "type.heading", "type.compact"]) {
-    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(DISPLAY), fontSize: v(candidate), bold: true, wrapWidthRatio: 1 }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
+    try { value = measureText(String(props.value), hole - 8, { fontFamily: tokenValue(FIGURES), fontSize: v(candidate), bold: true }); valueSize = candidate; if (value.lines.length === 1) break; } catch { value = null; }
   }
   if (!value) throw new Error("Ring metric is too small for its value; give the ring more room or shorten the value");
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: circle.x + (size - hole) / 2 + 4, y: circle.y + (size - value.height) / 2, width: hole - 8, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: INK, bold: true, align: "center", valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   if (labelLayout) nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + v("space.2"), y: circle.y + size + gap, width: frame.width - 2 * v("space.2") }, labelLayout, text("type.compact", SECONDARY, false, "center")));
   return nodes;
+}
+
+/**
+ * The height a metric tile's value, label, sublabel and delta take at a width:
+ * what a column sizes the tile to when the number heads its points, so the
+ * first point sits under the number rather than under a fixed box's air.
+ */
+export function metricHeight(width, props) {
+  const pad = props.tone === "hero" ? 0 : v("space.3");
+  const inner = width - 2 * pad;
+  const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
+  const gap = v("space.1");
+  const parts = [measureText(String(props.value ?? ""), inner, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true }).height,
+    ...(props.label ? [measure(props.label, inner, "type.compact").height] : []), ...(props.sublabel ? [measure(props.sublabel, inner, "type.label").height] : []),
+    ...(props.delta ? [measure(props.delta, inner, "type.label", true).height] : [])];
+  return parts.reduce((sum, h) => sum + h, 0) + gap * (parts.length - 1) + 2 * pad;
 }
 
 export function metricNodes({ id, frame, props }) {
@@ -302,6 +345,7 @@ export function metricNodes({ id, frame, props }) {
   // "ring": a share drawn as an accent arc around the value (a KPI ring).
   if (props.tone === "ring") return ringMetricNodes({ id, frame, props });
   if (props.tone !== undefined && !METRIC_TONES.includes(props.tone)) throw new Error(`Unknown metric tone: ${props.tone}; use one of ${METRIC_TONES.join(", ")}`);
+  if (props.better !== undefined && !["up", "down"].includes(props.better)) throw new Error(`A metric's \`better\` is "up" or "down" (got ${JSON.stringify(props.better)}): the direction that is good news for the measure`);
   // "ink": a black tile with the value in the accent (a keynote stat row);
   // "rule": no tile, the value in the accent behind a hairline at the left (the
   // "51 | 443 | 39" stat row).
@@ -310,20 +354,20 @@ export function metricNodes({ id, frame, props }) {
   const pad = props.tone === "hero" ? 0 : v("space.3");
   const width = frame.width - 2 * pad;
   const valueSize = props.variant === "prominent" ? "type.deckTitle" : "type.metric";
-  const value = measureText(String(props.value), width, { fontFamily: tokenValue(DISPLAY), fontSize: v(valueSize), bold: true, wrapWidthRatio: 1 });
+  const value = measureText(String(props.value), width, { fontFamily: tokenValue(FIGURES), fontSize: v(valueSize), bold: true });
   const labelLayout = props.label ? measure(props.label, width, "type.compact") : null;
   const sub = props.sublabel ? measure(props.sublabel, width, "type.label") : null;
   const delta = props.delta ? measure(props.delta, width, "type.label", true) : null;
   const gap = v("space.1");
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
-  if (total > frame.height + 0.01) throw new Error("Metric tile is too short for its value, label and delta; give the tile more height or drop the delta");
+  if (total > frame.height + 0.01) throw new Error(`Metric tile is too short for its ${["value", labelLayout && "label", sub && "sublabel", delta && "delta"].filter(Boolean).join(", ")}: they take ${Math.ceil(total)}px at this width and the tile has ${Math.floor(frame.height)}px. Shorten the ${sub ? "sublabel or the label" : "label"}${delta ? ", or drop the delta" : ""}, or set fewer tiles so each is wider`);
   const nodes = [];
   if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
   else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
-  // No hairline before the tile. The rule was drawn as a divider between tiles
-  // - n tiles, n-1 rules - and on a row whose values are left-aligned over a
-  // label it does not read as a divider at all: it sits hard against the number
+  // No hairline before the tile. A rule drawn as a divider between tiles
+  // - n tiles, n-1 rules - on a row whose values are left-aligned over a
+  // label does not read as a divider at all: it sits hard against the number
   // that follows it and reads as a left border on that card. The tiles are
   // already a row of three peers on one baseline with a gap between them, which
   // is what makes them read as a set; a fence between them adds a device and
@@ -334,18 +378,22 @@ export function metricNodes({ id, frame, props }) {
   const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;
   const align = props.align ?? (hero || ruled ? "left" : "center");
   // Peers in a row start on one line. Centred in its own track, a tile with
-  // three lines against its neighbours' four began ten pixels lower, and three
-  // numbers read across came out as a visible step down.
+  // three lines against its neighbours' four would begin ten pixels lower, and
+  // three numbers read across would step visibly down.
   let y = hero || props.valign === "top" ? frame.y : frame.y + (frame.height - total) / 2;
-  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: DISPLAY, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
+  nodes.push(textPrimitive({ id: stableId(id, "value"), role: "metric-value", frame: { x: frame.x + pad, y, width, height: value.height }, text: value.text, style: { fontFamily: FIGURES, fontSize: token(valueSize), color: ink, bold: true, align, valign: "top", wrap: false, lineHeight: value.lineHeight }, data: { textLayout: value } }));
   y += value.height;
   if (labelLayout) { y += gap; nodes.push(label(stableId(id, "label"), "metric-label", { x: frame.x + pad, y, width }, labelLayout, text("type.compact", grey, false, align))); y += labelLayout.height; }
   if (sub) { y += gap; nodes.push(label(stableId(id, "sublabel"), "metric-sublabel", { x: frame.x + pad, y, width }, sub, text("type.label", grey, false, align))); y += sub.height; }
   if (delta) {
     y += gap;
-    const negative = /^\s*[-−▼↓]/.test(String(props.delta));
-    const positive = /^\s*[+▲↑]/.test(String(props.delta));
-    const color = dark ? WHITE : negative ? token("color.negative") : positive ? token("color.positive") : PRIMARY;
+    const falling = /^\s*[-−▼↓]/.test(String(props.delta));
+    const rising = /^\s*[+▲↑]/.test(String(props.delta));
+    // Coloured by merit, not by sign: a measure whose `better` is "down" - a
+    // cost, churn, a wait - reads its fall as the good news.
+    const better = props.better ?? "up";
+    const good = better === "up" ? rising : falling, bad = better === "up" ? falling : rising;
+    const color = dark ? WHITE : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
     nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text("type.label", color, true, align)));
   }
   return nodes;
@@ -358,8 +406,26 @@ export function metricNodes({ id, frame, props }) {
  * active section on a tinted band in bold, an optional detail per item.
  * props: { items: [{ label, detail?, number? }], active?: index }
  */
+// How many sections each contents style holds: a list down the page, or
+// equal columns across it. The composer reads this to pick the style a deck's
+// section count fits (`agendaStyleFor`), the authoring check to refuse a named
+// style that cannot (compose-deck.mjs contentsProblem), and `--limits` to
+// publish it.
+export const AGENDA_LIMITS = Object.freeze({ list: Object.freeze({ min: 2, max: 10 }), columns: Object.freeze({ min: 2, max: 6 }) });
+
+/**
+ * The contents style that holds `count` sections: the one asked for where it
+ * fits, otherwise the list, which holds the most. The contents page is the
+ * runtime's own furniture, so a style drawn by the deck's variation is
+ * switched for one that fits rather than refused at composition.
+ */
+export function agendaStyleFor(style, count) {
+  const asked = style === "columns" ? "columns" : "list";
+  return count >= AGENDA_LIMITS[asked].min && count <= AGENDA_LIMITS[asked].max ? asked : "list";
+}
+
 export function agendaLayout(frame, props) {
-  if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 10) throw new Error("Agenda takes two to ten items");
+  if (!Array.isArray(props.items) || props.items.length < AGENDA_LIMITS.list.min || props.items.length > AGENDA_LIMITS.list.max) throw new Error("Agenda takes two to ten items");
   const disc = markerSize(), gap = v("space.3"), pad = v("space.2");
   const hasDetail = props.items.some((i) => i.detail);
   const labelWidth = hasDetail ? Math.min(frame.width * 0.42, 460) : frame.width - disc - gap - 2 * pad;
@@ -375,9 +441,21 @@ export function agendaLayout(frame, props) {
   return { items, disc, gap, pad, labelWidth, detailWidth, hasDetail, rowGap, height: natural };
 }
 
+/**
+ * The list as the page can hold it: with each section's detail where the rows
+ * fit the frame, and as the labels alone where they do not. The details are
+ * the sections' own summaries, which their dividers carry, so the contents
+ * page gives them up before it fails to compose.
+ */
+function fittedAgenda(frame, props) {
+  const full = agendaLayout(frame, props);
+  if (full.height <= frame.height + 0.01 || !full.hasDetail) return full;
+  return agendaLayout(frame, { ...props, items: props.items.map((item) => ({ ...item, detail: undefined })) });
+}
+
 export function agendaNodes({ id, frame, props }) {
-  const L = agendaLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error("Agenda items exceed the page; shorten the details or split the agenda");
+  const L = fittedAgenda(frame, props);
+  if (L.height > frame.height + 0.01) throw new Error("Agenda items exceed the page; shorten the section titles or split the agenda");
   // Rows spread over the frame when it is taller than the list, up to a generous cap.
   const spare = Math.max(0, frame.height - L.height);
   const extra = Math.min(spare / L.items.length, v("space.5"));
@@ -403,7 +481,7 @@ export function agendaNodes({ id, frame, props }) {
  */
 export function agendaColumnsNodes({ id, frame, props }) {
   const items = Array.isArray(props.items) ? props.items : [];
-  if (items.length < 2 || items.length > 6) throw new Error("Column agenda takes two to six sections");
+  if (items.length < AGENDA_LIMITS.columns.min || items.length > AGENDA_LIMITS.columns.max) throw new Error("Column agenda takes two to six sections");
   const dark = props.tone === "dark";
   const gap = v("space.5"), width = (frame.width - gap * (items.length - 1)) / items.length;
   const nodes = [];
@@ -411,7 +489,7 @@ export function agendaColumnsNodes({ id, frame, props }) {
   const measured = items.map((item, i) => {
     const active = i === props.active;
     const numeral = String(item.number ?? i + 1).padStart(2, "0");
-    const number = measureText(numeral, width, { fontFamily: tokenValue(DISPLAY), fontSize: v("type.quoteMark"), bold: true, wrapWidthRatio: 1 });
+    const number = measureText(numeral, width, { fontFamily: tokenValue(FIGURES), fontSize: v("type.quoteMark"), bold: true });
     const labelLayout = measure(item.label, width, "type.heading", active);
     const detail = item.detail ? measure(item.detail, width, "type.body") : null;
     return { numeral, number, labelLayout, detail, height: number.height + 20 + labelLayout.height + (detail ? 8 + detail.height : 0) };
@@ -424,7 +502,7 @@ export function agendaColumnsNodes({ id, frame, props }) {
     const numberColor = active ? ACCENT : dark ? token("color.chartGrid") : SECONDARY;
     const textColor = active ? (dark ? WHITE : INK) : dark ? token("color.chartGrid") : SECONDARY;
     let y = top;
-    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: DISPLAY, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
+    nodes.push(textPrimitive({ id: stableId(rid, "number"), role: "agenda-number", frame: { x, y, width, height: number.height }, text: numeral, style: { fontFamily: FIGURES, fontSize: token("type.quoteMark"), color: numberColor, bold: true, align: "left", valign: "top", wrap: false, lineHeight: number.lineHeight }, data: { index: i, active, textLayout: number } }));
     y += number.height + 8;
     nodes.push(linePrimitive({ id: stableId(rid, "rule"), role: "agenda-rule", x1: x, y1: y, x2: x + width, y2: y, style: { stroke: active ? ACCENT : dark ? token("color.chartGrid") : RULE, lineWidth: token(active ? "line.standard" : "line.hairline") } }));
     y += 12;
@@ -442,7 +520,7 @@ export function registerPanels(registry) {
     variants: { list: {}, columns: { props: { variant: "columns" } } }, defaultVariant: "list",
     resolveVariant: (props = {}) => props.variant === "columns" ? "columns" : "list",
     render: (input) => ({ nodes: input.props.variant === "columns" ? agendaColumnsNodes(input) : agendaNodes(input) }),
-    measureContent: ({ frame, props }) => props.variant === "columns" ? { height: frame.height } : agendaLayout(frame, props),
+    measureContent: ({ frame, props }) => props.variant === "columns" ? { height: frame.height } : fittedAgenda(frame, props),
     guidance: { useWhen: "the contents page and the tracker page before each section", why: "readers orient by the numbered list; the tinted band says where they are", actionTitle: "'Contents' or 'Agenda'; the sections carry the claims" }
   });
   registry.set("cards", {

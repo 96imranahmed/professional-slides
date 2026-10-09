@@ -1,0 +1,32 @@
+{
+ "$comment": "The verdict of each judgement kind under which its rule refuses nothing: what a test's or a scripted run's reader answers when the answer is not the point (evals/tests/judgement_oracle.py, evals/support/answer-judgements.mjs).",
+ "verdicts": {
+  "answer-contradicted": "consistent",
+  "answer-lead": "no-verdict",
+  "axis-measures-time": "not-time",
+  "claim-states-change": "other-claim",
+  "claims-repeat": "distinct",
+  "column-reads": "facts",
+  "commentary-caveats": "no-caveats",
+  "commentary-restates": "adds",
+  "file-is-logo": "logo",
+  "header-concludes": "concludes",
+  "heading-says-snapshots": "says-snapshots",
+  "heading-states-result": "describes",
+  "items-relation": "parallel",
+  "number-replaced-by": "not-replaced",
+  "picture-shows": "shows",
+  "pill-states-status": "status",
+  "planning-label": "content",
+  "prose-alternatives": "one-argument",
+  "qualification-says-approximate": "approximate",
+  "row-is-total": "not-total",
+  "same-quantity": "different",
+  "shares-in-words": "no-shares",
+  "source-cites-pointer": "names-source",
+  "tiles-one-measure": "different-measures",
+  "title-count-check": "agrees",
+  "title-count-only": "compares",
+  "title-leads-with-gap": "finding"
+ }
+}

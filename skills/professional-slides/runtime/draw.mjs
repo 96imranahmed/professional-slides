@@ -2,10 +2,9 @@
  * The four things every component module does.
  *
  * Measure a string at a token size, draw a filled box, place a measured string
- * in a frame, and group a number's thousands. Each of those had grown its own
- * copy in six to ten modules - `measure` alone existed in six, with four
- * different argument orders, so calling one with another's order silently
- * measured the wrong thing. They live here once.
+ * in a frame, and group a number's thousands. They live here once: a copy per
+ * module drifts, and with different argument orders a call in one module's
+ * order silently measures the wrong thing in another.
  *
  * Every helper takes an options object rather than a tail of positional
  * booleans, and the modules keep a one-line local alias where their own call
@@ -22,18 +21,14 @@ export function sizeValue(size) {
 }
 
 /**
- * Measure a string at a token size, in the deck's resolved face.
- *
- * `wrapWidthRatio: 1` is not a default anyone should have to remember: a
- * component measures against the frame it was given, not against a fraction of
- * it, or the text it drew will not be the text it measured.
+ * Measure a string at a token size, in the deck's resolved face, against the
+ * whole frame it will be drawn in, so the text drawn is the text measured.
  */
 export function measureAt(text, width, { size = "type.body", bold = false, font = "font.body" } = {}) {
   return measureText(String(text), width, {
     fontFamily: tokenValue(typeof font === "string" ? token(font) : font),
     fontSize: sizeValue(size),
     bold,
-    wrapWidthRatio: 1,
   });
 }
 

@@ -54,7 +54,7 @@ console.log(JSON.stringify({ primary: contrastRatio(c['color.componentPrimary'],
 class DesignCompositionTests(unittest.TestCase):
     def test_systems_move_the_commentary_the_takeaway_and_the_panels(self):
         result = run_node('''
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 const page = { title: 'Revenue grew 40% while costs held flat across the period', exhibit: { type: 'chart.column', categories: ['2021','2022','2023'], series: [{ name: 'Revenue', values: [10, 12, 14] }] },
   points: [{ lead: 'Growth came from price', text: 'Volumes held while list prices rose' }, { lead: 'Costs held', text: 'Headcount was flat across the three years' }],
   pointsTone: 'dark', soWhat: 'Pricing, not volume, carried the growth.' };

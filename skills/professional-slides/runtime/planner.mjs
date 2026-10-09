@@ -37,7 +37,10 @@ function extentOf(props = {}) {
   );
 }
 
-function capacityRecommendation(item, path, reasons) {
+// A chart's marks set its own labels a step smaller; they do not set the
+// page's prose, so a deck's paragraphs keep one size whatever each page's chart
+// carries. `charts` collects the chart's step apart from the page's.
+function capacityRecommendation(item, path, reasons, charts = null) {
   let recommended = "executive";
   const props = item.props || {};
   if (item.component === "insight-tree-table") {
@@ -52,21 +55,29 @@ function capacityRecommendation(item, path, reasons) {
     // tables paginate; it never drags the page's other type with it.
   } else if (typeof item.component === "string" && item.component.startsWith("chart.")) {
     const extent = extentOf(props);
-    recommended = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : recommended;
-    if (recommended !== "live-pitch") reasons.push({ path, component: item.component, measure: "marks", count: extent, recommended });
+    const chart = extent > 12 ? "appendix" : extent > 8 ? "pre-read" : "executive";
+    if (chart !== "executive") reasons.push({ path, component: item.component, measure: "marks", count: extent, recommended: chart, scope: "chart" });
+    if (charts) charts.push(chart);
   }
-  for (const [index, child] of (item.items || []).entries()) recommended = maximumDensity(recommended, capacityRecommendation(child, `${path}.items[${index}]`, reasons));
+  for (const [index, child] of (item.items || []).entries()) recommended = maximumDensity(recommended, capacityRecommendation(child, `${path}.items[${index}]`, reasons, charts));
   return recommended;
 }
 
 export function resolveSlideDensity(plan) {
   const requested = plan.density ?? "executive";
   if (!DENSITY_ORDER.includes(requested)) throw new Error(`Unknown density profile: ${requested}`);
-  const reasons = [];
-  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons)), "executive");
-  // An explicit density is the author's; otherwise the denser of default and recommendation.
+  const reasons = [], charts = [];
+  const recommended = (plan.items || []).reduce((result, item, index) => maximumDensity(result, capacityRecommendation(item, `${plan.id}.items[${index}]`, reasons, charts)), "executive");
+  // The page's type is the deck's: a heavy hierarchy fits by its layout, not by
+  // setting this page's prose a size under every other page's. The
+  // recommendation is kept, with its reasons, as a record of what was heavy.
   const explicit = plan.density !== undefined;
-  return { requested, recommended, resolved: explicit ? requested : maximumDensity(requested, recommended), selection: explicit ? "explicit" : "capacity-default", reasons };
+  const resolved = requested;
+  // The charts' own step: at most one past the page's, so a chart's labels
+  // sit one size under the page's text and never two.
+  const oneStep = DENSITY_ORDER[Math.min(DENSITY_ORDER.length - 1, DENSITY_ORDER.indexOf(resolved) + 1)];
+  const chart = charts.reduce((result, step) => maximumDensity(result, step), resolved);
+  return { requested, recommended, resolved, chart: DENSITY_ORDER.indexOf(chart) > DENSITY_ORDER.indexOf(oneStep) ? oneStep : chart, selection: explicit ? "explicit" : "capacity-default", reasons };
 }
 
 function validateItem(item, path, registry) {
@@ -343,7 +354,7 @@ function planCover(plan) {
     id: plan.id,
     density: plan.density ?? "executive",
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
-    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), variant, ...(plan.image ? {image:plan.image} : {}), ...(plan.image && plan.tone ? { tone: plan.tone } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
+    composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), ...(plan.marks?.length ? { marks: plan.marks } : {}), variant, ...(plan.image ? {image:plan.image} : {}), ...(plan.image && plan.tone ? { tone: plan.tone } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
   return { spec, decision: { layout: "structural", kind: "cover", density: { requested: spec.density, recommended: "live-pitch", resolved: spec.density, selection: plan.density === undefined ? "capacity-default" : "explicit", reasons: [] }, itemJobs: [{ id: "cover", job: "introduce the deck", component: "cover" }] } };
 }
@@ -387,7 +398,7 @@ function planTracker(plan, registry) {
   if (plan.items !== undefined || plan.tracker !== undefined) throw new Error("Full tracker content belongs in trackerPage");
   validateItem({ id: "tracker", job: "orient the reader in the approved sequence", component: "tracker-page", props }, plan.id, registry);
   const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
-  const density = plan.density ?? "pre-read";
+  const density = plan.density ?? "executive";
   return {
     spec: { id: plan.id, notes: plan.notes || "", density, frame, composition: absolute({ id: `${plan.id}-tracker`, children: [
       componentNode({ id: "tracker", component: "tracker-page", props, frame, role: "tracker-page" }),
@@ -404,7 +415,7 @@ export function planSlide(plan, registry = REGISTRY) {
   const titleDecision = titleVariant ?? "house-style";
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(content.density.chart !== content.density.resolved ? { chartDensity: content.density.chart } : {}), ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, ...(plan.sourceForms ? { sourceForms: plan.sourceForms } : {}), note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
       titleVariant: titleDecision,
       density: content.density,
@@ -466,11 +477,11 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
   if (!deckPlan?.id || !Array.isArray(deckPlan.slides)) throw new Error("Deck plan requires id and slides");
   const defaultTitleVariant = resolveTitleVariant({ variant: deckPlan.titleVariant });
   // A page that carries an argument carries a page number. `slide-chrome`
-  // defaults one from the slide's position; the structural pages planned below
-  // it did not, so a deck's closing takeaways and its statements sat unnumbered
-  // in a numbered deck and the printed footer ran 45, 46, then nothing, then
-  // 49. A divider is the exception a reader expects: a full-bleed navy page
-  // with a numeral on it already says where it is.
+  // defaults one from the slide's position, and the structural pages planned
+  // below take theirs the same way, so a numbered deck's footer does not skip
+  // its closing takeaways or statements. A divider is the exception a reader
+  // expects: a full-bleed navy page with a numeral on it already says where it
+  // is.
   const planned = mapAll(deckPlan.slides, (slide, index) => slide.kind === "cover"
     ? planCover(slide)
     : slide.kind === "tracker" ? planTracker(slide, registry)
@@ -479,6 +490,16 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
   const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
-  deck.slides.forEach((slide, index) => { if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role; });
+  // Three keys the planned specs do not carry ride onto the scene slide: the
+  // page's role, `hidden`, its show state in the file (emit_pptx.py), and - on
+  // a page the composer split in two, a table past its rows - the id of the
+  // page it was split from (`sourceSlideId`), which is how every reader of the
+  // scene finds the page a slide belongs to: without it a split page had no
+  // text for the content plan to read and was refused as TEXT_PLAN_INCOMPLETE.
+  deck.slides.forEach((slide, index) => {
+    if (deckPlan.slides[index].role) slide.role = deckPlan.slides[index].role;
+    if (deckPlan.slides[index].hidden) slide.hidden = true;
+    if (deckPlan.slides[index].sourceSlideId) slide.sourceSlideId = deckPlan.slides[index].sourceSlideId;
+  });
   return {deck, decisions:planned.map(item=>item.decision)};
 }

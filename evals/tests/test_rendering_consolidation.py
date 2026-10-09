@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "ga
 import page_gates  # noqa: E402
 
 DECK = r"""
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const chart=(heading,extra={})=>({type:'chart.column',heading,unit:'%',categories:['2022','2023','2024'],series:[{name:'s',values:[1,2,3]}],...extra});
 const build=(slides)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides})).deck;
@@ -66,7 +66,7 @@ console.log(JSON.stringify(Object.fromEntries(deck.slides.map((s)=>[s.id,lit(s.n
 """)
         roles = lambda page: {role for role, text, _ in result[page] if text.lower() == "only one of five"}
         self.assertEqual(roles("a"), {"list-item", "insight-body"}, "a point and the so-what bar")
-        self.assertIn("insight-body", roles("b"), "the caption under its panel")
+        self.assertIn("insight-caption", roles("b"), "the caption under its panel, set as text rather than a box")
         self.assertEqual(roles("c"), {"side-panel-text", "paragraph"}, "the rail's statement and the memo's prose")
         # Cut from the text as written, never from the phrase as offered.
         self.assertTrue(all(text in ("only one of five", "Only one of five") for page in result.values() for _, text, _ in page if text.lower() == "only one of five"))
@@ -127,14 +127,25 @@ console.log(JSON.stringify({units:Object.fromEntries(figures.map((f)=>[f,figureU
         self.assertEqual(result["railWords"], [False] * 5)
 
     def test_the_verdict_check_reads_measures_by_the_same_pattern(self):
+        # Read off the compiler's refusals: a verdict column of figures is a
+        # measure exactly where SCALAR_FIGURE reads a figure, and words where it does not.
         result = run_node(r"""
 import {SCALAR_FIGURE} from './skills/professional-slides/runtime/value-format.mjs';
-import {readFileSync} from 'node:fs';
-const source=readFileSync('./skills/professional-slides/runtime/page-types.mjs','utf8');
-console.log(JSON.stringify({shared:/import \{ SCALAR_FIGURE as NUMERIC \} from "\.\/value-format\.mjs"/.test(source),own:/const NUMERIC\s*=/.test(source)}));
+import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
+import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
+// A column of words is asked whether it judges its rows: a reader says "Confidence" does. A column of figures is never asked.
+const reader=judgementSession({oracle:(kind,subject)=>kind==='column-reads'?(subject.header==='Confidence'?'judges':'facts'):null});
+const base={takeaway:false,why:'The page compares the two firms on the same terms',settles:{kind:'comparison',what:'Company filings, 2025 to 2026'},adds:'The commentary names what the exhibit cannot'};
+const page=(cell)=>({...base,id:'p1',type:'lookup',form:'table',commentary:'none',title:'The near-term commercial call is split between the two firms',
+  exhibit:{columns:[{label:'Criterion',type:'category'},'Confidence','Reason'],rows:[['Consumer reach',cell,'Weekly users'],['Enterprise adoption',cell,'Ramp panel'],['Coding',cell,'Units differ']]}});
+const refused=(cell)=>withJudgements(reader,()=>{try{compilePage(page(cell));return false;}catch(e){return /VERDICT_TABLE_PLAIN/.test(e.message);}});
+const cells=['+25bps','12 pts','4.5/5','$12.5bn','3.2x','~40%','−1.5pp','1,200','€4bn+','High','Medium','Duration unclear','about 50','~50–60'];
+console.log(JSON.stringify(cells.map((cell)=>({cell,figure:SCALAR_FIGURE.test(cell),refused:refused(cell)}))));
 """)
-        self.assertTrue(result["shared"])
-        self.assertFalse(result["own"])
+        self.assertTrue(any(r["figure"] for r in result) and any(not r["figure"] for r in result))
+        for row in result:
+            with self.subTest(cell=row["cell"]):
+                self.assertEqual(row["refused"], not row["figure"])
 
 
 class FlatComboLineTests(unittest.TestCase):

@@ -6,7 +6,7 @@ class SemanticDesignTests(unittest.TestCase):
     def test_banded_table_bar_keeps_its_label_and_boundary_visible(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 for (const palette of ['midnight','evergreen','crimson']) {
@@ -29,7 +29,7 @@ console.log('{}');
     def test_style_variants_keep_status_and_focus_contrast(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 import {contrastRatio} from './skills/professional-slides/runtime/palettes.mjs';
 for(const palette of ['midnight','evergreen','crimson']) {
@@ -62,7 +62,7 @@ console.log('{}');
     def test_category_cells_and_property_local_metadata(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const rows=[['Best picture','1','1'],['Acting','0','2']];
 const a=styleTable({columns:['Award class','A','B'],rows:structuredClone(rows)});
@@ -81,13 +81,14 @@ console.log('{}');
     def test_focus_and_references_survive_unrelated_insertions(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 const target={id:'ranking',title:'Alpha leads the comparison',exhibit:{type:'chart.bar',categories:['Alpha','Beta','Gamma','Delta','Epsilon'],series:[{name:'Value',values:[10,5,4,3,2]}]},points:[{lead:'Implication',text:'Choose the size that meets the stated need.'}]};
 const reference={id:'source',title:'The figures have a traceable basis',points:['See {{page:ranking}} for the comparison.']};
 const spec={schema:'professional-slides.deck/v3',id:'x',slides:[target,reference],contents:false};
 const one=composeDeck(spec),two=composeDeck({...spec,slides:[{id:'extra',title:'An unrelated context page',points:['Context only.']},target,reference]});
 const findChart=items=>{for(const i of items){if(i.component==='chart.bar')return i;const v=i.items&&findChart(i.items);if(v)return v;}};
-for(const deck of [one,two]){const chart=findChart(deck.slides.find(s=>s.id==='ranking').items);assert.deepEqual(chart.props.highlights??[],[]);}
+// The title names Alpha, so Alpha's bar is lit - on its own page, whatever comes before it.
+for(const deck of [one,two]){const chart=findChart(deck.slides.find(s=>s.id==='ranking').items);assert.deepEqual(chart.props.highlights,[{category:'Alpha',style:'bar'}]);}
 assert.ok(JSON.stringify(one.slides.at(-1)).includes('See 1 for'));
 assert.ok(JSON.stringify(two.slides.at(-1)).includes('See 2 for'));
 console.log('{}');
@@ -96,7 +97,7 @@ console.log('{}');
     def test_references_survive_splitting_then_pagination(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 const table={type:'table',columns:['Item','Value'],rows:Array.from({length:40},(_,i)=>[`Item ${i}`,String(i)])};
 const deck=composeDeck({schema:'professional-slides.deck/v3',id:'nested',contents:false,slides:[
  {id:'long',title:'Both samples have a traceable basis',exhibits:[table,structuredClone(table)]},
@@ -111,7 +112,7 @@ console.log('{}');
     def test_unordered_findings_do_not_acquire_markers_from_neighbours(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const slide={title:'Two findings explain the choice',layout:'exhibit-left',exhibit:{type:'chart.bar',categories:['A','B','C','D'],series:[{name:'Value',values:[4,3,2,1]}]},points:[{lead:'Scope',text:'The sample has a stated boundary.'},{lead:'Decision',text:'Use the measured basis for this choice.'}]};
 const lists=item=>[...(item.component==='bullet-list'?[item]:[]),...(item.items||[]).flatMap(lists)];
 for(const history of [[],['prose'],['numbered','ruled','icon-lead']]) {
@@ -125,7 +126,7 @@ console.log('{}');
     def test_summary_role_does_not_require_metric_tiles(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const plan=composeDeck({schema:'professional-slides.deck/v3',id:'summary',contents:false,slides:[{id:'answer',shape:'executive-summary',title:'A focused opening answers the reader’s question',points:[{lead:'Answer',text:'Choose the supported option under the stated condition.'},{lead:'Consequence',text:'Begin with the reversible step and evaluate its result.'}]}]});
 assert.equal(plan.slides[0].role,'executive-summary');
@@ -169,7 +170,7 @@ console.log('{}');
     def test_automatic_cards_do_not_discard_authored_phrase_focus(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const deck=composeDeck({schema:'professional-slides.deck/v3',id:'focus',contents:false,slides:[{id:'focused',title:'Three observations support the next step',highlight:'reversible first step',points:[{lead:'Decision',text:'A reversible first step preserves the next choice.'},{lead:'Evidence',text:'The measured comparison puts both options on a common basis.'},{lead:'Review',text:'Observe the result before committing further resources.'}]}]});
 const scene=planDeck(deck).deck;
@@ -198,7 +199,7 @@ console.log('{}');
     def test_repeated_membership_is_not_a_filled_category(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 assert.throws(()=>styleTable({columns:[{label:'Publisher',type:'category'},'Title'],rows:[['DC','One'],['DC','Two']]}),/repeats/);
 assert.doesNotThrow(()=>styleTable({columns:['Publisher','Title'],rows:[['DC','One'],['DC','Two']]}));
 const repeated={columns:[{label:'Publisher',type:'category',surface:'plain'},'Title'],rows:[['DC','One'],['DC','Two']]};
@@ -211,7 +212,7 @@ console.log('{}');
     def test_filled_category_validation_precedes_pagination(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {paginateTable} from './skills/professional-slides/runtime/compose.mjs';
+import {paginateTable} from './evals/support/compose.mjs';
 const rows=Array.from({length:40},(_,i)=>[`Class ${i}`,'Evidence']);
 rows.at(-1)[0]=rows[0][0];
 assert.throws(()=>paginateTable({id:'taxonomy',title:'Distinct categories',exhibit:{type:'table',columns:[{label:'Class',type:'category'},'Evidence'],rows}}),/repeats/);
@@ -242,7 +243,7 @@ console.log('{}');
     def test_continuation_scale_survives_header_footnote_markers(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {barScales,styleTable,changeFromContent,composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {barScales,styleTable,changeFromContent,composeSlide} from './evals/support/compose.mjs';
 const whole={columns:['Film',{label:'Multiple',unit:'x budget',bar:true}],rows:[['A','7.2'],['B','2.4']]};
 const scales=barScales(whole);
 const page=styleTable({...whole,columns:['Film',{label:'Multiple¹',unit:'x budget',bar:true}],rows:[['B','2.4']],scales});
@@ -266,7 +267,7 @@ console.log('{}');
     def test_continuation_preserves_physical_units_and_unordered_matrix(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {paginateTable,styleTable,composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {paginateTable,styleTable,composeSlide} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const slide={id:'t',title:'A measured comparison',layout:'exhibit-full',exhibit:{type:'table',density:'compact',columns:['Item',{label:'Multiple',unit:'x budget',bar:true}],rows:Array.from({length:24},(_,i)=>[i<12?'Short':'A much longer item label',i<12?'300':'1,200.0'])}};
 const pages=paginateTable(slide);assert.ok(pages.length>1);assert.deepEqual(pages[0].exhibit.columns,pages.at(-1).exhibit.columns);
@@ -279,7 +280,7 @@ console.log('{}');
     def test_peer_bars_share_pixels_per_unit_and_native_bars_start_at_zero(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const panel=(categories,values)=>({type:'chart.bar',heading:'Scores',unit:'points',categories,series:[{name:'Score',values}],yMax:100});
 const spec={schema:'professional-slides.deck/v3',id:'peers',contents:false,slides:[
@@ -297,7 +298,7 @@ console.log('{}');
     def test_line_series_identity_survives_disabling_endpoint_labels(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {composeDeck} from './skills/professional-slides/runtime/compose.mjs';
+import {composeDeck} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const deck=planDeck(composeDeck({schema:'professional-slides.deck/v3',id:'lines',contents:false,slides:[{id:'line',title:'Two series remain identifiable',layout:'exhibit-full',exhibit:{type:'chart.line',heading:'Observed outcomes',unit:'units',native:false,endLabels:false,directLabels:false,categories:['A','B','C'],series:[{name:'First population',values:[1,2,3]},{name:'Second population',values:[3,1,2]}]}}]})).deck;
 for(const name of ['First population','Second population']) assert.ok(deck.slides[0].nodes.some(n=>n.text===name));
@@ -319,7 +320,7 @@ console.log('{}');
     def test_explicit_peer_table_geometry_survives_style_compilation(self):
         run_node("""
 import assert from 'node:assert/strict';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const scales={'length-bar':{type:'bars',label:'Length',unit:'issues',series:['Length'],min:0,max:140,labelTexts:['4','75','48','133']}};
 const make=rows=>styleTable({columns:['Work',{label:'Length',unit:'issues',bar:true},'Context'],columnWidths:[.45,.30,.25],scales,rows});

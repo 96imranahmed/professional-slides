@@ -3,12 +3,32 @@ metrics strip, hero fitness, stack/grid and side ratios."""
 import unittest
 from node_probe import run_node
 
+KIT = "./skills/professional-slides/runtime/page-types.mjs"
+
+PAGE = """
+const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
+const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+"""
+
+DECK = """
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const build=(slides, extra={})=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',tracker:false,slides,...extra},'.')).deck;
+"""
+
+PLANNED = '''
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
+'''
+
 
 class ComposeLayoutTests(unittest.TestCase):
     def test_single_bottom_implication_runs_the_exhibit_width_without_widening_peers(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const text='The model retains the same service boundary. Additional capacity changes one constraint but does not establish permission, funding or readiness. Those conditions must be verified together before the later commitment.';
 const build=count=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'bottom',tracker:false,slides:[{id:'s',title:'One implication uses the region below its evidence',layout:'exhibit-top',pointsHeading:false,exhibit:{type:'table',columns:['Case','Value'],rows:[['A',10],['B',20]]},points:Array.from({length:count},(_,i)=>({lead:`Finding ${i+1}`,text}))}]})).deck;
@@ -33,7 +53,7 @@ console.log('{}');
     def test_a_short_text_page_uses_its_body_track_without_losing_content(self):
         run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
 const points=['The first finding establishes the premise.','The second finding explains its consequence.'];
 const page=composeSlide({title:'Two findings support the decision',layout:'text',points},0);
@@ -56,7 +76,7 @@ console.log(JSON.stringify({ok:true}));
     def test_aliases_and_layouts_resolve_to_components(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const cards=composeSlide({title:'T',exhibit:{type:'cards',items:[{icon:'target',title:'A',text:'a'},{icon:'rocket',title:'B',text:'b'}]}},0);
 // Icon cards hug their copy at the top of the body; centred, they carried as
@@ -134,20 +154,82 @@ if __name__ == '__main__':
     unittest.main()
 
 
+class MetricStripTests(unittest.TestCase):
+    def test_measures_stand_beside_an_exhibit_of_a_few_rows_that_keep_their_height(self):
+        # Three measures in a strip over a four-row dumbbell made two thin
+        # bands across the page: the numbers spread over 1160px, four rows of
+        # dots under them. Rows that keep their own height (a dumbbell, a
+        # lollipop, a short table) and few of them take the measures in a
+        # column beside them; bars, which grow into the height, and a longer
+        # set of rows keep the strip over the exhibit.
+        result = run_node('''
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const metrics=[{value:'5.9x',label:'ChatGPT visits per Claude visit'},{value:'+7.6pp',label:'Claude visit share gained in a year'},{value:'-21pp',label:'ChatGPT visit share lost in a year'}];
+const rows=(n)=>Array.from({length:n},(_,i)=>'Row '+(i+1));
+const dumbbell=(n)=>({type:'chart.dumbbell',heading:'Web visits and cross-use',unit:'%',categories:rows(n),series:[{name:'2025',values:rows(n).map((_,i)=>2+i*9)},{name:'2026',values:rows(n).map((_,i)=>9+i*11)}],xMin:0,xMax:100});
+const bar={type:'chart.bar',heading:'Retained at six months',unit:'%',categories:rows(3),series:[{name:'Retained',values:[25.8,45,59]}]};
+const place=(exhibit)=>{
+  const slide=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'d',slides:[{id:'s',title:'Claude gained web share, but ChatGPT still drew six times its visits',layout:'metrics-over-exhibit',metrics,exhibit}]})).deck.slides[0];
+  const tiles=slide.componentInstances.filter(c=>c.component==='metric').map(c=>c.frame);
+  const chart=slide.componentInstances.find(c=>c.component.startsWith('chart.')).frame;
+  return {column:new Set(tiles.map(t=>Math.round(t.x))).size===1&&new Set(tiles.map(t=>Math.round(t.y))).size===3,
+    beside:tiles.every(t=>t.x+t.width<=chart.x),over:tiles.every(t=>t.y+t.height<=chart.y)};
+};
+console.log(JSON.stringify({four:place(dumbbell(4)),six:place(dumbbell(6)),bar:place(bar)}));
+''')
+        self.assertEqual(result["four"], {"column": True, "beside": True, "over": False})
+        self.assertEqual(result["six"], {"column": False, "beside": False, "over": True})
+        self.assertEqual(result["bar"], {"column": False, "beside": False, "over": True})
+
+
 class ChartRuleTests(unittest.TestCase):
+    def test_the_title_names_the_mark_it_is_about(self):
+        result = run_node(r'''
+import {focusFromTitle, namedInTitle} from './evals/support/compose.mjs';
+const two={type:'chart.line',categories:['2022','2023','2024','2025'],series:[{name:'OpenAI',values:[1,2,3,4]},{name:'Anthropic',values:[1,3,5,8]}]};
+const scatter={type:'chart.scatter',points:[{name:'Opus',x:5,y:58},{name:'Astra',x:3,y:53},{name:'Sol',x:1,y:48}]};
+const years={type:'chart.column',categories:['2022','2023','2024'],series:[{name:'Revenue',values:[1,2,3]}]};
+console.log(JSON.stringify({
+  series: focusFromTitle(two,'Anthropic grows twice as fast').focusSeries ?? null,
+  both: focusFromTitle(two,'Anthropic outgrows OpenAI').focusSeries ?? null,
+  point: focusFromTitle(scatter,'Astra costs half as much per task').focus ?? null,
+  period: focusFromTitle(years,'Revenue tripled after 2022').highlights ?? null,
+  token: namedInTitle(['Direct consumer attention','Selected enterprise paid adoption','Coding monetization'],'OpenAI leads on consumer attention'),
+  shared: namedInTitle(['Enterprise API','Enterprise seats','Consumer'],'Enterprise buyers pay first'),
+  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell'),
+  // The compile counts the mark the title names: a trend whose title names one of its lines is marked.
+  compile: await (async () => { const {scaffoldPage}=await import('./skills/professional-slides/runtime/author-deck.mjs'); const {compilePage}=await import('./skills/professional-slides/runtime/page-types.mjs');
+    const p=scaffoldPage('trend'), ex=p.exhibit, series=[{name:'Eastern',values:ex.series[0].values.map(v=>v/2)},{name:'Dales',values:ex.series[0].values.map(v=>v/3)}];
+    return ['Journeys grew fastest on the Eastern line','Journeys grew on both lines'].map((title)=>{ try { compilePage({...p,title,exhibit:{type:ex.type,heading:ex.heading,unit:ex.unit,categories:ex.categories,series}},0); return 'compiled'; } catch (e) { return /marks its finding on the plot/.test(e.message) ? 'unmarked' : 'other'; } }); })() }));
+''')
+        self.assertEqual(result["series"], "Anthropic")
+        self.assertIsNone(result["both"], "a title that names both compares them")
+        self.assertEqual(result["point"], ["Astra"])
+        self.assertIsNone(result["period"], "a year in the title is its time frame, not its subject")
+        self.assertEqual(result["token"], "Direct consumer attention")
+        self.assertIsNone(result["shared"], "a word two labels carry names neither")
+        self.assertIsNone(result["plural"])
+        self.assertEqual(result["compile"], ["other", "unmarked"])
+
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const find=(items,pred)=>{for(const it of items){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 // Highlight the answer: the title names Hoboken, so Hoboken's bar takes the accent.
 const bar=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
 const chart=find(bar.items,i=>i.component==='chart.bar');
-assert.deepEqual(chart.props.highlights ?? [],[],'title text does not choose a chart focus');
+assert.deepEqual(chart.props.highlights,[{category:'Hoboken',style:'bar'}],'the bar the title names takes the accent');
 const spec=nativeChartSpec('chart.bar',chart.props,{x:0,y:0,width:700,height:400});
-assert.deepEqual(spec.highlightIndices,[]);
+assert.deepEqual(spec.highlightIndices,[0]);
+// A title naming two members compares them, and marks neither; an authored mark is kept.
+const pair=composeSlide({title:'Hoboken is safer than Berkeley',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}]}},0);
+assert.deepEqual(find(pair.items,i=>i.component==='chart.bar').props.highlights ?? [],[]);
+const authored=composeSlide({title:'Hoboken is the safest of the four',exhibit:{type:'chart.bar',categories:['Hoboken','San Francisco','Berkeley','New York City'],series:[{name:'v',values:[189,587,639,571]}],highlights:[{category:'Berkeley',style:'bar'}]}},0);
+assert.deepEqual(find(authored.items,i=>i.component==='chart.bar').props.highlights,[{category:'Berkeley',style:'bar'}]);
 // A CAGR becomes the growth arrow with its rate in the bubble (years from the
 // category names); forecast shading is passed to the native chart when no
 // annotation forces shapes.
@@ -201,7 +283,7 @@ class TextPageColumnTests(unittest.TestCase):
     def test_a_split_list_keeps_one_run_of_numbers_and_the_page_style(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const points = ['one','two','three','four','five'].map((n, i) => ({lead: `Finding ${n}`, text: `what the ${n} finding rests on, in a sentence long enough to wrap`}));
 // `layout: "text"` is what the executive-summary shape sets; points with
 // leads and no layout become a ledger table instead, which is a different page.
@@ -238,7 +320,7 @@ console.log(JSON.stringify({ok:true}));
         """
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {splitReadingModes} from './skills/professional-slides/runtime/compose.mjs';
+import {splitReadingModes} from './evals/support/compose.mjs';
 const steps={type:'steps',items:[{label:'Introduce',text:'Earn attachment'},{label:'Connect',text:'Carry it forward'},{label:'Pay off',text:'Spend it'}]};
 const table={type:'table',columns:['Model','Reward','Cost'],rows:[['Connected','Accumulation','Homework'],['Standalone','Concentration','Reintroduction']]};
 const chart={type:'chart.column',categories:['a','b'],series:[{name:'s',values:[1,2]}]};
@@ -266,3 +348,284 @@ assert.equal(splitReadingModes(page([steps,table],{layout:'two-up'})).length,1);
 console.log(JSON.stringify({ok:true}));
 ''')
         self.assertTrue(result["ok"])
+
+
+class HeroNumberTests(unittest.TestCase):
+    """The first thing said about the hero number sits under it, not under a box's air."""
+
+    def test_hero_number_and_its_explanation_stay_together(self):
+        """First cold run: a hero number's explanation dropped to the slide foot, and the number sat centred below a band of air."""
+        run_node(r"""
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+for (const count of [1,2]) {
+ const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'hero',slides:[{id:'s',title:'Rent parity is a boundary rather than a recommendation',layout:'hero-number',kpi:{value:'$7,858',label:'Monthly rent at cash parity'},pointsStyle:'prose',points:Array.from({length:count},(_,i)=>({lead:'Condition '+i,text:'Keep the verified package and the financial boundary together.'})),exhibit:{type:'table',columns:['Input','Amount'],rows:[['Net pay','$189k'],['Target','$62k'],['Other costs','$33k']]}}]}));
+ const nodes=deck.slides[0].nodes;
+ const metric=nodes.filter(n=>n.role?.startsWith('metric-')&&n.frame);
+ const prose=nodes.filter(n=>n.id.includes('s-points')&&n.text&&n.frame);
+ assert.ok(metric.length&&prose.length);
+ const metricEnd=Math.max(...metric.map(n=>n.frame.y+n.frame.height));
+ const proseStart=Math.min(...prose.map(n=>n.frame.y));
+ assert.ok(proseStart>=metricEnd&&proseStart-metricEnd<120,'explanation stays beside the metric rather than dropping to the slide foot');
+ // The group starts at the top of its track, level with the table, rather
+ // than centred in it with a band of air above the number.
+ const table=nodes.filter(n=>n.id.includes('s-exhibit')&&n.frame);
+ assert.ok(Math.abs(Math.min(...metric.map(n=>n.frame.y))-Math.min(...table.map(n=>n.frame.y)))<24,'the number starts level with the exhibit');
+}
+console.log('{}');
+""")
+
+    def test_the_points_follow_the_number(self):
+        """Rebuilt fifty-page deck: the first point under a hero number sat under a box's worth of air."""
+        result = run_node(PLANNED.format() + '''
+const deck = plan([{ id: 's', title: 'The lead model scores five points above the next two', layout: 'hero-number', subtitle: 'Index v4.3.2, max effort, September 2026',
+  kpi: { value: '58', label: 'Lead model on the index', sublabel: 'Five points above the next two, 22 September' },
+  points: ['The index placed the lead model at 58 on 22 September, the highest score in that snapshot; an earlier test had two rivals tied at 53, so one release changed the leader in a week.',
+           'The index combines selected tasks and configurations. Teams should evaluate their own work, effort settings and reliability, especially for long agent runs.'],
+  exhibit: { type: 'chart.bar', heading: 'Index score', unit: 'points', categories: ['A', 'B', 'C', 'D', 'E'], series: [{ name: 'Score', values: [58, 53, 53, 48, 37] }] } }]);
+const nodes = deck.slides[0].nodes;
+const metric = Math.max(...nodes.filter((n) => n.role?.startsWith('metric-') && n.frame).map((n) => n.frame.y + n.frame.height));
+const first = Math.min(...nodes.filter((n) => n.role === 'list-item' && n.frame).map((n) => n.frame.y));
+console.log(JSON.stringify({ gap: first - metric }));
+''')
+        self.assertGreaterEqual(result['gap'], 0)
+        self.assertLess(result['gap'], 32)
+
+
+class PanelRowCompositionTests(unittest.TestCase):
+    """Composed panels in a row share a ground and a top; a commentary rail keeps its own."""
+
+    def test_two_panels_in_a_row_are_not_tinted_by_alternation(self):
+        """Fifty-page read: "Batman: order" was drawn on grey and "Joker: chaos" on the canvas, and their header rows landed sixteen pixels apart."""
+        # The composed page: two captioned tables, which the chooser sends to
+        # `split-tone`, whose left half carried `treatment: "muted"` because it
+        # was the left half - an alternation, not a decision about the content.
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const panel=(heading,caption,rows)=>({type:'table',heading,caption,columns:['Trait','Reading'],rows});
+const spec={schema:'professional-slides.deck/v3',id:'order-and-chaos',slides:[{
+  title:'Order and chaos are one page read twice',
+  exhibits:[
+    panel('Batman: order','Order is a method: the same answer every time.',
+      [['Method','Repeatable'],['Motive','Fixed'],['Outcome','Contained']]),
+    panel('Joker: chaos','Chaos is a method too: a different answer each time.',
+      [['Method','Improvised'],['Motive','Shifting'],['Outcome','Open']]),
+  ]}]};
+const nodes=planDeck(toDeckPlan(spec)).deck.slides[0].nodes;
+assert.equal(nodes.filter(n=>n.role==='section-surface').length,0,'neither half is singled out');
+const headings=nodes.filter(n=>n.role==='section-heading');
+assert.deepEqual(headings.map(n=>n.text),['Batman: order','Joker: chaos']);
+assert.equal(headings[0].frame.y,headings[1].frame.y,'the two headings sit on one line');
+const tops=nodes.filter(n=>n.role==='table-header-text'&&n.text==='Trait').map(n=>n.frame.y);
+assert.equal(tops.length,2);
+assert.equal(tops[0],tops[1],'and the tables under them start on one top');
+console.log('{}');
+''')
+
+    def test_the_commentary_rail_is_not_a_peer_of_the_exhibit(self):
+        """Fifty-page read: the row rule must leave a commentary rail's asked-for ground alone."""
+        # `pointsTone` is the page asking for a grey commentary column. It is
+        # read down, not across, so the row rule leaves its ground alone.
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const spec={schema:'professional-slides.deck/v3',id:'rail',slides:[{
+  title:'The rail keeps the ground the page asked for',
+  exhibit:{type:'chart.column',heading:'Appearances',unit:'count',
+    categories:['1992','1993','1994','1995'],series:[{name:'Episodes',values:[28,20,10,5]}]},
+  pointsTone:'muted',
+  points:['Order is the method','Chaos is also a method']}]};
+const nodes=planDeck(toDeckPlan(spec)).deck.slides[0].nodes;
+const surfaces=nodes.filter(n=>n.role==='section-surface');
+assert.equal(surfaces.length,1,'the rail keeps its grey ground');
+assert.ok(surfaces[0].frame.x>640,'and it is the right-hand column, not the exhibit');
+console.log('{}');
+''')
+
+    def test_unheaded_table_beside_chart_has_no_invisible_heading_band(self):
+        """Fifty-page read: a table beside a chart sat under a fabricated heading band."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const make=(heading)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'mixed',slides:[{id:'s',title:'Read quantities and permissions together',layout:'two-up',exhibits:[
+ {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['Scope'],series:[{name:'Amount',values:[31]}]},
+ {type:'table',...(heading?{heading}:{}),columns:['Scope','Amount'],rows:[['First work','$31m'],['Later work','$215m']]}
+]}]})).deck.slides[0];
+const plain=make();
+const chart=plain.componentInstances.find(c=>c.component==='chart.column');
+const table=plain.componentInstances.find(c=>c.component==='table');
+assert.equal(table.frame.y,chart.frame.y,'table starts with the chart, not below a fabricated band');
+assert.ok(!plain.nodes.some(n=>n.role==='section-heading'&&n.frame.x>=table.frame.x),'no unrequested table heading');
+const named=make('Approved scope');
+assert.ok(named.nodes.some(n=>n.role==='section-heading'&&n.text==='Approved scope'),'explicit author heading survives');
+console.log('{}');
+''')
+
+    def test_a_panel_with_no_heading_draws_no_rule_and_keeps_its_band(self):
+        """Fifty-page read: a table arrived under a rule with nothing above it."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const table=(rows)=>({type:'table',columns:['Trait','Reading'],rows});
+const spec={schema:'professional-slides.deck/v3',id:'unheaded',slides:[{
+  title:'Two tables read across the page',arrange:'row',
+  exhibits:[table([['Method','Repeatable'],['Motive','Fixed']]),
+            table([['Method','Improvised'],['Motive','Shifting']])]}]};
+const nodes=planDeck(toDeckPlan(spec)).deck.slides[0].nodes;
+assert.equal(nodes.filter(n=>n.role==='section-heading').length,0,'nothing is printed');
+assert.equal(nodes.filter(n=>n.role==='section-heading-rule').length,0,'so nothing is ruled');
+const tops=nodes.filter(n=>n.role==='table-header-text'&&n.text==='Trait').map(n=>n.frame.y);
+assert.equal(tops[0],tops[1],'and the band that exists for the row rule is still reserved');
+console.log('{}');
+''')
+
+
+class CommentaryPlacementTests(unittest.TestCase):
+    def test_a_short_commentary_column_goes_under_a_chart_its_page_type_placed_beside(self):
+        """Fifty-page audit: a commentary rail ended halfway down beside a full-height chart."""
+        result = run_node(f"""
+import {{ compilePage }} from '{KIT}';
+import {{ composeSlide }} from './evals/support/compose.mjs';
+{PAGE}
+const exhibit = {{ heading: 'Contribution after costs', unit: '$', categories: ['2019', '2020', '2021', '2022', '2023', '2024'],
+  series: [{{ name: 'Firm A', values: [3, 5, 8, 9, 12, 15] }}, {{ name: 'Firm B', values: [4, 5, 6, 7, 7, 8] }}], highlights: [{{ category: '2024' }}] }};
+const page = (points) => ({{ ...base, id: 'p1', type: 'trend', form: 'line', commentary: 'beside', title: 'Firm A pulled ahead of Firm B after 2021',
+  exhibit, points, highlight: points.map((p) => p.split(' ')[0]) }});
+const ids = (slide) => {{ const out = []; const walk = (item) => {{ out.push(String(item.id || '')); (item.items || []).forEach(walk); }}; slide.items.forEach(walk); return out; }};
+const short = ids(composeSlide(compilePage(page(['Contribution rose every year.', 'Costs fell faster than prices.']), 0), 0));
+const byHand = ids(composeSlide({{ id: 'p1', title: 'A hand-written page keeps its column', layout: 'exhibit-left', exhibit: {{ type: 'chart.line', ...exhibit }}, points: ['Contribution rose every year.', 'Costs fell faster than prices.'] }}, 0));
+console.log(JSON.stringify({{ short: {{ side: short.some((i) => i.endsWith('-side')), below: short.some((i) => i.endsWith('-below')) }}, byHand: byHand.some((i) => i.endsWith('-side')) }}));
+""")
+        self.assertEqual(result["short"], {"side": False, "below": True})
+        self.assertTrue(result["byHand"])
+
+
+class CaptionTests(unittest.TestCase):
+    def test_captions_are_text_and_the_statement_box_is_the_takeaway_alone(self):
+        """Fifty-page audit: captions were set as centred bold boxes."""
+        result = run_node(DECK + """
+const chart = (heading, caption) => ({ type: 'chart.column', heading, unit: '%', categories: ['2022', '2023', '2024', '2025'], series: [{ name: 's', values: [1, 2, 3, 4] }], caption });
+const deck = build([{ id: 's', title: 'Two panels, each with its finding', layout: 'two-up', exhibits: [chart('Margin', 'Margins rose in every year of the run'), chart('Cost', 'Costs fell at every operator we measured')] }]);
+const nodes = deck.slides[0].nodes;
+console.log(JSON.stringify({ captions: nodes.filter((n) => n.role === 'insight-caption').map((n) => n.style.align), boxes: nodes.filter((n) => n.role === 'insight-surface').length }));
+""")
+        self.assertEqual(result["captions"], ["left", "left"])
+        self.assertEqual(result["boxes"], 0)
+
+
+class DensityTests(unittest.TestCase):
+    def test_a_charts_mark_count_steps_its_labels_not_the_pages_prose(self):
+        """Fifty-page audit: a chart's mark count set the whole page's prose a size smaller."""
+        result = run_node(DECK + """
+const categories = Array.from({ length: 13 }, (_, i) => String(2012 + i));
+const deck = build([{ id: 's', title: 'Thirteen years of one measure', layout: 'exhibit-left', exhibit: { type: 'chart.column', heading: 'Volume', unit: 'm', categories, series: [{ name: 'v', values: categories.map((_, i) => i + 1) }] },
+  points: ['The measure rose in every year of the thirteen.', 'The rise was fastest after the policy change.'] }]);
+const slide = deck.slides[0];
+console.log(JSON.stringify({ density: slide.density, body: slide.tokens['type.body'].value, chart: slide.tokens['type.chartLabel'].value }));
+""")
+        self.assertEqual(result["density"], "executive")
+        self.assertEqual(result["body"], 12)
+        self.assertLess(result["chart"], 10)
+
+
+class StaircaseTests(unittest.TestCase):
+    """A staircase uses its frame: solid steps, and the commentary in the space it climbs into."""
+
+    STEPS = [{"label": "Publish", "text": "The lab introduces the protocol"},
+             {"label": "Adopt", "text": "Tool builders implement servers and clients"},
+             {"label": "Donate", "text": "The protocol moves to a foundation"},
+             {"label": "Compete", "text": "Several labs build on the interface"}]
+
+    def test_the_commentary_sits_over_the_lower_steps_and_the_stair_climbs_the_body(self):
+        """Rebuilt fifty-page deck: staircases left empty triangles."""
+        import json
+        result = run_node(f'''
+import {{ compilePage }} from '{KIT}';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const page = compilePage({{ id: 'm', type: 'mechanism', form: 'steps', commentary: 'below', takeaway: false, why: 'Four stages show how the standard spread',
+  settles: {{ kind: 'sequence', what: 'The dated stages of the protocol' }}, title: 'The protocol spread from one lab to the field in four steps',
+  adds: 'The points say why openness limits capture',
+  exhibit: {{ items: {json.dumps(self.STEPS)} }},
+  points: ['The lab helped establish the protocol as a common way for assistants to connect to tools and data, and donating it widened its reach.',
+           'That same openness limits capture: a customer can route work to another model if quality, price or policy changes.'],
+  highlight: ['common way for assistants', 'openness limits capture'] }});
+const {{ deck }} = planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides: [page] }}));
+const slide = deck.slides[0], body = slide.contentFrame;
+const columns = slide.nodes.filter((n) => n.role === 'step-column').map((n) => n.frame);
+const treads = slide.nodes.filter((n) => n.role === 'step-block').map((n) => n.frame);
+const points = slide.nodes.filter((n) => n.role === 'list-item').map((n) => n.frame);
+const texts = slide.nodes.filter((n) => n.role === 'step-text').map((n) => n.frame);
+console.log(JSON.stringify({{ body, columns, treads, points, texts }}));
+''')
+        body, columns, treads, points = result['body'], result['columns'], result['treads'], result['points']
+        self.assertEqual(len(columns), 4)
+        # Each step is solid from its tread to the baseline, and the stair stands on the body's foot.
+        for column, tread in zip(columns, treads):
+            self.assertAlmostEqual(column['y'], tread['y'], places=3)
+        foot = body['y'] + body['height']
+        self.assertTrue(all(abs(c['y'] + c['height'] - foot) < 2 for c in columns))
+        # The last step reaches the top of the body; the points sit above the first two steps.
+        self.assertLess(treads[-1]['y'] - body['y'], 16)
+        right = max(p['x'] + p['width'] for p in points)
+        bottom = max(p['y'] + p['height'] for p in points)
+        self.assertLess(right, columns[2]['x'])
+        self.assertLess(bottom, treads[1]['y'])
+        self.assertLess(points[0]['y'] - body['y'], 60)
+        # Each description sits inside its own step, under the tread.
+        for text, tread, column in zip(result['texts'], treads, columns):
+            self.assertGreaterEqual(text['y'], tread['y'] + tread['height'])
+            self.assertLessEqual(text['x'] + text['width'], column['x'] + column['width'] + 0.5)
+
+    def test_commentary_too_long_for_the_space_stays_under_the_stair(self):
+        """Rebuilt fifty-page deck: commentary too long for the space over the steps stays under the stair."""
+        import json
+        long = "A lasting lead requires retained paid tasks at positive contribution and cash coverage of compute obligations; neither firm discloses these on a matched basis, so the outcome can remain open for years while both grow quickly."
+        result = run_node(PLANNED.format() + f'''
+const deck = plan([{{ id: 's', title: 'Three steps', layout: 'exhibit-top', pageType: {{ type: 'mechanism', form: 'steps' }},
+  exhibit: {{ type: 'steps', items: {json.dumps(self.STEPS[:3])} }}, points: {json.dumps([{"lead": "Near term", "text": long}, {"lead": "Long term", "text": long}, {"lead": "Reversal", "text": long}])} }}]);
+const slide = deck.slides[0];
+const columns = slide.nodes.filter((n) => n.role === 'step-column').map((n) => n.frame);
+const points = slide.nodes.filter((n) => ['list-item', 'paragraph'].includes(n.role) || /points/.test(n.id)).filter((n) => n.frame && n.type === 'text').map((n) => n.frame);
+console.log(JSON.stringify({{ stairFoot: Math.max(...columns.map((c) => c.y + c.height)), pointsTop: Math.min(...points.map((p) => p.y)) }}));
+''')
+        self.assertLess(result['stairFoot'], result['pointsTop'])
+
+
+class PictureCreditsTests(unittest.TestCase):
+    def test_attributed_pictures_get_a_generated_credits_page(self):
+        """62-page deck: fetched photographs need their credits on a page the composer writes."""
+        result = run_node('''
+import { pictureCredits } from './evals/support/compose.mjs';
+const spec = { cover: { image: { alt: 'Hub', path: 'a.jpg', credit: 'Photo: A, CC BY-SA 4.0, via Wikimedia Commons' } },
+  slides: [{ id: 'fleet', photo: { alt: 'Cabin', path: 'b.jpg', credit: 'Photo: B, CC BY 4.0, via Wikimedia Commons' } }, { id: 'own', photo: { alt: 'Office', path: 'c.jpg', credit: 'Client photograph' } }] };
+const pages = pictureCredits(spec);
+console.log(JSON.stringify({ n: pages.length, id: pages[0]?.id, rows: pages[0]?.exhibit.rows, none: pictureCredits({ slides: [] }).length }));
+''')
+        self.assertEqual(result['id'], 'picture-credits')
+        self.assertEqual(result['rows'], [['Cover', 'Hub', 'A, CC BY-SA 4.0, via Wikimedia Commons'], ['{{page:fleet}}', 'Cabin', 'B, CC BY 4.0, via Wikimedia Commons']])
+        self.assertEqual(result['none'], 0)
+
+
+class RailWidthTests(unittest.TestCase):
+    def test_a_rail_takes_a_quarter_of_the_row_where_its_statement_fits_there(self):
+        # A claim of twenty-odd words in a third of the page left a dark band of air beside an exhibit that wanted the width.
+        result = run_node(r'''
+import {toDeckPlan} from './evals/support/compose.mjs';
+import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
+const chart = {type:'chart.line',categories:['FY19','FY20','FY21','FY22','FY23','FY24'],series:[{name:'Journeys',values:[40,12,30,41,44,46]}]};
+const slide = (id, text) => ({id, title:'Journeys recovered more slowly than every regional peer', layout:'sidebar', panel:{text}, exhibit:chart});
+const short = 'The two peers back above FY19 added off-peak trains in FY23; Northvale kept its hourly timetable.';
+const long = short + ' Its recovery flattened a year later, and the gap to the peers has widened every year since the timetable stopped changing.';
+const {deck} = planDeck(toDeckPlan({schema:'professional-slides.deck/v3', id:'d', tracker:false, slides:[slide('a', short), slide('b', long)]}));
+console.log(JSON.stringify(deck.slides.map((s) => Math.round(s.componentInstances.find((c) => c.component === 'side-statement').frame.width))));
+''')
+        quarter, third = result
+        self.assertLess(quarter, 300)
+        self.assertGreater(third, 360)

@@ -3,18 +3,18 @@
 // profile cards and a logo wall. Each shares the deck's marker vocabulary, its
 // body and display type, one primary colour and hairline rules; every text node
 // is measured once here and carries its layout with it.
-import { token, tokenValue, stableId, textPrimitive, rectPrimitive, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker, markerSize } from "./marks.mjs";
-import { mediaNode } from "./media.mjs";
+import { mediaNode, markDrawable } from "./media.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary");
 const SURFACE = token("color.surface"), RULE = token("color.rule");
+const PRIMARY_TINT = token("color.componentPrimaryTint"), ACCENT_TINT = token("color.accentTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
 const v = (id) => tokenValue(token(id));
 
-export const EXTRA_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.textSecondary", "color.rule", "font.display", "type.heading", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "line.medium", "color.surfaceTint", "radius.none", "radius.small", "radius.round"])]);
+export const EXTRA_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.textSecondary", "color.rule", "font.display", "type.heading", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "line.medium", "color.surfaceTint", "color.componentPrimaryTint", "color.accentTint", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left", font = FONT) => ({ fontFamily: font, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false, font = FONT) => measureAt(value, width, { size, bold, font });
@@ -159,48 +159,71 @@ function normalizeSteps(props) {
 }
 
 /**
- * A staircase: one tread per milestone, each a step higher, numbered at its
- * left; the description sits above its tread, and a hairline riser drops
- * from each tread to the baseline so the figure reads as stairs, not bars.
+ * A staircase: one step per milestone, each a solid column rising from the
+ * baseline with its tread on top - the number and the label on the house
+ * colour - and its description inside the column under the tread.
+ *
+ * Solid, each step is the height it has climbed, and the text sits in the
+ * shape it describes; treads floating over hairline risers, the descriptions
+ * above them, would ink a sixth of the area the figure is given.
  */
 export function stepsLayout(frame, props) {
   const items = normalizeSteps(props);
   const gap = v("space.2"), pad = v("space.3"), tread = 44, disc = markerDiameter();
   const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad - disc - v("space.2");
   if (inner < 60) throw new Error("Steps are too narrow for their labels; use fewer steps");
-  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.body", true), body: item.text ? measure(item.text, width - pad, "type.compact") : null }));
+  const measured = items.map((item) => ({ item, title: measure(item.label, inner, "type.body", true), body: item.text ? measure(item.text, width - 2 * pad, "type.compact") : null }));
   if (measured.some((m) => m.title.lines.length > 3)) throw new Error("Step labels must fit three lines on the tread; shorten them or use fewer steps");
   // A tread grows to carry a two-line label at a narrow width.
   const treadHeight = Math.max(tread, Math.max(...measured.map((m) => m.title.height)) + 2 * v("space.2"));
   const bodyHeight = Math.max(0, ...measured.map((m) => (m.body ? m.body.height : 0)));
-  const rise = Math.max(treadHeight + v("space.2"), bodyHeight + v("space.3"));
-  return { items: measured, gap, pad, width, inner, tread: treadHeight, disc, rise, bodyHeight, height: treadHeight + rise * (items.length - 1) + bodyHeight + v("space.3") };
+  // The first step is the tread and its description; every step above it
+  // climbs by the rise.
+  const base = treadHeight + (bodyHeight ? pad + bodyHeight + pad : v("space.4"));
+  const rise = treadHeight + v("space.4");
+  return { items: measured, gap, pad, width, inner, tread: treadHeight, disc, rise, base, bodyHeight, height: base + rise * (items.length - 1) };
+}
+
+/**
+ * The rise a staircase takes in `frame`. On its own the rise is capped and the
+ * figure centred: three steps given a whole body rise by a hundred and eighty
+ * pixels a step and read as three columns, not a stair. With `reserve` - the
+ * box at the frame's top left the page's commentary is set in, over the lower
+ * steps - the stair stands on the frame's foot and climbs as far as the box
+ * lets it, so the figure and its commentary fill the frame between them.
+ */
+function stepsRise(frame, L, reserve) {
+  const n = L.items.length;
+  if (n < 2) return { rise: L.rise, baseline: frame.y + frame.height };
+  if (!reserve) {
+    const stretched = (frame.height - L.base) / (n - 1);
+    const rise = Math.max(L.rise, Math.min(stretched, L.rise * STEP_RISE_STRETCH));
+    const figure = L.base + rise * (n - 1);
+    return { rise, baseline: frame.y + frame.height - Math.max(0, (frame.height - figure) / 2) };
+  }
+  // The steps under the box: every one whose column starts inside its width.
+  const under = L.items.filter((_, i) => i * (L.width + L.gap) < reserve.width).length;
+  const clear = frame.height - reserve.height;
+  if (clear < L.base) throw new Error(`The commentary over the steps takes ${Math.ceil(reserve.height)}px and leaves the first step ${Math.floor(clear)}px of the ${Math.ceil(L.base)}px it needs; set the commentary under the steps`);
+  const rise = Math.min((frame.height - L.base) / (n - 1), under > 1 ? (clear - L.base) / (under - 1) : Infinity);
+  if (rise < L.tread / 2) throw new Error("The commentary over the steps leaves them too flat to read as a stair; set the commentary under the steps");
+  return { rise, baseline: frame.y + frame.height };
 }
 
 export function stepsNodes({ id, frame, props }) {
   const L = stepsLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`Steps need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the descriptions or use fewer steps`);
+  const reserve = props.reserve && Number.isFinite(props.reserve.width) && Number.isFinite(props.reserve.height) ? props.reserve : null;
+  if (!reserve && L.height > frame.height + 0.01) throw new Error(`Steps need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the descriptions or use fewer steps`);
   const n = L.items.length;
-  // The rise is capped, and the staircase is centred in whatever is left.
-  //
-  // It used to stretch to fill the frame: three steps in a 470px body gave a
-  // 191px rise for a 44px tread, so the page was three small islands with a
-  // hundred and fifty pixels of nothing between them and the whole top-left
-  // corner empty. A staircase is a shape, not a way of spending height - it
-  // rises by about what a tread and its text need, and the leftover goes in one
-  // place rather than being smeared between every step.
-  const naturalRise = L.rise;
-  const stretched = n > 1 ? (frame.height - L.tread - L.bodyHeight - v("space.3")) / (n - 1) : naturalRise;
-  const rise = n > 1 ? Math.max(naturalRise, Math.min(stretched, naturalRise * STEP_RISE_STRETCH)) : naturalRise;
-  const figure = L.tread + rise * (n - 1) + L.bodyHeight + v("space.3");
-  const baseline = frame.y + frame.height - Math.max(0, (frame.height - figure) / 2);
+  const { rise, baseline } = stepsRise(frame, L, reserve);
   const nodes = [];
-  nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "step-baseline", x1: frame.x, y1: baseline, x2: frame.x + frame.width, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
   L.items.forEach((m, i) => {
-    const x = frame.x + i * (L.width + L.gap), top = baseline - L.tread - rise * i, sid = stableId(id, "step", i);
+    const x = frame.x + i * (L.width + L.gap), top = baseline - L.base - rise * i, sid = stableId(id, "step", i);
     const last = i === n - 1;
+    // The step's body, from its tread down to the baseline, in the tint of
+    // its tread's colour: the height the stair has climbed.
+    nodes.push(rect(stableId(sid, "column"), "step-column", { x, y: top, width: L.width, height: baseline - top }, last ? ACCENT_TINT : PRIMARY_TINT));
     nodes.push(rect(stableId(sid, "tread"), "step-block", { x, y: top, width: L.width, height: L.tread }, last ? ACCENT : PRIMARY));
-    if (i) nodes.push(linePrimitive({ id: stableId(sid, "riser"), role: "step-riser", x1: x, y1: top + L.tread, x2: x, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
     // The tread's marker: the icon the author named, else the step's number.
     // A staircase already carries its order in its shape, so an icon loses
     // nothing and says what the step is about.
@@ -208,16 +231,18 @@ export function stepsNodes({ id, frame, props }) {
       ? iconMarker({ id: stableId(sid, "icon"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, icon: m.item.icon, tone: "inverse" })
       : numberMarker({ id: stableId(sid, "number"), role: "step-marker", x: x + L.pad, y: top + (L.tread - L.disc) / 2, size: L.disc, number: i + 1, reverse: true })));
     nodes.push(label(stableId(sid, "label"), "step-label", { x: x + L.pad + L.disc + v("space.2"), y: top + (L.tread - m.title.height) / 2, width: L.inner }, m.title, text("type.body", WHITE, true)));
-    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top - v("space.2") - m.body.height, width: L.width - L.pad }, m.body, text("type.compact", INK)));
+    if (m.body) nodes.push(label(stableId(sid, "text"), "step-text", { x: x + L.pad, y: top + L.tread + L.pad, width: L.width - 2 * L.pad }, m.body, text("type.compact", INK)));
   });
+  nodes.push(linePrimitive({ id: stableId(id, "baseline"), role: "step-baseline", x1: frame.x, y1: baseline, x2: frame.x + frame.width, y2: baseline, style: { stroke: RULE, lineWidth: token("line.hairline") } }));
   return nodes;
 }
 
-/* ------------------------------------------------------------------ people */
-
-// How much a staircase may stretch past the height its content needs. Past
-// this the treads stop reading as steps and start reading as scattered blocks.
+// How much a staircase on its own may stretch past the rise its treads need.
+// Past this the steps stop reading as a stair and start reading as a row of
+// columns of unrelated heights.
 const STEP_RISE_STRETCH = 1.45;
+
+/* ------------------------------------------------------------------ people */
 
 const PORTRAIT = 72;
 
@@ -233,9 +258,9 @@ function normalizePeople(props) {
 
 const initials = (name) => name.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join("") || "?";
 
-export function peopleLayout(frame, props) {
+export function peopleLayout(frame, props, rhythm = 0) {
   const items = normalizePeople(props);
-  const gap = v("space.4"), pad = v("space.4");
+  const gap = v("space.4"), pad = v("space.4") + rhythm;
   const width = (frame.width - gap * (items.length - 1)) / items.length, inner = width - 2 * pad;
   if (inner < PORTRAIT + 16) throw new Error("Profile cards are too narrow; use fewer people");
   const nameGap = v("space.3"), roleGap = v("space.1"), pointsGap = v("space.3"), pointGap = v("space.1");
@@ -251,13 +276,31 @@ export function peopleLayout(frame, props) {
   return { items: measured, gap, pad, width, inner, nameGap, roleGap, pointsGap, pointGap, headHeight, height: Math.max(...measured.map((m) => m.height - m.head + headHeight)) };
 }
 
+/**
+ * The profile cards as the frame lets them be drawn: as tall as their copy,
+ * with the padding the frame allows (a step or two more, never the frame's
+ * whole height). A card drawn to a taller frame than its copy is a box a third
+ * empty under the last point; drawn to its copy, the commentary under the row
+ * sits against it. `peopleNodes` draws this and the ceiling reports it.
+ */
+function grownPeople(frame, props) {
+  const natural = peopleLayout(frame, props);
+  if (!Number.isFinite(frame.height)) return natural;
+  for (const rhythm of [v("space.3"), v("space.2"), v("space.1")]) {
+    const grown = peopleLayout(frame, props, rhythm);
+    if (grown.height <= frame.height + 0.01) return grown;
+  }
+  return natural;
+}
+
 export function peopleNodes({ id, frame, props }) {
-  const L = peopleLayout(frame, props);
-  if (L.height > frame.height + 0.01) throw new Error(`Profile cards need ${Math.ceil(L.height)}px but have ${frame.height}px; shorten the points or use fewer people`);
+  const natural = peopleLayout(frame, props);
+  if (natural.height > frame.height + 0.01) throw new Error(`Profile cards need ${Math.ceil(natural.height)}px but have ${frame.height}px; shorten the points or use fewer people`);
+  const L = grownPeople(frame, props);
   const nodes = [];
   L.items.forEach((m, i) => {
     const x = frame.x + i * (L.width + L.gap), pid = stableId(id, "person", i), cx = x + L.pad;
-    nodes.push(rect(stableId(pid, "surface"), "person-surface", { x, y: frame.y, width: L.width, height: frame.height }, SURFACE, RULE, "radius.small"));
+    nodes.push(rect(stableId(pid, "surface"), "person-surface", { x, y: frame.y, width: L.width, height: L.height }, SURFACE, RULE, "radius.small"));
     let y = frame.y + L.pad;
     const px = x + (L.width - PORTRAIT) / 2, portrait = { x: px, y, width: PORTRAIT, height: PORTRAIT };
     if (m.item.image) {
@@ -293,7 +336,9 @@ function normalizeLogos(props) {
   if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 12) throw new Error("Logo wall takes two to twelve logos");
   return props.items.map((item, index) => {
     if (!item || !clean(item.name)) throw new Error(`Logo ${index + 1} requires a name`);
-    return { name: clean(item.name), caption: clean(item.caption), image: item.image ?? null };
+    // A member's mark - a logo, a place's outline, a photograph (players.mjs) - is drawn once it can be; a logo or a
+    // photograph planned and not yet fetched leaves the member's name in its cell, as a logo cell keeps its player's name.
+    return { name: clean(item.name), caption: clean(item.caption), image: item.image && typeof item.image === "object" && (markDrawable(item.image) || item.image.path) ? item.image : null };
   });
 }
 
@@ -348,7 +393,7 @@ export function logosNodes({ id, frame, props }) {
 /* ---------------------------------------------------------------- register */
 
 export function registerExtras(registry) {
-  const define = (id, category, preferredSize, sample, render, measureContent, guidance) => registry.set(id, { id, version: "1.0.0", category, role: id, tokens: [...EXTRA_TOKENS], preferredSize, sample, render, measureContent, guidance });
+  const define = (id, category, preferredSize, sample, render, measureContent, guidance, measureCeiling) => registry.set(id, { id, version: "1.0.0", category, role: id, tokens: [...EXTRA_TOKENS], preferredSize, sample, render, measureContent, guidance, ...(measureCeiling ? { measureCeiling } : {}) });
   define("cycle", "diagram", { width: 1160, height: 460 },
     { items: [1, 2, 3, 4, 5].map((i) => ({ label: `(Insert step ${i})`, text: "(Insert one-line description)" })), center: "(Insert loop name)" },
     (input) => ({ nodes: cycleNodes(input) }),
@@ -363,7 +408,8 @@ export function registerExtras(registry) {
     { items: [1, 2, 3, 4].map((i) => ({ name: `(Insert name ${i})`, role: "(Insert role)", points: ["(Insert relevant experience)", "(Insert responsibility)"] })) },
     (input) => ({ nodes: peopleNodes(input) }),
     ({ frame, props }) => peopleLayout(frame, props),
-    { useWhen: "introducing two to five people (a team, a steering group, interviewees) with a role and a line or two each", why: "equal cards with a portrait make the group read as a unit; centred content keeps the cards calm", actionTitle: "state why this group is the right one for the work" });
+    { useWhen: "introducing two to five people (a team, a steering group, interviewees) with a role and a line or two each", why: "equal cards with a portrait make the group read as a unit; centred content keeps the cards calm", actionTitle: "state why this group is the right one for the work" },
+    ({ frame, props }) => grownPeople(frame, props).height);
   define("logos", "media", { width: 1160, height: 300 },
     { items: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => ({ name: `(Insert logo ${i})`, caption: i % 2 ? "(Insert segment)" : null })) },
     (input) => ({ nodes: logosNodes(input) }),

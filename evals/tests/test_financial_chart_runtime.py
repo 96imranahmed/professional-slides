@@ -39,7 +39,7 @@ class FinancialChartRuntimeTests(unittest.TestCase):
     def test_signed_peer_bars_share_physical_scale_when_only_one_has_losses(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const slide={id:'s',title:'One offer cannot fund both savings goals',layout:'two-up',exhibits:[[8,-12],[39,8]].map((values,i)=>({type:'chart.bar',heading:i?'New York residual':'London residual',unit:'£k',categories:['First goal','Second goal'],series:[{name:'Residual',values}],dataTable:false,valueFormat:{decimals:1}}))};
 const {deck}=planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'peer-bars',slides:[slide]}));
@@ -52,7 +52,7 @@ console.log('{}');
     def test_paired_signed_charts_share_the_complete_numeric_domain(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {composeSlide,toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const walk=item=>[item,...(item.items||[]).flatMap(walk)];
 for(const [type,series,min,max] of [
@@ -89,11 +89,18 @@ console.log(JSON.stringify({accepted:true}));
         result = run_node("""
 import assert from 'node:assert/strict';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
+// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
+const describes=new Set(),asked=[];
+const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
+const read=(fn)=>withJudgements(reader,fn);
 const frame={x:60,y:60,width:1000,height:500};
 const title=REGISTRY.get('chart-title');
 const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
-const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','Revenue doubled','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
+// A heading with no figure in it ("Revenue doubled") is not asked about: the figure is what the notation reads.
+const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
 invalid.push('Net employment change to 2030: +16%', 'Reported Gini change versus 2016: one percent', 'Revenue to 2030.5', 'Revenue versus 2016%', 'Disrupted workers within one year: 25%');
+read(()=>{
 for(const heading of invalid) {
  assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
  assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
@@ -105,6 +112,7 @@ for(const heading of invalid) {
 for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025','Revenue FY14','FY14–FY17 average earnings impact','Revenue FY14–17','Revenue FY2014–2017']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
 }
+describes.add('homicides per 100,000');
 for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000','baseline = 100','index, base = 1']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}));
 }
@@ -116,6 +124,7 @@ for(const heading of ['Net employment change to 2030, midpoint adoption','Report
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading}}));
  assert.doesNotThrow(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}));
 }
+describes.add('Disrupted workers within 1 year, %');
 for(const unit of ['Disrupted workers within one year, %','Disrupted workers within 1 year, %']) {
  assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}));
 }
@@ -124,6 +133,9 @@ for(const unit of ['Disrupted workers within one year, 25%','Disrupted workers w
 }
 // The action title remains free to state a quantified conclusion.
 assert.doesNotThrow(()=>REGISTRY.get('section-heading').render({id:'section',frame,props:{heading:'Homicides fell 20%'}}));
+});
+// With no answer recorded, nothing is refused: the question waits.
+assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'NYPD: 382 to 305'}}));
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
@@ -133,13 +145,21 @@ console.log(JSON.stringify({accepted:true}));
         # same message that asked for an explicit period.
         result = run_node("""
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
+// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
+const describes=new Set(),asked=[];
+const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
+const read=(fn)=>withJudgements(reader,fn);
 const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
-const accepted=heading=>{try{title.render({id:'t',frame,props:{heading}});return true;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return false;}};
+const accepted=heading=>read(()=>{try{title.render({id:'t',frame,props:{heading}});return true;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return false;}});
+// A year names the period unless its notation makes it a value (after a colon, a sign or "=", or with a decimal or a unit):
+// the periods are set aside without a question, and a reader takes every figure left for a result.
 const periods=['Destinations, today and 2030 goal','2030 target capacity','Seats, 2024 vs 2030 plan','Capacity 2019 and 2030','Fleet by 2030','Passengers FY26','Revenue 2025-26','Revenue Q3 2025','Balance at 31 March 2026','Balance as of 2026-03-31','Balance on 31/03/2026','Balance at March 31, 2026'];
-const results=['Revenue +12%','Revenue up 3.4x','Revenue up 12x','Revenue fell 20%','Revenue $1.2bn','Revenue 5bn','Share 45%','NYPD: 2025','Homicides fell 2015','Revenue of 2030','Revenue, 2025.5','Revenue versus 2016%','Margin up 40pp'];
-console.log(JSON.stringify({refusedPeriods:periods.filter(h=>!accepted(h)),acceptedResults:results.filter(accepted)}));
+const results=['Revenue +12%','Revenue up 3.4x','Revenue up 12x','Revenue fell 20%','Revenue $1.2bn','Revenue 5bn','Share 45%','NYPD: 2025','Revenue, 2025.5','Revenue versus 2016%','Margin up 40pp'];
+const refusedPeriods=periods.filter(h=>!accepted(h)), unasked=[...asked];
+console.log(JSON.stringify({refusedPeriods,unasked,acceptedResults:results.filter(accepted)}));
 """)
-        self.assertEqual(result, {"refusedPeriods": [], "acceptedResults": []})
+        self.assertEqual(result, {"refusedPeriods": [], "unasked": [], "acceptedResults": []})
 
     def test_chart_titles_accept_rank_scales_and_set_sizes_and_name_the_result_they_refuse(self):
         # "rank, 1 = best" and "busiest day 2 August 2026, top 40" describe the
@@ -147,9 +167,16 @@ console.log(JSON.stringify({refusedPeriods:periods.filter(h=>!accepted(h)),accep
         # refused, with the figure named so the author knows what to move.
         result = run_node("""
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
+// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
+const describes=new Set(),asked=[];
+const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
+const read=(fn)=>withJudgements(reader,fn);
 const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
-const refusal=props=>{try{title.render({id:'t',frame,props});return null;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return error.message;}};
+const refusal=props=>read(()=>{try{title.render({id:'t',frame,props});return null;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return error.message;}});
+// A set size is a figure the notation does not settle: it is read, and a reader takes these for the set the chart shows.
 const headings=['Hub connectivity index, busiest day 2 August 2026, top 40',"World's Top 100 airlines, rank (1 = best)",'Largest 20 carriers by seats, Sep 2026'];
+headings.forEach((h)=>describes.add(h));
 const units=['rank, 1 = best','rank (1 = best)','ranking; 1 = highest'];
 const results=["Passengers: actual and required path to the leader's 53.2m",'Revenue +12%','Revenue up 3.4x','Revenue $1.2bn','Revenue fell 20%','NYPD: 2025','Top 40%','Top 3 grew 40%','Top 10.5'];
 const badUnits=['rank, 1 = best, 3.2','rank, 2 = best'];
@@ -601,7 +628,9 @@ for(const categories of [['A','B'],['B','A']]) {
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);
 assert.throws(()=>render('chart.stacked-column',base),/two unstacked series/);
-assert.throws(()=>render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}),/two unstacked series/);
+// Three series or more take a named subject too: it in the primary, the peers in the comparator grey.
+const three=render('chart.column',{...base,series:[...base.series,{name:'Third',values:[20,30]}]}).filter(n=>n.role==='chart-mark');
+assert.deepEqual([...new Set(three.filter(n=>n.data.series!==base.focusSeries).map(n=>n.style.fill.tokenId))],['color.chartComparator']);
 const explicit=render('chart.column',{...base,focusSeries:undefined,colorIndices:[2,4]}).filter(n=>n.role==='chart-mark');
 assert.deepEqual([...new Set(explicit.map(n=>n.style.fill.tokenId))],['color.chartSeries3','color.chartSeries5']);
 console.log(JSON.stringify({accepted:true}));
@@ -618,7 +647,7 @@ import assert from 'node:assert/strict';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs';
-import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {changeFromContent} from './evals/support/compose.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
 const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];

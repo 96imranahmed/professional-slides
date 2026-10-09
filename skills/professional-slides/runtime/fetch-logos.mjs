@@ -6,7 +6,9 @@
 //   node runtime/fetch-logos.mjs <id>.deck.json --dry-run  report what would be fetched
 //   node runtime/fetch-logos.mjs <id>.deck.json --hint airline   steer ambiguous names
 //
-// For each entry in `players` whose logo is still `{ alt }`, the script finds
+// For each entry in `players` marked by a logo (players.mjs: the default; a
+// place marked by its outline needs no file, and a thing marked by its
+// photograph is fetch-pictures.mjs's) whose logo is still `{ alt }`, the script finds
 // the player's Wikipedia article (the entry's `wikipedia` title, or a search on
 // its name plus `logoHint`), reads the logo file named in the article's
 // infobox, and downloads a 512px PNG rendering of it. Every `{ alt: "<name>
@@ -16,8 +18,10 @@
 // the deck may use it is the author's call, as for any picture.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJson } from "./cli.mjs";
 import { spawn } from "node:child_process";
+import { judged } from "./judgements.mjs";
+import { logoPlayers } from "./players.mjs";
 
 export const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
 const API = "https://en.wikipedia.org/w/api.php";
@@ -37,14 +41,23 @@ export async function articlesFor(player, hint) {
   return (found.query?.search || []).map((hit) => hit.title);
 }
 
-/** The logo file named in an article's infobox (`logo =`, else `image =` when it is a logo). */
-export function logoFileFrom(wikitext) {
+/**
+ * The logo file named in an article's infobox: its `logo =` field, else its
+ * `image =` field where that file is the organisation's logo. Whether it is -
+ * an infobox's image is as often a photograph of the place or the fleet - is
+ * read off the file's name (file-is-logo, judgements.mjs); unread, it is not
+ * taken.
+ */
+export function logoFileFrom(wikitext, organisation = null) {
   const field = (name) => wikitext.match(new RegExp(`\\|\\s*${name}\\s*=\\s*(?:\\[\\[)?(?:File:|Image:)?([^|\\]\\n]+?\\.(?:svg|png|jpe?g|gif))`, "i"))?.[1]?.trim();
-  return field("logo") ?? field("logo_image") ?? (field("image") && /logo|wordmark/i.test(field("image")) ? field("image") : null);
+  const named = field("logo") ?? field("logo_image");
+  if (named) return named;
+  const image = field("image");
+  return image && organisation && judged("file-is-logo", { organisation, file: image }, null, organisation)?.verdict === "logo" ? image : null;
 }
 
 // Crop a logo to its mark. Infobox logos often sit in a wide transparent or
-// white margin, so a square mark letterboxed into a wordmark slot came out a
+// white margin, so a square mark letterboxed into a wordmark slot comes out a
 // third of the size of its neighbours. Pillow ships with python-pptx.
 const TRIM = `
 import sys
@@ -66,7 +79,7 @@ if box:
 `;
 
 /** Trim a logo file to its mark in place; true when it was cropped. Never throws. */
-export function trimLogo(file, python = process.env.RUNTIME_PYTHON || "python3") {
+export function trimLogo(file, python = pythonBin()) {
   return new Promise((resolve) => {
     const child = spawn(python, ["-c", TRIM, file], { stdio: ["ignore", "pipe", "ignore"] });
     let out = "";
@@ -87,7 +100,7 @@ export async function fetchLogo(player, directory, hint) {
   let title = null, file = null;
   for (const candidate of titles) {
     const parsed = await api({ action: "parse", page: candidate, prop: "wikitext", section: "0", redirects: "1" });
-    file = logoFileFrom(parsed.parse?.wikitext ?? "");
+    file = logoFileFrom(parsed.parse?.wikitext ?? "", player.name);
     if (file) { title = candidate; break; }
   }
   if (!file) return { name: player.name, article: titles[0], error: "no logo in the infobox of the top search results; set `wikipedia` on the player" };
@@ -128,10 +141,10 @@ export function fillLogos(spec, fetched, baseDir) {
  * report. Returns what was filled and what failed.
  */
 export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true } = {}) {
-  const players = (spec.players || []).map((p) => typeof p === "string" ? { name: p } : p).filter((p) => p?.name && !(p.logo && (p.logo.path || p.logo.dataUri)));
+  const players = logoPlayers(spec.players);
   if (!players.length) return { filled: 0, fetched: [], failed: [] };
   const directory = path.join(baseDir, "assets", "logos");
-  const records = new Map((await fs.readFile(path.join(directory, "sources.json"), "utf8").then(JSON.parse).catch(() => [])).map((r) => [r.name, r]));
+  const records = new Map(((await readJson(path.join(directory, "sources.json"), { optional: true })) ?? []).map((r) => [r.name, r]));
   const results = [];
   for (const player of players) {
     const slug = slugOf(player.name);
@@ -146,32 +159,34 @@ export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true }
   const fresh = results.filter((r) => r.path && r.article);
   if (fresh.length) {
     for (const { path: p, ...rest } of fresh) records.set(rest.name, { ...rest, saved: path.relative(baseDir, p) });
-    await fs.writeFile(path.join(directory, "sources.json"), JSON.stringify([...records.values()], null, 2) + "\n");
+    await writeJson(path.join(directory, "sources.json"), [...records.values()]);
   }
   return { filled: fillLogos(spec, results, baseDir), fetched: results.filter((r) => r.path).map((r) => r.name), failed: results.filter((r) => !r.path).map((r) => `${r.name}: ${r.error}`) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [specArg, ...flags] = process.argv.slice(2);
-  if (!specArg) { console.error("Usage: fetch-logos.mjs <id>.deck.json [--hint word] [--dry-run]"); process.exit(1); }
+const USAGE = "Usage: fetch-logos.mjs <id>.deck.json [--hint word] [--dry-run]";
+
+async function main(argv) {
+  const { values, positionals: [specArg] } = parseCli(argv, { hint: { type: "string" }, "dry-run": { type: "boolean" } }, { usage: USAGE });
+  if (!specArg) throw new UsageError(USAGE);
   const specPath = path.resolve(specArg), baseDir = path.dirname(specPath);
-  const at = flags.indexOf("--hint"), hint = at >= 0 ? flags[at + 1] : undefined;
-  const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
-  const players = (spec.players || []).map((p) => typeof p === "string" ? { name: p } : p)
-    .filter((p) => p?.name && !(p.logo && (p.logo.path || p.logo.dataUri)));
-  if (flags.includes("--dry-run")) { console.log(JSON.stringify({ toFetch: players.map((p) => p.name) })); process.exit(0); }
+  const spec = await readJson(specPath);
+  const players = logoPlayers(spec.players);
+  if (values["dry-run"]) { console.log(JSON.stringify({ toFetch: players.map((p) => p.name) })); return; }
   const directory = path.join(baseDir, "assets", "logos");
   await fs.mkdir(directory, { recursive: true });
   const fetched = [];
   for (const player of players) {
-    try { fetched.push(await fetchLogo(player, directory, hint)); } catch (error) { fetched.push({ name: player.name, error: error.message }); }
+    try { fetched.push(await fetchLogo(player, directory, values.hint)); } catch (error) { fetched.push({ name: player.name, error: error.message }); }
   }
   const filled = fillLogos(spec, fetched, baseDir);
-  await fs.writeFile(specPath, JSON.stringify(spec, null, 1) + "\n");
+  await writeJson(specPath, spec);
   // One record per player, kept across runs.
   const recordPath = path.join(directory, "sources.json");
-  const records = new Map((await fs.readFile(recordPath, "utf8").then(JSON.parse).catch(() => [])).map((r) => [r.name, r]));
+  const records = new Map(((await readJson(recordPath, { optional: true })) ?? []).map((r) => [r.name, r]));
   for (const { path: p, ...rest } of fetched) records.set(rest.name, { ...rest, saved: p ? path.relative(baseDir, p) : null });
-  await fs.writeFile(recordPath, JSON.stringify([...records.values()], null, 2) + "\n");
+  await writeJson(recordPath, [...records.values()]);
   console.log(JSON.stringify({ fetched: fetched.filter((f) => f.path).map((f) => f.name), failed: fetched.filter((f) => !f.path).map((f) => `${f.name}: ${f.error}`), placeholdersFilled: filled }, null, 1));
 }
+
+if (isMain(import.meta.url)) runCli(main);

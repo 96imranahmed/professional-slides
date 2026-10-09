@@ -107,12 +107,13 @@ export function resolveQuoteClusterVariant(props = {}) {
   return `${count}-${treatment}-${arrangement}-${placement === "section" ? "section" : "full"}${outside}${props.avatar === true ? "-avatar" : ""}${alignment}`;
 }
 
-function fitText({ id, role, frame, text, fontSize, color = INK, bold = false, align = "left", valign = "top", fontFamily = BODY_FONT, data = {} }) {
+// A text node set at its size in its frame, or a refusal: unlike text-style.mjs
+// `fitText`, it never steps the size down.
+function framedText({ id, role, frame, text, fontSize, color = INK, bold = false, align = "left", valign = "top", fontFamily = BODY_FONT, data = {} }) {
   const layout = measureText(text, frame.width, {
     fontFamily: tokenValue(fontFamily),
     fontSize: tokenValue(fontSize),
-    bold,
-    wrapWidthRatio: 1
+    bold
   });
   if (layout.height > frame.height) throw new Error(`${id} exceeds its quote text frame; shorten the source excerpt or enlarge the cluster`);
   const y = frame.y + (valign === "mid" ? (frame.height - layout.height) / 2 : valign === "bottom" ? frame.height - layout.height : 0);
@@ -185,8 +186,8 @@ function calloutCaretCenter(frame, attributionPlacement) {
 
 // A quotation's box is a card (core.mjs cardFill): under the reference weight
 // it is the filled surface with no outline, as a pillar card is. A muted grey
-// box with a hairline was 15 grey levels off white - four of them made a page
-// that read as empty with type on it.
+// box with a hairline is 15 grey levels off white - four of them make a page
+// that reads as empty with type on it.
 
 function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar) {
   const bodyFrame = { ...frame, height: surfaceHeight(frame, treatment, count, avatar) };
@@ -234,7 +235,7 @@ function attributionNodes({ id, frame, item, count, treatment, attributionPlacem
   if (showAvatar) {
     const avatarFrame = { x: leftBase, y, width: avatarSize, height: avatarSize };
     nodes.push(item.portrait ? portraitPrimitive({ id: stableId(id, "avatar"), frame: avatarFrame, portrait: item.portrait, data }) : ellipsePrimitive({ id: stableId(id, "avatar"), role: "quote-avatar", frame: avatarFrame, style: { fill: MUTED, stroke: RULE, lineWidth: HAIRLINE, radius: ROUND }, data }));
-    if (item.avatarText && !item.portrait) nodes.push(fitText({
+    if (item.avatarText && !item.portrait) nodes.push(framedText({
       id: stableId(id, "avatar-label"), role: "quote-avatar-label", frame: avatarFrame, text: item.avatarText,
       fontSize: token("type.label"), color: INK, bold: true, align: "center", valign: "mid",
       data
@@ -243,8 +244,8 @@ function attributionNodes({ id, frame, item, count, treatment, attributionPlacem
   const nameHeight = count === 1 && item.detail ? 32 : item.detail ? height / 2 : height;
   const detailHeight = height - nameHeight;
   const attributionFrame = { x: contentX, y, width: contentWidth, height: nameHeight };
-  nodes.push(fitText({ id: stableId(id, "attribution"), role: "quote-attribution", frame: attributionFrame, text: item.attribution, fontSize: count === 1 ? token("type.body") : token("type.label"), color: INK, bold: true, align, valign: "top", data }));
-  if (item.detail) nodes.push(fitText({ id: stableId(id, "detail"), role: "quote-detail", frame: { x: contentX, y: y + nameHeight, width: contentWidth, height: detailHeight }, text: item.detail, fontSize: count === 1 ? token("type.label") : token("type.source"), color: SECONDARY, align, valign: "top", data }));
+  nodes.push(framedText({ id: stableId(id, "attribution"), role: "quote-attribution", frame: attributionFrame, text: item.attribution, fontSize: count === 1 ? token("type.body") : token("type.label"), color: INK, bold: true, align, valign: "top", data }));
+  if (item.detail) nodes.push(framedText({ id: stableId(id, "detail"), role: "quote-detail", frame: { x: contentX, y: y + nameHeight, width: contentWidth, height: detailHeight }, text: item.detail, fontSize: count === 1 ? token("type.label") : token("type.source"), color: SECONDARY, align, valign: "top", data }));
   return nodes;
 }
 
@@ -267,7 +268,7 @@ function quoteItemNodes({ id, frame, item, index, count, treatment, placement, a
   const bodyTop = markY + markFrame.height - tokenValue(token("space.1"));
   const bodyBottom = Math.min(attributionTop - tokenValue(token(speechBubble ? "space.1" : "space.3")), surfaceBottom - inset);
   const bodyFont = placement === "section" ? token("type.compact") : count === 1 ? token("type.sectionTitle") : count === 2 || speechBubble ? token("type.heading") : count === 3 ? token("type.body") : token("type.compact");
-  nodes.push(fitText({
+  nodes.push(framedText({
     id: stableId(id, "body"), role: "quote-body",
     frame: { x: bodyX, y: bodyTop, width: frame.x + frame.width - bodyRightInset - bodyX, height: Math.max(1, bodyBottom - bodyTop) },
     text: item.quote, fontSize: bodyFont, color: INK,

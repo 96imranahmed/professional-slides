@@ -4,34 +4,36 @@
  *
  *   node evals/scripts/compile_scene.mjs <spec.json> <scene-out.json>
  *
- * The spec's `deckPlan` goes through the planner; the scene that comes back is
- * what the emitter and the page gates both read. Prints one line of counters so
- * a failed compile is visible in CI output.
+ * A deck/v3 spec is composed first; a planner plan (`{ id, slides }`) goes to
+ * the planner as it is. The scene that comes back is what the emitter and the
+ * page gates both read. Prints one line of counters so a failed compile is
+ * visible in CI output.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { planDeck } from "../../skills/professional-slides/runtime/planner.mjs";
+import { toDeckPlan } from "../support/compose.mjs";
+import { metricsBackend } from "../../skills/professional-slides/runtime/font-metrics.mjs";
+import { isMain, parseCli, readJsonSync, runCli } from "../../skills/professional-slides/runtime/cli.mjs";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const runtime = path.resolve(here, "..", "..", "skills", "professional-slides", "runtime");
-const { planDeck } = await import(path.join(runtime, "planner.mjs"));
-const { toDeckPlan } = await import(path.join(runtime, "compose.mjs"));
-const { metricsBackend } = await import(path.join(runtime, "font-metrics.mjs"));
-
-const [, , specPath, outPath] = process.argv;
-if (!specPath || !outPath) {
-  console.error("usage: compile_scene.mjs <spec.json> <scene-out.json>");
-  process.exit(64);
+function main(argv) {
+  const [specPath, outPath] = parseCli(argv).positionals;
+  if (!specPath || !outPath) {
+    console.error("usage: compile_scene.mjs <spec.json> <scene-out.json>");
+    return 64;
+  }
+  const spec = readJsonSync(specPath);
+  const started = Date.now();
+  const plan = spec.schema === "professional-slides.deck/v3" ? toDeckPlan(spec, path.dirname(path.resolve(specPath))) : spec;
+  const { deck } = planDeck(plan);
+  console.log([
+    `metrics backend: ${metricsBackend()}`,
+    `slides: ${deck.slides.length}`,
+    `nodes: ${deck.slides.reduce((n, s) => n + s.nodes.length, 0)}`,
+    `ms: ${Date.now() - started}`
+  ].join(" | "));
+  // Compact, as build-deck writes it: only programs read a scene.
+  fs.writeFileSync(outPath, JSON.stringify(deck));
 }
-const spec = JSON.parse(fs.readFileSync(specPath, "utf8"));
-const started = Date.now();
-const plan = spec.schema === "professional-slides.deck/v3" || spec.deckPlan
-  ? toDeckPlan(spec, path.dirname(path.resolve(specPath))) : spec;
-const { deck } = planDeck(plan);
-console.log([
-  `metrics backend: ${metricsBackend()}`,
-  `slides: ${deck.slides.length}`,
-  `nodes: ${deck.slides.reduce((n, s) => n + s.nodes.length, 0)}`,
-  `ms: ${Date.now() - started}`
-].join(" | "));
-fs.writeFileSync(outPath, JSON.stringify(deck));
+
+if (isMain(import.meta.url)) runCli(main);

@@ -1,17 +1,18 @@
 // Period labels read as dates, so a chart can space them by the time between them.
 //
-// A fifty-page deck plotted a company's run rate at Jan, Mar, Jun, Aug, Oct,
-// Dec, Feb, Apr, May and Jul - gaps of one to three months - one slot apart,
-// so the line steepened where the observations happened to bunch rather than
-// where the growth did. A line or an area is a statement about rate, and its
-// horizontal axis is elapsed time: the chart reads the labels as dates and
-// places each observation where it falls (charts.mjs); a column chart, whose
-// slots are categories, is refused irregular dates at compile unless its
-// heading says they are snapshots (page-types.mjs).
+// A run rate observed at Jan, Mar, Jun, Aug, Oct, Dec, Feb, Apr, May and Jul -
+// gaps of one to three months - and plotted one slot apart steepens where the
+// observations happen to bunch rather than where the growth does. A line or an
+// area is a statement about rate, and its horizontal axis is elapsed time: the
+// chart reads the labels as dates and places each observation where it falls
+// (chart-line.mjs); a column chart, whose slots are categories, is refused
+// irregular dates at compile unless its heading says they are snapshots
+// (page-types.mjs).
 //
 // Only forms that read one way are parsed: a year (2025, 2025E, FY25), a
 // quarter or half (Q1 2025, 1Q25, H2 2025), a month with its year (Jan 2025,
-// Jan '25, Jan-25, 2025-01), a bare month run (Jan, Mar, Jun), an ISO date. A
+// Jan '25, Jan-25, 2025-01), a season (Summer 2019, Winter 2021-22, S19, W21),
+// a bare month run (Jan, Mar, Jun), an ISO date. A
 // label that parses as none of them, or a run that mixes kinds (years beside
 // quarters), is left on its categorical slots.
 
@@ -19,6 +20,8 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const monthOf = (name) => MONTHS.indexOf(name.slice(0, 3).toLowerCase());
 const year = (text) => { const n = Number(text); return text.length === 2 ? 2000 + n : n; };
+// Where a season stands in its schedule year, in months: spring and summer open it, autumn and winter close it.
+const SEASON_AT = Object.freeze({ spring: 0, summer: 0, autumn: 6, fall: 6, winter: 6 });
 
 /**
  * One period label as `{ kind, t }`: `t` in months from year zero, so every
@@ -31,6 +34,8 @@ export function parsePeriod(label) {
   if ((m = /^((?:19|20)\d{2})\s?[AEFPB]?$/i.exec(s))) return { kind: "year", t: Number(m[1]) * 12 };
   // A fiscal year: FY25, FY2025, FY'25, FY 25.
   if ((m = /^FY\s?'?(\d{2}|\d{4})[AEFPB]?$/i.exec(s))) return { kind: "year", t: year(m[1]) * 12 };
+  // A scenario's years counted from its start ("Year 1", "Year +2") are periods: a projection runs over them.
+  if ((m = /^Year\s?\+?(\d{1,2})$/i.exec(s))) return { kind: "year-offset", t: Number(m[1]) * 12 };
   // A split fiscal year whose second half is the next year: 2025-26, 2025/26.
   if ((m = /^((?:19|20)\d{2})[-–/](\d{2})$/.exec(s)) && (Number(m[1]) + 1) % 100 === Number(m[2])) return { kind: "year", t: Number(m[1]) * 12 };
   // A quarter: Q1 2025, Q1'25, Q1-25, Q1 FY25, 1Q25, 2025 Q1, 2025-Q1.
@@ -47,6 +52,15 @@ export function parsePeriod(label) {
   if ((m = /^((?:19|20)\d{2})[-/](0[1-9]|1[0-2])$/.exec(s))) return { kind: "month", t: Number(m[1]) * 12 + Number(m[2]) - 1 };
   // An ISO date: 2025-01-15, as a fraction of its month.
   if ((m = /^((?:19|20)\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.exec(s))) return { kind: "day", t: Number(m[1]) * 12 + Number(m[2]) - 1 + (Number(m[3]) - 1) / 31 };
+  // A season, as an airline or a school schedule names it: Summer 2019, Winter 2021-22 (2021/22), the schedule's S19 and
+  // W21, Spring and Autumn or Fall. Each is placed as a half of its schedule year - summer, then the winter that follows
+  // it - so a run of seasons is evenly spaced: a schedule's summer and winter are its halves, whatever their months.
+  if ((m = /^(summer|winter|spring|autumn|fall)\s?((?:19|20)\d{2}|'?\d{2})(?:[-–/](\d{2}|\d{4}))?(?:\s+season)?$/i.exec(s))) {
+    const first = year(m[2].replace("'", ""));
+    if (m[3] !== undefined && year(m[3].length === 4 ? m[3] : m[3]) % 100 !== (first + 1) % 100) return null;
+    return { kind: "season", t: first * 12 + SEASON_AT[m[1].toLowerCase()] };
+  }
+  if ((m = /^([SW])\s?((?:19|20)\d{2}|\d{2})$/.exec(s))) return { kind: "season", t: year(m[2]) * 12 + (m[1] === "S" ? 0 : 6) };
   // A bare month: its year is the run's, read in order below.
   if ((m = new RegExp(`^${MONTH}\\.?$`, "i").exec(s))) return { kind: "bare-month", t: monthOf(m[1]) };
   return null;
@@ -138,4 +152,29 @@ export function describeGaps(categories) {
   const noun = unit === 12 ? "year" : "month";
   const fmt = (v) => String(Math.round(v * 10) / 10);
   return `${fmt(lo)}-${fmt(hi)} ${noun}s`;
+}
+
+/**
+ * A year-and-month label as a reader writes it: "2025-08" is "Aug 25". The
+ * ISO form is a data key; thirteen of them under a line read as a table of
+ * codes. Any other label is returned as it came.
+ */
+export function readablePeriod(label) {
+  const m = /^((?:19|20)\d{2})[-/](0[1-9]|1[0-2])$/.exec(String(label ?? "").trim());
+  if (!m) return label;
+  const month = MONTHS[Number(m[2]) - 1];
+  return `${month[0].toUpperCase()}${month.slice(1)} ${m[1].slice(2)}`;
+}
+
+/**
+ * How many months apart a monthly axis labels its ticks: every month up to
+ * nine, a quarter up to two years, a half-year up to four, then a year. A
+ * label on each of thirteen months set them shoulder to shoulder; a quarterly
+ * tick reads the run at a glance and the line keeps every observation.
+ */
+export function monthlyLabelStep(categories) {
+  const times = periodTimes(categories);
+  if (!times || times.kind !== "month" || times.gaps.some((gap) => gap !== 1)) return 1;
+  const n = categories.length;
+  return n <= 9 ? 1 : n <= 25 ? 3 : n <= 49 ? 6 : 12;
 }

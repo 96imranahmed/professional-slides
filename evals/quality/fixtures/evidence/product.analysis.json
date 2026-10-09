@@ -1,0 +1,37 @@
+{
+ "schema": "professional-slides.analysis/v1",
+ "analyses": [
+  {
+   "id": "C-rivals",
+   "op": "compare",
+   "inputs": [
+    "p-rivals/retention",
+    "p-rivals/price",
+    "p-rivals/integrations"
+   ],
+   "soWhat": "Lumen leads on one of three measures, so the strategy rests on retention",
+   "strength": "strong"
+  },
+  {
+   "id": "C-lift",
+   "op": "gap",
+   "inputs": [
+    "p-retention/new-onboarding",
+    "p-retention/old-onboarding"
+   ],
+   "soWhat": "The retention lift widens every month after signup",
+   "strength": "strong"
+  },
+  {
+   "id": "C-paid",
+   "op": "ratio",
+   "inputs": [
+    "p-paid/paying",
+    "p-paid/active"
+   ],
+   "percent": true,
+   "soWhat": "Conversion to paid has more than doubled",
+   "strength": "strong"
+  }
+ ]
+}

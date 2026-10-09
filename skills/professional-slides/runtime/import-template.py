@@ -42,6 +42,11 @@ except ImportError:  # pragma: no cover
 
 from lxml import etree
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "gates"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "emit"))
+from color import contrast, luminance  # noqa: E402
+from text_stats import word_count  # noqa: E402
+
 NS = {
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
     "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
@@ -57,18 +62,6 @@ def hex6(value: str | None) -> str | None:
         return None
     value = value.strip().lstrip("#").upper()
     return value if re.fullmatch(r"[0-9A-F]{6}", value) else None
-
-
-def luminance(hex_color: str) -> float:
-    r, g, b = (int(hex_color[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in (r, g, b)]
-    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
-
-
-def contrast(a: str, b: str) -> float:
-    la, lb = luminance(a), luminance(b)
-    hi, lo = max(la, lb), min(la, lb)
-    return (hi + 0.05) / (lo + 0.05)
 
 
 def saturation(hex_color: str) -> float:
@@ -208,123 +201,144 @@ def walk(shapes):
 GRID = 40
 GRID_COLUMNS, GRID_ROWS = 32, 18
 BODY_ROW = 4
+TITLE_KINDS = ("title", "center_title", "ctrtitle")
 
 
-def analyse(path: Path, base: str) -> dict:
-    prs = Presentation(str(path))
-    scale_x = PAGE_W / (prs.slide_width / 914400 * 96)
-    scale_y = PAGE_H / (prs.slide_height / 914400 * 96)
-    observations: list[str] = []
-    theme_colors, theme_fonts = read_theme(theme_part(prs))
+def is_picture(shape) -> bool:
+    return shape.shape_type is not None and "PICTURE" in str(shape.shape_type)
 
-    # --- master and layouts: placeholders, footer, logo ------------------
-    master = prs.slide_masters[0]
-    title_frames, body_frames, footer_frames, number_frames, logo_frames, master_lines, master_bands = [], [], [], [], [], [], []
-    company = None
-    title_style_bold = None
-    master_shapes = list(master.shapes) + [s for layout in master.slide_layouts for s in layout.shapes]
-    for shape in master_shapes:
+
+class Masters:
+    """What the slide master and its layouts say: where the placeholders sit,
+    the rules and bands they draw, the footer's company name, the title weight."""
+
+    def __init__(self, prs, scale_x: float, scale_y: float):
+        self.title_frames, self.body_frames, self.footer_frames, self.number_frames = [], [], [], []
+        self.logo_frames, self.lines, self.bands = [], [], []
+        self.company = None
+        self.title_bold = None
+        master = prs.slide_masters[0]
+        for shape in list(master.shapes) + [s for layout in master.slide_layouts for s in layout.shapes]:
+            self.read(shape, (px(shape.left or 0, scale_x), px(shape.top or 0, scale_y), px(shape.width or 0, scale_x), px(shape.height or 0, scale_y)))
+        # The master's title style (lstStyle) may set bold or size without runs.
+        try:
+            tstyle = master._element.find(".//p:titleStyle/a:lvl1pPr/a:defRPr", NS)
+            if tstyle is not None and self.title_bold is None and tstyle.get("b") is not None:
+                self.title_bold = tstyle.get("b") == "1"
+        except Exception:
+            pass
+
+    def read(self, shape, frame):
         kind = placeholder_kind(shape)
-        frame = (px(shape.left or 0, scale_x), px(shape.top or 0, scale_y), px(shape.width or 0, scale_x), px(shape.height or 0, scale_y))
-        if kind in ("title", "center_title", "ctrtitle"):
-            title_frames.append(frame)
-            if title_style_bold is None:
-                title_style_bold = run_bold(shape)
+        if kind in TITLE_KINDS:
+            self.title_frames.append(frame)
+            if self.title_bold is None:
+                self.title_bold = run_bold(shape)
         elif kind in ("body", "obj", "object", "subtitle"):
-            body_frames.append(frame)
+            self.body_frames.append(frame)
         elif kind in ("footer", "ftr"):
-            footer_frames.append(frame)
-            if not company and text_of(shape).strip():
-                company = text_of(shape).strip()
+            self.footer_frames.append(frame)
+            if not self.company and text_of(shape).strip():
+                self.company = text_of(shape).strip()
         elif kind in ("slide_number", "sldnum"):
-            number_frames.append(frame)
-        elif shape.shape_type is not None and "PICTURE" in str(shape.shape_type):
-            logo_frames.append(frame)
+            self.number_frames.append(frame)
+        elif is_picture(shape):
+            self.logo_frames.append(frame)
         elif shape.shape_type is not None and ("LINE" in str(shape.shape_type) or "CONNECTOR" in str(shape.shape_type)):
-            master_lines.append(frame)
+            self.lines.append(frame)
         elif shape.shape_type is not None and "AUTO_SHAPE" in str(shape.shape_type) and solid_fill_hex(shape):
-            master_bands.append((frame, solid_fill_hex(shape)))
-    # The master's title style (lstStyle) may set bold or size without runs.
-    try:
-        tstyle = master._element.find(".//p:titleStyle/a:lvl1pPr/a:defRPr", NS)
-        if tstyle is not None and title_style_bold is None and tstyle.get("b") is not None:
-            title_style_bold = tstyle.get("b") == "1"
-    except Exception:
-        pass
+            self.bands.append((frame, solid_fill_hex(shape)))
 
-    # --- content slides ----------------------------------------------------
-    slides = list(prs.slides)
-    words, shapes_per_slide, charts, tables, pictures = [], [], 0, 0, 0
-    # How much of each page's body the house actually covers: the union of the
-    # shape boxes below the title band, on a coarse grid. A house whose pages are
-    # two thirds covered expects a deck that fills its columns.
-    coverage = []
-    title_sizes, body_sizes, fills = [], [], collections.Counter()
-    slide_titles = []
-    slide_title_frames, slide_body_frames = [], []
-    footer_texts = collections.Counter()
-    for slide in slides:
-        count = 0
-        slide_words = 0
-        covered = set()
-        for shape in walk(slide.shapes):
-            count += 1
-            kind = placeholder_kind(shape)
-            # Footer copy repeated on most pages (a document title, a company
-            # name) sits in the bottom tenth of the page.
-            if shape.top is not None and px(shape.top, scale_y) > PAGE_H * 0.9:
-                ft = text_of(shape).strip()
-                if ft and not re.fullmatch(r"[\d\s|/–-]+", ft) and len(ft) < 80:
-                    footer_texts[ft] += 1
-            if kind in ("title", "center_title", "ctrtitle") and shape.width and shape.top is not None and px(shape.top, scale_y) < PAGE_H * 0.35:
-                slide_title_frames.append((px(shape.left or 0, scale_x), px(shape.top, scale_y), px(shape.width, scale_x), px(shape.height or 0, scale_y)))
-            elif kind in ("body", "obj", "object") and shape.width and shape.top is not None:
-                slide_body_frames.append((px(shape.left or 0, scale_x), px(shape.top, scale_y), px(shape.width, scale_x), px(shape.height or 0, scale_y)))
-            if getattr(shape, "has_chart", False) and shape.has_chart:
-                charts += 1
-            if getattr(shape, "has_table", False) and shape.has_table:
-                tables += 1
-            if shape.shape_type is not None and "PICTURE" in str(shape.shape_type):
-                pictures += 1
-            text = text_of(shape)
+
+class ContentSlides:
+    """What the content slides carry: words, shapes, charts, tables and
+    pictures a slide, the fills they use, their type sizes, where their titles
+    and bodies sit, the footer copy they repeat, and how much of each body the
+    house covers."""
+
+    def __init__(self, slides, scale_x: float, scale_y: float):
+        self.scale_x, self.scale_y = scale_x, scale_y
+        self.words, self.shapes_per_slide, self.charts, self.tables, self.pictures = [], [], 0, 0, 0
+        # How much of each page's body the house actually covers: the union of the
+        # shape boxes below the title band, on a coarse grid. A house whose pages are
+        # two thirds covered expects a deck that fills its columns.
+        self.coverage = []
+        self.title_sizes, self.body_sizes, self.fills = [], [], collections.Counter()
+        self.titles = []
+        self.title_frames, self.body_frames = [], []
+        self.footer_texts = collections.Counter()
+        for slide in slides:
+            count = 0
+            slide_words = 0
+            covered = set()
+            for shape in walk(slide.shapes):
+                count += 1
+                slide_words += self.read(shape, covered)
+            self.shapes_per_slide.append(count)
+            self.words.append(slide_words)
+            body_cells = GRID_COLUMNS * (GRID_ROWS - BODY_ROW)
+            if body_cells and count:
+                self.coverage.append(len(covered) / float(body_cells))
+
+    def frame(self, shape):
+        sx, sy = self.scale_x, self.scale_y
+        return (px(shape.left or 0, sx), px(shape.top, sy), px(shape.width, sx), px(shape.height or 0, sy))
+
+    def read(self, shape, covered: set) -> int:
+        """Record one shape; the words it carries."""
+        sx, sy = self.scale_x, self.scale_y
+        kind = placeholder_kind(shape)
+        # Footer copy repeated on most pages (a document title, a company
+        # name) sits in the bottom tenth of the page.
+        if shape.top is not None and px(shape.top, sy) > PAGE_H * 0.9:
+            ft = text_of(shape).strip()
+            if ft and not re.fullmatch(r"[\d\s|/–-]+", ft) and len(ft) < 80:
+                self.footer_texts[ft] += 1
+        if kind in TITLE_KINDS and shape.width and shape.top is not None and px(shape.top, sy) < PAGE_H * 0.35:
+            self.title_frames.append(self.frame(shape))
+        elif kind in ("body", "obj", "object") and shape.width and shape.top is not None:
+            self.body_frames.append(self.frame(shape))
+        chart = getattr(shape, "has_chart", False) and shape.has_chart
+        if chart:
+            self.charts += 1
+        if getattr(shape, "has_table", False) and shape.has_table:
+            self.tables += 1
+        if is_picture(shape):
+            self.pictures += 1
+        text = text_of(shape)
+        words = word_count(text)
+        if kind in TITLE_KINDS:
+            self.title_sizes.extend(run_sizes(shape))
             if text.strip():
-                slide_words += len(text.split())
-            if kind in ("title", "center_title", "ctrtitle"):
-                title_sizes.extend(run_sizes(shape))
-                if text.strip():
-                    slide_titles.append(text.strip())
-            elif text.strip():
-                body_sizes.extend(run_sizes(shape))
-            text_for_coverage = text_of(shape)
-            text = text_for_coverage
-            grouping = shape.shape_type is not None and "GROUP" in str(shape.shape_type)
-            carries = bool(text.strip()) or getattr(shape, "has_chart", False) or getattr(shape, "has_table", False) or (shape.shape_type is not None and "PICTURE" in str(shape.shape_type)) or solid_fill_hex(shape)
-            if shape.width and shape.height and shape.top is not None and carries and not grouping:
-                x0, y0 = px(shape.left or 0, scale_x), px(shape.top, scale_y)
-                x1, y1 = x0 + px(shape.width, scale_x), y0 + px(shape.height, scale_y)
-                if (x1 - x0) * (y1 - y0) > PAGE_W * PAGE_H * 0.55:
-                    x1 = x0  # a background or a full-page frame is not coverage
-                for gx in range(max(0, int(x0 // GRID)), min(GRID_COLUMNS, int(x1 // GRID) + 1)):
-                    for gy in range(max(BODY_ROW, int(y0 // GRID)), min(GRID_ROWS, int(y1 // GRID) + 1)):
-                        covered.add((gx, gy))
-            fill = solid_fill_hex(shape)
-            if fill and fill not in ("FFFFFF", "000000") and luminance(fill) < 0.85:
-                fills[fill] += 1
-            if getattr(shape, "has_chart", False) and shape.has_chart:
-                try:
-                    for series in shape.chart.plots[0].series:
-                        srgb = series._element.find(".//a:solidFill/a:srgbClr", NS)
-                        if srgb is not None and hex6(srgb.get("val")):
-                            fills[hex6(srgb.get("val"))] += 2
-                except Exception:
-                    pass
-        shapes_per_slide.append(count)
-        words.append(slide_words)
-        body_cells = GRID_COLUMNS * (GRID_ROWS - BODY_ROW)
-        if body_cells and count:
-            coverage.append(len(covered) / float(body_cells))
+                self.titles.append(text.strip())
+        elif text.strip():
+            self.body_sizes.extend(run_sizes(shape))
+        grouping = shape.shape_type is not None and "GROUP" in str(shape.shape_type)
+        carries = bool(text.strip()) or getattr(shape, "has_chart", False) or getattr(shape, "has_table", False) or is_picture(shape) or solid_fill_hex(shape)
+        if shape.width and shape.height and shape.top is not None and carries and not grouping:
+            x0, y0 = px(shape.left or 0, sx), px(shape.top, sy)
+            x1, y1 = x0 + px(shape.width, sx), y0 + px(shape.height, sy)
+            if (x1 - x0) * (y1 - y0) > PAGE_W * PAGE_H * 0.55:
+                x1 = x0  # a background or a full-page frame is not coverage
+            for gx in range(max(0, int(x0 // GRID)), min(GRID_COLUMNS, int(x1 // GRID) + 1)):
+                for gy in range(max(BODY_ROW, int(y0 // GRID)), min(GRID_ROWS, int(y1 // GRID) + 1)):
+                    covered.add((gx, gy))
+        fill = solid_fill_hex(shape)
+        if fill and fill not in ("FFFFFF", "000000") and luminance(fill) < 0.85:
+            self.fills[fill] += 1
+        if chart:
+            try:
+                for series in shape.chart.plots[0].series:
+                    srgb = series._element.find(".//a:solidFill/a:srgbClr", NS)
+                    if srgb is not None and hex6(srgb.get("val")):
+                        self.fills[hex6(srgb.get("val"))] += 2
+            except Exception:
+                pass
+        return words
 
-    # --- colours -----------------------------------------------------------
+
+def house_colors(theme_colors: dict, fills: collections.Counter, observations: list) -> tuple[dict, list]:
+    """The palette overlay, and the most used fills it was read from."""
     dk1, dk2 = theme_colors.get("dk1", "000000"), theme_colors.get("dk2")
     accents = [theme_colors.get(f"accent{i}") for i in range(1, 7)]
     accents = [a for a in accents if a]
@@ -366,7 +380,7 @@ def analyse(path: Path, base: str) -> dict:
     if contrast(ink, "FFFFFF") < 4.5:
         observations.append(f"Ink #{ink} is too light for text on white; falling back to #051C2C")
         ink = "051C2C"
-    colors = {
+    return {
         "color.ink": f"#{ink}",
         "color.componentPrimary": f"#{primary}",
         "color.componentPrimaryTint": mix(primary, 0.88),
@@ -374,32 +388,29 @@ def analyse(path: Path, base: str) -> dict:
         "color.accentTint": mix(accent, 0.86),
         "color.surfaceMuted": f"#{muted}",
         **{f"color.chartSeries{i + 1}": f"#{c}" for i, c in enumerate(series)},
-    }
+    }, top_fills
 
-    # --- fonts ---------------------------------------------------------------
+
+def house_typography(theme_fonts: dict, observations: list) -> dict:
+    """The display and body faces: the theme's, where they are installed."""
     installed = installed_fonts()
     major, minor = theme_fonts.get("majorFont"), theme_fonts.get("minorFont")
+
     def usable(face):
         # Arial is the runtime's default and always has metrics (Liberation Sans stands in).
         return bool(face) and not face.startswith("+") and (face.lower() == "arial" or face.lower() in installed)
-    typography = {}
     body = minor if usable(minor) else "Arial"
     display = major if usable(major) else body
     if minor and not usable(minor):
         observations.append(f"Body face '{minor}' is not installed; Arial used (install it or set typography.body)")
     if major and not usable(major):
         observations.append(f"Display face '{major}' is not installed; {display} used")
-    typography = {"body": body, "display": display, "semibold": {"family": body, "nativeBold": True, "effectiveWeight": 700}}
+    return {"body": body, "display": display, "semibold": {"family": body, "nativeBold": True, "effectiveWeight": 700}}
 
-    # --- chrome ----------------------------------------------------------------
+
+def house_chrome(title_frames: list, body_frames: list, footer_frames: list, observations: list) -> dict:
+    """Margins, title top, body top and footer top on the 1280 x 720 page."""
     chrome = {}
-    # The slides' own title placeholders say where titles really sit; the
-    # master's are the fallback (cover and section layouts are excluded by the
-    # 35%-of-page-height cut above).
-    if slide_title_frames:
-        title_frames = slide_title_frames
-    if slide_body_frames:
-        body_frames = slide_body_frames
     if title_frames:
         tf = statistics.median([f[0] for f in title_frames]), statistics.median([f[1] for f in title_frames]), statistics.median([f[2] for f in title_frames])
         left = round(tf[0]); right = round(PAGE_W - tf[0] - tf[2])
@@ -409,47 +420,40 @@ def analyse(path: Path, base: str) -> dict:
     if body_frames:
         body_top = round(statistics.median([f[1] for f in body_frames]))
         chrome["bodyTop"] = max(chrome.get("titleTop", 44) + 48, min(220, body_top))
-    footer_tops = [f[1] for f in footer_frames + number_frames]
+    footer_tops = [f[1] for f in footer_frames]
     if footer_tops:
         chrome["footerTop"] = max(chrome.get("bodyTop", 140) + 220, min(700, round(min(footer_tops))))
     if not chrome:
         observations.append("No title or body placeholders on the master; the built-in margins apply")
+    return chrome
 
-    # --- house style guesses -------------------------------------------------
+
+def house_style(title_bold, title_frames: list, masters: Masters) -> dict:
+    """The house style tokens the master shows: title weight and title rule."""
     style = {}
-    if title_style_bold is not None:
-        style["style.titleWeight"] = "bold" if title_style_bold else "regular"
+    if title_bold is not None:
+        style["style.titleWeight"] = "bold" if title_bold else "regular"
     title_bottom = (title_frames[0][1] + title_frames[0][3]) if title_frames else None
     if title_bottom is not None:
-        rules = [l for l in master_lines if abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5]
+        rules = [l for l in masters.lines if abs(l[1] - title_bottom) < 24 and l[2] > PAGE_W * 0.5]
         if rules:
             style["style.titleRule"] = "rule"
             style["style.titleRuleLength"] = "full" if max(l[2] for l in rules) >= PAGE_W * 0.95 else "content"
-        elif any(b[0][1] <= 4 and b[0][3] >= title_bottom - 8 and b[0][2] >= PAGE_W * 0.9 for b in master_bands):
+        elif any(b[0][1] <= 4 and b[0][3] >= title_bottom - 8 and b[0][2] >= PAGE_W * 0.9 for b in masters.bands):
             style["style.titleRule"] = "band"
         else:
             # The built-in palettes draw a rule; a master that has none keeps its page open.
             style["style.titleRule"] = "none"
-    if display != body:
-        observations.append(f"Titles set in {display}, body in {body}")
+    return style
 
-    # --- density -------------------------------------------------------------
-    median_words = statistics.median(words) if words else 0
-    median_shapes = statistics.median(shapes_per_slide) if shapes_per_slide else 0
-    if median_words >= 90 or median_shapes >= 18:
-        density = "pre-read"
-    elif median_words >= 35 or median_shapes >= 8:
-        density = "executive"
-    else:
-        density = "live-pitch"
-    complexity = "high" if median_shapes >= 18 else "medium" if median_shapes >= 8 else "low"
 
-    # --- weight: how full this house's pages read ----------------------------
-    # The template is the house's own answer to "how much does a page carry".
-    # Measured here and written into the profile, it becomes the floor every
-    # page of a deck built on this template is held to, so one template drives
-    # layout, palette, chrome AND density consistently.
-    body_coverage = statistics.median(coverage) if coverage else 0.0
+def house_weight(median_words: float, median_shapes: float, body_coverage: float, observations: list) -> tuple[str, dict]:
+    """(fill, weight): how full this house's pages read.
+
+    The template is the house's own answer to "how much does a page carry".
+    Measured here and written into the profile, it becomes the floor every
+    page of a deck built on this template is held to, so one template drives
+    layout, palette, chrome and density consistently."""
     fill = "full" if (median_words >= 90 or body_coverage >= 0.62) else "airy" if (median_words < 35 and body_coverage < 0.38) else "balanced"
     base_weight = {
         "full": {"pageWords": 130, "columnFill": 0.68, "plotSpan": 0.60, "pointWords": 10, "tableFill": 0.55, "elements": 2},
@@ -470,37 +474,75 @@ def analyse(path: Path, base: str) -> dict:
         f"body coverage {body_coverage:.0%} - pages of a deck on this template are held to {weight['pageWords']} words "
         f"and a {weight['columnFill']:.0%} column, at fill '{fill}'"
     )
+    return fill, weight
 
-    # --- nearest design system ------------------------------------------------
-    # The house's colours, faces and margins are copied exactly; the design
-    # system supplies what a master cannot show - how the takeaway, the
-    # commentary, the cover and the chapter pages are built. Pick the one whose
-    # frame the template already resembles, and say why.
+
+def nearest_design(typography: dict, style: dict, density: str, chart_share: float, median_words: float) -> tuple[str, str]:
+    """(design system, why). The house's colours, faces and margins are copied
+    exactly; the design system supplies what a master cannot show - how the
+    takeaway, the commentary, the cover and the chapter pages are built. This
+    picks the one whose frame the template already resembles."""
+    display, body = typography["display"], typography["body"]
     serif = bool(re.search(r"georgia|times|garamond|serif|baskerville|caslon|minion|cambria|palatino", str(display), re.I)) and display != body
-    chart_share = (charts / len(slides)) if slides else 0
     if style.get("style.titleRule") == "band" and density == "live-pitch":
-        design, why = "keynote", "a full-width title band on a template that carries few words a page"
-    elif density == "live-pitch":
-        design, why = "keynote", f"a presented template: median {median_words:.0f} words a slide"
-    elif serif and style.get("style.titleWeight") == "regular":
-        design, why = "editorial", f"regular-weight serif titles ({display})"
-    elif chart_share >= 0.5 and style.get("style.titleWeight", "bold") == "bold":
-        design, why = "journal", f"chart-led pages ({chart_share:.0%} of slides carry a chart) under bold titles"
+        return "keynote", "a full-width title band on a template that carries few words a page"
+    if density == "live-pitch":
+        return "keynote", f"a presented template: median {median_words:.0f} words a slide"
+    if serif and style.get("style.titleWeight") == "regular":
+        return "editorial", f"regular-weight serif titles ({display})"
+    if chart_share >= 0.5 and style.get("style.titleWeight", "bold") == "bold":
+        return "journal", f"chart-led pages ({chart_share:.0%} of slides carry a chart) under bold titles"
+    return "consulting", "an analytical house template with sans titles over evidence and commentary"
+
+
+def analyse(path: Path, base: str) -> dict:
+    prs = Presentation(str(path))
+    scale_x = PAGE_W / (prs.slide_width / 914400 * 96)
+    scale_y = PAGE_H / (prs.slide_height / 914400 * 96)
+    observations: list[str] = []
+    theme_colors, theme_fonts = read_theme(theme_part(prs))
+    masters = Masters(prs, scale_x, scale_y)
+    slides = list(prs.slides)
+    content = ContentSlides(slides, scale_x, scale_y)
+    colors, top_fills = house_colors(theme_colors, content.fills, observations)
+    typography = house_typography(theme_fonts, observations)
+    # The slides' own title placeholders say where titles really sit; the
+    # master's are the fallback (cover and section layouts are excluded by the
+    # 35%-of-page-height cut in ContentSlides).
+    title_frames = content.title_frames or masters.title_frames
+    body_frames = content.body_frames or masters.body_frames
+    chrome = house_chrome(title_frames, body_frames, masters.footer_frames + masters.number_frames, observations)
+    style = house_style(masters.title_bold, title_frames, masters)
+    if typography["display"] != typography["body"]:
+        observations.append(f"Titles set in {typography['display']}, body in {typography['body']}")
+
+    median_words = statistics.median(content.words) if content.words else 0
+    median_shapes = statistics.median(content.shapes_per_slide) if content.shapes_per_slide else 0
+    if median_words >= 90 or median_shapes >= 18:
+        density = "pre-read"
+    elif median_words >= 35 or median_shapes >= 8:
+        density = "executive"
     else:
-        design, why = "consulting", "an analytical house template with sans titles over evidence and commentary"
+        density = "live-pitch"
+    complexity = "high" if median_shapes >= 18 else "medium" if median_shapes >= 8 else "low"
+    body_coverage = statistics.median(content.coverage) if content.coverage else 0.0
+    fill, weight = house_weight(median_words, median_shapes, body_coverage, observations)
+    chart_share = (content.charts / len(slides)) if slides else 0
+    design, why = nearest_design(typography, style, density, chart_share, median_words)
     observations.append(f"Nearest design system: {design} ({why}); the house colours, faces and margins override it")
 
     page_template = {}
-    if not company and footer_texts:
-        text, n = footer_texts.most_common(1)[0]
+    company = masters.company
+    if not company and content.footer_texts:
+        text, n = content.footer_texts.most_common(1)[0]
         if n >= max(2, len(slides) // 2):
             company = text
-    if master_lines and any(abs(l[1] - PAGE_H * 0.94) < 24 for l in master_lines):
+    if masters.lines and any(abs(l[1] - PAGE_H * 0.94) < 24 for l in masters.lines):
         page_template["rules"] = "bottom"
-    if logo_frames:
+    if masters.logo_frames:
         observations.append("The master carries a logo picture; register it as the deck's logo asset to reproduce it")
 
-    profile = {
+    return {
         "schema": "professional-slides.house/v1",
         "source": str(path.name),
         "palette": {"base": base, "id": re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-") or "template", "label": path.stem, "colors": {**colors, **style}},
@@ -518,13 +560,12 @@ def analyse(path: Path, base: str) -> dict:
             "slides": len(slides), "slideSize": [round(prs.slide_width / 914400, 2), round(prs.slide_height / 914400, 2)],
             "medianWordsPerSlide": median_words, "medianShapesPerSlide": median_shapes,
             "medianBodyCoverage": round(body_coverage, 3),
-            "charts": charts, "tables": tables, "pictures": pictures,
-            "titleSizesPt": sorted(set(title_sizes))[:6], "bodySizesPt": sorted(set(body_sizes))[:8],
+            "charts": content.charts, "tables": content.tables, "pictures": content.pictures,
+            "titleSizesPt": sorted(set(content.title_sizes))[:6], "bodySizesPt": sorted(set(content.body_sizes))[:8],
             "themeColors": theme_colors, "themeFonts": theme_fonts, "topFills": [f"#{c}" for c in top_fills],
-            "sampleTitles": slide_titles[:5],
+            "sampleTitles": content.titles[:5],
         },
     }
-    return profile
 
 
 def main() -> int:

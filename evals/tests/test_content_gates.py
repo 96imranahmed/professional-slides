@@ -36,6 +36,7 @@ GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 from node_probe import example_scene  # noqa: E402
+from judgement_oracle import answering  # noqa: E402
 
 
 def text(role, body, **data):
@@ -108,72 +109,118 @@ class TwinCellTests(unittest.TestCase):
 
 
 class RestatementTests(unittest.TestCase):
-    """The commentary reads the exhibit back to the reader."""
+    """The commentary reads the exhibit back to the reader. Whether a line
+    does is read (commentary-restates): the exhibit's words, its callouts and
+    the commentary's lines go to a reader, and the lines it names are the
+    finding."""
 
     EXHIBIT = table([
         ["Prior sequence", "Marvel describes Endgame as the conclusion to a 22-film sequence"],
         ["Inherited consequence", "Thanos's earlier action supplies the problem confronting the remaining Avengers"],
         ["Collective response", "The surviving ensemble responds to consequences already established"],
     ], ["Element", "Story mechanism"])
+    OWN = [text("list-item", "Twenty-two films of prior investment is the price of admission, "
+                             "and it is charged to every newcomer who arrives at the finale first."),
+           text("list-item", "Budget the onboarding: a viewer who starts here needs ninety minutes "
+                             "of catch-up before the opening scene lands.")]
+    BACK = text("list-item", "Thanos's earlier action supplies the problem confronting the remaining Avengers.")
 
-    def test_commentary_built_from_the_exhibits_words_is_reported(self):
-        said = [text("list-item", "Marvel describes Endgame as the conclusion to a 22-film sequence."),
-                text("list-item", "Thanos's earlier action supplies the problem confronting the remaining Avengers."),
-                text("list-item", "The surviving ensemble responds to consequences already established.")]
-        findings = run(page_gates.gate_restatement, 35, page(self.EXHIBIT + said))
-        self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
-        self.assertGreater(findings[0]["measured"]["share"], page_gates.THRESHOLDS["restatement_max"])
-        # The page is reported on the block a reader would read, not on a pooled
-        # average over the column.
-        self.assertIn("Marvel describes", findings[0]["measured"]["block"])
+    @staticmethod
+    def reader(subject, context):
+        """Names each line whose words are an exhibit cell's, as a reader would."""
+        cells = {t.rstrip(".") for t in subject["exhibit"]}
+        back = [line["id"] for line in subject["lines"] if line["text"].rstrip(".") in cells]
+        return {"verdict": "restates", "lines": back} if back else "adds"
 
-    def test_one_restating_block_is_not_diluted_by_the_ones_around_it(self):
+    def test_the_exhibit_and_each_line_are_put_to_the_reader(self):
+        with answering({"commentary-restates": self.reader}) as asked:
+            run(page_gates.gate_restatement, 35, page(self.EXHIBIT + self.OWN + [self.BACK]))
+        [(kind, subject)] = asked
+        self.assertEqual(kind, "commentary-restates")
+        self.assertIn("Story mechanism", subject["exhibit"])
+        self.assertEqual([line["id"] for line in subject["lines"]], ["c1", "c2", "c3"])
+        self.assertEqual(subject["callouts"], [])
+
+    def test_one_restating_line_is_reported_whatever_the_lines_around_it_say(self):
         """Three sentences that bring their own words and one that reads the
-        table back pooled out to 0.33 and passed. A reader does not average a
-        column; they read the block, and the block says nothing."""
-        said = [text("list-item", "Twenty-two films of prior investment is the price of admission, "
-                                  "and it is charged to every newcomer who arrives at the finale first."),
-                text("list-item", "Budget the onboarding: a viewer who starts here needs ninety minutes "
-                                  "of catch-up before the opening scene lands."),
-                text("list-item", "Thanos's earlier action supplies the problem confronting the remaining Avengers.")]
-        findings = run(page_gates.gate_restatement, 35, page(self.EXHIBIT + said))
+        table back pooled out under the old word-share bar and passed. A reader
+        does not average a column; they read the line, and the line says nothing."""
+        with answering({"commentary-restates": self.reader}):
+            findings = run(page_gates.gate_restatement, 35, page(self.EXHIBIT + self.OWN + [self.BACK]))
         self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
+        self.assertEqual(findings[0]["measured"]["lines"], 1)
         self.assertIn("Thanos", findings[0]["measured"]["block"])
+        self.assertIn("Thanos", findings[0]["repair"])
 
-    def test_commentary_that_brings_its_own_words_passes(self):
-        said = [text("list-item", "Twenty-two films of prior investment is the price of admission, "
-                                  "and it is charged to every newcomer who arrives at the finale first."),
-                text("list-item", "Budget the onboarding: a viewer who starts here needs ninety minutes "
-                                  "of catch-up before the opening scene lands."),
-                text("list-item", "Franchises without that backlog buy their payoff differently, "
-                                  "usually by spending a whole act on introductions.")]
-        self.assertEqual(run(page_gates.gate_restatement, 35, page(self.EXHIBIT + said)), [])
+    def test_commentary_that_says_what_the_exhibit_does_not_passes(self):
+        with answering({"commentary-restates": self.reader}):
+            self.assertEqual(run(page_gates.gate_restatement, 35, page(self.EXHIBIT + self.OWN)), [])
 
-    def test_a_page_with_no_exhibit_or_no_commentary_is_not_measured(self):
+    def test_a_lead_is_read_with_its_text_not_put_to_the_reader_alone(self):
+        # "Ninth of twenty" over a point is the subheading the point is read under: a reader judging it alone calls it a
+        # read-back of the ranking it names.
+        with answering({"commentary-restates": self.reader}) as asked:
+            run(page_gates.gate_restatement, 35, page(self.EXHIBIT + [text("list-lead", "Prior sequence")] + self.OWN))
+        [(_, subject)] = asked
+        self.assertEqual([line["text"] for line in subject["lines"]], [t["text"] for t in self.OWN])
+
+    def test_an_unanswered_question_does_not_hold(self):
+        with answering({}) as asked:
+            self.assertEqual(run(page_gates.gate_restatement, 35, page(self.EXHIBIT + [self.BACK])), [])
+        self.assertEqual(len(asked), 1)
+
+    def test_a_page_with_no_exhibit_or_no_commentary_is_not_asked(self):
         only_commentary = page([text("list-item", "A finding that stands on its own entirely.")])
-        self.assertEqual(run(page_gates.gate_restatement, 1, only_commentary), [])
-        self.assertEqual(run(page_gates.gate_restatement, 1, page(self.EXHIBIT)), [])
+        with answering({"commentary-restates": "restates"}) as asked:
+            self.assertEqual(run(page_gates.gate_restatement, 1, only_commentary), [])
+            self.assertEqual(run(page_gates.gate_restatement, 1, page(self.EXHIBIT)), [])
+        self.assertEqual(asked, [])
 
 
 class PlanningVoiceTests(unittest.TestCase):
-    """The dot-dash, left on the page."""
+    """The dot-dash, left on the page. Whether a line's opening label is planning
+    language is a question (planning-label), answered here as a reader would."""
 
     def test_a_planning_label_on_a_sentence_is_reported(self):
         for line in ["Interpretation: the team can generate drama before a villain arrives.",
                      "Takeaway: both libraries support billion-dollar films.",
                      "So what: the order of introduction is not a quality verdict.",
                      "Key insight - responsibility connects the two brands."]:
-            with self.subTest(line=line):
+            with self.subTest(line=line), answering({"planning-label": "planning-label"}) as asked:
                 findings = run(page_gates.gate_planning_voice, 8, page([text("list-item", line)]))
+                self.assertEqual(asked, [("planning-label", line)])
                 self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
                 self.assertIn("Delete the label and keep the sentence", findings[0]["repair"])
 
-    def test_the_same_words_inside_a_sentence_are_left_alone(self):
+    def test_a_label_that_is_the_lines_content_is_left_alone(self):
+        with answering({"planning-label": "content"}) as asked:
+            self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", "Revenue: up 4% on the year.")])), [])
+        self.assertEqual(len(asked), 1)
+
+    def test_a_caption_under_a_panel_is_the_pages_own_sentence(self):
+        # A finding set under its panel is drawn as `insight-caption`; the gates
+        # read it with the page's commentary, not as a label on the exhibit.
+        self.assertIn("insight-caption", page_gates.COMMENTARY_ROLES)
+        with answering({"planning-label": "planning-label"}):
+            findings = run(page_gates.gate_planning_voice, 8, page([text("insight-caption", "Interpretation: the cheaper line grows first.")]))
+        self.assertEqual([f["code"] for f in findings], ["PLANNING_VOICE"])
+
+    def test_a_line_with_no_label_is_not_asked_about(self):
         for line in ["The interpretation a reader brings decides which version they prefer.",
                      "Its takeaway is cheaper to state than to prove.",
                      "Note the eleven-month clock: it is the only one that cannot be recovered."]:
-            with self.subTest(line=line):
+            with self.subTest(line=line), answering({"planning-label": "planning-label"}) as asked:
                 self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", line)])), [])
+                self.assertEqual(asked, [])
+
+    def test_an_unanswered_question_holds_nothing_and_is_listed(self):
+        import judgements
+        judgements.load()
+        try:
+            self.assertEqual(run(page_gates.gate_planning_voice, 8, page([text("list-item", "Takeaway: both libraries support billion-dollar films.")])), [])
+            self.assertEqual([(q["kind"], q["where"]) for q in judgements.needed()], [("planning-label", ["8"])])
+        finally:
+            judgements.unload()
 
 
 class CaveatTests(unittest.TestCase):
@@ -187,9 +234,12 @@ class CaveatTests(unittest.TestCase):
                                   "earlier screen adaptations."),
                 text("list-item", "Dates establish an order. They do not establish artistic quality."),
                 text("list-item", "The comparison boundary is the two selected titles and nothing wider.")]
-        findings = run(page_gates.gate_caveat_heavy, 33, page(said))
+        caveats = {"verdict": "some-caveats", "caveats": ["l2", "l3", "l4"]}
+        with answering({"commentary-caveats": caveats}) as asked:
+            findings = run(page_gates.gate_caveat_heavy, 33, page(said))
         self.assertEqual([f["code"] for f in findings], ["CAVEAT_HEAVY"])
         self.assertGreater(findings[0]["measured"]["caveats"], page_gates.THRESHOLDS["caveats_max"])
+        self.assertEqual([line["id"] for line in asked[0][1]], ["l1", "l2", "l3", "l4"])
 
     def test_a_finding_in_contrastive_form_is_not_a_hedge(self):
         """The first version of this gate fired on the sharpest line in a
@@ -198,7 +248,14 @@ class CaveatTests(unittest.TestCase):
         said = [text("list-item", "Education does not decide the city; it decides the neighborhood."),
                 text("list-item", "The two state scales are set separately and are not comparable."),
                 text("list-item", "Pay bands overlap; the role, not the salary, separates the offers.")]
-        self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
+        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l2"]}}):
+            self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
+
+    def test_a_page_with_no_more_lines_than_the_caveats_it_may_carry_is_not_asked_about(self):
+        said = [text("list-item", "The survey is unverified."), text("list-item", "It does not cover weekend riders.")]
+        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l1", "l2"]}}) as asked:
+            self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
+        self.assertEqual(asked, [])
 
 
 class TableSchemaTests(unittest.TestCase):
@@ -271,7 +328,9 @@ class ContradictedShareTests(unittest.TestCase):
         self.assertEqual(run(page_gates.gate_contradicted_share, 16, self.page_with("38%")), [])
 
     def test_shares_written_as_words_are_read_too(self):
-        findings = run(page_gates.gate_contradicted_share, 16, self.page_with("Three quarters of institutions gate access"))
+        shares = {"verdict": "states-shares", "shares": [{"phrase": "Three quarters", "share": 0.75}]}
+        with answering({"shares-in-words": shares}):
+            findings = run(page_gates.gate_contradicted_share, 16, self.page_with("Three quarters of institutions gate access"))
         self.assertEqual([f["code"] for f in findings], ["CONTRADICTED_SHARE"])
 
     def test_a_page_that_publishes_no_denominator_is_not_measured(self):
@@ -279,20 +338,6 @@ class ContradictedShareTests(unittest.TestCase):
         # Two different bases on one page: the page is not making this claim.
         mixed = page([text("category-note", "17 of 33"), text("category-note", "9 of 40"), text("metric-value", "80%")])
         self.assertEqual(run(page_gates.gate_contradicted_share, 1, mixed), [])
-
-
-class FalsifiabilityTests(unittest.TestCase):
-    """A content gate that fires on good work is one that gets switched off."""
-
-    CONTENT_CODES = {"RESTATEMENT", "PLANNING_VOICE", "CAVEAT_HEAVY", "TWIN_CELLS",
-                     "TABLE_SCHEMA_FLAT", "CONTRADICTED_SHARE"}
-
-
-    def test_every_content_code_is_registered_and_documented(self):
-        for code in self.CONTENT_CODES:
-            with self.subTest(code=code):
-                self.assertIn(code, page_gates.GATE_CODES)
-                self.assertTrue(page_gates.GATE_CODES[code].strip())
 
 
 if __name__ == "__main__":

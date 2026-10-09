@@ -17,6 +17,12 @@ from node_probe import run_node
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "skills" / "professional-slides" / "runtime"
 
+PLANNED = '''
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
+import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
+const plan = (slides) => planDeck(toDeckPlan({{ schema: 'professional-slides.deck/v3', id: 'd', slides }})).deck;
+'''
+
 
 class DrawnLabelPrecisionTests(unittest.TestCase):
     def test_a_series_prints_every_label_to_one_precision(self):
@@ -88,7 +94,7 @@ class NativeLabelPrecisionTests(unittest.TestCase):
         sys.path.insert(0, str(RUNTIME / "emit"))
         from pptx import Presentation
         scene = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const spec={schema:'professional-slides.deck/v3',id:'p',cover:{title:'x'},slides:[{title:'Share rose in both markets over the period',layout:'exhibit-full',
   exhibit:{type:'chart.column',heading:'Share by market',categories:['A','B','C','D'],series:[{name:'Share',values:[32,40.8,15,14.9]}]}}]};
@@ -103,6 +109,42 @@ console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
                            check=True, capture_output=True)
             chart = next(s.chart for s in Presentation(pptx_path).slides[-1].shapes if s.has_chart)
             self.assertEqual(chart.plots[0].data_labels.number_format, "0.0")
+
+
+class QuotedPrecisionTests(unittest.TestCase):
+    """A label carries the precision the page's copy quotes for the same value."""
+
+    def test_a_figure_the_copy_quotes_keeps_its_decimal(self):
+        """Rebuilt fifty-page deck: a bar was labelled "12" where the copy said 11.6."""
+        result = run_node(PLANNED.format() + '''
+const chart = { type: 'chart.bar', heading: 'Announced face value', unit: '$B', categories: ['Azure', 'AWS one', 'AWS two', 'Akamai'],
+  series: [{ name: 'Face value', values: [250, 100, 100, 11.6] }] };
+const page = (subtitle) => ({ id: 's', title: 'Each lab has signed compute contracts worth over $100 billion', subtitle, layout: 'exhibit-full', exhibit: chart });
+const labels = (deck) => deck.slides[0].nodes.filter((n) => n.role === 'data-label').map((n) => n.text);
+const quoted = plan([page("Announced face values; Akamai's $11.6B is in an SEC filing")]);
+const silent = plan([page('Announced face values; payment timing is undisclosed')]);
+const native = (deck) => deck.slides[0].componentInstances.find((c) => c.component === 'chart.bar')?.nativeChart ?? null;
+console.log(JSON.stringify({ quoted: labels(quoted), silent: labels(silent), nativeQuoted: native(quoted), nativeSilent: Boolean(native(silent)) }));
+''')
+        self.assertIn('11.6', result['quoted'])
+        self.assertIn('250', result['quoted'])
+        # Unquoted, the chart keeps its one precision: whole numbers past 100.
+        self.assertIn('12', result['silent'])
+        self.assertNotIn('11.6', result['silent'])
+        # A series of mixed precision is drawn, not handed to one native number format.
+        self.assertIsNone(result['nativeQuoted'])
+        self.assertTrue(result['nativeSilent'])
+
+    def test_only_figures_written_with_decimals_are_quoted(self):
+        """Rebuilt fifty-page deck: only a figure written with decimals sets a label's precision."""
+        result = run_node('''
+import { figuresWithDecimals, formatValue } from './skills/professional-slides/runtime/value-format.mjs';
+const quoted = figuresWithDecimals(['Revenue of $1,234.56m and 4.75% growth in 2026, 57% of visits']);
+console.log(JSON.stringify({ quoted, two: formatValue(4.75, { values: [480, 4.75], quotedFigures: quoted }), whole: formatValue(57.4, { values: [480, 57.4], quotedFigures: quoted }) }));
+''')
+        self.assertEqual(result['quoted'], [{'value': 1234.56, 'decimals': 2}, {'value': 4.75, 'decimals': 2}])
+        self.assertEqual(result['two'], '4.75')
+        self.assertEqual(result['whole'], '57')
 
 
 if __name__ == "__main__":

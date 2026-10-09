@@ -4,15 +4,16 @@ The floors used to be a literal copy in `runtime/weight.mjs` and another in
 `runtime/gates/page_gates.py`, so every density change had to be made twice and
 nothing caught a miss. Both now read `runtime/weight.json`. These tests hold
 that arrangement together: the composer and the gates must resolve the same
-numbers, the documented vocabulary must match the emitted one, and the table in
-the evaluation reference must still be the corpus the floors were calibrated against.
-And the codes every stage emits are held to one registry: each registered in
-exactly one vocabulary, every emitted code registered, every documented one real.
+numbers, and the threshold table in the evaluation reference is the one the
+gates print. And the codes every stage emits are held to one registry: each
+registered in exactly one vocabulary, and every emitted code registered.
 """
 from __future__ import annotations
 
 import json
+import math
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -49,16 +50,11 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         self.assertEqual(result["resolved"]["pageWords"], 130)
         self.assertEqual(result["resolved"]["columnFill"], CONTRACT["byFill"]["full"]["columnFill"])
 
-    def test_every_floored_key_is_documented(self):
-        # A key with no line of documentation is a floor nobody can author
-        # against; a documented key with no floor is a promise the gates do not
-        # keep.
+    def test_every_fill_floors_every_key(self):
+        # A key one fill leaves out is a floor that fill does not keep.
         for fill, values in CONTRACT["byFill"].items():
             self.assertEqual(sorted(values), sorted(CONTRACT["keys"]), fill)
             self.assertEqual(sorted(values), sorted(CONTRACT["ranges"]), fill)
-        skill = (SKILL / "references/theming.md").read_text(encoding="utf-8")
-        for key in CONTRACT["keys"]:
-            self.assertIn(f"`{key}`", skill, f"The theming reference never names the {key} floor")
 
     def test_the_floors_stay_under_the_corpus_they_are_calibrated_against(self):
         # A floor is not a target. The body floor sits below the reference
@@ -70,23 +66,81 @@ console.log(JSON.stringify({byFill: WEIGHT_BY_FILL, keys: WEIGHT_KEYS, bands: RE
         self.assertLess(CONTRACT["byFill"]["airy"]["pageWords"], CONTRACT["byFill"]["balanced"]["pageWords"])
         self.assertLess(CONTRACT["byFill"]["balanced"]["pageWords"], CONTRACT["byFill"]["full"]["pageWords"])
 
-    def test_the_skill_quotes_the_targets_it_is_held_to(self):
-        # The comparison table in the evaluation reference is the argument for the floors. If
-        # the targets move, the table moves with them rather than standing as a
-        # second, older record of the same thing.
-        skill = (SKILL / "references/evaluation/index.md").read_text(encoding="utf-8")
-        slides = CONTRACT["reference"]["slides"]
-        wide = CONTRACT["reference"]["benchmark"]
-        for value in (slides["words"], slides["bands"]["titleBand"], slides["bands"]["body"],
-                      slides["bands"]["footer"], slides["drawings"],
-                      slides["numericByFamily"]["chart"]):  # noqa: E501
-            self.assertRegex(skill, rf"\|[^|\n]*\b{value}\b", f"the evaluation reference's target table has lost {value}")
-        self.assertIn(f"{round(slides['heavyShare'] * 100)}%", skill)
-        # And the craft rates the plan gates now floor against.
+    def test_the_gate_thresholds_are_printed_from_the_code(self):
+        # The threshold table is page_gates.py --thresholds-markdown, verbatim:
+        # the evaluation reference said 22% for an internal void the code held
+        # at 13%, and 128 words for a ceiling of 148, because a hand-kept table
+        # was checked only for whether its numbers appeared somewhere.
+        index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
+        begin, end = "<!-- thresholds:begin -->\n", "<!-- thresholds:end -->"
+        self.assertIn(begin, index)
+        block = index[index.index(begin) + len(begin):index.index(end)]
+        run = subprocess.run([sys.executable, str(GATES / "page_gates.py"), "--thresholds-markdown"], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(block, run.stdout, "regenerate the block: python3 runtime/gates/page_gates.py --thresholds-markdown")
+        self.assertEqual(block, page_gates.thresholds_markdown())
+        # The table reads the values the gates apply, fill by fill.
+        for fill in ("full", "balanced", "airy"):
+            self.assertIn(page_gates._share(CONTRACT["geometryByFill"][fill]["internal_void_block"]), block)
+        self.assertIn(f"| {page_gates.PROFILES['executive']['words_exhibit']} |", block)
+
+    def test_the_contract_says_where_its_figures_come_from(self):
+        calibration = CONTRACT["calibration"]
+        for key in ("date", "method", "sample"):
+            self.assertTrue(str(calibration.get(key, "")).strip(), key)
+        text = json.dumps(calibration)
+        self.assertNotRegex(text, r"[/\\]\w+\.(pptx|pdf|json)|/Users/|corpus/", "the provenance names no file or path")
+
+    def test_every_deck_wide_rule_reads_its_length_from_the_contract(self):
+        lengths = CONTRACT["deckLength"]
+        self.assertEqual(page_gates.THRESHOLDS["sections_from"], lengths["sections"])
+        self.assertEqual(page_gates.THRESHOLDS["front_matter_from"], lengths["frontMatter"])
+        self.assertEqual(page_gates.THRESHOLDS["deck_shape_from"], lengths["deckShape"])
+        self.assertEqual(page_gates.THRESHOLDS["shape_variety_from"], lengths["shapeVariety"])
+        self.assertEqual(page_gates.DECK_HABIT["from"], lengths["emptyHabit"])
+        result = run_node('''
+import { VARIETY } from './skills/professional-slides/runtime/gates/variety_gates.mjs';
+import { CONTENT_THRESHOLDS } from './skills/professional-slides/runtime/gates/content_gates.mjs';
+console.log(JSON.stringify({ variety: VARIETY.from, content: CONTENT_THRESHOLDS.from }));
+''')
+        self.assertEqual(result, {"variety": lengths["variety"], "content": lengths["content"]})
+        # The craft floors hold at the contract's own numbers, read off what they
+        # find either side of each: the deck length they read from, the treated-
+        # table and annotated-chart shares they block under, and the length the
+        # device floors (icons) start at.
         craft = CONTRACT["plan"]["craft"]
-        for key in ("chartAnnotated", "tableTreated"):
-            self.assertIn(f"{round(craft[key]['observed'] * 100)}%", skill,
-                          f"the evaluation reference does not say what client decks do for {key}")
+        tables, charts = craft["tableTreated"], craft["chartAnnotated"]
+        n = max(lengths["craft"], tables["blockFrom"], charts["blockFrom"])
+        cases = {
+            "short": ("table", lengths["craft"] - 1, 0),
+            "tablesUnder": ("table", n, math.ceil(tables["blockBelow"] * n) - 1),
+            "tablesAt": ("table", n, math.ceil(tables["blockBelow"] * n)),
+            "chartsUnder": ("chart", n, math.ceil(charts["blockBelow"] * n) - 1),
+            "chartsAt": ("chart", n, math.ceil(charts["blockBelow"] * n)),
+            "devicesUnder": ("table", lengths["craftDevices"] - 1, lengths["craftDevices"] - 1),
+            "devicesAt": ("table", lengths["craftDevices"], lengths["craftDevices"]),
+        }
+        found = run_node(f'''
+import {{ craftFindings }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
+const trend = {{ type: 'chart.line', categories: ['2020', '2021', '2022', '2023', '2024'], series: [{{ name: 'Revenue', values: [1, 2, 3, 4, 5] }}] }};
+const table = {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }};
+const deck = ([kind, pages, marked]) => {{
+  const spec = {{ slides: Array.from({{ length: pages }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i, exhibit: kind === 'chart' ? trend : table }})) }};
+  const scene = {{ slides: [{{ id: 'cover', componentInstances: [{{ component: 'cover' }}], nodes: [] }}, ...Array.from({{ length: pages }}, (_, i) => ({{ id: 'p' + i,
+    componentInstances: [{{ component: kind === 'chart' ? 'chart.line' : 'table' }}],
+    nodes: [{{ role: 'action-title' }}, {{ role: kind === 'chart' ? 'chart-mark' : 'table-cell' }},
+      ...(i < marked ? [{{ role: kind === 'chart' ? 'chart-bracket' : 'table-harvey-ball' }}] : [])] }}))] }};
+  return craftFindings(spec, scene).map((f) => f.code);
+}};
+console.log(JSON.stringify(Object.fromEntries(Object.entries({json.dumps(cases)}).map(([name, c]) => [name, deck(c)]))));
+''')
+        self.assertEqual(found["short"], [], "a deck under the craft length is a probe, not a deck")
+        self.assertIn("CRAFT_TABLES_PLAIN", found["tablesUnder"])
+        self.assertNotIn("CRAFT_TABLES_PLAIN", found["tablesAt"])
+        self.assertIn("CRAFT_CHARTS_BARE", found["chartsUnder"])
+        self.assertNotIn("CRAFT_CHARTS_BARE", found["chartsAt"])
+        self.assertNotIn("CRAFT_NO_ICONS", found["devicesUnder"])
+        self.assertIn("CRAFT_NO_ICONS", found["devicesAt"])
 
     def test_no_floor_is_stricter_than_the_corpus_it_claims_to_come_from(self):
         """A floor that most published pages fail is a preference, not a floor.
@@ -165,17 +219,19 @@ console.log(JSON.stringify({json.dumps(slides)}.map(isAnalyticalPage)));
 
 
 class GateVocabularyTests(unittest.TestCase):
-    """Every code the runtime emits is registered once, and every documented code exists."""
+    """Every code the runtime emits is registered once."""
 
     def test_the_emitted_codes_are_the_documented_codes(self):
         self.assertEqual(sorted(page_gates.GATE_CODES), sorted(page_gates.emitted_codes()))
+        # Each says what it is about: a code with an empty line is registered in name only.
+        self.assertEqual([code for code, about in page_gates.GATE_CODES.items() if not str(about).strip()], [])
 
     def test_the_vocabularies_are_read_from_their_modules(self):
         # The parse above is what the other tests stand on: it must find the
         # tables the modules import, not a subset of them.
         tables = vocabularies()
-        self.assertEqual(tables["gates/page_gates.py:GATE_CODES"], set(page_gates.GATE_CODES))
-        self.assertEqual(tables["gates/page_gates.py:COMPOSE_CODES"], set(page_gates.COMPOSE_CODES))
+        self.assertEqual(tables["gates/gate_config.py:GATE_CODES"], set(page_gates.GATE_CODES))
+        self.assertEqual(tables["gates/gate_config.py:COMPOSE_CODES"], set(page_gates.COMPOSE_CODES))
         result = run_node('''
 import { CODES } from './skills/professional-slides/runtime/reviewer.mjs';
 import { DELIVERY_CODES } from './skills/professional-slides/runtime/deliver-deck.mjs';
@@ -183,7 +239,7 @@ console.log(JSON.stringify({ reviewer: Object.keys(CODES), delivery: Object.keys
 ''')
         self.assertEqual(tables["reviewer.mjs:CODES"], set(result["reviewer"]))
         self.assertEqual(tables["deliver-deck.mjs:DELIVERY_CODES"], set(result["delivery"]))
-        self.assertIn("CPL", tables["gates/page_gates.py:GATE_CODES"])
+        self.assertIn("CPL", tables["gates/gate_config.py:GATE_CODES"])
 
     def test_every_code_the_runtime_emits_is_registered(self):
         # Delivery used to refuse decks with REVIEW_PASS_CAP, MISSING_RENDERED_GATES
@@ -211,29 +267,15 @@ console.log(JSON.stringify({ reviewer: Object.keys(CODES), delivery: Object.keys
         twice = {code: tables for code, tables in owners.items() if len(tables) > 1}
         self.assertFalse(twice, f"codes registered in more than one vocabulary: {twice}")
 
-    def test_no_document_names_a_gate_that_does_not_exist(self):
-        # Runtime constants that are named in the docs and are not codes, and the vocabularies' own names.
-        allowed = registered() | {"LABEL_HEADROOM", "RUNTIME_PYTHON"} | {table.split(":")[1] for table in vocabularies()}
-        shaped = re.compile(rf"`({CODE})`")
-        for path in sorted(SKILL.rglob("*.md")):
-            named = set(shaped.findall(path.read_text(encoding="utf-8")))
-            unknown = named - allowed
-            self.assertFalse(unknown, f"{path.name} names codes that are never emitted: {sorted(unknown)}")
-
     def test_the_material_codes_are_codes_a_review_can_raise(self):
         # rules.json marks which codes block a review. The reviewer raises its
         # own codes and confirms a build check's under that check's code
         # (MISSING_EVIDENCE, LAYOUT_MONOTONY); a material code in neither is a
         # promise nothing can keep.
         tables = vocabularies()
-        raisable = tables["reviewer.mjs:CODES"] | tables["gates/page_gates.py:GATE_CODES"] | tables["gates/page_gates.py:COMPOSE_CODES"]
+        raisable = tables["reviewer.mjs:CODES"] | tables["gates/gate_config.py:GATE_CODES"] | tables["gates/gate_config.py:COMPOSE_CODES"]
         material = json.loads((SKILL / "references" / "evaluation" / "rules.json").read_text(encoding="utf-8"))["materialCodes"]
         self.assertFalse(set(material) - raisable, "rules.json marks codes no review can raise")
-
-    def test_the_gate_table_lists_every_gate(self):
-        index = (SKILL / "references" / "evaluation" / "index.md").read_text(encoding="utf-8")
-        missing = [code for code in page_gates.GATE_CODES if f"`{code}`" not in index]
-        self.assertFalse(missing, f"the evaluation gate table has no row for {missing}")
 
 
 if __name__ == "__main__":

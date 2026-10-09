@@ -1,5 +1,7 @@
 import { CHROME, SLIDE, component, linePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
-import { measureText } from "./text-layout.mjs";
+import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
+import { textWords } from "./text-contract.mjs";
+import { REFERENCE_PAGE_BANDS } from "./weight.mjs";
 
 export const PAGE_RULES = ["none", "bottom", "top-and-bottom"];
 export const PAGE_BRANDING = ["footer-company", "top-right-logo", "none"];
@@ -7,11 +9,11 @@ export const PAGE_TEMPLATE_TOKENS = ["font.body", "type.source", "color.textSeco
 
 // The footer row is furniture inside the page's own margin system, so the
 // clearance under it is measured against the page's side margin (CHROME.left /
-// CHROME.right) instead of being whatever CHROME.footerTop happened to leave:
-// the row's bottom edge keeps this share of that margin clear of the page's
-// bottom edge. Before this the row bottom sat at CHROME.footerTop + the row
-// height = 706 on a 720 page - 14px against a 60px side margin - and the page
-// number read as though it had slipped off the page.
+// CHROME.right) rather than left to CHROME.footerTop: the row's bottom edge
+// keeps this share of that margin clear of the page's bottom edge. At
+// CHROME.footerTop + the row height the row would end at 706 on a 720 page -
+// 14px against a 60px side margin - and the page number would read as though
+// it had slipped off the page.
 //
 // A third of the margin, not half of it, because the padding is taken out of
 // the band the footer already shares with the body - space.4 above the row,
@@ -31,6 +33,26 @@ export const PAGE_NUMBER_MIN_DIGITS = 2;
 function assertPageCount(value) {
   if (!Number.isInteger(value) || value < 1) throw new Error("Page count must be a positive whole number of pages");
 }
+
+// A citation, and a note, each take at most this many footer lines. A citation the author typed is
+// refused past them; one the runtime derived from registry keys arrives with
+// its shorter forms (`sourceForms`, page-types.mjs citationForms) and is set
+// in the fullest that fits, so the runtime never refuses its own footer.
+export const FOOTER_LINES_MAX = 3;
+// The words a derived citation is held to: the reference footer's median and a quarter more (weight.json reference.slides.bands.footer).
+export const FOOTER_WORDS = Math.round(REFERENCE_PAGE_BANDS.footer * 1.25);
+// A registry source's `name` is its title - the publisher, the publication and
+// its year - `short` the form the footer falls back to, and `status` what kind
+// of record it is ("audited", "company-reported", "unaudited half-year
+// release"). The runtime writes them into the footer as a derived citation,
+// and each is held to the length of what it is: the long titles of real
+// publications (an agency and the full name of its annual survey, with year
+// and edition) run to twelve or fourteen words and the examples' longest is
+// seven; a status is a label of a word or two, and five words hold the longest
+// honest one. A caveat or a method is a `note`. The footer as drawn is counted
+// by `NOTE_HEAVY` whoever wrote it, so these limits are not what keeps prose
+// out of the footer; they keep a registry entry what it says it is.
+export const SOURCE_TITLE_WORDS = Object.freeze({ name: 16, short: 8, status: 5 });
 
 export function resolvePageTemplate(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("pageTemplate must be an object");
@@ -68,7 +90,7 @@ export function pageTemplateLayout(frame, props = {}) {
   const edgePadding = Math.round(Math.min(CHROME.left, CHROME.right) * FOOTER_EDGE_MARGIN_RATIO);
   const footerLift = Math.max(0, edgePadding - (frame.height - CHROME.footerTop - rowHeight));
   const style = { fontFamily: token("font.body"), fontSize: token("type.source"), color: token(props.inverse ? "color.onPrimary" : "color.textSecondary"), bold: false, align: "left", valign: "top", wrap: false };
-  const measure = (value, width) => measureText(value, width, { fontSize: tokenValue(style.fontSize) });
+  const measure = (value, width) => measureText(value, width, { fontSize: tokenValue(style.fontSize), wrapWidthRatio: ENGINE_RESERVE });
   // The deck's length reaches the footer through the page template the deck
   // already carries: `pageTemplate.pageCount` is merged into every slide's
   // chrome props, so one declaration on the deck sets the width of every page's
@@ -90,9 +112,35 @@ export function pageTemplateLayout(frame, props = {}) {
   const companyRight = right - (numberWidth ? numberWidth + gap : 0);
   const sourceRight = companyWidth ? companyRight - companyWidth - gap : numberWidth ? right - numberWidth - gap : right;
   const slots = [];
-  const place = (key, role, value, x, y, width, layout, align = "left") => {
+  const place = (key, role, value, x, y, width, layout, align = "left", data = {}) => {
     if (!value) return;
-    slots.push({ key, role, text: layout.text, frame: { x, y: y - footerLift, width, height: layout.height }, style: { ...style, align, lineHeight: layout.lineHeight }, data: { textLayout: layout, pageTemplate: template.rules } });
+    slots.push({ key, role, text: layout.text, frame: { x, y: y - footerLift, width, height: layout.height }, style: { ...style, align, lineHeight: layout.lineHeight }, data: { textLayout: layout, pageTemplate: template.rules, ...data } });
+  };
+  // The citation as the footer sets it: the author's own line, held to the
+  // line limit, or the fullest of a derived citation's forms that keeps it.
+  // `data` marks a derived line (the gates count what the author wrote) and
+  // carries the full citation when a shorter form stands in for it.
+  // A derived citation is also held to the words the page's footer has room
+  // for under the note bar (`sourceWordsMax`, set by the slide compile once it
+  // has counted the page - core.mjs compileSlide): the footer as drawn counts
+  // toward `NOTE_HEAVY`, so the runtime fits its own line under that bar and
+  // never asks the author to. The last form - the count alone - is drawn when
+  // no fuller one has room.
+  const forms = Array.isArray(props.sourceForms) && props.sourceForms.length && props.source ? props.sourceForms : null;
+  // Among the forms that still name every source, the fullest within the footer strong pages set - thirteen words at the
+  // median, a quarter more allowed (FOOTER_WORDS) - is taken first: a source's short name identifies it, the full
+  // citation is kept in the notes, and a footer that printed every source in full doubled the furniture a reader passes
+  // over. Where no form that names every source is that short, the rule above stands: no name is dropped to save words.
+  const wordsMax = forms && Number.isFinite(props.sourceWordsMax) ? props.sourceWordsMax : Infinity;
+  const namesEvery = (text) => !/in the notes$/.test(text);
+  const citation = (width, refusal) => {
+    const fits = (text, max) => { const layout = measure(text, width); return layout.lines.length <= FOOTER_LINES_MAX && (textWords(text) <= max || text === forms?.at(-1)) ? layout : null; };
+    const held = forms?.filter(namesEvery).find((text) => fits(text, Math.min(FOOTER_WORDS, wordsMax)));
+    for (const text of held ? [held] : forms ?? [props.source]) {
+      const layout = fits(text, wordsMax);
+      if (layout) return { text, layout, data: forms ? { derived: true, ...(text !== forms[0] ? { fullCitation: forms[0] } : {}) } : {} };
+    }
+    throw new Error(refusal);
   };
   const baselineTop = rowTop + (rowHeight - measure("7", 64).height) / 2;
   place("page-number", "page-number", pageNumber, right - numberWidth, baselineTop, numberWidth, numberLayout, "right");
@@ -100,12 +148,12 @@ export function pageTemplateLayout(frame, props = {}) {
   let occupiedTop = rowTop;
   if (template.sourcePlacement === "inline") {
     if (props.source && props.footerLeft) throw new Error("Inline sources share the left footer slot; move footerLeft to notes or select separate sources");
-    const source = props.source || props.footerLeft;
-    if (source) {
-      const layout = measure(source, sourceRight - left);
-      if (layout.lines.length > 3) throw new Error("Source exceeds three footer lines; shorten the visible citation and retain details in notes");
+    if (props.source || props.footerLeft) {
+      const refusal = "Source exceeds three footer lines; shorten the visible citation and retain details in notes";
+      const { text: source, layout, data } = props.source ? citation(sourceRight - left, refusal) : { text: props.footerLeft, layout: measure(props.footerLeft, sourceRight - left), data: {} };
+      if (layout.lines.length > FOOTER_LINES_MAX) throw new Error(refusal);
       const y = baselineTop - (layout.height - layout.lineHeight);
-      place(props.source ? "source" : "footer-left", props.source ? "source-text" : "footer-left", source, left, y, sourceRight - left, layout);
+      place(props.source ? "source" : "footer-left", props.source ? "source-text" : "footer-left", source, left, y, sourceRight - left, layout, "left", data);
       occupiedTop = Math.min(occupiedTop, y);
     }
   } else {
@@ -115,16 +163,15 @@ export function pageTemplateLayout(frame, props = {}) {
       place("footer-left", "footer-left", props.footerLeft, left, baselineTop, sourceRight - left, layout);
     }
     if (props.source) {
-      const layout = measure(props.source, right - left);
-      if (layout.lines.length > 3) throw new Error("Source exceeds three footer lines");
+      const { text: source, layout, data } = citation(right - left, "Source exceeds three footer lines");
       const y = frame.y + CHROME.sourceTop - Math.max(0, layout.height - rowHeight);
-      place("source", "source-text", props.source, left, y + (rowHeight - layout.lineHeight) / 2, right - left, layout);
+      place("source", "source-text", source, left, y + (rowHeight - layout.lineHeight) / 2, right - left, layout, "left", data);
       occupiedTop = Math.min(occupiedTop, y);
     }
   }
   if (props.note) {
     const layout = measure(props.note, sourceRight - left);
-    if (layout.lines.length > 3) throw new Error("Note exceeds three footer lines");
+    if (layout.lines.length > FOOTER_LINES_MAX) throw new Error("Note exceeds three footer lines");
     const y = occupiedTop - smallGap - layout.height;
     place("note", "footnote-text", props.note, left, y, sourceRight - left, layout);
     occupiedTop = y;

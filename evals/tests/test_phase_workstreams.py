@@ -10,7 +10,7 @@ class PhaseWorkstreamsTests(unittest.TestCase):
         # the foot, which the scene's band gates put to the author.
         run_node("""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const exhibit={type:'roadmap',variant:'phase-workstreams',phases:['Prepare','Verify'].map((label,i)=>({
  id:`p${i}`,label,workstreams:[{id:`w${i}`,label:'Accountable owner',activities:[{id:`a${i}`,text:'Inspect the named evidence before authorizing the next action.'}]}],
@@ -118,7 +118,7 @@ import assert from 'node:assert/strict';
 import {compileDeck,component,textPrimitive} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 import {PHASE_WORKSTREAM_VARIANTS} from './skills/professional-slides/runtime/phase-workstreams.mjs';
-import {renderSlideHtml} from './skills/professional-slides/runtime/adapters/html.mjs';
+import {renderSlideHtml} from './evals/support/html.mjs';
 const props=structuredClone(PHASE_WORKSTREAM_VARIANTS['phase-workstreams'].props),frame={x:60,y:140,width:1160,height:500};
 const compile=p=>compileDeck({slides:[{id:'e',density:'pre-read',frame,composition:component({id:'phases',component:'roadmap',frame,props:p})}]},REGISTRY);
 const deck=compile(props),nodes=deck.slides[0].nodes,activities=nodes.filter(n=>n.role==='roadmap-activity');

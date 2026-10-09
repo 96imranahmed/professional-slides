@@ -258,11 +258,47 @@ class SceneInkTests(unittest.TestCase):
         page_gates.gate_deck_ink(heavy, list(range(1, 13)), clean)
         self.assertEqual(clean, [])
 
-    def test_the_codes_are_advisory_and_registered(self):
+    def test_the_codes_are_advisory(self):
+        # Registration is held for every gate code at once (test_weight_contract.GateVocabularyTests).
         for code in ("SCENE_INK", "DECK_INK"):
-            self.assertIn(code, page_gates.GATE_CODES)
             self.assertIn(code, page_gates.ADVISORY_CODES)
-            self.assertIn(code, page_gates.emitted_codes())
+
+
+class InkEstimateTests(unittest.TestCase):
+    """The ink estimate reads what the render will count."""
+
+    CANVAS = "#FAF7F2"
+
+    def slide(self, nodes, instances=None):
+        return {"tokens": {"color.canvas": {"value": self.CANVAS}}, "nodes": nodes, "componentInstances": instances or []}
+
+    @staticmethod
+    def text(x, y, width, lines, color="#6B645C", size=10):
+        return {"type": "text", "role": "fact-text", "frame": {"x": x, "y": y, "width": width, "height": 16 * len(lines)},
+                "text": "\n".join(lines), "style": {"color": {"value": color}, "fontSize": {"value": size}},
+                "data": {"textLayout": {"lines": lines, "lineHeight": 16, "width": width}}}
+
+    def test_grey_type_on_a_tint_counts_in_patches_not_all_or_nothing(self):
+        """Fifty-six-page re-author: the ink estimate missed hollow tiles' grey type."""
+        tile = {"type": "rect", "role": "fact-tile", "frame": {"x": 72, "y": 190, "width": 560, "height": 193}, "style": {"fill": {"value": "#F0EBE3"}}}
+        lines = ["Carried in 2025 on 97 narrowbody aircraft, from secondary regional cities"] * 3
+        with_text = scene_ink.estimate(self.slide([tile, self.text(88, 300, 540, lines)]))
+        without = scene_ink.estimate(self.slide([tile]))
+        self.assertGreater(with_text, without, "hollow tiles' grey type reads as some ink, as the render reads it")
+        # Evenly painted, as the first fit painted it, the same type counted less.
+        self.assertLess(scene_ink.estimate(self.slide([tile, self.text(88, 300, 540, lines)]), 0.16, 1.2, 0.0, 1.0, 1.0), with_text)
+
+    def test_a_native_charts_plot_and_a_hairline_read_lighter(self):
+        """Fifty-six-page re-author: the ink estimate passed a page of native line charts."""
+        line = {"type": "line", "role": "chart-line", "frame": {"x": 100, "y": 300, "width": 900, "height": 0},
+                "style": {"stroke": {"value": "#C49A6C"}, "lineWidth": {"value": 3.5}},
+                "data": {"x1": 100, "y1": 300, "x2": 1000, "y2": 300, "componentInstance": "p:chart"}}
+        drawn = scene_ink.estimate(self.slide([line]))
+        native = scene_ink.estimate(self.slide([line], [{"instanceId": "p:chart", "nativeChart": {}}]))
+        self.assertLessEqual(native, drawn)
+        rule = {"type": "line", "role": "section-heading-rule", "frame": {"x": 72, "y": 300, "width": 1136, "height": 0},
+                "style": {"stroke": {"value": "#221E1A"}, "lineWidth": {"value": 1}}, "data": {}}
+        self.assertLess(scene_ink.estimate(self.slide([rule])), scene_ink.estimate(self.slide([rule]), hairline=1.0) + 1e-9)
 
 
 if __name__ == "__main__":

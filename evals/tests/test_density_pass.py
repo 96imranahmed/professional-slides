@@ -39,6 +39,13 @@ class BlockExtractionTests(unittest.TestCase):
         self.assertEqual(density_profile.page_blocks(page), [12, 7])
         self.assertEqual(density_profile.body_words(page), 21)
 
+    def test_a_source_that_wraps_is_footer_all_the_way_down(self):
+        # The second and third lines of a long source footer are the footer, not two short blocks of body.
+        page = "\n".join(["Title of the page", "", "A developed point of about a dozen words that says what follows.", "",
+                           "Source: Avison Young, Manhattan office report Q3 2026; Colliers,", "Manhattan office market Q3 2026; CBRE lending", "momentum Q2 2026"])
+        self.assertEqual(density_profile.page_blocks(page, {"Title of the page"}), [12])
+        self.assertEqual(density_profile.body_words(page, {"Title of the page"}), 12)
+
     def test_a_kicker_above_the_title_does_not_turn_the_title_into_body(self):
         # A generated page sets its section kicker above the title. The corpus
         # rule drops only the first line, so given the page's header lines the
@@ -52,12 +59,12 @@ class BlockExtractionTests(unittest.TestCase):
 
 class PopulationTests(unittest.TestCase):
     def test_only_pages_that_carry_prose_are_set_against_the_block_benchmark(self):
-        # The text-form benchmark measured pages with commentary or prose; a
-        # chart-led page's blocks are its labels.
-        for task in ("chart-with-commentary", "table-with-commentary", "text-page", "mixed"):
-            self.assertTrue(density_profile.prose_task(task), task)
-        for task in ("chart-led", "table-led", "diagram-led", None):
-            self.assertFalse(density_profile.prose_task(task), task)
+        # The benchmark was measured on reference pages chosen by what they print - sixty words, one block of fifteen -
+        # and a deck's pages are chosen by the same rule: a chart page whose blocks are its labels is not one.
+        self.assertTrue(density_profile.prose_blocks([5, 32, 28]))
+        self.assertTrue(density_profile.prose_blocks([60]))
+        self.assertFalse(density_profile.prose_blocks([5, 4, 6, 3, 8, 7, 9, 10, 6, 5]), "labels alone, however many")
+        self.assertFalse(density_profile.prose_blocks([5, 30]), "one developed block and little else")
 
 
 class ExecutiveSummaryTests(unittest.TestCase):
@@ -65,7 +72,7 @@ class ExecutiveSummaryTests(unittest.TestCase):
         # The client summary is four to six developed statements with their
         # parts as sub-points, not three bullets and an insight box.
         result = run_node("""
-import { toDeckPlan } from './skills/professional-slides/runtime/compose.mjs';
+import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
 const points=Array.from({length:6},(_,i)=>({lead:'Statement '+(i+1)+'.',text:'A developed statement with its evidence and what follows from it.',...(i===0?{points:['The first part','The second part']}:{})}));
 const spec={schema:'professional-slides.deck/v3',id:'e',cover:{title:'x'},slides:[{title:'The answer the deck argues, stated in one line',role:'executive-summary',shape:'executive-summary',pointsStyle:'prose',points}]};
@@ -84,7 +91,7 @@ class DensityReviewTests(unittest.TestCase):
 import { validateDensityReview, reviewOutcome } from './skills/professional-slides/runtime/reviewer.mjs';
 const profile={flaggedPages:['s04','s09']};
 const deck='Blocks per page sit at the client median; words per block run light against the 56-word target.';
-const partial={accepted:true,findings:[],density:{deck,pages:[{slide:'s04',verdict:'right',reason:'A chart-led page with one line of takeaway, as the client pages set it.'}]}};
+const partial={accepted:true,rating:8.5,findings:[],density:{deck,pages:[{slide:'s04',verdict:'right',reason:'A chart-led page with one line of takeaway, as the client pages set it.'}]}};
 const full={...partial,density:{deck,pages:[...partial.density.pages,{slide:'s09',verdict:'too dense',reason:'The third point restates the title to clear the word floor.'}]}};
 console.log(JSON.stringify({missing:validateDensityReview(partial,profile),absent:validateDensityReview({accepted:true,findings:[]},profile),
   none:validateDensityReview({accepted:true,findings:[]},null), complete:validateDensityReview(full,profile),
@@ -97,6 +104,32 @@ console.log(JSON.stringify({missing:validateDensityReview(partial,profile),absen
         self.assertFalse(result["outcome"]["accepted"])
         self.assertEqual([b["code"] for b in result["outcome"]["blocking"]], ["DENSITY_MISMATCH"])
         self.assertTrue(result["passing"]["accepted"])
+
+    def test_a_right_verdict_on_a_page_outside_the_band_quotes_its_developed_point(self):
+        point = ("Four extra peak trains an hour since FY22 have coincided with a 5.1-point fall in Eastern line punctuality: "
+                 "each added train leaves less recovery time at the two single-track sections east of Selby, so one late train now delays the next three.")
+        result = run_node(f"""
+import {{ validateDensityReview, DEVELOPED_POINT_WORDS }} from './skills/professional-slides/runtime/reviewer.mjs';
+const profile = {{ flaggedPages: ['p10'], deck: {{ wordsPerBlock: {{ band: [10.2, 22.6] }} }},
+  pages: [{{ id: 'p10', task: 'chart-with-commentary', prose: true, blocks: 9, wordsPerBlock: 7.5 }}, {{ id: 'p11', task: 'chart-led', prose: false, blocks: 7, wordsPerBlock: 6.6 }}] }};
+const deck = 'Words per block run under the band strong prose pages keep, so the deck reads as labels in places.';
+const printed = {{ p10: 'Each extra Eastern line peak train has cost a point of punctuality\\n' + {json.dumps(point)} + '\\nOff-peak trains share none of that conflict.' }};
+const review = (entry) => ({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'right', reason: 'The first point develops the mechanism behind the fall in punctuality.', ...entry }}] }} }});
+console.log(JSON.stringify({{ words: DEVELOPED_POINT_WORDS,
+  bare: validateDensityReview(review({{}}), profile, null, printed),
+  quoted: validateDensityReview(review({{ point: {json.dumps(point)} }}), profile, null, printed),
+  invented: validateDensityReview(review({{ point: {json.dumps(point.replace("three", "four"))} }}), profile, null, printed),
+  label: validateDensityReview(review({{ point: 'Off-peak trains share none of that conflict.' }}), profile, null, printed),
+  thin: validateDensityReview({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'too thin', reason: 'Three labels and one sentence under a two-panel chart.' }}] }} }}, profile, null, printed),
+  led: validateDensityReview({{ density: {{ deck, pages: [{{ slide: 'p10', verdict: 'right', reason: 'x'.repeat(30), point: {json.dumps(point)} }}, {{ slide: 'p11', verdict: 'right', reason: 'A chart-led page whose blocks are its labels.' }}] }} }}, profile, null, printed) }}));
+""")
+        self.assertEqual(result["words"], 25)
+        self.assertTrue(any("point" in e and "p10" in e for e in result["bare"]), result["bare"])
+        self.assertEqual(result["quoted"], [])
+        self.assertTrue(any("not on the page" in e for e in result["invented"]), result["invented"])
+        self.assertTrue(result["label"], "a label is not a developed point")
+        self.assertEqual(result["thin"], [], "only a verdict of right needs the point")
+        self.assertEqual(result["led"], [], "a page that carries no prose is not held to the prose band")
 
 
 class EvaluationLengthTests(unittest.TestCase):

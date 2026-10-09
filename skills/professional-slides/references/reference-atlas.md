@@ -19,6 +19,8 @@ Use this atlas during exhibit selection. The original schematics below explain r
 | Distribution / exceptions | Named observations, sample basis, quantile method; locate focal case against cohort spread. | Median alone called consistency; plausible inherited quartiles with no members. |
 | Spatial allocation | Real geometry or an explicitly designed conceptual allocation whose adjacency/capacity matters. | Map-shaped decoration or invented geographical coordinates. |
 
+Where the relationship is one the page's measures themselves set - a reconciliation, a threshold, matched small multiples, a distribution, shared rows of several measures - the runtime reads it and names the forms that are its best fit (`author-deck.mjs --types`, [Which form carries which claim](design.md#which-form-carries-which-claim)); `--plan` allocates among those. The atlas is for telling which relationship the evidence has, and for the relationships no measure decides: a workflow, a calendar, decision branches, a specimen, a synthesis.
+
 ## Devices worth transferring
 
 Each device below is a pattern a strong page uses. They are described, not cited, and nothing here is a pointer to retrieve.

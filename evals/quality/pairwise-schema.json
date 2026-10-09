@@ -1,0 +1,1 @@
+{"type":"object","required":["preference","margin","reasons"],"additionalProperties":false,"properties":{"preference":{"enum":["deck-1","deck-2","tie"]},"margin":{"enum":["slight","clear","decisive"]},"reasons":{"type":"array","items":{"type":"string"}}}}

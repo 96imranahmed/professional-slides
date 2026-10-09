@@ -1,0 +1,15 @@
+{
+  "$comment": "What makes a table treated: at least one analytical device that says something about its data. A node treats the table it belongs to when its role starts with one of a treatment's `rolePrefixes`, its cell's type is one of `cellTypes`, or it is a row band (`table-row-band`) of one of `rowBands` styles. Zebra banding, group rows and the implication gutter are not treatments: they keep the reader's place or structure the grid and say nothing about the data. A highlighted column or accented row is: it points the reader at the option or row the argument turns on. One definition, read by deck_gates.py (DECK_CRAFT), build-bars.mjs (BAR_TABLES_TREATED) and craft_gates.mjs (CRAFT_TABLES_PLAIN).",
+  "treatments": {
+    "heat cells": { "cellTypes": ["heatmap"] },
+    "Harvey balls and dots": { "rolePrefixes": ["table-harvey", "table-rating-", "table-dot"] },
+    "in-cell bars": { "rolePrefixes": ["table-bar", "table-progress-"] },
+    "state pills and marks": { "rolePrefixes": ["table-status-pill", "table-lamp", "table-check", "table-binary-mark"] },
+    "logos": { "rolePrefixes": ["table-logo", "table-header-logo"] },
+    "icons": { "rolePrefixes": ["table-cell-icon"] },
+    "trend arrows": { "rolePrefixes": ["table-trend"] },
+    "a highlighted column": { "rolePrefixes": ["table-column-band"] },
+    "an accented row": { "rowBands": ["accented"] },
+    "a bold total band": { "rowBands": ["total"] }
+  }
+}

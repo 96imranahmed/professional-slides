@@ -2,35 +2,92 @@
 
 Verification for `skills/professional-slides` covers content and plan contracts,
 composition, export, readback, rendered geometry and delivery-review bindings.
-Passing these checks does not establish editorial or visual taste.
+Passing these checks does not establish editorial or visual taste. The pipeline
+the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#pipeline);
+none of it is repeated here.
 
-## Cold runs
+## Quality eval
 
-`cold-run/` is the review loop as a command. A cold run is the skill used the
-way a stranger uses it — a brief, no context, no corrections — and every defect
-found here over two days of review was found by a person opening a PDF
-afterwards. `cold-run/score.mjs` scores the plan and the build separately and
-refuses to average them, because a plan that passes while its deck does not is a
-different problem from the reverse. See `cold-run/README.md`.
+`quality/` is the end-to-end measurement the unit suite cannot make: a headless
+agent given a brief and nothing else, the deck it delivers judged blind from
+its renders, and a pairwise comparison with the previous skill version on the
+same brief. Results accumulate in `quality/results.jsonl`, keyed by skill
+version, judge model, brief and run. Development briefs are in
+`quality/briefs/dev/`; `quality/briefs/heldout/` is never used for tuning. See
+`quality/README.md`.
+
+Each run packages this checkout, gives a headless agent the brief in an empty
+workspace, judges the delivered deck blind from its renders against
+`quality/rubric.md`, and compares it pairwise with the latest stored deck of a
+different skill version (the git tree hash of `skills/`) on the same brief.
+`quality/score.mjs` scores a run's plan and build apart - the plan gates and the
+build bars - and refuses to average them, because a plan that passes while its
+deck does not is a different problem from the reverse.
 
 ```bash
-node evals/cold-run/score.mjs out/deck.plan.json out/
+node evals/quality/run.mjs --set dev --runs 3 [--agent claude] [--judge claude] [--dry-run]
+node evals/quality/run.mjs --report                # the summary for this skill version
+node evals/quality/score.mjs out/deck.plan.json out/   # score one run's plan and build by hand
+node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught (typed, bound and traced numbers), clean fixture decks clear
+node evals/quality/critic-calibration.mjs --repeats 5 [--dry-run]   # the storyline critic on frozen packets: its spread, and planted anchors
+node evals/quality/variability.mjs                 # the plan under several seeds and design systems: decks differ where a claim leaves a choice of form, and nowhere else
 ```
+
+## Point changes
+
+`point-change/` is the skill's second workflow as a command: a change to one
+page of a deck the user already has - a figure that stands on three slides, a
+title, an exhibit redrawn - run the way `SKILL.md` tells an author to run it,
+on decks made on the spot. It checks that the change was made, that every
+other slide came out byte for byte as it went in, that a figure left behind
+on another slide was caught, and that nothing but the changed pages was
+refused, critiqued or reviewed; and it counts the commands the run took. See
+`point-change/README.md`.
+
+```bash
+node evals/point-change/run.mjs [--task <id>] [--agent claude]
+```
+
+## Calibration
+
+`calibration/` re-derives the targets in `runtime/reading-tasks.json` and
+`runtime/weight.json` from a calibration set kept outside the repository and
+found through the `PS_CALIBRATION_CORPUS` environment variable. It holds
+tooling only: no data file that could name the set's documents sits in the
+repository, and the shipped targets are numbers. See `calibration/README.md`.
+
+## Support code
+
+`support/` holds the code only the suite runs, kept out of the shipped runtime
+so the plugin carries nothing a deck does not use: the composer's entry point
+the tests import (`compose.mjs`, re-exporting `runtime/compose-*.mjs`), the
+component fixtures, the HTML adapter and the browser overlap audit with its
+layering policy.
 
 ## Commands
 
 ```bash
-# everything: unit tests, content-stage and cold-run numbers for the example decks
+# everything: unit tests, the example decks' content stage and the source checks
 evals/run.sh
 
-# plus the LibreOffice end-to-end render (~10 s, skipped without soffice)
+# plus the LibreOffice end-to-end render (test_end_to_end_render.py, ~5 s)
 evals/run.sh --slow
 
-# unit tests only
+# unit tests only: parallel, with a dependency preflight and a skip report.
+# --jobs N workers (default: CPUs, at most 8); --serial one worker; --strict fails
+# on a test skipped for a missing dependency; --slow adds the opt-in LibreOffice
+# end-to-end tests (PS_RUN_SLOW=1); --pattern GLOB picks modules; --verbose
+node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
-node evals/scripts/run_tests.mjs
 
-# deterministic page gates on any scene + render (item 11)
+# source checks (npm run check:syntax): syntax, the embedded probes, and dead
+# exports - an export no runtime module, eval script, test probe or code example
+# in the docs imports; it fails on any, unless evals/scripts/dead_exports.mjs
+# names it in PUBLIC_API with the reason it is kept
+node evals/scripts/check_source_quality.mjs
+node evals/scripts/dead_exports.mjs
+
+# deterministic page gates on any scene + render
 python3 skills/professional-slides/runtime/gates/page_gates.py \
     scene.json render_dir/ [--report out.json] \
     [--profile executive|pre-read|live-pitch] [--only CODE,CODE]
@@ -48,10 +105,9 @@ python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 numeric tokens, body ink, occupied grid cells, empty bands, title rules, and,
 given the scene or pages file, exhibits per page, one-exhibit-plus-column pages,
 plotted values per chart page and one-to-three-word title last lines — and sets
-it beside a reference census. `reference_census.json` holds the numbers for a
-sample of strong consulting pages; the sample stays outside the repository, so
-pass another PDF or census JSON to `--reference` to compare against something
-else.
+it beside a reference census: another PDF, or a census JSON this script wrote.
+The sample of strong consulting pages it was built to compare against stays
+outside the repository.
 
 Every per-page statistic is taken over the deck's analytical pages: the cover,
 section dividers, agendas and generated pages (picture credits) are left out,
@@ -65,7 +121,7 @@ each counts `pageType.values`, the number `author-deck.mjs` prints as `plotted`.
 ```bash
 python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
     --scene out/scene.json --pages deck.pages.json \
-    --reference evals/reference_census.json [--out census.json]
+    --reference reference.pdf [--out census.json]
 ```
 
 ## Page gates

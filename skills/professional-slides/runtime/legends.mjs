@@ -27,7 +27,7 @@ export function quantitativeLegendNodes({id,frame,props}) {
   if (props.items!==undefined) throw new Error('Quantitative scale legend uses a domain rather than categorical items');
   const scale=normalizeQuantitativeScale(props.scale), size=tokenValue(token('type.chartLabel'));
   const labels=scale.domain.map((v,i)=>`${scale.semantics==='relative-level'?(i?'High ':'Low '):''}${withUnit(v.toFixed(scale.decimals), scale.unit)}`);
-  const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size,wrapWidthRatio:1}));
+  const measurements=labels.map(text=>measureText(text,frame.width,{fontSize:size}));
   const height=Math.max(...measurements.map(m=>m.height));
   if (measurements.some(m=>m.lines.length!==1)||measurements.reduce((s,m)=>s+m.width,0)+16>frame.width || height+20>frame.height) throw new Error('Quantitative legend does not fit its allocated frame; widen the legend region or shorten the unit and end labels');
   const data={legendVariant:'quantitative-scale',domain:scale.domain,unit:scale.unit,palette:scale.palette,scaleSemantics:scale.semantics??null,bins:11};
@@ -53,7 +53,7 @@ function packLegendRows(widths, maxWidth, gap) {
 /** How many rows a horizontal legend of these items needs at this width. */
 export function legendRowCount(items, width) {
   const keyGap = tokenValue(token("space.2")), itemGap = tokenValue(token("space.4"));
-  const widths = items.map((item) => 12 + keyGap + measureText(typeof item === "string" ? item : item.label, width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
+  const widths = items.map((item) => 12 + keyGap + measureText(typeof item === "string" ? item : item.label, width, { fontSize: tokenValue(token("type.chartLabel")) }).width);
   return packLegendRows(widths, width, itemGap).length;
 }
 
@@ -71,9 +71,9 @@ export function legendNodes({ id, frame, props }) {
   const keyWidths = items.map((item) => {
     const markerSize = item.markerSize ?? 12;
     if (!Number.isFinite(markerSize) || markerSize < 8 || markerSize > 20) throw new Error("Legend marker size must be between eight and twenty pixels");
-    return variant === "line" ? defaultKeyWidth : Math.max(defaultKeyWidth, markerSize);
+    return variant === "line" || item.mark === "line" ? 24 : Math.max(defaultKeyWidth, markerSize);
   });
-  const widths = items.map((item, index) => keyWidths[index] + keyGap + measureText(item.label, frame.width, { fontSize: tokenValue(token("type.chartLabel")), wrapWidthRatio: 1 }).width);
+  const widths = items.map((item, index) => keyWidths[index] + keyGap + measureText(item.label, frame.width, { fontSize: tokenValue(token("type.chartLabel")) }).width);
   const vertical = placement === "right";
   // A horizontal legend wraps onto further rows when its items outrun the frame.
   const rows = vertical ? items.map((_, i) => [i]) : packLegendRows(widths, frame.width, itemGap);
@@ -96,6 +96,16 @@ export function legendNodes({ id, frame, props }) {
     const state = variant === "state" ? states[item.state] : null;
     const style = { fill: state && !state.fill ? "none" : color, stroke, lineWidth: token("line.hairline"), dash: state?.dash ?? "solid" };
     const data = { categoryKey: item.key ?? item.label, colorIndex, legendVariant: variant, placement };
+    // `mark: "line"` keys one series as the line it is drawn as, beside series keyed as bars: a combo's line read off a
+    // square swatch is read as a third bar series.
+    if (item.mark === "line") {
+      const label = textPrimitive({ id: stableId(id, "label", index), role: "legend-label", frame: { x: x + keyWidth + keyGap, y, width: widths[index] - keyWidth - keyGap, height }, text: item.label,
+        style: { fontFamily: token("font.body"), fontSize: token("type.chartLabel"), color: token("color.ink"), align: "left", valign: "mid", wrap: false }, data: { ...data, textLayout: { lines: [item.label] } } });
+      const nodes = [linePrimitive({ id: stableId(id, "key", index), role: "legend-swatch", x1: x, y1: y + height / 2, x2: x + keyWidth, y2: y + height / 2, style: { stroke: color, lineWidth: token("line.standard") }, data: { ...data, mark: "line" } }),
+        ellipsePrimitive({ id: stableId(id, "key-dot", index), role: "legend-marker", frame: { x: x + keyWidth / 2 - 4, y: y + height / 2 - 4, width: 8, height: 8 }, style: { fill: color, stroke: color, lineWidth: token("line.hairline") }, data: { ...data, mark: "line" } }), label];
+      if (vertical) y += height + keyGap; else x += widths[index] + itemGap;
+      return nodes;
+    }
     const mark = variant === "state" && item.state === "missing"
       ? linePrimitive({ id: stableId(id, "key", index), role: "legend-swatch", x1: x, y1: y + height / 2, x2: x + keyWidth, y2: y + height / 2, style: { stroke, lineWidth: token("line.standard") }, data })
       : variant === "line"

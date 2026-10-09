@@ -1,25 +1,26 @@
 """Nice-number axis ladder.
 
-Mirror of the JavaScript `range()` in `runtime/charts.mjs` so the deterministic
-page gates can check a rendered axis without shelling into Node, and so the two
-implementations can be fuzzed against each other.
+The renderer chooses an axis domain with `range()` and divides it with
+`tickCount()` (runtime/charts.mjs). `nice_range` and `tick_count` are exact
+ports of the two, so a Python reader - the page gate, the native chart's
+headroom stop in emit_pptx.py - gets the domain the scene draws; a parity
+test holds them to the JavaScript over many domains.
 
 An axis tick a reader recognises sits on the 1 / 2 / 2.5 / 5 ladder times a
 power of ten. Interpolating the raw data extrema instead produces axes reading
 14.025 or 22.75, which is the loudest amateur tell a chart can carry.
+`nice_axis` is the gate's rule for a rendered axis.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from typing import Iterable, Iterator, Sequence
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Iterator, Sequence
 
 STEP_LADDER = (1.0, 2.0, 2.5, 5.0)
 
-# Tolerance used when comparing a mantissa against the ladder. Rendered labels
-# are already rounded for display, so this only has to absorb float noise.
-_EPS = 1e-9
 
 # A tick label is a number, optionally wearing a currency symbol, a sign, a
 # percent sign or a magnitude suffix. Anything else ("Q1", "FY24") is a
@@ -30,7 +31,6 @@ _LABEL_RE = re.compile(
     r"\s*(?:%|pp|x|k|m|bn|b|tn)?\s*$",
     re.I,
 )
-_SUFFIXES = {"k": 1e3, "m": 1e6, "bn": 1e9, "b": 1e9, "tn": 1e12}
 
 
 def parse_number(label: str):
@@ -54,15 +54,6 @@ def parse_number(label: str):
         return sign * float(match.group("number").replace(",", ""))
     except ValueError:
         return None
-
-
-def magnitude_suffix(label: str):
-    """Return the magnitude multiplier implied by a trailing k/m/bn, else 1."""
-    text = str(label or "").strip().lower()
-    for suffix, factor in sorted(_SUFFIXES.items(), key=lambda kv: -len(kv[0])):
-        if text.endswith(suffix):
-            return factor
-    return 1.0
 
 
 def mantissa(value: float) -> float:
@@ -160,7 +151,8 @@ def nice_axis(values: Sequence[float]):
 
 
 def step_candidates(rough: float) -> Iterator[float]:
-    """Ladder steps in ascending order, starting a decade below `rough`."""
+    """Ladder steps in ascending order, starting a decade below `rough`
+    (charts.mjs stepCandidates)."""
     base = rough if (rough > 0 and math.isfinite(rough)) else 1.0
     start = math.floor(math.log10(base)) - 1
     for exponent in range(start, start + 5):
@@ -169,65 +161,59 @@ def step_candidates(rough: float) -> Iterator[float]:
             yield rung * magnitude
 
 
-def nice_domain(minimum: float, maximum: float, steps: int = 4, include_zero: bool = False) -> dict:
-    """Port of `range()` from charts.mjs.
+def to_fixed(value: float, places: int) -> float:
+    """JavaScript's `Number(value.toFixed(places))`: the exact binary value
+    rounded to `places` decimals, a tie going away from zero."""
+    return float(Decimal(value).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
 
-    Returns {"min", "max", "span", "step"} where the domain spans exactly
-    `steps` whole ladder steps and every tick is a nice number.
-    """
-    lo, hi = float(minimum), float(maximum)
+
+# The step counts a domain may be divided into, in the order that breaks a
+# tie: the tightest division wins, and four wins a tie (charts.mjs TICK_COUNTS).
+TICK_COUNTS = (4, 3, 5, 6)
+
+
+def nice_range(values: Sequence[float], include_zero: bool = False) -> dict:
+    """The axis domain the renderer draws for `values` (charts.mjs `range()`):
+    {"min", "max", "span", "step", "steps"}, spanning `steps` whole ladder steps
+    anchored at or below the data minimum, the tightest such span of the
+    TICK_COUNTS divisions."""
+    low, high = min(values), max(values)
     if include_zero:
-        lo, hi = min(0.0, lo), max(0.0, hi)
-    if lo == hi:
-        padding = abs(lo) * 0.05 or 1.0
-        lo -= padding
-        hi += padding
-    data_min, data_max = lo, hi
-    step = None
-    nice_min = 0.0
-    for candidate in step_candidates((data_max - data_min) / steps):
-        start = math.floor(data_min / candidate + _EPS) * candidate
-        if start + candidate * steps >= data_max - _EPS:
-            step = candidate
-            nice_min = start
-            break
-    if step is None:
-        step = (data_max - data_min) / steps
-        nice_min = data_min
-    exponent = math.floor(math.log10(step))
-    normalised = step / (10.0 ** exponent)
-    decimals = max(0, -exponent + (1 if abs(normalised - 2.5) < 1e-9 else 0))
-    decimals = min(10, decimals)
-
-    def rounded(value: float) -> float:
-        return float(round(value, decimals))
-
-    lo = rounded(nice_min)
-    hi = rounded(nice_min + step * steps)
-    return {"min": lo, "max": hi, "span": (hi - lo) or 1.0, "step": rounded(step)}
-
-
-def ticks(minimum: float, maximum: float, steps: int = 4, include_zero: bool = False) -> list:
-    """The tick values a `nice_domain` implies, inclusive of both endpoints."""
-    domain = nice_domain(minimum, maximum, steps, include_zero)
-    return [round(domain["min"] + domain["step"] * i, 10) for i in range(steps + 1)]
-
-
-def best_domain(values: Sequence[float], include_zero: bool = False, steps_range: Iterable[int] = (3, 4, 5, 6)) -> dict:
-    """Pick the step count in `steps_range` that leaves the least headroom.
-
-    Item 25 of the revamp: letting `steps` vary 3-6 minimises the empty band
-    above the tallest bar while keeping every tick on the ladder.
-    """
-    finite = [float(v) for v in values if v is not None and math.isfinite(float(v))]
-    if not finite:
-        raise ValueError("best_domain requires at least one finite value")
-    lo, hi = min(finite), max(finite)
+        low, high = min(0, low), max(0, high)
+    if low == high:
+        padding = abs(low) * 0.05 or 1
+        low -= padding
+        high += padding
     best = None
-    for steps in steps_range:
-        domain = nice_domain(lo, hi, steps, include_zero)
-        headroom = (domain["max"] - hi) + (lo - domain["min"])
-        score = (headroom / domain["span"], steps)
-        if best is None or score < best[0]:
-            best = (score, {**domain, "steps": steps})
-    return best[1]
+    for steps in TICK_COUNTS:
+        for candidate in step_candidates((high - low) / steps):
+            start = math.floor(low / candidate + 1e-9) * candidate
+            if start + candidate * steps >= high - 1e-9:
+                if best is None or candidate * steps < best[0] * best[2] - 1e-9:
+                    best = (candidate, start, steps)
+                break
+    step, nice_min, steps = best or ((high - low) / 4, low, 4)
+    exponent = math.floor(math.log10(step))
+    places = min(10, max(0, -exponent + (1 if step / 10.0 ** exponent == 2.5 else 0)))
+    domain_min, domain_max = to_fixed(nice_min, places), to_fixed(nice_min + step * steps, places)
+    return {"min": domain_min, "max": domain_max, "span": (domain_max - domain_min) or 1,
+            "step": to_fixed(step, places), "steps": steps}
+
+
+def tick_count(low: float, high: float, preferred: int = 4) -> int:
+    """How many steps the renderer divides [low, high] into (charts.mjs
+    `tickCount()`): the preferred count if it lands on the ladder, else three,
+    five, six or two."""
+    def on_ladder(count):
+        step = (high - low) / count
+        if not step > 0 or not math.isfinite(step):
+            return False
+        normalized = step / 10 ** math.floor(math.log10(step))
+        return any(abs(normalized - value) < 1e-9 for value in (1, 2, 2.5, 5, 10))
+    return next((count for count in (preferred, 3, 5, 6, 2) if on_ladder(count)), preferred)
+
+
+def axis_ticks(low: float, high: float, preferred: int = 4) -> list:
+    """The tick values the renderer draws on [low, high] (charts.mjs `axes()`)."""
+    steps = tick_count(low, high, preferred)
+    return [low + (high - low) * index / steps for index in range(steps + 1)]

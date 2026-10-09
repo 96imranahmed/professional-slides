@@ -10,6 +10,14 @@
       "aliases": ["commercial dd", "cdd", "acquisition diligence"]
     },
     {
+      "id": "competitive-position",
+      "file": "competitive-position.md",
+      "status": "stable",
+      "primaryDecision": "Which company, product or option is better positioned on the criteria that decide the market, now and over a stated horizon, and what would change the call.",
+      "audiences": ["investor", "strategy team", "board", "executive"],
+      "aliases": ["who is better positioned", "competitive landscape", "head to head", "company comparison", "versus deck"]
+    },
+    {
       "id": "project-progress-update",
       "file": "project-progress-update.md",
       "status": "stable",

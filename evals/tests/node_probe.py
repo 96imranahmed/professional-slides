@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "professional-slides"
 RUNTIME = SKILL / "runtime"
 REFERENCES = SKILL / "references"
+# The storyline loop puts each blocking item to a second critic before it records a pass (storyline.mjs CONFIRM_FILE).
+# The suite drives the loop with fixture answers, so it switches that step off; the test of the step switches it on.
+os.environ.setdefault("PS_STORYLINE_CONFIRM", "0")
 NODE = os.environ.get("RUNTIME_NODE") or shutil.which("node")
 
 WORKER = Path(__file__).resolve().parent / "probe-worker.mjs"
@@ -81,6 +84,66 @@ def requires_binary(*names: str):
         return shutil.which(name) is not None
     missing = [n for n in names if not found(n)]
     return unittest.skipIf(bool(missing), f"needs {', '.join(missing)} on PATH")
+
+
+_CHROMIUM_PROBE = r"""
+const fs = require('fs');
+try {
+  const { chromium } = require(require.resolve('playwright', { paths: [process.env.RUNTIME_NODE_MODULES] }));
+  const browser = process.env.PLAYWRIGHT_BROWSER_PATH || chromium.executablePath();
+  console.log(fs.existsSync(browser) ? '' : 'the Playwright Chromium build (npx playwright install chromium)');
+} catch (error) {
+  console.log('playwright (npm ci)');
+}
+"""
+
+
+def _chromium_missing() -> str:
+    """What the rendered overlap probes lack, or '' when they can launch."""
+    if not NODE:
+        return "Node.js"
+    try:
+        probe = subprocess.run([NODE, "-e", _CHROMIUM_PROBE], cwd=ROOT, capture_output=True,
+                               text=True, timeout=30, env=_probe_env())
+    except (OSError, subprocess.TimeoutExpired):
+        return "Node.js"
+    return probe.stdout.strip() if probe.returncode == 0 else "playwright (npm ci)"
+
+
+def requires_chromium(target):
+    """Skip a test or class that launches Playwright Chromium when it cannot.
+
+    Asked on first use rather than at import, so modules that never touch a
+    browser do not pay for the probe.
+    """
+    state: dict[str, str] = {}
+
+    def missing() -> str:
+        if "missing" not in state:
+            state["missing"] = _chromium_missing()
+        return state["missing"]
+
+    if isinstance(target, type):
+        original = target.setUpClass
+
+        @classmethod
+        def setUpClass(cls):
+            if missing():
+                raise unittest.SkipTest(f"needs {missing()}")
+            original.__func__(cls)
+
+        target.setUpClass = setUpClass
+        return target
+
+    import functools
+
+    @functools.wraps(target)
+    def wrapper(*args, **kwargs):
+        if missing():
+            raise unittest.SkipTest(f"needs {missing()}")
+        return target(*args, **kwargs)
+
+    return wrapper
 
 
 # LibreOffice registers under either name depending on the install.
@@ -284,16 +347,45 @@ def run_node(source: str) -> dict:
 
 
 _EXAMPLE_SCENES = {}
+_AUTHORED_EXAMPLES = {}
+
+
+def authored_example(name="page-types"):
+    """A worked example's pages file authored into a temporary directory, once a run.
+
+    The examples ship the pages file alone; `<name>.deck.json`, `.plan.json`
+    and `.content.json` are what author-deck.mjs writes beside it, so they are
+    written here, beside a copy of the examples' assets, and never committed.
+    """
+    if name not in _AUTHORED_EXAMPLES:
+        import tempfile
+        work = Path(tempfile.mkdtemp(prefix=f"ps-example-{name}-"))
+        atexit.register(shutil.rmtree, work, ignore_errors=True)
+        examples = SKILL / "examples"
+        shutil.copytree(examples / "assets", work / "assets")
+        shutil.copy(examples / f"{name}.pages.json", work / f"{name}.pages.json")
+        out = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(work / f"{name}.pages.json")],
+                             cwd=ROOT, capture_output=True, text=True)
+        if out.returncode != 0 or not (work / f"{name}.deck.json").exists():
+            raise AssertionError(f"author-deck.mjs refused {name}.pages.json (exit {out.returncode})\n{out.stderr[-2000:]}\n{out.stdout[-2000:]}")
+        _AUTHORED_EXAMPLES[name] = work
+    return _AUTHORED_EXAMPLES[name]
 
 
 def example_scene(name="nyc-or-sf"):
-    """A shipped example deck compiled to its scene, cached for the run."""
+    """A shipped example deck compiled to its scene, cached for the run.
+
+    A deck spec in examples/ is read as it is; an example shipped as a pages
+    file is authored first (authored_example).
+    """
     if name not in _EXAMPLE_SCENES:
+        examples = SKILL / "examples"
+        directory = examples if (examples / f"{name}.deck.json").exists() else authored_example(name)
         _EXAMPLE_SCENES[name] = run_node(f"""
 import fs from 'node:fs';
-import {{ toDeckPlan }} from './skills/professional-slides/runtime/compose.mjs';
+import {{ toDeckPlan }} from './evals/support/compose.mjs';
 import {{ planDeck }} from './skills/professional-slides/runtime/planner.mjs';
-const dir = './skills/professional-slides/examples';
+const dir = {json.dumps(str(directory))};
 const spec = JSON.parse(fs.readFileSync(dir + '/{name}.deck.json', 'utf8'));
 console.log(JSON.stringify(planDeck(toDeckPlan(spec, dir)).deck));
 """)

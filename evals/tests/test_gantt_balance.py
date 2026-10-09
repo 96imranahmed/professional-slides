@@ -26,7 +26,7 @@ console.log('{}');
     def test_parent_aligns_schedule_and_table_without_changing_time_or_width_shares(self):
         run_node(r"""
 import assert from 'node:assert/strict';
-import {toDeckPlan} from './skills/professional-slides/runtime/compose.mjs';
+import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const schedule={type:'gantt',periods:['0','1','2','3'],rows:[{label:'Prepare',from:0,to:1},{label:'Run',from:1,to:4}]};
 const table={type:'table',columns:['Stage','Minutes'],rows:[['Prepare','10'],['Run','30']]};

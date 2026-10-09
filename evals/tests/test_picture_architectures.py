@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from node_probe import run_node
 
@@ -26,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
+import render_gates  # noqa: E402
 
 BASE = "./skills/professional-slides"
 PHOTO = "examples/assets/hills.jpg"
@@ -35,7 +37,7 @@ class PictureArchitectureTests(unittest.TestCase):
     def test_the_count_chooses_the_shape_and_the_shape_is_recorded(self):
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const picture=(label)=>({{alt:label+' skyline',label,text:label+' carries the cheaper half of the decision by a clear margin.'}});
 const page=(n)=>({{title:'A title that states the finding for this page',pictures:[...Array(n)].map((_,i)=>picture('City '+i)),soWhat:'One of them wins.'}});
 const shapeOf=(slide)=>{{const recent=[];composeSlide(slide,0,'{BASE}',undefined,1,recent);return recent[0];}};
@@ -57,7 +59,7 @@ console.log(JSON.stringify({{ok:true}}));
         # of cards the largest frame on a page whose subject is the pictures.
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'Two cities, and the one the offer decides',pictures:[
   {{alt:'London',label:'London',text:'Rent at 62% of the New York figure.'}},
   {{alt:'New York',label:'New York',text:'Median pay 34% higher, and the tax that comes with it.'}}],
@@ -80,7 +82,7 @@ console.log(JSON.stringify({{ok:true}}));
         # in it.
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const page=(pictures)=>({{title:'A title that states the finding for this page',pictures,soWhat:'It matters.'}});
 const unsourced=composeSlide(page([{{alt:'Joker, still to source',label:'Joker',text:'The one with the box office.'}},
   {{alt:'Thanos, still to source',label:'Thanos',text:'The one with the franchise.'}}]),0,'{BASE}');
@@ -103,7 +105,7 @@ console.log(JSON.stringify({{ok:true}}));
     def test_the_pictures_are_the_evidence_so_an_exhibit_is_refused(self):
         result = run_node(f'''
 import assert from 'node:assert/strict';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'A title that states the finding for this page',
   pictures:[{{alt:'A',label:'A',text:'x'}},{{alt:'B',label:'B',text:'y'}}],
   exhibit:{{type:'table',columns:['a','b'],rows:[['1','2']]}}}};
@@ -124,7 +126,7 @@ console.log(JSON.stringify({{ok:true}}));
         result = run_node(f'''
 import assert from 'node:assert/strict';
 import {{auditContent}} from '{BASE}/runtime/content-audit.mjs';
-import {{composeSlide}} from '{BASE}/runtime/compose.mjs';
+import {{composeSlide}} from './evals/support/compose.mjs';
 const slide={{title:'Two cities, and the one the offer decides',pictures:[
   {{alt:'London',label:'London',text:'Rent at 62% of the New York figure.'}},
   {{alt:'New York',label:'New York',text:'Median pay 34% higher.'}}]}};
@@ -187,17 +189,14 @@ class PictureWordFloorTests(unittest.TestCase):
         page_gates.gate_thin_page(1, {"nodes": []}, plain := [])
         self.assertTrue(plain, "a page with no picture and no words is still thin")
         findings = []
-        original = page_gates.body_bands
-        page_gates.body_bands = lambda _slide: (words, 0, 0)
-        try:
+        # The thin-page gate reads the band count where it is defined.
+        with mock.patch.object(render_gates, "body_bands", lambda _slide: (words, 0, 0)):
             page_gates.gate_thin_page(1, slide, findings)
             self.assertEqual(findings, [], "a picture page is held to the body the picture left it")
             bare = []
             page_gates.gate_thin_page(1, {"nodes": [], "contentFrame": page_gates.content_frame({})}, bare)
             self.assertEqual([f["code"] for f in bare], ["THIN_PAGE"])
             self.assertEqual(bare[0]["threshold"], floor)
-        finally:
-            page_gates.body_bands = original
 
 
 if __name__ == "__main__":

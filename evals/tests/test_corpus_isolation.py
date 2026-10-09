@@ -23,7 +23,25 @@ package_plugin = importlib.util.module_from_spec(spec); spec.loader.exec_module(
 LEAKS = re.compile(r"corpus|/Users/|client[- ]?(?:deck|page|work|project|engagement)s?\b"
                    r"|published (?:deck|work|page|report|slideshow)s?\b|thought leadership|vision pass|calibration sample"
                    r"|[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf|\b(?:mckinsey|bcg|bain|deloitte|l\.e\.k|oliver wyman)\b", re.I)
-TEXT = {'.md', '.mjs', '.js', '.py', '.json', '.yaml', '.yml', '.toml', '.txt', '.svg'}
+TEXT = {'.md', '.mjs', '.js', '.py', '.json', '.jsonl', '.yaml', '.yml', '.toml', '.txt', '.svg', '.sh', '.csv'}
+# evals/ never ships, but it is shared with the repository: it may talk about
+# calibration, never say where the set lives or which documents are in it.
+MACHINE_PATH = re.compile(r"/Users/[A-Za-z0-9._-]|/home/[a-z]|[A-Z]:\\\\Users|/private/var/|/var/folders/")
+DOCUMENT_NAME = re.compile(r"[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf", re.I)
+FIRMS = re.compile(r"\b(?:mckinsey|bcg|bain|deloitte|accenture|kearney|booz|kpmg|pwc|l\.e\.k|oliver wyman)\b", re.I)
+# The directories that describe the calibration set or record runs against it.
+# Specimens and their decks are about their own subjects and may name anyone.
+CALIBRATION_FACING = ('evals/calibration', 'evals/quality', 'evals/README.md')
+
+
+def evals_text_files():
+    for path in sorted((ROOT / 'evals').rglob('*')):
+        rel = path.relative_to(ROOT).as_posix()
+        if not path.is_file() or path.suffix not in TEXT or '__pycache__' in rel or rel.startswith('evals/quality/runs/'):
+            continue
+        if path.name == Path(__file__).name:  # this file spells the patterns out
+            continue
+        yield rel, path
 
 
 class CorpusIsolationTests(unittest.TestCase):
@@ -45,6 +63,27 @@ class CorpusIsolationTests(unittest.TestCase):
                         if LEAKS.search(line):
                             offenders.append(f'{path.relative_to(dest)}:{i}: {LEAKS.search(line).group(0)}')
         self.assertEqual(offenders, [], '\n'.join(offenders[:40]))
+
+    def test_evals_name_no_machine_path_and_no_calibration_document(self):
+        offenders = []
+        for rel, path in evals_text_files():
+            for i, line in enumerate(path.read_text(encoding='utf-8', errors='ignore').splitlines(), 1):
+                for pattern in (MACHINE_PATH, DOCUMENT_NAME):
+                    if pattern.search(line):
+                        offenders.append(f'{rel}:{i}: {pattern.search(line).group(0)}')
+                if rel.startswith(CALIBRATION_FACING) and FIRMS.search(line):
+                    offenders.append(f'{rel}:{i}: {FIRMS.search(line).group(0)}')
+        self.assertEqual(offenders, [], '\n'.join(offenders[:40]))
+
+    def test_the_calibration_tools_find_the_set_through_the_environment(self):
+        for path in sorted((ROOT / 'evals' / 'calibration').glob('*.py')):
+            text = path.read_text(encoding='utf-8')
+            if 'corpus_root' in text and path.name != 'corpus.py':
+                self.assertIn('from corpus import corpus_root', text, path.name)
+        self.assertIn('PS_CALIBRATION_CORPUS', (ROOT / 'evals' / 'calibration' / 'corpus.py').read_text())
+        # No data file that could name the set's documents sits beside the tools.
+        data = [p.name for p in (ROOT / 'evals' / 'calibration').rglob('*') if p.suffix in {'.json', '.jsonl', '.csv'}]
+        self.assertEqual(data, [])
 
     def test_the_package_is_the_skill_alone(self):
         with tempfile.TemporaryDirectory() as tmp:

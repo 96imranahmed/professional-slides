@@ -13,6 +13,7 @@ import {
 import { measureText } from "./text-layout.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
+import { judged } from "./judgements.mjs";
 
 const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
@@ -53,7 +54,9 @@ const EVIDENCE_PAD_X = 16;
 const EVIDENCE_PAD_Y = 14;
 const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
-const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label"]);
+// An axis title is ink a callout box or its leader must clear - the y title
+// set above a scatter's plot among them.
+const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label", "axis-title"]);
 
 // An annotation centres on the mark it points at, and its bold face is the
 // annotation face rather than the body bold. Over the shared builder.
@@ -104,24 +107,44 @@ function normalizeEvidenceAnnotations(props = {}) {
 
 // A callout the chart has already moved beside its mark (or into a right-hand
 // rail) on an earlier pass holds no band above the plot: reserving 88px for a
-// box that is not there left an empty stripe over every such chart.
+// box that is not there would leave an empty stripe over the chart.
 const RELEASED_PLACEMENTS = new Set(["beside", "rail", "on-bar", "plot"]);
 const holdsBand = (annotation) => (annotation.treatment !== "orthogonal-dot" || annotation.orientation !== "horizontal") && !RELEASED_PLACEMENTS.has(annotation._placement);
 
+// The bands the callouts above the plot sit in, as lanes: lane 0 is the band
+// on the plot, each lane above it the next band up. A callout holds its own
+// lane, in order - the first callout highest - until a render has placed them
+// (`_lane`, set by packedEvidenceProps): callouts whose boxes do not meet across
+// the plot then share a lane, and the plot keeps the height a stacked band
+// would have taken. Each entry is { annotation, index, lane }, `index` its place
+// in the chart's annotations.
+function bandLanes(props) {
+  const banded = normalizeEvidenceAnnotations(props).map((annotation, index) => ({ annotation, index })).filter((entry) => holdsBand(entry.annotation));
+  const packed = banded.length && banded.every((entry) => Number.isInteger(entry.annotation._lane) && entry.annotation._lane >= 0);
+  return banded.map((entry, order) => ({ ...entry, lane: packed ? entry.annotation._lane : banded.length - 1 - order }));
+}
+const laneCount = (lanes) => (lanes.length ? Math.max(...lanes.map((entry) => entry.lane)) + 1 : 0);
+
 export function evidenceAnnotationTopBandCount(props = {}) {
-  return normalizeEvidenceAnnotations(props).filter(holdsBand).length;
+  return laneCount(bandLanes(props));
 }
 
 // In a compact band each box takes its own measured height plus a small gap,
 // and only the lowest keeps the full foot that clears the value labels riding
 // the tallest marks. It is what the chart falls back to when the full 88px
-// bands would leave the plot under its minimum height.
+// bands would leave the plot under its minimum height. A shared band is as tall
+// as its tallest box.
 const COMPACT_BAND_GAP = 8;
 const BAND_FOOT = EVIDENCE_CALLOUT_BAND - EVIDENCE_BOX_HEIGHT;
 function bandHeights(props, compact) {
-  const banded = normalizeEvidenceAnnotations(props).filter(holdsBand);
-  if (!compact) return banded.map(() => EVIDENCE_CALLOUT_BAND);
-  return banded.map((annotation, index) => evidenceBoxSize(annotation).height + (index === banded.length - 1 ? BAND_FOOT : COMPACT_BAND_GAP));
+  const lanes = bandLanes(props), count = laneCount(lanes);
+  // Indexed as the bands stack, band 0 the highest: band b holds lane count-1-b.
+  return Array.from({ length: count }, (_, band) => {
+    if (!compact) return EVIDENCE_CALLOUT_BAND;
+    const lane = count - 1 - band;
+    const tallest = Math.max(...lanes.filter((entry) => entry.lane === lane).map((entry) => evidenceBoxSize(entry.annotation).height), EVIDENCE_BOX_MIN_HEIGHT);
+    return tallest + (lane === 0 ? BAND_FOOT : COMPACT_BAND_GAP);
+  });
 }
 
 /** The height the evidence bands take above the plot, full or compact. */
@@ -140,8 +163,7 @@ function bandBoxY(plot, props, bandIndex, height) {
 
 // A callout with no `series` on a chart of several series (a stacked or
 // grouped chart keys its marks by series) points at the category as a whole:
-// the top of the stack, or the category's largest mark. It used to fail as an
-// unknown category though the category was on the chart.
+// the top of the stack, or the category's largest mark.
 function resolveEvidenceAnchor(pointMap, annotation, id) {
   const target = pointMap.get(`${annotation.series || "value"}:${annotation.category}`)
     ?? (annotation.series ? null : pointMap.get(`category:${annotation.category}`));
@@ -173,7 +195,7 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
     if (node.type !== "text") return node;
     // Text allocations often span a whole bar/category. Collision routing uses
     // the measured ink box rather than treating its empty margins as ink.
-    const measured = measureText(node.text, node.frame.width, { fontFamily: tokenValue(node.style.fontFamily), fontSize: tokenValue(node.style.fontSize), bold: node.style.bold, wrapWidthRatio: 1 });
+    const measured = measureText(node.text, node.frame.width, { fontFamily: tokenValue(node.style.fontFamily), fontSize: tokenValue(node.style.fontSize), bold: node.style.bold });
     const x = node.frame.x + (node.style.align === "center" ? (node.frame.width - measured.width) / 2 : node.style.align === "right" ? node.frame.width - measured.width : 0);
     const y = node.frame.y + (node.style.valign === "mid" ? (node.frame.height - measured.height) / 2 : node.style.valign === "bottom" ? node.frame.height - measured.height : 0);
     return { ...node, frame: { x, y, width: measured.width, height: measured.height } };
@@ -181,10 +203,10 @@ function annotationObstacleFrames(obstacles, roles = COLLISION_ROLES) {
 }
 
 // Two boxes keep the compact band's gap apart, not more: at 10px, two compact
-// boxes that overlapped across - a bridge's staff-cost and other-cost notes,
-// neighbours on the axis, stacked 8px apart by their bands - failed each
-// other by two pixels, and the second went to a rail that squeezed the
-// category labels off the page.
+// boxes that overlap across - a bridge's staff-cost and other-cost notes,
+// neighbours on the axis, stacked 8px apart by their bands - fail each other
+// by two pixels, and the second goes to a rail that squeezes the category
+// labels off the page.
 function clearSurface(frame, obstacles, placements) {
   return obstacles.every((node) => !meets(node, frame, 6))
     && placements.every((placement) => !overlaps(frame, placement.frame, COMPACT_BAND_GAP));
@@ -192,7 +214,7 @@ function clearSurface(frame, obstacles, placements) {
 
 // A line's segment is read as the segment, not its box: a callout placed in
 // the plot sits above or beside a rising line, inside the box its diagonal
-// spans; read as a box, every such place was refused.
+// spans; read as a box, every such place would be refused.
 function meets(node, frame, pad) {
   const d = node.type === "line" ? node.data : null;
   if (!d || ![d.x1, d.y1, d.x2, d.y2].every(Number.isFinite)) return overlaps(frame, node.frame, pad);
@@ -201,12 +223,20 @@ function meets(node, frame, pad) {
   return false;
 }
 
+// A leader's last few pixels lie under its endpoint dot, on the mark it
+// names, so its corridor stops at the dot's edge. Run on past the mark's
+// centre, it caught a neighbouring series' point that overlaps the mark - two
+// lines a point and a half apart where they cross - and the callout lost the
+// band it could share with another, the chart giving up 88px of plot to a
+// second band (packedEvidenceProps).
 function clearLeader(x1, y1, x2, y2, target, obstacles) {
+  const length = Math.hypot(x2 - x1, y2 - y1), trim = length ? Math.min(length, ENDPOINT_DIAMETER / 2) / length : 0;
+  const ex = x2 - (x2 - x1) * trim, ey = y2 - (y2 - y1) * trim;
   const corridor = {
-    x: Math.min(x1, x2) - 3,
-    y: Math.min(y1, y2) - 3,
-    width: Math.abs(x2 - x1) + 6,
-    height: Math.abs(y2 - y1) + 6
+    x: Math.min(x1, ex) - 3,
+    y: Math.min(y1, ey) - 3,
+    width: Math.abs(ex - x1) + 6,
+    height: Math.abs(ey - y1) + 6
   };
   return obstacles.every((node) => pointInsideFrame(target, node.frame, 1) || !meets(node, corridor, 1));
 }
@@ -215,19 +245,18 @@ function measureEvidenceText(annotation) {
   return measureText(annotation.text, EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   });
 }
 
 /**
  * The box is the size of what it says.
  *
- * 260x56 was the size of every callout whatever it carried, so "$46m, 11-month
- * filing" - one short line - arrived as a rectangle two and a half times its
- * own text with a leader dropping out of the empty half. A reader reads that as
- * an unfinished box, not as a note. The width now closes on the longest laid
- * line and the height on the lines themselves; 260 is the cap it wraps at, and
+ * At a fixed 260x56, "$46m, 11-month filing" - one short line - would arrive as
+ * a rectangle two and a half times its own text with a leader dropping out of
+ * the empty half, which a reader reads as an unfinished box, not as a note. The
+ * width closes on the longest laid line and the height on the lines
+ * themselves; 260 is the cap it wraps at, and
  * `EVIDENCE_BOX_MIN_WIDTH` keeps a two-word note from shrinking to a stamp.
  */
 function evidenceBoxSize(annotation) {
@@ -303,8 +332,8 @@ function ownLabel(target, annotation, obstacles) {
  *
  * On a horizontal bar chart a callout on any bar but the first drops its
  * leader from the band through every longer bar above it, and the orthogonal
- * treatment put its box 28px from the bar end - on top of the value label
- * printed there. Each treatment's error suggested the other. A designer sets
+ * treatment puts its box 28px from the bar end - on top of the value label
+ * printed there. A designer sets
  * the note level with its bar, just past the value, and that is the first
  * candidate here; then the other side, then the same two nudged half a box up
  * or down, then directly above or below the mark. The leader runs from the
@@ -328,9 +357,9 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
     candidates.push({ side: "left", frame: { x: beyond.left - ORTHOGONAL_GAP + reach - width, y, width, height }, leader: { x1: beyond.left - ORTHOGONAL_GAP + reach, y1: mid, x2: beyond.left, y2: target.y } });
   }
   // A bar below zero leaves its row empty past the axis: the note goes there,
-  // in the bar's own row, its leader to the bar's foot. Tried beside the
-  // value end only, the box met the bar itself and the "only region that
-  // shrank" could not be pointed at.
+  // in the bar's own row, its leader to the bar's foot. Beside the value end
+  // alone, the box would meet the bar itself and a note on the "only region
+  // that shrank" would have nowhere to go.
   const bar = obstacles.find((node) => node.role === "chart-mark" && node.data?.category === annotation.category
     && (!annotation.series || !node.data?.series || node.data.series === annotation.series) && node.frame.width > node.frame.height);
   if (bar && label && label.frame.x + label.frame.width <= bar.frame.x + 2) {
@@ -342,8 +371,8 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
   candidates.push({ side: "above", frame: { x: centred, y: above - ORTHOGONAL_GAP - height, width, height }, leader: { x1: leaderX, y1: above - ORTHOGONAL_GAP, x2: target.x, y2: above } });
   // Above a short mark among taller ones: the box clears the tallest thing
   // under its width, the leader drops to the mark. A pandemic-year column
-  // between two tall years had empty plot over it and no place, because the
-  // box set just above the mark met its neighbours.
+  // between two tall years has empty plot over it, but a box set just above
+  // the mark meets its neighbours.
   // Slid sideways, over the lowest neighbours, it finds the empty corner
   // between two tall ones.
   for (const shift of [0, -0.25, 0.25, -0.5, 0.5, -0.75, 0.75]) {
@@ -368,8 +397,8 @@ function besidePlacement({ annotation, index, target, bounds, obstacles, placeme
  * long, thick bar has plain area past its start, and a note set there needs no
  * leader - it is on the thing it describes. Only its own mark (same category
  * and series), fully inside with a margin, clear of its value label and every
- * other obstacle; the overlap audit accepts exactly this construction and
- * nothing looser (overlap-policy.mjs).
+ * other obstacle; the suite's rendered overlap audit accepts exactly this
+ * construction and nothing looser (evals/support/overlap-policy.mjs).
  */
 function insidePlacement({ annotation, index, target, marks, obstacles, placements }) {
   if (annotation.treatment === "speech") return null; // a speech bubble points with its tail
@@ -387,14 +416,14 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
   // The note alone, reversed out of the bar at its end. The longest bar of a
   // six-bar panel is about 34px thick and 300px long: too thin for the boxed
   // note (32px plus its margins), too long to leave room past its end, and a
-  // rail took the panel's plot below its minimum - so the bar the page is
-  // about was the one bar that could not be annotated. A line or two of the
+  // rail can take the panel's plot below its minimum - yet it is often the bar
+  // the page is about. A line or two of the
   // annotation face fits along it, set without a box: it sits on its mark.
   // It is the last resort, after the rail (`_placement: "on-bar"`, set by the
   // chart's render loop when the rail left the plot too narrow): a boxed note
   // reads louder, and a chart with width to spare keeps it. A column's segment
   // can be wider than tall too; the note must fit its words on the mark.
-  const text = annotation._placement === "on-bar" && f.width > f.height ? (() => { try { return measureText(annotation.text, Math.max(1, f.width - 2 * pad), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 }); } catch { return null; } })() : null;
+  const text = annotation._placement === "on-bar" && f.width > f.height ? (() => { try { return measureText(annotation.text, Math.max(1, f.width - 2 * pad), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true }); } catch { return null; } })() : null;
   if (text) {
     const w = Math.ceil(text.width) + 2, h = text.height;
     const frame = { x: f.x + f.width - pad - w, y: f.y + (f.height - h) / 2, width: w, height: h };
@@ -408,14 +437,12 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
  * Where a callout's leader lands: the mark's centre on the category axis, at
  * its value end - the top-centre of a column, the end-centre of a bar.
  *
- * Column points used to carry `leaderX` at the bar's right edge (and bars
- * `leaderY` at their top edge), which kept the leader clear of the value label
- * centred on the column but landed the dot on a corner: on a page of six
- * columns the reader followed it to the gap between two bars, not to the one
- * the note is about. The target is the point itself now, and the leader stops
- * short of the mark's own value label instead - the label sits on the same
- * centre line directly above the mark, so ending the leader at its top keeps
- * the dot on the mark's axis without striking through the number. The label is
+ * The target is the point itself, not a corner of the bar: on a page of six
+ * columns a dot on a corner leads the reader to the gap between two bars, not
+ * to the one the note is about. The leader stops short of the mark's own value
+ * label - the label sits on the same centre line directly above the mark, so
+ * ending the leader at its top keeps the dot on the mark's axis without
+ * striking through the number. The label is
  * found by its category, not only by sitting on the mark: a reference line
  * through a label lifts it clear of the line, and a lifted label is still the
  * one the leader would strike. A negative
@@ -430,7 +457,7 @@ function leaderTarget(target, obstacles, annotation) {
     && Math.abs(node.frame.y + node.frame.height - target.y) <= 1 && node.frame.height > 2);
   if (hanging) return { x, y: hanging.frame.y };
   // A range band prints its high value four pixels past its end, level with
-  // the centre, so a dot on the end-centre sat on the number. When the mark's
+  // the centre, so a dot on the end-centre sits on the number. When the mark's
   // own label is closer to the end than the dot's radius, the dot steps back
   // inside the bar by its radius and a gap - still the end of the bar, clear
   // of the figure. (A bar's label keeps a wider gap and needs no step.)
@@ -496,7 +523,7 @@ function speechNodes(id, placement, data) {
   const minX = Math.min(...xs), minY = Math.min(...ys);
   const width = Math.max(1, Math.max(...xs) - minX), height = Math.max(1, Math.max(...ys) - minY);
   const measured = measureText(placement.annotation.text, frame.width - 16, {
-    fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1,
+    fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true,
   });
   return [
     tailed
@@ -533,7 +560,7 @@ function speechNodes(id, placement, data) {
 }
 
 function evidenceTextNode(id, index, frame, text, data) {
-  const measured = measureText(text, Math.min(EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, Math.max(frame.width - 16, 1)), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(text, Math.min(EVIDENCE_BOX_WIDTH - EVIDENCE_PAD_X, Math.max(frame.width - 16, 1)), { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   const width = Math.max(frame.width - 16, Math.ceil(measured.width) + 2);
   return textPrimitive({
     id: stableId(id, "annotation-text", index),
@@ -631,7 +658,7 @@ export function renderChartCallout({ id, frame, props }) {
     right: { x1: frame.x + frame.width, y1: cy, x2: frame.x + frame.width + 24, y2: cy }
   };
   if (!Object.hasOwn(leaders, direction)) throw new Error(`Unknown callout direction: ${direction}`);
-  const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(props.text, frame.width - 16, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   // The box's 7px vertical padding closes to a 4px floor before the note is
   // refused; past that the frame cannot hold the note at the annotation size.
   if (measured.height > frame.height - 8) throw new Error(`Chart callout text needs ${Math.ceil(measured.height + 8)}px and its frame has ${Math.floor(frame.height)}px; give the callout more height or shorten the note`);
@@ -704,11 +731,14 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
   // gutter, the rail) but stays within the plot's height.
   const limits = plot.limits ?? { x: plot.x - 12, y: plot.y, width: plot.width + 24, height: plot.height };
   const besideBounds = { x: limits.x, y: plot.y, width: limits.width, height: plot.height };
-  let bandIndex = 0;
+  // Each banded callout's band, highest first, from its lane.
+  const lanes = bandLanes(props), count = laneCount(lanes);
+  const bandOf = new Map(lanes.map((entry) => [entry.index, count - 1 - entry.lane]));
   const placements = [];
   annotations.forEach((annotation, index) => {
     const target = resolveEvidenceAnchor(pointMap, annotation, id);
     const banded = holdsBand(annotation);
+    const bandIndex = bandOf.get(index) ?? 0;
     const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
     const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
     const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
@@ -725,8 +755,22 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
           : [() => standardPlacement(context), beside, inside];
     let placement = null;
     for (const attempt of chain) if ((placement = attempt())) break;
-    if (banded) bandIndex += 1;
     if (!placement) {
+      // Where a note of this size does have a clear position, with the callouts already placed: the other marks of the same
+      // series, each tried as this one was. Said with the refusal, so the author moves the note or cuts one, not guesses.
+      const where = () => {
+        const prefix = `${annotation.series || "value"}:`, own = [...pointMap.keys()].filter((key) => key.startsWith(prefix));
+        const keys = own.length ? own : [...pointMap.keys()].filter((key) => key.startsWith("category:"));
+        const taken = new Set(annotations.map((item) => String(item.category)));
+        const free = keys.map((key) => key.slice(key.indexOf(":") + 1)).filter((category) => !taken.has(String(category))).filter((category) => {
+          const moved = { ...annotation, category };
+          const at = { ...context, annotation: moved, target: resolveEvidenceAnchor(pointMap, moved, id) };
+          return Boolean(standardPlacement(at) ?? besidePlacement({ ...at, bounds: besideBounds, obstacles: besideObstacles }));
+        });
+        const placed = placements.length, of = annotations.length;
+        return free.length ? ` - with ${placed} of the ${of} callouts placed, a note of this size has a clear position at ${free.slice(0, 8).join(", ")}${free.length > 8 ? ", ..." : ""}`
+          : ` - no other mark has a clear position for a note of this size either: the plot has room for ${placed ? `no more than the ${placed} of its ${of} callouts already placed` : "no callout of this size"}`;
+      };
       // No room in the plot: this callout takes its band above it after all,
       // and the chart renders again with the plot that much shorter.
       if (annotation._placement === "plot") {
@@ -744,11 +788,11 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
       }
       if (annotation._placement !== "rail" && annotation._placement !== "on-bar") {
         const all = props.annotations;
-        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`), {
+        throw Object.assign(new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot${where()}; shorten the note, move it to a position that is free, annotate fewer marks, or enlarge the exhibit`), {
           retry: (current) => ({ ...current, annotations: (current.annotations || all).map((item, at) => at === index || item?._placement === "rail" ? { ...item, _placement: "rail" } : item) })
         });
       }
-      throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot; shorten the note, annotate fewer marks, or enlarge the exhibit`);
+      throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot${where()}; shorten the note, move it to a position that is free, annotate fewer marks, or enlarge the exhibit`);
     }
     placements.push({ ...placement, released: banded && placement.placement === "beside" });
   });
@@ -772,6 +816,42 @@ export function releasedEvidenceProps(nodes, props = {}) {
   return { ...props, annotations: props.annotations.map((item, index) => moved.has(index) ? { ...item, _placement: "beside" } : item) };
 }
 
+/**
+ * Props with the callouts that stayed in bands above the plot packed into as
+ * few bands as their boxes allow; null when they already are. Two boxes share a
+ * band when they do not meet across the plot (a box's position across depends
+ * on its mark, not on the plot's height, so the next render keeps it); a box
+ * that meets one set lower stays above it, as it was. Stacked one band per
+ * callout, two notes over different years took 176px of the plot where one band
+ * of 88 held both. The chart renders once more with these props.
+ */
+export function packedEvidenceProps(nodes, props = {}) {
+  if (!Array.isArray(props.annotations)) return null;
+  const lanes = bandLanes(props);
+  if (lanes.length < 2) return null;
+  const boxes = new Map();
+  for (const node of nodes) {
+    const data = node.data || {};
+    if (data.evidencePlacement !== "band" || !Number.isInteger(data.evidenceIndex) || !node.frame) continue;
+    const box = boxes.get(data.evidenceIndex);
+    const left = Math.min(node.frame.x, box?.left ?? Infinity), right = Math.max(node.frame.x + node.frame.width, box?.right ?? -Infinity);
+    boxes.set(data.evidenceIndex, { left, right });
+  }
+  // Every banded callout must be in its band: one placed elsewhere is
+  // released first (releasedEvidenceProps).
+  if (lanes.some((entry) => !boxes.has(entry.index))) return null;
+  const meets = (a, b) => a.left < b.right + COMPACT_BAND_GAP && b.left < a.right + COMPACT_BAND_GAP;
+  const placed = [];
+  for (const entry of [...lanes].sort((a, b) => a.lane - b.lane)) {
+    const box = boxes.get(entry.index);
+    const below = placed.filter((other) => meets(box, other.box));
+    placed.push({ index: entry.index, box, lane: below.length ? Math.max(...below.map((other) => other.lane)) + 1 : 0 });
+  }
+  if (laneCount(placed) >= laneCount(lanes)) return null;
+  const laneAt = new Map(placed.map((entry) => [entry.index, entry.lane]));
+  return { ...props, annotations: props.annotations.map((item, index) => (laneAt.has(index) ? { ...item, _lane: laneAt.get(index) } : item)) };
+}
+
 export function normalizeChangeAnnotations(props = {}) {
   const annotations = props.changeAnnotations || [];
   if (!Array.isArray(annotations)) throw new Error("Chart changeAnnotations must be an array");
@@ -786,7 +866,9 @@ export function normalizeChangeAnnotations(props = {}) {
       if (!["exact-source", "approximate-source-readings"].includes(annotation.basis)) throw new Error("Qualitative interval needs an explicit exact-source or approximate-source-readings basis");
       if (typeof annotation.qualification !== "string" || !annotation.qualification.trim()) throw new Error("Qualitative interval needs a qualification");
       if (annotation.showQualification !== undefined && typeof annotation.showQualification !== "boolean") throw new Error("showQualification must be boolean");
-      if (annotation.basis === "approximate-source-readings" && !/approximate|estimated|rough|~|≈/i.test(annotation.qualification)) throw new Error("Approximate interval qualification must explicitly identify approximate readings");
+      // A qualification marked approximate by its sign says so; one in words is read (qualification-says-approximate).
+      if (annotation.basis === "approximate-source-readings" && !/[~≈]/.test(annotation.qualification)
+        && judged("qualification-says-approximate", annotation.qualification.trim())?.verdict === "unqualified") throw new Error("Approximate interval qualification must explicitly identify approximate readings");
     } else if (!SCALAR_FIGURE.test(annotation.text)) throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     return {
       ...annotation,
@@ -812,7 +894,7 @@ export function normalizeAnnotationRail(props = {}) {
     if (row.label !== undefined) {
       if (typeof row.label !== "string" || !row.label.trim() || labels.has(row.label)) throw new Error("Annotation rail measure labels must be non-empty and unique");
       labels.add(row.label);
-      const measured = measureText(row.label, 160, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+      const measured = measureText(row.label, 160, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
       if (measured.height > 30) throw new Error("Shorten the annotation rail measure label to one line");
       labelWidth = Math.ceil(measured.width) + 4;
     }
@@ -841,7 +923,7 @@ export function chartAnnotationBands(props = {}) {
 
 function measureIntervalLabel(annotation, width) {
   const measured = measureText(annotation.text.trim() + (annotation.showQualification ? `\n${annotation.qualification.trim()}` : ""), width, {
-    fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(ANNOTATION), wrapWidthRatio: 1
+    fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(ANNOTATION)
   });
   if (measured.lines.length > 3) throw new Error("Qualitative interval label exceeds three measured lines; shorten its text or qualification");
   return measured;
@@ -865,7 +947,7 @@ function resolveAnchor(pointMap, anchor, id) {
 
 /** A compact change label: the text alone, no bubble, for step brackets on small multiples. */
 function compactLabelFrame(text, centerX, centerY, plot) {
-  const measured = measureText(text, 120, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true, wrapWidthRatio: 1 });
+  const measured = measureText(text, 120, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(ANNOTATION), bold: true });
   const width = Math.ceil(measured.width) + 6, height = 20;
   return { x: Math.max(plot.x - 10, Math.min(plot.x + plot.width + 10 - width, centerX - width / 2)), y: centerY - height / 2, width, height };
 }
@@ -874,16 +956,14 @@ function labelFrame(text, centerX, centerY, plot) {
   const measured = measureText(text, 168, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   });
   const width = Math.max(66, Math.min(180, Math.ceil(measured.width) + 24));
   const height = 34;
   if (measureText(text, width - 20, {
     fontFamily: tokenValue(token("font.bodySemibold")),
     fontSize: tokenValue(ANNOTATION),
-    bold: true,
-    wrapWidthRatio: 1
+    bold: true
   }).height > 24) throw new Error("Chart change annotation text is too long for its body-sized label; shorten it or use an evidence callout");
   return {
     x: Math.max(plot.x, Math.min(plot.x + plot.width - width, centerX - width / 2)),
@@ -948,26 +1028,36 @@ function labelNodes(id, index, frame, text, style) {
  * The arrow is drawn between two marks and its bubble rides the midpoint, so
  * on a falling series it crosses the interior bars and the values printed
  * above them. Rather than guess a gap from the mark geometry, this measures
- * the frames the chart has actually drawn - marks and data labels - inside the
- * arrow's horizontal span, and returns the lift that puts the shaft and the
- * bubble above all of them.
+ * what the chart has actually drawn inside the arrow's horizontal span - marks,
+ * data labels, the series lines, the callouts and earlier annotations' shafts
+ * and labels - and returns `{ lift, capped }`: the lift that puts the shaft and
+ * the bubble above all of them, and whether the plot had the room for it.
  *
  * The ceiling is not the plot's top edge but the top of the band the chart
  * already reserved for change annotations (CHANGE_ANNOTATION_BAND, which the
  * bracket styles draw in): an arrow that has to climb out of a plot full of
- * tall bars climbs into that band rather than sitting on a value label. A
- * partial lift still moves the bubble off the label it was sitting on.
+ * tall bars climbs into that band rather than sitting on a value label. Where
+ * even that is not room enough (`capped`), the change is drawn as a bracket.
  */
 function arrowLift({ start, end, plot, obstacles = [], text, band = 0 }) {
   const left = Math.min(start.x, end.x), right = Math.max(start.x, end.x);
-  if (right - left < 1) return 0;
+  if (right - left < 1) return { lift: 0, capped: false };
   const bubble = labelFrame(text, (start.x + end.x) / 2, (start.y + end.y) / 2, plot);
   const half = bubble.height / 2;
+  // A line - the series itself, or an earlier annotation's shaft - is read where it runs inside the span, not as the
+  // box around it: a steep series line would otherwise lift the arrow to the top of the plot.
+  const clipped = ({ data: d }) => {
+    const x1 = Math.max(Math.min(d.x1, d.x2), left), x2 = Math.min(Math.max(d.x1, d.x2), right);
+    if (x2 < x1) return null;
+    const at = (x) => (d.x2 === d.x1 ? Math.min(d.y1, d.y2) : d.y1 + ((x - d.x1) / (d.x2 - d.x1)) * (d.y2 - d.y1));
+    const top = Math.min(at(x1), at(x2)), bottom = d.x2 === d.x1 ? Math.max(d.y1, d.y2) : Math.max(at(x1), at(x2));
+    return { x: x1, y: top, width: Math.max(1, x2 - x1), height: Math.max(1, bottom - top) };
+  };
   const spans = obstacles
-    .filter((node) => node.role === "chart-mark" || node.role === "data-label")
-    .map((node) => node.frame)
+    .filter((node) => ["chart-mark", "data-label", "chart-line", "chart-reference-label", "chart-threshold-label", "annotation-leader", "annotation-surface", "annotation-text"].includes(node.role))
+    .map((node) => (node.type === "line" && Number.isFinite(node.data?.x1) ? clipped(node) : node.frame))
     .filter((frame) => frame && frame.x + frame.width > left + 1 && frame.x < right - 1);
-  if (!spans.length) return 0;
+  if (!spans.length) return { lift: 0, capped: false };
   // The arrow is a straight line, so the shaft's height over an obstacle is
   // read at the obstacle's own x; the bubble is a box around the midpoint and
   // has to clear whatever it overlaps horizontally.
@@ -981,14 +1071,17 @@ function arrowLift({ start, end, plot, obstacles = [], text, band = 0 }) {
     lift = Math.max(lift, shaftY(nearest) + clearance - frame.y);
   }
   const headroom = Math.min(start.y, end.y) - (plot.y - band + half);
-  return Math.max(0, Math.min(lift, headroom));
+  // `capped`: the plot has no room to lift it clear, and the arrow would still cross what it spans.
+  return { lift: Math.max(0, Math.min(lift, headroom)), capped: lift > headroom + 0.5 };
 }
 
-export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles = [] }) {
+export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles = [], arrowOnly = false }) {
   const annotations = normalizeChangeAnnotations(props);
   if (!annotations.length) return [];
   const nodes = [];
   const labels = [];
+  // The labels placed so far, which a later arrow keeps clear of as it does their shafts.
+  const labelObstacles = () => labels.map((label) => ({ role: "annotation-surface", frame: label.frame }));
   const evidenceBand = evidenceBandSpan(props, { compact: plot.evidenceCompact === true });
   // The band the chart frame already held back above the plot for these
   // annotations; an arrow may climb into it rather than overlap the marks.
@@ -1034,11 +1127,13 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
     // of from a shaft too short to break around the number.
     let style = annotation.style;
     if (style === "arrow") {
-      const probeLift = arrowLift({ start: { ...start }, end: { ...end }, plot, obstacles, text: annotation.text, band: changeBand });
-      const s0 = { x: start.x, y: start.y - probeLift }, e0 = { x: end.x, y: end.y - probeLift };
+      const probe = arrowLift({ start: { ...start }, end: { ...end }, plot, obstacles: [...obstacles, ...nodes, ...labelObstacles()], text: annotation.text, band: changeBand });
+      const s0 = { x: start.x, y: start.y - probe.lift }, e0 = { x: end.x, y: end.y - probe.lift };
       const length = Math.hypot(e0.x - s0.x, e0.y - s0.y), ux = (e0.x - s0.x) / length, uy = (e0.y - s0.y) / length;
       const probeFrame = labelFrame(annotation.text, (s0.x + e0.x) / 2, (s0.y + e0.y) / 2, plot);
-      if (length <= (Math.abs(ux) * probeFrame.width / 2 + Math.abs(uy) * probeFrame.height / 2 + 5) * 2 + 16) style = "bracket";
+      // An arrow the plot cannot lift clear of what it spans would run its shaft or set its label on a mark, a value or a
+      // line: the same change is read from a bracket in the band above the plot instead.
+      if ((probe.capped && !arrowOnly) || length <= (Math.abs(ux) * probeFrame.width / 2 + Math.abs(uy) * probeFrame.height / 2 + 5) * 2 + 16) style = "bracket";
     }
     if (style === "arrow") {
       // The arrow runs from the first mark to the last and its bubble sits at
@@ -1046,7 +1141,7 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       // the interior categories put there - a bar top, or the value printed
       // above it. Lift the whole arrow until both the shaft and the bubble
       // clear every mark and every printed value in the span.
-      const lift = arrowLift({ start, end, plot, obstacles, text: annotation.text, band: changeBand });
+      const { lift } = arrowLift({ start, end, plot, obstacles: [...obstacles, ...nodes, ...labelObstacles()], text: annotation.text, band: changeBand });
       if (lift > 0) { start.y -= lift; end.y -= lift; }
       const dx = end.x - start.x;
       const dy = end.y - start.y;
@@ -1122,8 +1217,7 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
     const measured = measureText(item.text, Math.max(32, labelSpan - 20), {
       fontFamily: tokenValue(token("font.bodySemibold")),
       fontSize: tokenValue(ANNOTATION),
-      bold: true,
-      wrapWidthRatio: 1
+      bold: true
     });
     const width = Math.min(labelSpan - 10, Math.max(52, Math.ceil(measured.width) + 20));
     if (width < 48 || measured.height > annotationRailLineHeight()) throw new Error(`Annotation rail text for ${item.category} does not fit its category span; shorten the value or show fewer categories`);
@@ -1162,3 +1256,22 @@ export function renderAnnotationRail({ id, plot, props, categoryMap, allow = tru
 export function calloutFits(text) {
   return measureEvidenceText({ text: String(text ?? "") }).height <= EVIDENCE_BOX_HEIGHT - EVIDENCE_PAD_Y;
 }
+
+// The prose `calloutCapacity` fills a box with: ordinary words of ordinary length.
+const CAPACITY_WORDS = "the operator added capacity on the busiest routes before demand returned in full".split(" ");
+/**
+ * How many words of ordinary prose a chart callout holds, by the renderer's
+ * own measure. Every message that tells an author how long a callout may run
+ * reads this number, so the catalogue, the compile refusal and the variety
+ * repairs cannot drift from the box.
+ */
+export function calloutCapacity() {
+  let n = 1;
+  while (n < 40 && calloutFits(Array.from({ length: n + 1 }, (_, i) => CAPACITY_WORDS[i % CAPACITY_WORDS.length]).join(" "))) n += 1;
+  return n;
+}
+
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+/** A small count as a page prints it in prose: "ten", past twenty the figure. */
+export const countInWords = (n) => NUMBER_WORDS[n] ?? String(n);

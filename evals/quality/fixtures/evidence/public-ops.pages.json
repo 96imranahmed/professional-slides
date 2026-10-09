@@ -1,0 +1,503 @@
+{
+ "deck": {
+  "schema": "professional-slides.deck/v3",
+  "id": "public-ops",
+  "workflow": "new_deck",
+  "request": "Why are ambulance response times rising, and where should the first new crews go? Use only the board papers we have sent you.",
+  "brief": "Why are ambulance response times rising, and where should the first new crews go?",
+  "answer": "Calls per crew and hospital handover delay drive the rise in response times; the first new crews go to Uplands and Valley, nearest the 18-minute standard, with handover delay cut alongside so the new crews are not held at hospital.",
+  "evidenceScope": {
+   "retrieval": "closed",
+   "note": "only the board papers supplied by the service may be used",
+   "quote": "Use only the board papers we have sent you"
+  },
+  "design": "consulting",
+  "density": "executive"
+ },
+ "sources": {
+  "ras-board": {
+   "name": "Riverside ambulance service board papers, 2023-2024",
+   "status": "illustrative"
+  },
+  "national-standard": {
+   "name": "National response standards 2024",
+   "status": "illustrative"
+  }
+ },
+ "pages": [
+  {
+   "id": "o0",
+   "type": "summary",
+   "form": "executive-summary",
+   "commentary": "none",
+   "takeaway": false,
+   "title": "Calls per crew and handover delay drive the rise; Uplands and Valley get crews first",
+   "why": "The opening states why response times rose, where the first crews go and the condition on them",
+   "evidence": [
+    "o-response",
+    "o-demand",
+    "o-handover",
+    "o-districts",
+    "o-standard",
+    "B-rise",
+    "B-calls",
+    "B-per-crew",
+    "B-districts",
+    "B-path"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "response time, calls, crews and handover delay from 2023 Q1 to 2024 Q4, and the two slowest districts",
+    "measures": [
+     "o-response/response",
+     "o-demand/calls",
+     "o-demand/crews",
+     "o-handover/handover",
+     "B-districts/value"
+    ]
+   },
+   "adds": "Each point says what its finding means for where the crews go and what must change beside them",
+   "exhibit": {
+    "type": "table",
+    "treatment": "dimensions",
+    "columns": [
+     "Measure",
+     "2023 Q1",
+     "2024 Q4",
+     "Read"
+    ],
+    "rows": [
+     [
+      "Mean response time, minutes",
+      "{{o-response/response@2023 Q1 | 0.0}}",
+      "{{o-response/response@2024 Q4 | 0.0}}",
+      "Up {{B-rise/percent | 0%}}"
+     ],
+     [
+      "Calls answered, thousand",
+      "{{o-demand/calls@2023 Q1 | 0.0}}",
+      "{{o-demand/calls@2024 Q4 | 0.0}}",
+      "Up {{B-calls/percent | 0%}}"
+     ],
+     [
+      "Crews on shift",
+      "{{o-demand/crews@2023 Q1 | 0}}",
+      "{{o-demand/crews@2024 Q4 | 0}}",
+      "Fewer crews for more calls"
+     ],
+     [
+      "Hospital handover, minutes",
+      "{{o-handover/handover@2023 Q1 | 0}}",
+      "{{o-handover/handover@2024 Q4 | 0}}",
+      "More than doubled"
+     ],
+     [
+      "Uplands response, minutes",
+      "n/a",
+      "{{B-districts/value@Uplands | 0.0}}",
+      "Slowest of eight districts"
+     ],
+     [
+      "Valley response, minutes",
+      "n/a",
+      "{{B-districts/value@Valley | 0.0}}",
+      "Second slowest"
+     ]
+    ]
+   },
+   "highlight": "handover delay has to be cut alongside",
+   "points": [
+    "Mean response time rose {{B-rise/percent | 0%}} in two years to {{o-response/response@2024 Q4 | 0.0}} minutes. On the two-year trend it breaches the {{o-standard/standard | 0}}-minute national standard in 2028.",
+    "Two causes drive the rise. Calls rose {{B-calls/percent | 0%}} while crews on shift fell, so each crew answers a quarter more calls; and hospital handover more than doubled to {{o-handover/handover@2024 Q4 | 0}} minutes, holding crews off the road.",
+    "The first new crews go to Uplands and Valley, the districts nearest the standard. Because a crew held at hospital cannot take the next call, handover delay has to be cut alongside, or the new crews will wait at the door too.",
+    "The board papers hold no district figures for demand or handover, so the order of districts rests on response time alone."
+   ]
+  },
+  {
+   "id": "o1",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Response time rose 37% in two years to 12.2 minutes",
+   "why": "The rise over time is the claim, so the quarterly series is drawn",
+   "evidence": [
+    "o-response",
+    "B-headroom",
+    "B-path",
+    "B-rise"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "mean response time by quarter",
+    "measures": [
+     "o-response/response"
+    ]
+   },
+   "exhibit": {
+    "heading": "Mean category-two response time",
+    "unit": "minutes",
+    "categories": [
+     "2023 Q1",
+     "2023 Q2",
+     "2023 Q3",
+     "2023 Q4",
+     "2024 Q1",
+     "2024 Q2",
+     "2024 Q3",
+     "2024 Q4"
+    ],
+    "series": [
+     {
+      "name": "Response time",
+      "values": [
+       8.9,
+       9.4,
+       9.8,
+       10.6,
+       10.1,
+       10.9,
+       11.4,
+       12.2
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "o-response/response"
+     ]
+    },
+    "highlights": [
+     {
+      "category": "2024 Q4"
+     }
+    ]
+   },
+   "bar": "At this rate the service loses the headroom it has to the national standard"
+  },
+  {
+   "id": "o2",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "Each crew answers a quarter more calls than in early 2023",
+   "why": "A ratio the runtime computed from two records, drawn over time",
+   "evidence": [
+    "o-demand",
+    "B-per-crew"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "calls answered per crew on shift by quarter",
+    "measures": [
+     "o-demand/calls",
+     "o-demand/crews"
+    ],
+    "relation": {
+     "kind": "ratio"
+    }
+   },
+   "exhibit": {
+    "heading": "Calls answered per crew on shift",
+    "unit": "thousand calls per crews on shift",
+    "categories": [
+     "2023 Q1",
+     "2023 Q2",
+     "2023 Q3",
+     "2023 Q4",
+     "2024 Q1",
+     "2024 Q2",
+     "2024 Q3",
+     "2024 Q4"
+    ],
+    "series": [
+     {
+      "name": "Calls per crew",
+      "values": [
+       0.349153,
+       0.355932,
+       0.368376,
+       0.393103,
+       0.386207,
+       0.4,
+       0.414912,
+       0.437719
+      ]
+     }
+    ],
+    "basis": {
+     "measures": [
+      "B-per-crew/result"
+     ]
+    },
+    "highlights": [
+     {
+      "category": "2024 Q4"
+     }
+    ]
+   },
+   "bar": "Demand per crew, not crew numbers alone, is what the roster has to answer"
+  },
+  {
+   "id": "o3",
+   "type": "panels",
+   "form": "row",
+   "commentary": "captions",
+   "title": "Handover delay doubled as response time rose",
+   "why": "Two delays in one unit, each with its own cause, read on its own panel",
+   "evidence": [
+    "o-handover",
+    "o-response"
+   ],
+   "settles": {
+    "kind": "comparison",
+    "what": "handover and response time by quarter",
+    "measures": [
+     "o-handover/handover",
+     "o-response/response"
+    ],
+    "relation": {
+     "kind": "separate",
+     "reason": "Handover and response are different stages of a call and are not subtracted from each other"
+    }
+   },
+   "adds": "The captions separate time lost at the hospital door from time lost on the road",
+   "exhibits": [
+    {
+     "heading": "Mean hospital handover time",
+     "unit": "minutes",
+     "categories": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "series": [
+      {
+       "name": "Handover",
+       "values": [
+        21,
+        24,
+        26,
+        33,
+        30,
+        35,
+        38,
+        44
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "o-handover/handover"
+      ]
+     },
+     "type": "chart.column",
+     "highlights": [
+      {
+       "category": "2024 Q4"
+      }
+     ],
+     "caption": "Crews now wait 44 minutes at the door, more than double the 2023 figure"
+    },
+    {
+     "heading": "Mean response time",
+     "unit": "minutes",
+     "categories": [
+      "2023 Q1",
+      "2023 Q2",
+      "2023 Q3",
+      "2023 Q4",
+      "2024 Q1",
+      "2024 Q2",
+      "2024 Q3",
+      "2024 Q4"
+     ],
+     "series": [
+      {
+       "name": "Response",
+       "values": [
+        8.9,
+        9.4,
+        9.8,
+        10.6,
+        10.1,
+        10.9,
+        11.4,
+        12.2
+       ]
+      }
+     ],
+     "basis": {
+      "measures": [
+       "o-response/response"
+      ]
+     },
+     "type": "chart.line",
+     "highlights": [
+      {
+       "category": "2024 Q4"
+      }
+     ],
+     "caption": "Response time rose more slowly, by just over three minutes across the same quarters"
+    }
+   ]
+  },
+  {
+   "id": "o5",
+   "type": "mechanism",
+   "form": "process",
+   "commentary": "so-what-bar",
+   "title": "A crew held at hospital cannot answer the next call",
+   "why": "The chain from handover delay to response time is a mechanism, drawn as steps",
+   "evidence": [
+    "o-mechanism"
+   ],
+   "settles": {
+    "kind": "structure",
+    "what": "how handover delay becomes response delay"
+   },
+   "exhibit": {
+    "items": [
+     {
+      "label": "Crew arrives at hospital"
+     },
+     {
+      "label": "Handover waits for a bay"
+     },
+     {
+      "label": "Crew unavailable to dispatch"
+     },
+     {
+      "label": "Next call waits longer"
+     }
+    ]
+   },
+   "bar": "Every minute a crew waits at the door is a minute it cannot be dispatched, so handover must be cut alongside new crews"
+  },
+  {
+   "id": "o6",
+   "type": "trend",
+   "form": "line",
+   "commentary": "so-what-bar",
+   "title": "On the two-year trend the 18-minute standard is breached in 2028",
+   "why": "The recorded quarters and the assumed path are one line, so the reader sees where the assumption begins and where it crosses the standard",
+   "evidence": [
+    "o-response",
+    "B-path",
+    "o-standard"
+   ],
+   "settles": {
+    "kind": "rate",
+    "what": "mean response time by quarter, recorded and then carried forward at the two-year mean quarterly rise",
+    "measures": [
+     "o-response/response",
+     "B-path/path"
+    ]
+   },
+   "exhibit": {
+    "heading": "Mean category-two response time, recorded and assumed",
+    "series": [
+     {
+      "measure": [
+       "o-response/response",
+       "B-path/path"
+      ],
+      "name": "Response time"
+     },
+     {
+      "measure": "o-standard/standard",
+      "name": "National standard"
+     }
+    ],
+    "select": {
+     "from": "2024 Q1"
+    }
+   },
+   "bar": "The path is an assumption, not a forecast: it says how long the service has if nothing changes"
+  },
+  {
+   "id": "o4",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "so-what-bar",
+   "title": "Uplands and Valley, slowest of eight districts, sit nearest the 18-minute standard",
+   "why": "The whole set of districts on one measure, ordered",
+   "evidence": [
+    "o-districts",
+    "B-districts",
+    "o-standard"
+   ],
+   "settles": {
+    "kind": "rank",
+    "what": "mean response time by district, 2024 Q4",
+    "measures": [
+     "B-districts/value"
+    ]
+   },
+   "exhibit": {
+    "heading": "Mean response time by district, 2024 Q4",
+    "unit": "minutes",
+    "categories": [
+     "North",
+     "South",
+     "East",
+     "Riverbend",
+     "Harbourside",
+     "Central",
+     "Valley",
+     "Uplands"
+    ],
+    "series": [
+     {
+      "name": "Response",
+      "values": [
+       9.8,
+       10.4,
+       11.2,
+       12.0,
+       12.6,
+       13.9,
+       14.8,
+       16.1
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Uplands"
+     }
+    ],
+    "basis": {
+     "measures": [
+      "B-districts/value"
+     ]
+    }
+   },
+   "bar": "The first new crews go to these two districts, which have the least headroom before a breach of the standard"
+  },
+  {
+   "id": "o7",
+   "type": "summary",
+   "form": "takeaways",
+   "commentary": "none",
+   "takeaway": false,
+   "why": "The close states where the first crews go, the condition on them and the next step",
+   "settles": {
+    "kind": "qualitative",
+    "what": "where the first crews go, what must change beside them and what to ask for next"
+   },
+   "adds": null,
+   "title": "Send the first crews to Uplands and Valley, and cut handover delay alongside",
+   "items": [
+    "Send the first new crews to Uplands, then Valley: they have the least headroom before a breach of the national standard.",
+    "Cut handover delay at the emergency departments alongside, since a crew held at the door adds no cover however many are hired.",
+    "Track calls per crew on shift each quarter, the measure that says whether the new crews keep pace with demand.",
+    "Ask the service for district figures on demand and handover before the second wave of crews is placed."
+   ]
+  }
+ ]
+}

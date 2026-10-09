@@ -9,7 +9,7 @@ class IntrinsicLayoutTests(unittest.TestCase):
 import assert from 'node:assert/strict';
 import {compileDeck,component,flow} from './skills/professional-slides/runtime/core.mjs';
 import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable} from './evals/support/compose.mjs';
 const alignment={group:'cases',keys:['a','b','c']};
 assert.deepEqual(styleTable({columns:['Case'],rows:[['Alpha'],['Beta'],['All mixtures']],rowAlignment:alignment}).rowAlignment,alignment);
 const scale={type:'bars',label:'Units',unit:'units',min:0,max:5,series:['Amount']};

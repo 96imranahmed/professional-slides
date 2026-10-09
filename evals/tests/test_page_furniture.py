@@ -10,7 +10,7 @@ class PageFurnitureTests(unittest.TestCase):
     def test_side_panel_tones_and_photo_strips(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {composeSlide} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide} from './evals/support/compose.mjs';
 const find=(items,pred)=>{for(const it of items||[]){if(pred(it))return it;const r=it.items?find(it.items,pred):null;if(r)return r;}return null;};
 const chart={type:'chart.bar',categories:['a','b','c','d'],series:[{name:'s',values:[1,2,3,4]}]};
 // A dark side panel is a section with the dark treatment and an inverse list.
@@ -35,7 +35,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {normalizePeriods,normalizeEvents,periodBandHeight} from './skills/professional-slides/runtime/charts.mjs';
-import {changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {changeFromContent} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 const cats=['2019','2020','2021','2022'];
 assert.deepEqual(normalizePeriods({periods:[{from:'2019',to:'2020',label:'Boom'},{from:'2021',to:'2022',label:'Bust'}]},cats).map(p=>[p.from,p.to]),[[0,1],[2,3]]);
@@ -60,7 +60,7 @@ console.log(JSON.stringify({ok:true}));
     def test_highlight_row_and_line_budget_pagination(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
-import {styleTable,paginateTable} from './skills/professional-slides/runtime/compose.mjs';
+import {styleTable,paginateTable} from './evals/support/compose.mjs';
 const rows=Array.from({length:12},(_,i)=>[`City ${i+1}`,String(100-i),String(i+1)]);
 const styled=styleTable({type:'table',columns:['City','Delay','Rank'],rows,highlightRow:'City 3'});
 assert.equal(styled.rows[2].style,'accented');
@@ -81,7 +81,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,agendaPages} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,agendaPages} from './evals/support/compose.mjs';
 const registry=createRegistry();
 const frame={x:0,y:0,width:600,height:360};
 // Unit chart: one dot per count, a grey remainder for percent blocks.
@@ -130,7 +130,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,changeFromContent} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,changeFromContent} from './evals/support/compose.mjs';
 import {nativeChartSpec} from './skills/professional-slides/runtime/core.mjs';
 const registry=createRegistry();
 // Paired bars: one panel per series, the later panels without category labels, drawn not native.
@@ -168,7 +168,7 @@ console.log(JSON.stringify({ok:true}));
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {createRegistry} from './skills/professional-slides/runtime/registry.mjs';
-import {composeSlide,sectionTabs,styleTable} from './skills/professional-slides/runtime/compose.mjs';
+import {composeSlide,sectionTabs,styleTable} from './evals/support/compose.mjs';
 import {compileDeck,component} from './skills/professional-slides/runtime/core.mjs';
 const registry=createRegistry();
 // Metrics grid: nine tiles become three rows of three, prominent, filling the frame.
@@ -190,8 +190,10 @@ assert.equal(marks.length,4);
 const widthA=marks.find(n=>n.data.category==='A').frame.width, widthB=marks.find(n=>n.data.category==='B').frame.width;
 assert.ok(Math.abs(widthA/widthB-1.5)<0.01,'A is 60 wide to B 40');
 assert.ok(m.some(n=>n.role==='data-label'&&n.text==='50%'));
-// Outlook headings infer trend cells; numeric change stays neutral without a verdict.
-const t=styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]});
+// A column a reader reads as a direction becomes trend cells (column-reads); numeric change stays neutral without a verdict.
+const {judgementSession,withJudgements}=await import('./skills/professional-slides/runtime/judgements.mjs');
+const outlook=judgementSession({oracle:(kind,subject)=>kind==='column-reads'&&subject.header==='Outlook'?{verdict:'direction',directions:[{cell:'up',value:'up'},{cell:'↓',value:'down'}]}:null});
+const t=withJudgements(outlook,()=>styleTable({type:'table',columns:['Sector','YoY change','Outlook'],rows:[['H','+20%','up'],['I','-65%','↓']]}));
 assert.equal(t.rows[0][1],'+20%');assert.deepEqual(t.rows[1][2],{type:'trend',value:'down'});
 const table=registry.get('table');
 const tn=table.render({id:'t',frame:{x:0,y:0,width:600,height:200},props:{...t,density:'body'}}).nodes;
@@ -205,7 +207,7 @@ const tabs=sectionTabs([{kind:'section',title:'A'},{title:'x'},{kind:'section',t
 assert.equal(tabs[1].tracker.construction,'compact-pills');assert.equal(tabs[3].tracker.selectedId,'2');assert.equal(tabs[0].tracker,undefined);
 const tl=registry.get('tracker-label').render({id:'k',frame:{x:60,y:30,width:1160,height:20},props:tabs[1].tracker}).nodes;
 assert.equal(tl.filter(n=>n.role==='tracker-pill').length,2);
-// BCG sets "Topic | statement"; McKinsey keeps the accent lead.
+// The evergreen palette sets "Topic | statement"; midnight keeps the accent lead.
 const frame={x:0,y:0,width:1280,height:720};
 const titleFor=(palette)=>compileDeck({id:'t',palette,slides:[{id:'p',frame,composition:component({id:'chrome',component:'slide-chrome',frame,props:{title:'Sector outlook: IT stays soft',titleLead:'Sector outlook'}})}]},registry).slides[0].nodes.find(n=>n.role==='action-title');
 assert.equal(titleFor('evergreen').text,'Sector outlook | IT stays soft');

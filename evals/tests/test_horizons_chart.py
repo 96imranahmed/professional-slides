@@ -59,5 +59,30 @@ console.log(JSON.stringify({accepted:true}));
         self.assertTrue(result["accepted"])
 
 
+class SteppedHorizonsTests(unittest.TestCase):
+    def test_stepped_horizons_reject_curve_only_properties(self):
+        """Review regression: stepped horizons silently ignored properties only curves draw."""
+        run_node("""
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const d=REGISTRY.get('chart.horizons'),frame={x:60,y:150,width:1160,height:480};
+for(const variant of ['stepped','stepped-minimal']) for(const [key,value] of [['start',0],['end',1],['colorIndex',2]]) {
+ const props={variant,horizons:[{id:'a',label:'Core',[key]:value},{id:'b',label:'Growth'}]};
+ assert.throws(()=>d.render({id:'bad',frame,props}),/only in curves/);
+}
+console.log(JSON.stringify({accepted:true}));
+""")
+
+    def test_stepped_bands_retain_optional_summary(self):
+        """Variant review: stepped bands dropped a horizon's optional summary."""
+        run_node("""
+import assert from 'node:assert/strict';
+import {renderHorizons,HORIZONS_VARIANTS} from './skills/professional-slides/runtime/horizons.mjs';
+const props=structuredClone(HORIZONS_VARIANTS['stepped-bands'].props);props.variant='stepped-bands';props.horizons[0].summary='Retain this summary.';
+const nodes=renderHorizons({id:'horizons',frame:{x:0,y:0,width:1160,height:600},props});
+assert.ok(nodes.some(n=>n.text?.includes('Retain this summary.')));console.log('{}');
+""")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,8 +5,11 @@
   "scripts": {
     "check:syntax": "node evals/scripts/check_source_quality.mjs",
     "test": "node evals/scripts/run_tests.mjs",
+    "test:strict": "node evals/scripts/run_tests.mjs --strict",
+    "test:serial": "node evals/scripts/run_tests.mjs --serial",
     "check": "npm run check:syntax && npm test",
     "check:gates": "bash evals/run.sh",
+    "eval:quality": "node evals/quality/run.mjs",
     "import:maps": "node evals/scripts/import_natural_earth_maps.mjs",
     "package:plugin": "python3 evals/scripts/package_plugin.py",
     "build:deck": "node skills/professional-slides/runtime/build-deck.mjs",
