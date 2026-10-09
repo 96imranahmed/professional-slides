@@ -57,46 +57,81 @@ export const titleLimitsLine = (limits) => (limits ? `a page title runs to ${lim
   ? `fits this deck's dividers at ${limits.sectionTitle.sure} words or fewer, never past ${limits.sectionTitle.words}, and between them only where its words are short (${limits.sectionTitle.characters} characters of short words fit)`
   : `to ${limits.sectionTitle.words} words at most on this deck's dividers`}` : ""}` : "");
 
-// A title a repair proposes: the words in quotes after it says to retitle, or
-// to rewrite or replace a title. A single quote closes only before punctuation
-// or the end, so an apostrophe inside the title does not end it; a title cut
-// short by that reads as shorter than it is, never longer.
-const PROPOSED = /\b(retitle|(?:rewrite|reword|replace|change|shorten)\s+(?:the\s+|this\s+|its\s+)?((?:section\s+)?)title)\b([^'"“\u2018`]{0,80})(?:"([^"]{8,})"|“([^”]{8,})”|`([^`]{8,})`|['\u2018](.{8,}?)['\u2019](?=[.;,:)]|\s*$))/gi;
-// A length a repair states for a title: "a title of 15 words", "the title to 14-16 words".
-const TITLE_LENGTH = /\b((?:section\s+)?)title\b[^.;]{0,40}?\b(\d{1,3})(?:\s*(?:-|–|to)\s*(\d{1,3}))?\s+words\b/gi;
+// What a judge's repair does to a title, said as fields rather than read out
+// of its sentence: one entry for each page whose title the repair rewrites -
+// the page (a divider's id, for a section's title), and the title the judge
+// proposes or the length in words it asks for, or both. The deck reviewer
+// gives it on a finding (reviewer.mjs), the storyline critic on an item
+// (storyline.mjs), and the build holds both to the title limits (titleErrors).
+export const RETITLE_SCHEMA = {
+  type: "array", minItems: 1,
+  items: { type: "object", additionalProperties: false, required: ["page"], properties: {
+    page: { type: "string" },
+    title: { type: "string", minLength: 2 },
+    // The length asked for, in words: the same number twice for one length.
+    words: { type: "object", additionalProperties: false, required: ["min", "max"], properties: { min: { type: "integer", minimum: 1 }, max: { type: "integer", minimum: 1 } } },
+  } },
+};
+const isCount = (value) => Number.isInteger(value) && value >= 1;
+/** A `retitle` as the author reads it beside the repair: each page with the title proposed and the length asked for. */
+export const retitleLine = (retitle) => (Array.isArray(retitle) ? retitle : []).filter((entry) => entry && typeof entry.page === "string")
+  .map((entry) => `${entry.page}: ${[typeof entry.title === "string" ? `"${entry.title.trim()}"` : null, entry.words ? `${entry.words.min === entry.words.max ? entry.words.min : `${entry.words.min}-${entry.words.max}`} words` : null].filter(Boolean).join(", ")}`).join("; ");
 
 /**
- * A title a judge proposes that the build would refuse, as errors: `text` is
- * a repair or a fix, `at` where it stands. Only what the sentence states is
- * read - a title given in quotes after "retitle" or "rewrite the title", and
- * a length given in words - and each is held to the page title's words, or to
- * the section title's where the sentence says a section title (or `section`
- * says every page the finding names is a divider). `sectionFits(title)`
- * composes a proposed section title on its divider, where the caller has the
- * deck to compose it in.
+ * `retitle` held to its form, as errors: a list of entries, each naming one
+ * of `pages` (the finding's own) once, and saying a title, a length or both.
+ * What holds without the title limits; titleErrors holds those.
  */
-export function titleErrors(text, limits, at, { section = false, sectionFits = null } = {}) {
-  if (!limits) return [];
-  const errors = [], source = String(text ?? "");
-  const bar = (said) => ((said || section) && limits.sectionTitle ? { max: limits.sectionTitle.words, what: "a section title", rule: "the words its divider holds" } : { max: limits.title.words.max, what: "a page title", rule: "TITLE_WORDS" });
-  for (const match of source.matchAll(PROPOSED)) {
-    // "Retitle the s2 divider" names a section as surely as "the section title" does.
-    const { max, what, rule } = bar(match[2] || /\b(?:section|divider)\b/i.test(match[3]));
-    // "Replace the title "<old>" with "<new>"": the title proposed is the one after `with`, not the one replaced.
-    const instead = /^\s*(?:with|by|to|for)\s+(?:"([^"]{8,})"|“([^”]{8,})”)/i.exec(source.slice(match.index + match[0].length));
-    const proposed = instead ? instead[1] ?? instead[2] : match[4] ?? match[5] ?? match[6] ?? match[7], words = titleWords(proposed);
-    if (words > max) errors.push(`${at}: the title it proposes runs to ${words} words ("${proposed.length > 70 ? `${proposed.slice(0, 67)}...` : proposed}") and the build refuses ${what} past ${max} (${rule}): propose one of ${max} words or fewer - the finding and its comparator, with the period, the population and the scope left to the subtitle`);
-    // A section title within the most its divider holds is composed on the divider where the caller can (`sectionFits`): a count
-    // of words bounds what fits and does not decide it.
-    else if (what === "a section title" && sectionFits && sectionFits(proposed) === false)
-      errors.push(`${at}: the section title it proposes ("${proposed.length > 70 ? `${proposed.slice(0, 67)}...` : proposed}", ${words} words, ${proposed.length} characters) does not fit its divider as this deck draws it (SPINE_UNFIT): its words are long for the room${limits.sectionTitle.sure !== undefined ? ` - ${limits.sectionTitle.sure} words or fewer always fit` : ""}; propose a shorter one, with the detail left to the section's summary`);
+export function retitleErrors(retitle, pages, at) {
+  if (retitle === undefined) return [];
+  if (!Array.isArray(retitle) || !retitle.length) return [`${at}: retitle lists the pages whose title the repair rewrites, one entry a page - leave it out where the repair rewrites none`];
+  const errors = [], own = Array.isArray(pages) ? pages : [], seen = new Set();
+  for (const [i, entry] of retitle.entries()) {
+    const where = `${at}: retitle[${i}]`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) { errors.push(`${where} is not an object: an entry is { page, title, words }`); continue; }
+    const extra = Object.keys(entry).filter((key) => !Object.hasOwn(RETITLE_SCHEMA.items.properties, key));
+    if (extra.length) errors.push(`${where} carries ${extra.join(", ")}: an entry takes page, title and words only`);
+    if (typeof entry.page !== "string" || !own.includes(entry.page)) errors.push(`${where} names ${typeof entry.page === "string" ? `page ${entry.page}` : "no page"}: its page is one of the finding's own (${own.join(", ") || "none listed"})`);
+    else if (seen.has(entry.page)) errors.push(`${where} names ${entry.page} again: one entry a page`);
+    seen.add(entry.page);
+    if (entry.title !== undefined && (typeof entry.title !== "string" || entry.title.trim().length < 2)) errors.push(`${where}: its title is the title proposed, as it would be printed`);
+    const { words } = entry;
+    if (words !== undefined && (!words || typeof words !== "object" || !isCount(words.min) || !isCount(words.max) || words.min > words.max))
+      errors.push(`${where}: its words are the length asked for, { min, max } in whole words with min no more than max (the same number twice for one length)`);
+    if (entry.title === undefined && words === undefined) errors.push(`${where} gives neither the title proposed nor a length: give its title, its words or both, or leave the page out`);
   }
-  for (const match of source.matchAll(TITLE_LENGTH)) {
-    // "from 24 words to 12" states the length it has, not the one it asks for.
-    if (/\bfrom\s+\d/i.test(match[0])) continue;
-    const { max, what, rule } = bar(match[1]);
-    const low = Number(match[2]);
-    if (low > max) errors.push(`${at}: it asks for a title of ${match[3] ? `${match[2]}-${match[3]}` : match[2]} words and the build refuses ${what} past ${max} (${rule}): ask for ${max} words or fewer`);
+  return errors;
+}
+
+const shown = (title) => (title.length > 70 ? `${title.slice(0, 67)}...` : title);
+
+/**
+ * A title a judge proposes that the build would refuse, as errors: `retitle`
+ * is a finding's or an item's (RETITLE_SCHEMA), `at` where it stands. Each
+ * entry's title, and the length it asks for, are held to the page title's
+ * words, or to the section title's where its page is one of `dividers`.
+ * `sectionFits(title, ids)` composes a proposed section title on its divider,
+ * where the caller has the deck to compose it in. An entry malformed is
+ * retitleErrors' to refuse, and is passed over here.
+ */
+export function titleErrors(retitle, limits, at, { dividers = [], sectionFits = null } = {}) {
+  if (!limits || !Array.isArray(retitle)) return [];
+  const errors = [];
+  for (const entry of retitle) {
+    if (!entry || typeof entry !== "object" || typeof entry.page !== "string") continue;
+    const section = Boolean(limits.sectionTitle) && dividers.includes(entry.page);
+    const { max, what, rule } = section ? { max: limits.sectionTitle.words, what: "a section title", rule: "the words its divider holds" } : { max: limits.title.words.max, what: "a page title", rule: "TITLE_WORDS" };
+    const proposed = typeof entry.title === "string" ? entry.title.trim() : "";
+    if (proposed) {
+      const words = titleWords(proposed);
+      if (words > max) errors.push(`${at}: the title it proposes for ${entry.page} runs to ${words} words ("${shown(proposed)}") and the build refuses ${what} past ${max} (${rule}): propose one of ${max} words or fewer - the finding and its comparator, with the period, the population and the scope left to the subtitle`);
+      // A section title within the most its divider holds is composed on the divider where the caller can (`sectionFits`): a count
+      // of words bounds what fits and does not decide it.
+      else if (section && sectionFits && sectionFits(proposed, [entry.page]) === false)
+        errors.push(`${at}: the section title it proposes for ${entry.page} ("${shown(proposed)}", ${words} words, ${proposed.length} characters) does not fit its divider as this deck draws it (SPINE_UNFIT): its words are long for the room${limits.sectionTitle.sure !== undefined ? ` - ${limits.sectionTitle.sure} words or fewer always fit` : ""}; propose a shorter one, with the detail left to the section's summary`);
+    }
+    const { words } = entry;
+    if (words && isCount(words.min) && words.min > max) errors.push(`${at}: it asks for a title of ${isCount(words.max) && words.max > words.min ? `${words.min}-${words.max}` : words.min} words on ${entry.page} and the build refuses ${what} past ${max} (${rule}): ask for ${max} words or fewer`);
   }
   return errors;
 }
@@ -163,7 +198,7 @@ export function floorsPrompt(floors, only = null) {
   if (!floors) return "";
   const listed = Object.entries(floors.pages).filter(([id]) => !only || only.includes(id));
   return `FLOORS THE BUILD HOLDS. The build measured these on the pages you are reading and refuses a page, or the deck, on the wrong side of one. They are not findings and not targets: they bound what a repair may ask for. Do not ask for fewer words than a page's floor or more than its ceiling, for blocks shorter or longer than the words-a-block band on a prose page, for a longer note where the footer is at its share, or for one more page of a kind a deck rule below has no room for. Where the right repair moves a page toward one of these - commentary cut, a point split, a table added - say in the finding's \`floors\` how the page stays inside it (the words that replace the ones cut, the form the page takes instead); validation refuses a repair that states a word count outside the page's band and says nothing in \`floors\`.
-${floors.titles ? `Titles: ${titleLimitsLine(floors.titles)}. A repair that proposes a title, or states a length for one, stays inside these; validation refuses one that does not.\n` : ""}Deck rules with no room left${floors.median !== null && floors.band ? ` (the prose pages' median is ${floors.median} words a block, held to ${floors.band[0]}-${floors.band[1]})` : ""}:
+${floors.titles ? `Titles: ${titleLimitsLine(floors.titles)}. A title a finding proposes in \`retitle\`, or a length it asks for there, stays inside these; validation refuses one that does not.\n` : ""}Deck rules with no room left${floors.median !== null && floors.band ? ` (the prose pages' median is ${floors.median} words a block, held to ${floors.band[0]}-${floors.band[1]})` : ""}:
 ${floors.deck.map((line) => `- ${line}`).join("\n") || "- none"}
 Per page (body words now and the band the build holds them to for the page's reading task; blocks; the footer's share):
 ${listed.map(([id, page]) => pageLine(id, page, floors)).join("\n") || "- none measured"}`;
@@ -176,6 +211,10 @@ ${listed.map(([id, page]) => pageLine(id, page, floors)).join("\n") || "- none m
 // "body words".
 const WORD_TARGET = /(?:(?<!\d\s)\bto|\btarget(?:ing)?(?:\s+of)?)\s+(?:(?:about|around|roughly|under|over|some|at\s+most|at\s+least|no\s+more\s+than)\s+)?(\d{2,4})(?:\s*(?:-|–|to)\s*(\d{2,4}))?\s+(?:body\s+)?words\b(?!\s+(?:a|per|each)\s+block)|\b(\d{2,4})(?:\s*(?:-|–|to)\s*(\d{2,4}))?\s+body\s+words\b/gi;
 const BLOCK_TARGET = /(\d{1,3})(?:\s*(?:-|–|to)\s*(\d{1,3}))?\s+words\s+(?:a|per)\s+block/gi;
+// A length the sentence gives for a title - "the title to 14-16 words" - is the
+// title's, which `retitle` states and titleErrors holds, not the body's: it is
+// struck from the sentence before a body count is read.
+const TITLE_LENGTH = /\b(?:section\s+)?title\b[^.;]{0,40}?\b\d{1,3}(?:\s*(?:-|–|to)\s*\d{1,3})?\s+words\b/gi;
 const ranges = (text, pattern) => [...String(text ?? "").matchAll(pattern)].map((match) => { const low = match[1] ?? match[3], high = match[2] ?? match[4] ?? low; return [Number(low), Number(high)]; });
 
 /**
@@ -185,8 +224,8 @@ const ranges = (text, pattern) => [...String(text ?? "").matchAll(pattern)].map(
  * outside the deck's band, must say in `floors` how the page stays inside it.
  * Only a stated number is caught: a repair that says "halve the commentary"
  * is held by the prompt, and by the gate when the page is rebuilt. A title a
- * repair proposes or sizes is held to the title limits (titleErrors) on any
- * finding, and `floors` does not excuse it.
+ * finding proposes or sizes in `retitle` is held to the title limits
+ * (titleErrors) on any finding, and `floors` does not excuse it.
  */
 export function floorErrors(findings, floors) {
   if (!floors) return [];
@@ -194,7 +233,7 @@ export function floorErrors(findings, floors) {
   for (const [i, finding] of (findings || []).entries()) {
     const pages = Array.isArray(finding?.slides) ? finding.slides : [];
     // A title has no way to stay inside its limit but to be shorter: `floors` does not excuse it.
-    if (floors.titles) errors.push(...titleErrors(finding?.repair, floors.titles, `findings[${i}]${finding?.id ? ` (${finding.id})` : ""}`, { section: pages.length > 0 && pages.every((id) => (floors.dividers || []).includes(id)) }));
+    if (floors.titles) errors.push(...titleErrors(finding?.retitle, floors.titles, `findings[${i}]${finding?.id ? ` (${finding.id})` : ""}`, { dividers: floors.dividers || [] }));
     if (pages.length !== 1 || (typeof finding.floors === "string" && finding.floors.trim().length >= 20)) continue;
     const page = floors.pages[pages[0]];
     if (!page) continue;

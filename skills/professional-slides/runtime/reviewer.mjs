@@ -33,7 +33,7 @@ import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from 
 import { normalizeText, textWords, TEXT_FORM } from "./text-contract.mjs";
 import { storylineGate, readStorylineHistory, repairReach, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
 import { REVIEW_TOUCHES } from "./gates/gate_classes.mjs";
-import { reviewFloors, floorsPrompt, floorErrors } from "./review-floors.mjs";
+import { reviewFloors, floorsPrompt, floorErrors, RETITLE_SCHEMA, retitleErrors } from "./review-floors.mjs";
 import { designStatistics, measurePasses, DOWNGRADE_MEASURES } from "./build-bars.mjs";
 import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE } from "./revision.mjs";
 import { assetsPrompt } from "./asset-needs.mjs";
@@ -145,14 +145,17 @@ const FINDING_PROPERTIES = {
   reason: { type: "string", minLength: 20 },
   repair: { type: "string" },
   // What the repair changes, in the reviewer's judgement (gates/gate_classes.mjs REVIEW_TOUCHES): what says whether it reopens the storyline critique.
+  // Said on every finding of a new review, and never read off the repair's sentence; a record from before it was required falls back by its code.
   touches: { type: "array", items: { type: "string", enum: Object.keys(REVIEW_TOUCHES) } },
   checkable: CHECKABLE_SCHEMA,
   // How the page stays inside the floors the packet shows for it, where the repair moves it toward one (review-floors.mjs).
   floors: { type: "string" },
+  // The titles the repair rewrites, each with the title proposed or the length asked for (review-floors.mjs RETITLE_SCHEMA): what the title limits hold.
+  retitle: RETITLE_SCHEMA,
   // A finding about the imported deck, on a revision (review-passes.mjs ABOUT_IMPORTED_RULE): reported to the user, never blocking.
   aboutImported: { type: "boolean" },
 };
-const FINDING_REQUIRED = Object.keys(FINDING_PROPERTIES).filter((key) => !["floors", "aboutImported"].includes(key));
+const FINDING_REQUIRED = Object.keys(FINDING_PROPERTIES).filter((key) => !["floors", "retitle", "aboutImported"].includes(key));
 const findingSchema = (dimensions = DIMENSIONS) => ({ type: "object", additionalProperties: false, required: FINDING_REQUIRED, properties: { ...FINDING_PROPERTIES, dimension: { type: "string", enum: dimensions } } });
 const FINDING = findingSchema();
 const NEW_FINDING = {
@@ -325,22 +328,8 @@ export const REPAIR_VERBS = Object.freeze(["add", "replace", "change", "move", "
   "annotate", "redraw", "respace", "encode", "introduce", "source", "shorten", "convert", "retitle", "rename", "reword", "delete", "remove", "draw", "print", "mark", "sort", "swap", "correct", "reconcile", "footnote"]);
 const REPAIR_VERB = new RegExp(`\\b(${REPAIR_VERBS.join("|")})\\b`, "i");
 const REPAIR_FLOOR = Object.freeze({ blocking: 40, other: 25 });
-
-// Where a repair sentence itself says it changes a bound fact, `touches` must
-// say so too: the author is told from `touches` whether a repair reopens the
-// storyline critique, and "Retitle the page" filed as copy would send it down
-// the wrong path. Only what a sentence states outright is read - a retitling,
-// or pages merged, cut, split, moved or added; everything else about what a
-// repair changes stays the reviewer's judgement. The verbs are listed so the
-// prompt states the rule as it is tested (formRules).
-const TITLE_VERBS = Object.freeze(["rewrite", "reword", "rename", "shorten", "replace", "change", "correct"]);
-const PAGE_VERBS = Object.freeze(["cut", "delete", "remove", "drop", "split", "move", "add"]);
-// "Move the page number" moves no page: a page's own parts, named after the word, are not the page.
-const PAGE_PARTS = ["number", "numbers", "title", "subtitle", "footer", "header", "heading", "margin", "edge", "frame", "width", "height", "body", "grid", "label", "note", "source", "reference"];
-const TOUCH_CUES = Object.freeze([
-  { word: "title", says: "retitles a page or a section", cue: new RegExp(`\\bretitle\\b|\\b(?:${TITLE_VERBS.join("|")})\\s+(?:(?:the|this|its)\\s+)?(?:(?:page|slide|section|action)(?:'s)?\\s+)?title\\b`, "i") },
-  { word: "structure", says: "merges, cuts, splits, moves or adds a page", cue: new RegExp(`\\bmerge\\s+(?:(?:the|these|both|two|into)\\s+)*(?:one\\s+)?(?:pages?|slides?)\\b|\\b(?:${PAGE_VERBS.join("|")})\\s+(?:(?:the|this|a|new)\\s+)*(?:page|slide)\\b(?!'s|\\s+(?:${PAGE_PARTS.join("|")})\\b)`, "i") },
-]);
+// The words a finding's `touches` is said in, as the prompt and the refusals list them.
+const TOUCH_WORDS = Object.keys(REVIEW_TOUCHES).join(", ");
 
 /** A review's findings in ledger form; an old review's `slide` reads as a one-page list. */
 export function deckItems(review) {
@@ -348,7 +337,10 @@ export function deckItems(review) {
     id: f.id ?? `F${i + 1}`, code: f.code, severity: f.severity, scope: f.scope ?? (f.slide ? "page" : "deck"), dimension: f.dimension ?? null,
     pages: Array.isArray(f.slides) ? f.slides : f.slide ? [f.slide] : [], reason: f.reason, repair: f.repair,
     // What the reviewer says the repair changes, and where the defect was first decidable: what delivery groups a rejection by.
+    // A record from before every finding had to say it carries no `touches`, and is read by its code (gate_classes.mjs reviewRepairOf).
     ...(Array.isArray(f.touches) ? { touches: f.touches } : {}), decidable: decidableAt(f), ...(f.aboutImported ? { aboutImported: true } : {}),
+    // The titles the repair proposes, which the rejection shows the author beside the repair.
+    ...(Array.isArray(f.retitle) && f.retitle.length ? { retitle: f.retitle } : {}),
     ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}),
   }));
   // A density verdict other than "right" blocks as a finding would, and is
@@ -419,14 +411,19 @@ function findingErrors(findings, ids, { dimensions = DIMENSIONS } = {}) {
       const floor = BLOCKING.has(f.severity) ? REPAIR_FLOOR.blocking : REPAIR_FLOOR.other;
       const short = typeof f.repair !== "string" || f.repair.trim().length < floor;
       if (short || !REPAIR_VERB.test(f.repair)) errors.push(`${at}: a ${f.severity} finding needs a concrete repair sentence saying what to add, replace, move, merge, cut, plot or rewrite (${short ? `it runs to ${String(f.repair ?? "").trim().length} characters; ${floor} or more` : `none of the verbs the rule looks for is in it: ${REPAIR_VERBS.join(", ")}`})`);
-      // What the repair changes is the reviewer's judgement; validation asks only that it is said, in the listed words.
-      const unknown = Array.isArray(f.touches) ? f.touches.filter((word) => !Object.hasOwn(REVIEW_TOUCHES, word)) : [];
-      if (!Array.isArray(f.touches) || !f.touches.length || unknown.length) errors.push(`${at}: touches says what the repair changes - one or more of ${Object.keys(REVIEW_TOUCHES).join(", ")}${unknown.length ? ` (got ${unknown.join(", ")})` : ""}`);
-      else for (const { word, says, cue } of TOUCH_CUES) {
-        const said = String(f.repair ?? "").match(cue);
-        if (said && !f.touches.includes(word)) errors.push(`${at}: the repair ${says} ("${said[0]}") and touches leaves out ${word}: add "${word}" to touches, since the author is told from it whether the repair reopens the storyline critique`);
-      }
     }
+    // What the repair changes is the reviewer's to say, on every finding, in the listed words - never read off the repair's
+    // sentence. Whether it is right is the reviewer's judgement; validation asks only that it is said.
+    if (!Array.isArray(f.touches)) errors.push(`${at}: touches is ${f.touches === undefined ? "missing" : "not a list"} - every finding says what its repair changes, one or more of ${TOUCH_WORDS} ([] only on a finding of severity none, which asks for no repair)`);
+    else {
+      const unknown = f.touches.filter((word) => !Object.hasOwn(REVIEW_TOUCHES, word));
+      if (unknown.length) errors.push(`${at}: touches says what the repair changes in the listed words, one or more of ${TOUCH_WORDS} (got ${unknown.join(", ")})`);
+      else if (!f.touches.length && f.severity !== "none") errors.push(`${at}: touches is empty - a ${f.severity} finding says what its repair changes, one or more of ${TOUCH_WORDS}`);
+    }
+    // A title the repair proposes, or a length it asks for, is said in `retitle`; its limits are floorErrors' (review-floors.mjs).
+    errors.push(...retitleErrors(f.retitle, f.slides, at));
+    if (Array.isArray(f.retitle) && f.retitle.length && Array.isArray(f.touches) && !f.touches.includes("title"))
+      errors.push(`${at}: retitle rewrites a title and touches leaves out title: add "title" to touches, since the author is told from it whether the repair reopens the storyline critique`);
     if (f.checkable === undefined) errors.push(`${at}: checkable is required - { rule, measure } or null`);
     if (f.floors !== undefined && typeof f.floors !== "string") errors.push(`${at}: floors is a sentence saying how the page stays inside the floors the packet shows`);
     if (f.checkable !== undefined && f.checkable !== null) {
@@ -645,8 +642,8 @@ export function validatePart(part, slideIds, { waivers = [], floors = null } = {
  */
 export const formRules = (dimensions = DIMENSIONS) => [
   { id: "repair", matches: /needs a concrete repair sentence/, rule: `\`repair\`, on every finding whose severity is not none: ${REPAIR_FLOOR.blocking} characters or more for a major or blocker, ${REPAIR_FLOOR.other} or more for a minor, and containing one of these verbs as a word: ${REPAIR_VERBS.join(", ")}` },
-  { id: "touches", matches: /touches says what the repair changes/, rule: `\`touches\`, on every finding whose severity is not none: one or more of ${Object.keys(REVIEW_TOUCHES).join(", ")}, naming everything the repair changes` },
-  { id: "touches-said", matches: /and touches leaves out/, rule: `\`touches\` includes title where the repair says to retitle, or to ${TITLE_VERBS.join(", ")} the title of a page or a section, and structure where it says to merge pages or to ${PAGE_VERBS.join(", ")} a page` },
+  { id: "touches", matches: /touches (?:is missing|is not a list|is empty|says what the repair changes)/, rule: `\`touches\`, on every finding: one or more of ${TOUCH_WORDS}, naming everything the repair changes ([] only on a finding of severity none, which asks for no repair)` },
+  { id: "retitle", matches: /: (?:retitle\b|the title it proposes for|it asks for a title of)/, rule: "`retitle`, on a finding whose repair rewrites a page's or a section's title: one entry for each page whose title it rewrites - `page` (one of the finding's `slides`; a divider's id for a section's title) with `title` (the title proposed, as it would be printed), `words` ({ min, max }: the length asked for, the same number twice for one length) or both; left out where the repair rewrites no title. A finding with `retitle` has title in `touches`, and what it proposes keeps to the title limits the floors show" },
   { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: in \`reason\` and \`repair\`, none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} within a few words before a page id, and none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
   { id: "left-out", matches: /which the finding's page list leaves out/, rule: "a deck finding's `slides` holds every page its `reason` or `repair` names - by id, as \"page 12\", or inside a range (\"p16-p19\" and \"p16 to p19\" name every page between); an id that is an ordinary word counts only written as an id, in brackets" },
   { id: "one-page", matches: /a page finding names one page/, rule: "a finding with `scope: \"page\"` has exactly one id in `slides`; the same defect on several pages is one `scope: \"deck\"` finding" },
@@ -691,6 +688,8 @@ export function mergeReviewParts(parts, slideIds, { sections = null, binding, pr
     if (SEVERITIES.indexOf(finding.severity) > SEVERITIES.indexOf(same.severity)) { same.severity = finding.severity; same.repair = finding.repair; }
     // The repair kept may be either part's, so what the joined finding touches is what either touches.
     if (same.touches || finding.touches) same.touches = [...new Set([...(same.touches || []), ...(finding.touches || [])])];
+    // Each part proposes titles for its own pages; the joined finding carries every page's.
+    if (finding.retitle) same.retitle = [...(same.retitle || []), ...finding.retitle.filter((entry) => !(same.retitle || []).some((kept) => kept.page === entry.page))];
     same.checkable = same.checkable ?? finding.checkable ?? null;
   }
   const joined = joinParts(parts, slideIds, advanceLedger([], {}, deckItems({ findings })), { pageKey: "slide", dimensions: DIMENSIONS, dimKey: "dimension" });
@@ -971,7 +970,7 @@ function acceptanceBlockers(review, waivers = []) {
 export function reviewOutcome(review, priorLedger = [], { waivers = [], downgrade = () => false } = {}) {
   const ledger = deckLedger(review?.pass > 1 ? priorLedger : [], review, { downgrade });
   const blocking = openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity,
-    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair, ...repairClass(e) }));
+    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...repairClass(e) }));
   const held = acceptanceBlockers(review, waivers);
   const newBlockers = ledger.filter((e) => e.raisedIn === (review?.pass ?? 1) && e.severity === "blocker" && e.status === "open");
   return { accepted: review?.accepted === true && blocking.length === 0 && held.length === 0, blocking: [...blocking, ...held], ledger, newBlockers: newBlockers.length };
@@ -995,7 +994,7 @@ export function spineAgreement(ledger) {
 /** A confirmation read's outcome: its own findings and rating alone, with no ledger behind it. */
 export function confirmationOutcome(review, { waivers = [] } = {}) {
   const ledger = advanceLedger([], {}, deckItems({ findings: review?.findings || [] }));
-  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair, ...repairClass(e) })),
+  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...repairClass(e) })),
     ...acceptanceBlockers(review, waivers)];
   return { accepted: review?.accepted === true && blocking.length === 0, blocking, ledger };
 }
@@ -1164,9 +1163,10 @@ export const STANDARDS = `THE STANDARD. You need no other file: this is the skil
 - Score with anchors, not an average, on the scale the storyline critique was rated on: ${ratingScale({ rendered: true })}. ${ACCEPT_RATING} is the delivery bar; a rating below it means major work remains: file it as findings. No earlier score, target or repair list exists for you; do not look for one.`;
 
 const FINDING_RULES = `FINDINGS. Give each finding an id (F1, F2, ...), a scope, the rubric dimension it belongs to, a code, a severity, a reason, a concrete repair (what to add, replace, move, merge, cut, plot, label or rewrite, and where) and \`touches\`, what that repair changes. A page finding names its one page in \`slides\`. A deck finding - a defect of the sequence, or one defect recurring on several pages - lists EVERY page it affects in \`slides\`, in deck order: never a sample. Validation refuses a sampled page list, and a finding whose reason or repair names a page its \`slides\` leave out. Do not file twenty copies of one defect: file it once, as a deck finding with all its pages.
-TOUCHES. The author can redo the layout and the copy freely, but the argument was settled by a storyline critique before the pages were drawn, and a repair that changes it sends the page back through that critique. So say what your repair changes, with every word that applies:
+TOUCHES. The author can redo the layout and the copy freely, but the argument was settled by a storyline critique before the pages were drawn, and a repair that changes it sends the page back through that critique. So say on every finding what your repair changes, with every word that applies - nothing reads it off your repair's sentence, and a finding without \`touches\` refuses the whole answer:
 ${Object.entries(REVIEW_TOUCHES).map(([word, { about }]) => `- ${word}: ${about}`).join("\n")}
-The first two leave the argument as it was read. Do not shrink a repair to keep it among them: where the title claims more than the page shows, the repair is the title or the evidence, and saying so is what gets it fixed.`;
+The first two leave the argument as it was read. Do not shrink a repair to keep it among them: where the title claims more than the page shows, the repair is the title or the evidence, and saying so is what gets it fixed.
+RETITLE. Where your repair rewrites a page's title, or a section's on its divider, \`touches\` holds title, and \`retitle\` gives, for each page whose title it rewrites, the title you propose (\`title\`), the length you ask for (\`words\`, { min, max }) or both. The build holds them to the title limits, and the author is shown them beside your repair: say them there, not only in the sentence.`;
 
 /**
  * The rules of form, printed beside the schema: what validation enforces on a

@@ -231,9 +231,9 @@ export const REVIEW_TOUCHES = Object.freeze({
   structure: { writes: ["pages", "type"], about: "the pages themselves: one added, cut, merged, moved, or given another page type" },
 });
 // What the repair of each of the reviewer's own codes can write, for a finding
-// that does not say (`touches` absent: a review recorded before the field, or
-// an item the runtime files itself, such as a density verdict). A reviewer's
-// own statement always stands in its place.
+// that does not say (`touches` absent: a finding recorded before every new one
+// had to carry it, or an item the runtime files itself). A reviewer's own
+// statement always stands in its place.
 const REVIEW_REPAIRS = Object.freeze(Object.fromEntries([
   ...codes("R", "PROVENANCE DENSITY_MISMATCH EDITORIAL UNANNOTATED_PLOT", COPY),
   ...codes("R", "UNREADABLE OVERFLOW BROKEN_GEOMETRY DEAD_SPACE", [...LAYOUT, ...FIT]),

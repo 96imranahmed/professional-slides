@@ -86,7 +86,7 @@ Every later pass only verifies, so the first pass is the only one that may find 
 - misses any rendered page in `pages`, the coverage record: one entry per page with its `verdict` (`ok`, `minor`, `major`, `blocker`) and `checks`, a short note for each page dimension ("n/a - no table on this page" where there is nothing to check);
 - gives a page a verdict other than the worst open finding naming it;
 - files a deck finding without its full page list: `scope: "deck"` lists every affected page in `slides`, and a list given by example ("e.g.", "such as", "etc.") or a reason naming a page the list leaves out is refused;
-- leaves a finding without an `id`, a rubric `dimension`, a concrete `repair` (a sentence built on one of the verbs the prompt lists), `touches` (what the repair changes: one or more of copy, layout, exhibit-view, title, claim, evidence, structure) or `checkable` (a rule, or null);
+- leaves a finding without an `id`, a rubric `dimension`, a concrete `repair` (a sentence built on one of the verbs the prompt lists), `touches` (what the repair changes: one or more of copy, layout, exhibit-view, title, claim, evidence, structure - the refusal names the finding that leaves it out) or `checkable` (a rule, or null);
 - states, in a repair, a word count outside the band the packet shows for the page without saying in `floors` how the page stays inside it ([floors](#the-floors-a-repair-stays-inside));
 - skips the **completeness self-check**: `completeness` holds one entry per dimension, `findings` when any was filed under it, or `clean` with what was checked and why nothing was found;
 - omits the `assessment` (argument, evidence, visual, copy, sequence, best page, worst page, most repetitive sequence, most deletable page);
@@ -108,7 +108,8 @@ Above 24 pages the packet splits the deck review's first pass, so that no reader
 Every prompt ends, beside its schema, with the rules of form validation enforces, word for word from the table the validator's refusals are read against (`formRules` in `runtime/reviewer.mjs`), and with one finding and one completeness entry that pass them:
 
 - a `repair` of 40 characters or more for a major or blocker and 25 for a minor, containing one of the listed verbs;
-- `touches` on every finding that asks for a repair, including `title` where the repair sentence itself says to retitle or to rewrite a title, and `structure` where it says to merge, cut, split, move or add a page;
+- `touches` on every finding, naming everything its repair changes (`[]` only on a finding of severity none, which asks for no repair). It is the reviewer's to say: nothing reads it off the repair's sentence;
+- `retitle` on a finding whose repair rewrites a page's title, or a section's on its divider: one entry a page, with `page` (one of the finding's `slides`), and `title` (the title proposed), `words` (`{ min, max }`, the length asked for) or both. A finding with `retitle` has `title` in `touches`;
 - no page list by example - the listed words ("including", "such as", "etc." among them) near a page id are refused;
 - every page a deck finding's text names, by id, by number or inside a range, is in its `slides`; an id spelt as an ordinary word (a page called cover) counts only where it is written as an id, in brackets;
 - one completeness entry per dimension the reader reports on, `findings` exactly where it filed one, with a note of 30 characters or more for `clean` and 10 for `findings`.
@@ -124,17 +125,17 @@ The build holds each page to measured bars the rendered page does not show, so t
 
 Every number is read from the build's own outputs - `scene.json`, `density-profile.json` and the standings of the gate reports - never retyped. A reviewer does not ask for what a gate refuses: where the right repair moves a page toward a floor, the finding says in `floors` how the page stays inside it. Validation refuses a repair that states a body word count outside the page's band, or a words-a-block figure outside the deck's band on a prose page, and says nothing in `floors`; a repair that states no number is held by the prompt, and by the gate at the rebuild.
 
-The packet also prints what a title is held to - a page title's words and lines (`TITLE_WORDS`), and what a section title of this deck holds on its dividers - and validation refuses a repair that proposes a longer title in quotes, or asks for one by length; `floors` does not excuse a title. The storyline critic is shown the same limits and its `fix` is held to them.
+The packet also prints what a title is held to - a page title's words and lines (`TITLE_WORDS`), and what a section title of this deck holds on its dividers - and validation refuses a finding whose `retitle` proposes a longer title, or asks for one by length; `floors` does not excuse a title. A title is read only from `retitle`, never out of the repair's sentence, and a section title is the one whose `page` is a divider. The storyline critic is shown the same limits and gives a title its `fix` proposes in the same field.
 
 ## After a rejection
 
-A rejected review's findings are listed in `REJECTED.md` in two groups, by what each repair changes. The reviewer says it (`touches`), and the registry the draft uses (the repair registry in `runtime/gates/gate_classes.mjs`, the bound fields in `runtime/storyline.mjs`) says whether that is the layout's or the argument's.
+A rejected review's findings are listed in `REJECTED.md` in two groups, by what each repair changes. The reviewer says it (`touches`), and the registry the draft uses (the repair registry in `runtime/gates/gate_classes.mjs`, the bound fields in `runtime/storyline.mjs`) says whether that is the layout's or the argument's. A title a finding proposes (`retitle`) is printed beside its repair.
 
 | Group | `touches` | What the author does |
 | --- | --- | --- |
 | Repairable without reopening the argument | `copy`, `layout` only | Fix in `<id>.pages.json`, recompile, rebuild and rerun delivery. The storyline critique stays ready; the next review pass verifies the changed pages. |
 | Reopen the argument | any of `exhibit-view`, `title`, `claim`, `evidence`, `structure` | Change only the pages these findings name, at the spine; recompile; run `node runtime/storyline.mjs <id>.deck.json out/` and bring it back to `ready`; then rebuild and rerun delivery. |
-| Not said which | none on record (a review from before the field), and the code's repairs could be either | Read each repair; one that changes a bound fact belongs with the group above. |
+| Not said which | none on record (a review recorded before every finding had to carry it), and the code's repairs could be either | Read each repair; one that changes a bound fact belongs with the group above. |
 
 **The post-review pass.** Each rejected deck-review pass allows one storyline verification pass that does not count against the critique's cap of three:
 
@@ -263,7 +264,7 @@ Skill evaluation defaults to at least 50 rendered pages; below-minimum diagnosti
 
 Return the answer to the schema `runtime/reviewer.mjs` writes into the packet; a key the schema does not name is refused at any level:
 
-- **Pass one** (`out/review.json`): `pass: 1`, `verifies: null`, `accepted`, `summary`, `rating`, `binding`, `opened`, `provenance`, `pages`, `findings` (each with `id`, `scope`, `slides`, `dimension`, `code`, `severity`, `reason`, `repair`, `touches`, `checkable` and, where the repair moves a page toward a floor, `floors`), `completeness`, `assessment`, `density` (the density pass above: `deck`, and per flagged page `slide`, `verdict`, `reason` and, where required, `point`) and, when the packet shows waivers, `waivers`.
+- **Pass one** (`out/review.json`): `pass: 1`, `verifies: null`, `accepted`, `summary`, `rating`, `binding`, `opened`, `provenance`, `pages`, `findings` (each with `id`, `scope`, `slides`, `dimension`, `code`, `severity`, `reason`, `repair`, `touches`, `checkable`, where the repair moves a page toward a floor `floors`, and where it rewrites a title `retitle`), `completeness`, `assessment`, `density` (the density pass above: `deck`, and per flagged page `slide`, `verdict`, `reason` and, where required, `point`) and, when the packet shows waivers, `waivers`.
 - **A later pass** (`out/review.json`): `pass`, `verifies`, `opened`, `provenance`, `pages` for the pages it read, `statuses`, additive `findings` with `basis`, `justification` and `evidence`, and `density`.
 - **The confirmation read** (`out/confirmation.json`): `confirms`, a verdict and note for every page, its findings and the assessment.
 

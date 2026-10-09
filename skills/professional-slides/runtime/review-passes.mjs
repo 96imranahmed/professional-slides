@@ -809,6 +809,8 @@ export function advanceLedger(prior, review, items, { downgrade = () => false, a
       // What the folded finding's repair touches is the entry's too: a pass scoped by what repairs touch must not lose it.
       Object.assign(kept, { severity: worst([was.severity, kept.severity, item.severity]), pages: [...new Set([...(kept.pages || []), ...(item.pages || [])])],
         ...(item.touches || kept.touches ? { touches: [...new Set([...(kept.touches || []), ...(item.touches || [])])] } : {}),
+        // And a title it proposes is the one the author is shown for that page now.
+        ...(item.retitle ? { retitle: [...(kept.retitle || []).filter((entry) => !item.retitle.some((fresh) => fresh.page === entry.page)), ...item.retitle] } : {}),
         folded: [...(kept.folded || []), { id: item.id, pass, severity: item.severity, pages: item.pages || [], reason: said }], updatedIn: pass });
       continue;
     }

@@ -188,7 +188,7 @@ const room = sectionTitleRoom(deck.spec, deck.dir);
 // A title inside the most words the divider holds, of long words: it does not fit, and the count of words did not say so.
 const LONG = ['Consolidated', 'international', 'profitability', 'notwithstanding', 'extraordinary', 'restructuring', 'commitments', 'throughout', 'neighbouring', 'jurisdictions', 'represented', 'comprehensively'];
 const long = LONG.slice(0, room.words).join(' '), short = 'Growth and its funding';
-const propose = (title) => withFindings(p1, ids, [finding('F1', ['s1'], 'The section title claims more than the two pages under it show of the growth.', { check: 'claim', fix: `Retitle the section "${title}" so it claims only what its pages show.` })],
+const propose = (title) => withFindings(p1, ids, [finding('F1', ['s1'], 'The section title claims more than the two pages under it show of the growth.', { check: 'claim', fix: 'Retitle the section so it claims only what its pages show.', retitle: [{ page: 's1', title }] })],
   { completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'claim' ? 'findings' : 'clean', note: check === 'claim' ? 'Filed the item on the section claim.' : `Checked ${check} across the spine and found nothing to raise.` })) });
 const unfit = await answer(deck, propose(long));
 const fit = await answer(deck, propose(short));

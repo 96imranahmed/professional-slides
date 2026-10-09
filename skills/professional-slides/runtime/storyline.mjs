@@ -67,7 +67,7 @@ import {
 } from "./review-passes.mjs";
 import { repairOf, reviewRepairOf } from "./gates/gate_classes.mjs";
 import { evidenceDepth, VARIETY } from "./gates/variety_gates.mjs";
-import { titleLimits, titleLimitsLine, titleErrors } from "./review-floors.mjs";
+import { titleLimits, titleLimitsLine, titleErrors, retitleErrors, RETITLE_SCHEMA } from "./review-floors.mjs";
 import { sectionTitleFits } from "./spine-fit.mjs";
 import { alternativesOf, analysisInsights, analysisLine, readAnalysis } from "./analysis.mjs";
 import { insightGradeProblems, readInsightLog } from "./measures.mjs";
@@ -163,7 +163,9 @@ const ITEM_PROPERTIES = {
 };
 // A finding about the imported deck (review-passes.mjs ABOUT_IMPORTED_RULE): optional, and only a revision's critique may set it.
 // `ifUnfixed` is what a blocking item does to the decision (BLOCKING_STAKE): a major or blocker without it is recorded as minor.
-const OPTIONAL_ITEM = { aboutImported: { type: "boolean" }, ifUnfixed: { type: "string" } };
+// `retitle`, on a finding whose fix rewrites a title: the title proposed or the length asked for, page by page (review-floors.mjs RETITLE_SCHEMA),
+// which the title limits hold - said as fields, never read out of the fix's sentence.
+const OPTIONAL_ITEM = { aboutImported: { type: "boolean" }, ifUnfixed: { type: "string" }, retitle: RETITLE_SCHEMA };
 const ITEM = { type: "object", additionalProperties: false, required: Object.keys(ITEM_PROPERTIES), properties: { ...ITEM_PROPERTIES, ...OPTIONAL_ITEM } };
 const NEW_ITEM = { type: "object", additionalProperties: false, required: [...Object.keys(ITEM_PROPERTIES), "basis", "justification", "evidence"],
   properties: { ...ITEM_PROPERTIES, ...OPTIONAL_ITEM, basis: { type: "string", enum: Object.keys(NEW_BASES) }, justification: { type: "string" }, evidence: { type: "string" } } };
@@ -623,8 +625,9 @@ export const BOUND_FIELDS = Object.freeze({
  * it changes is the layout's (gates/gate_classes.mjs reviewRepairOf: copy,
  * layout, fit), so the ready critique stands; "argument" where it writes a
  * field the critique is bound to (BOUND_FIELDS), which reopens it. The
- * reviewer's own statement (`touches`) decides; a finding that carries none
- * is read by its code - "argument" or "layout" where every repair of that
+ * reviewer's own statement (`touches`, which every finding of a new review
+ * carries) decides; a finding that carries none - one recorded before it was
+ * required - is read by its code: "argument" or "layout" where every repair of that
  * code is one or the other, and "unstated" where they could be either or the
  * code lists none.
  */
@@ -1084,7 +1087,7 @@ FIGURES TO RECONCILE. Each pair below is two measures of different insights, in 
 ${packet.reconcile.map((line) => `- ${line}`).join("\n")}
 ` : "");
 
-// The title limits the build holds (review-floors.mjs titleLimits), as the critic is held to them in a fix.
+// The title limits the build holds (review-floors.mjs titleLimits), as the critic is held to them in a finding's `retitle`.
 const limitsLine = (packet) => (packet.limits ? `\nLIMITS THE BUILD HOLDS: ${titleLimitsLine(packet.limits)}.\n` : "");
 
 // What the runtime computed from the insight log's measures before the outline was written.
@@ -1177,7 +1180,7 @@ export const storylineFormRules = ({ cap = null } = {}) => [
   ...(cap ? [{ id: "cap", matches: /returns at most \d+ items/, rule: `at most ${cap} items in all: findings, missing analyses and cuts` }] : []),
   { id: "pages", matches: /a page finding names one page|list the affected pages/, rule: "a finding with `scope: \"page\"` has exactly one id in `pages`; a spine finding has one or more" },
   { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} just before a page id, none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
-  { id: "title", matches: /the title it proposes|asks for a title of/, rule: "a `fix` that proposes a title in quotes, or a length for one, keeps to the limits above" },
+  { id: "title", matches: /: (?:retitle\b|the title it proposes for|the section title it proposes for|it asks for a title of)/, rule: "`retitle` ({ page, title, words }) holds a title the `fix` proposes, or its length, within the limits above" },
 ];
 const itemRules = (options) => `ITEMS. Every problem is an item with an id (F1, F2, ...; M1... for missing analyses; C1... for cuts), a severity and, for findings, the check it belongs to, the problem and the fix. A spine finding lists EVERY page it concerns (for the answer: the summary and closing pages). ${PAGE_IDS_RULE} ${BLOCKING_STAKE}.
 FORM. Validation refuses the whole answer on any of these:
@@ -1501,7 +1504,7 @@ function schemaErrors(value, schema, at) {
 export function storylineItems(review) {
   const items = [];
   for (const f of review?.findings || []) items.push({ id: f.id, code: `STORY_${String(f.check ?? "").toUpperCase()}`, dimension: f.check, scope: f.scope, severity: f.severity,
-    pages: f.pages || [], reason: f.problem, repair: f.fix, ...(f.aboutImported ? { aboutImported: true } : {}), ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}) });
+    pages: f.pages || [], reason: f.problem, repair: f.fix, ...(Array.isArray(f.retitle) && f.retitle.length ? { retitle: f.retitle } : {}), ...(f.aboutImported ? { aboutImported: true } : {}), ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}) });
   for (const m of review?.missingAnalyses || []) items.push({ id: m.id, code: registered(STORYLINE_CODES, "MISSING_ANALYSIS"), dimension: "missing", scope: "spine", severity: m.severity, pages: [],
     reason: `${m.analysis}: ${m.why}`, repair: `Run it on ${m.data}`, public: m.public ?? null, remedy: m.remedy ?? null });
   for (const c of review?.cutOrMerge || []) items.push({ id: c.id, code: registered(STORYLINE_CODES, c.action === "cut" ? "CUT_PAGE" : "MERGE_PAGES"), dimension: "cuts", scope: "spine", severity: c.severity,
@@ -1520,9 +1523,9 @@ function itemErrors(review, ids, own = null, { cap = null, limits = null, divide
     if (seen.has(item.id)) errors.push(`${at}: id ${item.id} is used twice`);
     seen.add(item.id);
     if (name === "findings") errors.push(...pageListErrors(at, { scope: item.scope, pages: item.pages, text: `${item.problem ?? ""} ${item.fix ?? ""}`, ids, deckScope: "spine", named: false }));
-    // A fix that proposes a title the build would refuse sends the author into a refusal: held to the limits the packet showed (review-floors.mjs).
-    if (name === "findings") errors.push(...titleErrors(item.fix, limits, at, { section: (item.pages || []).length > 0 && item.pages.every((id) => dividers.includes(id)),
-      sectionFits: sectionFits ? (title) => sectionFits(title, (item.pages || []).filter((id) => dividers.includes(id))) : null }));
+    // A fix that proposes a title the build would refuse sends the author into a refusal: what it proposes, said in `retitle`, is
+    // held to the limits the packet showed (review-floors.mjs). The fix's sentence is not read for a title.
+    if (name === "findings") errors.push(...retitleErrors(item.retitle, item.pages, at), ...titleErrors(item.retitle, limits, at, { dividers, sectionFits }));
     if (name === "cutOrMerge") errors.push(...pageListErrors(at, { scope: "spine", pages: item.pages, text: item.freedUse, ids, deckScope: "spine", named: false }));
     // Only data the critic knows to be published can carry a major: a guess at
     // what might exist is a research question, not a defect of the storyline.

@@ -163,8 +163,9 @@ class RepairReachTests(unittest.TestCase):
         result = run_node(FIXTURES + '''
 import { REVIEW_TOUCHES, SETTLED_LATER } from './skills/professional-slides/runtime/gates/gate_classes.mjs';
 const reach = (touches, code = 'MISLEADING_TIME_AXIS') => S.repairReach({ code, ...(touches ? { touches } : {}) });
-const errors = (o) => R.validateReview({ accepted: false, summary: 'A deck with one finding to repair.', rating: 7, pages: [], findings: [major(o)] }, ['p02']).filter((e) => /touches/.test(e));
+const errors = (o) => R.validateReview({ accepted: false, summary: 'A deck with one finding to repair.', rating: 7, pages: [], findings: [major(o)] }, ['p02']).filter((e) => /touches|retitle/.test(e));
 const schema = R.REVIEW_SCHEMA.properties.findings.items;
+const retitle = [{ page: 'p02', title: 'The line shows the gap the months open' }];
 console.log(JSON.stringify({
   words: Object.keys(REVIEW_TOUCHES), required: schema.required.includes('touches'), offered: schema.properties.touches.items.enum,
   // Every word writes fields of the one registry: the layout's three, or a field the critique is bound to.
@@ -172,15 +173,18 @@ console.log(JSON.stringify({
   stated: Object.fromEntries(Object.keys(REVIEW_TOUCHES).map((word) => [word, reach([word])])), mixed: reach(['copy', 'title']),
   // A record that does not say: by its code, where the code's repairs are all one or the other.
   unstated: { HEDGED_TITLE: reach(null, 'HEDGED_TITLE'), DEAD_SPACE: reach(null, 'DEAD_SPACE'), UNCLEAR_ARGUMENT: reach(null, 'UNCLEAR_ARGUMENT'), coined: reach(null), TEXT_FRAGMENTED: reach(null, 'TEXT_FRAGMENTED'), SPINE_UNFIT: reach(null, 'SPINE_UNFIT') },
-  // Validation asks that it is said, in the listed words; whether it is right is the reviewer's judgement, except where the repair sentence contradicts it.
-  missing: errors({ touches: undefined }).length, empty: errors({ touches: [] }).length, unknown: errors({ touches: ['wording'] }), fine: errors({ touches: ['copy', 'structure'] }), none: errors({ severity: 'none', touches: [] }),
-  // Only where the repair sentence itself says it: a retitling filed as copy, or pages merged, cut or added filed as layout, is refused and told what to add.
-  said: Object.fromEntries(Object.entries({ retitle: 'Retitle the page to the one measure its exhibit shows today.', rewrite: 'Rewrite the section title so it claims what its pages prove.', merge: 'Enlarge the table to fill the band or merge the page with p03.',
-    cut: 'Cut the page and move its one number to the summary table.', number: 'Move the page number to the footer, where every other page has it.', chart: 'Rewrite the chart title so that it names the unit of the measure.' })
-    .map(([name, repair]) => [name, errors({ repair, touches: ['copy', 'layout'] }).map((e) => e.match(/touches leaves out (\\w+)/)?.[1] ?? e)])),
-  saidRight: [errors({ repair: 'Retitle the page to the one measure its exhibit shows today.', touches: ['title'] }), errors({ repair: 'Cut the page and move its one number to the summary table.', touches: ['structure', 'copy'] })],
-  told: errors({ repair: 'Retitle the page to the one measure its exhibit shows today.', touches: ['copy'] })[0],
-  carried: R.deckItems({ findings: [major({ touches: ['title'] })] })[0].touches, density: R.deckItems({ findings: [], density: { pages: [{ slide: 'p02', verdict: 'too thin', reason: 'The page carries a title and nothing a reader can use.' }] } })[0].touches }));
+  // Validation asks that it is said, on every finding, in the listed words; whether it is right is the reviewer's judgement.
+  missing: errors({ touches: undefined }), empty: errors({ touches: [] }).length, unknown: errors({ touches: ['wording'] }), fine: errors({ touches: ['copy', 'structure'] }), none: errors({ severity: 'none', touches: [] }),
+  // A finding of severity none asks for no repair, and still says so.
+  noneMissing: errors({ severity: 'none', touches: undefined }), notList: errors({ touches: 'copy' }),
+  // The repair's sentence is not read for what it changes: what the reviewer says in `touches` stands.
+  unread: Object.fromEntries(Object.entries({ retitle: 'Retitle the page to the one measure its exhibit shows today.', rewrite: 'Rewrite the section title so it claims what its pages prove.', merge: 'Enlarge the table to fill the band or merge the page with p03.',
+    cut: 'Cut the page and move its one number to the summary table.' }).map(([name, repair]) => [name, errors({ repair, touches: ['copy', 'layout'] })])),
+  // A title it proposes is a field, and a finding that gives one says title in `touches`.
+  retitled: [errors({ retitle, touches: ['title'] }), errors({ retitle, touches: ['copy'] })],
+  carried: R.deckItems({ findings: [major({ touches: ['title'] })] })[0].touches, density: R.deckItems({ findings: [], density: { pages: [{ slide: 'p02', verdict: 'too thin', reason: 'The page carries a title and nothing a reader can use.' }] } })[0].touches,
+  // A finding recorded before every finding had to say it is read by its code.
+  recorded: S.repairReach(R.deckItems({ findings: [major({ touches: undefined, code: 'DEAD_SPACE' })] })[0]) }));
 ''')
         self.assertEqual(result['words'], ['copy', 'layout', 'exhibit-view', 'title', 'claim', 'evidence', 'structure'])
         self.assertTrue(result['required'])
@@ -189,15 +193,23 @@ console.log(JSON.stringify({
         self.assertEqual(result['stated'], {'copy': 'layout', 'layout': 'layout', 'exhibit-view': 'argument', 'title': 'argument', 'claim': 'argument', 'evidence': 'argument', 'structure': 'argument'})
         self.assertEqual(result['mixed'], 'argument')
         self.assertEqual(result['unstated'], {'HEDGED_TITLE': 'argument', 'DEAD_SPACE': 'layout', 'UNCLEAR_ARGUMENT': 'unstated', 'coined': 'unstated', 'TEXT_FRAGMENTED': 'layout', 'SPINE_UNFIT': 'argument'})
-        self.assertEqual([result['missing'], result['empty']], [1, 1])
+        # A refusal names the finding that leaves it out.
+        self.assertEqual(len(result['missing']), 1)
+        self.assertTrue(result['missing'][0].startswith('findings[0] (F1): touches is missing - every finding says what its repair changes'), result['missing'][0])
+        self.assertEqual(result['empty'], 1)
         self.assertIn('got wording', result['unknown'][0])
         self.assertEqual(result['fine'], [])
         self.assertEqual(result['none'], [])
-        self.assertEqual(result['said'], {'retitle': ['title'], 'rewrite': ['title'], 'merge': ['structure'], 'cut': ['structure'], 'number': [], 'chart': []})
-        self.assertEqual(result['saidRight'], [[], []])
-        self.assertIn('the repair retitles a page or a section ("Retitle") and touches leaves out title: add "title" to touches', result['told'])
+        self.assertEqual(len(result['noneMissing']), 1)
+        self.assertIn('findings[0] (F1): touches is missing', result['noneMissing'][0])
+        self.assertIn('touches is not a list', result['notList'][0])
+        self.assertEqual(result['unread'], {'retitle': [], 'rewrite': [], 'merge': [], 'cut': []})
+        self.assertEqual(result['retitled'][0], [])
+        self.assertEqual(len(result['retitled'][1]), 1)
+        self.assertIn('findings[0] (F1): retitle rewrites a title and touches leaves out title: add "title" to touches', result['retitled'][1][0])
         self.assertEqual(result['carried'], ['title'])
         self.assertEqual(result['density'], ['copy'])
+        self.assertEqual(result['recorded'], 'layout')
 
     def test_a_rejection_lists_what_is_repairable_without_reopening_the_argument_apart_from_what_reopens_it(self):
         result = run_node(FIXTURES + '''
@@ -206,7 +218,8 @@ await storylineReady(d);
 await deliver(d, { reviewer: 'packet' });
 const rec = await record(d);
 const findings = [major(), major({ id: 'F2', slides: ['p03'], dimension: 'argument', code: 'UNSUPPORTED_CLAIM', touches: ['title', 'copy'],
-  reason: 'The title says the subject leads on every measure and the page shows one measure.', repair: 'Rewrite the title to the one measure the page shows, or add the other measures to the exhibit.' }),
+  reason: 'The title says the subject leads on every measure and the page shows one measure.', repair: 'Rewrite the title to the one measure the page shows, or add the other measures to the exhibit.',
+  retitle: [{ page: 'p03', title: 'The subject leads the market on revenue, the one measure shown', words: { min: 8, max: 12 } }] }),
   major({ id: 'F3', slides: ['p04'], dimension: 'text', code: 'WALL_OF_TEXT', severity: 'minor', touches: ['copy'], repair: 'Cut the second paragraph, which restates the title.' })];
 const rejected = await deliver(d, { reviewFile: await write(d, 'r1.json', { ...firstPass(rec, d.ids, findings), pages: d.ids.map((id) => pageEntry(id, id === 'p04' ? 'minor' : ['p02', 'p03'].includes(id) ? 'major' : 'ok')) }) });
 const note = await fs.readFile(path.join(d.out, 'REJECTED.md'), 'utf8');
@@ -217,6 +230,8 @@ console.log(JSON.stringify({ at: rejected.rejectedAt, blockers: rejected.blocker
   headings: note.split('\\n').filter((l) => l.startsWith('## ')), layout: [section('Repairable without reopening the argument').includes('MISLEADING_TIME_AXIS'), section('Repairable without reopening the argument').includes('UNSUPPORTED_CLAIM')],
   argument: [section('Reopen the argument').includes('UNSUPPORTED_CLAIM'), section('Reopen the argument').includes('visible at the spine'), section('Reopen the argument').includes('node runtime/storyline.mjs'),
     section('Reopen the argument').includes(S.POST_REVIEW_RULE)],
+  // The title the reviewer proposes is a field, printed beside the repair for the author.
+  proposed: section('Reopen the argument').includes('[Title proposed - p03: "The subject leads the market on revenue, the one measure shown", 8-12 words]'),
   rating: section('Blockers').includes('REVIEW_RATING'), lead: note.split('\\n')[4] }));
 ''')
         self.assertEqual(result['at'], 'review pass 1 of 3')
@@ -228,8 +243,26 @@ console.log(JSON.stringify({ at: rejected.rejectedAt, blockers: rejected.blocker
         self.assertEqual(result['headings'], ['## Blockers', '## Repairable without reopening the argument (1)', '## Reopen the argument (1)'])
         self.assertEqual(result['layout'], [True, False])
         self.assertEqual(result['argument'], [True, True, True, True])
+        self.assertTrue(result['proposed'])
         self.assertTrue(result['rating'])
         self.assertIn('1 repairable without reopening the argument; 1 reopen the argument', result['lead'])
+
+    def test_a_new_review_whose_finding_does_not_say_what_its_repair_changes_is_refused_naming_it(self):
+        result = run_node(FIXTURES + '''
+const d = await prebuilt();
+await storylineReady(d);
+await deliver(d, { reviewer: 'packet' });
+const rec = await record(d);
+const findings = [major(), major({ id: 'F2', slides: ['p03'], touches: undefined })];
+const refused = await deliver(d, { reviewFile: await write(d, 'r1.json', { ...firstPass(rec, d.ids, findings), pages: d.ids.map((id) => pageEntry(id, ['p02', 'p03'].includes(id) ? 'major' : 'ok')) }) });
+await done(d);
+console.log(JSON.stringify({ at: refused.rejectedAt, blockers: refused.blockers.map((b) => [b.code, b.reason]) }));
+''')
+        self.assertEqual(result['at'], 'invalid review')
+        self.assertEqual(len(result['blockers']), 1)
+        code, reason = result['blockers'][0]
+        self.assertEqual(code, 'INVALID_REVIEW')
+        self.assertIn('findings[1] (F2): touches is missing', reason)
 
 
 class PostReviewPassTests(unittest.TestCase):
@@ -391,7 +424,7 @@ console.log(JSON.stringify({ ready: [ready.status, ready.pass], rejected: [rejec
 
 # A built deck's measured outputs, written beside the fixture's scene the way the build writes them.
 FLOORS = '''
-import { reviewFloors, floorsPrompt, floorErrors, titleErrors, titleLimits } from './skills/professional-slides/runtime/review-floors.mjs';
+import { reviewFloors, floorsPrompt, floorErrors, titleErrors, titleLimits, retitleErrors } from './skills/professional-slides/runtime/review-floors.mjs';
 async function measured(d, { fragmented = 54.5 } = {}) {
   const scene = JSON.parse(await fs.readFile(path.join(d.out, 'scene.json'), 'utf8'));
   scene.slides.forEach((slide, i) => { if (i) Object.assign(slide, { readingTask: 'chart-with-commentary', wordFloor: 96, wordCeiling: 293 }); });
@@ -427,7 +460,7 @@ await done(d);
 console.log(JSON.stringify({ p01: packet.floors.pages.p01, p02: packet.floors.pages.p02, deck: packet.floors.deck, band: packet.floors.band, pages: Object.keys(packet.floors.pages),
   said: ['FLOORS THE BUILD HOLDS', '- p01: 150 body words, held to 96-293 (chart-with-commentary); 3 blocks at 48 words a block (a prose page: counts toward the deck\\'s 41.3-86.5 band); counts toward PAGE_SHAPE_FLAT.share',
     'TEXT_FRAGMENTED.floor: median words a block on the prose pages 54.5; floor 41.3', 'PAGE_SHAPE_FLAT.share: pages on the commonest architecture 2 of 5 pages, 40%; cap 40%: at the cap, 1 more blocks'].map((text) => prompt.includes(text)),
-  titles: [packet.floors.titles.title.words.max, prompt.includes('Titles: a page title runs to 6-15 words (10 the norm) on 2 lines at most. A repair that proposes a title')], roomy: prompt.includes('EVIDENCE_MIX'), same: JSON.stringify(floors.pages.p01) === JSON.stringify(packet.floors.pages.p01), bare: [bare.band, bare.pages.p01.words, bare.pages.p01.blocks ?? null] }));
+  titles: [packet.floors.titles.title.words.max, prompt.includes('Titles: a page title runs to 6-15 words (10 the norm) on 2 lines at most. A title a finding proposes in `retitle`')], roomy: prompt.includes('EVIDENCE_MIX'), same: JSON.stringify(floors.pages.p01) === JSON.stringify(packet.floors.pages.p01), bare: [bare.band, bare.pages.p01.words, bare.pages.p01.blocks ?? null] }));
 ''')
         self.assertEqual(result['p01'], {'words': {'now': 150, 'floor': 96, 'ceiling': 293, 'task': 'chart-with-commentary'}, 'blocks': {'count': 3, 'wordsPerBlock': 48, 'prose': True}, 'rules': ['PAGE_SHAPE_FLAT.share']})
         # The footer's share is counted from the scene with the gate's own bands, against the gate's own bar.
@@ -459,16 +492,24 @@ const out = {
 // A length given for one part of the page is not the page's: only a count the sentence gives for the body is held to the band.
 out.part_of_page = errors({ repair: 'Keep the two row notes and add one developed takeaway of 40 to 60 words under the table.' });
 out.target = errors({ repair: 'Cut the restatement from the third block. Target about 60 words.' }).length;
-// A title the repair proposes, or sizes, is held to the title limits, and `floors` does not excuse it.
+// A title the finding proposes, or sizes, in `retitle` is held to the title limits, and `floors` does not excuse it.
 const titled = await reviewFloors(d.out, scene, { spec: d.spec, base: d.dir });
-const long = 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".';
+const long = 'The subject leads the market on revenue, on margin, on growth and on reach in every year shown';
+const retitled = (entry, o = {}) => major({ slides: ['p01'], touches: ['title'], repair: 'Retitle the page to the measures its exhibit shows.', retitle: [{ page: 'p01', ...entry }], ...o });
 out.titles = titled.titles;
-out.title = [floorErrors([major({ slides: ['p01'], repair: long, floors: 'The subtitle takes the period and the scope.' })], titled), floorErrors([major({ slides: ['p01'], repair: 'Retitle to "The subject leads the market on revenue and margin".' })], titled),
-  floorErrors([major({ slides: ['p01'], repair: 'Rewrite the title to 16-18 words so that it names each of the measures.' })], titled), floorErrors([major({ slides: ['p01'], repair: long })], floors)];
-// A section title is held to what this deck's dividers hold; the sentence, or a finding on a divider, says which title is meant.
+out.title = [floorErrors([retitled({ title: long }, { floors: 'The subtitle takes the period and the scope.' })], titled), floorErrors([retitled({ title: 'The subject leads the market on revenue and margin' })], titled),
+  floorErrors([retitled({ words: { min: 16, max: 18 } })], titled), floorErrors([retitled({ title: long })], floors),
+  // A title in the repair's sentence alone is not read: the finding says it in `retitle`, or it is not held.
+  floorErrors([major({ slides: ['p01'], repair: `Retitle to "${long}".` })], titled)];
+// A length the sentence gives a title is the title's, not a count asked of the page's body.
+out.titleInSentence = floorErrors([retitled({ words: { min: 12, max: 12 } }, { repair: 'Rewrite the title to 12 words so that it names one measure.' })], floors);
+// A section title is held to what this deck's dividers hold: the page an entry names says which title is meant.
 const limits = { title: titled.titles.title, sectionTitle: { words: 9, lines: 2 } };
-const ten = "Rewrite the section title as 'The subject out-earns each reporting rival with almost no debt'.";
-out.section = [titleErrors(ten, limits, 'F1'), titleErrors(ten.replace('section title', 'title'), limits, 'F1'), titleErrors(ten.replace('section title', 'title'), limits, 'F1', { section: true }).length];
+const ten = [{ page: 's1', title: 'The subject out-earns each reporting rival with almost no debt' }];
+out.section = [titleErrors(ten, limits, 'F1', { dividers: ['s1'] }), titleErrors(ten, limits, 'F1'), titleErrors([{ page: 's1', words: { min: 10, max: 12 } }], limits, 'F1', { dividers: ['s1'] }).length];
+// Its form holds without the limits: a page of the finding's own, once, with a title, a length or both.
+out.form = [retitleErrors([{ page: 'p09', title: 'A title for another page' }], ['p01'], 'F1'), retitleErrors([{ page: 'p01' }], ['p01'], 'F1'), retitleErrors([{ page: 'p01', words: { min: 12, max: 8 } }], ['p01'], 'F1'),
+  retitleErrors([], ['p01'], 'F1'), retitleErrors([{ page: 'p01', title: 'A title for the page', note: 'x' }, { page: 'p01', title: 'Another title for it' }], ['p01'], 'F1'), retitleErrors(undefined, ['p01'], 'F1')];
 const withDivider = titleLimits({ slides: [{ id: 's1', kind: 'section', title: 'The market' }, ...d.spec.slides] }, d.dir);
 out.measured = [withDivider.sectionTitle.lines, withDivider.sectionTitle.words > 2 && withDivider.sectionTitle.words < 30, 'sectionTitle' in titled.titles];
 await done(d);
@@ -487,13 +528,18 @@ console.log(JSON.stringify(out));
         self.assertEqual(result['part_of_page'], [])
         self.assertEqual(result['target'], 1)
         self.assertEqual(result['titles'], {'title': {'words': {'min': 6, 'max': 15, 'target': 10}, 'lines': 2}})
-        self.assertEqual([len(e) for e in result['title']], [1, 0, 1, 0])  # without the deck, no title limit is shown and none is held
-        self.assertIn('the title it proposes runs to 18 words', result['title'][0][0])
+        # Without the deck, no title limit is shown and none is held; a title in the sentence alone is not read.
+        self.assertEqual([len(e) for e in result['title']], [1, 0, 1, 0, 0])
+        self.assertIn('the title it proposes for p01 runs to 18 words', result['title'][0][0])
         self.assertIn('the build refuses a page title past 15 (TITLE_WORDS): propose one of 15 words or fewer', result['title'][0][0])
-        self.assertIn('asks for a title of 16-18 words', result['title'][2][0])
+        self.assertIn('asks for a title of 16-18 words on p01', result['title'][2][0])
+        self.assertEqual(result['titleInSentence'], [])
         self.assertIn('runs to 10 words', result['section'][0][0])
         self.assertIn('refuses a section title past 9', result['section'][0][0])
-        self.assertEqual([result['section'][1], result['section'][2]], [[], 1])
+        self.assertEqual([result['section'][1], result['section'][2]], [[], 1])  # a page that is not a divider holds a page title
+        self.assertEqual([len(e) for e in result['form']], [1, 1, 1, 1, 2, 0])
+        self.assertIn("names page p09: its page is one of the finding's own (p01)", result['form'][0][0])
+        self.assertIn('gives neither the title proposed nor a length', result['form'][1][0])
         self.assertEqual(result['measured'], [2, True, False])
 
     def test_a_one_page_revision_is_shown_one_pages_floors(self):
@@ -650,14 +696,17 @@ const broken = {
   cap: errors({ findings: Array.from({ length: 11 }, (_, i) => item(`F${i + 1}`, `p0${(i % 6) + 1}`)) }),
   pages: errors({ findings: [{ ...item('F1', 'p02'), pages: ['p02', 'p03'] }] }),
   sampled: errors({ findings: [spine('F1', ['p02', 'p03'], { problem: 'Several titles claim more than their pages show, including p02 and p03 among them.' })] }),
-  title: errors({ findings: [{ ...item('F1', 'p02'), fix: 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".' }] }) };
+  title: errors({ findings: [{ ...item('F1', 'p02'), retitle: [{ page: 'p02', title: 'The subject leads the market on revenue, on margin, on growth and on reach in every year shown' }] }] }),
+  retitle: errors({ findings: [{ ...item('F1', 'p02'), retitle: [{ page: 'p03', title: 'A narrower title for the next page' }] }] }) };
 const all = Object.values(broken).flat();
+// The fix's sentence is not read for a title: one it quotes and does not give in `retitle` is not held.
+const unread = errors({ findings: [{ ...item('F1', 'p02'), fix: 'Retitle to "The subject leads the market on revenue, on margin, on growth and on reach in every year shown".' }] });
 // A page a spine finding's text names and its list leaves out is not a refusal: the runtime adds it and says it did.
 const leftOut = S.settleCritiqueForm(critique(packet, { findings: [spine('F1', ['p02'], { problem: 'The claim on p02 is restated on p03 with the same measure and no new step.' })] }), context.ids, context.contentIds);
 await done(d);
 console.log(JSON.stringify({ leftOut: [leftOut.review.findings[0].pages, leftOut.mended.map((m) => [m.did, m.pages]), S.validateStorylineRecord(leftOut.review, context)], good: errors({}), found: errors({ findings: [item('F1', 'p02')] }), limits: packet.limits, shown: prompt.includes('LIMITS THE BUILD HOLDS: a page title runs to 6-15 words (10 the norm) on 2 lines at most.'),
   stated: rules.filter((rule) => !prompt.includes(`- ${rule.rule}`)).map((rule) => rule.id), ids: rules.map((rule) => rule.id), unmatched: all.filter((e) => !rules.some((rule) => rule.matches.test(e))),
-  each: Object.fromEntries(Object.entries(broken).map(([name, list]) => [name, list.length])), title: broken.title[0], cap: broken.cap[0].slice(0, 44) }));
+  each: Object.fromEntries(Object.entries(broken).map(([name, list]) => [name, list.length])), title: broken.title[0], retitle: broken.retitle[0], unread, cap: broken.cap[0].slice(0, 44) }));
 ''')
         self.assertEqual(result['good'], [])
         self.assertEqual(result['found'], [])
@@ -668,7 +717,9 @@ console.log(JSON.stringify({ leftOut: [leftOut.review.findings[0].pages, leftOut
         self.assertEqual(result['stated'], [])     # every rule the validator enforces is in the prompt, word for word
         self.assertEqual(result['unmatched'], [])  # and every refusal above is one of them
         self.assertTrue(all(n >= 1 for n in result['each'].values()), result['each'])
-        self.assertIn('the title it proposes runs to 18 words', result['title'])
+        self.assertIn('the title it proposes for p02 runs to 18 words', result['title'])
+        self.assertIn("retitle[0] names page p03: its page is one of the finding's own (p02)", result['retitle'])
+        self.assertEqual(result['unread'], [])
         self.assertEqual(result['cap'], 'the spine critique returns at most 10 items ')
 
     def test_a_long_spines_section_and_spine_parts_are_offered_only_what_a_critic_judges(self):

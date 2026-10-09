@@ -58,7 +58,7 @@ import {
 } from "./reviewer.mjs";
 import { applyRulesVersion, carriedCount } from "./weight.mjs";
 import { changesMade, excusedPages } from "./revision.mjs";
-import { reviewFloors } from "./review-floors.mjs";
+import { reviewFloors, retitleLine } from "./review-floors.mjs";
 import { capMessage, deckStatementFindings, evidenceScopeOf, requestOf, requestProvenanceOf, provenanceErrors, lineageStore, restartLineage, readConfirmations, recordConfirmation, readInventory, revisionChanges, openAboutImported } from "./review-passes.mjs";
 import { writeLedger, validateSelfCheck, findingKey, CLAIM_CODES } from "./claims.mjs";
 import { storylineGate, storylineOutcome, POST_REVIEW_RULE } from "./storyline.mjs";
@@ -466,7 +466,8 @@ async function reject({ report, directory, delivered, rejectedNote, advisories =
   report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
   if (listed.length) report.advisories = listed;
   const where = (b) => ((b.slides || []).length > 1 ? `slides ${b.slides.join(", ")}` : `slide ${b.slide ?? "deck"}`);
-  const line = (b, label = b.severity) => `- ${where(b)} · ${b.code} · ${label}${b.decidable === "spine" ? ` · ${SPINE_LABEL}` : ""}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}${(b.imported || []).length ? ` [About the imported deck: ${b.imported.join(", ")} ${b.imported.length === 1 ? "is the user's page" : "are the user's pages"} as imported, which this revision did not change. Repair the changed page${(b.slides || []).length - b.imported.length === 1 ? "" : "s"}; a change to ${b.imported.length === 1 ? "that page" : "those pages"} is the user's to ask for, and no storyline pass reads a page the revision leaves alone.]` : ""}`;
+  // A title the reviewer proposes is given as a field (`retitle`), not inside the repair: it is printed beside it.
+  const line = (b, label = b.severity) => `- ${where(b)} · ${b.code} · ${label}${b.decidable === "spine" ? ` · ${SPINE_LABEL}` : ""}: ${b.reason}${b.repair ? ` → ${b.repair}` : ""}${retitleLine(b.retitle) ? ` [Title proposed - ${retitleLine(b.retitle)}]` : ""}${(b.imported || []).length ? ` [About the imported deck: ${b.imported.join(", ")} ${b.imported.length === 1 ? "is the user's page" : "are the user's pages"} as imported, which this revision did not change. Repair the changed page${(b.slides || []).length - b.imported.length === 1 ? "" : "s"}; a change to ${b.imported.length === 1 ? "that page" : "those pages"} is the user's to ask for, and no storyline pass reads a page the revision leaves alone.]` : ""}`;
   const bars = blockers.filter((b) => b.kind === BUILD_BAR), grouped = blockers.filter((b) => b.kind !== BUILD_BAR && b.reach), blocking = blockers.filter((b) => b.kind !== BUILD_BAR && !b.reach);
   const atSpine = blockers.filter((b) => b.decidable === "spine").length;
   const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s)${bars.length ? `, ${bars.length} of them a build bar missed` : ""}${listed.length ? `; ${listed.length} advisor${listed.length === 1 ? "y" : "ies"}, which do not block` : ""}. No deliverable was written.`, ""];
