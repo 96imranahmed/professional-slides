@@ -7,7 +7,7 @@ import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimiti
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
-import { mediaNode } from "./media.mjs";
+import { mediaNode, markDrawable } from "./media.mjs";
 
 const PRIMARY = token("color.componentPrimary"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), ACCENT = token("color.accent");
 const SURFACE = token("color.surface"), RULE = token("color.rule"), TINT = token("color.componentPrimaryTint");
@@ -32,10 +32,12 @@ function normalizeCards(props) {
   return props.items.map((item, index) => {
     if (!item || typeof item.title !== "string" || !item.title.trim()) throw new Error(`Card ${index + 1} requires a title`);
     const points = Array.isArray(item.points) ? item.points.map((p) => (typeof p === "string" ? p : p?.text)).filter((p) => typeof p === "string" && p.trim()) : [];
-    // A card about a recognisable subject (a product, a company) carries its
-    // mark: an embedded `logo` takes the icon's place. One with no file yet
-    // keeps the icon until the build fills it (fetch-logos.mjs).
-    const logo = item.logo && typeof item.logo === "object" && item.logo.dataUri ? item.logo : null;
+    // A card about a recognisable subject (a product, a company, a place)
+    // carries its mark: an embedded `logo` - or a declared player's outline or
+    // photograph, the mark it declares (players.mjs) - takes the icon's place.
+    // One with no file yet keeps the icon until the build fills it
+    // (fetch-logos.mjs, fetch-pictures.mjs).
+    const logo = item.logo && typeof item.logo === "object" && markDrawable(item.logo) ? item.logo : null;
     return { title: item.title.trim(), text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : null, points, icon: item.icon ?? null, logo, number: item.number ?? index + 1, footer: typeof item.footer === "string" && item.footer.trim() ? item.footer.trim() : null, value: item.value !== undefined && item.value !== null && String(item.value).trim() ? String(item.value).trim() : null };
   });
 }

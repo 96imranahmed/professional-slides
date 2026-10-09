@@ -8,7 +8,7 @@ import { textWords } from "./text-contract.mjs";
 import { measureText, measureTextRuns, balancedWrap } from "./text-layout.mjs";
 import { PAGE_TEMPLATE_TOKENS, renderPageTemplate, PAGE_RULES, PAGE_BRANDING, pageTemplateLayout, resolvePageTemplate } from "./page-template.mjs";
 import { TRACKER_TOKENS, trackerLabelNodes } from "./trackers.mjs";
-import { mediaNode, logoFrame } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
 import { contrastRatio } from "./color.mjs";
 import { FONT, DISPLAY, INK, SECONDARY, PRIMARY, RULE, WHITE, HAIRLINE, textStyle, boxStyle, openLine, headingLayout, STANDARD, component,
   lightChevronNode, MUTED_SURFACE, BODY, SURFACE, SMALL_RADIUS, SECTION_HEADING_TOKENS, sectionHeadingNodes, PRIMARY_TINT, refineVariantAxes,
@@ -473,11 +473,12 @@ function defineCover() {
       let y = frame.y + frame.height * 0.78 - height;
       const nodes = [];
       if (dark) nodes.push(rectPrimitive({ id: stableId(id, "surface"), role: "cover-surface", frame, style: boxStyle(INK, INK, HAIRLINE, token("radius.none")) }));
-      // `marks`: the players the deck compares, their logos on white tiles in
+      // `marks`: the players the deck compares, their marks on white tiles in
       // the band above the title - a cover about two companies shows them
       // before a word is read, and the top half of the page carries them
-      // rather than nothing.
-      const marks = (props.marks || []).filter((mark) => mark?.dataUri).slice(0, 4);
+      // rather than nothing. Each is the mark its player declares: a logo, a
+      // place's outline, a photograph (compose-pictures.mjs playerMarks).
+      const marks = (props.marks || []).filter(markDrawable).slice(0, 4);
       if (marks.length && frame.width >= SLIDE.width) {
         const tileHeight = 112, tileWidth = 208, tileGap = tokenValue(token("space.5"));
         const top = frame.y + frame.height * 0.2;

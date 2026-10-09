@@ -247,6 +247,52 @@ function projection(frame, bounds) {
   return { plot, project, contains: ([longitude, latitude]) => longitude >= minLon && longitude <= maxLon && latitude >= minLat && latitude <= maxLat };
 }
 
+// The longer side of an outline's intrinsic box: what a mark's slot reads as its aspect, as a logo's pixel size is.
+const OUTLINE_SIDE = 512;
+// A ring narrower and shorter than this share of the outline's longer side is a speck at a mark's size, and is left out.
+const OUTLINE_SPECK = 0.01;
+
+/**
+ * A place's outline, drawn as a mark: the features `region` names in
+ * `geography` - a country's ISO code or name, a list of them, or an imported
+ * geography's feature ids; every feature where it names none - clipped to the
+ * geography's bounds and set in the maps' projection (longitude scaled by the
+ * cosine of the place's middle latitude). So `{ geography: "europe", region:
+ * "FRA" }` is metropolitan France, `{ geography: "gcc" }` the six Gulf states as
+ * one silhouette, and an imported city's borough its own feature. Returns the
+ * rings as paths in a unit box, the box's intrinsic `width` and `height` (its
+ * longer side 512, as a mark's aspect is read off a logo's pixels), and the
+ * data's source. Throws where a region is not in the geography or nothing of
+ * it falls inside the bounds. No network: the geography is the runtime's own
+ * data, or one imported by import-geography.mjs.
+ */
+export function placeOutline({ geography = "world", region = null } = {}) {
+  const resolved = resolveGeography(geography);
+  const asked = region === null || region === undefined ? [] : (Array.isArray(region) ? region : [region]).map((value) => String(value).trim()).filter(Boolean);
+  const idOf = (value) => {
+    if (resolved.custom) return resolved.countries.find((feature) => feature.id === value || normalizedKey(feature.name) === normalizedKey(value))?.id ?? null;
+    try { return resolveCountryId(value); } catch { return null; }
+  };
+  const ids = asked.map(idOf);
+  const unknown = asked.filter((_, at) => !ids[at] || !resolved.countries.some((feature) => feature.id === ids[at]));
+  if (unknown.length) throw new Error(`${unknown.map((value) => `"${value}"`).join(", ")} ${unknown.length === 1 ? "is" : "are"} not a region of the ${resolved.title} geography (${resolved.id}): name ${resolved.custom ? "a feature id of the imported geography" : "a country by its ISO code or name"}, or leave \`region\` out for the whole geography`);
+  const features = ids.length ? resolved.countries.filter((feature) => ids.includes(feature.id)) : resolved.countries;
+  const rings = features.flatMap((feature) => feature.polygons.map((ring) => clipRing(ring, resolved.bounds)).filter((ring) => ring.length >= 3));
+  if (!rings.length) throw new Error(`Nothing of ${asked.join(", ") || resolved.title} falls inside the ${resolved.title} geography's bounds: name the geography the place is drawn in`);
+  const points = rings.flat();
+  const [minLon, minLat, maxLon, maxLat] = points.reduce((b, [x, y]) => [Math.min(b[0], x), Math.min(b[1], y), Math.max(b[2], x), Math.max(b[3], y)], [Infinity, Infinity, -Infinity, -Infinity]);
+  const longitudeScale = Math.max(0.25, Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+  const width = Math.max(1e-6, (maxLon - minLon) * longitudeScale), height = Math.max(1e-6, maxLat - minLat);
+  const side = Math.max(width, height);
+  const projected = rings.map((ring) => ring.map(([x, y]) => [Number((((x - minLon) * longitudeScale) / width).toFixed(5)), Number(((maxLat - y) / height).toFixed(5))]));
+  const paths = projected.filter((ring) => {
+    const xs = ring.map((p) => p[0] * width), ys = ring.map((p) => p[1] * height);
+    return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= OUTLINE_SPECK * side;
+  });
+  const source = resolved.custom ? `${resolved.title}: ${resolved.source.url} (${resolved.source.license})` : `${NATURAL_EARTH_SOURCE.name} ${NATURAL_EARTH_SOURCE.scale}, public domain (${NATURAL_EARTH_SOURCE.url})`;
+  return { paths, width: Math.max(1, Math.round((OUTLINE_SIDE * width) / side)), height: Math.max(1, Math.round((OUTLINE_SIDE * height) / side)), geography: resolved.id, regions: features.map((feature) => feature.id), source };
+}
+
 function polygonNode({ id, country, paths, highlighted, quantitative, recede = false }) {
   const points = paths.flat();
   const [x,y,maxX,maxY] = points.reduce((b,p)=>[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])],[Infinity,Infinity,-Infinity,-Infinity]);

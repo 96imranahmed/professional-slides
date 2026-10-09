@@ -1,8 +1,11 @@
 // What a deck needs from the network, decided where the deck is written.
 //
-// A deck that declares `players` shows their logos, a planned photograph is
-// written as `{ alt }`, and a map marker may name a `place`: the build fetches
-// each (fetch-logos.mjs, fetch-pictures.mjs, fetch-places.mjs). Nothing said
+// A deck that declares `players` shows their marks - a logo for an
+// organisation, a photograph for a thing with a look, and an outline for a
+// place, which the runtime draws from its own geography and never fetches
+// (players.mjs) - a planned photograph is written as `{ alt }`, and a map
+// marker may name a `place`: the build fetches each logo, photograph and place
+// (fetch-logos.mjs, fetch-pictures.mjs, fetch-places.mjs). Nothing said
 // so before the build, and a run with no network learnt it last - a deck with
 // declared players and no logo files was refused after its render, and could
 // never be delivered offline. The need is stated at the first compile, draft
@@ -37,6 +40,7 @@ import { slugOf } from "./fetch-logos.mjs";
 import { picturePlaceholders } from "./fetch-pictures.mjs";
 import { markersToPlace } from "./fetch-places.mjs";
 import { textWords } from "./text-contract.mjs";
+import { logoPlayers } from "./players.mjs";
 
 export const ASSET_CODES = Object.freeze({
   ASSETS_NEEDED: "the deck plans logos, photographs or places whose files are not in its assets folder; the build will fetch them unless they are supplied or the deck declares it is built without the network",
@@ -77,12 +81,15 @@ const photographsLine = (supplied) => (supplied ? `${plural(supplied, "photograp
 /**
  * What the build would have to fetch for this deck, with the file each would
  * be read from were it supplied instead (paths relative to the deck's folder):
- * `logos` for the declared players without one, `pictures` for the planned
- * photographs, and `places` for the map markers that name a place and carry no
- * coordinates. A file already in the assets folder is not a need.
+ * `logos` for the declared players marked by a logo without one, `pictures`
+ * for the planned photographs - a player marked by its photograph among them,
+ * by its `image` - and `places` for the map markers that name a place and
+ * carry no coordinates. A player marked by its outline needs nothing: it is
+ * drawn from the runtime's geography (players.mjs). A file already in the
+ * assets folder is not a need.
  */
 export async function assetNeeds(spec, baseDir) {
-  const players = (spec.players || []).map((p) => (typeof p === "string" ? { name: p } : p)).filter((p) => p?.name && !(p.logo && (p.logo.path || p.logo.dataUri)));
+  const players = logoPlayers(spec.players);
   const logos = [];
   for (const player of players) {
     const files = ["png", "jpg"].map((ext) => path.join("assets", "logos", `${slugOf(player.name)}.${ext}`));

@@ -65,6 +65,7 @@ limits.mjs         every countable limit a page or a deck is held to, read from 
 spine-fit.mjs      the titles the storyline critique binds, composed where the deck's design sets them on every run, a draft and a plan too, with the room each has (SPINE_FIT_CODES)
 spine-exhibits.mjs the exhibits a spine fully determines - a bound or typed chart, a stub's view, a measure read whole, the executive summary's table - composed with placeholder copy in a draft and a plan, and refused where none can be drawn or the summary cannot fill its page (SPINE_EXHIBIT_CODES)
 deck-keys.mjs      the deck-level keys `deck` takes, each with its type: what `--schema deck` prints and the compile holds `deck` to
+players.mjs        the entities a deck compares (`players`), each with the mark it declares - a logo, a place's outline (maps.mjs placeOutline), a photograph - its checks, and the mark a page plans for it
 compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
 derive-content.mjs the content plan and text plan read off the composed pages; each page's word floor and ceiling
 compose-*.mjs      the composer (the suite reads it through evals/support/compose.mjs):
@@ -81,7 +82,7 @@ schedule-stages.mjs a timeline's or roadmap's dated stages: date, label and deta
 charts.mjs         registers the charts; they are drawn in chart-categorical, chart-line, chart-scatter-pie, chart-specialty, on chart-axes, with chart-decorations
 marks.mjs          the shared marker vocabulary: numberMarker, iconMarker, stateMarker (lists, cards, table cells, map pins, agenda)
 icons.mjs          56 named icons as path data, emitted as editable freeforms; `author-deck.mjs --icons` lists them with their aliases
-fetch-logos.mjs    player logos from Wikipedia infoboxes, trimmed to the mark (run by the build)
+fetch-logos.mjs    the logos of players marked by one, from Wikipedia infoboxes, trimmed to the mark (run by the build)
 fetch-pictures.mjs photographs for `{ alt }` placeholders from Wikimedia Commons, free licences only, each candidate looked at before it is taken (picture-shows; run by the build)
 fetch-places.mjs   coordinates for map markers that name a place, cached in the deck folder's assets/places.json (run by the build)
 fetch-series.mjs   public time series (World Bank, Our World in Data) into sources/ as CSV plus a chart block

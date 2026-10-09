@@ -1,7 +1,7 @@
 // The deck-level keys of a pages file, in one table.
 //
 // `deck` in `<id>.pages.json` carries what is true of the whole deck: the
-// request and the answer the reviews judge against, the players it compares,
+// request and the answer the reviews judge against, the entities it compares,
 // its design and its page furniture. Until this table nothing listed them, so
 // a key was learned from a reference page or from the refusal of whichever
 // stage first read it - and an author's own key (`template`, to record which
@@ -12,6 +12,7 @@
 // table does not hold is refused with the keys it is nearest to, and a value
 // of the wrong kind with what the key takes. What each value means in detail
 // stays with the stage that reads it, which still checks it.
+import { MARK_KINDS, playerProblems } from "./players.mjs";
 
 // The kinds a value is read as: what `accepts` names, checked shallowly.
 const KINDS = Object.freeze({
@@ -55,8 +56,11 @@ const DECK_KEYS = Object.freeze({
   answerStatus: key("\"final\" | \"provisional\"", ["string"], "provisional where the evidence in scope cannot settle the answer"),
   answerLimits: key("array of strings", ["array"], "what a provisional answer leaves open, a sentence each"),
   // who and what it shows
-  players: key("array of names or { name, logo, wikipedia, ... }", ["array"], "the organisations the deck compares: introduced by their logos before they are compared"),
-  playersHint: key("string", ["string"], "a word that tells the logo search what the players are (\"bank\", \"retailer\")"),
+  // Each entry declares the mark it is introduced by, by what it is (players.mjs): a name alone is an organisation marked by its logo.
+  players: key("array of names or { name, short, aliases, mark, logo | outline | image, ... }", ["array"],
+    `the entities the deck compares, each introduced by its own mark before it is compared. \`mark\` says which: ${Object.entries(MARK_KINDS).map(([kind, about]) => `"${kind}"${kind === "logo" ? " (the default)" : ""} - ${about}`).join("; ")}`,
+    (value) => { const problems = playerProblems(value); return problems.length ? `declares what the build cannot draw - ${problems.join("; ")}` : null; }),
+  playersHint: key("string", ["string"], "a word that tells the logo search what the players marked by logos are (\"bank\", \"retailer\")"),
   assets: key("{ fetch: \"build\" | \"none\", reason }", ["object"], "whether the build may fetch logos, photographs and places; \"none\" declares the deck is built without the network, with the reason the reviews are shown"),
   noPictures: key("string", ["string"], "why a deck about a subject with nothing to look at carries no photograph, in a sentence"),
   waivers: key("array of { code, reason }", ["array"], "build bars the deck asks to be excused from, each with a reason the review confirms"),

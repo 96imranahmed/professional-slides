@@ -1,9 +1,10 @@
 // Media primitives: a sample image read from assets/ on first use, a bitmap's
 // dimensions, the media node every embedded picture is drawn as (fitted or
-// cropped to its frame), and a logo's frame inside its slot. The media
+// cropped to its frame) - and a place's outline, where a compared place's
+// mark is its outline rather than a file - and a logo's frame inside its slot. The media
 // components are registry-media.mjs's.
 import { readFileSync } from "node:fs";
-import { primitive } from "./core.mjs";
+import { primitive, shapePrimitive, token } from "./core.mjs";
 import { readJsonSync } from "./cli.mjs";
 
 // The component samples' images, read and encoded when a sample is first
@@ -60,7 +61,33 @@ export function bitmapDimensions(dataUri) {
   throw new Error("JPEG has no dimensions frame");
 }
 
+/**
+ * Whether a mark can be drawn: an embedded picture (a logo's or a
+ * photograph's file, read in), or a place's outline read from the geography
+ * data (compose-pictures.mjs resolveMediaRefs, maps.mjs placeOutline). A mark
+ * planned and not yet fetched - `{ alt }`, `{ alt, search }` - cannot.
+ */
+export const markDrawable = (media) => Boolean(media && typeof media === "object" && (media.dataUri || Array.isArray(media.outline?.paths)));
+
+/**
+ * A place's outline in its slot, as a mark: its paths filled in the deck's
+ * primary colour, the box fitted to the outline's own aspect inside `frame`
+ * as a logo's is, so a mark's slot reads one outline as it reads one logo.
+ */
+function outlineNode({ id, frame, props, role }) {
+  const { paths, geography, regions } = props.outline;
+  if (!paths.length || !props.alt?.trim()) throw new Error("An outline mark requires its paths and alt text");
+  const aspect = props.width > 0 && props.height > 0 ? props.width / props.height : 1;
+  const width = Math.min(frame.width, frame.height * aspect), height = width / aspect;
+  return shapePrimitive({ id, role, geometry: "customPolygon",
+    frame: { x: frame.x + (frame.width - width) / 2, y: frame.y + (frame.height - height) / 2, width, height },
+    style: { fill: token("color.componentPrimary"), stroke: "none", lineWidth: token("line.hairline") },
+    data: { paths, alt: props.alt, mark: "outline", ...(props.player ? { player: props.player } : {}), geography, regions, ...(props.authorization ? { source: props.authorization } : {}) } });
+}
+
 export function mediaNode({ id, frame, props, role = "image", fit = "contain" }) {
+  // A place's mark is its outline, drawn as a shape in the slot a logo would take.
+  if (Array.isArray(props?.outline?.paths)) return outlineNode({ id, frame, props, role });
   if (
     !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(
       props?.dataUri || "",

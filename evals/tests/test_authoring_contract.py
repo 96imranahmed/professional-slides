@@ -352,7 +352,8 @@ console.log(JSON.stringify({
         self.assertEqual(result["declared"], ["PLAYERS_UNMARKED"])
         self.assertEqual(result["introduced"], [])
         self.assertEqual(result["late"], ["PLAYERS_UNMARKED"])
-        self.assertEqual(sorted(result["titles"][0]), ["Anthropic", "OpenAI"])
+        # Names that recur in the titles are not taken for players: only a declaration makes the rule apply.
+        self.assertEqual(result["titles"], [])
         self.assertEqual(result["unnamed"], 0)
         self.assertEqual(result["cards"], ["PROFILE_UNPICTURED"])
         self.assertEqual(result["aliased"], [])  # a logo under the player's short name introduces it

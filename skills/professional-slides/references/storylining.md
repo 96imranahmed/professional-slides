@@ -65,7 +65,7 @@ For a subject with public records, search for and download:
 - **Pipeline and commitments**: orders, plans, announcements, each with its status (announced, firm, delivered).
 - **Ratios that remove size**: per unit, per head, per route, per asset.
 
-Save what is downloaded under the task's `sources/` with its URL and retrieval date. Where a series is not published, say so and use the nearest defensible one. Declare the compared organisations as `players` on the deck so the deck introduces them, with their logos, before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)). Research a comparison on the same measures for every member; `n/a` in a table is a finding where a substitute metric would hide it.
+Save what is downloaded under the task's `sources/` with its URL and retrieval date. Where a series is not published, say so and use the nearest defensible one. Declare what the deck compares - organisations, places, products - as `players` on the deck so the deck introduces them, each by the mark it declares (a logo, a place's outline, a photograph), before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)). Only a declaration counts: the runtime does not guess the players from the titles. Research a comparison on the same measures for every member; `n/a` in a table is a finding where a substitute metric would hide it.
 
 A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge. If the candidate exhibits are mostly single-period comparisons of two entities, the research is not finished.
 

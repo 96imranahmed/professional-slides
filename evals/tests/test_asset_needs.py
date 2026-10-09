@@ -126,7 +126,7 @@ console.log(JSON.stringify({{ online: players_({{ slides, players }}, named), of
         self.assertEqual(result['build'], ['blocker'])
         # With it, players named on a page are introduced: said as an advisory, with the reason, never blocking.
         self.assertEqual([f[0] for f in result['offline']], ['advisory'])
-        self.assertEqual(result['offline'][0][1], {'players': 3, 'logoPages': 0, 'assets': 'none'})
+        self.assertEqual(result['offline'][0][1], {'players': 3, 'logoPages': 0, 'kinds': ['logo'], 'assets': 'none'})
         self.assertIn(f'it declares it is built without the network ("{REASON}")', result['offline'][0][2])
         self.assertIn('The reviewer is told the logos were not available', result['offline'][0][2])
         # The declaration is not a way to skip the introduction: a player named on no page still blocks.

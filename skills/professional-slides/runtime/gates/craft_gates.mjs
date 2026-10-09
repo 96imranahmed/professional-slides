@@ -23,7 +23,7 @@ import { BUILD_BAR_CODES, barStandings, barsNotHeld, chartStatistics, countedTab
 import { trivialChart, trendChart } from "../evidence.mjs";
 import { registered } from "../errors.mjs";
 import { assetsDeclaration } from "../asset-needs.mjs";
-import { playerNames } from "./variety_gates.mjs";
+import { playerEntries, playerNames, playerPhotographs } from "../players.mjs";
 import { judged } from "../judgements.mjs";
 
 export { trivialChart, trendChart };
@@ -36,7 +36,7 @@ export const CRAFT_CODES = Object.freeze({
   CRAFT_STEP_OVERUSE: "step and process diagrams recur far more often than the argument needs",
   CRAFT_NO_ICONS: "a long deck with no icon anywhere",
   CRAFT_NO_PICTURES: "a long deck about recognisable subjects with no photograph anywhere",
-  CRAFT_PLAYERS_UNINTRODUCED: "the deck compares named players but never introduces them with their marks",
+  CRAFT_PLAYERS_UNINTRODUCED: "the deck compares declared players but never introduces them with their marks - a logo, an outline or a photograph, as each declares",
   CRAFT_EXHIBIT_VARIETY: "the deck draws on too few kinds of exhibit for its length",
   CRAFT_SOURCE_CODES: "source lines cite internal ledger codes instead of naming the publisher",
 });
@@ -177,7 +177,7 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
 
   // The built deck's floors sit under the plan's targets on purpose
   // (weight.json plan.craft: `min` asks the plan, `blockBelow` stops the deck).
-  const stats = sceneStatistics(scene);
+  const stats = sceneStatistics(scene, spec.players);
   const treated = CRAFT.tableTreated, annotated = CRAFT.chartAnnotated;
   if (stats.tables >= treated.blockFrom && stats.tablesTreated / stats.tables < treated.blockBelow) {
     block("CRAFT_TABLES_PLAIN", { treated: stats.tablesTreated, of: stats.tables }, treated.blockBelow,
@@ -232,26 +232,33 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
       "a deck built with no network and no photograph supplied declares that instead (`assets: { fetch: \"none\", reason }`).");
   }
 
-  const players = Array.isArray(spec.players) ? spec.players.filter((p) => p && (typeof p === "string" || p.name)) : [];
+  // The entities the deck declares it compares, each introduced by the mark it declares (players.mjs): a logo, a
+  // place's outline, a photograph. Every one of those drawn counts, and only declared entities make the rule apply.
+  const players = playerEntries(spec.players);
+  const marks = stats.marks;
   // A deck that declares it is built without the network (asset-needs.mjs)
   // cannot show a mark it has no file for: it introduces its players by
-  // name, and the missing logos are said - here, in the build result and to
-  // the reviewer - rather than blocking a deck that could never clear them.
+  // name, and the missing logos and photographs are said - here, in the build
+  // result and to the reviewer - rather than blocking a deck that could never
+  // clear them. An outline needs no file, so it is drawn either way.
   const offline = assetsDeclaration(spec).fetch === "none";
-  const unnamed = offline && players.length >= 3 && stats.logos === 0 ? unnamedPlayers(spec, scene) : [];
+  const unnamed = offline && players.length >= 3 && marks === 0 ? unnamedPlayers(spec, scene) : [];
   // Where the deck stands says the same: under the declaration the floor advises once every player is named on a page.
-  stand("CRAFT_PLAYERS_UNINTRODUCED", "player logos drawn", stats.logos, 1, "min", { unit: "logos", applies: players.length >= 3, blocks: !offline || unnamed.length > 0 });
-  if (players.length >= 3 && stats.logos === 0) {
-    if (offline && !unnamed.length) advise("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, assets: "none" }, 1,
-      `The deck compares ${players.length} named players and shows none of their marks: it declares it is built without the network ("${assetsDeclaration(spec).reason}"), ` +
-      "so they are introduced by name. The reviewer is told the logos were not available. To show the marks, put each player's logo in assets/logos/ beside the pages file and rebuild.");
-    else block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, ...(offline ? { assets: "none", unnamed } : {}) }, 1,
+  stand("CRAFT_PLAYERS_UNINTRODUCED", "player marks drawn (logos, outlines, photographs)", marks, 1, "min", { unit: "marks", applies: players.length >= 3, blocks: !offline || unnamed.length > 0 });
+  if (players.length >= 3 && marks === 0) {
+    const kinds = [...new Set(players.map((player) => player.kind))];
+    // The files an offline build could not have: a logo or a photograph. An outline is drawn either way, so a deck of places has none missing.
+    const files = [kinds.includes("logo") ? "logos" : "", kinds.includes("image") ? "photographs" : ""].filter(Boolean).join(" and ") || "marks";
+    const supply = [kinds.includes("logo") ? "each player's logo in assets/logos/" : "", kinds.includes("image") ? "each player's photograph in assets/pictures/" : ""].filter(Boolean).join(" and ") || "each player's mark";
+    if (offline && !unnamed.length) advise("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, kinds, assets: "none" }, 1,
+      `The deck compares ${players.length} declared players and shows none of their marks: it declares it is built without the network ("${assetsDeclaration(spec).reason}"), ` +
+      `so they are introduced by name. The reviewer is told the ${files} were not available. To show the marks, put ${supply} beside the pages file and rebuild.`);
+    else block("CRAFT_PLAYERS_UNINTRODUCED", { players: players.length, logoPages: 0, kinds, ...(offline ? { assets: "none", unnamed } : {}) }, 1,
       offline ? `The deck is built without the network, so its players are introduced by name, and ${unnamed.join(", ")} ${unnamed.length === 1 ? "is" : "are"} named on no page. Introduce every player early on one page: ` +
-        "a `logo` cell that names its `player` (it prints the name while no file is there), with what the player is and the numbers the deck will compare."
-      : `The deck compares ${players.length} named players and never shows their marks. Introduce them early on one page: each player's ` +
-      "logo, what it is and the two or three numbers the deck will compare (a `logos` exhibit, or a table with a `logo` column). Later " +
-      "pages can then name a player without the reader having to remember who it is. Plan each logo as `{ alt: \"<Name> logo\" }`: the build fetches it from the player's Wikipedia infobox. " +
-      "With no network at the build, either put each logo in assets/logos/ beside the pages file (the compile lists the file names) or declare `assets: { fetch: \"none\", reason }` on the deck, under which the players are introduced by name.");
+        "a `logo` cell that names its `player` (it prints the name while no file is there; a place's outline needs none), with what the player is and the numbers the deck will compare."
+      : `The deck compares ${players.length} declared players and never shows their marks. Introduce them early on one page: each player's ` +
+      "mark, what it is and the two or three numbers the deck will compare (a `logos` exhibit naming each, or a table with a `logo` column naming each `player`) - " +
+      "the cell or the member draws the mark the player declares. Later pages can then name a player without the reader having to remember who it is. " + markNeeds(kinds));
   }
 
   // One coded source is one too many, so this is a count, not a share.
@@ -279,6 +286,15 @@ function floorFindings(spec, scene, standings, picturesSupplied) {
   return findings;
 }
 
+// What each kind of mark the deck's players declare needs at the build, said with the refusal.
+function markNeeds(kinds) {
+  return [
+    kinds.includes("logo") ? "A logo is planned as `{ alt: \"<Name> logo\" }` and the build fetches it from the player's Wikipedia infobox; with no network at the build, either put each logo in assets/logos/ beside the pages file (the compile lists the file names) or declare `assets: { fetch: \"none\", reason }` on the deck, under which the players are introduced by name." : "",
+    kinds.includes("outline") ? "A place's outline is drawn from the runtime's own geography, as its `outline: { geography, region }` declares it; nothing is fetched." : "",
+    kinds.includes("image") ? "A photograph is the player's own `image: { alt, search }`, which the build fetches from Wikimedia Commons with the deck's other photographs; supply it in assets/pictures/ where there is no network." : "",
+  ].filter(Boolean).join(" ");
+}
+
 // What is not a page's content when asking whether it names a player: the
 // citation, the footer and its notes, picture credits, and the runtime's own
 // navigation furniture, which repeats section titles on every page. A player
@@ -304,9 +320,16 @@ function unnamedPlayers(spec, scene) {
   return [...new Set(aliases.map(([, name]) => name))].filter((name) => !aliases.some(([alias, owner]) => owner === name && namedIn(printed, alias)));
 }
 
-/** What the built scene draws: its tables and how many carry a treatment, its charts and how many mark the finding, its anchors. */
-export function sceneStatistics(scene) {
-  let icons = 0, logos = 0, pictures = 0;
+/**
+ * What the built scene draws: its tables and how many carry a treatment, its
+ * charts and how many mark the finding, its anchors - and `marks`, the
+ * players' marks a content page draws: every logo, every place's outline
+ * drawn as a mark, and every photograph a declared player is marked by
+ * (`players`, the deck's; players.mjs), wherever it is set.
+ */
+export function sceneStatistics(scene, players = []) {
+  let icons = 0, logos = 0, pictures = 0, marks = 0;
+  const photographs = playerPhotographs(players);
   // Tables and chart pages are counted by one definition each, the build
   // bars' (build-bars.mjs tableStatistics, chartStatistics; gates/table-treatments.json).
   const { tables, treated: tablesTreated } = tableStatistics(scene);
@@ -318,12 +341,16 @@ export function sceneStatistics(scene) {
     for (const c of components) if (!["slide-chrome", "section", "page-template", "chrome"].includes(c)) kinds.add(c);
     const roles = slide.nodes.map((n) => String(n.role ?? ""));
     icons += roles.filter((r) => /icon/.test(r)).length;
-    logos += roles.filter((r) => /logo/.test(r) && r !== "cover-logo").length;
+    const logo = (r) => /logo/.test(r) && r !== "cover-logo";
+    logos += roles.filter(logo).length;
+    // A mark drawn in a logo's place is counted with the logos; an outline or a player's photograph set anywhere else is a mark too.
+    marks += slide.nodes.filter((n) => logo(String(n.role ?? "")) || n.data?.mark === "outline"
+      || (n.type === "image" && (n.data?.mark === "image" || photographs.has(String(n.data?.alt ?? "").trim().toLowerCase())))).length;
   }
   // Pictures anywhere, cover and dividers included, logos excluded.
   for (const slide of scene?.slides || []) for (const n of slide.nodes || []) {
     const role = String(n.role ?? "");
     if ((n.type === "image" || /image-frame|image-placeholder|table-photo|photo/.test(role)) && !/logo/.test(role)) pictures += 1;
   }
-  return { tables, tablesTreated, charts, chartsAnnotated, icons, logos, pictures, distinctExhibits: kinds.size };
+  return { tables, tablesTreated, charts, chartsAnnotated, icons, logos, marks, pictures, distinctExhibits: kinds.size };
 }

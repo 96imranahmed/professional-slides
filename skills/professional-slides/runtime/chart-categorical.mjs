@@ -6,7 +6,7 @@ import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighli
 import { formatValue, withUnit } from "./value-format.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
-import { mediaNode, logoFrame } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
@@ -67,8 +67,11 @@ const attachedLabelText = (primary,secondary,props) => secondary
  * runtime/icons.mjs, or `{ image }` for a brand logo or a flag. A well-made
  * page sets logos under columns and flags beside bars where the reader knows
  * the mark before the name. An image not yet supplied is planned as
- * `{ image: { alt } }` and draws an empty frame the picture gate holds.
- * Takes a map from category to entry, or an array in category order.
+ * `{ image: { alt } }` and draws an empty frame the picture gate holds. A
+ * declared player's mark planned as `{ image: { alt: "<Name> logo" } }` is
+ * the mark it declares (players.mjs): a place's is its outline, drawn from
+ * the geography data. Takes a map from category to entry, or an array in
+ * category order.
  */
 function normalizeCategoryIcons(props, categories) {
   if (props.categoryIcons === undefined || props.categoryIcons === null) return null;
@@ -90,7 +93,8 @@ function normalizeCategoryIcons(props, categories) {
 
 function categoryIconNodes(id, category, record, box, { area, align } = {}) {
   if (record.icon !== undefined) return iconMarker({ id: stableId(id, "category-icon", category), role: "category-icon", x: box.x, y: box.y, size: box.width, icon: record.icon, tone: record.tone ?? "plain", data: { category } });
-  if (!record.image.dataUri) return [rectPrimitive({ id: stableId(id, "category-logo-placeholder", category), role: "category-logo-placeholder", frame: box, style: { fill: token("color.surfaceMuted"), stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.none") }, data: { category, alt: record.image.alt } })];
+  // A place's outline is drawn as its mark; a logo or photograph not yet fetched keeps its slot as a placeholder.
+  if (!markDrawable(record.image)) return [rectPrimitive({ id: stableId(id, "category-logo-placeholder", category), role: "category-logo-placeholder", frame: box, style: { fill: token("color.surfaceMuted"), stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.none") }, data: { category, alt: record.image.alt } })];
   const frame = area ? logoFrame(box, record.image.width, record.image.height, { area, align }) : box;
   return [mediaNode({ id: stableId(id, "category-logo", category), frame, props: record.image, role: "category-logo" })];
 }
@@ -900,7 +904,7 @@ function drawCategoryIcon(chart, category, categoryStart) {
   const iconRecord = categoryIcons?.get(category);
   // A placeholder keeps the nominal slot; a logo may grow taller than it,
   // up to the lane, so a square mark gets the same ink as a wordmark.
-  const slotH = horizontal ? (logoMarks && iconRecord?.image?.dataUri ? Math.min(iconH + 8, groupSpan - 2) : Math.min(iconH, groupSpan)) : iconH;
+  const slotH = horizontal ? (logoMarks && markDrawable(iconRecord?.image) ? Math.min(iconH + 8, groupSpan - 2) : Math.min(iconH, groupSpan)) : iconH;
   if (iconRecord) nodes.push(...categoryIconNodes(id, category, iconRecord, horizontal
     ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconW, y: categoryStart + (groupSpan - slotH) / 2, width: iconW, height: slotH }
     : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH },

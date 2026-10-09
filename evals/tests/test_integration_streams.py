@@ -231,16 +231,16 @@ console.log(JSON.stringify({ waiting, offline, unnamed }));
         self.assertIsNone(result["waiting"]["blocking"])
         self.assertEqual(result["waiting"]["advised"], {"severity": "advisory", "class": "G", "pending": True, "assets": None, "unnamed": None})
         self.assertEqual(result["waiting"]["assets"], [["ASSETS_NEEDED", "S", "advisory"]])
-        self.assertIn("player logos drawn 0; floor 1: short by 1 logos - advisory", result["waiting"]["line"])
+        self.assertIn("player marks drawn (logos, outlines, photographs) 0; floor 1: short by 1 marks - advisory", result["waiting"]["line"])
         self.assertNotIn("PLAYERS_UNMARKED", result["waiting"]["codes"])   # every player is introduced by its mark on a page
         # Declared offline, nothing waits: every player is named on a page, so the floor advises, here as at the build.
         self.assertIsNone(result["offline"]["blocking"])
         self.assertEqual(result["offline"]["advised"], {"severity": "advisory", "class": "G", "pending": False, "assets": "none", "unnamed": None})
-        self.assertIn("player logos drawn 0; floor 1: short by 1 logos - advisory", result["offline"]["line"])
+        self.assertIn("player marks drawn (logos, outlines, photographs) 0; floor 1: short by 1 marks - advisory", result["offline"]["line"])
         self.assertEqual([result["offline"]["assets"], result["offline"]["statement"]], [[["ASSETS_OFFLINE", "S", "advisory"]], "none"])
         # A player named on no page still blocks, at the compile: no build will fetch its mark.
         self.assertEqual(result["unnamed"]["blocking"], {"severity": "blocker", "class": "G", "pending": False, "assets": "none", "unnamed": ["Zennor Mutual"]})
-        self.assertIn("short by 1 logos - BLOCKS", result["unnamed"]["line"])
+        self.assertIn("short by 1 marks - BLOCKS", result["unnamed"]["line"])
 
 
 @unittest.skipUnless(os.environ.get("PS_RUN_SLOW") == "1", "opt-in: set PS_RUN_SLOW=1 or pass --slow")

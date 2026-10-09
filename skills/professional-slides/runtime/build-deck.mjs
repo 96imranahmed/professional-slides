@@ -167,8 +167,10 @@ async function buildWith(specPath, outputDirectory, { preflight = false, render 
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
   const stem = deckStem(spec);
   const baseDir = source?.baseDir ?? path.dirname(path.resolve(specPath));
-  // The declared players' logos load themselves: reused from assets/logos/,
-  // fetched when missing, left as placeholders only when that fails.
+  // The logos of the declared players marked by one load themselves: reused
+  // from assets/logos/, fetched when missing, left as placeholders only when
+  // that fails. A player marked by its photograph is fetched with the deck's
+  // photographs below, and a place's outline is drawn from the geography data.
   // A deck that declares it is built without the network (asset-needs.mjs) is
   // taken at its word: nothing is fetched, and what is not on disk is recorded.
   const fetchMissing = fetchLogos && assetsDeclaration(spec).fetch !== "none";

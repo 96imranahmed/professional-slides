@@ -32,6 +32,7 @@ import { columnQuestion } from "./compose-tables.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
+import { playerEntries, plannedMark, planPlayerMarks } from "./players.mjs";
 import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
@@ -1401,9 +1402,9 @@ export function declaredSlide(pageIn, index = 0, { exhibitType = "table", player
   const estimate = (at) => (Array.isArray(exhibitType) ? exhibitType[at % exhibitType.length] ?? "table" : exhibitType);
   exhibits.forEach((ex, at) => { if (!ex.type) ex.type = at === 0 && draws ? draws : draws && page.type !== "numbers" ? draws : stubs?.kinds?.[at] ?? estimate(at); });
   if (target === "aligned-bars" && exhibits[0]) exhibits[0].aligned = true;
-  // A profiles page not yet written will introduce the deck's players by their marks.
+  // A profiles page not yet written will introduce the deck's players by their marks, each in the kind it declares.
   if (page.type === "profiles" && !written.length && exhibits[0] && form !== "radar" && Array.isArray(players))
-    exhibits[0].items = players.map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean).map((name) => ({ name, logo: { alt: `${name} logo` } }));
+    exhibits[0].items = playerEntries(players).map((entry) => ({ name: entry.name, logo: plannedMark(entry) }));
   const slide = { id: page.id ?? `page-${index + 1}`, title: page.title ?? "" };
   const text = ["beside", "beside-left", "below"].includes(commentary);
   if (Array.isArray(page.points) ? page.points.length : text || form === "executive-summary") slide.points = Array.isArray(page.points) ? page.points : [""];
@@ -1557,8 +1558,9 @@ function typedSlide(page, id, type, players) {
   if (page.type === "options" && page.form === "compare" && slide.exhibit) setType(slide.exhibit, "compare");
   const untyped = exhibitsOf(slide).filter((ex) => !ex.type);
   if (untyped.length) throw new Error(`${id}: ${untyped.length === 1 ? "the exhibit has" : `${untyped.length} exhibits have`} no \`type\`; a ${page.type}/${page.form} page does not set it, so name it (table, chart.bar, map, ...)`);
-  // Cells naming a player become its mark before any check reads the table.
-  if (players) markPlayerCells(slide, players);
+  // Cells naming a player become its mark before any check reads the table, and every place a page draws a player's
+  // mark - a cell or a logos member naming it, a logo planned under its name - is planned in the kind the player declares.
+  if (players) { markPlayerCells(slide, players); planPlayerMarks(slide, players); }
   for (const ex of exhibitsOf(slide)) readableCategories(ex);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   return { slide, target, exhibits, setType, primary };
@@ -1929,17 +1931,22 @@ export function subtitleProblem(title, subtitle, exhibits = []) {
 }
 
 /**
- * Table cells that name a declared player, drawn as its logo. A comparison
+ * Table cells that name a declared player, drawn as its mark. A comparison
  * table whose verdict column read "OpenAI" / "Anthropic" set the names as
  * green status pills, which reads as good and bad rather than as who; the
  * mark says who at a glance and leaves colour to mean a state. Only exact
  * names (or a player's `short`/`aliases`) outside the row-label column are
- * marked, so a sentence that mentions a player stays prose. The logo itself is
- * filled from assets/logos/ or fetched by the build (fetch-logos.mjs), as a
- * players page's are; until then the cell keeps the name.
+ * marked, so a sentence that mentions a player stays prose. The mark is the
+ * one the player declares (players.mjs plannedMark): a logo, filled from
+ * assets/logos/ or fetched by the build (fetch-logos.mjs), as a players
+ * page's are; a place's outline, drawn from the geography data; a thing's
+ * photograph, fetched with the deck's photographs. Until a file is there the
+ * cell keeps the name.
  */
 export function markPlayerCells(slide, players) {
   const names = playerNames(players);
+  const entries = new Map(playerEntries(players).map((entry) => [entry.name, entry]));
+  const markOf = (name) => plannedMark(entries.get(name));
   // The player a short verdict opens with: "Firm A leads", "Firm B
   // confirmed" - four words at most, so a sentence stays prose.
   const leading = (text) => {
@@ -1952,12 +1959,12 @@ export function markPlayerCells(slide, players) {
     // A cell that carries its own accent stays text: a mark cannot be accented.
     const text = typeof value === "string" ? value : value && typeof value === "object" && !value.type && typeof value.text === "string" && value.highlight === undefined && value.accent === undefined ? value.text : null;
     const name = text === null ? null : names.get(text.trim().toLowerCase());
-    if (name) return { type: "logo", player: name, media: { alt: `${name} logo` } };
+    if (name) return { type: "logo", player: name, media: markOf(name) };
     // A status pill saying who leads ("Firm A" in green, "Firm B" in green)
     // spends the status colours on a name; the verdict is the player's mark
     // with its words beside it, and colour keeps meaning a state.
     const verdict = value && typeof value === "object" && value.type === "rag" && typeof value.text === "string" ? leading(value.text) : text !== null ? leading(text) : null;
-    if (verdict && (value?.type === "rag" || text !== null)) return { type: "logo", player: verdict, media: { alt: `${verdict} logo` }, text: String(value?.text ?? text).trim() };
+    if (verdict && (value?.type === "rag" || text !== null)) return { type: "logo", player: verdict, media: markOf(verdict), text: String(value?.text ?? text).trim() };
     return value;
   };
   // A column headed by a player ("Firm A", "Firm B result") carries the
@@ -1969,7 +1976,7 @@ export function markPlayerCells(slide, players) {
     const label = typeof column === "string" ? column : column?.label;
     const player = c >= first && !(column && typeof column === "object" && (column.logo || column.type === "logo")) ? headed(label) : null;
     if (!player) return column;
-    return { ...(typeof column === "string" ? { label: column } : column), logo: { alt: `${player} logo` } };
+    return { ...(typeof column === "string" ? { label: column } : column), logo: markOf(player) };
   });
   if (!names.size) return;
   for (const ex of exhibitsOf(slide).filter(isTable)) {
@@ -2085,7 +2092,7 @@ export function describeTypes() {
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type> [--evidence <insight-id>]` prints a page of that type that compiles, with the insight's measures named in its exhibit, to fill in.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). A point left unmarked is marked on its own figure (its first percentage, amount or count); a point with no figure is named in the advisories (POINT_UNMARKED). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",
     "`better` - on a metric (a strip's `metrics`, a hero's `kpi`, a row block's `metric`), a table column, a table row or one trend cell: the direction that is good news for the measure, \"up\" (the default) or \"down\" (a cost, churn, a wait). A delta and a trend arrow are coloured by it - a rising cost is red - not by their sign.", "",
-    `Refused at compile, because a review found each on a finished deck: ${printRules(REVIEW_RULES)}. Advised: ${printRules(ADVISED_RULES)}. Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` - or two names in a fifth of the titles - without each one's logo on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
+    `Refused at compile, because a review found each on a finished deck: ${printRules(REVIEW_RULES)}. Advised: ${printRules(ADVISED_RULES)}. Deck-level: more than ${REVIEWED.tableRunMax} of any ${REVIEWED.tableWindow} consecutive analytical pages drawn as one table construction (VARIETY_TABLES); declared \`players\` without each one's own mark - its logo, its place's outline or its photograph, as it declares - on the cover or the first ${REVIEWED.earlyPages} analytical pages (PLAYERS_UNMARKED); \`profiles\` cards with no logo or picture (PROFILE_UNPICTURED). An executive summary is held to the text page's upper quartile (${SUMMARY_WORDS} body words), not its fence; a point's lead and text are one block for TEXT_BLOCK_TOO_LONG, and so is a card's or a cell's text.`, "",
     `Capacities: a chart callout holds about ${calloutCapacity()} words (measured against its box) and a chart ${CALLOUTS_MAX} callouts; a rail about ${railCapacity()} words (eight lines); a stat-list value 9 characters and a fact-grid value 10. A fact-grid takes \`columns\` (1 to 4 tiles across, one only when every tile carries its \`text\`; two rows or more fill the frame, one row grows by a third, a single column never stretches) and, on any item, \`gauge\` (0 to 1, a bar on the tile's foot). Commentary \`below\` runs up to three points across, four two by two, more three to a row. \`author-deck --check\` prints each page's word floor, ceiling and footer share as the page composes.`, "",
     `Text limits the build holds every page to: a title of ${TEXT_LIMITS.titleWords} words at most (TITLE_WORDS, refused at compile) and ${TEXT_LIMITS.titleLines} lines (TITLE_LINES) - the finding and its comparator, ${TEXT_LIMITS.titleTarget} words the norm, with the period, population and scope moved to the \`subtitle\`; a title that leads with a gap - what the evidence lacks, leaves unproven or cannot settle - on more than 15% of the analytical pages is refused (TITLE_GAP_SHARE), and a bare count ("The fleet is 116 aircraft") is advised (TITLE_COUNT_ONLY), each title read by a model (judge.mjs); a \`subtitle\` one line of ${SUBTITLE_WORDS} words; a chart or panel \`heading\` one line at its frame's width with its unit inline (HEADING_WRAPS - a short unit moves under the heading on its own, a unit written as a phrase does not); a \`takeaway\` ${TEXT_LIMITS.takeawayLines} lines (TAKEAWAY_LONG); a \`bar\` ${TEXT_LIMITS.barLines} lines; prose 35 to 90 characters a line (CPL). A chart \`heading\` or \`unit\` carries no results: its numbers are a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set size ("top 40"), an index base ("2019 = 100") or a rank scale ("rank, 1 = best"); a figure that notation does not settle is read by a model (judge.mjs).`, "",
     ...(() => { const names = distributionLabelCapacity(); return [

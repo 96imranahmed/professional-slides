@@ -28,6 +28,7 @@ import { PLAN, DECK_LENGTH, RULES, applyRulesVersion } from "../weight.mjs";
 import { calloutCapacity, countInWords } from "../chart-annotations.mjs";
 import { isTable, rowCells } from "../evidence.mjs";
 import { FIT_WORDS } from "../claim-fit.mjs";
+import { playerEntries, playerNames, playerPhotographs } from "../players.mjs";
 
 export const VARIETY_CODES = Object.freeze({
   PAGE_TYPE_UNDECLARED: "the deck's pages were not authored as page types, so nothing chose their structure",
@@ -69,7 +70,7 @@ export const VARIETY_CODES = Object.freeze({
   SHARES_IN_TILES: "shares of one measure an order of magnitude apart set in tiles of one size",
   // Deck-level, read here from the compiled pages.
   VARIETY_TABLES: "one table construction on more than half of ten consecutive analytical pages",
-  PLAYERS_UNMARKED: "the deck compares named players but no early page shows their logos",
+  PLAYERS_UNMARKED: "the deck declares the players it compares but no early page shows each one's mark - its logo, its outline or its photograph, as it declares",
   PROFILE_UNPICTURED: "a page introducing players or products as cards with no logo or picture on any of them",
 });
 
@@ -590,7 +591,7 @@ export function fitStandings(spec, { fits = new Map(), kept = null, carried = []
 }
 
 // Deck-level defects that show only across the whole deck, read from the compiled pages.
-export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3, titleShare: 0.2, titleNames: 2 });
+export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPages: 3 });
 
 // The coded-cell vocabulary the compiler (page-types.mjs) and these rules both
 // read, kept here because the compiler imports this module and not the other
@@ -599,24 +600,8 @@ export const REVIEWED = Object.freeze({ tableWindow: 10, tableRunMax: 5, earlyPa
 export const CODED = new Set(["binary", "harvey", "heatmap", "bars", "rag", "lights", "progress", "dot", "check", "trend", "number", "logo", "photo"]);
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 
-/**
- * The deck's players by every name a page may use for them - the name, its
- * `short` and its `aliases`, lower-cased - each mapped to the player's name.
- * A table cell naming a player is drawn as its logo, a panel headed by one is
- * that player's panel, and an early logo under a short name introduces it.
- * All three read this one map, so a player declared as "Southgate Labs" with
- * short "Southgate" is the same player to each.
- */
-export function playerNames(players) {
-  const names = new Map();
-  for (const p of Array.isArray(players) ? players : []) {
-    const player = typeof p === "string" ? { name: p } : p;
-    if (typeof player?.name !== "string" || !player.name.trim()) continue;
-    for (const alias of [player.name, player.short, ...(player.aliases || [])])
-      if (typeof alias === "string" && alias.trim()) names.set(alias.trim().toLowerCase(), player.name);
-  }
-  return names;
-}
+// The deck's players by every name a page may use for them (players.mjs), read by these rules and by the compiler.
+export { playerNames };
 
 /**
  * How a page's table reads before a word of it is read: the first column
@@ -659,24 +644,18 @@ function reviewedDeckFindings(spec, slides, stand) {
     "cash position as a bridge or a flow (`bridge`, `mechanism` form `flow`), commitments over time as bars aligned on their durations (`schedule` " +
     "form `gantt`, `ranking` form `aligned-bars`), verdicts as a coded scorecard (`scorecard` forms harvey, rag, check), measures as a chart; keep the table for the look-up.", worst.ids);
 
-  // Identity: the players the deck compares, shown by their marks early.
-  const aliases = playerNames(spec.players);
-  const players = [...new Set(aliases.values())];
-  const named = players.length >= 2 ? players : titleNames(analytical);
-  if (named.length >= 2) {
+  // Identity: the entities the deck declares it compares, each shown early by the mark it declares. Only a declaration
+  // counts: names that recur in the titles are not taken for players, since which names a deck compares is the deck's to say.
+  const entities = playerEntries(spec.players);
+  if (entities.length >= 2) {
     const early = [spec.cover, ...analytical.slice(0, REVIEWED.earlyPages)].filter(Boolean);
-    const conventional = new Set([...aliases.keys()].map((alias) => `${alias} logo`.toLowerCase()));
-    const marks = early.flatMap((page) => logoTexts(page, conventional)).join(" \n ").toLowerCase();
-    // A logo under any of the player's names introduces it.
-    const unmarked = named.filter((name) => ![name.toLowerCase(), ...[...aliases].filter(([, n]) => n === name).map(([alias]) => alias)].some((alias) => marks.includes(alias)));
-    stand("PLAYERS_UNMARKED", `compared players with no logo on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
-    if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked, pages: early.map((p) => p.id ?? "cover") }, 0,
-      `The deck compares ${named.join(", ")}${players.length >= 2 ? "" : " (named in its titles again and again)"}, and neither the cover nor the first ${REVIEWED.earlyPages} pages ` +
-      `shows ${unmarked.length === named.length ? "their logos" : `the logo of ${unmarked.join(", ")}`}. Introduce them by their marks before the evidence starts: a \`profiles\` page ` +
-      "(form `logos`, or `logo-table` with each player's numbers), or a `logo` column in an early table. " +
-      // A deck that declares it is built without the network (asset-needs.mjs) fetches nothing: the cell that names its player prints the name.
-      (spec.assets?.fetch === "none" ? "Write each as a `logo` cell that names its `player`: the deck declares it is built without the network, so the cell prints the name where the mark would be."
-        : `Write each as \`{ alt: "<Name> logo" }\` - the build fetches it from the player's Wikipedia infobox${players.length >= 2 ? "" : "; declare them in the deck's `players` so it can"}.`),
+    const shown = new Set(early.flatMap((page) => [...introducedOn(page, spec.players)]));
+    const named = entities.map((entity) => entity.name), unmarked = entities.filter((entity) => !shown.has(entity.name));
+    stand("PLAYERS_UNMARKED", `declared players with no mark of their kind (logo, outline, photograph) on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
+    if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked: unmarked.map((entity) => entity.name), marks: Object.fromEntries(unmarked.map((entity) => [entity.name, entity.kind])), pages: early.map((p) => p.id ?? "cover") }, 0,
+      `The deck compares ${named.join(", ")}, and neither the cover nor the first ${REVIEWED.earlyPages} pages shows ${unmarked.length === entities.length ? "their marks" : `the mark of ${unmarked.map((entity) => entity.name).join(", ")}`}. ` +
+      "Introduce each by the mark it declares before the evidence starts: a `profiles` page (form `logos` naming each, or `logo-table` with a `logo` cell naming each `player` beside the numbers the deck will compare), " +
+      `or a \`logo\` column in an early table - a cell or a \`logos\` member that names a player draws its own mark. ${markRepairs(unmarked, spec)}`,
       early.map((p) => p.id ?? "cover"));
   }
   // A page that introduces players or products as cards is about what they look like as much as what they do.
@@ -685,48 +664,69 @@ function reviewedDeckFindings(spec, slides, stand) {
     if (items.length && !items.some((item) => ["logo", "media", "image", "photo", "picture"].some((key) => item?.[key])))
       block("PROFILE_UNPICTURED", { page: s.id ?? null, cards: items.length }, 1,
         `${s.id}: ${items.length} cards introduce ${items.map((item) => item?.title ?? item?.name).filter(Boolean).slice(0, 4).join(", ")} with no logo or picture on any of them. ` +
-        "A reader recognises a company by its mark and a product by its look: give each card its `logo` ({ alt: \"<Name> logo\" }, fetched by name) or a credited " +
-        "`image` ({ alt, search }, fetched from Wikimedia Commons), or introduce them as form `logos`.", [s.id ?? null]);
+        "A reader recognises a company by its mark, a place by its outline and a product by its look: give each card its `logo` ({ alt: \"<Name> logo\" }, fetched by name - " +
+        "or, for a declared player, drawn as the mark it declares) or a credited `image` ({ alt, search }, fetched from Wikimedia Commons), or introduce them as form `logos`.", [s.id ?? null]);
   }
   return findings;
 }
 
-/**
- * Every logo a page draws, as the text that names it: the `{ alt }` of a logo
- * where the page plans one - under a `logo` key, in a logo cell, in a logos
- * exhibit or a chart's category marks - and of a declared player's logo named
- * the way the runtime names it ("<Name> logo"); logo cells; logos exhibits.
- */
-function logoTexts(page, conventional = new Set()) {
-  const found = [];
-  const walk = (value, inLogo) => {
-    if (Array.isArray(value)) return value.forEach((v) => walk(v, inLogo));
-    if (!value || typeof value !== "object") return;
-    for (const [key, v] of Object.entries(value)) {
-      if (key === "alt" && typeof v === "string" && (inLogo || value.type === "logo" || conventional.has(v.trim().toLowerCase()))) found.push(v);
-      else walk(v, inLogo || key === "logo" || key === "categoryIcons" || (key === "exhibit" && v?.type === "logos"));
-    }
-    if (value.type === "logos") found.push(...(value.items || []).map((item) => String(item?.name ?? "")));
-    // A logo cell that names its player marks that player, with a file to draw or without: the refusal tells the author to
-    // write one, so the rule reads the key it names (`player`) as well as the image's `alt`.
-    if (value.type === "logo" && typeof value.player === "string" && value.player.trim()) found.push(value.player);
-  };
-  walk(page, false);
-  return found;
+// What each kind of mark needs, said for the entities still to be introduced.
+function markRepairs(unmarked, spec) {
+  const kinds = new Set(unmarked.map((entity) => entity.kind));
+  const photographs = unmarked.filter((entity) => entity.kind === "image").map((entity) => `"${entity.image?.alt ?? entity.name}"`);
+  return [
+    // A deck that declares it is built without the network (asset-needs.mjs) fetches nothing: the cell that names its player prints the name.
+    kinds.has("logo") ? (spec.assets?.fetch === "none" ? "Write each as a `logo` cell that names its `player`: the deck declares it is built without the network, so a logo's cell prints the name where the mark would be."
+      : "A logo is planned as `{ alt: \"<Name> logo\" }` and the build fetches it from the player's Wikipedia infobox.") : "",
+    kinds.has("outline") ? "An outline is drawn from the runtime's own geography, as the entity's `outline` declares it, wherever a page plans the entity's mark - nothing is fetched." : "",
+    kinds.has("image") ? `A photograph is the entity's own \`image\` (${photographs.join(", ")}), which the build fetches from Wikimedia Commons: planned wherever a page plans the entity's mark, or set on the page as a photograph of that \`alt\`.` : "",
+  ].filter(Boolean).join(" ");
 }
 
 /**
- * The organisations a deck without `players` keeps naming: capitalised names
- * in a fifth of its titles or more, never written in lower case. Two or more
- * of them make a comparison of named players.
+ * The declared entities a page introduces by their marks, each only in the
+ * kind it declares (players.mjs), by name. A `logo` cell that names its
+ * `player` and a member of a `logos` exhibit named for one introduce it
+ * whatever its kind: the compile plans the entity's own mark in each
+ * (planPlayerMarks), and one with no file yet prints the name where the mark
+ * will be. Beyond those, a logo is introduced by an `{ alt }` planned where a
+ * logo goes - under a `logo` key, in a logo cell, a logos exhibit or a chart's
+ * category marks - or named the way the runtime names a player's logo
+ * ("<Name> logo"), that names it under any of its names; an outline, by the
+ * outline planned for it; a photograph, by the entity's own photograph (its
+ * `image.alt`) planned anywhere on the page. A mark of another kind - a logo
+ * for a place - does not introduce it.
  */
-function titleNames(slides) {
-  const titles = slides.map((s) => String(s.title ?? ""));
-  if (titles.length < 8) return [];
-  const lower = new Set(titles.join(" ").match(/\b[a-z][a-z'’]+\b/g) ?? []);
-  const counts = new Map();
-  for (const title of titles) for (const name of new Set((title.match(/\b[A-Z][A-Za-z0-9]*[A-Z0-9]?[A-Za-z0-9]*\b/g) ?? []).filter((w) => w.length > 2 && !lower.has(w.toLowerCase()))))
-    counts.set(name, (counts.get(name) || 0) + 1);
-  const names = [...counts].filter(([, n]) => n >= Math.max(4, REVIEWED.titleShare * titles.length)).map(([name]) => name);
-  return names.length >= REVIEWED.titleNames ? names : [];
+export function introducedOn(page, players) {
+  const names = playerNames(players), found = new Set();
+  const kindOf = new Map(playerEntries(players).map((entity) => [entity.name, entity.kind]));
+  const nameOf = (text) => names.get(String(text ?? "").trim().toLowerCase());
+  const photographs = playerPhotographs(players);
+  const conventional = new Set([...names].filter(([, name]) => kindOf.get(name) === "logo").map(([alias]) => `${alias} logo`));
+  const logos = [];
+  const walk = (value, inLogo) => {
+    if (Array.isArray(value)) return value.forEach((v) => walk(v, inLogo));
+    if (!value || typeof value !== "object") return;
+    // A logo cell that names its player marks that player, with a file to draw or without: the refusal tells the author to
+    // write one, so the rule reads the key it names (`player`) as well as the image's `alt`.
+    if (value.type === "logo" && typeof value.player === "string" && value.player.trim()) { logos.push(value.player); if (nameOf(value.player)) found.add(nameOf(value.player)); }
+    if (value.type === "logos") for (const item of value.items || []) { logos.push(String(item?.name ?? "")); if (nameOf(item?.name)) found.add(nameOf(item.name)); }
+    if (value.outline && typeof value.outline === "object" && !Array.isArray(value.outline)) {
+      const name = nameOf(value.player) ?? nameOf(String(value.alt ?? "").replace(/\s+outline$/i, ""));
+      if (kindOf.get(name) === "outline") found.add(name);
+    }
+    const photograph = typeof value.alt === "string" && photographs.has(value.alt.trim().toLowerCase());
+    if (photograph) found.add(photographs.get(value.alt.trim().toLowerCase()));
+    // An outline or a photograph planned where a logo goes is that mark, not a logo naming anyone.
+    const other = Boolean(value.outline) || value.mark === "image" || photograph;
+    for (const [key, v] of Object.entries(value)) {
+      if (key === "alt" && typeof v === "string" && !other && (inLogo || value.type === "logo" || conventional.has(v.trim().toLowerCase()))) logos.push(v);
+      else walk(v, inLogo || key === "logo" || key === "categoryIcons" || (key === "exhibit" && v?.type === "logos"));
+    }
+  };
+  walk(page, false);
+  // A logo under any of the player's names introduces it.
+  const said = logos.join(" \n ").toLowerCase();
+  for (const [alias, name] of names) if (kindOf.get(name) === "logo" && said.includes(alias)) found.add(name);
+  return found;
 }

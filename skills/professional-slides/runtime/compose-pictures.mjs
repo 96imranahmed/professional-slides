@@ -1,11 +1,14 @@
 // Pictures on a page: an image's props read from its file (`imageProps`,
 // with its pixel size), the media references an exhibit makes, the players'
-// logos, a photograph column, the `pictures` a picture page carries with their
-// frames and cards, and the credits page that names every picture's source.
+// marks (a logo, a place's outline, a photograph), a photograph column, the
+// `pictures` a picture page carries with their frames and cards, and the
+// credits page that names every picture's source.
 import fs from "node:fs";
 import path from "node:path";
 import { slugOf } from "./fetch-logos.mjs";
 import { readJsonSync } from "./cli.mjs";
+import { placeOutline } from "./maps.mjs";
+import { playerEntries, plannedMark } from "./players.mjs";
 
 function imageDimensions(buffer) {
   if (buffer[0] === 0x89 && buffer[1] === 0x50) return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20), mime: "image/png" };
@@ -45,10 +48,36 @@ export function imageProps(ref, baseDir) {
 }
 
 
-/** The declared players' logos that exist on disk, as embedded images, in the order the deck names them. */
+/**
+ * A place's outline planned as a mark (`{ alt, outline: { geography, region } }`,
+ * players.mjs plannedMark), read from the geography data the maps draw
+ * (maps.mjs placeOutline): its paths and the aspect its slot reads, with the
+ * data's source as the mark's credit. No file and no network.
+ */
+export function outlineProps(ref) {
+  const { outline, ...rest } = ref;
+  const drawn = placeOutline(outline);
+  return { ...rest, outline: { paths: drawn.paths, geography: drawn.geography, regions: drawn.regions }, width: drawn.width, height: drawn.height, authorization: drawn.source };
+}
+
+/**
+ * The declared players' marks that can be drawn, in the order the deck names
+ * them, each in the kind it declares (players.mjs): a logo on disk (the
+ * player's own `logo`, or assets/logos/ as the build fetches it) as an
+ * embedded image; a place's outline, read from the geography data; a thing's
+ * photograph on disk (its own `path`, or assets/pictures/ as the picture fetch
+ * names it), as an embedded image.
+ */
 export function playerMarks(spec, baseDir) {
-  return (spec.players || []).map((p) => (typeof p === "string" ? { name: p } : p)).flatMap((player) => {
-    if (!player?.name) return [];
+  return playerEntries(spec.players).flatMap((player) => {
+    if (player.kind === "outline") { try { return [outlineProps(plannedMark(player))]; } catch { return []; } }
+    if (player.kind === "image") {
+      const own = typeof player.image?.path === "string" ? player.image.path : null, alt = String(player.image?.alt ?? "").trim();
+      const file = own ?? (alt ? path.join("assets", "pictures", `${slugOf(alt)}.jpg`) : null);
+      if (!file || !fs.existsSync(path.resolve(baseDir, file))) return [];
+      const credit = player.image.credit ?? readJsonSync(path.resolve(baseDir, "assets", "pictures", "sources.json"), { optional: true })?.find((r) => r.alt === player.image.alt)?.credit;
+      try { return [{ ...imageProps({ path: file, alt, credit: credit ?? `Photo: ${alt}` }, baseDir), mark: "image", player: player.name }]; } catch { return []; }
+    }
     const own = player.logo && typeof player.logo === "object" && typeof player.logo.path === "string" ? player.logo.path : null;
     const found = own ?? ["png", "jpg"].map((ext) => path.join("assets", "logos", `${slugOf(player.name)}.${ext}`)).find((file) => fs.existsSync(path.resolve(baseDir, file)));
     if (!found) return [];
@@ -68,11 +97,15 @@ const MEDIA_KEYS = new Set(["media", "photo", "image", "logo"]);
  * A person's headshot, an icon-trends column's picture and a table's logo cell
  * all render from an embedded data URI, which an author writing a spec cannot
  * reasonably supply, so a media key that names a file is read from disk here.
- * A reference that already carries a data URI, or names no file, is left alone.
+ * A place's mark, planned as its `outline`, is read from the geography data
+ * (outlineProps). A reference that already carries a data URI, or names no
+ * file, is left alone.
  */
 export function resolveMediaRefs(value, baseDir, key = null) {
   if (Array.isArray(value)) return value.map((entry) => resolveMediaRefs(entry, baseDir, key));
   if (!value || typeof value !== "object") return value;
+  // A place's mark is its outline, read from the geography data rather than a file.
+  if (key && MEDIA_KEYS.has(key) && value.outline && typeof value.outline === "object" && !Array.isArray(value.outline.paths)) return outlineProps(value);
   if (key && MEDIA_KEYS.has(key) && typeof value.path === "string" && !value.dataUri) {
     const { path: _p, credit, ...rest } = value;
     return { ...rest, ...imageProps(value, baseDir), authorization: credit ?? value.authorization };

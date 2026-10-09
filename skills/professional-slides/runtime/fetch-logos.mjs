@@ -6,7 +6,9 @@
 //   node runtime/fetch-logos.mjs <id>.deck.json --dry-run  report what would be fetched
 //   node runtime/fetch-logos.mjs <id>.deck.json --hint airline   steer ambiguous names
 //
-// For each entry in `players` whose logo is still `{ alt }`, the script finds
+// For each entry in `players` marked by a logo (players.mjs: the default; a
+// place marked by its outline needs no file, and a thing marked by its
+// photograph is fetch-pictures.mjs's) whose logo is still `{ alt }`, the script finds
 // the player's Wikipedia article (the entry's `wikipedia` title, or a search on
 // its name plus `logoHint`), reads the logo file named in the article's
 // infobox, and downloads a 512px PNG rendering of it. Every `{ alt: "<name>
@@ -19,6 +21,7 @@ import path from "node:path";
 import { UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJson } from "./cli.mjs";
 import { spawn } from "node:child_process";
 import { judged } from "./judgements.mjs";
+import { logoPlayers } from "./players.mjs";
 
 export const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
 const API = "https://en.wikipedia.org/w/api.php";
@@ -138,7 +141,7 @@ export function fillLogos(spec, fetched, baseDir) {
  * report. Returns what was filled and what failed.
  */
 export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true } = {}) {
-  const players = (spec.players || []).map((p) => typeof p === "string" ? { name: p } : p).filter((p) => p?.name && !(p.logo && (p.logo.path || p.logo.dataUri)));
+  const players = logoPlayers(spec.players);
   if (!players.length) return { filled: 0, fetched: [], failed: [] };
   const directory = path.join(baseDir, "assets", "logos");
   const records = new Map(((await readJson(path.join(directory, "sources.json"), { optional: true })) ?? []).map((r) => [r.name, r]));
@@ -168,8 +171,7 @@ async function main(argv) {
   if (!specArg) throw new UsageError(USAGE);
   const specPath = path.resolve(specArg), baseDir = path.dirname(specPath);
   const spec = await readJson(specPath);
-  const players = (spec.players || []).map((p) => typeof p === "string" ? { name: p } : p)
-    .filter((p) => p?.name && !(p.logo && (p.logo.path || p.logo.dataUri)));
+  const players = logoPlayers(spec.players);
   if (values["dry-run"]) { console.log(JSON.stringify({ toFetch: players.map((p) => p.name) })); return; }
   const directory = path.join(baseDir, "assets", "logos");
   await fs.mkdir(directory, { recursive: true });

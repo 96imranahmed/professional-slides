@@ -1,4 +1,4 @@
-import { mediaNode, logoFrame } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
 import { formatValue, figureUnit } from "./value-format.mjs";
 import {
   token,
@@ -314,15 +314,16 @@ function normalize(props) {
       // compare, where a padded " " would read as a missing value.
       if ((emptyValue && (bandRow ? c > 0 : c === 0)) || (value && typeof value === "object" && value.blank === true)) { cell.blank = true; cell.type = "text"; }
       if (bandRow) cell.bold = true;
-      // A cell naming a declared player is drawn as the player's mark
-      // (page-types.mjs markPlayerCells). Before its logo is on disk - an
-      // offline build, a player with no article - it keeps the name as text
-      // rather than failing the table.
-      if (cell.type === "logo" && cell.player && !cell.media?.dataUri) { cell.type = "text"; cell.text = cell.text ?? cell.player; delete cell.media; }
+      // A cell naming a declared player is drawn as the player's mark, in the
+      // kind it declares (page-types.mjs markPlayerCells): a logo, a place's
+      // outline, a photograph. Before its file is on disk - an offline build, a
+      // player with no article - it keeps the name as text rather than failing
+      // the table; an outline is drawn from the geography data and is never missing.
+      if (cell.type === "logo" && cell.player && !markDrawable(cell.media)) { cell.type = "text"; cell.text = cell.text ?? cell.player; delete cell.media; }
       // A wordmark already says the name: beside it the verdict keeps only its
       // other words ("Firm A leads" is the mark and "leads"), and a bare name
-      // is the mark alone.
-      if (cell.type === "logo" && cell.text && cell.player && cell.media?.width / cell.media?.height >= 2.5
+      // is the mark alone. An outline or a photograph says no name.
+      if (cell.type === "logo" && cell.text && cell.player && cell.media?.dataUri && cell.media.mark !== "image" && cell.media?.width / cell.media?.height >= 2.5
           && String(cell.text).trim().toLowerCase().startsWith(String(cell.player).toLowerCase())) {
         const rest = String(cell.text).trim().slice(String(cell.player).length).trim();
         if (rest) cell.text = rest; else delete cell.text;
@@ -909,7 +910,7 @@ function minimumDrawnWidth(cell, props = {}) {
 function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
   const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
   const need = model.columns.map((column, c) => {
-    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (column.logo?.dataUri ? headerMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
+    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (markDrawable(column.logo) ? headerMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
     // A group band over this column alone must fit its label in this column.
     const group = column.group === undefined || column.group === null ? null : String(column.group);
     if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
@@ -1108,7 +1109,7 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
   // band height on both sides (measured at a taller band so the label fits).
   const chevronInset = props.headerShape === "chevron" ? v("space.5") : 0;
   // A header naming a player sets the player's mark before its label.
-  const headerMarks = model.columns.map((c, i) => (c.label && c.logo?.dataUri
+  const headerMarks = model.columns.map((c, i) => (c.label && markDrawable(c.logo)
     ? headerMark(c.logo, measure("M", widths[i], true, textSize).lineHeight, (widths[i] - 2 * padding) / 3) : null));
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding - 2 * chevronInset - (headerMarks[i] ? headerMarks[i].width + v("space.2") : 0), true, textSize) : null,

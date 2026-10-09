@@ -27,7 +27,10 @@
 // names the photograph the fetch would take, by the same choice in the same
 // order. A logo - planned under a `logo` key, in a logo cell or a chart's
 // category marks, or as a declared player's "<Name> logo" - is
-// fetch-logos.mjs's business.
+// fetch-logos.mjs's business. A player marked by its photograph (players.mjs)
+// is fetched here, wherever its mark is planned - a logo's place included -
+// once for every page that plans it; a place marked by its outline is drawn
+// from the geography data and never fetched.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -36,25 +39,32 @@ import { UA, slugOf } from "./fetch-logos.mjs";
 import { contentWords } from "./gates/content_gates.mjs";
 import { deckStem } from "./artifact-path.mjs";
 import { activeJudgements, judged, loadJudgements, recordedJudgement, withJudgements } from "./judgements.mjs";
+import { playerEntries, playerPhotographs } from "./players.mjs";
 
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
 const FREE = /^(cc0|cc[- ]by(-sa)?(\s[\d.]+)?(\s\w+)?|public domain|pd\b|pdm|attribution(-sharealike)?)/i;
 /**
  * Every photograph placeholder in the spec: `{ alt }` with no file, not opted
- * out, and not a logo. A logo is planned where the deck plans one - under a
- * `logo` key (a player's, a card's, a column header's), in a `logo` cell, in a
+ * out, not a place's outline (drawn from the geography data, never fetched)
+ * and not a logo. A logo is planned where the deck plans one - under a `logo`
+ * key (a player's, a card's, a column header's), in a `logo` cell, in a
  * chart's `categoryIcons` - or as a declared player's logo named the way the
- * runtime names it ("<Name> logo").
+ * runtime names it ("<Name> logo"). A player marked by its photograph
+ * (players.mjs) is a photograph wherever it is planned, a logo's place
+ * included: its own `image` in `players`, and every page's mark of it, which
+ * share its `alt` and so one file.
  */
 export function picturePlaceholders(spec) {
-  const players = (spec?.players || []).map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean);
+  const players = playerEntries(spec?.players).map((entry) => entry.name);
   const logos = new Set(players.map((name) => `${name} logo`.toLowerCase()));
+  const photographs = playerPhotographs(spec?.players);
   const found = [];
   const walk = (value, inLogo) => {
     if (Array.isArray(value)) { value.forEach((child) => walk(child, inLogo)); return; }
     if (!value || typeof value !== "object") return;
-    const logo = inLogo || value.type === "logo" || logos.has(String(value.alt ?? "").trim().toLowerCase());
-    if (!logo && typeof value.alt === "string" && value.alt.trim() && !value.path && !value.dataUri && value.fetch !== false) found.push(value);
+    const alt = String(value.alt ?? "").trim().toLowerCase();
+    const logo = !photographs.has(alt) && (inLogo || value.type === "logo" || logos.has(alt));
+    if (!logo && !value.outline && typeof value.alt === "string" && value.alt.trim() && !value.path && !value.dataUri && value.fetch !== false) found.push(value);
     for (const [key, child] of Object.entries(value)) walk(child, logo || key === "logo" || key === "categoryIcons");
   };
   walk(spec, false);
@@ -155,9 +165,13 @@ const askOf = (picture) => ({ query: picture.search ?? picture.alt,
  */
 export async function choosePictures(placeholders, { records = new Map(), search = searchCommons, preview = null } = {}) {
   const taken = new Set([...records.values()].map((r) => r.title).filter(Boolean));
-  const chosen = new Map();
+  const chosen = new Map(), asked = new Map();
   let waiting = 0;
   for (const picture of placeholders) {
+    // One photograph planned on several pages - a player's mark, by its `alt` and search words - is one choice and one file.
+    const same = JSON.stringify([picture.alt, picture.search ?? null]);
+    if (asked.has(same)) { chosen.set(picture, chosen.get(asked.get(same))); continue; }
+    asked.set(same, picture);
     const ask = askOf(picture), own = records.get(picture.alt)?.title;
     const exclude = new Set([...taken].filter((title) => title !== own));
     const found = await judgedChoice(await search(ask.query, { ...ask.options, exclude }), picture, { preview });
@@ -216,6 +230,8 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
   const wanted = fetchMissing ? placeholders.filter((picture) => state.get(picture).fetch) : [];
   let chosen = new Map(), waiting = 0;
   try { ({ chosen, waiting } = await choosePictures(wanted, { records, preview: previewer(directory) })); } catch (error) { for (const picture of wanted) failed.push(`${picture.alt}: ${error.message}`); }
+  // A photograph several pages plan (a player's mark) is chosen once (choosePictures) and downloaded once.
+  const downloaded = new Map();
   for (const picture of placeholders) {
     const { file, known, exists, fetch: fetching } = state.get(picture);
     try {
@@ -224,7 +240,8 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
         const choice = chosen.get(picture);
         if (!choice) { failed.push(waiting ? `${picture.alt}: its candidate photographs are to be looked at first (judge.mjs <pages> --fetch-assets)` : `${picture.alt}: no freely licensed photograph among the search's results shows what it is planned to show; set \`search\` to the place's own name, or supply the file`); continue; }
         await fs.mkdir(directory, { recursive: true });
-        await download(choice, file);
+        if (downloaded.get(file) !== choice) await download(choice, file);
+        downloaded.set(file, choice);
         const { url, landscape, ...record } = choice;
         records.set(picture.alt, { alt: picture.alt, search: picture.search ?? null, ...record, source: url, saved: path.relative(baseDir, file) });
       } else if (!exists) continue;
@@ -243,7 +260,7 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
     };
     strip(spec);
   }
-  return { filled: filled.length, failed, ...(waiting ? { waiting } : {}) };
+  return { filled: filled.length, failed: [...new Set(failed)], ...(waiting ? { waiting } : {}) };
 }
 
 const USAGE = "Usage: fetch-pictures.mjs <id>.deck.json [--dry-run]";

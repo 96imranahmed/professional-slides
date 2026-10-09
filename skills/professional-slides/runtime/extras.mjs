@@ -5,7 +5,7 @@
 // is measured once here and carries its layout with it.
 import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker, markerSize } from "./marks.mjs";
-import { mediaNode } from "./media.mjs";
+import { mediaNode, markDrawable } from "./media.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary");
@@ -336,7 +336,9 @@ function normalizeLogos(props) {
   if (!Array.isArray(props.items) || props.items.length < 2 || props.items.length > 12) throw new Error("Logo wall takes two to twelve logos");
   return props.items.map((item, index) => {
     if (!item || !clean(item.name)) throw new Error(`Logo ${index + 1} requires a name`);
-    return { name: clean(item.name), caption: clean(item.caption), image: item.image ?? null };
+    // A member's mark - a logo, a place's outline, a photograph (players.mjs) - is drawn once it can be; a logo or a
+    // photograph planned and not yet fetched leaves the member's name in its cell, as a logo cell keeps its player's name.
+    return { name: clean(item.name), caption: clean(item.caption), image: item.image && typeof item.image === "object" && (markDrawable(item.image) || item.image.path) ? item.image : null };
   });
 }
 
