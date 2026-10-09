@@ -351,7 +351,7 @@
        ]
       }
      ],
-     "caption": "Between the peaks the same trains leave well over half their seats empty, even on the busiest line"
+     "caption": "The same trains could double their off-peak riders and still meet the crowding standard, so growth between the peaks needs no new seats"
     }
    ],
    "source": "Source: illustrative data for a fictional operator; automatic passenger counts, weekdays, FY26"
@@ -535,7 +535,7 @@
    "photo": {
     "path": "assets/hills.jpg",
     "alt": "Illustration of layered hills",
-    "credit": "examples/assets"
+    "credit": "An illustration drawn for this example"
    },
    "exhibit": {
     "type": "chart.column",
@@ -1540,7 +1540,7 @@
    "type": "scorecard",
    "form": "harvey",
    "commentary": "in-exhibit",
-   "takeaway": "Sequence the growth by readiness: Dales in 2027, Valley in 2028, Eastern after 2030, Coast last.",
+   "takeaway": "A late power upgrade would delay only the Eastern line; the Dales and Valley lines grow without it.",
    "why": "Five lines are judged on the same four readiness criteria, and each line's verdict sits in its own row",
    "settles": {
     "kind": "comparison",
@@ -1827,7 +1827,7 @@
     "what": "verbatim comments from lapsed off-peak riders"
    },
    "adds": null,
-   "title": "Lapsed riders blame the hourly service, not the fare, for driving instead",
+   "title": "Riders say half-hourly trains, later evenings and timed connections would win them back",
    "exhibit": {
     "quotes": [
      {
@@ -1871,21 +1871,21 @@
      "alt": "Illustration of a city skyline on the water",
      "label": "City: Leeds and York",
      "text": "Commuters in the peak, shoppers and visitors between; the peak is full and the off-peak is half empty.",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     },
     {
      "path": "assets/hills.jpg",
      "alt": "Illustration of layered hills",
      "label": "Dales: Skipton and beyond",
      "text": "Walkers and day-trippers who decide the day before; they need a later last train home, not a faster one.",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     },
     {
      "path": "assets/terraces.jpg",
      "alt": "Illustration of a row of terraced houses",
      "label": "Valley towns: Halifax, Huddersfield",
      "text": "Town-to-town trips decided within the hour; they need a train every half hour to turn up and go.",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     }
    ],
    "source": "Illustrations: illustrative drawings for a fictional operator"
@@ -2038,7 +2038,7 @@
        ]
       }
      ],
-     "caption": "The line reaches 18.7 million journeys by FY31, 3.8 million more once electric trains run from FY30",
+     "caption": "Without electric trains the line barely grows, so all of its growth to FY31 rests on the power upgrade arriving on time",
      "annotations": [
       {
        "category": "FY30",
@@ -2672,14 +2672,14 @@
     "kind": "share",
     "what": "shares of off-peak journeys, peak journeys and residents, FY26 survey"
    },
-   "title": "Four in ten off-peak journeys are leisure trips",
+   "title": "Six in ten residents live near a station, yet few off-peak riders travel weekly",
    "bar": "The growth is in how often nearby off-peak riders travel, not in the full peak, so the plan adds off-peak frequency first",
    "exhibit": {
     "of": 10,
     "rows": [
      {
       "label": "Off-peak journeys",
-      "value": 4,
+      "value": 7,
       "text": "that are leisure trips"
      },
      {
@@ -3093,7 +3093,7 @@
      "label": "The grid connection",
      "points": [
       "The power contract and the grid connection both wait on the network operator's capacity study, now six weeks late.",
-      "Each quarter the Eastern line is energised after January 2029 costs about 0.2 million of the 3.8 million electric journeys in FY31."
+      "Each quarter the Eastern line is energised after January 2029 costs about 0.2 million FY31 journeys, so the six weeks already lost put about 0.1 million at risk."
      ],
      "exhibit": {
       "type": "chart.column",

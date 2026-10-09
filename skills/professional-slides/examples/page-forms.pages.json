@@ -560,7 +560,7 @@
        93,
        102,
        104,
-       99
+       100
       ]
      }
     ],
@@ -624,7 +624,7 @@
     },
     {
      "lead": "The money measures hold",
-     "text": "Cost per train-km and the customer score beat target, and revenue per journey is within a point of it. The plan therefore starts from an operation that is short of trains that work, not short of money or goodwill."
+     "text": "Cost per train-km and the customer score beat target, and revenue per journey meets it. The plan therefore starts from an operation that is short of trains that work, not short of money or goodwill."
     }
    ],
    "source": "Source: illustrative data for a fictional operator; FY26 scorecard"
@@ -1259,7 +1259,7 @@
        "category": "FY23"
       }
      ],
-     "caption": "The off-peak service doubled in one step in FY23, from an hourly train to one every half hour"
+     "caption": "The step to a train every half hour in FY23 is the change the plan repeats on the other lines"
     },
     {
      "type": "chart.line",
@@ -1296,7 +1296,7 @@
        "text": "Back to the FY20 level a year after the change"
       }
      ],
-     "caption": "Journeys passed their FY20 level in FY25 and have grown by 0.2 to 0.4 million a year since"
+     "caption": "Journeys took two years to answer the doubling, so each line's gain is counted from the second year of its new timetable"
     }
    ],
    "source": "Source: illustrative data for a fictional operator; timetable and ticket sales"
@@ -3608,7 +3608,7 @@
        "media": {
         "path": "assets/logos/westmoor-trains.png",
         "alt": "Westmoor Trains logo",
-        "credit": "examples/assets, a fictional mark"
+        "credit": "A fictional mark drawn for this example"
        }
       },
       "66.0",
@@ -3623,7 +3623,7 @@
        "media": {
         "path": "assets/logos/tideway-rail.png",
         "alt": "Tideway Rail logo",
-        "credit": "examples/assets, a fictional mark"
+        "credit": "A fictional mark drawn for this example"
        }
       },
       "52.4",
@@ -3638,7 +3638,7 @@
        "media": {
         "path": "assets/logos/pennine-link.png",
         "alt": "Pennine Link logo",
-        "credit": "examples/assets, a fictional mark"
+        "credit": "A fictional mark drawn for this example"
        }
       },
       "44.1",
@@ -3653,7 +3653,7 @@
        "media": {
         "path": "assets/logos/fenland-rail.png",
         "alt": "Fenland Rail logo",
-        "credit": "examples/assets, a fictional mark"
+        "credit": "A fictional mark drawn for this example"
        }
       },
       "31.5",
@@ -3668,7 +3668,7 @@
        "media": {
         "path": "assets/logos/northvale-rail.png",
         "alt": "Northvale Rail logo",
-        "credit": "examples/assets, a fictional mark"
+        "credit": "A fictional mark drawn for this example"
        }
       },
       "48.3",
@@ -3720,7 +3720,7 @@
       "image": {
        "path": "assets/logos/westmoor-trains.png",
        "alt": "Westmoor Trains logo",
-       "credit": "examples/assets, a fictional mark"
+       "credit": "A fictional mark drawn for this example"
       }
      },
      {
@@ -3736,7 +3736,7 @@
       "image": {
        "path": "assets/logos/tideway-rail.png",
        "alt": "Tideway Rail logo",
-       "credit": "examples/assets, a fictional mark"
+       "credit": "A fictional mark drawn for this example"
       }
      },
      {
@@ -3752,7 +3752,7 @@
       "image": {
        "path": "assets/logos/pennine-link.png",
        "alt": "Pennine Link logo",
-       "credit": "examples/assets, a fictional mark"
+       "credit": "A fictional mark drawn for this example"
       }
      }
     ]
@@ -3776,7 +3776,7 @@
     {
      "path": "assets/hills.jpg",
      "alt": "Illustration of layered hills",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     }
    ],
    "points": [
@@ -3797,7 +3797,7 @@
      "text": "The Dales line is the first to move to a half-hourly timetable, in December 2027. Its leisure market responds fastest to frequency, and it is the one line where the units, the crews and the paths are all already in hand."
     }
    ],
-   "source": "Illustration: examples/assets; survey data illustrative"
+   "source": "Illustration drawn for this example; illustrative survey data for a fictional operator"
   },
   {
    "id": "f-picture-picture-pair",
@@ -3818,14 +3818,14 @@
      "alt": "Illustration of a city skyline on the water",
      "label": "City: Leeds and York",
      "text": "Commuters in the peak, shoppers and visitors between. The peak is full and cannot grow before the electric fleet arrives; the off-peak is half empty and already has a train every twenty minutes.",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     },
     {
      "path": "assets/terraces.jpg",
      "alt": "Illustration of a row of terraced houses",
      "label": "Valley towns: Halifax and Huddersfield",
      "text": "Town-to-town trips decided within the hour, for work, college and shopping. They need a train every half hour all day so that nobody has to look up a time, which is what the May 2028 timetable gives them.",
-     "credit": "examples/assets"
+     "credit": "An illustration drawn for this example"
     }
    ],
    "source": "Illustrations: illustrative drawings for a fictional operator"
