@@ -157,8 +157,9 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight, underlay });
   drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps });
   overlay.push(...evidenceAnnotations.nodes);
-  // A change arrow keeps clear of the callouts set before it, as it does of the marks.
-  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap, obstacles: [...obstacles, ...evidenceAnnotations.nodes], arrowOnly }));
+  // A change arrow keeps clear of what is set above the marks before it - reference and threshold labels, callouts - as it
+  // does of the marks themselves.
+  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap, obstacles: [...obstacles, ...overlay], arrowOnly }));
   overlay.push(...renderAnnotationRail({ id, plot, props, categoryMap, allow: allowAnnotationRail }));
   return { underlay, overlay };
 }

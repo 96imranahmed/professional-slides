@@ -1054,7 +1054,7 @@ function arrowLift({ start, end, plot, obstacles = [], text, band = 0 }) {
     return { x: x1, y: top, width: Math.max(1, x2 - x1), height: Math.max(1, bottom - top) };
   };
   const spans = obstacles
-    .filter((node) => ["chart-mark", "data-label", "chart-line", "annotation-leader", "annotation-surface", "annotation-text"].includes(node.role))
+    .filter((node) => ["chart-mark", "data-label", "chart-line", "chart-reference-label", "chart-threshold-label", "annotation-leader", "annotation-surface", "annotation-text"].includes(node.role))
     .map((node) => (node.type === "line" && Number.isFinite(node.data?.x1) ? clipped(node) : node.frame))
     .filter((frame) => frame && frame.x + frame.width > left + 1 && frame.x < right - 1);
   if (!spans.length) return { lift: 0, capped: false };

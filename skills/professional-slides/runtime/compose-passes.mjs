@@ -268,7 +268,10 @@ export const SLIDE_PASSES = [
 
   // Normalize an authored percent stack or explicitly requested change annotation.
   ["read-the-data", (slide) => {
-    const derive = (ex) => decisiveFromTitle(focusFromTitle(changeFromContent(percentStack(ex), slide.title), slide.title), slide.title);
+    // A growth mark the author did not write is inferred on a page's lone chart only: small multiples share one title,
+    // and an arrow over each panel crowds charts drawn small.
+    const charts = (slide.exhibits || [slide.exhibit]).filter((ex) => String(ex?.type ?? "").startsWith("chart.")).length;
+    const derive = (ex) => decisiveFromTitle(focusFromTitle(changeFromContent(percentStack(ex), slide.title, { infer: charts === 1 }), slide.title), slide.title);
     if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
     if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
     return slide;

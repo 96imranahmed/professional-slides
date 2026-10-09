@@ -161,8 +161,8 @@ function claimedChange(ex, title) {
   return a !== null && b !== null && b - a >= CAGR_YEARS_MIN ? { cagr: { from, to } } : { change: { from, to } };
 }
 
-export function changeFromContent(exIn, title) {
-  const claimed = exIn && CHANGE_TYPES.includes(exIn.type) && exIn.change === undefined && !exIn.cagr && !(exIn.changeAnnotations || []).length ? claimedChange(exIn, title) : null;
+export function changeFromContent(exIn, title, { infer = true } = {}) {
+  const claimed = infer && exIn && CHANGE_TYPES.includes(exIn.type) && exIn.change === undefined && !exIn.cagr && !(exIn.changeAnnotations || []).length ? claimedChange(exIn, title) : null;
   const ex = claimed ? { ...exIn, ...claimed } : exIn;
   if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (!ex.change && !ex.cagr) || (ex.changeAnnotations || []).length) return ex;
   const categories = ex.categories || [], series = Array.isArray(ex.series) ? ex.series : [];

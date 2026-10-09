@@ -86,12 +86,15 @@ console.log(JSON.stringify({
   other: read('other-claim', chart(years, values)), open: read(null, chart(years, values)),
   short: read('states-change', chart(years.slice(0, 3), values.slice(0, 3))), line: read('states-change', { ...chart(years, values), type: 'chart.line' }),
   optedOut: read('states-change', chart(years, values, { change: false })),
+  panel: withJudgements(judgementSession({ oracle: (kind, subject) => { if (kind === 'claim-states-change') asked.push(subject); return 'states-change'; } }),
+    () => changeFromContent(chart(years, values), 'Journeys grew every year since 2019', { infer: false })).changeAnnotations ?? null,
   subject: asked[0], times: asked.length }));
 """)
         self.assertEqual(result["cagr"], [{"start": "2019", "end": "2024", "style": "arrow", "text": "+5.8% p.a."}])
         # Two years apart is a change, not a rate.
         self.assertEqual(result["near"][0]["text"], "+13%")
-        self.assertEqual([result["other"], result["open"], result["short"], result["line"], result["optedOut"]], [None] * 5)
+        # Not inferred on a chart among several panels (compose-passes.mjs: a page's lone chart only), nor asked about there.
+        self.assertEqual([result["other"], result["open"], result["short"], result["line"], result["optedOut"], result["panel"]], [None] * 6)
         self.assertEqual(result["subject"], {"title": "Journeys grew every year since 2019", "series": "Journeys", "periods": ["2019", "2020", "2021", "2022", "2023", "2024"]})
         # Asked of a column chart of four periods or more the author marked nothing on: not of three periods, a line, or `change: false`.
         self.assertEqual(result["times"], 4)
