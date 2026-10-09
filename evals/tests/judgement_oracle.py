@@ -46,15 +46,9 @@ def answering(answers):
         judgements.unload()
 
 
-# The verdict of each kind under which its rule refuses nothing: what a test's reader answers when the answer is not the point.
-PASSING = {"column-reads": "facts", "prose-alternatives": "one-argument", "row-is-total": "not-total", "axis-measures-time": "not-time",
-           "header-concludes": "concludes", "pill-states-status": "status", "heading-says-snapshots": "says-snapshots",
-           "tiles-one-measure": "different-measures", "title-leads-with-gap": "finding", "title-count-only": "compares",
-           "heading-states-result": "describes", "qualification-says-approximate": "approximate", "answer-contradicted": "consistent",
-           "source-cites-pointer": "names-source", "planning-label": "content", "commentary-caveats": "no-caveats",
-           "shares-in-words": "no-shares", "title-count-check": "agrees", "picture-shows": "shows", "file-is-logo": "logo",
-           "answer-lead": "no-verdict", "claims-repeat": "distinct", "same-quantity": "different", "number-replaced-by": "not-replaced",
-           "commentary-restates": "adds"}
+# The verdict of each kind under which its rule refuses nothing: what a test's reader answers when the answer is not the point
+# (evals/support/passing-verdicts.json, which a scripted run's reader answers from too).
+PASSING = json.loads((Path(__file__).resolve().parents[1] / "support" / "passing-verdicts.json").read_text(encoding="utf-8"))["verdicts"]
 
 
 def _words(value):

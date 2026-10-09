@@ -41,8 +41,10 @@
  *
  * Offline the author is scripted: each task's `moves` (tasks.json) are
  * written into the pages file, the next one only when a compile refused the
- * one before; a staged critique is answered by the quality eval's fake
- * critic, and the run stops at the deck review's packet. `--agent <name>`
+ * one before; the copy questions the compile asks are answered so their
+ * rules pass (evals/support/answer-judgements.mjs), a staged critique is
+ * answered by the quality eval's fake critic, and the run stops at the deck
+ * review's packet. `--agent <name>`
  * gives the request and the deck to a real agent CLI instead (an entry of
  * evals/quality/config.json `agents`), told to build the revision in `work/`
  * beside the deck, and scores what it leaves behind on `made`, `preserved`,
@@ -67,6 +69,7 @@ import { lastJson } from "../../skills/professional-slides/runtime/process.mjs";
 import { readRunLog, runCost } from "../../skills/professional-slides/runtime/run-log.mjs";
 import { ASSESSMENT_KEYS, DIMENSIONS, PAGE_DIMENSIONS } from "../../skills/professional-slides/runtime/reviewer.mjs";
 import { fillTemplate } from "../quality/lib.mjs";
+import { answerJudgements } from "../support/answer-judgements.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -229,6 +232,11 @@ function runTask(task, work) {
     if (named.length) stale = [...new Set([...(stale || []), ...named])];
   }
   if (!compiled) return { task: task.id, commands, refusals, error: "the scripted moves did not compile" };
+  // The copy questions the rules ask (judge.mjs): a run gives each staged packet to a fresh reader, and the scripted run
+  // answers each so its rule passes - the questions are what the run reaches, not what it scores.
+  const judged = answerJudgements(pagesFile);
+  commands.push({ step: "judge", exit: judged.code });
+  if (judged.code !== 0) return { task: task.id, commands, refusals, error: `the copy questions were not all answered: ${judged.stderr.slice(-400)}` };
   const full = step("compile", node("author-deck.mjs", pagesFile));
   if (full.code !== 0) { refusals.push(...refusalsOf(dir, changed).map((f) => ({ ...f, step: "compile" }))); return { task: task.id, commands, refusals, error: "the full compile refused the deck" }; }
 
@@ -298,7 +306,7 @@ function runTask(task, work) {
 function scriptedCritique(answer, critic) {
   if (!critic?.aboutImported) return answer;
   const critique = JSON.parse(answer), found = critic.aboutImported;
-  critique.findings = [...critique.findings, { id: "F9", scope: "spine", pages: found.pages, check: "numbers", severity: found.severity ?? "major", problem: found.problem, fix: found.fix, aboutImported: true }];
+  critique.findings = [...critique.findings, { id: "F9", scope: "spine", pages: found.pages, check: "numbers", severity: found.severity ?? "major", problem: found.problem, fix: found.fix, ...(found.ifUnfixed ? { ifUnfixed: found.ifUnfixed } : {}), aboutImported: true }];
   critique.completeness = critique.completeness.map((entry) => (entry.check === "numbers" ? { ...entry, result: "findings", note: "Filed an item under numbers, about the imported deck." } : entry));
   return JSON.stringify(critique);
 }

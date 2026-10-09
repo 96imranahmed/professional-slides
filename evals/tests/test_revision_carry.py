@@ -984,7 +984,8 @@ class PointChangeBenchmarkTests(unittest.TestCase):
             self.assertTrue(all(p["ok"] for p in bare["checks"]["made"]["prints"]))
             # The pie redrawn under the slide's own label title: compiled at the first attempt, and no critique staged.
             swap = by["swap-own-title"]
-            self.assertEqual(swap["cost"]["sequence"], ["import", "check", "compile", "storyline", "build", "deliver(3)"])
+            # The copy questions the compile asks are answered (judge) before the full compile, as a run answers them.
+            self.assertEqual(swap["cost"]["sequence"], ["import", "check", "judge", "compile", "storyline", "build", "deliver(3)"])
             self.assertFalse(swap["checks"]["scoped"]["critique"]["staged"])
             self.assertEqual(swap["checks"]["scoped"]["review"]["changed"], ["s07"])
             # The retitle that contradicts a slide nobody asked to change: the critic's finding about the imported deck blocks

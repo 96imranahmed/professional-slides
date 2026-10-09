@@ -118,7 +118,7 @@
    "fixture": "user",
    "request": "Slide 4's title is a label. Retitle it to say what the table shows: London grows fastest on the thinnest margin.",
    "deliver": true,
-   "critic": {"aboutImported": {"pages": ["s02", "s04"], "severity": "blocker", "problem": "The new title on slide 4 says London grows fastest, which its own table shows at 11.0% like for like; the summary on slide 2 still says the South grew fastest like for like at 9.4%.", "fix": "The user decides which is meant: correct the summary's sentence to London at 11.0%, or say on what other basis the South leads."}},
+   "critic": {"aboutImported": {"pages": ["s02", "s04"], "severity": "blocker", "problem": "The new title on slide 4 says London grows fastest, which its own table shows at 11.0% like for like; the summary on slide 2 still says the South grew fastest like for like at 9.4%.", "fix": "The user decides which is meant: correct the summary's sentence to London at 11.0%, or say on what other basis the South leads.", "ifUnfixed": "The decision-maker is told two different regions lead like-for-like growth, and acts on whichever slide they read last."}},
    "moves": [
     { "note": "A title is the slide's own text: it is rewritten in place.",
       "edits": [{"page": "s04", "title": "London grows fastest on the thinnest margin"}] }

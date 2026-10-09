@@ -65,10 +65,12 @@ class CheckIsTheBuildTests(unittest.TestCase):
         checked = run(AUTHOR, pages, "--check", "--render", env={"TMPDIR": str(scratch)})
         self.assertIn(checked.returncode, (0, 2), checked.stderr[-1500:])
         self.assertIn("Rendered", checked.stderr, checked.stderr[-1500:])
-        # The render is made in a temporary folder that is removed, and nothing is written beside the pages file but the log.
+        # The render is made in a temporary folder that is removed, and nothing is written beside the pages file but the log
+        # and each page's image, kept as out/page-check/<id>.png for the writer checking it (page-types.md, Write in two passes)
         # (the renderer keeps its LibreOffice profile in the temporary directory; that is its own).
         self.assertEqual([entry.name for entry in scratch.iterdir() if entry.name.startswith("author-render-")], [])
-        self.assertFalse((work / "out").exists())
+        kept = sorted(entry.relative_to(work).as_posix() for entry in (work / "out").rglob("*") if entry.is_file()) if (work / "out").exists() else []
+        self.assertTrue(all(name.startswith("out/page-check/") and name.endswith(".png") for name in kept), kept)
         self.assertFalse((work / f"{stem}.deck.json").exists())
         log = json.loads((work / f"{stem}.author-log.jsonl").read_text().splitlines()[-1])
         self.assertTrue(log["render"])
