@@ -977,20 +977,49 @@ const sourceText = (file) => (/\.pdf$/i.test(file)
 const UNREAD_SHARE = 0.5;
 // The scales a source prints a recorded number at: as it is, a share as a percentage or back, and by a thousand, a million or a billion either way.
 const SCALES = [1, 100, 0.01, 1e-3, 1e-6, 1e-9, 1e3, 1e6, 1e9];
-/** The numbers `text` prints, read both ways where a comma could be a thousands separator or a CSV field's end: "4,629.9" and "2,690.17" alike. */
-const numbersIn = (text) => [...(text.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g) ?? []), ...(text.match(/\d+(?:\.\d+)?/g) ?? [])].map((n) => Number(n.replace(/,/g, "")));
+// A sign a source prints on a figure: a minus - the hyphen, the typographic
+// minus, or the en dash a typesetter sets for one - or a plus, set against the
+// figure or its currency symbol and not run on from a word or a number:
+// "-12.4", "−£3.2" and "+0.8" are signed; "2020-24", "COVID-19" and "10 - 12"
+// are not.
+const SIGN_BEFORE = /(?<=(?<![\p{L}\p{N}])([-+\u2212\u2013])\p{Sc}?)/uy;
+// An accounting negative: the figure in parentheses standing as a cell of its
+// own - at a line's start or end, beside a field separator, or across a column
+// gap of two spaces - so "(12.4)" in a table is -12.4, while "(34%)" inside a
+// sentence is an aside and carries no sign.
+const CELL_OPEN = /(?<=(?:^[ \t]*|[,;\t|][ \t]*|[ \t]{2,})["']?\(\p{Sc}?)/muy;
+const CELL_CLOSE = /%?\)["']?(?=[ \t]*(?:$|[,;\t|])|[ \t]{2})/muy;
+/** The sign `text` prints on the figure from `start` to `end`: -1, 1, or 0 where it prints none. */
+function signOf(text, start, end) {
+  SIGN_BEFORE.lastIndex = start;
+  const sign = SIGN_BEFORE.exec(text)?.[1];
+  if (sign) return sign === "+" ? 1 : -1;
+  CELL_OPEN.lastIndex = start;
+  CELL_CLOSE.lastIndex = end;
+  return CELL_OPEN.test(text) && CELL_CLOSE.test(text) ? -1 : 0;
+}
+/**
+ * The numbers `text` prints, as `{ value, sign }`: the magnitude, read both
+ * ways where a comma could be a thousands separator or a CSV field's end -
+ * "4,629.9" and "2,690.17" alike - and the sign printed on it (signOf).
+ */
+const numbersIn = (text) => [/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g, /\d+(?:\.\d+)?/g].flatMap((figure) => [...text.matchAll(figure)]
+  .map((m) => ({ value: Number(m[0].replace(/,/g, "")), sign: signOf(text, m.index, m.index + m[0].length) })));
 /**
  * Whether one of `printed` (a source's numbers) is `value` as the log records
  * it: the same number at one of SCALES, rounded to the decimals the log keeps.
  * The log's 2.08 (msf) is the source's 2,075,442 (sf). A number of one digit
- * is found only as itself: rounded, 4 is found in any table.
+ * is found only as itself: rounded, 4 is found in any table. A figure the
+ * source prints unsigned is found at either sign, since a source gives a
+ * direction in words ("fell 12.4") as often as in a sign; one it prints signed
+ * is found at that sign only, so a loss recorded as a gain is told.
  */
 function printedIn(printed, value) {
-  const decimals = (String(value).split(".")[1] ?? "").length, tolerance = 0.5 * 10 ** -decimals + 1e-9, target = Math.abs(value);
-  return printed.some((n) => n === target || SCALES.some((scale) => {
+  const decimals = (String(value).split(".")[1] ?? "").length, tolerance = 0.5 * 10 ** -decimals + 1e-9, target = Math.abs(value), sign = Math.sign(value);
+  return printed.some(({ value: n, sign: printedSign }) => (!printedSign || !sign || printedSign === sign) && (n === target || SCALES.some((scale) => {
     const scaled = n * scale;
     return Math.abs(scaled - target) <= tolerance && String(n).replace(/\D/g, "").replace(/^0+/, "").length >= 2;
-  }));
+  })));
 }
 
 /**

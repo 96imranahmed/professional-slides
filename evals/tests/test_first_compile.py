@@ -156,6 +156,29 @@ console.log(JSON.stringify({ out, refused: measureProblems({ id: 'x', measures: 
                                          {"id": "pdf", "measures": ["slipped"], "missing": ["slipped 4847", "slipped 4887"]}])
         self.assertTrue(any("`computed` says how" in problem for problem in result["refused"]))
 
+    def test_a_figure_the_source_prints_signed_is_found_at_that_sign_only(self):
+        """The read-back dropped every sign: a loss the source prints as -12.4 read back as a recorded gain of 12.4."""
+        result = run_node('''
+import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+import { unreadNumbers } from './skills/professional-slides/runtime/storyline.mjs';
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'signs-'));
+await fs.mkdir(path.join(dir, 'sources'));
+// The hyphen, the typographic minus, a plus, and an accounting negative standing as a cell of its own.
+await fs.writeFile(path.join(dir, 'sources/margins.csv'), 'segment,change_pts,growth_pct\\nRetail,-12.4,+3.8\\nWholesale,\\u22122.7,(5.1)\\n');
+await fs.writeFile(path.join(dir, 'sources/note.md'), 'Over 2020-24 the retail margin fell 12.4 points and wholesale rose 2.7; the largest segment (34%) held.');
+const m = (values) => ({ unit: 'pts', population: 'segments', periods: values.map((_, i) => String(2024 + i)), values });
+const items = [
+  { id: 'signed', sources: ['sources/margins.csv'], measures: { change: m([-12.4, -2.7]), growth: m([3.8, -5.1]) } },
+  { id: 'reversed', sources: ['sources/margins.csv'], measures: { change: m([12.4, 2.7]), growth: m([-3.8, 5.1]) } },
+  // A direction given in words is found at either sign; a span of years and an aside in parentheses carry none.
+  { id: 'worded', sources: ['sources/note.md'], measures: { fell: m([-12.4, 2.7]), magnitude: m([12.4, -2.7]), span: m([2020, 24]),
+    share: { unit: '%', population: 'segments', period: '2025', value: 34 } } }];
+const out = await unreadNumbers(items, dir);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify(out));
+''')
+        self.assertEqual(result, [{"id": "reversed", "measures": ["change", "growth"], "missing": ["change 12.4", "change 2.7", "growth -3.8", "growth 5.1"]}])
+
 
 class MeasureEventTests(unittest.TestCase):
     def test_a_dated_event_on_a_measure_is_read_by_the_critic_and_drawn_on_the_chart(self):
