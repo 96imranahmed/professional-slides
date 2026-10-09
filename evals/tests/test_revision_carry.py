@@ -1157,5 +1157,21 @@ console.log(JSON.stringify({{ off: {{ at: off.rejectedAt, why: off.blockers.map(
         self.assertEqual([s[:2] for s in result["slides"]], [[f"s0{n}", True] for n in range(1, 9)])
 
 
+class ReviewerToldWhatChangedTests(unittest.TestCase):
+    def test_a_slide_hidden_or_shown_again_is_marked_as_such_for_the_reviewer(self):
+        """A carried slide whose only change is that the slide show hides it was described to the reviewer as a slide with
+        words edited in place: the mark and the deck's makeup now say what changed."""
+        result = run_node("""
+import { reviewPrompt } from './skills/professional-slides/runtime/reviewer.mjs';
+const slides = [{ id: 's01', title: 'A', carried: { slide: 1, edited: false, reworded: false } }, { id: 's02', title: 'B', carried: { slide: 2, edited: true, reworded: false, hidden: true } },
+  { id: 's03', title: 'C', carried: { slide: 3, edited: true, reworded: false, hidden: false } }, { id: 's04', title: 'D', carried: { slide: 4, edited: true, reworded: true } }, { id: 'p05', title: 'E' }];
+const prompt = reviewPrompt({ slides, revision: { changed: ['s02', 's03', 's04', 'p05'] } });
+console.log(JSON.stringify({ marks: prompt.split('\\n').filter((l) => l.startsWith('- [') && l.includes('[changed')).map((l) => l.slice(l.indexOf('[changed'))), makeup: prompt.match(/Of its 5 pages, [^.]*\\./)?.[0] }));
+""")
+        self.assertEqual(result["marks"], ["[changed: hidden from the slide show]", "[changed: put back into the slide show]", "[changed]", "[changed]"])
+        self.assertEqual(result["makeup"], "Of its 5 pages, 1 is the user's own slide, carried unchanged, 1 is a slide of theirs with words edited in place, "
+                         "1 is a slide of theirs this revision hides from the slide show, 1 is a slide of theirs it puts back into the slide show, 1 is a page the revision composed.")
+
+
 if __name__ == "__main__":
     unittest.main()

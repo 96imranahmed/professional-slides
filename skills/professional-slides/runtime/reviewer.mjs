@@ -475,13 +475,20 @@ function openedErrors(opened, required, ids) {
   return errors;
 }
 
-// What the deck is made of, from its counts: the slides carried untouched, the ones edited in place, the pages the runtime composed.
+// What the deck is made of, from its counts: the slides carried untouched, the ones edited in place - their words, or whether
+// the slide show shows them - and the pages the runtime composed. A record from before a carried slide said which (no
+// `reworded`) reads its edit as words.
 function revisionMakeup(slides) {
-  const carried = slides.filter((s) => s.carried), edited = carried.filter((s) => s.carried.edited).length, kept = carried.length - edited, composed = slides.length - carried.length;
+  const carried = slides.filter((s) => s.carried), composed = slides.length - carried.length;
+  const kept = carried.filter((s) => !s.carried.edited).length, reworded = carried.filter((s) => s.carried.reworded ?? s.carried.edited).length;
+  const hid = carried.filter((s) => s.carried.hidden === true).length, showed = carried.filter((s) => s.carried.hidden === false).length;
   if (!carried.length) return "";
-  return `Of its ${slides.length} pages, ${[kept ? `${kept} ${kept === 1 ? "is the user's own slide" : "are the user's own slides"}, carried unchanged` : null, edited ? `${edited} ${edited === 1 ? "is a slide of theirs" : "are slides of theirs"} with words edited in place` : null,
+  return `Of its ${slides.length} pages, ${[kept ? `${kept} ${kept === 1 ? "is the user's own slide" : "are the user's own slides"}, carried unchanged` : null, reworded ? `${reworded} ${reworded === 1 ? "is a slide of theirs" : "are slides of theirs"} with words edited in place` : null,
+    hid ? `${hid} ${hid === 1 ? "is a slide of theirs" : "are slides of theirs"} this revision hides from the slide show` : null, showed ? `${showed} ${showed === 1 ? "is a slide of theirs" : "are slides of theirs"} it puts back into the slide show` : null,
     composed ? `${composed} ${composed === 1 ? "is a page" : "are pages"} the revision composed` : null].filter(Boolean).join(", ")}. `;
 }
+// A changed page's mark, saying so where what changed is whether the slide show shows it.
+const changedMark = (s, changed) => (!changed.has(s.id) ? "" : s.carried?.hidden === true ? " [changed: hidden from the slide show]" : s.carried?.hidden === false ? " [changed: put back into the slide show]" : " [changed]");
 
 // What a revision left standing on purpose: the pages it says print a changed figure or changed words of another thing
 // (`only`, revision.mjs excusedPages). The stale check did not read them for that change, so the reviewer is asked to.
@@ -1298,7 +1305,7 @@ ${floorsPrompt(packet.floors)}
 ${waiverPrompt(packet.waivers)}
 
 PAGES (id, page, title, image, exhibits, dimensions with nothing to check):
-${slides.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- (see packet.json)"}
+${slides.map((s) => `${pageLine(s)}${changedMark(s, changed)}`).join("\n") || "- (see packet.json)"}
 Spreads: ${(packet.spreads || []).join(", ") || "rendered/spread-*.png"}
 Montage: ${packet.montage}
 
@@ -1434,7 +1441,7 @@ OPEN FINDINGS (give every one a status; an open density finding takes its status
 ${(scope.open || []).filter((f) => !isDensity(f)).map((f) => `- ${f.id} · ${f.code} · ${f.severity} · ${(f.pages || []).join(", ") || "deck"}: ${itemLines(f)}${f.downgradable ? ` [measured check now passes (${f.downgradable}): may drop if partly fixed]` : ""}`).join("\n") || "- none"}
 
 PAGES TO READ at full size (${scope.changed?.length ?? 0} changed since that pass or beside a deleted page, the rest named by an open major or blocker):
-${pages.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- none"}
+${pages.map((s) => `${pageLine(s)}${changedMark(s, changed)}`).join("\n") || "- none"}
 Montage, for the sequence: ${packet.montage}
 
 TITLES ALONE, to check the repaired pages still fit the argument:
@@ -1518,7 +1525,7 @@ ${waiverPrompt(packet.waivers)}
 ${floorsPrompt(packet.floors)}
 
 PAGES (id, page, title, image, exhibits):
-${slides.map((s) => `${pageLine(s)}${changed.has(s.id) ? " [changed]" : ""}`).join("\n") || "- (see packet.json)"}
+${slides.map((s) => `${pageLine(s)}${changedMark(s, changed)}`).join("\n") || "- (see packet.json)"}
 Spreads: ${(packet.spreads || []).join(", ") || "rendered/spread-*.png"}
 Montage: ${packet.montage}
 

@@ -183,7 +183,9 @@ export function carriedSaid(spec, inventory) {
   const slides = new Map((inventory?.slides || []).map((slide) => [slide.index, slide]));
   return (spec?.carried || []).map((entry) => { const slide = slides.get(entry.sourceSlide), changes = carriedChanges(entry, slide);
     const before = slideTexts(slide, { furniture: false }), after = editedTexts(slide, changes, { furniture: false });
-    return { id: entry.id, sourceSlide: entry.sourceSlide, edited: changed(changes), texts: [slide?.title ? normalTitle(after[0]) : normalTitle(entry.title), ...after.slice(slide?.title ? 1 : 0)],
+    // `reworded`: its title or words changed; `hidden`: where the revision hides it (true) or shows it again (false).
+    return { id: entry.id, sourceSlide: entry.sourceSlide, edited: changed(changes), reworded: changes.title !== undefined || Boolean(changes.edits),
+      ...(changes.hidden !== undefined ? { hidden: changes.hidden } : {}), texts: [slide?.title ? normalTitle(after[0]) : normalTitle(entry.title), ...after.slice(slide?.title ? 1 : 0)],
       // The slide as a record a critic can read whole: its lines, each table row by row, each chart value by value.
       record: slideRecord(editedSlide(slide, changes)),
       rewritten: after.map((text, at) => ({ text, was: before[at], title: at === 0 && Boolean(slide?.title) })).filter(({ text, was }) => text !== was) }; });

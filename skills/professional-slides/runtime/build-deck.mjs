@@ -257,7 +257,8 @@ async function assembleRevision({ spec, stem, baseDir, directory, py, result, de
   const text = (role, value) => ({ type: "text", role, text: value });
   await fs.writeFile(path.join(directory, ASSEMBLED_SCENE), JSON.stringify({ id: deck.id, assembled: true, source: inventory?.source?.file ?? null,
     slides: order.map((item) => (item.composed ? { ...deck.slides[item.composed - 1], composed: item.composed }
-      : { id: item.id, carried: { slide: item.carry, edited: Boolean(said.get(item.id)?.edited) }, componentInstances: [],
+      : { id: item.id, carried: { slide: item.carry, edited: Boolean(said.get(item.id)?.edited), reworded: Boolean(said.get(item.id)?.reworded),
+          ...(said.get(item.id)?.hidden !== undefined ? { hidden: said.get(item.id).hidden } : {}) }, componentInstances: [],
           nodes: (said.get(item.id)?.texts ?? []).map((value, at) => text(at === 0 ? "action-title" : "paragraph", value)) })) }));
   // The lines the revision rewrote on carried slides join the claim ledger: a figure the revision changed is its own to reproduce.
   const rewritten = [...said.values()].filter((item) => item.rewritten.length).map((item) => ({ id: item.id, nodes: item.rewritten.map((line) => text(line.title ? "action-title" : "paragraph", line.text)) }));
