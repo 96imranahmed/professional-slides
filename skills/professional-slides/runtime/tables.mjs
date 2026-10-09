@@ -1431,15 +1431,15 @@ function drawTableHeader(table) {
       );
     }
   }
+  // A column's header is filled where the table's header is a band.
+  const banded = (col) => Boolean(col) && col.type !== "implication" && (header === "standard" || bandedOpen || (header === "dimensions" && col.type !== "category"));
+  // The implication gutter carries no label, but on a banded header it takes the band's fill: strong decks run the band
+  // straight across to the verdict column's header, and set the verdict apart in the body - the dashed rule and its
+  // chevron down the gutter - not with a notch cut out of the header. Between open headers it stays open.
+  const bandedGutter = (c) => m.columns[c]?.type === "implication" && props.headerShape !== "chevron" && banded(m.columns[c - 1]) && banded(m.columns[c + 1]);
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
-    // The implication gutter carries no header, so it takes no header fill: a
-    // band run through it would put a block of ink in the header with nothing in
-    // it and join the verdict column to the evidence it is drawn from - the
-    // opposite of what the gutter is there to say. The band breaks at the
-    // gutter, and the chevron is what crosses it.
-    const filledHeader = column.type !== "implication"
-      && (header === "standard" || bandedOpen || (header === "dimensions" && column.type !== "category"));
+    const filledHeader = banded(column) || bandedGutter(c);
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(
@@ -1517,10 +1517,10 @@ function drawTableHeader(table) {
           textStyle(false, filledHeader ? white : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
         );
     }
-    // One continuous header rule unless a column is an implication arrow or
-    // the header sits over a chevron/category run whose slits are by design.
-    const continuousHeader = !m.columns.some((col) => col.type === "implication") && props.headerShape !== "chevron" && header !== "categories";
-    // An implication gutter splits the rule in two - evidence, verdict - and
+    // One continuous header rule unless an open header has an implication gutter, or the header sits over a chevron or
+    // category run whose slits are by design. A gutter under a banded header is part of the band, and so is its rule.
+    const continuousHeader = !m.columns.some((col, at) => col.type === "implication" && !bandedGutter(at)) && props.headerShape !== "chevron" && header !== "categories";
+    // An open header's implication gutter splits the rule in two - evidence, verdict - and
     // no further: a rule broken at every column read as a damaged table.
     const gutterSplit = !continuousHeader && props.headerShape !== "chevron" && header !== "categories";
     if (!(filledHeader && props.headerShape === "chevron") && (continuousHeader ? c === 0 : column.type !== "implication" && (!gutterSplit || runStart(c))))

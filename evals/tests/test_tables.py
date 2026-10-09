@@ -358,6 +358,29 @@ console.log('{}');
 
 
 class ImplicationRuleTests(unittest.TestCase):
+    def test_a_banded_header_runs_across_the_gutter_and_an_open_one_splits_at_it(self):
+        """A filled header broke at the implication gutter, leaving a white notch in the band; strong decks run the band
+        across and set the verdict apart in the body. An open header still splits its rule there, in two and no further."""
+        result = run_node('''
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const columns=['Group','Margin','Service',{label:'',type:'implication',width:{px:52},divider:true},'What it means'];
+const blank={type:'implication',relation:'implies',draw:false};
+const rows=[['A','15.1','Partial',blank,'Close the service gap'],['B','4.9','Strong',blank,'Rated above, on a third of the margin'],['C','6.1','Full',blank,'Strong hubs on a thin margin']];
+const frame={x:0,y:0,width:900,height:300};
+const draw=(treatment, more={})=>REGISTRY.get('table').render({id:'t',frame,props:{columns,rows,treatment,...more}}).nodes;
+const cover=(nodes)=>{ const cells=nodes.filter(n=>n.role==='table-header-cell').map(n=>[n.frame.x,n.frame.x+n.frame.width]).sort((a,b)=>a[0]-b[0]);
+  let gaps=0; for(let i=1;i<cells.length;i++) if(cells[i][0]>cells[i-1][1]+0.5) gaps++; return {cells:cells.length, gaps, from:cells[0]?.[0], to:cells.at(-1)?.[1]}; };
+const rules=(nodes)=>nodes.filter(n=>String(n.id).includes('header-rule')).length;
+const banded=draw('standard'), open=draw('open',{headerBand:false});
+console.log(JSON.stringify({banded:{...cover(banded), rules:rules(banded)}, open:{cells:cover(open).cells, rules:rules(open)}}));
+''')
+        self.assertEqual(result["banded"]["gaps"], 0, result)
+        self.assertEqual(result["banded"]["cells"], 5)
+        self.assertEqual(result["banded"]["from"], 0)
+        self.assertGreater(result["banded"]["to"], 880)
+        self.assertEqual(result["banded"]["rules"], 1, "one header rule under the whole band")
+        self.assertEqual([result["open"]["cells"], result["open"]["rules"]], [0, 2], "an open header: no band, its rule split at the gutter in two")
+
     def test_the_rule_spans_the_evidence_and_stops_above_a_total(self):
         """First cold run: the gutter's hairline crossed the dark total band and its disc came to rest a row low."""
         # Drawn to the foot of the table the hairline crossed the dark total
