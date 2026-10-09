@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import unittest
 
-from node_probe import run_node
+import json
+import tempfile
+
+from node_probe import example_scene_file, run_node
 
 JUDGE = "import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';\n"
 
@@ -86,6 +89,7 @@ console.log(JSON.stringify({
   other: read('other-claim', chart(years, values)), open: read(null, chart(years, values)),
   short: read('states-change', chart(years.slice(0, 3), values.slice(0, 3))), line: read('states-change', { ...chart(years, values), type: 'chart.line' }),
   optedOut: read('states-change', chart(years, values, { change: false })),
+  calledOut: read('states-change', chart(years, values, { annotations: [{ category: '2024', text: 'Up a third since 2019' }] })),
   panel: withJudgements(judgementSession({ oracle: (kind, subject) => { if (kind === 'claim-states-change') asked.push(subject); return 'states-change'; } }),
     () => changeFromContent(chart(years, values), 'Journeys grew every year since 2019', { infer: false })).changeAnnotations ?? null,
   subject: asked[0], times: asked.length }));
@@ -94,7 +98,8 @@ console.log(JSON.stringify({
         # Two years apart is a change, not a rate.
         self.assertEqual(result["near"][0]["text"], "+13%")
         # Not inferred on a chart among several panels (compose-passes.mjs: a page's lone chart only), nor asked about there.
-        self.assertEqual([result["other"], result["open"], result["short"], result["line"], result["optedOut"], result["panel"]], [None] * 6)
+        # Nor on a chart whose callouts already mark its finding.
+        self.assertEqual([result["other"], result["open"], result["short"], result["line"], result["optedOut"], result["panel"], result["calledOut"]], [None] * 7)
         self.assertEqual(result["subject"], {"title": "Journeys grew every year since 2019", "series": "Journeys", "periods": ["2019", "2020", "2021", "2022", "2023", "2024"]})
         # Asked of a column chart of four periods or more the author marked nothing on: not of three periods, a line, or `change: false`.
         self.assertEqual(result["times"], 4)
@@ -134,6 +139,24 @@ const codes = (nodes) => sceneCollisions({ id: 's', nodes }).filter((f) => f.cod
 console.log(JSON.stringify({ own: codes([text('a'), shaft('a')]), other: codes([text('a'), shaft('b')]) }));
 """)
         self.assertEqual(result, {"own": 0, "other": 1})
+
+
+class TrialPagesTests(unittest.TestCase):
+    def test_a_trial_page_reads_the_answers_and_asks_nothing(self):
+        """A search's trial pages - a layout weighed, a page padded with placeholder words to measure its fill - were gated
+        like the deck's own, and their garbled copy went to a reader as questions. They read the recorded answers and ask
+        nothing; the deck's own pages ask."""
+        with tempfile.TemporaryDirectory() as tmp:
+            scene = example_scene_file(tmp, "nyc-or-sf")
+            result = run_node(JUDGE + f"""
+import fs from 'node:fs';
+import {{ sceneGateFindings }} from './skills/professional-slides/runtime/author-deck.mjs';
+const deck = JSON.parse(fs.readFileSync({json.dumps(str(scene))}, 'utf8'));
+const asked = (ask) => {{ const session = judgementSession(); withJudgements(session, () => sceneGateFindings(deck, process.env.RUNTIME_PYTHON || 'python3', {{}}, {{ ask }})); return session.pending.size; }};
+console.log(JSON.stringify({{ deck: asked(true), trial: asked(false) }}));
+""")
+        self.assertGreater(result["deck"], 0)
+        self.assertEqual(result["trial"], 0)
 
 
 if __name__ == "__main__":

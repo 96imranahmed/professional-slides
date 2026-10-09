@@ -149,7 +149,9 @@ export function decisiveFromTitle(ex, title) {
 const GROWTH_PERIODS_MIN = 4, CAGR_YEARS_MIN = 3;
 const yearOf = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
 function claimedChange(ex, title) {
-  if (!["chart.column", "chart.stacked-column"].includes(ex.type) || !String(title ?? "").trim() || ex.segmentGrowth) return null;
+  // A chart whose author already set callouts on it has marked its finding there: a second mark repeats them and takes the
+  // band they need.
+  if (!["chart.column", "chart.stacked-column"].includes(ex.type) || !String(title ?? "").trim() || ex.segmentGrowth || (ex.annotations || []).length) return null;
   const categories = (ex.categories || []).map(String), series = Array.isArray(ex.series) ? ex.series : [];
   if (categories.length < GROWTH_PERIODS_MIN || !categories.every((c) => PERIOD_CATEGORY.test(c)) || !(series.length === 1 || ex.type === "chart.stacked-column")) return null;
   if (!series.every((sr) => Array.isArray(sr.values) && sr.values.length === categories.length && sr.values.every(Number.isFinite))) return null;

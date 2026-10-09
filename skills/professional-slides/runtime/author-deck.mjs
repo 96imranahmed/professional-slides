@@ -622,9 +622,13 @@ export function insightTypes(insights) {
  * from the same run. Run here they cannot surprise the author at the build;
  * only the rendered page's empty space is left for the build to find.
  * Blocking findings and advisories; `ran: false` with the reason when Python
- * or the gates could not run, which the CLI says aloud.
+ * or the gates could not run, which the CLI says aloud. `ask: false` reads the
+ * recorded judgements without adding a question: for the trial pages a search
+ * composes - a layout it weighs, a page padded to measure its fill, a draft's
+ * placeholder copy - whose words are not the deck's, and whose questions no
+ * reader should be given.
  */
-export function sceneGateFindings(deck, python = pythonBin(), spec = {}) {
+export function sceneGateFindings(deck, python = pythonBin(), spec = {}, { ask = true } = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "author-gates-"));
   try {
     const scene = path.join(dir, "scene.json"), out = path.join(dir, "gates.json"), budgetOut = path.join(dir, "budget.json");
@@ -639,7 +643,7 @@ export function sceneGateFindings(deck, python = pythonBin(), spec = {}) {
       return { findings: [], advisories: [], all: [], standings: [], architectures: [], budget: [], ran: false, reason: String(run.error?.message ?? run.stderr ?? `exit ${run.status}`).trim().split("\n").slice(-3).join(" ") || `exit ${run.status}` };
     const report = readJsonSync(out);
     const withId = (f) => { const slide = f.slide ? deck.slides[f.slide - 1] : null; return { ...f, id: slide ? slide.sourceSlideId ?? slide.id : undefined }; };
-    for (const request of report.judgementsNeeded ?? []) addPending(session, { ...request, where: (request.where ?? []).map((n) => deck.slides[Number(n) - 1]?.sourceSlideId ?? deck.slides[Number(n) - 1]?.id ?? n) });
+    if (ask) for (const request of report.judgementsNeeded ?? []) addPending(session, { ...request, where: (request.where ?? []).map((n) => deck.slides[Number(n) - 1]?.sourceSlideId ?? deck.slides[Number(n) - 1]?.id ?? n) });
     // Each page's budget as the build measures it: words against its floor and
     // ceiling, the footer's share, how much of the body it fills. Printed before
     // the author edits, so a fix does not push the page across a line unseen.
@@ -940,7 +944,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // The particular proofs (spine-exhibits.mjs) name the bound choice to make - the members to select, the table to declare - so
   // where one speaks of a page the witness refused, it is the page's one finding and the compile's general refusal is not repeated.
   const recorded = { ...spec, slides: [...spec.slides, ...failed.filter((f) => f.record).map((f) => f.record)] };
-  const undrawable = draft ? spineExhibitFindings(doc, { spec: recorded, insights, baseDir, sceneGates: (deck) => sceneGateFindings(deck, undefined, spec),
+  const undrawable = draft ? spineExhibitFindings(doc, { spec: recorded, insights, baseDir, sceneGates: (deck) => sceneGateFindings(deck, undefined, spec, { ask: false }),
     compile: (page) => { const one = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true }); const refused = one.bindingFindings[0]?.repair ?? one.compileErrors[0]; if (refused) throw new Error(refused); return one.spec.slides[0]; } }) : [];
   const proven = new Set(undrawable.map((f) => String(f.id)));
   const compiled = refusals.filter((f) => !proven.has(String(f.id)));
@@ -1048,7 +1052,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
       compile: (page, index) => { const one = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true }); const refused = one.bindingFindings[0]?.repair ?? one.compileErrors[0]; if (refused) throw new Error(refused); return one.spec.slides[0]; },
       compose: (body, behind) => composeVariants(spec, baseDir, body, behind),
       // The deck's first page leads the batch, so the gates place no variant as a cover.
-      pageGates: (slides) => { const gated = sceneGateFindings({ ...composed.deck, slides: [composed.deck.slides[0], ...slides] }, undefined, spec);
+      pageGates: (slides) => { const gated = sceneGateFindings({ ...composed.deck, slides: [composed.deck.slides[0], ...slides] }, undefined, spec, { ask: false });
         return { ran: gated.ran, findings: gated.all.map((f) => ({ ...f, slide: f.slide ? f.slide - 1 : f.slide })), budget: (gated.budget ?? []).map((row) => ({ ...row, slide: row.slide - 1 })) }; },
     }) : new Map();
     // The statement goes on each of the page's findings it answers: the page gates' (`repair`) and the text plan's (`reason`).
@@ -1179,7 +1183,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
         })());
         return alone.get(key);
       },
-      pageGates: (deck) => { const gated = sceneGateFindings(deck, undefined, spec); return { ran: gated.ran, findings: gated.all, budget: gated.budget }; },
+      pageGates: (deck) => { const gated = sceneGateFindings(deck, undefined, spec, { ask: false }); return { ran: gated.ran, findings: gated.all, budget: gated.budget }; },
       // The deck's median words a block with the page swapped, estimated from the scene (TEXT_FRAGMENTED): an alternative that takes it out of its band, or further out, is not proposed.
       aggregate: (id, blocks) => fragmentationShift(scene.budget ?? [], id, blocks),
       // The mark a bare chart's own finding names (provenMarks) goes with every alternative that draws it: a form that fits is not offered as a chart still bare.
@@ -1750,7 +1754,7 @@ async function placementBlocks(doc, { insights, baseDir }) {
   if (slides.length) {
     const keys = new Map(slides.map((slide) => [slide.id, slide.key]));
     const composed = await composeForAuthoring({ ...deck, slides: slides.map(({ key: _key, index: _index, ...slide }) => slide), appendix: undefined }, baseDir);
-    const gated = composed.deck ? sceneGateFindings(composed.deck, undefined, deck) : { budget: [] };
+    const gated = composed.deck ? sceneGateFindings(composed.deck, undefined, deck, { ask: false }) : { budget: [] };
     for (const row of gated.budget ?? []) { const key = keys.get(String(row.id ?? "")); if (key && row.blocks && !found.has(key)) found.set(key, row.blocks); }
   }
   return (page, choice) => found.get(keyOf(page, choice)) ?? null;
