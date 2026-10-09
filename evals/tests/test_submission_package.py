@@ -66,6 +66,20 @@ class SubmissionPackageTests(unittest.TestCase):
         finally:
             path.write_bytes(original)
 
+    def test_only_committed_files_are_packaged(self):
+        # A local run leaves files beside the examples - a judgement store, an author cache - that the
+        # shipping rules would otherwise take for example data: only what git tracks is packaged.
+        stray = ROOT / 'skills/professional-slides/examples/zz-local-run-probe.json'
+        stray.write_text('{}')
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                build_submission(ROOT, Path(tmp))
+                shipped = Path(tmp) / 'professional-slides/skills/professional-slides/examples'
+                self.assertFalse((shipped / stray.name).exists())
+                self.assertTrue((shipped / 'page-types.pages.json').exists())
+        finally:
+            stray.unlink()
+
     def test_invalid_listing_is_refused(self):
         path = self.package / 'plugin.json'
         original = path.read_bytes()

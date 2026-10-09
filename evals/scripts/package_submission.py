@@ -12,6 +12,7 @@ import json
 import re
 import zipfile
 import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -57,6 +58,17 @@ def verify(destination):
     return [] if actual == recorded else ['Inventory differs from recorded hashes']
 
 
+def tracked(source):
+    """The files git tracks in `source`, or None where it is not a checkout. Only
+    committed source is packaged: a judgement store, an author cache or a
+    compiled deck a local run leaves beside an example is never shipped."""
+    try:
+        listed = subprocess.run(['git', '-C', str(source), 'ls-files', '-z'], capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return {Path(name.decode('utf-8')) for name in listed.split(b'\0') if name}
+
+
 def package(source, destination):
     if destination.is_relative_to(source) and not destination.is_relative_to(source / 'dist'):
         raise ValueError('Submission outputs must be external or under source dist/')
@@ -64,11 +76,12 @@ def package(source, destination):
         if not (destination / 'package-manifest.json').is_file():
             raise ValueError('Refusing to replace an unowned directory')
         shutil.rmtree(destination)
+    committed = tracked(source)
     for path in sorted(source.rglob('*')):
         if path.is_relative_to(destination):
             continue
         relative = path.relative_to(source)
-        if not shipped(relative):
+        if not shipped(relative) or (committed is not None and path.is_file() and relative not in committed):
             continue
         if path.is_symlink():
             raise ValueError(f'Symlink cannot enter submission: {relative}')
