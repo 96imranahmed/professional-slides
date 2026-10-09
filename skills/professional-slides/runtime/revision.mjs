@@ -239,14 +239,21 @@ export function withCarriedPages(spec, composed, make, keyOf = (item) => String(
 /**
  * The deck as the build assembles it: each slide of the built file as
  * `{ carry, id, title?, edits?, hidden? }` - a source slide, with what is
- * edited on it - or `{ composed, id }`, the nth slide the runtime composed
- * (`composed`: the composed slides in order, `{ id, sourceSlideId }`).
+ * edited on it - or `{ composed, id, sourceSlide? }`, the nth slide the
+ * runtime composed (`composed`: the composed slides in order,
+ * `{ id, sourceSlideId }`), with the source slide its page stands in for.
+ * The assembler gives a composed slide that slide's place in the deck's
+ * sections: a page redrawn where the first slide of a section stood opens
+ * that section, and does not join the one before it.
  */
 export function assemblyOrder(spec, inventory, composed) {
   const slides = new Map((inventory?.slides || []).map((slide) => [slide.index, slide]));
   const keyOf = (slide) => String(slide.sourceSlideId ?? slide.id);
+  // The slide each page stands for: a typed page's in its choices, a section's beside them (the import writes both).
+  const standsFor = new Map([...(spec?.slides || []), ...(spec?.appendix || [])].map((page) => [String(page?.id), page?.pageType?.sourceSlide ?? page?.sourceSlide]).filter(([, index]) => Number.isInteger(index)));
   const made = (entry) => { const { title, edits, hidden } = carriedChanges(entry, slides.get(entry.sourceSlide)); return { ...(title !== undefined ? { title } : {}), ...(edits ? { edits } : {}), ...(hidden !== undefined ? { hidden } : {}) }; };
-  return withCarriedPages(spec, composed.map((slide, index) => ({ composed: index + 1, id: keyOf(slide) })), (entry) => ({ carry: entry.sourceSlide, id: entry.id, ...made(entry) }), (item) => item.id);
+  return withCarriedPages(spec, composed.map((slide, index) => ({ composed: index + 1, id: keyOf(slide), ...(standsFor.has(keyOf(slide)) ? { sourceSlide: standsFor.get(keyOf(slide)) } : {}) })),
+    (entry) => ({ carry: entry.sourceSlide, id: entry.id, ...made(entry) }), (item) => item.id);
 }
 
 /** Where each composed slide stands in the final deck, counted from 1: the page number it prints beside carried slides. */
@@ -539,6 +546,11 @@ export function composedPageLimits(slide, inventoryName) {
  * carried slide the title its edits leave it (`retitled`) where a `replace`
  * rewrote it. Written only where there is something to record, so a new
  * deck's record is as it was.
+ *
+ * A page composed where a hidden slide stood keeps it out of the slide show
+ * unless it says `hidden: false`, as a carried slide does: the starter writes
+ * `hidden: true` beside the slide's draft, and a page written whole in its
+ * place without the flag has not decided to show a backup slide.
  */
 export function stampKept(spec, inventory) {
   if (spec?.workflow !== REVISION || !Array.isArray(inventory?.slides)) return spec;
@@ -547,6 +559,8 @@ export function stampKept(spec, inventory) {
   // and shown, whichever key wrote it (storyline.mjs storyStructure).
   for (const entry of spec.carried || []) { const { retitled } = carriedChanges(entry, slides.get(entry.sourceSlide)); if (retitled !== undefined && retitled !== normalTitle(entry.title)) entry.retitled = retitled; else delete entry.retitled; }
   for (const page of [...(spec.slides || []), ...(spec.appendix || [])]) {
+    // A typed page names its slide in its choices, a section beside them.
+    if (page && page.hidden === undefined && slides.get(page.pageType?.sourceSlide ?? page.sourceSlide)?.hidden === true) page.hidden = true;
     if (!page?.pageType || page.pageType.sourceSlide === undefined) continue;
     const kept = keptFromSlide(page, slides.get(page.pageType.sourceSlide));
     if (kept && (kept.title || kept.source)) page.pageType.kept = { ...(kept.title ? { title: true } : {}), ...(kept.source ? { source: true } : {}) };

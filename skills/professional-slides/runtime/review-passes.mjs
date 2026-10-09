@@ -411,8 +411,18 @@ function sourceChartKind(type) {
 /** The evidence a source slide drew, by kind: a table for each of its tables, and each chart by its kind as a page names it without `chart.`. */
 export const sourceEvidence = (source) => [...(source?.tables || []).map(() => "table"), ...(source?.charts || []).map((c) => sourceChartKind(c?.type))];
 const exhibitKind = (exhibit) => { const type = String(exhibit?.type ?? "exhibit"); return type.startsWith("chart.") ? type.slice("chart.".length) : type; };
-const fileName = (file) => String(file ?? "").split(/[\\/]/).pop();
 const sameList = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+// A picture's file as the import wrote it: `assets/<deck>/s04-1.png`, from the inventory's folder. Every imported deck names
+// its pictures alike, so the name alone does not say whose picture a page shows: a path is the slide's picture where it is
+// that file, written from the inventory's folder or from any folder above it.
+const posixPath = (file) => path.posix.normalize(String(file ?? "").replace(/\\/g, "/"));
+const isFile = (written, file) => { const [at, own] = [posixPath(written), posixPath(file)]; return Boolean(file) && (at === own || at.endsWith(`/${own}`)); };
+/** Does a page show exactly its slide's pictures: each of its files one of the slide's, and every one of the slide's shown. */
+function samePictures(written, files) {
+  const left = [...files];
+  for (const file of written) { const at = left.findIndex((own) => isFile(file, own)); if (at < 0) return false; left.splice(at, 1); }
+  return left.length === 0;
+}
 
 /** How a page is drawn: the evidence it draws by kind, its pictures by file, and the drawing settings it carries. */
 function drawingOf(slide) {
@@ -428,7 +438,7 @@ function drawingOf(slide) {
     for (const [key, v] of Object.entries(value)) {
       if (INERT.has(key) || (top && BUILT.has(key))) continue;
       if (SETTINGS.has(key)) settings.push(key);
-      if (PICTURES.has(key) && typeof v === "string") pictures.push(fileName(v));
+      if (PICTURES.has(key) && typeof v === "string") pictures.push(v);
       else walk(v, false);
     }
   };
@@ -437,7 +447,7 @@ function drawingOf(slide) {
 }
 function sameDrawing(slide, source) {
   const page = drawingOf(slide);
-  return !page.settings.length && sameList(page.evidence, sourceEvidence(source)) && sameList(page.pictures, (source.pictures || []).map((p) => fileName(p?.file)));
+  return !page.settings.length && sameList(page.evidence, sourceEvidence(source)) && samePictures(page.pictures, (source.pictures || []).map((p) => p?.file));
 }
 
 /**
@@ -446,15 +456,23 @@ function sameDrawing(slide, source) {
  * cut slide, or that the runtime composed to show evidence their slide did
  * not hold (sameEvidence) - what the storyline critique reads; `copy`, those
  * plus the pages whose words or numbers changed; `drawn`, the pages drawn other than their
- * slide was (sameDrawing); and `content`, every page in `copy` or `drawn` -
- * what the deck review's first pass reads. A revision whose spine is
- * unchanged needs no storyline critique; one whose copy is unchanged is a
- * `restyle`, and the deck review reads every page. Null for new work.
+ * slide was (sameDrawing); `shown`, the pages the revision hides from the
+ * slide show or puts back into it, against their slide; and `content`, every
+ * page in `copy`, `drawn` or `shown` - what the deck review's first pass
+ * reads. A revision whose spine is unchanged needs no storyline critique; one
+ * whose copy is unchanged is a `restyle`, and the deck review reads every
+ * page. Null for new work.
+ *
+ * Whether a slide is in the show is no part of its title, its words or its
+ * drawing, so each of those reads a page hidden or shown again as its slide;
+ * it is still a change the user will see in the show, and a review that was
+ * told the page did not change could not file a word on it.
  *
  * A revision that carries slides from its source deck (`carried` on the
  * spec, revision.mjs) is read slide by slide: a carried slide is unchanged
  * unless the revision edited it - a new title changes the spine, replaced
- * words the copy - and every page the runtime composes is drawn anew beside
+ * words the copy, hiding it or showing it again what the show holds
+ * (`shown`) - and every page the runtime composes is drawn anew beside
  * the user's own slides, so the review reads each of them. `pages` then
  * lists the carried slides in their places among the composed pages,
  * `carried` the slides copied untouched, and it is never a restyle.
@@ -476,7 +494,7 @@ export function revisionChanges(spec, inventory) {
   // Every page that stands for a slide or adds one, in deck order: the composed pages, and the carried slides among them.
   const pages = carries ? withCarriedPages(spec, typed, (entry) => ({ id: entry.id, carried: entry })) : typed;
   const sourceOf = (s) => (s.carried ? s.carried.sourceSlide : s.pageType.sourceSlide ?? s.sourceSlide);
-  const spine = new Set(), copy = new Set(), drawn = new Set(), used = new Set(), untouched = [], partial = new Set();
+  const spine = new Set(), copy = new Set(), drawn = new Set(), shown = new Set(), used = new Set(), untouched = [], partial = new Set();
   let furthest = 0;
   for (const s of pages) {
     const from = sourceOf(s);
@@ -490,9 +508,13 @@ export function revisionChanges(spec, inventory) {
       // The title as the revision leaves it, whichever key wrote it: a title rewritten through `replace` is a title change.
       if (changes.retitled !== undefined || moved) spine.add(s.id);
       if (spine.has(s.id) || changes.edits) copy.add(s.id);
-      if (!copy.has(s.id)) untouched.push(s.id);
+      // Hidden or shown again, the assembler sets it so on the slide (`hidden` in its plan): the slide is not carried untouched.
+      if (changes.hidden !== undefined) shown.add(s.id);
+      if (!copy.has(s.id) && !shown.has(s.id)) untouched.push(s.id);
       continue;
     }
+    // A composed page is in the show or out of it as it says (`hidden`), and its slide was as the inventory read it.
+    if (Boolean(s.hidden) !== Boolean(source.hidden)) shown.add(s.id);
     if (source.unheld) partial.add(s.id);
     // The critique is bound to a page's title and to what it shows as evidence. So a page the runtime composed keeps its slide's
     // spine where both are the slide's: the same title, over evidence every number of which the slide already held (sameEvidence).
@@ -512,8 +534,8 @@ export function revisionChanges(spec, inventory) {
     for (const s of [before, after]) if (s) { spine.add(s.id); copy.add(s.id); }
   }
   const ids = pages.map((s) => s.id);
-  return { spine: ids.filter((id) => spine.has(id)), copy: ids.filter((id) => copy.has(id)), drawn: ids.filter((id) => drawn.has(id)),
-    content: ids.filter((id) => copy.has(id) || drawn.has(id)), restyle: copy.size === 0 && !carries, dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0,
+  return { spine: ids.filter((id) => spine.has(id)), copy: ids.filter((id) => copy.has(id)), drawn: ids.filter((id) => drawn.has(id)), shown: ids.filter((id) => shown.has(id)),
+    content: ids.filter((id) => copy.has(id) || drawn.has(id) || shown.has(id)), restyle: copy.size === 0 && !carries, dropped, pages: ids, spineChanged: spine.size > 0 || dropped.length > 0,
     unheld: ids.filter((id) => partial.has(id) && (copy.has(id) || drawn.has(id))),
     ...(carries ? { carried: untouched.filter((id) => !copy.has(id)) } : {}) };
 }

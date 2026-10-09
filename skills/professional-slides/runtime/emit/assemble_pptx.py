@@ -34,12 +34,19 @@ stays, byte for byte, and the result lists what was removed (`removed`). Only
 rewritten, to list the slides in their new order - and not even those where
 every slide is carried in the order it had.
 
+A deck in sections keeps every slide in one. A composed slide drawn in place
+of a source slide (`sourceSlide`) takes that slide's place in its section; one
+the revision adds joins the section of the slide before it. A replacement
+placed by the slide before it would leave the section the user filed the
+slide under whenever that slide opened a section.
+
 The plan (written by build-deck.mjs from the compiled deck) is
 
     { "source": "deck.source.pptx", "sha256": "<of the source>", "composed": "composed.pptx" | null,
       "slides": [ { "carry": 3 },                                       source slide 3, as it is
                   { "carry": 4, "title": "...", "edits": [{ "old", "new" }], "hidden": false },
-                  { "composed": 1 } ] }                                 slide 1 of the composed package
+                  { "composed": 1, "sourceSlide": 5 },                  slide 1 of the composed package, drawn where source slide 5 stood
+                  { "composed": 2 } ] }                                 a page the revision adds
 
 The result (stdout, JSON) says what was done and proves what was kept: every
 carried slide's parts are read back from the written file and compared with
@@ -536,7 +543,8 @@ class Assembly:
 
     # the presentation part ---------------------------------------------------
     def write_order(self, order: list, dropped: list):
-        """`order` is the final slide list: ("carried", slide id, rel id) or ("composed", part name here)."""
+        """`order` is the final slide list: ("carried", slide id, rel id) or ("composed", part name here, the id of the
+        source slide it is drawn in place of, or None)."""
         listed = self.presentation.find(q("p", "sldIdLst"))
         if listed is None:
             listed = etree.SubElement(self.presentation, q("p", "sldIdLst"))
@@ -546,9 +554,14 @@ class Assembly:
             listed.remove(el)
         sections = [el for el in self.presentation.iter(q("p14", "sldIdLst"))]
         dropped_ids = {slide_id for slide_id, _, _ in dropped}
+        # A dropped slide a composed one is drawn in place of keeps its entry in its section until that slide takes it over.
+        replaced = {item[2] for item in order if item[0] == "composed" and item[2] in dropped_ids}
+        places = {}
         for section in sections:
             for el in list(section):
-                if el.get("id") in dropped_ids:
+                if el.get("id") in replaced and el.get("id") not in places:
+                    places[el.get("id")] = el
+                elif el.get("id") in dropped_ids:
                     section.remove(el)
         # A custom show lists slides by relationship: a dropped slide leaves it.
         dropped_rels = {rid for _, rid, _ in dropped}
@@ -572,8 +585,14 @@ class Assembly:
                 entry = etree.SubElement(listed, q("p", "sldId"))
                 entry.set("id", str(number))
                 entry.set(q("r", "id"), rid)
-                # A deck with sections keeps every slide in one: a new slide joins the section of the slide before it.
-                self.join_section(sections, str(number), previous)
+                # A deck with sections keeps every slide in one: a slide drawn in place of another takes that slide's place in
+                # its section (the first of a page split in two; the rest follow it), and a slide the revision adds joins the
+                # section of the slide before it.
+                place = places.pop(item[2], None)
+                if place is not None:
+                    place.set("id", str(number))
+                else:
+                    self.join_section(sections, str(number), previous)
                 previous = str(number)
             ids.append(entry.get("id"))
         self.parts[PRESENTATION] = serialise(self.presentation)
@@ -667,7 +686,10 @@ def assemble(plan: dict, base: Path) -> tuple:
             index = int(entry["composed"])
             if composed is None or not 1 <= index <= len(made):
                 raise Refusal(f"The plan places composed slide {index}, and the composed deck holds {len(made)}")
-            order.append(("composed", assembly.bring(made[index - 1][2])))
+            stands = entry.get("sourceSlide")
+            if stands is not None and not (isinstance(stands, int) and 1 <= stands <= len(listed)):
+                raise Refusal(f"The plan draws composed slide {index} in place of source slide {stands}, of a deck of {len(listed)}")
+            order.append(("composed", assembly.bring(made[index - 1][2]), listed[stands - 1][0] if stands is not None else None))
     dropped = [(slide_id, rid, part) for at, (slide_id, rid, part) in enumerate(listed, 1) if at not in used]
     # A kept slide that links to a cut one loses the link (its text stays): a link to a missing part is a damaged file.
     # The slide is then changed, so it is reported as an edit and not proven identical.

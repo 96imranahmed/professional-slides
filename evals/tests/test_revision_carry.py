@@ -617,6 +617,44 @@ console.log(JSON.stringify({ dropped, moved }));''')
         self.assertTrue(result["dropped"]["spineChanged"])
         self.assertEqual(result["moved"]["spine"], ["s02"])
 
+    def test_a_slide_hidden_or_shown_again_is_the_revisions_to_review(self):
+        # The assembler hides or shows a carried slide (`hidden` in its plan) and the emitter a composed one; each is read
+        # as its slide by its title, words and drawing. Read as unchanged, the review was told nothing changed on it and
+        # refused any finding there.
+        result = self.changes('''
+import { stampKept } from "./skills/professional-slides/runtime/revision.mjs";
+const backup = { slides: inventory.slides.map((s) => (s.index === 4 ? { ...s, hidden: true } : s)) };
+const said = (n, more = {}) => ({ id: `s0${n}`, title: inventory.slides[n - 1].title, points: [inventory.slides[n - 1].paragraphs[0].text],
+  pageType: { type: "summary", form: "takeaways", sourceSlide: n, content: { claim: inventory.slides[n - 1].title } }, ...more });
+const rebuilt = (four) => stampKept(deck([], [1, 2, 3, 4, 5].map((n) => (n === 4 ? said(4, four) : said(n)))), backup);
+const of = (spec) => { const c = revisionChanges(spec, backup); return { content: c.content, shown: c.shown, carried: c.carried ?? null, spineChanged: c.spineChanged }; };
+console.log(JSON.stringify({
+  hid: of(deck([carry(1), carry(2), carry(3, { hidden: true }), carry(4), carry(5)])),
+  kept: of(deck([carry(1), carry(2), carry(3, { hidden: false }), carry(4, { hidden: true }), carry(5)])),
+  shownAgain: of(deck([carry(1), carry(2), carry(3), carry(4, { hidden: false }), carry(5)])),
+  // A page composed where the hidden slide stood: left without the flag it stays hidden, as the carried slide would.
+  composedKept: { hidden: rebuilt({}).slides[3].hidden ?? null, ...of(rebuilt({})) },
+  composedShown: { hidden: rebuilt({ hidden: false }).slides[3].hidden ?? null, ...of(rebuilt({ hidden: false })) },
+  composedHid: of(stampKept(deck([], [1, 2, 3, 4, 5].map((n) => said(n, n === 2 || n === 4 ? { hidden: true } : {}))), backup)) }));''')
+        self.assertEqual(result["hid"], {"content": ["s03"], "shown": ["s03"], "carried": ["s01", "s02", "s04", "s05"], "spineChanged": False})
+        self.assertEqual(result["kept"], {"content": [], "shown": [], "carried": ["s01", "s02", "s03", "s04", "s05"], "spineChanged": False})
+        self.assertEqual(result["shownAgain"], {"content": ["s04"], "shown": ["s04"], "carried": ["s01", "s02", "s03", "s05"], "spineChanged": False})
+        self.assertEqual(result["composedKept"], {"hidden": True, "content": [], "shown": [], "carried": None, "spineChanged": False})
+        self.assertEqual(result["composedShown"], {"hidden": False, "content": ["s04"], "shown": ["s04"], "carried": None, "spineChanged": False})
+        self.assertEqual(result["composedHid"]["shown"], ["s02"])
+        self.assertEqual(result["composedHid"]["content"], ["s02"])
+
+    def test_a_picture_is_its_slides_by_its_path_not_its_name(self):
+        # Every imported deck names its pictures s01-1.png, s01-2.png, ...: another deck's picture of the same name is
+        # another picture, and the slide's own, written from a folder above the inventory's, is the same one.
+        result = self.changes('''
+const pictured = { slides: inventory.slides.map((s) => (s.index === 3 ? { ...s, pictures: [{ file: "assets/board/s03-1.png" }] } : s)) };
+const drawn = (file) => revisionChanges(deck([], [{ ...typed("s03", "Revenue by year", 3), pictures: [{ path: file, alt: "The chart" }] }]), pictured).drawn;
+console.log(JSON.stringify({ own: drawn("assets/board/s03-1.png"), dotted: drawn("./assets/board/s03-1.png"), above: drawn("../work/assets/board/s03-1.png"),
+  windows: drawn("work\\\\assets\\\\board\\\\s03-1.png"), otherDeck: drawn("assets/budget/s03-1.png"), other: drawn("assets/board/s03-2.png") }));''')
+        self.assertEqual({name: drawn for name, drawn in result.items()},
+                         {"own": [], "dotted": [], "above": [], "windows": [], "otherDeck": ["s03"], "other": ["s03"]})
+
     def test_the_critique_is_bound_to_a_carried_slides_title_and_place_and_to_no_word_of_it(self):
         result = self.changes('''
 const base = deck([1, 2, 3, 4, 5].map((n) => carry(n)));
@@ -823,31 +861,50 @@ class AssemblerTests(SwappedDeck):
         slide_ids = [int(el.get("id")) for el in presentation.findall("p:sldIdLst/p:sldId", ns)]
         self.assertEqual(len(set(slide_ids)), 4)
 
-    def test_a_deck_with_sections_keeps_every_slide_in_one(self):
+    P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+    PML = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+    def sectioned(self, slides):
+        """The source deck filed in two sections as PowerPoint writes them - "Opening" (slides 1-3) and "Body" (the rest) -
+        assembled by `slides`: the code, and the slide ids of the written deck in order and section by section."""
         from lxml import etree
-        p14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
-        pml = "http://schemas.openxmlformats.org/presentationml/2006/main"
         parts = self.parts(self.source)
         root = etree.fromstring(parts["ppt/presentation.xml"])
-        ids = [el.get("id") for el in root.find(f"{{{pml}}}sldIdLst")]
+        ids = [el.get("id") for el in root.find(f"{{{self.PML}}}sldIdLst")]
         sections = "".join(f'<p14:section name="{name}" id="{{0000000{n}-0000-0000-0000-000000000000}}"><p14:sldIdLst>{"".join(f"""<p14:sldId id="{i}"/>""" for i in group)}</p14:sldIdLst></p14:section>'
                            for n, (name, group) in enumerate((("Opening", ids[:3]), ("Body", ids[3:]))))
-        root.append(etree.fromstring(f'<p:extLst xmlns:p="{pml}" xmlns:p14="{p14}"><p:ext uri="{{521415D9-36F7-43E2-AB2F-B90AF26B5E84}}"><p14:sectionLst>{sections}</p14:sectionLst></p:ext></p:extLst>'))
+        root.append(etree.fromstring(f'<p:extLst xmlns:p="{self.PML}" xmlns:p14="{self.P14}"><p:ext uri="{{521415D9-36F7-43E2-AB2F-B90AF26B5E84}}"><p14:sectionLst>{sections}</p14:sectionLst></p:ext></p:extLst>'))
         parts["ppt/presentation.xml"] = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
         work = Path(tempfile.mkdtemp(prefix="asm-", dir=self.home))
         with zipfile.ZipFile(work / "sectioned.pptx", "w", zipfile.ZIP_DEFLATED) as archive:
             for name, data in parts.items():
                 archive.writestr(name, data)
-        (work / "plan.json").write_text(json.dumps({"source": str(work / "sectioned.pptx"), "composed": self.build["revision"]["composedPptx"],
-                                                    "slides": [{"carry": 1}, {"carry": 2}, {"carry": 4}, {"composed": 1}, {"carry": 5}]}))
+        (work / "plan.json").write_text(json.dumps({"source": str(work / "sectioned.pptx"), "composed": self.build["revision"]["composedPptx"], "slides": slides}))
         done = sh(PYTHON, ASSEMBLE, work / "plan.json", work / "out.pptx")
-        self.assertEqual(done.returncode, 0, done.stderr)
+        if done.returncode != 0:
+            return done, None, None
         written = etree.fromstring(self.parts(work / "out.pptx")["ppt/presentation.xml"])
-        listed = [el.get("id") for el in written.find(f"{{{pml}}}sldIdLst")]
-        grouped = [[el.get("id") for el in section.iter(f"{{{p14}}}sldId")] for section in written.iter(f"{{{p14}}}section")]
-        # Slide 3 left the opening; the composed slide joined the body, after the slide it follows.
+        listed = [el.get("id") for el in written.find(f"{{{self.PML}}}sldIdLst")]
+        return done, listed, [[el.get("id") for el in section.iter(f"{{{self.P14}}}sldId")] for section in written.iter(f"{{{self.P14}}}section")]
+
+    def test_a_deck_with_sections_keeps_every_slide_in_one(self):
+        done, listed, grouped = self.sectioned([{"carry": 1}, {"carry": 2}, {"carry": 4}, {"composed": 1}, {"carry": 5}])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        # Slide 3 left the opening; the composed slide, which stands for no slide, joined the body after the slide it follows.
         self.assertEqual(grouped, [listed[:2], listed[2:]])
         self.assertEqual(len(listed), 5)
+
+    def test_a_slide_drawn_in_place_of_the_first_of_a_section_opens_that_section(self):
+        # Slide 4 opens the body. Placed by the slide before it, its replacement joined the opening and the body lost its
+        # first page; it takes slide 4's place instead, and the opening keeps its three.
+        done, listed, grouped = self.sectioned([{"carry": 1}, {"carry": 2}, {"carry": 3}, {"composed": 1, "sourceSlide": 4}, {"carry": 5}])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(grouped, [listed[:3], listed[3:]])
+        self.assertEqual(len(listed), 5)
+        # A slide that is not the source deck's is no place to take.
+        done, _, _ = self.sectioned([{"carry": 1}, {"composed": 1, "sourceSlide": 99}])
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("in place of source slide 99", done.stderr)
 
 
 class BuildTests(SwappedDeck):
@@ -860,6 +917,8 @@ class BuildTests(SwappedDeck):
         self.assertEqual(self.build["status"], "built-unrendered")
         self.assertEqual(self.build["blockers"], [])
         out = self.swapped / "out"
+        # The plan names the slide the composed page is drawn in place of, whose place in the deck's sections it takes.
+        self.assertEqual(json.loads((out / "assembly.json").read_text())["slides"][6], {"composed": 1, "id": "s07", "sourceSlide": 7})
         self.assertEqual(Path(self.build["pptxPath"]).resolve(), (out / "deck.pptx").resolve())
         self.assertTrue((out / "deck.composed.pptx").exists())
         # The composed pages' own scene holds the one page; the assembled deck's holds all eight, in order.

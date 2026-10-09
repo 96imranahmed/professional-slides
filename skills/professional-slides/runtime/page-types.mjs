@@ -2153,7 +2153,7 @@ const FORM_SCHEMA = {
 export function pageSchema(only = null) {
   if (only !== null && !PAGE_TYPES[only]) throw new Error(`unknown page type "${only}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   // Any page, typed or structural, may be hidden.
-  const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it; false shows the slide again" };
+  const hidden = { type: "boolean", description: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide's page carries it, and a page composed where a hidden slide stood is hidden without it; false shows the slide again" };
   const typed = Object.entries(PAGE_TYPES).filter(([name]) => only === null || name === only).map(([name, t]) => ({
     type: "object",
     required: ["id", "type", "form", "commentary", "why", "title"],
