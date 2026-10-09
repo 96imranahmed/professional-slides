@@ -10,9 +10,12 @@
  *                       deck id, a one-page plan, built and never delivered, and the newest
  *                       files on disk
  *   FAKE_AGENT_RECORDS  {"file", "row"}: append the row to that results file while the run is
- *                       under way, as a second runner sharing the file would
+ *                       under way, as a second runner sharing the file would - once, however
+ *                       many runs call the agent
+ *   FAKE_AGENT_SLEEP_MS take this long before writing anything, so runners started together
+ *                       are under way at once
  */
-import { appendFileSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export const AUTHOR_MARK = "AUTHOR-RATIONALE-7f3e";
@@ -22,6 +25,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const prompt = process.argv[2] ?? "";
 const cwd = process.cwd();
 if (process.env.FAKE_AGENT_LOG) appendFileSync(process.env.FAKE_AGENT_LOG, JSON.stringify({ prompt, cwd }) + "\n");
+if (process.env.FAKE_AGENT_SLEEP_MS) await new Promise((resolve) => setTimeout(resolve, Number(process.env.FAKE_AGENT_SLEEP_MS)));
 const slides = Number(process.env.FAKE_AGENT_SLIDES ?? 4);
 if (slides > 0) {
   const deck = path.join(cwd, "decks", "fake");
@@ -78,6 +82,7 @@ if (slides > 0) {
 }
 if (process.env.FAKE_AGENT_RECORDS) {
   const { file, row } = JSON.parse(process.env.FAKE_AGENT_RECORDS);
-  appendFileSync(file, JSON.stringify(row) + "\n");
+  const line = JSON.stringify(row);
+  if (!(existsSync(file) && readFileSync(file, "utf8").split("\n").includes(line))) appendFileSync(file, line + "\n");
 }
 console.log(JSON.stringify({ type: "result", result: "done" }));

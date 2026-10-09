@@ -11,12 +11,14 @@
  *                   rendered pages, and nothing the author wrote about them
  *   parse           the judge's JSON, from whatever wrapper its CLI put round it
  *   results         one JSON line per judged deck, keyed by skill, judge, treatment
- *                   (agent and prompt), brief and run
+ *                   (agent and prompt), brief and run; each key claimed before
+ *                   its run is paid for, and each run kept in a directory of its own
  *   summarize       mean and spread per brief, and the pairwise win rate, per treatment
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, appendFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync, writeSync, appendFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -411,6 +413,22 @@ export function keptDir(store, key) {
   return path.join(store, safe(skillSha), safe(brief), `${safe(agent)}-${safe(prompt)}-${safe(judge)}-run${key.run}`);
 }
 
+/**
+ * Make the directory a run is kept in, its own: keptDir's, or - where one of
+ * that name is already there, a killed run's whose row never landed or a run
+ * recorded in another results file sharing the store - the first free `.2`,
+ * `.3` beside it. Each is created exclusively, so no two runs write their
+ * decks into one directory and no run's files are mixed into another's.
+ */
+export function makeKeptDir(store, key) {
+  const base = keptDir(store, key);
+  mkdirSync(path.dirname(base), { recursive: true });
+  for (let n = 1; ; n += 1) {
+    const dir = n === 1 ? base : `${base}.${n}`;
+    try { mkdirSync(dir); return dir; } catch (error) { if (error.code !== "EEXIST") throw error; }
+  }
+}
+
 export function readResults(file) {
   if (!existsSync(file)) return [];
   return readFileSync(file, "utf8").split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
@@ -421,14 +439,54 @@ export const isRecorded = (rows, row) => rows.some((r) => keyOf(r) === keyOf(row
 
 /**
  * Append one row; a row whose key is already recorded is refused rather than
- * doubled. Unless told otherwise the file is read at the moment of writing, so
- * a row another runner recorded since this one started is seen.
+ * doubled. Unless told otherwise the file is read at the moment of writing.
+ * Reading then writing cannot keep two runners off one key - both can read
+ * before either writes - so the runner claims the key first (claimRun) and
+ * this check is the backstop for a writer that did not.
  */
 export function appendResult(file, row, existing = readResults(file)) {
   if (isRecorded(existing, row)) throw new Error(`already recorded: ${keyOf(row)}`);
   mkdirSync(path.dirname(file), { recursive: true });
   appendFileSync(file, JSON.stringify(row) + "\n");
   return row;
+}
+
+/** Where the runs under way on a results file hold their keys: beside it. */
+export const claimsDir = (file) => `${file}.claims`;
+
+/**
+ * Claim a run's key on the results `file` before its agent and judge are paid
+ * for. The claim is a file created exclusively under claimsDir, which only one
+ * runner's create can do, and the results are read after it rather than
+ * before: a runner that recorded the key let go of its claim only once its row
+ * was appended, so the key is now held, recorded, or this runner's.
+ *
+ * Returns `{held: true, release}` - release once the row is appended, or the
+ * run has failed - or `{held: false, why}` when another runner holds the key
+ * or has recorded it. A runner killed mid-run cannot let go: its claim stays,
+ * naming the process and the host, and later runs number past it.
+ */
+export function claimRun(file, key) {
+  const dir = claimsDir(file);
+  mkdirSync(dir, { recursive: true });
+  const claim = path.join(dir, `${createHash("sha256").update(keyOf({ key })).digest("hex").slice(0, 32)}.json`);
+  let fd;
+  try {
+    fd = openSync(claim, "wx");
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    const holder = readQuiet(claim);
+    return { held: false, why: `${holder ? `claimed by process ${holder.pid} on ${holder.host} since ${holder.since}` : "claimed by another runner"} (${claim})` };
+  }
+  const release = () => rmSync(claim, { force: true });
+  try {
+    try { writeSync(fd, JSON.stringify({ key, pid: process.pid, host: os.hostname(), since: new Date().toISOString() }) + "\n"); } finally { closeSync(fd); }
+    if (isRecorded(readResults(file), { key })) { release(); return { held: false, why: "already recorded" }; }
+  } catch (error) {
+    release();
+    throw error;
+  }
+  return { held: true, release };
 }
 
 /** The next run of a measurement (IDENTITY), so new runs continue its count. */

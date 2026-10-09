@@ -12,6 +12,9 @@
  * built. One line per judged deck goes to results.jsonl, keyed by skill
  * version, judge model, treatment (agent and prompt), brief and run; the report
  * is the mean and spread per brief and the pairwise win rate, per treatment.
+ * Runners can share a results file and a store: each claims a run's key before
+ * its agent runs, passes over a number another runner holds or has recorded,
+ * and keeps its deck in a directory of its own.
  *
  * Options
  *   --set NAME            dev, heldout, or all
@@ -33,13 +36,13 @@
  *   --skill-sha VALUE     label the version under test instead of reading it from git
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import {
   QUALITY, ROOT, RESULT_SCHEMA, appendResult, briefRequest, briefs, buildDeckPacket,
-  buildPairPacket, collectArtifacts, deckPages, fillTemplate, schemaVars, formatSummary, isRecorded, keptDir, keyOf, nextRun, pairSwap,
+  buildPairPacket, claimRun, collectArtifacts, deckPages, fillTemplate, schemaVars, formatSummary, keptDir, makeKeptDir, nextRun, pairSwap,
   parseJudgeOutput, previousDeck, readResults, skillSha as readSkillSha, storeArtifacts, summarize, treatmentsOf,
   validatePreference, validateVerdict,
 } from "./lib.mjs";
@@ -169,32 +172,39 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     const request = briefRequest(brief.text);
     const prompt = promptTemplate.replace("{brief}", request.trim());
     const identity = { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName, brief: brief.id };
-    const first = nextRun(rows, identity);
-    for (let runNumber = first; runNumber < first + options.runs; runNumber += 1) {
+    let runNumber = nextRun(rows, identity);
+    for (let done = 0; done < options.runs; runNumber += 1) {
       const key = { ...identity, run: runNumber };
-      const keep = keptDir(store, key);
       if (options.dryRun) {
+        done += 1;
         log(`\n${brief.id} run ${runNumber}`);
         log(`  agent  ${fillTemplate(agent.command, { prompt: shorten(prompt), workspace: "<workspace>", plugin }).join(" ")}`);
-        log(`  keep   ${relative(keep)}`);
+        log(`  keep   ${relative(keptDir(store, key))}`);
         log(`  judge  ${fillTemplate(judge.command, { prompt: "<deck prompt>", packet: "<packet>", schema: "<judge-schema.json>", model }).join(" ")}`);
         const previous = options.noPairwise ? null : previousDeck(rows, identity, store);
         log(`  pair   ${previous ? `against ${previous.skillSha} run ${previous.run}` : "no previous version stored"}`);
         continue;
       }
 
-      // A key recorded since the results were read - by another runner sharing
-      // the file - is refused here, before the agent and the judge are paid for.
-      if (isRecorded(readResults(resultsFile), { key })) throw new Error(`already recorded: ${keyOf({ key })}; nothing was run for it`);
+      // The key is claimed before the agent and the judge are paid for, so two
+      // runners sharing the results file never run one key: a key another
+      // runner holds or has recorded since the results were read is passed
+      // over, and this run takes the next number.
+      const claim = claimRun(resultsFile, key);
+      if (!claim.held) {
+        log(`${brief.id} run ${runNumber}: ${claim.why}; taking run ${runNumber + 1}`);
+        continue;
+      }
+      done += 1;
       const workspace = mkdtempSync(path.join(os.tmpdir(), "ps-quality-run-"));
       const row = { schema: RESULT_SCHEMA, key, recorded: new Date().toISOString(), set: brief.set };
       try {
+        const keep = makeKeptDir(store, key);
         const agentOut = run(fillTemplate(agent.command, { prompt, workspace, plugin: plugin ?? "" }), {
           cwd: workspace, timeoutMinutes: agent.timeoutMinutes ?? 120,
           // Stored design preferences would make runs depend on who ran them.
           env: { PROFESSIONAL_SLIDES_HOME: path.join(workspace, ".professional-slides-home") },
         });
-        mkdirSync(keep, { recursive: true });
         writeFileSync(path.join(keep, "agent.stdout.txt"), agentOut.stdout);
         writeFileSync(path.join(keep, "agent.stderr.txt"), agentOut.stderr);
         row.agentRun = { exit: agentOut.code, seconds: agentOut.seconds, ...(agentOut.error ? { error: agentOut.error } : {}) };
@@ -246,11 +256,14 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
             }
           }
         }
+        appendResult(resultsFile, row);
       } finally {
+        // Let go only after the row is appended: a runner that claims the key
+        // next reads the results after claiming, and finds it recorded.
+        claim.release();
         if (!options.keepWorkspace) rmSync(workspace, { recursive: true, force: true });
         else log(`workspace kept: ${workspace}`);
       }
-      appendResult(resultsFile, row);
       rows.push(row);
       const rating = row.judge ? `rating ${row.judge.rating}` : row.status;
       const pair = row.pairwise?.preferred ? `, preferred ${row.pairwise.preferred} over ${row.pairwise.against.slice(0, 12)}` : "";
@@ -258,7 +271,8 @@ export async function main(argv = process.argv.slice(2), log = console.log) {
     }
   }
 
-  if (!options.dryRun) log(`\n${formatSummary(summarize(rows, { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName }))}`);
+  // Read again for the summary: runners sharing the file recorded their runs of this measurement too.
+  if (!options.dryRun) log(`\n${formatSummary(summarize(readResults(resultsFile), { skillSha: sha, judge: judgeKey, agent: agentName, prompt: promptName }))}`);
   return 0;
 }
 

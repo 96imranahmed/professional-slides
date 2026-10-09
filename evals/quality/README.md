@@ -31,7 +31,11 @@ called.
 2. **Collect.** The build directory (the one holding `scene.json`, preferring a
    delivered one), its renders and review sheets, `delivery.json`, and the
    pages, plan and deck files are kept under
-   `runs/<skill>/<brief>/<agent>-<prompt>-<judge>-run<n>/` (git-ignored). The
+   `runs/<skill>/<brief>/<agent>-<prompt>-<judge>-run<n>/` (git-ignored), a
+   directory each run creates for itself: where one of that name is already
+   there - a killed run's, or a run recorded in another results file sharing
+   the store - the run takes the first free `.2`, `.3` beside it rather than
+   writing into another run's deck. The
    authoring files are the scored deck's own - its id, in its spec's
    directory - never the newest file on disk, which may be another attempt's;
    one that cannot be told to be that deck's is not guessed but recorded in
@@ -55,9 +59,17 @@ called.
    labelled old or new. The preference is mapped back to `current`,
    `previous` or `tie`.
 6. **Record.** One line in `results.jsonl`, keyed by skill version, judge
-   model, agent, prompt, brief and run. A key already recorded is refused
-   before the agent runs, so nothing is paid for twice and nothing doubled;
-   new runs continue the run count.
+   model, agent, prompt, brief and run; new runs continue the run count.
+   Before its agent runs, a run claims its key: a file created exclusively
+   under `results.jsonl.claims/` (git-ignored), which only one runner can
+   create, and let go once the row is appended. Reading the results and then
+   writing could not do this - two runners can both read before either
+   writes. A key another runner holds or has recorded is passed over for the
+   next number, so runners can share a results file and a store side by side:
+   each gets the runs it asked for, numbered apart, and nothing is paid for
+   twice or doubled. A runner killed mid-run cannot let go of its claim; the
+   claim names its process and host, later runs number past it, and it can be
+   deleted once that runner is known to be gone.
 
 The skill version is the git tree hash of `skills/` at HEAD, with
 `+dirty.<digest>` of any uncommitted change to it, so two different working
@@ -375,7 +387,8 @@ rules alone and reported where it differs between seeds, not failed.
 `fixtures/fake-agent.mjs` and `fixtures/fake-judge.mjs`: no model is called. It
 checks blinding (the fake agent writes author files carrying a marker, and the
 fake judge reports any packet file carrying it), pairing through the shuffled
-order, results keying and the summary's arithmetic.
+order, results keying, two runners started together on one results file and
+store, and the summary's arithmetic.
 `evals/tests/test_quality_score.py` covers the scorer, and
 `evals/tests/test_plan_variety.py` the variability measurement and its four
 assertions.

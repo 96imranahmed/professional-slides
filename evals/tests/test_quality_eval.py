@@ -8,8 +8,9 @@ the judge sees the brief, the rubric and the pages and nothing the author
 wrote; that a new version is compared with the last one deck against deck and
 the answer is mapped back through the shuffled order; that results are keyed by
 skill version, judge, treatment (agent and prompt), brief and run and never
-doubled; that the deck kept is one attempt's, scene and authoring files alike;
-and that the summary's arithmetic is right.
+doubled, even by runners sharing the results file; that each run's deck is
+kept in a directory of its own, and is one attempt's, scene and authoring files
+alike; and that the summary's arithmetic is right.
 """
 from __future__ import annotations
 
@@ -52,15 +53,30 @@ class Harness:
                                 "timeoutMinutes": 1}},
         }))
 
-    def run_eval(self, sha, *extra, slides=4, check=True, env=None):
+    def eval_command(self, sha, *extra, slides=4, env=None):
         args = [NODE, str(RUN), "--set", "dev", "--brief", BRIEF, "--config", str(self.config),
                 "--results", str(self.results), "--store", str(self.store), "--skill-sha", sha, *extra]
         env = {**os.environ, "FAKE_AGENT_SLIDES": str(slides), "FAKE_JUDGE_LOG": str(self.judge_log),
                "FAKE_AGENT_LOG": str(self.agent_log), **(env or {})}
+        return args, env
+
+    def run_eval(self, sha, *extra, slides=4, check=True, env=None):
+        args, env = self.eval_command(sha, *extra, slides=slides, env=env)
         out = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, env=env, timeout=120)
         if check:
             self.assertEqual(out.returncode, 0, out.stderr + out.stdout)
         return out
+
+    def start_eval(self, sha, *extra, slides=4, env=None):
+        """A runner left running, so a test can start a second beside it."""
+        args, env = self.eval_command(sha, *extra, slides=slides, env=env)
+        runner = subprocess.Popen(args, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        self.addCleanup(lambda: runner.poll() is None and runner.kill())
+        return runner
+
+    def claims(self):
+        claims = Path(f"{self.results}.claims")
+        return sorted(p.name for p in claims.iterdir()) if claims.exists() else []
 
     def rows(self):
         return [json.loads(line) for line in self.results.read_text().splitlines() if line.strip()]
@@ -208,6 +224,7 @@ class ResultsTests(Harness, unittest.TestCase):
         keys = [tuple(r["key"][f] for f in ("skillSha", "judge", "agent", "prompt", "brief", "run")) for r in self.rows()]
         self.assertEqual(keys, [("aaa", "fake:fixture", "fake", "brief", BRIEF, 1), ("aaa", "fake:fixture", "fake", "brief", BRIEF, 2),
                                 ("aaa", "fake:fixture", "fake", "brief", BRIEF, 3)])
+        self.assertEqual(self.claims(), [], "each claim is let go once its row is recorded")
         row = self.rows()[0]
         self.assertEqual(row["schema"], "professional-slides.quality-result/v1")
         self.assertEqual(row["status"], "judged")
@@ -246,6 +263,7 @@ class ResultsTests(Harness, unittest.TestCase):
         self.assertFalse(self.results.exists())
         self.assertFalse(self.store.exists())
         self.assertFalse(self.agent_log.exists())
+        self.assertFalse(Path(f"{self.results}.claims").exists(), "nothing is claimed")
 
     def test_the_same_key_is_refused_rather_than_doubled(self):
         result = run_node('''
@@ -260,20 +278,21 @@ console.log(JSON.stringify({refused,lines:fs.readFileSync(file,'utf8').trim().sp
 ''')
         self.assertEqual(result, {"refused": True, "lines": 2})
 
-    def test_a_key_recorded_while_the_run_was_under_way_is_refused_before_the_agent_runs(self):
+    def test_a_key_recorded_while_the_run_was_under_way_is_passed_over_before_the_agent_runs(self):
         # A second runner sharing the results file records run 2 while this
-        # runner's run 1 is under way. Run 2 is refused before its agent and
-        # judge are paid for, and is never doubled.
+        # runner's run 1 is under way. Run 2 is passed over before its agent
+        # and judge are paid for, never doubled, and this runner's second run
+        # is run 3.
         taken = {"schema": "professional-slides.quality-result/v1", "status": "judged",
                  "key": {"skillSha": "aaa", "judge": "fake:fixture", "agent": "fake", "prompt": "brief", "brief": BRIEF, "run": 2}}
-        out = self.run_eval("aaa", "--runs", "2", check=False,
+        out = self.run_eval("aaa", "--runs", "2",
                             env={"FAKE_AGENT_RECORDS": json.dumps({"file": str(self.results), "row": taken})})
-        self.assertEqual(out.returncode, 1, out.stdout)
-        self.assertIn("already recorded", out.stderr)
-        self.assertEqual(self.agent_calls(), 1, "the agent ran for run 1 only")
-        self.assertEqual([p["mode"] for p in self.judged()], ["deck"])
+        self.assertIn(f"{BRIEF} run 2: already recorded; taking run 3", out.stdout)
+        self.assertEqual(self.agent_calls(), 2, "the agent ran for runs 1 and 3")
+        self.assertEqual([p["mode"] for p in self.judged()], ["deck", "deck"])
         runs = [r["key"]["run"] for r in self.rows()]
-        self.assertEqual(sorted(runs), [1, 2])
+        self.assertEqual(sorted(runs), [1, 2, 3])
+        self.assertNotIn("deck", next(r for r in self.rows() if r["key"]["run"] == 2), "run 2 is the other runner's row")
 
     def test_old_rows_read_as_the_default_treatment(self):
         result = run_node('''
@@ -302,6 +321,77 @@ console.log(JSON.stringify({defaults:DEFAULT_TREATMENT,config:config.defaults,be
         self.assertIn("--runs must be a positive whole number", out.stderr)
         out = self.run_eval("aaa", "--bogus", check=False)
         self.assertIn("Usage: run.mjs", out.stderr)
+
+
+class ConcurrencyTests(Harness, unittest.TestCase):
+    """Runners sharing a results file and a store never run one key, nor keep two decks in one place."""
+
+    def test_runners_started_together_number_their_runs_apart(self):
+        # Both read the results before either records anything, so both would
+        # start at run 1. Each agent takes a second, so the two are under way
+        # at once.
+        runners = [self.start_eval("aaa", "--runs", "2", env={"FAKE_AGENT_SLEEP_MS": "1000"}) for _ in range(2)]
+        for runner in runners:
+            stdout, stderr = runner.communicate(timeout=120)
+            self.assertEqual(runner.returncode, 0, stderr + stdout)
+        rows = self.rows()
+        self.assertEqual(sorted(r["key"]["run"] for r in rows), [1, 2, 3, 4], "every key once, none doubled")
+        self.assertEqual(self.agent_calls(), 4, "no run was paid for twice")
+        kept = {r["deck"]["artifacts"] for r in rows}
+        self.assertEqual(len(kept), 4, "each run kept in its own place")
+        for artifacts in kept:
+            self.assertTrue((self.store / artifacts / "kept.json").exists(), artifacts)
+        self.assertEqual(self.claims(), [])
+
+    def test_a_claim_left_by_a_killed_runner_is_numbered_past(self):
+        # A runner killed mid-run cannot let go of its claim; the next runner
+        # passes over that number rather than stopping on it.
+        key = {"skillSha": "aaa", "judge": "fake:fixture", "agent": "fake", "prompt": "brief", "brief": BRIEF, "run": 1}
+        held = run_node(f'''
+import {{claimRun}} from './evals/quality/lib.mjs';
+console.log(JSON.stringify({{held: claimRun({json.dumps(str(self.results))}, {json.dumps(key)}).held}}));
+''')
+        self.assertTrue(held["held"])
+        out = self.run_eval("aaa", "--runs", "1")
+        self.assertRegex(out.stdout, rf"{re.escape(BRIEF)} run 1: claimed by process \d+ on .+; taking run 2")
+        self.assertEqual([r["key"]["run"] for r in self.rows()], [2])
+        self.assertEqual(len(self.claims()), 1, "the killed runner's claim is left for whoever knows it is gone")
+
+    def test_a_results_file_sharing_the_store_keeps_its_runs_apart(self):
+        # Two results files, one store, the same key in each: the second run's
+        # deck is kept beside the first's, not written over it.
+        self.run_eval("aaa", "--runs", "1", slides=4)
+        other = self.tmp / "other.jsonl"
+        self.run_eval("aaa", "--runs", "1", "--results", str(other), slides=8)
+        first = self.rows()[0]["deck"]["artifacts"]
+        second = json.loads(other.read_text())["deck"]["artifacts"]
+        self.assertEqual(second, f"{first}.2")
+        self.assertEqual(len(json.loads((self.store / first / "kept.json").read_text())["slides"]), 4, "the first run's deck is intact")
+        self.assertEqual(len(json.loads((self.store / second / "kept.json").read_text())["slides"]), 8)
+
+    def test_a_key_is_claimed_once_and_then_freed_or_recorded(self):
+        result = run_node('''
+import {appendResult,claimRun,claimsDir} from './evals/quality/lib.mjs';
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'q-')),'r.jsonl');
+const key={skillSha:'a',judge:'j:m',agent:'fake',prompt:'brief',brief:'dev/x',run:1};
+const first=claimRun(file,key), second=claimRun(file,key), other=claimRun(file,{...key,prompt:'unattended'});
+first.release();
+const again=claimRun(file,key);
+appendResult(file,{key});
+again.release();
+const recorded=claimRun(file,key);
+console.log(JSON.stringify({first:first.held,second:second.held,secondWhy:second.why,pid:process.pid,other:other.held,
+  again:again.held,recorded:recorded.held,recordedWhy:recorded.why,left:fs.readdirSync(claimsDir(file)).length}));
+''')
+        self.assertTrue(result["first"])
+        self.assertFalse(result["second"], "a held key is not handed out twice")
+        self.assertIn(f"claimed by process {result['pid']}", result["secondWhy"])
+        self.assertTrue(result["other"], "another treatment's key is its own")
+        self.assertTrue(result["again"], "a released key is free")
+        self.assertFalse(result["recorded"], "a recorded key is not handed out")
+        self.assertEqual(result["recordedWhy"], "already recorded")
+        self.assertEqual(result["left"], 1, "only the other treatment's claim is still held")
 
 
 class CollectTests(Harness, unittest.TestCase):
