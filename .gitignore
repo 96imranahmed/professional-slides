@@ -29,6 +29,9 @@ Claude outputs/
 *.author-log.jsonl
 author-log.jsonl
 *.author-cache.json
+# A deck's recorded copy judgements and the packets judge.mjs stages for them (judgements.mjs)
+*.judgements.json
+**/judgements/packet-*/
 # What author-deck.mjs writes beside the worked example's pages file
 /skills/professional-slides/examples/page-types.deck.json
 /skills/professional-slides/examples/page-types.plan.json

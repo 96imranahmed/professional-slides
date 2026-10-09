@@ -207,7 +207,7 @@ const tabs=sectionTabs([{kind:'section',title:'A'},{title:'x'},{kind:'section',t
 assert.equal(tabs[1].tracker.construction,'compact-pills');assert.equal(tabs[3].tracker.selectedId,'2');assert.equal(tabs[0].tracker,undefined);
 const tl=registry.get('tracker-label').render({id:'k',frame:{x:60,y:30,width:1160,height:20},props:tabs[1].tracker}).nodes;
 assert.equal(tl.filter(n=>n.role==='tracker-pill').length,2);
-// BCG sets "Topic | statement"; McKinsey keeps the accent lead.
+// The evergreen palette sets "Topic | statement"; midnight keeps the accent lead.
 const frame={x:0,y:0,width:1280,height:720};
 const titleFor=(palette)=>compileDeck({id:'t',palette,slides:[{id:'p',frame,composition:component({id:'chrome',component:'slide-chrome',frame,props:{title:'Sector outlook: IT stays soft',titleLead:'Sector outlook'}})}]},registry).slides[0].nodes.find(n=>n.role==='action-title');
 assert.equal(titleFor('evergreen').text,'Sector outlook | IT stays soft');

@@ -118,8 +118,8 @@ class SeriesRoundingTests(unittest.TestCase):
         scene = run_node("""
 import { toDeckPlan } from './evals/support/compose.mjs';
 import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
-const spec={schema:'professional-slides.deck/v3',id:'r',cover:{title:'x'},slides:[{title:'BCG leads with charts and McKinsey with text',layout:'exhibit-full',
-  exhibit:{type:'chart.stacked-column',percent:true,heading:'Pages by family',categories:['BCG','McKinsey'],
+const spec={schema:'professional-slides.deck/v3',id:'r',cover:{title:'x'},slides:[{title:'Northvale leads with charts and Westmoor with text',layout:'exhibit-full',
+  exhibit:{type:'chart.stacked-column',percent:true,heading:'Pages by family',categories:['Northvale','Westmoor'],
     series:[{name:'Chart',values:[24,12]},{name:'Text',values:[13,15]},{name:'Table',values:[14,10]}]}}]};
 console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
 """)
