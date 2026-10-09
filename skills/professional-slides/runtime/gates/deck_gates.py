@@ -765,9 +765,10 @@ def gate_column_monotony(slides, content_indexes, findings):
 
     Four or more consecutive analytical pages whose commentary column uses the
     same device. A strong deck marks a column with icons, an accent lead
-    phrase, a hairline or nothing at all, and reserves the numbered disc for an
-    ordered ledger; a deck that reaches for one device every time reads as one
-    page repeated even when its exhibits differ.
+    phrase, a hairline or nothing at all, and keeps the numbered disc for a set
+    the reader refers to by number - steps, priorities, a counted set; a deck
+    that reaches for one device every time reads as one page repeated even
+    when its exhibits differ.
     """
     # The defect is a distinctive device used page after page - a numbered
     # disc, an icon, a letter. The house bullet and unmarked prose are the
@@ -801,7 +802,8 @@ def gate_column_monotony(slides, content_indexes, findings):
         "rotate: icon-lead (an icon and the lead running into the sentence in "
         "the accent), ruled (a hairline between items), prose (a bold lead and "
         "its paragraph), lettered (options rather than steps). The numbered "
-        "disc belongs on an ordered ledger.",
+        "disc belongs on a set the reader refers to by number: steps, "
+        "priorities, a counted set.",
     ))
 
 

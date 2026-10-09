@@ -303,9 +303,10 @@ console.log(JSON.stringify({ stubbed, bare, draft: { depth: line('EVIDENCE_DEPTH
         # A draft reads the undrawn pages the same way, so its standings are the plan's.
         self.assertEqual([draft["depth"], draft["panels"], draft["players"]], [stubbed["depth"], stubbed["panels"], 0])
         # What a draft holds against this spine is what no form or placement mends, which the storyline critique is bound to: the
-        # page types the four rounds repeat, and the range of exhibit kinds - twenty-nine pages ask for twelve, and with a deck's
-        # pages of figures capped at a tenth (rules version 7: two pages here) the search over every form the catalogue allows reaches eleven.
-        self.assertEqual(draft["blocking"], ["VARIETY_TYPE_SHARE", "VARIETY_EXHIBIT_RANGE"])
+        # page types the four rounds repeat. The range of exhibit kinds - twenty-nine pages ask for twelve - the search over every
+        # form the catalogue allows now reaches, since cards that print no figure count as text, not against the cap on pages of
+        # figures (rules version 7: two pages here).
+        self.assertEqual(draft["blocking"], ["VARIETY_TYPE_SHARE"])
         self.assertTrue(draft["repeats"])
         self.assertEqual(set(draft["repeats"]), {"PROOF_REPEATS.identical"})
         # A structure rule blocks in a draft only where no copy, layout or fit settles it; one a form or placement mends waits.

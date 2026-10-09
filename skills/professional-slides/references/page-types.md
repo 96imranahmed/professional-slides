@@ -142,7 +142,7 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, ... |
 | `schedule` | what happens when | timeline, gantt, roadmap, horizons |
 | `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list |
-| `parallel` | three to six parallel ideas (give each card an `icon` for icon columns) | cards, capsules, arrow-rows, labelled-rows |
+| `parallel` | three to six parallel ideas (give each card an `icon` for icon columns; cards with no icon take their tone from how they relate, as a model reads their titles: categories or options under a filled band, steps under large numerals, a ranked or counted set numbered) | cards, capsules, arrow-rows, labelled-rows |
 | `profiles` | who the players are, with their marks (a logo, a place's outline or a photograph, as each declares) | logos, people, logo-table, cards, radar |
 | `place` | where things are ([Geography](geography.md)) | map |
 | `picture` | what the subject looks like | picture-hero, picture-pair, picture-strip, photo-backdrop |

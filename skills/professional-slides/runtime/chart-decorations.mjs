@@ -138,7 +138,7 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   return { underlay, overlay };
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, allowOutsideReferenceLabels = false }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false }) {
   const underlay = [];
   const overlay = [];
   if (props.categories && categoryMap.size && (props.periods || props.events)) {
@@ -157,7 +157,8 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight, underlay });
   drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps });
   overlay.push(...evidenceAnnotations.nodes);
-  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap, obstacles }));
+  // A change arrow keeps clear of the callouts set before it, as it does of the marks.
+  overlay.push(...renderChangeAnnotations({ id, plot, props, pointMap, obstacles: [...obstacles, ...evidenceAnnotations.nodes], arrowOnly }));
   overlay.push(...renderAnnotationRail({ id, plot, props, categoryMap, allow: allowAnnotationRail }));
   return { underlay, overlay };
 }

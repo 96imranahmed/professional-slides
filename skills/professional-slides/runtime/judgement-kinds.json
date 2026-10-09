@@ -56,6 +56,33 @@
     "time"
    ]
   },
+  "claim-states-change": {
+   "version": 1,
+   "asks": "Does the page's title rest on how much this series grew or fell between two of its periods - its growth or its decline - rather than on its level, its peak, its shape or a comparison of its members? If it does, between which two of the periods shown?",
+   "subject": "the page's title, the series charted and its periods in order",
+   "verdicts": {
+    "states-change": "the title rests on the series' change between two periods, given in `from` and `to`",
+    "other-claim": "the title rests on something else: a level, a peak, a shape, a comparison"
+   },
+   "fields": {
+    "from": {
+     "type": "string",
+     "quoted": true,
+     "for": [
+      "states-change"
+     ],
+     "about": "the period the change runs from, copied exactly from the periods"
+    },
+    "to": {
+     "type": "string",
+     "quoted": true,
+     "for": [
+      "states-change"
+     ],
+     "about": "the period the change runs to, copied exactly from the periods"
+    }
+   }
+  },
   "claims-repeat": {
    "version": 1,
    "asks": "Do any two of these pages make the same claim - the same finding about the same thing, whatever the wording - so that one proves nothing the other does not? Two claims about one subject that find different things, or a summary and the page that proves it, are not repeats.",
@@ -205,6 +232,18 @@
    "quoteFor": [
     "result"
    ]
+  },
+  "items-relation": {
+   "version": 1,
+   "asks": "How do these items relate, as the page's title introduces them? An ordered sequence (steps or stages taken in order); a ranking (priorities, most important first); a counted set the reader refers to by number (the title gives their count: \"four challenges\", \"three reasons\"); alternatives the reader chooses between (options, scenarios); or parallel categories (named groups, themes or findings, none before another)?",
+   "subject": "the page's title and the items' leads or titles, in order",
+   "verdicts": {
+    "sequence": "an ordered sequence: steps or stages taken in order",
+    "ranked": "a ranking: priorities or items in order of importance",
+    "counted": "a counted set the reader refers to by number",
+    "alternatives": "alternatives the reader chooses between",
+    "parallel": "parallel categories, none before another"
+   }
   },
   "number-replaced-by": {
    "version": 1,

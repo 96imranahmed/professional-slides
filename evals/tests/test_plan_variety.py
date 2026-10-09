@@ -534,10 +534,10 @@ console.log(JSON.stringify({ changed: p.pages.filter((page) => page.source === '
         self.assertTrue(result["kept"])
         self.assertEqual(result["fit"], 0)
         self.assertEqual(result["standings"], ["VARIETY_KIND_SHARE"])   # the share is counted; nothing is judged without measures
-        # The deck's own way of drawing is read from its declared forms, which needs no measure - but the rules come first: a
-        # second card set would take the numbers family to its cap, so the added page of points is drawn another way, and says why.
-        self.assertEqual(result["added"][1], "rules")
-        self.assertNotEqual(result["added"][0], result["added"][2])
+        # The deck's own way of drawing is read from its declared forms, which needs no measure: the added page of points is
+        # drawn as the deck draws its parallel pages, as cards. Cards that print no figure are text set in boxes, not the numbers
+        # family whose cap a second card set once reached (variety_gates.mjs pageFamily).
+        self.assertEqual(result["added"], ["cards", "convention", "cards"])
 
     def test_the_plan_command_reads_the_inventory_beside_a_revisions_pages_file(self):
         with tempfile.TemporaryDirectory() as tmp:

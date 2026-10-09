@@ -5,7 +5,7 @@
 // (compose-layouts.mjs) built from the arrangements (compose-arrangements.mjs).
 import { SIZE, HUG, LAYOUT } from "./compose-body.mjs";
 import { imageProps, normalizePictures, sourcedPicture } from "./compose-pictures.mjs";
-import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem } from "./compose-points.mjs";
+import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem, itemsRelation } from "./compose-points.mjs";
 import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
 import { SLIDE_PASSES } from "./compose-passes.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
@@ -226,6 +226,16 @@ function analyticalPasses(slide, id, ctx) {
   return { slide, slideIn };
 }
 
+// The tone a set of cards with no icon takes from how its cards relate (itemsRelation): parallel categories, or alternatives,
+// each under a band naming it; a sequence under large numerals; a ranking or a counted set numbered. A tone the author gave,
+// an icon to draw or a question not yet answered leaves the cards as written (numbered, the renderer's default).
+const CARD_TONE_BY_RELATION = Object.freeze({ parallel: "header", alternatives: "header", sequence: "big-number", ranked: "numbered", counted: "numbered" });
+function withCardTone(ex, title) {
+  if (ex?.type !== "cards" || ex.tone !== undefined || (ex.items || []).some((item) => item?.icon || item?.logo || item?.value)) return ex;
+  const tone = CARD_TONE_BY_RELATION[itemsRelation(title, (ex.items || []).map((item) => item?.title), { least: 2 })];
+  return tone ? { ...ex, tone } : ex;
+}
+
 /** The page's pictures, its layout (recorded in `recent`), its points style (recorded in `recentStyles`) and its exhibits. */
 function pagePlan(slide, id, recent, recentStyles) {
   const pictures = normalizePictures(slide, id);
@@ -237,7 +247,7 @@ function pagePlan(slide, id, recent, recentStyles) {
   const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
-  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))];
+  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))].map((ex) => withCardTone(ex, slide.title));
   // A lone table whose density the composer chose (a findings matrix defaults
   // to compact, pagination picks the lightest step its estimate fits) may be
   // set a type step up when its frame holds it (`fillDensity` in tables.mjs).

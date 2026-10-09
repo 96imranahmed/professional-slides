@@ -161,7 +161,8 @@ export function lineChart({ id, frame, props, area = false }) {
   placeEndLabels(chart);
   drawPointHighlights(chart);
   const { plot, nodes, pointMap, categoryMap, yScale } = chart;
-  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
+  // A line read off its value axis takes its change as the diagonal arrow only (LINE_AXIS_CHANGE_STYLE): no bracket fallback.
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, arrowOnly: chart.showValueAxis === true });
 }
 
 /** The data checked, and what the props decide: the line colours, end labels or a legend, data labels, the value axis and its scale. */

@@ -92,7 +92,10 @@ export function sceneCollisions(slide) {
   for (const text of texts) {
     const ink = inkBox(text);
     for (const line of nodes.filter((n) => n.type === "line" && LINE_ROLES.has(n.role))) {
-      if (["annotation-leader", "data-label-leader"].includes(line.role) && ["annotation-text", "data-label"].includes(text.role)) continue;
+      // A leader ends at its own label; a change arrow's shaft is its own label's only - one that runs through another
+      // annotation's label is the crossing this refuses.
+      const key = line.data?.annotationKey;
+      if (["annotation-leader", "data-label-leader"].includes(line.role) && ["annotation-text", "data-label"].includes(text.role) && (key === undefined || key === text.data?.annotationKey)) continue;
       if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role] });
     }
     for (const box of nodes.filter((n) => n.type === "rect" && BOX_ROLES.has(n.role))) {

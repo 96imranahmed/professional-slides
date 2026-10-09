@@ -246,6 +246,9 @@ const TYPE_FAMILY = { trend: "chart", ranking: "chart", composition: "chart", re
 /** A compiled page's family: the first exhibit it draws, or what its type sets when it draws none. */
 export function pageFamily(slide) {
   const [first] = exhibitsOf(slide);
+  // Cards that carry no figure - categories under their bands, steps under their numerals - are the page's text set in
+  // boxes, not a strip of numbers: they count with text, and the numbers family holds the tiles and cards that print one.
+  if (first?.type === "cards" && first.tone !== "stat" && !(first.items || []).some((item) => item?.value !== undefined && item?.value !== null && String(item.value).trim())) return "text";
   if (first) return exhibitFamily(first.type);
   if (slide.photo || slide.image) return "picture";
   if (slide.shape === "findings-matrix") return "table";
