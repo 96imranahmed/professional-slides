@@ -156,6 +156,14 @@ class RestatementTests(unittest.TestCase):
         with answering({"commentary-restates": self.reader}):
             self.assertEqual(run(page_gates.gate_restatement, 35, page(self.EXHIBIT + self.OWN)), [])
 
+    def test_a_lead_is_read_with_its_text_not_put_to_the_reader_alone(self):
+        # "Ninth of twenty" over a point is the subheading the point is read under: a reader judging it alone calls it a
+        # read-back of the ranking it names.
+        with answering({"commentary-restates": self.reader}) as asked:
+            run(page_gates.gate_restatement, 35, page(self.EXHIBIT + [text("list-lead", "Prior sequence")] + self.OWN))
+        [(_, subject)] = asked
+        self.assertEqual([line["text"] for line in subject["lines"]], [t["text"] for t in self.OWN])
+
     def test_an_unanswered_question_does_not_hold(self):
         with answering({}) as asked:
             self.assertEqual(run(page_gates.gate_restatement, 35, page(self.EXHIBIT + [self.BACK])), [])

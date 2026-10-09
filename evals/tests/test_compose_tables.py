@@ -212,6 +212,23 @@ assert.equal(explicit.rows[0][2].tone,'negative');
 console.log('{}');
 ''')
 
+    def test_a_column_is_asked_about_as_the_author_wrote_the_table(self):
+        # The composer adds a gutter before an implication column; the question it asks is the page check's, of the table
+        # as written, so the two share one answer.
+        result = run_node(r'''
+import {styleTable, columnQuestion} from './skills/professional-slides/runtime/compose-tables.mjs';
+import {judgementSession, withJudgements, judgementKey} from './skills/professional-slides/runtime/judgements.mjs';
+const asked = [];
+const reader = judgementSession({oracle:(kind, subject, context) => { if (kind === 'column-reads') asked.push(judgementKey(kind, subject, context)); return null; }});
+const columns = ['Line', 'Status', {label: 'What it means', implication: true}];
+const rows = [['Eastern', 'Stalled', 'Electrify first'], ['Valley', 'Slipping', 'Extend the sidings'], ['Dales', 'Ahead of plan', 'Grows first']];
+const styled = withJudgements(reader, () => styleTable({columns, rows}));
+const own = columnQuestion('Status', rows.map((row) => row[1]), ['Line', 'Status', 'What it means']);
+console.log(JSON.stringify({asked, own: judgementKey('column-reads', own.subject, own.context), gutter: styled.columns.length > columns.length}));
+''')
+        self.assertTrue(result["gutter"])
+        self.assertIn(result["own"], result["asked"])
+
     def test_verdict_cells_recommended_column_and_total_rows_are_inferred(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';

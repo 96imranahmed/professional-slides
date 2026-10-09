@@ -28,6 +28,7 @@ from judgements import judged
 # that panel, not a label on it.
 COMMENTARY_ROLES = {"list-item", "list-lead", "insight-body", "paragraph", "paragraph-lead",
                     "panel-caption", "insight-caption", "statement-text"}
+LEAD_ROLES = {"list-lead", "paragraph-lead"}
 EXHIBIT_TEXT_ROLES = {"table-cell-text", "table-header-text", "table-group-text",
                       "data-label", "category-label", "category-note", "annotation-text",
                       "legend-label", "chart-unit", "metric-value", "metric-label",
@@ -70,12 +71,17 @@ def gate_restatement(slide_no, slide, findings):
         return
     # A callout's words are the exhibit's (it is fixed to a mark), so a line that says what a callout says reads it back too.
     callouts = [source_text(n) for n in text_nodes(slide) if n.get("role") == "annotation-text" and source_text(n).strip()]
-    lines = [{"id": f"c{at + 1}", "text": text} for at, text in enumerate(commentary)]
-    shown = list(dict.fromkeys(t for t in exhibit if t not in callouts))
-    said = judged("commentary-restates", {"exhibit": shown, "callouts": list(dict.fromkeys(callouts)), "lines": lines}, None, slide_no)
-    if not said or said.get("verdict") != "restates":
+    # A lead is the subheading its text is read under ("Ninth of twenty"), not a line of its own: it names what the text
+    # beside it says, and is not put to the reader apart from it.
+    said = [source_text(n) for n in text_nodes(slide) if n.get("role") in COMMENTARY_ROLES - LEAD_ROLES and source_text(n).strip()]
+    lines = [{"id": f"c{at + 1}", "text": text} for at, text in enumerate(said)]
+    if not lines:
         return
-    restated = [line["text"] for line in lines if line["id"] in (said.get("lines") or [])]
+    shown = list(dict.fromkeys(t for t in exhibit if t not in callouts))
+    read = judged("commentary-restates", {"exhibit": shown, "callouts": list(dict.fromkeys(callouts)), "lines": lines}, None, slide_no)
+    if not read or read.get("verdict") != "restates":
+        return
+    restated = [line["text"] for line in lines if line["id"] in (read.get("lines") or [])]
     if not restated:
         return
     findings.append(finding(

@@ -75,11 +75,17 @@ export function readCell(value, reading) {
 }
 
 /** Each column's recorded reading (column-reads), by column index; the label column and a typed column are not read. */
-function columnReadings(ex) {
-  const headers = (ex.columns || []).map(columnLabel);
+// A column still in words once the composer's own treatments have run is asked about as the author wrote the table - its
+// header, its cells and the table's headers before a gutter or a derived column was added - which is the question the
+// page's own check (page-types.mjs plainVerdict) asks of it, so the two share one answer.
+function columnReadings(ex, authored) {
+  const headers = (ex.columns || []).map(columnLabel), written = (authored.columns || []).map(columnLabel);
+  const cellsOf = (table, c) => (table.rows || []).map((row) => resultCells(row)[c - 1]);
   return (ex.columns || []).map((column, c) => {
     if (!c || (column && typeof column === "object" && ((column.type && column.type !== "text") || column.heat || column.bar || column.harvey))) return null;
-    const asked = columnQuestion(headers[c], (ex.rows || []).map((row) => resultCells(row)[c - 1]), headers);
+    const at = written.indexOf(headers[c], 1);
+    if (at < 1 || !columnQuestion(headers[c], cellsOf(ex, c), headers)) return null;
+    const asked = columnQuestion(written[at], cellsOf(authored, at), written);
     return asked && judged("column-reads", asked.subject, asked.context);
   });
 }
@@ -920,6 +926,7 @@ const mapTableCells = (row, transform) => Array.isArray(row) ? transform(row) : 
 
 export function styleTable(ex) {
   validateCategoryLabels(ex);
+  const authored = ex;
   if (ex.treatment === undefined && ex.columns.some(c => c?.type === "category")) ex = { ...ex, treatment: "categories" };
   for (const transform of [rubricColumns, iconColumn, inferredTreatments, columnTreatments, implicationColumn, deriveColumns, totalRow, groupNumericColumns]) ex = transform(ex);
   // An object column (one that names a `group`, a `unit`, an alignment) still
@@ -929,7 +936,7 @@ export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string"
     ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
     : { width: columnWeight(ex, i), ...c });
-  const readings = columnReadings(ex);
+  const readings = columnReadings(ex, authored);
   const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => readCell(cell, readings[i + (Array.isArray(row) || row?.label === undefined ? 0 : 1)])))));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
