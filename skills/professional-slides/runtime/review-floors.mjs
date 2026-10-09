@@ -103,6 +103,54 @@ export function retitleErrors(retitle, pages, at) {
   return errors;
 }
 
+// What a repair asks of a page's body, said as fields rather than read out of
+// its sentence: one entry for each page whose body the repair takes to a
+// stated length - the body words it asks for, the words a block, or both, as
+// { min, max } ranges. The deck reviewer gives it on a finding (reviewer.mjs),
+// and floorErrors holds it to the floors the packet shows for the page. A
+// repair that states no length ("halve the commentary") has nothing here, and
+// is held by the prompt and by the gate when the page is rebuilt.
+const RANGE_SCHEMA = { type: "object", additionalProperties: false, required: ["min", "max"], properties: { min: { type: "integer", minimum: 1 }, max: { type: "integer", minimum: 1 } } };
+export const RESIZE_SCHEMA = {
+  type: "array", minItems: 1,
+  items: { type: "object", additionalProperties: false, required: ["page"], properties: {
+    page: { type: "string" },
+    // The page's body words the repair asks for: the same number twice for one length.
+    words: RANGE_SCHEMA,
+    // The words a block it asks for, on a page of prose blocks.
+    wordsPerBlock: RANGE_SCHEMA,
+  } },
+};
+const span = (range) => (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`);
+const isRange = (range) => Boolean(range) && typeof range === "object" && isCount(range.min) && isCount(range.max) && range.min <= range.max;
+/** A `resize` as the author reads it beside the repair: each page with the length asked for. */
+export const resizeLine = (resize) => (Array.isArray(resize) ? resize : []).filter((entry) => entry && typeof entry.page === "string")
+  .map((entry) => `${entry.page}: ${[isRange(entry.words) ? `${span(entry.words)} body words` : null, isRange(entry.wordsPerBlock) ? `${span(entry.wordsPerBlock)} words a block` : null].filter(Boolean).join(", ")}`).join("; ");
+
+/**
+ * `resize` held to its form, as errors: a list of entries, each naming one of
+ * `pages` (the finding's own) once, and giving body words, words a block or
+ * both. What holds without the floors; floorErrors holds those.
+ */
+export function resizeErrors(resize, pages, at) {
+  if (resize === undefined) return [];
+  if (!Array.isArray(resize) || !resize.length) return [`${at}: resize lists the pages whose body the repair takes to a stated length, one entry a page - leave it out where the repair states no length`];
+  const errors = [], own = Array.isArray(pages) ? pages : [], seen = new Set();
+  for (const [i, entry] of resize.entries()) {
+    const where = `${at}: resize[${i}]`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) { errors.push(`${where} is not an object: an entry is { page, words, wordsPerBlock }`); continue; }
+    const extra = Object.keys(entry).filter((key) => !Object.hasOwn(RESIZE_SCHEMA.items.properties, key));
+    if (extra.length) errors.push(`${where} carries ${extra.join(", ")}: an entry takes page, words and wordsPerBlock only`);
+    if (typeof entry.page !== "string" || !own.includes(entry.page)) errors.push(`${where} names ${typeof entry.page === "string" ? `page ${entry.page}` : "no page"}: its page is one of the finding's own (${own.join(", ") || "none listed"})`);
+    else if (seen.has(entry.page)) errors.push(`${where} names ${entry.page} again: one entry a page`);
+    seen.add(entry.page);
+    for (const key of ["words", "wordsPerBlock"]) if (entry[key] !== undefined && !isRange(entry[key]))
+      errors.push(`${where}: its ${key} is the length asked for, { min, max } in whole words with min no more than max (the same number twice for one length)`);
+    if (entry.words === undefined && entry.wordsPerBlock === undefined) errors.push(`${where} gives no length: give its words, its wordsPerBlock or both, or leave the page out`);
+  }
+  return errors;
+}
+
 const shown = (title) => (title.length > 70 ? `${title.slice(0, 67)}...` : title);
 
 /**
@@ -197,54 +245,41 @@ const pageLine = (id, page, floors) => {
 export function floorsPrompt(floors, only = null) {
   if (!floors) return "";
   const listed = Object.entries(floors.pages).filter(([id]) => !only || only.includes(id));
-  return `FLOORS THE BUILD HOLDS. The build measured these on the pages you are reading and refuses a page, or the deck, on the wrong side of one. They are not findings and not targets: they bound what a repair may ask for. Do not ask for fewer words than a page's floor or more than its ceiling, for blocks shorter or longer than the words-a-block band on a prose page, for a longer note where the footer is at its share, or for one more page of a kind a deck rule below has no room for. Where the right repair moves a page toward one of these - commentary cut, a point split, a table added - say in the finding's \`floors\` how the page stays inside it (the words that replace the ones cut, the form the page takes instead); validation refuses a repair that states a word count outside the page's band and says nothing in \`floors\`.
+  return `FLOORS THE BUILD HOLDS. The build measured these on the pages you are reading and refuses a page, or the deck, on the wrong side of one. They are not findings and not targets: they bound what a repair may ask for. Do not ask for fewer words than a page's floor or more than its ceiling, for blocks shorter or longer than the words-a-block band on a prose page, for a longer note where the footer is at its share, or for one more page of a kind a deck rule below has no room for. Where the right repair moves a page toward one of these - commentary cut, a point split, a table added - say in the finding's \`floors\` how the page stays inside it (the words that replace the ones cut, the form the page takes instead). A length you ask of a page's body goes in the finding's \`resize\` - its body words, its words a block, or both - and validation refuses one outside the page's band that says nothing in \`floors\`.
 ${floors.titles ? `Titles: ${titleLimitsLine(floors.titles)}. A title a finding proposes in \`retitle\`, or a length it asks for there, stays inside these; validation refuses one that does not.\n` : ""}Deck rules with no room left${floors.median !== null && floors.band ? ` (the prose pages' median is ${floors.median} words a block, held to ${floors.band[0]}-${floors.band[1]})` : ""}:
 ${floors.deck.map((line) => `- ${line}`).join("\n") || "- none"}
 Per page (body words now and the band the build holds them to for the page's reading task; blocks; the footer's share):
 ${listed.map(([id, page]) => pageLine(id, page, floors)).join("\n") || "- none measured"}`;
 }
 
-// A word count a repair states for a page's body: "to about 60 words", "to
-// 120-150 words", "target about 150 words", "90 body words". A length given
-// for one part - "a takeaway of 40 to 60 words" - is not the page's, so the
-// count must follow "to" or "target" (and not be the end of a range), or say
-// "body words".
-const WORD_TARGET = /(?:(?<!\d\s)\bto|\btarget(?:ing)?(?:\s+of)?)\s+(?:(?:about|around|roughly|under|over|some|at\s+most|at\s+least|no\s+more\s+than)\s+)?(\d{2,4})(?:\s*(?:-|–|to)\s*(\d{2,4}))?\s+(?:body\s+)?words\b(?!\s+(?:a|per|each)\s+block)|\b(\d{2,4})(?:\s*(?:-|–|to)\s*(\d{2,4}))?\s+body\s+words\b/gi;
-const BLOCK_TARGET = /(\d{1,3})(?:\s*(?:-|–|to)\s*(\d{1,3}))?\s+words\s+(?:a|per)\s+block/gi;
-// A length the sentence gives for a title - "the title to 14-16 words" - is the
-// title's, which `retitle` states and titleErrors holds, not the body's: it is
-// struck from the sentence before a body count is read.
-const TITLE_LENGTH = /\b(?:section\s+)?title\b[^.;]{0,40}?\b\d{1,3}(?:\s*(?:-|–|to)\s*\d{1,3})?\s+words\b/gi;
-const ranges = (text, pattern) => [...String(text ?? "").matchAll(pattern)].map((match) => { const low = match[1] ?? match[3], high = match[2] ?? match[4] ?? low; return [Number(low), Number(high)]; });
-
 /**
- * A repair that states a number the build refuses, as errors. A finding on
- * one page whose repair gives a body word count wholly outside the band the
- * packet shows for that page, or - on a prose page - a words-a-block figure
- * outside the deck's band, must say in `floors` how the page stays inside it.
- * Only a stated number is caught: a repair that says "halve the commentary"
- * is held by the prompt, and by the gate when the page is rebuilt. A title a
- * finding proposes or sizes in `retitle` is held to the title limits
- * (titleErrors) on any finding, and `floors` does not excuse it.
+ * A length a repair asks for that the build refuses, as errors. Where a
+ * finding's `resize` asks for body words wholly outside the band the packet
+ * shows for that page, or - on a prose page - words a block outside the
+ * deck's band, the finding must say in `floors` how the page stays inside it.
+ * Only the fields are read, never the repair's sentence: a length the
+ * reviewer leaves in the sentence is held by the prompt, and by the gate when
+ * the page is rebuilt. A title a finding proposes or sizes in `retitle` is
+ * held to the title limits (titleErrors) on any finding, and `floors` does not
+ * excuse it.
  */
 export function floorErrors(findings, floors) {
   if (!floors) return [];
   const errors = [];
   for (const [i, finding] of (findings || []).entries()) {
-    const pages = Array.isArray(finding?.slides) ? finding.slides : [];
+    const at = `findings[${i}]${finding?.id ? ` (${finding.id})` : ""}`;
     // A title has no way to stay inside its limit but to be shorter: `floors` does not excuse it.
-    if (floors.titles) errors.push(...titleErrors(finding?.retitle, floors.titles, `findings[${i}]${finding?.id ? ` (${finding.id})` : ""}`, { dividers: floors.dividers || [] }));
-    if (pages.length !== 1 || (typeof finding.floors === "string" && finding.floors.trim().length >= 20)) continue;
-    const page = floors.pages[pages[0]];
-    if (!page) continue;
-    const at = `findings[${i}]${finding.id ? ` (${finding.id})` : ""}`;
-    const { floor, ceiling } = page.words;
-    // A length the sentence gives for a title is the title's (held above), not the page's body.
-    const body = String(finding.repair ?? "").replace(TITLE_LENGTH, " ");
-    const off = floor !== null && ceiling !== null ? ranges(body, WORD_TARGET).find(([low, high]) => high < floor || low > ceiling) : null;
-    if (off) errors.push(`${at}: the repair asks for ${off[0] === off[1] ? off[0] : `${off[0]}-${off[1]}`} words on ${pages[0]}, and the build holds that page to ${floor}-${ceiling} body words (it carries ${page.words.now}): ask for a count inside the band, or say in \`floors\` how the page stays inside it - what replaces the words cut, or the form the page takes instead`);
-    const blocks = page.blocks?.prose && floors.band ? ranges(finding.repair, BLOCK_TARGET).find(([low, high]) => high < floors.band[0] || low > floors.band[1]) : null;
-    if (blocks) errors.push(`${at}: the repair asks for ${blocks[0] === blocks[1] ? blocks[0] : `${blocks[0]}-${blocks[1]}`} words a block on ${pages[0]}, a prose page, and the build holds the prose pages' median to ${floors.band[0]}-${floors.band[1]} words a block: ask for blocks inside the band, or say in \`floors\` how the deck stays inside it`);
+    if (floors.titles) errors.push(...titleErrors(finding?.retitle, floors.titles, at, { dividers: floors.dividers || [] }));
+    if (!Array.isArray(finding?.resize) || (typeof finding.floors === "string" && finding.floors.trim().length >= 20)) continue;
+    for (const entry of finding.resize) {
+      const page = entry && typeof entry.page === "string" ? floors.pages[entry.page] : null;
+      if (!page) continue;
+      const { floor, ceiling } = page.words;
+      if (isRange(entry.words) && floor !== null && ceiling !== null && (entry.words.max < floor || entry.words.min > ceiling))
+        errors.push(`${at}: the repair asks for ${span(entry.words)} words on ${entry.page}, and the build holds that page to ${floor}-${ceiling} body words (it carries ${page.words.now}): ask for a length inside the band, or say in \`floors\` how the page stays inside it - what replaces the words cut, or the form the page takes instead`);
+      if (isRange(entry.wordsPerBlock) && page.blocks?.prose && floors.band && (entry.wordsPerBlock.max < floors.band[0] || entry.wordsPerBlock.min > floors.band[1]))
+        errors.push(`${at}: the repair asks for ${span(entry.wordsPerBlock)} words a block on ${entry.page}, a prose page, and the build holds the prose pages' median to ${floors.band[0]}-${floors.band[1]} words a block: ask for blocks inside the band, or say in \`floors\` how the deck stays inside it`);
+    }
   }
   return errors;
 }

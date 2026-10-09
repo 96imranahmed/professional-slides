@@ -811,6 +811,7 @@ export function advanceLedger(prior, review, items, { downgrade = () => false, a
         ...(item.touches || kept.touches ? { touches: [...new Set([...(kept.touches || []), ...(item.touches || [])])] } : {}),
         // And a title it proposes is the one the author is shown for that page now.
         ...(item.retitle ? { retitle: [...(kept.retitle || []).filter((entry) => !item.retitle.some((fresh) => fresh.page === entry.page)), ...item.retitle] } : {}),
+        ...(item.resize ? { resize: [...(kept.resize || []).filter((entry) => !item.resize.some((fresh) => fresh.page === entry.page)), ...item.resize] } : {}),
         folded: [...(kept.folded || []), { id: item.id, pass, severity: item.severity, pages: item.pages || [], reason: said }], updatedIn: pass });
       continue;
     }

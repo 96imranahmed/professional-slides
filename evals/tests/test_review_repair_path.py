@@ -219,7 +219,7 @@ await deliver(d, { reviewer: 'packet' });
 const rec = await record(d);
 const findings = [major(), major({ id: 'F2', slides: ['p03'], dimension: 'argument', code: 'UNSUPPORTED_CLAIM', touches: ['title', 'copy'],
   reason: 'The title says the subject leads on every measure and the page shows one measure.', repair: 'Rewrite the title to the one measure the page shows, or add the other measures to the exhibit.',
-  retitle: [{ page: 'p03', title: 'The subject leads the market on revenue, the one measure shown', words: { min: 8, max: 12 } }] }),
+  retitle: [{ page: 'p03', title: 'The subject leads the market on revenue, the one measure shown', words: { min: 8, max: 12 } }], resize: [{ page: 'p03', words: { min: 100, max: 140 } }] }),
   major({ id: 'F3', slides: ['p04'], dimension: 'text', code: 'WALL_OF_TEXT', severity: 'minor', touches: ['copy'], repair: 'Cut the second paragraph, which restates the title.' })];
 const rejected = await deliver(d, { reviewFile: await write(d, 'r1.json', { ...firstPass(rec, d.ids, findings), pages: d.ids.map((id) => pageEntry(id, id === 'p04' ? 'minor' : ['p02', 'p03'].includes(id) ? 'major' : 'ok')) }) });
 const note = await fs.readFile(path.join(d.out, 'REJECTED.md'), 'utf8');
@@ -232,6 +232,8 @@ console.log(JSON.stringify({ at: rejected.rejectedAt, blockers: rejected.blocker
     section('Reopen the argument').includes(S.POST_REVIEW_RULE)],
   // The title the reviewer proposes is a field, printed beside the repair for the author.
   proposed: section('Reopen the argument').includes('[Title proposed - p03: "The subject leads the market on revenue, the one measure shown", 8-12 words]'),
+  // So is the length it asks of the page's body.
+  sized: section('Reopen the argument').includes('[Length asked - p03: 100-140 body words]'),
   rating: section('Blockers').includes('REVIEW_RATING'), lead: note.split('\\n')[4] }));
 ''')
         self.assertEqual(result['at'], 'review pass 1 of 3')
@@ -244,6 +246,7 @@ console.log(JSON.stringify({ at: rejected.rejectedAt, blockers: rejected.blocker
         self.assertEqual(result['layout'], [True, False])
         self.assertEqual(result['argument'], [True, True, True, True])
         self.assertTrue(result['proposed'])
+        self.assertTrue(result['sized'])
         self.assertTrue(result['rating'])
         self.assertIn('1 repairable without reopening the argument; 1 reopen the argument', result['lead'])
 
@@ -424,7 +427,7 @@ console.log(JSON.stringify({ ready: [ready.status, ready.pass], rejected: [rejec
 
 # A built deck's measured outputs, written beside the fixture's scene the way the build writes them.
 FLOORS = '''
-import { reviewFloors, floorsPrompt, floorErrors, titleErrors, titleLimits, retitleErrors } from './skills/professional-slides/runtime/review-floors.mjs';
+import { reviewFloors, floorsPrompt, floorErrors, titleErrors, titleLimits, retitleErrors, resizeErrors, resizeLine } from './skills/professional-slides/runtime/review-floors.mjs';
 async function measured(d, { fragmented = 54.5 } = {}) {
   const scene = JSON.parse(await fs.readFile(path.join(d.out, 'scene.json'), 'utf8'));
   scene.slides.forEach((slide, i) => { if (i) Object.assign(slide, { readingTask: 'chart-with-commentary', wordFloor: 96, wordCeiling: 293 }); });
@@ -474,24 +477,33 @@ console.log(JSON.stringify({ p01: packet.floors.pages.p01, p02: packet.floors.pa
         self.assertTrue(result['same'])
         self.assertEqual(result['bare'], [None, {'now': 11, 'floor': 96, 'ceiling': 293, 'task': 'chart-with-commentary'}, None])
 
-    def test_a_repair_that_states_a_count_the_build_refuses_says_how_the_page_stays_inside(self):
+    def test_a_length_the_build_refuses_says_how_the_page_stays_inside(self):
         result = run_node(FIXTURES + FLOORS + '''
 const d = await prebuilt();
 const scene = await measured(d);
 const floors = await reviewFloors(d.out, scene);
-const errors = (o) => floorErrors([major({ slides: ['p01'], ...o })], floors);
+// A length the repair asks of a page's body is given in `resize`, and only there is it read.
+const sized = (resize, o = {}) => major({ slides: ['p01'], touches: ['copy'], repair: 'Cut the commentary so the chart leads the page.', resize: [{ page: 'p01', ...resize }], ...o });
+const errors = (resize, o) => floorErrors([sized(resize, o)], floors);
+const cut = { words: { min: 60, max: 60 } };
 const out = {
-  under: errors({ repair: 'Cut the commentary to about 60 words so the chart leads the page.' }), over: errors({ repair: 'Add the mechanism and the limitation, taking the page to 320-350 words.' }),
-  inside: errors({ repair: 'Cut the commentary to about 120-150 words in two blocks.' }), blocks: errors({ repair: 'Split the points so each runs to 20 words a block.' }),
-  said: errors({ repair: 'Cut the commentary to about 60 words so the chart leads the page.', floors: 'The page changes to a chart-led form, whose floor is 42 words.' }),
-  unstated: errors({ repair: 'Halve the commentary so the chart leads the page.' }), elsewhere: floorErrors([major({ slides: ['cover'], repair: 'Cut the cover to 5 words.' })], floors),
+  under: errors(cut), over: errors({ words: { min: 320, max: 350 } }), inside: errors({ words: { min: 120, max: 150 } }), blocks: errors({ wordsPerBlock: { min: 20, max: 20 } }),
+  said: errors(cut, { floors: 'The page changes to a chart-led form, whose floor is 42 words.' }),
+  elsewhere: floorErrors([sized({ page: 'cover', words: { min: 5, max: 5 } }, { slides: ['cover'] })], floors),
+  // The repair's sentence is not read: a count left in it, and none in `resize`, is held by the prompt and the gate.
+  sentence: ['Cut the commentary to about 60 words so the chart leads the page.', 'Cut the restatement from the third block. Target about 60 words.', 'Split the points so each runs to 20 words a block.']
+    .map((repair) => floorErrors([major({ slides: ['p01'], repair })], floors).length),
+  // A deck finding is held page by page.
+  deck: floorErrors([major({ scope: 'deck', slides: ['p01', 'p02'], touches: ['copy'], resize: [{ page: 'p01', words: { min: 120, max: 150 } }, { page: 'p02', words: { min: 40, max: 50 } }] })], floors),
   // Delivery holds an answer to it: the review is refused on form, not recorded.
-  review: R.validateReview({ accepted: false, summary: 'A deck with one finding to repair.', rating: 7, pages: [], findings: [major({ slides: ['p01'], repair: 'Cut the commentary to about 60 words so the chart leads the page.' })] }, d.ids, { floors }).filter((e) => /floors/.test(e)).length,
-  part: R.validatePart({ part: { kind: 'section', id: 's1', slides: ['p01'] }, findings: [major({ slides: ['p01'], repair: 'Cut the commentary to about 60 words so the chart leads the page.' })] }, d.ids, { floors }).filter((e) => /floors/.test(e)).length,
-  offered: 'floors' in R.REVIEW_SCHEMA.properties.findings.items.properties && !R.REVIEW_SCHEMA.properties.findings.items.required.includes('floors') };
-// A length given for one part of the page is not the page's: only a count the sentence gives for the body is held to the band.
-out.part_of_page = errors({ repair: 'Keep the two row notes and add one developed takeaway of 40 to 60 words under the table.' });
-out.target = errors({ repair: 'Cut the restatement from the third block. Target about 60 words.' }).length;
+  review: R.validateReview({ accepted: false, summary: 'A deck with one finding to repair.', rating: 7, pages: [], findings: [sized(cut)] }, d.ids, { floors }).filter((e) => /floors/.test(e)).length,
+  part: R.validatePart({ part: { kind: 'section', id: 's1', slides: ['p01'] }, findings: [sized(cut)] }, d.ids, { floors }).filter((e) => /floors/.test(e)).length,
+  // A body length is a change to the page's words, said in `touches` as copy.
+  touched: R.validateReview({ accepted: false, summary: 'A deck with one finding to repair.', rating: 7, pages: [], findings: [sized({ words: { min: 120, max: 150 } }, { touches: ['layout'] })] }, d.ids, { floors }).filter((e) => /resize/.test(e)),
+  resized: [resizeErrors([{ page: 'p09', words: { min: 100, max: 120 } }], ['p01'], 'F1'), resizeErrors([{ page: 'p01' }], ['p01'], 'F1'), resizeErrors([{ page: 'p01', words: { min: 120, max: 80 } }], ['p01'], 'F1'),
+    resizeErrors([], ['p01'], 'F1'), resizeErrors([{ page: 'p01', words: { min: 100, max: 120 }, note: 'x' }, { page: 'p01', wordsPerBlock: { min: 40, max: 50 } }], ['p01'], 'F1'), resizeErrors(undefined, ['p01'], 'F1')],
+  line: resizeLine([{ page: 'p01', words: { min: 120, max: 150 }, wordsPerBlock: { min: 40, max: 40 } }]),
+  offered: ['floors', 'resize'].every((key) => key in R.REVIEW_SCHEMA.properties.findings.items.properties && !R.REVIEW_SCHEMA.properties.findings.items.required.includes(key)) };
 // A title the finding proposes, or sizes, in `retitle` is held to the title limits, and `floors` does not excuse it.
 const titled = await reviewFloors(d.out, scene, { spec: d.spec, base: d.dir });
 const long = 'The subject leads the market on revenue, on margin, on growth and on reach in every year shown';
@@ -501,7 +513,7 @@ out.title = [floorErrors([retitled({ title: long }, { floors: 'The subtitle take
   floorErrors([retitled({ words: { min: 16, max: 18 } })], titled), floorErrors([retitled({ title: long })], floors),
   // A title in the repair's sentence alone is not read: the finding says it in `retitle`, or it is not held.
   floorErrors([major({ slides: ['p01'], repair: `Retitle to "${long}".` })], titled)];
-// A length the sentence gives a title is the title's, not a count asked of the page's body.
+// A length the sentence gives a title is not read as a count asked of the page's body.
 out.titleInSentence = floorErrors([retitled({ words: { min: 12, max: 12 } }, { repair: 'Rewrite the title to 12 words so that it names one measure.' })], floors);
 // A section title is held to what this deck's dividers hold: the page an entry names says which title is meant.
 const limits = { title: titled.titles.title, sectionTitle: { words: 9, lines: 2 } };
@@ -521,12 +533,18 @@ console.log(JSON.stringify(out));
         self.assertEqual(result['inside'], [])
         self.assertIn('20 words a block on p01, a prose page', result['blocks'][0])
         self.assertEqual(result['said'], [])
-        self.assertEqual(result['unstated'], [])  # only a stated number is caught; the prompt and the gate hold the rest
         self.assertEqual(result['elsewhere'], [])
+        self.assertEqual(result['sentence'], [0, 0, 0])
+        self.assertEqual(len(result['deck']), 1)
+        self.assertIn('asks for 40-50 words on p02', result['deck'][0])
         self.assertEqual([result['review'], result['part']], [1, 1])
+        self.assertEqual(len(result['touched']), 1)
+        self.assertIn('resize changes a page\'s words and touches leaves out copy', result['touched'][0])
+        self.assertEqual([len(e) for e in result['resized']], [1, 1, 1, 1, 2, 0])
+        self.assertIn("names page p09: its page is one of the finding's own (p01)", result['resized'][0][0])
+        self.assertIn('gives no length', result['resized'][1][0])
+        self.assertEqual(result['line'], 'p01: 120-150 body words, 40 words a block')
         self.assertTrue(result['offered'])
-        self.assertEqual(result['part_of_page'], [])
-        self.assertEqual(result['target'], 1)
         self.assertEqual(result['titles'], {'title': {'words': {'min': 6, 'max': 15, 'target': 10}, 'lines': 2}})
         # Without the deck, no title limit is shown and none is held; a title in the sentence alone is not read.
         self.assertEqual([len(e) for e in result['title']], [1, 0, 1, 0, 0])

@@ -33,7 +33,7 @@ import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from 
 import { normalizeText, textWords, TEXT_FORM } from "./text-contract.mjs";
 import { storylineGate, readStorylineHistory, repairReach, STORYLINE_CHECKS, STORYLINE_PAGE_CHECKS } from "./storyline.mjs";
 import { REVIEW_TOUCHES } from "./gates/gate_classes.mjs";
-import { reviewFloors, floorsPrompt, floorErrors, RETITLE_SCHEMA, retitleErrors } from "./review-floors.mjs";
+import { reviewFloors, floorsPrompt, floorErrors, RETITLE_SCHEMA, retitleErrors, RESIZE_SCHEMA, resizeErrors } from "./review-floors.mjs";
 import { designStatistics, measurePasses, DOWNGRADE_MEASURES } from "./build-bars.mjs";
 import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE } from "./revision.mjs";
 import { assetsPrompt } from "./asset-needs.mjs";
@@ -152,10 +152,12 @@ const FINDING_PROPERTIES = {
   floors: { type: "string" },
   // The titles the repair rewrites, each with the title proposed or the length asked for (review-floors.mjs RETITLE_SCHEMA): what the title limits hold.
   retitle: RETITLE_SCHEMA,
+  // The page bodies the repair takes to a stated length - body words, words a block (review-floors.mjs RESIZE_SCHEMA): what the floors hold.
+  resize: RESIZE_SCHEMA,
   // A finding about the imported deck, on a revision (review-passes.mjs ABOUT_IMPORTED_RULE): reported to the user, never blocking.
   aboutImported: { type: "boolean" },
 };
-const FINDING_REQUIRED = Object.keys(FINDING_PROPERTIES).filter((key) => !["floors", "retitle", "aboutImported"].includes(key));
+const FINDING_REQUIRED = Object.keys(FINDING_PROPERTIES).filter((key) => !["floors", "retitle", "resize", "aboutImported"].includes(key));
 const findingSchema = (dimensions = DIMENSIONS) => ({ type: "object", additionalProperties: false, required: FINDING_REQUIRED, properties: { ...FINDING_PROPERTIES, dimension: { type: "string", enum: dimensions } } });
 const FINDING = findingSchema();
 const NEW_FINDING = {
@@ -339,8 +341,9 @@ export function deckItems(review) {
     // What the reviewer says the repair changes, and where the defect was first decidable: what delivery groups a rejection by.
     // A record from before every finding had to say it carries no `touches`, and is read by its code (gate_classes.mjs reviewRepairOf).
     ...(Array.isArray(f.touches) ? { touches: f.touches } : {}), decidable: decidableAt(f), ...(f.aboutImported ? { aboutImported: true } : {}),
-    // The titles the repair proposes, which the rejection shows the author beside the repair.
+    // The titles the repair proposes and the lengths it asks for, which the rejection shows the author beside the repair.
     ...(Array.isArray(f.retitle) && f.retitle.length ? { retitle: f.retitle } : {}),
+    ...(Array.isArray(f.resize) && f.resize.length ? { resize: f.resize } : {}),
     ...(f.basis ? { basis: f.basis, justification: f.justification, evidence: f.evidence } : {}),
   }));
   // A density verdict other than "right" blocks as a finding would, and is
@@ -424,6 +427,10 @@ function findingErrors(findings, ids, { dimensions = DIMENSIONS } = {}) {
     errors.push(...retitleErrors(f.retitle, f.slides, at));
     if (Array.isArray(f.retitle) && f.retitle.length && Array.isArray(f.touches) && !f.touches.includes("title"))
       errors.push(`${at}: retitle rewrites a title and touches leaves out title: add "title" to touches, since the author is told from it whether the repair reopens the storyline critique`);
+    // A length the repair asks of a page's body is said in `resize`; its floors are floorErrors' (review-floors.mjs).
+    errors.push(...resizeErrors(f.resize, f.slides, at));
+    if (Array.isArray(f.resize) && f.resize.length && Array.isArray(f.touches) && !f.touches.includes("copy"))
+      errors.push(`${at}: resize changes a page's words and touches leaves out copy: add "copy" to touches`);
     if (f.checkable === undefined) errors.push(`${at}: checkable is required - { rule, measure } or null`);
     if (f.floors !== undefined && typeof f.floors !== "string") errors.push(`${at}: floors is a sentence saying how the page stays inside the floors the packet shows`);
     if (f.checkable !== undefined && f.checkable !== null) {
@@ -531,7 +538,7 @@ const ratingErrors = (review, open) => (Number.isFinite(review.rating) && review
  * `downgrade` (downgradeRule) and `pageText` (pageTexts) hold a verification
  * pass's residual severities and missed findings to the rebuilt scene;
  * `floors` (review-floors.mjs) are the floors the packet showed, which a
- * repair that states a word count is held to; `imported` are the pages of a
+ * length a finding asks in `resize` is held to; `imported` are the pages of a
  * revision's source deck that it left unchanged, which no later pass files a
  * finding on alone.
  */
@@ -644,6 +651,7 @@ export const formRules = (dimensions = DIMENSIONS) => [
   { id: "repair", matches: /needs a concrete repair sentence/, rule: `\`repair\`, on every finding whose severity is not none: ${REPAIR_FLOOR.blocking} characters or more for a major or blocker, ${REPAIR_FLOOR.other} or more for a minor, and containing one of these verbs as a word: ${REPAIR_VERBS.join(", ")}` },
   { id: "touches", matches: /touches (?:is missing|is not a list|is empty|says what the repair changes)/, rule: `\`touches\`, on every finding: one or more of ${TOUCH_WORDS}, naming everything the repair changes ([] only on a finding of severity none, which asks for no repair)` },
   { id: "retitle", matches: /: (?:retitle\b|the title it proposes for|it asks for a title of)/, rule: "`retitle`, on a finding whose repair rewrites a page's or a section's title: one entry for each page whose title it rewrites - `page` (one of the finding's `slides`; a divider's id for a section's title) with `title` (the title proposed, as it would be printed), `words` ({ min, max }: the length asked for, the same number twice for one length) or both; left out where the repair rewrites no title. A finding with `retitle` has title in `touches`, and what it proposes keeps to the title limits the floors show" },
+  { id: "resize", matches: /: (?:resize\b|the repair asks for [\d-]+ words)/, rule: "`resize`, on a finding whose repair takes a page's body to a stated length: one entry for each such page - `page` (one of the finding's `slides`) with `words` ({ min, max }: the body words asked for), `wordsPerBlock` ({ min, max }) or both; left out where the repair states no length. A finding with `resize` has copy in `touches`, and a length outside the page's floors says in `floors` how the page stays inside them" },
   { id: "sampled", matches: /lists pages by example|ends a page list with/, rule: `no page list by example: in \`reason\` and \`repair\`, none of ${SAMPLING_WORDS.before.map((w) => `"${w}"`).join(", ")} within a few words before a page id, and none of ${SAMPLING_WORDS.after.map((w) => `"${w}"`).join(", ")} after one` },
   { id: "left-out", matches: /which the finding's page list leaves out/, rule: "a deck finding's `slides` holds every page its `reason` or `repair` names - by id, as \"page 12\", or inside a range (\"p16-p19\" and \"p16 to p19\" name every page between); an id that is an ordinary word counts only written as an id, in brackets" },
   { id: "one-page", matches: /a page finding names one page/, rule: "a finding with `scope: \"page\"` has exactly one id in `slides`; the same defect on several pages is one `scope: \"deck\"` finding" },
@@ -690,6 +698,7 @@ export function mergeReviewParts(parts, slideIds, { sections = null, binding, pr
     if (same.touches || finding.touches) same.touches = [...new Set([...(same.touches || []), ...(finding.touches || [])])];
     // Each part proposes titles for its own pages; the joined finding carries every page's.
     if (finding.retitle) same.retitle = [...(same.retitle || []), ...finding.retitle.filter((entry) => !(same.retitle || []).some((kept) => kept.page === entry.page))];
+    if (finding.resize) same.resize = [...(same.resize || []), ...finding.resize.filter((entry) => !(same.resize || []).some((kept) => kept.page === entry.page))];
     same.checkable = same.checkable ?? finding.checkable ?? null;
   }
   const joined = joinParts(parts, slideIds, advanceLedger([], {}, deckItems({ findings })), { pageKey: "slide", dimensions: DIMENSIONS, dimKey: "dimension" });
@@ -970,7 +979,7 @@ function acceptanceBlockers(review, waivers = []) {
 export function reviewOutcome(review, priorLedger = [], { waivers = [], downgrade = () => false } = {}) {
   const ledger = deckLedger(review?.pass > 1 ? priorLedger : [], review, { downgrade });
   const blocking = openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity,
-    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...repairClass(e) }));
+    reason: e.status === "open" ? reasonOf(e) : `${e.status} (pass ${e.updatedIn}): ${reasonOf(e)}`, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...(e.resize ? { resize: e.resize } : {}), ...repairClass(e) }));
   const held = acceptanceBlockers(review, waivers);
   const newBlockers = ledger.filter((e) => e.raisedIn === (review?.pass ?? 1) && e.severity === "blocker" && e.status === "open");
   return { accepted: review?.accepted === true && blocking.length === 0 && held.length === 0, blocking: [...blocking, ...held], ledger, newBlockers: newBlockers.length };
@@ -994,7 +1003,7 @@ export function spineAgreement(ledger) {
 /** A confirmation read's outcome: its own findings and rating alone, with no ledger behind it. */
 export function confirmationOutcome(review, { waivers = [] } = {}) {
   const ledger = advanceLedger([], {}, deckItems({ findings: review?.findings || [] }));
-  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...repairClass(e) })),
+  const blocking = [...openBlocking(ledger).map((e) => ({ id: e.id, slide: e.pages?.[0] ?? null, slides: e.pages || [], code: e.code, severity: e.severity, reason: e.reason, repair: e.repair, ...(e.retitle ? { retitle: e.retitle } : {}), ...(e.resize ? { resize: e.resize } : {}), ...repairClass(e) })),
     ...acceptanceBlockers(review, waivers)];
   return { accepted: review?.accepted === true && blocking.length === 0, blocking, ledger };
 }
@@ -1166,7 +1175,8 @@ const FINDING_RULES = `FINDINGS. Give each finding an id (F1, F2, ...), a scope,
 TOUCHES. The author can redo the layout and the copy freely, but the argument was settled by a storyline critique before the pages were drawn, and a repair that changes it sends the page back through that critique. So say on every finding what your repair changes, with every word that applies - nothing reads it off your repair's sentence, and a finding without \`touches\` refuses the whole answer:
 ${Object.entries(REVIEW_TOUCHES).map(([word, { about }]) => `- ${word}: ${about}`).join("\n")}
 The first two leave the argument as it was read. Do not shrink a repair to keep it among them: where the title claims more than the page shows, the repair is the title or the evidence, and saying so is what gets it fixed.
-RETITLE. Where your repair rewrites a page's title, or a section's on its divider, \`touches\` holds title, and \`retitle\` gives, for each page whose title it rewrites, the title you propose (\`title\`), the length you ask for (\`words\`, { min, max }) or both. The build holds them to the title limits, and the author is shown them beside your repair: say them there, not only in the sentence.`;
+RETITLE. Where your repair rewrites a page's title, or a section's on its divider, \`touches\` holds title, and \`retitle\` gives, for each page whose title it rewrites, the title you propose (\`title\`), the length you ask for (\`words\`, { min, max }) or both. The build holds them to the title limits, and the author is shown them beside your repair: say them there, not only in the sentence.
+RESIZE. Where your repair takes a page's body to a stated length, \`touches\` holds copy, and \`resize\` gives, for each such page, the body words you ask for (\`words\`, { min, max }), the words a block (\`wordsPerBlock\`) or both. The build holds them to the page's floors, and the author is shown them beside your repair: say them there, not only in the sentence.`;
 
 /**
  * The rules of form, printed beside the schema: what validation enforces on a
