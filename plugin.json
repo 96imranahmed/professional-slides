@@ -28,7 +28,9 @@
         ],
         "defaultPrompt": "Use $professional-slides to create or revise a decision-ready executive deck and verify the final editable artifact.",
         "websiteURL": "https://github.com/96imranahmed/professional-slides",
-        "supportURL": "https://github.com/96imranahmed/professional-slides/issues"
+        "supportURL": "https://github.com/96imranahmed/professional-slides/issues",
+        "privacyPolicyURL": "https://shiphappens.xyz/slides/privacy",
+        "termsOfServiceURL": "https://shiphappens.xyz/slides/terms"
       },
       "publication": {
         "release_notes": "Updated the Professional Slides skill and bundled authoring runtime, including competitive positioning templates, existing-deck import, environment checks, evidence handling, table treatments, and rendered review gates. Packaged as a standalone skills-only plugin with portable, Codex, and Claude Code manifests."
