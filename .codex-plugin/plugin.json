@@ -26,6 +26,8 @@
     ],
     "defaultPrompt": "Use $professional-slides to create or revise a decision-ready executive deck and verify the final editable artifact.",
     "websiteURL": "https://github.com/96imranahmed/professional-slides",
-    "supportURL": "https://github.com/96imranahmed/professional-slides/issues"
+    "supportURL": "https://github.com/96imranahmed/professional-slides/issues",
+    "privacyPolicyURL": "https://shiphappens.xyz/slides/privacy",
+    "termsOfServiceURL": "https://shiphappens.xyz/slides/terms"
   }
 }

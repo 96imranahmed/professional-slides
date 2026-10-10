@@ -40,8 +40,12 @@ class SubmissionPackageTests(unittest.TestCase):
         interface = data['extensions']['com.openai']['interface']
         self.assertLessEqual(len(interface['longDescription']), 4000)
         self.assertLessEqual(len(interface['shortDescription']), 30)
-        for field in ['privacyPolicyURL', 'termsOfServiceURL']:
-            self.assertNotIn(field, interface)
+        # The published pages load the policy and terms kept beside the store manifest.
+        self.assertEqual(interface['privacyPolicyURL'], 'https://shiphappens.xyz/slides/privacy')
+        self.assertEqual(interface['termsOfServiceURL'], 'https://shiphappens.xyz/slides/terms')
+        for document in ['PRIVACY.md', 'TERMS.md']:
+            self.assertTrue((ROOT / '.codex-plugin' / document).is_file(), document)
+            self.assertFalse((self.package / '.codex-plugin' / document).exists(), document)
         self.assertNotIn('countries', data['extensions']['com.openai']['publication'])
         self.assertNotIn('review', data['extensions']['com.openai'])
 
