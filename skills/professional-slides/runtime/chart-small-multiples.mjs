@@ -21,9 +21,9 @@
 // the bottom row (columns, lines) or beside the left column (bars). Values
 // print on the marks while they are few enough to read in a panel - six
 // columns or bars, or a line's last value - and the shared scale says the rest.
-import { ellipsePrimitive, linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, stableId, textPrimitive, token } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
-import { measureText } from "./text-layout.mjs";
+import { measureAt } from "./draw.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, fillStyle, labelBold, lineStyle, numericBounds, textStyle } from "./chart-axes.mjs";
 
 export const SMALL_MULTIPLES = Object.freeze({ min: 2, max: 12, marks: Object.freeze(["column", "bar", "line"]) });
@@ -31,8 +31,7 @@ const ACCENT = token("color.accent");
 const GAP_X = 18, GAP_Y = 16, TITLE = 18, AXIS = 16, HEADER = 20;
 // Values print on a panel's marks while they are this few: past it a panel's figures crowd its plot.
 const LABELLED_MARKS = 6;
-const face = (bold = false, size = CHART_LABEL) => ({ fontFamily: tokenValue(FONT), fontSize: tokenValue(size), bold });
-const measure = (text, width, bold = false, size = CHART_LABEL) => measureText(String(text), width, face(bold, size));
+const measure = (text, width, bold = false, size = CHART_LABEL) => measureAt(String(text), width, { size, bold, font: FONT });
 
 /** The props checked: the mark, the categories, the panels, the grid and the scale. */
 function normalized(props = {}) {
@@ -82,11 +81,14 @@ function columnsFor(count, frame, mark, given) {
 
 /** The trellis laid out: the grid, each cell's frame and its plot, and the scale. */
 export function smallMultiplesLayout(frameIn, props = {}) {
-  const frame = Number.isFinite(frameIn.height) ? frameIn : { ...frameIn, height: Math.round(frameIn.width * 0.45) };
   const spec = normalized(props);
   const { mark, categories, items, rowLabels, columnLabels } = spec;
-  const columns = columnLabels ? columnLabels.length : columnsFor(items.length, frame, mark, props.columns);
+  // Measured at a width alone, the trellis is as tall as its rows need at the shape its mark reads best in, and no shorter.
+  const measuring = !Number.isFinite(frameIn.height);
+  const guess = { ...frameIn, height: Math.round(frameIn.width * 0.45) };
+  const columns = columnLabels ? columnLabels.length : columnsFor(items.length, measuring ? guess : frameIn, mark, props.columns);
   const rows = Math.ceil(items.length / columns);
+  const frame = measuring ? { ...frameIn, height: (columnLabels ? HEADER : 0) + (mark === "bar" ? 0 : AXIS) + rows * Math.max(mark === "bar" ? categories.length * 10 + TITLE + 24 : 96, ((frameIn.width - (columns - 1) * GAP_X) / columns) / (mark === "bar" ? 1.1 : 1.6)) + (rows - 1) * GAP_Y } : frameIn;
   const rowGutter = rowLabels ? Math.min(140, Math.ceil(Math.max(...rowLabels.map((l) => measure(l, 140, true).width))) + 12) : 0;
   const categoryGutter = mark === "bar" ? Math.min(120, Math.ceil(Math.max(...categories.map((c) => measure(c, 120, false, AXIS_LABEL).width))) + 8) : 0;
   const top = frame.y + (columnLabels ? HEADER : 0);

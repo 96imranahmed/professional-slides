@@ -75,7 +75,7 @@ const written = (value) => typeof value === "string" && value.trim().length > 0;
 const humanised = (name) => String(name ?? "").replace(/[_.-]+/g, " ").trim();
 const classOfKind = (kind) => (isChartKind(kind) || kind === "map" ? "chart" : kind === "table" ? "table" : "figure");
 // The keys of an exhibit or a block a renderer reads as data, not as words a reader sees: the completion leaves them as written.
-const STRUCTURAL = new Set(["icon", "type", "src", "image", "url", "id", "tone", "variant", "treatment", "arrangement", "date", "start", "end", "from", "to", "kind", "status", "geography", "measure", "format"]);
+const STRUCTURAL = new Set(["icon", "type", "src", "image", "url", "id", "tone", "variant", "treatment", "arrangement", "date", "start", "end", "from", "to", "kind", "status", "geography", "measure", "format", "better"]);
 // The page types whose one exhibit is a table: a measure on one is tabulated where nothing declares its view (naturalClass).
 const TABLE_TYPES = new Set(["scorecard", "lookup", "matrix", "options"]);
 // The chart kinds a callout names one category of, along their axis - what the witness marks a finding on and a scaffold carries a

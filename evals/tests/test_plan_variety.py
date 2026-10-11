@@ -590,14 +590,15 @@ class VariabilityEvalTests(unittest.TestCase):
         self.assertLessEqual(spine["betweenSeeds"]["pages"], spine["betweenSeeds"]["free"])
         self.assertLess(spine["concentration"]["high"], 0.6)
         # What a reader sees between two seeds: the pages that draw an exhibit whose kinds differ, the two decks' top three kinds,
-        # and how many chart pages another page type carries as directly - the type's own latitude, which this spine has none of.
+        # and how many chart pages another page type carries as directly - the type's own latitude, which this spine has on one page.
         reader = spine["reader"]
         self.assertGreaterEqual(reader["exhibitPages"], 20)
         self.assertGreater(reader["differing"], 0.05)
         self.assertTrue(0 <= reader["topThreeShared"] <= 3)
         self.assertLess(reader["topThreeShared"], 3)                           # two seeds do not always lead with the same three kinds
         self.assertLessEqual(reader["topThree"]["low"], reader["topThree"]["high"])
-        self.assertEqual([spine["spine"], spine["typeLatitude"]["pages"]], ["open", []])
+        # One page has it: six series over the same periods are carried as directly by small multiples (panels) as by lines.
+        self.assertEqual([spine["spine"], spine["typeLatitude"]["pages"]], ["open", ["v03"]])
         self.assertGreaterEqual(spine["typeLatitude"]["chartPages"], 10)
 
     def test_the_eval_reads_a_spine_whose_open_exhibits_are_declared_by_stubs_as_its_critique_does(self):

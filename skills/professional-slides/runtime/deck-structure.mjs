@@ -8,7 +8,7 @@
 // compiles, and on its declared choices (page-types.mjs declaredSlide) where
 // it does not, so that fixing a page never reveals a structure rule the run
 // before could have reported.
-import { PAGE_TYPES, dataKeys, declaredSlide, drawnOf, placementsOf, plannableForms, structureOf, undrawnExhibit } from "./page-types.mjs";
+import { PAGE_TYPES, dataKeys, declaredSlide, drawnOf, placementsOf, plannableForms, structureOf, undrawnExhibit, exhibitRange } from "./page-types.mjs";
 import { TYPE_SHAPES } from "./evidence.mjs";
 import { axisOf, measureRegistry } from "./measures.mjs";
 import { declaredPlot, refsOf } from "./gates/dependency_gates.mjs";
@@ -533,7 +533,12 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     // (`forms: "any"` asks the other question - whether any allocation the catalogue allows meets the rules - and lifts both.)
     const mendable = asSource.length ? given : forms === "any" ? Object.keys(type.forms) : best.length ? given : formDeclared && fit?.chosen ? Object.keys(type.forms).filter((form) => gradeIn(form) >= fit.chosen.grade) : Object.keys(type.forms);
     // A summary's form is its place (openForms), not the layout's: no rule turns a closing list into a second answer.
-    const wider = page.type === "summary" ? [] : mendable.flatMap((form) => placementsOf(page.type, form).map((commentary) => ({ form, commentary })));
+    // A form that cannot hold the exhibits the page carries - those it has written, or as many as its declared form draws at
+    // least - is no mend for it: a row of two panels is not a trellis of one, and the change would be refused at the compile.
+    const drawnCount = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object").length;
+    const carried = drawnCount || (formDeclared ? exhibitRange(page.type, page.form)[0] : 0);
+    const holds = (form) => { const [lo, hi] = exhibitRange(page.type, form); return !carried || (carried >= lo && carried <= hi); };
+    const wider = page.type === "summary" ? [] : mendable.filter(holds).flatMap((form) => placementsOf(page.type, form).map((commentary) => ({ form, commentary })));
     // The page as the compile reads it, where it compiles as written under the choices it declares.
     const written = declared ? compiled?.get?.(String(page.id ?? `page-${index + 1}`)) ?? null : null;
     return { page, index, appendix, type, options, wider, declared, formDeclared, written, slides: new Map(), fit, best, open, fitted: best.length > 0, imported: revision && page.sourceSlide !== undefined,
