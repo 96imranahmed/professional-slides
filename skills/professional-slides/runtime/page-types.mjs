@@ -134,7 +134,9 @@ export const PAGE_TYPES = Object.freeze({
     // `dashboard`: two to six headed exhibits of any kind on a grid of named
     // areas - a hero chart and its satellites, a map beside a table - under an
     // optional strip of figures, with an optional rail.
-    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence", "small-multiples": CHART("small-multiples"), dashboard: "dashboard" },
+    // `breakout`: an overview and the detail of one of its bars, columns or
+    // segments, the mark fanned out to the panel that splits it.
+    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence", "small-multiples": CHART("small-multiples"), dashboard: "dashboard", breakout: "breakout" },
     commentary: ["captions", "below", "so-what-bar", "none"], exhibits: [2, 4],
   },
   scorecard: {
@@ -264,7 +266,40 @@ export const FORM_COMMENTARY = Object.freeze({
   "panels/dashboard": ["none", "rail", "so-what-bar"],
 });
 // Forms that carry a different number of exhibits from their type: a trellis is one exhibit of many panels.
-const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6] });
+const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6], "panels/breakout": 2 });
+// The charts whose bars, columns and segments a breakout or a spread runs from:
+// the marks it links are boxes with a top, a bottom and a side to leave from.
+const LINKED_CHARTS = new Set(["chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"]);
+/** One end of a breakout or a spread: an exhibit by its place on the page (0, 1, ...), a category it draws, and a series of it. */
+function linkEnd(id, key, end, ref, exhibits, { mark = true } = {}) {
+  if (!ref || typeof ref !== "object") throw new Error(`${id}: \`${key}.${end}\` names { exhibit${mark ? ", category, series?" : ""} } - the exhibit by its place on the page, from 0`);
+  const at = ref.exhibit;
+  if (!Number.isInteger(at) || at < 0 || at >= exhibits.length) throw new Error(`${id}: \`${key}.${end}.exhibit\` is the exhibit's place on the page, 0 to ${exhibits.length - 1} (got ${JSON.stringify(at)})`);
+  const ex = exhibits[at];
+  if (!LINKED_CHARTS.has(ex.type)) throw new Error(`${id}: a ${key} runs between bars, columns or stacks (${[...LINKED_CHARTS].join(", ")}); exhibit ${at} is ${ex.type}`);
+  if (!mark) return { exhibit: at };
+  const categories = (ex.categories || []).map(String), names = (ex.series || []).map((sr) => sr?.name);
+  if (!categories.includes(String(ref.category))) throw new Error(`${id}: \`${key}.${end}.category\` is one of exhibit ${at}'s categories (${categories.join(", ")}); got ${JSON.stringify(ref.category)}`);
+  if (ref.series !== undefined && !names.includes(ref.series)) throw new Error(`${id}: \`${key}.${end}.series\` is one of exhibit ${at}'s series (${names.join(", ")}); got ${JSON.stringify(ref.series)}`);
+  return { exhibit: at, category: String(ref.category), ...(ref.series !== undefined ? { series: ref.series } : {}) };
+}
+/** `breakout: { from: { exhibit, category, series? }, to: exhibit }` - the overview's mark and the panel that splits it, the overview first. */
+function breakoutOf(page, id, exhibits) {
+  const b = page.breakout;
+  if (!b || typeof b !== "object") throw new Error(`${id}: a breakout page names the mark it splits - \`breakout: { from: { exhibit: 0, category, series? }, to: 1 }\`, the overview first and the detail beside it`);
+  const from = linkEnd(id, "breakout", "from", { exhibit: 0, ...b.from }, exhibits);
+  const to = linkEnd(id, "breakout", "to", { exhibit: b.to ?? 1 }, exhibits, { mark: false });
+  if (to.exhibit <= from.exhibit) throw new Error(`${id}: the detail a breakout fans out to sits to the right of its overview - \`to\` after \`from.exhibit\``);
+  return { from, to };
+}
+/** `spread: { from: { exhibit, category, series? }, to: { ... }, label }` - the gap between marks in two panels, named. */
+function spreadOf(page, id, exhibits) {
+  const sp = page.spread;
+  if (!sp || typeof sp !== "object" || typeof sp.label !== "string" || !sp.label.trim()) throw new Error(`${id}: \`spread\` names the gap it draws - { from, to, label }, the label the difference in the measure's unit ("+12 pts")`);
+  const from = linkEnd(id, "spread", "from", sp.from, exhibits), to = linkEnd(id, "spread", "to", sp.to, exhibits);
+  if (to.exhibit <= from.exhibit) throw new Error(`${id}: a spread runs left to right, from a mark in one panel to a mark in a later one`);
+  return { from, to, label: sp.label.trim() };
+}
 /** The fewest and most exhibits a page of `type` and `form` carries: `[lo, hi]`. */
 export function exhibitRange(type, form) {
   const n = FORM_EXHIBITS[`${type}/${form}`] ?? PAGE_TYPES[type]?.exhibits ?? 1;
@@ -1939,6 +1974,21 @@ function layOutPage({ page, id, type, slide, target, exhibits, setType, primary,
       // reader cannot say what led to what.
       const unnamed = exhibits.filter((ex) => !(typeof ex.heading === "string" && ex.heading.trim()));
       if (unnamed.length) throw new Error(`${id}: every step of a sequence carries its \`heading\` - the cause, the change, the result; ${unnamed.length} ${unnamed.length === 1 ? "has" : "have"} none`);
+    }
+    if (page.form === "breakout") {
+      slide.breakout = breakoutOf(page, id, exhibits);
+      // The fan is drawn on the marks as the deck draws them; a native chart
+      // is laid out by PowerPoint, and its bars would move off the lines.
+      for (const ex of exhibits) ex.native = false;
+      // The mark broken out is the overview's subject: lit, unless the author marked it.
+      const overview = exhibits[slide.breakout.from.exhibit];
+      if (!markedChart(overview) && (overview.series || []).length === 1) overview.highlights = [{ category: slide.breakout.from.category }];
+    }
+    else if (page.breakout !== undefined) throw new Error(`${id}: \`breakout\` fans a mark out to the panel that splits it - it belongs to panels form "breakout"`);
+    if (page.spread !== undefined) {
+      if (!["row", "breakout"].includes(page.form)) throw new Error(`${id}: \`spread\` names the gap between marks in two panels of a row - panels form "row"`);
+      slide.spread = spreadOf(page, id, exhibits);
+      for (const at of [slide.spread.from.exhibit, slide.spread.to.exhibit]) exhibits[at].native = false;
     }
     slide.arrange = page.form;
     if (page.exhibit) { slide.exhibits = [page.exhibit, ...(page.exhibits || [])]; delete slide.exhibit; }

@@ -16,7 +16,7 @@ import { stepsLayout } from "./extras.mjs";
 import { factGridLayout } from "./figures.mjs";
 import { renderTable, withoutInferredBars } from "./tables.mjs";
 import { metricHeight } from "./panels.mjs";
-import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, BODY_HEIGHT, SIDE_COLUMN_SHORT, SIDE_COLUMN_DEPTH, SIDE_COLUMN_MIN_WIDTH } from "./compose-body.mjs";
+import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, LINK_GUTTER, BODY_HEIGHT, SIDE_COLUMN_SHORT, SIDE_COLUMN_DEPTH, SIDE_COLUMN_MIN_WIDTH } from "./compose-body.mjs";
 import { heavyTable, styleTable } from "./compose-tables.mjs";
 import { sharedBound, SIDEWAYS_CATEGORIES } from "./compose-charts.mjs";
 import { exhibitItem, headedPanel } from "./compose-exhibits.mjs";
@@ -25,6 +25,9 @@ import { photoStrip } from "./compose-pictures.mjs";
 import { metricsColumn } from "./compose-metrics.mjs";
 import { hasCommentary } from "./compose-layouts.mjs";
 import { fitsQuarter } from "./compose-text-pages.mjs";
+
+/** A link's end by the exhibit's place on the page: `1`, or `{ exhibit: 1, ... }` as the compile writes it. */
+const placeOf = (end) => (typeof end === "number" ? end : end?.exhibit ?? 0);
 
 /**
  * Two peer exhibits side by side: `two-up` and `two-up-contrast`.
@@ -37,12 +40,19 @@ export function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, f
   shareCaptionHeight(exhibits, { id, slide, layout });
   fitLineLabelsToPanels(exhibits, layout);
   const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
-  shareValueScales(charts);
-  shareBarDomain(charts, { id, slide });
+  // A breakout's detail is the overview's mark enlarged: on its own scale its
+  // split fills the panel and the fan opens to it, where on the overview's
+  // scale it stood the mark's height and the lines ran flat.
+  if (layout !== "breakout") {
+    shareValueScales(charts);
+    shareBarDomain(charts, { id, slide });
+  }
   sharePlotFrame(charts);
   // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
   const panelSize = (ex, index) => {
     if (slide.pairedWeights) return { width: { fr: slide.pairedWeights[index] }, height: "fill" };
+    // The overview reads across its members; the detail is one mark split, a narrow panel.
+    if (layout === "breakout") return { width: { fr: index === placeOf(slide.breakout?.to ?? 1) ? 1 : 2 }, height: "fill" };
     if (exhibits.length !== 2) return SIZE;
     const other = exhibits.find((_, i) => i !== index);
     const narrow = (t) => t?.type === "table" && (t.columns || []).length <= 3;
@@ -71,8 +81,21 @@ export function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, f
   // The arrow is the relation; a row of peers without it is a comparison.
   const row = layout === "sequence"
     ? panels.flatMap((panel, i) => (i ? [{ id: `${id}-step-${i}`, component: "connector", props: { variant: "arrow" }, size: { width: CONNECTOR_WIDTH, height: "fill" } }, panel] : [panel]))
+    : layout === "breakout" || slide.spread
+    // A breakout's fan and a spread's bracket cross the gutter: the panel after
+    // the first is set in from it, so the lines have the room to read as lines.
+    ? panels.map((panel, i) => (i ? { id: `${id}-set-in-${i}`, layout: "flow.column", padding: { left: LINK_GUTTER }, size: panel.size, items: [{ ...panel, size: SIZE }] } : panel))
     : panels;
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: row });
+  const exhibitId = (end) => `${id}-exhibit-${placeOf(end)}`;
+  const links = [
+    ...(slide.breakout ? [{ kind: "breakout", from: { ...slide.breakout.from, exhibit: exhibitId(slide.breakout.from ?? 0) }, to: { exhibit: exhibitId(slide.breakout.to ?? 1) } }] : []),
+    ...(slide.spread ? [{ kind: "spread", label: slide.spread.label, from: { ...slide.spread.from, exhibit: exhibitId(slide.spread.from) }, to: { ...slide.spread.to, exhibit: exhibitId(slide.spread.to) } }] : []),
+  ];
+  const rowItem = { id: `${id}-row`, layout: "flow.row", size: SIZE, items: row };
+  // The lines are drawn over the row once its charts are drawn (exhibit-links.mjs).
+  items.push(links.length
+    ? { id: `${id}-linked`, layout: "overlay", size: SIZE, items: [rowItem, ...links.map((props, k) => ({ id: `${id}-link-${k}`, component: "exhibit-link", props, size: SIZE }))] }
+    : rowItem);
   if (slide.points?.length) items.push(pointsUnderPanels(slide.points, { id, slide, layout, panels, fill, pointsStyle }));
 }
 

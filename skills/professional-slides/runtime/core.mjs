@@ -1268,13 +1268,21 @@ function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, 
     return heights;
   };
   const scene = { slideId, registry, pageTemplate, designTokens, slideTokens, nodes, componentInstances, chromeOwners, placements, headerBandHeight, sharedTableRows };
-  for (const { node, frame, ancestors = [], inRow: inRowPlacement = false } of placements) {
+  // A component that draws between other components - a breakout's fan from a
+  // mark to the panel that splits it - reads where they were drawn
+  // (`readsScene`), so it is placed after everything else on the slide.
+  const reads = (node) => node.nodeType !== "section" && registry.get(node.component)?.readsScene === true;
+  const deferred = [];
+  for (const placement of placements) {
+    const { node, frame, ancestors = [], inRow: inRowPlacement = false } = placement;
+    if (reads(node)) { deferred.push(placement); continue; }
     if (node.nodeType === "section") {
       placeSection(scene, { node, frame, ancestors, inRowPlacement });
       continue;
     }
     placeComponent(scene, { node, frame, ancestors });
   }
+  for (const { node, frame, ancestors = [] } of deferred) placeComponent(scene, { node, frame, ancestors });
   assertUniqueIds(nodes);
   for (const node of nodes) {
     const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
@@ -1381,7 +1389,8 @@ function placeComponent({ slideId, registry, pageTemplate, designTokens, slideTo
   let rendered;
   try {
     const placementTokens = chromePlacement ? designTokens : slideTokens;
-    rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
+    const drawn = definition.readsScene ? { scene: { nodes: nodes.map((item) => ({ ...item })), instances: componentInstances.map(({ id, instanceId, component, frame: at }) => ({ id, instanceId, component, frame: at })) } } : {};
+    rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props, ...drawn }));
   } catch (error) {
     throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
   }

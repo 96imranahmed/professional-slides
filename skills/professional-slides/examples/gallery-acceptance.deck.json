@@ -4594,6 +4594,85 @@
         "reference": "average"
       },
       "source": "Source: illustrative"
+    },
+    {
+      "title": "The City line earns 27% of revenue, more than half of it from season tickets",
+      "arrange": "breakout",
+      "exhibits": [
+        {
+          "type": "chart.bar",
+          "heading": "Revenue by line, FY26",
+          "unit": "£m",
+          "categories": [
+            "City",
+            "Valley",
+            "Dales",
+            "Eastern",
+            "Coast"
+          ],
+          "series": [
+            {
+              "name": "Revenue",
+              "values": [
+                41,
+                33,
+                32,
+                27,
+                19
+              ]
+            }
+          ],
+          "highlights": [
+            {
+              "category": "City"
+            }
+          ],
+          "native": false
+        },
+        {
+          "type": "chart.stacked-column",
+          "heading": "City line revenue by ticket, FY26",
+          "unit": "£m",
+          "categories": [
+            "City"
+          ],
+          "series": [
+            {
+              "name": "Season",
+              "values": [
+                22
+              ]
+            },
+            {
+              "name": "Leisure return",
+              "values": [
+                12
+              ]
+            },
+            {
+              "name": "Single",
+              "values": [
+                7
+              ]
+            }
+          ],
+          "native": false
+        }
+      ],
+      "breakout": {
+        "from": {
+          "exhibit": 0,
+          "category": "City"
+        },
+        "to": 1
+      },
+      "points": [
+        "Season tickets earn £22m of the City line's £41m, the largest share of any line",
+        "Three office days a week have cut City season sales by a fifth since FY22"
+      ],
+      "source": "Illustrative revenue data for a fictional operator",
+      "highlight": "£22m",
+      "id": "layout-breakout"
     }
   ],
   "fill": "airy"

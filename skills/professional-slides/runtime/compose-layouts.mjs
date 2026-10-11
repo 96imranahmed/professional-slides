@@ -187,6 +187,7 @@ export function chooseLayout(slide, recent = []) {
   if (slide.arrange === "dashboard") return "dashboard";
   if (slide.arrange === "stack") return "stack";
   if (slide.arrange === "sequence") return "sequence";
+  if (slide.arrange === "breakout") return "breakout";
   if (slide.arrange === "row") return exhibits.length === 2 && !slide.points?.length ? "two-up-contrast" : "two-up";
   if (slide.arrange === "grid" || exhibits.length >= 4) return "grid";
   // Two charts on one category set with points beside them stack in the hero

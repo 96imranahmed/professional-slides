@@ -15,8 +15,8 @@ export const OVERLAP_CODES = Object.freeze({
   TEXT_ON_TEXT: "two labels whose ink overlaps",
 });
 
-const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption"]);
-const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader"]);
+const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption", "exhibit-link-label"]);
+const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader", "exhibit-link-line"]);
 const BOX_ROLES = new Set(["flow-step", "chart-mark", "fact-tile"]);
 const RULE_ROLES = new Set(["divider-accent", "cover-accent", "section-heading-rule", "takeaways-rule"]);
 const OLD_STYLE_DESCENDERS = /[34579]/;

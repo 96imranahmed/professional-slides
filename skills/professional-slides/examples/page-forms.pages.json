@@ -1667,6 +1667,192 @@
    "source": "Source: illustrative data for a fictional operator; ticket sales and train running records"
   },
   {
+   "id": "f-panels-breakout",
+   "type": "panels",
+   "form": "breakout",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The network's revenue by line and, beside it, what the largest line's revenue is made of, so the season-ticket exposure reads against the whole",
+   "settles": {
+    "kind": "share",
+    "what": "revenue by line, FY26, and the City line's revenue by ticket type"
+   },
+   "adds": "The points say why the season-ticket share matters and what the plan does about it",
+   "title": "The City line earns 27% of revenue, more than half of it from season tickets",
+   "exhibits": [
+    {
+     "type": "chart.bar",
+     "heading": "Revenue by line, FY26",
+     "unit": "£m",
+     "categories": [
+      "City",
+      "Valley",
+      "Dales",
+      "Eastern",
+      "Coast"
+     ],
+     "series": [
+      {
+       "name": "Revenue",
+       "values": [
+        41,
+        33,
+        32,
+        27,
+        19
+       ]
+      }
+     ]
+    },
+    {
+     "type": "chart.stacked-column",
+     "heading": "City line revenue by ticket, FY26",
+     "unit": "£m",
+     "categories": [
+      "City"
+     ],
+     "series": [
+      {
+       "name": "Season",
+       "values": [
+        22
+       ]
+      },
+      {
+       "name": "Leisure return",
+       "values": [
+        12
+       ]
+      },
+      {
+       "name": "Single",
+       "values": [
+        7
+       ]
+      }
+     ]
+    }
+   ],
+   "breakout": {
+    "from": {
+     "exhibit": 0,
+     "category": "City"
+    },
+    "to": 1
+   },
+   "points": [
+    {
+     "lead": "Seasons lead",
+     "text": "Season tickets earn £22m of the City line's £41m, a larger share than on any other line, because the line serves the two business parks at Thorpe and Holbeck."
+    },
+    {
+     "lead": "Exposed to hybrid work",
+     "text": "Three office days a week have cut City season sales by a fifth since FY22, and the decline has not yet levelled off in the latest quarter's sales."
+    },
+    {
+     "lead": "Flexible fares",
+     "text": "A carnet of eight returns at a season's daily rate would keep the commuters the season ticket is losing, at a cost of about £1.4m."
+    }
+   ],
+   "source": "Source: illustrative revenue data for a fictional operator; synthetic"
+  },
+  {
+   "id": "f-panels-spread",
+   "type": "panels",
+   "form": "row",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Northvale's cost per train-km against three peers today and after the plan, with the saving named between the two",
+   "settles": {
+    "kind": "comparison",
+    "what": "operating cost per train-km at four operators, FY26 and after the plan"
+   },
+   "adds": "The points say where the £2.10 comes from",
+   "title": "The plan cuts Northvale's cost per train-km by £2.10, level with Westmoor",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Cost per train-km, FY26",
+     "unit": "£",
+     "categories": [
+      "Westmoor",
+      "Southfield",
+      "Eastbrook",
+      "Northvale"
+     ],
+     "series": [
+      {
+       "name": "Cost",
+       "values": [
+        11.2,
+        11.6,
+        12.0,
+        13.4
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "Northvale"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Cost per train-km after the plan",
+     "unit": "£",
+     "categories": [
+      "Northvale",
+      "Westmoor",
+      "Southfield",
+      "Eastbrook"
+     ],
+     "series": [
+      {
+       "name": "Cost",
+       "values": [
+        11.3,
+        11.2,
+        11.6,
+        12.0
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "Northvale"
+      }
+     ]
+    }
+   ],
+   "spread": {
+    "from": {
+     "exhibit": 0,
+     "category": "Northvale"
+    },
+    "to": {
+     "exhibit": 1,
+     "category": "Northvale"
+    },
+    "label": "−£2.10"
+   },
+   "points": [
+    {
+     "lead": "Crew rosters",
+     "text": "Rostering to the recast timetable saves £1.20 a train-km, most of it in rest-day working on the Valley and Coast lines, where crews now cover gaps at overtime rates."
+    },
+    {
+     "lead": "Energy",
+     "text": "Regenerative braking on the Valley fleet saves £0.55 a train-km from 2028, once the two substations on the line are upgraded to take the returned power."
+    },
+    {
+     "lead": "Depots",
+     "text": "Closing the Malton depot and moving its overnight maintenance to York saves the last £0.35 a train-km, with no change to the fleet's availability."
+    }
+   ],
+   "source": "Source: illustrative cost data for four fictional operators; synthetic"
+  },
+  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",

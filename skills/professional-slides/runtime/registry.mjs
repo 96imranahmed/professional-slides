@@ -31,13 +31,14 @@ import { registerExtras } from "./extras.mjs";
 import { registerGantt } from "./gantt.mjs";
 import { registerFramework } from "./framework.mjs";
 import { registerFigures } from "./figures.mjs";
+import { registerExhibitLinks } from "./exhibit-links.mjs";
 
 // The registration order is the registry's iteration order - the manifest,
 // the component samples, the gallery - so it is fixed here: the core
 // families first, then the families that build on them.
 const FAMILIES = [registerChrome, registerTextBlocks, registerDataBlocks, registerMediaBlocks, registerProcessFamily, registerDiagrams,
   registerConnectors, registerChartTitle, registerTrackers, registerInsightTreeTable, registerQuoteCluster, registerCharts, registerChartGroup,
-  registerMedia, registerSegmentedEvidence, registerRelationshipNetwork, registerPanels, registerExtras, registerGantt, registerFramework, registerFigures];
+  registerMedia, registerSegmentedEvidence, registerRelationshipNetwork, registerPanels, registerExtras, registerGantt, registerFramework, registerFigures, registerExhibitLinks];
 
 export function createRegistry() {
   return FAMILIES.reduce((registry, register) => register(registry), new Map());

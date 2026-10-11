@@ -206,6 +206,10 @@ export const CARRIERS = Object.freeze([
   // A trellis of five to twelve small charts on one scale, where four panels stop: the cuts' shapes compared at a glance.
   { type: "panels", form: "small-multiples", kind: "chart.small-multiples", alone: false, bound: "series: [{ measure }], a panel each, in one unit over the same periods or members",
     carries: { cuts: (p) => (p.cuts >= 5 ? D : GRADE.none), "many-series": (p) => (p.series >= 5 ? D : W) }, needs: (p) => need(within(p.cuts ?? p.series, 5, 12), "five to twelve cuts") },
+  // An overview and the split of one of its marks, the mark fanned out to the panel: what one part of a whole is made of,
+  // read with the whole it belongs to.
+  { type: "panels", form: "breakout", kind: null, shows: "an overview and the breakdown of one of its bars, columns or segments, the mark fanned out to the panel that splits it",
+    carries: { "part-of-whole": (p) => (p.cuts === 2 ? W : GRADE.none) }, needs: (p) => need(p.cuts === 2, "an overview and one detail") },
   { type: "panels", form: "sequence", kind: null, shows: "cause and effect, before and after, input to result: two or three exhibits read left to right with an arrow between each",
     carries: { cuts: (p) => (p.sequence ? D : GRADE.none) }, needs: (p) => need(within(p.cuts, 2, 3), "two or three steps") },
   // --- scorecard: recorded magnitudes in coded cells -----------------------
