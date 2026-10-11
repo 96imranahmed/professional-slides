@@ -215,7 +215,7 @@ class RenderedScheduleTests(unittest.TestCase):
         forms = json.loads((SKILL / "examples" / "page-forms.pages.json").read_text(encoding="utf-8"))
         worked = json.loads((SKILL / "examples" / "page-types.pages.json").read_text(encoding="utf-8"))
         schedule = [page for page in forms["pages"] if page["type"] == "schedule"]
-        self.assertEqual(sorted(page["form"] for page in schedule), ["roadmap", "timeline"])
+        self.assertEqual(sorted(page["form"] for page in schedule), ["roadmap", "rollout", "timeline"])
         summary = next(page for page in worked["pages"] if page.get("type") == "summary")
         deck = {key: value for key, value in worked["deck"].items() if key != "workflow"}
         deck["id"] = "schedules"
@@ -237,7 +237,7 @@ class RenderedScheduleTests(unittest.TestCase):
             self.assertFalse(gates.get("pixelGatesSkipped"), "the page gates measured the renders")
             voids = [f for f in gates["findings"] if any(word in f["code"] for word in ("VOID", "DEAD_BAND"))]
             self.assertEqual(voids, [])
-            self.assertEqual(len(sorted((out / "rendered").glob("slide-*.png"))), 4)  # cover, summary, timeline, roadmap
+            self.assertEqual(len(sorted((out / "rendered").glob("slide-*.png"))), 5)  # cover, summary, timeline, roadmap, rollout
 
 
 if __name__ == "__main__":
