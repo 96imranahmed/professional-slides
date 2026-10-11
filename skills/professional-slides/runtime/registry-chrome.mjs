@@ -10,6 +10,15 @@ import { PAGE_TEMPLATE_TOKENS, renderPageTemplate, PAGE_RULES, PAGE_BRANDING, pa
 import { TRACKER_TOKENS, trackerLabelNodes } from "./trackers.mjs";
 import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
 import { contrastRatio } from "./color.mjs";
+
+// The contrast a rule, a non-text mark, needs against the surface it is drawn on (WCAG 1.4.11).
+const MARK_CONTRAST = 3;
+/** The colour a cover's rule takes: the first that reads on the cover's surface. */
+export function coverRuleColor(dark) {
+  const surface = tokenValue(dark ? INK : token("color.canvas"));
+  const candidates = [PRIMARY, token("color.accent"), dark ? token("color.onPrimary") : INK];
+  return candidates.find((color) => contrastRatio(tokenValue(color), surface) >= MARK_CONTRAST) ?? candidates.at(-1);
+}
 import { FONT, DISPLAY, INK, SECONDARY, PRIMARY, RULE, WHITE, HAIRLINE, textStyle, boxStyle, openLine, headingLayout, STANDARD, component,
   lightChevronNode, MUTED_SURFACE, BODY, SURFACE, SMALL_RADIUS, SECTION_HEADING_TOKENS, sectionHeadingNodes, PRIMARY_TINT, refineVariantAxes,
   refineSectionHeader } from "./registry-shared.mjs";
@@ -488,8 +497,9 @@ function defineCover() {
           nodes.push(mediaNode({ id: stableId(id, "mark", at), frame: logoFrame({ x: tile.x + 20, y: tile.y + 16, width: tileWidth - 40, height: tileHeight - 32 }, mark.width, mark.height, { area: (tileWidth - 40) * (tileHeight - 32) * 0.5 }), props: mark, role: "cover-mark" }));
         });
       }
-      // Accent rule above the title: the one graphic element on a text cover.
-      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", PRIMARY, token("line.standard")));
+      // Accent rule above the title: the one graphic element on a text cover, in the first of the house colour, the accent and
+      // the reversed white (the ink on a light cover) that reads at 3:1 on the cover - a navy rule on a navy cover is no rule.
+      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", coverRuleColor(dark), token("line.standard")));
       if (props.logo?.trim()) {
         const logo = measureText(props.logo, 320, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.heading")), bold: true });
         nodes.push(textPrimitive({ id: stableId(id, "logo"), role: "cover-logo", frame: { x, y: frame.y + CHROME.titleTop, width: 320, height: logo.height }, text: logo.text, style: { ...textStyle(token("type.heading"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: logo.lineHeight, wrap: false }, data: { textLayout: logo } }));

@@ -218,7 +218,12 @@ function drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacl
       const x = xScale(reference.value);
       // Interrupt the exact-value guide around direct labels, rather than
       // drawing through a value near the threshold. Its x position is unchanged.
-      const gaps = obstacles.filter(node => node.role === "data-label" && x >= node.frame.x - 4 && x <= node.frame.x + node.frame.width + 4)
+      // A label's slot is wider than its figure (50px at least): the line breaks
+      // where the figure's ink is, or a median through a field of short labels
+      // vanished for six rows, the subject's among them.
+      const ink = (node) => { const w = measureDataLabel(node.text).width, f = node.frame, align = node.style?.align;
+        const left = align === "right" ? f.x + f.width - w : align === "center" ? f.x + (f.width - w) / 2 : f.x; return { left, right: left + w }; };
+      const gaps = obstacles.filter(node => node.role === "data-label" && x >= ink(node).left - 4 && x <= ink(node).right + 4)
         .map(node => [Math.max(plot.y - 4, node.frame.y - 4), Math.min(plot.y + plot.height, node.frame.y + node.frame.height + 4)])
         .sort((a, b) => a[0] - b[0]);
       let cursor = plot.y - 4, segment = 0;

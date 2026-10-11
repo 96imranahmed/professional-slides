@@ -370,7 +370,9 @@ function attachmentGutters(chart) {
   // column, clear of the value labels and any stack totals, under a heading.
   if (deltas && !horizontal && (props.periods || props.events || (props.bands || []).some((band) => band?.label && bandAxis(band) === "category"))) throw new Error("Column deltas take the band periods, events and a labelled category band use; show one or the other");
   const deltaClear = deltas && !horizontal ? Math.max(26, totalHeight + 4) : 0;
-  const deltaBand = deltas && !horizontal ? deltaClear + 22 + 20 : 0;
+  // A bar chart's delta column is headed just over the plot; under a legend that heading takes a row of its own, where the
+  // legend's right-hand keys would otherwise print across it.
+  const deltaBand = deltas && !horizontal ? deltaClear + 22 + 20 : deltas && horizontal && chart.showLegend ? 22 : 0;
   // A bracket subtotal on a stacked column spans the named segments and prints their sum beside the stack.
   const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
   if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");

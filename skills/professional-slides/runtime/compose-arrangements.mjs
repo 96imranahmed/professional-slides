@@ -510,7 +510,8 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
   // categories run across, or a flow read left to right. Bars read down their
   // rows and a table down its lines; set under points they lose the height
   // they are read by.
-  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type)) || exhibits[0].type === "flow";
+  // A radar is round: under its points it would sit no larger in a band the page's width, so it keeps its column beside them.
+  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow";
   if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
       && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
     exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });

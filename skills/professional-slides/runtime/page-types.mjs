@@ -250,11 +250,14 @@ export const PRESET_ROUTES = Object.freeze({
 
 // Placements a form cannot draw, narrowed from its type's list: small
 // multiples, box plots and pictograms carry no callouts on their marks; a
-// radar's profile has no cells to hold the reading; a chart over its own data
-// table keeps the table under it, so its commentary sits beside it or on it.
+// radar's profile has no cells to hold the reading, so its commentary sits
+// beside it, in a rail or under it - a radar is round, and beside its words it
+// takes the page's height, where under them it is held to a band; a chart
+// over its own data table keeps the table under it, so its commentary sits
+// beside it or on it.
 export const FORM_COMMENTARY = Object.freeze({
   "trend/sparklines": [...ANY_TEXT], "ranking/boxplot": [...ANY_TEXT], "composition/pictogram": [...ANY_TEXT],
-  "profiles/radar": ["below", "none"], "trend/model": ["beside", "on-exhibit"],
+  "profiles/radar": ["beside", "beside-left", "rail", "below", "none"], "trend/model": ["beside", "on-exhibit"],
   // A trellis is one exhibit: its commentary sits beside or under it as a chart's does, and its panels carry no captions.
   "panels/small-multiples": [...ANY_TEXT, "none"],
   // A dashboard's cells carry their own headings and figures: its words are the rail beside it or the bar under it.

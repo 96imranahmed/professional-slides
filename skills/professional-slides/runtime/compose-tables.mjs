@@ -773,7 +773,7 @@ const HEAT_STEPS = 5;
  * `scales` the scale each recorded column shares down its rows.
  */
 function heatColumns(ex, indexes) {
-  const scales = {}, modes = new Map(), problems = [];
+  const scales = {}, modes = new Map(), problems = [], declaredScales = new Map();
   const bodyCells = (i) => (ex.rows || []).map((row) => (Array.isArray(row) ? row : row?.cells || [])[i]);
   for (const i of indexes) {
     const column = ex.columns[i], label = String(columnLabel(column) || `column ${i + 1}`).trim();
@@ -796,9 +796,22 @@ function heatColumns(ex, indexes) {
     const unit = String(column.unit ?? "").trim() || figureUnit(texts[numbers.indexOf(known[0])]) || "";
     const ends = declared ? [String(lo), String(hi)] : [texts[numbers.indexOf(lo)], texts[numbers.indexOf(hi)]];
     const inUnits = (text) => (figureUnit(text) || !unit ? text : withUnit(text, unit));
+    // Columns that declare one domain in one unit are on one scale, and the key says so once: a shade means the same in each.
+    const sharedKey = declared ? `${lo}:${hi}:${unit}` : null;
+    if (sharedKey && declaredScales.has(sharedKey)) {
+      const { id, labels } = declaredScales.get(sharedKey);
+      labels.push(label);
+      // Named by what the columns' labels share after their last comma ("% satisfied"), else by the unit.
+      const tails = new Set(labels.map((text) => (text.includes(",") ? text.split(/,\s*/).pop().trim() : "")));
+      const tail = tails.size === 1 ? [...tails][0] : "";
+      scales[id].label = tail ? `${tail[0].toUpperCase()}${tail.slice(1)}${unit && !tail.includes(unit) ? ` (${unit})` : ""}` : unit ? `Every shaded column (${unit})` : "Every shaded column";
+      modes.set(i, { id, lo, hi });
+      continue;
+    }
     const id = `${barScaleId(label).replace(/-bar$/, "")}-${i + 1}-heat`;
     scales[id] = { type: "heatmap", label: unit && !label.includes(unit) ? `${label} (${unit})` : label, min: 1, max: HEAT_STEPS, anchors: { 1: ends[0], [HEAT_STEPS]: ends[1] }, ramp: { low: inUnits(ends[0]), high: inUnits(ends[1]) },
       ...(ex.legend === false ? { legend: false } : {}), palette: "theme-sequential" };
+    if (sharedKey) declaredScales.set(sharedKey, { id, labels: [label] });
     modes.set(i, { id, lo, hi });
   }
   if (problems.length) throw new Error(`A heat column shades numbers - whole scores from 1 to ${HEAT_STEPS} as they stand, any other figures by where each sits between the column's lowest and highest (or across the \`domain: [low, high]\` the column declares). ${problems.join(". ")[0].toUpperCase()}${problems.join(". ").slice(1)}`);

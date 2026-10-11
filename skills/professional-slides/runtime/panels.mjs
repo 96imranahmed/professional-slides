@@ -494,8 +494,16 @@ export function agendaColumnsNodes({ id, frame, props }) {
     const detail = item.detail ? measure(item.detail, width, "type.body") : null;
     return { numeral, number, labelLayout, detail, height: number.height + 20 + labelLayout.height + (detail ? 8 + detail.height : 0) };
   });
-  // One baseline for every column: the numerals sit on a shared line.
-  const top = frame.y + Math.max(0, (frame.height - Math.max(...measured.map((m) => m.height))) / 2) - 40;
+  // The columns run the body's height, each its own band: the active section's tinted, a hairline between the others. The
+  // sections' numerals, rules, labels and details sit on one shared baseline, centred down the bands - a block that does not
+  // fill its column is centred in it - so the page reads as its columns, where the block alone stood between two empty bands.
+  const top = frame.y + Math.max(0, (frame.height - Math.max(...measured.map((m) => m.height))) / 2);
+  items.forEach((item, i) => {
+    const x0 = frame.x + i * (width + gap);
+    // The band reaches half a gap past its section's text on each side, so the words keep air inside the tint.
+    if (i === props.active) nodes.push(rect(stableId(id, "band", i), "agenda-band", { x: x0 - gap / 2, y: frame.y, width: width + gap, height: frame.height }, dark ? token("color.componentPrimary") : token("color.surfaceMuted")));
+    else if (i > 0 && i - 1 !== props.active) nodes.push(linePrimitive({ id: stableId(id, "divider", i), role: "agenda-divider", x1: x0 - gap / 2, y1: frame.y, x2: x0 - gap / 2, y2: frame.y + frame.height, style: { stroke: dark ? token("color.chartGrid") : RULE, lineWidth: token("line.hairline") } }));
+  });
   items.forEach((item, i) => {
     const active = i === props.active, x = frame.x + i * (width + gap), rid = stableId(id, "item", i);
     const { numeral, number, labelLayout, detail } = measured[i];
