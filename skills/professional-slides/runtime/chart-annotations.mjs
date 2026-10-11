@@ -14,6 +14,7 @@ import { measureText } from "./text-layout.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 import { judged } from "./judgements.mjs";
+import { contrastRatio } from "./color.mjs";
 
 const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
 const EVIDENCE_ANNOTATION_TREATMENTS = Object.freeze(["callout", "orthogonal-dot", "speech"]);
@@ -34,6 +35,7 @@ const ON_PRIMARY = token("color.onPrimary");
 const RULE = token("color.rule");
 const INK = token("color.ink");
 const SURFACE = token("color.surface");
+const SECONDARY = token("color.textSecondary");
 const ANNOTATION = token("type.chartAnnotation");
 const HAIRLINE = token("line.hairline");
 const STANDARD = token("line.standard");
@@ -56,6 +58,20 @@ const ORTHOGONAL_GAP = 28;
 const ENDPOINT_DIAMETER = 8;
 // An axis title is ink a callout box or its leader must clear - the y title
 // set above a scatter's plot among them.
+// The looks a callout takes (`style`, on an annotation of the callout treatment), each one drawn on the strong pages the
+// calibration was read from: the outlined note (`box`, the default); a tinted note with no outline (`tint`); the note in
+// the accent with no box at all, its leader a hairline (`plain`); a white bubble whose accent tail points at its mark
+// (`bubble`); a pill holding one value, +12% or 2.3x (`pill`); and a figure set large with its line under it (`figure`).
+// Every one is placed as a callout is - in the plot's open space beside its mark, the band only where the plot has none.
+export const CALLOUT_STYLES = Object.freeze(["box", "tint", "plain", "bubble", "pill", "figure"]);
+const styleOf = (annotation) => annotation?.style ?? "box";
+const ACCENT = token("color.accent");
+const FIGURE_TYPE = token("type.heading");
+const PILL_PAD_X = 8;
+const PILL_MAX_WIDTH = 200;
+const FIGURE_CAPTION_WIDTH = 200;
+// A pill or a figure this near its mark is read as its mark's, with no leader.
+const LEADER_ADJACENT = 18;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label", "axis-title"]);
 
 // An annotation centres on the mark it points at, and its bold face is the
@@ -92,6 +108,10 @@ function normalizeEvidenceAnnotations(props = {}) {
     }
     const treatment = evidenceTreatment(annotation);
     if (annotation.border !== undefined && typeof annotation.border !== "boolean") throw new Error("Chart annotation border must be a boolean");
+    if (annotation.style !== undefined && !CALLOUT_STYLES.includes(annotation.style)) throw new Error(`Chart evidence annotation ${index + 1}: \`style\` is one of ${CALLOUT_STYLES.join(", ")} (got ${JSON.stringify(annotation.style)})`);
+    if (annotation.style !== undefined && treatment !== "callout") throw new Error(`Chart evidence annotation ${index + 1}: a \`style\` belongs to a callout; a ${treatment} note keeps its own look`);
+    if (annotation.style === "figure" && (typeof annotation.figure !== "string" || !annotation.figure.trim())) throw new Error(`Chart evidence annotation ${index + 1}: a figure callout sets one value large - give it \`figure\` ("+32%", "$1.3T") and \`text\`, the line under it`);
+    if (annotation.figure !== undefined && annotation.style !== "figure") throw new Error(`Chart evidence annotation ${index + 1}: \`figure\` is the value a \`style: "figure"\` callout sets large`);
     if (!EVIDENCE_ANNOTATION_TREATMENTS.includes(treatment)) throw new Error(`Unknown chart evidence annotation treatment: ${treatment}`);
     if (treatment !== "orthogonal-dot" && (annotation.orientation !== undefined || annotation.side !== undefined)) {
       throw new Error("Only an orthogonal-dot chart annotation accepts orientation or side");
@@ -259,7 +279,34 @@ function measureEvidenceText(annotation) {
  * themselves; 260 is the cap it wraps at, and
  * `EVIDENCE_BOX_MIN_WIDTH` keeps a two-word note from shrinking to a stamp.
  */
+const annotationFace = (bold = true) => ({ fontFamily: tokenValue(token(bold ? "font.bodySemibold" : "font.body")), fontSize: tokenValue(ANNOTATION), bold });
+
+/**
+ * A styled callout's layout: the lines it sets and the box they close on. A
+ * plain note and a figure have no box, so the frame is their ink; a pill is
+ * one line, a half-height round either side.
+ */
+function styleLayout(annotation) {
+  const style = styleOf(annotation);
+  if (style === "plain") {
+    const text = measureText(annotation.text, EVIDENCE_BOX_WIDTH - 4, annotationFace());
+    return { text, width: Math.ceil(text.width) + 4, height: Math.ceil(text.height) + 2 };
+  }
+  if (style === "pill") {
+    const text = measureText(annotation.text, 100000, annotationFace());
+    return { text, width: Math.ceil(text.width) + 2 * PILL_PAD_X, height: Math.max(20, Math.ceil(text.height) + 8) };
+  }
+  if (style === "figure") {
+    const figure = measureText(annotation.figure, 100000, { fontFamily: tokenValue(token("font.bodySemibold")), fontSize: tokenValue(FIGURE_TYPE), bold: true });
+    const text = measureText(annotation.text, FIGURE_CAPTION_WIDTH, annotationFace(false));
+    return { figure, text, width: Math.ceil(Math.max(figure.width, text.width)) + 4, height: Math.ceil(figure.height + text.height) + 2 };
+  }
+  return null;
+}
+
 function evidenceBoxSize(annotation) {
+  const styled = styleLayout(annotation);
+  if (styled) return { width: styled.width, height: styled.height };
   const measured = measureEvidenceText(annotation);
   return {
     width: Math.min(EVIDENCE_BOX_WIDTH, Math.max(EVIDENCE_BOX_MIN_WIDTH, Math.ceil(measured.width) + EVIDENCE_PAD_X)),
@@ -268,6 +315,18 @@ function evidenceBoxSize(annotation) {
 }
 
 function assertEvidenceTextFits(annotation) {
+  const style = styleOf(annotation);
+  if (style === "pill") {
+    const { text, width } = styleLayout(annotation);
+    if (text.lines?.length > 1 || width > PILL_MAX_WIDTH) throw new Error(`Chart evidence annotation for ${annotation.category} is a pill, which holds one value - "+12%", "2.3x", "No. 1" - in one short line; "${annotation.text}" is a note: give it \`style: "box"\` or "plain"`);
+    return;
+  }
+  if (style === "figure") {
+    const { figure, text } = styleLayout(annotation);
+    if (figure.width > PILL_MAX_WIDTH) throw new Error(`Chart evidence annotation for ${annotation.category}: a figure callout sets one value large ("$1.3T", "+32%"); "${annotation.figure}" is longer than a value`);
+    if ((text.lines?.length ?? 1) > 2) throw new Error(`Chart evidence annotation for ${annotation.category}: the line under a figure is two lines at most; cut "${annotation.text}" to a few words, the figure says the rest`);
+    return;
+  }
   // Three lines at the callout's 260px cap is what a note on a mark can carry
   // and still read as a note; past that it is a paragraph, and no placement
   // makes a paragraph legible over a plot.
@@ -433,6 +492,123 @@ function insidePlacement({ annotation, index, target, marks, obstacles, placemen
   return null;
 }
 
+// What a box set in the plot's open space stays off, beyond what a box beside its mark does: the rules a value is read
+// against and the labels of bands and guides. A leader may cross a rule; it may not cross a mark, a label or another note.
+const OPEN_ROLES = new Set([...BESIDE_ROLES, "chart-reference-line", "chart-threshold-line", "chart-trend-line", "chart-event-line", "chart-band-label", "chart-band-edge", "chart-band-ring", "data-label-leader"]);
+const LEADER_ROLES = new Set([...COLLISION_ROLES, "chart-line", "category-label", "chart-quadrant-title", "chart-threshold-label", "chart-band-label", "chart-event-label", "chart-period-label", "data-label-leader"]);
+// The grid the open space is searched on, the shortest leader that reads as a leader rather than a box touching its mark,
+// and the cost a slanted leader carries against a straight one of the same length.
+const OPEN_STEP = 6;
+const OPEN_LEADER_MIN = 14;
+const SLANT_COST = 48;
+
+/**
+ * A pill or a figure set on its mark, as a value label is: centred over the
+ * mark's own label (a column, a point), or past the end of a bar's label - no
+ * leader, read as the mark's. Null where that place is taken.
+ */
+function adjacentPlacement({ annotation, index, target, bounds, obstacles, leaderStops, placements }) {
+  const { width, height } = evidenceBoxSize(annotation);
+  const end = leaderTarget(target, leaderStops, annotation);
+  const label = ownLabel(target, annotation, leaderStops);
+  const candidates = [{ x: end.x - width / 2, y: end.y - ENDPOINT_DIAMETER / 2 - 2 - height }];
+  if (label && label.frame.x >= target.x - 2) candidates.push({ x: label.frame.x + label.frame.width + 6, y: label.frame.y + label.frame.height / 2 - height / 2 });
+  for (const at of candidates) {
+    const frame = { ...at, width, height };
+    if (frameInside(frame, bounds) && clearSurface(frame, obstacles, placements)) return { annotation, index, target, frame, leader: null, side: "on", placement: "open" };
+  }
+  return null;
+}
+
+/** What a leader costs a reader: its length, and more where it slants. */
+function leaderCost(placement) {
+  if (!placement) return Infinity;
+  if (!placement.leader) return 0;
+  const { x1, y1, x2, y2 } = placement.leader, length = Math.hypot(x2 - x1, y2 - y1);
+  return length + (Math.abs(x2 - x1) < 1 || Math.abs(y2 - y1) < 1 ? 0 : SLANT_COST + length * 0.25);
+}
+
+/** Two segments cross (their interiors meet). */
+function segmentsCross([ax, ay, bx, by], [cx, cy, dx, dy]) {
+  const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (!d) return false;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d, u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d;
+  return t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99;
+}
+
+/**
+ * A leader read as the line it is, not the box its diagonal spans: every few
+ * pixels of it clear of every obstacle but what touches its own mark - a
+ * series line read as its segments, so a leader to the lowest of three lines
+ * may not cross the two above it.
+ */
+function segmentClear(x1, y1, x2, y2, target, obstacles) {
+  const length = Math.hypot(x2 - x1, y2 - y1), end = Math.max(0, length - ENDPOINT_DIAMETER / 2 - 2);
+  const others = obstacles.filter((node) => !pointInsideFrame(target, node.frame, 1));
+  for (let t = 0; t <= end; t += 3) {
+    const probe = { x: x1 + (x2 - x1) * t / (length || 1) - 1, y: y1 + (y2 - y1) * t / (length || 1) - 1, width: 2, height: 2 };
+    if (others.some((node) => meets(node, probe, 1))) return false;
+  }
+  return true;
+}
+
+/**
+ * A box anywhere in the plot's open space, its leader run straight to the mark.
+ *
+ * Next to its mark is where a note reads best (besidePlacement), but in a
+ * cluster - the best room of a scatter among its neighbours, a peak among
+ * peaks - every position touching the mark is taken, and the band above the
+ * plot was the next resort: 88px off the plot's height, the chart shrunk to
+ * make room for a note while the plot's corners stood empty. The open space
+ * is searched instead, on a 6px grid across the plot: a box clear of every
+ * mark, label, rule and note, joined to its mark by a leader that crosses
+ * none of them. The nearest wins, a level or upright leader before a slanted
+ * one of the same length; a box over its own mark is never chosen, nor one
+ * so near that the leader is a stub. Only a note that has no such place
+ * anywhere in the plot takes the band.
+ */
+function openPlacement({ annotation, index, target: mark, bounds, obstacles, leaderStops, placements, marks = [] }) {
+  const { width, height } = evidenceBoxSize(annotation);
+  // From above, the leader lands where a band's would: on the mark's value end, stopping short of its own value label.
+  const valueEnd = leaderTarget(mark, leaderStops, annotation);
+  // A bar or a step has a body: a box under a floating step, or beside a bar, points at the edge that faces it - the
+  // step's underside, the bar's side - rather than crossing its own mark to reach the value end.
+  // Its marks by category where the chart keys them, else the one its value end sits on (a bridge's steps carry no keys).
+  const keyed = marks.filter((node) => node.type === "rect" && node.data?.category === annotation.category && (annotation.series === undefined || node.data?.series === annotation.series));
+  const own = keyed.length ? keyed : marks.filter((node) => node.type === "rect" && node.frame && pointInsideFrame(mark, node.frame, 1)).slice(0, 1);
+  const body = own.length ? { x: Math.min(...own.map((n) => n.frame.x)), y: Math.min(...own.map((n) => n.frame.y)), right: Math.max(...own.map((n) => n.frame.x + n.frame.width)), bottom: Math.max(...own.map((n) => n.frame.y + n.frame.height)) } : null;
+  // Only the underside, and only its middle: a dot on a column's side or corner leads the reader to the gap between two
+  // bars (leaderTarget), so a box beside a mark still points at its value end.
+  const endFor = (frame) => {
+    if (!body || frame.y < body.bottom + OPEN_LEADER_MIN) return valueEnd;
+    const inset = (body.right - body.x) * 0.2, x = Math.max(body.x + inset, Math.min(body.right - inset, Math.max(frame.x + 10, Math.min(frame.x + frame.width - 10, (body.x + body.right) / 2))));
+    return x >= frame.x + 10 && x <= frame.x + frame.width - 10 ? { x, y: body.bottom } : valueEnd;
+  };
+  const taken = placements.filter((placement) => placement.leader).map((placement) => [placement.leader.x1, placement.leader.y1, placement.leader.x2, placement.leader.y2]);
+  const stops = [...leaderStops, ...placements.map((placement) => ({ frame: placement.frame }))];
+  let best = null;
+  for (let y = bounds.y; y + height <= bounds.y + bounds.height; y += OPEN_STEP) {
+    for (let x = bounds.x; x + width <= bounds.x + bounds.width; x += OPEN_STEP) {
+      const frame = { x, y, width, height };
+      const target = endFor(frame);
+      if (pointInsideFrame(target, frame, OPEN_LEADER_MIN)) continue;
+      // The leader leaves the edge facing the mark: straight down or up where the mark is under the box, straight across where
+      // it is level with it, from the nearest corner otherwise.
+      const under = target.x >= x + 10 && target.x <= x + width - 10, level = target.y >= y + 6 && target.y <= y + height - 6;
+      const x1 = under ? target.x : level ? (target.x < x ? x : x + width) : Math.max(x, Math.min(x + width, target.x));
+      const y1 = under ? (target.y < y ? y : y + height) : level ? target.y : Math.max(y, Math.min(y + height, target.y));
+      const length = Math.hypot(target.x - x1, target.y - y1);
+      const cost = leaderCost({ leader: { x1, y1, x2: target.x, y2: target.y } });
+      if (length < OPEN_LEADER_MIN || (best && cost >= best.cost)) continue;
+      if (!clearSurface(frame, obstacles, placements)) continue;
+      const leader = { x1, y1, x2: target.x, y2: target.y };
+      if (!segmentClear(x1, y1, target.x, target.y, target, stops) || taken.some((other) => segmentsCross([x1, y1, target.x, target.y], other))) continue;
+      best = { cost, frame, leader, side: under ? (target.y < y ? "below" : "above") : level ? (target.x < x ? "right" : "left") : "open" };
+    }
+  }
+  return best && { annotation, index, target: mark, frame: best.frame, leader: best.leader, side: best.side, placement: "open" };
+}
+
 /**
  * Where a callout's leader lands: the mark's centre on the category axis, at
  * its value end - the top-centre of a column, the end-centre of a bar.
@@ -593,6 +769,7 @@ function evidenceNodes(id, placement) {
     ...(placement.insideOf ? { insideMark: true, category: placement.insideOf.category, ...(placement.insideOf.series !== null ? { series: placement.insideOf.series } : {}) } : {})
   };
   if (speech) return speechNodes(id, placement, data);
+  if (callout && styleOf(annotation) !== "box") return styledNodes(id, placement, { ...data, calloutStyle: styleOf(annotation) });
   // Set on its own bar: the text alone, in whichever of the reversed or the
   // ink colour reads on the bar's fill.
   if (placement.textOnly) {
@@ -634,6 +811,74 @@ function evidenceNodes(id, placement) {
     style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, opacity: 1 },
     data
   }));
+  return nodes;
+}
+
+
+/** The leader and its dot, in a stroke and a weight, or nothing where the note sits on its mark. */
+function leaderNodes(id, index, leader, stroke, weight, data) {
+  if (!leader) return [];
+  return [
+    linePrimitive({ id: stableId(id, "annotation-leader", index), role: "annotation-leader", ...leader, style: { stroke, lineWidth: weight, dash: "solid" }, data: { ...data, endArrow: false, endpoint: "dot" } }),
+    ellipsePrimitive({ id: stableId(id, "annotation-endpoint", index), role: "annotation-endpoint",
+      frame: { x: leader.x2 - ENDPOINT_DIAMETER / 2, y: leader.y2 - ENDPOINT_DIAMETER / 2, width: ENDPOINT_DIAMETER, height: ENDPOINT_DIAMETER },
+      style: { fill: stroke, stroke, lineWidth: HAIRLINE, opacity: 1 }, data }),
+  ];
+}
+
+/** The accent where it reads as text on the canvas, the ink where it does not (a pale accent fails 4.5:1). */
+function accentText() {
+  return contrastRatio(tokenValue(ACCENT), tokenValue(SURFACE)) >= 4.5 ? ACCENT : INK;
+}
+
+/**
+ * A callout in one of its styles (CALLOUT_STYLES), drawn in the frame its
+ * placement found. A pill or a figure set beside its mark - within a few
+ * pixels - drops its leader: it is read as its mark's, as a value label is.
+ */
+function styledNodes(id, placement, data) {
+  const { annotation, index, frame, leader } = placement;
+  const style = data.calloutStyle;
+  const layout = styleLayout(annotation);
+  const reach = leader ? Math.hypot(leader.x2 - leader.x1, leader.y2 - leader.y1) : 0;
+  const near = !leader || reach <= LEADER_ADJACENT;
+  const text = (key, at, measured, color, bold, align = "center") => textPrimitive({ id: stableId(id, key, index), role: "annotation-text", frame: at, text: measured.text,
+    style: { ...textStyle(key === "annotation-figure" ? FIGURE_TYPE : ANNOTATION, color, bold, align), lineHeight: measured.lineHeight, wrap: false }, data: { ...data, textLayout: measured } });
+  if (style === "tint") {
+    return [...leaderNodes(id, index, leader, PRIMARY, STANDARD, data),
+      rectPrimitive({ id: stableId(id, "annotation-box", index), role: "annotation-surface", frame, style: { fill: PRIMARY_TINT, stroke: "none", lineWidth: HAIRLINE, radius: NONE_RADIUS, opacity: 1 }, data }),
+      evidenceTextNode(id, index, frame, annotation.text, data)];
+  }
+  if (style === "plain") {
+    const color = accentText();
+    return [...leaderNodes(id, index, leader, color, HAIRLINE, data),
+      text("annotation-text", { x: frame.x + 2, y: frame.y + 1, width: frame.width - 4, height: layout.text.height }, layout.text, color, true, leader && leader.x1 <= frame.x + 1 ? "left" : leader && leader.x1 >= frame.x + frame.width - 1 ? "right" : "center")];
+  }
+  if (style === "pill") {
+    const ink = onFill(ACCENT);
+    return [...(near ? [] : leaderNodes(id, index, leader, SECONDARY, HAIRLINE, data)),
+      rectPrimitive({ id: stableId(id, "annotation-box", index), role: "annotation-surface", frame, style: { fill: ACCENT, stroke: ACCENT, lineWidth: HAIRLINE, radius: token("radius.round"), opacity: 1 }, data }),
+      text("annotation-text", { x: frame.x + PILL_PAD_X, y: frame.y + (frame.height - layout.text.height) / 2, width: frame.width - 2 * PILL_PAD_X, height: layout.text.height }, layout.text, ink, true)];
+  }
+  if (style === "figure") {
+    const color = accentText();
+    return [...(near ? [] : leaderNodes(id, index, leader, SECONDARY, HAIRLINE, data)),
+      text("annotation-figure", { x: frame.x + 2, y: frame.y + 1, width: frame.width - 4, height: layout.figure.height }, layout.figure, color, true),
+      text("annotation-text", { x: frame.x + 2, y: frame.y + 1 + layout.figure.height, width: frame.width - 4, height: layout.text.height }, layout.text, INK, false)];
+  }
+  // A bubble: the outlined note with a solid accent tail closing on its mark, while the mark is near; past that reach, a leader.
+  const tailed = leader && reach <= TAIL_REACH;
+  const nodes = [];
+  if (tailed) {
+    const horizontal = Math.abs(leader.x1 - frame.x) < 1.5 || Math.abs(leader.x1 - frame.x - frame.width) < 1.5, tail = 14;
+    const points = [...(horizontal ? [[leader.x1, leader.y1 - tail / 2], [leader.x1, leader.y1 + tail / 2]] : [[leader.x1 - tail / 2, leader.y1], [leader.x1 + tail / 2, leader.y1]]), [leader.x2, leader.y2]];
+    const xs = points.map(([x]) => x), ys = points.map(([, y]) => y), minX = Math.min(...xs), minY = Math.min(...ys);
+    const width = Math.max(1, Math.max(...xs) - minX), height = Math.max(1, Math.max(...ys) - minY);
+    nodes.push(shapePrimitive({ id: stableId(id, "annotation-tail", index), role: "annotation-surface", geometry: "iconPath", frame: { x: minX, y: minY, width, height },
+      style: { fill: ACCENT, stroke: ACCENT, lineWidth: HAIRLINE }, data: { ...data, paths: [{ points: points.map(([x, y]) => [(x - minX) / width, (y - minY) / height]), closed: true }] } }));
+  } else nodes.push(...leaderNodes(id, index, leader, ACCENT, HAIRLINE, data));
+  nodes.push(rectPrimitive({ id: stableId(id, "annotation-box", index), role: "annotation-surface", frame, style: { fill: SURFACE, stroke: ACCENT, lineWidth: HAIRLINE, radius: NONE_RADIUS, opacity: 1 }, data }),
+    evidenceTextNode(id, index, frame, annotation.text, data));
   return nodes;
 }
 
@@ -721,12 +966,15 @@ function railWidth(annotations) {
  * it gave up a band reserved above the plot, so the chart can render once
  * more with that band released instead of leaving an empty stripe.
  */
-export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles = [] }) {
+export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles = [], guides = [] }) {
   const annotations = normalizeEvidenceAnnotations(props);
   if (!annotations.length) return { placements: [], nodes: [] };
   annotations.forEach(assertEvidenceTextFits);
   const collisionObstacles = annotationObstacleFrames(obstacles);
   const besideObstacles = annotationObstacleFrames(obstacles, BESIDE_ROLES);
+  // The open space is read against everything the chart has drawn so far, the rules and bands set over the marks included.
+  const openObstacles = annotationObstacleFrames([...obstacles, ...guides], OPEN_ROLES);
+  const leaderStops = annotationObstacleFrames([...obstacles, ...guides], LEADER_ROLES);
   // A box beside its mark may use the chart's whole frame across (the value
   // gutter, the rail) but stays within the plot's height.
   const limits = plot.limits ?? { x: plot.x - 12, y: plot.y, width: plot.width + 24, height: plot.height };
@@ -742,12 +990,24 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
     const context = { annotation, index, target, plot, props, bandIndex, obstacles: collisionObstacles, placements };
     const beside = () => besidePlacement({ ...context, bounds: besideBounds, obstacles: besideObstacles });
     const inside = () => insidePlacement({ ...context, marks: obstacles.filter((node) => node.role === "chart-mark") });
+    const open = () => openPlacement({ ...context, bounds: plot, obstacles: openObstacles, leaderStops, marks: obstacles.filter((node) => node.role === "chart-mark") });
+    // Beside its mark first; where that leader runs long - a box lifted over every taller neighbour - the open space is
+    // searched too, and the shorter leader wins.
+    const nearest = () => {
+      const near = beside();
+      if (near && leaderCost(near) <= OPEN_LEADER_MIN * 3) return near;
+      const far = open();
+      return leaderCost(far) < leaderCost(near) ? far : near;
+    };
     // In the plot's free space a callout sits near its mark with a leader - above
-    // a short mark, beside a line, in an empty corner - never inside a mark
-    // that the band would have left clear.
-    const chain = annotation._placement === "plot" ? [beside]
+    // a short mark, beside a line - or, where its neighbours crowd it, in the
+    // plot's open space with a longer leader; never inside a mark that the band
+    // would have left clear.
+    // A pill or a figure is set on its mark first, as a value label is.
+    const onMark = ["pill", "figure"].includes(styleOf(annotation)) ? [() => adjacentPlacement({ ...context, bounds: plot, obstacles: openObstacles, leaderStops })] : [];
+    const chain = annotation._placement === "plot" ? [...onMark, nearest]
       : RELEASED_PLACEMENTS.has(annotation._placement)
-      ? [beside, inside]
+      ? [...onMark, nearest, inside]
       : annotation.treatment === "orthogonal-dot" && annotation.orientation === "horizontal"
         ? [() => horizontalPlacement(context), beside, inside]
         : annotation.treatment === "orthogonal-dot"
@@ -794,7 +1054,7 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
       }
       throw new Error(`${id} has no clear position for the callout at ${annotation.category} above, beside or in a rail beside the plot${where()}; shorten the note, move it to a position that is free, annotate fewer marks, or enlarge the exhibit`);
     }
-    placements.push({ ...placement, released: banded && placement.placement === "beside" });
+    placements.push({ ...placement, released: banded && ["beside", "open"].includes(placement.placement) });
   });
   return { placements, nodes: placements.flatMap((placement) => evidenceNodes(id, placement)) };
 }
@@ -811,7 +1071,8 @@ export function evidenceRailWidth(props = {}) {
  * when no callout moved. The chart renders once more with these props.
  */
 export function releasedEvidenceProps(nodes, props = {}) {
-  const moved = new Set(nodes.filter((node) => node.role === "annotation-surface" && node.data?.evidenceReleased).map((node) => node.data.evidenceIndex));
+  // A callout's surface, or the text of one drawn with no box (a plain note, a figure).
+  const moved = new Set(nodes.filter((node) => ["annotation-surface", "annotation-text"].includes(node.role) && node.data?.evidenceReleased).map((node) => node.data.evidenceIndex));
   if (!moved.size || !Array.isArray(props.annotations)) return null;
   return { ...props, annotations: props.annotations.map((item, index) => moved.has(index) ? { ...item, _placement: "beside" } : item) };
 }

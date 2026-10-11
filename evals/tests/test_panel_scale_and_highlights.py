@@ -121,9 +121,9 @@ const perUnit = (slide, i, v) => { const m = marksOf(slide.nodes, i).find((n) =>
 console.log(JSON.stringify({ otherTops: [top(other, 0), top(other, 1)], otherBases: [base_(other, 0), base_(other, 1)],
   samePerUnit: [perUnit(same, 0, 59), perUnit(same, 1, 391)], sameBases: [base_(same, 0), base_(same, 1)] }));
 """)
-        # Another unit: the plain panel's plot rises into the band the callout
-        # needed on its neighbour; the baselines still meet.
-        self.assertLess(result['otherTops'][1], result['otherTops'][0] - 40)
+        # Another unit: the callout takes its own panel's open space, and the plain
+        # panel beside it is never pushed down to match; the baselines still meet.
+        self.assertLessEqual(result['otherTops'][1], result['otherTops'][0] + 0.5)
         self.assertEqual(result['otherBases'][0], result['otherBases'][1])
         # One unit, one scale: the band stays shared so a unit is one height.
         self.assertAlmostEqual(result['samePerUnit'][0], result['samePerUnit'][1], delta=0.01)
@@ -166,7 +166,7 @@ console.log(JSON.stringify({ rail: r.nodes.filter((n) => n.role === 'annotation-
         self.assertEqual(result['below'], 2)
         self.assertIn('carries 2 callouts at most', result['three'])
 
-    def test_three_callouts_keep_the_band_on_a_bridge_beside_a_column(self):
+    def test_three_callouts_on_a_bridge_beside_a_column_are_all_placed_most_in_the_plot(self):
         # The bridge as it sits beside a rail under a two-line title: 747px by
         # 516. It failed "give the chart more height" (the endpoint label row
         # was taken after the frame had compacted its bands), and a little
@@ -186,7 +186,12 @@ for (const height of [516, 440]) {
 }
 console.log(JSON.stringify(out));
 """)
-        self.assertEqual(result, {'516': ['band'] * 3, '440': ['band'] * 3})
+        # All three are placed, none in a rail and none over another; each takes the plot's open space where it has a clear
+        # leader to its step, and only a note with none takes the band (it took all three, 88px off the plot).
+        for height, placed in result.items():
+            self.assertEqual(len(placed), 3, height)
+            self.assertNotIn('rail', placed, height)
+            self.assertLess(placed.count('band'), 3, height)
 
 
 class PanelWidthTests(unittest.TestCase):

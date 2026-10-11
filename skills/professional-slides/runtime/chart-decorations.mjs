@@ -158,7 +158,11 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     underlay.push(...bands.underlay); overlay.push(...bands.overlay);
   }
   drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacles, underlay, overlay });
-  const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles });
+  // The value lines across the plot are drawn after the callouts, their labels clear of them; a callout set in the plot's
+  // open space keeps off the lines themselves, so they are passed where they will be.
+  const valueRules = yScale ? (props.referenceLines || []).filter((reference) => !isMarker(reference) && Number.isFinite(reference?.value))
+    .map((reference) => ({ type: "line", role: "chart-reference-line", frame: { x: plot.x, y: yScale(reference.value), width: plot.width, height: 0 } })) : [];
+  const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles, guides: [...underlay, ...overlay, ...valueRules] });
   const annotationPlacements = evidenceAnnotations.placements;
   const overlaps = (a, b, padding = 4) => !(
     a.x + a.width + padding <= b.x

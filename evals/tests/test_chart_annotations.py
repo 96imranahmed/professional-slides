@@ -43,7 +43,7 @@ import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
 const chart=REGISTRY.get('chart.column');
 const box=text=>{
   const nodes=chart.render({id:'bars',frame:{x:40,y:40,width:760,height:420},
-    props:{...chart.sample,dataLabels:false,referenceLines:[],annotations:[{category:'2026',text}]}}).nodes;
+    props:{...chart.sample,dataLabels:false,referenceLines:[],calloutBand:'band',annotations:[{category:'2026',text}]}}).nodes;
   return nodes.find(n=>n.role==='annotation-surface').frame;
 };
 const LONG='The only route to a month-12 launch runs through a month-one filing';
@@ -54,7 +54,8 @@ assert.ok(long.width<=260,'260 is the width it wraps at, and the widest it gets'
 assert.ok(short.height<long.height,'and two lines are taller than one');
 assert.ok(short.height>=32,'while a two-word note is still a box, not a stamp');
 assert.ok(medium.width<200,'the defect: a one-line note in a 260px rectangle');
-// The foot stays where the leader expects it, whatever the box's height.
+// In the band (asked for here; a callout takes the plot's open space first), the foot stays where the leader expects it,
+// whatever the box's height.
 assert.ok(Math.abs((short.y+short.height)-(long.y+long.height))<1);
 console.log('{}');
 ''')
@@ -331,6 +332,129 @@ console.log(JSON.stringify({ composes: cats.filter((_, i) => bars[i] === null), 
         self.assertTrue(result["everywhere"])
         self.assertEqual(result["none"], [True])
 
+
+
+class OpenSpaceTests(unittest.TestCase):
+    """A callout takes the plot's open space, and the chart keeps its height: the band above the plot is the last resort."""
+
+    def test_a_crowded_scatter_keeps_its_plot_and_sets_every_note_in_it(self):
+        # The gallery's scatter: a note on the best room, in a cluster at the top of the plot, found no place touching its
+        # point and took a band - 88px off the plot - and with three notes the shorter plot failed its own point labels.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const rooms = [['Haunted Hairdresser', 12, 2.9], ['Quantum Cupboard', 18, 3.2], ["Pharaoh's Paperwork", 25, 3.6], ['Vault of Mild Peril', 33, 4.0], ['Clockwork Library', 41, 4.3],
+  ['Detective Duck', 46, 4.55], ['Moon Base Mishap', 51, 4.65], ['The Missing Llama', 55, 4.75], ['Midnight Bakery', 63, 4.5], ["Pirate's Pantry", 74, 4.2], ['Lost Sock Drawer', 85, 3.8], ["Grandma's Attic", 92, 3.4]];
+const props = { heading: 'Escape rate against review score, 2026', xLabel: 'Teams escaping within the hour, %', yLabel: 'Average review, stars out of 5', xMin: 0, xMax: 100, yMin: 2.5, yMax: 5,
+  points: rooms.map(([name, x, y]) => ({ name, x, y })), referenceLines: [{ axis: 'y', value: 4.0, label: 'Chain average 4.0' }] };
+const notes = [{ category: 'Haunted Hairdresser', text: 'Too hard: 12% escape, 2.9 stars' }, { category: 'The Missing Llama', text: 'Best in the chain: 55% escape, 4.8 stars' }, { category: "Grandma's Attic", text: 'Too easy: most teams out in 25 minutes' }];
+const render = (annotations) => REGISTRY.get('chart.scatter').render({ id: 'c', frame: { x: 60, y: 130, width: 1160, height: 540 }, props: { ...props, annotations } }).nodes;
+const axis = (nodes) => nodes.find((n) => n.role === 'chart-axis' && n.frame.height > 0).frame;
+const plain = render([]), noted = render(notes), llama = render(notes.slice(1, 2));
+const boxes = (nodes) => nodes.filter((n) => n.role === 'annotation-surface').map((n) => ({ at: n.data.evidencePlacement, frame: n.frame }));
+const line = noted.find((n) => n.role === 'chart-reference-line').frame;
+console.log(JSON.stringify({ plain: axis(plain), noted: axis(noted), llama: axis(llama), boxes: boxes(noted), llamaAt: boxes(llama).map((b) => b.at), line }));
+""")
+        self.assertEqual(result["noted"], result["plain"], "three notes leave the plot its full height")
+        self.assertEqual(result["llama"], result["plain"])
+        self.assertEqual(result["llamaAt"], ["open"], "the note in the cluster found the open space")
+        plot = result["plain"]
+        for box in result["boxes"]:
+            frame = box["frame"]
+            self.assertNotEqual(box["at"], "band")
+            self.assertGreaterEqual(frame["y"], plot["y"] - 0.5)
+            # Clear of the value line it would otherwise sit on.
+            self.assertFalse(frame["y"] - 6 < result["line"]["y"] < frame["y"] + frame["height"] + 6, frame)
+
+    def test_a_note_on_a_floating_step_hangs_under_it(self):
+        # A bridge's steps float: the open space is under them, and a leader from a box there lands on the step's
+        # underside, not across the step to its value end.
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const props = { heading: 'Operating profit, FY25 to FY26', unit: 'million', categories: ['FY25', 'Revenue', 'Energy', 'Depreciation', 'Employees', 'All other costs', 'FY26'],
+  values: [22197, 2915, 1374, 1602, -2129, -3237, 22722], totals: [0, 6], annotations: [{ category: 'Revenue', text: 'Yield and volume lifted revenue 2.9m' }] };
+const nodes = REGISTRY.get('chart.waterfall').render({ id: 'w', frame: { x: 60, y: 170, width: 1160, height: 400 }, props }).nodes;
+const step = nodes.filter((n) => n.role === 'chart-mark')[1].frame;
+const box = nodes.find((n) => n.role === 'annotation-surface'), leader = nodes.find((n) => n.role === 'annotation-leader').data;
+console.log(JSON.stringify({ step, box: box.frame, at: box.data.evidencePlacement, leader }));
+""")
+        step, box, leader = result["step"], result["box"], result["leader"]
+        self.assertEqual(result["at"], "open")
+        self.assertGreater(box["y"], step["y"] + step["height"])
+        self.assertAlmostEqual(leader["y2"], step["y"] + step["height"], places=3)
+        self.assertEqual(leader["x1"], leader["x2"], "straight down")
+        self.assertTrue(step["x"] + step["width"] * 0.2 - 0.5 <= leader["x2"] <= step["x"] + step["width"] * 0.8 + 0.5, "the middle of the step, not its corner")
+
+
+class CalloutStyleTests(unittest.TestCase):
+    """The callout styles a strong deck draws, each placed as a callout is."""
+
+    PRELUDE = """
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const years = ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'];
+const values = [74.9, 75.7, 78.0, 80.1, 80.9, 22.1, 19.4, 61.6, 79.2, 83.9, 84.5];
+const render = (annotations) => REGISTRY.get('chart.column').render({ id: 'c', frame: { x: 60, y: 170, width: 1160, height: 470 },
+  props: { heading: 'Passengers', unit: 'million', categories: years, series: [{ name: 'Passengers', values }], annotations } }).nodes;
+const of = (nodes, style) => nodes.filter((n) => n.data?.calloutStyle === style || (style === 'box' && n.data?.annotationTreatment === 'callout' && !n.data?.calloutStyle));
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+"""
+
+    def test_each_style_draws_its_own_look(self):
+        result = run_node(self.PRELUDE + """
+const nodes = render([{ category: '2021', text: 'Closure year: 19.4m', style: 'plain' }, { category: '2022', text: '+218%', style: 'pill' },
+  { category: '2025', figure: '84.5m', text: 'a new record', style: 'figure' }, { category: '2017', text: 'Steady growth before the closure', style: 'tint' },
+  { category: '2020', text: 'Halls shut in March', style: 'bubble' }]);
+const look = (style) => of(nodes, style).map((n) => ({ role: n.role, type: n.type, fill: n.style?.fill?.tokenId ?? n.style?.fill, stroke: n.style?.stroke?.tokenId ?? n.style?.stroke,
+  color: n.style?.color?.tokenId, size: n.style?.fontSize?.tokenId, radius: n.style?.radius?.tokenId, text: n.text }));
+const mark = (category) => nodes.find((n) => n.role === 'chart-mark' && n.data.category === category).frame;
+// Alone, where nothing else claims the place over its value, a pill sits on its mark.
+const solo = render([{ category: '2022', text: '+218%', style: 'pill' }]);
+const pill = of(solo, 'pill').find((n) => n.role === 'annotation-surface').frame, soloLeader = solo.some((n) => n.role === 'annotation-leader');
+const { token, tokenValue } = await import('./skills/professional-slides/runtime/core.mjs');
+const { contrastRatio } = await import('./skills/professional-slides/runtime/color.mjs');
+const accentReads = contrastRatio(tokenValue(token('color.accent')), tokenValue(token('color.surface'))) >= 4.5;
+console.log(JSON.stringify({ accentReads, plain: look('plain'), pill: look('pill'), figure: look('figure'), tint: look('tint'), bubble: look('bubble'), pillFrame: pill, soloLeader, mark2022: mark('2022'),
+  placed: nodes.filter((n) => n.role === 'annotation-text').length }));
+""")
+        roles = lambda style: [n["role"] for n in result[style]]
+        # Plain: the note in the accent and a hairline leader, no box.
+        self.assertNotIn("annotation-surface", roles("plain"))
+        self.assertIn("annotation-leader", roles("plain"))
+        # In the accent where it reads as text on the canvas at 4.5:1, in the ink where a pale accent would not.
+        self.assertEqual([n["color"] for n in result["plain"] if n["role"] == "annotation-text"], ["color.accent" if result["accentReads"] else "color.ink"])
+        # Pill: a round accent surface holding the value, set on its mark with no leader.
+        surface = next(n for n in result["pill"] if n["role"] == "annotation-surface")
+        self.assertEqual((surface["fill"], surface["radius"]), ("color.accent", "radius.round"))
+        self.assertFalse(result["soloLeader"])
+        mark = result["mark2022"]
+        self.assertLessEqual(result["pillFrame"]["y"] + result["pillFrame"]["height"], mark["y"])
+        self.assertAlmostEqual(result["pillFrame"]["x"] + result["pillFrame"]["width"] / 2, mark["x"] + mark["width"] / 2, delta=1)
+        # Figure: the value large in the accent and its line under it, no box.
+        texts = [n for n in result["figure"] if n["role"] == "annotation-text"]
+        self.assertEqual([(n["text"], n["size"]) for n in texts], [("84.5m", "type.heading"), ("a new record", "type.chartAnnotation")])
+        self.assertNotIn("annotation-surface", roles("figure"))
+        # Tint: the note on a tinted ground with no outline.
+        tint = next(n for n in result["tint"] if n["role"] == "annotation-surface")
+        self.assertEqual((tint["fill"], tint["stroke"]), ("color.componentPrimaryTint", "none"))
+        # Bubble: a white note outlined in the accent.
+        bubble = [n for n in result["bubble"] if n["role"] == "annotation-surface" and n["type"] == "rect"][0]
+        self.assertEqual((bubble["fill"], bubble["stroke"]), ("color.surface", "color.accent"))
+        self.assertEqual(result["placed"], 6, "every note set, the figure's value and line counted apart")
+
+    def test_a_style_out_of_its_place_is_refused_with_what_to_write(self):
+        result = run_node(self.PRELUDE + """
+console.log(JSON.stringify({
+  unknown: error(() => render([{ category: '2021', text: 'x', style: 'arrow' }])),
+  speech: error(() => render([{ category: '2021', text: 'Closure year', treatment: 'speech', style: 'plain' }])),
+  figure: error(() => render([{ category: '2025', text: 'a new record', style: 'figure' }])),
+  stray: error(() => render([{ category: '2025', text: 'a new record', figure: '84.5m' }])),
+  longPill: error(() => render([{ category: '2022', text: 'Passengers tripled in a single year as the halls reopened', style: 'pill' }])) }));
+""")
+        self.assertIn("is one of box, tint, plain, bubble, pill, figure", result["unknown"])
+        self.assertIn("a `style` belongs to a callout", result["speech"])
+        self.assertIn("give it `figure`", result["figure"])
+        self.assertIn("is the value a `style: \"figure\"` callout sets large", result["stray"])
+        self.assertIn("is a pill, which holds one value", result["longPill"])
 
 if __name__ == "__main__":
     unittest.main()
