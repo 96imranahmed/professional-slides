@@ -7,7 +7,7 @@
 // chart definition says which it `draws` and which it `refuses`, and
 // `refuseUndrawn` refuses any other before the chart is laid out, so nothing
 // authored is dropped unseen.
-import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitive, isTokenReference } from "./core.mjs";
+import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitive, isTokenReference, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, renderAnnotationRail, renderChangeAnnotations, renderEvidenceAnnotations } from "./chart-annotations.mjs";
 import { FONT, INK, SECONDARY, GRID, CHART_LABEL, textStyle, lineStyle, CHART_ANNOTATION, labelBold } from "./chart-axes.mjs";
@@ -142,9 +142,11 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   return { underlay, overlay };
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, scatterX = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, scatterX = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false, markerOffset = 0, allowMarkers = false }) {
   const underlay = [];
   const overlay = [];
+  for (const reference of props.referenceLines || []) if (reference?.style !== undefined && !REFERENCE_STYLES.includes(reference.style)) throw new Error(`a reference line's style is ${REFERENCE_STYLES.map((s) => `"${s}"`).join(" or ")}`);
+  if (!allowMarkers && (props.referenceLines || []).some(isMarker)) throw new Error("an average marker (`style: \"marker\"`) sits on a bar, column or line chart's value axis; on this chart draw it as a reference line");
   // Bands sit behind everything the chart draws over its data, their labels clear of the marks (chart-bands.mjs).
   if (props.bands !== undefined) {
     const bands = bandNodes({ id, plot, props, categories: props.categories || [], pointMap, yScale, xScale: yScale ? null : xScale, scatterX, obstacles,
@@ -165,7 +167,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     || b.y + b.height + padding <= a.y
   );
   drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight, underlay });
-  drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps });
+  drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps, markerOffset });
   overlay.push(...evidenceAnnotations.nodes);
   // A change arrow keeps clear of what is set above the marks before it - reference and threshold labels, callouts - as it
   // does of the marks themselves.
@@ -174,11 +176,45 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   return { underlay, overlay };
 }
 
+/**
+ * `referenceLines: [{ value, label, style: "marker" }]`: the value marked on
+ * the value axis by a filled triangle and its label - "Ø 18.1", an average -
+ * with no line across the marks, as strong decks mark a field's average under
+ * its bars. On a bar chart the triangle points up from under the plot at the
+ * value; on a column or line chart it points left from the plot's right edge
+ * (past the value labels, `offset`), and the label follows it. Its row or
+ * gutter is reserved by the chart (markerGutter, MARKER_ROW).
+ */
+export const REFERENCE_STYLES = Object.freeze(["line", "marker"]);
+export const MARKER_ROW = 34;
+const MARKER_SIZE = 10;
+export const isMarker = (reference) => reference?.style === "marker";
+const markerText = (reference, props) => (typeof reference.label === "string" && reference.label.trim() ? reference.label.trim() : `Ø ${formatValue(reference.value, props)}`);
+/** The width a column or line chart's markers take at its right. */
+export function markerGutter(props = {}) {
+  const markers = (props.referenceLines || []).filter(isMarker);
+  if (!markers.length) return 0;
+  return MARKER_SIZE + 6 + Math.ceil(Math.max(...markers.map((reference) => measureText(markerText(reference, props), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true }).width))) + 4;
+}
+function markerNodes({ id, index, reference, props, plot, horizontal, at, offset = 0 }) {
+  const measured = measureText(markerText(reference, props), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
+  const s = MARKER_SIZE, color = token("color.componentPrimary");
+  const points = horizontal ? [[0, 1], [0.5, 0], [1, 1]] : [[1, 0], [0, 0.5], [1, 1]];
+  const frame = horizontal ? { x: at - s / 2, y: plot.y + plot.height + 4, width: s, height: s * 0.9 } : { x: plot.x + plot.width + offset + 2, y: at - s / 2, width: s * 0.9, height: s };
+  const glyph = shapePrimitive({ id: stableId(id, "reference-marker", index), role: "chart-reference-marker", geometry: "customPolygon", frame, style: { fill: color, stroke: "none", lineWidth: token("line.hairline") }, data: { paths: [points], value: reference.value } });
+  const label = horizontal
+    ? { x: at - measured.width / 2 - 1, y: frame.y + frame.height + 2, width: measured.width + 2, height: measured.height, align: "center" }
+    : { x: frame.x + frame.width + 4, y: at - measured.height / 2, width: measured.width + 2, height: measured.height, align: "left" };
+  return [glyph, textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: label, text: measured.text,
+    style: { ...textStyle(CHART_LABEL, color, true, label.align), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value, marker: true } })];
+}
+
 // Horizontal charts carry a value axis along x: a reference is a vertical line
 // with its label set above the plot, clear of the bars.
 function drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacles, underlay, overlay }) {
   if (!yScale && xScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
+      if (isMarker(reference)) { overlay.push(...markerNodes({ id, index, reference, props, plot, horizontal: true, at: xScale(reference.value) })); continue; }
       const x = xScale(reference.value);
       // Interrupt the exact-value guide around direct labels, rather than
       // drawing through a value near the threshold. Its x position is unchanged.
@@ -261,9 +297,10 @@ function drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight,
 // A value axis up the page: each reference is a dashed line across the plot,
 // broken around value labels left on it, with its label in the first place
 // clear of the callouts, the marks and the plotted series.
-function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps }) {
+function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps, markerOffset = 0 }) {
   if (yScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
+      if (isMarker(reference)) { overlay.push(...markerNodes({ id, index, reference, props, plot, horizontal: false, at: yScale(reference.value), offset: markerOffset })); continue; }
       if(reference.placement === "outside-end" && !allowOutsideReferenceLabels) throw new Error("Outside reference labels are supported only on column charts");
       const y = yScale(reference.value);
       // A value label the chart left in place across this line (its column
@@ -305,7 +342,7 @@ function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowO
         // the plot, which a line chart (with no outside gutter) cannot leave.
         ...[0.5, 0.25, 0.75, 0.375, 0.625, 0.125, 0.875].flatMap(at => [y - labelHeight - 8, y + 8].map(top => ({ x: plot.x + (plot.width - labelWidth) * at, y: top, width: labelWidth, height: labelHeight, align: "center" })))
       ];
-      const fits = (candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
+      const fits = (candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).filter((other) => !isMarker(other)).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
       // A label the series runs through is read as part of the line: the
       // first place clear of every plotted line and point is taken, and only
       // where there is none does the label settle for clear of the marks.
@@ -369,11 +406,24 @@ export const measureDataLabel = (text, width = 1000) => {
 };
 
 /**
+ * `segmentGrowth` or `seriesGrowth` as the columns it draws: one `{ from, to,
+ * label }`, or up to three of them side by side - "CAGR 2015-19 | 2019-24" -
+ * each its own column. Null where the chart asks for none.
+ */
+export const GROWTH_COLUMNS_MAX = 3;
+export function growthColumns(spec, categories, series, name) {
+  if (spec === undefined || spec === null || spec === false) return null;
+  const list = Array.isArray(spec) ? spec : [spec];
+  if (!list.length || list.length > GROWTH_COLUMNS_MAX) throw new Error(`${name} takes one { from, to } or a list of up to ${GROWTH_COLUMNS_MAX}, one column each`);
+  return list.map((g, at) => growthColumn(g, categories, series, list.length > 1 ? `${name}[${at}]` : name));
+}
+
+/**
  * The growth of each series between two categories: a compound annual rate
  * when both name years, otherwise the change. Stacked columns set it beside the
  * last stack (`segmentGrowth`), lines beside their end labels (`seriesGrowth`).
  */
-export function growthColumn(g, categories, series, name) {
+function growthColumn(g, categories, series, name) {
   const a = categories.indexOf(g?.from), b = categories.indexOf(g?.to);
   if (a < 0 || b <= a) throw new Error(`${name}.from and .to must name two categories in order`);
   const year = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
@@ -418,6 +468,11 @@ export const CHART_DECORATIONS = Object.freeze({
   intervals: "intervals (`intervals`)",
   valueBreak: "a broken value axis (`valueBreak`)",
   categoryBreaks: "category-axis breaks (`categoryBreaks`)",
+  groupBrackets: "group brackets (`groupBrackets`)",
+  valueLabels: "value-label overrides (`valueLabels`)",
+  segmentGrowth: "a growth column per segment (`segmentGrowth`)",
+  seriesGrowth: "a growth column per line (`seriesGrowth`)",
+  stackBracket: "a bracket over a stack's segments (`stackBracket`)",
 });
 const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
 // What a chart on a vertical category axis draws through the shared decorations.

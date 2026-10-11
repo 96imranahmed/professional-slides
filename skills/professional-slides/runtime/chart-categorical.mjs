@@ -12,8 +12,9 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, 
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
-  growthColumn, seriesState, stateLabel } from "./chart-decorations.mjs";
+  growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
+import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings } from "./chart-marks.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
 // before it labels every nth row instead.
@@ -208,6 +209,8 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   drawCategoryGroups(chart);
   keepValueLabelsOffReferenceLines(chart);
   drawSegmentGrowth(chart);
+  drawGroupBrackets(chart);
+  chart.nodes.push(...labelRings({ id, nodes: chart.nodes, valueLabels: chart.valueLabels }));
   const { nodes, chartProps, plot, pointMap, categoryMap, yScale, xScale } = chart;
   return withDecorations(nodes, {
     id,
@@ -218,6 +221,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
     yScale: horizontal ? null : yScale,
     xScale: horizontal ? xScale : null,
     allowBarHighlight: true,
+    allowMarkers: true,
     allowAnnotationRail: !horizontal,
     allowOutsideReferenceLabels: !horizontal
   });
@@ -270,8 +274,11 @@ function categoricalData(chart) {
   // A broken axis (valueBreak) leaves no scale to read, so its marks carry their values however many there are.
   const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12 || Boolean(props.valueBreak)));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
+  // A label said another way - a range, an approximation - or ringed (chart-marks.mjs).
+  const valueLabels = normalizeValueLabels(props, categories, series);
+  if (valueLabels.size && !showDataLabels) throw new Error("valueLabels change the values printed on the marks, and this chart prints none; drop dataLabels: false, or say it in a callout");
   return { categories, series, stackLabels, barHighlighted, barHighlight, regionHighlight, chartProps, forecastKeyed, forecastLegend,
-    showLegend, values, showDataLabels, showValueAxis };
+    showLegend, values, showDataLabels, showValueAxis, valueLabels };
 }
 
 /**
@@ -310,9 +317,15 @@ function labelGutters(chart) {
     : 0;
   const noteColumnWidth = noteColumn ? noteWidth + 8 : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && (props.comparisonDomain?.values ?? values).some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
+  // A bar chart's category groups name their runs of rows in a column left of the row labels, each against a bracket.
+  const groupColumnWidth = horizontal && !hideCategoryLabels && Array.isArray(props.categoryGroups) && props.categoryGroups.length
+    ? Math.min(GROUP_LABEL_WIDTH, Math.ceil(Math.max(...props.categoryGroups.map((group) => axisText(String(group?.label ?? ""), GROUP_LABEL_WIDTH).width)))) + 18 : 0;
   return { barLabelGap, barLabelWidth, hideCategoryLabels, categoryIcons, logoMarks, iconW, iconH, iconSlot, axisText, noteWidth,
-    noteColumn, horizontalCategoryLabelWidth, noteColumnWidth, negativeLabelGutter };
+    noteColumn, horizontalCategoryLabelWidth, noteColumnWidth, negativeLabelGutter, groupColumnWidth };
 }
+
+// The widest a bar chart's group label sets before it wraps.
+const GROUP_LABEL_WIDTH = 120;
 
 /**
  * The room the marks' attachments take around the plot: stack totals,
@@ -328,15 +341,18 @@ function attachmentGutters(chart) {
   const totalWidth = totalMetrics.length ? Math.max(...totalMetrics.map(item => item.width)) + barLabelGap : 0;
   for(const reference of props.referenceLines || []) if(reference.placement !== undefined && !["inside", "outside-end"].includes(reference.placement)) throw new Error("Unknown reference-line label placement");
   if(horizontal && (props.referenceLines || []).some(r=>r.placement === "outside-end")) throw new Error("Outside reference labels require a vertical quantitative axis");
-  const referenceGutter = Math.max(0,...(props.referenceLines || []).filter(r=>r.placement === "outside-end").map(r=>measureDataLabel(r.label || String(r.value)).width + barLabelGap));
+  // Average markers (chart-decorations.mjs) on a column chart sit at the plot's right, past any outside reference label.
+  const referenceGutter = Math.max(0,...(props.referenceLines || []).filter(r=>r.placement === "outside-end").map(r=>measureDataLabel(r.label || String(r.value)).width + barLabelGap)) + (horizontal ? 0 : markerGutter(props));
+  if (horizontal && (props.referenceLines || []).some(isMarker) && props.showValueAxis === true) throw new Error("an average marker sits under the bars, where a value axis sets its ticks; with the values on the bars drop showValueAxis, or draw the average as a reference line");
   // A delta column (change versus the previous survey) sits to the right of
   // horizontal bars: a signed value in a tinted disc per category.
   const deltas = normalizeDeltas(props, categories);
   // `segmentGrowth: { from, to, label? }` on a stacked column: the rate per
   // segment between two categories in a column at the right, aligned to the
-  // last stack's segments (a "CAGR 2019–23" column).
-  const segmentGrowth = stacked && !horizontal && props.segmentGrowth ? growthColumn(props.segmentGrowth, categories, series, "segmentGrowth") : null;
-  const deltaWidth = (deltas && horizontal ? 64 : 0) + (segmentGrowth ? 76 : 0);
+  // last stack's segments (a "CAGR 2019–23" column); a list of up to three sets
+  // their columns side by side, level with the last stack.
+  const segmentGrowth = stacked && !horizontal && props.segmentGrowth ? growthColumns(props.segmentGrowth, categories, series, "segmentGrowth") : null;
+  const deltaWidth = (deltas && horizontal ? 64 : 0) + (segmentGrowth ? 76 * segmentGrowth.length : 0);
   // On columns the deltas are pills in a band above the plot, one over each
   // column, clear of the value labels and any stack totals, under a heading.
   if (deltas && !horizontal && (props.periods || props.events || (props.bands || []).some((band) => band?.label && bandAxis(band) === "category"))) throw new Error("Column deltas take the band periods, events and a labelled category band use; show one or the other");
@@ -346,7 +362,11 @@ function attachmentGutters(chart) {
   const stackBracket = stacked && !horizontal && Array.isArray(props.stackBracket) && props.stackBracket.length ? props.stackBracket : null;
   if (stackBracket && stackBracket.some((name) => !series.some((item) => item.name === name))) throw new Error("stackBracket must name series of the chart");
   if (horizontal && (props.periods || props.events)) throw new Error("periods and events annotate vertical columns and lines, not horizontal bars");
-  return { totalTexts, totalHeight, totalWidth, referenceGutter, deltas, segmentGrowth, deltaWidth, deltaClear, deltaBand, stackBracket };
+  // Group brackets (chart-marks.mjs): a column of brackets right of a bar chart's values, a band over a column chart's.
+  const brackets = normalizeGroupBrackets(props, categories, series, { stacked });
+  if (brackets.length && !horizontal && (deltas || props.periods || props.events)) throw new Error("group brackets take the band over the columns that deltas, periods and events use; show one or the other");
+  const bracketWidth = horizontal ? bracketGutter(brackets) : 0, bracketBand = !horizontal && brackets.length ? BRACKET_BAND : 0;
+  return { totalTexts, totalHeight, totalWidth, referenceGutter, deltas, segmentGrowth, deltaWidth, deltaClear, deltaBand, stackBracket, brackets, bracketWidth, bracketBand };
 }
 
 /** The column labels' face, the category notes, and `columnLabels(width)`: the labels laid out at a plot width. */
@@ -394,7 +414,7 @@ function columnLabelPlan(chart) {
 function categoricalPlot(chart) {
   const { frame, props, horizontal, stacked, categories, series, regionHighlight, forecastKeyed, forecastLegend, showLegend,
     showDataLabels, showValueAxis, barLabelGap, barLabelWidth, iconSlot, axisText, horizontalCategoryLabelWidth, noteColumnWidth,
-    negativeLabelGutter, totalHeight, totalWidth, referenceGutter, deltaWidth, deltaBand, columnLabels } = chart;
+    negativeLabelGutter, totalHeight, totalWidth, referenceGutter, deltaWidth, deltaBand, columnLabels, bracketWidth, bracketBand, groupColumnWidth } = chart;
   // The band under the columns is their labels': estimated at the slot the
   // plot will give each column, so the frame's own height checks count the
   // room it leaves, and settled on the measured labels once the plot is laid
@@ -408,22 +428,22 @@ function categoricalPlot(chart) {
     topInset: props.plotTopInset,
     // Horizontal categories live to the left; only an exposed value axis
     // needs a bottom label band. The column-chart gutter left bars floating.
-    bottomInset: horizontal ? (showValueAxis ? 32 : 12) : categoryBand,
+    bottomInset: horizontal ? (showValueAxis ? 32 : 12) + ((props.referenceLines || []).some(isMarker) ? MARKER_ROW : 0) : categoryBand,
     ...(horizontal ? {} : { labels: { gap: labelGap, height: (width) => columnLabels(width).height } }),
     headroom: horizontal ? BAR_HEADROOM : VALUE_HEADROOM,
     topLegend: showLegend ? legendRowsFor(forecastKeyed ? forecastLegend : series.map((item) => item.name), frame) : false,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    periodBand: periodBandHeight(props, categories, { horizontal }) + deltaBand,
+    periodBand: periodBandHeight(props, categories, { horizontal }) + deltaBand + bracketBand,
     // The 54px left gutter is the value axis's: it holds "1,200" and its tick.
     // With the numbers on the marks there is no axis to hold, and a vertical
     // category label never leaves its own slot, so the plot keeps the width the
     // axis would have taken and only a reading margin is reserved. The gutter
     // also mirrors to the right when the plot is centred, so this is twice the
     // width back on every labelled column chart.
-    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) : showValueAxis ? 54 : 16,
-    valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth,
+    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) + groupColumnWidth : showValueAxis ? 54 : 16,
+    valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth + bracketWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis,
     span: horizontal ? null : tableSpan(props, frame, categories.length)
@@ -442,7 +462,7 @@ function categoricalPlot(chart) {
 function categoryGroupLayouts(chart) {
   const { props, horizontal, categories, plot } = chart;
   const categoryGroups=props.categoryGroups ?? [];
-  if(!Array.isArray(categoryGroups) || (horizontal && categoryGroups.length)) throw new Error("Category groups require an array on a horizontal category axis");
+  if(!Array.isArray(categoryGroups)) throw new Error("Category groups require an array of { id, label, categories }");
   const groupedCategories=new Set(),groupIds=new Set();
   for(const group of categoryGroups) {
     if(!group || typeof group.id!=="string" || !group.id.trim() || groupIds.has(group.id) || typeof group.label!=="string" || !group.label.trim() || !Array.isArray(group.categories) || group.categories.length<2) throw new Error("Category groups require unique IDs, labels and at least two categories");
@@ -451,6 +471,8 @@ function categoryGroupLayouts(chart) {
     if(indices.some((n,i)=>n<0 || i>0&&n!==indices[i-1]+1) || group.categories.some(category=>groupedCategories.has(category))) throw new Error("Category groups require exact contiguous ordered non-overlapping categories");
     group.categories.forEach(category=>groupedCategories.add(category));
   }
+  // A bar chart's groups sit in the column left of the row labels (labelGutters), and take nothing off the plot.
+  if (horizontal) return { categoryGroups, groupLayouts: categoryGroups.map(group=>measureText(group.label,GROUP_LABEL_WIDTH,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL),wrapWidthRatio:ENGINE_RESERVE})) };
   const groupLayouts=categoryGroups.map(group=>measureText(group.label,plot.width/categories.length*group.categories.length-16,{fontFamily:tokenValue(FONT),fontSize:tokenValue(AXIS_LABEL),wrapWidthRatio:ENGINE_RESERVE}));
   plot.categoryGroupHeight=categoryGroups.length?Math.max(...groupLayouts.map(m=>m.height))+tokenValue(token("space.3"))*2:0;
   plot.height-=plot.categoryGroupHeight;
@@ -736,7 +758,10 @@ const LIGHTER_FILL = 0.4;
 /** A category's bars or segments and their value labels; returns the stack's running ends. */
 function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
   const { id, props, horizontal, stacked, series, stackLabels, barHighlighted, barHighlight, showDataLabels, barLabelGap, barLabelWidth,
-    segmentGrowth, plot, colorIndexFor, colorFor, lighter, nodes, pointMap, yScale, xScale, rowSize, rowLine, rowShown, segmentMids, barSpan } = chart;
+    segmentGrowth, plot, colorIndexFor, colorFor, lighter: lighterState, nodes, pointMap, yScale, xScale, rowSize, rowLine, rowShown, segmentMids, barSpan, valueLabels } = chart;
+  // An estimate (a value said as a range or an approximation) is drawn lighter, as an assumption is.
+  const said = (seriesIndex) => valueLabels.get(`${series[seriesIndex].name}:${category}`);
+  const lighter = (seriesIndex, at) => lighterState(seriesIndex, at) || Boolean(said(seriesIndex)?.estimate);
   let positiveCumulative = 0;
   let negativeCumulative = 0;
   series.forEach((item, seriesIndex) => {
@@ -769,12 +794,12 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
       role: "chart-mark",
       frame: bar,
       style: lighter(seriesIndex, categoryIndex) ? fillStyle(markColor, markColor, token("line.hairline"), LIGHTER_FILL) : fillStyle(markColor),
-      data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}), ...(lighter(seriesIndex, categoryIndex) ? { state: seriesState(item, chart.categories).state } : {}) }
+      data: { category, categoryKey: category, series: item.name, seriesKey: item.name, colorIndex, highlighted: Boolean(selected), ...(barHighlight ? { highlightStyle: "bar" } : {}), ...(lighterState(seriesIndex, categoryIndex) ? { state: seriesState(item, chart.categories).state } : said(seriesIndex)?.estimate ? { state: "estimate" } : {}) }
     }));
     // A zero segment has no area in a stack. Printing its label inside a
     // one-pixel placeholder both invents a visible segment and fails fit.
     if (showDataLabels && (!stacked || value !== 0) && (!horizontal || rowShown(categoryIndex))) {
-      let labelText = attachedLabelText(formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
+      let labelText = attachedLabelText(said(seriesIndex)?.display ?? formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
       const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
       labelText = labelMetrics.text;
       const labelFrame = horizontal
@@ -796,14 +821,14 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
         frame: labelFrame,
         text: labelText,
         style: textStyle(horizontal && !stacked ? rowSize : CHART_LABEL, labelOnFill && !lighter(seriesIndex, categoryIndex) ? onFill(markColor) : INK, labelBold(), horizontal && !stacked ? (value >= 0 ? "left" : "right") : "center"),
-        data: { category, series: item.name }
+        data: { category, series: item.name, ...(said(seriesIndex)?.display ? { display: said(seriesIndex).display, value } : {}), ...(said(seriesIndex)?.estimate ? { estimate: true } : {}) }
       }));
     }
     const point = horizontal
       ? { x: xScale(end), y: bar.y + bar.height / 2, changeX: xScale(end) + (value >= 0 ? 12 : -12), changeY: bar.y + bar.height / 2 }
       : { x: bar.x + bar.width / 2, y: yScale(end), changeX: bar.x + bar.width / 2, changeY: yScale(end) + (value >= 0 ? -(showDataLabels ? 38 : 16) : (showDataLabels ? 38 : 16)) };
     pointMap.set(`${item.name}:${category}`, point);
-    if (segmentGrowth && category === segmentGrowth.to) segmentMids.set(item.name, bar.y + bar.height / 2);
+    if (segmentGrowth && category === (segmentGrowth.length > 1 ? chart.categories.at(-1) : segmentGrowth[0].to)) segmentMids.set(item.name, bar.y + bar.height / 2);
     if (series.length === 1) pointMap.set(`value:${category}`, point);
     if (stacked) {
       if (value >= 0) positiveCumulative = end;
@@ -1026,7 +1051,8 @@ function drawForecastDivider(chart) {
 
 /** Each category group's bracket and label under the column labels. */
 function drawCategoryGroups(chart) {
-  const { id, categories, plot, categoryGroups, groupLayouts, nodes, categoryMap, categorySpan } = chart;
+  const { id, categories, plot, categoryGroups, groupLayouts, nodes, categoryMap, categorySpan, horizontal } = chart;
+  if (horizontal) return drawBarGroups(chart);
   for(const [i,group] of categoryGroups.entries()) {
     const start=categories.indexOf(group.categories[0]),end=start+group.categories.length;
     const x1=categoryMap.get(categories[start]).labelCenter-categorySpan/2+8,x2=categoryMap.get(categories[end-1]).labelCenter+categorySpan/2-8;
@@ -1034,6 +1060,23 @@ function drawCategoryGroups(chart) {
     const data={groupId:group.id,dependencies:group.categories.map(category=>stableId(id,"category",category))};
     for(const [part,a,b,c,d] of [["span",x1,y,x2,y],["left",x1,y-4,x1,y],["right",x2,y-4,x2,y]])nodes.push(linePrimitive({id:stableId(id,"category-group",group.id,part),role:"category-group-rule",x1:a,y1:b,x2:c,y2:d,style:lineStyle(SECONDARY),data}));
     nodes.push(textPrimitive({id:stableId(id,"category-group",group.id,"label"),role:"category-group-label",frame:{x:x1,y:y+4,width:x2-x1,height:groupLayouts[i].height},text:groupLayouts[i].text,style:{...textStyle(AXIS_LABEL,SECONDARY),valign:"top",lineHeight:groupLayouts[i].lineHeight,wrap:false},data:{...data,textLayout:groupLayouts[i]}}));
+  }
+}
+
+/** A bar chart's category groups: a bracket against each run of rows, its label at the left, centred on the run. */
+function drawBarGroups(chart) {
+  const { id, plot, categoryGroups, groupLayouts, nodes, categoryMap, horizontalCategoryLabelWidth, negativeLabelGutter, regionHighlight, groupColumnWidth } = chart;
+  const labelsLeft = plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0);
+  const x = labelsLeft - 6, arm = 5;
+  for (const [i, group] of categoryGroups.entries()) {
+    const rows = group.categories.map((category) => categoryMap.get(category));
+    const top = Math.min(...rows.map((r) => r.y)) + 1, bottom = Math.max(...rows.map((r) => r.y + r.height)) - 1;
+    const data = { groupId: group.id, dependencies: group.categories.map((category) => stableId(id, "category", category)) };
+    for (const [part, a, b, c, d] of [["span", x, top, x, bottom], ["top", x, top, x + arm, top], ["bottom", x, bottom, x + arm, bottom]])
+      nodes.push(linePrimitive({ id: stableId(id, "category-group", group.id, part), role: "category-group-rule", x1: a, y1: b, x2: c, y2: d, style: lineStyle(SECONDARY), data }));
+    const layout = groupLayouts[i], width = groupColumnWidth - 18;
+    nodes.push(textPrimitive({ id: stableId(id, "category-group", group.id, "label"), role: "category-group-label", frame: { x: x - 6 - width, y: (top + bottom) / 2 - layout.height / 2, width, height: layout.height }, text: layout.text,
+      style: { ...textStyle(AXIS_LABEL, INK, true, "right"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } }));
   }
 }
 
@@ -1048,7 +1091,7 @@ function keepValueLabelsOffReferenceLines(chart) {
   // and the reference line is broken around it (see `referenceGaps` in
   // decorations).
   if(!horizontal && !stacked && (props.referenceLines||[]).length) for(const label of nodes.filter(n=>n.role === "data-label" && n.data?.series !== undefined)) {
-    const lines=(props.referenceLines||[]).map(r=>yScale(r.value));
+    const lines=(props.referenceLines||[]).filter(r=>!isMarker(r)).map(r=>yScale(r.value));
     const ink=measureDataLabel(label.text), pad=(label.frame.height-ink.height)/2;
     const clear=(top)=>lines.every(y=>y<top-3||y>top+ink.height+3);
     const inkTop=label.frame.y+pad;
@@ -1076,17 +1119,26 @@ function keepValueLabelsOffReferenceLines(chart) {
   }
 }
 
+/** `groupBrackets`: each run of categories bracketed with its sum or share (chart-marks.mjs). */
+function drawGroupBrackets(chart) {
+  const { id, horizontal, stacked, brackets, plot, categories, nodes, showDataLabels, barLabelWidth, barLabelGap, totalWidth, deltaWidth } = chart;
+  if (!brackets.length) return;
+  const rightOf = plot.x + plot.width + (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) + deltaWidth + 6;
+  nodes.push(...bracketNodes({ id, brackets, horizontal, plot, categories, nodes, rightOf }));
+}
+
 /** `segmentGrowth`: the column of per-segment rates right of the plot. */
 function drawSegmentGrowth(chart) {
   const { id, horizontal, deltas, segmentGrowth, plot, nodes, segmentMids } = chart;
-  if (segmentGrowth) {
-    // Heading and one rate per segment, right of the plot, level with the last stack's segments.
-    const x = plot.x + plot.width + (deltas && horizontal ? 64 : 0) + 8, width = 66;
-    nodes.push(textPrimitive({ id: stableId(id, "growth-heading"), role: "chart-delta-label", frame: { x, y: plot.y - 22, width, height: 18 }, text: segmentGrowth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
-    for (const row of segmentGrowth.rows) {
+  // Heading and one rate per segment, right of the plot, level with the last stack's segments; a column a period.
+  for (const [k, growth] of (segmentGrowth || []).entries()) {
+    const x = plot.x + plot.width + (deltas && horizontal ? 64 : 0) + 8 + k * 76, width = 66;
+    const key = (...parts) => (k ? stableId(id, ...parts, k) : stableId(id, ...parts));
+    nodes.push(textPrimitive({ id: key("growth-heading"), role: "chart-delta-label", frame: { x, y: plot.y - 22, width, height: 18 }, text: growth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
+    for (const row of growth.rows) {
       const mid = segmentMids.get(row.name);
       if (mid === undefined) continue;
-      nodes.push(textPrimitive({ id: stableId(id, "growth", row.name), role: "chart-delta-label", frame: { x, y: mid - 10, width, height: 20 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
+      nodes.push(textPrimitive({ id: key("growth", row.name), role: "chart-delta-label", frame: { x, y: mid - 10, width, height: 20 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
     }
   }
 }

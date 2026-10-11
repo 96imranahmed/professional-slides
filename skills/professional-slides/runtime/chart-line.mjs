@@ -8,7 +8,7 @@ import { timePositions, spacedLabelIndices, monthlyLabelStep } from "./time-axis
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
-import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumn, seriesState, stateLabel, statesSeries } from "./chart-decorations.mjs";
+import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
 import { normalizeIntervals, intervalValues, intervalLabelWidth, intervalNodes } from "./chart-bands.mjs";
 
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
@@ -165,7 +165,8 @@ export function lineChart({ id, frame, props, area = false }) {
   chart.nodes.push(...(chart.intervalLabels || []));
   const { plot, nodes, pointMap, categoryMap, yScale } = chart;
   // A line read off its value axis takes its change as the diagonal arrow only (LINE_AXIS_CHANGE_STYLE): no bracket fallback.
-  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, arrowOnly: chart.showValueAxis === true });
+  // An average marker sits past the last value label (chart-decorations.mjs).
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, arrowOnly: chart.showValueAxis === true, allowMarkers: !chart.endLabels && !chart.seriesGrowth, markerOffset: chart.showDataLabels ? 68 : 0 });
 }
 
 /** The data checked, and what the props decide: the line colours, end labels or a legend, data labels, the value axis and its scale. */
@@ -187,7 +188,7 @@ function lineOptions(chart) {
   // its end label (a "CAGR 2020–30" column at the right
   // of a forecast). It rides on the end labels, which name the rows.
   if (props.seriesGrowth && !endLabels) throw new Error("seriesGrowth sits beside the end labels; set directLabels: \"end\"");
-  const seriesGrowth = props.seriesGrowth ? growthColumn(props.seriesGrowth, categories, series, "seriesGrowth") : null;
+  const seriesGrowth = props.seriesGrowth ? growthColumns(props.seriesGrowth, categories, series, "seriesGrowth") : null;
   // Dated observations at uneven gaps (Jan, Mar, Jun, Aug) sit where they fall
   // in time: one slot apart, a run-rate line steepens where the observations
   // bunch rather than where the growth does (time-axis.mjs). Two a month apart
@@ -228,7 +229,7 @@ function linePlot(chart) {
     topInset: props.plotTopInset,
     leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
     // An interval's label sits past the last value label, at the line's right end.
-    valueLabelInset: seriesGrowth ? 186 + 96 : (showDataLabels ? 68 : 0) + (intervals.some((interval) => interval.label) ? intervalLabelWidth(props) + (showDataLabels ? 4 : 10) : 0),
+    valueLabelInset: seriesGrowth ? 186 + 96 + (seriesGrowth.length - 1) * 80 : (showDataLabels ? 68 : 0) + (intervals.some((interval) => interval.label) ? intervalLabelWidth(props) + (showDataLabels ? 4 : 10) : 0) + markerGutter(props),
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -388,15 +389,16 @@ function placeEndLabels(chart) {
     if (overflow > 0) for (const label of sorted) label.y -= overflow;
     for (let i = sorted.length - 2; i >= 0; i--) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - step);
     for (const label of pendingEndLabels) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: { x: label.x, y: label.y, width: 176, height: 24 }, text: label.text, data: label.data, style: textStyle(CHART_LABEL, label.color, true, "left") }));
-    if (seriesGrowth) {
-      // The column starts a gap after the longest end label, so the rates read
-      // as that label's next word rather than a column across the page.
-      const longest = Math.max(...pendingEndLabels.map((label) => measureDataLabel(label.text).width));
-      const x = plot.x + plot.width + 9 + Math.min(176, longest) + 16, width = 76;
-      nodes.push(textPrimitive({ id: stableId(id, "growth-heading"), role: "chart-delta-label", frame: { x, y: sorted[0].y - 22, width, height: 20 }, text: seriesGrowth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
+    // The columns start a gap after the longest end label, so the rates read
+    // as that label's next words rather than a column across the page; a column a period.
+    const longest = Math.max(...pendingEndLabels.map((label) => measureDataLabel(label.text).width));
+    for (const [k, growth] of (seriesGrowth || []).entries()) {
+      const x = plot.x + plot.width + 9 + Math.min(176, longest) + 16 + k * 80, width = 76;
+      const key = (...parts) => (k ? stableId(id, ...parts, k) : stableId(id, ...parts));
+      nodes.push(textPrimitive({ id: key("growth-heading"), role: "chart-delta-label", frame: { x, y: sorted[0].y - 22, width, height: 20 }, text: growth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
       for (const label of pendingEndLabels) {
-        const row = seriesGrowth.rows.find((entry) => entry.name === label.data.series);
-        nodes.push(textPrimitive({ id: stableId(id, "growth", row.name), role: "chart-delta-label", frame: { x, y: label.y, width, height: 24 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
+        const row = growth.rows.find((entry) => entry.name === label.data.series);
+        nodes.push(textPrimitive({ id: key("growth", row.name), role: "chart-delta-label", frame: { x, y: label.y, width, height: 24 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
       }
     }
   }
