@@ -621,6 +621,7 @@ def thresholds_markdown():
     profiles = [name for name in ("live-pitch", "executive", "pre-read", "appendix") if name in PROFILES]
     fixed = [
         ("TITLE_LINES", "action title lines, at most", str(THRESHOLDS["title_lines_max"])),
+        ("TITLE_LINES", "side title lines down its panel, at most", str(THRESHOLDS["side_title_lines_max"])),
         ("TITLE_WORDS", "action title words, at most", str(THRESHOLDS["title_words_max"])),
         ("TYPE_RANGE", "point sizes by role", "; ".join("{} {:g}-{:g}".format(role, low, high) for role, (low, high) in TYPE_RANGES.items())),
         ("CPL", "characters per line of prose", "{}-{}".format(THRESHOLDS["cpl_min"], THRESHOLDS["cpl_max"])),

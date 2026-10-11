@@ -114,7 +114,7 @@ Geometry that leaves a page empty is corrected where the page is composed:
 - A chart prints a value to the precision the page's copy quotes it (at most two places): a bar beside a sentence saying 11.6 is labelled 11.6, not 12; every other label keeps the chart's own precision.
 - Panel captions are compact, left-aligned text under their panels at the panel's width; the statement box is the page's takeaway alone.
 
-`tracker` names the navigation construction: `pills` (every section, the current one filled), `label` (the current section's name alone, at the left above the title), `breadcrumb` (the section under its parent) or `number-strip`. Left unset it is chosen from the section map rather than always taken as pills: six sections or more, or any name past fourteen characters, takes `label`; four or more with medium-length names takes `number-strip`.
+`tracker` names the navigation construction: `pills` (every section, the current one filled), `label` (the current section's name alone, at the left above the title), `breadcrumb` (the section under its parent), `number-strip` or `side-rail` (every section as a tab down the page's right margin, the current one filled, each name turning once along its tab at most; the body keeps its width). Left unset it is chosen from the section map rather than always taken as pills: six sections or more, or any name past fourteen characters, takes `label`; four or more with medium-length names takes `number-strip`.
 
 `pictures` carries one to five labelled photographs. A `metrics` strip uses `metricsPosition: "top" | "bottom"`; omit it when it duplicates the argument. 
 

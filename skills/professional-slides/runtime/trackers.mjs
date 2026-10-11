@@ -63,9 +63,11 @@ const TRACKER_PAGE_VARIANTS = Object.freeze(Object.fromEntries([
 ]));
 
 const TRACKER_LABEL_VARIANTS = Object.freeze(Object.fromEntries(
-  ["label", "breadcrumb", "number-strip", "pills"].flatMap(construction => ["light", "dark"].map(mode => [
+  ["label", "breadcrumb", "number-strip", "pills", "side-rail"].flatMap(construction => ["light", "dark"].map(mode => [
     `${construction}-${mode}`,
-    { props: { construction: `compact-${construction}`, mode }, ...(mode === "dark" ? { backdrop: "primary" } : {}) }
+    { props: { construction: `compact-${construction}`, mode }, ...(mode === "dark" ? { backdrop: "primary" } : {}),
+      // The rail stands down the page's margin, not along the title row.
+      ...(construction === "side-rail" ? { preferredSize: { width: 34, height: 560 } } : {}) }
   ]))
 ));
 
@@ -235,7 +237,7 @@ export function trackerPageNodes({ id, frame, props }) {
 
 function labelSettings(props) {
   const construction = props.construction ?? "compact-label", mode = props.mode ?? "light";
-  if (!["compact-label", "compact-breadcrumb", "compact-number-strip", "compact-pills"].includes(construction)) throw new Error(`Unknown tracker-label construction: ${construction}`);
+  if (!["compact-label", "compact-breadcrumb", "compact-number-strip", "compact-pills", "compact-side-rail"].includes(construction)) throw new Error(`Unknown tracker-label construction: ${construction}`);
   if (!["light", "dark"].includes(mode)) throw new Error(`Unknown tracker-label mode: ${mode}`);
   return { construction, mode };
 }
@@ -265,6 +267,7 @@ export function trackerLabelNodes({ id, frame, props }) {
     });
     return nodes;
   }
+  if (construction === "compact-side-rail") return sideRailNodes({ id, frame, props, items, dark });
   if (construction === "compact-pills") {
     // Section pill tabs at the right of the title band (the e-Conomy tracker):
     // every section as a pill, the current one filled in the accent.
@@ -291,6 +294,39 @@ export function trackerLabelNodes({ id, frame, props }) {
   const parent = String(props.parentTitle ?? props.parentLabel ?? "").trim();
   const text = construction === "compact-breadcrumb" && parent ? `${parent}  /  ${selected.label}` : selected.label;
   return [measuredText(stableId(id, "text"), "tracker-compact-label", frame, text, style(token("type.label"), foreground, true, "left", "top"), { trackerId: props.trackerId ?? "deck-sections", sectionId: selected.id, selected: true, construction })];
+}
+
+// The side rail's tabs: as wide as two label lines (a section name may turn
+// once along its tab) and a little air, with a hairline gap between them.
+export const SIDE_RAIL = Object.freeze({ width: 34, gap: 3, pad: 8, lines: 2 });
+
+/**
+ * Every section as a tab down the right edge of the page (`compact-side-rail`),
+ * its name set reading downwards, the current one filled in the accent: the
+ * rail a long deck runs down its margin, which shows the sections not open
+ * without taking a line of the title band. It lives in the page's right
+ * margin, so the body keeps its width.
+ */
+function sideRailNodes({ id, frame, props, items, dark }) {
+  const nodes = [], { gap, pad } = SIDE_RAIL, fontSize = tokenValue(token("type.label"));
+  const tab = (frame.height - gap * (items.length - 1)) / items.length;
+  const length = tab - 2 * pad;
+  const measured = items.map((item) => {
+    try { return { item, layout: measureText(item.label, length, { fontFamily: tokenValue(BODY_FONT), fontSize, bold: true }) }; }
+    catch { throw new Error(`Side rail tab "${item.label}" has a word longer than its tab of ${Math.floor(tab)}px down the page; shorten the section labels or use tracker "number-strip"`); }
+  });
+  const long = measured.find((m) => m.layout.lines.length > SIDE_RAIL.lines || m.layout.height > frame.width - 2);
+  if (long) throw new Error(`Side rail tab "${long.item.label}" runs to ${long.layout.lines.length} lines along a tab of ${Math.floor(tab)}px - each of the ${items.length} tabs holds two; shorten the section labels or use tracker "number-strip"`);
+  const accent = token("color.accent");
+  measured.forEach(({ item, layout }, index) => {
+    const data = commonData(props, item, index), active = data.selected, y = frame.y + index * (tab + gap);
+    nodes.push(rectPrimitive({ id: stableId(id, "tab", item.id), role: "tracker-rail-tab", frame: { x: frame.x, y, width: frame.width, height: tab }, style: box(active ? accent : (dark ? INK : MUTED), active ? accent : (dark ? INK : MUTED), HAIRLINE, token("radius.none")), data }));
+    // Laid out unturned along the tab's length, then turned a quarter about the tab's centre.
+    const cx = frame.x + frame.width / 2, cy = y + tab / 2;
+    nodes.push(textPrimitive({ id: stableId(id, "tab-label", item.id), role: "tracker-rail-label", frame: { x: cx - length / 2, y: cy - layout.height / 2, width: length, height: layout.height }, text: item.label,
+      style: { ...style(token("type.label"), active ? WHITE : (dark ? WHITE : SECONDARY), true, "center", "mid"), lineHeight: layout.lineHeight, wrap: false, rotate: 90 }, data: { ...data, textLayout: layout } }));
+  });
+  return nodes;
 }
 
 export function registerTrackers(registry) {

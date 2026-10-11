@@ -220,6 +220,9 @@ const TRACKER_CONSTRUCTIONS = Object.freeze({
   // 1 2 3 4 on a rail, the current one filled: position without the words, for
   // a deck whose section titles are too long to set as pills.
   "number-strip": "compact-number-strip",
+  // Every section as a tab down the right margin, the current one filled: the
+  // pills' reach without a line of the title band.
+  "side-rail": "compact-side-rail",
 });
 export const TRACKER_NAMES = Object.freeze(Object.keys(TRACKER_CONSTRUCTIONS));
 

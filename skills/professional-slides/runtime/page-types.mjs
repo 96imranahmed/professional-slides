@@ -1778,7 +1778,19 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
 }
 
 /** The commentary the page carries, against what its `commentary` choice says it carries. */
+// The commentary a side title leaves room for: the panel takes a third of the
+// width, so the body is one exhibit carrying its own explanation.
+const SIDE_TITLE_COMMENTARY = ["none", "on-exhibit", "in-exhibit"];
 function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, waivedAdvisories }) {
+  if (page.titlePlacement !== undefined && !["top", "side"].includes(page.titlePlacement))
+    throw new Error(`${id}: \`titlePlacement\` is "top" (the default) or "side" (got ${JSON.stringify(page.titlePlacement)})`);
+  if (page.titleNumeral !== undefined && page.titlePlacement !== "side") throw new Error(`${id}: \`titleNumeral\` is the figure set over a side title - it needs \`titlePlacement: "side"\``);
+  if (page.titlePlacement === "side") {
+    if (exhibits.length !== 1 || !SIDE_TITLE_COMMENTARY.includes(page.commentary))
+      throw new Error(`${id}: a side title takes a third of the page's width, so the body beside it is one exhibit carrying its own explanation - commentary ${SIDE_TITLE_COMMENTARY.map((c) => `"${c}"`).join(", ")} (this page has ${exhibits.length} exhibit${exhibits.length === 1 ? "" : "s"} and "${page.commentary}")`);
+    if (page.titleNumeral !== undefined && !(typeof page.titleNumeral === "string" && /\d/.test(page.titleNumeral) && page.titleNumeral.trim().split(/\s+/).length <= 2))
+      throw new Error(`${id}: \`titleNumeral\` is the finding's figure ("47%", "£2.1bn"), a word or two at most; the words go in the title`);
+  }
   // Commentary: where the explanation lives decides the layout.
   const points = (page.points || []).length;
   const textless = ["on-exhibit", "in-exhibit", "captions", "none"].includes(page.commentary);

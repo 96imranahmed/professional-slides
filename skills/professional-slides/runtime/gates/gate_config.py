@@ -182,6 +182,10 @@ THRESHOLDS = {
     **FILL_LEVELS[DEFAULT_FILL],
     "exhibit_ink_min": 0.02,     # a hero frame must carry ink, not just area (a line chart sits near 2-3%, a 12pt table near 5-6%)
     "title_lines_max": 2,
+    # A title set down a side panel (registry-chrome.mjs SIDE_TITLE) wraps in a
+    # column a quarter of the page wide: the same fifteen words take five or six
+    # lines there, and the word limit, not the line count, holds its length.
+    "side_title_lines_max": 7,
     "title_words_max": CONTRACT["plan"]["titleWords"]["max"],  # the compiler refuses past it too (page-types.mjs)
     "cpl_min": 35,
     "cpl_max": 90,

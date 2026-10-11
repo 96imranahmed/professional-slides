@@ -630,6 +630,75 @@
    "source": "Source: illustrative data for a fictional operator; FY26 scorecard"
   },
   {
+   "id": "f-ranking-side-title",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "on-exhibit",
+   "takeaway": false,
+   "titlePlacement": "side",
+   "titleNumeral": "47%",
+   "why": "One figure carries the page - Northvale's off-peak load against seven peers - so the title and its figure stand in a panel beside the ranking",
+   "settles": {
+    "kind": "rank",
+    "what": "off-peak seats filled on eight operators, FY26"
+   },
+   "adds": "The callouts say why Northvale's trains run emptier and how far the median sits above it",
+   "title": "Northvale fills 47% of its off-peak seats, the fewest of the eight operators",
+   "subtitle": "Off-peak load factor, share of seats filled, FY26",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Off-peak seats filled, FY26",
+    "unit": "%",
+    "categories": [
+     "Westmoor",
+     "Kingsway",
+     "Eastbrook",
+     "Southfield",
+     "Coastline",
+     "Dalesway",
+     "Valley Rail",
+     "Northvale"
+    ],
+    "series": [
+     {
+      "name": "Load factor",
+      "values": [
+       68,
+       64,
+       61,
+       58,
+       55,
+       53,
+       50,
+       47
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Northvale"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 57,
+      "label": "Median 57%"
+     }
+    ],
+    "annotations": [
+     {
+      "category": "Northvale",
+      "text": "Six-car trains run hourly where peers run two cars half-hourly"
+     },
+     {
+      "category": "Westmoor",
+      "text": "Westmoor halved train length in 2024 and doubled frequency"
+     }
+    ]
+   },
+   "source": "Source: illustrative load data; synthetic"
+  },
+  {
    "id": "f-composition-stacked-bar",
    "type": "composition",
    "form": "stacked-bar",

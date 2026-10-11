@@ -374,10 +374,13 @@ def gate_title(slide_no, slide, findings):
         if node.get("role") not in TITLE_ROLES:
             continue
         lines = lines_of(node)
-        if len(lines) > THRESHOLDS["title_lines_max"]:
+        side = (node.get("data") or {}).get("titlePlacement") == "side"
+        most = THRESHOLDS["side_title_lines_max" if side else "title_lines_max"]
+        if len(lines) > most:
             findings.append(finding(
-                slide_no, "TITLE_LINES", len(lines), THRESHOLDS["title_lines_max"],
-                "Cut the action title to two lines: state the finding, drop the setup clause.",
+                slide_no, "TITLE_LINES", len(lines), most,
+                f"Cut the action title to {most} lines down its panel: state the finding, drop the setup clause." if side
+                else "Cut the action title to two lines: state the finding, drop the setup clause.",
             ))
         # A continuation marker "(2/3)" on a split page is not part of the claim.
         text = re.sub(r"\s*\(\d+/\d+\)\s*$", "", source_text(node))
