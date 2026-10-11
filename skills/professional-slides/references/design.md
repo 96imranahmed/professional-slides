@@ -16,6 +16,7 @@ Decide what the page has to make the reader see, then take the page type and for
 | Before against after, per category | `ranking`, form `dumbbell`; `trend`, form `slope` for two to four dates | Grouped bars with ten pairs |
 | Spread within each member of a set | `ranking`, form `boxplot` | An average alone |
 | Which of many series moved | `trend`, form `sparklines`; `panels`, form `small-multiples` with axes, columns or bars a panel | Twelve lines on one plot |
+| How one subject stands on several measures at once | `panels`, form `dashboard`: a hero exhibit with its satellites, a strip of figures over the grid | Four equal panels, or a page a measure |
 | A forecast read with its numbers | `trend`, form `model`, the chart over its data table | A chart and a separate table of the same figures |
 | Parts of a whole, one period | `composition`, form `donut` for two to four parts, `waffle` for a share read as counts, `treemap` for many | A pie with eight slices |
 | A population share read as "six in ten" | `composition`, form `pictogram` | A single bar at 60% |

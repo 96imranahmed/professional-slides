@@ -10,7 +10,7 @@ import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
 import { SLIDE_PASSES } from "./compose-passes.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
 import { peerExhibitsRow, exhibitOverCommentary, labelledRows, centredCards, centredFigure, exhibitBesideCommentary, figureWithPoints,
-  fullWidthExhibit, tableHalves, heroNumber, splitTone, exhibitStack, exhibitGrid } from "./compose-arrangements.mjs";
+  fullWidthExhibit, tableHalves, heroNumber, splitTone, exhibitStack, exhibitGrid, exhibitDashboard } from "./compose-arrangements.mjs";
 import { picturesAcross, pictureHero, photoBackdrop } from "./compose-picture-pages.mjs";
 import { sidebarPage, textPage } from "./compose-text-pages.mjs";
 
@@ -38,7 +38,8 @@ export const SLIDE_KEYS = Object.freeze({
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
   shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
   layout: "force a layout instead of letting the composer choose one",
-  arrange: "row, stack, grid or sequence (a row joined by arrows), when the page carries more than one exhibit",
+  arrange: "row, stack, grid, sequence (a row joined by arrows) or dashboard (a grid of areas), when the page carries more than one exhibit",
+  grid: "on a dashboard, its column and row tracks and each exhibit's area on them",
   density: "this page's density profile, overriding the deck's",
   // the title band
   title: "the action title: the finding, not the subject",
@@ -307,6 +308,7 @@ function arrangePage(items, page) {
   else if (layout === "split-tone") splitTone(items, page);
   else if (layout === "stack") exhibitStack(items, page);
   else if (layout === "grid") exhibitGrid(items, page);
+  else if (layout === "dashboard") exhibitDashboard(items, page);
   else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence") peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
   else if (layout === "labelled-rows") labelledRows(items, { id, slide, baseDir, fill });
   else if (layout === "picture-pair" || layout === "picture-strip") picturesAcross(items, page);

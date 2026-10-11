@@ -245,6 +245,7 @@ export const CARRIERS = Object.freeze([
     "mechanism/rank-flow": "rank movement across periods",
     "schedule/timeline": "dated milestones", "schedule/gantt": "durations and overlaps across workstreams", "schedule/roadmap": "stages, when each runs and what it delivers",
     "schedule/horizons": "a portfolio of bets by when each pays",
+    "panels/dashboard": "several measures of one subject read together at a glance: a hero exhibit with its satellites, figures over a grid of a chart, a table and a map",
     "parallel/cards": "three to six parallel ideas, an icon each", "parallel/capsules": "three to six parallel ideas in a line", "parallel/arrow-rows": "parallel ideas read down, each leading to its consequence",
     "parallel/labelled-rows": "a point per area, each with its evidence",
     "profiles/logos": "the players the deck compares, by their marks", "profiles/people": "the people involved", "profiles/logo-table": "the players with the numbers the deck will use",

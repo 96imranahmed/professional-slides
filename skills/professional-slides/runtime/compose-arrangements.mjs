@@ -24,6 +24,7 @@ import { paragraph, pointColumns, pointsItem, sideTreatment, listDepth, pointsPe
 import { photoStrip } from "./compose-pictures.mjs";
 import { metricsColumn } from "./compose-metrics.mjs";
 import { hasCommentary } from "./compose-layouts.mjs";
+import { fitsQuarter } from "./compose-text-pages.mjs";
 
 /**
  * Two peer exhibits side by side: `two-up` and `two-up-contrast`.
@@ -758,6 +759,30 @@ export function exhibitStack(items, { id, slide, exhibits, baseDir, fill, points
     const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), layout: "flow.column", size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
   } else items.push({ ...stacked, size: SIZE });
+}
+
+/**
+ * A dashboard: two to six headed exhibits on a grid of areas - a hero chart
+ * over two columns beside two satellites, a map beside a table - each in the
+ * cell its `area` names (page-types.mjs dashboardGrid), the tracks as wide
+ * and as tall as their weights. The strip of figures over it is the page's
+ * (measuresOverPage); the rail, where the page has one, stands at its right
+ * as a boxed column. A text `panel` heads itself, so it takes no band.
+ */
+export function exhibitDashboard(items, { id, slide, exhibits, baseDir }) {
+  const grid = slide.grid;
+  if (!grid) throw new Error(`${id}: a dashboard carries its grid (page-types.mjs dashboardGrid)`);
+  const cells = exhibits.map((exhibit, i) => {
+    const { area, ...ex } = exhibit;
+    const item = { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE };
+    return { ...(ex.type === "panel" ? item : headedPanel(ex, item, `${id}-exhibit-${i}`)), cell: grid.areas[i] };
+  });
+  const board = { id: `${id}-dashboard`, layout: "grid", gridColumns: grid.columns, gridRows: grid.rows, size: SIZE, items: cells };
+  if (slide.panel?.text) {
+    const rail = { id: `${id}-rail`, component: "side-statement", props: { text: slide.panel.text, tone: slide.panel.tone ?? "muted" }, size: { width: { fr: 1 }, height: "fill" } };
+    // A quarter of the row where the statement fits there, a third where it does not, as a sidebar page's panel (compose-text-pages.mjs).
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [{ ...board, size: { width: { fr: fitsQuarter(rail.props) ? 3 : 2 }, height: "fill" } }, rail] });
+  } else items.push(board);
 }
 
 // Two rows of two small exhibits, every panel headed.

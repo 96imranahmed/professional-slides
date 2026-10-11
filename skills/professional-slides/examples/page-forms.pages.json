@@ -1500,6 +1500,173 @@
    "source": "Source: illustrative data for a fictional operator; train running records"
   },
   {
+   "id": "f-panels-dashboard",
+   "type": "panels",
+   "form": "dashboard",
+   "commentary": "rail",
+   "takeaway": false,
+   "why": "Four measures of one year - journeys, revenue, punctuality and cost - read together, the quarter-by-quarter journeys the hero and the lines as its satellites",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by quarter, and revenue growth and punctuality by line, FY25 and FY26"
+   },
+   "title": "Off-peak growth carried FY26, led by the most punctual lines",
+   "metrics": [
+    {
+     "value": "48.2m",
+     "label": "Journeys",
+     "delta": "+3.4%"
+    },
+    {
+     "value": "£612m",
+     "label": "Revenue",
+     "delta": "+5.1%"
+    },
+    {
+     "value": "91.5%",
+     "label": "Trains on time",
+     "delta": "+1.2 pts"
+    },
+    {
+     "value": "£17.60",
+     "label": "Cost per train-km",
+     "delta": "-2.0%",
+     "better": "down"
+    }
+   ],
+   "grid": {
+    "columns": [
+     3,
+     2
+    ],
+    "rows": [
+     1,
+     1.15
+    ]
+   },
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Journeys by quarter",
+     "unit": "million",
+     "categories": [
+      "Q1 FY25",
+      "Q2 FY25",
+      "Q3 FY25",
+      "Q4 FY25",
+      "Q1 FY26",
+      "Q2 FY26",
+      "Q3 FY26",
+      "Q4 FY26"
+     ],
+     "series": [
+      {
+       "name": "Peak",
+       "values": [
+        6.1,
+        6.0,
+        6.2,
+        5.9,
+        6.2,
+        6.1,
+        6.3,
+        6.0
+       ]
+      },
+      {
+       "name": "Off-peak",
+       "values": [
+        5.4,
+        5.6,
+        5.5,
+        5.7,
+        5.9,
+        6.1,
+        6.0,
+        6.3
+       ]
+      }
+     ],
+     "focusSeries": "Off-peak",
+     "area": {
+      "column": 1,
+      "row": 1,
+      "rowSpan": 2
+     }
+    },
+    {
+     "type": "chart.bar",
+     "heading": "Revenue growth, FY26",
+     "unit": "%",
+     "categories": [
+      "Dales",
+      "Valley",
+      "City",
+      "Eastern",
+      "Coast"
+     ],
+     "series": [
+      {
+       "name": "Growth",
+       "values": [
+        9.1,
+        7.4,
+        5.2,
+        3.3,
+        0.8
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "Dales"
+      }
+     ],
+     "area": {
+      "column": 2,
+      "row": 1
+     }
+    },
+    {
+     "type": "table",
+     "heading": "On time, FY26",
+     "columns": [
+      "Line",
+      "On time",
+      "Change"
+     ],
+     "rows": [
+      [
+       "Dales",
+       "93.1%",
+       "+2.0 pts"
+      ],
+      [
+       "Valley",
+       "92.4%",
+       "+1.6 pts"
+      ],
+      [
+       "City",
+       "91.8%",
+       "+0.9 pts"
+      ],
+      [
+       "Coast",
+       "88.2%",
+       "-0.4 pts"
+      ]
+     ],
+     "area": {
+      "column": 2,
+      "row": 2
+     }
+    }
+   ],
+   "rail": "Off-peak journeys overtook the peak in the last quarter, and Dales and Valley - the two lines with half-hourly stations - led both revenue growth and punctuality.",
+   "source": "Source: illustrative data for a fictional operator; ticket sales and train running records"
+  },
+  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",

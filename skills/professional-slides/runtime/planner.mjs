@@ -244,7 +244,7 @@ function layoutKind(plan, items) {
 function makeItem(item, index, cell = null) {
   const size = item.size || { width: { fr: item.weight || 1 }, height: (["paragraph", "insight", "evidence-note", "callout", "table"].includes(item.component) || item.component === "bullet-list" && item.props?.variant === "body") ? "hug" : "fill" };
   if (item.items) {
-    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover, textFlow: item.textFlow };
+    const nestedPlan = { id: item.id, layout: item.layout || "auto", gap: item.gap, leftover: item.leftover, textFlow: item.textFlow, gridColumns: item.gridColumns, gridRows: item.gridRows };
     const nested = makeComposition(nestedPlan, item.items);
     return section({
       id: item.id,
@@ -329,12 +329,13 @@ function makeComposition(plan, items, { root = false } = {}) {
     });
   }
   if (kind === "grid") {
-    const columns = Math.min(3, Math.ceil(Math.sqrt(items.length)));
-    const rows = Math.ceil(items.length / columns);
+    // Tracks a plan sets (a dashboard's: weights each way), else equal ones by the square root of the count.
+    const columns = plan.gridColumns?.length ?? Math.min(3, Math.ceil(Math.sqrt(items.length)));
+    const rows = plan.gridRows?.length ?? Math.ceil(items.length / columns);
     return grid({
       id: `${plan.id}-grid`,
-      columns: Array.from({ length: columns }, () => ({ fr: 1 })),
-      rows: Array.from({ length: rows }, () => ({ fr: 1 })),
+      columns: plan.gridColumns ? plan.gridColumns.map((fr) => ({ fr })) : Array.from({ length: columns }, () => ({ fr: 1 })),
+      rows: plan.gridRows ? plan.gridRows.map((fr) => ({ fr })) : Array.from({ length: rows }, () => ({ fr: 1 })),
       children: items.map((item, index) => makeItem(item, index, { column: index % columns, row: Math.floor(index / columns), ...(item.cell || {}) }))
     });
   }

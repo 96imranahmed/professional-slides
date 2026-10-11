@@ -131,7 +131,10 @@ export const PAGE_TYPES = Object.freeze({
     // between each - cause and effect, before and after, input to result.
     // `small-multiples`: five to twelve cuts as one trellis of small charts of
     // one kind on one scale, where four panels stop.
-    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence", "small-multiples": CHART("small-multiples") },
+    // `dashboard`: two to six headed exhibits of any kind on a grid of named
+    // areas - a hero chart and its satellites, a map beside a table - under an
+    // optional strip of figures, with an optional rail.
+    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence", "small-multiples": CHART("small-multiples"), dashboard: "dashboard" },
     commentary: ["captions", "below", "so-what-bar", "none"], exhibits: [2, 4],
   },
   scorecard: {
@@ -254,9 +257,11 @@ export const FORM_COMMENTARY = Object.freeze({
   "profiles/radar": ["below", "none"], "trend/model": ["beside", "on-exhibit"],
   // A trellis is one exhibit: its commentary sits beside or under it as a chart's does, and its panels carry no captions.
   "panels/small-multiples": [...ANY_TEXT, "none"],
+  // A dashboard's cells carry their own headings and figures: its words are the rail beside it or the bar under it.
+  "panels/dashboard": ["none", "rail", "so-what-bar"],
 });
 // Forms that carry a different number of exhibits from their type: a trellis is one exhibit of many panels.
-const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1 });
+const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6] });
 /** The fewest and most exhibits a page of `type` and `form` carries: `[lo, hi]`. */
 export function exhibitRange(type, form) {
   const n = FORM_EXHIBITS[`${type}/${form}`] ?? PAGE_TYPES[type]?.exhibits ?? 1;
@@ -469,6 +474,7 @@ const FORM_DATA = {
   "composition/pictogram": ["rows (1 to 5, each { label, value, text } - the figures filled out of `of`)", "of (10 or 20)", "icon (the figure: person by default)"],
   "profiles/radar": ["categories (3 to 8 attributes)", "series (1 to 4 players, one value per attribute)", "max (the scale's top)", "focusSeries (the subject)"],
   "schedule/horizons": ["horizons (2 to 5, each { label, title, description })", "variant (curves, stepped, stepped-minimal, stepped-bands)"],
+  "panels/dashboard": ["exhibits (2 to 6, each with its `heading`, of any kind - charts, a table, a map, a `panel` of text, a `metric` - and an `area` { column, row, columnSpan, rowSpan } on the grid, or none to fill it in reading order)", "grid ({ columns, rows }: how many tracks each way, or their widths as weights - [2, 1, 1]; 4 columns and 3 rows at most)", "metrics (an optional strip of 2 to 6 figures over the grid)"],
   "panels/small-multiples": ["one exhibit: mark (column, bar or line)", "categories (the axis every panel shares)", "items (5 to 12 panels, each { label, values, focus?, reference? })", "highlights (the panel the page is about)", "reference (\"average\" or a value)", "scale (shared or own)", "rowLabels and columnLabels (a grid read both ways)"],
   "schedule/timeline": ["items (4 or more, each { date, label, text }: when, what happens, and a sentence on it, set at reading size and counted as the page's words)", "orientation (across or down; absent, the frame decides - rows where the page has the height, columns over commentary below)"],
   "schedule/roadmap": ["items (4 or more, each { label, period, text }: the stage, when it runs, and what it delivers)", "orientation (across or down; absent, the frame decides)"],
@@ -1835,10 +1841,67 @@ function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, wa
   return { points, unmarkedPoints };
 }
 
+// A dashboard's grid: four tracks across and three down at most, and, under a strip of figures, two down - each cell needs the
+// height a chart's heading and a readable plot take (chart-axes.mjs MIN_PLOT_HEIGHT).
+export const DASHBOARD = Object.freeze({ columns: 4, rows: 3, rowsUnderStrip: 2, metrics: 6 });
+const tracks = (spec, name, id, most) => {
+  const list = Number.isInteger(spec) ? Array.from({ length: spec }, () => 1) : spec;
+  if (!Array.isArray(list) || !list.length || list.length > most || list.some((w) => !(Number.isFinite(w) && w > 0)))
+    throw new Error(`${id}: a dashboard's grid.${name} is how many tracks run that way (1 to ${most}) or their widths as weights - [2, 1, 1]`);
+  return list;
+};
+/**
+ * A dashboard's grid, checked against its exhibits: the column and row
+ * tracks, and each exhibit's area on them (1-based, spans of tracks). An
+ * exhibit with no `area` takes the next free cell in reading order. Areas
+ * overlap nowhere, and every exhibit names what its cell shows (`heading`).
+ */
+function dashboardGrid(page, id, exhibits) {
+  const metrics = Array.isArray(page.metrics) ? page.metrics.length : 0;
+  if (metrics && (metrics < 2 || metrics > DASHBOARD.metrics)) throw new Error(`${id}: a dashboard's strip of figures holds 2 to ${DASHBOARD.metrics} metrics (this has ${metrics})`);
+  const given = page.grid ?? {};
+  if (typeof given !== "object") throw new Error(`${id}: grid is { columns, rows }`);
+  const unplaced = exhibits.filter((ex) => !ex.area).length;
+  const columns = tracks(given.columns ?? Math.min(DASHBOARD.columns, Math.max(2, Math.ceil(exhibits.length / 2))), "columns", id, DASHBOARD.columns);
+  const most = metrics ? DASHBOARD.rowsUnderStrip : DASHBOARD.rows;
+  const asked = Array.isArray(given.rows) ? given.rows.length : given.rows;
+  if (metrics && asked > DASHBOARD.rowsUnderStrip) throw new Error(`${id}: under a strip of figures a dashboard holds ${DASHBOARD.rowsUnderStrip} rows; three leave each cell under the height a chart needs - drop a row, or move the figures into a cell`);
+  const rows = tracks(given.rows ?? Math.min(most, Math.ceil(exhibits.length / columns.length)), "rows", id, most);
+  const taken = new Set(), placed = [];
+  const claim = (column, row, columnSpan, rowSpan, at) => {
+    for (let c = column; c < column + columnSpan; c += 1) for (let r = row; r < row + rowSpan; r += 1) {
+      const key = `${c},${r}`;
+      if (taken.has(key)) throw new Error(`${id}: exhibit ${at + 1}'s area overlaps another's at column ${c + 1}, row ${r + 1}`);
+      taken.add(key);
+    }
+  };
+  exhibits.forEach((ex, at) => {
+    if (!(typeof ex.heading === "string" && ex.heading.trim()) && !(typeof ex.panelHeading === "string" && ex.panelHeading.trim()))
+      throw new Error(`${id}: every cell of a dashboard names what it shows - exhibit ${at + 1} (${ex.type ?? "untyped"}) has no \`heading\``);
+    if (!ex.area) return;
+    const { column, row, columnSpan = 1, rowSpan = 1 } = ex.area;
+    const ok = [column, row, columnSpan, rowSpan].every(Number.isInteger) && column >= 1 && row >= 1 && columnSpan >= 1 && rowSpan >= 1
+      && column - 1 + columnSpan <= columns.length && row - 1 + rowSpan <= rows.length;
+    if (!ok) throw new Error(`${id}: exhibit ${at + 1}'s area { column, row, columnSpan, rowSpan } counts tracks from 1 and stays inside the ${columns.length} by ${rows.length} grid (got ${JSON.stringify(ex.area)})`);
+    claim(column - 1, row - 1, columnSpan, rowSpan, at);
+    placed[at] = { column: column - 1, row: row - 1, columnSpan, rowSpan };
+  });
+  // The rest fill the free cells in reading order, a cell each.
+  const free = [];
+  for (let r = 0; r < rows.length; r += 1) for (let c = 0; c < columns.length; c += 1) if (!taken.has(`${c},${r}`)) free.push({ column: c, row: r, columnSpan: 1, rowSpan: 1 });
+  if (unplaced > free.length) throw new Error(`${id}: ${unplaced} exhibits have no area and the ${columns.length} by ${rows.length} grid has ${free.length} free cells; widen the grid or give each an area`);
+  exhibits.forEach((ex, at) => { if (!placed[at]) placed[at] = free.shift(); });
+  return { columns, rows, areas: placed };
+}
+
 /** The layout the commentary and the form ask for, and each type's own arrangement of the slide. */
 function layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points }) {
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
-  if (trellisPage(page.type, page.form)) {
+  if (page.type === "panels" && page.form === "dashboard") {
+    slide.arrange = "dashboard";
+    slide.grid = dashboardGrid(page, id, exhibits);
+    if (page.exhibit) { slide.exhibits = [page.exhibit, ...(page.exhibits || [])]; delete slide.exhibit; }
+  } else if (trellisPage(page.type, page.form)) {
     // A trellis is one chart, set as a chart is: beside its commentary, over it, or across the page.
     const items = (primary?.items || []).length;
     if (items < SMALL_MULTIPLES_LEAST) throw new Error(`${id}: small multiples are for five or more cuts (this one has ${items}); two to four sit as panels in a row or a grid, each with its caption`);

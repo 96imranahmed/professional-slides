@@ -175,7 +175,7 @@ for (const [type, t] of Object.entries(PAGE_TYPES)) for (const [form, target] of
 console.log(JSON.stringify({ out, floor: EVIDENCE_FLOOR, copy: COPY_LIMITS, callouts: CALLOUTS_MAX, bar: TEXT_LIMITS.barLines,
   trend: pageLimits('trend', 'line'), panels: pageLimits('panels', 'row'), rows: pageLimits('parallel', 'labelled-rows'), argument: pageLimits('argument', 'memo') }));
 ''')
-        self.assertEqual(len(result["out"]), 95)
+        self.assertEqual(len(result["out"]), 96)
         for key, form in result["out"].items():
             with self.subTest(form=key):
                 held = form["held"]

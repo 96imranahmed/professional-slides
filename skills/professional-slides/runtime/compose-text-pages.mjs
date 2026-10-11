@@ -17,7 +17,7 @@ const PROSE_ROOM = BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH;
 // narrower than the quarter, so a design's gap or margin cannot push the
 // statement past its eight lines once it is set.
 const QUARTER = 0.9 * (BODY_WIDTH - COLUMN_GAP) / 4;
-const fitsQuarter = (props) => { try { sideStatementLayout({ x: 0, y: 0, width: QUARTER, height: BODY_WIDTH }, props); return true; } catch { return false; } };
+export const fitsQuarter = (props) => { try { sideStatementLayout({ x: 0, y: 0, width: QUARTER, height: BODY_WIDTH }, props); return true; } catch { return false; } };
 
 /**
  * For a page that is prose beside its panel and nothing else - a memo, or a

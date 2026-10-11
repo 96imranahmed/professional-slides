@@ -184,6 +184,7 @@ export function chooseLayout(slide, recent = []) {
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
   // An explicit arrangement is the author overriding the choice, not a hint.
+  if (slide.arrange === "dashboard") return "dashboard";
   if (slide.arrange === "stack") return "stack";
   if (slide.arrange === "sequence") return "sequence";
   if (slide.arrange === "row") return exhibits.length === 2 && !slide.points?.length ? "two-up-contrast" : "two-up";
