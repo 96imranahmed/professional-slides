@@ -334,6 +334,284 @@
    "source": "Source: illustrative data for a fictional operator; ticket sales by line"
   },
   {
+   "id": "f-trend-target-band",
+   "type": "trend",
+   "form": "line",
+   "commentary": "below",
+   "why": "Punctuality over eight years read against the range the regulator sets, so the reader sees which years fell short and when the new timetable began",
+   "settles": {
+    "kind": "rate",
+    "what": "trains arriving within five minutes against the regulator's 90-95% range, FY19 to FY26"
+   },
+   "adds": "The points say what moved punctuality into the range and what keeps it there",
+   "title": "Punctuality has sat inside the target range for three years running",
+   "exhibit": {
+    "heading": "Trains arriving within five minutes, FY19-FY26",
+    "unit": "%",
+    "categories": [
+     "FY19",
+     "FY20",
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "On time",
+      "values": [
+       84.2,
+       86.1,
+       90.3,
+       85.7,
+       87.9,
+       91.2,
+       92.0,
+       91.5
+      ]
+     }
+    ],
+    "bands": [
+     {
+      "from": 90,
+      "to": 95,
+      "label": "Target range 90-95%"
+     },
+     {
+      "from": "FY24",
+      "to": "FY26",
+      "label": "New timetable",
+      "style": "box"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "Below the range",
+     "text": "Punctuality sat under 90% in five of the eight years, with FY22's dip the result of a leaf-fall season run on an unchanged timetable."
+    },
+    {
+     "lead": "The new timetable",
+     "text": "Recovery time at the two busiest junctions lifted punctuality above 91% in FY24, and it has stayed in the range since."
+    },
+    {
+     "lead": "Holding it",
+     "text": "FY26's 91.5% is a point and a half above the floor; one bad autumn would take the operator back under it."
+    }
+   ]
+  },
+  {
+   "id": "f-trend-event-band",
+   "type": "trend",
+   "form": "line",
+   "commentary": "below",
+   "why": "Weekly journeys over a year in which a six-week strike is the reading: the shaded run shows when it began and ended",
+   "settles": {
+    "kind": "rate",
+    "what": "weekly journeys, January to December FY26"
+   },
+   "adds": "The points say what the strike cost and how fast journeys came back",
+   "title": "Journeys fell by a third during the six-week strike and recovered within a month",
+   "exhibit": {
+    "heading": "Weekly journeys",
+    "unit": "million",
+    "categories": [
+     "Jan",
+     "Feb",
+     "Mar",
+     "Apr",
+     "May",
+     "Jun",
+     "Jul",
+     "Aug",
+     "Sep",
+     "Oct",
+     "Nov",
+     "Dec"
+    ],
+    "series": [
+     {
+      "name": "Journeys",
+      "values": [
+       0.92,
+       0.95,
+       0.97,
+       0.64,
+       0.61,
+       0.96,
+       0.99,
+       0.98,
+       1.01,
+       1.03,
+       1.02,
+       1.05
+      ]
+     }
+    ],
+    "bands": [
+     {
+      "from": "Apr",
+      "to": "May",
+      "label": "Strike"
+     }
+    ],
+    "valueFormat": {
+     "decimals": 2
+    }
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "A third lost",
+     "text": "Journeys fell from 0.97 million a week in March to 0.61 million in May, the lowest week of the year."
+    },
+    {
+     "lead": "Back within a month",
+     "text": "By June journeys were within one per cent of March, and by September they were above it."
+    },
+    {
+     "lead": "Revenue",
+     "text": "The six weeks cost about £9m in fares, of which delay-repay and season-ticket refunds were £2m, and none of it has been recovered from the dispute."
+    }
+   ]
+  },
+  {
+   "id": "f-trend-intervals",
+   "type": "trend",
+   "form": "line",
+   "commentary": "below",
+   "why": "A forecast whose uncertainty is the claim: the range annual journeys may land in by FY31, read against the 60 million target",
+   "settles": {
+    "kind": "rate",
+    "what": "annual journeys, recorded FY21 to FY26 and forecast FY27 to FY31"
+   },
+   "adds": "The points say what drives the range and what would narrow it",
+   "title": "Journeys reach 60 million by FY31 in four outcomes of five",
+   "exhibit": {
+    "heading": "Annual journeys",
+    "unit": "million",
+    "categories": [
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26",
+     "FY27",
+     "FY28",
+     "FY29",
+     "FY30",
+     "FY31"
+    ],
+    "series": [
+     {
+      "name": "Journeys",
+      "values": [
+       31,
+       38,
+       42,
+       45,
+       47,
+       48,
+       50.5,
+       53,
+       55.5,
+       58,
+       60.5
+      ],
+      "assumedFrom": "FY27"
+     }
+    ],
+    "intervals": [
+     {
+      "low": [
+       null,
+       null,
+       null,
+       null,
+       null,
+       48,
+       49.5,
+       51,
+       52.5,
+       54,
+       55.5
+      ],
+      "high": [
+       null,
+       null,
+       null,
+       null,
+       null,
+       48,
+       51.5,
+       55,
+       58.5,
+       62,
+       65.5
+      ],
+      "label": "50% of outcomes"
+     },
+     {
+      "low": [
+       null,
+       null,
+       null,
+       null,
+       null,
+       48,
+       48,
+       48.5,
+       49,
+       49.5,
+       50
+      ],
+      "high": [
+       null,
+       null,
+       null,
+       null,
+       null,
+       48,
+       53,
+       57.5,
+       62,
+       66.5,
+       71
+      ],
+      "label": "90% of outcomes"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 60,
+      "label": "Target 60m"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "Most outcomes clear 60m",
+     "text": "The central forecast passes 60 million in FY31, and four outcomes in five land at or above the target."
+    },
+    {
+     "lead": "What widens the fan",
+     "text": "Hybrid working and fares policy drive the spread; leisure growth alone keeps the low case above 50 million."
+    },
+    {
+     "lead": "Narrowing it",
+     "text": "A fares settlement by FY28 would halve the width of the inner band by fixing the largest single input."
+    }
+   ]
+  },
+  {
    "id": "f-ranking-column",
    "type": "ranking",
    "form": "column",
@@ -699,6 +977,175 @@
    "source": "Source: illustrative load data; synthetic"
   },
   {
+   "id": "f-ranking-value-break",
+   "type": "ranking",
+   "form": "column",
+   "commentary": "below",
+   "why": "Eight lines ranked on journeys per route-km, where one line is so far ahead that its column breaks the axis so the rest can be read",
+   "settles": {
+    "kind": "rank",
+    "what": "journeys per route-km on eight lines, FY26"
+   },
+   "adds": "The points say why the Airport line is so far ahead and what that means for the fleet",
+   "title": "The Airport line carries more journeys per km than the next four lines together",
+   "exhibit": {
+    "type": "chart.column",
+    "heading": "Journeys per route-km, FY26",
+    "unit": "thousand",
+    "categories": [
+     "Airport",
+     "Coast",
+     "Valley",
+     "Dales",
+     "Eastern",
+     "Northern",
+     "Lakes",
+     "Borders"
+    ],
+    "series": [
+     {
+      "name": "Journeys",
+      "values": [
+       412,
+       48,
+       44,
+       39,
+       35,
+       31,
+       27,
+       22
+      ]
+     }
+    ],
+    "valueBreak": {
+     "from": 70,
+     "to": 380
+    },
+    "highlights": [
+     {
+      "category": "Airport"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "A line of its own",
+     "text": "The Airport line carries 412 thousand journeys per route-km, more than the next four lines together, on just eleven kilometres of track."
+    },
+    {
+     "lead": "The rest are close",
+     "text": "The other seven lines run between 22 and 48 thousand, a spread the broken axis keeps legible."
+    },
+    {
+     "lead": "Fleet first",
+     "text": "Moving two of the newest units to the Airport line would add more seats where they are used than any other move in the fleet plan."
+    }
+   ]
+  },
+  {
+   "id": "f-ranking-group-brackets",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "below",
+   "why": "Nine stations ranked on journeys, the city core bracketed with its share of the whole and the average marked",
+   "settles": {
+    "kind": "rank",
+    "what": "journeys at nine stations, FY26"
+   },
+   "adds": "The points say what the concentration means for where the money goes",
+   "title": "The three biggest stations carry almost half of all journeys",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Journeys by station, FY26",
+    "unit": "million",
+    "categories": [
+     "Central",
+     "Harbour",
+     "Airport",
+     "Northgate",
+     "Riverside",
+     "Old Town",
+     "Parkway",
+     "Westfield",
+     "Market"
+    ],
+    "series": [
+     {
+      "name": "Journeys",
+      "values": [
+       9.8,
+       7.4,
+       5.6,
+       4.1,
+       3.6,
+       3.2,
+       2.9,
+       2.4,
+       1.9
+      ]
+     }
+    ],
+    "groupBrackets": [
+     {
+      "categories": [
+       "Central",
+       "Harbour",
+       "Airport"
+      ],
+      "value": "share",
+      "label": "of all journeys"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 4.54,
+      "style": "marker"
+     }
+    ],
+    "categoryGroups": [
+     {
+      "id": "c",
+      "label": "City core",
+      "categories": [
+       "Central",
+       "Harbour",
+       "Airport"
+      ]
+     },
+     {
+      "id": "s",
+      "label": "Suburbs",
+      "categories": [
+       "Northgate",
+       "Riverside",
+       "Old Town",
+       "Parkway",
+       "Westfield",
+       "Market"
+      ]
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "Three stations",
+     "text": "Central, Harbour and Airport carry 22.8 million of the 40.9 million journeys, almost half of the whole."
+    },
+    {
+     "lead": "The suburbs",
+     "text": "The six suburban stations each carry less than the average of 4.5 million, and together a little over half."
+    },
+    {
+     "lead": "Where to invest",
+     "text": "Gate-line upgrades at the three core stations reach half of all passengers for a third of the budget, so they come first in the plan."
+    }
+   ]
+  },
+  {
    "id": "f-composition-stacked-bar",
    "type": "composition",
    "form": "stacked-bar",
@@ -973,6 +1420,106 @@
     }
    ],
    "source": "Source: illustrative data for a fictional operator; seat-km from the FY26 timetable, loads from ticket sales"
+  },
+  {
+   "id": "f-composition-likert",
+   "type": "composition",
+   "form": "stacked-bar",
+   "commentary": "below",
+   "why": "Five statements rated on one agreement scale, the neutral answers centred so agreement and disagreement read either side of it",
+   "settles": {
+    "kind": "share",
+    "what": "agreement with five statements about the service, share of 1,204 regular riders"
+   },
+   "adds": "The points say which answers the plan acts on first",
+   "title": "Half of riders say trains do not run often enough; most say stations feel safe",
+   "exhibit": {
+    "type": "chart.stacked-bar",
+    "heading": "Agreement with each statement, share of riders",
+    "unit": "%",
+    "question": {
+     "text": "How far do you agree or disagree with each of the following statements about your local rail service?",
+     "base": "n = 1,204 regular riders"
+    },
+    "categories": [
+     "Trains run often enough",
+     "Fares are fair for the journey",
+     "Trains are reliable",
+     "Stations feel safe",
+     "Information is clear"
+    ],
+    "series": [
+     {
+      "name": "Strongly disagree",
+      "values": [
+       22,
+       12,
+       8,
+       5,
+       4
+      ]
+     },
+     {
+      "name": "Disagree",
+      "values": [
+       28,
+       20,
+       17,
+       12,
+       10
+      ]
+     },
+     {
+      "name": "Neutral",
+      "values": [
+       14,
+       24,
+       25,
+       23,
+       21
+      ]
+     },
+     {
+      "name": "Agree",
+      "values": [
+       24,
+       30,
+       35,
+       40,
+       42
+      ]
+     },
+     {
+      "name": "Strongly agree",
+      "values": [
+       12,
+       14,
+       15,
+       20,
+       23
+      ]
+     }
+    ],
+    "diverging": {
+     "neutral": "Neutral"
+    }
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic",
+   "takeaway": false,
+   "points": [
+    {
+     "lead": "Frequency",
+     "text": "Half of riders disagree that trains run often enough, the only statement where disagreement outweighs agreement."
+    },
+    {
+     "lead": "Fares",
+     "text": "Fares split riders: 44% agree they are fair for the journey and 32% disagree, with a quarter undecided."
+    },
+    {
+     "lead": "Safety and information",
+     "text": "Six riders in ten agree that stations feel safe, and almost two-thirds that information is clear."
+    }
+   ]
   },
   {
    "id": "f-relationship-bubble",

@@ -92,6 +92,7 @@ Printed by `python3 runtime/gates/page_gates.py --thresholds-markdown` from the 
 | Code | Threshold | Value |
 | --- | --- | --- |
 | `TITLE_LINES` | action title lines, at most | 2 |
+| `TITLE_LINES` | side title lines down its panel, at most | 7 |
 | `TITLE_WORDS` | action title words, at most | 15 |
 | `TYPE_RANGE` | point sizes by role | body 10-14; table-dense 8.5-14; chart-furniture 8-11; action-title 20-26; source 7-9 |
 | `CPL` | characters per line of prose | 35-90 |
