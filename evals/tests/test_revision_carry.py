@@ -182,7 +182,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_composed_page_is_held_to_every_page_rule_and_no_other_page_is_named(self):
         def topic(doc):
             at = doc["pages"].index(self.page(doc, "s07"))
-            doc["pages"][at] = {**DONUT, "title": "Sales mix by channel", "points": ["Wholesale is 22% of sales"]}
+            doc["pages"][at] = {**copy.deepcopy(DONUT), "title": "Sales mix by channel", "points": ["Wholesale is 22% of sales"]}
         # A title the revision wrote is the revision's: a label of its own is refused, as on any page.
         work = self.revise(lambda doc: (topic(doc), self.page(doc, "s07").update(title="Channel mix")))
         done = self.author(work, "--check")
@@ -200,7 +200,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_rule_that_measures_the_deck_advises_while_slides_are_carried(self):
         def swap(doc):
             doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
+            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = copy.deepcopy(DONUT)
         work = self.revise(swap)
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 0, done.stderr[:1500])
@@ -249,7 +249,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_slide_is_carried_once_and_not_also_redrawn(self):
         def twice(doc):
             doc["pages"].append({**self.page(doc, "s02"), "id": "s02b"})
-            doc["pages"].append({**DONUT, "id": "n01"})
+            doc["pages"].append({**copy.deepcopy(DONUT), "id": "n01"})
             doc["deck"]["density"] = "live-pitch"
         work = self.revise(twice)
         self.assertEqual(self.author(work, "--check").returncode, 2)
@@ -271,7 +271,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_composed_page_needs_slides_of_the_size_it_is_composed_at(self):
         def swap(doc):
             doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
+            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = copy.deepcopy(DONUT)
         work = self.revise(swap)
         inventory = json.loads((work / "deck.inventory.json").read_text())
         inventory["slideSize"] = {"width": 960, "height": 720}
@@ -746,7 +746,7 @@ class SwappedDeck(CarriedDeck):
         shutil.copytree(cls.bed, cls.swapped)
         doc = copy.deepcopy(cls.starter)
         doc["deck"]["density"] = "live-pitch"
-        doc["pages"][6] = dict(DONUT)
+        doc["pages"][6] = copy.deepcopy(DONUT)
         (cls.swapped / "deck.pages.json").write_text(json.dumps(doc, ensure_ascii=False))
         authored = sh(NODE, AUTHOR, cls.swapped / "deck.pages.json")
         # The exit code is said with the output: a compile killed from outside (a negative code) prints nothing of its own.
@@ -969,7 +969,7 @@ class EvidenceOnARevisionTests(CarriedDeck):
     def test_a_revision_needs_no_insight_log_and_one_page_may_bring_its_own(self):
         def swap(doc):
             doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
+            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = copy.deepcopy(DONUT)
         work = self.revise(swap)
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 0, done.stderr[:800])
