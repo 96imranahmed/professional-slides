@@ -2,7 +2,7 @@
 // (`categoricalChart`), with what only they set beside their categories - the
 // row labels of a bar chart, icons and logos under or beside a category,
 // deltas, stack labels and the period a chart focuses on by default.
-import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighlightStyle, linePrimitive, textPrimitive, tokenValue, onFill } from "./core.mjs";
+import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighlightStyle, linePrimitive, textPrimitive, tokenValue, onFill, shapePrimitive } from "./core.mjs";
 import { formatValue, withUnit } from "./value-format.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
@@ -13,6 +13,7 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, 
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumn, seriesState, stateLabel } from "./chart-decorations.mjs";
+import { bandAxis } from "./chart-bands.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
 // before it labels every nth row instead.
@@ -187,6 +188,7 @@ export function categoricalChart(context) {
 function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   const chart = { id, frame, props, horizontal, stacked, tokens };
   Object.assign(chart, categoricalData(chart));
+  Object.assign(chart, valueBreakPlan(chart));
   Object.assign(chart, labelGutters(chart));
   Object.assign(chart, attachmentGutters(chart));
   Object.assign(chart, columnLabelPlan(chart));
@@ -195,10 +197,13 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   Object.assign(chart, categoricalBounds(chart));
   Object.assign(chart, categoricalColors(chart));
   Object.assign(chart, categoricalAxes(chart));
+  Object.assign(chart, brokenScales(chart));
   Object.assign(chart, rowLabelling(chart));
   Object.assign(chart, barSpans(chart));
   drawDeltaHeadings(chart);
   chart.categories.forEach((category, categoryIndex) => drawCategory(chart, category, categoryIndex));
+  drawValueBreaks(chart);
+  drawCategoryBreaks(chart);
   drawForecastDivider(chart);
   drawCategoryGroups(chart);
   keepValueLabelsOffReferenceLines(chart);
@@ -262,7 +267,8 @@ function categoricalData(chart) {
   // block of evidence where an axis is a lookup table. `dataLabels: false`
   // still declines, and a dense chart falls back to the axis.
   const markCount = series.length * categories.length;
-  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12));
+  // A broken axis (valueBreak) leaves no scale to read, so its marks carry their values however many there are.
+  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12 || Boolean(props.valueBreak)));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   return { categories, series, stackLabels, barHighlighted, barHighlight, regionHighlight, chartProps, forecastKeyed, forecastLegend,
     showLegend, values, showDataLabels, showValueAxis };
@@ -333,7 +339,7 @@ function attachmentGutters(chart) {
   const deltaWidth = (deltas && horizontal ? 64 : 0) + (segmentGrowth ? 76 : 0);
   // On columns the deltas are pills in a band above the plot, one over each
   // column, clear of the value labels and any stack totals, under a heading.
-  if (deltas && !horizontal && (props.periods || props.events)) throw new Error("Column deltas take the band periods and events use; show one or the other");
+  if (deltas && !horizontal && (props.periods || props.events || (props.bands || []).some((band) => band?.label && bandAxis(band) === "category"))) throw new Error("Column deltas take the band periods, events and a labelled category band use; show one or the other");
   const deltaClear = deltas && !horizontal ? Math.max(26, totalHeight + 4) : 0;
   const deltaBand = deltas && !horizontal ? deltaClear + 22 + 20 : 0;
   // A bracket subtotal on a stacked column spans the named segments and prints their sum beside the stack.
@@ -409,7 +415,7 @@ function categoricalPlot(chart) {
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
-    periodBand: periodBandHeight(props, categories) + deltaBand,
+    periodBand: periodBandHeight(props, categories, { horizontal }) + deltaBand,
     // The 54px left gutter is the value axis's: it holds "1,200" and its tick.
     // With the numbers on the marks there is no axis to hold, and a vertical
     // category label never leaves its own slot, so the plot keeps the width the
@@ -454,7 +460,7 @@ function categoryGroupLayouts(chart) {
 
 /** The value scale: the data's extents (each stack's, when stacked), with clearance under negative columns' labels. */
 function categoricalBounds(chart) {
-  const { props, horizontal, stacked, categories, series, values, showDataLabels, showValueAxis, plot } = chart;
+  const { props, horizontal, stacked, categories, series, values, showDataLabels, showValueAxis, plot, valueBreak } = chart;
   const stackExtents = categories.flatMap((_, categoryIndex) => {
     if (!stacked) return series.map(item => item.values[categoryIndex]);
     const categoryValues = series.map(item => item.values[categoryIndex]);
@@ -463,7 +469,8 @@ function categoricalBounds(chart) {
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  const bounds = numericBounds(withReferenceValues(stacked ? stackExtents : values, props), { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // A broken axis (valueBreak) lays the marks out on its compressed scale: the run it cuts takes a few pixels.
+  const bounds = numericBounds(withReferenceValues((stacked ? stackExtents : values).map(chart.compress), props), { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   // Reserve measured clearance below negative columns with direct labels.
   // Only automatic unlabelled domains expand; explicit bounds stay authoritative.
   if (!horizontal && !stacked && showDataLabels && !showValueAxis && props.gridlines !== true && props.yMin === undefined && values.some(value => value < 0)) {
@@ -472,7 +479,100 @@ function categoricalBounds(chart) {
     bounds.min = Math.min(bounds.min, (minimum * plot.height - clearance * bounds.max) / (plot.height - clearance));
     bounds.span = bounds.max - bounds.min;
   }
+  // The cut is a fixed few pixels whatever the scale: set now the plot's length is known, and the domain reaches the
+  // compressed top once the cut has its width.
+  if (valueBreak) {
+    const length = horizontal ? plot.width : plot.height;
+    valueBreak.gap = BREAK_PX / length * bounds.span;
+    const top = Math.max(...(stacked ? stackExtents : values).map(chart.compress));
+    if (props.yMax === undefined && props.xMax === undefined && top > bounds.max) { bounds.max = top; bounds.span = bounds.max - bounds.min; }
+  }
   return { bounds };
+}
+
+// The cut a broken axis draws across a mark: wide enough to read as a gap, short of a value's worth of plot.
+const BREAK_PX = 14;
+
+/**
+ * `valueBreak: { from, to }` on a bar or column chart, stacked or not: the
+ * run of the value axis from `from` to `to` is cut out, so an outlier - one
+ * column ten times its neighbours - keeps its place without flattening the
+ * rest, and every mark that crosses the cut carries a slanted gap across it.
+ * The values stay printed on the marks: a broken axis cannot be read off a
+ * scale, so it takes no value axis or gridlines. A mark ending inside the cut
+ * would be drawn at a length that is neither its value nor the cut's, and a
+ * cut no mark crosses breaks nothing; both are refused.
+ */
+function valueBreakPlan(chart) {
+  const { props, stacked, categories, series, values, showDataLabels, showValueAxis } = chart;
+  const identity = { valueBreak: null, compress: (v) => v };
+  if (props.valueBreak === undefined || props.valueBreak === null) return identity;
+  const { from, to } = props.valueBreak ?? {};
+  if (!Number.isFinite(from) || !Number.isFinite(to) || !(from > 0 && to > from)) throw new Error("valueBreak cuts the axis from one positive value to a higher one: { from, to }, 0 < from < to");
+  if (showValueAxis || props.gridlines === true) throw new Error("a broken axis cannot be read off a scale - its values are printed on its marks; drop showValueAxis and gridlines, or draw the outlier unbroken");
+  if (!showDataLabels) throw new Error("a broken axis prints every value on its mark, since the cut leaves no scale to read; drop dataLabels: false");
+  const ends = stacked
+    ? categories.flatMap((_, at) => { let sum = 0; return series.map((item) => (sum += Math.max(0, item.values[at]))); })
+    : values;
+  const inside = ends.find((v) => v > from && v < to);
+  if (inside !== undefined) throw new Error(`valueBreak cuts ${from} to ${to}, and a mark ends at ${inside}, inside the cut; move the cut so every mark ends below it or past it`);
+  if (!ends.some((v) => v >= to)) throw new Error(`valueBreak cuts ${from} to ${to}, which no mark crosses; a cut is for a mark that would flatten the rest - drop it`);
+  for (const reference of [...(props.referenceLines || []).map((r) => r?.value), ...(props.bands || []).flatMap((b) => [b?.from, b?.to])].filter(Number.isFinite))
+    if (reference > from) throw new Error(`a reference or band at ${reference} sits at or past the cut (${from} to ${to}), where the scale is no longer one; keep references under the cut`);
+  const valueBreak = { from, to, gap: 0 };
+  // Below the cut the scale is the data's; past it every value moves down by the run cut out, plus the cut's own few pixels.
+  const compress = (v) => (v <= from ? v : v >= to ? v - (to - from) + valueBreak.gap : from + (v - from) / (to - from) * valueBreak.gap);
+  return { valueBreak, compress };
+}
+
+/** On a broken axis the scales place a value by its compressed position. */
+function brokenScales(chart) {
+  const { valueBreak, compress, yScale, xScale } = chart;
+  if (!valueBreak) return {};
+  return { yScale: (v) => yScale(compress(v)), xScale: (v) => xScale(compress(v)) };
+}
+
+/** The slanted gap across every mark that crosses a broken axis's cut. */
+function drawValueBreaks(chart) {
+  const { id, horizontal, valueBreak, nodes, yScale, xScale } = chart;
+  if (!valueBreak) return;
+  const [lo, hi] = horizontal ? [xScale(valueBreak.from), xScale(valueBreak.to)] : [yScale(valueBreak.to), yScale(valueBreak.from)];
+  const slant = 5;
+  for (const mark of nodes.filter((node) => node.role === "chart-mark")) {
+    const f = mark.frame;
+    const crosses = horizontal ? f.x < lo + 0.5 && f.x + f.width > hi - 0.5 : f.y < lo + 0.5 && f.y + f.height > hi - 0.5;
+    if (!crosses) continue;
+    // A parallelogram in the page's colour laid across the mark, leaning as a hand-drawn "//" does.
+    const points = horizontal
+      ? [[lo - slant, f.y + f.height + 2], [lo + slant, f.y - 2], [hi + slant, f.y - 2], [hi - slant, f.y + f.height + 2]]
+      : [[f.x - 2, hi + slant], [f.x + f.width + 2, hi - slant], [f.x + f.width + 2, lo - slant], [f.x - 2, lo + slant]];
+    const box = { x: Math.min(...points.map((p) => p[0])), y: Math.min(...points.map((p) => p[1])) };
+    box.width = Math.max(...points.map((p) => p[0])) - box.x; box.height = Math.max(...points.map((p) => p[1])) - box.y;
+    nodes.push(shapePrimitive({ id: stableId(mark.id, "break"), role: "chart-break", geometry: "customPolygon", frame: box, style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") },
+      data: { paths: [points.map(([x, y]) => [Number(((x - box.x) / box.width).toFixed(6)), Number(((y - box.y) / box.height).toFixed(6))])], from: valueBreak.from, to: valueBreak.to, category: mark.data.category, series: mark.data.series } }));
+  }
+}
+
+/**
+ * `categoryBreaks: ["<category>", ...]`: the category axis broken after each
+ * named category - the periods either side are not adjacent (FY10 beside FY20)
+ * - drawn as a "//" across the axis line midway to the next category.
+ */
+function drawCategoryBreaks(chart) {
+  const { id, props, horizontal, categories, plot, nodes, categorySpan } = chart;
+  if (props.categoryBreaks === undefined) return;
+  if (!Array.isArray(props.categoryBreaks) || !props.categoryBreaks.length) throw new Error("categoryBreaks names the categories the axis breaks after: a nonempty list");
+  for (const name of props.categoryBreaks) {
+    const at = categories.indexOf(name);
+    if (at < 0 || at === categories.length - 1) throw new Error(`categoryBreaks names "${name}", which is not a category the axis continues past (${categories.slice(0, 8).join(", ")})`);
+    const mid = (horizontal ? plot.y : plot.x) + (at + 1) * categorySpan;
+    const axisAt = horizontal ? plot.x : plot.y + plot.height;
+    const mask = horizontal ? { x: axisAt - 6, y: mid - 4, width: 12, height: 8 } : { x: mid - 4, y: axisAt - 6, width: 8, height: 12 };
+    nodes.push(rectPrimitive({ id: stableId(id, "category-break", name), role: "chart-break", frame: mask, style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") }, data: { after: name } }));
+    for (const [k, offset] of [[0, -3], [1, 3]]) nodes.push(linePrimitive({ id: stableId(id, "category-break", name, k), role: "chart-break-mark",
+      ...(horizontal ? { x1: axisAt - 6, y1: mid + offset + 3, x2: axisAt + 6, y2: mid + offset - 3 } : { x1: mid + offset - 3, y1: axisAt + 6, x2: mid + offset + 3, y2: axisAt - 6 }),
+      style: lineStyle(INK, token("line.standard")), data: { after: name } }));
+  }
 }
 
 /** Each mark's colour - the highlight, the forecast tint, the subject against its comparators - and the legend's items. */

@@ -10,6 +10,7 @@ import { SECONDARY, CHART_ANNOTATION, textStyle, lineStyle, topLegend, tickCount
   markWeight, chartFrame, fillStyle, assertGridlineOption, numericBounds, axisTickText, axes, labelBold } from "./chart-axes.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount } from "./chart-annotations.mjs";
 import { withReferenceValues, withDecorations } from "./chart-decorations.mjs";
+import { bandXValues } from "./chart-bands.mjs";
 
 const SCATTER_QUADRANT_STYLES = Object.freeze(["threshold-lines", "alternating-tint", "focus-tint"]);
 const SCATTER_QUADRANT_KEYS = Object.freeze(["topLeft", "topRight", "bottomLeft", "bottomRight"]);
@@ -97,7 +98,7 @@ export function scatter({ id, frame, props, bubble = false }) {
   const { nodes, plot, pointMap, categoryMap, yScale } = chart;
   // `referenceLines` on the value axis: the break-even, the parity line, the
   // 50% hurdle a curve is read against.
-  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, allowAnnotationRail: false });
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, scatterX: chart.xScale, allowAnnotationRail: false });
 }
 
 /** The points checked, and what the props decide: the focus, the series, whether they are joined and named at their ends, and the legend. */
@@ -178,8 +179,12 @@ function scatterPlot(chart) {
 function scatterScales(chart) {
   const { props, plot } = chart;
   // `xScale` / `yScale: { min, max }` name the same domain as xMin/xMax.
-  const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin ?? props.xScale?.min, max: props.xMax ?? props.xScale?.max, axis: "x" });
-  const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin ?? props.yScale?.min, max: props.yMax ?? props.yScale?.max, axis: "y" });
+  // A band on the x axis (chart-bands.mjs) is a range the points are read against, so its ends are in the domain; a ring
+  // round named points takes room round them, so the domain of a ringed scatter reaches a tenth past its points each way.
+  const ringed = (props.bands || []).some((band) => Array.isArray(band?.points));
+  const reach = (values) => { if (!ringed || values.length < 2) return []; const lo = Math.min(...values), hi = Math.max(...values), pad = (hi - lo) * 0.1; return [lo - pad, hi + pad]; };
+  const xBounds = numericBounds([...props.points.map(point => point.x), ...bandXValues(props), ...reach(props.points.map(point => point.x))], { min: props.xMin ?? props.xScale?.min, max: props.xMax ?? props.xScale?.max, axis: "x" });
+  const yBounds = numericBounds(withReferenceValues([...props.points.map(point => point.y), ...reach(props.points.map(point => point.y))], props), { min: props.yMin ?? props.yScale?.min, max: props.yMax ?? props.yScale?.max, axis: "y" });
   const xScale = (value) => plot.x + (value - xBounds.min) / xBounds.span * plot.width;
   const yScale = (value) => plot.y + plot.height - (value - yBounds.min) / yBounds.span * plot.height;
   const quadrants = normalizedQuadrants(props.quadrants, xBounds, yBounds);

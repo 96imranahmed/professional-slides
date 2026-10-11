@@ -27,7 +27,7 @@ import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
-import { timePositions, describeGaps, isPeriodLabel, readablePeriod } from "./time-axis.mjs";
+import { timePositions, describeGaps, isPeriodLabel, readablePeriod, gapsBroken } from "./time-axis.mjs";
 import { columnQuestion } from "./compose-tables.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
@@ -43,6 +43,7 @@ import { deckSchema } from "./deck-keys.mjs";
 import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
 import { judged } from "./judgements.mjs";
+import { bandAxis } from "./chart-bands.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing, and checked at
@@ -63,7 +64,7 @@ export const COMMENTARY = Object.freeze({
   "beside-left": "a commentary column to the left of the exhibit",
   below: "points in a band under the exhibit",
   rail: "one claim in a filled side panel (`rail` text) beside the exhibit",
-  "on-exhibit": "on the chart itself, no separate text: a number mark (`cagr`, `changeAnnotations`, labelled `referenceLines`, `stackTotals`) first, sentence callouts (`annotations`) where the mechanism needs them",
+  "on-exhibit": "on the chart itself, no separate text: a number mark (`cagr`, `changeAnnotations`, labelled `referenceLines`, a labelled value `bands` range, `stackTotals`) first, sentence callouts (`annotations`) where the mechanism needs them",
   "in-exhibit": "the explanation lives in the exhibit's cells (an implication column, a findings matrix, labelled cards)",
   captions: "one finding under each panel (`caption` on every exhibit)",
   "so-what-bar": "one implication in a filled bar across the foot of the exhibit (`bar` text); the page's close",
@@ -303,7 +304,7 @@ export function markedChart(ex) {
   // (`targets`): it draws no callout or highlight, and the target line on
   // every row is the comparison a ranking is asked to mark. Only there: every
   // other chart ignores the key, and a bare bar chart is not marked by it.
-  const lists = ["annotations", "highlights", "events", ...(TARGET_CHARTS.has(ex?.type) ? ["targets"] : [])];
+  const lists = ["annotations", "highlights", "events", "bands", ...(TARGET_CHARTS.has(ex?.type) ? ["targets"] : [])];
   return lists.some((key) => Array.isArray(ex?.[key]) && ex[key].length > 0) || (ex?.focusSeries !== undefined && ex.focusSeries !== false) || numberMarked(ex);
 }
 
@@ -313,7 +314,10 @@ export function markedChart(ex) {
 // on one page in eight, a total on one in ten - so a number mark carries the
 // page's commentary on the plot, and a sentence callout beside it is optional.
 const NUMBER_MARKS = ["changeAnnotations", "referenceLines", "stackTotals", "segmentGrowth", "seriesGrowth", "change", "cagr", "growth"];
-export const numberMarked = (ex) => NUMBER_MARKS.some((key) => (Array.isArray(ex?.[key]) ? ex[key].length > 0 : ex?.[key] != null && ex[key] !== false));
+// A labelled band on the value axis - a target range, a tolerance - is a benchmark set on the plot, as a labelled
+// reference line is (chart-bands.mjs).
+const valueBandMarked = (ex) => (Array.isArray(ex?.bands) ? ex.bands : []).some((band) => band?.label && ["value", "x", "y"].includes(bandAxis(band)));
+export const numberMarked = (ex) => NUMBER_MARKS.some((key) => (Array.isArray(ex?.[key]) ? ex[key].length > 0 : ex?.[key] != null && ex[key] !== false)) || valueBandMarked(ex);
 
 // The evidence floor for a chart page. Strong consulting decks' chart pages
 // plot a median of about 22 values (the middle half 10 to 48), while a type's
@@ -710,7 +714,7 @@ const REVIEW_RULES = [
   ["TABLE_STACK", "two or more tables set one above another (panels form stack, or in both rows of a grid)", "one table with the members as columns, or one table with the other evidence as a chart or a strip of numbers beside or above it; tables side by side in a row pass"],
   ["COMPARISON_MEASURES_DIFFER", "panels headed by different declared players, each on a measure of its own", "one panel per measure, the players as its bars or series"],
   ["TOTAL_ROW_BLANK", "a table row that closes the table as a total (`style: \"total\"`, or a label that reads as one) with nothing in its result cells", "a measure table adds its own total only where a column sums, and `total: true` where none does is refused"],
-  ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps, whose heading does not tell the reader they are chosen dates", "a line or an area spaces dated categories by the time between them, so draw the series as one, or say \"snapshots\" or \"selected years\" in the heading"],
+  ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps, whose heading does not tell the reader they are chosen dates", "a line or an area spaces dated categories by the time between them, so draw the series as one, say \"snapshots\" or \"selected years\" in the heading, or break the axis at each gap (`categoryBreaks`)"],
   ["VERDICT_TABLE_PLAIN", "on a lookup, options or matrix page, a column whose cells judge each row - who leads, a verdict, a rating, a status - in plain words", "give it a `type`: rag, harvey, check, lights, dot, or use a scorecard"],
   ["SCENARIO_PROSE", `two to four alternatives (scenarios, options, paths) the reader is to compare, as paragraphs of ${SCENARIO_WORDS} words or more each`, "set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal"],
   ["PROSE_PARAGRAPH_LONG", `a paragraph of more than ${PROSE_PARAGRAPH_MAX} words`, "two led paragraphs, each its own claim"],
@@ -880,6 +884,8 @@ function reviewedDefect(page, id, exhibits, skip = new Set()) {
     // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
     // trough, now); four or more read as a series, and the eye reads the rhythm.
     if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || !timePositions(chart.categories)) continue;
+    // An axis broken (`categoryBreaks`) after every category its next date does not follow says it skips, as a heading would.
+    if (gapsBroken(chart.categories, chart.categoryBreaks)) continue;
     // A heading may tell the reader the columns are chosen dates (heading-says-snapshots); one that says nothing does not.
     const told = { heading: String(chart.heading ?? "").trim(), unit: String(chart.unit ?? "").trim() };
     const series = !told.heading && !told.unit ? true : judged("heading-says-snapshots", told, { categories: chart.categories.map(String) }, id)?.verdict === "reads-as-series";
@@ -950,8 +956,9 @@ function readableCategories(ex) {
   const to = (value) => (renamed.has(String(value)) ? renamed.get(String(value)) : value);
   ex.categories = ex.categories.map(to);
   for (const key of ["annotations", "highlights", "pointHighlights", "events"]) if (Array.isArray(ex[key])) ex[key] = ex[key].map((item) => (item && typeof item === "object" && item.category !== undefined ? { ...item, category: to(item.category) } : item));
-  for (const key of ["changeAnnotations", "periods"]) if (Array.isArray(ex[key])) ex[key] = ex[key].map((item) => (item && typeof item === "object" ? Object.fromEntries(Object.entries(item).map(([k, v]) => [k, ["start", "end", "from", "to"].includes(k) ? to(v) : v])) : item));
+  for (const key of ["changeAnnotations", "periods", "bands"]) if (Array.isArray(ex[key])) ex[key] = ex[key].map((item) => (item && typeof item === "object" ? Object.fromEntries(Object.entries(item).map(([k, v]) => [k, ["start", "end", "from", "to"].includes(k) ? to(v) : v])) : item));
   if (ex.forecastFrom !== undefined) ex.forecastFrom = to(ex.forecastFrom);
+  if (Array.isArray(ex.categoryBreaks)) ex.categoryBreaks = ex.categoryBreaks.map(to);
 }
 
 // The chart-form refusals (chartFormDefect), by code.

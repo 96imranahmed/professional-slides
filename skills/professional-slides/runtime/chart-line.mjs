@@ -9,6 +9,7 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, chartFrame, labe
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumn, seriesState, stateLabel, statesSeries } from "./chart-decorations.mjs";
+import { normalizeIntervals, intervalValues, intervalLabelWidth, intervalNodes } from "./chart-bands.mjs";
 
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
 
@@ -157,9 +158,11 @@ export function lineChart({ id, frame, props, area = false }) {
   Object.assign(chart, lineOptions(chart));
   Object.assign(chart, linePlot(chart));
   Object.assign(chart, lineAxes(chart));
+  drawIntervals(chart);
   Object.assign(chart, drawLines(chart));
   placeEndLabels(chart);
   drawPointHighlights(chart);
+  chart.nodes.push(...(chart.intervalLabels || []));
   const { plot, nodes, pointMap, categoryMap, yScale } = chart;
   // A line read off its value axis takes its change as the diagonal arrow only (LINE_AXIS_CHANGE_STYLE): no bracket fallback.
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, arrowOnly: chart.showValueAxis === true });
@@ -202,17 +205,21 @@ function lineOptions(chart) {
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels && !crowded });
   if (showValueAxis && (props.changeAnnotations || []).some(annotation => annotation.style !== "arrow")) throw new Error("LINE_AXIS_CHANGE_STYLE: a visible value axis requires the diagonal arrow with its circular growth badge; omit the value axis for bracket annotations");
   const tight = !showValueAxis && props.gridlines !== true;
-  const bounds = numericBounds(withReferenceValues(values, props, { base: props.yMin ?? Math.min(...values), padded: tight }), { min: props.yMin, max: props.yMax, axis: "y", tight });
+  // A line's intervals (chart-bands.mjs) are drawn on its scale, so they are in its domain: a fan wider than the record sets the axis.
+  const intervals = normalizeIntervals(props, categories);
+  if (endLabels && intervals.some((interval) => interval.label)) throw new Error("a labelled interval is named at the line's end, where end labels name the series; name the series in a legend (drop directLabels: \"end\") or drop the interval's label");
+  const reach = [...values, ...intervalValues(props)];
+  const bounds = numericBounds(withReferenceValues(reach, props, { base: props.yMin ?? Math.min(...reach), padded: tight }), { min: props.yMin, max: props.yMax, axis: "y", tight });
   const labelWidth = axisLabelWidth(bounds);
   const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height; } catch { return 28; } }));
   return { categories, series, lineColor, endLabels, showLegend, seriesGrowth, spacing, labelAt, showDataLabels, showValueAxis, bounds,
-    labelWidth, labelHeightAt };
+    labelWidth, labelHeightAt, intervals };
 }
 
 /** The plot inside the frame, the period labels' slot and height at its width, and the two scales. */
 function linePlot(chart) {
   const { frame, props, categories, endLabels, showLegend, seriesGrowth, spacing, showDataLabels, showValueAxis, bounds, labelWidth,
-    labelHeightAt } = chart;
+    labelHeightAt, intervals } = chart;
   // The period labels sit 16px under the plot, clear of the markers on its
   // floor; the band keeps their measured height and no more, estimated at the
   // narrowest slot a label gets and settled once the plot is laid out.
@@ -220,7 +227,8 @@ function linePlot(chart) {
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     leftInset: showValueAxis ? Math.max(labelWidth + 8, showDataLabels ? 68 : 0) : showDataLabels ? 68 : 54,
-    valueLabelInset: seriesGrowth ? 186 + 96 : showDataLabels ? 68 : 0,
+    // An interval's label sits past the last value label, at the line's right end.
+    valueLabelInset: seriesGrowth ? 186 + 96 : (showDataLabels ? 68 : 0) + (intervals.some((interval) => interval.label) ? intervalLabelWidth(props) + (showDataLabels ? 4 : 10) : 0),
     topLegend: showLegend,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
@@ -274,6 +282,16 @@ function lineAxes(chart) {
   return { nodes, pointMap, categoryMap };
 }
 
+/** `intervals`: each envelope under the lines, in the subject's colour, the widest palest, and its label at the right end. */
+function drawIntervals(chart) {
+  const { id, props, categories, series, lineColor, intervals, showDataLabels, plot, yScale, xScale, nodes } = chart;
+  if (!intervals.length) return;
+  const subject = Math.max(0, series.findIndex((item) => item.name === props.focusSeries));
+  const { under, labels } = intervalNodes({ id, plot, props, categories, xAt: xScale, yAt: yScale, color: lineColor(subject), offset: showDataLabels ? 72 : 10 });
+  nodes.push(...under);
+  chart.intervalLabels = labels;
+}
+
 /** Each series: its area or lone fill, segments, markers and value labels; returns the end labels still to place. */
 function drawLines(chart) {
   const { id, props, area, categories, series, lineColor, endLabels, labelAt, showDataLabels, bounds, plot, yScale, xScale, nodes, pointMap } = chart;
@@ -281,8 +299,9 @@ function drawLines(chart) {
   const weight = markWeight();
   // A line alone on its plot takes a light fill beneath it (markWeight); two
   // or more lines keep bare strokes, where fills would stack into mud.
-  // The fill is the weight of a record: a line that is an assumption, in whole or from part-way, stays a bare stroke.
-  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded";
+  // The fill is the weight of a record: a line that is an assumption, in whole or from part-way, stays a bare stroke; so does
+  // a line in its own interval, whose envelope is the shading.
+  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
     if (area || lone) {

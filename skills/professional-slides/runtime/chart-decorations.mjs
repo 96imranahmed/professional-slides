@@ -12,6 +12,7 @@ import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, renderAnnotationRail, renderChangeAnnotations, renderEvidenceAnnotations } from "./chart-annotations.mjs";
 import { FONT, INK, SECONDARY, GRID, CHART_LABEL, textStyle, lineStyle, CHART_ANNOTATION, labelBold } from "./chart-axes.mjs";
 import { formatValue } from "./value-format.mjs";
+import { bandNodes, bandValues, bandLabelRow } from "./chart-bands.mjs";
 
 // A target or capacity is part of the quantitative comparison. Include it in
 // automatic domains; numericBounds also rejects it outside an explicit domain.
@@ -25,7 +26,8 @@ import { formatValue } from "./value-format.mjs";
 // quarter of its span past the top, which holds the label; the 15% added again
 // on top of it left a quarter of the plot empty over a peak line.
 export const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
-  const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
+  // A value band (chart-bands.mjs) is a range the data is read against: its ends are in the domain as a reference is.
+  const references = [...(props.referenceLines || []).map(reference => reference.value), ...bandValues(props)].filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
   const headroom = props.yMax === undefined && props.xMax === undefined && !padded ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
   return [...values, ...references, ...headroom];
@@ -98,9 +100,11 @@ function eventRows(events) {
   return rows;
 }
 const eventBandHeight = (events) => { if (!events.length) return 0; const [first, second] = eventRows(events); return first + EVENT_ROW_GAP + (events.length > 1 ? second + EVENT_ROW_GAP : 0); };
-export function periodBandHeight(props = {}, categories = []) {
-  // The period band clears the value labels above the tallest column (26px).
-  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories));
+export function periodBandHeight(props = {}, categories = [], { horizontal = false } = {}) {
+  // The period band clears the value labels above the tallest column (26px). A labelled category band names its run in
+  // the same row (chart-bands.mjs), over a vertical chart; a bar chart's sits inside its band.
+  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories))
+    + bandLabelRow(props, categories, { horizontal });
 }
 function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   const periods = normalizePeriods(props, categories), events = normalizeEvents(props, categories);
@@ -138,9 +142,15 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
   return { underlay, overlay };
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, scatterX = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false }) {
   const underlay = [];
   const overlay = [];
+  // Bands sit behind everything the chart draws over its data, their labels clear of the marks (chart-bands.mjs).
+  if (props.bands !== undefined) {
+    const bands = bandNodes({ id, plot, props, categories: props.categories || [], pointMap, yScale, xScale: yScale ? null : xScale, scatterX, obstacles,
+      changeBand: chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: null }).top });
+    underlay.push(...bands.underlay); overlay.push(...bands.overlay);
+  }
   if (props.categories && categoryMap.size && (props.periods || props.events)) {
     const bands = periodAndEventNodes({ id, plot, props, categoryMap, categories: props.categories });
     underlay.push(...bands.underlay); overlay.push(...bands.overlay);
@@ -404,6 +414,10 @@ export const CHART_DECORATIONS = Object.freeze({
   periods: "periods (`periods`)",
   events: "events (`events`)",
   pointHighlights: "point highlights (`pointHighlights`)",
+  bands: "bands (`bands`)",
+  intervals: "intervals (`intervals`)",
+  valueBreak: "a broken value axis (`valueBreak`)",
+  categoryBreaks: "category-axis breaks (`categoryBreaks`)",
 });
 const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
 // What a chart on a vertical category axis draws through the shared decorations.

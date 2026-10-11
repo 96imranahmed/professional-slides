@@ -32,27 +32,27 @@ export { logoFrame } from "./media.mjs";
 
 const chartDefinitions = [
   {
-    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries"],
+    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "bands", "valueBreak", "categoryBreaks"],
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "value", values: [32, 46, 61, 74] }], highlights: [{ category: "2026" }], annotations: [], referenceLines: [{ value: 60, label: "Target" }] }
   },
   {
-    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries"], refuses: ["periods", "events", "annotationRail"],
+    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries", "bands", "valueBreak", "categoryBreaks"], refuses: ["periods", "events", "annotationRail"],
     sample: { categories: ["North", "West", "South", "East"], series: [{ name: "value", values: [74, 62, 48, 35] }], highlights: [{ category: "North" }], annotations: [{ category: "North", text: "Scale leader" }] }
   },
   {
-    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: CATEGORY_DECORATIONS, refuses: ["focusSeries"],
+    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: [...CATEGORY_DECORATIONS, "bands", "valueBreak", "categoryBreaks"], refuses: ["focusSeries"],
     sample: { categories: ["2024", "2025", "2026"], series: [{ name: "Core", values: [30, 32, 35] }, { name: "Growth", values: [12, 20, 30] }, { name: "New", values: [5, 9, 14] }], annotations: [{ series: "New", category: "2026", text: "New scales" }] }
   },
   {
-    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
+    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "bands", "valueBreak", "categoryBreaks"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
     sample: { categories: ["Segment A", "Segment B", "Segment C"], series: [{ name: "Core", values: [45, 35, 25] }, { name: "Growth", values: [35, 40, 45] }, { name: "New", values: [20, 25, 30] }] }
   },
   {
-    id: "chart.line", render: (context) => lineChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
+    id: "chart.line", render: (context) => lineChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights", "bands", "intervals"],
     sample: { categories: ["Q1", "Q2", "Q3", "Q4"], series: [{ name: "Actual", values: [22, 31, 43, 55] }, { name: "Plan", values: [25, 34, 42, 48] }], highlights: [{ category: "Q4" }], annotations: [{ series: "Actual", category: "Q4", text: "Ahead of plan" }] }
   },
   {
-    id: "chart.area", render: (context) => lineChart({ ...context, area: true }), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights"],
+    id: "chart.area", render: (context) => lineChart({ ...context, area: true }), draws: [...CATEGORY_DECORATIONS, "focusSeries", "pointHighlights", "bands"],
     sample: { categories: ["Jan", "Feb", "Mar", "Apr", "May"], series: [{ name: "value", values: [18, 28, 34, 47, 59] }], annotations: [{ category: "May", text: "Demand builds" }] }
   },
   {
@@ -60,11 +60,11 @@ const chartDefinitions = [
     sample: { categories: ["Start", "Price", "Volume", "Cost", "End"], values: [80, 18, 12, -9, 101], totals: [0, 4], annotations: [{ category: "End", text: "+21 net" }] }
   },
   {
-    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
+    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 20, y: 36 }, { name: "B", x: 42, y: 58 }, { name: "C", x: 68, y: 74 }, { name: "D", x: 82, y: 44 }], annotations: [{ category: "C", text: "Best position" }] }
   },
   {
-    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus"], refuses: ["annotationRail"],
+    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 18, y: 38, size: 12 }, { name: "B", x: 43, y: 66, size: 36 }, { name: "C", x: 72, y: 76, size: 58 }, { name: "D", x: 84, y: 42, size: 20 }] }
   },
   {

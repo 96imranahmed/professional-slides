@@ -143,6 +143,18 @@ export function spacedLabelIndices(xs, minGap) {
   }, []);
 }
 
+/**
+ * Whether every gap longer than the axis's step is marked by a break after
+ * the category before it (`categoryBreaks`): such an axis says outright that
+ * it skips, so the reader sees no rhythm the dates do not have.
+ */
+export function gapsBroken(categories, breaks = []) {
+  const times = periodTimes(categories);
+  if (!times || !Array.isArray(breaks) || !breaks.length) return false;
+  const step = Math.min(...times.gaps), marked = new Set(breaks.map(String));
+  return times.gaps.every((gap, at) => gap - step < 0.01 || marked.has(String(categories[at])));
+}
+
 /** The gaps as a reader would say them, for a message: "1-3 months", "1-4 years". */
 export function describeGaps(categories) {
   const times = periodTimes(categories);
