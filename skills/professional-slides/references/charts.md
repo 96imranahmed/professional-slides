@@ -123,6 +123,13 @@ A value label a reference line runs through stays on its column: the chart nudge
 - `categoryGroups` on a bar chart names each run of rows in a column left of the row labels, against a bracket.
 - `segmentGrowth` on a stacked column and `seriesGrowth` on a line take a list of up to three `{ from, to }`, one column each, side by side.
 
+**Survey exhibits:**
+
+- `question: { text, base }` on any chart sets the survey question under the heading, quoted in full beside a "Q" badge, three lines at most, with the base that answered it (`base: 1204` prints "n = 1,204"; a string prints as written). The heading stays one line and names the measure; the question is what the answers were given to.
+- `diverging: { neutral }` on a stacked bar or column is a Likert scale: the series are the answers in scale order, most negative first, each a share of respondents (none below zero). The answers before the neutral one stack out left of zero, nearest the centre first; the neutral answer straddles zero; the rest stack right, every share printed unsigned. The colours run pole to pole on the red-white-green scale, which is kept for genuinely polar answers round a neutral middle, the neutral answer in the comparator grey, and the bars line up on a centre rule. A scale with an odd number of answers names its middle one.
+- `categoryLabel: "above"` on a bar chart sets each label over its bar across the plot's width, where a label column would hold three words a line: survey statements, initiative names.
+- `rowNotes` on a bar chart runs one entry a category (`null` for none): text, or `{ text, tone, quote, arrow }`, set in a column at the right level with its bar. `tone: "positive" | "negative" | "neutral"` marks a voice for or against with a strip in the verdict's colour, `quote: true` sets it in quotation marks and `arrow: true` draws a leader back to the bar; `rowNotesWidth` sets the column (160 to 360px).
+
 Each of these is drawn as shapes, not a native chart, and refused on a chart that does not draw it, naming the charts that do.
 
 **Paired bars** (`paired: true` on `chart.bar`, two or three series) become a row of drawn panels, one per series, the first carrying the category labels and the later ones `categoryLabels: false`, each headed by its series name and on its own scale; the panels share one top band so their rows align.

@@ -20,6 +20,7 @@ import { HORIZONS_SAMPLE, HORIZONS_TOKENS, HORIZONS_VARIANTS, renderHorizons, re
 import { evidenceTreatment, releasedEvidenceProps, packedEvidenceProps } from "./chart-annotations.mjs";
 import { SERIES, MARK_WEIGHT_TOKENS } from "./chart-axes.mjs";
 import { CATEGORY_DECORATIONS, refuseUndrawn, referenceSeriesAsLines, assumedRunBracketed } from "./chart-decorations.mjs";
+import { questionLayout, questionNodes } from "./chart-question.mjs";
 import { categoricalChart } from "./chart-categorical.mjs";
 import { lineChart, comboChart } from "./chart-line.mjs";
 import { waterfall, waffleLayout, waffleChart, bubbleGridLayout, bubbleGrid, marimekkoLayout, marimekko, rangeChart } from "./chart-specialty.mjs";
@@ -40,11 +41,11 @@ const chartDefinitions = [
     sample: { categories: ["North", "West", "South", "East"], series: [{ name: "value", values: [74, 62, 48, 35] }], highlights: [{ category: "North" }], annotations: [{ category: "North", text: "Scale leader" }] }
   },
   {
-    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: [...CATEGORY_DECORATIONS, "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "segmentGrowth", "stackBracket"], refuses: ["focusSeries"],
+    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: [...CATEGORY_DECORATIONS, "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "segmentGrowth", "stackBracket", "diverging"], refuses: ["focusSeries"],
     sample: { categories: ["2024", "2025", "2026"], series: [{ name: "Core", values: [30, 32, 35] }, { name: "Growth", values: [12, 20, 30] }, { name: "New", values: [5, 9, 14] }], annotations: [{ series: "New", category: "2026", text: "New scales" }] }
   },
   {
-    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
+    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "diverging"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
     sample: { categories: ["Segment A", "Segment B", "Segment C"], series: [{ name: "Core", values: [45, 35, 25] }, { name: "Growth", values: [35, 40, 45] }, { name: "New", values: [20, 25, 30] }] }
   },
   {
@@ -298,14 +299,15 @@ export function registerCharts(registry) {
       ...(chart.id === "chart.waffle" ? (() => {
         const height = ({ frame, props = {} }) => {
           const heading = String(props.heading ?? "").trim() ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;
-          return heading + waffleLayout({ ...frame, y: frame.y + heading, height: Number.isFinite(frame.height) ? frame.height - heading : frame.height }, props).height;
+          const asked = questionLayout(props.question, frame.width)?.height ?? 0;
+          return heading + asked + waffleLayout({ ...frame, y: frame.y + heading + asked, height: Number.isFinite(frame.height) ? frame.height - heading - asked : frame.height }, props).height;
         };
         return { measureContent: (input) => ({ height: height(input) }), measureCeiling: height };
       })() : {}),
       ...(EXTRA_CHARTS.some((c) => c.id === chart.id) ? { measureContent: ({ frame, props = {} }) => {
         const headingHeight = String(props.heading ?? "").trim()
           ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;
-        return { height: headingHeight + EXTRA_CHARTS.find((c) => c.id === chart.id).layout({ ...frame, height: undefined }, props).height };
+        return { height: headingHeight + (questionLayout(props.question, frame.width)?.height ?? 0) + EXTRA_CHARTS.find((c) => c.id === chart.id).layout({ ...frame, height: undefined }, props).height };
       } } : {}),
       ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: marimekkoLayout(frame, props).height }) } : {}),
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
@@ -317,22 +319,28 @@ export function registerCharts(registry) {
       render: ({ id, frame, props = {}, tokens }) => {
         refuseUndrawn(chart, props, id, chartDefinitions);
         if (Array.isArray(props.series) && props.series.some(item => item.tone !== undefined)) throw new Error("Chart series cannot use status tone; positive/negative colours belong to short text labels or check/cross icons. Use chart palette series colours for marks.");
+        // A survey question (chart-question.mjs) is set under the heading, and the plot takes what is left.
+        const { question, ...plotted } = props;
         // A series that is a threshold, a target or a constant is drawn as a reference line where the chart draws them, and a
         // recorded series carried forward on an assumption has the turn bracketed (chart-decorations.mjs SERIES_STATES). Each is
         // tried in turn: where the line's label or the bracket's band finds no room, the series stay dashed and keyed.
         const drawn = (within) => {
-          const lined = referenceSeriesAsLines(props, chart.draws);
-          const attempts = [lined && assumedRunBracketed(lined, chart.draws), lined, assumedRunBracketed(props, chart.draws)].filter(Boolean);
+          const lined = referenceSeriesAsLines(plotted, chart.draws);
+          const attempts = [lined && assumedRunBracketed(lined, chart.draws), lined, assumedRunBracketed(plotted, chart.draws)].filter(Boolean);
           for (const attempt of attempts) { try { return renderResolved(chart.render, { id, frame: within, tokens, props: attempt }); } catch { continue; } }
-          return renderResolved(chart.render, { id, frame: within, tokens, props });
+          return renderResolved(chart.render, { id, frame: within, tokens, props: plotted });
+        };
+        const asked = (within) => {
+          const layout = questionLayout(question, within.width);
+          return layout ? [...questionNodes({ id, frame: within, layout }), ...drawn({ ...within, y: within.y + layout.height, height: within.height - layout.height })] : drawn(within);
         };
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
-          return { nodes: drawn(frame) };
+          return { nodes: asked(frame) };
         }
         const title = registry.get("chart-title"), titleProps = headingProps(props);
         const height = title.measureContent({ frame, props: titleProps }).height;
-        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...drawn({ ...frame, y: frame.y + height, height: frame.height - height })] };
+        return { nodes: [...title.render({ id: stableId(id, "heading"), frame: { ...frame, height }, props: titleProps, tokens }).nodes, ...asked({ ...frame, y: frame.y + height, height: frame.height - height })] };
       }
     });
   }

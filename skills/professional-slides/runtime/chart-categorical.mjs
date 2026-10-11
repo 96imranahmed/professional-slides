@@ -14,7 +14,7 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, 
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
-import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings } from "./chart-marks.mjs";
+import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings, normalizeRowNotes, rowNoteNodes, ROW_NOTE_GAP } from "./chart-marks.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
 // before it labels every nth row instead.
@@ -189,6 +189,7 @@ export function categoricalChart(context) {
 function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = false, tokens = TOKENS }) {
   const chart = { id, frame, props, horizontal, stacked, tokens };
   Object.assign(chart, categoricalData(chart));
+  Object.assign(chart, divergingPlan(chart));
   Object.assign(chart, valueBreakPlan(chart));
   Object.assign(chart, labelGutters(chart));
   Object.assign(chart, attachmentGutters(chart));
@@ -205,12 +206,14 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   chart.categories.forEach((category, categoryIndex) => drawCategory(chart, category, categoryIndex));
   drawValueBreaks(chart);
   drawCategoryBreaks(chart);
+  drawDivergingCentre(chart);
   drawForecastDivider(chart);
   drawCategoryGroups(chart);
   keepValueLabelsOffReferenceLines(chart);
   drawSegmentGrowth(chart);
   drawGroupBrackets(chart);
   chart.nodes.push(...labelRings({ id, nodes: chart.nodes, valueLabels: chart.valueLabels }));
+  drawRowNotes(chart);
   const { nodes, chartProps, plot, pointMap, categoryMap, yScale, xScale } = chart;
   return withDecorations(nodes, {
     id,
@@ -271,8 +274,9 @@ function categoricalData(chart) {
   // block of evidence where an axis is a lookup table. `dataLabels: false`
   // still declines, and a dense chart falls back to the axis.
   const markCount = series.length * categories.length;
-  // A broken axis (valueBreak) leaves no scale to read, so its marks carry their values however many there are.
-  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12 || Boolean(props.valueBreak)));
+  // A broken axis (valueBreak) leaves no scale to read, and a diverging scale's answers are read share by share, so their
+  // marks carry their values however many there are.
+  const showDataLabels = props.dataLabels === true || stackLabels.totals.size > 0 || stackLabels.secondary.size > 0 || (props.dataLabels !== false && (series.length === 1 || markCount <= 12 || Boolean(props.valueBreak) || Boolean(props.diverging)));
   const showValueAxis = resolveValueAxis(props, { valueCount: values.length, dataLabelsVisible: showDataLabels });
   // A label said another way - a range, an approximation - or ringed (chart-marks.mjs).
   const valueLabels = normalizeValueLabels(props, categories, series);
@@ -312,20 +316,29 @@ function labelGutters(chart) {
   const estimatedLane = horizontal ? Math.max(1, (frame.height - 56) / Math.max(1, categories.length)) : Infinity;
   const blockHeight = noteTexts.length ? Math.max(...noteTexts.map((n) => axisText(n, Math.max(baseLabelWidth, Math.min(240, noteWidth))).height)) + axisText("Ag", 180).height : 0;
   const noteColumn = noteTexts.length > 0 && blockHeight > estimatedLane;
+  // `categoryLabel: "above"`: a long statement set over its bar across the plot's width, as a survey sets it, where a
+  // label column at the left would hold three words a line.
+  if (props.categoryLabel !== undefined && props.categoryLabel !== "above" && props.categoryLabel !== "beside") throw new Error("categoryLabel is \"above\" (each label over its bar) or \"beside\" (the label column, the default)");
+  const labelAbove = props.categoryLabel === "above";
+  if (labelAbove && !horizontal) throw new Error("categoryLabel \"above\" sets a bar's label over it; a column chart names its columns under them - draw the statements as bars");
+  if (labelAbove && noteTexts.length) throw new Error("a label set above its bar has no line for a category note; put the note in the label, or in rowNotes beside the bar");
   const horizontalCategoryLabelWidth = horizontal && !hideCategoryLabels
-    ? iconSlot + (noteTexts.length && !noteColumn ? Math.max(baseLabelWidth, Math.min(240, noteWidth)) : baseLabelWidth)
+    ? iconSlot + (labelAbove ? 0 : noteTexts.length && !noteColumn ? Math.max(baseLabelWidth, Math.min(240, noteWidth)) : baseLabelWidth)
     : 0;
   const noteColumnWidth = noteColumn ? noteWidth + 8 : 0;
   const negativeLabelGutter = horizontal && !stacked && showDataLabels && (props.comparisonDomain?.values ?? values).some(v=>v<0) ? barLabelWidth + barLabelGap : 0;
   // A bar chart's category groups name their runs of rows in a column left of the row labels, each against a bracket.
   const groupColumnWidth = horizontal && !hideCategoryLabels && Array.isArray(props.categoryGroups) && props.categoryGroups.length
     ? Math.min(GROUP_LABEL_WIDTH, Math.ceil(Math.max(...props.categoryGroups.map((group) => axisText(String(group?.label ?? ""), GROUP_LABEL_WIDTH).width)))) + 18 : 0;
+  const rowNotes = normalizeRowNotes(props, categories, { horizontal, frame });
   return { barLabelGap, barLabelWidth, hideCategoryLabels, categoryIcons, logoMarks, iconW, iconH, iconSlot, axisText, noteWidth,
-    noteColumn, horizontalCategoryLabelWidth, noteColumnWidth, negativeLabelGutter, groupColumnWidth };
+    noteColumn, horizontalCategoryLabelWidth, noteColumnWidth: noteColumnWidth + (rowNotes ? rowNotes.width + ROW_NOTE_GAP : 0), negativeLabelGutter, groupColumnWidth, labelAbove, rowNotes };
 }
 
 // The widest a bar chart's group label sets before it wraps.
 const GROUP_LABEL_WIDTH = 120;
+// A label set over its bar starts this far in from the axis the bar stands on.
+const ABOVE_INSET = 6;
 
 /**
  * The room the marks' attachments take around the plot: stack totals,
@@ -485,6 +498,7 @@ function categoricalBounds(chart) {
   const { props, horizontal, stacked, categories, series, values, showDataLabels, showValueAxis, plot, valueBreak } = chart;
   const stackExtents = categories.flatMap((_, categoryIndex) => {
     if (!stacked) return series.map(item => item.values[categoryIndex]);
+    if (chart.diverging) return chart.diverging.ends[categoryIndex];
     const categoryValues = series.map(item => item.values[categoryIndex]);
     return [
       categoryValues.filter(value => value < 0).reduce((sum, value) => sum + value, 0),
@@ -514,6 +528,43 @@ function categoricalBounds(chart) {
 
 // The cut a broken axis draws across a mark: wide enough to read as a gap, short of a value's worth of plot.
 const BREAK_PX = 14;
+
+/**
+ * `diverging: { neutral }` on a stacked bar or column: a Likert scale. The
+ * series are the scale's answers in order, most negative first, each a share
+ * of the respondents (none below zero). The answers before the neutral one
+ * stack out to the left of zero, nearest the centre first; the neutral answer
+ * straddles zero; the answers after it stack out to the right. So the bars
+ * line up on the centre and their lengths each way are the disagreement and
+ * the agreement. Values print unsigned, and the colours run from one pole to
+ * the other on the red-white-green scale - genuinely polar answers round a
+ * neutral middle, the use that scale is kept for - with the neutral answer in
+ * the comparator grey. A scale with no neutral answer splits in half.
+ */
+function divergingPlan(chart) {
+  const { props, stacked, series, categories } = chart;
+  if (props.diverging === undefined || props.diverging === false) return { diverging: null };
+  if (!stacked) throw new Error("diverging lays a Likert scale's answers out each side of zero, as a stacked bar or column; draw it as chart.stacked-bar");
+  const spec = props.diverging === true ? {} : props.diverging;
+  if (!spec || typeof spec !== "object") throw new Error("diverging is true or { neutral: \"<the middle answer>\" }");
+  if (series.some((item) => item.values.some((v) => v < 0))) throw new Error("a diverging scale's answers are shares of the respondents, none below zero; the chart sets the disagreeing ones left of zero itself");
+  const names = series.map((item) => item.name);
+  const neutral = spec.neutral === undefined ? -1 : names.indexOf(spec.neutral);
+  if (spec.neutral !== undefined && neutral < 0) throw new Error(`diverging.neutral names the middle answer, one of the series (${names.join(", ")})`);
+  if (neutral < 0 && series.length % 2) throw new Error(`a scale of ${series.length} answers has a middle one: name it in diverging.neutral, and it straddles zero`);
+  const split = neutral >= 0 ? neutral : series.length / 2;
+  const negative = names.slice(0, split).map((_, i) => i), positive = names.map((_, i) => i).slice(neutral >= 0 ? neutral + 1 : split);
+  if (!negative.length || !positive.length) throw new Error("a diverging scale has answers on both sides of its middle");
+  // Most negative is the outer pole: levels 0 to 3 of the scale on that side, 7 to 10 on the other.
+  const level = (k, n, low) => (n === 1 ? (low ? 2 : 8) : low ? Math.round((k / (n - 1)) * 3) : 10 - Math.round(((n - 1 - k) / (n - 1)) * 3));
+  const colors = new Map([...negative.map((i, k) => [i, token(`color.heat.red-white-green.${level(k, negative.length, true)}`)]), ...positive.map((i, k) => [i, token(`color.heat.red-white-green.${level(k, positive.length, false)}`)]), ...(neutral >= 0 ? [[neutral, token("color.chartComparator")]] : [])]);
+  // Drawn from the centre out: the neutral answer, then each side nearest the centre first.
+  const order = [...(neutral >= 0 ? [neutral] : []), ...[...negative].reverse(), ...positive];
+  const sign = (i) => (negative.includes(i) ? -1 : 1);
+  const ends = categories.map((_, at) => { const middle = neutral >= 0 ? series[neutral].values[at] / 2 : 0;
+    return [-(middle + negative.reduce((sum, i) => sum + series[i].values[at], 0)), middle + positive.reduce((sum, i) => sum + series[i].values[at], 0)]; });
+  return { diverging: { neutral, order, sign, colors, ends } };
+}
 
 /**
  * `valueBreak: { from, to }` on a bar or column chart, stacked or not: the
@@ -552,6 +603,19 @@ function brokenScales(chart) {
   const { valueBreak, compress, yScale, xScale } = chart;
   if (!valueBreak) return {};
   return { yScale: (v) => yScale(compress(v)), xScale: (v) => xScale(compress(v)) };
+}
+
+/** The centre line a diverging scale's bars line up on, behind them: it shows between the rows, clear of the neutral answer's figures. */
+function drawDivergingCentre(chart) {
+  const { id, horizontal, diverging, plot, nodes, xScale, yScale } = chart;
+  if (!diverging) return;
+  // The axis at zero, which the chart sets in front of its marks, gives way to it.
+  for (const axis of [stableId(id, "y-axis"), stableId(id, "zero-baseline")]) { const at = nodes.findIndex((node) => node.id === axis && (horizontal ? axis.endsWith("y-axis") : true)); if (at >= 0) nodes.splice(at, 1); }
+  // A hairline rectangle, not a connector: a renderer may draw a connector over the shapes before it, and this line belongs behind the bars.
+  const width = 1.5;
+  nodes.unshift(rectPrimitive({ id: stableId(id, "diverging-centre"), role: "chart-diverging-centre",
+    frame: horizontal ? { x: xScale(0) - width / 2, y: plot.y - 4, width, height: plot.height + 8 } : { x: plot.x - 4, y: yScale(0) - width / 2, width: plot.width + 8, height: width },
+    style: { fill: INK, stroke: "none", lineWidth: token("line.hairline") }, data: { diverging: true } }));
 }
 
 /** The slanted gap across every mark that crosses a broken axis's cut. */
@@ -618,6 +682,7 @@ function categoricalColors(chart) {
   const focusSeriesIndex = twoSeriesContrast ? defaultFocusIndex(series.map((item) => item.name), props.focusSeries) : -1;
   const focusCategoryIndex = twoMarkContrast ? defaultFocusIndex(categories) : -1;
   const colorFor = (seriesIndex, categoryIndex) => {
+    if (chart.diverging) return chart.diverging.colors.get(seriesIndex);
     const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
     // Highlight the answer: the bar the title is about takes the accent; the
     // others keep their series colour (navy), never grey. Forecast periods are lighter.
@@ -681,7 +746,7 @@ function rowLabelling(chart) {
   // unnamed bar says nothing. page-types.mjs describeTypes publishes the rule.
   const fullLine = measureText("Ag", 1000, axisFont).height;
   const smallLine = measureText("Ag", 1000, { ...axisFont, fontSize: tokenValue(ROW_LABEL_MIN) }).height;
-  const crowded = horizontal && !stacked && categorySpan < fullLine;
+  const crowded = horizontal && !stacked && categorySpan < fullLine && !chart.labelAbove;
   const rowSize = crowded && categorySpan >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
   const rowLine = rowSize === AXIS_LABEL ? fullLine : smallLine;
   const rowEvery = crowded && categorySpan < rowLine ? Math.ceil(rowLine / categorySpan) : 1;
@@ -700,6 +765,13 @@ function barSpans(chart) {
   // at 0.7 leave a gap nearly as wide as each bar (markWeight).
   const barWeight = categories.length <= 3 ? 0.86 : categories.length <= 6 ? 0.78 : markWeight().bars;
   let groupSpan = categorySpan * barWeight;
+  // A label set over its bar takes the top of the lane; the bar takes what is left, a little air under the label.
+  const aboveLayouts = chart.labelAbove ? categories.map((category) => measureText(String(category), plot.width - ABOVE_INSET, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) })) : null;
+  const labelBlock = aboveLayouts ? Math.max(...aboveLayouts.map((layout) => layout.height)) + 3 : 0;
+  if (aboveLayouts) {
+    groupSpan = Math.min(groupSpan, categorySpan - labelBlock - 6);
+    if (groupSpan < 8) throw new Error(`labels set above their bars leave each bar ${Math.max(0, Math.floor(groupSpan))}px of a ${Math.floor(categorySpan)}px lane; give the chart the page's height, fewer statements, or labels of one line`);
+  }
   let stackExternalWidth = 0;
   if (stacked && !horizontal && showDataLabels) {
     for (const category of categories) for (const item of series) {
@@ -716,7 +788,7 @@ function barSpans(chart) {
   if (stackBracket) groupSpan = Math.min(groupSpan, categorySpan * 0.5);
   const segmentMids = new Map();
   const barSpan = stacked ? groupSpan : groupSpan / series.length;
-  return { groupSpan, stackExternalWidth, segmentMids, barSpan };
+  return { groupSpan, stackExternalWidth, segmentMids, barSpan, aboveLayouts, labelBlock };
 }
 
 /** The heading over the delta column (bars) or band (columns). */
@@ -738,7 +810,7 @@ function drawDeltaHeadings(chart) {
  */
 function drawCategory(chart, category, categoryIndex) {
   const { horizontal, stacked, plot, categoryMap, categorySpan, groupSpan, stackExternalWidth } = chart;
-  const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2);
+  const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2) + (chart.labelBlock || 0) / 2;
   categoryMap.set(category, horizontal
     ? { x: plot.x, y: categoryStart, width: plot.width, height: groupSpan }
     : { x: categoryStart, y: plot.y, width: groupSpan, height: plot.height, labelSpan: categorySpan, labelCenter: stacked ? categoryStart+(groupSpan-4)/2 : plot.x+(categoryIndex+.5)*categorySpan });
@@ -764,12 +836,17 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
   const lighter = (seriesIndex, at) => lighterState(seriesIndex, at) || Boolean(said(seriesIndex)?.estimate);
   let positiveCumulative = 0;
   let negativeCumulative = 0;
-  series.forEach((item, seriesIndex) => {
-    const value = item.values[categoryIndex];
+  // A diverging scale is drawn from the centre out, its disagreeing answers to the left of zero (divergingPlan).
+  const diverging = chart.diverging;
+  const order = diverging ? diverging.order : series.map((_, i) => i);
+  order.forEach((seriesIndex) => {
+    const item = series[seriesIndex];
+    const value = diverging ? diverging.sign(seriesIndex) * item.values[categoryIndex] : item.values[categoryIndex];
     const selected = barHighlighted.has(category);
     const colorIndex = colorIndexFor(seriesIndex, categoryIndex);
     const markColor = colorFor(seriesIndex, categoryIndex);
-    const start = stacked ? (value >= 0 ? positiveCumulative : negativeCumulative) : 0;
+    const middle = diverging && seriesIndex === diverging.neutral;
+    const start = middle ? -value / 2 : stacked ? (value >= 0 ? positiveCumulative : negativeCumulative) : 0;
     const end = start + value;
     let bar;
     if (horizontal) {
@@ -799,7 +876,8 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
     // A zero segment has no area in a stack. Printing its label inside a
     // one-pixel placeholder both invents a visible segment and fails fit.
     if (showDataLabels && (!stacked || value !== 0) && (!horizontal || rowShown(categoryIndex))) {
-      let labelText = attachedLabelText(said(seriesIndex)?.display ?? formatValue(value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
+      // A diverging scale's answers print unsigned: a share of respondents, whichever side of zero it is drawn.
+      let labelText = attachedLabelText(said(seriesIndex)?.display ?? formatValue(diverging ? Math.abs(value) : value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
       const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
       labelText = labelMetrics.text;
       const labelFrame = horizontal
@@ -830,7 +908,8 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
     pointMap.set(`${item.name}:${category}`, point);
     if (segmentGrowth && category === (segmentGrowth.length > 1 ? chart.categories.at(-1) : segmentGrowth[0].to)) segmentMids.set(item.name, bar.y + bar.height / 2);
     if (series.length === 1) pointMap.set(`value:${category}`, point);
-    if (stacked) {
+    if (middle) { positiveCumulative = end; negativeCumulative = start; }
+    else if (stacked) {
       if (value >= 0) positiveCumulative = end;
       else negativeCumulative = end;
     }
@@ -978,6 +1057,14 @@ function drawCategoryLabel(chart, category, categoryIndex, categoryStart) {
   const { id, frame, horizontal, regionHighlight, hideCategoryLabels, iconSlot, noteWidth, noteColumn, horizontalCategoryLabelWidth,
     negativeLabelGutter, categoryNotes, plot, labelSpan, categoryLayouts, labelShown, nodes, categoryMap, categorySpan, rowSize, rowLine,
     rowShown, groupSpan } = chart;
+  // A label set over its bar runs the plot's width, the bar under it.
+  if (chart.labelAbove && !hideCategoryLabels) {
+    const layout = chart.aboveLayouts[categoryIndex];
+    // Clear of the axis the bars stand on, so the line does not touch the label's first letter.
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: plot.x + ABOVE_INSET, y: categoryStart - chart.labelBlock, width: plot.width - ABOVE_INSET, height: layout.height }, text: layout.text,
+      style: { ...textStyle(AXIS_LABEL, INK, false, "left"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { category, textLayout: layout, placement: "above" } }));
+    return;
+  }
   // `categoryNotes`: a second line under the category label - the base of the
   // measure ("n=412"), the year, the unit of that column. A well-made chart
   // carries it and it is most of what separates its label band from a bare one.
@@ -1125,6 +1212,14 @@ function drawGroupBrackets(chart) {
   if (!brackets.length) return;
   const rightOf = plot.x + plot.width + (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) + deltaWidth + 6;
   nodes.push(...bracketNodes({ id, brackets, horizontal, plot, categories, nodes, rightOf }));
+}
+
+/** `rowNotes`: the note column at a bar chart's right, past its values, deltas and brackets (chart-marks.mjs). */
+function drawRowNotes(chart) {
+  const { id, rowNotes, stacked, plot, categories, categoryMap, nodes, showDataLabels, barLabelWidth, barLabelGap, totalWidth, deltaWidth, bracketWidth } = chart;
+  if (!rowNotes) return;
+  const left = plot.x + plot.width + (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) + deltaWidth + bracketWidth + ROW_NOTE_GAP;
+  nodes.push(...rowNoteNodes({ id, rowNotes, categories, categoryMap, nodes, left }));
 }
 
 /** `segmentGrowth`: the column of per-segment rates right of the plot. */

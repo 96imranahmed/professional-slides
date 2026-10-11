@@ -12,7 +12,7 @@
 //
 // The bracket's figure is computed from the plotted values, never typed, so
 // it states what the marks show.
-import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { formatValue } from "./value-format.mjs";
 import { FONT, INK, CHART_LABEL, textStyle, lineStyle, labelBold } from "./chart-axes.mjs";
@@ -138,5 +138,67 @@ export function labelRings({ id, nodes, valueLabels }) {
     const width = ink.width + 16, height = ink.height + 10;
     out.push(ellipsePrimitive({ id: stableId(label.id, "ring"), role: "chart-label-ring", frame: { x: cx - width / 2, y: cy - height / 2, width, height }, style: { fill: "none", stroke: token("color.accent"), lineWidth: token("line.standard") }, data: { category: label.data.category, series: label.data.series } }));
   }
+  return out;
+}
+
+// A note level with each bar of a bar chart, in a column at its right: what a
+// respondent said ("a verbatim"), the reason behind a figure, the action a row
+// calls for. `rowNotes` runs one entry a category, in category order - text,
+// or `{ text, tone, quote, arrow }` - `null` leaving a row bare.
+//
+//   tone   "positive" | "negative": a voice for or against, marked by a bar
+//          of the verdict's colour at the note's left (a verdict is what the
+//          status colours are kept for); the text stays ink
+//   quote  true sets the text in quotation marks, as said
+//   arrow  true draws a leader from the note back to its bar's value
+export const ROW_NOTE_GAP = 14;
+const ROW_NOTE_TONES = Object.freeze(["positive", "negative", "neutral"]);
+const ROW_NOTE_WIDTH = Object.freeze({ min: 160, max: 360 });
+
+/** A bar chart's row notes, checked: `{ width, notes }` with a note (or null) per category; null for a chart with none. */
+export function normalizeRowNotes(props = {}, categories = [], { horizontal = false, frame } = {}) {
+  if (props.rowNotes === undefined) return null;
+  if (!horizontal) throw new Error("rowNotes sit level with a bar chart's rows; on columns, say it in a callout or under the chart");
+  if (!Array.isArray(props.rowNotes) || props.rowNotes.length !== categories.length) throw new Error(`rowNotes carries one entry a category, in category order (${categories.length}), null for a row with none`);
+  const notes = props.rowNotes.map((entry, at) => {
+    if (entry === null || entry === undefined) return null;
+    const note = typeof entry === "string" ? { text: entry } : entry;
+    if (!note || typeof note.text !== "string" || !note.text.trim()) throw new Error(`row note ${at + 1} is text, or { text, tone, quote, arrow }`);
+    if (note.tone !== undefined && !ROW_NOTE_TONES.includes(note.tone)) throw new Error(`row note ${at + 1}: tone is ${ROW_NOTE_TONES.map((t) => `"${t}"`).join(", ")} - a voice for, against or neither`);
+    return { text: note.quote ? `“${note.text.trim().replace(/^[“"]|[”"]$/g, "")}”` : note.text.trim(), tone: note.tone, arrow: note.arrow === true };
+  });
+  if (!notes.some(Boolean)) throw new Error("rowNotes carries no note; drop it");
+  const asked = props.rowNotesWidth;
+  if (asked !== undefined && !(Number.isFinite(asked) && asked >= ROW_NOTE_WIDTH.min && asked <= ROW_NOTE_WIDTH.max)) throw new Error(`rowNotesWidth is the note column's width in px, ${ROW_NOTE_WIDTH.min} to ${ROW_NOTE_WIDTH.max}`);
+  const width = asked ?? Math.max(ROW_NOTE_WIDTH.min, Math.min(ROW_NOTE_WIDTH.max, Math.round((frame?.width ?? 760) * 0.34)));
+  return { width, notes };
+}
+
+/** Each row's note in the column at the chart's right, centred on its bar, with its tone bar and its leader. */
+export function rowNoteNodes({ id, rowNotes, categories, categoryMap, nodes, left }) {
+  const out = [], tone = { positive: token("color.positive"), negative: token("color.negative"), neutral: token("color.chartComparator") };
+  const toned = rowNotes.notes.some((note) => note?.tone);
+  rowNotes.notes.forEach((note, at) => {
+    if (!note) return;
+    const category = categories[at], lane = categoryMap.get(category);
+    const x = left + (toned ? 8 : 0), width = rowNotes.width - (toned ? 8 : 0);
+    const layout = measureText(note.text, width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL) });
+    const room = lane.height + 14;
+    if (layout.height > room) throw new Error(`row note ${at + 1} ("${note.text.slice(0, 40)}...") runs to ${layout.lines.length} lines, more than its row holds; cut it, widen the column (rowNotesWidth), or give the chart more height`);
+    // Centred on the row's bars as drawn, which sit a few pixels inside their lane.
+    const bars = nodes.filter((node) => node.role === "chart-mark" && node.data?.category === category).map((node) => node.frame);
+    const mid = bars.length ? (Math.min(...bars.map((b) => b.y)) + Math.max(...bars.map((b) => b.y + b.height))) / 2 : lane.y + lane.height / 2;
+    const y = mid - layout.height / 2, data = { category, rowNote: true, ...(note.tone ? { tone: note.tone } : {}) };
+    if (note.tone) out.push(rectPrimitive({ id: stableId(id, "row-note-tone", category), role: "chart-row-note-tone", frame: { x: left, y, width: 3, height: layout.height }, style: { fill: tone[note.tone], stroke: "none", lineWidth: token("line.hairline") }, data }));
+    out.push(textPrimitive({ id: stableId(id, "row-note", category), role: "chart-row-note", frame: { x, y, width, height: layout.height }, text: layout.text,
+      style: { ...textStyle(CHART_LABEL, INK, false, "left"), valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { ...data, textLayout: layout } }));
+    if (note.arrow) {
+      // The bar's end, or its value's ink where the value is printed past it.
+      const ink = (node) => (node.role === "data-label" && node.style?.align === "left" ? node.frame.x + measureText(node.text, 1000, face()).width : node.frame.x + node.frame.width);
+      const ends = nodes.filter((node) => ["chart-mark", "data-label"].includes(node.role) && node.data?.category === category).map(ink);
+      const from = Math.max(...ends) + 4;
+      if (left - 6 - from > 12) out.push(linePrimitive({ id: stableId(id, "row-note-leader", category), role: "annotation-leader", x1: left - 6, y1: mid, x2: from, y2: mid, style: lineStyle(INK, token("line.hairline")), data: { ...data, endArrow: true } }));
+    }
+  });
   return out;
 }

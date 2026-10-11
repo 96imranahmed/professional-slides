@@ -26,7 +26,7 @@ const ROUND = token("radius.round");
 
 export const QUOTE_CLUSTER_TOKENS = Object.freeze([
   "color.canvas", "color.surface", "color.surfaceMuted", "color.surfaceTint", "color.ink",
-  "color.textSecondary", "color.componentPrimary", "color.rule",
+  "color.textSecondary", "color.componentPrimary", "color.rule", "color.positive", "color.negative", "color.chartComparator",
   "font.body", "font.display", "type.deckTitle", "type.sectionTitle", "type.quoteMark", "type.quoteMarkHero", "type.heading",
   "type.body", "type.compact", "type.label", "type.source", "space.1",
   "space.2", "space.3", "space.4", "space.5", "space.6", "space.8",
@@ -59,6 +59,9 @@ function settings(props = {}) {
   const placement = props.placement ?? "full-field";
   const arrangement = props.arrangement ?? (treatment === "speech-bubble" && (props.quotes?.length ?? 0) === 3 ? "staggered" : "grid");
   const avatar = props.avatar === true;
+  // A portrait large enough to recognise: 24px (the default) is a marker; a voice page that is about who said it sets 40 to 72.
+  if (props.avatarSize !== undefined && !(Number.isFinite(props.avatarSize) && props.avatarSize >= 24 && props.avatarSize <= 72)) throw new Error("avatarSize is the portrait's diameter in px, 24 to 72");
+  if (props.avatarSize !== undefined && !avatar) throw new Error("avatarSize sizes the portraits `avatar: true` draws; set avatar, or drop avatarSize");
   const attributionPlacement = props.attributionPlacement ?? (avatar || treatment === "callout" && props.attributionAlign === "left" ? "below-left" : treatment === "callout" ? "below-center" : "inside");
   const attributionAlign = props.attributionAlign ?? (attributionPlacement === "below-left" || treatment === "speech-bubble" ? "left" : treatment === "contained" ? "right" : "center");
   if (!["contained", "callout", "speech-bubble"].includes(treatment)) throw new Error(`Unknown quote-cluster treatment: ${treatment}`);
@@ -72,8 +75,12 @@ function settings(props = {}) {
   if (attributionPlacement === "below-center" && attributionAlign !== "center") throw new Error("Centered callout attribution must use centered alignment");
   if (attributionPlacement === "below-left" && attributionAlign !== "left") throw new Error("Left callout attribution must use left alignment");
   if (arrangement === "staggered" && (placement !== "full-field" || treatment !== "speech-bubble")) throw new Error("Staggered quote clusters require full-field speech-bubble treatment");
-  return { treatment, placement, arrangement, attributionPlacement, attributionAlign, avatar: props.avatar === true };
+  return { treatment, placement, arrangement, attributionPlacement, attributionAlign, avatar: props.avatar === true, avatarSize: props.avatarSize ?? tokenValue(token("space.5")) };
 }
+
+// A voice for or against, as a survey's verbatims are sorted: its quotation marks and a strip at its left in the verdict's
+// colour - a verdict being what the status colours are kept for - the words in ink.
+const QUOTE_TONES = Object.freeze({ positive: token("color.positive"), negative: token("color.negative"), neutral: token("color.chartComparator") });
 
 function items(props = {}) {
   const raw = Array.isArray(props.quotes)
@@ -92,7 +99,8 @@ function items(props = {}) {
     if (!quote || !attribution) throw new Error(`Quote ${index + 1} requires exact quote text and attribution`);
     const avatarText = stringField(item.avatarText, "initials");
     if (Array.from(avatarText).length > 3) throw new Error("Quote initials must contain at most three characters");
-    return { quote, attribution, detail, avatarText, portrait: item.portrait };
+    if (item.tone !== undefined && !Object.hasOwn(QUOTE_TONES, item.tone)) throw new Error(`Quote ${index + 1} tone is ${Object.keys(QUOTE_TONES).map((t) => `"${t}"`).join(", ")}: a voice for, against or neither`);
+    return { quote, attribution, detail, avatarText, portrait: item.portrait, tone: item.tone };
   });
   return normalized;
 }
@@ -175,8 +183,8 @@ function attributionHeight(count) {
   return count === 1 ? 56 : tokenValue(token("space.6"));
 }
 
-function surfaceHeight(frame, treatment, count, avatar = false) {
-  return frame.height - (treatment === "callout" ? outsideAttributionHeight(count) : avatar ? attributionHeight(count) + tokenValue(token("space.4")) : 0);
+function surfaceHeight(frame, treatment, count, avatar = false, avatarSize = 0) {
+  return frame.height - (treatment === "callout" ? outsideAttributionHeight(count) : avatar ? Math.max(attributionHeight(count), avatarSize) + tokenValue(token("space.4")) : 0);
 }
 
 function calloutCaretCenter(frame, attributionPlacement) {
@@ -189,8 +197,8 @@ function calloutCaretCenter(frame, attributionPlacement) {
 // box with a hairline is 15 grey levels off white - four of them make a page
 // that reads as empty with type on it.
 
-function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar) {
-  const bodyFrame = { ...frame, height: surfaceHeight(frame, treatment, count, avatar) };
+function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar, avatarSize) {
+  const bodyFrame = { ...frame, height: surfaceHeight(frame, treatment, count, avatar, avatarSize) };
   if (treatment === "speech-bubble") return [shapePrimitive({
     id: stableId(id, "surface"), role: "quote-surface", geometry: "snip1Rect", frame: bodyFrame,
     style: { ...cardFill(SURFACE, RULE), lineWidth: STANDARD, flipV: true }, data
@@ -216,15 +224,15 @@ function surfaceNodes(id, frame, count, treatment, attributionPlacement, data, a
   return [rectPrimitive({ id: stableId(id, "surface"), role: "quote-surface", frame: bodyFrame, style: { ...cardFill(MUTED, RULE), lineWidth: HAIRLINE, radius: SMALL }, data })];
 }
 
-function attributionNodes({ id, frame, item, count, treatment, attributionPlacement, align, avatar, data }) {
+function attributionNodes({ id, frame, item, count, treatment, attributionPlacement, align, avatar, avatarSize: size, data }) {
   const outside = attributionPlacement !== "inside";
-  const height = attributionHeight(count);
+  const height = Math.max(attributionHeight(count), avatar ? size : 0);
   const caret = treatment === "callout" ? (count === 1 ? tokenValue(token("space.5")) : tokenValue(token("space.3"))) : tokenValue(token("space.2"));
-  const surfaceBottom = frame.y + surfaceHeight(frame, treatment, count, avatar);
+  const surfaceBottom = frame.y + surfaceHeight(frame, treatment, count, avatar, size);
   const y = outside ? surfaceBottom + caret + tokenValue(token("space.1")) : surfaceBottom - height - tokenValue(token("space.2"));
   const inset = tokenValue(token("space.4"));
   const showAvatar = avatar && Boolean(item.portrait || item.avatarText);
-  const avatarSize = showAvatar ? tokenValue(token("space.5")) : 0;
+  const avatarSize = showAvatar ? size : 0;
   const gap = showAvatar ? tokenValue(token("space.2")) : 0;
   const leftBase = frame.x + inset;
   const contentX = leftBase + avatarSize + gap;
@@ -237,29 +245,31 @@ function attributionNodes({ id, frame, item, count, treatment, attributionPlacem
     nodes.push(item.portrait ? portraitPrimitive({ id: stableId(id, "avatar"), frame: avatarFrame, portrait: item.portrait, data }) : ellipsePrimitive({ id: stableId(id, "avatar"), role: "quote-avatar", frame: avatarFrame, style: { fill: MUTED, stroke: RULE, lineWidth: HAIRLINE, radius: ROUND }, data }));
     if (item.avatarText && !item.portrait) nodes.push(framedText({
       id: stableId(id, "avatar-label"), role: "quote-avatar-label", frame: avatarFrame, text: item.avatarText,
-      fontSize: token("type.label"), color: INK, bold: true, align: "center", valign: "mid",
+      fontSize: avatarSize >= 40 ? token("type.body") : token("type.label"), color: INK, bold: true, align: "center", valign: "mid",
       data
     }));
   }
-  const nameHeight = count === 1 && item.detail ? 32 : item.detail ? height / 2 : height;
-  const detailHeight = height - nameHeight;
+  const nameHeight = count === 1 && item.detail ? 32 : item.detail ? attributionHeight(count) / 2 : attributionHeight(count);
+  const detailHeight = attributionHeight(count) - nameHeight;
   const attributionFrame = { x: contentX, y, width: contentWidth, height: nameHeight };
   nodes.push(framedText({ id: stableId(id, "attribution"), role: "quote-attribution", frame: attributionFrame, text: item.attribution, fontSize: count === 1 ? token("type.body") : token("type.label"), color: INK, bold: true, align, valign: "top", data }));
   if (item.detail) nodes.push(framedText({ id: stableId(id, "detail"), role: "quote-detail", frame: { x: contentX, y: y + nameHeight, width: contentWidth, height: detailHeight }, text: item.detail, fontSize: count === 1 ? token("type.label") : token("type.source"), color: SECONDARY, align, valign: "top", data }));
   return nodes;
 }
 
-function quoteItemNodes({ id, frame, item, index, count, treatment, placement, attributionPlacement, attributionAlign, avatar }) {
-  const data = { quoteIndex: index, treatment, attributionPlacement };
-  const nodes = [...surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar)];
+function quoteItemNodes({ id, frame, item, index, count, treatment, placement, attributionPlacement, attributionAlign, avatar, avatarSize }) {
+  const data = { quoteIndex: index, treatment, attributionPlacement, ...(item.tone ? { tone: item.tone } : {}) };
+  const nodes = [...surfaceNodes(id, frame, count, treatment, attributionPlacement, data, avatar, avatarSize)];
+  const markColor = item.tone ? QUOTE_TONES[item.tone] : PRIMARY;
+  if (item.tone) nodes.push(rectPrimitive({ id: stableId(id, "tone"), role: "quote-tone", frame: { x: frame.x, y: frame.y, width: 4, height: surfaceHeight(frame, treatment, count, avatar, avatarSize) }, style: { fill: markColor, stroke: "none", lineWidth: HAIRLINE }, data }));
   const inset = tokenValue(token("space.4"));
   const speechBubble = treatment === "speech-bubble";
   const markSize = count === 1 ? token("type.quoteMarkHero") : count <= 2 ? token("type.quoteMark") : token("type.deckTitle");
   const markFrame = count === 1 ? { width: 96, height: 116 } : count <= 2 ? { width: 66, height: 76 } : { width: 50, height: 58 };
   const markY = frame.y + tokenValue(token("space.2"));
-  nodes.push(textPrimitive({ id: stableId(id, "mark-open"), role: "quote-mark", frame: { x: frame.x + inset, y: markY, ...markFrame }, text: "“", style: { fontFamily: DISPLAY_FONT, fontSize: markSize, color: PRIMARY, bold: true, align: "left", valign: "top" }, data }));
-  const attributionBlockHeight = attributionHeight(count);
-  const surfaceBottom = frame.y + surfaceHeight(frame, treatment, count, avatar);
+  nodes.push(textPrimitive({ id: stableId(id, "mark-open"), role: "quote-mark", frame: { x: frame.x + inset, y: markY, ...markFrame }, text: "“", style: { fontFamily: DISPLAY_FONT, fontSize: markSize, color: markColor, bold: true, align: "left", valign: "top" }, data }));
+  const attributionBlockHeight = Math.max(attributionHeight(count), avatar ? avatarSize : 0);
+  const surfaceBottom = frame.y + surfaceHeight(frame, treatment, count, avatar, avatarSize);
   const caret = count === 1 ? tokenValue(token("space.5")) : tokenValue(token("space.3"));
   const attributionTop = attributionPlacement === "inside" ? surfaceBottom - attributionBlockHeight - tokenValue(token("space.2")) : surfaceBottom + caret + tokenValue(token("space.1"));
   const closeY = attributionPlacement !== "inside" ? surfaceBottom - inset - markFrame.height : attributionTop - tokenValue(token("space.2")) - markFrame.height;
@@ -274,8 +284,8 @@ function quoteItemNodes({ id, frame, item, index, count, treatment, placement, a
     text: item.quote, fontSize: bodyFont, color: INK,
     bold: false, align: "left", valign: "top", data
   }));
-  if (treatment !== "speech-bubble") nodes.push(textPrimitive({ id: stableId(id, "mark-close"), role: "quote-mark", frame: { x: frame.x + frame.width - inset - markFrame.width, y: closeY, ...markFrame }, text: "”", style: { fontFamily: DISPLAY_FONT, fontSize: markSize, color: PRIMARY, bold: true, align: "right", valign: "bottom" }, data }));
-  nodes.push(...attributionNodes({ id, frame, item, count, treatment, attributionPlacement, align: attributionAlign, avatar, data }));
+  if (treatment !== "speech-bubble") nodes.push(textPrimitive({ id: stableId(id, "mark-close"), role: "quote-mark", frame: { x: frame.x + frame.width - inset - markFrame.width, y: closeY, ...markFrame }, text: "”", style: { fontFamily: DISPLAY_FONT, fontSize: markSize, color: markColor, bold: true, align: "right", valign: "bottom" }, data }));
+  nodes.push(...attributionNodes({ id, frame, item, count, treatment, attributionPlacement, align: attributionAlign, avatar, avatarSize, data }));
   return nodes;
 }
 
@@ -285,7 +295,7 @@ export function quoteClusterNodes({ id, frame, props }) {
   if (quoteItems.length > 3 && resolved.placement === "section") throw new Error("Four-up and five-up quote clusters require full-field placement");
   if (resolved.arrangement === "staggered" && quoteItems.length !== 3) throw new Error("The staggered quote arrangement requires exactly three quotes");
   const frames = gridFrames(frame, quoteItems.length, resolved.placement, resolved.arrangement);
-  return quoteItems.flatMap((item, index) => quoteItemNodes({ id: stableId(id, "quote", index + 1), frame: frames[index], item, index, count: quoteItems.length, treatment: resolved.treatment, placement: resolved.placement, attributionPlacement: resolved.attributionPlacement, attributionAlign: resolved.attributionAlign, avatar: resolved.avatar }));
+  return quoteItems.flatMap((item, index) => quoteItemNodes({ id: stableId(id, "quote", index + 1), frame: frames[index], item, index, count: quoteItems.length, treatment: resolved.treatment, placement: resolved.placement, attributionPlacement: resolved.attributionPlacement, attributionAlign: resolved.attributionAlign, avatar: resolved.avatar, avatarSize: resolved.avatarSize }));
 }
 
 export function registerQuoteCluster(registry) {
