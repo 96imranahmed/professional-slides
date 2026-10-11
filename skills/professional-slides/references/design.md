@@ -15,17 +15,20 @@ Decide what the page has to make the reader see, then take the page type and for
 | Two measures on one time axis | `trend`, form `combo` | Twin axes without a reason |
 | Before against after, per category | `ranking`, form `dumbbell`; `trend`, form `slope` for two to four dates | Grouped bars with ten pairs |
 | Spread within each member of a set | `ranking`, form `boxplot` | An average alone |
+| A low and a high for each member: a valuation by method, a band by line | `ranking`, form `range` | Two bars a member |
 | Which of many series moved | `trend`, form `sparklines`; `panels`, form `small-multiples` with axes, columns or bars a panel | Twelve lines on one plot |
 | How one subject stands on several measures at once | `panels`, form `dashboard`: a hero exhibit with its satellites, a strip of figures over the grid | Four equal panels, or a page a measure |
 | A forecast read with its numbers | `trend`, form `model`, the chart over its data table | A chart and a separate table of the same figures |
 | Parts of a whole, one period | `composition`, form `donut` for two to four parts, `waffle` for a share read as counts, `treemap` for many | A pie with eight slices |
 | A population share read as "six in ten" | `composition`, form `pictogram` | A single bar at 60% |
+| A share of each of a few populations, each its own whole | `composition`, form `radial-bars` (or `pictogram` for counted heads) | One bar chart pretending the bars share a total |
 | Composition changing over time | `composition`, form `stacked-column`; `trend`, form `stacked-area` | Side-by-side pies |
 | Size and share together | `composition`, form `marimekko` | Two separate charts |
 | A bridge from one total to another | `bridge`, form `waterfall` | A stacked bar |
 | A relationship between two measures | `relationship`, form `scatter`; `bubble` when a third measure matters | A table of pairs |
 | One question for two to four cuts | `panels`, form `row`, `grid` or `stack`, a `caption` under each | One chart per page, four pages running |
 | Cause and effect, before and after | `panels`, form `sequence` | Two pages the reader has to join |
+| What one bar, column or segment is made of | `panels`, form `breakout`: the mark fanned out to the panel that splits it | A second page the reader has to match back |
 | Where on a map, a network from a hub, flows between places | `place`, form `map` ([Geography](geography.md)) | A list of countries, or countries filled to stand for cities |
 | The players the deck compares - companies, places, products | `profiles`, form `logo-table` with the numbers the deck will use, or `logos` with a line each; each drawn by the mark it declares | Names in a bullet list |
 | Each player's profile across three to eight attributes | `profiles`, form `radar` | A table whose shape the reader must picture |
@@ -45,11 +48,14 @@ Decide what the page has to make the reader see, then take the page type and for
 | Two things judged on two axes | `mechanism`, form `matrix`; `quadrants` when each box holds a list | A ranked list |
 | Position between two poles, or a judged grade on a named scale | `mechanism`, form `spectrum` | A 1-to-5 score nobody measured |
 | A hub and what depends on it | `mechanism`, form `relationship-network` | A list of dependencies |
+| Who reports to whom; things placed under the domains they belong to; an issue broken into its evidence | `mechanism`, form `organization`, `placement` or `insight-tree` | Indented bullets |
 | Dated milestones, durations, waves | `schedule`, form `timeline`, `gantt` or `roadmap` | A table of dates |
 | A portfolio of bets by when each pays | `schedule`, form `horizons` | A timeline that dates bets as tasks |
+| Initiatives rolled out year by year | `schedule`, form `rollout` | A gantt of phases with no dates |
 | Three to six parallel ideas | `parallel`, form `cards` (an `icon` each), `capsules` or `arrow-rows` | Plain bullets |
 | A point per area, each with its evidence | `parallel`, form `labelled-rows` | A column of bullets beside a chart |
 | A thing worth seeing: a product, a place, a person | `picture`, form `picture-hero`, `picture-pair`, `picture-strip` or `photo-backdrop` | A description of it |
+| A product as its user sees it | `picture`, form `device` | A screenshot floating on a white page |
 | Report-style argument with no single exhibit | `argument`, form `memo` or `sidebar` | A single wide block |
 | What people said | `statement`, form `quotes` | Quotes inside bullets |
 | One sentence the deck turns on | `statement`, form `statement`, over a photograph when there is one | A title on an empty page |

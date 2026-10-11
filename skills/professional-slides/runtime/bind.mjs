@@ -586,6 +586,13 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
   if (kind === "chart.sparklines" || kind === "chart.small-multiples") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); if (kind === "chart.small-multiples") ex.categories = labels; delete ex.series; return null; }
   if (kind === "chart.treemap") { ex.items = labels.map((label, j) => ({ label, value: values[0][j] })); delete ex.series; return null; }
   if (kind === "chart.bubble-grid") { ex.rows = labels; ex.columns = names; ex.values = labels.map((_, j) => values.map((row) => row[j])); delete ex.series; return null; }
+  // A range is two measures over the members, the low then the high.
+  if (kind === "chart.range") {
+    if (values.length !== 2) return `a range written from measures names two, the low then the high, each over the same members; this names ${values.length}`;
+    ex.categories = labels; ex.low = values[0]; ex.high = values[1];
+    delete ex.series;
+    return null;
+  }
   if (kind === "chart.boxplot") {
     if (values.length !== BOX.length) return `a box plot written from measures names five, in order - ${BOX.join(", ")} - each over the same members; this names ${values.length}`;
     ex.categories = labels;

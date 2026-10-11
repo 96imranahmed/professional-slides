@@ -136,7 +136,8 @@ function assertKnownSlideKeys(slide, id) {
  * `chrome` carries.
  */
 const KINDS = {
-  statement: (slide, { id }) => ({ kind: "statement", text: slide.text || slide.title,
+  // The page is its one sentence: an exhibit written with it was dropped without a word, so it is refused.
+  statement: (slide, { id }) => (slide.exhibit || (slide.exhibits || []).length ? (() => { throw new Error(`${id}: a statement page is its one sentence and draws no exhibit - set the evidence on its own page, or put a photograph behind the sentence as \`image\``); })() : { kind: "statement", text: slide.text || slide.title,
     ...(slide.accent ? { accent: slide.accent } : {}),
     ...(slide.subtext ? { subtext: slide.subtext } : {}),
     ...(slide.tone === "dark" ? { mode: "dark" } : {}) }),

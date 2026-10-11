@@ -1146,6 +1146,71 @@
    ]
   },
   {
+   "id": "f-ranking-range",
+   "type": "ranking",
+   "form": "range",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Five ways of valuing the Coast concession, each a low and a high, so the board sees where they overlap and where the bid sits among them",
+   "settles": {
+    "kind": "comparison",
+    "what": "the Coast concession's value by five methods, low and high, £m"
+   },
+   "adds": "The points say which methods the bid rests on and what would move them",
+   "title": "Every method values the Coast concession between £350m and £520m; our bid sits at £440m",
+   "exhibit": {
+    "heading": "Value of the Coast concession by method",
+    "unit": "£m",
+    "categories": [
+     "Discounted cash flow",
+     "Trading multiples",
+     "Precedent awards",
+     "Bid ladder",
+     "Asset base"
+    ],
+    "low": [
+     410,
+     380,
+     350,
+     420,
+     300
+    ],
+    "high": [
+     520,
+     470,
+     500,
+     480,
+     360
+    ],
+    "highlights": [
+     {
+      "category": "Discounted cash flow"
+     }
+    ],
+    "referenceLines": [
+     {
+      "value": 440,
+      "label": "Our bid £440m"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Cash flow leads",
+     "text": "The discounted cash flow puts the concession at £410m to £520m on the timetable recast, the method the board relies on most."
+    },
+    {
+     "lead": "Market checks",
+     "text": "Trading multiples and the last four awards both bracket the bid, so it is neither the cheapest nor the dearest reading."
+    },
+    {
+     "lead": "A floor, not a price",
+     "text": "The asset base, at £300m to £360m, is what the fleet and depots fetch on their own, and sets the walk-away point."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
+  },
+  {
    "id": "f-composition-stacked-bar",
    "type": "composition",
    "form": "stacked-bar",
@@ -1520,6 +1585,58 @@
      "text": "Six riders in ten agree that stations feel safe, and almost two-thirds that information is clear."
     }
    ]
+  },
+  {
+   "id": "f-composition-radial-bars",
+   "type": "composition",
+   "form": "radial-bars",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Step-free access is a share of each line's stations, each line its own whole, so the arcs are read one by one against a full circle",
+   "settles": {
+    "kind": "share",
+    "what": "stations with step-free access on four lines, share of each line's stations, FY26"
+   },
+   "adds": "The points say where the gap is and what closing it costs",
+   "title": "Step-free access reaches 93% of City stations but only 41% of Dales stations",
+   "exhibit": {
+    "heading": "Stations with step-free access, share of each line's, FY26",
+    "unit": "%",
+    "items": [
+     {
+      "label": "City line",
+      "value": 93
+     },
+     {
+      "label": "Valley line",
+      "value": 77
+     },
+     {
+      "label": "Coast line",
+      "value": 62
+     },
+     {
+      "label": "Dales line",
+      "value": 41,
+      "highlight": true
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "A rural gap",
+     "text": "Thirteen of the Dales line's twenty-two stations have stairs only, most of them single-platform halts built in the 1870s."
+    },
+    {
+     "lead": "Cheap to close",
+     "text": "Ramps rather than lifts would serve nine of the thirteen at about £0.4m each, a third of the cost of a lift at a single-platform halt."
+    },
+    {
+     "lead": "Who it reaches",
+     "text": "The Dales line carries the network's oldest passengers: one in four is over sixty-five, against one in seven across the network as a whole."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {
    "id": "f-relationship-bubble",
@@ -4346,6 +4463,212 @@
    "source": "Source: illustrative data for a fictional operator"
   },
   {
+   "id": "f-mechanism-organization",
+   "type": "mechanism",
+   "form": "organization",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The recast is run by one accountable director with five workstream leads under them, so the board sees who answers for what",
+   "settles": {
+    "kind": "structure",
+    "what": "the timetable recast programme's reporting lines"
+   },
+   "adds": "The points say where each decision is taken",
+   "title": "One director answers for the recast; five leads each own a workstream",
+   "exhibit": {
+    "root": "Programme director",
+    "children": [
+     "Timetable lead",
+     "Crews and rosters lead",
+     "Fleet lead",
+     "Stations lead",
+     "Passenger communications lead"
+    ]
+   },
+   "points": [
+    {
+     "lead": "One owner",
+     "text": "The programme director signs off the timetable, holds the £18m budget and reports to the board each month on cost, dates, risk and the passenger research."
+    },
+    {
+     "lead": "Workstream leads",
+     "text": "Each lead owns a plan, a budget line and a risk log, and meets the director every week from now until the new timetable goes live in May next year."
+    },
+    {
+     "lead": "Escalation",
+     "text": "A lead escalates any change over £250k or a week's delay; the director decides within five working days, and the board hears of each decision, with its cost, at its next meeting."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
+  },
+  {
+   "id": "f-mechanism-placement",
+   "type": "mechanism",
+   "form": "placement",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Twelve capabilities placed under the three domains they serve, the ones the plan builds marked, so the board sees where the gaps fall",
+   "settles": {
+    "kind": "structure",
+    "what": "the operator's twelve capabilities by domain, and the four the plan builds"
+   },
+   "adds": "The points say why the gaps cluster in the passenger domain",
+   "title": "Four of the five capabilities the passenger domain needs are missing",
+   "exhibit": {
+    "columns": [
+     {
+      "label": "Operations"
+     },
+     {
+      "label": "Passenger"
+     },
+     {
+      "label": "Commercial"
+     }
+    ],
+    "items": [
+     {
+      "label": "Timetable planning",
+      "column": 0
+     },
+     {
+      "label": "Crew rostering",
+      "column": 0
+     },
+     {
+      "label": "Fleet maintenance",
+      "column": 0
+     },
+     {
+      "label": "Control and recovery",
+      "column": 0
+     },
+     {
+      "label": "Journey planner",
+      "column": 1,
+      "highlight": true
+     },
+     {
+      "label": "Live seat map",
+      "column": 1,
+      "highlight": true
+     },
+     {
+      "label": "Delay repay",
+      "column": 1
+     },
+     {
+      "label": "Accessibility booking",
+      "column": 1,
+      "highlight": true
+     },
+     {
+      "label": "Customer insight",
+      "column": 1,
+      "highlight": true
+     },
+     {
+      "label": "Fares and pricing",
+      "column": 2
+     },
+     {
+      "label": "Retail and app",
+      "column": 2
+     },
+     {
+      "label": "Partnerships",
+      "column": 2
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "Operations is complete",
+     "text": "All four operational capabilities are in place and were rated mature in the FY26 capability review, two of them for the third year running."
+    },
+    {
+     "lead": "The passenger gap",
+     "text": "Four of the five passenger capabilities are missing or run by hand, which is where the satisfaction scores fall furthest behind the peers."
+    },
+    {
+     "lead": "Build order",
+     "text": "The plan builds the journey planner and the seat map first, since both feed the customer-insight data that accessibility booking and insight itself need."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
+  },
+  {
+   "id": "f-mechanism-insight-tree",
+   "type": "mechanism",
+   "form": "insight-tree",
+   "commentary": "none",
+   "takeaway": false,
+   "why": "The revenue gap breaks into volume and yield, each leaf with the evidence for it and what follows, read across in one table",
+   "settles": {
+    "kind": "structure",
+    "what": "the £24m revenue gap broken into its drivers, with the evidence and implication of each"
+   },
+   "title": "The £24m revenue gap is two-thirds fewer leisure trips and one-third lower yield",
+   "exhibit": {
+    "headers": {
+     "tree": "Revenue gap driver",
+     "insight": "What the evidence shows",
+     "implication": "What follows"
+    },
+    "root": {
+     "id": "root",
+     "label": "Revenue £24m under plan"
+    },
+    "branches": [
+     {
+      "id": "vol",
+      "label": "Fewer journeys (£16m)",
+      "leaves": [
+       {
+        "id": "leis",
+        "label": "Leisure trips",
+        "insight": "Weekend journeys are 12% under plan on the Dales and Valley lines, where Sunday trains run hourly.",
+        "implications": [
+         "Restore the half-hourly Sunday service"
+        ]
+       },
+       {
+        "id": "comm",
+        "label": "Commuter trips",
+        "insight": "Season sales fell by a fifth since FY22 as office days dropped to three a week.",
+        "implications": [
+         "Launch a carnet of eight returns"
+        ]
+       }
+      ]
+     },
+     {
+      "id": "yld",
+      "label": "Lower yield (£8m)",
+      "leaves": [
+       {
+        "id": "mix",
+        "label": "Ticket mix",
+        "insight": "Advance fares grew to 31% of leisure sales from 22%, pulling the average fare down.",
+        "implications": [
+         "Cap advance fares on peak weekends"
+        ]
+       },
+       {
+        "id": "rep",
+        "label": "Delay repay",
+        "insight": "Repay claims doubled after automatic claims began in April, on punctuality that did not change.",
+        "implications": [
+         "Fund punctuality, not repay"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic"
+  },
+  {
    "id": "f-schedule-timeline",
    "type": "schedule",
    "form": "timeline",
@@ -4474,6 +4797,76 @@
    ],
    "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; programme plan, September 2026"
+  },
+  {
+   "id": "f-schedule-rollout",
+   "type": "schedule",
+   "form": "rollout",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Four initiatives rolled out over three years, each row's phase in each year, so the board sees what runs at once",
+   "settles": {
+    "kind": "sequence",
+    "what": "the four growth initiatives' phases, FY27 to FY29"
+   },
+   "adds": "The points say where the years crowd and what that asks of the teams",
+   "title": "All four initiatives run at once in FY28, the year the timetable goes live",
+   "exhibit": {
+    "years": [
+     "FY27",
+     "FY28",
+     "FY29"
+    ],
+    "rows": [
+     {
+      "label": "Timetable recast",
+      "phases": [
+       "Design and shadow running",
+       "Go live",
+       "Tune"
+      ]
+     },
+     {
+      "label": "Flexible fares",
+      "phases": [
+       "Pilot on the City line",
+       "Network launch",
+       "Review"
+      ]
+     },
+     {
+      "label": "Station upgrades",
+      "phases": [
+       "Design",
+       "Build at nine stations",
+       "Build at four more"
+      ]
+     },
+     {
+      "label": "Journey planner",
+      "phases": [
+       "Build",
+       "Launch",
+       "Extend to partners"
+      ]
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "A crowded FY28",
+     "text": "The timetable goes live, fares launch and station building starts in the same year, and all three draw on the same operations team."
+    },
+    {
+     "lead": "Staggering",
+     "text": "Moving the fares launch to FY29 would free the commercial team for the timetable's first six months, at a cost of about £2m in deferred revenue."
+    },
+    {
+     "lead": "What cannot move",
+     "text": "The timetable date is fixed by the franchise; the station work is fixed by the grant's spending window."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {
    "id": "f-numbers-fact-grid",
@@ -4996,6 +5389,43 @@
     }
    ],
    "source": "Illustrations: illustrative drawings for a fictional operator"
+  },
+  {
+   "id": "f-picture-device",
+   "type": "picture",
+   "form": "device",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "The new journey planner is a product passengers see on their phones, so the page shows it as they see it",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the journey planner's destination page as passengers see it"
+   },
+   "adds": "The points say what the planner changes for a passenger and what the pilot showed",
+   "title": "The journey planner sells the day out, not just the ticket",
+   "exhibit": {
+    "device": "phone",
+    "image": {
+     "path": "assets/harbour.jpg",
+     "alt": "The planner's destination page for a harbour day out",
+     "credit": "An illustration drawn for this example"
+    }
+   },
+   "points": [
+    {
+     "lead": "The day out",
+     "text": "Each destination page opens on the place itself, with the walks, the cafés, the last train home and the fare for the day, before any timetable appears."
+    },
+    {
+     "lead": "One price",
+     "text": "The fare shown is the off-peak return for the whole group, so passengers see the price of the whole day before they pick a time to travel."
+    },
+    {
+     "lead": "Early results",
+     "text": "In the twelve-week pilot on the Dales line, three times as many visitors booked from a destination page as from the old timetable search, and they spent a fifth more."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {
    "id": "f-options-table-halves",

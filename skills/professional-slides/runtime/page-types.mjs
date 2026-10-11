@@ -103,16 +103,20 @@ export const PAGE_TYPES = Object.freeze({
     task: "where every member of the set stands on one measure, the subject marked",
     // `boxplot`: each member's spread - its range, middle half and median -
     // where one figure per member would hide how far its values run.
+    // `range`: each member's low to high - the valuation methods of a
+    // football field, a target's band by line - where the middle half is not known.
     forms: { bar: CHART("bar"), column: CHART("column"), lollipop: CHART("lollipop"), dumbbell: CHART("dumbbell"), bullet: CHART("bullet"),
-      distribution: CHART("bar"), "aligned-bars": "aligned-bars", boxplot: CHART("boxplot") },
+      distribution: CHART("bar"), "aligned-bars": "aligned-bars", boxplot: CHART("boxplot"), range: CHART("range") },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1, marked: true, minCategories: 4,
   },
   composition: {
     task: "what a whole is made of, and how the mix differs between members or periods",
     // `pictogram`: a population's share counted in figures - six in ten -
     // for one to five populations, where a percentage reads as precision.
+    // `radial-bars`: a share of each of two to six populations, each its own
+    // whole, as arcs round one centre.
     forms: { "stacked-bar": CHART("stacked-bar"), "stacked-column": CHART("stacked-column"), marimekko: CHART("marimekko"),
-      waffle: CHART("waffle"), donut: CHART("donut"), treemap: CHART("treemap"), pie: CHART("pie"), pictogram: "pictogram" },
+      waffle: CHART("waffle"), donut: CHART("donut"), treemap: CHART("treemap"), pie: CHART("pie"), pictogram: "pictogram", "radial-bars": "radial-bars" },
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
   },
   relationship: {
@@ -157,15 +161,20 @@ export const PAGE_TYPES = Object.freeze({
   },
   mechanism: {
     task: "how a system works: its parts, flows, stages or causes",
-    forms: Object.fromEntries(["flow", "tree", "cycle", "steps", "framework", "layers", "relationship-network", "funnel",
-      "sankey", "quadrants", "matrix", "spectrum", "process", "chevron-process", "zone-matrix", "rank-flow"].map((f) => [f, f])),
+    // `organization`: who reports to whom; `placement`: items set in the
+    // columns they belong to; `insight-tree`: an issue broken into branches,
+    // each leaf's evidence in the table beside it.
+    forms: { ...Object.fromEntries(["flow", "tree", "cycle", "steps", "framework", "layers", "relationship-network", "funnel",
+      "sankey", "quadrants", "matrix", "spectrum", "process", "chevron-process", "zone-matrix", "rank-flow", "organization", "placement"].map((f) => [f, f])),
+      "insight-tree": "insight-tree-table" },
     commentary: [...ANY_TEXT, "on-exhibit", "none"], exhibits: 1,
   },
   schedule: {
     task: "what happens when: phases, milestones, workstreams",
     // `horizons`: the portfolio of bets by when each pays - the core now,
     // growth next, options later - where a timeline would date them as tasks.
-    forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap", horizons: CHART("horizons") },
+    // `rollout`: initiatives row by row, each one's phase in each year.
+    forms: { timeline: "timeline", gantt: "gantt", roadmap: "roadmap", horizons: CHART("horizons"), rollout: "initiative-rollout" },
     commentary: ["beside", "below", "so-what-bar", "none"], exhibits: 1,
   },
   numbers: {
@@ -199,7 +208,8 @@ export const PAGE_TYPES = Object.freeze({
   },
   picture: {
     task: "what the subject looks like: an aircraft, a site, a product",
-    forms: { "picture-hero": "picture-hero", "picture-pair": "picture-pair", "picture-strip": "picture-strip", "photo-backdrop": "photo-backdrop" },
+    // `device`: a product as its user sees it - a screenshot in its phone, tablet or laptop frame.
+    forms: { "picture-hero": "picture-hero", "picture-pair": "picture-pair", "picture-strip": "picture-strip", "photo-backdrop": "photo-backdrop", device: "device-frame" },
     commentary: ["captions", "beside", "below"], exhibits: [0, 1],
   },
   options: {
@@ -396,7 +406,8 @@ export const numberMarked = (ex) => NUMBER_MARKS.some((key) => (Array.isArray(ex
 // The deck-level median (variety_gates.mjs EVIDENCE_DEPTH) holds the rest.
 export const EVIDENCE_FLOOR = Object.freeze({ chart: 8, bridge: 5 });
 const CHART_TYPES = ["trend", "ranking", "composition", "relationship", "bridge"];
-const WHOLE_PARTS = ["pie", "donut", "treemap", "waffle", "pictogram"];
+// Radial bars, like the pictogram, set a share of each of a few populations, each its own whole.
+const WHOLE_PARTS = ["pie", "donut", "treemap", "waffle", "pictogram", "radial-bars"];
 const isChartExhibit = (ex) => /^chart[.-]/.test(String(ex?.type ?? ""));
 /** Is this a chart page: a chart type, or panels that carry a chart? */
 export const chartPage = (type, exhibits) => CHART_TYPES.includes(type) || (type === "panels" && exhibits.some(isChartExhibit));
@@ -489,17 +500,21 @@ const MINIMUM = Object.freeze({
     ? (ex.rows || []).length >= 1 || "a pictogram counts a share of each population in figures - `rows`, each { label, value } out of `of` (10 or 20)"
     : form === "waffle"
     ? ((ex.series || []).length === 1 && (ex.categories || []).length >= 2) || "a waffle counts the members of each part - `categories` for the parts and one series of whole counts"
+    : form === "radial-bars"
+    ? ((ex.items || []).length >= 2 || "radial bars set a share of each of two to six populations, each `{ label, value }` out of 100")
     : ["pie", "donut", "treemap"].includes(form)
     ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
     : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
   schedule: (ex, form) => form === "gantt" ? true : form === "horizons" ? (ex.horizons || []).length >= 2 || "the horizons are two to five bets, each { label, title, description } in the order they pay"
+    : form === "rollout" ? ((ex.rows || []).length >= 2 && (ex.years || []).length >= 3) || "a rollout runs two or more initiatives across three or more years, each row `{ label, phases }` a phase a year"
     : SCHEDULE_PARTS[ex.variant] ? SCHEDULE_PARTS[ex.variant](ex)
     : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items ({ date | period, label, text }), or pair it with the evidence behind them as panels",
   parallel: (ex) => (ex.items || []).length >= 3 || "three or more parallel ideas",
   // A decision tree holds exactly two branches (its renderer's limit), so its
   // parts are the conclusions under them; a rank flow's are its `entities`.
   mechanism: (ex, form) => (form === "tree" ? (ex.branches || []).flatMap((b) => b?.conclusions || []).length >= 3
-    : ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows", "entities"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3)) || "a mechanism has three or more parts",
+    : form === "insight-tree" ? (ex.branches || []).flatMap((b) => b?.leaves || []).length >= 3
+    : ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows", "entities", "fields", "children"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3)) || "a mechanism has three or more parts",
   relationship: (ex) => (ex.points || ex.rows || []).length >= 5 || "a relationship needs five or more members to show one",
   bridge: (ex) => (ex.categories || []).length >= 4 || "a bridge has a start, two or more steps and an end",
 });
@@ -546,9 +561,12 @@ export function plannableForms(type) {
   const built = ([, target]) => Boolean(CONSTRUCTION_DATA[target]);
   return forms.filter((entry, at) => at === 0 || !(FORM_DATA[`${type}/${entry[0]}`] || (built(entry) && !built(forms[0])))).map(([form]) => form);
 }
+const sampleKeys = (exhibitType) => { const sample = REGISTRY.get(exhibitType)?.sample; return sample ? Object.keys(sample).filter((key) => !STYLING.has(key)) : []; };
 export function dataKeys(exhibitType, { type, form, variant } = {}) {
   // A variant with its own sample reads that sample's data, not the default's:
   // a phase roadmap has phases and no `items`.
+  // An organization set by hand reads `nodes` and `connectors`, which its sample, the automatic layout, does not carry.
+  if (exhibitType === "organization" && !variant) return [...(sampleKeys("organization")), "nodes"];
   const own = variant && REGISTRY.get(exhibitType)?.variants?.[variant]?.props;
   if (own && Object.keys(own).some((key) => own[key] !== undefined && !STYLING.has(key)))
     return Object.keys(own).filter((key) => own[key] !== undefined && !STYLING.has(key));
@@ -1445,11 +1463,12 @@ const formDraws = (type, form) => {
   if (["mechanism", "schedule", "composition", "profiles"].includes(type)) return target;
   if (type === "parallel" && form !== "labelled-rows") return target;
   if (type === "numbers" && ["fact-grid", "stat-list"].includes(form)) return target;
+  if (type === "picture" && form === "device") return "device-frame";
   return type === "place" ? "map" : type === "statement" && form === "quotes" ? "quote-cluster" : type === "options" && form === "compare" ? "compare" : null;
 };
 // How many exhibits a page of each construction carries when its own are not written yet.
 const declaredExhibits = (type, form) => (trellisPage(type, form) ? 1 : type === "panels" || (type === "options" && form !== "compare") ? 2
-  : type === "picture" ? (form === "photo-backdrop" ? 1 : 0) : ["argument", "summary", "matrix"].includes(type) || form === "labelled-rows" || form === "statement" ? 0 : 1);
+  : type === "picture" ? (["photo-backdrop", "device"].includes(form) ? 1 : 0) : ["argument", "summary", "matrix"].includes(type) || form === "labelled-rows" || form === "statement" ? 0 : 1);
 
 /** An exhibit a spine declares and has not drawn: nothing but its `basis`, its `type`, or neither. */
 export const undrawnExhibit = (ex) => Boolean(ex) && typeof ex === "object" && Object.keys(ex).every((key) => key === "type" || key === "basis");
@@ -1636,7 +1655,10 @@ function typedSlide(page, id, type, players) {
     if (!(slide.exhibit.columns || []).some((c) => c && typeof c === "object" && c.type === "logo"))
       throw new Error(`${id}: a logo table introduces each player by its mark - give it a \`type: "logo"\` column`);
   }
-  if (page.type === "picture") {
+  if (page.type === "picture" && page.form === "device") {
+    if (!exhibits.length) throw new Error(`${id}: a device page carries its \`exhibit\` - { device, image } - the screenshot in its frame`);
+    setType(slide.exhibit ?? slide.exhibits[0], "device-frame");
+  } else if (page.type === "picture") {
     if (page.form === "photo-backdrop" ? !(page.photo && exhibits.length) : !(page.pictures || []).length)
       throw new Error(`${id}: ${page.form === "photo-backdrop" ? "a photo-backdrop page carries a `photo` and one exhibit" : `a ${page.form} page carries its \`pictures\``}`);
   }
@@ -2009,7 +2031,7 @@ function layOutPage({ page, id, type, slide, target, exhibits, setType, primary,
     else if (page.form === "metric-strip") { if (!(page.metrics || []).length) throw new Error(`${id}: a metric strip carries \`metrics\``); slide.layout = "metrics-over-exhibit"; }
     else slide.layout = layoutFor[page.commentary] ?? "exhibit-full";
   } else if (page.type === "picture") {
-    slide.layout = target;
+    slide.layout = page.form === "device" ? layoutFor[page.commentary] ?? "exhibit-full" : target;
   } else if (page.type === "parallel" && page.form === "labelled-rows") {
     slide.layout = target;
   } else if (page.type === "options") {
@@ -2036,7 +2058,11 @@ function layOutPage({ page, id, type, slide, target, exhibits, setType, primary,
     if (page.panel && proseBeside && (page.paragraphs || []).length && panelWords < PANEL_WORDS_MIN)
       throw new Error(`${id}: the panel takes the width the prose leaves - over half the page - and ${panelWords} words set a column of tint that is mostly empty. Give it what the reader keeps beside the reasoning - the figures, the conditions, the decision and its cost, as the argument states them - in ${PANEL_WORDS_MIN} words or more; or, with no more to hold, set the page as a sidebar beside its evidence (an exhibit or points), where the panel keeps a third of the row`);
   } else if (page.type === "statement") {
-    if (page.form === "statement") { slide.kind = "statement"; if (!page.text) throw new Error(`${id}: a statement page carries its \`text\``); }
+    if (page.form === "statement") {
+      slide.kind = "statement"; if (!page.text) throw new Error(`${id}: a statement page carries its \`text\``);
+      // A statement page is its sentence: an exhibit written with it was dropped without a word.
+      if (exhibits.length) throw new Error(`${id}: a statement page is its one sentence, and draws no exhibit - set the evidence on its own page, or put a photograph behind the sentence as \`image\``);
+    }
     else { if (!primary) throw new Error(`${id}: a quotes page carries a quote-cluster exhibit`); setType(primary, "quote-cluster"); }
   } else if (page.type === "summary") {
     if (page.form === "executive-summary") { slide.role = "executive-summary"; if (!points) throw new Error(`${id}: an executive summary carries its developed \`points\``); }

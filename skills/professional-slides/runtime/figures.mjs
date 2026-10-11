@@ -450,9 +450,20 @@ export function placementLayout(frame, props) {
   return { columns, heads, stacks, width, inner, gap, headHeight, pillGap, height: headHeight + v("space.3") + stackHeight };
 }
 
+const PLACEMENT_TILE_GROW = 2.5;
 export function placementNodes({ id, frame, props }) {
   const L = placementLayout(frame, props);
   if (L.height > frame.height + 0.01) throw new Error(`The placement grid needs ${Math.ceil(L.height)}px and has ${Math.floor(frame.height)}px; place fewer items`);
+  // One tile height across the grid, the tallest label's, grown so the
+  // longest column fills its well: tiles pinned to the top of tall wells left
+  // a grey band across the foot of the page. Past two and a half times its
+  // label a tile reads as a box with a word in it, and the rest stays well.
+  const natural = Math.max(...L.stacks.flat().map((p) => p.m.height + 2 * v("space.2")));
+  const most = Math.max(...L.stacks.map((stack) => stack.length));
+  const room = frame.height - L.headHeight - 2 * v("space.3") - L.pillGap * (most - 1);
+  // Where the tallest label repeated down the longest column would not fit, each tile keeps its own label's height.
+  const uniform = natural <= room / most;
+  const tileOf = (p) => (uniform ? Math.min(room / most, natural * PLACEMENT_TILE_GROW) : p.m.height + 2 * v("space.2"));
   const out = [];
   L.columns.forEach((col, c) => {
     const x = frame.x + c * (L.width + L.gap), cid = stableId(id, "column", c), head = L.heads[c];
@@ -464,10 +475,10 @@ export function placementNodes({ id, frame, props }) {
     out.push(fillRect(stableId(cid, "well"), "placement-well", { x, y: frame.y + L.headHeight, width: L.width, height: frame.height - L.headHeight }, MUTED));
     let y = frame.y + L.headHeight + v("space.3");
     L.stacks[c].forEach((p, i) => {
-      const h = p.m.height + 2 * v("space.2"), pid = stableId(cid, "item", i);
-      out.push(fillRect(stableId(pid, "pill"), "placement-item", { x: x + v("space.2"), y, width: L.width - 2 * v("space.2"), height: h }, p.item.highlight ? ACCENT : WHITE, { stroke: p.item.highlight ? "none" : RULE, radius: "radius.small" }));
-      out.push(label(stableId(pid, "label"), "placement-item-label", { x: x + v("space.3"), y: y + v("space.2"), width: L.inner }, p.m, style("type.compact", p.item.highlight ? WHITE : INK, p.item.highlight, "center")));
-      y += h + L.pillGap;
+      const pid = stableId(cid, "item", i), tile = tileOf(p);
+      out.push(fillRect(stableId(pid, "pill"), "placement-item", { x: x + v("space.2"), y, width: L.width - 2 * v("space.2"), height: tile }, p.item.highlight ? ACCENT : WHITE, { stroke: p.item.highlight ? "none" : RULE, radius: "radius.small" }));
+      out.push(label(stableId(pid, "label"), "placement-item-label", { x: x + v("space.3"), y: y + (tile - p.m.height) / 2, width: L.inner }, p.m, style("type.compact", p.item.highlight ? WHITE : INK, p.item.highlight, "center")));
+      y += tile + L.pillGap;
     });
   });
   return out;

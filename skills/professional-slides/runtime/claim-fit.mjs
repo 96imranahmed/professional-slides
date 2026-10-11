@@ -164,6 +164,9 @@ export const CARRIERS = Object.freeze([
     carries: { profile: D, pair: W }, needs: (p) => first(overMembers(p), need(within(p.series, 2, 4), "two to four measures")) },
   { type: "ranking", form: "boxplot", kind: "chart.boxplot", bound: "boxes: { min, q1, median, q3, max }, a measure each over the same members",
     carries: { spread: D }, needs: (p) => first(overMembers(p), need(p.spread, "five measures named min, q1, median, q3 and max"), need(p.labels <= 12, "twelve members at most")) },
+  // Each member's low and high where its middle half is not known: a football field's methods, a band by line.
+  { type: "ranking", form: "range", kind: "chart.range", bound: "series: [{ measure }], the low then the high, over the same members",
+    carries: { spread: (p) => (p.series === 2 ? D : GRADE.none) }, needs: (p) => first(overMembers(p, 3), need(p.series === 2, "a low and a high for each member")) },
   // --- composition ---------------------------------------------------------
   { type: "composition", form: "stacked-bar", kind: "chart.stacked-bar", bound: "series: [{ measure }], one a part, over the wholes",
     // Rows read down a list of members. Dates read left to right: the mix of one whole at two or three dates is a column a date,
@@ -188,6 +191,9 @@ export const CARRIERS = Object.freeze([
     carries: { "part-of-whole": D }, needs: (p) => first(overMembers(p, 2), oneSeries(p), need(p.labels <= 5, "five parts at most"), need(p.positive, "every part above zero")) },
   { type: "composition", form: "pictogram", kind: "pictogram", shows: "a population share read as figures - six in ten - for one to five populations",
     carries: { "share-of-each": D }, needs: (p) => first(need(p.axis === "members" && p.labels <= 5, "one to five populations"), oneSeries(p), need(p.percent, "a percentage of each population")) },
+  // A share of each of a few populations as arcs round one centre: the pictogram's task for figures that are not counted heads.
+  { type: "composition", form: "radial-bars", kind: "radial-bars", shows: "a share of each of two to six populations, each its own whole, as arcs round one centre",
+    carries: { "share-of-each": D }, needs: (p) => first(need(p.axis === "members" && within(p.labels, 2, 6), "two to six populations"), oneSeries(p), need(p.percent, "a percentage of each population")) },
   // --- relationship --------------------------------------------------------
   { type: "relationship", form: "scatter", kind: "chart.scatter", bound: "points: { x: \"<ref>\", y: \"<ref>\" }, two measures over the same members",
     carries: { relationship: D, profile: (p) => (p.series === 2 ? W : GRADE.none), pair: W }, needs: (p) => first(overMembers(p, 5), need(p.series === 2, "exactly two measures")) },
@@ -251,8 +257,10 @@ export const CARRIERS = Object.freeze([
     "mechanism/spectrum": "a position between two poles, or a judged grade on a named scale", "mechanism/process": "a sequence of steps",
     "mechanism/chevron-process": "a sequence of stages, each with its detail", "mechanism/zone-matrix": "things placed on two axes, by zone",
     "mechanism/rank-flow": "rank movement across periods",
+    "mechanism/organization": "who reports to whom: one accountable role and the layers under it", "mechanism/placement": "items set in the columns they belong to",
+    "mechanism/insight-tree": "an issue broken into branches, each leaf's evidence in the table beside it",
     "schedule/timeline": "dated milestones", "schedule/gantt": "durations and overlaps across workstreams", "schedule/roadmap": "stages, when each runs and what it delivers",
-    "schedule/horizons": "a portfolio of bets by when each pays",
+    "schedule/horizons": "a portfolio of bets by when each pays", "schedule/rollout": "initiatives rolled out year by year, each row's phase in each year",
     "panels/dashboard": "several measures of one subject read together at a glance: a hero exhibit with its satellites, figures over a grid of a chart, a table and a map",
     "parallel/cards": "three to six parallel ideas, an icon each", "parallel/capsules": "three to six parallel ideas in a line", "parallel/arrow-rows": "parallel ideas read down, each leading to its consequence",
     "parallel/labelled-rows": "a point per area, each with its evidence",
@@ -260,6 +268,7 @@ export const CARRIERS = Object.freeze([
     "profiles/cards": "each player or product on a card", "profiles/radar": "each player's profile across three to eight attributes on one scale",
     "place/map": "where things are: a network, a footprint, a regional pattern",
     "picture/picture-hero": "one thing worth seeing", "picture/picture-pair": "two things worth seeing side by side", "picture/picture-strip": "a run of pictures", "picture/photo-backdrop": "an exhibit over its subject's photograph",
+    "picture/device": "a product as its user sees it, in its device frame",
     "options/compare": "two options compared on the same terms", "options/table-halves": "two or three options compared row by row", "options/two-up": "the case for each of two options, each with its exhibit",
     "argument/memo": "a developed argument in prose", "argument/sidebar": "an argument with its claim set beside it",
     "statement/statement": "one sentence the deck turns on", "statement/quotes": "what people said",
@@ -435,7 +444,9 @@ export function exhibitRefs(ex) {
   const named = (node) => (typeof node === "string" ? [node] : Array.isArray(node) ? node.flatMap(named) : node && typeof node === "object" && node.measure !== undefined ? named(node.measure) : []);
   const object = (node) => (node && typeof node === "object" && !Array.isArray(node) ? Object.values(node).flatMap((value) => (typeof value === "string" ? [value] : named(value))) : []);
   const basis = ex.basis && typeof ex.basis === "object" ? [...(Array.isArray(ex.basis.measures) ? ex.basis.measures : []), ...(typeof ex.basis.measure === "string" ? [ex.basis.measure] : [])] : [];
-  return [...new Set([...(Array.isArray(ex.series) ? ex.series.flatMap(named) : []), ...named(ex.measure === undefined ? [] : [ex.measure]), ...object(ex.points), ...object(ex.boxes),
+  // A range's low and high, where they name measures rather than carry values.
+  const bound = (end) => (typeof end === "string" || (end && typeof end === "object" && !Array.isArray(end)) ? named(end) : []);
+  return [...new Set([...(Array.isArray(ex.series) ? ex.series.flatMap(named) : []), ...named(ex.measure === undefined ? [] : [ex.measure]), ...object(ex.points), ...object(ex.boxes), ...bound(ex.low), ...bound(ex.high),
     ...(ex.targets && !Array.isArray(ex.targets) ? named(ex.targets) : []), ...(ex.bridge && typeof ex.bridge === "object" ? [ex.bridge.from, ex.bridge.to, ...[].concat(ex.bridge.steps ?? [])].flatMap(named) : []),
     ...(Array.isArray(ex.items) ? ex.items.flatMap(named) : []), ...basis].filter((ref) => typeof ref === "string").map((ref) => ref.trim()))];
 }

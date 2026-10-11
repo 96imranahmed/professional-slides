@@ -4,6 +4,7 @@
 // journey, the tree and the organisation chart.
 import { token, tokenValue, ellipsePrimitive, rectPrimitive, stableId, textPrimitive, insetFrame, shapePrimitive, houseStyle, readableOn } from "./core.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
+import { contrastRatio } from "./color.mjs";
 import { routeConnector } from "./routing.mjs";
 import { renderPhaseWorkstreams, measurePhaseWorkstreams, PHASE_WORKSTREAM_TOKENS, PHASE_WORKSTREAM_VARIANTS } from "./phase-workstreams.mjs";
 import { renderPhaseHierarchy, QUALITATIVE_TOPOLOGY_TOKENS, PHASE_HIERARCHY_SAMPLE } from "./qualitative-topology.mjs";
@@ -89,6 +90,7 @@ function processNodes({ id, frame, props, roadmap = false, journey = false }) {
   return nodes;
 }
 
+const ORG_TIER_GAP_MAX = 120;
 function treeNodes({ id, frame, props, organization = false }) {
   if (organization && Array.isArray(props.nodes)) {
     const nodeFrames = new Map(props.nodes.map((node) => [node.id, {
@@ -138,24 +140,47 @@ function treeNodes({ id, frame, props, organization = false }) {
     return nodes;
   }
   const nodes = [];
-  const root = { x: frame.x + frame.width / 2 - 90, y: frame.y + 14, width: 180, height: 58 };
+  // An organization's two tiers stand a bounded gap apart, centred in the
+  // frame, joined by a bus as reporting lines are drawn; the gap past that
+  // reads as two charts, and a pair of tiers pinned to the frame's top left
+  // the lower third of a page empty.
+  const tierGap = organization ? Math.min(ORG_TIER_GAP_MAX, Math.max(48, frame.height * 0.3)) : null;
+  const top = organization ? frame.y + Math.max(0, (frame.height - (58 + tierGap + 74)) / 2) : frame.y + 14;
+  const root = { x: frame.x + frame.width / 2 - 90, y: top, width: 180, height: 58 };
   nodes.push(rectPrimitive({ id: stableId(id, "root"), role: organization ? "organization-root" : "tree-root", frame: root, style: boxStyle(PRIMARY, PRIMARY, STANDARD, SMALL_RADIUS) }));
-  nodes.push(textPrimitive({ id: stableId(id, "root-text"), role: "node-label", frame: insetFrame(root, 8), text: props.root, style: textStyle(COMPACT, WHITE, true, "center") }));
+  const rootBox = insetFrame(root, 8), rootLayout = measureText(String(props.root), rootBox.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true, wrapWidthRatio: ENGINE_RESERVE });
+  if (rootLayout.height > rootBox.height) throw new Error(`The root role "${props.root}" needs ${Math.ceil(rootLayout.height)}px and its box holds ${Math.floor(rootBox.height)}px; shorten it`);
+  nodes.push(textPrimitive({ id: stableId(id, "root-text"), role: "node-label", frame: { ...rootBox, y: rootBox.y + (rootBox.height - rootLayout.height) / 2, height: rootLayout.height }, text: rootLayout.text, style: { ...textStyle(COMPACT, WHITE, true, "center", "top"), lineHeight: rootLayout.lineHeight, wrap: false }, data: { textLayout: rootLayout } }));
   const span = frame.width / props.children.length;
+  const childY = organization ? root.y + root.height + tierGap : frame.y + frame.height * 0.52, busY = (root.y + root.height + childY) / 2;
+  if (organization) {
+    const centres = props.children.map((_, index) => frame.x + span * index + span / 2);
+    nodes.push(openLine(stableId(id, "connector", "stem"), root.x + root.width / 2, root.y + root.height, root.x + root.width / 2, busY, "tree-connector", SECONDARY, HAIRLINE));
+    nodes.push(openLine(stableId(id, "connector", "bus"), Math.min(...centres), busY, Math.max(...centres), busY, "tree-connector", SECONDARY, HAIRLINE));
+  }
   props.children.forEach((child, index) => {
-    const childFrame = { x: frame.x + span * index + 18, y: frame.y + frame.height * 0.52, width: span - 36, height: 74 };
+    const childFrame = { x: frame.x + span * index + 18, y: childY, width: span - 36, height: 74 };
     const centerX = childFrame.x + childFrame.width / 2;
-    nodes.push(openLine(stableId(id, "connector", index), root.x + root.width / 2, root.y + root.height, centerX, childFrame.y, "tree-connector", SECONDARY, HAIRLINE));
+    if (organization) nodes.push(openLine(stableId(id, "connector", index), centerX, busY, centerX, childFrame.y, "tree-connector", SECONDARY, HAIRLINE));
+    else nodes.push(openLine(stableId(id, "connector", index), root.x + root.width / 2, root.y + root.height, centerX, childFrame.y, "tree-connector", SECONDARY, HAIRLINE));
     nodes.push(rectPrimitive({ id: stableId(id, "child", index), role: organization ? "organization-node" : "tree-node", frame: childFrame, style: boxStyle(index === 0 ? PRIMARY_TINT : SURFACE, RULE, HAIRLINE, SMALL_RADIUS) }));
-    nodes.push(textPrimitive({ id: stableId(id, "child-text", index), role: "node-label", frame: insetFrame(childFrame, 8), text: child, style: textStyle(COMPACT, INK, true, "center") }));
+    // Measured where it wraps, so its lines are the ones the box holds.
+    const box = insetFrame(childFrame, 8), layout = measureText(String(child), box.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true, wrapWidthRatio: ENGINE_RESERVE });
+    if (layout.height > box.height) throw new Error(`Organization role "${child}" needs ${Math.ceil(layout.height)}px and its box holds ${Math.floor(box.height)}px; shorten the role`);
+    nodes.push(textPrimitive({ id: stableId(id, "child-text", index), role: "node-label", frame: { ...box, y: box.y + (box.height - layout.height) / 2, height: layout.height }, text: layout.text, style: { ...textStyle(COMPACT, INK, true, "center", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
   });
   return nodes;
 }
 
+// A row named by a code (A, B, 1) takes the disc; a row named in words takes
+// a column of its own, as wide as its longest name allows, the disc dropped.
+const ROLLOUT_CODE_CHARS = 3, ROLLOUT_LABEL_MAX = 200;
 function initiativeRolloutNodes({ id, frame, props }) {
   const years = props.years || ["20xx", "20xx", "20xx"];
   const rows = props.rows || [];
-  const labelWidth = 72;
+  const named = rows.some((row) => String(row.label ?? "").length > ROLLOUT_CODE_CHARS);
+  const labelLayout = (row, width) => measureText(String(row.label ?? ""), width, { fontSize: tokenValue(token("type.heading")), bold: true, wrapWidthRatio: ENGINE_RESERVE });
+  const labelWidth = named ? Math.min(ROLLOUT_LABEL_MAX, Math.max(...rows.map((row) => Math.ceil(labelLayout(row, ROLLOUT_LABEL_MAX).width))) + tokenValue(token("space.4"))) : 72;
   const contentX = frame.x + labelWidth;
   const contentWidth = frame.width - labelWidth;
   const span = contentWidth / years.length;
@@ -171,13 +196,20 @@ function initiativeRolloutNodes({ id, frame, props }) {
   const fills = [INK, token("color.chartSeries2"), MUTED_SURFACE];
   rows.forEach((row, rowIndex) => {
     const y = rowsTop + rowIndex * (rowHeight + rowGap);
-    const markerSize = Math.min(48, rowHeight * 0.68);
-    nodes.push(ellipsePrimitive({ id: stableId(id, "row-marker", rowIndex), role: "rollout-row-marker", frame: { x: frame.x + (labelWidth - markerSize) / 2, y: y + (rowHeight - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
-    nodes.push(textPrimitive({ id: stableId(id, "row-label", rowIndex), role: "rollout-row-label", frame: { x: frame.x + (labelWidth - markerSize) / 2, y: y + (rowHeight - markerSize) / 2, width: markerSize, height: markerSize }, text: row.label, style: textStyle(token("type.heading"), WHITE, true, "center") }));
+    if (named) {
+      const layout = labelLayout(row, labelWidth - tokenValue(token("space.4")));
+      if (layout.height > rowHeight) throw new Error(`Rollout row "${row.label}" needs ${Math.ceil(layout.height)}px and each row has ${Math.floor(rowHeight)}px; shorten the name or give the rollout more height`);
+      nodes.push(textPrimitive({ id: stableId(id, "row-label", rowIndex), role: "rollout-row-label", frame: { x: frame.x, y: y + (rowHeight - layout.height) / 2, width: labelWidth - tokenValue(token("space.4")), height: layout.height }, text: layout.text, style: { ...textStyle(token("type.heading"), INK, true, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout } }));
+    } else {
+      const markerSize = Math.min(48, rowHeight * 0.68);
+      nodes.push(ellipsePrimitive({ id: stableId(id, "row-marker", rowIndex), role: "rollout-row-marker", frame: { x: frame.x + (labelWidth - markerSize) / 2, y: y + (rowHeight - markerSize) / 2, width: markerSize, height: markerSize }, style: boxStyle(PRIMARY, PRIMARY, HAIRLINE, token("radius.round")) }));
+      nodes.push(textPrimitive({ id: stableId(id, "row-label", rowIndex), role: "rollout-row-label", frame: { x: frame.x + (labelWidth - markerSize) / 2, y: y + (rowHeight - markerSize) / 2, width: markerSize, height: markerSize }, text: row.label, style: textStyle(token("type.heading"), WHITE, true, "center") }));
+    }
     years.forEach((_, phaseIndex) => {
       const x = contentX + phaseIndex * span;
       const cell = row.phases?.[phaseIndex] || "";
-      const dark = phaseIndex < 2;
+      // The label reverses where the phase's fill is dark enough to carry white, whichever design sets the fill.
+      const dark = contrastRatio(tokenValue(fills[phaseIndex % fills.length]), tokenValue(WHITE)) >= 4.5;
       nodes.push(shapePrimitive({ id: stableId(id, "phase", rowIndex, phaseIndex), role: "rollout-phase", geometry: "chevron", frame: { x: x + 2, y, width: span + (phaseIndex < years.length - 1 ? 10 : -2), height: rowHeight }, style: boxStyle(fills[phaseIndex % fills.length], SURFACE, STANDARD, token("radius.none")) }));
       nodes.push(textPrimitive({ id: stableId(id, "phase-label", rowIndex, phaseIndex), role: "rollout-phase-label", frame: { x: x + 30, y: y + 6, width: span - 50, height: rowHeight - 12 }, text: cell, style: textStyle(LABEL, dark ? WHITE : INK, false, "center") }));
     });

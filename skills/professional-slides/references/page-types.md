@@ -131,21 +131,21 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | Type | Reading task | Forms |
 | --- | --- | --- |
 | `trend` | a measure over four or more periods, its rate or break marked | line, column, stacked-column, area, stacked-area, combo, slope, indexed, sparklines, model |
-| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet, distribution, aligned-bars, boxplot |
-| `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie, pictogram |
+| `ranking` | the whole set on one measure, the subject marked | bar, column, lollipop, dumbbell, bullet, distribution, aligned-bars, boxplot, range |
+| `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie, pictogram, radial-bars |
 | `relationship` | two measures across the members | scatter, bubble, bubble-grid |
 | `bridge` | what a change between totals is made of | waterfall |
 | `panels` | one question for two to four cuts, side by side; five to twelve as small multiples; several measures of one subject at a glance as a dashboard; one mark of an overview broken out | row, grid, stack, sequence, small-multiples, dashboard, breakout |
 | `scorecard` | members judged against criteria, cells coded | harvey, heatmap, rag, lights, check, bars, progress, dot, trend, binary |
 | `lookup` | measures to look up under their units | measure-table, table |
 | `matrix` | findings down the side, evidence across | findings-matrix |
-| `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, ... |
-| `schedule` | what happens when | timeline, gantt, roadmap, horizons |
+| `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, organization, placement, insight-tree, ... |
+| `schedule` | what happens when | timeline, gantt, roadmap, horizons, rollout |
 | `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list |
 | `parallel` | three to six parallel ideas (give each card an `icon` for icon columns; cards with no icon take their tone from how they relate, as a model reads their titles: categories or options under a filled band, steps under large numerals, a ranked or counted set numbered) | cards, capsules, arrow-rows, labelled-rows |
 | `profiles` | who the players are, with their marks (a logo, a place's outline or a photograph, as each declares) | logos, people, logo-table, cards, radar |
 | `place` | where things are ([Geography](geography.md)) | map |
-| `picture` | what the subject looks like | picture-hero, picture-pair, picture-strip, photo-backdrop |
+| `picture` | what the subject looks like | picture-hero, picture-pair, picture-strip, photo-backdrop, device |
 | `options` | options compared on the same terms | compare, table-halves, two-up |
 | `argument` | reasoning in prose | memo, sidebar |
 | `statement` | one sentence, or the voices behind it | statement, quotes |
@@ -165,7 +165,26 @@ These forms narrow their type's commentary placements and carry checks of their 
 | `panels/small-multiples` | one question for five to twelve cuts - each region's trend, each line's punctuality - as one trellis of small charts of one kind on one scale, where four panels stop | one exhibit: `mark` (`column`, `bar` or `line`), `categories` (the shared axis), `items` (5 to 12, each `{ label, values, focus?, reference? }`), `highlights` naming the subject's panel, `reference` (`"average"` or a value), `scale` (`shared` or `own`), `rowLabels` and `columnLabels` for a grid read both ways | `beside`, `beside-left`, `below`, `rail`, `so-what-bar`, `none`; no captions | fewer than five panels (a row or grid of headed panels); more than one exhibit; panels too small to read at the page's size |
 | `panels/dashboard` | several measures of one subject read together: a hero chart with its satellites, a map beside a table, figures over a grid | `exhibits` (2 to 6, each with its `heading`, of any kind - a chart, a table, a map, a `panel` of text, a `metric` - and an `area` `{ column, row, columnSpan, rowSpan }`, counted from 1; one with no area takes the next free cell), `grid` `{ columns, rows }` (a count or weights such as `[2, 1]`; four columns and three rows at most, two rows under a strip), `metrics` (an optional strip of 2 to 6 figures over the grid) | `none`, `rail` (a boxed column at the right), `so-what-bar` | a cell with no heading; areas that overlap or leave the grid; more exhibits than free cells; three rows under a strip; a cell too small for what it holds (composition names the exhibit and the pixels it lacks) |
 | `panels/breakout` | what one bar, column or segment of an overview is made of, read with the whole it belongs to: the mark fanned out to the panel that splits it | two `exhibits` - the overview first (`chart.column`, `chart.bar` or a stacked one) and the detail beside it - and `breakout: { from: { exhibit: 0, category, series? }, to: 1 }`; the detail is drawn on its own scale, so the fan opens to it, and the mark is lit unless the overview already marks something | the panels' choices | a mark the fan would cross or enclose another bar on its way out (break out the last column, the longest bar or a segment of one stack); a detail to the left of its overview; a chart that draws no bars |
+| `ranking/range` | each member's low to high where its middle half is not known: the methods of a valuation football field, a target band by line | `categories` (3 or more members), `low` and `high` (one each per member, written from two measures in that order), `referenceLines` for the bid or target | the type's choices | a low above its high; fewer than three members |
+| `composition/radial-bars` | a share of each of two to six populations, each its own whole, as arcs round one centre | `items` (2 to 6, each `{ label, value }` out of 100, `highlight` on the subject); not held to the evidence floor, as a pictogram is not | the type's choices | a share past 100; more than six arcs |
+| `mechanism/organization` | who reports to whom: one accountable role and the layer under it | `root` and `children` (three or more roles), or `nodes` and `connectors` for deeper charts set by hand | the type's choices | a role longer than its box holds |
+| `mechanism/placement` | items set in the columns they belong to - a capability map's tiles under its domains, the ones to build marked | `columns` (2 to 5), `items` (each `{ label, column, highlight? }`, 30 at most); tiles take one height, grown to fill the longest column | the type's choices | an item naming a column that is not there |
+| `mechanism/insight-tree` | an issue broken into branches, each leaf's evidence and what follows set in the table beside it | `headers`, `root`, `branches` (each with `leaves`, three or more leaves in all, each `{ label, insight, implications }`) | the type's choices | a frame narrower than about 840px |
+| `schedule/rollout` | initiatives rolled out year by year, each row's phase in each year | `years` (3 or more), `rows` (2 or more, each `{ label, phases }`, a phase a year); a row named in words takes a column of its own, a code (A, 1) a disc | the type's choices | a row name too tall for its row |
+| `picture/device` | a product as its user sees it: a screenshot in its phone, tablet or laptop frame | one `exhibit` `{ device, image: { path, alt, credit } }` | `captions`, `beside`, `below` | no screenshot to frame |
 | `schedule/horizons` | the portfolio of bets by when each pays - the core now, growth next, options later | `horizons` (2 to 5, each `{ label, title, description }`, in the order they pay), `variant` (`curves`, `stepped`, `stepped-minimal`, `stepped-bands`) | `beside`, `below`, `so-what-bar`, `none` | fewer than two horizons |
+
+**Components without a page form.** Seven components are strips, bands or blanks that cannot fill a page; each reaches one by a route:
+
+- `journey` (stages and their touchpoints) runs across a short top row of a `panels` dashboard, the evidence for each stage under it.
+- `highlight-strip` (numbered findings) spans a short row of a dashboard under its hero exhibit.
+- `icon-trends` sits the same way; a page of trends alone is `parallel` form `cards`, an `icon` on each.
+- `speech` bubbles stand beside the figure they explain in a dashboard; a page of voices is `statement` form `quotes`.
+- `logo-collage` names a set's members in a dashboard cell; a page of the players by their marks is `profiles` form `logos`.
+- `status-list` sits beside an exhibit in a dashboard; a page of states is `scorecard` form `rag`, a row an item.
+- `worksheet`, blank by design, is handed over beside the worked example of it in a `panels` row.
+
+The timeline's and roadmap's variants (`time-grid`, `dated-lanes`, `phase-hierarchy`, `wave-columns`, `phase-workstreams`) are pages already: `exhibit.variant` names one, and each is counted in its own parts.
 
 ## Beyond one exhibit and a column
 

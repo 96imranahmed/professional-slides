@@ -74,7 +74,8 @@ console.log(JSON.stringify({ missing: forms.filter((f) => !rows.includes(f)), ex
         # Every reading task is a line, with the forms that are its best fit.
         self.assertIn("- two values in one unit for each member - before and after, or one measure against another: best fit ", types)
         self.assertRegex(types, r"- which of five or more series moved over the same periods: best fit trend/line, trend/sparklines")
-        self.assertRegex(types, r"- how far each member's own values run[^\n]*: best fit ranking/boxplot\n")
+        # A range carries a spread where only the low and high are known; the box plot where the middle half is.
+        self.assertRegex(types, r"- how far each member's own values run[^\n]*: best fit ranking/boxplot, ranking/range\n")
         # A form that at most serves a task is not listed as its best fit.
         line = next(text for text in types.splitlines() if text.startswith("- where each member of a set stands on one measure"))
         self.assertIn("serves scorecard/bars, lookup/table", line)
@@ -216,7 +217,7 @@ const log = JSON.parse(fs.readFileSync('./evals/quality/fixtures/variety/variety
 const insights = new Map(log.map((item) => [item.id, item]));
 const CASES = {{ 'trend/line': 'i-journeys', 'trend/column': 'i-journeys', 'trend/area': 'i-journeys', 'trend/stacked-column': 'i-daypart', 'trend/stacked-area': 'i-daypart', 'trend/combo': 'i-money', 'trend/slope': 'i-operators',
   'trend/indexed': 'i-operators', 'trend/sparklines': 'i-operators', 'trend/model': 'i-journeys', 'ranking/bar': 'i-punctual', 'ranking/column': 'i-punctual', 'ranking/lollipop': 'i-punctual', 'ranking/dumbbell': 'i-then-now',
-  'ranking/bullet': 'i-response', 'ranking/distribution': 'i-cost-field', 'ranking/aligned-bars': 'i-profile', 'ranking/boxplot': 'i-spread', 'composition/stacked-bar': 'i-daypart-peers', 'composition/stacked-column': 'i-daypart-peers',
+  'ranking/bullet': 'i-response', 'ranking/distribution': 'i-cost-field', 'ranking/aligned-bars': 'i-profile', 'ranking/boxplot': 'i-spread', 'ranking/range': 'i-then-now', 'composition/stacked-bar': 'i-daypart-peers', 'composition/stacked-column': 'i-daypart-peers',
   'composition/marimekko': 'i-daypart-peers', 'composition/waffle': 'i-fleet', 'composition/donut': 'i-revenue-parts', 'composition/treemap': 'i-fleet', 'composition/pie': 'i-revenue-parts', 'relationship/scatter': 'i-frequency',
   'relationship/bubble': 'i-lines', 'relationship/bubble-grid': 'i-lines', 'bridge/waterfall': 'i-bridge', 'scorecard/heatmap': 'i-profile', 'scorecard/bars': 'i-profile', 'lookup/table': 'i-profile', 'lookup/measure-table': 'i-operators',
   'numbers/fact-grid': 'i-estate', 'numbers/stat-list': 'i-estate', 'numbers/metric-strip': 'i-response', 'numbers/hero-number': 'i-response', 'panels/row': 'i-profile', 'panels/grid': 'i-profile', 'panels/stack': 'i-money', 'panels/small-multiples': 'i-operators' }};
