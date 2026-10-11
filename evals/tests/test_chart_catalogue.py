@@ -140,6 +140,8 @@ function candidates(sample){
     diverging:series.length>1?[series.length%2?{neutral:series[(series.length-1)/2]}:true]:[],
     // A fit through the points (chart-scatter-pie.mjs): five points or more.
     trendLine:(sample.points||[]).length>=5?[{method:'linear'}]:[],
+    // An icon beside a category's label (chart-categorical.mjs categoryIcons).
+    categoryIcons:first!==undefined?[{[first]:'plane'}]:[],
   };
 }
 const MARK_KEYS=['annotations','highlights','referenceLines','focusSeries','focus','changeAnnotations','pointHighlights','periods','events','annotationRail'];

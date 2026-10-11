@@ -206,9 +206,16 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const items = [];
   const { metricsBelow, metricsBeside } = measuresOverPage(items, { id, slide, layout, exhibits });
   const pointsPlaced = arrangePage(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures, metricsBeside });
+  // A page photograph is drawn where its layout keeps a place for it - a strip beside the copy, a picture page's hero or
+  // backdrop - and was dropped unseen anywhere else.
+  if (slide.photo && !placesItem(items, (itemId) => itemId === `${id}-photo` || itemId === `${id}-backdrop`))
+    throw new Error(`${id}: \`photo\` is set as a strip beside the copy, and this ${layout} page keeps no place for it - choose commentary "beside" or "beside-left" so the page has a column beside the exhibit, or make the picture the page's subject (a picture page, or a \`pictures\` entry)`);
   closePage(items, { id, slide, layout, fill, pointsStyle, metricsBelow, pointsPlaced });
   return pageRecord(items, { id, slide, slideIn });
 }
+
+/** Whether an item whose id passes `match` is anywhere in the layout tree. */
+const placesItem = (items, match) => items.some((item) => item && (match(String(item.id ?? "")) || placesItem(item.items || [], match)));
 
 /** The passes after the first three, with the standfirst read off first; returns the slide they produce and the slide they started from. */
 function analyticalPasses(slide, id, ctx) {

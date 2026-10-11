@@ -61,6 +61,23 @@ export function heatScaleTokens(colors) {
   })));
 }
 
+// What every page sets on the canvas must stay visible on it: the ink as text (WCAG 2's 4.5:1) and the primary as the
+// marks a chart draws in it. A dark canvas set under the house navy drew a chart's line navy on navy, about 1:1, and every
+// gate passed it. The mark floor is 2:1, below WCAG's 3:1 for a graphic, because a house's pale primary - a light blue at
+// 2.8:1 - still reads as a filled bar, and refusing it would refuse the house; under 2:1 a mark is lost. The accent is a
+// brand's own and is not held here: where it sets text the runtime darkens it to read (design-systems.mjs readable).
+const CANVAS_CONTRAST = Object.freeze({ "color.ink": [4.5, "text"], "color.componentPrimary": [2, "a chart's marks"] });
+function assertCanvasContrast(tokens) {
+  const canvas = tokens["color.canvas"]?.value, isHex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
+  if (!isHex(canvas)) return;
+  for (const [key, [least, role]] of Object.entries(CANVAS_CONTRAST)) {
+    const color = tokens[key]?.value;
+    if (!isHex(color)) continue;
+    const ratio = contrastRatio(color, canvas);
+    if (ratio < least) throw new Error(`The palette's ${key} (${color}) reads at ${ratio.toFixed(1)}:1 on the canvas (${canvas}), and ${role} needs ${least}:1 - on a dark canvas set a light ${key}, or keep the canvas light`);
+  }
+}
+
 export function resolvePalette(id = "midnight", baseTokens, slots) {
   // A palette object `{ base, colors, label? }` (a house profile imported from a
   // template deck) overlays its colours and style tokens on a named base.
@@ -83,6 +100,7 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
     preset = PALETTES[id];
   }
   const tokens = Object.fromEntries(Object.entries(baseTokens).map(([key, value]) => [key, { ...value, value: preset.colors[key] ?? value.value }]));
+  assertCanvasContrast(tokens);
   // The filled surface follows the page it sits on: the palette's own ink mixed
   // toward its own canvas, so a warm paper page gets a warm stone and a navy
   // house a cool grey, and a house profile with its own ink needs no new colour.

@@ -33,19 +33,19 @@ export { logoFrame } from "./media.mjs";
 
 const chartDefinitions = [
   {
-    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels"],
+    id: "chart.column", render: (context) => categoricalChart(context), draws: [...CATEGORY_DECORATIONS, "focusSeries", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "categoryIcons"],
     sample: { categories: ["2023", "2024", "2025", "2026"], series: [{ name: "value", values: [32, 46, 61, 74] }], highlights: [{ category: "2026" }], annotations: [], referenceLines: [{ value: 60, label: "Target" }] }
   },
   {
-    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels"], refuses: ["periods", "events", "annotationRail"],
+    id: "chart.bar", render: (context) => categoricalChart({ ...context, horizontal: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focusSeries", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "categoryIcons"], refuses: ["periods", "events", "annotationRail"],
     sample: { categories: ["North", "West", "South", "East"], series: [{ name: "value", values: [74, 62, 48, 35] }], highlights: [{ category: "North" }], annotations: [{ category: "North", text: "Scale leader" }] }
   },
   {
-    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: [...CATEGORY_DECORATIONS, "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "segmentGrowth", "stackBracket", "diverging"], refuses: ["focusSeries"],
+    id: "chart.stacked-column", render: (context) => categoricalChart({ ...context, stacked: true }), draws: [...CATEGORY_DECORATIONS, "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "segmentGrowth", "stackBracket", "diverging", "categoryIcons"], refuses: ["focusSeries"],
     sample: { categories: ["2024", "2025", "2026"], series: [{ name: "Core", values: [30, 32, 35] }, { name: "Growth", values: [12, 20, 30] }, { name: "New", values: [5, 9, 14] }], annotations: [{ series: "New", category: "2026", text: "New scales" }] }
   },
   {
-    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "diverging"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
+    id: "chart.stacked-bar", render: (context) => categoricalChart({ ...context, horizontal: true, stacked: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "bands", "valueBreak", "categoryBreaks", "groupBrackets", "valueLabels", "diverging", "categoryIcons"], refuses: ["focusSeries", "periods", "events", "annotationRail"],
     sample: { categories: ["Segment A", "Segment B", "Segment C"], series: [{ name: "Core", values: [45, 35, 25] }, { name: "Growth", values: [35, 40, 45] }, { name: "New", values: [20, 25, 30] }] }
   },
   {
