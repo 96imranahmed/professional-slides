@@ -155,15 +155,21 @@ function renderDecisionTree(tree, input) {
     const leafWidth = (width - 20 * (b.conclusions.length - 1)) / b.conclusions.length;
     return b.conclusions.map(c => nodeHeight(c.text, leafWidth, false));
   }));
-  const conclusionHeight = Math.max(64, copyLayout(props.conclusion, frame.width - 32, true).height + 16);
-  const gap = (frame.height - rootHeight - branchHeight - leafHeight - conclusionHeight) / 3;
+  // The overall conclusion is a fourth tier when the tree carries it; a tree
+  // whose page states it in the title or the commentary ends at its leaves,
+  // its tiers no further apart than they read as one figure, centred.
+  const concluded = Boolean(props.conclusion);
+  const conclusionHeight = concluded ? Math.max(64, copyLayout(props.conclusion, frame.width - 32, true).height + 16) : 0;
+  const gap = concluded ? (frame.height - rootHeight - branchHeight - leafHeight - conclusionHeight) / 3
+    : Math.min(TREE_GAP_MAX, (frame.height - rootHeight - branchHeight - leafHeight) / 2);
   if (gap < 16) throw new Error(`${id} decision tree needs more room for its complete node text and tier gaps`);
-  const branchY = frame.y + rootHeight + gap;
+  const top = concluded ? frame.y : frame.y + (frame.height - rootHeight - branchHeight - leafHeight - 2 * gap) / 2;
+  const branchY = top + rootHeight + gap;
   const leafY = branchY + branchHeight + gap;
   const nodes = [],
     root = {
       x: frame.x + (frame.width - rootWidth) / 2,
-      y: frame.y,
+      y: top,
       width: rootWidth,
       height: rootHeight,
     };
@@ -206,7 +212,7 @@ function renderDecisionTree(tree, input) {
     connect(
       stableId(id, b.id, "link"),
       frame.x + frame.width / 2,
-      frame.y + rootHeight,
+      top + rootHeight,
       center,
       branchY,
       `${id}-root-box`, `${stableId(id,b.id)}-box`,
@@ -238,6 +244,7 @@ function renderDecisionTree(tree, input) {
       );
     });
   });
+  if (!concluded) return { nodes: dependent(nodes) };
   const f = {
     x: frame.x,
     y: frame.y + frame.height - conclusionHeight,
@@ -258,24 +265,31 @@ function renderDecisionTree(tree, input) {
       { bold: true, role: "decision-conclusion" },
     ),
   );
+  return { nodes: dependent(nodes) };
+}
+
+const TREE_GAP_MAX = 72;
+/** Each box and its label move together. */
+function dependent(nodes) {
   for (const node of nodes) {
     if (node.role === 'decision-label') node.data.dependencies = [node.id.replace(/-text$/, '-box')];
     if (node.role === 'decision-box') node.data.dependencies = [node.id.replace(/-box$/, '-text')];
   }
-  return { nodes };
+  return nodes;
 }
 
-/** A root, two branches of one to three conclusions each, unique ids, an overall conclusion, and a frame of at least 900 by 440. */
+/** A root, two branches of one to three conclusions each, unique ids, an optional overall conclusion, and a frame of at least 900 by 440. */
 function assertDecisionBranches(props, frame, branches) {
   if (
     !props.root ||
-    !props.conclusion ||
     !Array.isArray(branches) ||
     branches.length !== 2
   )
     throw new Error(
-      "Decision tree requires a root, two branches and overall conclusion",
+      "Decision tree requires a root and two branches",
     );
+  if (props.conclusion !== undefined && (typeof props.conclusion !== "string" || !props.conclusion.trim()))
+    throw new Error("A decision tree's overall `conclusion` is a sentence, or left out when the page's title states it");
   const ids = [];
   for (const b of branches) {
     ids.push(b.id);

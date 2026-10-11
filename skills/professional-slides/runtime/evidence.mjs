@@ -136,9 +136,13 @@ export function plottedValues(ex, { printed = false } = {}) {
   if (isTable(ex)) return numericCells(ex);
   if (Array.isArray(ex.boxes)) return ex.boxes.length * 5;
   if (Array.isArray(ex.low) && Array.isArray(ex.high)) return counted(ex.low) + counted(ex.high);
+  // A point on a scatter is read on both axes - two values, three with a
+  // bubble's size - as a box is its five figures: a seven-point demand curve
+  // plots fourteen, where a single series of seven bars plots seven.
+  const reads = type === "chart.bubble" ? 3 : type === "chart.scatter" ? 2 : 1;
   if (Array.isArray(ex.series) && ex.series.length)
-    return ex.series.reduce((n, s) => n + (Array.isArray(s?.points) ? s.points.length : counted(s?.values)), 0) + counted(ex.targets);
-  if (Array.isArray(ex.points)) return ex.points.length;
+    return ex.series.reduce((n, s) => n + (Array.isArray(s?.points) ? s.points.length * reads : counted(s?.values)), 0) + counted(ex.targets);
+  if (Array.isArray(ex.points)) return ex.points.length * reads;
   if (Array.isArray(ex.values)) return ex.values.flat().filter(finite).length;
   // `printed`: a figure bound and printed ("29%") is a number the reader reads as a typed one (29) is - the evidence floor
   // counts both, so a page drawn at the spine and laid out reads the same; the binding gates count only what was typed.

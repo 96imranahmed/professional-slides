@@ -38,9 +38,16 @@ export const TABLE_ALIGNED = new Set(["chart.column", "chart.stacked-column", "c
 export const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "chart.lollipop",
   "chart.dumbbell", "chart.bullet", "chart.range"]);
 
+const STACKS = new Set(["chart.stacked-column", "chart.stacked-bar", "chart.stacked-area"]);
+const PERCENT_CHARTS = new Set([...STACKS, "chart.waffle"]);
 /** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
 export function percentStack(ex) {
-  if (!ex || !ex.percent || !["chart.stacked-column", "chart.stacked-bar"].includes(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
+  if (!ex || !ex.percent) return ex;
+  // Only a stack has a total to share out; a waffle reads `percent` as its own (ten columns of a hundred dots). Anywhere
+  // else the flag did nothing, and a page meant as shares printed raw counts.
+  if (String(ex.type ?? "").startsWith("chart.") && !PERCENT_CHARTS.has(ex.type))
+    throw new Error(`\`percent: true\` re-expresses a stack as shares of its total - it applies to ${[...STACKS].join(", ")} (and a waffle's hundred dots), not ${ex.type}; enter shares as the values, with the unit saying so`);
+  if (!STACKS.has(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
   const totals = ex.categories.map((_, i) => ex.series.reduce((sum, sr) => sum + (sr.values[i] || 0), 0));
   // Shares to one decimal by largest remainder, so each column sums to exactly
   // 100. Rounding each share on its own can bring a column to 100.1, past the

@@ -665,7 +665,7 @@ console.log(JSON.stringify({{
 }}));
 ''')
         self.assertEqual(result['line'], 7)  # a missing value is not plotted
-        self.assertEqual(result['scatter'], 3)
+        self.assertEqual(result['scatter'], 6)  # a point is read on both axes, as a box is its five figures
         self.assertEqual(result['waffle'], 3)  # a waffle counts its parts, not its squares
         self.assertEqual(result['pie'], 3)
         self.assertEqual(result['grid'], 6)
@@ -1000,7 +1000,9 @@ console.log(JSON.stringify({{ out, radar: radar?.then.properties.commentary.enum
             self.assertTrue(entry['worked'], f'{key} has no worked page for --example')
         self.assertIn('chart.boxplot', result['out']['ranking/boxplot']['drawn'])
         self.assertIn('model-page', result['out']['trend/model']['drawn'])
-        self.assertEqual(result['radar'], ['below', 'none'])
+        # A radar is square: beside its points it holds the body's height, where
+        # over points below it sat small between two white margins.
+        self.assertEqual(result['radar'], ['beside', 'beside-left', 'rail', 'below', 'none'])
 
     def test_a_form_refuses_what_it_cannot_draw(self):
         """Rebuilt fifty-page deck: a form refuses what it cannot draw."""

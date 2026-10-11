@@ -2,6 +2,7 @@
 // their cards (`picturesAcross`), one subject beside its argument
 // (`pictureHero`), and an exhibit on a card over the thing it measures
 // (`photoBackdrop`).
+import { token } from "./core.mjs";
 import { SIZE, HUG, BODY_WIDTH } from "./compose-body.mjs";
 import { pictureFrame, pictureCards, photoStrip, imageProps } from "./compose-pictures.mjs";
 import { pointsItem, sideTreatment, proseOf } from "./compose-points.mjs";
@@ -64,9 +65,11 @@ export function pictureHero(items, { id, slide, pictures, baseDir, fill, pointsS
 export function photoBackdrop(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle }) {
   if (!slide.photo) throw new Error(`${id}: a photo-backdrop page needs \`photo\`, the picture the card sits on`);
   if (exhibits.length !== 1) throw new Error(`${id}: a photo-backdrop page carries one exhibit on its card`);
+  // The photograph runs to both edges of the slide under the card, so the
+  // evidence reads as set on the place, not beside a picture of it.
   const backdrop = slide.photo.path
-    ? { id: `${id}-backdrop`, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover" }, size: SIZE }
-    : { id: `${id}-backdrop`, component: "image-frame", props: { alt: slide.photo.alt }, size: SIZE };
+    ? { id: `${id}-backdrop`, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: "cover", bleed: "sides" }, size: SIZE }
+    : { id: `${id}-backdrop`, component: "image-frame", props: { alt: slide.photo.alt, bleed: "sides" }, size: SIZE };
   const card = { id: `${id}-card`, treatment: "card", layout: "flow.column", gap: "space.3",
     size: { width: Math.round(BODY_WIDTH * 0.58), height: "fill" },
     // The card is a little over half the page wide, so points set across it
@@ -75,5 +78,7 @@ export function photoBackdrop(items, { id, slide, layout, exhibits, baseDir, fil
     items: [exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, SIZE),
             ...(slide.points?.length ? [pointsUnderPanels(slide.points, { id, slide, layout, panels: [], fill, pointsStyle, tone: "open", most: 2 })] : [])] };
   items.push({ id: `${id}-stage`, layout: "overlay", size: SIZE, items: [backdrop,
-    { id: `${id}-card-row`, layout: "flow.row", padding: "space.5", leftover: slide.photoSide === "right" ? "start" : "end", size: SIZE, items: [card] }] });
+    // The photograph shows round the card on every side: a token, where the
+    // bare name "space.5" read as no padding and set the card on the frame's edges.
+    { id: `${id}-card-row`, layout: "flow.row", padding: token("space.5"), leftover: slide.photoSide === "right" ? "start" : "end", size: SIZE, items: [card] }] });
 }

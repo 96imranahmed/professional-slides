@@ -352,6 +352,9 @@ export const numberMarked = (ex) => NUMBER_MARKS.some((key) => (Array.isArray(ex
 //   - A bridge's steps are the drivers the change has; splitting a driver to
 //     reach eight bars would invent precision. Start, three steps and end is
 //     the least that decomposes a change rather than restating two totals.
+//   - A value is a number the reader reads off the plot: a scatter point is
+//     two (three on a bubble), a box five, so a seven-point curve clears it
+//     where one series of seven bars does not.
 //   - One whole's parts (pie, donut, treemap, waffle) number what the whole
 //     has - a pie holds five at most, and small counts are sent to the waffle
 //     - so the form is not floored; the deck's median still counts them.
@@ -431,6 +434,18 @@ const BLOCK_LABEL_WORDS = 5, BLOCK_CHART_ROWS = 2;
 export const COPY_LIMITS = Object.freeze({ railWordsMin: 10, barWordsMin: 8, captionWordsMin: 8, calloutWordsMin: 10,
   blockPoints: Object.freeze({ min: 2, max: 4 }), blockLabelWords: BLOCK_LABEL_WORDS, panelWordsMin: PANEL_WORDS_MIN });
 
+// A schedule variant drawn from its own data is counted in its own parts: a
+// wave's columns carry their activities and deliverables, a phase plan its
+// workstreams, a dated schedule its events.
+const SCHEDULE_PARTS = Object.freeze({
+  "wave-columns": (ex) => (ex.items || []).length >= 3 || "a wave roadmap runs three or more waves, each { heading, range, activities, deliverables }",
+  "phase-workstreams": (ex) => ((ex.phases || []).length >= 2 && (ex.phases || []).flatMap((phase) => phase?.workstreams || []).length >= 4)
+    || "a phase roadmap runs two or more phases and four or more workstreams between them, each with its activities",
+  "time-grid": (ex) => (ex.lanes || []).flatMap((lane) => lane?.events || []).length >= 4 || "a time grid places four or more events in its lanes",
+  "dated-lanes": (ex) => (ex.events || []).length >= 4 || "a dated schedule places four or more events, each on a lane and a date",
+  "phase-hierarchy": (ex) => (ex.phases || []).length >= 3 || "a phase hierarchy runs three or more phases, one of them opened into its steps",
+});
+
 // The least a page of each type carries to be worth a page. Below it the type
 // was chosen for less evidence than it needs: a three-phase roadmap, a two-part
 // pie or a four-row matrix leaves half a page empty.
@@ -443,6 +458,7 @@ const MINIMUM = Object.freeze({
     ? ((ex.labels || ex.items || []).length >= 3 || "a share of one thing is a numbers page - a composition shows three or more parts")
     : ((ex.categories || []).length >= 2 && (ex.series || []).length >= 2) || (ex.series || []).length >= 3 || "a composition compares the mix across two or more members or periods, or shows three or more parts",
   schedule: (ex, form) => form === "gantt" ? true : form === "horizons" ? (ex.horizons || []).length >= 2 || "the horizons are two to five bets, each { label, title, description } in the order they pay"
+    : SCHEDULE_PARTS[ex.variant] ? SCHEDULE_PARTS[ex.variant](ex)
     : (ex.items || []).length >= 4 || "a timeline or roadmap of three items is a strip, not a page - four or more dated items ({ date | period, label, text }), or pair it with the evidence behind them as panels",
   parallel: (ex) => (ex.items || []).length >= 3 || "three or more parallel ideas",
   // A decision tree holds exactly two branches (its renderer's limit), so its
@@ -456,7 +472,7 @@ const MINIMUM = Object.freeze({
 // The data an exhibit type reads, from its registered sample: what an author
 // has to supply, as against styling (heading, unit, annotations, ...).
 const STYLING = new Set(["heading", "unit", "annotations", "highlights", "focusSeries", "active", "treatment", "placement", "arrangement",
-  "attributionAlign", "variant", "conclusion", "center", "today", "totals", "targets", "ranges", "highlight", "centerId", "ringOrder", "referenceLines", "legend", "dataLabels"]);
+  "attributionAlign", "variant", "conclusion", "center", "today", "totals", "targets", "ranges", "highlight", "centerId", "ringOrder", "referenceLines", "legend", "dataLabels", "labelTreatment"]);
 // Page constructions that are not registered components, with what they read.
 const CONSTRUCTION_DATA = {
   "hero-number": ["kpi"], "metrics-over-exhibit": ["metrics", "exhibit"], "findings-matrix": ["rows (each with cells)"], "measure-table": ["columns", "rows"],
@@ -495,7 +511,12 @@ export function plannableForms(type) {
   const built = ([, target]) => Boolean(CONSTRUCTION_DATA[target]);
   return forms.filter((entry, at) => at === 0 || !(FORM_DATA[`${type}/${entry[0]}`] || (built(entry) && !built(forms[0])))).map(([form]) => form);
 }
-export function dataKeys(exhibitType, { type, form } = {}) {
+export function dataKeys(exhibitType, { type, form, variant } = {}) {
+  // A variant with its own sample reads that sample's data, not the default's:
+  // a phase roadmap has phases and no `items`.
+  const own = variant && REGISTRY.get(exhibitType)?.variants?.[variant]?.props;
+  if (own && Object.keys(own).some((key) => own[key] !== undefined && !STYLING.has(key)))
+    return Object.keys(own).filter((key) => own[key] !== undefined && !STYLING.has(key));
   if (FORM_DATA[`${type}/${form}`]) return FORM_DATA[`${type}/${form}`];
   if (CONSTRUCTION_DATA[exhibitType]) return CONSTRUCTION_DATA[exhibitType];
   const sample = REGISTRY.get(exhibitType)?.sample;
@@ -1604,7 +1625,7 @@ function typedSlide(page, id, type, players) {
 function checkExhibitData({ page, id, slide, exhibits, primary }) {
   // The exhibit carries the data its form reads, named before the build has to.
   for (const ex of exhibitsOf(slide)) {
-    const keys = CONSTRUCTION_DATA[ex.type] ? [] : dataKeys(ex.type);
+    const keys = CONSTRUCTION_DATA[ex.type] ? [] : dataKeys(ex.type, { variant: ex.variant });
     if (keys.length && !keys.some((key) => ex[key] !== undefined))
       throw new Error(`${id}: a ${ex.type} exhibit reads ${keys.map((k) => `\`${k}\``).join(", ")} - none is given`);
   }

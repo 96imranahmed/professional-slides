@@ -112,7 +112,7 @@ Use one family across a deck. A cover or chapter transition may use the family's
 | `pre-read` | evidence-led document read without narration | compact but readable type, tighter analytical rhythm |
 | `appendix` | source-rich analytical support | smallest approved type and tightest grid |
 
-This section owns density. The deck sets one `density`, and with it one body size for every page: a page type refuses `density` on a page, no preset sets it, and structural and tracker pages take `executive` unless the deck sets another. Appendix pages are set at `appendix`. A chart's mark count may step its own labels down one size; nothing else on the page shrinks. When content does not fit, change the page, not its type size: remove duplication, enlarge the exhibit, choose another form, split the page or move it to the appendix. Measure the content at its allocated width.
+This section owns density. The deck sets one `density`, and with it one body size for every page: a page type refuses `density` on a page, no preset sets it, and structural and tracker pages take `executive` unless the deck sets another. Appendix pages are set at `appendix`. A chart's mark count may step its own labels down one size, and a table its own type down its density ladder (compact, then dense) before it splits; nothing else on the page shrinks. When content does not fit, change the page, not its type size: remove duplication, enlarge the exhibit, choose another form, split the page or move it to the appendix. Measure the content at its allocated width.
 
 ## Theme manifest
 

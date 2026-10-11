@@ -4,7 +4,15 @@ A funnel that said it drew conversion rates and drew none; a heat key printed
 once per column over columns that share one scale; a bar chart's deltas
 heading set across its legend; a radar held under its points; an agenda in
 columns floating between two empty bands; a median cut away beside labels it
-never touched; a cover rule drawn in the cover's own colour.
+never touched; a cover rule drawn in the cover's own colour; a phase roadmap
+and the dated schedules asked for the `items` only the strip draws; a decision
+tree refused without an overall conclusion its title already stated; three
+two-state codes the grading described as one job; a photo backdrop that set
+its chart beside a picture rather than over a photograph; table archetypes
+an author could name but whose row style the composer dropped; a seven-point
+curve refused as thinner than seven bars; `percent` ignored on a stacked area
+and anywhere else nothing stacks; a measure table whose heat columns took a
+total row it could not draw, summed from the shading steps.
 """
 import unittest
 
@@ -111,6 +119,137 @@ for (const name of Object.keys(PALETTES)) for (const tone of ['dark', 'light']) 
     assert.ok(ratio >= 3, `${name} ${tone}: the rule reads at ${ratio.toFixed(2)}:1`);
   });
 }
+console.log('{}');
+""")
+
+    def test_a_schedule_variant_is_counted_in_its_own_parts(self):
+        run_node(PRELUDE + """
+const page = (form, exhibit) => ({ id: 's', type: 'schedule', form, commentary: 'none', takeaway: false, why: 'The board approves the order of the work',
+  settles: { kind: 'sequence', what: 'the phases of the timetable recast' }, title: 'The recast runs in two phases, design first and shadow running from May', exhibit });
+const phase = (id, n) => ({ id, label: `Phase ${id}`, workstreams: Array.from({ length: n }, (_, i) => ({ id: `${id}-${i}`, label: `Workstream ${i + 1}`, activities: [{ id: `${id}-${i}-a`, text: 'Model demand on the eight corridors.' }] })) });
+assert.ok(compilePage(page('roadmap', { variant: 'phase-workstreams', phases: [phase('a', 2), phase('b', 2)] })));
+assert.match(error(() => compilePage(page('roadmap', { variant: 'phase-workstreams', phases: [phase('a', 1), phase('b', 1)] }))), /four or more workstreams/);
+const plan = REGISTRY.get('roadmap').render({ id: 'r', frame: { x: 0, y: 0, width: 1160, height: 480 }, props: { variant: 'phase-workstreams', phases: [phase('a', 2), phase('b', 2)] } }).nodes;
+assert.ok(!plan.some((n) => n.role === 'roadmap-products-label'), 'no products, no products heading');
+const axis = { kind: 'periods', precision: 'week', periods: ['w1', 'w2', 'w3', 'w4'].map((id) => ({ id, label: id.toUpperCase() })) };
+const lanes = (n) => [{ id: 'spec', label: 'Specification', events: Array.from({ length: n }, (_, i) => ({ id: `e${i}`, periodId: `w${i + 1}`, kind: 'meeting' })) }];
+const grid = (n) => page('timeline', { variant: 'time-grid', axis, lanes: lanes(n), eventKinds: [{ id: 'meeting', label: 'Review', symbol: 'triangle' }] });
+assert.ok(compilePage(grid(4)));
+assert.match(error(() => compilePage(grid(2))), /four or more events in its lanes/);
+assert.doesNotMatch(error(() => compilePage(grid(2))), /reads `items`/);
+console.log('{}');
+""")
+
+    def test_a_decision_tree_may_end_at_its_leaves(self):
+        run_node(PRELUDE + """
+const tree = REGISTRY.get('tree'), frame = { x: 60, y: 140, width: 1160, height: 520 };
+const props = { root: 'How should Northvale move to the new timetable?', branches: [
+  { id: 'a', label: 'Switch over in one weekend', conclusions: [{ id: 'a1', text: 'Saves twelve weeks of double crewing' }, { id: 'a2', text: 'Leaves no live test of the rosters' }] },
+  { id: 'b', label: 'Run in shadow for twelve weeks', conclusions: [{ id: 'b1', text: 'Costs 1.8m in overtime' }, { id: 'b2', text: 'Finds roster gaps first' }] }] };
+const nodes = tree.render({ id: 't', frame, props }).nodes;
+assert.ok(!nodes.some((n) => n.role === 'decision-conclusion'));
+const boxes = nodes.filter((n) => n.role === 'decision-box');
+const top = Math.min(...boxes.map((n) => n.frame.y)), bottom = Math.max(...boxes.map((n) => n.frame.y + n.frame.height));
+assert.ok(Math.abs((top - frame.y) - (frame.y + frame.height - bottom)) <= 1, 'the three tiers are centred');
+assert.ok(tree.render({ id: 't', frame, props: { ...props, conclusion: 'Shadow running is worth the quarter' } }).nodes.some((n) => n.role === 'decision-conclusion'));
+assert.match(error(() => tree.render({ id: 't', frame, props: { ...props, conclusion: ' ' } })), /a sentence, or left out/);
+console.log('{}');
+""")
+
+    def test_dots_checks_and_binaries_do_three_jobs(self):
+        run_node(PRELUDE + """
+import { rightFor } from './skills/professional-slides/runtime/claim-fit.mjs';
+const jobs = ['dot', 'check', 'binary'].map((form) => rightFor('scorecard', form));
+assert.equal(new Set(jobs).size, 3);
+assert.match(jobs[0], /no verdict/);
+assert.match(jobs[1], /pass/);
+assert.match(jobs[2], /neither answer is the better/);
+const table = REGISTRY.get('table');
+const roles = (type, value) => table.render({ id: 't', frame: { x: 0, y: 0, width: 600, height: 200 }, props: {
+  columns: ['Operator', { label: 'Wi-fi', type }], rows: [['Northvale', type === 'binary' ? { type, value, scale: 'answer' } : { type, value }]],
+  ...(type === 'binary' ? { scales: { answer: { type: 'binary', label: 'Wi-fi on board', test: 'The operator offers wi-fi', labelDisplay: 'none', states: { yes: 'Yes', no: 'No', missing: 'Not recorded' } } } } : {}) } })
+  .nodes.filter((n) => /^table-(dot|check|binary)/.test(n.role)).map((n) => n.role);
+assert.deepEqual([...new Set(roles('dot', true))], ['table-dot']);
+assert.ok(roles('check', true).every((role) => role.startsWith('table-check')));
+assert.deepEqual([...new Set(roles('binary', 'yes'))], ['table-binary-mark']);
+console.log('{}');
+""")
+
+    def test_a_backdrop_runs_under_its_card_to_the_slide_edges(self):
+        run_node(PRELUDE + """
+import { SLIDE } from './skills/professional-slides/runtime/core.mjs';
+const page = { id: 'b', type: 'picture', form: 'photo-backdrop', commentary: 'captions', takeaway: false, why: 'The claim is about a place, so the evidence sits on it',
+  settles: { kind: 'rate', what: 'Saturday load factor by hour on Dales trains' }, adds: 'The caption says who fills the morning trains', title: 'Saturday Dales trains leave Leeds 97% full, fuller than the weekday peak',
+  photo: { alt: 'The Dales above Skipton in spring' },
+  exhibit: { type: 'chart.column', heading: 'Saturday departures', unit: '% of seats filled', categories: ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+    series: [{ name: 'Load factor', values: [24, 51, 88, 97, 90, 72, 58, 44] }], highlights: [{ category: '10:00' }],
+    caption: 'Four in five Saturday riders are walkers bound for Skipton, and the last train home leaves before most finish' } };
+const [slide] = composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: [compilePage(page)] }, '.').deck.slides;
+const photo = slide.nodes.find((n) => n.id.includes('backdrop') && n.role === 'image-frame');
+assert.equal(photo.frame.x, 0);
+assert.equal(photo.frame.width, SLIDE.width, 'the photograph runs to both edges');
+const card = slide.nodes.find((n) => n.id.includes('-card') && n.role === 'section-surface');
+assert.ok(card.frame.y > photo.frame.y + 8 && card.frame.y + card.frame.height < photo.frame.y + photo.frame.height - 8, 'the photograph shows above and below the card');
+assert.match(error(() => REGISTRY.get('image-frame').render({ id: 'i', frame: { x: 0, y: 0, width: 100, height: 100 }, props: { alt: 'x', bleed: 'page' } })), /`bleed` is "sides"/);
+console.log('{}');
+""")
+
+    def test_every_table_archetype_composes_from_a_page(self):
+        run_node(PRELUDE + """
+const table = REGISTRY.get('table');
+const page = (name, exhibit) => ({ id: 'v', type: 'lookup', form: 'table', commentary: 'none', takeaway: false, why: 'The reader looks up each row',
+  settles: { kind: 'comparison', what: 'the rows of the table' }, title: 'Every row of the table reads at a glance against the others', exhibit: { ...exhibit, variant: name } });
+const composed = [];
+for (const [name, variant] of Object.entries(table.variants)) {
+  const rows = variant.props?.rows;
+  if (!rows || rows.length < 3) continue;
+  composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: [compilePage(page(name, structuredClone(variant.props)))] }, './skills/professional-slides/examples');
+  composed.push(name);
+}
+assert.ok(composed.length >= 20, `${composed.length} archetypes compose from a page`);
+const [slide] = composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: [compilePage(page('accented-rows', structuredClone(table.variants['accented-rows'].props)))] }, '.').deck.slides;
+const bands = slide.nodes.filter((n) => n.role === 'table-row-band').map((n) => n.data.rowStyle);
+assert.ok(bands.length >= 3 && bands.every((style) => style === 'accented'), 'every row keeps the accent band');
+console.log('{}');
+""")
+
+    def test_a_scatter_point_is_read_on_both_axes(self):
+        run_node(PRELUDE + """
+import { plottedValues } from './skills/professional-slides/runtime/evidence.mjs';
+const points = [90, 72, 80, 61, 66, 48, 52].map((y, i) => ({ name: `Route ${i + 1}`, x: 2 + i, y }));
+assert.equal(plottedValues({ type: 'chart.scatter', points }), 14);
+assert.equal(plottedValues({ type: 'chart.bubble', points: points.map((p) => ({ ...p, size: 4 })) }), 21);
+assert.equal(plottedValues({ type: 'chart.column', categories: points.map((p) => p.name), series: [{ name: 'Riders', values: points.map((p) => p.y) }] }), 7);
+const page = { id: 'd', type: 'relationship', form: 'scatter', commentary: 'on-exhibit', takeaway: false, why: 'The board sets the off-peak fare from how riders respond to it',
+  settles: { kind: 'rate', what: 'off-peak riders against the fare on seven trial routes' }, adds: 'The callout names the route the fare filled', title: 'Each pound off the off-peak fare adds about nine riders a train',
+  exhibit: { heading: 'Off-peak fare trial, seven routes', xLabel: 'Fare, £', yLabel: 'Riders a train', points, annotations: [{ target: 'Route 1', text: 'The cheapest fare filled 90 seats a train on the trial' }] } };
+assert.ok(compilePage(page), 'a seven-point curve clears the floor');
+console.log('{}');
+""")
+
+    def test_percent_shares_out_every_stack_and_only_a_stack(self):
+        run_node(PRELUDE + """
+import { percentStack } from './skills/professional-slides/runtime/compose-charts.mjs';
+const data = { categories: ['2019', '2020', '2021', '2022'], series: [{ name: 'Commuting', values: [520, 470, 440, 420] }, { name: 'Leisure', values: [260, 290, 310, 330] }, { name: 'Business', values: [80, 100, 110, 120] }] };
+const area = percentStack({ type: 'chart.stacked-area', percent: true, ...data });
+assert.equal(area.percent, undefined);
+for (let i = 0; i < 4; i++) assert.equal(Math.round(area.series.reduce((sum, s) => sum + s.values[i], 0) * 10) / 10, 100);
+assert.equal(area.unit, '% of total');
+assert.match(error(() => percentStack({ type: 'chart.line', percent: true, ...data })), /re-expresses a stack/);
+assert.equal(percentStack({ type: 'chart.waffle', percent: true, categories: ['A'], series: [{ name: 'n', values: [40] }] }).percent, true);
+console.log('{}');
+""")
+
+    def test_a_heat_columns_total_is_its_figures_summed(self):
+        run_node(PRELUDE + """
+import { styleTable } from './skills/professional-slides/runtime/compose-tables.mjs';
+const table = styleTable({ columns: ['Station', { label: 'Journeys, k', heat: true }], rows: [['Keighley', '412'], ['Halifax', '288'], ['Selby', '164']], total: true });
+assert.deepEqual(table.rows.at(-1).cells, ['Total', { type: 'text', text: '864' }]);
+const page = { id: 'm', type: 'lookup', form: 'measure-table', commentary: 'none', takeaway: false, why: 'The reader looks up each station',
+  settles: { kind: 'comparison', what: 'journeys at five stations' }, title: 'Keighley carries more journeys than the four smaller stations together',
+  exhibit: { columns: ['Station', { label: 'Journeys, k', heat: true }], rows: [['Keighley', '412'], ['Halifax', '288'], ['Selby', '164'], ['Malton', '120'], ['Skipton', '98']] } };
+const [slide] = composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: [compilePage(page)] }, '.').deck.slides;
+assert.ok(slide.nodes.some((n) => n.text === '1,082'), 'the total row prints the figures summed');
 console.log('{}');
 """)
 

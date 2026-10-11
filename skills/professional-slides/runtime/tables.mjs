@@ -256,6 +256,9 @@ function normalize(props) {
   );
   if (new Set(columns.map((c) => c.id)).size !== columns.length)
     throw new Error("Duplicate table column id");
+  // A label is printed as it stands: an object there was set as "[object Object]".
+  const unlabelled = columns.find((c) => c.label !== undefined && c.label !== null && !["string", "number"].includes(typeof c.label));
+  if (unlabelled) throw new Error(`Table column ${Number(unlabelled.id) + 1}'s \`label\` is its heading text (got ${JSON.stringify(unlabelled.label).slice(0, 60)})`);
   // `group`: the band above the header that names what a run of columns
   // measures ("Size", "Growth", "Specialization"); `unit`: the measure's unit
   // under the label, so the cells carry the number alone. Groups must be

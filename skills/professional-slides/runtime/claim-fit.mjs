@@ -216,8 +216,12 @@ export const CARRIERS = Object.freeze([
   { type: "scorecard", form: "progress", kind: "table", bound: "a token a cell under a column of type progress",
     carries: { profile: (p) => (p.percent && !p.signed && p.top <= 100 ? D : GRADE.none) }, needs: (p) => need(p.percent && !p.signed && p.top <= 100, "percentages of a maximum") },
   ...[...JUDGED_CELLS].map((form) => ({ type: "scorecard", form, kind: "table", judged: true,
-    shows: { harvey: "members rated against criteria on a declared scale", rag: "a state or verdict a cell: on track, at risk, off track", lights: "a state a cell as a lamp", check: "which members meet each criterion",
-      dot: "a yes or no a cell", trend: "the direction each measure moved for each member", binary: "which of two states each cell is in" }[form] })),
+    shows: { harvey: "members rated against criteria on a declared scale", rag: "a state or verdict a cell: on track, at risk, off track", lights: "a state a cell as a lamp", check: "a verdict a cell: which members pass each requirement, a green tick or a red cross",
+      // Three two-state codes, three jobs: a dot records what a member has without judging it, a check passes or fails it, a
+      // binary records a measured answer in ink with its states named in a key.
+      dot: "what each member has or offers - a filled dot where it does, an open one where it does not - with no verdict on either",
+      trend: "the direction each measure moved for each member",
+      binary: "a recorded answer a cell in ink, its states named in a key, where neither answer is the better one" }[form] })),
   // --- lookup --------------------------------------------------------------
   // Measures grouped under their units: its point where the page looks up measures in more than one.
   { type: "lookup", form: "measure-table", kind: "table", bound: "a token a cell: a measure a row, grouped under its unit",

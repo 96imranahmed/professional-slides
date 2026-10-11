@@ -6,7 +6,7 @@
 // takeaways, statement and cover can carry, and the icon-trends and
 // logo-collage components with their sample media. The media primitives they
 // draw with are media.mjs's.
-import { rectPrimitive, primitive, stableId, textPrimitive, insetFrame, token, tokenValue } from "./core.mjs";
+import { rectPrimitive, primitive, stableId, textPrimitive, insetFrame, token, tokenValue, SLIDE } from "./core.mjs";
 import { iconMarker } from "./marks.mjs";
 import { sampleImage, MEDIA_SAMPLE, WORDMARK_RECORDS, mediaNode } from "./media.mjs";
 import { SECONDARY, MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS, LABEL, textStyle, boxStyle, component, INK, DISPLAY } from "./registry-shared.mjs";
@@ -155,10 +155,16 @@ function withSourcedMedia(registry) {
   const image = registry.get("image-frame");
   const imageRender = image.render;
   // `fit: "cover"` fills the frame and crops (a photo panel beside a chart).
-  image.render = (input) =>
-    input.props.dataUri && input.props.width
-      ? { nodes: [mediaNode({ ...input, props: (({ fit, ...rest }) => rest)(input.props), id: stableId(input.id, "image"), fit: input.props.fit ?? "contain" })] }
-      : imageRender(input);
+  // `bleed: "sides"` runs it to both edges of the slide at its own height: the
+  // photograph a card of evidence sits on, not a picture inside the margins.
+  image.render = (input) => {
+    if (input.props.bleed !== undefined && input.props.bleed !== "sides") throw new Error(`An image's \`bleed\` is "sides" (to both edges of the slide) or left out (got ${JSON.stringify(input.props.bleed)})`);
+    const { bleed, ...props } = input.props;
+    const frame = bleed ? { ...input.frame, x: 0, width: SLIDE.width } : input.frame;
+    return props.dataUri && props.width
+      ? { nodes: [mediaNode({ ...input, frame, props: (({ fit, ...rest }) => rest)(props), id: stableId(input.id, "image"), fit: props.fit ?? "contain" })] }
+      : imageRender({ ...input, frame, props });
+  };
   for (const name of ["icon", "logo"]) {
     const owner = registry.get(name),
       original = owner.render;

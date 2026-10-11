@@ -143,7 +143,8 @@ const numberOf = (cell) => {
   // the derivation, and read as text it was empty and every row ranked first.
   // A bound or a range is not a figure to rank or share.
   if (cell && typeof cell === "object" && cell.type === "bars") return cell.values?.length === 1 && Number.isFinite(cell.values[0]) && [undefined, "approx"].includes(cell.bound) ? cell.values[0] : null;
-  const text = cellText(cell).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
+  // A shaded recorded value keeps its figure beside the step it is shaded in: the figure is the number, the step is not.
+  const text = (cell && typeof cell === "object" && cell.type === "heatmap" && cell.figure !== undefined ? String(cell.figure) : cellText(cell)).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
   if (!/^-?\d*\.?\d+$/.test(text)) return null;
   return Number(text);
 };
@@ -296,12 +297,15 @@ function totalRow(ex) {
     // than printing a figure the table cannot justify.
     // A bar cell carries its number in `values`; its total is printed as text
     // in the band, since a total drawn on its parts' scale runs off the end.
+    // So is a heat column's: the sum of its cells lies past the range they are
+    // shaded across, and a plain figure there was read as a heat cell with no scale.
     const bars = typeof column === "object" && column?.type === "bars";
+    const heat = typeof column === "object" && (column?.type === "heatmap" || column?.heat === true);
     const values = body.map((row) => (bars ? (Number.isFinite(row.cells[index]?.values?.[0]) ? row.cells[index].values[0] : null) : numberOf(row.cells[index])));
     if (!addsUp(column, values)) return " ";
     if (values.some((value) => value === null)) return " ";
     const sum = String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
-    return bars ? { type: "text", text: sum } : sum;
+    return bars || heat ? { type: "text", text: sum } : sum;
   });
   const { total: _t, totalLabel: _l, ...rest } = ex;
   // A total row is its totals. The measure-table preset's total ("auto") is
@@ -958,6 +962,9 @@ export function styleTable(ex) {
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
   if (ex.rowAlignment !== undefined) extra.rowAlignment = ex.rowAlignment;
+  // Every row's style at once (the `accented-rows` table bands each row in the
+  // accent tint): carried to the table, which holds it to its four row styles.
+  if (ex.rowStyle !== undefined) extra.rowStyle = ex.rowStyle;
   // A table that ends the chain with no treatment at all is a plain grid, and a
   // plain grid past five rows is where a reader loses their place. About 89% of
   // tables in strong decks carry a treatment of some kind, and the commonest
