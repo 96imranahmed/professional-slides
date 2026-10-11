@@ -13,6 +13,8 @@ import { withReferenceValues, withDecorations, normalizedHighlights } from "./ch
 const WATERFALL_BREAK_SHARE = 1 / 7;
 
 export function waterfall({ id, frame, props }) {
+  if (props.orientation !== undefined && !["vertical", "horizontal"].includes(props.orientation)) throw new Error(`${id}: a bridge's \`orientation\` is "vertical" (the default, steps across) or "horizontal" (steps down the page, names in a column)`);
+  if (props.orientation === "horizontal") return horizontalWaterfall({ id, frame, props });
   assertGridlineOption(props);
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
@@ -89,6 +91,68 @@ export function waterfall({ id, frame, props }) {
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
+}
+
+// A horizontal bridge's rows: the least a step's row takes, the share of it its bar fills, and the room at the bar ends for a figure.
+const HBRIDGE = Object.freeze({ row: 26, bar: 0.62, labelRoom: 64, nameMax: 260 });
+/**
+ * A bridge read down the page (`orientation: "horizontal"`): each step a row,
+ * its name in a column at the left - names too long to sit under columns, a
+ * dozen steps a page wide - its bar running from where the last ended, and
+ * its figure at the bar's end. It takes its notes in the commentary: a callout
+ * or a reference line set here is refused rather than dropped.
+ */
+function horizontalWaterfall({ id, frame, props }) {
+  if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
+  if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
+  if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
+  for (const key of ["annotations", "referenceLines", "changeAnnotations", "annotationRail", "periods", "events"]) {
+    const value = props[key];
+    if (Array.isArray(value) ? value.length : value) throw new Error(`${id}: a horizontal bridge takes its notes in the page's commentary - \`${key}\` is drawn on the vertical bridge; drop it or the orientation`);
+  }
+  const running = [];
+  let total = 0;
+  props.values.forEach((value, index) => { total = props.totals?.includes(index) ? value : total + value; running.push(total); });
+  const n = props.categories.length, rowHeight = frame.height / n;
+  if (rowHeight < HBRIDGE.row) throw new Error(`${id}: ${n} steps need ${Math.ceil(n * HBRIDGE.row)}px down the page and have ${Math.floor(frame.height)}px; fewer steps, or the vertical bridge`);
+  const nameWidth = Math.min(HBRIDGE.nameMax, frame.width * 0.28);
+  const names = props.categories.map((category) => measureText(category, nameWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const tallName = names.find((layout) => layout.height > rowHeight);
+  if (tallName) throw new Error(`${id}: the step "${props.categories[names.indexOf(tallName)]}" needs ${Math.ceil(tallName.height)}px and its row has ${Math.floor(rowHeight)}px; shorten it`);
+  const plot = { x: frame.x + nameWidth + 12 + HBRIDGE.labelRoom, y: frame.y, width: frame.width - nameWidth - 12 - 2 * HBRIDGE.labelRoom, height: frame.height };
+  if (plot.width < 160) throw new Error(`${id}: a horizontal bridge needs more width for its bars`);
+  // Steps that are a sliver of their totals are drawn as the vertical bridge draws them: the totals cut near their start and
+  // the scale opened on the band the steps move through (WATERFALL_BREAK_SHARE).
+  const steps = props.values.map((value, index) => (props.totals?.includes(index) ? null : [running[index] - value, running[index]])).filter(Boolean);
+  const stepLow = steps.length ? Math.min(...steps.flat()) : 0, stepHigh = steps.length ? Math.max(...steps.flat()) : 0;
+  const broken = props.yMin === undefined && props.yMax === undefined && steps.length > 0 && stepLow > 0 && running.every((level) => level > 0)
+    && stepHigh - stepLow < WATERFALL_BREAK_SHARE * stepHigh ? Math.max(0, stepLow - (stepHigh - stepLow)) : null;
+  const bounds = numericBounds(broken === null ? [0, ...running, ...steps.flat()] : [broken, ...running, ...steps.flat()], { min: broken ?? props.yMin, max: props.yMax, axis: "x", includeZero: broken === null, tight: true });
+  const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
+  const nodes = broken === null ? [linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: xScale(0), y1: plot.y, x2: xScale(0), y2: plot.y + plot.height, style: lineStyle(INK) })] : [];
+  let previous = 0, lastBar = null;
+  props.categories.forEach((category, index) => {
+    const value = props.values[index], isTotal = props.totals?.includes(index);
+    const start = isTotal ? (broken ?? 0) : previous, end = isTotal ? value : previous + value;
+    const y = frame.y + index * rowHeight, barHeight = rowHeight * HBRIDGE.bar;
+    const bar = { x: xScale(Math.min(start, end)), y: y + (rowHeight - barHeight) / 2, width: Math.max(2, Math.abs(xScale(end) - xScale(start))), height: barHeight };
+    const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.chartSeries3");
+    nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill), data: { category, value, total: Boolean(isTotal), ...(isTotal && broken !== null ? { axisBreak: broken } : {}) } }));
+    // The cut: two strokes of the page across the total near its start, so it reads as cut and not as short.
+    if (isTotal && broken !== null) for (const [at, dx] of [[0, 0], [1, 7]]) {
+      const x = bar.x + 22 + dx;
+      nodes.push(linePrimitive({ id: stableId(id, "axis-break", category, at), role: "chart-axis-break", x1: x - 5, y1: bar.y + bar.height + 4, x2: x + 5, y2: bar.y - 4, style: lineStyle(token("color.surface"), token("line.medium")) }));
+    }
+    const name = names[index];
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y + (rowHeight - name.height) / 2, width: nameWidth, height: name.height }, text: name.text, style: { ...textStyle(AXIS_LABEL, INK, Boolean(isTotal), "right"), valign: "top", lineHeight: name.lineHeight, wrap: false }, data: { textLayout: name } }));
+    // The figure at the end the step runs to: past the right end of a rise or a total, before the left end of a fall.
+    const text = isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`;
+    const right = isTotal || value >= 0;
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: right ? bar.x + bar.width + 4 : bar.x - HBRIDGE.labelRoom, y: y + (rowHeight - 24) / 2, width: HBRIDGE.labelRoom - 4, height: 24 }, text, style: textStyle(CHART_LABEL, INK, labelBold(), right ? "left" : "right"), data: { category, value } }));
+    if (lastBar) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: xScale(previous), y1: lastBar.y + lastBar.height, x2: xScale(previous), y2: bar.y, style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
+    previous = end; lastBar = bar;
+  });
+  return nodes;
 }
 
 /**

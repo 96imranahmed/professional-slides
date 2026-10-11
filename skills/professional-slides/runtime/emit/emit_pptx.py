@@ -429,6 +429,13 @@ class Emitter:
         fill = style_value(style, "fill", None)
         if fill and fill != "none":
             shape.fill.solid(); shape.fill.fore_color.rgb = rgb(fill)
+            # A translucent disc (a Venn set over its neighbour) keeps its opacity, as a filled shape does in _paint.
+            opacity = style.get("opacity")
+            if opacity is not None and float(opacity) < 1:
+                sf = shape.fill._xPr.find(qn("a:solidFill"))
+                clr = sf[0] if sf is not None and len(sf) else None
+                if clr is not None:
+                    etree.SubElement(clr, qn("a:alpha")).set("val", str(int(float(opacity) * 100000)))
         else:
             shape.fill.background()
         stroke = style_value(style, "stroke", None)

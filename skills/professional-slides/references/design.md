@@ -34,6 +34,7 @@ Decide what the page has to make the reader see, then take the page type and for
 | Each player's profile across three to eight attributes | `profiles`, form `radar` | A table whose shape the reader must picture |
 | One number that is the whole point | `numbers`, form `hero-number` with the evidence that produced it | A bullet |
 | Three to six headline numbers | `numbers`, form `metric-strip` over its exhibit; `stat-list` or `fact-grid` when each needs its sentence | Numbers buried in prose |
+| A market and the part of it the plan can win | `numbers`, form `nested-circles` | Three figures in a row with no sense of scale |
 | Exact values looked up across fields | `lookup`, form `measure-table` or `table`, each column's cell `type` coding what it holds | A chart that hides the digits |
 | Members judged against criteria | `scorecard`, form `harvey`, `rag`, `lights`, `check`, `heatmap` or `bars` | Prose pros and cons |
 | Findings down the side, evidence across | `matrix`, form `findings-matrix` | A table of sentences |
@@ -49,6 +50,7 @@ Decide what the page has to make the reader see, then take the page type and for
 | Position between two poles, or a judged grade on a named scale | `mechanism`, form `spectrum` | A 1-to-5 score nobody measured |
 | A hub and what depends on it | `mechanism`, form `relationship-network` | A list of dependencies |
 | Who reports to whom; things placed under the domains they belong to; an issue broken into its evidence | `mechanism`, form `organization`, `placement` or `insight-tree` | Indented bullets |
+| What two or three groups share | `mechanism`, form `venn` | Two lists the reader has to compare |
 | Dated milestones, durations, waves | `schedule`, form `timeline`, `gantt` or `roadmap` | A table of dates |
 | A portfolio of bets by when each pays | `schedule`, form `horizons` | A timeline that dates bets as tasks |
 | Initiatives rolled out year by year | `schedule`, form `rollout` | A gantt of phases with no dates |

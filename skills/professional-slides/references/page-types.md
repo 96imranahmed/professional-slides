@@ -139,9 +139,9 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `scorecard` | members judged against criteria, cells coded | harvey, heatmap, rag, lights, check, bars, progress, dot, trend, binary |
 | `lookup` | measures to look up under their units | measure-table, table |
 | `matrix` | findings down the side, evidence across | findings-matrix |
-| `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, organization, placement, insight-tree, ... |
+| `mechanism` | how a system works | flow, tree, cycle, steps, framework, layers, funnel, sankey, quadrants, organization, placement, insight-tree, venn, ... |
 | `schedule` | what happens when | timeline, gantt, roadmap, horizons, rollout |
-| `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list |
+| `numbers` | a few numbers that carry the claim | hero-number, metric-strip, fact-grid, stat-list, nested-circles |
 | `parallel` | three to six parallel ideas (give each card an `icon` for icon columns; cards with no icon take their tone from how they relate, as a model reads their titles: categories or options under a filled band, steps under large numerals, a ranked or counted set numbered) | cards, capsules, arrow-rows, labelled-rows |
 | `profiles` | who the players are, with their marks (a logo, a place's outline or a photograph, as each declares) | logos, people, logo-table, cards, radar |
 | `place` | where things are ([Geography](geography.md)) | map |
@@ -172,6 +172,8 @@ These forms narrow their type's commentary placements and carry checks of their 
 | `mechanism/insight-tree` | an issue broken into branches, each leaf's evidence and what follows set in the table beside it | `headers`, `root`, `branches` (each with `leaves`, three or more leaves in all, each `{ label, insight, implications }`) | the type's choices | a frame narrower than about 840px |
 | `schedule/rollout` | initiatives rolled out year by year, each row's phase in each year | `years` (3 or more), `rows` (2 or more, each `{ label, phases }`, a phase a year); a row named in words takes a column of its own, a code (A, 1) a disc | the type's choices | a row name too tall for its row |
 | `picture/device` | a product as its user sees it: a screenshot in its phone, tablet or laptop frame | one `exhibit` `{ device, image: { path, alt, credit } }` | `captions`, `beside`, `below` | no screenshot to frame |
+| `numbers/nested-circles` | a whole and the part of it inside the part - a market, the share that can be served, the share that can be won | `items` (2 to 4, each `{ label, value, display, text? }`, each value at most the one before) | the type's choices | a part larger than the whole it sits in |
+| `mechanism/venn` | two or three sets and what they share, the overlap the point | `sets` (2 or 3, each `{ id, label, text? }`), `overlaps` (each `{ sets: [ids], label }`) | the type's choices | an overlap naming a set that is not drawn |
 | `schedule/horizons` | the portfolio of bets by when each pays - the core now, growth next, options later | `horizons` (2 to 5, each `{ label, title, description }`, in the order they pay), `variant` (`curves`, `stepped`, `stepped-minimal`, `stepped-bands`) | `beside`, `below`, `so-what-bar`, `none` | fewer than two horizons |
 
 **Components without a page form.** Seven components are strips, bands or blanks that cannot fill a page; each reaches one by a route:

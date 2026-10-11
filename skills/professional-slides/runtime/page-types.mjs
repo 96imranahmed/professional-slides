@@ -165,7 +165,7 @@ export const PAGE_TYPES = Object.freeze({
     // columns they belong to; `insight-tree`: an issue broken into branches,
     // each leaf's evidence in the table beside it.
     forms: { ...Object.fromEntries(["flow", "tree", "cycle", "steps", "framework", "layers", "relationship-network", "funnel",
-      "sankey", "quadrants", "matrix", "spectrum", "process", "chevron-process", "zone-matrix", "rank-flow", "organization", "placement"].map((f) => [f, f])),
+      "sankey", "quadrants", "matrix", "spectrum", "process", "chevron-process", "zone-matrix", "rank-flow", "organization", "placement", "venn"].map((f) => [f, f])),
       "insight-tree": "insight-tree-table" },
     commentary: [...ANY_TEXT, "on-exhibit", "none"], exhibits: 1,
   },
@@ -179,7 +179,8 @@ export const PAGE_TYPES = Object.freeze({
   },
   numbers: {
     task: "a few measured numbers that carry the claim, with the evidence under them",
-    forms: { "hero-number": "hero-number", "metric-strip": "metrics-over-exhibit", "fact-grid": "fact-grid", "stat-list": "stat-list" },
+    // `nested-circles`: a whole and the part of it inside the part - a market sized to what can be served and won.
+    forms: { "hero-number": "hero-number", "metric-strip": "metrics-over-exhibit", "fact-grid": "fact-grid", "stat-list": "stat-list", "nested-circles": "nested-circles" },
     // Every numbers form sets its figures against one exhibit: the proof beside
     // a hero number, the tiles of a grid, the chart under a strip.
     commentary: ["beside", "below", "none"], exhibits: 1,
@@ -514,6 +515,7 @@ const MINIMUM = Object.freeze({
   // parts are the conclusions under them; a rank flow's are its `entities`.
   mechanism: (ex, form) => (form === "tree" ? (ex.branches || []).flatMap((b) => b?.conclusions || []).length >= 3
     : form === "insight-tree" ? (ex.branches || []).flatMap((b) => b?.leaves || []).length >= 3
+    : form === "venn" ? (ex.sets || []).length >= 2 || "a Venn diagram shows two or three sets and what they share"
     : ["nodes", "items", "stages", "layers", "branches", "pillars", "quadrants", "points", "flows", "entities", "fields", "children"].some((key) => Array.isArray(ex[key]) && ex[key].length >= 3)) || "a mechanism has three or more parts",
   relationship: (ex) => (ex.points || ex.rows || []).length >= 5 || "a relationship needs five or more members to show one",
   bridge: (ex) => (ex.categories || []).length >= 4 || "a bridge has a start, two or more steps and an end",
@@ -1462,7 +1464,7 @@ const formDraws = (type, form) => {
   if (PAGE_TYPES[type].table || (type === "profiles" && form === "logo-table")) return "table";
   if (["mechanism", "schedule", "composition", "profiles"].includes(type)) return target;
   if (type === "parallel" && form !== "labelled-rows") return target;
-  if (type === "numbers" && ["fact-grid", "stat-list"].includes(form)) return target;
+  if (type === "numbers" && ["fact-grid", "stat-list", "nested-circles"].includes(form)) return target;
   if (type === "picture" && form === "device") return "device-frame";
   return type === "place" ? "map" : type === "statement" && form === "quotes" ? "quote-cluster" : type === "options" && form === "compare" ? "compare" : null;
 };
@@ -1645,7 +1647,7 @@ function typedSlide(page, id, type, players) {
     if (!Array.isArray(chart.series) || !chart.series.length) throw new Error(`${id}: a model page's chart carries the \`series\` its data table prints`);
     slide.shape = "model-page";
   } else if (target.startsWith("chart.") || target === "aligned-bars" || ["mechanism", "schedule", "composition"].includes(page.type) || (page.type === "profiles" && page.form !== "logo-table")
-      || (page.type === "parallel" && exhibits.length) || (page.type === "numbers" && ["fact-grid", "stat-list"].includes(page.form))) {
+      || (page.type === "parallel" && exhibits.length) || (page.type === "numbers" && ["fact-grid", "stat-list", "nested-circles"].includes(page.form))) {
     if (!exhibits.length) throw new Error(`${id}: form "${page.form}" needs its exhibit`);
     setType(slide.exhibit ?? slide.exhibits[0], target);
   }

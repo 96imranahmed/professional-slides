@@ -5,5 +5,5 @@ export const TABLE_VARIANT_NAMES = Object.freeze([
   "status-report", "photo-rows", "category-logo-comparison", "signed-bar-rows", "dimension-headers", "standard", "open", "plain",
   "plain-rows", "accented-rows", "category-bullets", "grouped-hypotheses", "grouped-hypotheses-labelled", "numbered-sections",
   "grouped-text", "rating-scale", "options-as-columns", "bar-columns", "bar-columns-plain-numbers", "variable-cardinality",
-  "heatmap-1-10", "heatmap-diverging", "heatmap-adverse", "implication-columns",
+  "heatmap-1-10", "heatmap-diverging", "heatmap-adverse", "implication-columns", "sparkline-rows",
 ]);

@@ -21,6 +21,7 @@ const MUTED_SURFACE = token("color.surfaceMuted");
 const INK = token("color.ink");
 const SECONDARY = token("color.textSecondary");
 const PRIMARY = token("color.componentPrimary");
+const WHITE = token("color.onPrimary");
 const HAIRLINE = token("line.hairline");
 const LABEL = token("type.label");
 const FONT = token("font.body");
@@ -352,13 +353,31 @@ function markerCoordinate(marker, geography, projected) {
   return [projected.plot.x + marker.x * projected.plot.width, projected.plot.y + marker.y * projected.plot.height];
 }
 
+// A badge prints its value inside its disc, so the figure carries the value and
+// every badge on the map is one size - the widest figure's with a little air
+// round it. Sized by area as well, a small value's badge was swollen to hold its
+// figure and the size key no longer told the truth; a map of badges has no key.
+const BADGE_PAD = 10;
+const badgeText = (marker) => String(marker.display ?? marker.value);
+const badgeLayout = (marker) => measureText(badgeText(marker), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
+const badgeDiameter = (markers) => Math.max(0, ...markers.filter((marker) => marker?.style === "badge").map((marker) => { const layout = badgeLayout(marker); return Math.max(layout.width, layout.height) + BADGE_PAD; }));
+function markerDiameter(marker, maxValue, badges = 0) {
+  return marker?.style === "badge" ? badges : drawnDiameter(marker, maxValue);
+}
+
 function markerNodes({ id, frame, geography, projected, markers, highlighted = new Set() }) {
   const maxValue = Math.max(0, ...markers.map((marker) => Number.isFinite(marker?.value) ? marker.value : 0));
+  for (const marker of markers) {
+    if (marker?.style !== undefined && marker.style !== "badge") throw new Error(`A map marker's \`style\` is "badge" (its value printed in its disc) or left out (got ${JSON.stringify(marker.style)})`);
+    if (marker?.style === "badge" && !Number.isFinite(marker.value)) throw new Error(`A badge marker prints its value: give "${marker.label ?? "it"}" a \`value\` (and \`display\` for the figure as printed)`);
+  }
+  const badges = badgeDiameter(markers);
+  if (badges && markers.some((marker) => Number.isFinite(marker?.value) && marker.style !== "badge")) throw new Error("A map's valued markers are all badges (the figure printed) or none (sized by area against a key); mixed, the key reads the badges wrong");
   // Every marker's footprint, before any label is placed, so a label never
   // lands on a marker that comes later in the list.
   const occupied = markers.map((marker) => {
     const [x, y] = markerCoordinate(marker, geography, projected);
-    const r = drawnDiameter(marker, maxValue) / 2 + 1;
+    const r = markerDiameter(marker, maxValue, badges) / 2 + 1;
     return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
   });
   const nodes = [];
@@ -388,14 +407,18 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
     // world without covering the country around it. A hub is a ring with a dot
     // in it. A marker carrying a value is sized by area against the largest
     // value on the map (valueDiameter), so the size legend reads true.
-    const size = drawnDiameter(marker, maxValue);
+    const size = markerDiameter(marker, maxValue, badges);
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
-    nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
+    if (marker.style === "badge") {
+      const layout = badgeLayout(marker);
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, badge: true, value: marker.value } }));
+      nodes.push(textPrimitive({ id: stableId(id, "marker-value", index), role: "map-marker-value", frame: { x: centerX - layout.width / 2 - 1, y: centerY - layout.height / 2, width: Math.ceil(layout.width) + 2, height: layout.height }, text: badgeText(marker), style: { fontFamily: FONT, fontSize: LABEL, color: WHITE, bold: true, align: "center", valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { value: marker.value, textLayout: layout } }));
+    } else nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
     if (marker.hub) {
       const dot = size * 0.45, dotFrame = { x: centerX - dot / 2, y: centerY - dot / 2, width: dot, height: dot };
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: dotFrame, style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, radius: token("radius.round") } }));
     }
-    const fraction = marker.hub ? 0 : (marker.fraction ?? 1);
+    const fraction = marker.hub || marker.style === "badge" ? 0 : (marker.fraction ?? 1);
     if (fraction >= 0.999) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") } }));
     else if (fraction > 0) nodes.push(wedgePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: markerFrame, startAngle: -90, endAngle: -90 + fraction * 360, style: { fill: INK, stroke: INK, lineWidth: HAIRLINE, radius: token("radius.none") } }));
     if (marker.label) {
@@ -549,7 +572,7 @@ const formatLegendValue = (v) => Number.isInteger(v) ? v.toLocaleString("en-US")
  */
 function sizeLegendSpec(props, markers) {
   const valued = markers.filter((m) => Number.isFinite(m?.value));
-  if (!valued.length || props.sizeLegend === false) return null;
+  if (!valued.length || props.sizeLegend === false || valued.every((marker) => marker.style === "badge")) return null;
   const options = props.sizeLegend && typeof props.sizeLegend === "object" ? props.sizeLegend : {};
   const style = options.style ?? "row";
   if (!["row", "stacked"].includes(style)) throw new Error('Map sizeLegend style is "row" or "stacked"');

@@ -4673,6 +4673,71 @@
       "source": "Illustrative revenue data for a fictional operator",
       "highlight": "£22m",
       "id": "layout-breakout"
+    },
+    {
+      "id": "figure-nested-circles",
+      "title": "The plan can win £96m of a £1.2bn leisure market",
+      "exhibit": {
+        "type": "nested-circles",
+        "items": [
+          {
+            "label": "Regional leisure travel",
+            "value": 1200,
+            "display": "£1.2bn"
+          },
+          {
+            "label": "Trips Northvale's lines serve",
+            "value": 480,
+            "display": "£480m"
+          },
+          {
+            "label": "What the plan can win",
+            "value": 96,
+            "display": "£96m"
+          }
+        ]
+      },
+      "points": [
+        "Two-fifths of regional leisure travel runs between places the network serves",
+        "The plan can win a fifth of that by FY30"
+      ],
+      "source": "Illustrative market sizing for a fictional operator"
+    },
+    {
+      "id": "figure-venn",
+      "title": "Later weekend trains serve all three groups the plan targets",
+      "exhibit": {
+        "type": "venn",
+        "sets": [
+          {
+            "id": "walk",
+            "label": "Weekend walkers"
+          },
+          {
+            "id": "older",
+            "label": "Older passengers"
+          },
+          {
+            "id": "family",
+            "label": "Families"
+          }
+        ],
+        "overlaps": [
+          {
+            "sets": [
+              "walk",
+              "older",
+              "family"
+            ],
+            "label": "Later weekend trains"
+          }
+        ]
+      },
+      "points": [
+        "A later last train is the one change all three groups ask for",
+        "Each group's own asks come after the shared change"
+      ],
+      "source": "Illustrative passenger research for a fictional operator"
     }
   ],
   "fill": "airy"

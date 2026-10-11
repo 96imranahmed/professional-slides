@@ -43,7 +43,10 @@ export const CELL_TYPES = Object.freeze([
   "dot",
   "check",
   "trend",
+  "sparkline",
 ]);
+// A sparkline cell's line: its least width, and the most points it draws before it is a chart, not a cell.
+const SPARK = Object.freeze({ width: 56, height: 18, points: 24 });
 // A photo cell's height: three body lines, which is where a thumbnail stops
 // being a sliver and starts showing what it is of.
 const PHOTO_CELL_HEIGHT = 64;
@@ -739,6 +742,13 @@ function markCellLayout(cell, { padding, gap, marker, inner, bold, size }) {
     if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width; widen the column");
     return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
   }
+  if (cell.type === "sparkline") {
+    const values = Array.isArray(cell.values) ? cell.values.map(Number) : [];
+    if (values.length < 3 || values.length > SPARK.points || values.some((value) => !Number.isFinite(value))) throw new Error(`Table sparkline cells take three to ${SPARK.points} numbers in \`values\`, in order`);
+    const label = measure(cell.text ?? String(cell.values.at(-1)), inner, true, "type.label");
+    if (inner - label.width - gap < SPARK.width) throw new Error("Table sparkline cell leaves no room for its line; widen the column");
+    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, spark: { values, labelWidth: label.width }, height: Math.max(label.height, SPARK.height) };
+  }
   if (cell.type === "trend") {
     const key = { up: "up", positive: "up", strong: "up", improving: "up", flat: "flat", neutral: "flat", moderate: "flat", stable: "flat", down: "down", negative: "down", weak: "down", declining: "down" }[String(cell.value).toLowerCase()];
     if (!key) throw new Error(`Table trend cells take up, flat or down (got ${cell.value})`);
@@ -900,6 +910,7 @@ function minimumDrawnWidth(cell, props = {}) {
     return Math.ceil(Math.max(label, v("space.6")) + gap + v("space.6"));
   }
   if (cell.type === "trend") return v("icon.small") + v("space.2");
+  if (cell.type === "sparkline") return Math.ceil(measure(cell.text ?? String((cell.values || []).at(-1) ?? ""), 100000, true, "type.label").width + gap + SPARK.width);
   if (cell.type === "dot" || cell.type === "check") return v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
   // A verdict with its player's mark: the mark, the gap and the longest word.
   if (cell.type === "logo" && cell.text && cell.media?.width) {
@@ -1812,6 +1823,7 @@ function drawCellContent(table, cell, at) {
   } else if (cell.type === "rag") drawStatusPill(table, cell, at);
   else if (cell.type === "lights") drawLights(table, cell, at);
   else if (cell.type === "progress") drawProgress(table, cell, at);
+  else if (cell.type === "sparkline") drawSparkline(table, cell, at);
   else if (cell.type === "dot") drawDot(table, cell, at);
   else if (cell.type === "trend") drawTrend(table, cell, at);
   else if (cell.type === "check") drawCheck(table, cell, at);
@@ -1852,6 +1864,25 @@ function drawProgress(table, cell, at) {
   nodes.push(rectPrimitive({ id: stableId(cellId, "track"), role: "table-progress-track", frame: { x: inner.x, y: y0, width: trackWidth, height: barHeight }, style: box(t("color.chartGrid")), data }));
   if (value > 0) nodes.push(rectPrimitive({ id: stableId(cellId, "fill"), role: "table-progress-fill", frame: { x: inner.x, y: y0, width: trackWidth * value / 100, height: barHeight }, style: box(primary), data: { ...data, value } }));
   putText(stableId(cellId, "progress-label"), "table-progress-label", { x: inner.x + trackWidth + m.gap, y: area.y + (height - l.blocks[0].height) / 2, width: labelWidth }, l.blocks[0], textStyle(true, color, "right", "type.label"), data);
+}
+
+/**
+ * A row's values as a small line on the row's own scale - its shape, the
+ * reading a sparkline is for - with its last value printed beside it for the
+ * level, and a dot on that last point.
+ */
+function drawSparkline(table, cell, at) {
+  const { m, nodes, putText } = table;
+  const { l, height, area, cellId, data, color, inner } = at;
+  const { values, labelWidth } = l.spark;
+  const width = inner.width - labelWidth - m.gap, top = area.y + (height - SPARK.height) / 2;
+  const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+  const point = (value, i) => ({ x: inner.x + (width * i) / (values.length - 1), y: top + SPARK.height - ((value - lo) / span) * SPARK.height });
+  const points = values.map(point);
+  points.slice(1).forEach((p, i) => nodes.push(linePrimitive({ id: stableId(cellId, "spark", i), role: "table-sparkline", x1: points[i].x, y1: points[i].y, x2: p.x, y2: p.y, style: { stroke: primary, lineWidth: t("line.standard") }, data })));
+  const end = points.at(-1), dot = 5;
+  nodes.push(ellipsePrimitive({ id: stableId(cellId, "spark-end"), role: "table-sparkline-end", frame: { x: end.x - dot / 2, y: end.y - dot / 2, width: dot, height: dot }, style: { fill: primary, stroke: primary, lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, value: values.at(-1) } }));
+  putText(stableId(cellId, "spark-label"), "table-sparkline-label", { x: inner.x + width + m.gap, y: area.y + (height - l.blocks[0].height) / 2, width: labelWidth }, l.blocks[0], textStyle(true, color, "right", "type.label"), data);
 }
 
 /** A dot, filled or open. */

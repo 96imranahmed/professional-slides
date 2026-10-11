@@ -114,11 +114,19 @@ function down(frame, stages, roadmap, stacked = false) {
  * `height` is what it takes with the rhythm its frame allows, `ceiling` the
  * most it can take legibly.
  */
-export function stagesLayout(frame, props, { roadmap = false, id = "schedule" } = {}) {
+export function stagesLayout(frameIn, props, { roadmap = false, id = "schedule" } = {}) {
   if (!Array.isArray(props.items) || !props.items.length) throw new Error(`${id} requires ordered stages`);
   if (props.orientation !== undefined && !["across", "down"].includes(props.orientation)) throw new Error(`${id}: \`orientation\` is "across" (the stages in columns) or "down" (the stages in rows)`);
   const stages = props.items.map((item, index) => stageOf(item, index, id));
-  const attempt = (build, stacked) => { try { return build(frame, stages, roadmap, stacked); } catch (error) { return { error }; } };
+  // Eras take room of their own: a bracket row over the columns, or a heading
+  // before each era's first row. The stages are laid out in what is left.
+  const eras = erasOf(props.eras, stages, id);
+  const reserve = (name) => (!eras.length ? 0 : name === "across" ? ERA_ROW : eras.length * ERA_HEAD);
+  const shrink = (height) => ({ ...frameIn, height: Number.isFinite(frameIn.height) ? frameIn.height - height : frameIn.height });
+  const frame = frameIn;
+  // Each arrangement is laid out in the frame its eras leave, and carries what it reserved.
+  const attempt = (build, stacked) => { const name = build === across ? "across" : "down", held = reserve(name);
+    try { const option = build(shrink(held), stages, roadmap, stacked); return { ...option, held, natural: option.natural + held }; } catch (error) { return { error }; } };
   const stackable = roadmap && stages.some((stage) => stage.when);
   const options = (props.orientation ? [props.orientation] : ["across", "down"]).flatMap((name) => (name === "across" ? [attempt(across)] : [attempt(down, false), ...(stackable ? [attempt(down, true)] : [])]));
   const drawn = options.filter((option) => !option.error);
@@ -135,7 +143,32 @@ export function stagesLayout(frame, props, { roadmap = false, id = "schedule" } 
     : fitting.length ? (pick("across") && pick("across").natural >= 0.8 * frame.height ? pick("across") : pick("down") ?? fitting[0])
     : drawn.reduce((best, option) => (option.natural < best.natural ? option : best));
   const spare = bounded ? Math.max(0, Math.min(chosen.growth, frame.height - chosen.natural)) : 0;
-  return { ...chosen, stages, spare, height: chosen.natural + spare, ceiling: chosen.natural + chosen.growth };
+  const eraHeight = chosen.orientation === "across" ? chosen.held : 0;
+  const inner = { ...frameIn, y: frameIn.y + eraHeight, height: Number.isFinite(frameIn.height) ? frameIn.height - eraHeight : frameIn.height };
+  return { ...chosen, stages, spare, inner, eras, eraHeight, height: chosen.natural + spare, ceiling: chosen.natural + chosen.growth };
+}
+
+// The row an era takes over the columns: its name, and the bracket under it
+// that spans its stages; and the heading an era takes before its first row.
+const ERA_ROW = 34, ERA_HEAD = 30;
+/**
+ * `eras: [{ label, from, to }]` - one to four named runs of stages (a
+ * stage's label or its place, from 0), in order and not overlapping: the
+ * franchise periods over a timeline, the plan's phases over its milestones.
+ */
+function erasOf(eras, stages, id) {
+  if (eras === undefined) return [];
+  if (!Array.isArray(eras) || eras.length < 1 || eras.length > 4) throw new Error(`${id}: \`eras\` names one to four runs of stages, each { label, from, to }`);
+  const at = (ref) => (Number.isInteger(ref) ? ref : stages.findIndex((stage) => stage.label === String(ref)));
+  let last = -1;
+  return eras.map((era, index) => {
+    const from = at(era?.from), to = at(era?.to ?? era?.from);
+    if (typeof era?.label !== "string" || !era.label.trim()) throw new Error(`${id}: era ${index + 1} needs a \`label\``);
+    if (!(from >= 0 && to >= from && to < stages.length)) throw new Error(`${id}: era "${era.label}" runs from a stage to a later one, each named by its label or its place from 0 (stages: ${stages.map((stage) => stage.label).join(", ")})`);
+    if (from <= last) throw new Error(`${id}: era "${era.label}" overlaps the era before it; eras run in order and do not overlap`);
+    last = to;
+    return { label: era.label.trim(), from, to };
+  });
 }
 
 /** The nodes of a dated timeline (`roadmap: false`) or roadmap in `frame`. */
@@ -144,6 +177,20 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
   if (L.natural > frame.height + 0.01) throw new Error(`${id}: the stages need ${Math.ceil(L.natural)}px and have ${Math.floor(frame.height)}px; cut the detail, use fewer stages, or give the schedule the page's height`);
   const prefix = roadmap ? "roadmap" : "timeline";
   const nodes = [];
+  // Each era over its stages: its name, and a bracket from the first stage's column to the last's.
+  if (L.eras.length && L.orientation === "across") {
+    const span = L.inner.width / L.stages.length;
+    for (const [index, era] of L.eras.entries()) {
+      const x1 = frame.x + era.from * span + v("space.2"), x2 = frame.x + (era.to + 1) * span - v("space.2"), y = frame.y + L.eraHeight - v("space.2");
+      const layout = measure(era.label, x2 - x1, COMPACT, true);
+      nodes.push(textPrimitive({ id: stableId(id, "era-label", index), role: `${prefix}-era`, frame: { x: x1, y: y - 8 - layout.height, width: x2 - x1, height: layout.height }, text: layout.text,
+        style: { ...textStyle(COMPACT, SECONDARY, true, "center", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, era: era.label } }));
+      nodes.push(openLine(stableId(id, "era-bracket", index), x1, y - 4, x2, y - 4, `${prefix}-era-bracket`, RULE, HAIRLINE));
+      nodes.push(openLine(stableId(id, "era-tick", index, "start"), x1, y - 4, x1, y + 2, `${prefix}-era-bracket`, RULE, HAIRLINE));
+      nodes.push(openLine(stableId(id, "era-tick", index, "end"), x2, y - 4, x2, y + 2, `${prefix}-era-bracket`, RULE, HAIRLINE));
+    }
+  }
+  frame = L.inner;
   const say = (key, index, layout, box, size, color, bold, align = "left", valign = "top") => nodes.push(textPrimitive({ id: stableId(id, key, index), role: `${prefix}-${key}`, frame: box, text: layout.text,
     style: { ...textStyle(size, color, bold, align, valign), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, stage: index } }));
   const blockFill = token("color.surfaceTint");
@@ -174,7 +221,18 @@ export function stagesNodes({ id, frame, props, roadmap = false }) {
   const railX = frame.x + L.headX + L.marker / 2;
   const rows = [];
   let y = frame.y;
-  for (const cell of L.cells) { rows.push(y); y += cell.height + rowGap; }
+  // An era's heading - its name over a hairline - stands before its first row.
+  L.cells.forEach((cell, index) => {
+    const era = L.eras.find((candidate) => candidate.from === index);
+    if (era) {
+      const k = L.eras.indexOf(era), layout = measure(era.label, frame.width, COMPACT, true);
+      nodes.push(textPrimitive({ id: stableId(id, "era-label", k), role: `${prefix}-era`, frame: { x: frame.x, y, width: frame.width, height: layout.height }, text: layout.text,
+        style: { ...textStyle(COMPACT, SECONDARY, true, "left", "top"), lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, era: era.label } }));
+      nodes.push(openLine(stableId(id, "era-bracket", k), frame.x, y + layout.height + 4, frame.x + frame.width, y + layout.height + 4, `${prefix}-era-bracket`, RULE, HAIRLINE));
+      y += ERA_HEAD;
+    }
+    rows.push(y); y += cell.height + rowGap;
+  });
   if (!roadmap && L.cells.length > 1) {
     const first = rows[0] + L.cells[0].label.lineHeight / 2, last = rows.at(-1) + L.cells.at(-1).label.lineHeight / 2;
     nodes.push(openLine(stableId(id, "rail"), railX, first, railX, last, `${prefix}-rail`, RULE, STANDARD));

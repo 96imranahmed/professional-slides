@@ -138,6 +138,8 @@ function candidates(sample){
     seriesGrowth:[{from:first,to:last}],
     stackBracket:series.length>1?[series.slice(0,2)]:[],
     diverging:series.length>1?[series.length%2?{neutral:series[(series.length-1)/2]}:true]:[],
+    // A fit through the points (chart-scatter-pie.mjs): five points or more.
+    trendLine:(sample.points||[]).length>=5?[{method:'linear'}]:[],
   };
 }
 const MARK_KEYS=['annotations','highlights','referenceLines','focusSeries','focus','changeAnnotations','pointHighlights','periods','events','annotationRail'];

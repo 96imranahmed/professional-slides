@@ -92,6 +92,7 @@ export function scatter({ id, frame, props, bubble = false }) {
   Object.assign(chart, scatterPlot(chart));
   Object.assign(chart, scatterScales(chart));
   Object.assign(chart, scatterAxes(chart));
+  drawTrendLine(chart);
   Object.assign(chart, drawScatterPoints(chart));
   Object.assign(chart, drawConnectedSeries(chart));
   placeScatterLabels(chart);
@@ -229,6 +230,42 @@ function scatterAxes(chart) {
     }
   }
   return { nodes };
+}
+
+// A fit is a claim about the sample: under five points a line through them says more than they do.
+const TREND_LEAST = 5;
+/**
+ * `trendLine: { method: "linear", label? }`: the least-squares line through
+ * the points, drawn behind them across the x range they cover, and named with
+ * its basis - "Linear fit, R² = 0.62" unless `label` says otherwise, or nothing
+ * with `label: false`. A line where the points have no x spread, or past the
+ * linear method, is refused rather than drawn as a guess.
+ */
+function drawTrendLine(chart) {
+  const { id, props, plot, xScale, yScale, xBounds, yBounds, nodes } = chart;
+  const trend = props.trendLine;
+  if (!trend) return;
+  if (typeof trend !== "object" || (trend.method ?? "linear") !== "linear") throw new Error(`${id}: a trend line is \`{ method: "linear" }\` - the least-squares line through the points; another model is the analysis's to report, not the chart's to draw`);
+  const points = props.points;
+  if (points.length < TREND_LEAST) throw new Error(`${id}: a trend line through ${points.length} points says more than they do - fit it on ${TREND_LEAST} or more, or label the points and leave the reader to judge`);
+  const n = points.length, mx = points.reduce((s, p) => s + p.x, 0) / n, my = points.reduce((s, p) => s + p.y, 0) / n;
+  const sxx = points.reduce((s, p) => s + (p.x - mx) ** 2, 0), sxy = points.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0), syy = points.reduce((s, p) => s + (p.y - my) ** 2, 0);
+  if (!(sxx > 0)) throw new Error(`${id}: the points share one x, so no line can be fitted through them`);
+  const slope = sxy / sxx, intercept = my - slope * mx, r2 = syy > 0 ? (sxy * sxy) / (sxx * syy) : 1;
+  // Across the points' own x range, held inside the plot's y bounds.
+  const yAt = (x) => intercept + slope * x;
+  // An end past the y bounds moves back along the line to the bound it crosses.
+  const clip = (x) => { const y = yAt(x); return y < yBounds.min ? (yBounds.min - intercept) / slope : y > yBounds.max ? (yBounds.max - intercept) / slope : x; };
+  const x0 = clip(Math.min(...points.map((p) => p.x))), x1 = clip(Math.max(...points.map((p) => p.x)));
+  nodes.push(linePrimitive({ id: stableId(id, "trend-line"), role: "chart-trend-line", x1: xScale(x0), y1: yScale(yAt(x0)), x2: xScale(x1), y2: yScale(yAt(x1)),
+    style: lineStyle(SECONDARY, token("line.standard"), "dash"), data: { method: "linear", slope, intercept, r2 } }));
+  const text = trend.label === false ? null : typeof trend.label === "string" && trend.label.trim() ? trend.label.trim() : `Linear fit, R² = ${r2.toFixed(2)}`;
+  if (!text) return;
+  const layout = measureText(text, 240, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_ANNOTATION) });
+  const ex = xScale(x1), ey = yScale(yAt(x1));
+  const above = ey - layout.height - 6 >= plot.y;
+  nodes.push(textPrimitive({ id: stableId(id, "trend-label"), role: "chart-reference-label", frame: { x: Math.max(plot.x, Math.min(plot.x + plot.width - layout.width - 2, ex - layout.width)), y: above ? ey - layout.height - 6 : ey + 6, width: Math.ceil(layout.width) + 2, height: layout.height },
+    text, style: { ...textStyle(CHART_ANNOTATION, SECONDARY, false, "right"), valign: "top" }, data: { trendLine: true, r2, textLayout: layout } }));
 }
 
 /** Each point (sized, for a bubble chart) and its label, and the maps callouts anchor to. */

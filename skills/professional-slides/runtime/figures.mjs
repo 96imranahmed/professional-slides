@@ -305,7 +305,20 @@ function normalizeSpectrum(props) {
   const segments = props.segments === undefined ? null : Number(props.segments);
   if (segments !== null && !(Number.isInteger(segments) && segments >= 3 && segments <= 7)) throw new Error("A segmented spectrum takes 3 to 7 segments");
   if (props.scale !== undefined && (segments === null || !Array.isArray(props.scale) || props.scale.length !== segments || props.scale.some((step) => !clean(step)))) throw new Error("A spectrum's scale names every segment, in order, and needs `segments`");
+  // `markers`: two or three things placed on every row - options, players, now
+  // and target - each named once in a key over the track, the first the subject.
+  const markers = props.markers === undefined ? null : between(props.markers, 2, 3, "A spectrum's markers").map((marker, i) => {
+    if (!clean(marker?.id) || !clean(marker?.label)) throw new Error(`Spectrum marker ${i + 1} needs an \`id\` and a \`label\` for the key`);
+    return { id: clean(marker.id), label: clean(marker.label) };
+  });
+  if (markers && segments !== null) throw new Error("Markers sit on the continuous spectrum; a segmented scale marks one level a row");
   return between(props.items, 2, 6, "A spectrum").map((item, i) => {
+    if (markers) {
+      if (!clean(item?.left) || !clean(item?.right)) throw new Error(`Spectrum row ${i + 1} needs both poles named`);
+      const values = markers.map((marker) => Number(item.values?.[marker.id]));
+      if (values.some((value) => !(value >= 0 && value <= 1))) throw new Error(`Spectrum row ${i + 1} places every marker - ${markers.map((marker) => marker.id).join(", ")} - at a fraction from 0 to 1 in \`values\``);
+      return { left: clean(item.left), right: clean(item.right), values, text: clean(item.text) };
+    }
     if (segments !== null) {
       if (!clean(item?.left)) throw new Error(`Spectrum row ${i + 1} needs its name in \`left\``);
       const level = Number(item.level);
@@ -336,8 +349,9 @@ export function spectrumLayout(frame, props) {
   const gap = v("space.5");
   const segGap = 4, segWidth = segments ? (trackWidth - segGap * (segments - 1)) / segments : 0;
   const scale = segments && props.scale ? props.scale.map((step) => measure(step, segWidth, "type.label")) : null;
-  const header = scale ? Math.max(...scale.map((m) => m.height)) + v("space.2") : 0;
-  return { rows, segments, segGap, segWidth, scale, header, rightPole, poleWidth, trackWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  const key = props.markers ? props.markers.map((marker) => measure(String(marker.label), trackWidth, "type.compact", true)) : null;
+  const header = scale ? Math.max(...scale.map((m) => m.height)) + v("space.2") : key ? Math.max(...key.map((m) => m.height)) + v("space.4") : 0;
+  return { rows, segments, segGap, segWidth, scale, key, header, rightPole, poleWidth, trackWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
 
 export function spectrumNodes({ id, frame, props }) {
@@ -351,6 +365,18 @@ export function spectrumNodes({ id, frame, props }) {
   const trackX = frame.x + L.poleWidth + v("space.4");
   const segX = (k) => trackX + k * (L.segWidth + L.segGap);
   if (L.scale) L.scale.forEach((m, k) => out.push(label(stableId(id, "scale", k), "spectrum-scale", { x: segX(k), y: y + L.header - v("space.2") - m.height, width: L.segWidth }, m, style("type.label", SECONDARY, false, "center"))));
+  // The key: each marker's dot and name, in a row centred over the track.
+  const MARKER_FILLS = [ACCENT, PRIMARY, SECONDARY], keyDot = 10;
+  if (L.key) {
+    const widths = L.key.map((m) => keyDot + v("space.2") + m.width), total = widths.reduce((a, b) => a + b, 0) + v("space.5") * (widths.length - 1);
+    let kx = trackX + (L.trackWidth - total) / 2;
+    L.key.forEach((m, k) => {
+      const ky = y + L.header - v("space.4") - m.height;
+      out.push(ellipsePrimitive({ id: stableId(id, "key-dot", k), role: "spectrum-key-dot", frame: { x: kx, y: ky + (m.height - keyDot) / 2, width: keyDot, height: keyDot }, style: { fill: MARKER_FILLS[k], stroke: MARKER_FILLS[k], lineWidth: token("line.hairline") }, data: { marker: props.markers[k].id } }));
+      out.push(label(stableId(id, "key-label", k), "spectrum-key-label", { x: kx + keyDot + v("space.2"), y: ky, width: m.width + 2 }, m, style("type.compact", INK, true, "left")));
+      kx += widths[k] + v("space.5");
+    });
+  }
   y += L.header;
   L.rows.forEach((r, i) => {
     const rid = stableId(id, "row", i), mid = y + r.head / 2, dot = 16;
@@ -359,6 +385,17 @@ export function spectrumNodes({ id, frame, props }) {
     if (L.segments) {
       for (let k = 0; k < L.segments; k++) out.push(fillRect(stableId(rid, "segment", k), k === r.item.level - 1 ? "spectrum-level" : "spectrum-segment", { x: segX(k), y: mid - 7, width: L.segWidth, height: 14 }, k === r.item.level - 1 ? ACCENT : MUTED, { data: { level: k + 1, selected: k === r.item.level - 1 } }));
       if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "left")));
+      y += r.height + gap;
+      return;
+    }
+    if (r.item.values) {
+      // Every marker on the bare track, the subject drawn last so it sits on top of a tie.
+      out.push(fillRect(stableId(rid, "track"), "spectrum-track", { x: trackX, y: mid - 3, width: L.trackWidth, height: 6 }, MUTED, { radius: "radius.round" }));
+      [...r.item.values.keys()].reverse().forEach((k) => {
+        const value = r.item.values[k];
+        out.push(ellipsePrimitive({ id: stableId(rid, "marker", props.markers[k].id), role: "spectrum-marker", frame: { x: trackX + L.trackWidth * value - dot / 2, y: mid - dot / 2, width: dot, height: dot }, style: { fill: MARKER_FILLS[k], stroke: WHITE, lineWidth: token("line.standard") }, data: { value, marker: props.markers[k].id } }));
+      });
+      if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "center")));
       y += r.height + gap;
       return;
     }
@@ -481,6 +518,130 @@ export function placementNodes({ id, frame, props }) {
       y += tile + L.pillGap;
     });
   });
+  return out;
+}
+
+
+/* ---------------------------------------------------------- nested circles */
+
+// A market sized as the share of it that can be served and the share that can
+// be won (TAM, SAM, SOM), or any whole with the part of it inside the part:
+// circles one inside the next, each sized by area, resting on one point, each
+// figure named beside its circle on a leader. Each circle holds the next, so
+// each value is at most the one before.
+function normalizeNested(props) {
+  const items = between(props.items, 2, 4, "Nested circles").map((item, i) => {
+    if (!clean(item?.label)) throw new Error(`Circle ${i + 1} needs a label`);
+    const value = Number(item.value);
+    if (!(value > 0)) throw new Error(`Circle "${item.label}" needs a positive \`value\` to be sized by`);
+    return { label: clean(item.label), value, display: clean(item.display) ?? String(item.value), text: clean(item.text) };
+  });
+  items.forEach((item, i) => { if (i && item.value > items[i - 1].value) throw new Error(`"${item.label}" sits inside "${items[i - 1].label}", so its value is at most ${items[i - 1].value}`); });
+  return items;
+}
+
+export function nestedLayout(frame, props) {
+  const items = normalizeNested(props);
+  const labelWidth = Math.min(320, frame.width * 0.42), gap = v("space.6");
+  const diameter = Math.min(frame.width - labelWidth - gap, Number.isFinite(frame.height) ? frame.height : Infinity, 420);
+  if (diameter < 160) throw new Error("Nested circles need more room; widen the frame");
+  const largest = items[0].value;
+  const circles = items.map((item) => ({ item, d: diameter * Math.sqrt(item.value / largest),
+    figure: measure(item.display, labelWidth, "type.heading", true), name: measure(item.label, labelWidth, "type.body", true), text: item.text ? measure(item.text, labelWidth, "type.compact") : null }));
+  return { items, circles, diameter, labelWidth, gap, height: diameter };
+}
+
+export function nestedNodes({ id, frame, props }) {
+  const L = nestedLayout(frame, props);
+  const out = [], fills = [MUTED, TINT, PRIMARY, ACCENT];
+  const width = L.diameter + L.gap + L.labelWidth, x0 = frame.x + (frame.width - width) / 2, bottom = frame.y + (frame.height + L.diameter) / 2, cx = x0 + L.diameter / 2;
+  L.circles.forEach((c, i) => out.push(ellipsePrimitive({ id: stableId(id, "circle", i), role: "nested-circle", frame: { x: cx - c.d / 2, y: bottom - c.d, width: c.d, height: c.d },
+    style: { fill: fills[i], stroke: i ? "none" : RULE, lineWidth: token("line.hairline") }, data: { label: c.item.label, value: c.item.value } })));
+  // Each circle named at the height of its top, on a leader from the top to the column at the right; the labels keep
+  // their order down the column and never overlap, so a leader may bend down to its label.
+  const lx = x0 + L.diameter + L.gap;
+  let floor = frame.y;
+  L.circles.forEach((c, i) => {
+    const top = bottom - c.d, block = c.figure.height + c.name.height + (c.text ? v("space.1") + c.text.height : 0);
+    const y = Math.max(floor, top - c.figure.height / 2);
+    out.push(line(stableId(id, "leader", i), "nested-leader", cx, top, lx - v("space.2"), y + c.figure.height / 2, SECONDARY));
+    out.push(label(stableId(id, "figure", i), "nested-figure", { x: lx, y, width: L.labelWidth }, c.figure, style("type.heading", i === L.circles.length - 1 ? ACCENT : INK, true)));
+    out.push(label(stableId(id, "name", i), "nested-label", { x: lx, y: y + c.figure.height, width: L.labelWidth }, c.name, style("type.body", INK, true)));
+    if (c.text) out.push(label(stableId(id, "text", i), "nested-text", { x: lx, y: y + c.figure.height + c.name.height + v("space.1"), width: L.labelWidth }, c.text, style("type.compact", SECONDARY)));
+    floor = y + block + v("space.3");
+  });
+  if (floor > frame.y + frame.height + 0.01) throw new Error(`The circles' labels need ${Math.ceil(floor - frame.y)}px and have ${Math.floor(frame.height)}px; shorten their lines`);
+  return out;
+}
+
+/* -------------------------------------------------------------------- venn */
+
+// Two or three sets and what they share, drawn schematically - equal circles,
+// their overlaps where the sets meet - with each set named in its own part and
+// each overlap named in its lens. The areas say nothing about size: a Venn
+// sized to its counts is a different, area-true figure.
+function normalizeVenn(props) {
+  const sets = between(props.sets, 2, 3, "A Venn diagram's sets").map((set, i) => {
+    if (!clean(set?.id) || !clean(set?.label)) throw new Error(`Set ${i + 1} needs an \`id\` and a \`label\``);
+    return { id: clean(set.id), label: clean(set.label), text: clean(set.text) };
+  });
+  const ids = new Set(sets.map((set) => set.id));
+  const overlaps = (props.overlaps || []).map((o, i) => {
+    const members = Array.isArray(o?.sets) ? o.sets.map(String) : [];
+    if (members.length < 2 || members.some((m) => !ids.has(m)) || new Set(members).size !== members.length) throw new Error(`Overlap ${i + 1} names two or more of the sets by id (${[...ids].join(", ")})`);
+    if (!clean(o.label)) throw new Error(`Overlap ${i + 1} needs a label`);
+    return { sets: members.sort(), label: clean(o.label) };
+  });
+  return { sets, overlaps };
+}
+
+export function vennLayout(frame, props) {
+  const { sets, overlaps } = normalizeVenn(props);
+  const three = sets.length === 3;
+  const height = Number.isFinite(frame.height) ? frame.height : Infinity;
+  const d = three ? Math.min(height / 1.5, frame.width / 2.2, 300) : Math.min(height * 0.9, frame.width / 1.8, 340);
+  if (d < 150) throw new Error("A Venn diagram needs more room; widen the frame");
+  return { sets, overlaps, d, three, height: three ? d * 1.5 : d };
+}
+
+export function vennNodes({ id, frame, props }) {
+  const L = vennLayout(frame, props);
+  const r = L.d / 2, fills = [PRIMARY, ACCENT, SECONDARY];
+  const cx = frame.x + frame.width / 2, cy = frame.y + frame.height / 2;
+  // Two sets their centres 1.1 radii apart either side of the middle; three on
+  // an equilateral triangle of side 1.15 radii, its centroid the middle, which
+  // leaves each pair a lens and all three a middle wide enough to name.
+  const side = r * 1.15, rise = (side * Math.sqrt(3)) / 6;
+  const centres = L.three
+    ? [[cx - side / 2, cy - rise], [cx + side / 2, cy - rise], [cx, cy + 2 * rise]]
+    : [[cx - r * 0.55, cy], [cx + r * 0.55, cy]];
+  const out = [];
+  L.sets.forEach((set, i) => out.push(ellipsePrimitive({ id: stableId(id, "set", set.id), role: "venn-set", frame: { x: centres[i][0] - r, y: centres[i][1] - r, width: L.d, height: L.d },
+    style: { fill: fills[i], stroke: fills[i], lineWidth: token("line.standard"), opacity: 0.22 }, data: { set: set.id } })));
+  // Each set's name in the part of its circle furthest from the others' centre.
+  const middle = [centres.reduce((s, c) => s + c[0], 0) / centres.length, centres.reduce((s, c) => s + c[1], 0) / centres.length];
+  const width = r * 0.95;
+  L.sets.forEach((set, i) => {
+    const [x, y] = centres[i], dx = x - middle[0], dy = y - middle[1], len = Math.hypot(dx, dy) || 1;
+    const px = x + (dx / len) * r * 0.45, py = y + (dy / len) * r * 0.45;
+    const name = measure(set.label, width, "type.heading", true), text = set.text ? measure(set.text, width, "type.compact") : null;
+    const block = name.height + (text ? v("space.1") + text.height : 0);
+    out.push(label(stableId(id, "set-label", set.id), "venn-label", { x: px - width / 2, y: py - block / 2, width }, name, style("type.heading", INK, true, "center")));
+    if (text) out.push(label(stableId(id, "set-text", set.id), "venn-text", { x: px - width / 2, y: py - block / 2 + name.height + v("space.1"), width }, text, style("type.compact", SECONDARY, false, "center")));
+  });
+  // Each overlap's name at the middle of the sets it joins - a pair's of three
+  // pushed out of the third circle, into the part only the pair shares.
+  for (const [k, o] of L.overlaps.entries()) {
+    const members = o.sets.map((setId) => centres[L.sets.findIndex((set) => set.id === setId)]);
+    let ox = members.reduce((s, c) => s + c[0], 0) / members.length, oy = members.reduce((s, c) => s + c[1], 0) / members.length;
+    if (L.three && members.length === 2) {
+      const other = centres.find((c) => !members.includes(c)), dx = ox - other[0], dy = oy - other[1], len = Math.hypot(dx, dy) || 1;
+      ox += (dx / len) * r * 0.32; oy += (dy / len) * r * 0.32;
+    }
+    const lensWidth = o.sets.length === 3 ? r * 0.6 : r * 0.7;
+    const m = measure(o.label, lensWidth, "type.compact", true);
+    out.push(label(stableId(id, "overlap", k), "venn-overlap", { x: ox - lensWidth / 2, y: oy - m.height / 2, width: lensWidth }, m, style("type.compact", INK, true, "center")));
+  }
   return out;
 }
 
@@ -1222,6 +1383,8 @@ export function radialBarsNodes({ id, frame, props }) {
 /* ----------------------------------------------------------- registration */
 
 const SAMPLES = {
+  "nested-circles": { items: [{ label: "(Insert the whole)", value: 100, display: "(Insert figure)" }, { label: "(Insert the part that can be served)", value: 40, display: "(Insert figure)" }, { label: "(Insert the part that can be won)", value: 8, display: "(Insert figure)" }] },
+  venn: { sets: [{ id: "a", label: "(Insert set A)" }, { id: "b", label: "(Insert set B)" }], overlaps: [{ sets: ["a", "b"], label: "(Insert what both share)" }] },
   "stat-list": { items: [{ value: "87%", text: "(Insert what the first statistic counts)" }, { value: "70%", text: "(Insert what the second statistic counts)" }, { value: "1 in 4", text: "(Insert what the third statistic counts)" }] },
   flow: { nodes: [{ id: "a", label: "(Insert step 1)" }, { id: "b", label: "(Insert branch A)" }, { id: "c", label: "(Insert branch B)" }, { id: "d", label: "(Insert outcome)" }],
     edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }] },
@@ -1245,6 +1408,8 @@ const SAMPLES = {
 };
 
 const GUIDANCE = {
+  "nested-circles": { useWhen: "a whole and the part of it inside the part - a market, the share that can be served, the share that can be won", why: "circles sized by area, one inside the next, show how far each step narrows the whole, which three figures in a row do not", actionTitle: "state the part the plan can win and what it is worth" },
+  venn: { useWhen: "two or three sets and what they share, where the overlap is the point", why: "circles that overlap say which members belong to both, which two lists side by side leave the reader to find", actionTitle: "state what the overlap holds and why it matters" },
   "stat-list": { useWhen: "two to six headline statistics, each with the sentence that says what it counts", why: "large numbers down a column read before anything else on the page, and the sentence beside each stops the number being read out of context", actionTitle: "state what the statistics together show" },
   flow: { useWhen: "a process with branches or merges, where the arrows between steps carry the argument", why: "columns by stage keep the reading left to right and the arrows show which steps depend on which", actionTitle: "state where the flow breaks or what decides the branch" },
   spectrum: { useWhen: "positions on two to six dimensions, each between two named poles", why: "a marker on a track shows where the subject sits and how far it has to move, without inventing a numeric scale", actionTitle: "state which dimension is furthest from where it needs to be" },
@@ -1282,6 +1447,8 @@ const RENDER = {
   speech: [speechNodes, speechLayout, { width: 1160, height: 400 }],
   "side-statement": [sideStatementNodes, sideStatementLayout, { width: 380, height: 508 }],
   "radial-bars": [radialBarsNodes, radialBarsLayout, { width: 760, height: 420 }],
+  "nested-circles": [nestedNodes, nestedLayout, { width: 760, height: 420 }],
+  venn: [vennNodes, vennLayout, { width: 760, height: 440 }],
 };
 
 export function registerFigures(registry) {

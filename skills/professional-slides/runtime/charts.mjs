@@ -61,11 +61,11 @@ const chartDefinitions = [
     sample: { categories: ["Start", "Price", "Volume", "Cost", "End"], values: [80, 18, 12, -9, 101], totals: [0, 4], annotations: [{ category: "End", text: "+21 net" }] }
   },
   {
-    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands"], refuses: ["annotationRail"],
+    id: "chart.scatter", render: (context) => scatter(context), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands", "trendLine"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 20, y: 36 }, { name: "B", x: 42, y: 58 }, { name: "C", x: 68, y: 74 }, { name: "D", x: 82, y: 44 }], annotations: [{ category: "C", text: "Best position" }] }
   },
   {
-    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands"], refuses: ["annotationRail"],
+    id: "chart.bubble", render: (context) => scatter({ ...context, bubble: true }), draws: ["annotations", "referenceLines", "highlights", "changeAnnotations", "focus", "bands", "trendLine"], refuses: ["annotationRail"],
     sample: { points: [{ name: "A", x: 18, y: 38, size: 12 }, { name: "B", x: 43, y: 66, size: 36 }, { name: "C", x: 72, y: 76, size: 58 }, { name: "D", x: 84, y: 42, size: 20 }] }
   },
   {

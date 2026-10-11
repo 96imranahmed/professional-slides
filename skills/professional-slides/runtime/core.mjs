@@ -1033,7 +1033,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
   // Bands are placed against the plot we measured (chart-bands.mjs); a native chart has no band behind its marks.
   // A survey question is set over the plot (chart-question.mjs), which a native chart frame would cover.
-  if (props.question || props.diverging || props.categoryLabel === "above" || props.rowNotes || (props.bands || []).length || (props.intervals || []).length || props.valueBreak || (props.categoryBreaks || []).length || (props.groupBrackets || []).length || (props.valueLabels || []).length) return null;
+  if (props.question || props.trendLine || props.diverging || props.categoryLabel === "above" || props.rowNotes || (props.bands || []).length || (props.intervals || []).length || props.valueBreak || (props.categoryBreaks || []).length || (props.groupBrackets || []).length || (props.valueLabels || []).length) return null;
   const categories = [...(props.categories || props.labels || [])];
   // The category labels the scene drew are the ones PowerPoint prints: a
   // ten-year line the scene labels FY17, FY20, FY23, FY26 would otherwise come

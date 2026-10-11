@@ -479,6 +479,7 @@ export const CHART_DECORATIONS = Object.freeze({
   seriesGrowth: "a growth column per line (`seriesGrowth`)",
   stackBracket: "a bracket over a stack's segments (`stackBracket`)",
   diverging: "a diverging scale (`diverging`)",
+  trendLine: "a fitted trend line (`trendLine`)",
 });
 const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
 // What a chart on a vertical category axis draws through the shared decorations.

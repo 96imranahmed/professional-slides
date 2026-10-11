@@ -245,6 +245,11 @@ export const CARRIERS = Object.freeze([
   // so one recorded figure over its exhibit is carried by a strip as directly as by a hero number: which leads is the author's.
   { type: "numbers", form: "metric-strip", kind: null, carries: { figures: (p) => (within(p.scalars, 1, 4) && p.series > 0 ? D : GRADE.none) }, needs: (p) => need(p.series > 0, "an exhibit under the strip") },
   { type: "numbers", form: "fact-grid", kind: "fact-grid", carries: { figures: (p) => (within(p.scalars, 3, 9) && !p.series ? D : GRADE.none) }, needs: (p) => need(within(p.scalars, 3, 9), "three to nine figures") },
+  // Each figure a part of the one before: the whole, the part that can be served, the part that can be won.
+  { type: "numbers", form: "nested-circles", kind: "nested-circles", shows: "a whole and the part of it inside the part, each figure a circle sized by area inside the one before",
+    // The measures cannot say that each figure sits inside the one before, so the form serves figures; the author who knows
+    // it does chooses it.
+    carries: { figures: (p) => (within(p.scalars, 2, 4) && !p.series ? W : GRADE.none) }, needs: (p) => need(within(p.scalars, 2, 4), "two to four figures, each part of the one before") },
   { type: "numbers", form: "stat-list", kind: "stat-list", carries: { figures: (p) => (within(p.scalars, 2, 6) && !p.series ? D : GRADE.none) }, needs: (p) => need(within(p.scalars, 2, 6), "two to six figures") },
   // --- forms whose content is the subject's own shape or the author's judgement
   ...Object.entries({
@@ -259,6 +264,7 @@ export const CARRIERS = Object.freeze([
     "mechanism/rank-flow": "rank movement across periods",
     "mechanism/organization": "who reports to whom: one accountable role and the layers under it", "mechanism/placement": "items set in the columns they belong to",
     "mechanism/insight-tree": "an issue broken into branches, each leaf's evidence in the table beside it",
+    "mechanism/venn": "two or three sets and what they share, the overlap the point",
     "schedule/timeline": "dated milestones", "schedule/gantt": "durations and overlaps across workstreams", "schedule/roadmap": "stages, when each runs and what it delivers",
     "schedule/horizons": "a portfolio of bets by when each pays", "schedule/rollout": "initiatives rolled out year by year, each row's phase in each year",
     "panels/dashboard": "several measures of one subject read together at a glance: a hero exhibit with its satellites, figures over a grid of a chart, a table and a map",
