@@ -219,7 +219,7 @@ const CASES = {{ 'trend/line': 'i-journeys', 'trend/column': 'i-journeys', 'tren
   'ranking/bullet': 'i-response', 'ranking/distribution': 'i-cost-field', 'ranking/aligned-bars': 'i-profile', 'ranking/boxplot': 'i-spread', 'composition/stacked-bar': 'i-daypart-peers', 'composition/stacked-column': 'i-daypart-peers',
   'composition/marimekko': 'i-daypart-peers', 'composition/waffle': 'i-fleet', 'composition/donut': 'i-revenue-parts', 'composition/treemap': 'i-fleet', 'composition/pie': 'i-revenue-parts', 'relationship/scatter': 'i-frequency',
   'relationship/bubble': 'i-lines', 'relationship/bubble-grid': 'i-lines', 'bridge/waterfall': 'i-bridge', 'scorecard/heatmap': 'i-profile', 'scorecard/bars': 'i-profile', 'lookup/table': 'i-profile', 'lookup/measure-table': 'i-operators',
-  'numbers/fact-grid': 'i-estate', 'numbers/stat-list': 'i-estate', 'numbers/metric-strip': 'i-response', 'numbers/hero-number': 'i-response', 'panels/row': 'i-profile', 'panels/grid': 'i-profile', 'panels/stack': 'i-money' }};
+  'numbers/fact-grid': 'i-estate', 'numbers/stat-list': 'i-estate', 'numbers/metric-strip': 'i-response', 'numbers/hero-number': 'i-response', 'panels/row': 'i-profile', 'panels/grid': 'i-profile', 'panels/stack': 'i-money', 'panels/small-multiples': 'i-operators' }};
 const shaped = (type, insight) => (['trend'].includes(type) ? {{ ...insight, shape: 'series' }} : type === 'relationship' ? {{ ...insight, shape: 'measure-pair' }} : insight);
 const out = {{}};
 for (const [key, id] of Object.entries(CASES)) {{
@@ -400,7 +400,7 @@ console.log(JSON.stringify({{ failed: compiled.compileErrors.length, noted: pack
         self.assertEqual(result["failed"], 0)
         # A table of six series over time is the one page whose type the fit questions: charts would carry it, and the critic judges.
         self.assertEqual([page_id for page_id, _ in result["noted"]], ["v30"])
-        self.assertIn("| fit: its measures ask the reader to read which of five or more series moved over the same periods, which trend/line or trend/sparklines would carry directly", result["line"])
+        self.assertIn("| fit: its measures ask the reader to read which of five or more series moved over the same periods, which trend/line or trend/sparklines or panels/small-multiples would carry directly", result["line"])
         self.assertIn("where a page's line ends in `fit:`", result["check"])
         # The reviewer is shown what the runtime read of the deck as drawn, as advisories to confirm or answer.
         self.assertEqual([item["code"] for item in result["read"]], ["VARIETY_FIT_UNUSED"])

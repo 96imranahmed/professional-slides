@@ -137,6 +137,7 @@ function candidates(sample){
     segmentGrowth:[{from:first,to:last}],
     seriesGrowth:[{from:first,to:last}],
     stackBracket:series.length>1?[series.slice(0,2)]:[],
+    diverging:series.length>1?[series.length%2?{neutral:series[(series.length-1)/2]}:true]:[],
   };
 }
 const MARK_KEYS=['annotations','highlights','referenceLines','focusSeries','focus','changeAnnotations','pointHighlights','periods','events','annotationRail'];

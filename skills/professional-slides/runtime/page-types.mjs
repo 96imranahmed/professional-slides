@@ -72,6 +72,8 @@ export const COMMENTARY = Object.freeze({
 });
 
 const CHART = (name) => `chart.${name}`;
+// Small multiples begin where panels stop: four cuts are a row or a grid of headed panels.
+const SMALL_MULTIPLES_LEAST = 5;
 // The fewest words a panel beside prose alone holds before it reads as an
 // empty column (compilePage, argument pages).
 const PANEL_WORDS_MIN = 25;
@@ -124,10 +126,12 @@ export const PAGE_TYPES = Object.freeze({
     commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
   },
   panels: {
-    task: "one question answered for two to four cuts, measures or members side by side",
+    task: "one question answered for two to four cuts, measures or members side by side - or up to twelve as small multiples",
     // `sequence`: two or three exhibits read left to right with an arrow
     // between each - cause and effect, before and after, input to result.
-    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence" },
+    // `small-multiples`: five to twelve cuts as one trellis of small charts of
+    // one kind on one scale, where four panels stop.
+    forms: { row: "row", grid: "grid", stack: "stack", sequence: "sequence", "small-multiples": CHART("small-multiples") },
     commentary: ["captions", "below", "so-what-bar", "none"], exhibits: [2, 4],
   },
   scorecard: {
@@ -248,7 +252,18 @@ export const PRESET_ROUTES = Object.freeze({
 export const FORM_COMMENTARY = Object.freeze({
   "trend/sparklines": [...ANY_TEXT], "ranking/boxplot": [...ANY_TEXT], "composition/pictogram": [...ANY_TEXT],
   "profiles/radar": ["below", "none"], "trend/model": ["beside", "on-exhibit"],
+  // A trellis is one exhibit: its commentary sits beside or under it as a chart's does, and its panels carry no captions.
+  "panels/small-multiples": [...ANY_TEXT, "none"],
 });
+// Forms that carry a different number of exhibits from their type: a trellis is one exhibit of many panels.
+const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1 });
+/** The fewest and most exhibits a page of `type` and `form` carries: `[lo, hi]`. */
+export function exhibitRange(type, form) {
+  const n = FORM_EXHIBITS[`${type}/${form}`] ?? PAGE_TYPES[type]?.exhibits ?? 1;
+  return Array.isArray(n) ? n : [n, n];
+}
+/** A panels page drawn as one trellis: its one exhibit is laid out as a chart's is, not as a row of panels. */
+export const trellisPage = (type, form) => type === "panels" && form === "small-multiples";
 const commentaryOf = (type, form) => FORM_COMMENTARY[`${type}/${form}`] ?? PAGE_TYPES[type]?.commentary ?? [];
 /**
  * The commentary placements a page of `type` and `form` compiles with: the
@@ -375,6 +390,7 @@ export const LIMITS = Object.freeze({
   // (past eight its labels collide round the rim), a box plot four to twelve
   // members, a pictogram one to five populations, the horizons two to five bets.
   "chart.radar": { key: "categories", min: 3, max: 8 }, "chart.boxplot": { key: "categories", min: 4, max: 12 },
+  "chart.small-multiples": { key: "items", min: 2, max: 12 },
   pictogram: { key: "rows", min: 1, max: 5 }, "chart.horizons": { key: "horizons", min: 2, max: 5 },
 });
 /** The limit a page's primary exhibit is held to: its form's, else its component's. */
@@ -453,6 +469,7 @@ const FORM_DATA = {
   "composition/pictogram": ["rows (1 to 5, each { label, value, text } - the figures filled out of `of`)", "of (10 or 20)", "icon (the figure: person by default)"],
   "profiles/radar": ["categories (3 to 8 attributes)", "series (1 to 4 players, one value per attribute)", "max (the scale's top)", "focusSeries (the subject)"],
   "schedule/horizons": ["horizons (2 to 5, each { label, title, description })", "variant (curves, stepped, stepped-minimal, stepped-bands)"],
+  "panels/small-multiples": ["one exhibit: mark (column, bar or line)", "categories (the axis every panel shares)", "items (5 to 12 panels, each { label, values, focus?, reference? })", "highlights (the panel the page is about)", "reference (\"average\" or a value)", "scale (shared or own)", "rowLabels and columnLabels (a grid read both ways)"],
   "schedule/timeline": ["items (4 or more, each { date, label, text }: when, what happens, and a sentence on it, set at reading size and counted as the page's words)", "orientation (across or down; absent, the frame decides - rows where the page has the height, columns over commentary below)"],
   "schedule/roadmap": ["items (4 or more, each { label, period, text }: the stage, when it runs, and what it delivers)", "orientation (across or down; absent, the frame decides)"],
 };
@@ -1366,7 +1383,7 @@ const formDraws = (type, form) => {
   return type === "place" ? "map" : type === "statement" && form === "quotes" ? "quote-cluster" : type === "options" && form === "compare" ? "compare" : null;
 };
 // How many exhibits a page of each construction carries when its own are not written yet.
-const declaredExhibits = (type, form) => (type === "panels" || (type === "options" && form !== "compare") ? 2
+const declaredExhibits = (type, form) => (trellisPage(type, form) ? 1 : type === "panels" || (type === "options" && form !== "compare") ? 2
   : type === "picture" ? (form === "photo-backdrop" ? 1 : 0) : ["argument", "summary", "matrix"].includes(type) || form === "labelled-rows" || form === "statement" ? 0 : 1);
 
 /** An exhibit a spine declares and has not drawn: nothing but its `basis`, its `type`, or neither. */
@@ -1416,10 +1433,11 @@ export function declaredSlide(pageIn, index = 0, { exhibitType = "table", player
   const text = ["beside", "beside-left", "below"].includes(commentary);
   if (Array.isArray(page.points) ? page.points.length : text || form === "executive-summary") slide.points = Array.isArray(page.points) ? page.points : [""];
   for (const key of ["blocks", "rows", "metrics", "kpi", "photo", "pictures", "paragraphs"]) if (page[key] !== undefined) slide[key] = page[key];
-  if (exhibits.length === 1 && page.type !== "panels") slide.exhibit = exhibits[0]; else if (exhibits.length) slide.exhibits = exhibits;
+  if (exhibits.length === 1 && (page.type !== "panels" || trellisPage(page.type, form))) slide.exhibit = exhibits[0]; else if (exhibits.length) slide.exhibits = exhibits;
   // The layout each choice sets, as layOutPage sets it on a page that compiles.
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
-  if (page.type === "panels") slide.arrange = form ?? "row";
+  if (trellisPage(page.type, form)) slide.layout = layoutFor[commentary] ?? "exhibit-full";
+  else if (page.type === "panels") slide.arrange = form ?? "row";
   else if (page.type === "numbers") {
     slide.layout = form === "hero-number" ? "hero-number" : form === "metric-strip" ? "metrics-over-exhibit" : layoutFor[commentary] ?? "exhibit-full";
     if (form === "metric-strip" && !slide.metrics) slide.metrics = [{}];
@@ -1522,7 +1540,7 @@ function typedSlide(page, id, type, players) {
   for (const [key, value] of Object.entries(page)) if (!CHOICE_KEYS.includes(key)) slide[key] = value;
   const target = type.forms[page.form];
   const exhibits = exhibitsOf(page);
-  const [lo, hi] = Array.isArray(type.exhibits) ? type.exhibits : [type.exhibits, type.exhibits];
+  const [lo, hi] = exhibitRange(page.type, page.form);
   if (exhibits.length < lo || exhibits.length > hi)
     throw new Error(`${id}: a ${page.type} page carries ${lo === hi ? lo : `${lo} to ${hi}`} exhibit${hi === 1 ? "" : "s"}; this one has ${exhibits.length}`);
   if (page.blocks !== undefined && page.form !== "labelled-rows") throw new Error(`${id}: \`blocks\` are the rows of a labelled-rows page - choose type "parallel", form "labelled-rows", or drop them`);
@@ -1820,7 +1838,12 @@ function checkCommentary({ page, id, slide, exhibits, primary, rules, waived, wa
 /** The layout the commentary and the form ask for, and each type's own arrangement of the slide. */
 function layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points }) {
   const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
-  if (page.type === "panels") {
+  if (trellisPage(page.type, page.form)) {
+    // A trellis is one chart, set as a chart is: beside its commentary, over it, or across the page.
+    const items = (primary?.items || []).length;
+    if (items < SMALL_MULTIPLES_LEAST) throw new Error(`${id}: small multiples are for five or more cuts (this one has ${items}); two to four sit as panels in a row or a grid, each with its caption`);
+    slide.layout = layoutFor[page.commentary] ?? "exhibit-full";
+  } else if (page.type === "panels") {
     if (page.form === "grid" && exhibits.length < 3) throw new Error(`${id}: a grid of panels holds three or four; two sit in a row`);
     if (page.form === "sequence") {
       const { min, max } = LIMITS.sequence;
@@ -2117,7 +2140,7 @@ export function describeTypes() {
   // Which form carries which claim (claim-fit.mjs): the one definition the plan, a scaffold, the fit search and the standings read.
   lines.push(...describeFit());
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
-    const n = Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits;
+    const n = (Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits) + Object.keys(t.forms).filter((form) => FORM_EXHIBITS[`${name}/${form}`] !== undefined).map((form) => ` (form ${form}: ${exhibitRange(name, form).join("-").replace(/^(\d+)-\1$/, "$1")})`).join("");
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target, { type: name, form })]).filter(([, keys]) => keys.length);
     lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).join(" | ")}`,
       // What a form's page has to show, where no measure says it (the forms graded from measures are listed by reading task above).
@@ -2167,7 +2190,7 @@ export function pageSchema(only = null) {
     properties: {
       id: { type: "string" }, type: { const: name }, title: { type: "string" },
       subtitle: { type: "string", description: `optional standfirst under the title: the measure and unit, the population, the period or the scope, in one line of ${SUBTITLE_WORDS} words or fewer; never a restatement of the title` },
-      form: { enum: Object.keys(t.forms) }, commentary: { enum: t.commentary },
+      form: { enum: Object.keys(t.forms) }, commentary: { enum: [...new Set([...t.commentary, ...Object.keys(t.forms).flatMap((form) => FORM_COMMENTARY[`${name}/${form}`] || [])])] },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }], description: `optional closing sentence, ${TEXT_LIMITS.takeawayLines} lines at most; absent or false, the page closes on its exhibit` },
       source: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" }, minItems: 1 }], description: "the citation as text, or keys of the pages file's `sources` registry" },
       why: { type: "string", minLength: 20 }, series: { type: "string" }, rail: { type: "string" },

@@ -583,7 +583,7 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
     return null;
   }
   // Small multiples draw a series an item, and the item says what its series is.
-  if (kind === "chart.sparklines") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); delete ex.series; return null; }
+  if (kind === "chart.sparklines" || kind === "chart.small-multiples") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); if (kind === "chart.small-multiples") ex.categories = labels; delete ex.series; return null; }
   if (kind === "chart.treemap") { ex.items = labels.map((label, j) => ({ label, value: values[0][j] })); delete ex.series; return null; }
   if (kind === "chart.bubble-grid") { ex.rows = labels; ex.columns = names; ex.values = labels.map((_, j) => values.map((row) => row[j])); delete ex.series; return null; }
   if (kind === "chart.boxplot") {

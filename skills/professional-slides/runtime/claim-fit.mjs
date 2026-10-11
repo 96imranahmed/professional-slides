@@ -203,6 +203,9 @@ export const CARRIERS = Object.freeze([
   { type: "panels", form: "grid", kind: null, carries: { cuts: (p) => (p.cuts === 4 ? D : W) }, needs: (p) => need(within(p.cuts, 3, 4), "three or four cuts") },
   // One above the other on a shared time axis: two series a reader reads down the same periods.
   { type: "panels", form: "stack", kind: null, carries: { cuts: (p) => (p.cuts === 2 && p.axis === "periods" ? D : W) }, needs: (p) => need(p.cuts === 2, "exactly two cuts") },
+  // A trellis of five to twelve small charts on one scale, where four panels stop: the cuts' shapes compared at a glance.
+  { type: "panels", form: "small-multiples", kind: "chart.small-multiples", alone: false, bound: "series: [{ measure }], a panel each, in one unit over the same periods or members",
+    carries: { cuts: (p) => (p.cuts >= 5 ? D : GRADE.none), "many-series": (p) => (p.series >= 5 ? D : W) }, needs: (p) => need(within(p.cuts ?? p.series, 5, 12), "five to twelve cuts") },
   { type: "panels", form: "sequence", kind: null, shows: "cause and effect, before and after, input to result: two or three exhibits read left to right with an arrow between each",
     carries: { cuts: (p) => (p.sequence ? D : GRADE.none) }, needs: (p) => need(within(p.cuts, 2, 3), "two or three steps") },
   // --- scorecard: recorded magnitudes in coded cells -----------------------
@@ -684,7 +687,7 @@ export function pageFit(page, { registry, insights = null } = {}) {
   const refs = primary ? primary.refs : claimed;
   let profile = profileOf(refs, { ...context, ex: primary?.ex ?? null, prefer: TYPE_AXIS[d.type] ?? null });
   let task = null;
-  if (d.type === "panels") { if (exhibits.length) { profile = { cuts: Math.max(exhibits.length, written.length), axis: exhibits.every((item) => item.profile.axis === "periods") ? "periods" : "members", sequence: d.settles.kind === "sequence" }; task = "cuts"; } }
+  if (d.type === "panels") { if (exhibits.length) { profile = { cuts: d.form === "small-multiples" ? Math.max(exhibits.length, ...written.map((item) => (Array.isArray(item.ex?.items) ? item.ex.items.length : item.refs.length))) : Math.max(exhibits.length, written.length), axis: exhibits.every((item) => item.profile.axis === "periods") ? "periods" : "members", sequence: d.settles.kind === "sequence" }; task = "cuts"; } }
   else if (d.type === "numbers") { if (profile && (profile.scalars || profile.series)) task = "figures"; }
   else if (d.type === "lookup") { if (profile) task = "lookup"; }
   else if (d.type === "scorecard") { if (profile && profile.series > 0 && profile.axis === "members") task = "profile"; }
@@ -796,6 +799,9 @@ export function boundKeys(kind, measures, { form = null } = {}) {
     const [x, y, size] = beside;
     return out({ points: { x: { measure: x.ref, name: `(${x.name}: what the x axis measures)` }, y: { measure: y.ref, name: `(${y.name}: what the y axis measures)` }, ...(count === 3 ? { size: { measure: size.ref, name: `(${size.name}: what the size shows)` } } : {}) } }, beside.slice(0, count), { names: lead.axis.labels });
   }
+  // Small multiples take a series a panel over periods (columns or lines) or over members (bars).
+  if (kind === "chart.small-multiples") return together.length >= 5 ? out({ series: named(together.slice(0, 12)), mark: overMembers ? "bar" : "column" }, together.slice(0, 12), { labels: together.slice(0, 12).map((x) => x.name) })
+    : { why: "small multiples set five to twelve series in one unit over the same periods or members, a panel each, and the insight records fewer" };
   if (kind === "chart.sparklines") return !overMembers && together.length >= 2 ? out({ series: named(together.slice(0, 12)) }, together.slice(0, 12), { labels: together.slice(0, 12).map((x) => x.name) })
     : { why: "small multiples set two to twelve series in one unit over the same periods, and the insight records fewer" };
   if (kind === "chart.treemap" || kind === "chart.pie" || kind === "chart.donut") return overMembers ? out({ measure: lead.ref }, [lead]) : { why: "the parts of a whole are one measure over its members, and the insight's first measure runs over periods" };

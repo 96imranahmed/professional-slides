@@ -34,7 +34,7 @@
 // field the critique binds (DEFERRED): the copy the completion stood in for,
 // the content of an exhibit that states no measure, the form and commentary
 // placement, and how full the composed page is.
-import { PAGE_TYPES, drawnOf, markedChart, placementsOf, skeletonOf, structureOf, undrawnExhibit, withChoice } from "./page-types.mjs";
+import { PAGE_TYPES, drawnOf, markedChart, placementsOf, skeletonOf, structureOf, undrawnExhibit, withChoice, exhibitRange, trellisPage } from "./page-types.mjs";
 import { axisOf, isPercentUnit, valuesOf } from "./measures.mjs";
 import { VIEW_CLASSES, declaredLabels, metricsOf, refsOf, roleFor } from "./gates/dependency_gates.mjs";
 import { boundKeys, kindOfForm } from "./claim-fit.mjs";
@@ -248,7 +248,7 @@ function slotKind(page, at) {
   if (page.type === "trend" && page.form === "model") return null;
   if (PAGE_TYPES[page.type].table || (page.type === "profiles" && page.form === "logo-table")) return "table";
   if (page.type === "numbers") return ["fact-grid", "stat-list"].includes(page.form) ? target : null;
-  if (["panels", "options", "picture", "summary"].includes(page.type) && !(page.type === "options" && page.form === "compare")) return page.type === "options" && page.form === "table-halves" ? "table" : null;
+  if (["panels", "options", "picture", "summary"].includes(page.type) && !(page.type === "options" && page.form === "compare") && !trellisPage(page.type, page.form)) return page.type === "options" && page.form === "table-halves" ? "table" : null;
   // A ranking's aligned bars are a group of bar charts, one a measure.
   return target === "aligned-bars" ? "chart.bar" : kindOfForm(page.type, page.form) ?? target;
 }
@@ -322,7 +322,7 @@ export function completePage(pageIn, { example = null, registry = new Map(), sho
   const page = structuredClone(pageIn), type = PAGE_TYPES[page.type];
   const filled = { keys: [], exhibits: [], metrics: [], blocks: [], marks: [], kpi: false };
   const worked = example && typeof example === "object" ? example : {};
-  const [lo, hi] = Array.isArray(type.exhibits) ? type.exhibits : [type.exhibits, type.exhibits];
+  const [lo, hi] = exhibitRange(page.type, page.form);
   const rows = page.form === "labelled-rows";
   // A type that carries no exhibit has nowhere to draw one: a stub on it declares a view nothing on the page can show.
   const stubbed = exhibitsOf(page).filter(undrawnExhibit);
@@ -384,7 +384,7 @@ export function completePage(pageIn, { example = null, registry = new Map(), sho
   // none is left to a stand-in that plots numbers the spine never named.
   const worth = own.length ? 0 : exampleExhibits.length && (lo > 0 || (page.type === "parallel") || (page.type === "statement" && page.form === "quotes") || (page.type === "picture" && page.form === "photo-backdrop")) ? exampleExhibits.length : 0;
   // A panels page sets one cut a panel, so it takes a panel a series, as many as the type holds, whatever its worked page drew.
-  const cuts = page.type === "panels" && !own.length ? Math.min(hi, unshownSeries.length) : 0;
+  const cuts = page.type === "panels" && !trellisPage(page.type, page.form) && !own.length ? Math.min(hi, unshownSeries.length) : 0;
   const wanted = rows ? 0 : Math.max(lo, cuts, unshownSeries.length ? Math.min(worth, unshownSeries.length) : worth);
   for (let at = slots.length; at < wanted; at += 1) slots.push({ at, ex: {}, stub: true, added: true });
   const empty = slots.filter((slot) => slot.stub && !demandOf(slot.ex.basis ?? {}, registry).length);
@@ -429,7 +429,7 @@ export function completePage(pageIn, { example = null, registry = new Map(), sho
     drawn.push(exhibit);
   }
   if (drawn.length) {
-    if (page.exhibit !== undefined || (drawn.length === 1 && page.exhibits === undefined && page.type !== "panels")) { page.exhibit = drawn[0]; if (drawn.length > 1) page.exhibits = drawn.slice(1); }
+    if (page.exhibit !== undefined || (drawn.length === 1 && page.exhibits === undefined && (page.type !== "panels" || trellisPage(page.type, page.form)))) { page.exhibit = drawn[0]; if (drawn.length > 1) page.exhibits = drawn.slice(1); }
     else page.exhibits = drawn;
   }
 

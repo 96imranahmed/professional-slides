@@ -135,7 +135,7 @@ Structural pages stay as they are: `{ "kind": "section", "title": ..., "summary"
 | `composition` | what a whole is made of | stacked-bar, stacked-column, marimekko, waffle, donut, treemap, pie, pictogram |
 | `relationship` | two measures across the members | scatter, bubble, bubble-grid |
 | `bridge` | what a change between totals is made of | waterfall |
-| `panels` | one question for two to four cuts, side by side | row, grid, stack, sequence |
+| `panels` | one question for two to four cuts, side by side, or five to twelve as small multiples | row, grid, stack, sequence, small-multiples |
 | `scorecard` | members judged against criteria, cells coded | harvey, heatmap, rag, lights, check, bars, progress, dot, trend, binary |
 | `lookup` | measures to look up under their units | measure-table, table |
 | `matrix` | findings down the side, evidence across | findings-matrix |
@@ -162,6 +162,7 @@ These forms narrow their type's commentary placements and carry checks of their 
 | `trend/model` | a forecast read with its numbers: the series over its own data table | `categories`, `series`, the chart's `type` (`chart.column` by default; line, area, stacked-column or combo) | `beside`, `on-exhibit` | no chart, another chart type, or no `series` |
 | `composition/pictogram` | a population's share counted in figures - six in ten - where a percentage reads as precision | `rows` (1 to 5, each `{ label, value, text }`, filled out of `of`), `of` (10 or 20), `icon` (a person by default) | as boxplot | no `rows` |
 | `profiles/radar` | each player's profile across three to eight attributes on one scale, where the shape is the comparison | `categories` (3 to 8 attributes), `series` (1 to 4 players, one value per attribute), `max` (the scale's top), `focusSeries` | `below`, `none` | more than four players; a player missing a value; no `max`; several players and no `focusSeries` |
+| `panels/small-multiples` | one question for five to twelve cuts - each region's trend, each line's punctuality - as one trellis of small charts of one kind on one scale, where four panels stop | one exhibit: `mark` (`column`, `bar` or `line`), `categories` (the shared axis), `items` (5 to 12, each `{ label, values, focus?, reference? }`), `highlights` naming the subject's panel, `reference` (`"average"` or a value), `scale` (`shared` or `own`), `rowLabels` and `columnLabels` for a grid read both ways | `beside`, `beside-left`, `below`, `rail`, `so-what-bar`, `none`; no captions | fewer than five panels (a row or grid of headed panels); more than one exhibit; panels too small to read at the page's size |
 | `schedule/horizons` | the portfolio of bets by when each pays - the core now, growth next, options later | `horizons` (2 to 5, each `{ label, title, description }`, in the order they pay), `variant` (`curves`, `stepped`, `stepped-minimal`, `stepped-bands`) | `beside`, `below`, `so-what-bar`, `none` | fewer than two horizons |
 
 ## Beyond one exhibit and a column
@@ -496,7 +497,7 @@ Where the insight log records `measures`, every page with numbers on it says wha
 
 | Form | Written as | The runtime writes |
 | --- | --- | --- |
-| `sparklines`, `bubble-grid`, `boxplot` | `series: [{ measure }]` - for a box plot the five measures named `min`, `q1`, `median`, `q3`, `max` over the same members | a small line a series; the members as rows and a measure a column; a box a member |
+| `sparklines`, `small-multiples`, `bubble-grid`, `boxplot` | `series: [{ measure }]` - for a box plot the five measures named `min`, `q1`, `median`, `q3`, `max` over the same members | a small line a series; the members as rows and a measure a column; a box a member |
 | `treemap`, `donut`, `pie`, `waffle` | `measure: "<ref>"` (a waffle `series: [{ measure }]`) over the parts | a tile, slice or block a part |
 | `combo` | two series in two units | the second on its own axis, with its unit |
 | `dumbbell`, paired bars | the members' series with `select: { periods: ["FY19", "FY26"] }` and `pivot: true`; or two measures over the same members | each series a row, the two dates its ends |

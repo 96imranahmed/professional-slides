@@ -4515,6 +4515,85 @@
         }
       ],
       "id": "points-checklist"
+    },
+    {
+      "title": "Only the West grew in every year, and fastest in the last two",
+      "tag": "Illustrative",
+      "exhibit": {
+        "type": "chart.small-multiples",
+        "heading": "Journeys by region",
+        "unit": "million",
+        "mark": "column",
+        "categories": [
+          "FY23",
+          "FY24",
+          "FY25",
+          "FY26"
+        ],
+        "items": [
+          {
+            "label": "North",
+            "values": [
+              12,
+              12.4,
+              12.6,
+              12.5
+            ]
+          },
+          {
+            "label": "South",
+            "values": [
+              9.1,
+              9.3,
+              9.2,
+              9.4
+            ]
+          },
+          {
+            "label": "East",
+            "values": [
+              15.2,
+              14.8,
+              14.9,
+              15.1
+            ]
+          },
+          {
+            "label": "West",
+            "values": [
+              7.4,
+              8.6,
+              10.1,
+              11.8
+            ]
+          },
+          {
+            "label": "Central",
+            "values": [
+              20.1,
+              20.3,
+              20.2,
+              20.6
+            ]
+          },
+          {
+            "label": "Coast",
+            "values": [
+              5.2,
+              5.1,
+              5.3,
+              5.2
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "West"
+          }
+        ],
+        "reference": "average"
+      },
+      "source": "Source: illustrative"
     }
   ],
   "fill": "airy"

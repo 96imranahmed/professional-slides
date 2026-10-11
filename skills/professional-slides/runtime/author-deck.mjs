@@ -104,7 +104,7 @@ import os from "node:os";
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
-  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts } from "./page-types.mjs";
+  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage } from "./page-types.mjs";
 import { claimSheet, claimSheetLines } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
@@ -1310,7 +1310,7 @@ export function planOf(spec) {
     const record = { id: slide.id, n: pages.length + 1, title: slide.title };
     if (slide.kind && !t) Object.assign(record, { kind: slide.kind, exhibit: "text", architecture: "text", why: "Section structure" });
     else {
-      const exhibit = t.type === "panels" ? "paired" : t.type === "matrix" ? "rows" : t.type === "picture" ? t.form : t.type === "argument" ? "text"
+      const exhibit = t.type === "panels" && t.form !== "small-multiples" ? "paired" : t.type === "matrix" ? "rows" : t.type === "picture" ? t.form : t.type === "argument" ? "text"
         : t.type === "statement" && t.form === "statement" ? "text" : t.type === "numbers" && !ex ? "metrics" : ex?.type === "chart-group" && ex.aligned ? "chart.bar" : ex?.type ?? "text";
       Object.assign(record, {
         exhibit, architecture: architectureOf(slide), why: t.why, pageType: `${t.type}/${t.form}`, commentary: t.commentary,
@@ -1548,10 +1548,12 @@ function bindScaffold(page, insight, { fit = null, order, declared = [] } = {}) 
     const named = declared[cut.at] ?? declared.find((kind) => kinds.includes(kind));
     return { from, kind: [...kinds.filter((kind) => kind === named), ...kinds].find((kind) => !boundKeys(kind, from).why) };
   }).filter((cut) => cut.kind);
-  const [fewest, most] = [].concat(PAGE_TYPES[page.type].exhibits);
-  const opened = charted.length && cuts.length >= (page.type === "panels" ? Math.max(fewest, 2) : 1) && charted.length === charts.length;
+  const [fewest, most] = exhibitRange(page.type, page.form);
+  const cutPanels = page.type === "panels" && !trellisPage(page.type, page.form);
+  // A trellis is one chart of many panels: it is bound as its form draws it, not opened into cuts.
+  const opened = !trellisPage(page.type, page.form) && charted.length && cuts.length >= (cutPanels ? Math.max(fewest, 2) : 1) && charted.length === charts.length;
   if (opened) {
-    const made = cuts.slice(0, page.type === "panels" ? most ?? fewest : 1).map((cut, at) => {
+    const made = cuts.slice(0, cutPanels ? most ?? fewest : 1).map((cut, at) => {
       // The worked exhibit's callouts come with it as prompts, moved to what the new exhibit draws: a chart marks its finding.
       const from = charted[at % charted.length];
       const ex = { type: cut.kind, heading: PROMPTS.heading, ...(typeof from.caption === "string" ? { caption: PROMPTS.caption } : {}),
@@ -1559,7 +1561,7 @@ function bindScaffold(page, insight, { fit = null, order, declared = [] } = {}) 
       bindChart(ex, cut.kind, cut.from);
       return ex;
     });
-    if (page.type === "panels") { delete page.exhibit; page.exhibits = made; } else if (page.exhibit) page.exhibit = made[0]; else page.exhibits = made;
+    if (cutPanels) { delete page.exhibit; page.exhibits = made; } else if (page.exhibit) page.exhibit = made[0]; else page.exhibits = made;
   }
   (opened ? [] : charts).forEach((ex, at) => {
     const kind = kindOf(ex, at);

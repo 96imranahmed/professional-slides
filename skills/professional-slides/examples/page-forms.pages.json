@@ -1302,6 +1302,204 @@
    "source": "Source: illustrative data for a fictional operator; timetable and ticket sales"
   },
   {
+   "id": "f-panels-small-multiples",
+   "type": "panels",
+   "form": "small-multiples",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Eight lines answer one question - did punctuality improve after the timetable change - and only a panel a line shows which did",
+   "settles": {
+    "kind": "comparison",
+    "what": "trains arriving within five minutes by line and month, FY26"
+   },
+   "adds": "The points say why the Eastern line moved and the others did not, which the panels show but cannot explain",
+   "title": "Only the Eastern line improved month after month once its timetable changed",
+   "subtitle": "Trains arriving within five minutes, eight lines, April 2025 to March 2026",
+   "exhibit": {
+    "heading": "Trains on time by line, FY26",
+    "unit": "%",
+    "mark": "line",
+    "categories": [
+     "Apr",
+     "May",
+     "Jun",
+     "Jul",
+     "Aug",
+     "Sep",
+     "Oct",
+     "Nov",
+     "Dec",
+     "Jan",
+     "Feb",
+     "Mar"
+    ],
+    "items": [
+     {
+      "label": "City",
+      "values": [
+       91.2,
+       90.8,
+       91.5,
+       90.1,
+       89.7,
+       90.4,
+       91.0,
+       90.6,
+       89.9,
+       90.3,
+       90.8,
+       91.1
+      ]
+     },
+     {
+      "label": "Valley",
+      "values": [
+       86.4,
+       86.9,
+       87.2,
+       86.5,
+       87.8,
+       88.1,
+       88.4,
+       87.9,
+       88.6,
+       89.0,
+       89.3,
+       89.1
+      ]
+     },
+     {
+      "label": "Eastern",
+      "values": [
+       80.3,
+       81.1,
+       82.6,
+       83.4,
+       84.9,
+       86.2,
+       87.0,
+       88.4,
+       89.1,
+       90.2,
+       91.0,
+       91.8
+      ]
+     },
+     {
+      "label": "Dales",
+      "values": [
+       88.1,
+       87.6,
+       88.4,
+       87.2,
+       86.8,
+       87.5,
+       88.0,
+       87.1,
+       86.5,
+       87.4,
+       87.9,
+       88.2
+      ]
+     },
+     {
+      "label": "Coast",
+      "values": [
+       84.6,
+       85.1,
+       84.2,
+       83.7,
+       84.8,
+       85.3,
+       84.1,
+       83.6,
+       84.4,
+       85.0,
+       84.7,
+       84.9
+      ]
+     },
+     {
+      "label": "Airport",
+      "values": [
+       90.1,
+       90.6,
+       89.8,
+       90.4,
+       90.9,
+       90.2,
+       89.6,
+       90.5,
+       90.8,
+       90.1,
+       90.6,
+       90.3
+      ]
+     },
+     {
+      "label": "Lakes",
+      "values": [
+       85.9,
+       85.2,
+       86.1,
+       85.4,
+       84.8,
+       85.6,
+       86.0,
+       85.1,
+       84.6,
+       85.4,
+       85.8,
+       85.5
+      ]
+     },
+     {
+      "label": "Borders",
+      "values": [
+       83.2,
+       83.9,
+       83.1,
+       82.6,
+       83.4,
+       84.0,
+       83.3,
+       82.8,
+       83.6,
+       83.1,
+       83.7,
+       83.4
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Eastern"
+     }
+    ],
+    "reference": "average"
+   },
+   "points": [
+    {
+     "lead": "One line moved",
+     "text": "The Eastern line rose from 80.3% to 91.8% over the year, gaining in eleven months of twelve, while the other seven lines ended within a point of where they began."
+    },
+    {
+     "lead": "The timetable, not the trains",
+     "text": "Eastern was the only line recast in April with slack at its two single-track sections; its fleet and its staffing did not change, so the gain is the timetable's."
+    },
+    {
+     "lead": "The case for the rest",
+     "text": "Borders and Coast run the same single-track pattern and sit lowest at 83.4% and 84.9%; recasting their timetables is the cheapest punctuality gain the plan has."
+    }
+   ],
+   "highlight": [
+    "80.3% to 91.8%",
+    "only line recast",
+    "83.4% and 84.9%"
+   ],
+   "source": "Source: illustrative data for a fictional operator; train running records"
+  },
+  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",

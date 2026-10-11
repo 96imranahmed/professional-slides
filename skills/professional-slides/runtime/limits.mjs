@@ -9,7 +9,7 @@
 // `measured` marks a capacity the renderer measures in pixels, given here as
 // the words of ordinary prose it holds: a guide to write to, not the test.
 import { PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
-  railCapacity, calloutCapacity } from "./page-types.mjs";
+  railCapacity, calloutCapacity, exhibitRange } from "./page-types.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
 import { CONTENT_THRESHOLDS, titleContentWords } from "./gates/content_gates.mjs";
@@ -80,7 +80,7 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
     return Object.fromEntries(tasks.map((task) => [task, budget(task, density, summary)]).filter(([, b]) => b));
   };
   const exhibit = (f) => { const l = limitOf(type, f, t.forms[f]); return l ? { [l.key]: { min: l.min, ...(l.max ? { max: l.max } : {}) }, ...(l.valueChars ? { valueCharacters: { max: l.valueChars } } : {}), ...(l.columns ? { columns: { min: 1, max: l.columns, note: "tiles across; optional - left out, the grid sets them" } } : {}) } : null; };
-  const [lo, hi] = Array.isArray(t.exhibits) ? t.exhibits : [t.exhibits, t.exhibits];
+  const [lo, hi] = form ? exhibitRange(type, form) : Array.isArray(t.exhibits) ? t.exhibits : [t.exhibits, t.exhibits];
   const perForm = (f) => ({ commentary: placements(f), bodyWords: words(f), ...(exhibit(f) ? { exhibit: exhibit(f) } : {}) });
   const placed = commentary ? [commentary] : [...new Set(forms.flatMap(placements))];
   return {
