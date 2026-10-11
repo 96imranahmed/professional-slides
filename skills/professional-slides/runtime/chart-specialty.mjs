@@ -368,7 +368,10 @@ export function marimekko({ id, frame, props, tokens = TOKENS }) {
   return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, allowAnnotationRail: false });
 }
 
-export function rangeChart({ id, frame, props }) {
+export function rangeChart({ id, frame, props: authored }) {
+  // A member is picked out by its bar in the accent: a tint across a row of a range chart started after the row's name and
+  // ran past its rules.
+  const props = { ...authored, ...(Array.isArray(authored.highlights) ? { highlights: authored.highlights.map((h) => ({ style: "bar", ...h })) } : {}) };
   assertGridlineOption(props);
   const categories = props.categories || [];
   if (!categories.length || !Array.isArray(props.low) || !Array.isArray(props.high) || props.low.length !== categories.length || props.high.length !== categories.length) throw new Error("Range chart requires categories with one low and one high value each");

@@ -163,7 +163,10 @@ function treeNodes({ id, frame, props, organization = false }) {
     const centerX = childFrame.x + childFrame.width / 2;
     if (organization) nodes.push(openLine(stableId(id, "connector", index), centerX, busY, centerX, childFrame.y, "tree-connector", SECONDARY, HAIRLINE));
     else nodes.push(openLine(stableId(id, "connector", index), root.x + root.width / 2, root.y + root.height, centerX, childFrame.y, "tree-connector", SECONDARY, HAIRLINE));
-    nodes.push(rectPrimitive({ id: stableId(id, "child", index), role: organization ? "organization-node" : "tree-node", frame: childFrame, style: boxStyle(index === 0 ? PRIMARY_TINT : SURFACE, RULE, HAIRLINE, SMALL_RADIUS) }));
+    // An organization tints the role it names (`highlight`, its place from 0) and no other: a first role tinted by default
+    // read as singled out with nothing on the page saying why.
+    const tinted = organization ? props.highlight === index : index === 0;
+    nodes.push(rectPrimitive({ id: stableId(id, "child", index), role: organization ? "organization-node" : "tree-node", frame: childFrame, style: boxStyle(tinted ? PRIMARY_TINT : SURFACE, RULE, HAIRLINE, SMALL_RADIUS) }));
     // Measured where it wraps, so its lines are the ones the box holds.
     const box = insetFrame(childFrame, 8), layout = measureText(String(child), box.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true, wrapWidthRatio: ENGINE_RESERVE });
     if (layout.height > box.height) throw new Error(`Organization role "${child}" needs ${Math.ceil(layout.height)}px and its box holds ${Math.floor(box.height)}px; shorten the role`);

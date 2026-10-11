@@ -1055,7 +1055,7 @@
     "what": "journeys at nine stations, FY26"
    },
    "adds": "The points say what the concentration means for where the money goes",
-   "title": "The three biggest stations carry almost half of all journeys",
+   "title": "The three biggest stations carry more than half of all journeys",
    "exhibit": {
     "type": "chart.bar",
     "heading": "Journeys by station, FY26",
@@ -1133,11 +1133,11 @@
    "points": [
     {
      "lead": "Three stations",
-     "text": "Central, Harbour and Airport carry 22.8 million of the 40.9 million journeys, almost half of the whole."
+     "text": "Central, Harbour and Airport carry 22.8 million of the 40.9 million journeys, 56% of the whole."
     },
     {
      "lead": "The suburbs",
-     "text": "The six suburban stations each carry less than the average of 4.5 million, and together a little over half."
+     "text": "The six suburban stations each carry less than the average of 4.5 million, and 44% between them."
     },
     {
      "lead": "Where to invest",
@@ -1157,7 +1157,7 @@
     "what": "the Coast concession's value by five methods, low and high, £m"
    },
    "adds": "The points say which methods the bid rests on and what would move them",
-   "title": "Every method values the Coast concession between £350m and £520m; our bid sits at £440m",
+   "title": "The five methods value the Coast concession at £300m to £520m; our bid is £440m",
    "exhibit": {
     "heading": "Value of the Coast concession by method",
     "unit": "£m",
@@ -1600,7 +1600,7 @@
    "adds": "The points say where the gap is and what closing it costs",
    "title": "Step-free access reaches 93% of City stations but only 41% of Dales stations",
    "exhibit": {
-    "heading": "Stations with step-free access, share of each line's, FY26",
+    "heading": "Stations with step-free access by line, FY26",
     "unit": "%",
     "items": [
      {
@@ -5936,11 +5936,11 @@
    "points": [
     {
      "lead": "The day out",
-     "text": "Each destination page opens on the place itself, with the walks, the cafés, the last train home and the fare for the day, before any timetable appears."
+     "text": "Each destination page opens on the place itself, with its walks, its cafés, the last train home and the fare for the day, before any timetable appears on the screen."
     },
     {
      "lead": "One price",
-     "text": "The fare shown is the off-peak return for the whole group, so passengers see the price of the whole day before they pick a time to travel."
+     "text": "The fare shown is the off-peak return for the whole group, so passengers see the price of the whole day out before they pick a time to travel."
     },
     {
      "lead": "Early results",

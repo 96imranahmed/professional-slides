@@ -1142,6 +1142,15 @@ export function deviceFrameLayout(frame, props) {
   return { device, height: Math.min(h, device === "laptop" ? w * 0.62 : 520) };
 }
 
+/** A rectangle w by h with corners of radius r, as fractions of its frame for a customPolygon, each corner in eight steps. */
+function roundedOutline(w, h, r, steps = 8) {
+  const corner = (cx, cy, from) => Array.from({ length: steps + 1 }, (_, i) => {
+    const a = from + (Math.PI / 2) * (i / steps);
+    return [Number(((cx + r * Math.cos(a)) / w).toFixed(6)), Number(((cy + r * Math.sin(a)) / h).toFixed(6))];
+  });
+  return [...corner(w - r, r, -Math.PI / 2), ...corner(w - r, h - r, 0), ...corner(r, h - r, Math.PI / 2), ...corner(r, r, Math.PI)];
+}
+
 export function deviceFrameNodes({ id, frame, props }) {
   const L = deviceFrameLayout(frame, props);
   const out = [];
@@ -1152,9 +1161,15 @@ export function deviceFrameNodes({ id, frame, props }) {
     screen = { x: x + 12, y: y + 12, width: bodyW - 24, height: bodyH - 24 };
     out.push(shapePrimitive({ id: stableId(id, "base"), role: "device-base", geometry: "trapezoid", frame: { x: x - bodyW * 0.06, y: y + bodyH, width: bodyW * 1.12, height: frame.height * 0.06 }, style: { fill: SECONDARY, stroke: "none" } }));
   } else {
-    const h = frame.height, w = Math.min(frame.width, h * 0.5), x = frame.x + (frame.width - w) / 2;
-    out.push(fillRect(stableId(id, "body"), "device-body", { x, y: frame.y, width: w, height: h }, INK, { radius: "radius.round" }));
-    screen = { x: x + 10, y: frame.y + 28, width: w - 20, height: h - 56 };
+    // A phone: a body with corners a seventh of its width round - the round
+    // token made it a pill - drawn as a polygon so the fill keeps its token, a
+    // speaker slot in the top bezel, and the screen set inside the corners.
+    const h = frame.height, w = Math.min(frame.width, h * 0.5), x = frame.x + (frame.width - w) / 2, r = w * 0.14;
+    out.push(shapePrimitive({ id: stableId(id, "body"), role: "device-body", geometry: "customPolygon", frame: { x, y: frame.y, width: w, height: h },
+      style: { fill: INK, stroke: "none", lineWidth: token("line.hairline") }, data: { paths: [roundedOutline(w, h, r)] } }));
+    const side = w * 0.05, top = r + w * 0.02;
+    out.push(fillRect(stableId(id, "speaker"), "device-speaker", { x: x + w * 0.38, y: frame.y + top / 2 - 2, width: w * 0.24, height: 4 }, SECONDARY, { radius: "radius.round" }));
+    screen = { x: x + side, y: frame.y + top, width: w - 2 * side, height: h - 2 * top };
   }
   if (props.image.dataUri) out.push(mediaNode({ id: stableId(id, "screen"), role: "image", frame: screen, props: props.image, fit: "cover" }));
   else {

@@ -324,7 +324,7 @@ function sideRailNodes({ id, frame, props, items, dark }) {
     // Laid out unturned along the tab's length, then turned a quarter about the tab's centre.
     const cx = frame.x + frame.width / 2, cy = y + tab / 2;
     nodes.push(textPrimitive({ id: stableId(id, "tab-label", item.id), role: "tracker-rail-label", frame: { x: cx - length / 2, y: cy - layout.height / 2, width: length, height: layout.height }, text: item.label,
-      style: { ...style(token("type.label"), active ? WHITE : (dark ? WHITE : SECONDARY), true, "center", "mid"), lineHeight: layout.lineHeight, wrap: false, rotate: 90 }, data: { ...data, textLayout: layout } }));
+      style: { ...style(token("type.label"), active ? WHITE : (dark ? WHITE : INK), true, "center", "mid"), lineHeight: layout.lineHeight, wrap: false, rotate: 90 }, data: { ...data, textLayout: layout } }));
   });
   return nodes;
 }

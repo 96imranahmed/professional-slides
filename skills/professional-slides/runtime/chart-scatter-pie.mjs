@@ -262,9 +262,10 @@ function drawTrendLine(chart) {
   const text = trend.label === false ? null : typeof trend.label === "string" && trend.label.trim() ? trend.label.trim() : `Linear fit, R² = ${r2.toFixed(2)}`;
   if (!text) return;
   const layout = measureText(text, 240, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_ANNOTATION) });
-  const ex = xScale(x1), ey = yScale(yAt(x1));
-  const above = ey - layout.height - 6 >= plot.y;
-  nodes.push(textPrimitive({ id: stableId(id, "trend-label"), role: "chart-reference-label", frame: { x: Math.max(plot.x, Math.min(plot.x + plot.width - layout.width - 2, ex - layout.width)), y: above ? ey - layout.height - 6 : ey + 6, width: Math.ceil(layout.width) + 2, height: layout.height },
+  // In the corner of the plot the line leaves clear: the foot of a rising line's right end, the head of a falling one's;
+  // set by its end, a label sat where the line ran on or was clipped, and the line struck through it.
+  const rising = slope >= 0, inset = 4;
+  nodes.push(textPrimitive({ id: stableId(id, "trend-label"), role: "chart-reference-label", frame: { x: plot.x + plot.width - Math.ceil(layout.width) - 2 - inset, y: rising ? plot.y + plot.height - layout.height - inset : plot.y + inset, width: Math.ceil(layout.width) + 2, height: layout.height },
     text, style: { ...textStyle(CHART_ANNOTATION, SECONDARY, false, "right"), valign: "top" }, data: { trendLine: true, r2, textLayout: layout } }));
 }
 
