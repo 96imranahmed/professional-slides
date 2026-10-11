@@ -4,7 +4,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-node_modules/
+node_modules
 
 # Generated presentation work should not enter the skill package.
 build/
