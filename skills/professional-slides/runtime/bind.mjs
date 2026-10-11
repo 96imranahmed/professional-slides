@@ -377,14 +377,15 @@ function basisOf(item, measures, roles = null) {
 }
 
 /** A metric, a hero figure, a row's metric or a fact-grid item that names its number: `value` and `basis` written from it. */
-function bindFigure(item, what, { bound, fail, valueOf, formatOf, printOf, viewed }, carriesBasis, owner = null) {
+function bindFigure(item, what, { bound, fail, valueOf, formatOf, printOf, viewed }, carriesBasis, owner = null, sized = false) {
   if (item.measure === undefined) return;
   if (item.value !== undefined) return void fail(`${what} names its \`measure\` and types a \`value\` as well: leave \`value\` out and the runtime prints the recorded number in the \`format\``);
   const found = valueOf(item.measure, what), format = formatOf(item.format, what);
   if (!found || !format) return;
   const shown = printOf(found, format, what);
   if (shown === null) return;
-  item.value = shown;
+  // A figure drawn to its size (a nested circle, a radial ring) keeps the number to size it by, and prints the figure beside it.
+  if (sized) { item.value = found.value; item.display = shown; } else item.value = shown;
   if (owner) viewed(owner, found.ref, found.label);
   if (carriesBasis) item.basis = basisOf(item, [found.ref]);
   delete item.measure; delete item.format;
@@ -603,16 +604,19 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
   return undefined;
 }
 
+// The figures drawn to their size, whose items keep a number as `value` and print the figure as `display`.
+const SIZED_FIGURES = new Set(["nested-circles", "radial-bars"]);
+
 /** An exhibit that names its measures - in its series, as its one `measure`, or item by item - filled from them. */
 function bindExhibit(ex, what, context) {
   const { page, bound, fail, state, viewed } = context;
-  // A fact grid's or stat list's items each name one number.
-  if (Array.isArray(ex.items) && ex.items.some((item) => item && typeof item === "object" && item.measure !== undefined)) {
-    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}, item ${i + 1}${item.label ? ` ("${item.label}")` : ""}`, context, false, ex) : undefined)).filter(Boolean);
-    if (refs.length) bound.shown.set(ex, new Set([...(bound.shown.get(ex) ?? []), ...refs]));
-  }
   // The kind the exhibit will be drawn as: its own `type`, or the one its page's form sets (the compiler types it after the binding).
   const drawnAs = String(ex.type ?? (ex === (page.exhibit ?? page.exhibits?.[0]) ? kindOfForm(page.type, page.form) ?? "" : ""));
+  // A fact grid's, stat list's, nested circles' or radial rings' items each name one number.
+  if (Array.isArray(ex.items) && ex.items.some((item) => item && typeof item === "object" && item.measure !== undefined)) {
+    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}, item ${i + 1}${item.label ? ` ("${item.label}")` : ""}`, context, false, ex, SIZED_FIGURES.has(drawnAs)) : undefined)).filter(Boolean);
+    if (refs.length) bound.shown.set(ex, new Set([...(bound.shown.get(ex) ?? []), ...refs]));
+  }
   const named_ = (key) => ex[key] && typeof ex[key] === "object" && !Array.isArray(ex[key]) && /"measure"\s*:/.test(JSON.stringify(ex[key]));
   const declares = ex.basis && typeof ex.basis === "object" && (ex.basis.measures !== undefined || ex.basis.measure !== undefined);
   if ((named_("points") || named_("bridge")) && declares) return void fail(`${what} names its measures in its \`${named_("points") ? "points" : "bridge"}\`, so its \`basis\` is written from them: keep only \`role\` and \`relevance\` there`);

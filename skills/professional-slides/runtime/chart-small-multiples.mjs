@@ -107,7 +107,9 @@ export function smallMultiplesLayout(frameIn, props = {}) {
     // Columns that print their values keep a line over the tallest for its figure.
     const headroom = mark === "column" && (categories.length <= LABELLED_MARKS || item.focus !== undefined) ? 16 : 0;
     const plot = { x: cell.x, y: cell.y + (titled ? TITLE : 0) + 4 + headroom, width: cell.width - (mark === "line" ? 40 : mark === "bar" ? 34 : 0), height: cell.height - (titled ? TITLE : 0) - 8 - headroom };
-    const own = spec.scale === "own" ? numericBounds([...item.values.filter(Number.isFinite), ...(Number.isFinite(item.reference) ? [item.reference] : [])], { axis: "y", includeZero: mark !== "line", tight: true }) : shared;
+    // An own scale still holds the rule the panel draws: its own reference, or else the chart's.
+    const ruled = Number.isFinite(item.reference) ? item.reference : Number.isFinite(spec.reference) ? spec.reference : null;
+    const own = spec.scale === "own" ? numericBounds([...item.values.filter(Number.isFinite), ...(ruled === null ? [] : [ruled])], { axis: "y", includeZero: mark !== "line", tight: true }) : shared;
     return { item, at, col, row, cell, plot, bounds: own };
   });
   return { ...spec, frame, columns, rows, cells, rowGutter, categoryGutter, top, left, height: frame.height };

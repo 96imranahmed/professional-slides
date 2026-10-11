@@ -218,10 +218,10 @@ const insights = new Map(log.map((item) => [item.id, item]));
 const CASES = {{ 'trend/line': 'i-journeys', 'trend/column': 'i-journeys', 'trend/area': 'i-journeys', 'trend/stacked-column': 'i-daypart', 'trend/stacked-area': 'i-daypart', 'trend/combo': 'i-money', 'trend/slope': 'i-operators',
   'trend/indexed': 'i-operators', 'trend/sparklines': 'i-operators', 'trend/model': 'i-journeys', 'ranking/bar': 'i-punctual', 'ranking/column': 'i-punctual', 'ranking/lollipop': 'i-punctual', 'ranking/dumbbell': 'i-then-now',
   'ranking/bullet': 'i-response', 'ranking/distribution': 'i-cost-field', 'ranking/aligned-bars': 'i-profile', 'ranking/boxplot': 'i-spread', 'ranking/range': 'i-then-now', 'composition/stacked-bar': 'i-daypart-peers', 'composition/stacked-column': 'i-daypart-peers',
-  'composition/marimekko': 'i-daypart-peers', 'composition/waffle': 'i-fleet', 'composition/donut': 'i-revenue-parts', 'composition/treemap': 'i-fleet', 'composition/pie': 'i-revenue-parts', 'relationship/scatter': 'i-frequency',
+  'composition/marimekko': 'i-daypart-peers', 'composition/waffle': 'i-fleet', 'composition/donut': 'i-revenue-parts', 'composition/treemap': 'i-fleet', 'composition/pie': 'i-revenue-parts', 'composition/radial-bars': 'i-spread', 'relationship/scatter': 'i-frequency',
   'relationship/bubble': 'i-lines', 'relationship/bubble-grid': 'i-lines', 'bridge/waterfall': 'i-bridge', 'scorecard/heatmap': 'i-profile', 'scorecard/bars': 'i-profile', 'lookup/table': 'i-profile', 'lookup/measure-table': 'i-operators',
   'numbers/fact-grid': 'i-estate', 'numbers/stat-list': 'i-estate', 'numbers/metric-strip': 'i-response', 'numbers/hero-number': 'i-response', 'panels/row': 'i-profile', 'panels/grid': 'i-profile', 'panels/stack': 'i-money', 'panels/small-multiples': 'i-operators' }};
-const shaped = (type, insight) => (['trend'].includes(type) ? {{ ...insight, shape: 'series' }} : type === 'relationship' ? {{ ...insight, shape: 'measure-pair' }} : insight);
+const shaped = (type, insight) => (['trend'].includes(type) ? {{ ...insight, shape: 'series' }} : type === 'relationship' ? {{ ...insight, shape: 'measure-pair' }} : type === 'composition' ? {{ ...insight, shape: 'mix' }} : insight);
 const out = {{}};
 for (const [key, id] of Object.entries(CASES)) {{
   const [type, form] = key.split('/'), insight = shaped(type, insights.get(id));

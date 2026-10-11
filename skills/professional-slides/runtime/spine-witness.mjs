@@ -247,7 +247,7 @@ function slotKind(page, at) {
   if (at > 0 || !target) return null;
   if (page.type === "trend" && page.form === "model") return null;
   if (PAGE_TYPES[page.type].table || (page.type === "profiles" && page.form === "logo-table")) return "table";
-  if (page.type === "numbers") return ["fact-grid", "stat-list"].includes(page.form) ? target : null;
+  if (page.type === "numbers") return ["fact-grid", "stat-list", "nested-circles"].includes(page.form) ? target : null;
   if (["panels", "options", "picture", "summary"].includes(page.type) && !(page.type === "options" && page.form === "compare") && !trellisPage(page.type, page.form)) return page.type === "options" && page.form === "table-halves" ? "table" : null;
   // A ranking's aligned bars are a group of bar charts, one a measure.
   return target === "aligned-bars" ? "chart.bar" : kindOfForm(page.type, page.form) ?? target;
@@ -285,6 +285,11 @@ function exhibitFrom(page, demand, kind, { block = false, worked = null, given =
   // A figure grid or list states a number an item; a measure shown as context beside the claim's says so in the exhibit's own basis.
   const figures = figuresFrom(demand).map(({ role: _role, relevance: _relevance, ...item }) => item);
   if (figures.length < 2 && !block) return { why: `a grid or list of figures states two or more numbers, and ${demand.map((d) => d.ref).join(", ")} ${demand.length === 1 ? "gives" : "give"} ${figures.length}` };
+  // Nested circles are a whole and the parts inside it, each a figure named by its label and sized by its number (bind.mjs).
+  if (kind === "nested-circles") {
+    if (figures.length > 4) return { why: `nested circles set two to four figures, one inside the next, and ${demand.map((d) => d.ref).join(", ")} ${demand.length === 1 ? "gives" : "give"} ${figures.length}: name the whole and the parts inside it in \`labels\`` };
+    return { exhibit: { items: figures, ...contextBasis(demand) } };
+  }
   const listed = kind === "stat-list" || open;
   return { exhibit: { ...(open ? { type: "stat-list" } : {}), items: figures.map(({ label, ...rest }) => (listed ? { ...rest, text: label } : { ...rest, label, text: marked(proseOf(6)) })), ...contextBasis(demand) } };
 }
@@ -392,7 +397,7 @@ export function completePage(pageIn, { example = null, registry = new Map(), sho
   // one value goes with them where the slot tabulates or states figures; a chart needs none of it drawn.
   const share = new Map(empty.map((slot) => [slot.at, []]));
   unshownSeries.forEach((d, i) => { if (empty.length) share.get(empty[empty.length === 1 ? 0 : Math.min(i, empty.length - 1)].at).push(d); });
-  const stating = empty.find((slot) => { const kind = typeof slot.ex.type === "string" && slot.ex.type ? slot.ex.type : slotKind(page, slot.at); return kind !== null && !isChartKind(kind) && ["table", "fact-grid", "stat-list"].includes(kind); });
+  const stating = empty.find((slot) => { const kind = typeof slot.ex.type === "string" && slot.ex.type ? slot.ex.type : slotKind(page, slot.at); return kind !== null && !isChartKind(kind) && ["table", "fact-grid", "stat-list", "nested-circles"].includes(kind); });
   if (stating && !(Array.isArray(page.metrics) || page.kpi || Array.isArray(worked.metrics) || worked.kpi)) share.get(stating.at).push(...unshownSingles);
   const drawn = [], drawnLabels = new Map();
   let stated = Boolean(stating);

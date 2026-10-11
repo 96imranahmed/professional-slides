@@ -96,6 +96,9 @@ const body = analytical.nodes.filter((n) => n.role === 'chart-mark');
 assert.ok(Math.max(...body.map((n) => n.frame.x + n.frame.width)) <= SLIDE.width - CHROME.right, 'the body keeps its width');
 const long = [{ kind: 'section', title: 'Where ridership stands today across all of the network' }, compilePage({ ...top, commentary: 'on-exhibit' }), ...[2, 3, 4, 5, 6, 7].map((n) => ({ kind: 'section', title: `Section number ${n} of the plan` }))];
 assert.match(error(() => scene(long, { tracker: 'side-rail' })), /Side rail tab .* holds two/);
+// Two sections are a pair of tabs, not a position: refused for the deck, with the trackers that take two named.
+const two = [slides[0], slides[1], slides[2]];
+assert.match(error(() => scene(two, { tracker: 'side-rail' })), /A side-rail tracker needs three sections; use tracker: "pills" or "label" for two/);
 console.log('{}');
 """)
 

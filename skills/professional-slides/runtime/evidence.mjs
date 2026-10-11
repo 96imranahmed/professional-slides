@@ -156,7 +156,8 @@ const isChart = (ex) => String(ex.type ?? "").startsWith("chart.");
 /** A chart that shows two numbers of one series: a metric pair with a chart drawn round it. */
 export function trivialChart(ex) {
   if (!isChart(ex) || ["chart.scatter", "chart.bubble", "chart.bubble-grid", "chart.waffle"].includes(ex.type)) return false;
-  const series = Array.isArray(ex.series) ? ex.series.length : 1;
+  // A trellis's panels (small multiples' `items`) are its series: five cuts of a before and after plot ten numbers.
+  const series = Array.isArray(ex.series) ? ex.series.length : Array.isArray(ex.items) ? ex.items.length : 1;
   const categories = Array.isArray(ex.categories) ? ex.categories.length : Array.isArray(ex.rows) ? ex.rows.length : Infinity;
   return series <= 1 && categories <= 2;
 }

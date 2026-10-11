@@ -257,6 +257,12 @@ function renderResolved(render, context) {
   return first;
 }
 
+/** A chart's height with its survey question: the question, then the chart laid out in the frame left under it. */
+function belowQuestion(frame, props, layout) {
+  const asked = questionLayout(props.question, frame.width)?.height ?? 0;
+  return asked + layout({ ...frame, y: frame.y + asked, height: Number.isFinite(frame.height) ? frame.height - asked : frame.height }, props).height;
+}
+
 export function registerCharts(registry) {
   const headingProps = props => ({ heading: props.heading, unit: props.unit, variant: props.titleVariant,
     ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}),
@@ -309,8 +315,9 @@ export function registerCharts(registry) {
           ? registry.get("chart-title").measureContent({ frame, props: headingProps(props) }).height : 0;
         return { height: headingHeight + (questionLayout(props.question, frame.width)?.height ?? 0) + EXTRA_CHARTS.find((c) => c.id === chart.id).layout({ ...frame, height: undefined }, props).height };
       } } : {}),
-      ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: marimekkoLayout(frame, props).height }) } : {}),
-      ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: bubbleGridLayout(frame, props).height }) } : {}),
+      // A survey question is set above these two as above any chart (render, below), so it is measured with them.
+      ...(chart.id === "chart.marimekko" ? { measureContent: ({ frame, props = {} }) => ({ height: belowQuestion(frame, props, marimekkoLayout) }) } : {}),
+      ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: belowQuestion(frame, props, bubbleGridLayout) }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;
         const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}) } });

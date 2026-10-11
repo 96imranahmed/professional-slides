@@ -1585,6 +1585,16 @@ function bindScaffold(page, insight, { fit = null, order, declared = [] } = {}) 
       else reasons.push(table ? `a ${page.form} scorecard codes percentages of a maximum, and the insight's measures over members are none` : `a ${page.form} scorecard sets recorded measures over members side by side, and the insight records none over three or more members`);
     } else if (Array.isArray(ex.rows) && Array.isArray(ex.columns)) {
       reasons.push(`the cells of a ${page.type}/${page.form} table code a judgement, which no measure records; recorded measures over members are a scorecard of form heatmap or bars, and the numbers set out side by side a lookup page (\`--scaffold lookup --evidence ${insight.id}\`)`);
+    } else if (Array.isArray(ex.items) && kind === "radial-bars") {
+      // A ring a population: one measure in percent over two to six members, each ring naming its member's share. The rings are read
+      // together, so they print at one precision - whole numbers, or a decimal for all where any needs one.
+      const lead = series.find((x) => x.axis.kind === "members" && isPercentUnit(x.m.unit) && x.axis.labels.length >= 2 && x.axis.labels.length <= 6);
+      if (lead) {
+        const values = valuesOf(lead.m), format = values.every((v) => typeof v !== "number" || Number.isInteger(v)) ? "0%" : "0.0%";
+        ex.items = lead.axis.labels.map((label) => ({ label, measure: `${lead.ref}@${label}`, format }));
+        claimed.push(lead.ref);
+        promptExhibit(ex);
+      } else reasons.push("radial bars set a percentage of each of two to six populations - one measure in percent over its members - and the insight records none");
     } else if (Array.isArray(ex.items) && page.type === "numbers") {
       const shown = (measures.filter((x) => x.axis.kind === "scalar").length ? measures.filter((x) => x.axis.kind === "scalar") : measures).slice(0, Math.max(ex.items.length, 2));
       const keeps = new Set(ex.items.flatMap((item) => Object.keys(item ?? {})));

@@ -58,6 +58,22 @@ assert.equal(nodes.find((n) => n.role === 'chart-reference-line' && n.data.item 
 console.log('{}');
 """)
 
+    def test_an_own_scale_holds_the_charts_reference(self):
+        # A chart-level reference outside a panel's values was ruled against that panel's own domain, far off the slide.
+        run_node(PRELUDE + """
+const small = regions.slice(0, 6).map((label, i) => ({ label, values: years.map((_, j) => 1 + ((i + j) % 3)) }));
+const nodes = render({ mark: 'column', categories: years, items: small, scale: 'own', reference: 100 });
+const lines = nodes.filter((n) => n.role === 'chart-reference-line');
+assert.equal(lines.length, small.length);
+for (const line of lines) {
+  const marks = nodes.filter((n) => n.role === 'chart-mark' && n.data.item === line.data.item);
+  const bottom = Math.max(...marks.map((n) => n.frame.y + n.frame.height));
+  assert.equal(line.data.value, 100);
+  assert.ok(line.frame.y >= frame.y && line.frame.y <= bottom, `${line.data.item}: the rule at ${line.frame.y} sits in its panel`);
+}
+console.log('{}');
+""")
+
     def test_a_grid_read_both_ways_takes_its_headers(self):
         run_node(PRELUDE + """
 const nodes = render({ mark: 'column', categories: years, items: items.slice(0, 6), rowLabels: ['North', 'South'], columnLabels: ['Season', 'Flexi', 'Anytime'] });
@@ -104,6 +120,16 @@ assert.equal(slide.pageType.values, 32, 'every panel counts towards the evidence
 assert.throws(() => compilePage({ ...page, exhibit: { ...page.exhibit, items: items.slice(0, 4) } }), /five or more cuts/);
 assert.throws(() => compilePage({ ...page, exhibit: undefined, exhibits: [page.exhibit, page.exhibit] }), /carries 1 exhibit/);
 assert.throws(() => compilePage({ ...page, commentary: 'captions' }), /choose `commentary`/);
+console.log('{}');
+""")
+
+    def test_a_before_and_after_trellis_is_not_a_metric_pair(self):
+        # Two shared categories across eight panels plot sixteen numbers; the panels check read the trellis as one series of two.
+        run_node(PRELUDE + self.PAGE + """
+const ends = ['FY23', 'FY26'], pairs = items.map((item) => ({ ...item, values: [item.values[0], item.values.at(-1)] }));
+const slide = compilePage({ ...page, exhibit: { ...page.exhibit, categories: ends, items: pairs } });
+assert.equal(slide.exhibit.type, 'chart.small-multiples');
+assert.equal(slide.pageType.values, 16);
 console.log('{}');
 """)
 

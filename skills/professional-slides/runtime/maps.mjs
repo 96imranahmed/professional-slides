@@ -358,6 +358,8 @@ function markerCoordinate(marker, geography, projected) {
 // round it. Sized by area as well, a small value's badge was swollen to hold its
 // figure and the size key no longer told the truth; a map of badges has no key.
 const BADGE_PAD = 10;
+// A hub that is a badge is ringed, the ring this far outside the disc: a dot in its middle would cover the figure.
+const HUB_RING = 4;
 const badgeText = (marker) => String(marker.display ?? marker.value);
 const badgeLayout = (marker) => measureText(badgeText(marker), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
 const badgeDiameter = (markers) => Math.max(0, ...markers.filter((marker) => marker?.style === "badge").map((marker) => { const layout = badgeLayout(marker); return Math.max(layout.width, layout.height) + BADGE_PAD; }));
@@ -377,7 +379,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
   // lands on a marker that comes later in the list.
   const occupied = markers.map((marker) => {
     const [x, y] = markerCoordinate(marker, geography, projected);
-    const r = markerDiameter(marker, maxValue, badges) / 2 + 1;
+    const r = markerDiameter(marker, maxValue, badges) / 2 + 1 + (marker?.style === "badge" && marker.hub ? HUB_RING : 0);
     return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
   });
   const nodes = [];
@@ -411,10 +413,12 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
     const markerFrame = { x: centerX - size / 2, y: centerY - size / 2, width: size, height: size };
     if (marker.style === "badge") {
       const layout = badgeLayout(marker);
+      if (marker.hub) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-ring", index), role: "map-marker", frame: { x: markerFrame.x - HUB_RING, y: markerFrame.y - HUB_RING, width: size + 2 * HUB_RING, height: size + 2 * HUB_RING },
+        style: { fill: SURFACE, stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { geography: geography.id, hub: true } }));
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, badge: true, value: marker.value } }));
       nodes.push(textPrimitive({ id: stableId(id, "marker-value", index), role: "map-marker-value", frame: { x: centerX - layout.width / 2 - 1, y: centerY - layout.height / 2, width: Math.ceil(layout.width) + 2, height: layout.height }, text: badgeText(marker), style: { fontFamily: FONT, fontSize: LABEL, color: WHITE, bold: true, align: "center", valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { value: marker.value, textLayout: layout } }));
     } else nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
-    if (marker.hub) {
+    if (marker.hub && marker.style !== "badge") {
       const dot = size * 0.45, dotFrame = { x: centerX - dot / 2, y: centerY - dot / 2, width: dot, height: dot };
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: dotFrame, style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, radius: token("radius.round") } }));
     }

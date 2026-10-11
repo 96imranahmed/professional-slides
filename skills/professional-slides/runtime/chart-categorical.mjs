@@ -507,8 +507,10 @@ function categoricalBounds(chart) {
       categoryValues.filter(value => value > 0).reduce((sum, value) => sum + value, 0)
     ];
   });
-  // A broken axis (valueBreak) lays the marks out on its compressed scale: the run it cuts takes a few pixels.
-  const bounds = numericBounds(withReferenceValues((stacked ? stackExtents : values).map(chart.compress), props), { min: horizontal ? (props.xMin ?? props.yMin) : props.yMin, max: horizontal ? (props.xMax ?? props.yMax) : props.yMax, axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  // A broken axis (valueBreak) lays the marks out on its compressed scale: the run it cuts takes a few pixels, and
+  // an explicit bound is compressed with them, or a top past the cut would flatten the marks as if nothing were cut.
+  const explicitMin = horizontal ? (props.xMin ?? props.yMin) : props.yMin, explicitMax = horizontal ? (props.xMax ?? props.yMax) : props.yMax;
+  const bounds = numericBounds(withReferenceValues((stacked ? stackExtents : values).map(chart.compress), props), { min: explicitMin === undefined ? undefined : chart.compress(explicitMin), max: explicitMax === undefined ? undefined : chart.compress(explicitMax), axis: horizontal ? "x" : "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   // Reserve measured clearance below negative columns with direct labels.
   // Only automatic unlabelled domains expand; explicit bounds stay authoritative.
   if (!horizontal && !stacked && showDataLabels && !showValueAxis && props.gridlines !== true && props.yMin === undefined && values.some(value => value < 0)) {
@@ -523,7 +525,8 @@ function categoricalBounds(chart) {
     const length = horizontal ? plot.width : plot.height;
     valueBreak.gap = BREAK_PX / length * bounds.span;
     const top = Math.max(...(stacked ? stackExtents : values).map(chart.compress));
-    if (props.yMax === undefined && props.xMax === undefined && top > bounds.max) { bounds.max = top; bounds.span = bounds.max - bounds.min; }
+    if (explicitMax !== undefined) { bounds.max = chart.compress(explicitMax); bounds.span = bounds.max - bounds.min; }
+    else if (top > bounds.max) { bounds.max = top; bounds.span = bounds.max - bounds.min; }
   }
   return { bounds };
 }

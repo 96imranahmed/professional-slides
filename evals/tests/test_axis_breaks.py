@@ -39,6 +39,17 @@ assert.equal(nativeChartSpec('chart.column', { ...lines, valueBreak: { from: 70,
 console.log('{}');
 """)
 
+    def test_an_explicit_top_is_cut_with_the_marks(self):
+        # A yMax past the cut was set against the compressed marks unchanged, which flattened them as if nothing were cut.
+        run_node(PRELUDE + """
+const cut = { from: 70, to: 380 }, auto = render('chart.column', { ...lines, valueBreak: cut }), topped = render('chart.column', { ...lines, valueBreak: cut, yMax: 420 });
+assert.ok(height(topped, 'Coast') > height(auto, 'Coast') * 0.8, `the rest keep their height under a set top (${height(topped, 'Coast')} against ${height(auto, 'Coast')})`);
+assert.ok(height(topped, 'Airport') < height(auto, 'Airport'), 'the room over the outlier is the room the top asks for');
+const bars = render('chart.bar', { ...lines, valueBreak: cut, xMax: 420 }), width = (c) => bars.find((n) => n.role === 'chart-mark' && n.data.category === c).frame.width;
+assert.ok(width('Coast') > width('Airport') / 3, "a bar chart's top is cut the same way");
+console.log('{}');
+""")
+
     def test_a_break_inside_a_stack_cuts_the_segment_that_crosses_it(self):
         run_node(PRELUDE + """
 const costs = { categories: ['Airport', 'Coast', 'Valley', 'Dales', 'Eastern'], series: [{ name: 'Track', values: [310, 22, 20, 19, 18] }, { name: 'Staff', values: [40, 14, 13, 12, 12] }, { name: 'Energy', values: [12, 8, 7, 7, 9] }] };

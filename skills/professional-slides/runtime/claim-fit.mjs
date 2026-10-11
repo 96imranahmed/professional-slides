@@ -192,7 +192,7 @@ export const CARRIERS = Object.freeze([
   { type: "composition", form: "pictogram", kind: "pictogram", shows: "a population share read as figures - six in ten - for one to five populations",
     carries: { "share-of-each": D }, needs: (p) => first(need(p.axis === "members" && p.labels <= 5, "one to five populations"), oneSeries(p), need(p.percent, "a percentage of each population")) },
   // A share of each of a few populations as arcs round one centre: the pictogram's task for figures that are not counted heads.
-  { type: "composition", form: "radial-bars", kind: "radial-bars", shows: "a share of each of two to six populations, each its own whole, as arcs round one centre",
+  { type: "composition", form: "radial-bars", kind: "radial-bars", bound: "items: [{ label, measure: \"<ref>@<member>\" }], one measure in percent over two to six members",
     carries: { "share-of-each": D }, needs: (p) => first(need(p.axis === "members" && within(p.labels, 2, 6), "two to six populations"), oneSeries(p), need(p.percent, "a percentage of each population")) },
   // --- relationship --------------------------------------------------------
   { type: "relationship", form: "scatter", kind: "chart.scatter", bound: "points: { x: \"<ref>\", y: \"<ref>\" }, two measures over the same members",

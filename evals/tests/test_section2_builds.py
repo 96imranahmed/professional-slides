@@ -63,6 +63,22 @@ assert.match(error(() => render('map', { geography: 'country:GBR', markers: [mar
 console.log('{}');
 """)
 
+    def test_a_hub_badge_is_ringed_and_its_value_left_clear(self):
+        # A hub dot was drawn over the badge's figure; a hub that is a badge is ringed instead.
+        run_node(PRELUDE + """
+const markers = [{ label: 'Leeds', longitude: -1.549, latitude: 53.801, value: 82, display: '82', style: 'badge', hub: true }, { label: 'York', longitude: -1.082, latitude: 53.959, value: 41, display: '41', style: 'badge' }];
+const nodes = render('map', { geography: 'country:GBR', markers });
+const at = (n) => nodes.indexOf(n), within = (a, b) => a.x >= b.x && a.y >= b.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height;
+const value = nodes.find((n) => n.role === 'map-marker-value' && n.text === '82'), disc = nodes.find((n) => n.data?.badge && n.data.value === 82);
+const ring = nodes.find((n) => n.id.includes('marker-ring'));
+assert.ok(ring && within(disc.frame, ring.frame) && ring.frame.width > disc.frame.width, 'the hub is a ring round its badge');
+assert.ok(at(ring) < at(disc), 'drawn under the badge');
+const after = nodes.slice(at(value) + 1).filter((n) => n.frame && within(n.frame, disc.frame));
+assert.deepEqual(after.map((n) => n.role), [], 'nothing is drawn over the figure');
+assert.equal(nodes.filter((n) => n.id.includes('marker-ring')).length, 1, 'only the hub is ringed');
+console.log('{}');
+""")
+
     def test_eras_run_over_the_columns_or_head_the_rows(self):
         run_node(PRELUDE + """
 const items = ['FY21', 'FY23', 'FY25', 'FY27'].map((date, i) => ({ date, label: `Stage ${i + 1}`, text: 'What happens at this stage, in a sentence.' }));
@@ -106,6 +122,42 @@ console.log(JSON.stringify({ widths: discs.map((n) => n.frame.width), bottoms: d
 """)
         self.assertAlmostEqual(circles["widths"][1] / circles["widths"][0], math.sqrt(300 / 1200), places=3)
         self.assertAlmostEqual(circles["bottoms"][0], circles["bottoms"][1], places=3)
+
+    def test_nested_circles_are_written_from_recorded_figures(self):
+        # A circle names its measure and keeps the number it is sized by, the figure printed beside it; a page whose exhibit is only a
+        # basis is completed into circles, where it was completed into a stat list the form then refused.
+        result = run_node(PRELUDE + """
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { compileDeck, authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+import { completePage } from './skills/professional-slides/runtime/spine-witness.mjs';
+import { measureRegistry } from './skills/professional-slides/runtime/measures.mjs';
+const insight = { id: 'i-market', finding: 'Regional leisure travel is worth £1.2bn a year, the lines serve £480m of it and the plan can win £96m', shape: 'mix', calculation: 'trips times the average fare',
+  sources: ['sources/i-market.csv'], soWhat: 'The plan wins a fifth of the trips the lines serve', strength: 'strong', breadth: { parts: 3 },
+  measures: { whole: { unit: '£m', population: 'regional leisure trips', period: 'FY26', value: 1200 }, served: { unit: '£m', population: 'trips the lines serve', period: 'FY26', value: 480 },
+    won: { unit: '£m', population: 'trips the plan can win', period: 'FY26', value: 96 } } };
+const insights = new Map([[insight.id, insight]]), refs = ['i-market/whole', 'i-market/served', 'i-market/won'];
+const page = { id: 'n1', type: 'numbers', form: 'nested-circles', commentary: 'beside', evidence: ['i-market'], title: 'The plan can win £96m of the £1.2bn regional leisure market',
+  why: 'How far the market narrows to what the plan can win', settles: { kind: 'share', what: 'the market, the part served and the part won', measures: refs } };
+const named = { ...page, adds: 'The points say where each circle comes from',
+  points: ['Regional leisure travel is every trip by any mode, £1.2bn a year.', 'The lines serve £480m of it, the trips between places the network reaches.', 'The timetable and fares can win £96m, a fifth of what the lines serve.'],
+  exhibit: { items: [['Regional leisure travel', 'whole'], ['Trips the lines serve', 'served'], ['What the plan can win', 'won']].map(([label, name]) => ({ label, measure: `i-market/${name}`, format: '£0m' })) } };
+const compiled = compileDeck({ deck: { id: 'd', design: 'consulting' }, pages: [named] }, { insights, partial: true });
+const drawn = [];
+JSON.stringify(compiled, (key, value) => { if (key === 'items' && Array.isArray(value) && value.some((item) => item?.display !== undefined)) drawn.push(value); return value; });
+const completed = completePage({ ...page, exhibit: { basis: { measures: refs } } }, { registry: measureRegistry(insights) });
+// Drafted under the worked deck's settings: its schema, question and answer.
+const worked = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8')).deck;
+const deck = { ...Object.fromEntries(Object.entries(worked).filter(([key]) => key !== 'workflow')), id: 'nest' };
+const draft = await authorDeck({ deck, pages: [{ ...page, exhibit: { basis: { measures: refs } } }] }, { baseDir: fs.mkdtempSync(path.join(os.tmpdir(), 'nested-')), insights, draft: true, fit: false });
+console.log(JSON.stringify({ errors: [...compiled.compileErrors, ...compiled.bindingFindings].map((f) => f.message ?? f.repair ?? f), drawn: drawn[0],
+  completed: completed.why ?? completed.page.exhibit, draft: draft.blocking.map((f) => [f.code, String(f.repair ?? '').slice(0, 200)]) }));
+""")
+        self.assertEqual(result["errors"], [])
+        self.assertEqual([(item["value"], item["display"]) for item in result["drawn"]], [(1200, "£1200m"), (480, "£480m"), (96, "£96m")])
+        completed = result["completed"]
+        self.assertNotIn("type", completed)
+        self.assertEqual([item["measure"] for item in completed["items"]], ["i-market/whole", "i-market/served", "i-market/won"])
+        self.assertEqual(result["draft"], [])
 
     def test_a_venn_names_each_overlap_in_its_own_lens(self):
         run_node(PRELUDE + """

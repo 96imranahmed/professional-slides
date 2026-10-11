@@ -275,6 +275,8 @@ export const FORM_COMMENTARY = Object.freeze({
   "panels/small-multiples": [...ANY_TEXT, "none"],
   // A dashboard's cells carry their own headings and figures: its words are the rail beside it or the bar under it.
   "panels/dashboard": ["none", "rail", "so-what-bar"],
+  // A device frame is one screenshot with no pictures to caption: its words sit beside it or under it.
+  "picture/device": ["beside", "below"],
 });
 // Forms that carry a different number of exhibits from their type: a trellis is one exhibit of many panels.
 const FORM_EXHIBITS = Object.freeze({ "panels/small-multiples": 1, "panels/dashboard": [2, 6], "panels/breakout": 2 });

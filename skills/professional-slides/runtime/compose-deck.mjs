@@ -231,9 +231,9 @@ export function sectionTabs(slidesIn, mode = "pills") {
   if (!construction) throw new Error(`Unknown tracker: ${mode}; use ${TRACKER_NAMES.join(", ")}, "repeat-contents" or false`);
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (sections.length < 2) return slidesIn;
-  // A rail of two markers is not a position, it is a pair of dots.
-  if (mode === "number-strip" && sections.length < 3) {
-    throw new Error('A number-strip tracker needs three sections; use tracker: "pills" or "label" for two');
+  // A rail of two markers is not a position, it is a pair of dots - numbered, or tabs down the margin.
+  if ((mode === "number-strip" || mode === "side-rail") && sections.length < 3) {
+    throw new Error(`A ${mode} tracker needs three sections; use tracker: "pills" or "label" for two`);
   }
   const items = sections.map((s, i) => ({ id: String(i + 1), label: s.title }));
   let current = 0;

@@ -76,6 +76,37 @@ assert.match(error(() => composeAll({ schema: 'professional-slides.deck/v3', id:
 console.log('{}');
 """)
 
+    def test_a_device_page_takes_only_the_commentary_it_draws(self):
+        # Captions passed with no pictures to caption, and the page was laid out without its words or its `adds`.
+        run_node(PRELUDE + """
+const page = workedExamples().pages.find((p) => p.type === 'picture' && p.form === 'device');
+assert.ok(compilePage(page));
+assert.match(error(() => compilePage({ ...page, commentary: 'captions' })), /choose `commentary`/);
+assert.ok(compilePage({ ...page, commentary: 'below' }));
+console.log('{}');
+""")
+
+    def test_radial_bars_are_scaffolded_from_a_recorded_share(self):
+        # The scaffold kept the worked page's rings and said the form took no measure.
+        result = run_node(PRELUDE + """
+import { scaffoldReport, compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+const insight = { id: 'i-access', finding: 'Step-free access runs from 93% of City stations to 41% on the Dales line', shape: 'mix', calculation: 'step-free stations over all stations',
+  sources: ['sources/i-access.csv'], soWhat: 'The Dales line is where access spending goes first', strength: 'strong', breadth: { members: 4 },
+  measures: { stepfree: { unit: '%', population: 'stations by line', period: 'FY26', members: ['City', 'Valley', 'Coast', 'Dales'], values: [93, 77, 62.5, 41] } } };
+const report = scaffoldReport('composition', { id: 'p9', form: 'radial-bars', insight });
+const compiled = compileDeck({ deck: { id: 'd', design: 'consulting' }, pages: [report.page] }, { insights: new Map([[insight.id, insight]]), partial: true });
+const drawn = [];
+JSON.stringify(compiled, (key, value) => { if (key === 'items' && Array.isArray(value) && value.some((item) => item?.display !== undefined)) drawn.push(value); return value; });
+const none = scaffoldReport('composition', { id: 'p9', form: 'radial-bars', insight: { ...insight, measures: { stepfree: { ...insight.measures.stepfree, unit: 'stations' } } } });
+console.log(JSON.stringify({ bound: report.bound, fallback: report.fallback, errors: [...compiled.compileErrors, ...compiled.bindingFindings].length, drawn: drawn[0], none: none.fallback }));
+""")
+        self.assertEqual(result["bound"], ["i-access/stepfree"])
+        self.assertIsNone(result["fallback"])
+        self.assertEqual(result["errors"], 0)
+        self.assertEqual([(item["label"], item["value"], item["display"]) for item in result["drawn"]],
+                         [("City", 93, "93.0%"), ("Valley", 77, "77.0%"), ("Coast", 62.5, "62.5%"), ("Dales", 41, "41.0%")])
+        self.assertIn("radial bars set a percentage of each of two to six populations", " ".join(result["none"] or []))
+
     def test_an_organization_set_by_hand_compiles(self):
         run_node(PRELUDE + """
 const page = { id: 'o', type: 'mechanism', form: 'organization', commentary: 'none', takeaway: false, why: 'Who reports to whom across three levels',

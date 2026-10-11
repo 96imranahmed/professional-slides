@@ -44,6 +44,22 @@ assert.equal(nativeChartSpec('chart.bar', props, frame, nodes), null, 'a native 
 console.log('{}');
 """)
 
+    def test_a_marimekko_or_bubble_grid_is_measured_with_its_question(self):
+        # Their own measures left the question out, so a chart sized to its content had the plot squeezed under it.
+        run_node(PRELUDE + """
+const cases = {
+  'chart.marimekko': { heading: 'Spend by segment', unit: '$B', categories: ['Retail', 'Corporate', 'Wealth', 'Markets'], series: [{ name: 'Domestic', values: [42, 30, 12, 8] }, { name: 'International', values: [18, 25, 10, 22] }] },
+  'chart.bubble-grid': { heading: 'Use cases by stage', unit: 'use cases', rows: ['Large', 'Regional', 'Local', 'Other'], columns: ['Idea', 'Concept', 'Pilot', 'Live'], values: [[30, 9, 9, 4], [15, 12, 9, 6], [24, 13, 13, 6], [8, 9, 9, 1]] },
+};
+const asked = { text: QUESTION, base: 1204 };
+for (const [kind, props] of Object.entries(cases)) {
+  const chart = REGISTRY.get(kind), open = { ...frame, height: undefined };
+  const plain = chart.measureContent({ frame: open, props }).height, withQuestion = chart.measureContent({ frame: open, props: { ...props, question: asked } }).height;
+  assert.ok(withQuestion > plain + 30, `${kind}: the question adds its height (${plain} -> ${withQuestion})`);
+}
+console.log('{}');
+""")
+
     def test_a_question_past_three_lines_is_refused(self):
         message = run_node(PRELUDE + """
 const long = Array.from({ length: 6 }, () => QUESTION).join(' ');
