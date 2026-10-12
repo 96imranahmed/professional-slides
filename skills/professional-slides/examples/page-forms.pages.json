@@ -3246,6 +3246,102 @@
    "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
   },
   {
+   "id": "f-lookup-side-labels",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a saving within its group - running the trains, or selling them - and reads across what it is worth and when it lands; the group names run down the side so every row keeps its width",
+   "settles": {
+    "kind": "structure",
+    "what": "seven cost and revenue options in two groups, with their yearly value and timing"
+   },
+   "adds": "The last column says what each option needs before its value can be counted",
+   "title": "Running the trains offers most of the £21m a year the plan finds",
+   "exhibit": {
+    "treatment": "categories",
+    "columns": [
+     {
+      "label": "",
+      "type": "category",
+      "vertical": true
+     },
+     {
+      "label": "Option",
+      "type": "text",
+      "bold": true
+     },
+     {
+      "label": "Value, £m a year",
+      "align": "right"
+     },
+     "Timing",
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      {
+       "text": "Running the trains",
+       "rowSpan": 4
+      },
+      "Crew rosters fitted to the recast timetable",
+      "6.4",
+      "FY28",
+      "Agreement with the drivers' union on rest-day working"
+     ],
+     [
+      null,
+      "Regenerative braking on the Valley fleet",
+      "3.1",
+      "FY29",
+      "Two substations upgraded to take the returned power"
+     ],
+     [
+      null,
+      "Closing the Malton depot",
+      "2.2",
+      "FY29",
+      "Overnight maintenance moved to York"
+     ],
+     [
+      null,
+      "Energy bought on a ten-year contract",
+      "1.8",
+      "FY28",
+      "A tender the board approves in FY27"
+     ],
+     [
+      {
+       "text": "Selling them",
+       "rowSpan": 3
+      },
+      "Off-peak day returns priced for leisure",
+      "4.1",
+      "FY28",
+      "The half-hourly Dales and Valley timetables"
+     ],
+     [
+      null,
+      "Advance fares sold in the app",
+      "2.0",
+      "FY27",
+      "Seat reservations on the Coast line"
+     ],
+     [
+      null,
+      "Station retail at Leeds and York",
+      "1.4",
+      "FY29",
+      "Leases renegotiated as they fall due"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
+  },
+  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",

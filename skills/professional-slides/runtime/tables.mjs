@@ -55,6 +55,9 @@ const SPARK = Object.freeze({ width: 56, height: 18, points: 24 });
 // A photo cell's height: three body lines, which is where a thumbnail stops
 // being a sliver and starts showing what it is of.
 const PHOTO_CELL_HEIGHT = 64;
+// A row-group label set on its side may stretch the rows it spans by half again their own height: "Definitions" down
+// one row of a two-line definition. Further, the rows are pushed apart for a word, and the label is too long for them.
+const VERTICAL_STRETCH = 1.5;
 // A portrait picture - a poster, a book cover - cropped to a landscape cell
 // would keep a band across its middle, a row of posters a row of unreadable
 // strips. It keeps its own shape, a little taller than a landscape
@@ -269,6 +272,15 @@ function normalize(props) {
   if (unlabelled) throw new Error(`Table column ${Number(unlabelled.id) + 1}'s \`label\` is its heading text (got ${JSON.stringify(unlabelled.label).slice(0, 60)})`);
   // `headerIcon` stands over a column's label: one with no label has nothing to stand over, a header already naming a
   // player by its mark has the place taken, and a chevron's point leaves no room over its label.
+  // `vertical: true` on a column: each of its labels set on its side, reading upward, down the rows it spans - the
+  // row-group label a well-made table runs down its left edge in a filled cell. The column is as narrow as its lines,
+  // so it carries no header, and it holds labels: a category or a text cell.
+  for (const column of columns.filter((c) => c.vertical !== undefined)) {
+    const name = `Table column ${Number(column.id) + 1}`;
+    if (column.vertical !== true) throw new Error(`${name}: \`vertical\` is true (its labels set on their side down their rows) or left out`);
+    if (!["category", "text"].includes(column.type)) throw new Error(`${name}: a vertical column sets row-group labels, as category or text cells; a ${column.type} column is read across`);
+    if (String(column.label ?? "").trim()) throw new Error(`${name}: a vertical column is as narrow as its labels' lines, with no room for a header; leave its \`label\` empty ("${column.label}")`);
+  }
   for (const column of columns.filter((c) => c.headerIcon !== undefined)) {
     const name = `Table column ${Number(column.id) + 1}${column.label ? ` ("${column.label}")` : ""}`;
     if (!iconDefinition(column.headerIcon)) throw new Error(`${name}: ${unknownIcon(column.headerIcon, "column header icon")}`);
@@ -355,6 +367,11 @@ function normalize(props) {
       if (cell.accent === undefined && (typeof cell.highlight === "string" || Array.isArray(cell.highlight))) { cell.accent = cell.highlight; delete cell.highlight; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
+      // A label is set on its side by its column (`vertical`), which is narrowed to hold it; a cell turned in a column
+      // read across would run out of its box, and a figure or a mark in a vertical column has no side to be set on.
+      if (cell.vertical && !column.vertical) throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" is set \`vertical\` in a column read across; set \`vertical: true\` on its column`);
+      if (column.vertical && !cell.blank && !["category", "text"].includes(cell.type)) throw new Error(`Table cell in vertical column ${c + 1} is a ${cell.type} cell; a vertical column holds row-group labels, as category or text cells`);
+      if (column.vertical && (cell.sectionNumber !== undefined || cell.icon !== undefined)) throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" is set on its side, where a numbered disc or an icon would stand across it; drop the \`sectionNumber\` or \`icon\`, or set the column across`);
       // `quote`: what someone said, in quotation marks, and `by` the voice under it - the market feedback a well-made
       // page sets a column of. `by` names who said a quote, so on any other cell it would be dropped unseen.
       if (cell.by !== undefined && cell.type !== "quote") throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" names \`by\`, who said it, and is a ${cell.type ?? "text"} cell; set \`type: "quote"\` on the cell or its column`);
@@ -581,6 +598,7 @@ function contentLayout(cell, width, props, used) {
   if (inner <= 0) throw new Error("Table cell is too narrow for padding; widen the column or use compact density");
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
+  if (cell.vertical && !cell.blank) return verticalLayout(cell, inner, { padding, size: dense ? "type.label" : compact ? "type.compact" : "type.body" });
   const fixed = fixedCellLayout(cell, { props, padding, gap, marker, inner });
   if (fixed) return fixed;
   if (!["body", "compact", "dense"].includes(props.density ?? "body"))
@@ -672,6 +690,20 @@ function contentLayout(cell, width, props, used) {
       blockHeight,
     ),
   };
+}
+
+/**
+ * A label set on its side: laid out on one line along its rows, its `height`
+ * the run it needs down them (which a span then holds, measureRows); on two
+ * lines - `run` the narrower measure - when the column holds two and its rows
+ * are short of one. `lines` says how many the column's width holds.
+ */
+function verticalLayout(cell, inner, { padding, size, run = null }) {
+  const bold = cell.type === "category" || Boolean(cell.bold);
+  const text = requireText(cell.text, "cell");
+  const block = measure(text, run ?? 100000, bold, size);
+  return { padding, offset: 0, blocks: [block], bold, size, marker: 0, numberMarker: 0, numberWidth: 0, vertical: true,
+    lines: Math.max(1, Math.floor((inner + 0.5) / block.lineHeight)), blockHeight: block.width, height: Math.ceil(block.width) };
 }
 
 /** A cell whose height is its picture's or its mark's, not its text's: a logo, a photo, an implication disc, in-cell bars. Undefined for any other cell. */
@@ -1064,6 +1096,11 @@ export function measureTable({ frame, props }) {
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
     ),
     gap = v(compact ? "space.1" : "space.2");
+  // A vertical column is as wide as its labels' lines and no wider: one, or two where a label set on one line would
+  // stretch its rows past half again their height (measureRows, then measured again here at two).
+  const verticalLines = props._verticalLines ?? 1;
+  const cellSize = density === "dense" ? "type.label" : compact ? "type.compact" : "type.body";
+  for (const column of model.columns) if (column.vertical) column.width = { px: Math.ceil(verticalLines * measure("M", 1000, true, cellSize).lineHeight + 2 * padding + gap) };
   const resolve = () => widenForWords(model, resolveWidths(model.columns, tableProps, frame.width), tableProps, {
     padding, chevronInset: props.headerShape === "chevron" ? v("space.5") : 0,
     textSize: density === "dense" ? "type.label" : density === "compact" ? "type.compact" : "type.body" });
@@ -1093,7 +1130,11 @@ export function measureTable({ frame, props }) {
         ? "type.compact"
         : "type.body";
   const { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight, iconSize, iconBand } = measureHeader({ props, model, padding, widths, paddingY, textSize });
-  const { layouts, sectionMarkerSize, heights } = measureRows({ props, model, density, tableProps, used, padding, gap, widths, paddingY });
+  const { layouts, sectionMarkerSize, heights, overrun } = measureRows({ props, model, density, tableProps, used, padding, gap, widths, paddingY });
+  if (overrun) {
+    if (verticalLines < 2) return measureTable({ frame, props: { ...props, _verticalLines: 2 } });
+    throw new Error(`Table row label "${overrun.text}" runs ${Math.ceil(overrun.run)}px down rows ${Math.floor(overrun.natural)}px tall, set on its side on ${overrun.lines === 1 ? "one line" : "two lines"}; a vertical label stretches its rows by half again at most - shorten it to the words that name the group, or let it span more rows`);
+  }
   const legends = measureLegends({ frame, model, used, gap, textSize });
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
   const legendHeight = sum(legends.map((l) => l.height));
@@ -1244,23 +1285,47 @@ function measureRows({ props, model, density, tableProps, used, padding, gap, wi
         ? "space.6"
         : "space.8",
   );
+  // A label set on its side runs down its rows rather than across its column, so its rows are measured without it
+  // and then hold it, last of all.
+  const across = (cell) => cell && !cell.vertical;
   const heights = layouts.map((row, r) =>
     Math.max(
       minimumRowHeight,
       ...row.map((l, c) =>
-        l && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
+        l && across(model.cells[r][c]) && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
       ),
     ),
   );
+  const hold = (r, cell, required) => {
+    const allocated = sum(heights.slice(r, r + cell.rowSpan));
+    if (required > allocated) {
+      const extra = (required - allocated) / cell.rowSpan;
+      for (let k = r; k < r + cell.rowSpan; k++) heights[k] += extra;
+    }
+  };
   model.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
-      if (!cell || cell.rowSpan === 1) return;
-      const required = cellHeight(layouts[r][c]),
-        allocated = sum(heights.slice(r, r + cell.rowSpan));
-      if (required > allocated) {
-        const extra = (required - allocated) / cell.rowSpan;
-        for (let k = r; k < r + cell.rowSpan; k++) heights[k] += extra;
+      if (across(cell) && cell.rowSpan > 1) hold(r, cell, cellHeight(layouts[r][c]));
+    }),
+  );
+  // A vertical label may stretch its rows by half again their own height, set on one line or, where its column holds
+  // two, on two; past that it would push its rows apart for a word, and `overrun` asks the table for a second line or
+  // says the label is too long for its rows.
+  let overrun = null;
+  model.cells.forEach((row, r) =>
+    row.forEach((cell, c) => {
+      if (!cell?.vertical || cell.blank) return;
+      const natural = sum(heights.slice(r, r + cell.rowSpan)), most = natural * VERTICAL_STRETCH;
+      let layout = layouts[r][c];
+      if (cellHeight(layout) > most && layout.lines >= 2 && layout.blocks[0].lines.length === 1) {
+        const width = layout.blocks[0].width, words = Math.max(...String(cell.text).split(/\s+/).map((word) => measure(word, 100000, layout.bold, layout.size).width));
+        for (let run = Math.max(words, width / 2); run < width; run += 2) {
+          const two = verticalLayout(cell, widths[c] - 2 * padding, { padding, size: layout.size, run: Math.ceil(run) });
+          if (two.blocks[0].lines.length <= 2) { layout = layouts[r][c] = two; break; }
+        }
       }
+      if (cellHeight(layout) > most && !overrun) overrun = { text: String(cell.text), run: layout.height, natural, lines: layout.blocks[0].lines.length };
+      hold(r, cell, cellHeight(layout));
     }),
   );
   if (props._sharedRowHeights !== undefined) {
@@ -1269,7 +1334,7 @@ function measureRows({ props, model, density, tableProps, used, padding, gap, wi
       throw new Error("Shared table rows must preserve every measured cell height");
     heights.splice(0, heights.length, ...props._sharedRowHeights);
   }
-  return { layouts, sectionMarkerSize, heights };
+  return { layouts, sectionMarkerSize, heights, overrun };
 }
 
 /**
@@ -1725,7 +1790,9 @@ function cellPlacements(table) {
   // A row led by a filled label block centres its cells on the block: the
   // block's label sits in its middle, and a one-line value hanging from the
   // row's top edge beside it puts the row on two baselines.
-  const filledRows = new Set(m.cells.flatMap((row, r) => row.some((cell) => cell && cell.type === "category" && categorySurface(cell, props) === "primary") ? [r] : []));
+  // A label set on its side down a run of rows is not one row's block, and centring the first row of its run on it would
+  // set that row on another line than the rest.
+  const filledRows = new Set(m.cells.flatMap((row, r) => row.some((cell) => cell && !cell.vertical && cell.type === "category" && categorySurface(cell, props) === "primary") ? [r] : []));
   return { bubblePill, pictureRows, filledRows };
 }
 
@@ -1880,7 +1947,18 @@ function drawCellContent(table, cell, at) {
   else if (cell.type === "implication") drawImplicationMark(table, cell, at);
   else if (bubble) drawBubbleLabel(table, cell, at);
   else if (cell.type === "bars") drawBars(table, cell, at);
+  else if (cell.vertical) drawVerticalLabel(table, cell, at);
   else drawTextCell(table, cell, at);
+}
+
+/** A row-group label set on its side: laid out unturned along its rows, centred on its cell, then turned a quarter to read upwards. */
+function drawVerticalLabel(table, cell, at) {
+  const { nodes } = table;
+  const { r, c, l, inner, color, data } = at;
+  const block = l.blocks[0], width = Math.ceil(block.width) + 2;
+  const cx = inner.x + inner.width / 2, cy = inner.y + inner.height / 2;
+  nodes.push(textPrimitive({ id: stableId(table.id, "cell-text", r, c, 0), role: "table-cell-text", frame: { x: cx - width / 2, y: cy - block.height / 2, width, height: block.height }, text: block.text,
+    style: { ...textStyle(l.bold, color, "center", l.size), lineHeight: block.lineHeight, rotate: -90 }, data: { ...data, textLayout: block, vertical: true } }));
 }
 
 /** A RAG status as a pill with its state's word. */

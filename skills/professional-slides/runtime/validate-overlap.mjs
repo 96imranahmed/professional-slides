@@ -59,12 +59,23 @@ export function inkBox(node) {
   return placed(node, width, lines.length * line, top, bottom);
 }
 
-/** The box from `top` to `bottom` of a block `width` by `height`, placed in the node's frame by its alignment. */
+/**
+ * The box from `top` to `bottom` of a block `width` by `height`, placed in the
+ * node's frame by its alignment - and, for a label turned a quarter (a table's
+ * row-group label set on its side, a rail's tab), turned with it about the
+ * frame's centre: unturned, its ink lay across the columns beside it.
+ */
 function placed(node, width, height, top, bottom) {
   const align = node.style?.align ?? "left", valign = node.style?.valign ?? "top";
   const x = align === "center" ? node.frame.x + (node.frame.width - width) / 2 : align === "right" ? node.frame.x + node.frame.width - width : node.frame.x;
   const y = valign === "mid" || valign === "middle" ? node.frame.y + (node.frame.height - height) / 2 : valign === "bottom" ? node.frame.y + node.frame.height - height : node.frame.y;
-  return { x, y: y + top, width, height: bottom - top };
+  const box = { x, y: y + top, width, height: bottom - top };
+  const turn = ((Number(node.style?.rotate || 0) % 360) + 360) % 360;
+  if (turn !== 90 && turn !== 270) return box;
+  const cx = node.frame.x + node.frame.width / 2, cy = node.frame.y + node.frame.height / 2;
+  // A quarter turn clockwise takes (dx, dy) from the centre to (-dy, dx); a quarter back, to (dy, -dx).
+  const [dx0, dx1, dy0, dy1] = [box.x - cx, box.x + box.width - cx, box.y - cy, box.y + box.height - cy];
+  return turn === 90 ? { x: cx - dy1, y: cy + dx0, width: box.height, height: box.width } : { x: cx + dy0, y: cy - dx1, width: box.height, height: box.width };
 }
 
 function crosses(box, line, pad = -1) {
