@@ -13,6 +13,8 @@ Each build writes `claims.json`: the title spine in order and every sentence tha
 3. **Read the title spine alone.** Merge or cut pages that prove a proposition another page already proves; make sure every figure and reversal condition in the summary and close appears on the page that proves it.
 4. **Look at every rendered page once** for the defects the gates cannot count: an empty band under the title, a hero number repeating the title, stock key lines, mismatched scales, one highlight used inconsistently.
 
+On a long deck, check each section as soon as it is written rather than the deck after the build: `author-deck.mjs <id>.pages.json --brief selfcheck --section <part>` sets the section's claims beside the records, and its checker saves `out/self-check/<part>.json`. After the build, `node runtime/self-check.mjs <id>.pages.json out/` records `out/self-check.json` from those answers, for every page whose claims are what its checker read, and names the rest.
+
 Fix what fails and rebuild, then record `out/self-check.json`:
 
 ```json

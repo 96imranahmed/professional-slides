@@ -2298,7 +2298,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (values.brief !== undefined) {
     if (!BRIEF_ROLES.includes(values.brief)) { console.error(`--brief is one of ${BRIEF_ROLES.join(", ")}`); return 1; }
     let insights = null;
-    if (values.brief === "writer" || values.brief === "skeleton") try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
+    if (["writer", "skeleton", "selfcheck"].includes(values.brief)) try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
     // A writer is told, page by page, the words each text slot holds where the deck sets it - measured as --scaffold --id
     // measures it, on the page as written or its scaffold - so copy is written once to what fits, not fitted a check at a time.
     let slotsOf = null;
@@ -2314,7 +2314,9 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     }
     const answerRecord = readJsonSync(path.join(dir, "out", ANSWER_CRITIQUE_FILE), { optional: true });
     const answerItems = openAnswerItems(answerRecord), answerHazards = answerHazardsOf(answerRecord);
-    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf, answerItems, answerHazards });
+    // A section's self-checker reads its pages' claims beside the records, as soon as the section checks clean (brief.mjs).
+    const sheet = values.brief === "selfcheck" && insights ? claimSheet(doc, insights, (sectionPages(doc, values.section ?? null).pages ?? []).map((page) => String(page.id))) : null;
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf, answerItems, answerHazards, sheet });
     if (brief.why) { console.error(brief.why); return 1; }
     say(brief.lines.join("\n"));
     return 0;

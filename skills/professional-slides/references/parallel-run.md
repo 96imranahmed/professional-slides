@@ -2,7 +2,7 @@
 
 A deck of a hundred pages built in sequence spends most of its time waiting. One agent writes every page, one critic reads them all, writers hunt through the references and the logs, and each finding surfaces a round after the last. On the BA benchmark that came to almost seven hours. This page sets out the stages, the roles and the limits that let the same deck, held to the same gates, be built section by section, side by side.
 
-A section is one part file, `pages/<part>.pages.json`, of about ten to twenty pages. The lead (the agent the user talks to) owns the request, the governing thought, the sections and every stage gate. It never writes pages and never runs the skill's test suite.
+A section is one part file, `pages/<part>.pages.json`, of about five to eight pages: a pillar of twenty pages is three or four sections, so no writer holds the run for long. The lead (the agent the user talks to) owns the request, the governing thought, the sections and every stage gate. It never writes pages and never runs the skill's test suite.
 
 ## The stages
 
@@ -13,9 +13,9 @@ A section is one part file, `pages/<part>.pages.json`, of about ten to twenty pa
 | 2. Skeleton | One `skeleton` agent per section | `author-deck.mjs <id>.pages.json --brief skeleton --section <part>`, which prints the answer critique's open items and the log's hazards | Each page has its title, type, `why`, `evidence` and `settles`; then the lead runs `--plan --write` and `--draft` to exit 0 |
 | 3. Critique | One critic on the whole spine, a fresh one each pass (the spine critique is one reading: its items are capped across the deck) | The packet `storyline.mjs <id>.deck.json out/` stages, as soon as `--draft` exits 0 | The review records `ready`; blocking items go back to that section's skeleton agent |
 | 4. Write | One `writer` per section | `--brief writer --section <part>` | Every page in the section checks clean, with `--check --page <ids> --json` and `--claims` |
-| 5. Judge | A fresh reader per section, as soon as that section is written | The packet `judge.mjs <id>.pages.json --page <section ids>` stages | No question open for the section |
+| 5. Judge and self-check | A fresh reader and a self-checker per section, side by side, as soon as that section is written | The packet `judge.mjs <id>.pages.json --page <section ids>` stages; `author-deck.mjs <id>.pages.json --brief selfcheck --section <part>` | No question open; `out/self-check/<part>.json` saved, its fixes applied word for word by the section's writer |
 | 6. Compile and render | The lead | The whole-deck compile, then `--check --render` | Exit 0, every finding fixed in one batch |
-| 7. Self-check and review | One self-checker per section, then the reviewer | `out/claims.json`, then the review packet | `out/self-check.json` written; the review accepted |
+| 7. Record and review | The lead, then the reviewer | `self-check.mjs <id>.pages.json out/` after the build, then the review packet | `out/self-check.json` complete (a page changed since its check goes back to its self-checker); the review accepted |
 
 A section moves to its next stage as soon as it passes: the lead does not wait for every section to be written before the first is judged.
 
@@ -38,8 +38,11 @@ Add to the pack only what this deck asks of the role: the voice, the counter-cas
 | --- | --- | --- |
 | `skeleton` | About 40 tool calls | A page's evidence cannot settle its title |
 | `writer` | About 80 tool calls; at most three checks of a page | The same finding returns after a fix; a page cannot compose under any form the check proposes |
-| critic, judge, reviewer | One reading, its answer validated | The answer fails `--validate` twice |
+| critic, judge, self-checker, reviewer | One reading, its answer validated | The answer fails `--validate` twice |
+| lead | Routes every fix to the page's own writer, word for word where a checker gave the wording | Never writes copy itself: on the BA retest a dozen of the self-check's problems were in lines the lead wrote while clearing gates |
 | research | About fifteen searches a gap | The decisive series is found, or shown not to be public |
+
+Each agent keeps its scratch files in a folder named for its section (`scratchpad/w-<part>/`): writers side by side overwrote one another's check output when they shared one.
 
 A writer checks only its own pages, with `--json` (a page's findings, budgets and limits, not the whole deck's report). It writes copy to the stated ranges, and applies the copy rules to its own lines before the judges read them. It never tries variants by brute force: a page that fails on length is told the range that fits, and a page that cannot compose is told the form that does.
 

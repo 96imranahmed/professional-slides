@@ -4,6 +4,7 @@
 // insights it rests on, with the recorded value each number in it states. What
 // a sentence asserts beyond its numbers - a rank, a universal, a cause - is the
 // writer's to read against those findings, and the self-check's after them.
+import { createHash } from "node:crypto";
 import { bindDeck } from "./bind.mjs";
 import { measureRegistry } from "./measures.mjs";
 import { measurementsIn } from "./printed-numbers.mjs";
@@ -34,10 +35,16 @@ export function claimSheet(doc, insights, ids = []) {
   });
 }
 
+/**
+ * A page's claims as a section's self-checker read them: a verdict recorded against this hash stays current while the page's
+ * title and sentences are unchanged, so a section checked before the build keeps its verdicts through it (self-check.mjs).
+ */
+export const sheetHash = (page) => createHash("sha256").update(JSON.stringify([page.title ?? null, page.claims.map((c) => [c.field, c.text])])).digest("hex").slice(0, 16);
+
 /** The sheet as lines to read: each page, its evidence findings, then each sentence with the record behind its numbers - and "CHECK" where a number has none. */
 export function claimSheetLines(sheet) {
   return sheet.flatMap((page) => [
-    `${page.id}  ${page.title}`,
+    `${page.id}  ${page.title}  (sheet ${sheetHash(page)})`,
     ...page.evidence.map((e) => `  evidence ${e.id}: ${e.finding ?? "(no finding recorded)"}`),
     ...page.claims.flatMap((claim) => [`  ${claim.numbers.some((n) => !n.states.length) ? "CHECK" : "ok   "} ${claim.field}: ${claim.text}`,
       ...claim.numbers.map((n) => `        ${n.shown}: ${n.states.length ? n.states.slice(0, 3).join("; ") : "no recorded value at this precision"}`)]),

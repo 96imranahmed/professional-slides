@@ -80,7 +80,8 @@ function measureLine(name, m) {
   return `${name} (${[m?.unit, m?.population].filter(Boolean).join("; ") || "no unit"}): ${shown || "no values"}${m?.computed ? `; computed: ${m.computed}` : ""}${gaps}`;
 }
 
-const insightLines = (insight) => [
+/** An insight as a reader checking claims against it reads it: its finding, calculation, recorded values and sources. */
+export const insightLines = (insight) => [
   `[${insight.id}] (${[insight.strength, insight.shape].filter(Boolean).join(", ")}) ${insight.finding ?? ""}`,
   `   calculation: ${insight.calculation ?? "none recorded"}`,
   ...Object.entries(insight.measures ?? {}).map(([name, m]) => `   ${measureLine(name, m)}`),
