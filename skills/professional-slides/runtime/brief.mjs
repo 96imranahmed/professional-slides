@@ -30,6 +30,7 @@ import path from "node:path";
 import { includedParts, partsOf } from "./pages-file.mjs";
 import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import { tokenOf } from "./spine-witness.mjs";
+import { hazardLine, itemLine } from "./answer-critique.mjs";
 
 export const BRIEF_ROLES = Object.freeze(["skeleton", "writer", "critic", "judge"]);
 // The fields the storyline critique reads of a page (storyline.mjs storyStructure): what a skeleton writes.
@@ -138,7 +139,7 @@ function commandLines(role, { file, ids, deckFile }) {
  * `limitsOf(page)` is the limits block `--scaffold` prints for a page; `insights` the insight log as author-deck reads it,
  * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id.
  */
-export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null }) {
+export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [] }) {
   const found = sectionPages(doc, section);
   if (found.why) return { why: found.why };
   const { pages, part } = found;
@@ -147,6 +148,14 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
   const said = (value) => (typeof value === "string" ? value : compact(value));
   const lines = [`# ${role} brief: ${part ? `section ${partName(part)} (${part})` : "the whole deck"}, ${pages.length} page${pages.length === 1 ? "" : "s"}`, "", digest.trim(), "", "## The deck",
     ...(deck.request ? [`Request: ${said(deck.request)}`] : []), ...(deck.answer ? [`Answer: ${said(deck.answer)}`] : []), ...(deck.density ? [`Density: ${deck.density}`] : [])];
+  // What the answer critique raised before the skeleton (answer-critique.mjs): a page that builds on a claim the log does not
+  // support is a page the storyline critique sends back, so the skeleton and its writers see what is open.
+  if ((role === "skeleton" || role === "writer") && answerItems.length) {
+    lines.push("", "## Raised on the answer before the skeleton (out/answer-critique.json): do not build on these as raised", ...answerItems.map((item) => `- ${itemLine(item)}`));
+  }
+  if ((role === "skeleton" || role === "writer") && answerHazards.length) {
+    lines.push("", "## Comparisons the log cannot support (out/answer-critique.json): no title, exhibit or point makes them as stated", ...answerHazards.map((hazard) => `- ${hazardLine(hazard)}`));
+  }
   if (role === "skeleton") {
     // The pillars in order, for where the section sits; the section's own pages follow in full.
     lines.push("", "## The deck's sections (* yours)", ...pagesOf(doc).filter((page) => page.kind === "section").map((page) => `${mine.has(String(page.id)) ? "*" : " "} [${page.id}] ${page.title ?? ""}`));

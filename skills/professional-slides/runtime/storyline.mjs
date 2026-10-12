@@ -85,6 +85,7 @@ import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 import { carriedSaid, withCarriedPages } from "./revision.mjs";
 import { naturalClass } from "./spine-witness.mjs";
 import { JUDGEMENT_KINDS } from "./judgements.mjs";
+import { answerCritiqueRefusal, answerHashOf, answerHazards, hazardLine as answerHazardLine, itemLine as answerItemLine, openAnswerItems, readAnswerCritique } from "./answer-critique.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
 // scope allows and whose answer is offered as provisional: the decisive gaps
@@ -959,6 +960,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const sections = mode === "full" && !scope && !revision && (split || contentPages > STORYLINE_SECTION_THRESHOLD)
     ? splitSections(pages.map((p) => ({ id: p.id, title: p.title, opens: p.kind === "section", counted: isContent(p) })), { max: STORYLINE_SECTION_MAX }) : null;
   const answer = spec.answer ?? content?.answer ?? "";
+  const answerRecord = scope ? null : await readAnswerCritique(outputDirectory);
   const packet = { mode, binding: storylineBinding(spec, measures), bindingVersion: BINDING_VERSION, pageHashes: storylinePageHashes(spec, measures), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
     maxPasses: scope?.maxPasses ?? MAX_PASSES, scope, sections, deck: path.resolve(specPath), revision: !scope && revision ? { changed: revision.spine, dropped: revision.dropped } : null,
     request: requestOf(spec), requestProvenance: requestProvenanceOf(spec), evidenceScope: evidenceScopeOf(spec), answerStatus: answerStatusOf(spec),
@@ -974,6 +976,9 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     reconcile: reconcile(scope ? scope.postReview?.pages ?? scope.changed : revision ? revision.spine : null),
     // The blocking items open when an earlier lineage was retired: a first pass says of each whether it still stands.
     ...(!scope && carried.length ? { carried } : {}),
+    // What the answer critique raised before the skeleton: a first pass is told, so it files what the spine still carries.
+    ...(!scope && answerRecord && (openAnswerItems(answerRecord).length || answerHazards(answerRecord).length)
+      ? { answerCritique: { verdict: answerRecord.verdict, changed: answerRecord.answerHash !== answerHashOf(answer), items: openAnswerItems(answerRecord), hazards: answerHazards(answerRecord) } } : {}),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
   const schema = offeredSchema(mode, scope, { carried: !scope && carried.length > 0 });
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
@@ -1312,6 +1317,16 @@ const carriedLines = (packet) => (packet.carried?.length ? `
 OPEN WHEN THE EARLIER LINEAGE WAS RETIRED: an earlier critique of this storyline, recorded before the critique was bound to what it is bound to now, left ${packet.carried.length} blocking item${packet.carried.length === 1 ? "" : "s"} open. That record cannot be compared with this spine, so ${packet.carried.length === 1 ? "it is not a status" : "they are not statuses"} to verify; but ${packet.carried.length === 1 ? "it is" : "each is"} a serious problem a critic saw, and none is dropped unread. For each, say in \`carried\` whether it still stands on the spine as it is now - one { item, stands, evidence } - and where it stands, file it as an item of this pass (a finding, a missing analysis or a cut) and name that item's id in \`finding\`. Validation refuses a critique that leaves one unanswered.
 ${packet.carried.map((item) => `- ${item.id} · ${item.dimension ?? item.code ?? "item"} · ${item.severity} · ${(item.pages || []).join(", ") || "the spine"}: ${item.text}`).join("\n")}
 ` : "");
+/** What the answer critique raised before the skeleton (answer-critique.mjs), as a first pass is told of it. */
+const answerCritiqueLines = (packet) => answerItemsLines(packet) + answerHazardLines(packet);
+const answerHazardLines = (packet) => (packet.answerCritique?.hazards?.length ? `
+COMPARISONS THE LOG CANNOT SUPPORT, named by the same critic from the log's own records. Where a page's title, claim or measures make one of these comparisons as the hazard states it, file an item on that page.
+${packet.answerCritique.hazards.map((hazard) => `- ${answerHazardLine(hazard)}`).join("\n")}
+` : "");
+const answerItemsLines = (packet) => (packet.answerCritique?.items?.length ? `
+RAISED ON THE ANSWER BEFORE THE SKELETON: a critic read the answer against the insight log before any page was written and raised ${packet.answerCritique.items.length} item${packet.answerCritique.items.length === 1 ? "" : "s"} (verdict ${packet.answerCritique.verdict}${packet.answerCritique.changed ? "; the answer has been revised since" : "; the answer has not changed since"}). They are not statuses to verify. Where the answer or the spine still makes one of these claims, or a page still rests on the comparison one names, file it as your own item, with its pages: it is the first thing a reader who checks the log will find. Where the answer and the pages no longer make it, say nothing of it.
+${packet.answerCritique.items.map((item) => `- ${answerItemLine(item)}`).join("\n")}
+` : "");
 const marked = (packet, line, p) => `${line}${packet.revision?.changed?.includes(p.id) ? "  [changed]" : ""}`;
 
 /** The request and the answer, as the critic reads them. */
@@ -1341,7 +1356,7 @@ export function spinePrompt(packet) {
   return `You are the senior partner who signs a team's storyline off before a single slide is drawn: the spine - the request, the answer, the sections, the titles in order, and what each page claims, rests on and shows. You did not write it. Be exacting and fair: your job is to say whether it is ready to lay out and, where it is not, what would make it so. Judge from this packet alone: do not search the web or open other files.
 
 This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}. Return the items that matter, ${SPINE_ITEM_MAX} at most (FORM below); fewer is normal. Later passes verify them, and may add only a serious new problem on a part the team changed.
-${revisionLines(packet)}${carriedLines(packet)}
+${revisionLines(packet)}${carriedLines(packet)}${answerCritiqueLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
@@ -1386,7 +1401,7 @@ THIS STORYLINE IS LONG (${packet.contentPages} content pages), so critique it in
   return `You are the senior partner who signs a team's storyline off before a single slide is drawn - the problem-solving session where a story is tested before it is built. You did not write it. Be exacting and fair: your job is to say whether it is ready to lay out and, where it is not, what would make it so. Judge from this packet alone: do not search the web or open other files.
 
 This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}: every ${packet.revision ? "changed" : "content"} page gets a note on every page check, and every spine check is considered. Later passes verify your items and may add only a serious new problem on a page the team changed.
-${split}${revisionLines(packet)}${carriedLines(packet)}
+${split}${revisionLines(packet)}${carriedLines(packet)}${answerCritiqueLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify(packet.players)}
 DATA THEY FOUND (files under sources/): ${packet.sources.length ? packet.sources.join(", ") : "none"}
@@ -1459,7 +1474,7 @@ Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("section"))}
 /** The spine critic of a long page-level critique: the compact spine, not the whole page listing again. */
 export function storylineSpinePrompt(packet) {
   return `You are the spine critic of a long storyline read in parallel, before anything is drawn: section critics read every page. Be exacting and fair; judge from this packet alone: do not search the web or open other files.
-${carriedLines(packet)}
+${carriedLines(packet)}${answerCritiqueLines(packet)}
 ${requestLines(packet)}
 PLAYERS DECLARED: ${JSON.stringify((packet.players || []).map((p) => p?.name ?? p))}
 REQUESTED LENGTH: ${packet.targetPages ? `${packet.targetPages}+ pages (the storyline has ${packet.totalPages}, ${packet.contentPages} of them content pages)` : `not fixed (the storyline has ${packet.totalPages} pages)`}
@@ -2293,6 +2308,8 @@ async function validateStorylineAnswer(specPath, outputDirectory, file) {
   const errors = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
   const unanswered = openSpineQuestions(spec);
   if (unanswered) errors.push(unanswered);
+  const sentBack = answerCritiqueRefusal(await readAnswerCritique(out), spec.answer);
+  if (sentBack) errors.push(sentBack);
   const { review, invalid } = await readCritique(path.resolve(file));
   const packet = await readJson(path.join(await lineageStore(spec, out, specPath), PACKET_RECORD), { optional: true });
   if (invalid || !review || !packet) {
@@ -2327,6 +2344,10 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   if (request.length) return { status: "refused", errors: request };
   const unanswered = openSpineQuestions(spec);
   if (unanswered) return { status: "refused", errors: [unanswered] };
+  // The answer as the answer critique read it against the log, before the skeleton (answer-critique.mjs): sent back and not
+  // changed since, the spine was written over claims the log does not support, and this critique would only find them again.
+  const sentBack = answerCritiqueRefusal(await readAnswerCritique(out), spec.answer);
+  if (sentBack) return { status: "refused", errors: [sentBack] };
   const store = await lineageStore(spec, out, specPath);
   const historyDir = path.join(store, HISTORY);
   let history = await readPasses(historyDir);

@@ -9,14 +9,17 @@ A section is one part file, `pages/<part>.pages.json`, of about ten to twenty pa
 | Stage | Who, side by side | What they read | Done when |
 | --- | --- | --- | --- |
 | 1. Brief and sections | The lead | The request, the insight log's index | `deck` written; one part file per section, each with its sub-question and page budget |
-| 2. Skeleton | One `skeleton` agent per section | `author-deck.mjs <id>.pages.json --brief skeleton --section <part>` | Each page has its title, type, `why`, `evidence` and `settles`; then the lead runs `--plan --write` and `--draft` to exit 0 |
-| 3. Critique | One critic on the whole spine, a fresh one each pass (the spine critique is one reading: its items are capped across the deck) | The packet `storyline.mjs <id>.deck.json out/` stages | The review records `ready`; blocking items go back to that section's skeleton agent |
+| 1b. Answer critique | One critic, beside the lead's sectioning | The packet `answer-critique.mjs <id>.pages.json out/` stages: the answer beside every insight's calculation | Recorded; the answer narrowed, and the analyses and searches its items name started ([Read the answer against the log](storylining.md#read-the-answer-against-the-log)) |
+| 2. Skeleton | One `skeleton` agent per section | `author-deck.mjs <id>.pages.json --brief skeleton --section <part>`, which prints the answer critique's open items and the log's hazards | Each page has its title, type, `why`, `evidence` and `settles`; then the lead runs `--plan --write` and `--draft` to exit 0 |
+| 3. Critique | One critic on the whole spine, a fresh one each pass (the spine critique is one reading: its items are capped across the deck) | The packet `storyline.mjs <id>.deck.json out/` stages, as soon as `--draft` exits 0 | The review records `ready`; blocking items go back to that section's skeleton agent |
 | 4. Write | One `writer` per section | `--brief writer --section <part>` | Every page in the section checks clean, with `--check --page <ids> --json` and `--claims` |
 | 5. Judge | A fresh reader per section, as soon as that section is written | The packet `judge.mjs <id>.pages.json --page <section ids>` stages | No question open for the section |
 | 6. Compile and render | The lead | The whole-deck compile, then `--check --render` | Exit 0, every finding fixed in one batch |
 | 7. Self-check and review | One self-checker per section, then the reviewer | `out/claims.json`, then the review packet | `out/self-check.json` written; the review accepted |
 
-A section moves to its next stage as soon as it passes: the lead does not wait for every section to be written before the first is judged. The full critique of the written deck (`storyline.mjs --full`) splits by section for a long deck, and `--split` asks for that split at any length. Data gaps a critic finds go to one research agent per gap, in parallel, while the sections they do not touch are written.
+A section moves to its next stage as soon as it passes: the lead does not wait for every section to be written before the first is judged.
+
+Stage the critique as early as the draft allows. A structure rule that only a change of page type can meet does not hold it back: `--plan --write` writes its forms anyway and says so, and the types change beside the critic's reading (each changed page is verified on its own). The confirming critic of a pass's blocking items reads while the lead starts the fixes. The full critique of the written deck (`storyline.mjs --full`) splits by section for a long deck, and `--split` asks for that split at any length. Data gaps a critic finds go to one research agent per gap, in parallel, while the sections they do not touch are written.
 
 ## What each agent is given
 

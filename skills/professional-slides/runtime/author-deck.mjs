@@ -143,6 +143,7 @@ import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync } from "./pages-file.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
+import { RECORD_FILE as ANSWER_CRITIQUE_FILE, answerHazards as answerHazardsOf, openAnswerItems } from "./answer-critique.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { axisOf, hasMeasures, insightLogRefusal, isPercentUnit, measureConflicts, measureRegistry, readInsightLog, unmeasuredInsights, valuesOf } from "./measures.mjs";
@@ -2160,7 +2161,13 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
   // `--write`: the choices the plan makes where a page declares none - its form and placement, the kind of a stub it left
   // untyped - written into the file the page is written in, the pages file or its part. A declared choice the plan would
   // change is the author's to take, and is left as it is. Copied by hand into a hundred pages, a typo cost a run.
-  const wrote = write && plan.satisfied ? writePlan(file, plan) : null;
+  // A rule only another page type meets - no allocation of forms does, the best-fit ones or any other the catalogue allows -
+  // is not settled by searching the forms again. Its allocation is written all the same, so the draft and the storyline
+  // critique can start while the types change: on the BA benchmark one such rule kept the forms, the draft and the critique
+  // waiting for 23 minutes. Each type changed after re-plans only its own page. Where some form would meet the rule at a cost
+  // to fit, the choice stays the author's and nothing is written.
+  const typeBound = !plan.satisfied && plan.unsatisfied.length > 0 && plan.unsatisfied.every((u) => u.fixedByTypes || !mended.includes(u.code)) && !served.length;
+  const wrote = write && (plan.satisfied || typeBound) ? writePlan(file, plan) : null;
   // A view that plots a period or member its measure does not disclose is refused with the labels to plot (SPINE_UNDRAWABLE);
   // `--write` writes those labels where the refusal says, so a spine of stubs over gapped series is mended in one run.
   const disclosed = write ? writeDisclosed(file, unlayable, measureRegistry(insights)) : [];
@@ -2180,6 +2187,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
     ...(estimated.length && plan.pages.some((page) => page.source === "changed") ? ["  A change to a declared choice above mends a rule that is broken on the estimate: write the estimated pages' exhibits (or give each its `type`) and run --plan again before taking it."] : []),
     ...(plan.unsatisfied.length ? ["", "Unsatisfied:", ...plan.unsatisfied.map((u) => `  ${u.standing ? readStandings([u.standing])[0].line : `${u.code}: ${u.finding.repair}`}` +
       (u.fixedByTypes ? "\n    The page types alone break this rule: no form or placement can meet it. Change a page's `type`, or mark a deliberate run with a shared `series`." : "")),
+      ...(wrote && typeBound ? ["  Only a change of page type meets " + (plan.unsatisfied.length === 1 ? "it" : "them") + ", so the allocation is written: run --draft and start the storyline critique now, and change the types beside it (each re-plans only its own page, and its critique is verified on that page)."] : []),
       ...(plan.pinned.length && plan.unsatisfied.some((u) => !u.fixedByTypes) ? [`  The plan keeps every page in a form that carries its claim best, and those forms do not meet ${plan.unsatisfied.filter((u) => !u.fixedByTypes).map((u) => u.code).join(", ")} between them.` +
         (served.length ? ` ${mended.join(", ")} would be met only by drawing ${served.length === 1 ? "this page" : "these pages"} in a form that is not a best fit for ${served.length === 1 ? "its" : "their"} claim: ${served.slice(0, 12).map((page) => `${page.id} as ${page.form} (best fit: ${page.best.join(", ")})`).join("; ")}${served.length > 12 ? `; and ${served.length - 12} more` : ""}. That trades the picture for the rule, and the plan does not propose it: the sounder repair is evidence of another shape or a page of another type, made before the critique. A form you declare on a page is kept, and is named under VARIETY_FIT_UNUSED.`
           : mended.length ? ` ${mended.join(", ")} would be met by other placements or forms the catalogue allows these pages; declare them and run --plan again.` : " No form the catalogue allows these pages meets it either: the page types or the evidence have to change.")] : [])] : []),
@@ -2304,7 +2312,9 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
         if (slots) slotsOf.set(String(own.id), slots);
       }
     }
-    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf });
+    const answerRecord = readJsonSync(path.join(dir, "out", ANSWER_CRITIQUE_FILE), { optional: true });
+    const answerItems = openAnswerItems(answerRecord), answerHazards = answerHazardsOf(answerRecord);
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf, answerItems, answerHazards });
     if (brief.why) { console.error(brief.why); return 1; }
     say(brief.lines.join("\n"));
     return 0;

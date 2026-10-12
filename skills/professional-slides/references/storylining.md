@@ -183,6 +183,24 @@ Place a governing prerequisite before the first comparison that relies on it, or
 
 Give secondary obstacles proportionate space: if an option already fails an essential prerequisite, attach a further cost to that option unless it could reopen the choice. Adjacent schedules that repeat the same activities under different headings join on one time axis. When deletion takes a deck below a requested length, return to evidence breadth - a genuinely unanswered question the sources support - or move reference material to the appendix; never split a page to recover the count.
 
+## Read the answer against the log
+
+Before the skeleton is written, a fresh critic reads the answer against the insight log: `node runtime/answer-critique.mjs <id>.pages.json out/`. At exit 3 give `out/answer-critique/prompt.md` to the critic, save its JSON as `out/answer-critique/answer.json` and run it again. It has the request, the question, the answer, every insight with its calculation note and recorded values, and the computed analyses. No page exists yet, so each item it raises costs one edit, not a rewrite of the sections.
+
+It reads each claim of the answer five ways:
+
+- **Support:** some insight records evidence for it.
+- **Scope:** a ranked or universal word ("best", "leads", "only", "every") holds against the whole set the log records.
+- **Basis:** two figures set against each other share a definition, population and period, as the calculation notes say.
+- **Edition:** a change is read within one source edition, not across two editions or a restatement.
+- **Analysis or gap:** what the reasoning needs is computed from the log's measures, or researched.
+
+Each item says its remedy: **narrow** the answer, **compute** the analysis, or **research** the data. Do all three before the skeleton. The same critic names the log's hazards: comparisons its own records cannot support, whatever the answer says.
+
+The skeleton and writer briefs print the open items and the hazards. The storyline critique's first pass is told of them, and files any the spine still carries. While the answer stands unchanged after a `revise`, the storyline critique refuses to stage.
+
+On the BA benchmark the storyline critique's first pass raised four blocking or major items, three quarters of an hour in. All four were in the log before any page existed: "the best returns" against a rival's higher margin, a recommendation the log's own series undercut, a share compared on another basis, and a series across two survey editions. The first two were in the answer itself, the last two in the log's calculation notes.
+
 ## Work in parallel with subagents
 
 Research and analysis split cleanly, so when the harness can spawn subagents, fan them out. The lead keeps the request, the answer, the players and the title spine; subagents do bounded work and return files.

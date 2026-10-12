@@ -533,6 +533,27 @@ console.log(JSON.stringify({ satisfied: plan.satisfied, unsatisfied: plan.unsati
         fixed = {u["code"] for u in result["unsatisfied"] if u["fixedByTypes"]}
         self.assertTrue({"VARIETY_TYPE_SHARE", "VARIETY_TYPE_RUN"} <= fixed, result["unsatisfied"])
 
+    def test_a_plan_only_page_types_can_mend_is_written_so_the_draft_and_critique_can_start(self):
+        # On the BA benchmark one structure rule no form could meet kept the forms unwritten, and with them the draft and the
+        # storyline critique, for 23 minutes while the types were argued over. A rule only types mend is not mended by searching
+        # the forms again, so the best allocation is written and the run says the critique can start beside the type changes.
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = Path(tmp) / "page-types.pages.json"
+            doc = json.loads((SKILL / "examples" / "page-types.pages.json").read_text(encoding="utf-8"))
+            keep = {"id", "title", "type", "why", "kind", "evidence", "settles"}
+            doc["pages"] = [{k: v for k, v in p.items() if k in keep} if p.get("type") else p for p in doc["pages"]]
+            for p in doc["pages"]:
+                if p.get("type") and p["type"] not in ("summary", "statement"):
+                    p["type"] = "trend"
+            pages.write_text(json.dumps(doc), encoding="utf-8")
+            run = subprocess.run([NODE, str(SKILL / "runtime" / "author-deck.mjs"), str(pages), "--plan", "--write"], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 2, "the type rules stay unmet")
+            self.assertIn("The page types alone break this rule", run.stderr)
+            self.assertIn("so the allocation is written: run --draft and start the storyline critique now", run.stderr)
+            written = json.loads(pages.read_text(encoding="utf-8"))["pages"]
+            typed = [p for p in written if p.get("type")]
+            self.assertTrue(typed and all(p.get("form") and p.get("commentary") for p in typed), "every typed page is given its form and placement")
+
     def test_a_plan_is_read_from_a_spine(self):
         with tempfile.TemporaryDirectory() as tmp:
             def untitled(doc):
