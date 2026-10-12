@@ -2343,6 +2343,345 @@
    "source": "Source: illustrative data for a fictional operator; train running records"
   },
   {
+   "id": "f-panels-small-multiples-stacked",
+   "type": "panels",
+   "form": "small-multiples",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Six lines answer one question - did riders leave season tickets once trains came every twenty minutes - and only a stack a year on each line shows the mix moving",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by ticket type, as shares of each line's journeys, FY24 to FY26"
+   },
+   "adds": "The points say why the Eastern mix moved and what it means for revenue, which the shares show but cannot explain",
+   "title": "Only the Eastern line moved its riders from season tickets to day tickets",
+   "subtitle": "Journeys by ticket type as a share of each line's journeys, six lines, FY24 to FY26",
+   "exhibit": {
+    "heading": "Journeys by ticket type and line",
+    "unit": "% of journeys",
+    "mark": "stacked-column",
+    "percent": true,
+    "categories": [
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "items": [
+     {
+      "label": "City",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         4.2,
+         4.1,
+         4
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         3.5,
+         3.6,
+         3.7
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         2.3,
+         2.3,
+         2.4
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Valley",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         2.6,
+         2.6,
+         2.5
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         2,
+         2.1,
+         2.1
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1,
+         1,
+         1.1
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Eastern",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         2.9,
+         2.4,
+         1.9
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         2.2,
+         2.9,
+         3.6
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1.1,
+         1.2,
+         1.3
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Dales",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         0.9,
+         0.9,
+         0.9
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.4,
+         1.4,
+         1.5
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         0.8,
+         0.8,
+         0.8
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Coast",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         1.5,
+         1.5,
+         1.4
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.2,
+         1.2,
+         1.3
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         0.7,
+         0.7,
+         0.7
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Airport",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         0.6,
+         0.6,
+         0.6
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.8,
+         1.9,
+         1.9
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1.5,
+         1.6,
+         1.6
+        ]
+       }
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Eastern"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "One line's mix moved",
+     "text": "Season tickets fell from 47% to 28% of Eastern journeys in two years and day tickets rose from 36% to 53%; on the other five lines no ticket type moved by more than three points."
+    },
+    {
+     "lead": "Frequency, not price",
+     "text": "Eastern was the only line recast to a train every twenty minutes in FY25, and fares did not change; riders who no longer plan around a timetable stop buying a season ticket to cover it."
+    },
+    {
+     "lead": "What it does to revenue",
+     "text": "A day-ticket journey earns about a third more than a season journey, so the shift adds revenue as long as the trains keep coming; the same recast on the Valley line is the next test."
+    }
+   ],
+   "highlight": [
+    "47% to 28%",
+    "only line recast",
+    "a third more"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic ticket sales"
+  },
+  {
+   "id": "f-panels-small-multiples-donut",
+   "type": "panels",
+   "form": "small-multiples",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Eight lines each share out their own journeys, and a donut a line shows which one sells differently without asking the reader to compare stacks of unequal height",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by ticket type on each of the eight lines, FY26"
+   },
+   "adds": "The points say why day tickets lead on one line and what that asks of the timetable elsewhere",
+   "title": "Day tickets carry half the Eastern line's journeys and under two in five elsewhere",
+   "subtitle": "All eight lines, every journey in FY26 by the ticket its rider bought",
+   "exhibit": {
+    "heading": "Journeys by ticket type and line, FY26",
+    "unit": "% of journeys",
+    "mark": "donut",
+    "categories": [
+     "Day",
+     "Season",
+     "Advance"
+    ],
+    "centre": "Day",
+    "items": [
+     {
+      "label": "City",
+      "values": [
+       3.7,
+       4,
+       2.4
+      ]
+     },
+     {
+      "label": "Valley",
+      "values": [
+       2.1,
+       2.5,
+       1.1
+      ]
+     },
+     {
+      "label": "Eastern",
+      "values": [
+       3.6,
+       1.9,
+       1.3
+      ]
+     },
+     {
+      "label": "Dales",
+      "values": [
+       1.2,
+       1.1,
+       0.8
+      ]
+     },
+     {
+      "label": "Coast",
+      "values": [
+       1.3,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "label": "Airport",
+      "values": [
+       1.5,
+       0.7,
+       1.6
+      ]
+     },
+     {
+      "label": "Lakes",
+      "values": [
+       1,
+       0.9,
+       0.7
+      ]
+     },
+     {
+      "label": "Borders",
+      "values": [
+       0.8,
+       0.9,
+       0.4
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Eastern"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "One line sells differently",
+     "text": "Day tickets are 53% of Eastern journeys; on the other seven lines they run from 37% to 39%, and season tickets still lead on four of them."
+    },
+    {
+     "lead": "Why it matters",
+     "text": "The Eastern line is the one running a train every twenty minutes, and its riders now buy on the day; the timetable, not the fare, sets the mix the other lines will move towards."
+    }
+   ],
+   "highlight": [
+    "53% of Eastern journeys",
+    "every twenty minutes"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic ticket sales"
+  },
+  {
    "id": "f-panels-dashboard",
    "type": "panels",
    "form": "dashboard",

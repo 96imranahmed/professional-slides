@@ -4,6 +4,7 @@
 // describes (`changeFromContent`), a stack re-expressed as shares
 // (`percentStack`), paired bar panels, and the shared ceiling peer charts take.
 import { defaultFocusIndex } from "./chart-categorical.mjs";
+import { sharesOfWhole } from "./chart-axes.mjs";
 import { CEILING_LADDER, niceCeiling } from "./nice-numbers.mjs";
 import { judged } from "./judgements.mjs";
 
@@ -39,28 +40,19 @@ export const SIDEWAYS_CATEGORIES = new Set(["chart.bar", "chart.stacked-bar", "c
   "chart.dumbbell", "chart.bullet", "chart.range"]);
 
 const STACKS = new Set(["chart.stacked-column", "chart.stacked-bar", "chart.stacked-area"]);
-const PERCENT_CHARTS = new Set([...STACKS, "chart.waffle"]);
+// A trellis of stacks shares each one out itself, and refuses `percent` on a mark that draws no stack (chart-small-multiples.mjs).
+const PERCENT_CHARTS = new Set([...STACKS, "chart.waffle", "chart.small-multiples"]);
 /** `percent: true` on a stacked chart re-expresses each category as shares of its total (100% stack). */
 export function percentStack(ex) {
   if (!ex || !ex.percent) return ex;
   // Only a stack has a total to share out; a waffle reads `percent` as its own (ten columns of a hundred dots). Anywhere
   // else the flag did nothing, and a page meant as shares printed raw counts.
   if (String(ex.type ?? "").startsWith("chart.") && !PERCENT_CHARTS.has(ex.type))
-    throw new Error(`\`percent: true\` re-expresses a stack as shares of its total - it applies to ${[...STACKS].join(", ")} (and a waffle's hundred dots), not ${ex.type}; enter shares as the values, with the unit saying so`);
+    throw new Error(`\`percent: true\` re-expresses a stack as shares of its total - it applies to ${[...STACKS].join(", ")}, a trellis of stacks (and a waffle's hundred dots), not ${ex.type}; enter shares as the values, with the unit saying so`);
+  if (ex.type === "chart.small-multiples") return { ...ex, unit: ex.unit || "% of total" };
   if (!STACKS.has(ex.type) || !Array.isArray(ex.series) || !Array.isArray(ex.categories)) return ex;
-  const totals = ex.categories.map((_, i) => ex.series.reduce((sum, sr) => sum + (sr.values[i] || 0), 0));
-  // Shares to one decimal by largest remainder, so each column sums to exactly
-  // 100. Rounding each share on its own can bring a column to 100.1, past the
-  // 0-100 axis the chart refuses to draw.
-  const shares = ex.categories.map((_, i) => {
-    if (!totals[i]) return ex.series.map(() => 0);
-    const exact = ex.series.map((sr) => ((sr.values[i] || 0) / totals[i]) * 1000);
-    const floors = exact.map(Math.floor);
-    let short = 1000 - floors.reduce((a, b) => a + b, 0);
-    const order = exact.map((v, k) => [v - floors[k], k]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-    for (const [, k] of order) { if (short <= 0) break; floors[k] += 1; short -= 1; }
-    return floors.map((v) => v / 10);
-  });
+  // Shares to one decimal by largest remainder, so each column sums to exactly 100 (chart-axes.mjs sharesOfWhole).
+  const shares = ex.categories.map((_, i) => sharesOfWhole(ex.series.map((sr) => sr.values[i])));
   const series = ex.series.map((sr, k) => ({ ...sr, values: sr.values.map((_, i) => shares[i][k]) }));
   const { percent, ...rest } = ex;
   return { ...rest, series, unit: ex.unit || "% of total", yMin: 0, yMax: 100, change: ex.change ?? false };

@@ -91,6 +91,22 @@ console.log(JSON.stringify({
         self.assertEqual(result["rule"], [25] * 6)  # a measure of one value is a rule across the plot
         self.assertTrue(result["untouched"])  # a page that binds nothing is the author's own object
 
+    def test_a_trellis_of_stacks_is_written_by_hand_and_a_donut_trellis_binds(self):
+        # A stacked panel draws several parts, and a measure a panel fills one: written as single-value panels the stacked
+        # mark would refuse them with no word of why. A donut's panel is one measure shared out over its members.
+        result = run_node(LOG + '''
+const panels = { type: 'panels', form: 'small-multiples', commentary: 'below' };
+console.log(JSON.stringify({
+  stacked: problems(page({ ...panels, exhibit: { heading: 'Cash and debt', mark: 'stacked-column', series: [{ measure: 'i-bal/cash' }, { measure: 'i-bal/debt' }] } })),
+  donut: exhibitOf({ heading: 'Cash and debt by year', mark: 'donut', series: [{ measure: 'i-bal/cash', name: 'Cash' }, { measure: 'i-bal/debt', name: 'Debt' }] }, panels),
+}));
+''')
+        self.assertEqual(len(result["stacked"]), 1)
+        self.assertIn("trellis of stacks", result["stacked"][0])
+        self.assertEqual([item["label"] for item in result["donut"]["items"]], ["Cash", "Debt"])
+        self.assertEqual(result["donut"]["categories"], ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"])
+        self.assertEqual(result["donut"]["items"][0]["values"], [15, 21, 37, 43, 50, 55])
+
     def test_a_recorded_series_and_a_scenario_are_one_line_with_the_assumed_run_marked(self):
         result = run_node(LOG + '''
 import { compileDeck, composeForAuthoring } from './skills/professional-slides/runtime/author-deck.mjs';
