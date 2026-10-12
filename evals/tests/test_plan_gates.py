@@ -23,6 +23,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from node_probe import run_node
+
 ROOT = Path(__file__).resolve().parents[2]
 GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates" / "plan_gates.mjs"
 
@@ -335,6 +337,42 @@ class PlanGateTests(unittest.TestCase):
         self.assertIn("mix", report["statistics"])
         self.assertIn("styleEntropy", report["reference"])
         self.assertIn("observed", report["reference"])
+
+    def test_the_blockers_alone_are_the_structure_refusals_the_whole_gates_make(self):
+        """A structure search weighs each of tens of thousands of candidate decks by its structure blockers
+        (deck-structure.mjs structureCost) and reads them with planBlockers, which runs only the gates that can
+        refuse a deck's structure: 11 of a 106-page plan's 24 seconds went on the rest. Whatever the plan - one
+        architecture on every page, an architecture nobody can classify, a page carrying a field the plan does not
+        have, no pages at all, a revision whose rules version waives a code - it must say exactly the blocking
+        structure findings the whole gates say, or the search takes a deck the plan refuses for one it passes."""
+        result = run_node("""
+import { planBlockers, runPlanGates } from './skills/professional-slides/runtime/gates/plan_gates.mjs';
+import { classOf } from './skills/professional-slides/runtime/gates/gate_classes.mjs';
+const page = (n, more = {}) => ({ n, title: 'A page that says something measurable here', exhibit: 'chart.column', architecture: 'exhibit-left', ...more });
+const spread = ['evidence-only', 'paired-evidence', 'timeline', 'card-grid', 'text', 'reconciliation', 'exhibit-left'];
+const plans = {
+  flat: { pages: Array.from({ length: 20 }, (_, i) => page(i + 1)) },
+  spread: { pages: Array.from({ length: 20 }, (_, i) => page(i + 1, { architecture: spread[i % spread.length] })) },
+  unclassified: { pages: Array.from({ length: 20 }, (_, i) => page(i + 1, { architecture: `case-${i}` })) },
+  stray: { pages: Array.from({ length: 20 }, (_, i) => page(i + 1, { architecture: spread[i % spread.length], ...(i === 3 ? { colour: 'red' } : {}) })) },
+  absent: { id: 'none' },
+};
+const refusals = (findings) => findings.filter((f) => f.severity === 'blocker' && classOf(f.code) === 'S').map((f) => JSON.stringify(f));
+const out = {};
+for (const [name, plan] of Object.entries(plans)) for (const deck of [undefined, { workflow: 'revision', rulesVersion: 1 }]) {
+  const whole = refusals(runPlanGates(plan, { deck }).findings), alone = refusals(planBlockers(plan, { deck }));
+  out[`${name}${deck ? '/revision' : ''}`] = { same: JSON.stringify(whole) === JSON.stringify(alone), codes: whole.map((f) => JSON.parse(f).code) };
+}
+console.log(JSON.stringify(out));
+""")
+        for name, reading in result.items():
+            self.assertTrue(reading["same"], name)
+        # The cases are ones the gates refuse, so the agreement is about something.
+        self.assertIn("PLAN_STYLE_ENTROPY", result["flat"]["codes"])
+        self.assertIn("PLAN_STYLE_ENTROPY", result["unclassified"]["codes"])
+        self.assertIn("PLAN_SCHEMA", result["stray"]["codes"])
+        self.assertIn("PLAN_SCHEMA", result["absent"]["codes"])
+        self.assertEqual(result["spread"]["codes"], [])
 
 
 if __name__ == "__main__":

@@ -163,9 +163,6 @@ export function architecture(page) {
   return ARCHITECTURES.has(normalized) ? normalized : null;
 }
 
-/** Did the author actually choose a shape for this page, or is it inferred? */
-const declaresArchitecture = (page) => architecture(page) !== null;
-
 // --- the entropy metric -----------------------------------------------------
 
 /**
@@ -183,11 +180,11 @@ const declaresArchitecture = (page) => architecture(page) !== null;
  * author for making it, so a `series` name collapses its run to a single
  * observation before the count.
  */
-export function styleEntropy(pages) {
+export function styleEntropy(pages, shapeOf = architecture) {
   const observations = [];
   let lastSeries = null;
   for (const page of pages) {
-    const shape = architecture(page);
+    const shape = shapeOf(page);
     if (!shape) continue;
     const series = page.series ? String(page.series) : null;
     if (series && series === lastSeries) continue;
@@ -197,7 +194,7 @@ export function styleEntropy(pages) {
   const counts = new Map();
   for (const shape of observations) counts.set(shape, (counts.get(shape) || 0) + 1);
   const n = observations.length, k = counts.size;
-  const declared = pages.every(declaresArchitecture);
+  const declared = pages.every((page) => shapeOf(page) !== null);
   if (n === 0 || k <= 1) return { value: 0, distinct: k, pages: n, counts, declared };
   let h = 0;
   for (const count of counts.values()) { const p = count / n; h -= p * Math.log(p); }
@@ -310,9 +307,9 @@ function gateRuns(pages, findings) {
   flush();
 }
 
-function gateEntropy(pages, findings) {
+function gateEntropy(pages, findings, shapeOf = architecture) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
-  const unknown = content.filter(p => p.architecture && !declaresArchitecture(p));
+  const unknown = content.filter(p => p.architecture && shapeOf(p) === null);
   if (unknown.length) {
     findings.push(finding(null, "PLAN_STYLE_ENTROPY",
       { entropy: null, reason: "unrecognized architecture", pages: unknown.map(p => p.id ?? p.n),
@@ -324,7 +321,7 @@ function gateEntropy(pages, findings) {
     return;
   }
   if (content.length < DECK_LENGTH.plan) return;
-  const entropy = styleEntropy(content);
+  const entropy = styleEntropy(content, shapeOf);
   // Without a declared architecture per page the only thing left to count is
   // the evidence family, which has four or five values against the composer's
   // twelve shapes - so the number comes out high and means nothing. A gate that
@@ -618,17 +615,24 @@ const round = (n) => Math.round(n * 1000) / 1000;
 
 // --- driver -----------------------------------------------------------------
 
-export function runPlanGates(plan, { deck, reads = null } = {}) {
-  const findings = [];
+// The plan's pages as read (readPlanPages), with PLAN_SCHEMA said where it has none or they carry fields the plan does not have.
+function readPlan(plan, findings, reads) {
   if (!plan || typeof plan !== "object" || !Array.isArray(plan.pages)) {
     findings.push(finding(null, "PLAN_SCHEMA", "absent", "professional-slides.plan/v1",
       "The plan needs a `pages` array, one row per page, each naming its exhibit, architecture and anchors."));
-    return report(plan, findings, [], deck);
+    return null;
   }
   const { pages, unknown } = readPlanPages(plan.pages, reads);
   if (unknown.length) findings.push(finding(null, "PLAN_SCHEMA", { unknownFields: unknown }, [...PLAN_FIELDS],
     `A plan page carries fields the plan does not have (${unknown.slice(0, 6).map((u) => `\`${u.field}\`${u.page === null ? "" : ` on ${u.page}`}`).join(", ")}${unknown.length > 6 ? ", ..." : ""}); ` +
     "nothing reads them. Record the page under the plan's own fields (references/storyline-records.md#the-plan-file)."));
+  return pages;
+}
+
+export function runPlanGates(plan, { deck, reads = null } = {}) {
+  const findings = [];
+  const pages = readPlan(plan, findings, reads);
+  if (!pages) return report(plan, findings, [], deck);
   gateTitles(pages, findings);
   gateMix(pages, findings);
   gateRuns(pages, findings);
@@ -642,6 +646,25 @@ export function runPlanGates(plan, { deck, reads = null } = {}) {
 // The plan's blocking codes. Everything else it reports rests on labels the
 // author declared, which can be wrong, and so advises.
 const PLAN_BLOCKING = new Set(["PLAN_SCHEMA", "PLAN_EXHIBIT_REASON", "PLAN_STYLE_ENTROPY"]);
+
+/**
+ * The plan's refusals of the deck's structure, alone: PLAN_SCHEMA and
+ * PLAN_STYLE_ENTROPY, its blocking codes of the structure class
+ * (gate_classes.mjs) - PLAN_EXHIBIT_REASON refuses a page, and every other
+ * code advises - reported and waived as runPlanGates reports them. A
+ * structure search weighs each candidate deck by its structure blockers and
+ * its standings (deck-structure.mjs structureCost) and nothing else; reading
+ * every plan gate and the plan's statistics for each of the 50,000 candidates
+ * a 106-page spine's plan weighed was 11 of its search's 24 seconds.
+ */
+export function planBlockers(plan, { deck = plan, reads = null, shapes = null } = {}) {
+  const findings = [];
+  const pages = readPlan(plan, findings, reads);
+  // `shapes` keeps each page's architecture for the search, which reads the same page objects in every candidate.
+  const shapeOf = shapes ? (page) => { if (!shapes.has(page)) shapes.set(page, architecture(page)); return shapes.get(page); } : architecture;
+  if (pages) gateEntropy(pages, findings, shapeOf);
+  return applyRulesVersion(findings.map((f) => ({ ...f, severity: "blocker" })), deck ?? {});
+}
 
 function report(plan, findings, pages, deck = plan) {
   const content = pages.filter((p) => !p.kind || p.kind === "content");
