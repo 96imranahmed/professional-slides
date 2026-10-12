@@ -3035,6 +3035,217 @@
    "source": "Source: illustrative cost data for four fictional operators; synthetic"
   },
   {
+   "id": "f-panels-heading-icons",
+   "type": "panels",
+   "form": "row",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Three measures of the Eastern line answer one question - did the twenty-minute timetable work - and a panel each, headed by its icon, lets the reader find punctuality, crowding and revenue at a glance",
+   "settles": {
+    "kind": "comparison",
+    "what": "punctuality, peak crowding and revenue on the Eastern line, FY22 to FY26"
+   },
+   "adds": "The points say which measure moved first and why the others followed",
+   "title": "The Eastern line ran on time, emptier and richer once trains came every twenty minutes",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Trains on time",
+     "headingIcon": "clock",
+     "unit": "%",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "On time",
+       "values": [
+        80.1,
+        80.6,
+        81.2,
+        86.4,
+        91.8
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Peak trains over capacity",
+     "headingIcon": "people",
+     "unit": "%",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Over capacity",
+       "values": [
+        24,
+        26,
+        27,
+        15,
+        9
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Fare revenue",
+     "headingIcon": "money",
+     "unit": "£m",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Revenue",
+       "values": [
+        41,
+        43,
+        44,
+        49,
+        55
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    }
+   ],
+   "points": [
+    {
+     "lead": "Punctuality moved first",
+     "text": "Trains on time rose from 81.2% to 91.8% in the two years after the recast, because the slack at the two single-track sections absorbed the delays that used to cascade."
+    },
+    {
+     "lead": "Crowding followed",
+     "text": "With a train every twenty minutes the peak spread out: trains over capacity fell from 27% to 9%, though the line carries more riders than before."
+    },
+    {
+     "lead": "Revenue came last",
+     "text": "Fare revenue grew from £44m to £55m as riders moved to day tickets, which earn about a third more a journey than seasons."
+    }
+   ],
+   "highlight": [
+    "81.2% to 91.8%",
+    "27% to 9%",
+    "£44m to £55m"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic performance and revenue records"
+  },
+  {
+   "id": "f-lookup-header-icons",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up an option and reads across what it costs, how long it takes, who it serves and when its first trains run; an icon over each header lets the eye find the column before the words",
+   "settles": {
+    "kind": "structure",
+    "what": "cost, time to deliver, riders served and first trains of five timetable options"
+   },
+   "adds": "The last column says what each option needs before it can start",
+   "title": "Two of five timetable options can start before the electric fleet arrives",
+   "exhibit": {
+    "columns": [
+     "Option",
+     {
+      "label": "Cost, £m",
+      "headerIcon": "money",
+      "align": "right"
+     },
+     {
+      "label": "Years to deliver",
+      "headerIcon": "clock",
+      "align": "right"
+     },
+     {
+      "label": "Riders served, m a year",
+      "headerIcon": "people",
+      "align": "right"
+     },
+     {
+      "label": "First trains",
+      "headerIcon": "calendar"
+     },
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Half-hourly Dales line",
+      "12",
+      "1",
+      "2.1",
+      "Dec 2027",
+      "Two more crews at Skipton; the units are already in hand"
+     ],
+     [
+      "Later last trains on the Valley line",
+      "8",
+      "1",
+      "3.4",
+      "May 2028",
+      "Extended sidings at Halifax, due in May 2028"
+     ],
+     [
+      "Twenty-minute Valley service",
+      "46",
+      "3",
+      "3.4",
+      "2029",
+      "The electric fleet, and a signalling upgrade at Huddersfield"
+     ],
+     [
+      "Half-hourly Coast line",
+      "38",
+      "4",
+      "1.9",
+      "2030",
+      "A passing loop near Malton, not yet in the funding plan"
+     ],
+     [
+      "Eastern line electrification",
+      "310",
+      "5",
+      "1.2",
+      "2031",
+      "Government funding and a possession plan agreed with freight"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
+  },
+  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",

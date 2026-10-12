@@ -18,7 +18,8 @@ import {
 import { measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { strongestContrastIndex } from "./palettes.mjs";
 import { contrastRatio } from "./color.mjs";
-import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
+import { numberMarker, stateMarker, iconMarker, markerSize, MARK_TOKENS } from "./marks.mjs";
+import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { measureAt } from "./draw.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 
@@ -262,6 +263,15 @@ function normalize(props) {
   // A label is printed as it stands: an object there was set as "[object Object]".
   const unlabelled = columns.find((c) => c.label !== undefined && c.label !== null && !["string", "number"].includes(typeof c.label));
   if (unlabelled) throw new Error(`Table column ${Number(unlabelled.id) + 1}'s \`label\` is its heading text (got ${JSON.stringify(unlabelled.label).slice(0, 60)})`);
+  // `headerIcon` stands over a column's label: one with no label has nothing to stand over, a header already naming a
+  // player by its mark has the place taken, and a chevron's point leaves no room over its label.
+  for (const column of columns.filter((c) => c.headerIcon !== undefined)) {
+    const name = `Table column ${Number(column.id) + 1}${column.label ? ` ("${column.label}")` : ""}`;
+    if (!iconDefinition(column.headerIcon)) throw new Error(`${name}: ${unknownIcon(column.headerIcon, "column header icon")}`);
+    if (!String(column.label ?? "").trim()) throw new Error(`${name}: \`headerIcon\` stands over the column's label, and this column has none`);
+    if (markDrawable(column.logo)) throw new Error(`${name}: a header carries a player's mark (\`logo\`) or an icon (\`headerIcon\`), not both`);
+    if (props.headerShape === "chevron") throw new Error(`${name}: a chevron header has no room over its labels for an icon; drop \`headerIcon\` or the chevrons`);
+  }
   // `group`: the band above the header that names what a run of columns
   // measures ("Size", "Growth", "Specialization"); `unit`: the measure's unit
   // under the label, so the cells carry the number alone. Groups must be
@@ -542,6 +552,9 @@ const categorySurface = (cell, props) =>
 
 // A player's mark set on a line of text - a column header, a verdict cell:
 // one line tall, and no wider than `most`.
+// A column's header icon, the glyph alone: a sixth over a numbered disc, smaller than a card's ringed icon as a table's
+// header is smaller than a card's title (28px at executive density).
+const headerIconSize = () => Math.round((markerSize() * 7) / 6);
 const headerMark = (media, lineHeight, most) =>
   logoFrame({ x: 0, y: 0, width: Math.min(most, lineHeight * 4), height: lineHeight }, media.width, media.height, { area: lineHeight * lineHeight * 2.4 });
 
@@ -928,6 +941,8 @@ function widenForWords(model, widths, props, { padding, textSize, chevronInset }
     // A group band over this column alone must fit its label in this column.
     const group = column.group === undefined || column.group === null ? null : String(column.group);
     if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
+    // A header icon is a word the column cannot break.
+    if (column.headerIcon !== undefined) word = Math.max(word, headerIconSize());
     for (const row of model.cells) {
       const cell = row[c];
       if (!cell || cell.blank) continue;
@@ -1060,7 +1075,7 @@ export function measureTable({ frame, props }) {
       : density === "compact"
         ? "type.compact"
         : "type.body";
-  const { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight } = measureHeader({ props, model, padding, widths, paddingY, textSize });
+  const { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight, iconSize, iconBand } = measureHeader({ props, model, padding, widths, paddingY, textSize });
   const { layouts, sectionMarkerSize, heights } = measureRows({ props, model, density, tableProps, used, padding, gap, widths, paddingY });
   const legends = measureLegends({ frame, model, used, gap, textSize });
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
@@ -1105,6 +1120,8 @@ export function measureTable({ frame, props }) {
     groups,
     groupHeight,
     headerHeight,
+    iconSize,
+    iconBand,
     layouts,
     heights,
     stretched,
@@ -1148,8 +1165,14 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
     layout: measure(run.group, sum(widths.slice(run.start, run.end + 1)) - 2 * padding, true, textSize),
   }));
   const groupHeight = groups.length ? Math.max(...groups.map((g) => g.layout.height)) + paddingY + v("space.1") : 0;
+  // `headerIcon`: a line icon over a column's label, as a card sets one over its title. The band is the header's,
+  // so every label sits on one line under it whether its column has an icon or not.
+  const iconSize = headerIconSize(), iconBand = model.columns.some((c) => c.headerIcon !== undefined) ? iconSize + v("space.1") : 0;
+  model.columns.forEach((c, i) => {
+    if (c.headerIcon !== undefined && widths[i] - 2 * padding < iconSize) throw new Error(`Table column "${c.label}" is ${Math.floor(widths[i])}px wide, too narrow for its ${iconSize}px header icon; widen the column or drop the icon`);
+  });
   const naturalHeaderHeight = headers.some(Boolean)
-    ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight + iconBand
     : 0;
   // The shared band excludes the rule gap, as it does for chart and section
   // headings. Reserve it during measurement so peer rules align before rows
@@ -1157,7 +1180,7 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
   const headerHeight = naturalHeaderHeight && !chevronInset
     ? Math.max(naturalHeaderHeight, props.headerBandHeight === undefined ? 0 : props.headerBandHeight + v("space.1"))
     : naturalHeaderHeight;
-  return { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight };
+  return { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight, iconSize, iconBand };
 }
 
 /** Each cell's layout at its column's width - bar columns on a shared scale sharing one plot width - and the row heights: the minimum, the tallest cell, spans, and the heights a row-aligned peer shares. */
@@ -1492,7 +1515,14 @@ function drawTableHeader(table) {
     if (m.headers[c]) {
       const chevron = filledHeader && props.headerShape === "chevron";
       const inset = chevron ? m.headerHeight / 2 : 0;
-      const labelY = frame.y + m.paddingY + m.groupHeight;
+      // Every label stands under the header's icon band, a column with no icon of its own included: one baseline.
+      const labelY = frame.y + m.paddingY + m.groupHeight + m.iconBand;
+      if (column.headerIcon !== undefined) {
+        const align = column.align ?? "left", room = m.widths[c] - 2 * m.padding;
+        const x = xs[c] + m.padding + (align === "center" ? (room - m.iconSize) / 2 : align === "right" ? room - m.iconSize : 0);
+        // In the white of a filled header's band, else in the house's primary.
+        nodes.push(...iconMarker({ id: stableId(id, "header-icon", c), role: "table-header-icon", x, y: frame.y + m.paddingY + m.groupHeight, size: m.iconSize, icon: column.headerIcon, tone: filledHeader ? "inverse" : "plain", data: { column: c } }));
+      }
       const mark = m.headerMarks?.[c];
       if (mark) {
         const markBox = { x: xs[c] + m.padding + inset, y: labelY + (m.headers[c].lineHeight - mark.height) / 2, width: mark.width, height: mark.height };

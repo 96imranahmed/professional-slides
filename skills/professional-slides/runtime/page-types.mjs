@@ -1710,6 +1710,17 @@ function checkExhibitData({ page, id, slide, exhibits, primary }) {
     if (ex.type === "chart.waterfall" && page.commentary === "below" && (ex.annotations || []).length > WATERFALL_BELOW_CALLOUTS)
       throw new Error(`${id}: a bridge over commentary "below" carries ${WATERFALL_BELOW_CALLOUTS} callouts at most (this one has ${ex.annotations.length}) - the points take a third of its height; choose "rail" or "beside" for three, or move a note into the points`);
   }
+  // An icon over a chart's heading (`headingIcon`, registry-chart-title.mjs) names the panel by its picture before its
+  // words. It needs a heading to stand over - a table heads its columns with `columns[].headerIcon` - and panels side
+  // by side share one heading band, so an icon over one heading and not the next sets their headings at two heights.
+  const iconed = exhibitsOf(slide).filter((ex) => ex.headingIcon !== undefined);
+  for (const ex of iconed) {
+    if (!String(ex.type ?? "").startsWith("chart.")) throw new Error(`${id}: \`headingIcon\` stands over a chart's heading, and a ${ex.type} exhibit draws none${ex.type === "table" ? "; a table sets an icon over a column's header as `columns[].headerIcon`" : ""}`);
+    if (!String(ex.heading ?? "").trim()) throw new Error(`${id}: \`headingIcon\` stands over the chart's heading, and this chart has none; give it a \`heading\`, or drop the icon`);
+    if (!iconDefinition(ex.headingIcon)) throw new Error(`${id}: ${unknownIcon(ex.headingIcon, "heading icon")}`);
+  }
+  if (iconed.length && iconed.length < exhibitsOf(slide).length)
+    throw new Error(`${id}: ${iconed.length} of ${exhibitsOf(slide).length} panels carry a \`headingIcon\`; panels side by side share one heading band, so every one carries an icon or none does`);
   const formLimit = primary && LIMITS[`${page.type}/${page.form}`];
   if (formLimit) {
     const n = Array.isArray(primary[formLimit.key]) ? primary[formLimit.key].length : 0;

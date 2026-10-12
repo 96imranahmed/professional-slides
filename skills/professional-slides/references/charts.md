@@ -121,6 +121,7 @@ A value label a reference line runs through stays on its column: the chart nudge
 - `referenceLines: [{ value, label, style: "marker" }]` marks a value on the axis with a triangle and its label ("Ø 4.5" by default) and no line across the marks: under a bar chart's bars (no value axis), at a column or line chart's right.
 - `valueLabels: [{ category, series, display, estimate, ring }]` says a mark's value another way - a range ("55-65") or an approximation ("~52"), twelve characters at most - which marks it as an estimate, drawn lighter as an assumption is; `ring: true` circles the label the page turns on.
 - `categoryGroups` on a bar chart names each run of rows in a column left of the row labels, against a bracket.
+- `headingIcon: "<icon>"` on a chart with a `heading` sets a line icon in a ring over the heading, as a card sets one over its title (`author-deck.mjs --icons` lists them): each panel of a row named by its picture - punctuality, crowding, revenue. The icon stands in the heading band, so peers sharing the band keep their headings and rules level; on a page of several exhibits every one carries an icon or none does. A chart with no heading, and an exhibit that is not a chart, are refused it (a table sets its icons over its column headers, [Components](components.md)).
 - `segmentGrowth` on a stacked column and `seriesGrowth` on a line take a list of up to three `{ from, to }`, one column each, side by side.
 
 **Survey exhibits:**
