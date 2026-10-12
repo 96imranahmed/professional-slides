@@ -1862,7 +1862,15 @@ async function openFitCache(file, { doc, insights, fitCap }) {
   return {
     get(target) { const hit = after[target.id]; return hit && hit.key === keyOf(target) ? hit.verdicts : null; },
     set(target, verdicts) { after[target.id] = { key: keyOf(target), verdicts }; },
-    async save() { if (JSON.stringify(after) !== JSON.stringify(before)) await (Object.keys(after).length ? writeJson(file, { schema: CACHE_SCHEMA, note: "The fit search's verdicts (author-deck.mjs). Safe to delete.", fits: after }) : fs.rm(file, { force: true })); },
+    // Written whole and renamed in, as the composer's and the gates' caches are: section writers check side by side, and two
+    // runs writing the file at once must leave one run's whole cache, never a mix of both.
+    async save() {
+      if (JSON.stringify(after) === JSON.stringify(before)) return;
+      if (!Object.keys(after).length) { await fs.rm(file, { force: true }); return; }
+      const tmp = `${file}.${process.pid}.tmp`;
+      await writeJson(tmp, { schema: CACHE_SCHEMA, note: "The fit search's verdicts (author-deck.mjs). Safe to delete.", fits: after });
+      await fs.rename(tmp, file);
+    },
   };
 }
 
