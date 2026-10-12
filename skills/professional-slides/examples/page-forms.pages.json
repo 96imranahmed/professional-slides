@@ -3161,187 +3161,6 @@
    "source": "Source: illustrative data for a fictional operator; synthetic performance and revenue records"
   },
   {
-   "id": "f-lookup-header-icons",
-   "type": "lookup",
-   "form": "table",
-   "commentary": "in-exhibit",
-   "takeaway": false,
-   "why": "The reader looks up an option and reads across what it costs, how long it takes, who it serves and when its first trains run; an icon over each header lets the eye find the column before the words",
-   "settles": {
-    "kind": "structure",
-    "what": "cost, time to deliver, riders served and first trains of five timetable options"
-   },
-   "adds": "The last column says what each option needs before it can start",
-   "title": "Two of five timetable options can start before the electric fleet arrives",
-   "exhibit": {
-    "columns": [
-     "Option",
-     {
-      "label": "Cost, £m",
-      "headerIcon": "money",
-      "align": "right"
-     },
-     {
-      "label": "Years to deliver",
-      "headerIcon": "clock",
-      "align": "right"
-     },
-     {
-      "label": "Riders served, m a year",
-      "headerIcon": "people",
-      "align": "right"
-     },
-     {
-      "label": "First trains",
-      "headerIcon": "calendar"
-     },
-     {
-      "label": "What it needs first",
-      "implication": true
-     }
-    ],
-    "rows": [
-     [
-      "Half-hourly Dales line",
-      "12",
-      "1",
-      "2.1",
-      "Dec 2027",
-      "Two more crews at Skipton; the units are already in hand"
-     ],
-     [
-      "Later last trains on the Valley line",
-      "8",
-      "1",
-      "3.4",
-      "May 2028",
-      "Extended sidings at Halifax, due in May 2028"
-     ],
-     [
-      "Twenty-minute Valley service",
-      "46",
-      "3",
-      "3.4",
-      "2029",
-      "The electric fleet, and a signalling upgrade at Huddersfield"
-     ],
-     [
-      "Half-hourly Coast line",
-      "38",
-      "4",
-      "1.9",
-      "2030",
-      "A passing loop near Malton, not yet in the funding plan"
-     ],
-     [
-      "Eastern line electrification",
-      "310",
-      "5",
-      "1.2",
-      "2031",
-      "Government funding and a possession plan agreed with freight"
-     ]
-    ]
-   },
-   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
-  },
-  {
-   "id": "f-lookup-side-labels",
-   "type": "lookup",
-   "form": "table",
-   "commentary": "in-exhibit",
-   "takeaway": false,
-   "why": "The reader looks up a saving within its group - running the trains, or selling them - and reads across what it is worth and when it lands; the group names run down the side so every row keeps its width",
-   "settles": {
-    "kind": "structure",
-    "what": "seven cost and revenue options in two groups, with their yearly value and timing"
-   },
-   "adds": "The last column says what each option needs before its value can be counted",
-   "title": "Running the trains offers most of the £21m a year the plan finds",
-   "exhibit": {
-    "treatment": "categories",
-    "columns": [
-     {
-      "label": "",
-      "type": "category",
-      "vertical": true
-     },
-     {
-      "label": "Option",
-      "type": "text",
-      "bold": true
-     },
-     {
-      "label": "Value, £m a year",
-      "align": "right"
-     },
-     "Timing",
-     {
-      "label": "What it needs first",
-      "implication": true
-     }
-    ],
-    "rows": [
-     [
-      {
-       "text": "Running the trains",
-       "rowSpan": 4
-      },
-      "Crew rosters fitted to the recast timetable",
-      "6.4",
-      "FY28",
-      "Agreement with the drivers' union on rest-day working"
-     ],
-     [
-      null,
-      "Regenerative braking on the Valley fleet",
-      "3.1",
-      "FY29",
-      "Two substations upgraded to take the returned power"
-     ],
-     [
-      null,
-      "Closing the Malton depot",
-      "2.2",
-      "FY29",
-      "Overnight maintenance moved to York"
-     ],
-     [
-      null,
-      "Energy bought on a ten-year contract",
-      "1.8",
-      "FY28",
-      "A tender the board approves in FY27"
-     ],
-     [
-      {
-       "text": "Selling them",
-       "rowSpan": 3
-      },
-      "Off-peak day returns priced for leisure",
-      "4.1",
-      "FY28",
-      "The half-hourly Dales and Valley timetables"
-     ],
-     [
-      null,
-      "Advance fares sold in the app",
-      "2.0",
-      "FY27",
-      "Seat reservations on the Coast line"
-     ],
-     [
-      null,
-      "Station retail at Leeds and York",
-      "1.4",
-      "FY29",
-      "Leases renegotiated as they fall due"
-     ]
-    ]
-   },
-   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
-  },
-  {
    "id": "f-scorecard-heatmap",
    "type": "scorecard",
    "form": "heatmap",
@@ -4343,6 +4162,187 @@
     ]
    },
    "source": "Source: illustrative data for a fictional operator; FY26 timetable and ticket sales"
+  },
+  {
+   "id": "f-lookup-header-icons",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up an option and reads across what it costs, how long it takes, who it serves and when its first trains run; an icon over each header lets the eye find the column before the words",
+   "settles": {
+    "kind": "structure",
+    "what": "cost, time to deliver, riders served and first trains of five timetable options"
+   },
+   "adds": "The last column says what each option needs before it can start",
+   "title": "Two of five timetable options can start before the electric fleet arrives",
+   "exhibit": {
+    "columns": [
+     "Option",
+     {
+      "label": "Cost, £m",
+      "headerIcon": "money",
+      "align": "right"
+     },
+     {
+      "label": "Years to deliver",
+      "headerIcon": "clock",
+      "align": "right"
+     },
+     {
+      "label": "Riders served, m a year",
+      "headerIcon": "people",
+      "align": "right"
+     },
+     {
+      "label": "First trains",
+      "headerIcon": "calendar"
+     },
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Half-hourly Dales line",
+      "12",
+      "1",
+      "2.1",
+      "Dec 2027",
+      "Two more crews at Skipton; the units are already in hand"
+     ],
+     [
+      "Later last trains on the Valley line",
+      "8",
+      "1",
+      "3.4",
+      "May 2028",
+      "Extended sidings at Halifax, due in May 2028"
+     ],
+     [
+      "Twenty-minute Valley service",
+      "46",
+      "3",
+      "3.4",
+      "2029",
+      "The electric fleet, and a signalling upgrade at Huddersfield"
+     ],
+     [
+      "Half-hourly Coast line",
+      "38",
+      "4",
+      "1.9",
+      "2030",
+      "A passing loop near Malton, not yet in the funding plan"
+     ],
+     [
+      "Eastern line electrification",
+      "310",
+      "5",
+      "1.2",
+      "2031",
+      "Government funding and a possession plan agreed with freight"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
+  },
+  {
+   "id": "f-lookup-side-labels",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a saving within its group - running the trains, or selling them - and reads across what it is worth and when it lands; the group names run down the side so every row keeps its width",
+   "settles": {
+    "kind": "structure",
+    "what": "seven cost and revenue options in two groups, with their yearly value and timing"
+   },
+   "adds": "The last column says what each option needs before its value can be counted",
+   "title": "Running the trains offers most of the £21m a year the plan finds",
+   "exhibit": {
+    "treatment": "categories",
+    "columns": [
+     {
+      "label": "",
+      "type": "category",
+      "vertical": true
+     },
+     {
+      "label": "Option",
+      "type": "text",
+      "bold": true
+     },
+     {
+      "label": "Value, £m a year",
+      "align": "right"
+     },
+     "Timing",
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      {
+       "text": "Running the trains",
+       "rowSpan": 4
+      },
+      "Crew rosters fitted to the recast timetable",
+      "6.4",
+      "FY28",
+      "Agreement with the drivers' union on rest-day working"
+     ],
+     [
+      null,
+      "Regenerative braking on the Valley fleet",
+      "3.1",
+      "FY29",
+      "Two substations upgraded to take the returned power"
+     ],
+     [
+      null,
+      "Closing the Malton depot",
+      "2.2",
+      "FY29",
+      "Overnight maintenance moved to York"
+     ],
+     [
+      null,
+      "Energy bought on a ten-year contract",
+      "1.8",
+      "FY28",
+      "A tender the board approves in FY27"
+     ],
+     [
+      {
+       "text": "Selling them",
+       "rowSpan": 3
+      },
+      "Off-peak day returns priced for leisure",
+      "4.1",
+      "FY28",
+      "The half-hourly Dales and Valley timetables"
+     ],
+     [
+      null,
+      "Advance fares sold in the app",
+      "2.0",
+      "FY27",
+      "Seat reservations on the Coast line"
+     ],
+     [
+      null,
+      "Station retail at Leeds and York",
+      "1.4",
+      "FY29",
+      "Leases renegotiated as they fall due"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
   },
   {
    "id": "f-mechanism-flow",
