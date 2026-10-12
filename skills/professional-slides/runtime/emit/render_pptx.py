@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Vendor-neutral slide renderer: PPTX -> PDF (LibreOffice headless) -> PNG per slide.
+"""Saved-slide renderer: PPTX -> PDF (PowerPoint or LibreOffice) -> PNG per slide.
 
-Usage: render_pptx.py deck.pptx out_dir [--dpi 96] [--montage]
+Usage: render_pptx.py deck.pptx out_dir [--dpi 96] [--montage] [--renderer auto|powerpoint|libreoffice]
        render_pptx.py --sheets out_dir
 Writes out_dir/slide-N.png (N from 1), and with --montage the review sheets
 (out_dir/montage.png and out_dir/spread-N.png). --sheets writes only the
 sheets, from the slide PNGs already in out_dir, so a build can draw them while
 its gates read the pages. Prints JSON with the list of files. This is the only
-renderer; it runs anywhere LibreOffice does.
+renderer; desktop PowerPoint is preferred on macOS and Windows, with LibreOffice
+as the fallback and the Linux exporter. Set PROFESSIONAL_SLIDES_RENDERER to pin
+a backend for builds and the doctor; explicit selections never fall back.
 
 out_dir/render-cache.json keys each slide's render on the parts it is drawn
-from (slide_keys). Rendered again into the same out_dir, only the slides with
-a new key go through LibreOffice, as a sub-deck of the same file; every PNG
-and PDF page of an unchanged slide is the last render's. The PDF, the PNGs and
-page-text.json are always the whole deck, in its order.
+from (slide_keys) and names the renderer that drew it. Rendered again into the
+same out_dir by the same renderer, only the slides with a new key are exported
+again, as a sub-deck of the same file; every PNG and PDF page of an unchanged
+slide is the last render's. The PDF, the PNGs and page-text.json are always the
+whole deck, in its order.
 
-Exit 0 when the deck rendered, 3 when LibreOffice or poppler is not installed
+Exit 0 when the deck rendered, 3 when the selected renderer or poppler is not installed
 (the JSON then carries `skipped: true`, what is missing and how to install
 it, so a build can finish unrendered and say so), 1 on a crash.
 """
@@ -32,40 +35,20 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from renderer_backends import CHOICES, discover, powerpoint_pdf, soffice
 
 # The canvas the gates measure (gates/ink.py): a 13.333 x 7.5 in slide at 96
 # dpi. pdftoppm rounds the page to 1281 px wide at `-r 96`, and every gate
 # then resampled every page back; the renders are scaled to the canvas instead.
 CANVAS_W, CANVAS_H = 1280, 720
 MISSING_EXIT = 3
-SOFFICE_PATHS = ("/Applications/LibreOffice.app/Contents/MacOS/soffice", "/usr/lib/libreoffice/program/soffice")
-
-
-def soffice() -> str | None:
-    for name in ("soffice", "libreoffice"):
-        p = shutil.which(name)
-        if p:
-            return p
-    for p in SOFFICE_PATHS:
-        if Path(p).exists():
-            return p
-    return None
-
-
-def missing_tools() -> dict:
-    """{tool: install line} for each renderer tool this machine lacks."""
-    mac, windows = sys.platform == "darwin", sys.platform.startswith("win")
-    missing = {}
-    if soffice() is None:
-        missing["soffice"] = ("brew install --cask libreoffice" if mac else
-                              "winget install TheDocumentFoundation.LibreOffice" if windows else
-                              "sudo apt-get install -y libreoffice-impress")
-    if shutil.which("pdftoppm") is None:
-        missing["pdftoppm"] = ("brew install poppler" if mac else "choco install poppler" if windows else
-                               "sudo apt-get install -y poppler-utils")
-    return missing
+def missing_tools(renderer: str | None = None) -> dict:
+    """The same discovery and install advice used by the doctor's probe."""
+    return discover(renderer)["missing"]
 
 
 # LibreOffice on macOS does not enumerate /System/Library/Fonts/Supplemental,
@@ -342,13 +325,15 @@ def subdeck(pptx: Path, keep: list, out: Path) -> Path:
     return out
 
 
-def held_renders(out_dir: Path, dpi: int) -> dict:
-    """{key: (png, pdf, page index)} the last render in `out_dir` left, where its PDF and every PNG are still there."""
+def held_renders(out_dir: Path, dpi: int, renderer: str) -> dict:
+    """{key: (png, pdf, page index)} the last render in `out_dir` left, where its PDF and every PNG are still there and
+    `renderer` drew them: a page PowerPoint drew is not spliced beside one LibreOffice drew (a cache from before the
+    renderer was named was LibreOffice's)."""
     try:
         cache = json.loads((out_dir / RENDER_CACHE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    if not isinstance(cache, dict) or cache.get("schema") != RENDER_CACHE_SCHEMA or cache.get("dpi") != dpi:
+    if not isinstance(cache, dict) or cache.get("schema") != RENDER_CACHE_SCHEMA or cache.get("dpi") != dpi or cache.get("renderer", "libreoffice") != renderer:
         return {}
     pdf = out_dir / str(cache.get("pdf", ""))
     keys = cache.get("keys") or []
@@ -357,7 +342,7 @@ def held_renders(out_dir: Path, dpi: int) -> dict:
     return {key: (out_dir / f"slide-{i + 1}.png", pdf, i) for i, key in enumerate(keys) if isinstance(key, str)}
 
 
-def render_changed(deck: Path, keys: list, held: dict, out_dir: Path, saved_pdf: Path, dpi: int, td: Path) -> dict | None:
+def render_changed(deck: Path, keys: list, held: dict, out_dir: Path, saved_pdf: Path, dpi: int, td: Path, export) -> dict | None:
     """Render only the slides whose key the last render does not hold, as a
     sub-deck of the same file, and splice: each PNG and PDF page of an unchanged
     slide is the last render's, by its key. None where a whole render is the
@@ -370,7 +355,7 @@ def render_changed(deck: Path, keys: list, held: dict, out_dir: Path, saved_pdf:
     fresh_dir.mkdir()
     fresh_pdf = None
     if changed:
-        fresh_pdf = to_pdf(subdeck(deck, changed, td / f"changed-{deck.name}"), td)
+        fresh_pdf = export(subdeck(deck, changed, td / f"changed-{deck.name}"), td)
         rasterise(fresh_pdf, fresh_dir, dpi)
         slide_files(fresh_dir)
     stage = td / "stage"
@@ -397,29 +382,72 @@ def render_changed(deck: Path, keys: list, held: dict, out_dir: Path, saved_pdf:
     return {"rendered": len(changed), "reused": len(keys) - len(changed)}
 
 
-def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False, incremental: bool = True) -> dict:
-    missing = missing_tools()
+def export_pdf(pptx: Path, directory: Path, discovery: dict) -> tuple[Path, str, list]:
+    """Try the selected exporters in order; validate page coverage before use.
+
+    Only auto may fall back. Every failed attempt has its own output folder
+    and is recorded, so a stale or incomplete PDF never passes the gates.
+    """
+    from pypdf import PdfReader
+    from pypdf.errors import PdfReadError
+    with zipfile.ZipFile(pptx) as package:
+        root = ET.fromstring(package.read("ppt/presentation.xml"))
+        count = len(root.findall("./{http://schemas.openxmlformats.org/presentationml/2006/main}sldIdLst/*"))
+    warnings = []
+    for backend in discovery["available"]:
+        attempt = directory / backend["id"]
+        attempt.mkdir(parents=True, exist_ok=True)
+        try:
+            pdf = powerpoint_pdf(pptx, attempt, backend) if backend["id"] == "powerpoint" else to_pdf(pptx, attempt)
+            actual = len(PdfReader(pdf).pages)
+            if actual != count:
+                raise RuntimeError(f"PDF contains {actual} pages for {count} slides")
+            return pdf, backend["id"], warnings
+        except (OSError, RuntimeError, subprocess.SubprocessError, PdfReadError) as error:
+            warnings.append({"renderer": backend["id"], "message": str(error)})
+            if discovery["requested"] != "auto":
+                raise
+    raise RuntimeError("All available PDF exporters failed: " + "; ".join(f"{w['renderer']}: {w['message']}" for w in warnings))
+
+
+def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False, incremental: bool = True, renderer: str | None = None) -> dict:
+    missing = missing_tools(renderer)
     if missing:
         return {"pptx": str(pptx), "skipped": True, "missing": sorted(missing), "install": list(missing.values()),
                 "message": "The deck was not rendered: {} not installed. Install with: {}. Then build again; "
                            "until then the pixel gates and the review sheets are skipped.".format(
                                " and ".join(sorted(missing)), "; ".join(missing.values()))}
+    discovery = discover(renderer)
     out_dir.mkdir(parents=True, exist_ok=True)
     saved_pdf = out_dir / (pptx.stem + ".pdf")
     with tempfile.TemporaryDirectory() as td:
         deck = shown(pptx, Path(td) / "shown")
         keys = slide_keys(deck, dpi)
-        spliced = render_changed(deck, keys, held_renders(out_dir, dpi), out_dir, saved_pdf, dpi, Path(td)) if incremental else None
+        first, warnings, spliced = discovery["available"][0]["id"], [], None
+        if incremental:
+            # The changed slides go to the renderer that drew the held ones; where it fails, the whole deck is
+            # rendered below as discovery allows (an explicit renderer's failure stands).
+            pinned = {**discovery, "available": discovery["available"][:1]}
+            (Path(td) / "changed").mkdir()
+            try:
+                spliced = render_changed(deck, keys, held_renders(out_dir, dpi, first), out_dir, saved_pdf, dpi, Path(td) / "changed",
+                                         lambda sub, directory: export_pdf(sub, directory, pinned)[0])
+            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                if discovery["requested"] != "auto":
+                    raise
+                warnings.append({"renderer": first, "message": str(error)})
+        used = first
         if spliced is None:
-            pdf = to_pdf(deck, Path(td))
+            pdf, used, failed = export_pdf(deck, Path(td) / "whole", discovery)
+            warnings += failed
             shutil.copyfile(pdf, saved_pdf)
             for old in out_dir.glob("slide-*.png"):
                 old.unlink()
             rasterise(pdf, out_dir, dpi)
         files = slide_files(out_dir)
-    (out_dir / RENDER_CACHE).write_text(json.dumps({"schema": RENDER_CACHE_SCHEMA, "dpi": dpi, "pdf": saved_pdf.name, "keys": keys}))
-    result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "size": list(canvas_size(dpi)), "renderer": "libreoffice",
-              "slides": spliced or {"rendered": len(keys), "reused": 0}}
+    (out_dir / RENDER_CACHE).write_text(json.dumps({"schema": RENDER_CACHE_SCHEMA, "dpi": dpi, "renderer": used, "pdf": saved_pdf.name, "keys": keys}))
+    result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "size": list(canvas_size(dpi)), "renderer": used,
+              "rendererRequested": discovery["requested"], "rendererWarnings": warnings, "slides": spliced or {"rendered": len(keys), "reused": 0}}
     text_path = out_dir / "page-text.json"
     text_path.write_text(json.dumps(page_texts(saved_pdf), ensure_ascii=False))
     result["pageText"] = str(text_path)
@@ -510,6 +538,7 @@ def main(argv=None):
     ap.add_argument("out_dir", nargs="?")
     ap.add_argument("--dpi", type=int, default=96)
     ap.add_argument("--montage", action="store_true")
+    ap.add_argument("--renderer", choices=CHOICES, default=None)
     ap.add_argument("--sheets", metavar="OUT_DIR", default=None,
                     help="Write only the montage and spreads from the slide PNGs in OUT_DIR")
     a = ap.parse_args(argv)
@@ -518,7 +547,7 @@ def main(argv=None):
         return 0
     if not (a.pptx and a.out_dir):
         ap.error("the deck and the output directory are required")
-    result = render(Path(a.pptx), Path(a.out_dir), a.dpi, a.montage)
+    result = render(Path(a.pptx), Path(a.out_dir), a.dpi, montage=a.montage, renderer=a.renderer)
     print(json.dumps(result))
     if result.get("skipped"):
         print(result["message"], file=sys.stderr)

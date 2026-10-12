@@ -3,11 +3,12 @@
 #
 #   python3 -m pip install -r requirements.txt
 #
-# Two binaries are not installable from here and are needed for a full build:
-# LibreOffice (`soffice`, PPTX to PDF) and poppler's `pdftoppm` (PDF to PNG).
-# On macOS: `brew install --cask libreoffice` and `brew install poppler`.
-# Without them the build still writes the deck and the suite still runs; the
-# render, readback and ink gates skip and say so.
+# Full rendering also needs desktop PowerPoint or LibreOffice (PPTX to PDF),
+# and poppler's `pdftoppm` and `pdftotext`. The doctor finds the available
+# renderer and prints setup commands. Installed PowerPoint is preferred on
+# macOS/Windows; Linux and noninteractive jobs use LibreOffice.
+# Without a renderer the build still writes and reads back the deck; rendered
+# gates and reviews are skipped, so delivery cannot claim rendered acceptance.
 #
 # Set RUNTIME_PYTHON when these live in an environment of their own.
 

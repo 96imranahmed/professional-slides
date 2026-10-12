@@ -48,7 +48,7 @@ Each check is about one page or about the saved file. A blocking finding stops t
 ## Modules
 
 ```
-doctor.mjs           Node, a Python that imports the emitter's packages (RUNTIME_PYTHON), soffice, pdftoppm, pdftotext; an install line per missing piece
+doctor.mjs           Node, a Python that imports the emitter's packages (RUNTIME_PYTHON), PowerPoint or LibreOffice, pdftoppm, pdftotext; an install line per missing piece
 preferences.mjs      the design intake's answers, stored once per user outside any project
 design-options.mjs   one labelled contact sheet per intake question (emit/contact_sheet.py lays them out)
 import-template.py   a template deck -> house profile; infer-style.py the same from a PDF or screenshots
@@ -84,6 +84,7 @@ fetch-*.mjs          logos, flags, photographs, places and public series, with t
 build-deck.mjs       compose -> emit -> render -> readback -> page gates -> export text check
 gates/page_gates.py  the page gates on the scene and the renders; gate_config.py their thresholds
 gates/consistency_gates.mjs  what the pages state between them: one number, one value
-emit/emit_pptx.py    scene -> editable PPTX; render_pptx.py PPTX -> PDF -> PNG; readback_pptx.py the saved file read back
+emit/emit_pptx.py    scene -> editable PPTX; render_pptx.py PPTX -> PDF (PowerPoint or LibreOffice) -> PNG; readback_pptx.py the saved file read back
+emit/renderer_backends.py  the renderer discovery the doctor shares; the macOS AppleScript and Windows PowerShell COM exporters (the probe never launches an office app)
 emit/assemble_pptx.py  a revision's deck: the source PPTX with its composed pages set in
 ```
