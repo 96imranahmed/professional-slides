@@ -41,11 +41,12 @@
 //
 // Everything here reads declared fields and numbers. No title is parsed for
 // its claim.
-import { cellText, isTable, plottedValues, rowCells } from "../evidence.mjs";
+import { cellText, isTable, plottedValues, rowCells, tileKey } from "../evidence.mjs";
 import { axisOf, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "../measures.mjs";
-import { BINDING_CODES, bindDeck, withoutTokens } from "../bind.mjs";
+import { BINDING_CODES, bindDeck, readFormat, renderValue, withoutTokens } from "../bind.mjs";
 import { matches, measurementsIn, percentUnit, printedNumbers, states } from "../printed-numbers.mjs";
 import { registered } from "../errors.mjs";
+import { kindOfForm } from "../claim-fit.mjs";
 
 export const DEPENDENCY_CODES = Object.freeze({
   CLAIM_MEASURES_MISSING: "a page with numbers on it does not say which measures its claim is about",
@@ -60,6 +61,15 @@ export const DEPENDENCY_CODES = Object.freeze({
   SOURCE_UNCITED: "the page's citation leaves out a source the measures it shows are cited to, or is typed where it can be derived",
   RELATION_UNDECLARED: "two measures of the claim in one unit sit in separate exhibits and the page does not say what the reader is to read between them",
   RELATION_SPLIT: "the claim asserts a relation between two measures and no exhibit shows them on one basis",
+});
+
+// What a page's figures say against the record itself, read off the references and the recorded values alone - no judge,
+// no words: two tiles that print one recorded measure, a format that prints decimals no recorded value carries, and a page
+// resting on insights the answer critique names together as a comparison the log cannot support.
+export const RECORD_CODES = Object.freeze({
+  TILES_SAME_MEASURE: "two tiles of one page print one recorded measure at two periods or for two members",
+  PRECISION_UNRECORDED: "a token or a bound figure prints more decimal places than any recorded value of its measure carries",
+  COMPARISON_UNSUPPORTED: "a page draws on two or more insights the answer critique names together as a comparison the insight log cannot support",
 });
 
 /** The relations a claim can assert between its measures, and what shows each. */
@@ -478,6 +488,144 @@ export function claimMarks(doc, insights) {
 }
 
 /**
+ * The figures a page sets in boxes for the reader to read across: a strip's
+ * metrics, a hero's `kpi`, and the items of a fact grid or a stat list - by
+ * its own `type`, or the kind its page's form draws the first exhibit as.
+ */
+export function tilesOf(page) {
+  if (!page || typeof page !== "object") return [];
+  const first = page.exhibit ?? (Array.isArray(page.exhibits) ? page.exhibits[0] : undefined);
+  const grids = exhibitsOf(page).filter((ex) => ["fact-grid", "stat-list"].includes(String(ex.type ?? (ex === first ? kindOfForm(page.type, page.form) ?? "" : ""))));
+  return [...(Array.isArray(page.metrics) ? page.metrics : []), page.kpi, ...grids.flatMap((ex) => (Array.isArray(ex.items) ? ex.items : []))].filter((tile) => tile && typeof tile === "object");
+}
+
+// A tile's whole value one `{{...}}` token.
+const TOKEN_ALONE = /^\s*\{\{([^{}]+)\}\}\s*$/;
+/** `<insight>/<measure>[@<period or member>]` as `{ ref, label }`, the label null for a measure of one value. */
+const cellOfReference = (reference) => { const text = String(reference ?? "").trim(), at = text.indexOf("@"); return { ref: at < 0 ? text : text.slice(0, at).trim(), label: at < 0 ? null : text.slice(at + 1).trim() }; };
+/** The recorded measure and the period or member a tile prints by reference - its `measure`, or a value that is one token - or null. */
+function recordedCell(tile, registry) {
+  const named = typeof tile.measure === "string" ? tile.measure : TOKEN_ALONE.exec(typeof tile.value === "string" ? tile.value : "")?.[1]?.split("|")[0];
+  if (named === undefined) return null;
+  const cell = cellOfReference(named);
+  return registry.has(cell.ref) ? cell : null;
+}
+
+/**
+ * The recorded measure each tile of `bound` prints by reference, keyed by the
+ * tile as the compile reads it (evidence.mjs tileKey), read off `authored` -
+ * the same page before its references were written out, which keeps the
+ * reference the binding takes off. The compile asks the judge whether two
+ * tiles are one measure only of tiles that print different recorded measures.
+ */
+export function tileMeasures(authored, bound, registry) {
+  const shown = tilesOf(bound), out = new Map();
+  tilesOf(authored).forEach((tile, at) => { const cell = recordedCell(tile, registry); if (cell && shown[at]) out.set(tileKey(shown[at]), cell.ref); });
+  return out;
+}
+
+/**
+ * Two tiles of `authored` that print one recorded measure at two periods or
+ * for two members: `{ ref, tiles: [{ label, value, at }] }`, or null. That is
+ * the reference, not a reading: on the BA retest hb10's 2027 cap and hw03's
+ * carbon bill for two halves each cost a judge round (tiles-one-measure)
+ * where both tiles named the same `<insight>/<measure>`. `bound` is the page
+ * with its references written out, for the values as printed.
+ */
+function sameMeasureTiles(authored, bound, registry) {
+  const shown = tilesOf(bound), byRef = new Map();
+  tilesOf(authored).forEach((tile, at) => {
+    const cell = recordedCell(tile, registry);
+    if (!cell) return;
+    const seen = byRef.get(cell.ref) ?? [];
+    if (!seen.some((other) => other.label === cell.label)) seen.push({ label: cell.label, value: String(shown[at]?.value ?? tile.value ?? ""), name: String(shown[at]?.label ?? tile.label ?? "").trim(), at });
+    byRef.set(cell.ref, seen);
+  });
+  const [ref, tiles] = [...byRef].find(([, list]) => list.length >= 2) ?? [];
+  return ref ? { ref, tiles } : null;
+}
+
+// The decimal places one number carries as written, at most twelve significant figures (so 0.1 x 3 is not 0.30000000000000004).
+const placesOf = (x) => { const [digits, exponent = "0"] = String(Number(Math.abs(x).toPrecision(12))).split(/e/i); return Math.max(0, (digits.split(".")[1] || "").length - Number(exponent)); };
+/**
+ * The decimal places a measure's record carries, scaled by `factor` (a
+ * format's `/1000` or `x100`): the most any of its recorded values has. Null
+ * where it records no number.
+ */
+export function recordedPlaces(measure, factor = 1) {
+  const numbers = valuesOf(measure).filter((value) => typeof value === "number" && Number.isFinite(value));
+  return numbers.length ? Math.max(...numbers.map((value) => placesOf(value * factor))) : null;
+}
+/** `format` with its digits written to `places` decimal places, its prefix, suffix and modifiers as they were. */
+const formatAtPlaces = (format, places) => {
+  const [pattern = "", ...modifiers] = String(format).split("|").map((part) => part.trim());
+  return [pattern.replace(/(0(?:,0)?)\.0+/, places ? `$1.${"0".repeat(places)}` : "$1"), ...modifiers.filter(Boolean)].join(" | ");
+};
+
+/**
+ * Every number a page prints by reference at more decimal places than the
+ * record of its measure carries: a token, or a bound figure (a metric, a
+ * hero's `kpi`, a row's metric, an item). On the BA retest the OAG seat
+ * shares were recorded as 34, 16 and 14 and printed "34.0%", a precision
+ * nobody measured, because the writer brief offered `| 0.0` for every token.
+ * Each is `{ where, ref, label, printed, as }` - `as` the format that prints the
+ * record as recorded.
+ */
+function overPrecise(page, registry) {
+  const found = [];
+  const check = (reference, format, where) => {
+    const { ref, label } = cellOfReference(reference), measure = registry.get(ref);
+    const read = measure ? readFormat(format) : null;
+    if (!read || typeof read === "string" || read.decimals === null) return;
+    const places = recordedPlaces(measure, read.factor);
+    if (places === null || read.decimals <= places) return;
+    const axis = axisOf(measure), value = label === null ? valuesOf(measure)[0] : valuesOf(measure)[axis.labels.indexOf(label)];
+    found.push({ where, ref: label === null ? ref : `${ref}@${label}`, printed: typeof value === "number" ? renderValue(value, read) : null, recorded: value, as: formatAtPlaces(format, places) });
+  };
+  const figures = [...(Array.isArray(page.metrics) ? page.metrics : []), page.kpi, ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.metric) : []),
+    ...exhibitsOf(page).flatMap((ex) => (Array.isArray(ex.items) ? ex.items : []))];
+  for (const figure of figures) if (figure && typeof figure === "object" && typeof figure.measure === "string" && typeof figure.format === "string") check(figure.measure, figure.format, `the figure "${String(figure.label ?? figure.measure).trim()}"`);
+  const walk = (node, field) => {
+    if (typeof node === "string") { for (const [token, inner] of node.matchAll(/\{\{([^{}]+)\}\}/g)) { const [reference, ...format] = inner.split("|"); if (format.length) check(reference, format.join("|"), `the token ${token} in \`${field}\``); } return; }
+    if (Array.isArray(node)) return node.forEach((child, i) => walk(child, `${field}[${i}]`));
+    if (node && typeof node === "object") for (const [key, child] of Object.entries(node)) if (key !== "measure" && key !== "format") walk(child, field ? `${field}.${key}` : key);
+  };
+  walk(page, "");
+  return found;
+}
+
+/**
+ * The pages that rest on insights the answer critique named together as a
+ * comparison the log cannot support (answer-critique.mjs answerHazards: each
+ * `{ insights, problem, rule }`). On the BA benchmark such a comparison - a
+ * share set beside rivals' on a basis the log's own calculation note says
+ * differs - was found only by the storyline critique, after pages were
+ * written on it. A page whose `evidence` or `settles.measures` draw on two or
+ * more insights one hazard names hears the hazard's rule where the page is
+ * checked, as an advisory: drawing on both is not yet comparing them. Read
+ * by ids alone; the hazard's words are quoted, never read.
+ */
+export function hazardFindings(doc, hazards) {
+  const named = (Array.isArray(hazards) ? hazards : []).map((hazard) => ({ ids: [...new Set((Array.isArray(hazard?.insights) ? hazard.insights : []).map(String))], rule: String(hazard?.rule ?? "").trim() }))
+    .filter((hazard) => hazard.ids.length >= 2);
+  if (!named.length) return [];
+  const out = [];
+  [...(doc?.pages || []), ...(doc?.appendix || [])].forEach((page, index) => {
+    if (!page || typeof page !== "object" || !page.type) return;
+    const id = String(page.id ?? `page-${index + 1}`);
+    const drawn = new Set([...(Array.isArray(page.evidence) ? page.evidence.map(String) : []),
+      ...(Array.isArray(page.settles?.measures) ? page.settles.measures : []).map((ref) => parseRef(ref)?.owner).filter(Boolean)]);
+    for (const hazard of named) {
+      const both = hazard.ids.filter((insight) => drawn.has(insight));
+      if (both.length < 2) continue;
+      out.push({ code: registered(RECORD_CODES, "COMPARISON_UNSUPPORTED"), id, severity: "advisory", measured: { insights: both, rule: hazard.rule },
+        repair: `${id}: the page draws on ${both.join(" and ")}, which the answer critique (out/answer-critique.json) names together as a comparison the insight log cannot support. The rule it sets: "${hazard.rule}" - keep every title, exhibit and point of the page to it, or rest the page on one of them (\`evidence\`, \`settles.measures\`)` });
+    }
+  });
+  return out;
+}
+
+/**
  * The dependency findings of a pages document against its insight log (with
  * the analyses computed from it): every reference bound (bind.mjs), every
  * typed page's claim and exhibits held to the measures they name, and every
@@ -514,6 +662,19 @@ export function dependencyFindings(doc, insights) {
     if (untraced.length) out.push({ code: registered(BINDING_CODES, "NUMBER_UNTRACED"), id, severity: "advisory", measured: untraced.map((u) => `${u.field}: ${u.shown}`),
       repair: `${id}: ${untraced.length} typed number${untraced.length === 1 ? " is" : "s are"} no value of a measure the page rests on - ${untraced.slice(0, 8).map((u) => `${u.shown} in \`${u.field}\``).join(", ")}${untraced.length > 8 ? ", ..." : ""}. ` +
         "Print a recorded or computed number by reference - `{{<insight id>/<measure>@<period or member> | 0.0}}` - so the runtime writes it; a number nobody recorded is a measure to add to the insight, an analysis to run, or an assumption to state" });
+    // One recorded measure in two tiles is one measure at two dates or for two members, whatever the labels say: the references
+    // say it, so no judge is asked (page-types.mjs chartFormDefect asks only of tiles of different measures).
+    const twice = sameMeasureTiles(authored[index] ?? page, page, registry);
+    if (twice) {
+      const [a, b] = twice.tiles, at = (tile) => (tile.label === null ? "" : ` at ${tile.label}`);
+      out.push({ code: registered(RECORD_CODES, "TILES_SAME_MEASURE"), id, severity: "blocker", measured: { measure: twice.ref, labels: twice.tiles.map((tile) => tile.label) },
+        repair: `${id}: the tiles ${a.value} ("${a.name}") and ${b.value} ("${b.name}") print one recorded measure, ${twice.ref}${at(a)} and${at(b)}${twice.tiles.length > 2 ? ` (and ${twice.tiles.length - 2} more of its ${axisOf(registry.get(twice.ref)).kind})` : ""}, which the reader has to compare in separate boxes. ` +
+          `Plot the measure on one axis - a \`trend\` page across the periods, a \`ranking\` across the members, or the chart the page already carries - or keep one tile and say the other in the copy (\`{{${twice.ref}${b.label === null ? "" : `@${b.label}`} | ...}}\` in its text); keep tiles for measures that differ` });
+    }
+    // A decimal the record does not carry is a precision nobody measured: advised, with the format that prints the record as it is.
+    const precise = overPrecise(authored[index] ?? page, registry);
+    if (precise.length) out.push({ code: registered(RECORD_CODES, "PRECISION_UNRECORDED"), id, severity: "advisory", measured: precise.map((p) => `${p.ref}: "${p.as}"`),
+      repair: `${id}: ${precise.length} number${precise.length === 1 ? " is" : "s are"} printed at more decimal places than the record carries - ${precise.slice(0, 8).map((p) => `${p.where} prints ${p.printed ?? p.ref} where ${p.ref} records ${p.recorded}: write "${p.as}"`).join("; ")}${precise.length > 8 ? "; ..." : ""}. Print each at the record's own precision` });
     const exhibits = exhibitsOf(page), metrics = metricsOf(page);
     // Each exhibit as the author wrote it, tokens and all: what is typed in it is told apart from what the runtime wrote.
     const typedExhibits = authored[index] && typeof authored[index] === "object" ? exhibitsOf(authored[index]) : [];

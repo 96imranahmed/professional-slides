@@ -434,6 +434,87 @@ console.log(JSON.stringify({ typed: codes(typed), bound: codes(bound), bare: cod
         self.assertEqual(result["itemStripped"], [False, 1])
 
 
+class RecordReadingTests(unittest.TestCase):
+    """What a page's figures print against the record itself, read off the references and the recorded values."""
+
+    def test_one_recorded_measure_in_two_tiles_is_refused_and_the_judge_reads_only_different_measures(self):
+        """BA retest: hb10's 2027 cap beside its 2025 charge, and hw03's carbon bill for two halves, each cost a judge round
+        (tiles-one-measure) where both tiles named one `<insight>/<measure>` at two periods. The references say it; the judge
+        is asked only whether tiles of different measures are one."""
+        result = run_node(LOG + '''
+import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
+import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+const asked = [];
+const reader = judgementSession({ oracle: (kind, subject) => { asked.push({ kind, subject }); return kind === 'tiles-one-measure' ? 'different-measures' : null; } });
+const item = (ref, label) => ({ measure: ref, format: 'GBP 0m', label, text: 'held at the year end on the balance sheet' });
+const grid = (items) => page({ type: 'numbers', form: 'fact-grid', commentary: 'none', bar: undefined, title: 'Cash rose to its highest level as debt fell by half',
+  exhibit: { items }, settles: { kind: 'comparison', what: 'cash and debt at year end', measures: ['i-bal/cash', 'i-bal/debt'] } });
+const strip = (metrics, kpi) => page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, metrics, ...(kpi ? { kpi } : {}), exhibit: { heading: 'Staff', series: [{ measure: 'i-bal/staff', name: 'Staff' }] } });
+const judged = (p) => { asked.length = 0; let out; withJudgements(reader, () => { out = compileDeck(deckOf(p), { insights, partial: true }); }); return { errors: out.compileErrors, asked: asked.filter((q) => q.kind === 'tiles-one-measure').map((q) => q.subject.map((t) => t.label)) }; };
+const found = (p) => dependencyFindings(deckOf(p), insights).filter((f) => f.code === 'TILES_SAME_MEASURE');
+const twice = grid([item('i-bal/cash@FY25', 'Cash, FY25'), item('i-bal/cash@FY26', 'Cash, FY26'), item('i-bal/debt@FY26', 'Debt, FY26')]);
+const once = grid([item('i-bal/cash@FY26', 'Cash, FY26'), item('i-bal/debt@FY26', 'Debt, FY26'), item('i-bal/debt@FY26', 'Debt again, FY26')]);
+const allOne = grid([item('i-bal/cash@FY24', 'Cash, FY24'), item('i-bal/cash@FY25', 'Cash, FY25'), item('i-bal/cash@FY26', 'Cash, FY26')]);
+console.log(JSON.stringify({
+  twice: found(twice).map((f) => [f.severity, f.measured, f.repair]), once: found(once).length,
+  token: found(strip([{ value: '{{i-bal/cash@FY24 | GBP 0m}}', label: 'Cash, FY24' }, { measure: 'i-bal/cash@FY26', format: 'GBP 0m', label: 'Cash, FY26' }])).map((f) => f.measured),
+  kpi: found(strip([{ measure: 'i-bal/debt@FY26', format: 'GBP 0m', label: 'Debt' }], { measure: 'i-bal/debt@FY21', format: 'GBP 0m', label: 'Debt then' })).map((f) => f.measured),
+  judged: { twice: judged(twice), allOne: judged(allOne) } }));
+''')
+        [(severity, measured, repair)] = result["twice"]
+        self.assertEqual(severity, "blocker")
+        self.assertEqual(measured, {"measure": "i-bal/cash", "labels": ["FY25", "FY26"]})
+        self.assertIn("print one recorded measure, i-bal/cash at FY25 and at FY26", repair)
+        self.assertIn("plot the measure on one axis".capitalize(), repair)
+        self.assertIn("keep one tile and say the other in the copy", repair)
+        self.assertEqual(result["once"], 0, "one measure at one period twice is not two periods of it")
+        self.assertEqual(result["token"], [{"measure": "i-bal/cash", "labels": ["FY24", "FY26"]}], "a tile whose value is one token names its measure too")
+        self.assertEqual(result["kpi"], [{"measure": "i-bal/debt", "labels": ["FY26", "FY21"]}], "a hero figure is a tile beside the strip")
+        # The judge reads one tile of each recorded measure: the two cash tiles are the record's to refuse, not its to read.
+        self.assertEqual(result["judged"]["twice"], {"errors": [], "asked": [["Cash, FY25", "Debt, FY26"]]})
+        self.assertEqual(result["judged"]["allOne"], {"errors": [], "asked": []})
+
+    def test_a_number_printed_past_the_records_precision_is_advised_with_the_format_that_keeps_it(self):
+        """BA retest: the OAG seat shares were recorded as 34, 16 and 14 and printed 34.0% - a precision nobody measured -
+        because the writer brief offered `| 0.0` for every token."""
+        result = run_node(LOG + '''
+const advice = (p) => dependencyFindings(deckOf(p), insights).filter((f) => f.code === 'PRECISION_UNRECORDED').map((f) => [f.severity, f.measured, f.repair]);
+const titled = (title) => advice(page({ title }));
+const metric = (measure, format) => advice(page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, metrics: [{ measure, format, label: 'A figure' }], exhibit: { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] } }));
+console.log(JSON.stringify({
+  whole: titled('Cash rose to {{i-bal/cash@FY26 | 0.0}} million while debt fell'), kept: titled('Cash rose to {{i-bal/cash@FY26 | 0}} million while debt fell'),
+  // The most places any recorded value carries: 0.04 among the swings carries two, so a swing of 4.3 at one place is the record's.
+  swing: titled('The swing reached {{i-bal/swing@FY21 | 0.0}} million'), unpatterned: titled('Cash rose to {{i-bal/cash@FY26}} million while debt fell'),
+  figure: metric('i-bal/cash@FY26', 'GBP 0.0m'), scaled: metric('i-bal/perHead', '0.00% | x100'), scaledKept: metric('i-bal/perHead', '0.0% | x100') }));
+''')
+        [(severity, measured, repair)] = result["whole"]
+        self.assertEqual(severity, "advisory")
+        self.assertEqual(measured, ['i-bal/cash@FY26: "0"'])
+        self.assertIn("the token {{i-bal/cash@FY26 | 0.0}} in `title` prints 55.0 where i-bal/cash@FY26 records 55: write \"0\"", repair)
+        self.assertEqual(result["kept"], [])
+        self.assertEqual(result["swing"], [])
+        self.assertEqual(result["unpatterned"], [], "a token with no pattern prints no more places than its value has")
+        self.assertEqual(result["figure"][0][1], ['i-bal/cash@FY26: "GBP 0m"'])
+        # A ratio printed as a percentage carries the places its record has once scaled: 0.349 is 34.9%.
+        self.assertEqual(result["scaled"][0][1], ['i-bal/perHead: "0.0% | x100"'])
+        self.assertEqual(result["scaledKept"], [])
+
+    def test_a_page_resting_on_insights_a_hazard_names_together_hears_its_rule(self):
+        """The answer critique names the comparisons the log cannot support (out/answer-critique.json `hazards`); a page that
+        draws on two of the insights one hazard names - by `evidence` or by `settles.measures` - is told the rule, by ids alone."""
+        result = run_node(LOG + '''
+import { hazardFindings } from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
+const hazards = [{ insights: ['i-bal', 'i-peers'], problem: 'The peers report a calendar year and the company a fiscal one.', rule: 'Never set the company beside the peers as one year.' },
+  { insights: ['i-peers'], problem: 'One insight alone.', rule: 'Read nowhere here.' }];
+const both = page();
+const alone = page({ id: 'p2', evidence: ['i-bal'] });
+const settled = page({ id: 'p3', evidence: ['i-bal'], settles: { kind: 'comparison', what: 'margins', measures: ['i-bal/cash', 'i-peers/margin'] } });
+console.log(JSON.stringify(hazardFindings(deckOf(both, alone, settled), hazards).map((f) => [f.code, f.id, f.severity, f.measured.insights, f.repair])));
+''')
+        self.assertEqual([row[:4] for row in result], [["COMPARISON_UNSUPPORTED", "p1", "advisory", ["i-bal", "i-peers"]], ["COMPARISON_UNSUPPORTED", "p3", "advisory", ["i-bal", "i-peers"]]])
+        self.assertIn('The rule it sets: "Never set the company beside the peers as one year."', result[0][4])
+
+
 class AuthoringSurfaceTests(unittest.TestCase):
     """What the author meets at the command line: a scaffold already bound, one finding for a bad reference, and the list of untraced numbers."""
 

@@ -753,6 +753,32 @@ console.log(JSON.stringify({{
         self.assertIn('a: `strength` is one of strong, supporting, context (got "high")', result['ungraded'])
         self.assertIn('b: `soWhat`', result['ungraded'])
 
+    def test_breadth_is_read_off_the_recorded_measures_where_nothing_else_says_it(self):
+        """BA retest: `net-uk-europe-country-flows` recorded two measures over 27 countries and was refused as too narrow
+        for a peer set until `breadth.members: 27` was typed in by hand; the record already said how wide it was."""
+        result = run_node(f'''
+import {{ breadthProblem, breadthOf }} from '{KIT}';
+const members = Array.from({{ length: 27 }}, (_, i) => `Country ${{i + 1}}`), years = ['2019', '2020', '2021', '2022'];
+const flows = {{ id: 'flows', shape: 'peer-set', measures: {{ passengers: {{ unit: 'passengers m', period: '2025', members, values: members.map((_, i) => 30 - i) }},
+  share: {{ unit: '%', period: '2025', members: members.slice(0, 4), values: [40, 30, 20, 10] }} }} }};
+const pair = (n) => ({{ id: 'pair', shape: 'series', measures: {{ a: {{ unit: 'm', periods: years, values: [1, 2, 3, 4] }}, b: {{ unit: 'm', periods: years.slice(0, n), values: [1, 2, 3, 4].slice(0, n) }} }} }});
+console.log(JSON.stringify({{
+  flows: [breadthOf(flows), breadthProblem(flows)], few: breadthProblem({{ ...flows, measures: {{ share: flows.measures.share }} }}),
+  series: [breadthOf(pair(4)), breadthProblem(pair(4))], unequal: breadthOf(pair(2)),
+  mix: breadthOf({{ id: 'm', shape: 'mix', measures: {{ split: {{ unit: '%', period: '2025', members: ['A', 'B', 'C'], values: [50, 30, 20] }} }} }}),
+  typed: breadthOf({{ ...flows, breadth: {{ members: 5 }} }}), data: breadthOf({{ ...flows, data: {{ categories: ['A', 'B'] }} }}), fact: breadthOf({{ ...flows, shape: 'fact' }}),
+}}));
+''')
+        self.assertEqual(result['flows'], [{'members': 27}, None])
+        self.assertIn('4 members', result['few'])  # still a research task where the widest measure is narrow
+        self.assertEqual(result['series'], [{'periods': 4, 'series': 2}, None])  # the subject and a peer over four periods
+        self.assertEqual(result['unequal'], {'periods': 4, 'series': 1})  # a series is as many measures as run the whole window
+        self.assertEqual(result['mix'], {'parts': 3})
+        # What the author typed, or the data itself, still says it: the measures are read only where neither does.
+        self.assertEqual(result['typed'], {'members': 5})
+        self.assertEqual(result['data'], {'members': 2})
+        self.assertEqual(result['fact'], {})
+
     def test_a_mix_counts_the_parts_its_chart_draws(self):
         # Read from each composition form's own sample data: the parts are the
         # slices, tiles, waffle categories, figure rows - or, where two or more

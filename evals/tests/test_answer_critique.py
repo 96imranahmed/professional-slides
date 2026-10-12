@@ -161,6 +161,29 @@ class BriefTests(unittest.TestCase):
             self.assertIn('A1 (major, scope, narrow): "the thinnest liquidity cover among them"', brief.stdout)
             self.assertIn("[i-peers] Capital is ranked only among the peers that publish it.", brief.stdout, "the log's hazards reach the skeleton whatever the answer says")
 
+    def test_a_page_resting_on_insights_a_hazard_names_together_hears_its_rule_at_the_draft_and_the_check(self):
+        """A hazard names insights the log cannot compare; a page drawing on two of them is told its rule where it is
+        checked, before a critique has to find the comparison on the spine. Read by ids; advisory, since drawing on both
+        is not yet comparing them."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = stage_fixture(tmp)
+            out = Path(tmp) / "out"
+            out.mkdir()
+            record = critique()
+            record["hazards"].append({"insights": ["i-cash", "i-earn"], "problem": "Cash flow is reported on a calendar year and earnings on the fiscal one.",
+                                      "rule": "Never set cash flow beside earnings as one year's numbers."})
+            (out / "answer-critique.json").write_text(json.dumps(record), encoding="utf-8")
+            reports = {mode: subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages), mode, "--page", "f1,f2", "--json"], capture_output=True, text=True)
+                       for mode in ("--draft", "--check")}
+        for mode, run_ in reports.items():
+            report = json.loads(run_.stdout)
+            said = {page: [f for f in report["pages"][page].get("advisories", []) if f["code"] == "COMPARISON_UNSUPPORTED"] for page in ("f1", "f2")}
+            self.assertEqual(said["f1"], [], mode)
+            [hazard] = said["f2"]
+            self.assertEqual(hazard["class"], "P", mode)
+            self.assertEqual(hazard["measured"]["insights"], ["i-cash", "i-earn"], mode)
+            self.assertIn('"Never set cash flow beside earnings as one year\'s numbers."', hazard["repair"], mode)
+
 
 if __name__ == "__main__":
     unittest.main()
