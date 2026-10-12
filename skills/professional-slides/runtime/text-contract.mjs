@@ -29,13 +29,27 @@ export const TEXT_CONTRACT_CODES = Object.freeze({
   TEXT_EXPORT_LOST: "a planned block of text missing from its saved page",
   TEXT_EXPORT_UNPLANNED: "text on a saved page that the plan never wrote",
 });
-export const normalizeText = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
+const NORMALIZED = new Map();
+const normalizeOnce = value => String(value ?? '').normalize('NFKC').replace(/[\u00ad\u200b]/g, '').replace(/-\s*\r?\n\s*/g, '-').replace(/\s+/g, ' ').trim();
+// The structure search reads the same pages' words tens of thousands of times: a string normalises once.
+export const normalizeText = value => {
+  if (typeof value !== 'string') return normalizeOnce(value);
+  let hit = NORMALIZED.get(value);
+  if (hit === undefined) { if (NORMALIZED.size > 200000) NORMALIZED.clear(); hit = normalizeOnce(value); NORMALIZED.set(value, hit); }
+  return hit;
+};
 // Lines the counting rule excludes, matching how the shipped task targets count.
 const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 // The one definition of a word (gates/text_stats.py ports it): the normalised
 // text split on whitespace, every token a word.
 export const textWordList = value => { const text = normalizeText(value); return text ? text.split(' ') : []; };
-export const textWords = value => textWordList(value).length;
+const WORDS = new Map();
+export const textWords = value => {
+  if (typeof value !== 'string') return textWordList(value).length;
+  let hit = WORDS.get(value);
+  if (hit === undefined) { if (WORDS.size > 200000) WORDS.clear(); hit = textWordList(value).length; WORDS.set(value, hit); }
+  return hit;
+};
 /** Words set as said - a table's quote cell, a spectrum pole's voice: in curly quotation marks, the author's own taken off first. */
 export const quoted = value => `“${String(value).trim().replace(/^[“"‘']+|[”"’']+$/g, '')}”`;
 // A paragraph as authored: a string, or `{ lead, text }` - the subheading a

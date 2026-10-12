@@ -303,7 +303,7 @@ export function varietyFindings(spec, options = {}) {
 // write too (gate_config.py `standing`). The author's report prints one line
 // a rule from it on every run, so a refusal is never the first time its rule
 // is mentioned.
-function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
+function contractFindings(spec, { structureOf, drawnOf, standings = [], memo = null } = {}) {
   if (spec.purpose === "catalogue") return [];
   const slides = [...(spec.slides || []), ...(spec.appendix || [])].filter(isContent);
   const findings = [];
@@ -471,7 +471,7 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [] } = {}) {
       `${redraws()}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
   findings.push(...mixFindings(slides, stand));
-  findings.push(...reviewedDeckFindings(spec, slides, stand));
+  findings.push(...reviewedDeckFindings(spec, slides, stand, memo));
   return findings;
 }
 
@@ -626,15 +626,17 @@ export function tableConstruction(slide) {
   return [first, coded ? "coded cells" : "text cells", rows.length > 8 ? "long" : "short", slide.soWhat ? "a band at the foot" : "open foot"].join(" · ");
 }
 
-function reviewedDeckFindings(spec, slides, stand) {
+function reviewedDeckFindings(spec, slides, stand, memo = null) {
   const findings = [];
+  // A structure search reads one deck thousands of times, each page in ten windows: within it a page's construction is read once.
+  const constructionOf = memo ? (slide) => { if (!memo.tables.has(slide)) memo.tables.set(slide, tableConstruction(slide)); return memo.tables.get(slide); } : tableConstruction;
   const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
   const analytical = slides.filter((s) => s.pageType && !["statement", "summary"].includes(s.pageType.type));
   // Table monotony: the worst window of ten analytical pages.
   let worst = null, most = [];
   for (let at = 0; at + REVIEWED.tableWindow <= Math.max(analytical.length, REVIEWED.tableWindow); at += 1) {
     const window = analytical.slice(at, at + REVIEWED.tableWindow), tally = new Map();
-    for (const s of window) { const key = tableConstruction(s); if (key) tally.set(key, [...(tally.get(key) || []), s.id ?? null]); }
+    for (const s of window) { const key = constructionOf(s); if (key) tally.set(key, [...(tally.get(key) || []), s.id ?? null]); }
     for (const [key, ids] of tally) {
       if (ids.length > most.length) most = ids;
       if (ids.length > REVIEWED.tableRunMax && (!worst || ids.length > worst.ids.length)) worst = { key, ids, from: window[0]?.id ?? null, to: window.at(-1)?.id ?? null };

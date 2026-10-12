@@ -1303,10 +1303,13 @@ async function provenMarks(doc, insights, { deck, spec, baseDir }) {
 }
 
 /** The plan record (plan_gates.mjs) implied by the compiled deck. */
-export function planOf(spec) {
+export function planOf(spec, { records = null } = {}) {
   const pages = [];
   if (spec.cover) pages.push({ id: "cover", n: 1, kind: "cover", title: spec.cover.title, exhibit: spec.cover.image ? "image" : "text", architecture: spec.cover.image ? "picture-led" : "text", why: "The deck's cover" });
   for (const slide of [...spec.slides, ...(spec.appendix || [])]) {
+    // Within a structure search (`records`), a page object at the same place reads as the record it read as before.
+    const kept = records?.get(slide);
+    if (kept && kept.n === pages.length + 1) { pages.push(kept.record); continue; }
     const t = slide.pageType;
     const ex = slide.exhibit ?? slide.exhibits?.[0];
     const record = { id: slide.id, n: pages.length + 1, title: slide.title };
@@ -1324,6 +1327,7 @@ export function planOf(spec) {
         ...(t.series ? { series: t.series } : {}), ...(t.sourceSlide !== undefined ? { sourceSlide: t.sourceSlide } : {}),
       });
     }
+    records?.set(slide, { n: record.n, record });
     pages.push(record);
   }
   return { schema: "professional-slides.plan/v1", id: spec.id, design: spec.design, ...(spec.workflow ? { workflow: spec.workflow } : {}),

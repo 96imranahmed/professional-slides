@@ -134,17 +134,19 @@ export function shapeStructure(pages, { airy = false } = {}) {
  * (author-deck.mjs); findings of other classes the two raise come back too,
  * for the caller to file.
  */
-export function declaredStructure(spec, { planOf, insights = undefined, sourceKinds = null }) {
+export function declaredStructure(spec, { planOf, insights = undefined, sourceKinds = null, memo = null }) {
   const standings = [];
-  const variety = varietyFindings(spec, { structureOf, drawnOf, standings });
+  // `memo` is a structure search's: the page objects it swaps in and out are read once each, however often the deck is read.
+  const structureOfSlide = memo ? (slide) => { if (!memo.structures.has(slide)) memo.structures.set(slide, structureOf(slide)); return memo.structures.get(slide); } : structureOf;
+  const variety = varietyFindings(spec, { structureOf: structureOfSlide, drawnOf, standings, memo });
   // How the deck's exhibits are spread over their kinds, and the pages drawn in a form that carries their claim less directly than
   // another they could take: said with the standings, and never a refusal (gates/variety_gates.mjs fitStandings). Read where the
   // caller passes the insight log (null where the deck has none); a search that only weighs the rules leaves it out.
   const fit = insights === undefined ? { findings: [], standings: [] } : fitStandings(spec, { fits: fitsOf(spec, insights), kept: keptAsSource(spec, sourceKinds), carried: carriedKinds(spec.carried, sourceKinds) });
   standings.push(...fit.standings);
   variety.push(...fit.findings);
-  const plan = planOf(spec);
-  const report = runPlanGates(plan, { deck: spec });
+  const plan = planOf(spec, memo ? { records: memo.records } : undefined);
+  const report = runPlanGates(plan, { deck: spec, reads: memo?.reads });
   const content = plan.pages.filter((page) => !page.kind || page.kind === "content");
   const entropy = styleEntropy(content);
   if (entropy.declared && entropy.pages) {
@@ -573,10 +575,12 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     }
     return { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
   };
+  // The search reads the deck tens of thousands of times with one page swapped: each page object's reads are kept for the search.
+  const memo = { structures: new WeakMap(), tables: new WeakMap(), records: new WeakMap(), reads: new WeakMap() };
   const evaluate = (override = null) => {
     evaluations += 1;
     const spec = specOf(override), slides = spec.slides, appendix = spec.appendix ?? [];
-    const declared = declaredStructure(spec, { planOf });
+    const declared = declaredStructure(spec, { planOf, memo });
     const shape = shapeStructure([...slides, ...appendix].filter((slide) => slide.pageType).map((slide) => ({ id: slide.id, architecture: declaredArchitecture(slide) })),
       { airy: resolveFill(spec) === "airy" });
     // The deck's median words a block under these choices, where the caller read each page's off its scene (`blocksOf`: the

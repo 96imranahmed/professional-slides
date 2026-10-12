@@ -238,6 +238,10 @@ function clearSurface(frame, obstacles, placements) {
 function meets(node, frame, pad) {
   const d = node.type === "line" ? node.data : null;
   if (!d || ![d.x1, d.y1, d.x2, d.y2].every(Number.isFinite)) return overlaps(frame, node.frame, pad);
+  // Every point walked below lies in the segment's box: a frame that box cannot reach meets none of them.
+  const EPS = 1e-6;
+  if (Math.max(d.x1, d.x2) < frame.x - pad - EPS || Math.min(d.x1, d.x2) > frame.x + frame.width + pad + EPS
+    || Math.max(d.y1, d.y2) < frame.y - pad - EPS || Math.min(d.y1, d.y2) > frame.y + frame.height + pad + EPS) return false;
   const steps = Math.max(1, Math.ceil(Math.hypot(d.x2 - d.x1, d.y2 - d.y1) / 4));
   for (let i = 0; i <= steps; i += 1) if (pointInsideFrame({ x: d.x1 + (d.x2 - d.x1) * i / steps, y: d.y1 + (d.y2 - d.y1) * i / steps }, frame, pad)) return true;
   return false;
@@ -567,7 +571,22 @@ function segmentClear(x1, y1, x2, y2, target, obstacles) {
  * so near that the leader is a stub. Only a note that has no such place
  * anywhere in the plot takes the band.
  */
-function openPlacement({ annotation, index, target: mark, bounds, obstacles, leaderStops, placements, marks = [] }) {
+const OPEN_MEMO = new Map();
+function openPlacement(args) {
+  const { annotation, index, target: mark, obstacles, leaderStops, placements, marks = [], bounds } = args;
+  // A chart composed again with the same notes, marks and room - the fit search and the proofs compose one page many
+  // times - finds the same place: the search is a function of these alone, and of the box the note measures to in the
+  // deck's type, which is part of the key so two designs never share a place.
+  const { width, height } = evidenceBoxSize(annotation);
+  const key = JSON.stringify([annotation, width, height, mark, bounds, obstacles.map((o) => [o.role, o.type, o.frame, o.type === "line" ? o.data : null]), leaderStops.map((o) => [o.role, o.type, o.frame]), placements.map((o) => [o.frame, o.leader]), marks.map((o) => [o.type, o.frame, o.data?.category, o.data?.series])]);
+  if (OPEN_MEMO.has(key)) { const hit = OPEN_MEMO.get(key); return hit && { annotation, index, target: mark, frame: { ...hit.frame }, leader: { ...hit.leader }, side: hit.side, placement: "open" }; }
+  const found = openPlacementSearch(args);
+  if (OPEN_MEMO.size > 5000) OPEN_MEMO.clear();
+  OPEN_MEMO.set(key, found && { frame: { ...found.frame }, leader: { ...found.leader }, side: found.side });
+  return found;
+}
+
+function openPlacementSearch({ annotation, index, target: mark, bounds, obstacles, leaderStops, placements, marks = [] }) {
   const { width, height } = evidenceBoxSize(annotation);
   // From above, the leader lands where a band's would: on the mark's value end, stopping short of its own value label.
   const valueEnd = leaderTarget(mark, leaderStops, annotation);
@@ -586,7 +605,9 @@ function openPlacement({ annotation, index, target: mark, bounds, obstacles, lea
   };
   const taken = placements.filter((placement) => placement.leader).map((placement) => [placement.leader.x1, placement.leader.y1, placement.leader.x2, placement.leader.y2]);
   const stops = [...leaderStops, ...placements.map((placement) => ({ frame: placement.frame }))];
-  let best = null;
+  // Every cell's leader and its cost come from geometry alone, so the cells are ranked by cost (scan order breaking ties,
+  // as the scan's strict "cheaper than the best" did) and tested in that order: the first clear cell is the scan's answer.
+  const cells = [];
   for (let y = bounds.y; y + height <= bounds.y + bounds.height; y += OPEN_STEP) {
     for (let x = bounds.x; x + width <= bounds.x + bounds.width; x += OPEN_STEP) {
       const frame = { x, y, width, height };
@@ -598,13 +619,19 @@ function openPlacement({ annotation, index, target: mark, bounds, obstacles, lea
       const x1 = under ? target.x : level ? (target.x < x ? x : x + width) : Math.max(x, Math.min(x + width, target.x));
       const y1 = under ? (target.y < y ? y : y + height) : level ? target.y : Math.max(y, Math.min(y + height, target.y));
       const length = Math.hypot(target.x - x1, target.y - y1);
-      const cost = leaderCost({ leader: { x1, y1, x2: target.x, y2: target.y } });
-      if (length < OPEN_LEADER_MIN || (best && cost >= best.cost)) continue;
-      if (!clearSurface(frame, obstacles, placements)) continue;
+      if (length < OPEN_LEADER_MIN) continue;
       const leader = { x1, y1, x2: target.x, y2: target.y };
-      if (!segmentClear(x1, y1, target.x, target.y, target, stops) || taken.some((other) => segmentsCross([x1, y1, target.x, target.y], other))) continue;
-      best = { cost, frame, leader, side: under ? (target.y < y ? "below" : "above") : level ? (target.x < x ? "right" : "left") : "open" };
+      cells.push({ order: cells.length, cost: leaderCost({ leader }), frame, leader, target, side: under ? (target.y < y ? "below" : "above") : level ? (target.x < x ? "right" : "left") : "open" });
     }
+  }
+  cells.sort((a, b) => a.cost - b.cost || a.order - b.order);
+  let best = null;
+  for (const cell of cells) {
+    const { frame, leader, target } = cell;
+    if (!clearSurface(frame, obstacles, placements)) continue;
+    if (!segmentClear(leader.x1, leader.y1, target.x, target.y, target, stops) || taken.some((other) => segmentsCross([leader.x1, leader.y1, target.x, target.y], other))) continue;
+    best = cell;
+    break;
   }
   return best && { annotation, index, target: mark, frame: best.frame, leader: best.leader, side: best.side, placement: "open" };
 }

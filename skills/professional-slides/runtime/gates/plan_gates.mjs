@@ -61,9 +61,22 @@ const PLAN_FIELDS = new Set(["id", "n", "kind", "title", "exhibit", "variant", "
 const PLAN_ALIASES = Object.freeze({ layout: "architecture", points: "items", dataShape: "shape", exhibitVariant: "variant", reason: "why", exhibitReason: "why" });
 
 /** The plan's pages with every alias read into its field, and each field a page carries that the plan does not have. */
-function readPlanPages(pages) {
+function readPlanPages(pages, reads = null) {
   const unknown = [];
   const read = pages.map((page) => {
+    // Within a structure search the same record recurs in every reading of the deck: it is read once (reads, a WeakMap).
+    const kept = reads?.get(page);
+    if (kept) { unknown.push(...kept.unknown); return kept.out; }
+    const before = unknown.length;
+    const out = readPlanPage(page, unknown);
+    reads?.set(page, { out, unknown: unknown.slice(before) });
+    return out;
+  });
+  return { pages: read, unknown };
+}
+
+function readPlanPage(page, unknown) {
+  {
     const out = { ...page };
     for (const [alias, field] of Object.entries(PLAN_ALIASES)) {
       if (!Object.hasOwn(out, alias)) continue;
@@ -72,8 +85,7 @@ function readPlanPages(pages) {
     }
     for (const field of Object.keys(out)) if (!PLAN_FIELDS.has(field)) unknown.push({ page: page.id ?? page.n ?? null, field });
     return out;
-  });
-  return { pages: read, unknown };
+  }
 }
 
 const PICTURE_SHAPES = new Set(["picture-pair", "picture-strip", "picture-hero"]);
@@ -606,14 +618,14 @@ const round = (n) => Math.round(n * 1000) / 1000;
 
 // --- driver -----------------------------------------------------------------
 
-export function runPlanGates(plan, { deck } = {}) {
+export function runPlanGates(plan, { deck, reads = null } = {}) {
   const findings = [];
   if (!plan || typeof plan !== "object" || !Array.isArray(plan.pages)) {
     findings.push(finding(null, "PLAN_SCHEMA", "absent", "professional-slides.plan/v1",
       "The plan needs a `pages` array, one row per page, each naming its exhibit, architecture and anchors."));
     return report(plan, findings, [], deck);
   }
-  const { pages, unknown } = readPlanPages(plan.pages);
+  const { pages, unknown } = readPlanPages(plan.pages, reads);
   if (unknown.length) findings.push(finding(null, "PLAN_SCHEMA", { unknownFields: unknown }, [...PLAN_FIELDS],
     `A plan page carries fields the plan does not have (${unknown.slice(0, 6).map((u) => `\`${u.field}\`${u.page === null ? "" : ` on ${u.page}`}`).join(", ")}${unknown.length > 6 ? ", ..." : ""}); ` +
     "nothing reads them. Record the page under the plan's own fields (references/storyline-records.md#the-plan-file)."));
