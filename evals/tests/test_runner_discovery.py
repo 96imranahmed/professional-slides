@@ -31,12 +31,15 @@ console.log(JSON.stringify(units({modules!r})));
             tree = ast.parse((TESTS / f"{name}.py").read_text(encoding="utf-8"))
             classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
             tested = [node.name for node in classes if any(isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name.startswith("test") for item in node.body)]
-            holding.extend(f"{name}.{cls}" for cls in tested)
+            # A mixin's tests run in the test classes that derive from it - a share of a sweep, `class GridFinanceTests(GridShare,
+            # unittest.TestCase)` - so a mixin is run when one of those is scheduled.
+            derived = {cls: [f"{name}.{other.name}" for other in classes if cls in {getattr(base, "id", None) for base in other.bases}] for cls in tested}
+            holding.extend((f"{name}.{cls}", derived[cls]) for cls in tested)
             # A module of test functions and no class is scheduled whole.
             if not classes:
                 self.assertIn(name, scheduled)
         self.assertGreater(len(holding), 300)
-        self.assertEqual(sorted(unit for unit in holding if unit not in scheduled), [])
+        self.assertEqual(sorted(unit for unit, through in holding if unit not in scheduled and not scheduled.intersection(through)), [])
 
     def test_a_class_is_found_through_a_fixture_class_of_its_own_module_or_another(self):
         result = run_node('''

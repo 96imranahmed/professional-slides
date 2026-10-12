@@ -274,6 +274,40 @@ console.log(JSON.stringify({ code: found.code, fit: found.alternatives, untouche
         self.assertIn("1 alternatives a page are composed", capped["capped"])
         self.assertIsNone(result["off"])
 
+    def test_the_alternatives_are_gated_in_one_call_and_held_to_the_decks_structure(self):
+        # The machinery, with the deck's own functions replaced: every alternative of every page goes through the
+        # page gates in one call, and one that passes them but would break a structure rule is not offered.
+        result = run_node('''
+import { alternativeChoices, fitSearch, fitLines } from './skills/professional-slides/runtime/fit-search.mjs';
+const page = (id) => ({ id, type: 'schedule', form: 'timeline', commentary: 'below', title: 'T', exhibit: { items: [1, 2, 3, 4] }, points: ['a'] });
+const targets = ['a', 'b'].map((id, index) => ({ id, page: page(id), index }));
+let gateCalls = 0, composed = 0;
+const fits = await fitSearch(targets, {
+  spec: { slides: targets.map((t) => ({ id: t.id })) }, deck: { slides: [{ id: 'cover' }] }, perPage: 2,
+  compile: (alt) => { if (alt.commentary === 'none') throw new Error(`${alt.id}: commentary "none" has no place for the points`); return { id: alt.id, form: alt.form, commentary: alt.commentary }; },
+  compose: async (spec) => { composed += 1; return { deck: { slides: spec.slides.map((s) => ({ id: s.id, form: s.form, commentary: s.commentary })) }, pageErrors: [] }; },
+  pageGates: (deck) => { gateCalls += 1; return { ran: true, findings: deck.slides.map((s, i) => (s.commentary === 'so-what-bar' ? { slide: i + 1, code: 'SCENE_VOID', severity: 'blocker', measured: { from: 400, to: 560 } } : null)).filter(Boolean) }; },
+  localFindings: () => [], structure: (id, slide) => (id === 'b' && slide.commentary === 'beside' ? ['VARIETY_COLUMN'] : []),
+  brief: (f) => `${f.code}: an empty band of ${f.measured.to - f.measured.from}px` });
+console.log(JSON.stringify({ choices: alternativeChoices(page('a')).slice(0, 4), a: fits.get('a'), b: fits.get('b'), gateCalls, composed, lines: fitLines(fits.get('b')) }));
+''')
+        # Nearest first: the same form with another placement, then another form with the same placement.
+        self.assertEqual([f'{c["form"]}/{c["commentary"]}' for c in result["choices"]], ["timeline/beside", "timeline/so-what-bar", "timeline/none", "gantt/below"])
+        self.assertEqual(result["gateCalls"], 1, "one call to the page gates for every alternative of every page")
+        self.assertEqual(result["composed"], 2, "a round a deck: both pages take their nth alternative together")
+        self.assertEqual(result["a"]["pass"], [{"form": "timeline", "commentary": "beside"}])
+        self.assertEqual(result["a"]["fail"], [{"form": "timeline", "commentary": "so-what-bar", "remaining": ["SCENE_VOID: an empty band of 160px"]}])
+        self.assertEqual(result["b"]["pass"], [])
+        self.assertEqual(result["b"]["fail"][0], {"form": "timeline", "commentary": "beside", "remaining": [], "structure": ["VARIETY_COLUMN"]})
+        self.assertTrue(any("would break VARIETY_COLUMN (deck structure)" in line for line in result["lines"]["lines"]))
+        self.assertTrue(any(line.startswith("needs:  timeline/none") for line in result["lines"]["lines"]))
+        self.assertTrue(result["a"]["untried"] and "alternatives a page are composed" in result["a"]["capped"])
+        self.assertIn("No other form or placement of this type fits", result["lines"]["lead"])
+
+
+class FitRepairTests(unittest.TestCase):
+    """The fit search as the command prints and caches it: a class apart from the search's own, so each has a worker."""
+
     def test_the_repair_leads_with_the_verified_alternative(self):
         with tempfile.TemporaryDirectory() as tmp:
             def stack(doc):
@@ -310,36 +344,6 @@ console.log(JSON.stringify({ code: found.code, fit: found.alternatives, untouche
             changed = cli(file, "--check")
             self.assertNotIn("PLANTED", changed.stderr)
             self.assertIn('passes the scene checks: form "row", commentary "below"', changed.stderr)
-
-    def test_the_alternatives_are_gated_in_one_call_and_held_to_the_decks_structure(self):
-        # The machinery, with the deck's own functions replaced: every alternative of every page goes through the
-        # page gates in one call, and one that passes them but would break a structure rule is not offered.
-        result = run_node('''
-import { alternativeChoices, fitSearch, fitLines } from './skills/professional-slides/runtime/fit-search.mjs';
-const page = (id) => ({ id, type: 'schedule', form: 'timeline', commentary: 'below', title: 'T', exhibit: { items: [1, 2, 3, 4] }, points: ['a'] });
-const targets = ['a', 'b'].map((id, index) => ({ id, page: page(id), index }));
-let gateCalls = 0, composed = 0;
-const fits = await fitSearch(targets, {
-  spec: { slides: targets.map((t) => ({ id: t.id })) }, deck: { slides: [{ id: 'cover' }] }, perPage: 2,
-  compile: (alt) => { if (alt.commentary === 'none') throw new Error(`${alt.id}: commentary "none" has no place for the points`); return { id: alt.id, form: alt.form, commentary: alt.commentary }; },
-  compose: async (spec) => { composed += 1; return { deck: { slides: spec.slides.map((s) => ({ id: s.id, form: s.form, commentary: s.commentary })) }, pageErrors: [] }; },
-  pageGates: (deck) => { gateCalls += 1; return { ran: true, findings: deck.slides.map((s, i) => (s.commentary === 'so-what-bar' ? { slide: i + 1, code: 'SCENE_VOID', severity: 'blocker', measured: { from: 400, to: 560 } } : null)).filter(Boolean) }; },
-  localFindings: () => [], structure: (id, slide) => (id === 'b' && slide.commentary === 'beside' ? ['VARIETY_COLUMN'] : []),
-  brief: (f) => `${f.code}: an empty band of ${f.measured.to - f.measured.from}px` });
-console.log(JSON.stringify({ choices: alternativeChoices(page('a')).slice(0, 4), a: fits.get('a'), b: fits.get('b'), gateCalls, composed, lines: fitLines(fits.get('b')) }));
-''')
-        # Nearest first: the same form with another placement, then another form with the same placement.
-        self.assertEqual([f'{c["form"]}/{c["commentary"]}' for c in result["choices"]], ["timeline/beside", "timeline/so-what-bar", "timeline/none", "gantt/below"])
-        self.assertEqual(result["gateCalls"], 1, "one call to the page gates for every alternative of every page")
-        self.assertEqual(result["composed"], 2, "a round a deck: both pages take their nth alternative together")
-        self.assertEqual(result["a"]["pass"], [{"form": "timeline", "commentary": "beside"}])
-        self.assertEqual(result["a"]["fail"], [{"form": "timeline", "commentary": "so-what-bar", "remaining": ["SCENE_VOID: an empty band of 160px"]}])
-        self.assertEqual(result["b"]["pass"], [])
-        self.assertEqual(result["b"]["fail"][0], {"form": "timeline", "commentary": "beside", "remaining": [], "structure": ["VARIETY_COLUMN"]})
-        self.assertTrue(any("would break VARIETY_COLUMN (deck structure)" in line for line in result["lines"]["lines"]))
-        self.assertTrue(any(line.startswith("needs:  timeline/none") for line in result["lines"]["lines"]))
-        self.assertTrue(result["a"]["untried"] and "alternatives a page are composed" in result["a"]["capped"])
-        self.assertIn("No other form or placement of this type fits", result["lines"]["lead"])
 
 
 class PageRunTests(unittest.TestCase):

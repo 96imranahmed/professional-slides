@@ -277,14 +277,8 @@ done();
         self.assertEqual({field for field, moved in result["layout"].items() if moved}, set())
 
 
-class DraftPropertyTests(unittest.TestCase):
-    def test_a_spine_that_passes_its_draft_meets_no_later_refusal_whose_repair_changes_a_bound_field(self):
-        # Over the evidence fixtures, each as written and under the changes a spine can carry into its layout unseen: a value
-        # the record does not disclose, a relation left out, a context exhibit with no relevance, a claim with no measures, a
-        # type its evidence cannot be drawn as. The spine is the laid-out deck cut back to what the critique binds; the laid-out
-        # deck is that spine with only copy, marks and layout added. Wherever the full compile refuses a page for something
-        # the copy, the layout and the fit do not mend, the draft has refused that page first.
-        result = run_node(SETUP + '''
+# The draft property over the evidence fixtures named for FIXTURE_NAMES (DraftPropertyShare says what it holds).
+DRAFT_PROPERTY = SETUP + '''
 const firstBound = (doc, pick) => [...doc.pages].map((p) => [p, [p.exhibit, ...(p.exhibits || [])].filter(Boolean).find(pick)]).find(([, ex]) => ex);
 const seriesRefs = (ex) => (Array.isArray(ex?.series) ? ex.series.flatMap((s) => [].concat(s?.measure ?? [])) : []).map(String);
 const MUTATIONS = {
@@ -303,7 +297,7 @@ const MUTATIONS = {
 };
 const boundOnly = (f) => f.id !== undefined && f.class === 'P' && (['PAGE_DOES_NOT_COMPOSE', 'COMPILE'].includes(f.code) || repairOf(f).settledLater === null);
 const cases = [], broken = [];
-for (const name of ['finance', 'public-ops', 'product', 'explainer']) for (const [label, mutate] of Object.entries(MUTATIONS)) {
+for (const name of FIXTURE_NAMES) for (const [label, mutate] of Object.entries(MUTATIONS)) {
   const change = mutate(read(name));
   if (!change) continue;
   const where = stage(name, { log: change.log ?? ((x) => x) });
@@ -323,13 +317,67 @@ for (const name of ['finance', 'public-ops', 'product', 'explainer']) for (const
 }
 console.log(JSON.stringify({ cases: cases.length, mutated: cases.filter((c) => c.label !== 'none' && c.later?.length).length, labels: [...new Set(cases.filter((c) => c.later?.length).map((c) => c.label))], broken }));
 done();
-''')
-        self.assertEqual(result["broken"], [])
-        self.assertGreaterEqual(result["cases"], 20)
+'''
+
+
+# What the property is held to over the four fixtures together: enough cases, enough of them a change the full compile
+# refuses, and every change seen to bite.
+LABELS = ("undisclosed", "relation", "context", "claim", "typed")
+FLOORS = {"cases": 20, "mutated": 8}   # 30 and 22 when the property was sharded
+
+
+class DraftPropertyShare:
+    """The draft property over a share of the evidence fixtures, run once for the class.
+
+    Over the evidence fixtures, each as written and under the changes a spine can carry into its layout unseen: a value
+    the record does not disclose, a relation left out, a context exhibit with no relevance, a claim with no measures, a
+    type its evidence cannot be drawn as. The spine is the laid-out deck cut back to what the critique binds; the laid-out
+    deck is that spine with only copy, marks and layout added. Wherever the full compile refuses a page for something
+    the copy, the layout and the fit do not mend, the draft has refused that page first.
+
+    One class ran the four fixtures in 23 s, a floor under the suite's wall time. The fixtures are independent, so each
+    share is a class with its own worker, held to its part of the whole: the changes it shows biting (`labels`) and its
+    part of each floor. DraftPropertySharesTests checks that the parts add up to what the four fixtures were held to.
+    """
+
+    fixtures = ()
+    labels = ()
+    floors = {}
+    result = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = run_node(DRAFT_PROPERTY.replace("FIXTURE_NAMES", json.dumps(list(cls.fixtures))))
+
+    def test_a_spine_that_passes_its_draft_meets_no_later_refusal_whose_repair_changes_a_bound_field(self):
+        self.assertEqual(self.result["broken"], [])
+        self.assertGreaterEqual(self.result["cases"], self.floors["cases"])
         # The changes do make the full compile refuse a page for a bound fact: the property is not held vacuously.
-        self.assertGreaterEqual(result["mutated"], 8)
-        for label in ("undisclosed", "relation", "context", "claim", "typed"):
-            self.assertIn(label, result["labels"])
+        self.assertGreaterEqual(self.result["mutated"], self.floors["mutated"])
+        for label in self.labels:
+            self.assertIn(label, self.result["labels"])
+
+
+class DraftPropertyFinanceTests(DraftPropertyShare, unittest.TestCase):
+    fixtures, labels, floors = ("finance",), ("undisclosed", "context", "claim"), {"cases": 6, "mutated": 2}             # 8 and 6
+
+
+class DraftPropertyPublicOpsTests(DraftPropertyShare, unittest.TestCase):
+    fixtures, labels, floors = ("public-ops",), ("relation", "context", "claim", "typed"), {"cases": 7, "mutated": 3}    # 10 and 8
+
+
+class DraftPropertyProductTests(DraftPropertyShare, unittest.TestCase):
+    fixtures, labels, floors = ("product", "explainer"), ("undisclosed", "claim"), {"cases": 8, "mutated": 3}            # 12 and 8
+
+
+class DraftPropertySharesTests(unittest.TestCase):
+    def test_the_shares_take_every_fixture_once_and_add_up_to_what_the_four_were_held_to(self):
+        shares = (DraftPropertyFinanceTests, DraftPropertyPublicOpsTests, DraftPropertyProductTests)
+        fixtures = [name for share in shares for name in share.fixtures]
+        self.assertEqual(sorted(fixtures), sorted(["finance", "public-ops", "product", "explainer"]))
+        self.assertLessEqual(set(LABELS), {label for share in shares for label in share.labels})
+        for key, floor in FLOORS.items():
+            self.assertGreaterEqual(sum(share.floors[key] for share in shares), floor, key)
 
 
 class SummaryFillTests(unittest.TestCase):

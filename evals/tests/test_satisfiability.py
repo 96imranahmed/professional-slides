@@ -62,18 +62,18 @@ def author(*args):
     return subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), *args], capture_output=True, text=True, cwd=ROOT, timeout=180)
 
 
+# The worked page of each form, the first a form has: what `--example <type>/<form>` prints first.
+WORKED = '''
+const worked = new Map();
+for (const page of examples.pages.filter((p) => p.type)) { const key = `${page.type}/${page.form}`; if (!worked.has(key)) worked.set(key, page); }
+'''
+
+
 class SatisfiabilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.result = run_node(STANDALONE + '''
-const worked = new Map();
-for (const page of examples.pages.filter((p) => p.type)) { const key = `${page.type}/${page.form}`; if (!worked.has(key)) worked.set(key, page); }
-const out = {};
-for (const key of catalogue) out[key] = worked.has(key) ? { id: worked.get(key).id, problems: await standalone(worked.get(key)) } : null;
-// Every worked page, not only the first of its form, stands on its own.
-const others = {};
-for (const page of examples.pages.filter((p) => p.type && worked.get(`${p.type}/${p.form}`) !== p)) others[page.id] = await standalone(page);
-console.log(JSON.stringify({ catalogue, out, others }));
+        cls.result = run_node(STANDALONE + WORKED + '''
+console.log(JSON.stringify({ catalogue, out: Object.fromEntries(catalogue.map((key) => [key, worked.has(key) ? { id: worked.get(key).id } : null])) }));
 ''')
 
     def test_the_catalogue_is_the_one_the_types_command_prints(self):
@@ -89,11 +89,73 @@ console.log(JSON.stringify({ catalogue, out, others }));
         missing = [key for key, page in self.result["out"].items() if page is None]
         self.assertEqual(missing, [], "forms with no worked page for `--example <type>/<form>`: " + ", ".join(missing))
 
+    def test_the_worked_pages_are_about_the_fictional_operator(self):
+        examples = json.loads((ROOT / "skills/professional-slides/examples/page-forms.pages.json").read_text(encoding="utf-8"))
+        self.assertIn("Northvale", examples["deck"]["answer"])
+        ids = [page["id"] for page in examples["pages"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        # Every source line names its source: a folder path is nothing a reader can look up (source-cites-pointer read one so).
+        self.assertTrue(all("illustrative" in page["source"].lower() for page in examples["pages"]))
+
+
+class WorkedPageShare:
+    """Every worked page stands on its own, a share of the pages at a time.
+
+    Compiling, composing and gating each of the 137 worked pages as the only page of a deck, with the `--example` commands
+    beside them, took one class 28 s: a floor under the suite's wall time however many workers it had. The pages are independent, so each share is a class the
+    runner can give its own worker: the pages whose place in the examples is `share` modulo SHARES.
+    """
+
+    share = 0
+    result = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = run_node(STANDALONE + WORKED + f'''
+const mine = examples.pages.filter((p) => p.type).filter((p, at) => at % {SHARES} === {cls.share});
+const out = {{}}, others = {{}};
+for (const page of mine) {{ const key = `${{page.type}}/${{page.form}}`;
+  if (worked.get(key) === page) out[key] = {{ id: page.id, problems: await standalone(page) }};
+  // Every worked page, not only the first of its form, stands on its own.
+  else others[page.id] = await standalone(page); }}
+console.log(JSON.stringify({{ out, others, pages: mine.length }}));
+''')
+
     def test_every_worked_page_passes_on_its_own(self):
         failing = {key: page["problems"] for key, page in self.result["out"].items() if page and page["problems"]}
         self.assertEqual(failing, {}, "worked pages that do not pass as the only page of a deck:\n" + "\n".join(
             f"  {key} ({self.result['out'][key]['id']}): {'; '.join(problems)}" for key, problems in failing.items()))
         self.assertEqual({page: problems for page, problems in self.result["others"].items() if problems}, {})
+
+
+SHARES = 3
+
+
+class WorkedPagesFirstTests(WorkedPageShare, unittest.TestCase):
+    share = 0
+
+
+class WorkedPagesSecondTests(WorkedPageShare, unittest.TestCase):
+    share = 1
+
+
+class WorkedPagesThirdTests(WorkedPageShare, unittest.TestCase):
+    share = 2
+
+
+class WorkedPageSharesTests(unittest.TestCase):
+    def test_the_shares_take_every_worked_page(self):
+        self.assertEqual(sorted(share.share for share in (WorkedPagesFirstTests, WorkedPagesSecondTests, WorkedPagesThirdTests)), list(range(SHARES)))
+
+
+class ExampleCommandTests(unittest.TestCase):
+    """`--example` reaches every form: a command a type, apart from the worked pages' compiles so that each has its own worker."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = run_node(STANDALONE + '''
+console.log(JSON.stringify({ catalogue }));
+''')
 
     def test_the_example_command_reaches_every_form(self):
         # One call for a type prints all its forms; a form is asked for by name.
@@ -111,14 +173,6 @@ console.log(JSON.stringify({ catalogue, out, others }));
                 pages = json.loads(result.stdout)
                 self.assertTrue(pages)
                 self.assertEqual({f'{page["type"]}/{page["form"]}' for page in pages}, {key})
-
-    def test_the_worked_pages_are_about_the_fictional_operator(self):
-        examples = json.loads((ROOT / "skills/professional-slides/examples/page-forms.pages.json").read_text(encoding="utf-8"))
-        self.assertIn("Northvale", examples["deck"]["answer"])
-        ids = [page["id"] for page in examples["pages"]]
-        self.assertEqual(len(ids), len(set(ids)))
-        # Every source line names its source: a folder path is nothing a reader can look up (source-cites-pointer read one so).
-        self.assertTrue(all("illustrative" in page["source"].lower() for page in examples["pages"]))
 
 
 class ScaffoldTests(unittest.TestCase):
