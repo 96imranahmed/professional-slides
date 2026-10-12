@@ -54,6 +54,14 @@
 //                                                        reader meets it, beside the findings of the insights the
 //                                                        page rests on, each number with the recorded value it
 //                                                        states - CHECK where none: the writer's self-check
+//   node runtime/author-deck.mjs <id>.pages.json --brief skeleton|writer|critic|judge [--section <part>]
+//                                                        the context pack a section's subagent reads in place of
+//                                                        the references and the insight log (brief.mjs): its
+//                                                        role's rules as a short digest, the section's pages with
+//                                                        the limits --scaffold prints for each, for a writer the
+//                                                        token that prints every value its evidence holds, and
+//                                                        the commands it runs; a section is a part file
+//                                                        (pages/<part>.pages.json), the whole deck without one
 //   node runtime/author-deck.mjs <id>.pages.json --repair-relation <page-id>
 //                                                        the one exhibit that sets a page's split measures on one
 //                                                        scale, built from the page's own exhibits, to paste in
@@ -127,6 +135,7 @@ import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync } from "./pages-file.mjs";
+import { BRIEF_ROLES, briefDigest, briefLines } from "./brief.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { axisOf, hasMeasures, insightLogRefusal, isPercentUnit, measureConflicts, measureRegistry, readInsightLog, unmeasuredInsights, valuesOf } from "./measures.mjs";
@@ -1665,7 +1674,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge [--section <part>]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2063,7 +2072,7 @@ async function main(argv) {
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
     "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" },
-    pending: { type: "string", valueName: "a file" } }, { usage: USAGE });
+    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2108,6 +2117,17 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     return 0;
   }
   if (!doc || typeof doc !== "object" || !doc.deck || !Array.isArray(doc.pages)) { console.error("A pages file is { deck: {...}, pages: [...] }"); return 2; }
+  // A section's context pack, for the subagent that writes, critiques or judges it (brief.mjs).
+  if (values.brief !== undefined) {
+    if (!BRIEF_ROLES.includes(values.brief)) { console.error(`--brief is one of ${BRIEF_ROLES.join(", ")}`); return 1; }
+    let insights = null;
+    if (values.brief === "writer" || values.brief === "skeleton") try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief) });
+    if (brief.why) { console.error(brief.why); return 1; }
+    say(brief.lines.join("\n"));
+    return 0;
+  }
+  if (values.section !== undefined) { console.error("--section names the part file a --brief covers"); return 1; }
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];
@@ -2255,13 +2275,16 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   return 0;
 }
 
+/** Every countable limit a page is held to under the deck's density: the `limits` block --scaffold prints, and --brief beside each page. */
+const scaffoldLimits = (page, density) => pageLimits(page.type, page.form, { commentary: page.commentary, density });
+
 /**
  * A page as `--scaffold` and `--example` print it: its JSON, closed by a
  * `limits` block - every countable limit the page is held to, one limit a
  * line - which the compiler reads past, so the page pasted whole compiles.
  */
 function withLimits(page, density, more = {}) {
-  const limits = { ...pageLimits(page.type, page.form, { commentary: page.commentary, density }), ...more };
+  const limits = { ...scaffoldLimits(page, density), ...more };
   const block = Object.entries(limits).map(([key, value]) => `  ${JSON.stringify(key)}: ${JSON.stringify(value)}`).join(",\n");
   return JSON.stringify(page, null, 1).replace(/\n}$/, `,\n "limits": {\n${block}\n }\n}`);
 }

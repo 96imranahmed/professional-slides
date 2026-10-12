@@ -20,6 +20,7 @@
 // any still open. gates/judgements.py reads the same file by the same key.
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readJsonSync } from "./cli.mjs";
 
@@ -111,7 +112,10 @@ export const judgementStorePath = (dir, stem) => path.join(dir, `${stem}.judgeme
 
 /** The deck's recorded judgements: `{ schema, verdicts }`, empty where none are recorded yet. */
 export async function readJudgementStore(dir, stem) {
-  try { return JSON.parse(await fs.readFile(judgementStorePath(dir, stem), "utf8")); }
+  return judgementStoreNow(dir, stem);
+}
+function judgementStoreNow(dir, stem) {
+  try { return JSON.parse(readFileSync(judgementStorePath(dir, stem), "utf8")); }
   catch (error) { if (error.code === "ENOENT") return { schema: JUDGEMENTS_SCHEMA, verdicts: {} }; throw new Error(`${judgementStorePath(dir, stem)} is not valid JSON: write it as judge.mjs does, or remove it to ask again`); }
 }
 
@@ -194,18 +198,31 @@ export function judgementPrompt(packet) {
     `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null.\n`;
 }
 
-/** The packets staged in <dir>/judgements/, in order: `{ folder, packet, answered }`, `answered` where an answer.json waits beside it. */
+const PACKET_NAME = /^packet-\d+$/;
+const packetDirs = async (folder) => (await fs.readdir(folder, { withFileTypes: true }).catch(() => [])).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+
+/**
+ * The packets staged in <dir>/judgements/, in order: `{ folder, packet, answered, scope }`, `answered` where an answer.json
+ * waits beside it. A plain run's packets sit in judgements/ itself (`scope` null); a page run's (judge.mjs --page) in a
+ * folder of their own, judgements/<scope>/, so sections judged side by side never stage over each other's packets.
+ */
 export async function stagedPackets(dir) {
   const root = path.join(dir, PACKET_DIR);
-  const names = (await fs.readdir(root, { withFileTypes: true }).catch(() => [])).filter((entry) => entry.isDirectory() && /^packet-\d+$/.test(entry.name)).map((entry) => entry.name).sort();
+  const names = await packetDirs(root);
+  const folders = names.filter((name) => PACKET_NAME.test(name)).map((name) => ({ folder: path.join(root, name), scope: null }));
+  for (const scope of names.filter((name) => !PACKET_NAME.test(name))) {
+    folders.push(...(await packetDirs(path.join(root, scope))).filter((name) => PACKET_NAME.test(name)).map((name) => ({ folder: path.join(root, scope, name), scope })));
+  }
   const found = [];
-  for (const name of names) {
-    const folder = path.join(root, name);
+  for (const { folder, scope } of folders) {
     const packet = await fs.readFile(path.join(folder, "packet.json"), "utf8").then(JSON.parse, () => null);
-    if (packet) found.push({ folder, packet, answered: await fs.access(path.join(folder, "answer.json")).then(() => true, () => false) });
+    if (packet) found.push({ folder, packet, answered: await fs.access(path.join(folder, "answer.json")).then(() => true, () => false), scope });
   }
   return found;
 }
+
+/** A packet as a reader is told of it: its folder under judgements/ ("packet-02", or "1-atlantic/packet-02" for a page run's). */
+export const packetName = (dir, folder) => path.relative(path.join(dir, PACKET_DIR), folder);
 
 /**
  * Every pending question staged at once, in as few packets of
@@ -216,24 +233,35 @@ export async function stagedPackets(dir) {
  * kept as it is - a reader may be answering it now - and one that is not is
  * removed, its open questions staged again with the rest. Returns `{ packets,
  * fresh }`: every packet waiting, and how many were staged by this call.
+ *
+ * With `scope` - a page run (judge.mjs --page), whose `requests` are only its
+ * pages' questions - the packets go in judgements/<scope>/ and only that
+ * scope's are kept or removed: a section judged beside it is not this run's to
+ * restage, and a question one of its packets already holds is not staged
+ * twice (those packets are returned as `elsewhere`). A plain run reads every
+ * packet staged, a page run's included, against every open question, as before.
  */
-export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } = {}) {
-  const root = path.join(dir, PACKET_DIR);
-  await fs.mkdir(root, { recursive: true });
+export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, scope = null } = {}) {
+  const root = path.join(dir, PACKET_DIR), home = scope ? path.join(root, scope) : root;
+  await fs.mkdir(home, { recursive: true });
   const open = new Map(requests.map((request) => [request.key, request]));
-  const kept = [];
+  const kept = [], elsewhere = [];
   for (const staged of await stagedPackets(dir)) {
+    if (scope && staged.scope !== scope) {
+      if (staged.packet.items.some((item) => open.has(item.key))) { elsewhere.push(staged); for (const item of staged.packet.items) open.delete(item.key); }
+      continue;
+    }
     if (staged.packet.items.every((item) => open.has(item.key))) { kept.push(staged); for (const item of staged.packet.items) open.delete(item.key); }
-    else await fs.rm(staged.folder, { recursive: true, force: true });
+    else { await fs.rm(staged.folder, { recursive: true, force: true }); await dropEmptyScope(root, staged.scope); }
   }
-  let number = Math.max(0, ...kept.map(({ folder }) => Number(path.basename(folder).slice("packet-".length))));
+  let number = Math.max(0, ...kept.filter((staged) => staged.scope === scope).map(({ folder }) => Number(path.basename(folder).slice("packet-".length))));
   const rest = [...open.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
   // As few packets as `max` allows, of even sizes, so readers working side by side finish together.
   const size = rest.length ? Math.ceil(rest.length / Math.ceil(rest.length / max)) : max;
   const fresh = [];
   for (let at = 0; at < rest.length; at += size) {
     number += 1;
-    const folder = path.join(root, `packet-${String(number).padStart(2, "0")}`);
+    const folder = path.join(home, `packet-${String(number).padStart(2, "0")}`);
     await fs.mkdir(folder, { recursive: true });
     const items = [];
     for (const { key, kind, subject, context, where, image } of rest.slice(at, at + size)) {
@@ -250,9 +278,14 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } 
     await fs.writeFile(path.join(folder, "packet.json"), `${JSON.stringify(packet, null, 1)}\n`);
     await fs.writeFile(path.join(folder, "prompt.md"), judgementPrompt(packet));
     await fs.writeFile(path.join(folder, "schema.json"), `${JSON.stringify(answerSchema(items), null, 1)}\n`);
-    fresh.push({ folder, packet, answered: false });
+    fresh.push({ folder, packet, answered: false, scope });
   }
-  return { packets: [...kept, ...fresh], fresh: fresh.length };
+  return { packets: [...kept, ...fresh], fresh: fresh.length, ...(scope ? { elsewhere } : {}) };
+}
+
+/** A page run's folder under judgements/, removed once its last packet is: an empty folder would read as a section still waiting. */
+async function dropEmptyScope(root, scope) {
+  if (scope) await fs.rmdir(path.join(root, scope)).catch(() => {});
 }
 
 /** Every problem with one packet's answer, as sentences: every question answered once, a verdict of its kind, quotes of its subject. */
@@ -279,12 +312,13 @@ function packetProblems(packet, answer) {
  * whose answers were not recorded; `waiting`, the packets still without one.
  */
 export async function recordAnswers(dir, stem, { by = null } = {}) {
-  const store = await readJudgementStore(dir, stem);
-  const at = new Date().toISOString(), problems = [], refused = [];
+  judgementStoreNow(dir, stem);  // a store that is not JSON is said before anything is read against it
+  const verdicts = {};
+  const at = new Date().toISOString(), problems = [], refused = [], answeredFolders = [];
   let recorded = 0, waiting = 0;
   for (const { folder, packet, answered } of await stagedPackets(dir)) {
     if (!answered) { waiting += 1; continue; }
-    const name = path.basename(folder);
+    const name = packetName(dir, folder);
     let answer;
     try { answer = JSON.parse(await fs.readFile(path.join(folder, "answer.json"), "utf8")); }
     catch { problems.push(`${name}/answer.json is not valid JSON`); refused.push(folder); continue; }
@@ -292,14 +326,24 @@ export async function recordAnswers(dir, stem, { by = null } = {}) {
     if (checked.problems.length) { problems.push(...checked.problems.map((problem) => `${name}: ${problem}`)); refused.push(folder); continue; }
     for (const item of packet.items) {
       const { key: _key, ...said } = checked.given.get(item.key);
-      store.verdicts[item.key] = { kind: item.kind, version: JUDGEMENT_KINDS[item.kind].version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+      verdicts[item.key] = { kind: item.kind, version: JUDGEMENT_KINDS[item.kind].version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
     }
     recorded += packet.items.length;
-    await fs.rm(folder, { recursive: true, force: true });
+    answeredFolders.push(folder);
   }
-  if (recorded) await fs.writeFile(judgementStorePath(dir, stem), `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: store.verdicts }, null, 1)}\n`);
+  // Sections are judged side by side (judge.mjs --page), so another run may have recorded since this one began: the store is
+  // read again as it stands and written in the same tick, whole, by a rename - never from a copy read before the answers were.
+  if (recorded) {
+    const file = judgementStorePath(dir, stem), staged = `${file}.${process.pid}.tmp`;
+    const standing = judgementStoreNow(dir, stem).verdicts ?? {};
+    writeFileSync(staged, `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: Object.assign(standing, verdicts) }, null, 1)}\n`);
+    renameSync(staged, file);
+  }
+  // A packet's folder goes only once its answers are in the store.
+  for (const folder of answeredFolders) { await fs.rm(folder, { recursive: true, force: true }); await dropEmptyScope(path.join(dir, PACKET_DIR), path.relative(path.join(dir, PACKET_DIR), path.dirname(folder)) || null); }
   return { recorded, problems, refused, waiting };
 }
+
 
 /** The pending questions of a session, as a finding: JUDGEMENTS_PENDING, with how many of each kind and where. */
 export function pendingFinding(session, { pagesFile = "<id>.pages.json" } = {}) {

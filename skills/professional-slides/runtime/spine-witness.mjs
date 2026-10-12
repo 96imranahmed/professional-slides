@@ -113,7 +113,7 @@ function withoutMarked(node) {
 // A figure's format keeps the number it prints (bind.mjs): one decimal place, or as many as the value needs.
 const formatOf = (measure, value) => `0.${"0".repeat(Math.max(1, typeof value === "number" ? decimalsNeeded(value, { percent: isPercentUnit(measure.unit) }) : 1))}`;
 const valueAt = (measure, label) => (label === null ? valuesOf(measure)[0] : valuesOf(measure)[axisOf(measure).labels.indexOf(label)]);
-const tokenOf = (ref, label, measure) => (typeof valueAt(measure, label) === "number" ? `{{${ref}${label === null ? "" : `@${label}`} | ${formatOf(measure, valueAt(measure, label))}}}` : "n/a");
+export const tokenOf = (ref, label, measure) => (typeof valueAt(measure, label) === "number" ? `{{${ref}${label === null ? "" : `@${label}`} | ${formatOf(measure, valueAt(measure, label))}}}` : "n/a");
 
 /**
  * What an undrawn exhibit or figure is to show, from its `basis`: each

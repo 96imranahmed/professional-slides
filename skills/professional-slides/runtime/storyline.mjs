@@ -7,8 +7,12 @@
 //   node runtime/storyline.mjs <id>.deck.json out/ --full           the page-level critique as well: every content page on every page check
 //   node runtime/storyline.mjs <id>.deck.json out/ --run [codex|claude] [--model m]
 //                                                                   also runs a fresh critic for the packet
-//   node runtime/storyline.mjs merge <id>.deck.json out/            joins parallel section critiques (--full on a long spine)
-//                                                                   into out/storyline-review.json
+//   node runtime/storyline.mjs <id>.deck.json out/ --split          the page-level critique (--full) staged by section whatever
+//                                                                   the spine's length: a prompt per section (its pages, the
+//                                                                   answer and every title) and one spine prompt (the title
+//                                                                   spine, for flow and MECE), for critics side by side
+//   node runtime/storyline.mjs merge <id>.deck.json out/            joins parallel section critiques (--full on a long spine,
+//                                                                   or --split) into out/storyline-review.json
 //   ... --max-passes n                                              lifts the cap of three passes, when the user asks for another
 //   ... --reason "<why>" [--user-approved]                          switching between --full and the spine critique
 //                                                                   (--spine) starts a new lineage; a second restart needs the user
@@ -853,7 +857,11 @@ async function storyPages(spec, specPath, { max }) {
 // A spine past this many content pages is critiqued page by page (--full) by
 // parallel section critics (splitSections, at most STORYLINE_SECTION_MAX pages
 // each) and one spine critic: a forty-page section read by one critic is the
-// thin reading the split exists to prevent.
+// thin reading the split exists to prevent. `--split` asks for the same split
+// at any length, so sections written side by side are critiqued side by side
+// (one critic reading BA's 106-page spine took 6 to 21 minutes a pass). Only a
+// first pass splits: a verification pass reads the open items and the pages
+// that changed, and is one packet whatever was asked.
 export const STORYLINE_SECTION_THRESHOLD = 30;
 export const STORYLINE_SECTION_MAX = 16;
 
@@ -883,7 +891,7 @@ export const readStorylineHistory = (store) => readPasses(path.join(store, HISTO
  * prompt, the schema, the packet); its record, which the answer is validated
  * against, is kept in the deck's lineage store.
  */
-export async function buildStorylinePacket(specPath, outputDirectory, { scope = null, mode = "spine", revision = null, carried = [] } = {}) {
+export async function buildStorylinePacket(specPath, outputDirectory, { scope = null, mode = "spine", revision = null, carried = [], split = false } = {}) {
   const spec = await readJson(specPath);
   const base = path.dirname(specPath);
   const store = await lineageStore(spec, outputDirectory, specPath);
@@ -894,7 +902,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
   const contentPages = pages.filter(isContent).length;
   const targetPages = Number.isFinite(spec.targetPages) ? spec.targetPages : spec.purpose === "evaluation" ? 50 : null;
-  const sections = mode === "full" && !scope && !revision && contentPages > STORYLINE_SECTION_THRESHOLD
+  const sections = mode === "full" && !scope && !revision && (split || contentPages > STORYLINE_SECTION_THRESHOLD)
     ? splitSections(pages.map((p) => ({ id: p.id, title: p.title, opens: p.kind === "section", counted: isContent(p) })), { max: STORYLINE_SECTION_MAX }) : null;
   const answer = spec.answer ?? content?.answer ?? "";
   const packet = { mode, binding: storylineBinding(spec, measures), bindingVersion: BINDING_VERSION, pageHashes: storylinePageHashes(spec, measures), pass: scope ? scope.pass : 1, verifies: scope ? scope.verifies : null,
@@ -2235,7 +2243,7 @@ export function stampProvenance(review, packet, said = { mended: [] }) {
   return { ...review, provenance: { backend: "subagent", ...(review?.provenance && typeof review.provenance === "object" ? review.provenance : {}), promptHash: packet.promptHash } };
 }
 
-async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
+async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = MAX_PASSES, mode, reason, userApproved = false, split = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
   const maxPasses = passCap(spec, asked);
@@ -2369,7 +2377,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
         message: `${capMessage("storyline critique", spent + 1, maxPasses, latest.ledger)} The post-review pass (${POST_REVIEW_RULE}) is not available: ${post.why}. Nor is the pass a compile refusal allows (${COMPILE_REFUSAL_RULE}): ${refusal.why}.` };
     }
   }
-  const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes, carried: scope ? [] : await carriedItems(historyDir) });
+  const { dir, packet: next } = await buildStorylinePacket(specPath, out, { scope, mode: wanted, revision: changes, carried: scope ? [] : await carriedItems(historyDir), split });
   // The folder the answer is saved into exists from the moment it is asked for: an answer written elsewhere and copied in is not lost to a missing directory.
   await fs.mkdir(out, { recursive: true });
   return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0, ...(retired ? { retired } : {}),
@@ -2435,8 +2443,8 @@ export async function mergeStorylineDirectory(specPath, outputDirectory, options
  * author's context, working in the packet's staging directory. A CLI that is
  * not signed in leaves the packet for a critic the calling agent spawns.
  */
-export async function runStorylineReview(specPath, outputDirectory, backend = "auto", { model, timeoutMs = 600000, maxPasses = MAX_PASSES, mode, reason, userApproved } = {}) {
-  const options = { maxPasses, mode, reason, userApproved };
+export async function runStorylineReview(specPath, outputDirectory, backend = "auto", { model, timeoutMs = 600000, maxPasses = MAX_PASSES, mode, reason, userApproved, split = false } = {}) {
+  const options = { maxPasses, mode, reason, userApproved, split };
   const step = await prepareStoryline(specPath, outputDirectory, options);
   if (step.status !== "packet-written") return step;
   const which = detectBackend(backend);
@@ -2471,17 +2479,20 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
   return { ...next, verdict: review.verdict, rating: review.rating, topFixes: review.topFixes };
 }
 
-const USAGE = "Usage: storyline.mjs [merge] <id>.deck.json output-directory [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]";
+const USAGE = "Usage: storyline.mjs [merge] <id>.deck.json output-directory [--full | --spine] [--split] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]";
 
 async function main(argv) {
   const { values, positionals } = parseCli(argv, { full: { type: "boolean" }, spine: { type: "boolean" }, run: { type: "string", bare: "auto" }, model: { type: "string" },
-    "max-passes": { type: "string" }, reason: { type: "string" }, "user-approved": { type: "boolean" } }, { usage: USAGE });
+    "max-passes": { type: "string" }, reason: { type: "string" }, "user-approved": { type: "boolean" }, split: { type: "boolean" } }, { usage: USAGE });
   const merging = positionals[0] === "merge";
   const [spec, out] = merging ? positionals.slice(1) : positionals;
   if (!spec || !out) throw new UsageError(USAGE);
   if (values.full && values.spine) throw new UsageError(`--full and --spine are two modes; pass one\n${USAGE}`);
-  const options = { maxPasses: values["max-passes"] ? Number(values["max-passes"]) : MAX_PASSES, mode: values.full ? "full" : values.spine ? "spine" : undefined,
-    reason: values.reason, userApproved: Boolean(values["user-approved"]) };
+  // The spine critique is one reading of the whole argument, held to ten items: split by section, each critic would file its
+  // own ten and the cap would no longer say which matter most. The page-level critique is what splits, so --split asks for it.
+  if (values.split && values.spine) throw new UsageError(`--split stages the page-level critique (--full) by section; the spine critique is one reading of the whole spine, capped at ${SPINE_ITEM_MAX} items\n${USAGE}`);
+  const options = { maxPasses: values["max-passes"] ? Number(values["max-passes"]) : MAX_PASSES, mode: values.full || values.split ? "full" : values.spine ? "spine" : undefined,
+    reason: values.reason, userApproved: Boolean(values["user-approved"]), split: Boolean(values.split) };
   const result = merging ? await mergeStorylineDirectory(path.resolve(spec), path.resolve(out), options)
     : values.run !== undefined ? await runStorylineReview(path.resolve(spec), path.resolve(out), values.run, { ...options, model: values.model })
     : await prepareStoryline(path.resolve(spec), path.resolve(out), options);
