@@ -133,6 +133,9 @@ export function plottedValues(ex, { printed = false } = {}) {
   if (type === "chart-group") return (ex.charts || []).reduce((n, c) => n + plottedValues({ type: c?.component, ...(c?.props || {}) }), 0);
   if (type === "chart.waffle") return (ex.categories || []).length;
   if (type === "pictogram") return (ex.rows || []).length;
+  // A zone matrix places things on two judged axes - likelihood against impact - so its positions are judgements, not
+  // measurements; a deck's risk map was refused for "plotting six numbers" that no insight could hold.
+  if (type === "zone-matrix") return 0;
   if (isTable(ex)) return numericCells(ex);
   if (Array.isArray(ex.boxes)) return ex.boxes.length * 5;
   if (Array.isArray(ex.low) && Array.isArray(ex.high)) return counted(ex.low) + counted(ex.high);
@@ -148,7 +151,8 @@ export function plottedValues(ex, { printed = false } = {}) {
   // counts both, so a page drawn at the spine and laid out reads the same; the binding gates count only what was typed.
   // A trellis of stacks plots each panel's parts (`series`), a value a part a category.
   if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.series) ? item.series.reduce((m, part) => m + counted(part?.values), 0) : Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) || (printed && typeof item?.value === "string" && /\d/.test(item.value)) ? 1 : 0), 0);
-  if (Array.isArray(ex.markers)) return ex.markers.length;
+  // A marker plots its value; one that only places a city on the map plots nothing - its coordinates are where, not how much.
+  if (Array.isArray(ex.markers)) return ex.markers.filter((marker) => finite(marker?.value)).length;
   return 0;
 }
 
