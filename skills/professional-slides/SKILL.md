@@ -1,6 +1,6 @@
 ---
 name: professional-slides
-description: Plan a slide deck as an argument and build it as a new editable .pptx - board and steerco papers, project updates, investor and pitch decks, due diligence, competitive positioning, pre-reads - with storyline, action titles, ghost deck, exhibit choice and rendered review. Also edits an existing PPTX - a figure, a title, one exhibit - leaving every other slide as it was, or rebuilds one. A staged pipeline, not a quick editor: use a generic pptx tool for a typo. Use for "make me a deck/slides", "turn this analysis into slides", "revise/rewrite a deck", "write the storyline", "sharpen the titles".
+description: Create or revise editable PowerPoint decks, storylines, and slide titles with rendered review. Use a general PowerPoint editor for quick fixes.
 ---
 
 # Professional Slides
