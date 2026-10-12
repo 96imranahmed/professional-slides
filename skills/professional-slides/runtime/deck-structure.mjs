@@ -14,7 +14,7 @@ import { axisOf, measureRegistry } from "./measures.mjs";
 import { declaredPlot, refsOf } from "./gates/dependency_gates.mjs";
 import { resolveFill } from "./compose-points.mjs";
 import { DECK_LENGTH, PLAN } from "./weight.mjs";
-import { exhibitKinds, fitStandings, varietyFindings } from "./gates/variety_gates.mjs";
+import { exhibitFamily, exhibitKinds, exhibitMix, fitStandings, pageFamily, varietyFindings } from "./gates/variety_gates.mjs";
 import { drawOrder, formDraw, kindOfForm, pageFit, otherTypes, sharedKinds } from "./claim-fit.mjs";
 import { featuredDraw } from "./design-systems.mjs";
 import { runPlanGates, styleEntropy } from "./gates/plan_gates.mjs";
@@ -484,8 +484,13 @@ const BLOCKS = Object.freeze({ low: PLAN.textForm.wordsPerBlock.q1, high: PLAN.t
  * satisfied, unsatisfied, steps, evaluations, capped }`; `source` is
  * "declared" (both choices kept), "placed" (the declared form kept and its
  * placement proposed), "proposed" (both given) or "changed" (a declared
- * choice changed to mend a rule, with what it `was`).
+ * choice changed to mend a rule, with what it `was` and `why`: the rules the
+ * change lowered, movedRules). An unsatisfied VARIETY_EXHIBIT_RANGE carries
+ * the kinds the allocation `drawn` and the changes that would add one
+ * (`adders`).
  */
+// The most changes the plan names that would add a kind of exhibit the deck does not draw (VARIETY_EXHIBIT_RANGE).
+const KIND_ADDERS = 12;
 // A rule the page types alone break cannot be met by any form or placement.
 const TYPE_RULES = new Set(["VARIETY_TYPE_SHARE", "VARIETY_TYPE_RANGE", "VARIETY_TYPE_RUN", "PAGE_TYPE_UNDECLARED"]);
 const brokenStandings = (current) => current.standings.filter((standing) => standing.blocks && ["over", "short"].includes(standingRoom(standing).state));
@@ -493,6 +498,28 @@ const brokenStandings = (current) => current.standings.filter((standing) => stan
 // to declared pages or pairs of changes reads the structure tens of thousands of times for nothing.
 const mendable = (current) => brokenStandings(current).some((standing) => !TYPE_RULES.has(standing.code))
   || current.findings.some((f) => isBlocking(f) && classOf(f.code) === "S" && !TYPE_RULES.has(f.code));
+/**
+ * The rules one step of the search moved, read off the deck's structure
+ * before and after it: `mends` the broken rules it lowered (fewer blocking
+ * findings, or less room lacking), `room` the rules it only gave room under
+ * (a standing off its bar, a cap with a page fewer). On the BA retest the plan
+ * printed "changed (declared insight-tree/none)" with no rule, beside its own
+ * "a form you declare on a page is kept": the change is said with what it was
+ * made for.
+ */
+function movedRules(before, after) {
+  const key = (standing) => `${standing.code}.${standing.key ?? ""}`;
+  const was = new Map(before.standings.filter((standing) => standing.blocks).map((standing) => [key(standing), standingRoom(standing)]));
+  const mends = new Set(), room = new Set();
+  for (const standing of after.standings.filter((s) => s.blocks)) {
+    const then = was.get(key(standing)), now = standingRoom(standing);
+    if (then && now.margin > then.margin + 1e-9) (["over", "short"].includes(then.state) ? mends : room).add(standing.code);
+  }
+  const tally = (findings) => findings.filter((f) => isBlocking(f) && classOf(f.code) === "S").reduce((counts, f) => counts.set(f.code, (counts.get(f.code) ?? 0) + 1), new Map());
+  const had = tally(before.findings), has = tally(after.findings);
+  for (const [code, count] of had) if ((has.get(code) ?? 0) < count) mends.add(code);
+  return { mends: [...mends], room: [...room].filter((code) => !mends.has(code)) };
+}
 
 export function allocateStructure(doc, { insights = null, planOf, compiled = null, blocksOf = null, sourceKinds = null, forms = "best", maxSteps = 40, maxEvaluations = 40000 } = {}) {
   let evaluations = 0;
@@ -623,6 +650,10 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     // An estimate steers the free choices only: a form built for particular data, or a change to a declared choice, is taken
     // for the rules the plan is held to, so those are weighed with the estimate left out.
     const held = (c) => ({ ...c, drift: 0 });
+    // And such a change is taken only where it lowers what the broken rules lack. Weighed on the whole cost, it was taken for
+    // room alone: on the BA retest 32 of the 33 declared choices the plan changed, while a rule no declared choice could meet was
+    // short, only took a cap or a floor off its bar (movedRules: "room"), against the plan's own "a form you declare is kept".
+    const mends = (c) => c.blockers < cost.blockers || (c.blockers === cost.blockers && c.lacking < cost.lacking - 1e-9);
     for (const [pool, choices, free] of [[open, "options", true], ...(broken ? [[open.filter((e) => !e.formDeclared), "wider", false], [typed.filter((e) => (e.declared || e.formDeclared) && !e.imported), "wider", false]] : [])]) {
       singles: for (const entry of pool) for (const choice of sameFormFirst(entry, entry[choices])) {
         // The budget holds inside a pass as between passes: a wide deck's widened pool is thousands of whole-deck evaluations.
@@ -632,7 +663,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
         // room is made with placements, or the seed's choices would be undone wherever a rule sat at its bar.
         if (!broken && entry.fitted && choice.form !== entry.choice.form) continue;
         const next = structureCost(evaluate({ entry, choice }));
-        if (free ? cheaper(next, best?.cost ?? cost) : cheaper(held(next), held(best?.cost ?? cost))) best = { entry, choice, cost: next };
+        if (free ? cheaper(next, best?.cost ?? cost) : mends(next) && cheaper(held(next), held(best?.cost ?? cost))) best = { entry, choice, cost: next };
       }
       if (best) break;
     }
@@ -664,8 +695,12 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     if (best.choice.form !== best.entry.choice.form) best.entry.by = "rules";
     best.entry.choice = best.choice;
     steps += 1;
+    const was = current;
     current = evaluate();
     cost = structureCost(current);
+    // What the step was taken for, kept on each page it moved: a declared choice changed is printed with the rule it lowered.
+    const why = movedRules(was, current);
+    for (const entry of [best.entry, ...(best.first ? [best.first.entry] : [])]) for (const [kind, codes] of Object.entries(why)) codes.forEach((code) => (entry.why ??= { mends: new Set(), room: new Set() })[kind].add(code));
     capped = steps >= maxSteps || evaluations >= maxEvaluations;
   }
   const broken = brokenStandings(current);
@@ -718,6 +753,44 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
   const final = specOf();
   const spread = fitStandings(final, { fits: fitsOf(final, insights), kept: keptAsSource(final, sourceKinds), carried: carriedKinds(all.map(({ page }) => page).filter((page) => page?.carry === true), sourceKinds) });
   current.standings.push(...spread.standings);
+  // Where the deck draws too few kinds of exhibit (VARIETY_EXHIBIT_RANGE), the kinds it draws and the changes that would add one
+  // it does not: on a page, another form of its type, or a form of another type its evidence's shapes rest under (TYPE_SHAPES),
+  // whose exhibit is of a kind not drawn - the families the deck draws least first, one change for each kind before a second.
+  // On the BA retest the plan said "short by 1 kinds" and named neither, and the lead found five kinds by trial in 23 minutes
+  // and 12 runs, scaffolding a dozen forms that were mostly refused on shape. These are suggestions to check with --scaffold:
+  // the plan makes none of them, since each draws the page in a form its claim did not choose.
+  const kindAdders = () => {
+    const ranged = current.findings.find((f) => f.code === "VARIETY_EXHIBIT_RANGE");
+    const drawn = new Set(ranged?.measured?.kinds ?? exhibitMix([...final.slides, ...(final.appendix ?? [])]).kinds);
+    // A kind is counted in its exhibit's family, and a page that draws no exhibit (its kind is its type and form) in its page's.
+    const familyOf = (kind, slide) => (kind.includes("/") ? pageFamily(slide) : exhibitFamily(kind));
+    const families = new Map(), drawers = new Map();
+    for (const entry of typed) { const slide = slideOf(entry, entry.choice); for (const kind of slide ? exhibitKinds(slide) : []) families.set(familyOf(kind, slide), (families.get(familyOf(kind, slide)) ?? 0) + 1);
+      for (const kind of new Set(slide ? exhibitKinds(slide) : [])) drawers.set(kind, (drawers.get(kind) ?? 0) + 1); }
+    const found = [];
+    for (const entry of typed.filter((e) => !e.imported && e.page.type !== "summary")) {
+      const id = String(entry.page.id ?? `page-${entry.index + 1}`), shapes = new Set(shapesOf(entry));
+      // A kind no other page draws is lost when its page is redrawn: a change adds a kind only where it adds more than it loses.
+      // (Taking two such changes on the BA copy, a steps page as a framework and labelled rows as capsules, left the count where it was.)
+      const own = slideOf(entry, entry.choice), alone = [...new Set(own ? exhibitKinds(own) : [])].filter((kind) => drawers.get(kind) === 1);
+      // The page as a form would draw it once redrawn: its own exhibits' kinds set aside, so the kind is the form's, or the estimate from its evidence where the form leaves it open.
+      const redrawn = (type, form) => { const placements = placementsOf(type, form);
+        return declaredSlide({ ...entry.page, type, form, commentary: placements.includes(entry.choice.commentary) ? entry.choice.commentary : placements[0], exhibit: undefined, exhibits: undefined }, entry.index, { exhibitType: entry.exhibitType, players: doc.deck?.players }); };
+      const types = [entry.page.type, ...Object.keys(TYPE_SHAPES).filter((type) => type !== entry.page.type && TYPE_SHAPES[type].some((shape) => shapes.has(shape)))];
+      for (const type of types) for (const form of Object.keys(PAGE_TYPES[type].forms)) {
+        if (type === entry.page.type && form === entry.choice.form) continue;
+        const slide = redrawn(type, form), kinds = new Set(slide ? exhibitKinds(slide) : []), adds = [...kinds].filter((kind) => !drawn.has(kind)), loses = alone.filter((kind) => !kinds.has(kind));
+        if (adds.length > loses.length) found.push({ id, change: type === entry.page.type ? "form" : "type", ...(type === entry.page.type ? {} : { from: entry.page.type }), type, form, adds, ...(loses.length ? { loses } : {}), family: familyOf(adds[0], slide), at: entry.index });
+      }
+    }
+    const load = (item) => families.get(item.family) ?? 0;
+    found.sort((a, b) => load(a) - load(b) || a.family.localeCompare(b.family) || a.adds[0].localeCompare(b.adds[0]) || (a.change === "form" ? 0 : 1) - (b.change === "form" ? 0 : 1) || a.at - b.at);
+    // One change for each kind first, two a page at most, so the list spans the kinds and pages there are; then the rest in order.
+    const seen = new Set(), each = new Map();
+    const firsts = found.filter((item) => !seen.has(item.adds[0]) && (each.get(item.id) ?? 0) < 2 && seen.add(item.adds[0]) && each.set(item.id, (each.get(item.id) ?? 0) + 1));
+    const picked = new Set([...new Set([...firsts, ...found.filter((item) => !seen.has(item.adds[0])), ...found])].slice(0, KIND_ADDERS));
+    return { drawn: [...drawn].sort(), adders: found.filter((item) => picked.has(item)).map(({ at, ...item }) => ({ ...item, drawn: families.get(item.family) ?? 0 })) };
+  };
   return {
     pages: typed.map((entry) => ({ id: entry.page.id ?? `page-${entry.index + 1}`, type: entry.page.type, form: entry.choice.form, commentary: entry.choice.commentary,
       source: formChanged(entry) || (entry.declared && changed(entry)) ? "changed" : entry.declared ? "declared" : entry.formDeclared ? "placed" : "proposed", ...(estimated(entry) ? { estimated: true } : {}),
@@ -730,7 +803,10 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
       // (A form the page's own measures fill, and that carries its claim best, was chosen for that and needs no such check.)
       ...(!entry.declared && entry.page.form !== entry.choice.form && !entry.open.includes(entry.choice.form) && !(entry.fitted && entry.best.includes(entry.choice.form)) && entry.by !== "source"
         ? { reads: dataKeys(entry.type.forms[entry.choice.form], { type: entry.page.type, form: entry.choice.form }) } : {}),
-      ...((entry.declared && changed(entry)) || formChanged(entry) ? { was: { form: entry.page.form, ...(entry.declared ? { commentary: entry.page.commentary } : {}) } } : {}) })),
-    structure: current, declared: before, satisfied: !unsatisfied.length, unsatisfied, pinned, steps, evaluations, capped: capped && !!(cost.blockers || cost.lacking),
+      ...((entry.declared && changed(entry)) || formChanged(entry) ? { was: { form: entry.page.form, ...(entry.declared ? { commentary: entry.page.commentary } : {}) },
+        // The rules the steps that moved it lowered: those it mends, else those it only gives room under.
+        ...(entry.why ? { why: { mends: [...entry.why.mends], room: [...entry.why.room].filter((code) => !entry.why.mends.has(code)) } } : {}) } : {}) })),
+    structure: current, declared: before, satisfied: !unsatisfied.length,
+    unsatisfied: unsatisfied.map((item) => (item.code === "VARIETY_EXHIBIT_RANGE" ? { ...item, ...kindAdders() } : item)), pinned, steps, evaluations, capped: capped && !!(cost.blockers || cost.lacking),
   };
 }

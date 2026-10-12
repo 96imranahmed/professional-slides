@@ -1647,7 +1647,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -1838,21 +1838,32 @@ function fitWords(page) {
 /**
  * The plan's choices written where the pages declare none (`--plan --write`):
  * the form and placement of a page that declares neither or only its form,
- * and the kind of each `basis` stub it leaves untyped. Returns the files
- * written, the pages given a choice, and the declared choices the plan would
- * change, which are left for the author.
+ * the kind of each `basis` stub it leaves untyped, and on a page with no
+ * exhibit whose kind the plan estimated, a stub of the kind it counted.
+ * `accept` also writes the changes the plan makes to declared choices
+ * (`--accept`). Returns the files written, the pages given a choice, the
+ * changes to declared choices (`accepted` where written, else `changed` left
+ * for the author), and the pages given an exhibit stub (`typed`).
  */
-function writePlan(file, plan) {
-  const given = new Map(plan.pages.filter((page) => ["proposed", "placed"].includes(page.source) || page.kinds?.length).map((page) => [String(page.id), page]));
+function writePlan(file, plan, { accept = false } = {}) {
+  const given = new Map(plan.pages.filter((page) => ["proposed", "placed"].includes(page.source) || (accept && page.source === "changed") || page.kinds?.length).map((page) => [String(page.id), page]));
   let pages = 0;
+  const accepted = [], typed = [];
   const files = editPagesSync(file, given.keys(), (page) => {
     const choice = given.get(String(page.id)), before = JSON.stringify(page);
     if (["proposed", "placed"].includes(choice.source)) { if (page.form === undefined) page.form = choice.form; if (page.commentary === undefined) page.commentary = choice.commentary; }
+    // On the BA retest four changes to declared choices were left for the lead to copy into four part files by hand.
+    if (accept && choice.source === "changed") { page.form = choice.form; page.commentary = choice.commentary; accepted.push(choice); }
     const exhibits = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object");
     for (const { at, kind } of choice.kinds ?? []) if (exhibits[at] && exhibits[at].type === undefined) exhibits[at].type = kind;
+    // A page with no exhibit whose kind the plan estimated is given a stub of each kind it counted (`draws`): on the BA retest
+    // the plan met the exhibit-range floor on twelve such estimates, and the writers, told none of them, drew other kinds.
+    // A stub of a type and nothing else is undrawn (page-types.mjs undrawnExhibit), so the page reads as it did.
+    const stubs = !exhibits.length && choice.estimated && choice.kinds?.length && Array.isArray(choice.draws) ? choice.draws.map((type) => ({ type })) : [];
+    if (stubs.length) { if (stubs.length === 1 && page.type !== "panels") page.exhibit = stubs[0]; else page.exhibits = stubs; typed.push(`${choice.id} (${choice.draws.join(", ")})`); }
     if (JSON.stringify(page) !== before) pages += 1;
   });
-  return { files, pages, changed: plan.pages.filter((page) => page.source === "changed").length };
+  return { files, pages, changed: accept ? 0 : plan.pages.filter((page) => page.source === "changed").length, accepted, typed };
 }
 
 /**
@@ -1907,7 +1918,18 @@ function writeDisclosed(file, unlayable, registry) {
   return done;
 }
 
-async function planCommand(doc, { dir, stem, file, say, refusal = [], write = false }) {
+/** What a change to a declared choice was made for (deck-structure.mjs movedRules), as the end of its line. */
+const whyWords = (why) => (why?.mends?.length ? ` to mend ${why.mends.join(", ")}` : why?.room?.length ? ` for room under ${why.room.join(", ")} (it mends no broken rule)` : "");
+
+/** The kinds an unsatisfied VARIETY_EXHIBIT_RANGE draws and the changes that would add one (deck-structure.mjs kindAdders), as the lines under it. */
+function kindAdderLines(unmet) {
+  const lines = [`    The deck draws ${unmet.drawn.length} kinds: ${unmet.drawn.join(", ")}.`];
+  if (!unmet.adders.length) return [...lines, "    No other form of a page's type, nor a form of a type its evidence rests under, draws a kind it does not: the evidence has to change."];
+  return [...lines, `    Changes that would add a kind it does not draw, the families it draws least first - suggestions to check with \`--scaffold <type>/<form> --evidence <insight>\`, not choices the plan makes:`,
+    ...unmet.adders.map((item) => `      ${item.id} as ${item.type}/${item.form} (${item.change === "form" ? "form change" : `type change from ${item.from}`}): adds ${item.adds.join(", ")}, a ${item.family} (${item.drawn} drawn)${item.loses ? `, and loses ${item.loses.join(", ")}, which no other page draws` : ""}`)];
+}
+
+async function planCommand(doc, { dir, stem, file, say, refusal = [], write = false, accept = false }) {
   let insights = null;
   try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { refusal.push({ code: "COMPILE", message: String(error.message).slice(0, 300) }); console.error(error.message); return 2; }
   // A slide a revision carries from its source deck is not the runtime's to give a form: the plan is of the pages it composes.
@@ -1965,9 +1987,10 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
   // The structure rules the draft of the proposal refuses that no form or placement decides: the allocation does not claim them.
   const ruled = [...new Set(unlayable.filter((f) => classOf(f.code) === "S").map((f) => f.code))];
   // `--write`: the choices the plan makes where a page declares none - its form and placement, the kind of a stub it left
-  // untyped - written into the file the page is written in, the pages file or its part. A declared choice the plan would
-  // change is the author's to take, and is left as it is. Copied by hand into a hundred pages, a typo cost a run.
-  const wrote = write && plan.satisfied ? writePlan(file, plan) : null;
+  // untyped or of an exhibit it estimated - written into the file the page is written in, the pages file or its part. A declared
+  // choice the plan would change is the author's to take, and is left as it is unless `--accept` takes it. Copied by hand into a
+  // hundred pages, a typo cost a run.
+  const wrote = write && plan.satisfied ? writePlan(file, plan, { accept }) : null;
   // A view that plots a period or member its measure does not disclose is refused with the labels to plot (SPINE_UNDRAWABLE);
   // `--write` writes those labels where the refusal says, so a spine of stubs over gapped series is mended in one run.
   const disclosed = write ? writeDisclosed(file, unlayable, measureRegistry(insights)) : [];
@@ -1980,13 +2003,14 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
     ...(declared ? [declared.blocking.length ? `As declared${estimated.length ? ", on that estimate," : ","} the deck's structure rules ${estimated.length ? "would refuse" : "refuse"} it: ${[...new Set(declared.blocking)].join(", ")}.`
       : `As declared${estimated.length ? ", on that estimate," : ","} the deck satisfies its structure rules.`] : ["Not every page declares a form and a placement, so the structure rules are read on the proposal."]),
     ...(unshaped.length ? ["", "Types the evidence cannot carry (choose another type, or find the data):", ...unshaped.map((line) => `  ${line}`)] : []),
-    "", plan.satisfied ? `Proposed allocation (${ruled.length ? `its forms and placements meet every structure rule they decide; the draft of it refuses ${ruled.join(", ")}, below` : `satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}`}; ${wrote ? `written into ${wrote.files.length ? wrote.files.join(", ") : "nothing: every page already declares its choices"} for ${wrote.pages} page${wrote.pages === 1 ? "" : "s"}${wrote.changed ? `, and the ${wrote.changed} change${wrote.changed === 1 ? "" : "s"} to a declared choice left for you` : ""}` : `nothing was written - copy the choices you take into the pages file, or rerun with --write`}):`
+    "", plan.satisfied ? `Proposed allocation (${ruled.length ? `its forms and placements meet every structure rule they decide; the draft of it refuses ${ruled.join(", ")}, below` : `satisfies every structure rule${estimated.length ? " as far as the pages declare their exhibits" : ""}`}; ${wrote ? `written into ${wrote.files.length ? wrote.files.join(", ") : "nothing: every page already declares its choices"} for ${wrote.pages} page${wrote.pages === 1 ? "" : "s"}${wrote.accepted.length ? `, the ${wrote.accepted.length} change${wrote.accepted.length === 1 ? "" : "s"} to a declared choice accepted (${wrote.accepted.map((page) => `${page.id} ${page.form}/${page.commentary}, declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""}`).join("; ")})` : ""}${wrote.typed.length ? `, the exhibit kind it counted written as the stub's \`type\` on ${wrote.typed.join(", ")}` : ""}${wrote.changed ? `, and the ${wrote.changed} change${wrote.changed === 1 ? "" : "s"} to a declared choice left for you (--accept writes ${wrote.changed === 1 ? "it" : "them"})` : ""}` : `nothing was written - copy the choices you take into the pages file, or rerun with --write`}):`
       : `No allocation of forms and placements satisfies ${plan.unsatisfied.map((u) => u.code).join(", ")}${plan.capped ? ` within the search's budget (${plan.steps} changes, ${plan.evaluations} readings of the structure)` : ""}; the closest found:`,
-    ...plan.pages.map((page) => `  ${String(page.id).padEnd(8)} ${page.type.padEnd(13)} form ${String(page.form).padEnd(18)} commentary ${String(page.commentary).padEnd(12)} ${page.source === "placed" ? "form declared, placement proposed" : page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})` : ""}${page.imported && page.source !== "proposed" ? " - imported page, kept as drawn" : ""}${page.estimated ? " - exhibit estimated" : ""}` +
+    ...plan.pages.map((page) => `  ${String(page.id).padEnd(8)} ${page.type.padEnd(13)} form ${String(page.form).padEnd(18)} commentary ${String(page.commentary).padEnd(12)} ${page.source === "placed" ? "form declared, placement proposed" : page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})${whyWords(page.why)}` : ""}${page.imported && page.source !== "proposed" ? " - imported page, kept as drawn" : ""}${page.estimated ? " - exhibit estimated" : ""}` +
       (page.reads ? ` - taken to meet a structure rule; this form reads ${page.reads.join(", ")}: check the evidence holds it` : "") + fitWords(page)),
     ...(estimated.length && plan.pages.some((page) => page.source === "changed") ? ["  A change to a declared choice above mends a rule that is broken on the estimate: write the estimated pages' exhibits (or give each its `type`) and run --plan again before taking it."] : []),
     ...(plan.unsatisfied.length ? ["", "Unsatisfied:", ...plan.unsatisfied.map((u) => `  ${u.standing ? readStandings([u.standing])[0].line : `${u.code}: ${u.finding.repair}`}` +
-      (u.fixedByTypes ? "\n    The page types alone break this rule: no form or placement can meet it. Change a page's `type`, or mark a deliberate run with a shared `series`." : "")),
+      (u.fixedByTypes ? "\n    The page types alone break this rule: no form or placement can meet it. Change a page's `type`, or mark a deliberate run with a shared `series`." : "") +
+      (u.adders ? `\n${kindAdderLines(u).join("\n")}` : "")),
       ...(plan.pinned.length && plan.unsatisfied.some((u) => !u.fixedByTypes) ? [`  The plan keeps every page in a form that carries its claim best, and those forms do not meet ${plan.unsatisfied.filter((u) => !u.fixedByTypes).map((u) => u.code).join(", ")} between them.` +
         (served.length ? ` ${mended.join(", ")} would be met only by drawing ${served.length === 1 ? "this page" : "these pages"} in a form that is not a best fit for ${served.length === 1 ? "its" : "their"} claim: ${served.slice(0, 12).map((page) => `${page.id} as ${page.form} (best fit: ${page.best.join(", ")})`).join("; ")}${served.length > 12 ? `; and ${served.length - 12} more` : ""}. That trades the picture for the rule, and the plan does not propose it: the sounder repair is evidence of another shape or a page of another type, made before the critique. A form you declare on a page is kept, and is named under VARIETY_FIT_UNUSED.`
           : mended.length ? ` ${mended.join(", ")} would be met by other placements or forms the catalogue allows these pages; declare them and run --plan again.` : " No form the catalogue allows these pages meets it either: the page types or the evidence have to change.")] : [])] : []),
@@ -2007,14 +2031,15 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
   ];
   console.error(lines.join("\n"));
   // One page a line: `id type/form/commentary source`, the choices to copy into the pages file.
-  say(JSON.stringify({ plan: { satisfied: plan.satisfied, ...(plan.capped ? { capped: true } : {}), unsatisfied: plan.unsatisfied.map((u) => ({ code: u.code, fixedByTypes: u.fixedByTypes })),
+  say(JSON.stringify({ plan: { satisfied: plan.satisfied, ...(plan.capped ? { capped: true } : {}), unsatisfied: plan.unsatisfied.map((u) => ({ code: u.code, fixedByTypes: u.fixedByTypes, ...(u.adders ? { drawn: u.drawn, adders: u.adders } : {}) })),
     ...(served.length ? { served: served.map((page) => `${page.id} ${page.form} (best fit: ${page.best.join(", ")})`), servedWouldMeet: mended } : {}),
-    pages: plan.pages.map((page) => `${page.id} ${page.type}/${page.form}/${page.commentary} ${page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})` : ""}${page.reads ? " (reads its own data)" : ""}${page.estimated ? " (exhibit estimated)" : ""}`), ...(estimated.length ? { estimated } : {}), ...(readings.length ? { readings } : {}),
+    pages: plan.pages.map((page) => `${page.id} ${page.type}/${page.form}/${page.commentary} ${page.source}${page.was ? ` (declared ${page.was.form}${page.was.commentary ? `/${page.was.commentary}` : ""})${whyWords(page.why)}` : ""}${page.reads ? " (reads its own data)" : ""}${page.estimated ? " (exhibit estimated)" : ""}`), ...(estimated.length ? { estimated } : {}), ...(readings.length ? { readings } : {}),
     // What the fit says of each page, by id: the task read, the forms and kinds of equal fit (the latitude), and the forms that carry a declared choice's claim more directly.
     ...(plan.pages.some((page) => page.task || page.kinds) ? { fit: Object.fromEntries(plan.pages.filter((page) => page.task || page.kinds || page.elsewhere || page.beside).map((page) => [page.id, { ...(page.task ? { task: page.task } : {}), ...(page.also ? { also: page.also } : {}), ...(page.by ? { by: page.by } : {}), ...(page.better ? { better: page.better } : {}),
       ...(page.hand ? { hand: page.hand } : {}), ...(page.typed ? { typed: page.typed.map((item) => `${item.where} ${item.has}: this deck's draw takes ${item.hand}`) } : {}),
       ...(page.kinds ? { kinds: page.kinds.map((item) => item.kind), alsoKinds: [...new Set(page.kinds.flatMap((item) => item.also))], kindsBy: [...new Set(page.kinds.filter((item) => item.also.length).map((item) => item.by))] } : {}), ...(page.exhibits ? { exhibits: page.exhibits.map((item) => `${item.where} ${item.has}: ${item.better.join(" or ")}`) } : {}),
       ...(page.elsewhere ? { elsewhere: page.elsewhere.map((item) => `${item.type}/${item.form}`) } : {}), ...(page.beside ? { beside: page.beside.map((item) => `${item.type}/${item.form}`) } : {}), ...(page.typeHand ? { typeHand: `${page.typeHand.type}/${page.typeHand.form}` } : {}) }])) } : {}) },
+    ...(wrote ? { written: { files: wrote.files, pages: wrote.pages, accepted: wrote.accepted.map((page) => String(page.id)), typed: wrote.typed } } : {}),
     ...(declared ? { declared } : {}), ...(unshaped.length ? { evidence: unshaped } : {}), ...(unfit.length ? { unfit: unfit.map((f) => ({ code: f.code, id: f.id, measured: f.measured, repair: f.repair })) } : {}),
     ...(unlayable.length ? { unlayable: unlayable.map((f) => ({ code: f.code, id: f.id ?? f.page, measured: f.measured, repair: f.repair })) } : {}),
     search: { steps: plan.steps, evaluations: plan.evaluations }, standing: { S: (drafted ?? read(plan.structure)).map((st) => st.line), ...(fragments.length ? { estimated: fragments.map((st) => st.line) } : {}) } }, null, 1));
@@ -2042,7 +2067,7 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" },
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, accept: { type: "boolean" }, "fetch-assets": { type: "boolean" },
     pending: { type: "string", valueName: "a file" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
@@ -2091,7 +2116,8 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];
-    const code = await planCommand(doc, { dir, stem, file, say, refusal, write: Boolean(values.write) });
+    if (values.accept && !values.write) { console.error("--accept writes the plan's changes to declared choices, with its other choices: run --plan --write --accept"); return 2; }
+    const code = await planCommand(doc, { dir, stem, file, say, refusal, write: Boolean(values.write), accept: Boolean(values.accept) });
     await fs.appendFile(logPath, JSON.stringify({ at: new Date().toISOString(), run: runs.length + 1, v: RUN_LOG_VERSION, mode: PLAN_MODE, pages: doc.pages.length + (doc.appendix || []).length, ok: code === 0, findings: refusal }) + "\n");
     return code;
   }

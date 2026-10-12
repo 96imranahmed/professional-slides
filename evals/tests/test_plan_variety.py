@@ -56,6 +56,16 @@ const formOf = (p, id) => p.pages.find((page) => page.id === id);
 const best = (page) => {{ const fit = pageFit(page, {{ registry, insights }}); return fit?.task ? fit.forms.equal.map((item) => item.form) : null; }};
 """
 
+# Eighteen pages, six types three times over (the spine of the test of a rule the best-fit forms cannot meet, below).
+ROUNDS = """
+const one = (id, type, evidence, measures, more = {}) => ({ id, type, title: `Page ${id} states a finding of its own about the operator`, why: 'the claim decides the type', evidence, settles: { kind: 'comparison', what: 'w', measures, ...more } });
+const round = (n) => [
+  one(`a${n}`, 'trend', ['i-journeys'], ['i-journeys/journeys']), one(`b${n}`, 'ranking', ['i-punctual'], ['i-punctual/punctuality']), one(`c${n}`, 'composition', ['i-revenue-parts'], ['i-revenue-parts/revenue']),
+  one(`d${n}`, 'panels', ['i-profile'], ['i-profile/punctuality', 'i-profile/cost'], { relation: { kind: 'separate', reason: 'each is its own ranking in its own unit' } }),
+  one(`e${n}`, 'lookup', ['i-operators'], ['northvale', 'coast', 'midland'].map((name) => `i-operators/${name}`)), one(`f${n}`, 'numbers', ['i-estate'], ['i-estate/stations', 'i-estate/staff', 'i-estate/depots', 'i-estate/lines'])];
+const rounds = { deck: { ...doc.deck, variation: 's1' }, pages: [...round(1), ...round(2), ...round(3)] };
+"""
+
 
 def cli(*args, script=AUTHOR, timeout=600):
     return subprocess.run([NODE, str(script), *map(str, args)], cwd=ROOT, capture_output=True, text=True, timeout=timeout,
@@ -191,6 +201,56 @@ console.log(JSON.stringify({ v09: formOf(p, 'v09'), v04: formOf(p, 'v04'), unuse
         self.assertEqual(sorted(result["unused"]["pages"]), ["v04", "v09"])
         self.assertFalse(result["unused"]["blocks"])
 
+    def test_a_declared_choice_is_changed_only_to_mend_a_broken_rule_and_says_which(self):
+        """On the BA retest the plan printed "changed (declared insight-tree/none)" with no rule, and 32 of the 33 declared
+        choices it changed while a rule no declared choice could meet was short only took a cap or a floor off its bar. A
+        change to a declared choice now lowers what a broken rule lacks, and names the rules it lowered."""
+        result = run_node(LOAD + ROUNDS + """
+const first = plan(rounds), chosen = new Map(first.pages.map((page) => [page.id, page]));
+const declared = { ...rounds, pages: rounds.pages.map((page) => ({ ...page, form: chosen.get(page.id).form, commentary: chosen.get(page.id).commentary })) };
+const again = plan(declared);
+console.log(JSON.stringify({ unsatisfied: again.unsatisfied.map((u) => u.code), e3: formOf(again, 'e3'),
+  changed: again.pages.filter((page) => page.source === 'changed').map((page) => ({ id: page.id, was: page.was, why: page.why })) }));
+""")
+        # Every page declares the choice the plan gave it; PAGE_SHAPE_FLAT is still broken, and three changes lower it.
+        self.assertEqual(result["unsatisfied"], ["PAGE_SHAPE_FLAT"])
+        self.assertEqual(sorted(page["id"] for page in result["changed"]), ["a2", "f1", "f2"])
+        for page in result["changed"]:
+            with self.subTest(page=page["id"]):
+                self.assertTrue(page["why"]["mends"], page)
+        self.assertIn("PAGE_SHAPE_FLAT", [code for page in result["changed"] for code in page["why"]["mends"]])
+        # The lookup page's so-what bar only sat a cap at its bar: before, it was moved into the table for that room alone.
+        self.assertEqual([result["e3"]["source"], result["e3"]["commentary"]], ["declared", "so-what-bar"])
+
+    def test_a_deck_short_of_kinds_is_told_the_kinds_it_draws_and_the_changes_that_would_add_one(self):
+        """On the BA retest "short by 1 kinds" named neither the kinds drawn nor what would add one, and the lead spent
+        23 minutes and 12 plan runs scaffolding a dozen forms. The plan names the kinds and up to twelve changes - a form
+        of the page's type, or a type its evidence rests under - the families the deck draws least first."""
+        result = run_node(LOAD + """
+import { TYPE_SHAPES } from './skills/professional-slides/runtime/evidence.mjs';
+const one = (id, type, evidence, measures) => ({ id, type, title: `Page ${id} states a finding of its own about the operator`, why: 'the claim decides the type', evidence, settles: { kind: 'comparison', what: 'w', measures } });
+const few = { deck: { ...doc.deck, variation: 's1' }, pages: Array.from({ length: 10 }, (_, n) => [one(`t${n}`, 'trend', ['i-journeys'], ['i-journeys/journeys']), one(`r${n}`, 'ranking', ['i-punctual'], ['i-punctual/punctuality'])]).flat() };
+const p = plan(few), range = p.unsatisfied.find((u) => u.code === 'VARIETY_EXHIBIT_RANGE');
+console.log(JSON.stringify({ range, draws: [...new Set(p.pages.flatMap((page) => page.draws))].sort(), types: Object.fromEntries(few.pages.map((page) => [page.id, page.type])),
+  shapes: { trend: insights.get('i-journeys').shape, ranking: insights.get('i-punctual').shape }, asks: TYPE_SHAPES }));
+""")
+        range_, draws = result["range"], result["draws"]
+        self.assertEqual(range_["drawn"], draws)
+        self.assertTrue(0 < len(range_["adders"]) <= 12, range_["adders"])
+        for item in range_["adders"]:
+            with self.subTest(item=item):
+                own = result["types"][item["id"]]
+                self.assertFalse(set(item["adds"]) & set(draws))
+                if item["change"] == "form":
+                    self.assertEqual(item["type"], own)
+                else:
+                    self.assertEqual(item["from"], own)
+                    self.assertIn(result["shapes"][own], result["asks"][item["type"]])
+        # Both kinds of change are offered, and the families the deck draws least come first.
+        self.assertEqual({item["change"] for item in range_["adders"]}, {"form", "type"})
+        self.assertEqual([item["drawn"] for item in range_["adders"]], sorted(item["drawn"] for item in range_["adders"]))
+        self.assertGreater(len({item["adds"][0] for item in range_["adders"]}), 6)
+
 
 class PlanWriteTests(unittest.TestCase):
     def test_the_plan_writes_its_choices_into_the_file_each_page_is_written_in(self):
@@ -226,6 +286,66 @@ class PlanWriteTests(unittest.TestCase):
             # Run again, nothing is left to write.
             again = cli(file, "--plan", "--write")
             self.assertIn("written into nothing", again.stderr)
+        finally:
+            shutil.rmtree(home, ignore_errors=True)
+
+    def test_accept_writes_the_changes_to_declared_choices_and_an_estimated_exhibit_gets_the_kind_the_plan_counted(self):
+        """On the BA retest "4 changes to a declared choice left for you" had no flag to take them, and the lead copied form
+        and commentary into four part files by hand; and the plan met the exhibit-range floor on the kinds it estimated for
+        pages with no exhibit, which no writer was told. --accept writes the changes; --write writes each estimated kind as
+        the page's exhibit stub, and never a type the author wrote."""
+        spine = run_node(LOAD + """
+import { placementsOf } from './skills/professional-slides/runtime/page-types.mjs';
+const deck = seeded('s1'), chosen = new Map(plan(deck).pages.map((page) => [page.id, page]));
+// Every page declares the form the plan gives it, and the placement under the exhibit wherever its form takes one: a placement too many pages share.
+console.log(JSON.stringify({ ...deck, pages: deck.pages.map((page) => { const to = chosen.get(page.id); if (!to) return page;
+  return { ...page, form: to.form, commentary: placementsOf(page.type, to.form).includes('below') ? 'below' : to.commentary }; }) }));
+""")
+        home = Path(tempfile.mkdtemp(prefix="plan-accept-"))
+        try:
+            files = []
+            for name in ("left", "accepted"):
+                (home / name).mkdir()
+                shutil.copy(FIXTURE / "variety.insights.json", home / name / "variety.insights.json")
+                files.append(home / name / "variety.pages.json")
+                files[-1].write_text(json.dumps(spine), encoding="utf-8")
+            kept = {page["id"]: page for page in spine["pages"] if page.get("type")}
+            left, file = files
+            self.assertEqual(cli(left, "--plan", "--accept").returncode, 2)     # --accept takes nothing without --write
+            self.assertIn("left for you (--accept writes them)", cli(left, "--plan", "--write").stderr)
+            self.assertEqual({page["id"]: page.get("commentary") for page in json.loads(left.read_text(encoding="utf-8"))["pages"] if page.get("type")},
+                             {id_: page["commentary"] for id_, page in kept.items()})
+            run = cli(file, "--plan", "--write", "--accept")
+            printed = json.loads(run.stdout)
+            self.assertTrue(printed["plan"]["satisfied"])
+            rows = {row.split()[0]: row for row in printed["plan"]["pages"]}
+            changed = [id_ for id_, row in rows.items() if " changed (declared " in row]
+            self.assertTrue(changed)
+            self.assertEqual(sorted(printed["written"]["accepted"]), sorted(changed))
+            self.assertIn("to a declared choice accepted", run.stderr)
+            pages = {page["id"]: page for page in json.loads(file.read_text(encoding="utf-8"))["pages"] if page.get("type")}
+            for id_ in changed:
+                with self.subTest(page=id_):
+                    # The row names the rule the change mends, and the file now holds the choice it names.
+                    self.assertRegex(rows[id_], r"changed \(declared [a-z-]+/below\) to mend [A-Z_]+")
+                    self.assertEqual("/".join([pages[id_]["type"], pages[id_]["form"], pages[id_]["commentary"]]), rows[id_].split()[1])
+                    self.assertEqual(kept[id_]["commentary"], "below")
+            # A panels page with no exhibit was planned on estimated kinds: it now carries a stub of each, typed as the plan counted.
+            fit = printed["plan"]["fit"]
+            typed = [id_ for id_ in printed["written"]["typed"]]
+            self.assertTrue(typed)
+            for entry in typed:
+                id_ = entry.split()[0]
+                with self.subTest(page=id_):
+                    self.assertNotIn("exhibit", kept[id_])
+                    self.assertNotIn("exhibits", kept[id_])
+                    stubs = pages[id_].get("exhibits") or [pages[id_]["exhibit"]]
+                    self.assertTrue(all(set(stub) == {"type"} for stub in stubs), stubs)
+                    self.assertTrue({stub["type"] for stub in stubs} <= set(fit[id_]["kinds"]), (stubs, fit[id_]))
+            # Run again: nothing is changed and nothing estimated is left to write.
+            again = cli(file, "--plan", "--write", "--accept")
+            self.assertNotIn(" changed (declared ", again.stdout)
+            self.assertFalse(json.loads(again.stdout)["written"]["typed"])
         finally:
             shutil.rmtree(home, ignore_errors=True)
 
