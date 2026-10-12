@@ -82,7 +82,12 @@ export const activeJudgements = () => active;
  * `beside` is shown to the reader with the question and is not keyed.
  */
 export function judged(kind, subject, context = null, where = null, { image = null, beside = null } = {}) {
-  const known = recordedJudgement(kind, subject, context);
+  // The answer read here is this question's own, recorded once as the question.
+  const recording = asked;
+  asked = null;
+  let known;
+  try { known = recordedJudgement(kind, subject, context); } finally { asked = recording; }
+  asked?.push({ ask: "judged", kind, subject, context, where, image, beside, said: known ?? null });
   if (known || !active) return known;
   const key = judgementKey(kind, subject, context);
   const open = active.pending.get(key) ?? { key, kind, subject, context: context ?? null, where: [], ...(image ? { image } : {}), ...(beside ? { beside } : {}) };
@@ -93,13 +98,48 @@ export function judged(kind, subject, context = null, where = null, { image = nu
 
 /** The recorded answer to a question, or null - without adding it to the pending list (a picture is fetched to be asked about only when no answer is recorded). */
 export function recordedJudgement(kind, subject, context = null) {
+  const said = answerOf(kind, subject, context);
+  asked?.push({ ask: "recorded", kind, subject, context, said });
+  return said;
+}
+
+/** The recorded answer, or null; a verdict read from the file is noted as read unless `note` is false. */
+function answerOf(kind, subject, context, { note = true } = {}) {
   const key = judgementKey(kind, subject, context);
   if (!active) return null;
   const said = active.oracle ? active.oracle(kind, subject, context) : null;
   if (said) return typeof said === "string" ? { verdict: said } : said;
   const known = active.verdicts.get(key);
-  if (known) active.read.add(key);
+  if (known && note) active.read.add(key);
   return known ?? null;
+}
+
+// While a cache records what a piece of work asks (askingFrom): every question and the answer read, in order.
+let asked = null;
+
+/**
+ * Record every question asked from now, with the answer it was given, in order; the function returned stops and
+ * returns them. What a cache keeps beside work whose result turns on those answers (author-deck.mjs
+ * openComposeCache), to read the work again only while each answer stands (answersStand) and to ask the same
+ * questions when it does (askAgain).
+ */
+export function askingFrom() {
+  const before = asked, mine = [];
+  asked = mine;
+  return () => { asked = before; return mine; };
+}
+
+/** Whether every question in `questions` (askedDuring) would be given the answer it was given then. Notes nothing. */
+export function answersStand(questions) {
+  return Array.isArray(questions) && questions.every((q) => JUDGEMENT_KINDS[q?.kind] && JSON.stringify(answerOf(q.kind, q.subject, q.context ?? null, { note: false })) === JSON.stringify(q.said ?? null));
+}
+
+/** The questions in `questions` asked again, in order, as the work that asked them did: its pending questions and its reads noted alike. */
+export function askAgain(questions) {
+  for (const q of questions) {
+    if (q.ask === "judged") judged(q.kind, q.subject, q.context ?? null, q.where ?? null, { ...(q.image ? { image: q.image } : {}), ...(q.beside ? { beside: q.beside } : {}) });
+    else recordedJudgement(q.kind, q.subject, q.context ?? null);
+  }
 }
 
 /** A question met elsewhere - by the Python gates, which hash it the same way - added to the session's pending list. */

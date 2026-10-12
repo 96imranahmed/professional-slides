@@ -240,6 +240,63 @@ class PythonGateTests(unittest.TestCase):
         self.assertEqual([f["code"] for f in second["findings"]], ["PLANNING_VOICE"])
         self.assertEqual(second["judgementsNeeded"], [])
 
+    def test_a_cached_page_is_read_only_while_its_answers_stand(self):
+        """A page check reads every unchanged page from the gates' page cache (page_gates.py PageCache) instead of gating
+        all of them again - 3.3s of a 5.4s check on the BA deck. The page's findings turn on its judgements too: a page
+        cached while its question was open is gated again once the question is answered, and its open question is
+        reported again while it stays open."""
+        scene = {"slides": [{"id": "p1", "readingTask": "chart-with-commentary", "nodes": [
+            {"type": "text", "role": "action-title", "text": "Peak trains run full while the off-peak runs half empty"},
+            {"type": "text", "role": "list-item", "text": "Takeaway: off-peak journeys grew where trains ran half-hourly."}]}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            scene_path, report, store, cache = (Path(tmp, name) for name in ("scene.json", "report.json", "deck.judgements.json", "gates.cache.json"))
+            scene_path.write_text(json.dumps(scene))
+            gates = [sys.executable, str(RUNTIME / "gates" / "page_gates.py"), str(scene_path), "--report", str(report), "--judgements", str(store), "--page-cache", str(cache)]
+            reports = []
+            for answered in (False, False, True, True):
+                if answered:
+                    [asked] = reports[0]["judgementsNeeded"]
+                    store.write_text(json.dumps({"verdicts": {judgements.judgement_key(asked["kind"], asked["subject"], asked["context"]): {"verdict": "planning-label", "quote": "Takeaway"}}}))
+                run = subprocess.run(gates, capture_output=True, text=True)
+                self.assertIn(run.returncode, (0, 2), run.stderr)
+                reports.append(json.loads(report.read_text()))
+            cached = json.loads(cache.read_text())["entries"]
+        # Read from the cache, the open question is open again, where it was met.
+        self.assertEqual(reports[1], reports[0])
+        self.assertEqual([(q["kind"], q["where"]) for q in reports[1]["judgementsNeeded"]], [("planning-label", ["1"])])
+        # Answered, the page is gated again and the rule holds; and that page is what the cache reads next time.
+        self.assertIn("PLANNING_VOICE", [f["code"] for f in reports[2]["findings"]])
+        self.assertNotIn("PLANNING_VOICE", [f["code"] for f in reports[0]["findings"]])
+        self.assertEqual(reports[3], reports[2])
+        [entry] = cached.values()
+        self.assertEqual([q["known"] for q in entry["asked"]], [True])
+
+
+class ReplayTests(unittest.TestCase):
+    def test_a_line_read_back_from_a_cache_is_asked_again_beside_its_page(self):
+        """A cached page asks its open questions again (page_gates.py PageCache, compose-cache's askAgain). A line's
+        question carries the page's commentary `beside` it; replayed without it, the reader would be shown the line
+        alone - and the per-line form exists so that the page is read with it."""
+        sys.path.insert(0, str(RUNTIME / "gates"))
+        import judgements as gates
+        page = {"commentary": ["Fuel rose a quarter", "Carbon is the 2030 headwind"]}
+        gates.load()
+        gates.recording(True)
+        gates.judged("commentary-restates", "Fuel rose a quarter", {"exhibit": ["Fuel", "Highest"]}, 4, beside=page)
+        asked = gates.recording(False)
+        gates.load()
+        self.assertTrue(gates.replay(asked))
+        [question] = gates.needed()
+        gates.unload()
+        self.assertEqual(question["beside"], page)
+        self.assertEqual(question["where"], ["4"])
+        result = run_node(CORE + """
+const session = J.judgementSession();
+J.withJudgements(session, () => J.askAgain([{ ask: 'judged', kind: 'commentary-restates', subject: 'Fuel rose a quarter', context: { exhibit: ['Fuel'] }, where: 'p4', beside: { commentary: ['Fuel rose a quarter', 'Carbon'] } }]));
+console.log(JSON.stringify([...session.pending.values()]));
+""")
+        self.assertEqual(result[0]["beside"], {"commentary": ["Fuel rose a quarter", "Carbon"]})
+
 
 class LineQuestionTests(unittest.TestCase):
     def test_a_line_is_keyed_alone_and_staged_beside_its_page_whose_words_are_shown_once(self):

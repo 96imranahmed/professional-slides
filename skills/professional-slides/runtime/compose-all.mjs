@@ -30,14 +30,18 @@ function withReadingTasks(result, spec) {
   return result;
 }
 
-/** `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page. */
-export function composeAll(spec, baseDir, { partial = false } = {}) {
+/**
+ * `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page.
+ * `slideCache` ({ has, get, set }) holds slides compiled before, by the slide as planned, its place and the deck's
+ * tokens (core.mjs compileSlideAsWritten): a page whose planned slide is unchanged is not compiled again.
+ */
+export function composeAll(spec, baseDir, { partial = false, slideCache = null } = {}) {
   const errors = [];
   let working = structuredClone(spec);
   for (let round = 0; round < 6; round += 1) {
     try {
       const plan = toDeckPlan(structuredClone(working), baseDir);
-      const result = planDeck(plan);
+      const result = planDeck(plan, undefined, { slideCache });
       // The tables the composer cut across pages, with what would hold each on one (compose-deck.mjs splitEstimate).
       if (plan.tableSplits) result.tableSplits = plan.tableSplits;
       if (!errors.length) return withReadingTasks(result, working);

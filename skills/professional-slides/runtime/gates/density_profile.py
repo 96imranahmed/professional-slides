@@ -240,12 +240,13 @@ def scene_blocks(slide: dict) -> list[int]:
     return page_blocks(scene_lines(slide), set())
 
 
-def scene_fragmentation(scene: dict) -> dict:
+def scene_fragmentation(scene: dict, blocks_of=scene_blocks) -> dict:
     """Where the deck will stand on TEXT_FRAGMENTED, estimated from the scene
     (scene_blocks): `pages`, each content page's blocks and words a block with
     whether its reading task is prose, and `standings`, the deck's estimated
     median against the band - marked `estimated`, and never blocking: the rule
-    is the render's to measure."""
+    is the render's to measure. `blocks_of(slide)` is scene_blocks, or reads a
+    page's blocks where an earlier run kept them (page_gates.PageCache)."""
     pages = []
     for index, slide in enumerate(scene.get("slides", [])):
         if is_cover(slide, index) or (AGENDA_PAGE.match(str(slide.get("id") or "")) or GENERATED_PAGE.match(str(slide.get("id") or ""))):
@@ -253,7 +254,7 @@ def scene_fragmentation(scene: dict) -> dict:
         task = slide.get("readingTask")
         if task in STRUCTURAL_TASKS or not task:
             continue
-        blocks = scene_blocks(slide)
+        blocks = blocks_of(slide)
         pages.append({"slide": index + 1, "id": slide.get("sourceSlideId") or slide.get("id"), "task": task, "prose": prose_blocks(blocks), "blocks": len(blocks), "developed": developed(blocks),
                       "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0})
     prose = [p for p in pages if p["blocks"] and p["prose"]]

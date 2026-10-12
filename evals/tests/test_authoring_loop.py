@@ -322,8 +322,9 @@ class FitRepairTests(unittest.TestCase):
             self.assertIn("not rendered - what only a render shows is checked by `--check --render`", run.stderr)
             self.assertNotIn("(verified", run.stderr)
             self.assertIn("needs:  stack/captions", run.stderr)
-            # A refused check writes no deck: its run log, and what the search composed, remembered beside the pages file.
-            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["assets", "page-types.author-cache.json", "page-types.author-log.jsonl", "page-types.pages.json"])
+            # A refused check writes no deck: its run log, and what the search, the composer and the gates read, remembered beside the pages file.
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["assets", "page-types.author-cache.json", "page-types.author-log.jsonl", "page-types.compose-cache.json",
+                                                                           "page-types.gate-cache.json", "page-types.pages.json"])
             cache_file = Path(tmp) / "page-types.author-cache.json"
             cache = json.loads(cache_file.read_text())
             verdicts = cache["fits"]["p10"]["verdicts"]
@@ -379,6 +380,52 @@ class PageRunTests(unittest.TestCase):
             # Without --check: still a report, never a write.
             self.assertEqual(cli(file, "--page", "p07").returncode, 0)
             self.assertFalse((Path(tmp) / "page-types.deck.json").exists())
+
+    def test_a_page_run_in_json_is_the_part_its_writer_reads(self):
+        """A writer's check printed the whole deck's standings and every page's budget - 24 to 61 thousand characters -
+        and the BA deck's writers searched it for their own page 205 times. `--json` prints that page's part alone, in
+        one small object: the findings it answers for and their repairs, its budget and its limits, and the deck's
+        verdict in a line - the same findings, with the same exit code."""
+        with tempfile.TemporaryDirectory() as tmp:
+            file = examples_deck(tmp, plant)
+            text, compact = cli(file, "--check", "--page", "p10"), cli(file, "--check", "--page", "p10", "--json")
+            self.assertEqual((compact.returncode, compact.stderr), (text.returncode, ""))
+            report = json.loads(compact.stdout)
+            page = report["pages"]["p10"]
+            self.assertFalse(report["ok"])
+            self.assertTrue(report["deck"].startswith("not ready: 1 finding on these pages to fix (P 1)"), report["deck"])
+            self.assertEqual([f["code"] for f in page["findings"]], ["SCENE_VOID"])
+            self.assertIn("SCENE_VOID [p10]", text.stderr)
+            self.assertTrue(page["findings"][0]["repair"])
+            self.assertTrue({"words", "floor", "fill"} <= set(page["budget"]))
+            self.assertIn("title", page["limits"])
+            self.assertLess(len(compact.stdout), 4000)
+            self.assertEqual(list(report["pages"]), ["p10"])
+            # A run that names no page has no page part to print.
+            self.assertEqual(cli(file, "--check", "--json").returncode, 1)
+
+    def test_a_page_run_composes_and_gates_only_what_changed(self):
+        """A page check edits one page of a hundred, and composing and gating every page again was 4.3s of a 5.4s check
+        on the BA deck. The composer's slides and the page gates' own results are kept beside the pages file, and a
+        page whose composed scene has not changed is read from them; what the run reports is what a run with neither
+        reports, before an edit and after it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            file = examples_deck(tmp, plant)
+            caches = [Path(tmp) / "page-types.compose-cache.json", Path(tmp) / "page-types.gate-cache.json"]
+            first, second = cli(file, "--check", "--page", "p07"), cli(file, "--check", "--page", "p07")
+            self.assertTrue(all(cache.exists() for cache in caches))
+            self.assertEqual((second.returncode, second.stdout, second.stderr), (first.returncode, first.stdout, first.stderr))
+            # p07 edited: read with the caches the run before it left, then with none.
+            doc = json.loads(Path(file).read_text())
+            [page] = [p for p in doc["pages"] if p.get("id") == "p07"]
+            page["title"] = page["title"].rstrip(".") + " this year"
+            Path(file).write_text(json.dumps(doc))
+            warm = cli(file, "--check", "--page", "p07")
+            for cache in caches:
+                cache.unlink()
+            cold = cli(file, "--check", "--page", "p07")
+        self.assertNotEqual(cold.stdout + cold.stderr, first.stdout + first.stderr)
+        self.assertEqual((warm.returncode, warm.stdout, warm.stderr), (cold.returncode, cold.stdout, cold.stderr))
 
     def test_a_page_run_names_only_pages_the_deck_has(self):
         with tempfile.TemporaryDirectory() as tmp:
