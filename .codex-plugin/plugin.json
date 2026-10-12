@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Professional Slides",
     "shortDescription": "Create editable slide decks",
-    "longDescription": "\u2022 Create editable PowerPoint decks from a brief, analysis, or existing presentation.\n\u2022 Plan the storyline and sharpen slide titles.\n\u2022 Add charts, tables, diagrams, and branded layouts.\n\u2022 Revise decks or individual slides.\n\u2022 Render and check the finished deck before delivery.",
+    "longDescription": "Professional Slides turns a brief, analysis, or existing presentation into an editable PowerPoint deck. It helps you develop the argument first, then choose the charts, tables, and layouts that make each point clear.\n\nUse it for\n\u2022 Board and steering committee papers, project updates, and executive summaries.\n\u2022 Investor and pitch decks, due diligence, and competitive comparisons.\n\u2022 Improving a storyline, sharpening titles, or revising individual slides.\n\nHow it works\n\u2022 Share the audience, decision, evidence, and any reference deck or brand.\n\u2022 Review the proposed storyline and slide titles before building.\n\u2022 Create editable charts, tables, diagrams, and text in a consistent visual style.\n\u2022 Inspect the rendered deck and its checks before delivery.\n\nWhat you receive\nAn editable PPTX, with the argument, exhibits, and sources carried through the build. Revisions create a new file and preserve your original presentation. Supply your own evidence or ask for public research; the workflow records sources, separates facts from assumptions, and flags missing evidence.\n\nThe finished deck is rendered and independently reviewed. Check factual accuracy and source rights before sharing. This skill needs a local authoring environment; setup instructions, example slides, and a sample deck are available on the website.",
     "developerName": "Imran Ahmed",
     "brandColor": "#183D36",
     "composerIcon": "./assets/icon.png",
@@ -26,7 +26,11 @@
     "websiteURL": "https://shiphappens.xyz/slides",
     "supportURL": "https://github.com/96imranahmed/professional-slides/issues",
     "privacyPolicyURL": "https://shiphappens.xyz/slides/privacy",
-    "termsOfServiceURL": "https://shiphappens.xyz/slides/terms"
+    "termsOfServiceURL": "https://shiphappens.xyz/slides/terms",
+    "screenshots": [
+      "./assets/sample-trend.png",
+      "./assets/sample-comparison.png"
+    ]
   },
   "extensions": {
     "com.openai": {

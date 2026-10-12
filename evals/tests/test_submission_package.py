@@ -49,6 +49,12 @@ class SubmissionPackageTests(unittest.TestCase):
         self.assertEqual(data['author']['name'], 'Imran Ahmed')
         self.assertEqual(interface['developerName'], 'Imran Ahmed')
         self.assertEqual(interface['websiteURL'], 'https://shiphappens.xyz/slides')
+        self.assertEqual(interface['screenshots'], [
+            './assets/sample-trend.png', './assets/sample-comparison.png'])
+        for screenshot in interface['screenshots']:
+            source = ROOT / screenshot
+            self.assertTrue(source.is_file(), screenshot)
+            self.assertEqual((self.package / screenshot).read_bytes(), source.read_bytes())
         self.assertEqual(data['extensions']['com.openai']['publication']['countries'], [])
         self.assertIs(data['extensions']['com.openai']['review']['commerce'], False)
         self.assertNotIn('test_cases', data['extensions']['com.openai']['review'])
