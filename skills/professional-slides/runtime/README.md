@@ -106,7 +106,7 @@ judge.mjs          the questions the compile asked and no judgement answers, sta
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
 gates/gate_config.py    the thresholds, the weight floors, the code tables (GATE_CODES, ADVISORY_CODES, COMPOSE_CODES), severity rules and the scene readers every gate shares
 gates/render_gates.py   the page's own gates: ink and bands on the render, and the title, type, measure, words and pictures
-gates/scene_gates.py    the gates read off the composed scene, so they run at authoring as well as the build (SCENE_VOID, SCENE_INK)
+gates/scene_gates.py    the gates read off the composed scene, so they run at authoring as well as the build (SCENE_VOID, SCENE_INK, GROUND_CONTRAST)
 gates/semantic_gates.py what the page says: restatement, planning voice, caveats, twin cells, contradicted shares, repeated table schemas (a line's meaning read through gates/judgements.py)
 gates/deck_gates.py     the deck-wide gates: photographs, craft rates, device vocabulary, evidence mix, front matter, page weight, architectures, thin-page habit
 gates/text_stats.py     the one word count (text-contract.mjs textWords, ported), printed words for the density profile, content words; stopwords.json the shared stopword list
@@ -122,7 +122,7 @@ deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> b
 emit/emit_pptx.py      scene -> editable PPTX (placeholders, native charts with workbooks, preset autoshapes and freeforms, palette -> theme)
 emit/assemble_pptx.py  a revision's deck: the source PPTX with its carried slides kept byte for byte, its edited slides' text rewritten in place and the composed slides set in with their own master; reads every carried slide back and compares it with the source (`revision.preserved`); `--check` tries the edits and writes nothing
 emit/render_pptx.py    PPTX -> PDF (LibreOffice) -> PNG per slide + montage
-emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene; lists the hidden slides (`readback.hidden`) and reports HIDDEN_STATE when the file and the scene disagree
+emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene; lists the hidden slides (`readback.hidden`) and reports HIDDEN_STATE when the file and the scene disagree; on every slide, the background, each run's and fill's colour and a native chart's text colour against the page's own ground (CANVAS_COLOR, TEXT_COLOR, SHAPE_COLOR, CHART_TEXT_COLOR)
 emit/color.py          WCAG luminance and contrast, as palettes.mjs and core.mjs compute them, for the emitter and the template importer
 weight.json, weight.mjs  the numeric contract the composer and gates read: floors by fill, targets, deck lengths, rule versions
 ```

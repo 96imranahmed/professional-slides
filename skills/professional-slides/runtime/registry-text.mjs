@@ -2,7 +2,7 @@
 // callout, the evidence note and the panel, with the measures the composer
 // sizes prose and lists by (`proseMeasure`, `measureProse`, `measureCaption`,
 // `measureInsight`, `measureList`).
-import { tokenValue, token, rectPrimitive, stableId, textPrimitive, ellipsePrimitive, shapePrimitive, emphasisRuns, houseStyle, TOKENS, onFill } from "./core.mjs";
+import { tokenValue, token, rectPrimitive, stableId, textPrimitive, ellipsePrimitive, shapePrimitive, emphasisRuns, houseStyle, TOKENS, onFill, reversedFill, reversedType } from "./core.mjs";
 import { measureText, accentRuns, measureTextRuns } from "./text-layout.mjs";
 import { markerSize, numberMarker, iconMarker, stateMarker, MARK_TOKENS } from "./marks.mjs";
 import { measuredTextNode } from "./text-style.mjs";
@@ -169,8 +169,8 @@ function insightNodes({ id, frame, props }) {
   const floor = tokenValue(token("space.1"));
   const content = layout.bar ? layout.contentHeight : Math.max(layout.contentHeight, layout.marker);
   if (layout.height > frame.height && content + 2 * Math.min(floor, layout.paddingY) > frame.height) throw new Error(`Insight overflows its ${frame.height}px box by ${Math.ceil(layout.height - frame.height)}px even with its padding closed to ${floor}px; give it ${Math.ceil(layout.height - frame.height)}px more height or shorten the sentence`);
-  const fill = variant === "primary" ? PRIMARY : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
-  const foreground = variant === "primary" ? WHITE : INK;
+  const fill = variant === "primary" ? reversedFill(PRIMARY) : variant === "neutral" ? MUTED_SURFACE : variant === "dotted" ? "none" : PRIMARY_TINT;
+  const foreground = variant === "primary" ? reversedType() : INK;
   const nodes = ["plain", "rule", "statement"].includes(variant) ? [] : [rectPrimitive({ id: stableId(id, "surface"), role: "insight-surface", frame, style: boxStyle(fill, "none", HAIRLINE, SMALL_RADIUS) })];
   if (variant === "rule") nodes.push(openLine(stableId(id, "rule"), frame.x, frame.y, frame.x + frame.width, frame.y, "insight-rule", RULE, HAIRLINE));
   if (variant === "statement") nodes.push(rectPrimitive({ id: stableId(id, "bar"), role: "insight-bar", frame: { x: frame.x, y: frame.y + layout.paddingY, width: layout.bar, height: layout.contentHeight }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.none")) }));
@@ -194,7 +194,7 @@ function insightNodes({ id, frame, props }) {
   if (layout.marker && !layout.bar) {
     // Chevron disc: reversed on the primary band, primary on a tinted band.
     const size = layout.marker, mx = frame.x + layout.paddingX, my = frame.y + (frame.height - size) / 2;
-    const discFill = variant === "primary" ? WHITE : PRIMARY, chevron = variant === "primary" ? PRIMARY : WHITE;
+    const discFill = variant === "primary" ? reversedType() : PRIMARY, chevron = variant === "primary" ? fill : WHITE;
     nodes.push(ellipsePrimitive({ id: stableId(id, "marker"), role: "insight-marker", frame: { x: mx, y: my, width: size, height: size }, style: boxStyle(discFill, discFill, HAIRLINE, token("radius.round")) }));
     nodes.push(shapePrimitive({ id: stableId(id, "marker-chevron"), role: "insight-marker-glyph", geometry: "iconPath", frame: { x: mx + size * 0.3, y: my + size * 0.28, width: size * 0.4, height: size * 0.44 }, style: { fill: "none", stroke: chevron, lineWidth: token("line.standard"), lineCap: "round" }, data: { paths: [{ points: [[0.2, 0], [0.8, 0.5], [0.2, 1]], closed: false }] } }));
   }
@@ -374,7 +374,7 @@ function bodyListNodes({ id, frame, props }) {
   // reversed number discs.
   const inverse = props.tone === "inverse";
   if (props.tone !== undefined && !["standard", "inverse"].includes(props.tone)) throw new Error(`Unknown bullet-list tone: ${props.tone}`);
-  const INK_ = inverse ? WHITE : INK;
+  const INK_ = inverse ? reversedType() : INK;
   // `centre: false` keeps the block at the top of its track. The leftover is
   // only a margin when the list owns the track: under a kpi or an insight it
   // reads as a gap between the two, and in a two-column split it lands the
@@ -514,6 +514,7 @@ function defineInsight() {
     category: "section",
     role: "insight",
     tokens: [
+      "color.band",
       "color.accent", "font.display", "radius.none", "color.componentPrimaryTint", "color.componentPrimary", "color.surfaceMuted",
       "color.rule", "color.onPrimary", "color.ink", "font.body", "type.heading", "type.body", "space.2", "space.3", "space.4", "space.5",
       "space.6", "line.hairline", "line.standard", "radius.small", "radius.round", "icon.medium"
@@ -569,6 +570,7 @@ function definePanel() {
     category: "section",
     role: "panel",
     tokens: [
+      "color.band",
       "color.surface",
       "color.surfaceMuted",
       "color.componentPrimary",
@@ -591,10 +593,10 @@ function definePanel() {
         throw new Error("Panel seriesColorIndex must be an integer from zero to five");
       const fill = seriesColorIndex !== undefined
         ? token(`color.chartSeries${seriesColorIndex + 1}`)
-        : tone === "primary" ? PRIMARY : tone === "dark" ? INK : tone === "muted" ? MUTED_SURFACE : SURFACE;
+        : tone === "primary" ? reversedFill(PRIMARY) : tone === "dark" ? reversedFill(INK) : tone === "muted" ? MUTED_SURFACE : SURFACE;
       const foreground = seriesColorIndex !== undefined
         ? onFill(fill)
-        : tone === "primary" || tone === "dark" ? WHITE : INK;
+        : tone === "primary" || tone === "dark" ? reversedType() : INK;
       const data = seriesColorIndex === undefined ? {} : { seriesKey: props.seriesKey ?? props.heading, colorIndex: seriesColorIndex };
       return {
         nodes: [

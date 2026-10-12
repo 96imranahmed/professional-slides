@@ -10,13 +10,13 @@
 //   today?: 4.5,                              // period index (fractional) for the vertical line
 //   labelWidth?: px
 // }
-import { token, tokenValue, stableId, textPrimitive, linePrimitive, shapePrimitive } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, linePrimitive, shapePrimitive, reversedFill, reversedGround, onFill } from "./core.mjs";
 import { measureAt, fillRect } from "./draw.mjs";
 
 const v = (id) => tokenValue(token(id));
 const INK = token("color.ink"), WHITE = token("color.onPrimary"), PRIMARY = token("color.componentPrimary"), SECOND = token("color.chartSeries2"), ACCENT = token("color.accent");
 const RULE = token("color.rule"), MUTED = token("color.surfaceMuted"), GREY = token("color.textSecondary"), FONT = token("font.body");
-export const GANTT_TOKENS = Object.freeze(["color.ink", "color.onPrimary", "color.componentPrimary", "color.chartSeries2", "color.accent", "color.rule", "color.surfaceMuted", "color.textSecondary", "font.body", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "line.hairline", "line.standard", "radius.none", "radius.small"]);
+export const GANTT_TOKENS = Object.freeze(["color.ink", "color.onPrimary", "color.band", "color.componentPrimary", "color.chartSeries2", "color.accent", "color.rule", "color.surfaceMuted", "color.textSecondary", "font.body", "type.body", "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "line.hairline", "line.standard", "radius.none", "radius.small"]);
 
 const measure = (text, width, size = "type.compact", bold = false) => measureAt(text, width, { size, bold });
 const style = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
@@ -150,9 +150,11 @@ export function ganttNodes({ id, frame, props }) {
     // group cell (filled, spans the group's rows)
     if (L.hasGroups && row.first && L.groups[row.group].name) {
       const gh = L.heights.slice(r, r + row.count).reduce((a, b) => a + b, 0);
-      nodes.push(rect(stableId(id, "group", row.group), "gantt-group", { x: frame.x, y: y + 1, width: L.groupWidth, height: gh - 2 }, row.group % 2 ? SECOND : PRIMARY, "radius.none", { group: row.group }));
+      // The group column is a label surface: on a page whose type is pale its first shade is the band, not a white block (core.mjs reversedFill).
+      const groupFill = row.group % 2 ? SECOND : reversedFill(PRIMARY);
+      nodes.push(rect(stableId(id, "group", row.group), "gantt-group", { x: frame.x, y: y + 1, width: L.groupWidth, height: gh - 2 }, groupFill, "radius.none", { group: row.group }));
       const gm = measure(L.groups[row.group].name, L.groupWidth - 2 * v("space.2"), "type.compact", true);
-      nodes.push(text(stableId(id, "group-label", row.group), "gantt-group-label", { x: frame.x + v("space.2"), y: y + (gh - gm.height) / 2, width: L.groupWidth - 2 * v("space.2") }, gm, style("type.compact", WHITE, true, "center")));
+      nodes.push(text(stableId(id, "group-label", row.group), "gantt-group-label", { x: frame.x + v("space.2"), y: y + (gh - gm.height) / 2, width: L.groupWidth - 2 * v("space.2") }, gm, style("type.compact", reversedGround() ? onFill(groupFill) : WHITE, true, "center")));
     }
     // label
     const lx = frame.x + (L.hasGroups ? L.groupWidth + v("space.2") : 0);

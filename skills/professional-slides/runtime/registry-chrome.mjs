@@ -3,7 +3,7 @@
 // titles, the cover, the section divider, the takeaways and statement pages,
 // and the footer lines (source, footnote, page number).
 import { token, tokenValue, CHROME, rectPrimitive, stableId, textPrimitive, TITLE_VARIANTS, resolveTitleVariant, houseStyle, normalizeInsets,
-  insetFrame, ellipsePrimitive, linePrimitive, SLIDE, STYLE_TOKENS, DEFAULT_TITLE_VARIANT } from "./core.mjs";
+  insetFrame, ellipsePrimitive, linePrimitive, SLIDE, STYLE_TOKENS, DEFAULT_TITLE_VARIANT, reversedFill, reversedType } from "./core.mjs";
 import { textWords } from "./text-contract.mjs";
 import { measureText, measureTextRuns, balancedWrap } from "./text-layout.mjs";
 import { PAGE_TEMPLATE_TOKENS, renderPageTemplate, PAGE_RULES, PAGE_BRANDING, pageTemplateLayout, resolvePageTemplate } from "./page-template.mjs";
@@ -232,8 +232,9 @@ function sideTitleChrome({ id, frame, props, page, railed, railNodes }) {
   const pad = tokenValue(token("space.6")), panelRight = frame.x + SIDE_TITLE.panel;
   const x = frame.x + CHROME.left, width = SIDE_TITLE.panel - CHROME.left - pad;
   const bottom = frame.y + CHROME.sourceTop - tokenValue(token("space.3"));
-  const reversed = token("color.onPrimary");
-  const nodes = [rectPrimitive({ id: stableId(id, "title-panel"), role: "title-band", frame: { x: frame.x, y: frame.y, width: SIDE_TITLE.panel, height: bottom - frame.y }, style: boxStyle(PRIMARY, "none", HAIRLINE, token("radius.none")), data: { titlePlacement: "side" } })];
+  // The panel is a surface type is reversed out of: the band on a page whose own type is pale (core.mjs reversedFill).
+  const reversed = reversedType(), panel = reversedFill(PRIMARY);
+  const nodes = [rectPrimitive({ id: stableId(id, "title-panel"), role: "title-band", frame: { x: frame.x, y: frame.y, width: SIDE_TITLE.panel, height: bottom - frame.y }, style: boxStyle(panel, "none", HAIRLINE, token("radius.none")), data: { titlePlacement: "side" } })];
   const set = (key, role, text, y, size, color, { bold = false, family = FONT } = {}) => {
     const layout = measureText(text, width, { fontFamily: tokenValue(family), fontSize: tokenValue(size), bold });
     nodes.push(textPrimitive({ id: stableId(id, key), role, frame: { x, y, width, height: layout.height }, text: layout.text, style: { ...textStyle(size, color, bold, "left", "top"), fontFamily: family, lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, titlePlacement: "side" } }));
@@ -249,7 +250,7 @@ function sideTitleChrome({ id, frame, props, page, railed, railNodes }) {
   // The finding's numeral, in the accent where it reads on the panel, else reversed.
   const numeral = typeof props.titleNumeral === "string" && props.titleNumeral.trim() ? props.titleNumeral.trim() : null;
   if (numeral) {
-    const accent = contrastRatio(tokenValue(token("color.accent")), tokenValue(PRIMARY)) >= MARK_CONTRAST ? token("color.accent") : reversed;
+    const accent = contrastRatio(tokenValue(token("color.accent")), tokenValue(panel)) >= MARK_CONTRAST ? token("color.accent") : reversed;
     // Figures are set in the body face, whose digits are lining (components.md): the display face's old-style 4 and 7 descend.
     const layout = set("title-numeral", "title-numeral", numeral, y, token("type.coverTitle"), accent, { bold: true });
     if (layout.lines.length > 1) throw new Error(`A side title's numeral is a figure on one line ("${numeral}"); put the words in the title`);
@@ -367,10 +368,11 @@ function renderSlideChrome({ id, frame, props }) {
     for (const node of [...titles, ...(railed ? [] : tracker), ...kicker]) if (node.frame) node.frame = { ...node.frame, y: node.frame.y - lift };
     titleBottom -= lift;
     const blockBottom = titleBottom + tokenValue(token("space.3"));
-    titles.unshift(rectPrimitive({ id: stableId(id, "title-band"), role: "title-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: blockBottom }, style: boxStyle(PRIMARY, "none", HAIRLINE, token("radius.none")), data: { block: true } }));
+    // On a page whose type is pale the block is the band, as every surface type is reversed out of (core.mjs reversedFill).
+    titles.unshift(rectPrimitive({ id: stableId(id, "title-band"), role: "title-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: blockBottom }, style: boxStyle(reversedFill(PRIMARY), "none", HAIRLINE, token("radius.none")), data: { block: true } }));
     for (const node of [...titles, ...(railed ? [] : tracker), ...kicker]) {
       if (node.type === "text" && node.frame && node.frame.y < blockBottom) {
-        node.style = { ...node.style, color: WHITE };
+        node.style = { ...node.style, color: reversedType() };
         // An accent lead ("Sector outlook:") keeps its weight but reverses too.
         const plain = (runs) => Array.isArray(runs) ? runs.map((run) => ({ ...run, accent: false })) : runs;
         if (Array.isArray(node.runs)) node.runs = plain(node.runs);
@@ -420,6 +422,7 @@ function defineSlideChrome() {
     id: "slide-chrome", category: "shared", role: "slide-chrome",
     tokens: [
       "color.canvas",
+      "color.band",
       "color.ink",
       "color.componentPrimary",
       "color.accent",
@@ -463,7 +466,7 @@ function definePageTemplate() {
 
 function defineSection() {
   return component({
-    id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "color.ink", "color.accentTint", "color.onPrimary", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
+    id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "color.ink", "color.accentTint", "color.onPrimary", "color.band", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
     render: ({ id, frame, props }) => {
       const treatment = props.treatment || "open";
       const edge = props.edge || "contained";
@@ -474,7 +477,7 @@ function defineSection() {
       const padding = sectionPadding(props);
       // Side panels from the 2020–24 decks: a navy "Key insights" column (dark),
       // a grey commentary column (muted) and an accent-tinted message column (tint).
-      const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : treatment === "dark" ? INK : treatment === "tint" ? token("color.accentTint") : SURFACE;
+      const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? reversedFill(PRIMARY) : treatment === "dark" ? reversedFill(INK) : treatment === "tint" ? token("color.accentTint") : SURFACE;
       const stroke = treatment === "open" ? RULE : fill;
       const nodes = [];
       const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
@@ -499,8 +502,14 @@ function defineSectionTitle() {
   return component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "(Insert section title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) });
 }
 
+// Whether a fixed-shape page paints its own ground - a navy cover, a dark
+// divider panel, a field of the primary, a photograph - rather than sitting on
+// the page's: such a page is drawn in the light page's tokens on any deck, as it
+// was designed (core.mjs groundOf), and the rest are set on the deck's ground.
+const owning = (definition, ownGround) => Object.assign(definition, { ownGround });
+
 function defineCover() {
-  return component({
+  return owning(component({
     id: "cover",
     category: "navigation",
     role: "cover",
@@ -577,6 +586,11 @@ function defineCover() {
       if (date) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "date"), role: "cover-date", frame: { x, y, width, height: date.height }, text: date.text, style: { ...textStyle(BODY, secondary, false, "left", "top"), lineHeight: date.lineHeight, wrap: false }, data: { textLayout: date } })); }
       return { nodes };
     }
+  }), (props) => {
+    const variant = props.variant ?? "dark";
+    if (variant === "plain") return false;
+    // A photograph is its own ground; the editorial and journal covers are typographic, set on the page.
+    return variant !== "dark" || ["block", "keynote"].includes(houseStyle("style.coverLayout"));
   });
 }
 
@@ -742,7 +756,7 @@ function renderSectionDivider({ id, frame, props }) {
 }
 
 function defineSectionDivider() {
-  return component({
+  return owning(component({
     id: "section-divider",
     category: "navigation",
     role: "divider",
@@ -775,14 +789,14 @@ function defineSectionDivider() {
     preferredSize: { ...SLIDE },
     sample: { title: "(Insert section title)" },
     render: renderSectionDivider
-  });
+  }), (props) => { const layout = houseStyle("style.dividerLayout"); return layout === "panel" ? (props.mode ?? "dark") === "dark" : layout === "keynote"; });
 }
 
 // A closing page: navy, "Key takeaways", the
 // three or four messages as big serif numerals with bold copy, an optional
 // photograph on the right (registry-media.mjs). Structural, like a divider.
 function defineTakeaways() {
-  return component({
+  return owning(component({
     id: "takeaways",
     category: "navigation",
     role: "takeaways",
@@ -871,14 +885,14 @@ function defineTakeaways() {
       const items = (Array.isArray(props.items) ? props.items : []).map((item) => measureTakeaway(String(item), width - 64));
       return { height: CHROME.titleTop + 8 + title.height + tokenValue(token("space.4")) + 12 + items.reduce((sum, item) => sum + item.height + 16, 0) };
     }
-  });
+  }), (props) => (props.mode ?? "dark") === "dark");
 }
 
 // The statement page: one sentence set large and
 // centred, its key phrase in the accent (bold white on navy), a short accent
 // rule above; with a photograph (registry-media.mjs) the sentence sits on a navy card.
 function defineStatement() {
-  return component({
+  return owning(component({
     id: "statement",
     category: "navigation",
     role: "statement",
@@ -943,7 +957,7 @@ function defineStatement() {
       const layout = measureText(String(props.text ?? ""), width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")) });
       return { height: 4 + 2 * tokenValue(token("space.4")) + layout.height };
     }
-  });
+  }), (props) => (props.mode ?? "light") === "dark" || Boolean(props.image));
 }
 
 function defineSource() {

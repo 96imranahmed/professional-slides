@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
-import { contrastRatio } from "./color.mjs";
+import { resolvePalette, heatScaleTokens, groundTokens, GROUNDS } from "./palettes.mjs";
+import { contrastRatio, relativeLuminance } from "./color.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 import { lineBox, accentRuns } from "./text-layout.mjs";
@@ -80,6 +80,11 @@ export const TOKENS = Object.freeze({
   // glance - about 30 grey levels under the page - where a 6-12% tint of the
   // primary vanishes on a projector and in the page's measured weight.
   "color.surfaceTint": colour("--surface-tint", "#DADEE1"),
+  // The surface type is reversed out of on a page whose type is pale - a header
+  // band, a dark panel, the so-what bar (reversedFill): a step off a dark or a
+  // primary ground. On a light page those surfaces keep the ink or the primary
+  // they are drawn in, so its value there is the ink's (resolvePalette).
+  "color.band": colour("--band", "#06233B"),
   "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
   "color.accent": colour("--accent", "#00A6E6"),
   "color.accentTint": colour("--accent-tint", "#DCF3FD"),
@@ -200,6 +205,26 @@ export function onFill(fill) {
   const white = token("color.onPrimary"), ink = token("color.ink");
   return contrastRatio(value, tokenValue(white)) >= contrastRatio(value, tokenValue(ink)) ? white : ink;
 }
+
+/**
+ * Whether the page's type is lighter than its ground: a page set on the dark or
+ * the primary ground (palettes.mjs groundTokens), where the ink is the pale type.
+ */
+export function reversedGround() {
+  return relativeLuminance(tokenValue("color.ink")) > relativeLuminance(tokenValue("color.canvas"));
+}
+/**
+ * The fill of a surface type is reversed out of - a table's header band, a total
+ * row, a dark or primary panel, the so-what bar: `fill` (the ink or the primary)
+ * on a light page; on a reversed ground the band (`color.band`), a step off the
+ * ground. There the ink and the primary are the pale type and the light marks,
+ * and a header band drawn in them was a white block with navy type on a navy
+ * page. A diagram's boxes and a chart's marks are marks, not surfaces: they keep
+ * their colours and turn light as the bars do.
+ */
+export const reversedFill = (fill) => (reversedGround() ? token("color.band") : fill);
+/** The type on a reversedFill surface: the reversed white on a light page, the pale ink on a reversed ground. */
+export const reversedType = () => (reversedGround() ? token("color.ink") : token("color.onPrimary"));
 
 /**
  * `phrases` inside `text` as runs on a filled surface: in the accent where the
@@ -1161,13 +1186,51 @@ export function componentGeometry(nodes) {
     anchors: { contentTop: y, contentBottom: bottom, ...(headings.length ? { headerTop: Math.min(...headings.map(node => node.frame.y)) } : {}) } };
 }
 
+/**
+ * The ground each page is set on, and its tokens. The palette resolves once,
+ * for its light page; a page set on another ground (`tone` on the page, else on
+ * the deck: `ground` here) takes the same palette resolved for that ground
+ * (palettes.mjs groundTokens), chrome and body alike, so its title, rules,
+ * marks and footer all read on it and the rest of the deck is untouched. A
+ * fixed-shape page that paints its own ground - a dark cover, a navy divider, a
+ * dark takeaways page (a component's `ownGround`) - is drawn in the light
+ * page's tokens on any deck, as it was designed: on a dark deck its navy is the
+ * ground the deck's pages are set on.
+ */
+function groundsOf(lightTokens) {
+  const resolved = new Map([["light", lightTokens]]);
+  return (ground) => {
+    if (!resolved.has(ground)) resolved.set(ground, groundTokens(lightTokens, ground, THEME_SLOT_TOKENS));
+    return resolved.get(ground);
+  };
+}
+function groundOf(slideSpec, deckGround, registry, lightTokens) {
+  if (slideSpec.ground !== undefined) {
+    if (!GROUNDS.includes(slideSpec.ground)) throw new Error(`Unknown tone: ${JSON.stringify(slideSpec.ground)}; a page is set on ${GROUNDS.map((g) => `"${g}"`).join(", ")}`);
+    return slideSpec.ground;
+  }
+  if (deckGround === "light") return "light";
+  const children = slideSpec.composition?.children;
+  const sole = Array.isArray(children) && children.length === 1 ? children[0] : null;
+  const own = sole?.component && registry.get(sole.component)?.ownGround;
+  return own && withDesignTokens(lightTokens, () => own(sole.props || {})) ? "light" : deckGround;
+}
+
 function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
-  const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
-  const typography = resolveTypography(deckSpec.typography, designTokens);
+  const { tokens: lightTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
+  const typography = resolveTypography(deckSpec.typography, lightTokens);
+  const deckGround = deckSpec.ground ?? "light";
+  if (!["light", "dark"].includes(deckGround)) throw new Error(`Unknown deck tone: ${JSON.stringify(deckGround)}; a deck is set on "light" (the default) or "dark", and a single page on "primary"`);
+  const tokensOn = groundsOf(lightTokens);
+  // The deck's tokens are its own ground's: the manifest, the theme the PowerPoint carries and the chrome of every page on it.
+  const designTokens = tokensOn(deckGround);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
-  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => compileSlide(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }));
+  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => {
+    const ground = groundOf(slideSpec, deckGround, registry, lightTokens);
+    return compileSlide(slideSpec, slideIndex, { registry, designTokens: tokensOn(ground), ground, typography, pageTemplate, palette, slideCache });
+  });
   const templateSequences = templateSequencesOf(slides);
   const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
@@ -1204,7 +1267,7 @@ function compileSlide(slideSpec, slideIndex, context) {
  * nodes' tokens resolved and the scene's invariants asserted. A slide found in
  * `slideCache` is returned as a copy.
  */
-function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }) {
+function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, ground = "light", typography, pageTemplate, palette, slideCache }) {
   const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
   if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
   const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
@@ -1294,7 +1357,7 @@ function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, 
   // A derived citation the footer set in a shorter form is kept whole in the
   // speaker notes, so no source a page rests on is lost to the fit.
   const fullCitation = nodes.find((node) => node.data?.fullCitation)?.data.fullCitation;
-  const compiled = { id: slideId, notes: [slideSpec.notes, fullCitation].filter(Boolean).join("\n\n"), nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+  const compiled = { id: slideId, notes: [slideSpec.notes, fullCitation].filter(Boolean).join("\n\n"), nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame, ...(ground !== "light" ? { ground } : {}) };
   if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
   slideCache?.set(cacheKey,structuredClone(compiled));
   return compiled;

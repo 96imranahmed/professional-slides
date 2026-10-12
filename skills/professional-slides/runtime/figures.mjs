@@ -8,7 +8,7 @@
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted } from "./core.mjs";
+import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted, reversedFill, reversedType } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
@@ -26,7 +26,7 @@ const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
   "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary",
-  "color.rule", "color.surfaceMuted", "color.surfaceTint", "font.body", "font.display", "type.metric", "type.heading", "type.body",
+  "color.rule", "color.surfaceMuted", "color.surfaceTint", "color.band", "font.body", "font.display", "type.metric", "type.heading", "type.body",
   "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6",
   "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
@@ -1284,7 +1284,7 @@ export function speechNodes({ id, frame, props }) {
 // the panel: beside a short memo the panel takes the width the prose leaves,
 // and a 700px statement runs as two long lines across it.
 const STATEMENT_MEASURE = 440;
-const sideFill = (tone) => (tone === "primary" ? PRIMARY : tone === "muted" ? MUTED : tone === "tint" ? TINT : INK);
+const sideFill = (tone) => (tone === "primary" ? reversedFill(PRIMARY) : tone === "muted" ? MUTED : tone === "tint" ? TINT : reversedFill(INK));
 // `highlight`: the page's phrase inside the statement, so the one claim the
 // page sets large is emphasised as the points beside it are. The accent where
 // it reads on the panel at large-type contrast (3:1), else by weight
@@ -1305,12 +1305,12 @@ export function sideStatementNodes({ id, frame, props }) {
   const L = sideStatementLayout(frame, props);
   const tone = props.tone ?? "dark", light = tone === "muted" || tone === "tint";
   const fill = sideFill(tone);
-  const ink = light ? INK : WHITE, out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
+  const ink = light ? INK : reversedType(), out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
   let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
   const x = frame.x + v("space.5");
   out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
   y += v("space.4");
-  if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : WHITE, true))); y += L.kicker.height + v("space.3"); }
+  if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : reversedType(), true))); y += L.kicker.height + v("space.3"); }
   const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
   out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);
   return out;

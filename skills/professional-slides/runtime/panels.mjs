@@ -3,7 +3,7 @@
 // KPI tile. Each shares the deck's heading band, marker vocabulary and body
 // type; the row rule (every panel in a row shares one header height) holds
 // inside a cards row because the cards are laid out here, together.
-import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted } from "./core.mjs";
+import { token, tokenValue, stableId, textPrimitive, linePrimitive, wedgePrimitive, ellipsePrimitive, readableOn, cardFill, cardMuted, reversedFill, reversedType } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { MARK_TOKENS, markerSize, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
@@ -18,7 +18,7 @@ const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 const ACCENT_OR_PRIMARY = () => token("color.accent");
 
-export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
+export const PANEL_TOKENS = Object.freeze([...new Set([...MARK_TOKENS, "color.accent", "color.componentPrimaryTint", "color.surfaceTint", "color.band", "color.textSecondary", "color.surfaceMuted", "color.rule", "color.positive", "color.negative", "color.chartGrid", "color.surface", "font.display", "type.heading", "type.body", "type.compact", "type.label", "type.metric", "type.deckTitle", "space.1", "space.2", "space.3", "space.4", "space.5", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
 
 const text = (size, color = INK, bold = false, align = "left") => ({ fontFamily: FONT, fontSize: token(size), color, bold, align, valign: "top", wrap: false });
 const measure = (value, width, size, bold = false) => measureAt(value, width, { size, bold });
@@ -163,8 +163,8 @@ export function cardsNodes({ id, frame: frameIn, props }) {
   const nodes = [];
   if (asked) {
     const h = Math.max(cardHeight, q.height + 2 * qpad);
-    nodes.push(rect(stableId(id, "question"), "card-question", { x: frameIn.x, y: frame.y, width: qw, height: h }, SECONDARY, "none", "radius.none"));
-    nodes.push(label(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, text("type.heading", WHITE, true)));
+    nodes.push(rect(stableId(id, "question"), "card-question", { x: frameIn.x, y: frame.y, width: qw, height: h }, reversedFill(SECONDARY), "none", "radius.none"));
+    nodes.push(label(stableId(id, "question-text"), "card-question-text", { x: frameIn.x + qpad, y: frame.y + qpad, width: qw - 2 * qpad }, q, text("type.heading", reversedType(), true)));
   }
   L.items.forEach((m, index) => {
     const x = frame.x + index * (L.width + L.gap), cid = stableId(id, "card", index);
@@ -177,17 +177,17 @@ export function cardsNodes({ id, frame: frameIn, props }) {
     const cx = x + L.pad;
     const align = L.centred ? "center" : "left";
     if (L.tone === "header") {
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY));
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, text("type.heading", WHITE, true)));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, reversedFill(PRIMARY)));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: top + v("space.2"), width: L.inner }, m.title, text("type.heading", reversedType(), true)));
       y = top + m.bandHeight + L.pad;
     } else if (L.tone === "dark") {
       // A navy tile carries icon and title in white; the copy sits below it on the page.
-      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, PRIMARY, "none", "radius.small"));
+      nodes.push(rect(stableId(cid, "band"), "card-band", { x, y: top, width: L.width, height: m.bandHeight }, reversedFill(PRIMARY), "none", "radius.small"));
       const block = (m.item.icon || m.item.logo ? L.iconSize + L.headGap : 0) + m.title.height;
       let ty = top + (m.bandHeight - block) / 2;
       if (m.item.logo) { nodes.push(...cardLogo(cid, m.item.logo, { x: cx, y: ty, width: L.inner, height: L.iconSize }, true, true)); ty += L.iconSize + L.headGap; }
       else if (m.item.icon) { nodes.push(...iconMarker({ id: stableId(cid, "icon"), role: "card-icon", x: cx + (L.inner - L.iconSize) / 2, y: ty, size: L.iconSize, icon: m.item.icon, tone: "filled" })); ty += L.iconSize + L.headGap; }
-      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", WHITE, true, "center")));
+      nodes.push(label(stableId(cid, "title"), "card-title", { x: cx, y: ty, width: L.inner }, m.title, text("type.heading", reversedType(), true, "center")));
     } else if (L.tone === "big-number") {
       // "01 / 02 / 03": the numeral in display type, the title beside the next
       // card's arrow, and the copy on a muted band that runs to the frame's foot.
@@ -284,8 +284,8 @@ export function quadrantsNodes({ id, frame, props }) {
   L.cells.forEach((cell, i) => {
     const x = frame.x + (i % 2) * (L.width + L.gap), y0 = frame.y + Math.floor(i / 2) * (L.height + L.gap), qid = stableId(id, "quadrant", i);
     nodes.push(rect(stableId(qid, "surface"), "quadrant-surface", { x, y: y0, width: L.width, height: L.height }, cardMuted()));
-    nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : PRIMARY));
-    nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : WHITE, true)));
+    nodes.push(rect(stableId(qid, "band"), "quadrant-band", { x, y: y0, width: L.width, height: cell.band }, light ? TINT : reversedFill(PRIMARY)));
+    nodes.push(label(stableId(qid, "title"), "quadrant-title", { x: x + L.pad, y: y0 + v("space.2"), width: L.inner }, cell.title, text("type.heading", light ? INK : reversedType(), true)));
     let y = y0 + cell.band + L.pad;
     cell.points.forEach((p, k) => {
       nodes.push(rect(stableId(qid, "bullet", k), "quadrant-bullet", { x: x + L.pad, y: y + (p.lineHeight - v("space.1")) / 2, width: v("space.1"), height: v("space.1") }, INK));
@@ -362,8 +362,8 @@ export function metricNodes({ id, frame, props }) {
   const total = value.height + (labelLayout ? gap + labelLayout.height : 0) + (sub ? gap + sub.height : 0) + (delta ? gap + delta.height : 0);
   if (total > frame.height + 0.01) throw new Error(`Metric tile is too short for its ${["value", labelLayout && "label", sub && "sublabel", delta && "delta"].filter(Boolean).join(", ")}: they take ${Math.ceil(total)}px at this width and the tile has ${Math.floor(frame.height)}px. Shorten the ${sub ? "sublabel or the label" : "label"}${delta ? ", or drop the delta" : ""}, or set fewer tiles so each is wider`);
   const nodes = [];
-  if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, INK, "none", "radius.none"));
-  else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, PRIMARY, "none", "radius.small"));
+  if (ink_) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, reversedFill(INK), "none", "radius.none"));
+  else if (dark) nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, reversedFill(PRIMARY), "none", "radius.small"));
   else if (props.tone === "tint") nodes.push(rect(stableId(id, "surface"), "metric-surface", frame, TINT, "none", "radius.small"));
   // No hairline before the tile. A rule drawn as a divider between tiles
   // - n tiles, n-1 rules - on a row whose values are left-aligned over a
@@ -375,7 +375,7 @@ export function metricNodes({ id, frame, props }) {
   // value in the accent, left-aligned, on no tile.
   // `tone: "hero"`: the one big number beside a chart, in the accent, left-aligned, top-anchored.
   const hero = props.tone === "hero";
-  const ink = ink_ ? ACCENT : dark ? WHITE : hero || ruled ? ACCENT : PRIMARY, grey = dark ? WHITE : hero || ruled ? INK : SECONDARY;
+  const ink = ink_ ? ACCENT : dark ? reversedType() : hero || ruled ? ACCENT : PRIMARY, grey = dark ? reversedType() : hero || ruled ? INK : SECONDARY;
   const align = props.align ?? (hero || ruled ? "left" : "center");
   // Peers in a row start on one line. Centred in its own track, a tile with
   // three lines against its neighbours' four would begin ten pixels lower, and
@@ -393,7 +393,7 @@ export function metricNodes({ id, frame, props }) {
     // cost, churn, a wait - reads its fall as the good news.
     const better = props.better ?? "up";
     const good = better === "up" ? rising : falling, bad = better === "up" ? falling : rising;
-    const color = dark ? WHITE : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
+    const color = dark ? reversedType() : bad ? token("color.negative") : good ? token("color.positive") : PRIMARY;
     nodes.push(label(stableId(id, "delta"), "metric-delta", { x: frame.x + pad, y, width }, delta, text("type.label", color, true, align)));
   }
   return nodes;

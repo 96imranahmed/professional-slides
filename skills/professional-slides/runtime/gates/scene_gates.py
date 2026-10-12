@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import math
 import re
+import sys
+from pathlib import Path
 
 from gate_config import (
     ARGUMENT_COMPONENTS, DATA_COMPONENTS, DECK_HABIT, FOOTER_TOP, GENERATED_PAGE, SOURCE_ROLES,
@@ -27,11 +29,15 @@ from render_gates import (
 )
 # The same measure estimated from the scene, so it runs at authoring, and the
 # scene's colours read the one way both scene measures read them.
-from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of
+from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of, ground_at
 from scene_ink import estimate as scene_ink_estimate
 from text_stats import word_count
 # What a title counts is read, not matched (judgements.py).
 from judgements import judged
+
+# WCAG contrast, the one definition the scene and the emitter read (emit/color.py).
+sys.path.insert(1, str(Path(__file__).resolve().parent.parent / "emit"))
+from color import contrast  # noqa: E402
 
 
 # A shape that holds text is a container: a card, a panel, a tile, a table
@@ -293,6 +299,74 @@ def gate_scene_void(slide_no, slide, findings):
         "the body under the title rather than centring it in air, set the commentary beside the exhibit "
         "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
         "text to cover the band.".format(void["from"], void["to"]),
+    ))
+
+
+# Type and marks read against what they are set on (scene_ink.ground_at): the
+# page's canvas, or the band, panel or bar under them. The palette holds its ink
+# and primary to its canvas (palettes.mjs CANVAS_CONTRAST), and a page set on a
+# dark or a primary ground takes colours derived for that ground (groundTokens);
+# but a palette written with a dark canvas over the house's light-page series
+# drew a chart navy on navy, and every gate passed it. The bars are where type
+# and marks are lost, not WCAG's: the quietest type the runtime sets on its own
+# light page - a comparator's label in the rule grey, white on a pale series -
+# reads at 2.8:1, so `text` stops short of it; an exhibit is lost when none of
+# its marks reads at the palette's floor for a mark (2:1).
+GROUND_CONTRAST = {"text": 2.5, "marks": 2.0}
+GROUND_MARK_ROLES = frozenset({"chart-mark", "chart-line", "chart-marker", "chart-segment", "table-bar"})
+
+
+def ground_contrast(slide):
+    """What the page sets that is lost on its ground: each run of type that
+    reads under GROUND_CONTRAST `text` against what it sits on, and each exhibit
+    none of whose marks reads at `marks`, as [{kind, ratio, color, ground, role,
+    text | instance}], the least legible first."""
+    nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
+    canvas = canvas_of(slide)
+    lost, marks = [], {}
+    for index, node in enumerate(nodes):
+        style, frame = node.get("style") or {}, node["frame"]
+        if node.get("type") == "text":
+            color = color_of(style.get("color"))
+            if not color or not word_count(source_text(node)):
+                continue
+            x, y, w, h = _text_box(node)
+            ground = ground_at(nodes, index, x + w / 2, y + h / 2, canvas)
+            if ground and contrast(color, ground) < GROUND_CONTRAST["text"]:
+                lost.append({"kind": "text", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
+                             "role": node.get("role"), "text": " ".join(source_text(node).split())[:60]})
+        elif node.get("role") in GROUND_MARK_ROLES:
+            color = color_of(style.get("stroke") if node.get("type") == "line" else style.get("fill")) or color_of(style.get("stroke"))
+            ground = ground_at(nodes, index, float(frame.get("x") or 0) + float(frame.get("width") or 0) / 2,
+                               float(frame.get("y") or 0) + float(frame.get("height") or 0) / 2, canvas)
+            if not color or not ground:
+                continue
+            instance = (node.get("data") or {}).get("componentInstance") or node.get("id")
+            record = {"kind": "marks", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
+                      "role": node.get("role"), "instance": instance}
+            if instance not in marks or record["ratio"] > marks[instance]["ratio"]:
+                marks[instance] = record
+    lost += [record for record in marks.values() if record["ratio"] < GROUND_CONTRAST["marks"]]
+    return sorted(lost, key=lambda record: record["ratio"])
+
+
+def gate_ground_contrast(slide_no, slide, findings):
+    """GROUND_CONTRAST. Type, or an exhibit's marks, set where they cannot be
+    read: under GROUND_CONTRAST on the ground they sit on. One finding a page,
+    naming the least legible and how many more."""
+    lost = ground_contrast(slide)
+    if not lost:
+        return
+    worst = lost[0]
+    what = ('Type "{}" ({})'.format(worst["text"], worst["role"]) if worst["kind"] == "text"
+            else "Every mark of {}".format(worst["instance"]))
+    more = " and {} more like it".format(len(lost) - 1) if len(lost) > 1 else ""
+    findings.append(finding(
+        slide_no, "GROUND_CONTRAST", {**worst, "count": len(lost)}, GROUND_CONTRAST[worst["kind"]],
+        "{} reads at {}:1 on its ground ({} on {}){}. Set a page on a dark or a brand-colour ground with `tone` - "
+        "on the deck or the page - which resolves every colour for that ground from the palette, rather than a "
+        "palette `color.canvas` under colours drawn for a light page; or give the type or the marks a colour that "
+        "reads on what they sit on.".format(what, worst["ratio"], worst["color"], worst["ground"], more),
     ))
 
 

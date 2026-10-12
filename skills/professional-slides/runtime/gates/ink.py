@@ -45,8 +45,40 @@ def relative(histogram, luminance):
     return luminance - (255 - background)
 
 
+def grey_contrast(a, b):
+    """The WCAG contrast of two grey levels of a render (0-255), each read as
+    the sRGB grey it is: what the eye gets of a colour pair once it is pixels."""
+    def luminance(level):
+        v = float(level) / 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    la, lb = luminance(a), luminance(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
 def _threshold(grey, luminance):
     return relative(grey.histogram(), luminance) if luminance < 255 else luminance
+
+
+def dark_background(histogram):
+    """The commonest dark grey of a page set on a dark ground: its background."""
+    return max(range(128), key=histogram.__getitem__)
+
+
+def marked(grey, luminance, dark=False):
+    """Whether each grey level of a load_grey array is marked, read from the
+    page's own background (relative). `dark` says the page is set on a dark
+    ground (the scene's canvas, scene_ink.dark_ground): there type and marks
+    are lighter than the page, and a darker-than test saw none of them - a
+    full navy page measured no ink at all and a 72% dead band - so a mark is a
+    pixel lighter than the commonest dark grey by the same margin."""
+    import numpy as np
+
+    if luminance >= 255:
+        return grey < luminance
+    histogram = np.bincount(grey.ravel(), minlength=256).tolist()
+    if dark:
+        return grey > dark_background(histogram) + (255 - luminance)
+    return grey < relative(histogram, luminance)
 
 
 def load_grey(path):
@@ -69,30 +101,26 @@ def load_grey(path):
         return np.asarray(grey)
 
 
-def ink_matrix(grey, luminance=INK_LUMINANCE):
+def ink_matrix(grey, luminance=INK_LUMINANCE, dark=False):
     """The ink mask of a load_grey array (rows x columns of booleans), with
-    the threshold measured from the page's own background (relative)."""
-    import numpy as np
-
-    if luminance >= 255:
-        return grey < luminance
-    return grey < relative(np.bincount(grey.ravel(), minlength=256).tolist(), luminance)
+    the threshold measured from the page's own background (marked)."""
+    return marked(grey, luminance, dark)
 
 
-def ink_rows(grey, luminance=INK_LUMINANCE):
+def ink_rows(grey, luminance=INK_LUMINANCE, dark=False):
     """rows[y] = count of marked pixels on row y of a load_grey array."""
-    return ink_matrix(grey, luminance).sum(axis=1).tolist()
+    return ink_matrix(grey, luminance, dark).sum(axis=1).tolist()
 
 
-def load_ink_matrix(path, luminance=INK_LUMINANCE):
+def load_ink_matrix(path, luminance=INK_LUMINANCE, dark=False):
     """The 1280x720 ink mask as a numpy array (rows x columns of booleans), or
     None when numpy or Pillow is not installed. Column-aware gates need the
     grid; the row gates take its row sums."""
     grey = load_grey(path)
-    return None if grey is None else ink_matrix(grey, luminance)
+    return None if grey is None else ink_matrix(grey, luminance, dark)
 
 
-def load_ink_rows(path, luminance=INK_LUMINANCE):
+def load_ink_rows(path, luminance=INK_LUMINANCE, dark=False):
     """Return rows[y] = count of pixels darker than `luminance` on that row of the
     1280x720 canvas, or None when Pillow is not installed. Ink uses
     INK_LUMINANCE; occupancy (for the dead-band and void gates) uses
@@ -107,7 +135,7 @@ def load_ink_rows(path, luminance=INK_LUMINANCE):
     the rows are counted with Pillow alone."""
     grey = load_grey(path)
     if grey is not None:
-        return ink_rows(grey, luminance)
+        return ink_rows(grey, luminance, dark)
     try:
         from PIL import Image
     except ImportError:
@@ -117,8 +145,12 @@ def load_ink_rows(path, luminance=INK_LUMINANCE):
         grey = image.convert("L")
         if grey.size != (CANVAS_W, CANVAS_H):
             grey = grey.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
-        luminance = _threshold(grey, luminance)
-        mask = grey.point(lambda p: 255 if p < luminance else 0, mode="L")
+        if dark and luminance < 255:
+            floor = dark_background(grey.histogram()) + (255 - luminance)
+            mask = grey.point(lambda p: 255 if p > floor else 0, mode="L")
+        else:
+            luminance = _threshold(grey, luminance)
+            mask = grey.point(lambda p: 255 if p < luminance else 0, mode="L")
         return [
             int(sum(mask.crop((0, y, CANVAS_W, y + 1)).histogram()[1:]))
             for y in range(CANVAS_H)

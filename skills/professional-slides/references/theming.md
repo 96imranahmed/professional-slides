@@ -83,6 +83,30 @@ Set `palette` once on the deck specification: `midnight` (default), `evergreen`,
 
 Typography is independent of palette. Deck-level `typography` supplies body, display, serif and an explicit semibold native face; `weight.semibold` requests 600 for direct annotations. Resolve the family before measuring text and validate face, size and weight in both adapters.
 
+## Dark and brand-colour pages
+
+A page is set on one of three grounds, named by `tone`: `light` (the palette's own page, the default), `dark` or `primary`. `tone: "dark"` on the deck sets every page on the dark ground; `tone` on a page sets that page alone - `dark` or `primary` in a light deck, `light` in a dark one. The palette, the design system and the identity stay as they are; `runtime/palettes.mjs` `groundTokens` resolves them for the page's ground, chrome and body alike, and every other page is untouched.
+
+It is a key and not a palette because a dark page is the house's own page reversed: one palette resolves for either ground, so one deck can carry both. A palette that sets a dark `color.canvas` is refused while its ink or primary would vanish on it, and one that passes still draws its series and surfaces for a light page; `GROUND_CONTRAST` refuses what is then lost.
+
+| `tone` | The ground | Fits |
+| --- | --- | --- |
+| `dark` | the house's own dark: its primary where that is a dark of its own (white reads on it at 10:1 - a navy, an indigo), else its ink, deepened until pale type reads at 13:1. Consulting is navy, editorial a warm black, the journal near-black, keynote indigo | a deck shown on a screen or a stage; one chart, table or KPI page set apart in a light deck |
+| `primary` | the house's primary as a field of colour, one page at a time; refused where pale type reads under 4.5:1 on it, with the dark ground offered instead | a KPI page, a statement, a text page that opens a part; a chart of one or two series |
+| `light` | the palette's own page | a page of a dark deck kept light |
+
+What each colour becomes on a dark or primary ground:
+
+- **Type.** The ink becomes the light page's own white (the editorial cream). Secondary type, units, the source line and the footer step from the ground toward it at the contrast they had, never under 4.5:1.
+- **Lines.** A rule or a gridline is a light line at the contrast it had: a gridline about 1.4:1, a rule about 2.8:1. The title rule follows its role.
+- **Marks.** Each series keeps its hue at the lightness its place in the house's range asks for - 3:1 for the palest, up to the type's own for a mark as dark as the ink - so a navy series turns near-white, a pale blue a mid blue, and the order of emphasis holds. The accent reads at 4.5:1 and keeps the most of its colour there; the status colours read at 4.5:1 or what they had.
+- **Surfaces.** Cards, the tinted label column, callout boxes and tints sit a step lighter than the ground; the heat scales are derived again from it.
+- **Reversed surfaces.** A table's header band, a total row, a dark or primary panel, a dark metric tile, the so-what bar, the keynote title block and a gantt's group column take `color.band`: a step off the ground lit in the primary's hue (a shade of it on a mid colour), with the pale type on it. A diagram's boxes and a chart's marks are marks, not surfaces: they turn light as the bars do, with the ground's colour as their type.
+
+A fixed-shape page that paints its own ground - the consulting cover, a navy divider panel, the keynote colour-field cover and divider, a dark takeaways page, a dark statement - is drawn as designed on a dark deck too, its navy the deck's ground. The editorial and journal covers and dividers, the contents page and a light statement sit on the deck's ground. `tone` on a statement is `dark` (its own navy surface), `light` or `primary`; on takeaways and a contents page `dark` or `light`; a divider takes none.
+
+In the file, the slide background is the ground (`CANVAS_COLOR`), every run and fill keeps its page's colour (`TEXT_COLOR`, `SHAPE_COLOR`), a native chart's own text takes the page's ink (`CHART_TEXT_COLOR`), and the PowerPoint theme is the deck's ground. `GROUND_CONTRAST` reads every run of type and every exhibit's marks against what they sit on in the scene, `RENDER_CONTRAST` reads the type on the render, and the render's ink and band gates read a dark page's marks as lighter than it ([page gates](evaluation/index.md#page-gates)).
+
 ## The four layers
 
 1. **Visual family** - colour, typeface, surface, line and shape character.
@@ -97,11 +121,11 @@ Resolve in that order, and let every new value enter through a named token, so a
 | Family | Use when | Character |
 | --- | --- | --- |
 | `executive-light` | default for consulting analysis, diligence, strategy and programme work | white canvas, cool neutrals, navy primary, restrained analytical colour |
-| `executive-dark` | stage presentation or screen-first executive delivery | deep blue-black canvas, pale type, controlled cyan-blue primary |
+| `executive-dark` | stage presentation or screen-first executive delivery, or one page set apart | not a palette: `tone: "dark"` on the deck or a page sets it on the house's own dark - its navy, else its ink deepened - with pale type and every colour derived from the palette ([Dark and brand-colour pages](#dark-and-brand-colour-pages)) |
 | `warm-editorial` | founder narrative, customer story, culture or strategy communication | warm paper canvas, charcoal type, terracotta primary, optional serif display |
 | `reference-derived` | an authorized source deck, corporate template or brand system is authoritative | derived from the inspected masters, layouts and recurring components |
 
-Use one family across a deck. A cover or chapter transition may use the family's inverse surface as a registered layout variant.
+Use one family across a deck. A cover or chapter transition may use the family's inverse surface as a registered layout variant, and a page of a light deck may be set on its dark or its primary ground for emphasis.
 
 ## Density profiles
 

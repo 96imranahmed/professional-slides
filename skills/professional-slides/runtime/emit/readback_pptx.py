@@ -48,7 +48,32 @@ READBACK_CODES = {
     "SERIES_COUNT": "a native chart carries a different number of series than planned",
     "NATIVE_AXIS_DRIFT": "a native chart's axis settings differ from the scene's",
     "HIDDEN_STATE": "a slide is hidden from the slide show in the file and not in the scene, or the other way",
+    "TEXT_COLOR": "a run of text in the file is set in neither its scene node's colour nor its page's accent",
+    "SHAPE_COLOR": "a shape's fill in the file is not its scene node's",
+    "CHART_TEXT_COLOR": "a native chart on a page set on another ground than the deck's keeps the theme's text colour, not the page's ink",
 }
+
+# A page set on a dark or a primary ground (core.mjs groundOf) resolves every
+# colour for that ground, and the file must keep them: a run or a fill the
+# emitter took from the deck's light-page colours, or a native chart's labels
+# left in the theme's text colour, was navy on a navy page that the scene, and
+# every gate reading it, drew legible.
+
+
+def hex_of(value):
+    """A scene style colour as RRGGBB, or None."""
+    if isinstance(value, dict):
+        value = value.get("value")
+    value = str(value or "").lstrip("#").upper()
+    return value if len(value) == 6 else None
+
+
+def saved_color(color_format):
+    """A python-pptx colour as RRGGBB, or None where none is set."""
+    try:
+        return str(color_format.rgb).upper() if color_format.type is not None else None
+    except AttributeError:
+        return None
 
 
 def frame_of(shape):
@@ -68,12 +93,14 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
     stats = {"text_checked": 0, "charts_checked": 0, "groups": 0, "wrap_none": 0, "title_placeholders": 0}
     if len(prs.slides) != len(scene["slides"]):
         findings.append({"code": "SLIDE_COUNT", "expected": len(scene["slides"]), "actual": len(prs.slides)})
+    deck_colors = {k: v.get("value") for k, v in (scene.get("tokens") or (scene["slides"][0].get("tokens") if scene.get("slides") else {}) or {}).items() if v.get("kind") == "color"}
     for si, (sl, slide) in enumerate(zip(scene["slides"], prs.slides), start=1):
         shown = slide._element.get("show") not in ("0", "false")
         if shown == bool(sl.get("hidden")):
             findings.append({"slide": si, "code": "HIDDEN_STATE", "expected": bool(sl.get("hidden")), "actual": not shown})
         if not shown:
             hidden.append({"slide": si, "id": sl.get("sourceSlideId") or sl.get("id")})
+        page_colors = {**deck_colors, **{k: v.get("value") for k, v in (sl.get("tokens") or {}).items() if v.get("kind") == "color"}}
         canvas = sl.get("tokens", {}).get("color.canvas", {}).get("value") or scene.get("tokens", {}).get("color.canvas", {}).get("value")
         if canvas:
             saved = slide._element.find("./" + qn("p:cSld") + "/" + qn("p:bg") + "/" + qn("p:bgPr") + "/" + qn("a:solidFill") + "/" + qn("a:srgbClr"))
@@ -132,6 +159,21 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
                     findings.append({"slide": si, "code": "TEXT_MISMATCH", "shape": name})
             if node.get("role") == "action-title" and (title is None or title.name != name):
                 findings.append({"slide": si, "code": "TITLE_NOT_PLACEHOLDER", "shape": name})
+            allowed = {hex_of((node.get("style") or {}).get("color")), hex_of(page_colors.get("color.accent") or page_colors.get("color.componentPrimary"))} - {None}
+            stray = sorted({c for p in tf.paragraphs for r in p.runs if r.text.strip() for c in [saved_color(r.font.color)] if c and c not in allowed})
+            if allowed and stray:
+                findings.append({"slide": si, "code": "TEXT_COLOR", "shape": name, "expected": sorted(allowed), "actual": stray})
+        for node in sl["nodes"]:
+            fill = hex_of((node.get("style") or {}).get("fill"))
+            sh = by_name.get(f"ps:{node['id']}")
+            if node["type"] not in ("rect", "ellipse", "shape") or not fill or sh is None or not hasattr(sh, "fill"):
+                continue
+            try:
+                actual = saved_color(sh.fill.fore_color)
+            except TypeError:  # a shape the emitter left unfilled
+                actual = None
+            if actual != fill:
+                findings.append({"slide": si, "code": "SHAPE_COLOR", "shape": sh.name, "expected": fill, "actual": actual})
         for ci in sl.get("componentInstances", []):
             if not ci.get("nativeChart"):
                 continue
@@ -140,6 +182,9 @@ def readback(scene: dict, pptx: Path, tol: float = 2.0) -> dict:
             if sh is None or not getattr(sh, "has_chart", False):
                 findings.append({"slide": si, "code": "MISSING_NATIVE_CHART", "shape": name}); continue
             stats["charts_checked"] += 1
+            ink = hex_of(page_colors.get("color.ink"))
+            if ink != hex_of(deck_colors.get("color.ink")) and saved_color(sh.chart.font.color) != ink:
+                findings.append({"slide": si, "code": "CHART_TEXT_COLOR", "shape": name, "expected": ink, "actual": saved_color(sh.chart.font.color)})
             expected = len(ci["nativeChart"]["series"]) or 1
             actual = sum(len(list(p.series)) for p in sh.chart.plots)
             if actual != expected:
