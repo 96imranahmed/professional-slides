@@ -8,8 +8,8 @@
 // a test holds each to the gate that enforces it (test_published_limits.py).
 // `measured` marks a capacity the renderer measures in pixels, given here as
 // the words of ordinary prose it holds: a guide to write to, not the test.
-import { PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, limitOf, familyOf, chartPage,
-  railCapacity, calloutCapacity, exhibitRange } from "./page-types.mjs";
+import { PAGE_TYPES, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, limitOf, familyOf, chartPage,
+  railCapacity, calloutCapacity, exhibitRange, placementsOf } from "./page-types.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
 import { CONTENT_THRESHOLDS, titleContentWords } from "./gates/content_gates.mjs";
@@ -68,7 +68,8 @@ export function pageLimits(type, form, { commentary = null, density } = {}) {
   if (!t) throw new Error(`No page type "${type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   if (form !== undefined && form !== null && !t.forms[form]) throw new Error(`No form "${form}" of ${type}; one of ${Object.keys(t.forms).join(", ")}`);
   const forms = form ? [form] : Object.keys(t.forms);
-  const placements = (f) => FORM_COMMENTARY[`${type}/${f}`] ?? t.commentary;
+  // The placements the compile takes for the form (page-types.mjs placementsOf): a bullet chart is not offered callouts it cannot draw.
+  const placements = (f) => placementsOf(type, f);
   // Points beside or below make a page one read with its commentary, which
   // sets the higher floor; every other placement leaves it led by its exhibit.
   // Labelled rows write their points in the rows themselves, so the page is

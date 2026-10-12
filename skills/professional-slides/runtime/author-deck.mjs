@@ -1369,13 +1369,25 @@ async function slotLimits(doc, { dir, stem, id, fallback }) {
   const long = Array.from({ length: TEXT_LIMITS.titleWords * 4 }, (_, i) => titleWords[i % Math.max(1, titleWords.length)] ?? "title").join(" ");
   const roomed = own ? spineFitFindings({ ...spec, slides: spec.slides.map((slide) => (slide === own ? { ...slide, title: long } : slide)), appendix: (spec.appendix || []).map((slide) => (slide === own ? { ...slide, title: long } : slide)) }, dir).find((f) => String(f.id) === String(id))?.measured?.fits : null;
   const range = (m) => (m.min === null ? { fits: null, short: m.short, over: m.over } : { min: m.min, max: m.max });
+  // Where no slot composed at any length - a spine page has no copy yet, and a page with none does not compose - each is given
+  // the page's limits for it (the `limits` block --scaffold prints) rather than an empty range: on the BA retest 82 of 82 slot
+  // lines printed `fits: null` to writers told to write to them. A heading has no limit there but its one line, and is left
+  // out. Where some slot composed, one that did not at any length is said as measured: that is a finding, not a gap.
+  const unmeasured = Object.keys(slots).length > 0 && Object.values(slots).every((m) => m.min === null);
+  const limits = unmeasured ? scaffoldLimits(page, doc.deck?.density) : null;
+  const ruled = (lever, m) => {
+    const slot = lever.split(":")[0], held = ({ words, lines }) => ({ ...(words ? { words } : {}), ...(lines ? { lines } : {}) });
+    if (slot === "points") return { count: m.count, wordsEach: { max: limits.textBlock.words.max }, ...(limits.bodyWords ? { bodyWords: limits.bodyWords } : {}) };
+    return limits[slot] ? { ...held(limits[slot]), has: m.count } : null;
+  };
+  const slotOf = ([lever, m]) => (unmeasured ? ruled(lever, m) : lever === "points" ? { count: m.count, wordsEach: range(m), ...(m.narrow ? { narrow: true } : {}) }
+    : { words: range(m), ...(m.characters ? { characters: { max: m.characters } } : {}), has: m.count });
   return {
-    note: `measured on ${page === pages[index] ? `${id} as the pages file holds it` : "this scaffold"}, composed where the deck sets it: the words each slot holds with the page composing as one page, no band left empty, nothing under its word floor, no heading wrapped and nothing past its frame or ceiling, each slot run shorter and longer with the rest as written; ${joint ? "written to the middle of every range at once, the page passes too" : "written to the middle of every range at once, the page does not pass: the ranges hold one slot at a time, so keep the rest near their length as written"}`,
-    together: joint,
+    note: unmeasured ? `not measured: ${page === pages[index] ? `${id} as the pages file holds it` : "this scaffold"} composes at no length of any slot - a page does not compose before its copy is written - so each slot is given the page's limits for it; write to them, and --scaffold --id measures the slots once the copy composes`
+      : `measured on ${page === pages[index] ? `${id} as the pages file holds it` : "this scaffold"}, composed where the deck sets it: the words each slot holds with the page composing as one page, no band left empty, nothing under its word floor, no heading wrapped and nothing past its frame or ceiling, each slot run shorter and longer with the rest as written; ${joint ? "written to the middle of every range at once, the page passes too" : "written to the middle of every range at once, the page does not pass: the ranges hold one slot at a time, so keep the rest near their length as written"}`,
+    ...(unmeasured ? { read: "limits" } : { together: joint }),
     ...(roomed ? { title: { words: { max: roomed.words }, characters: { max: roomed.characters }, measured: true } } : {}),
-    ...Object.fromEntries(Object.entries(slots).map(([lever, m]) => [lever === "points" ? "points" : lever.replace(":", " "),
-      lever === "points" ? { count: m.count, wordsEach: range(m), ...(m.narrow ? { narrow: true } : {}) }
-        : { words: range(m), ...(m.characters ? { characters: { max: m.characters } } : {}), has: m.count }])),
+    ...Object.fromEntries(Object.entries(slots).map((entry) => [entry[0] === "points" ? "points" : entry[0].replace(":", " "), slotOf(entry)]).filter(([, held]) => held)),
   };
 }
 

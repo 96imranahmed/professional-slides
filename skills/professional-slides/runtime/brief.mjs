@@ -172,7 +172,11 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
       const shown = role === "writer" ? fields : Object.fromEntries(SPINE_FIELDS.filter((key) => key !== "id" && fields[key] !== undefined).map((key) => [key, fields[key]]));
       lines.push(`[${page.id}]${of.has(String(page.id)) ? ` limits: ${of.get(String(page.id))}` : page.type || page.kind ? "" : " (no type yet)"} ${compact(shown)}`);
       // The words each of its text slots holds where the deck sets it (--scaffold --id prints the same): written to them, the page composes.
-      if (slotsOf?.has(String(page.id))) { const { note: _note, ...slots } = slotsOf.get(String(page.id)); lines.push(`  slots: ${compact(slots)}`); }
+      // A page with no copy yet does not compose at any slot length: its slots are its limits, and the line says so.
+      if (slotsOf?.has(String(page.id))) {
+        const { note: _note, read, ...slots } = slotsOf.get(String(page.id));
+        lines.push(read === "limits" ? `  slots (its limits - the page does not compose before its copy is written, so no slot was measured): ${compact(slots)}` : `  slots: ${compact(slots)}`);
+      }
     }
   }
   if (role === "skeleton" && insights) {
