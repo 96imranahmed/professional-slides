@@ -47,9 +47,12 @@ GRID = SETUP + '''
 const EXCOPY = ['heading', 'caption', 'annotations', 'highlights', 'note', 'changeAnnotations', 'events', 'focusSeries'];
 const bare = (ex) => { const out = structuredClone(ex); for (const key of EXCOPY) delete out[key]; return out; };
 const refsIn = (node) => [...new Set([...JSON.stringify(node ?? null).matchAll(/"measure":"([^"@]+)(?:@[^"]*)?"|\\{\\{([^{}|@\\s]+\\/[^{}|@\\s]+)/g)].map((m) => m[1] ?? m[2]))];
+// The share of the grid this probe runs (GridShare): the groups whose layouts it makes - 'typed', or a fixture - and the chunks
+// of them it compiles, [from, to) with a null `to` for every chunk after `from`.
+const SHARE = GRID_SHARE;
 const layouts = [];
-for (const page of examples.pages.filter((p) => p.type)) layouts.push({ name: `typed ${page.type}/${page.form}`, group: 'typed', deck: examples.deck, base: './skills/professional-slides/examples', insights: null, page, kind: 'typed' });
-for (const name of FIXTURE_NAMES) {
+if (SHARE.groups.includes('typed')) for (const page of examples.pages.filter((p) => p.type)) layouts.push({ name: `typed ${page.type}/${page.form}`, group: 'typed', deck: examples.deck, base: './skills/professional-slides/examples', insights: null, page, kind: 'typed' });
+for (const name of SHARE.groups.filter((group) => group !== 'typed')) {
   const doc = read(name), insights = await insightsOf(name, doc), deck = { ...doc.deck };
   // One scaffold a form a fixture: the first insight whose measures fill the form.
   for (const [type, t] of Object.entries(PAGE_TYPES)) for (const form of Object.keys(t.forms)) for (const insight of insights.values()) {
@@ -112,7 +115,7 @@ const groups = new Map();
 for (const layout of layouts) groups.set(layout.group, [...(groups.get(layout.group) ?? []), layout]);
 // A deck at a time, twelve pages a deck: a run compiles, composes and gates its pages together, and the deck's own rules are not what is tested.
 const chunks = [...groups.values()].flatMap((list) => Array.from({ length: Math.ceil(list.length / 12) }, (_, i) => list.slice(i * 12, (i + 1) * 12)));
-for (const list of chunks) {
+for (const list of chunks.slice(SHARE.span[0], SHARE.span[1] ?? undefined)) {
   const { deck, sources, base, insights, kind } = list[0], measures = measuresOf(insights);
   list.forEach((layout, at) => { const first = layout.kind === 'typed' && examples.pages.find((p) => p.type === layout.page.type && p.form === layout.page.form) === layout.page;
     layout.id = `g${at + 1}`; layout.page = { ...layout.page, id: layout.id }; if (first) firstOfForm.add(layout.page); });
@@ -151,7 +154,7 @@ const stubbed = [...proved];
 const containers = { panels: stubbed.filter((l) => l.page.type === 'panels').length, strips: stubbed.filter((l) => Array.isArray(l.page.metrics)).length, heroes: stubbed.filter((l) => l.page.kpi).length,
   grids: stubbed.filter((l) => ['fact-grid', 'stat-list'].includes(l.page.form)).length, rowFigures: stubbed.filter((l) => Array.isArray(l.page.blocks) && l.page.blocks.every((b) => b.metric)).length,
   rowExhibits: stubbed.filter((l) => Array.isArray(l.page.blocks) && l.page.blocks.some((b) => b.exhibit)).length };
-console.log(JSON.stringify({ layouts: layouts.length, forms: new Set(layouts.map((l) => `${l.page.type}/${l.page.form}`)).size, catalogue: Object.values(PAGE_TYPES).reduce((n, t) => n + Object.keys(t.forms).length, 0),
+console.log(JSON.stringify({ chunked: Object.fromEntries([...groups].map(([group, list]) => [group, Math.ceil(list.length / 12)])), layouts: layouts.length, forms: new Set(layouts.map((l) => `${l.page.type}/${l.page.form}`)).size, catalogue: Object.values(PAGE_TYPES).reduce((n, t) => n + Object.keys(t.forms).length, 0),
   boundTypes: [...new Set(layouts.filter((l) => l.kind === 'bound').map((l) => l.page.type))].sort(), containers, tally, refusals, broken }));
 '''
 
@@ -169,28 +172,47 @@ const LOANS = 'i-loans/loans', LIQUID = 'i-liquidity/liquid', SHORT = 'i-liquidi
 '''
 
 
-class GridTests(unittest.TestCase):
-    """The property over the generated grid, run once for the class."""
+FIXTURES = ("finance", "public-ops", "product", "explainer")
+# What the whole grid is held to: both arms of every spine seen, every container a page states figures in, and two counts
+# held to a floor.
+ARMS_TYPED = ("typed/drawn passed", "typed/none passed", "typed/none refused")
+ARMS_BOUND = ("bound/drawn passed", "bound/declared passed", "bound/stubs passed", "bound/stubs refused", "bound/none passed", "bound/none refused")
+CONTAINERS = ("panels", "strips", "heroes", "grids", "rowFigures", "rowExhibits")
+DECLARED, UNDRAWN = "bound/declared passed", "typed numbers undrawn: refused as undetermined"
+FLOORS = {DECLARED: 70, UNDRAWN: 40}   # 79 and 53 when the grid was sharded
 
+
+class GridShare:
+    """One share of the property over the generated grid, run once for the class.
+
+    The grid was one class, and its setUpClass compiled every chunk in one worker: 77 s, the floor under the whole suite's
+    wall time however many workers it had. Its chunks are independent - a deck at a time, twelve pages a deck - so it runs
+    in shares, each a class the runner can give its own worker: the worked pages a third of their chunks at a time, each
+    fixture's scaffolds whole. A share holds the per-page arms of the property over its pages, and its part of what was
+    held over the whole grid: the arms (`cells`) and containers it shows above nought, and its part of each floor.
+    GridCoverageTests checks that the shares run every chunk once and that their parts add up to the whole.
+    """
+
+    groups = ()
+    span = (0, None)
+    cells = ()
+    containers = ()
+    floors = {}
     result = None
 
     @classmethod
     def setUpClass(cls):
-        cls.result = run_node(GRID.replace("FIXTURE_NAMES", json.dumps(["finance", "public-ops", "product", "explainer"])))
+        cls.result = run_node(GRID.replace("GRID_SHARE", json.dumps({"groups": list(cls.groups), "span": list(cls.span)})))
 
-    def test_the_grid_covers_every_form_and_the_containers_a_page_states_figures_in(self):
-        result = self.result
-        self.assertEqual(result["forms"], result["catalogue"])                 # every form of every page type, typed
-        self.assertGreaterEqual(result["layouts"], 180)   # 98 worked pages, and one bound scaffold a form a fixture: 194 when written
-        # The types whose exhibits the fixtures' measures fill, bound: charts of every family, tables, figures and panels.
-        for name in ("trend", "ranking", "composition", "panels", "lookup", "scorecard", "numbers", "parallel"):
-            self.assertIn(name, result["boundTypes"])
-        for container, n in result["containers"].items():
-            self.assertGreater(n, 0, container)
-        # Each of the four spines is both passed and refused somewhere, so neither arm of the property is held vacuously.
-        for cell in ("typed/drawn passed", "typed/none passed", "typed/none refused", "bound/drawn passed", "bound/declared passed", "bound/stubs passed", "bound/stubs refused", "bound/none passed", "bound/none refused"):
-            self.assertGreater(result["tally"].get(cell, 0), 0, cell)
-        self.assertGreaterEqual(result["tally"]["bound/declared passed"], 70)   # 75 when written
+    def test_its_share_shows_both_arms_of_each_spine_and_its_containers(self):
+        # Neither arm of the property is held vacuously: each spine is both passed and refused somewhere.
+        tally = self.result["tally"]
+        for cell in self.cells:
+            self.assertGreater(tally.get(cell, 0), 0, cell)
+        for container in self.containers:
+            self.assertGreater(self.result["containers"][container], 0, container)
+        for cell, floor in self.floors.items():
+            self.assertGreaterEqual(tally.get(cell, 0), floor, cell)
 
     def test_a_spine_that_passes_its_draft_lays_out_to_the_same_bound_page_with_no_bound_refusal(self):
         # For every spine of the grid the draft passes: its witness, compiled as any pages file is, raises no finding whose
@@ -207,9 +229,72 @@ class GridTests(unittest.TestCase):
     def test_a_typed_page_whose_exhibits_draw_numbers_is_refused_as_undetermined_until_they_are_drawn(self):
         # With no insight log the critique is bound to the numbers an exhibit plots. A spine that kept such a page with nothing
         # drawn passed its draft, and the exhibit drawn at layout was then a changed argument: every one is refused now.
-        tally = self.result["tally"]
-        self.assertEqual(tally.get("typed numbers undrawn: PASSED", 0), 0)
-        self.assertGreaterEqual(tally["typed numbers undrawn: refused as undetermined"], 40)
+        self.assertEqual(self.result["tally"].get("typed numbers undrawn: PASSED", 0), 0)
+
+
+class GridTypedFirstTests(GridShare, unittest.TestCase):
+    groups, span, cells, floors = ("typed",), (0, 4), ARMS_TYPED, {UNDRAWN: 22}       # 27 when sharded
+
+
+class GridTypedMiddleTests(GridShare, unittest.TestCase):
+    groups, span, cells, floors = ("typed",), (4, 8), ARMS_TYPED, {UNDRAWN: 18}       # 22
+
+
+class GridTypedLastTests(GridShare, unittest.TestCase):
+    groups, span, cells = ("typed",), (8, None), ARMS_TYPED
+
+
+class GridFinanceTests(GridShare, unittest.TestCase):
+    groups, cells, floors = ("finance",), ARMS_BOUND, {DECLARED: 24}                 # 27
+    containers = ("strips", "heroes", "grids", "rowFigures", "rowExhibits")
+
+
+class GridPublicOpsTests(GridShare, unittest.TestCase):
+    groups, cells, floors, containers = ("public-ops",), ARMS_BOUND, {DECLARED: 21}, CONTAINERS   # 24
+
+
+class GridProductTests(GridShare, unittest.TestCase):
+    groups, cells, floors, containers = ("product",), ARMS_BOUND, {DECLARED: 18}, ("strips", "heroes", "grids")   # 20
+
+
+class GridExplainerTests(GridShare, unittest.TestCase):
+    groups, cells, floors, containers = ("explainer",), ARMS_BOUND, {DECLARED: 7}, ("strips", "heroes")   # 8
+
+
+SHARES = (GridTypedFirstTests, GridTypedMiddleTests, GridTypedLastTests, GridFinanceTests, GridPublicOpsTests, GridProductTests, GridExplainerTests)
+
+
+class GridCoverageTests(unittest.TestCase):
+    """The whole grid's layouts, made and not compiled, and the shares held to it."""
+
+    result = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = run_node(GRID.replace("GRID_SHARE", json.dumps({"groups": ["typed", *FIXTURES], "span": [0, 0]})))
+
+    def test_the_grid_covers_every_form_and_the_containers_a_page_states_figures_in(self):
+        result = self.result
+        self.assertEqual(result["forms"], result["catalogue"])                 # every form of every page type, typed
+        self.assertGreaterEqual(result["layouts"], 180)   # 98 worked pages, and one bound scaffold a form a fixture: 194 when written
+        # The types whose exhibits the fixtures' measures fill, bound: charts of every family, tables, figures and panels.
+        for name in ("trend", "ranking", "composition", "panels", "lookup", "scorecard", "numbers", "parallel"):
+            self.assertIn(name, result["boundTypes"])
+
+    def test_the_shares_run_every_chunk_once_and_add_up_to_the_whole_grid(self):
+        # Every chunk of every group is run by one share: the shares of a group tile its chunks from the first to the last.
+        self.assertEqual(set(self.result["chunked"]), {"typed", *FIXTURES})
+        self.assertTrue(all(len(share.groups) == 1 for share in SHARES), "a share's span counts the chunks of its one group")
+        for group, count in self.result["chunked"].items():
+            runs = sorted((share.span for share in SHARES if group in share.groups), key=lambda run: run[0])
+            self.assertTrue(runs and runs[0][0] == 0 and runs[-1][1] is None, (group, runs))
+            self.assertTrue(all(a[1] == b[0] for a, b in zip(runs, runs[1:])), (group, runs))
+            self.assertTrue(all(run[0] < count for run in runs), f"{group} has {count} chunks; a share past them runs nothing: {runs}")
+        # And what the whole grid was held to is held by the shares together: each arm and container somewhere, each floor in sum.
+        self.assertLessEqual({*ARMS_TYPED, *ARMS_BOUND}, {cell for share in SHARES for cell in share.cells})
+        self.assertLessEqual(set(CONTAINERS), {container for share in SHARES for container in share.containers})
+        for cell, floor in FLOORS.items():
+            self.assertGreaterEqual(sum(share.floors.get(cell, 0) for share in SHARES), floor, cell)
 
 
 class RunCasesTests(unittest.TestCase):

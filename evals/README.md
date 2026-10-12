@@ -66,6 +66,14 @@ layering policy.
 
 ## Commands
 
+Iterate on the modules a change touches, `--pattern "test_<module>.py"`, or on
+the fast tier, `--fast` (about a third of the full suite's wall time): every
+test except the property sweeps and end-to-end authoring classes listed, each
+with its reason, in `heavy-tests.json`. Run the full suite, with no flag, once
+before a commit or push. One run holds the machine at a time: a second run
+waits for the first, saying so, since two run together each take twice as long;
+a lock left by a run that was killed is taken over.
+
 ```bash
 # everything: unit tests, the example decks' content stage and the source checks
 evals/run.sh
@@ -76,8 +84,9 @@ evals/run.sh --slow
 # unit tests only: parallel, with a dependency preflight and a skip report.
 # --jobs N workers (default: CPUs, at most 8); --serial one worker; --strict fails
 # on a test skipped for a missing dependency; --slow adds the opt-in LibreOffice
-# end-to-end tests (PS_RUN_SLOW=1); --pattern GLOB picks modules; --verbose
-node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
+# end-to-end tests (PS_RUN_SLOW=1); --fast leaves out the heavy classes
+# evals/heavy-tests.json lists; --pattern GLOB picks modules; --verbose
+node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--fast] [--pattern GLOB] [--verbose]
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
 
 # source checks (npm run check:syntax): syntax, the embedded probes, and dead
