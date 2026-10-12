@@ -329,6 +329,8 @@ function arrangePage(items, page) {
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) return figureWithPoints(items, page);
   if (fullWidth) fullWidthExhibit(items, page);
+  // A table in halves with points sets them in columns under the panels, as the page with one table over its points does.
+  else if (layout === "table-halves" && slide.points?.length) { exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves: true }); return true; }
   else if (layout === "table-halves") tableHalves(items, page);
   else if (layout === "exhibit-left" || layout === "exhibit-right") exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle });
   else if (layout === "exhibit-top") exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });

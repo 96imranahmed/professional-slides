@@ -178,6 +178,12 @@ def label_format(spec: dict):
     # charts write them and every well-made page prints them.
     values_all = [v for series in spec.get("series", []) for v in (series.get("values") or []) if isinstance(v, (int, float))]
     grouped = any(abs(v) >= 1000 for v in values_all)
+    # A drawn chart that printed four figures with no separator - a declared
+    # format that does not ask for `grouping` (value-format.mjs formatValue) -
+    # says so (core.mjs nativeChartSpec), and the native chart prints the same:
+    # 5035 in the text plan and 5,035 in PowerPoint was a planned label lost.
+    if spec.get("labelGrouped") is False:
+        grouped = False
     base = "#,##0" if grouped else "0"
     # A fixed format, never "General": every label in the series carries the
     # one precision, so 12 prints as 12.0 beside 35.8, as the drawn chart

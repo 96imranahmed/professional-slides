@@ -137,6 +137,39 @@ console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
             self.assertEqual(chart.plots[0].data_labels.number_format, "0.0")
 
 
+class ThousandsSeparatorTests(unittest.TestCase):
+    def test_a_label_drawn_without_a_separator_is_saved_without_one(self):
+        """`valueFormat: { decimals: 0 }` draws 5035 - a declared format groups only when it says `grouping` - and the
+        native chart grouped every chart past a thousand and printed 5,035. The content plan reads the drawn label, so
+        the saved page lost a planned block (TEXT_EXPORT_LOST, the BA deck's slot ranking). The native chart now prints
+        what the drawn one did, and a chart drawn with separators keeps them."""
+        result = run_node("""
+import { toDeckPlan } from './evals/support/compose.mjs';
+import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
+const chart = (valueFormat) => { const spec = {schema:'professional-slides.deck/v3',id:'g',cover:{title:'x'},slides:[{title:'BA holds ten times the slots of the next airline',layout:'exhibit-full',
+  exhibit:{type:'chart.bar',heading:'Peak-week slots, summer 2020',categories:['British Airways','Lufthansa','Virgin Atlantic','Aer Lingus'],series:[{name:'Slots',values:[5035,496,380,326]}],...(valueFormat ? {valueFormat} : {})}}]};
+  const deck = planDeck(toDeckPlan(spec,'.')).deck, page = deck.slides.at(-1);
+  const native = page.componentInstances.find((c) => c.nativeChart)?.nativeChart ?? null;
+  return { deck, labels: page.nodes.filter((n) => n.role === 'data-label').map((n) => n.text), grouped: native ? (native.labelGrouped ?? null) : 'drawn' }; };
+const declared = chart({ decimals: 0 }), plain = chart(null);
+console.log(JSON.stringify({ declared: { labels: declared.labels, grouped: declared.grouped }, plain: { labels: plain.labels, grouped: plain.grouped }, scene: declared.deck }));
+""")
+        self.assertIn("5035", result["declared"]["labels"])
+        self.assertIs(result["declared"]["grouped"], False)
+        self.assertIn("5,035", result["plain"]["labels"])
+        self.assertIsNone(result["plain"]["grouped"])
+        try:
+            from pptx import Presentation  # noqa: E402
+        except ModuleNotFoundError:
+            self.skipTest("needs python-pptx (python3 -m pip install -r requirements.txt)")
+        with tempfile.TemporaryDirectory() as tmp:
+            scene_path, pptx_path = Path(tmp) / "scene.json", Path(tmp) / "g.pptx"
+            scene_path.write_text(json.dumps(result["scene"]))
+            subprocess.run([sys.executable, str(RUNTIME / "emit" / "emit_pptx.py"), str(scene_path), str(pptx_path)], check=True, capture_output=True)
+            chart = next(s.chart for s in Presentation(pptx_path).slides[-1].shapes if s.has_chart)
+            self.assertEqual(chart.plots[0].data_labels.number_format, "0")
+
+
 class ScatterAxisTests(unittest.TestCase):
     def test_a_scatter_names_both_axes_and_ticks_at_its_declared_step(self):
         # A scatter accepted xLabel, yLabel and xScale and drew none of them:

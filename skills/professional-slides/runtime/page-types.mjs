@@ -29,8 +29,9 @@ import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
 import { timePositions, describeGaps, isPeriodLabel, readablePeriod, gapsBroken } from "./time-axis.mjs";
 import { columnQuestion } from "./compose-tables.mjs";
+import { halvesProblems } from "./compose-layouts.mjs";
 import { checkPictures } from "./compose-pictures.mjs";
-import { SCALAR_FIGURE } from "./value-format.mjs";
+import { SCALAR_FIGURE, figureUnit } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
 import { playerEntries, plannedMark, planPlayerMarks } from "./players.mjs";
@@ -925,6 +926,10 @@ function tableDefect(page, id, exhibits, skip = new Set()) {
   const headers = (ex) => (ex.columns || []).map((c) => String(typeof c === "string" ? c : c?.label ?? "").trim().toLowerCase()).join("|");
   const twins = tables.filter((ex, at) => headers(ex) && tables.some((other, k) => k !== at && headers(other) === headers(ex)));
   if (twins.length && !skip.has("TABLE_PANELS_MERGE")) {
+    const cut = rankingCut(twins);
+    if (cut) return `${id}: TABLE_PANELS_MERGE - ${twins.length} tables on the page share the columns "${(twins[0].columns || []).map(headerText).join(" | ")}" and run one ranking on: ` +
+      `${cut.rows} members, ordered by "${cut.column}" from one table into the next, which the reader reads across two grids whose columns do not line up. ` +
+      `Set them as one table of the ${cut.rows} rows with \`split: "halves"\` - two panels side by side with one header and one set of column widths, read top-left to bottom-right, the commentary under them - or as one table set whole`;
     const measures = (ex) => ex.rows.map((row) => cellText(rowLabel(row)).trim()).filter(Boolean);
     const union = [...new Map(twins.flatMap(measures).map((m) => [m.toLowerCase(), m])).values()];
     const differ = twins.some((ex) => measures(ex).length !== union.length);
@@ -943,6 +948,31 @@ function tableDefect(page, id, exhibits, skip = new Set()) {
   const short = tables.find((ex) => bodyRows(ex) < least);
   if (short && !skip.has("TABLE_TOO_SHORT")) return `${id}: TABLE_TOO_SHORT - a table of ${bodyRows(short)} row${bodyRows(short) === 1 ? "" : "s"}${short.heading ? ` ("${short.heading}")` : ""} is a form half filled in; ` +
     (least === ROSTER_ROWS ? "a logo table introduces two players or more" : "a table earns its grid at three rows. Set two or three figures as a numbers page (fact-grid, stat-list, or a metric strip over the exhibit that proves them), or two members side by side as profile cards or a compare");
+  return null;
+}
+
+/**
+ * Twin tables that are one ranking cut in two, not members set on different
+ * measures: twenty cities as two tables of ten were read as two firms'
+ * disclosures, their cities as measures, and told to become one table of
+ * twenty columns. No row label repeats from one table to the next, and a
+ * column holds one figure in one unit in every row, running one way from the
+ * first table into the next: the rows are members of one ranking, and the
+ * repair is one table of them all. The column it is ordered by, or null.
+ */
+function rankingCut(twins) {
+  const labels = twins.flatMap((ex) => ex.rows.map((row) => cellText(rowLabel(row)).trim().toLowerCase()));
+  if (labels.some((label) => !label) || new Set(labels).size !== labels.length) return null;
+  const rows = twins.flatMap((ex) => ex.rows);
+  const width = Math.min(...rows.map((row) => resultCells(row).length));
+  const offset = (twins[0].columns || []).length - resultCells(rows[0]).length;
+  for (let at = 0; at < width; at += 1) {
+    const cells = rows.map((row) => cellText(resultCells(row)[at]).trim());
+    if (!cells.every((cell) => SCALAR_FIGURE.test(cell)) || new Set(cells.map(figureUnit)).size !== 1) continue;
+    const values = cells.map((cell) => Number(cell.replace(/[−–]/g, "-").replace(/[^\d.-]/g, "")));
+    const steps = values.slice(1).map((value, i) => Math.sign(value - values[i])).filter(Boolean);
+    if (steps.length && (steps.every((step) => step > 0) || steps.every((step) => step < 0))) return { rows: rows.length, column: headerText((twins[0].columns || [])[at + offset]) || "a figure column" };
+  }
   return null;
 }
 
@@ -1162,25 +1192,48 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
 }
 
 /**
- * The first refusal `check(skip)` finds that the deck is held to. A revision
+ * Every refusal `check(skip)` finds that the deck is held to, in the order it
+ * finds them. A rule returns its first refusal, so it is asked again past
+ * each one: a page with a blank total, an axis that skips years and labels
+ * turned off hears all three in one compile, where it took a compile for each
+ * (the BA run's pages, three defects in three compiles). A revision
  * (`workflow: "existing_deck_revision"`) that records an older `rulesVersion`
  * predates every rule introduced since (weight.json rules): each such refusal
  * is recorded in `advisories` with the version that introduced it, and the
- * check is read again past it, so a later refusal the deck is held to is not
- * hidden behind a waived one. A refusal is `"<id>: CODE - ..."` or
- * `{ code, message }`.
+ * check is read again past it. A refusal is `"<id>: CODE - ..."` or
+ * `{ code, message }`; one with no code cannot be asked past, and ends the list.
  */
 function unwaived(check, { waived, rules, advisories }) {
-  const skip = new Set();
-  for (;;) {
+  const skip = new Set(), held = [];
+  for (let asked = 0; asked < REFUSALS_ASKED; asked += 1) {
     const found = check(skip);
-    if (!found) return null;
+    if (!found) break;
     const message = typeof found === "string" ? found : found.message;
     const code = typeof found === "string" ? /^[^:]+: ([A-Z][A-Z_]+) - /.exec(found)?.[1] : found.code;
-    if (!code || skip.has(code) || !predatedRule(rules, code, undefined, waived)) return found;
-    advisories.push(waivedAdvice(code, code, message, rules));
+    if (!code || skip.has(code)) { held.push(found); break; }
+    if (predatedRule(rules, code, undefined, waived)) advisories.push(waivedAdvice(code, code, message, rules));
+    else held.push(found);
     skip.add(code);
   }
+  return held;
+}
+
+// How often one rule is asked past its last refusal: more than any rule has
+// codes, so the cap only stops a check that never settles.
+const REFUSALS_ASKED = 12;
+
+const ALSO_REFUSED = "Also refused on this page, so mend it in the same edit: ";
+/**
+ * A page's first refusal with the others it has, in one message: the first
+ * keeps its `"<id>: CODE - "` head, which every reader of a refusal keys on
+ * (its id, its code, the repairs it touches), and the rest follow without
+ * their page id.
+ */
+export function alsoRefused(message, more) {
+  const rest = more.map((text) => String(text).replace(/^[^:\s]+:\s*/, "")).filter(Boolean);
+  if (!rest.length) return message;
+  const head = String(message).replace(/[.\s]*$/, "");
+  return head.includes(ALSO_REFUSED) ? `${head}; and ${rest.join("; and ")}` : `${head}. ${ALSO_REFUSED}${rest.join("; and ")}`;
 }
 
 /** A refusal the deck predates, as the advisory the author reads in its place. */
@@ -1620,7 +1673,17 @@ export function compilePage(pageIn, index = 0, { insights = null, players = null
   const staged = (stage, run) => { try { return run(); } catch (error) { if (error && typeof error === "object" && error.stage === undefined) error.stage = stage; throw error; } };
   const { slide, target, exhibits, setType, primary } = staged("shape", () => typedSlide(page, id, type, players));
   staged("evidence", () => checkExhibitData({ page, id, slide, exhibits, primary }));
-  const { values, isChart } = staged("evidence", () => checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }));
+  const { values, isChart, refused } = staged("evidence", () => checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }));
+  // A page whose shape and type hold, refused on what its exhibits do - a blank total, labels turned off - has its copy
+  // checked as well, and hears every refusal in one message: none of those mends touches the copy, so a refusal of the copy
+  // found only once they are made would cost the author another compile.
+  if (refused.length) {
+    let copy = null;
+    try { checkCommentary({ page, id, slide, exhibits, primary, rules, waived, waivedAdvisories }); } catch (error) { if (String(error?.message ?? "").startsWith(`${id}:`)) copy = error.message; }
+    const error = new Error(alsoRefused(refused[0], [...refused.slice(1), ...(copy ? [copy] : [])]));
+    error.stage = "evidence";
+    throw error;
+  }
   const { points, unmarkedPoints } = staged("copy", () => checkCommentary({ page, id, slide, exhibits, primary, rules, waived, waivedAdvisories }));
   staged("layout", () => layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points }));
   return withPageType({ page, slide, exhibits, primary, values, isChart, unmarkedPoints, waivedAdvisories, settles, evidence, titleAdvisories });
@@ -1769,8 +1832,10 @@ function checkExhibitData({ page, id, slide, exhibits, primary }) {
  */
 function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }) {
   const held = { waived, rules, advisories: waivedAdvisories };
+  // A page the review would send to another shape hears every reason it would, and nothing past them: a mend made to a
+  // table the page is told to set another way is a mend thrown away.
   const reshape = unwaived((skip) => reshapeDefect(page, id, exhibits, players, skip), held);
-  if (reshape) throw new Error(reshape);
+  if (reshape.length) throw new Error(alsoRefused(reshape[0], reshape.slice(1)));
 
   // Evidence checks the type makes.
   // A title that names one series or bar marks it (compose-charts.mjs focusFromTitle).
@@ -1792,13 +1857,20 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
     if (values < floor) throw new Error(`${id}: this ${page.type} page plots ${values} value${values === 1 ? "" : "s"}; a chart page plots ${floor} or more (strong decks' chart pages plot about 22, the middle half 10 to 48). ` +
       `Deepen the evidence, not the styling: ${DEEPEN[page.type]}. If the data stops here, it is a numbers page - or a research task`);
   }
-  const reviewed = unwaived((skip) => reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)], skip), held);
-  if (reviewed) throw new Error(reviewed);
-  const form = unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip), held);
-  if (form) {
+  // What the review finds of the exhibits themselves - a blank total, an axis that skips, labels turned off - is
+  // independent: each is its own mend on a page whose shape and type hold, so they are said together, with what the
+  // type's table checks below find, and compilePage adds the copy's.
+  const refused = unwaived((skip) => reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)], skip), held);
+  for (const form of unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip), held)) {
     registered(CHART_FORM_CODES, form.code);
-    throw new Error(form.message);
+    refused.push(form.message);
   }
+  try { typedEvidence({ page, id, type, slide, primary }); } catch (error) { if (!refused.length) throw error; refused.push(error.message); }
+  return { values, isChart, refused };
+}
+
+/** The table or the rows the page's type is built from, typed as the composer draws them. */
+function typedEvidence({ page, id, type, slide, primary }) {
   if (page.type === "ranking" && page.form === "aligned-bars") {
     if (slide.exhibit) slide.exhibit = alignedBarsGroup(primary); else slide.exhibits = [alignedBarsGroup(primary)];
   }
@@ -1822,8 +1894,6 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
     if (!Array.isArray(page.rows) || !page.rows.some((row) => Array.isArray(row?.cells))) throw new Error(`${id}: a findings matrix carries \`rows\`, each with a label and \`cells\``);
     slide.shape = "findings-matrix";
   }
-
-  return { values, isChart };
 }
 
 /** The commentary the page carries, against what its `commentary` choice says it carries. */
@@ -2103,8 +2173,31 @@ function layOutPage({ page, id, type, slide, target, exhibits, setType, primary,
     slide.layout = layoutFor[page.commentary];
   }
 
+  const halved = exhibitsOf(slide).filter((ex) => ex?.split === "halves");
+  if (halved.length) slide.layout = halvesLayout(page, id, slide, halved);
+
   // A statement or takeaways page has no title band to hang a standfirst in.
   if (slide.kind && page.subtitle !== undefined) throw new Error(`${id}: a ${page.form} page has no title band, so it takes no \`subtitle\`; put the scope in its text`);
+}
+
+/**
+ * The layout of a page whose table is asked to be set in halves (`split:
+ * "halves"`): two panels across the page, the header repeated, read top-left
+ * to bottom-right, and the commentary under them. A ranking of twenty cities
+ * with its points could be neither one table (it split across two slides) nor
+ * two of ten (TABLE_PANELS_MERGE). Where the table cannot be halved, or the
+ * page leaves it no width to halve in, the refusal says why.
+ */
+function halvesLayout(page, id, slide, halved) {
+  const exhibits = exhibitsOf(slide);
+  const other = halved.find((ex) => ex.type !== "table");
+  if (other) throw new Error(`${id}: \`split: "halves"\` sets a table in two panels side by side, and a ${other.type} is not halved${String(other.type).startsWith("chart.") ? "; `split: true` sets a chart's series as small multiples" : ""}`);
+  if (exhibits.length !== 1) throw new Error(`${id}: a table in halves takes the page's width as its one exhibit, and this page carries ${exhibits.length}; set the other evidence on its own page`);
+  if (!["exhibit-full", "exhibit-top"].includes(slide.layout))
+    throw new Error(`${id}: a table in halves takes the page's width, and ${slide.layout ? `commentary "${page.commentary}" sets it beside a column` : `a ${page.type}/${page.form} page lays its table out itself`}; choose commentary "below", "so-what-bar" or "none" for the halves, or drop \`split\``);
+  const problems = halvesProblems(halved[0], { asked: true });
+  if (problems.length) throw new Error(`${id}: the table cannot be set in halves (\`split: "halves"\`) - ${problems.join("; ")}. Drop \`split\` and the table is set whole, stepping down its density to fit`);
+  return "table-halves";
 }
 
 /** The page's advisories and its `pageType` record: the choices, and the structure, skeleton and drawn shape the variety contract counts. */

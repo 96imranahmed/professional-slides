@@ -1099,6 +1099,11 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // format natively, so that chart stays drawn.
   if (new Set(places).size > 1 && Array.isArray(props.quotedFigures) && props.quotedFigures.length) return null;
   const labelDecimals = drawnLabels.length ? Math.max(...places) : null;
+  // So does its thousands separator. `valueFormat: { decimals: 0 }` draws 5035 (a declared format groups only when it says
+  // `grouping`), the native chart grouped every chart past a thousand and printed 5,035, and the text plan, read off the
+  // drawn label, lost 5035 from the saved page (TEXT_EXPORT_LOST, the BA deck's slot ranking). Said only where a label is
+  // drawn four figures with no separator, which is the one case the emitter's own rule (any value past a thousand) misreads.
+  const ungrouped = drawnLabels.some(node => /\d{4}/.test(node.text.replace(/\.\d+/g, "")));
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   // A two-mark contrast paints one peer in the primary and the other grey, and
   // which one is the scene's decision (chart-categorical.mjs defaultFocusIndex: the named
@@ -1132,6 +1137,7 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
     ...(labelDecimals !== null ? { labelDecimals } : {}),
+    ...(ungrouped ? { labelGrouped: false } : {}),
     showValueAxis,
     // A pie or donut names its categories in its legend (the drawn chart's
     // "legend-top-right"); without one the native chart shows unlabelled wedges.
