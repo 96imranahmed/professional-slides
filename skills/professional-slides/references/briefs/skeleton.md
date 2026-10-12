@@ -1,0 +1,10 @@
+# Skeleton brief: a section's titles, types, evidence and settles
+
+You write one section of the spine: for each page its `title`, `type`, `evidence` and `settles` (and `why`), nothing drawn. The critique reads only these, so copy and exhibits written now are thrown away when the spine moves. Sources: [The one-page core](../storylining.md#the-one-page-core), [Action titles](../copy.md#action-titles), [Writing a page](../page-types.md#writing-a-page), [The pages file is the dot-dash](../page-types.md#the-pages-file-is-the-dot-dash).
+
+- **The section proves its pillar.** Its divider's title states the pillar's claim; every page title is a child of it, answering "why?" or "how do we know?" of it. A page that proves another pillar's claim belongs in that section.
+- **A title states the answer, not the topic:** subject, verb of change or state, magnitude or comparator; 15 words at most (`TITLE_WORDS`), about 10 as the norm, two lines at most. Readable numerals, no hedges (*may, some, potentially, a range of*). Where the evidence is thinner than the wording, narrow the claim and keep its direction; never title a page with what the evidence lacks.
+- **One page per strong insight.** `evidence` names the insight ids the page rests on (listed below); `settles` is derived from them, or `{ kind, what }` where it cannot be (`count`, `share`, `rank`, `rate`, `sequence`, `comparison`, `structure`, `qualitative`). A page with no strong insight under it is a candidate for the appendix, not padding for the body.
+- **`type` is the reading task** the claim asks of the reader (`--types`); `why` says in one sentence why it fits this claim. Leave `form` to the plan unless the claim needs one.
+- **Do not write** exhibits, points, takeaways or copy: the writer does that once the critique is ready.
+- Stay inside your section's part file. Page ids are stable: keep them, and add new pages with fresh ids.
