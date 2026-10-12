@@ -19,7 +19,7 @@
 // flag-shaped slot UNSOURCED_PICTURE holds until the file is supplied.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { isMain, parseCli, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { UA } from "./fetch-logos.mjs";
 import { commonsCredit, commonsLicence } from "./fetch-pictures.mjs";
 import { flagAlt, flagCommonsTitle, flagCountry, flagFile, flagRefs, unknownFlag } from "./flags.mjs";
@@ -107,7 +107,7 @@ export async function autoFillFlags(spec, baseDir, { fetchMissing = true, fetch:
       fetched.push(country.name);
     } catch (error) { failed.push(`${country.name}: ${error.message}`); }
   }
-  if (fetched.length) await writeJson(recordsPath(directory), [...records.values()]);
+  if (fetched.length) await writeJsonWhole(recordsPath(directory), [...records.values()]);
   let filled = 0;
   for (const ref of refs) {
     const got = found.get(String(ref.flag));

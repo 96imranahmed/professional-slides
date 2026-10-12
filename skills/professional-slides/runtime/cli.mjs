@@ -138,6 +138,17 @@ export const writeJson = (file, value, options) => fsp.writeFile(file, formatJso
 export const writeJsonSync = (file, value) => fs.writeFileSync(file, formatJson(value));
 
 /**
+ * writeJson to a file of this process's own beside `file`, renamed in whole: for a file other runs read while this one writes
+ * it - a deck's picture and logo records, its caches, written by section writers checking side by side. A reader caught
+ * mid-write by a plain write read half a file ("Unexpected end of JSON input").
+ */
+export async function writeJsonWhole(file, value) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  await fsp.writeFile(tmp, formatJson(value));
+  await fsp.rename(tmp, file);
+}
+
+/**
  * The subset of JSON Schema the answer schemas use, checked field by field: every
  * reason `value` does not match `schema`, as sentences naming where (`at`). A
  * schema with `additionalProperties: false` refuses fields it does not name: an

@@ -111,7 +111,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { UsageError, isMain, parseCli, pythonBin, readJson, readJsonSync, runCli, writeJson } from "./cli.mjs";
+import { isMain, parseCli, pythonBin, readJson, readJsonSync, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
@@ -1867,9 +1867,7 @@ async function openFitCache(file, { doc, insights, fitCap }) {
     async save() {
       if (JSON.stringify(after) === JSON.stringify(before)) return;
       if (!Object.keys(after).length) { await fs.rm(file, { force: true }); return; }
-      const tmp = `${file}.${process.pid}.tmp`;
-      await writeJson(tmp, { schema: CACHE_SCHEMA, note: "The fit search's verdicts (author-deck.mjs). Safe to delete.", fits: after });
-      await fs.rename(tmp, file);
+      await writeJsonWhole(file, { schema: CACHE_SCHEMA, note: "The fit search's verdicts (author-deck.mjs). Safe to delete.", fits: after });
     },
   };
 }

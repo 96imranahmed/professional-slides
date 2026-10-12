@@ -18,7 +18,7 @@
 // the deck may use it is the author's call, as for any picture.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJson } from "./cli.mjs";
+import { isMain, parseCli, pythonBin, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { spawn } from "node:child_process";
 import { judged } from "./judgements.mjs";
 import { logoPlayers } from "./players.mjs";
@@ -159,7 +159,7 @@ export async function autoFillLogos(spec, baseDir, { hint, fetchMissing = true }
   const fresh = results.filter((r) => r.path && r.article);
   if (fresh.length) {
     for (const { path: p, ...rest } of fresh) records.set(rest.name, { ...rest, saved: path.relative(baseDir, p) });
-    await writeJson(path.join(directory, "sources.json"), [...records.values()]);
+    await writeJsonWhole(path.join(directory, "sources.json"), [...records.values()]);
   }
   return { filled: fillLogos(spec, results, baseDir), fetched: results.filter((r) => r.path).map((r) => r.name), failed: results.filter((r) => !r.path).map((r) => `${r.name}: ${r.error}`) };
 }

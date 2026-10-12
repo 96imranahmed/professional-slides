@@ -48,7 +48,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { isMain, parseCli, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { UA, slugOf } from "./fetch-logos.mjs";
 import { contentWords } from "./gates/content_gates.mjs";
 import { deckStem } from "./artifact-path.mjs";
@@ -315,7 +315,11 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
       filled.push(picture.alt);
     } catch (error) { failed.push(`${picture.alt}: ${error.message}`); }
   }
-  if (records.size) { await fs.mkdir(directory, { recursive: true }); await writeJson(recordsPath(directory), [...records.values()]); }
+  // Written only when the records change, and whole: every run reads them, and section writers run side by side.
+  if (records.size && JSON.stringify([...records.values()]) !== JSON.stringify([...(await readRecords(directory)).values()])) {
+    await fs.mkdir(directory, { recursive: true });
+    await writeJsonWhole(recordsPath(directory), [...records.values()]);
+  }
   if (!write) {
     const strip = (value) => {
       if (Array.isArray(value)) { value.forEach(strip); return; }
