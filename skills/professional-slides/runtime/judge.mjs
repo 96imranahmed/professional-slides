@@ -7,7 +7,7 @@
 // a title leads with a gap, four paragraphs are alternatives - asks a model
 // once and replays the answer. This runs the compile (`author-deck.mjs
 // --check`, `--draft` for the spine, or `--fetch-assets` to fetch the planned
-// photographs and ask which candidate shows its subject), collects the
+// photographs and illustrations and ask which candidate shows its subject), collects the
 // questions it asked that no recorded judgement answers, and stages them all
 // at once in judgements/ beside the pages file, in packets of at most 60:
 // judgements/packet-01/, packet-02/, ..., each with its packet.json,

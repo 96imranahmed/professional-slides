@@ -6,7 +6,7 @@ import { token, rectPrimitive, stableId, ellipsePrimitive, TOKENS, defaultHighli
 import { formatValue, withUnit } from "./value-format.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
-import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
@@ -66,11 +66,12 @@ const attachedLabelText = (primary,secondary,props) => secondary
 
 /**
  * `categoryIcons`: a mark beside each category's label - an icon name from
- * runtime/icons.mjs, or `{ image }` for a brand logo or a flag. A well-made
- * page sets logos under columns and flags beside bars where the reader knows
- * the mark before the name. An image not yet supplied is planned as
- * `{ image: { alt } }` and draws an empty frame the picture gate holds. A
- * declared player's mark planned as `{ image: { alt: "<Name> logo" } }` is
+ * runtime/icons.mjs, `{ image }` for a brand logo, or `{ flag: "France" }`
+ * for a country's flag (planned by the compile as `{ image: { flag, alt } }`,
+ * flags.mjs). A well-made page sets logos under columns and flags beside bars
+ * where the reader knows the mark before the name. An image not yet supplied
+ * is planned as `{ image: { alt } }` and draws an empty frame the picture
+ * gate holds. A declared player's mark planned as `{ image: { alt: "<Name> logo" } }` is
  * the mark it declares (players.mjs): a place's is its outline, drawn from
  * the geography data. Takes a map from category to entry, or an array in
  * category order.
@@ -86,6 +87,8 @@ function normalizeCategoryIcons(props, categories) {
     if (entry === null || entry === undefined) continue;
     const record = typeof entry === "string" ? { icon: entry } : entry;
     if (record.icon !== undefined && !iconDefinition(record.icon)) throw new Error(unknownIcon(record.icon, "category icon"));
+    // A country's name is read into its flag where the page compiles (flags.mjs planFlags); a spec written by hand plans the picture itself.
+    if (record.flag !== undefined) throw new Error(`Category mark for "${category}" names a flag, which is planned when its page compiles from the pages file; in a spec written by hand, write { image: { flag: "<ISO code>", alt: "Flag of ..." } }`);
     if (record.icon === undefined && !record.image) throw new Error(`Category icon for "${category}" needs an icon name or an image`);
     if (record.image && !record.image.dataUri && !String(record.image.alt ?? "").trim()) throw new Error(`Category image for "${category}" needs a file, or alt text naming the one to come`);
     map.set(category, record);
@@ -95,6 +98,14 @@ function normalizeCategoryIcons(props, categories) {
 
 function categoryIconNodes(id, category, record, box, { area, align } = {}) {
   if (record.icon !== undefined) return iconMarker({ id: stableId(id, "category-icon", category), role: "category-icon", x: box.x, y: box.y, size: box.width, icon: record.icon, tone: record.tone ?? "plain", data: { category } });
+  // A flag stands at the slot's height at its own proportions, level with its neighbours; one not yet fetched keeps a
+  // flag-shaped slot.
+  if (isFlag(record.image)) {
+    const drawable = markDrawable(record.image);
+    const frame = flagFrame(box, drawable ? record.image.width : FLAG_ASPECT, drawable ? record.image.height : 1, { align });
+    return [drawable ? mediaNode({ id: stableId(id, "category-logo", category), frame, props: record.image, role: "category-logo" })
+      : flagPlaceholder({ id: stableId(id, "category-logo-placeholder", category), role: "category-logo-placeholder", frame, data: { category, alt: record.image.alt, flag: record.image.flag } })];
+  }
   // A place's outline is drawn as its mark; a logo or photograph not yet fetched keeps its slot as a placeholder.
   if (!markDrawable(record.image)) return [rectPrimitive({ id: stableId(id, "category-logo-placeholder", category), role: "category-logo-placeholder", frame: box, style: { fill: token("color.surfaceMuted"), stroke: token("color.rule"), lineWidth: token("line.hairline"), radius: token("radius.none") }, data: { category, alt: record.image.alt } })];
   const frame = area ? logoFrame(box, record.image.width, record.image.height, { area, align }) : box;
@@ -303,7 +314,11 @@ function labelGutters(chart) {
   // A logo is a wordmark, not a glyph: it takes a wide box (letterboxed, so a
   // square mark keeps its shape) where an icon takes a square one.
   const logoMarks = categoryIcons ? [...categoryIcons.values()].some((record) => record.image) : false;
-  const iconW = logoMarks ? (horizontal ? 64 : 72) : iconSize, iconH = logoMarks ? (horizontal ? 24 : 28) : iconSize;
+  // Flags alone take a slot of a flag's own size: at a logo's 64px a row of
+  // 3:2 flags 24px tall would push the bars a third of the way in for nothing.
+  // The slot runs to 2:1, the United Kingdom's; a longer flag is narrowed.
+  const flagMarks = logoMarks && [...categoryIcons.values()].every((record) => isFlag(record.image));
+  const iconW = flagMarks ? (horizontal ? 32 : 40) : logoMarks ? (horizontal ? 64 : 72) : iconSize, iconH = flagMarks ? (horizontal ? 16 : 20) : logoMarks ? (horizontal ? 24 : 28) : iconSize;
   const iconSlot = categoryIcons ? (horizontal ? iconW : iconH) + 6 : 0;
   // Category notes on a bar chart sit under their label as a two-line block
   // centred on the bar. When the lanes are too thin for that block, the notes
@@ -1120,8 +1135,9 @@ function drawCategoryIcon(chart, category, categoryStart) {
   // between a bar's label and the bar.
   const iconRecord = categoryIcons?.get(category);
   // A placeholder keeps the nominal slot; a logo may grow taller than it,
-  // up to the lane, so a square mark gets the same ink as a wordmark.
-  const slotH = horizontal ? (logoMarks && markDrawable(iconRecord?.image) ? Math.min(iconH + 8, groupSpan - 2) : Math.min(iconH, groupSpan)) : iconH;
+  // up to the lane, so a square mark gets the same ink as a wordmark. A flag
+  // keeps the slot's height, which every flag shares.
+  const slotH = horizontal ? (logoMarks && markDrawable(iconRecord?.image) && !isFlag(iconRecord.image) ? Math.min(iconH + 8, groupSpan - 2) : Math.min(iconH, groupSpan)) : iconH;
   if (iconRecord) nodes.push(...categoryIconNodes(id, category, iconRecord, horizontal
     ? { x: plot.x - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) - iconW, y: categoryStart + (groupSpan - slotH) / 2, width: iconW, height: slotH }
     : { x: categoryMap.get(category).labelCenter - Math.min(iconW, categorySpan - 8) / 2, y: plot.y + plot.height + (regionHighlight ? 18 : 8), width: Math.min(iconW, categorySpan - 8), height: iconH },

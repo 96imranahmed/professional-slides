@@ -1,0 +1,50 @@
+[
+ {
+  "flag": "CHE",
+  "country": "Switzerland",
+  "credit": "Flag of Switzerland, drawn for this example to its official proportions",
+  "saved": "assets/flags/che.png"
+ },
+ {
+  "flag": "JPN",
+  "country": "Japan",
+  "credit": "Flag of Japan, drawn for this example to its official proportions",
+  "saved": "assets/flags/jpn.png"
+ },
+ {
+  "flag": "AUT",
+  "country": "Austria",
+  "credit": "Flag of Austria, drawn for this example to its official proportions",
+  "saved": "assets/flags/aut.png"
+ },
+ {
+  "flag": "NLD",
+  "country": "Netherlands",
+  "credit": "Flag of the Netherlands, drawn for this example to its official proportions",
+  "saved": "assets/flags/nld.png"
+ },
+ {
+  "flag": "DNK",
+  "country": "Denmark",
+  "credit": "Flag of Denmark, drawn for this example to its official proportions",
+  "saved": "assets/flags/dnk.png"
+ },
+ {
+  "flag": "DEU",
+  "country": "Germany",
+  "credit": "Flag of Germany, drawn for this example to its official proportions",
+  "saved": "assets/flags/deu.png"
+ },
+ {
+  "flag": "FRA",
+  "country": "France",
+  "credit": "Flag of France, drawn for this example to its official proportions",
+  "saved": "assets/flags/fra.png"
+ },
+ {
+  "flag": "POL",
+  "country": "Poland",
+  "credit": "Flag of Poland, drawn for this example to its official proportions",
+  "saved": "assets/flags/pol.png"
+ }
+]

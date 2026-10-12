@@ -212,5 +212,35 @@ console.log(JSON.stringify(compileDeck({id:'pie',slides},REGISTRY)));
         self.assertNotIn('<c:dLblPos val="outEnd"/>', xml)
 
 
+@needs_emitter
+class PictureFrameTests(unittest.TestCase):
+    """A flag's hairline is its picture's own outline, and every picture carries its alt text and credit.
+
+    Japan's white flag on a white page had no edge; and python-pptx described
+    every picture as "image.png", which is what a screen reader read out."""
+
+    def test_a_picture_keeps_its_outline_its_alt_text_and_its_credit(self):
+        image = io.BytesIO(); Image.new('RGB', (30, 20), 'white').save(image, format='PNG')
+        uri = 'data:image/png;base64,' + base64.b64encode(image.getvalue()).decode()
+        def picture(name, **extra):
+            return {'id': name, 'type': 'image', 'role': 'category-logo', 'frame': {'x': 100, 'y': 100, 'width': 30, 'height': 20},
+                    'data': {'dataUri': uri, 'alt': f'Flag of {name}', 'authorization': f'Flag: A. Drawer, Public domain ({name})'}, **extra}
+        scene = {'typography': {'body': 'Arial', 'display': 'Arial'}, 'tokens': {}, 'slides': [{'id': 'one', 'tokens': {}, 'nodes': [
+            picture('Japan', style={'stroke': {'value': '#929BA3'}, 'lineWidth': {'value': 1}}), picture('Poland')]}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            file = Path(tmp) / 'flags.pptx'
+            Emitter(scene).run(file)
+            pictures = {shape.name: shape for shape in Presentation(file).slides[0].shapes if shape.shape_type == 13}
+        japan, poland = pictures['ps:Japan'], pictures['ps:Poland']
+        outline = japan._element.spPr.find(qn('a:ln'))
+        self.assertIsNotNone(outline)
+        self.assertEqual(outline.find(qn('a:solidFill')).find(qn('a:srgbClr')).get('val'), '929BA3')
+        self.assertEqual(int(outline.get('w')), 9525)  # a 1px hairline: 0.75pt
+        self.assertIsNone(poland._element.spPr.find(qn('a:ln')))  # a picture without a stroke keeps none
+        props = japan._element.nvPicPr.cNvPr
+        self.assertEqual(props.get('descr'), 'Flag of Japan')
+        self.assertEqual(props.get('title'), 'Flag: A. Drawer, Public domain (Japan)')
+
+
 if __name__ == "__main__":
     unittest.main()

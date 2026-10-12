@@ -50,16 +50,17 @@ console.log(JSON.stringify({ none, some, stated: { statement: stated.statement, 
   declared: { statement: declared.statement, findings: declared.findings.map((f) => [f.code, f.severity, f.repair]), notice: assetNotice(declared.statement) },
   reports, prompts: reports.map(assetsPrompt), supplied: [supplied[0].statement, supplied[1], supplied[2].findings.map((f) => f.code), assetNotice(supplied[2].statement)], silent: [assetNotice(null), assetsPrompt(null)] }));
 ''')
-        # A player that carries its own logo file, a picture opted out of fetching and a marker with coordinates need nothing.
-        self.assertEqual(result['none'], {'logos': [{'name': 'North Rail', 'file': 'assets/logos/north-rail.png'}, {'name': 'Harbour & Co', 'file': 'assets/logos/harbour-co.png'}],
-                                          'pictures': [{'alt': 'The depot at night', 'file': 'assets/pictures/the-depot-at-night.jpg'}], 'places': ['Leeds']})
+        # A player that carries its own logo file, a picture opted out of fetching and a marker with coordinates need nothing;
+        # a deck that names no flag and plans no illustration needs none of either.
+        self.assertEqual(result['none'], {'logos': [{'name': 'North Rail', 'file': 'assets/logos/north-rail.png'}, {'name': 'Harbour & Co', 'file': 'assets/logos/harbour-co.png'}], 'flags': [],
+                                          'pictures': [{'alt': 'The depot at night', 'file': 'assets/pictures/the-depot-at-night.jpg'}], 'illustrations': [], 'places': ['Leeds']})
         # A file in the assets folder (either extension) and a cached place are no longer needs.
-        self.assertEqual(result['some'], {'logos': [{'name': 'Harbour & Co', 'file': 'assets/logos/harbour-co.png'}],
-                                          'pictures': [{'alt': 'The depot at night', 'file': 'assets/pictures/the-depot-at-night.jpg'}], 'places': []})
+        self.assertEqual(result['some'], {'logos': [{'name': 'Harbour & Co', 'file': 'assets/logos/harbour-co.png'}], 'flags': [],
+                                          'pictures': [{'alt': 'The depot at night', 'file': 'assets/pictures/the-depot-at-night.jpg'}], 'illustrations': [], 'places': []})
         stated = result['stated']
         self.assertEqual(stated['findings'], [['ASSETS_NEEDED', 'advisory']])
         self.assertEqual(stated['statement']['fetch'], 'build')
-        self.assertEqual(stated['statement']['needsNetwork'], {'logos': ['North Rail', 'Harbour & Co'], 'pictures': ['The depot at night'], 'places': ['Leeds']})
+        self.assertEqual(stated['statement']['needsNetwork'], {'logos': ['North Rail', 'Harbour & Co'], 'flags': [], 'pictures': ['The depot at night'], 'illustrations': [], 'places': ['Leeds']})
         a, b, c = stated['statement']['choices']
         for said in ['(a) supply the files', 'assets/logos/north-rail.png', 'assets/logos/harbour-co.png', 'assets/pictures/the-depot-at-night.jpg', '`longitude` and `latitude` on each marker (Leeds)']:
             self.assertIn(said, a)
@@ -71,7 +72,7 @@ console.log(JSON.stringify({ none, some, stated: { statement: stated.statement, 
         declared = result['declared']
         self.assertEqual([f[:2] for f in declared['findings']], [['ASSETS_OFFLINE', 'advisory']])
         self.assertIn('the build fetches nothing: 1 logo (Harbour & Co), 1 photograph will not be available', declared['findings'][0][2])
-        self.assertEqual(declared['statement']['notAvailable'], {'logos': ['Harbour & Co'], 'pictures': ['The depot at night'], 'places': []})
+        self.assertEqual(declared['statement']['notAvailable'], {'logos': ['Harbour & Co'], 'flags': [], 'pictures': ['The depot at night'], 'illustrations': [], 'places': []})
         self.assertIn('built without the network ("The build machine has no network access at all")', declared['notice'])
         # What a build records: whether it fetched, the declaration, and what was still missing.
         self.assertEqual([r['fetch'] for r in result['reports']], ['build', 'skipped', 'none'])

@@ -73,7 +73,9 @@ Calculate from unrounded inputs and round for display; keep independently rounde
 
 On a column chart the same `deltas` become pills in a band above the plot, one over each column under the `deltasLabel` heading (`false` drops it); they take the band periods and events use, so a chart shows one or the other.
 
-**Category marks.** `categoryIcons` sets a mark beside each category's label: an icon name (`{ "Messaging": "mail" }`) or `{ image }` for a brand logo or a flag. Put logos under columns and flags beside bars when the reader knows the mark before the name. It takes a map from category to entry, or an array in category order. An image the author has yet to supply is planned as `{ image: { alt } }` and draws an empty frame that `UNSOURCED_PICTURE` holds. The mark sits above the label on a column chart and between the label and the bar on a bar chart; a chart carrying marks is drawn as shapes, not a native chart.
+**Category marks.** `categoryIcons` sets a mark beside each category's label: an icon name (`{ "Messaging": "mail" }`), `{ image }` for a brand logo, or `{ "flag": "France" }` (or "FR", "FRA") for a country's flag, which the build fetches ([Design](design.md#make-every-exhibit-earn-its-page)). Put logos under columns and flags beside bars when the reader knows the mark before the name. It takes a map from category to entry, or an array in category order. An image the author has yet to supply is planned as `{ image: { alt } }` and draws an empty frame that `UNSOURCED_PICTURE` holds. The mark sits above the label on a column chart and between the label and the bar on a bar chart; a chart carrying marks is drawn as shapes, not a native chart.
+
+Flags take a slot of a flag's size, not a logo's: every flag stands at the slot's height at its own proportions (Switzerland square, Germany 3:5), against the bar, with a hairline round it, and one still to come keeps an empty slot at a flag's 2:3.
 
 **Value labels, subject and period ticks.**
 

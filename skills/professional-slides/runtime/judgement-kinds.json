@@ -233,6 +233,17 @@
     "result"
    ]
   },
+  "illustration-shows": {
+   "version": 1,
+   "asks": "Open the image. Is it a drawn illustration that shows what the slide asks for, and could it stand beside the slide's copy as it is?",
+   "subject": "what the slide asks an illustration to show, and the candidate file's title and description; the image is attached",
+   "verdicts": {
+    "shows": "a drawing of what is asked for",
+    "not-an-illustration": "a photograph, map, diagram, chart, logo, flag, coat of arms, icon or screenshot",
+    "other-subject": "a drawing of something other than what is asked for, or too generic to say it"
+   },
+   "quoteFor": []
+  },
   "items-relation": {
    "version": 1,
    "asks": "How do these items relate, as the page's title introduces them? An ordered sequence (steps or stages taken in order); a ranking (priorities, most important first); a counted set the reader refers to by number (the title gives their count: \"four challenges\", \"three reasons\"); alternatives the reader chooses between (options, scenarios); or parallel categories (named groups, themes or findings, none before another)?",

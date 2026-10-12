@@ -33,6 +33,8 @@ import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
 import { playerEntries, plannedMark, planPlayerMarks } from "./players.mjs";
+import { planFlags } from "./flags.mjs";
+import { planPictureKinds } from "./compose-pictures.mjs";
 import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
@@ -1677,6 +1679,10 @@ function typedSlide(page, id, type, players) {
   // Cells naming a player become its mark before any check reads the table, and every place a page draws a player's
   // mark - a cell or a logos member naming it, a logo planned under its name - is planned in the kind the player declares.
   if (players) { markPlayerCells(slide, players); planPlayerMarks(slide, players); }
+  // A country named as a mark - `flag: "France"`, or its ISO code - is planned as its flag's picture, or the page is refused
+  // with the nearest names a flag is drawn for.
+  planFlags(slide, id);
+  planPictureKinds(slide, id);
   for (const ex of exhibitsOf(slide)) readableCategories(ex);
   const primary = slide.exhibit ?? slide.exhibits?.[0];
   return { slide, target, exhibits, setType, primary };

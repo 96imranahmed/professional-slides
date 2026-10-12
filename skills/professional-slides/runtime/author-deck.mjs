@@ -114,6 +114,7 @@ import { SLIDE_KEYS } from "./compose-page.mjs";
 import { composeAll } from "./compose-all.mjs";
 import { chartDraws } from "./charts.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
+import { autoFillFlags } from "./fetch-flags.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { assetFindings, assetNotice, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
@@ -194,6 +195,7 @@ const COPY_CODES = /^TEXT_|^CONTENT_(?:ADDS_NOTHING|NO_HIGHLIGHT)$/;
 export async function composeForAuthoring(spec, baseDir) {
   const copy = structuredClone(spec);
   await autoFillLogos(copy, baseDir, { hint: copy.playersHint, fetchMissing: false });
+  await autoFillFlags(copy, baseDir, { fetchMissing: false });
   await autoFillPictures(copy, baseDir, { fetchMissing: false });
   await autoFillPlaces(copy, baseDir, { fetchMissing: false });
   // Pages that fail to compose are set aside and reported; the rest are still
@@ -1868,18 +1870,20 @@ function writePlan(file, plan) {
 }
 
 /**
- * The deck's planned logos and photographs fetched into assets/ before it is
- * composed (`--fetch-assets`), as the build fetches them: the pages compiled
- * once to find what they plan, then each placeholder without a file filled
- * from the network. Returns the line the run prints.
+ * The deck's planned logos, flags, photographs and illustrations fetched into
+ * assets/ before it is composed (`--fetch-assets`), as the build fetches them:
+ * the pages compiled once to find what they plan, then each placeholder
+ * without a file filled from the network. Returns the line the run prints.
  */
 async function fetchAssets(doc, { insights, baseDir }) {
   const { spec } = compileDeck(doc, { insights, partial: true });
   const copy = structuredClone(spec);
   const logos = await autoFillLogos(copy, baseDir, { hint: copy.playersHint, fetchMissing: true }).catch((error) => ({ failed: [error.message] }));
+  const flags = await autoFillFlags(copy, baseDir, { fetchMissing: true }).catch((error) => ({ failed: [error.message] }));
   const pictures = await autoFillPictures(copy, baseDir, { fetchMissing: true }).catch((error) => ({ failed: [error.message] }));
-  const failed = [...(logos?.failed ?? []), ...(pictures?.failed ?? [])];
-  return `Assets fetched into assets/: ${logos?.fetched?.length ?? 0} logo${logos?.fetched?.length === 1 ? "" : "s"} and ${pictures?.filled ?? 0} photograph${pictures?.filled === 1 ? "" : "s"} placed${failed.length ? `; not fetched: ${failed.slice(0, 6).join("; ")}${failed.length > 6 ? "; ..." : ""}` : ""}. fetch-pictures.mjs <id>.deck.json --dry-run names each photograph before it is fetched`;
+  const failed = [...(logos?.failed ?? []), ...(flags?.failed ?? []), ...(pictures?.failed ?? [])];
+  const count = (n, word) => `${n ?? 0} ${word}${n === 1 ? "" : "s"}`;
+  return `Assets fetched into assets/: ${count(logos?.fetched?.length, "logo")}, ${count(flags?.fetched?.length, "flag")} and ${count(pictures?.filled, "picture")} placed${failed.length ? `; not fetched: ${failed.slice(0, 6).join("; ")}${failed.length > 6 ? "; ..." : ""}` : ""}. fetch-pictures.mjs <id>.deck.json --dry-run names each photograph and illustration before it is fetched`;
 }
 
 /**
@@ -2126,7 +2130,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   let compiled, insights = null;
   try {
     insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) });
-    // `--fetch-assets`: the planned logos and photographs fetched now, into assets/, so this run and every check after it
+    // `--fetch-assets`: the planned logos, flags, photographs and illustrations fetched now, into assets/, so this run and every check after it
     // composes and renders the pages with them - a title that fits beside no photograph, a page whose picture is of the
     // wrong thing, are seen at the compile rather than after the build. The choice is the build's (fetch-pictures.mjs).
     if (values["fetch-assets"]) console.error(await fetchAssets(doc, { insights, baseDir: dir }));

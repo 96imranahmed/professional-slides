@@ -621,6 +621,20 @@ class Emitter:
         if data.get("circular"):
             geometry = pic._element.spPr.find(qn("a:prstGeom"))
             geometry.set("prst", "ellipse")
+        # A picture that carries a stroke (a flag's hairline) draws it as the
+        # picture's own outline, so the edge moves and resizes with the picture.
+        stroke = style_value(node.get("style") or {}, "stroke", None)
+        if stroke and stroke != "none":
+            pic.line.color.rgb = rgb(stroke)
+            pic.line.width = Pt(float(style_value(node.get("style") or {}, "lineWidth", 1) or 1) * 0.75)
+        # The picture's alt text is what it shows, and its title the credit it
+        # was cleared under: python-pptx writes the file's name ("image.png")
+        # as the description, which a screen reader reads aloud as the picture.
+        frame_props = pic._element.nvPicPr.cNvPr
+        if str(data.get("alt") or "").strip():
+            frame_props.set("descr", str(data["alt"]).strip())
+        if str(data.get("authorization") or "").strip():
+            frame_props.set("title", str(data["authorization"]).strip())
         pic.name = f"ps:{node['id']}"
         self.stats["images"] += 1
         return pic

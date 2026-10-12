@@ -1,4 +1,4 @@
-import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { formatValue, figureUnit } from "./value-format.mjs";
 import {
   token,
@@ -63,6 +63,10 @@ const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 
 // runs long and low and a square mark stands to the cell's height.
 const LOGO_CELL_HEIGHT = 40;
 const LOGO_AREA = LOGO_CELL_HEIGHT * LOGO_CELL_HEIGHT * 2;
+// A flag alone in its cell stands this tall, every flag in the column alike:
+// flags differ only in proportion, so they share a height where logos share
+// an area, and a flag at a logo's 40px would outweigh its row.
+const FLAG_CELL_HEIGHT = 24;
 // Below this a wordmark squeezed by a narrow column stops being legible.
 const LOGO_MIN_HEIGHT = 12;
 // Cells that may lead with an icon before their label.
@@ -544,6 +548,23 @@ const categorySurface = (cell, props) =>
 // one line tall, and no wider than `most`.
 const headerMark = (media, lineHeight, most) =>
   logoFrame({ x: 0, y: 0, width: Math.min(most, lineHeight * 4), height: lineHeight }, media.width, media.height, { area: lineHeight * lineHeight * 2.4 });
+// Any mark set on a line of text, with the `slot` its words start after: a
+// logo as headerMark sets it, its slot its own width; a flag at the line's
+// height at its own proportions, centred in a 2:3 slot every flag shares, so
+// the names in a column of flags start level; and a mark whose file is still
+// to come as the slot it keeps, a flag's 2:3 or a wordmark's 1:2.
+const lineMark = (media, lineHeight, most) => {
+  if (isFlag(media)) {
+    const slot = Math.min(most, lineHeight * FLAG_ASPECT);
+    const frame = markDrawable(media) ? flagFrame({ x: 0, y: 0, width: slot, height: lineHeight }, media.width, media.height) : { x: 0, y: 0, width: slot, height: lineHeight };
+    return { ...frame, slot };
+  }
+  const frame = markDrawable(media) ? headerMark(media, lineHeight, most) : { x: 0, y: 0, width: Math.min(most, lineHeight * 2), height: lineHeight };
+  return { ...frame, x: 0, slot: frame.width };
+};
+// Whether a column header carries a mark: one drawn, or a flag still to come, which keeps its slot as a cell's does. A
+// player's logo still to come leaves the header to its name.
+const headerCarriesMark = (column) => markDrawable(column.logo) || (isFlag(column.logo) && Boolean(String(column.logo.alt ?? "").trim()));
 
 function contentLayout(cell, width, props, used) {
   const dense = props.density === "dense",
@@ -648,22 +669,35 @@ function contentLayout(cell, width, props, used) {
 
 /** A cell whose height is its picture's or its mark's, not its text's: a logo, a photo, an implication disc, in-cell bars. Undefined for any other cell. */
 function fixedCellLayout(cell, { props, padding, gap, marker, inner }) {
+  if (cell.type === "logo" && !markDrawable(cell.media) && !String(cell.media?.alt ?? "").trim())
+    throw new Error("A logo cell needs its mark: a file, a country's `flag`, or `{ alt }` naming the logo still to come");
   if (cell.type === "logo" && cell.text) {
-    // A verdict naming its player: the mark at the height of a line of body
-    // type, the cell's words beside it ("Firm A leads").
+    // A verdict naming its player, or a row led by its country: the mark at
+    // the height of a line of body type, the cell's words beside it ("Firm A
+    // leads", a flag and "France").
     const media = cell.media;
-    mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height: 20 }, props: media, role: "table-logo" });
+    if (markDrawable(media)) mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height: 20 }, props: media, role: "table-logo" });
     const lineHeight = measure("M", inner, false, bodySize(props)).lineHeight;
-    const mark = headerMark(media, lineHeight, inner / 2);
-    const label = measure(cell.text, Math.max(1, inner - mark.width - gap), cell.bold, bodySize(props));
+    const mark = lineMark(media, lineHeight, inner / 2);
+    const label = measure(cell.text, Math.max(1, inner - mark.slot - gap), cell.bold, bodySize(props));
     return { height: Math.max(lineHeight, label.height), padding, mark, blocks: [label] };
+  }
+  if (cell.type === "logo" && isFlag(cell.media)) {
+    // A flag alone in its cell: the flag's height, which every flag in the column shares, at its own proportions.
+    const height = Math.max(FLAG_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
+    const media = cell.media, drawable = markDrawable(media);
+    if (drawable) mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height }, props: media, role: "table-logo" });
+    const logo = flagFrame({ x: 0, y: 0, width: inner, height }, drawable ? media.width : FLAG_ASPECT, drawable ? media.height : 1, { most: FLAG_CELL_HEIGHT });
+    if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
+    return { height, padding, logo };
   }
   if (cell.type === "logo") {
     const height = Math.max(LOGO_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
-    const media = cell.media;
-    // mediaNode validates the embedded bitmap; logoFrame sizes it.
-    mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
-    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, media.width, media.height, { area: LOGO_AREA });
+    const media = cell.media, drawable = markDrawable(media);
+    // mediaNode validates the embedded bitmap; logoFrame sizes it. A logo
+    // still to come keeps a wordmark's slot, as a chart category's does.
+    if (drawable) mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
+    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, drawable ? media.width : 2, drawable ? media.height : 1, { area: LOGO_AREA });
     if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt || "a logo"} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
     return {height, padding, logo};
   }
@@ -912,11 +946,11 @@ function minimumDrawnWidth(cell, props = {}) {
   if (cell.type === "trend") return v("icon.small") + v("space.2");
   if (cell.type === "sparkline") return Math.ceil(measure(cell.text ?? String((cell.values || []).at(-1) ?? ""), 100000, true, "type.label").width + gap + SPARK.width);
   if (cell.type === "dot" || cell.type === "check") return v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
-  // A verdict with its player's mark: the mark, the gap and the longest word.
-  if (cell.type === "logo" && cell.text && cell.media?.width) {
+  // A verdict with its player's mark, or a flag before its country: the mark (or the slot it keeps), the gap and the longest word.
+  if (cell.type === "logo" && cell.text && (cell.media?.width || String(cell.media?.alt ?? "").trim())) {
     const lineHeight = measure("M", 1000, false, bodySize(props)).lineHeight;
     const words = String(cell.text).split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, cell.bold, bodySize(props)).width);
-    return Math.ceil(headerMark(cell.media, lineHeight, lineHeight * 4).width + v("space.2") + Math.max(0, ...words));
+    return Math.ceil(lineMark(cell.media, lineHeight, lineHeight * 4).slot + v("space.2") + Math.max(0, ...words));
   }
   return 0;
 }
@@ -924,7 +958,7 @@ function minimumDrawnWidth(cell, props = {}) {
 function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
   const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
   const need = model.columns.map((column, c) => {
-    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (markDrawable(column.logo) ? headerMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
+    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (headerCarriesMark(column) ? lineMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
     // A group band over this column alone must fit its label in this column.
     const group = column.group === undefined || column.group === null ? null : String(column.group);
     if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
@@ -1123,8 +1157,8 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
   // band height on both sides (measured at a taller band so the label fits).
   const chevronInset = props.headerShape === "chevron" ? v("space.5") : 0;
   // A header naming a player sets the player's mark before its label.
-  const headerMarks = model.columns.map((c, i) => (c.label && markDrawable(c.logo)
-    ? headerMark(c.logo, measure("M", widths[i], true, textSize).lineHeight, (widths[i] - 2 * padding) / 3) : null));
+  const headerMarks = model.columns.map((c, i) => (c.label && headerCarriesMark(c)
+    ? lineMark(c.logo, measure("M", widths[i], true, textSize).lineHeight, (widths[i] - 2 * padding) / 3) : null));
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding - 2 * chevronInset - (headerMarks[i] ? headerMarks[i].width + v("space.2") : 0), true, textSize) : null,
   );
@@ -1499,7 +1533,8 @@ function drawTableHeader(table) {
         // On a filled header the mark sits on a white chip: a dark wordmark
         // on the navy band is a mark nobody can see.
         if (filledHeader) nodes.push(rectPrimitive({ id: stableId(id, "header-chip", c), role: "table-header-chip", frame: { x: markBox.x - 3, y: markBox.y - 2, width: markBox.width + 6, height: markBox.height + 4 }, style: { ...box(white), radius: t("radius.small") }, data: { column: c } }));
-        nodes.push(mediaNode({ id: stableId(id, "header-logo", c), frame: markBox, props: column.logo, role: "table-header-logo" }));
+        nodes.push(markDrawable(column.logo) ? mediaNode({ id: stableId(id, "header-logo", c), frame: markBox, props: column.logo, role: "table-header-logo" })
+          : flagPlaceholder({ id: stableId(id, "header-logo-placeholder", c), role: "table-header-logo-placeholder", frame: markBox, data: { column: c, alt: column.logo.alt, flag: column.logo.flag } }));
       }
       const markShift = mark ? mark.width + v("space.2") : 0;
       putText(
@@ -1935,21 +1970,27 @@ function drawLabelledLogo(table, cell, at) {
   const { m, nodes, putText } = table;
   const { l, height, area, cellId, data, color, inner } = at;
   const top = area.y + (height - l.height) / 2, label = l.blocks[0];
-  const markBox = { x: inner.x, y: top + (label.lineHeight - l.mark.height) / 2, width: l.mark.width, height: l.mark.height };
-  const logo = mediaNode({ id: stableId(cellId, "logo"), frame: markBox, props: cell.media, role: "table-logo" });
-  logo.data = { ...logo.data, ...data, labelled: true };
-  nodes.push(logo);
-  putText(stableId(cellId, "text"), "table-cell-text", { x: inner.x + l.mark.width + v("space.2"), y: top, width: inner.width - l.mark.width - v("space.2") }, label, textStyle(cell.bold, color, "left", m.textSize), data);
+  const markBox = { x: inner.x + l.mark.x, y: top + (label.lineHeight - l.mark.height) / 2, width: l.mark.width, height: l.mark.height };
+  nodes.push(cellMark(cell, markBox, cellId, { ...data, labelled: true }));
+  putText(stableId(cellId, "text"), "table-cell-text", { x: inner.x + l.mark.slot + v("space.2"), y: top, width: inner.width - l.mark.slot - v("space.2") }, label, textStyle(cell.bold, color, "left", m.textSize), data);
 }
 
-/** A logo alone, sized to the common logo area. */
+/** A logo alone, sized to the common logo area; a flag alone, at the height its column's flags share. */
 function drawLogo(table, cell, at) {
   const { nodes } = table;
   const { l, height, area, cellId, data, inner } = at;
-  const box = logoFrame({ x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, cell.media.width, cell.media.height, { area: LOGO_AREA });
-  const logo = mediaNode({id:stableId(cellId,"logo"),frame:box,props:cell.media,role:"table-logo"});
-  logo.data = {...logo.data,...data,cellHeight:l.height,logoArea:LOGO_AREA};
-  nodes.push(logo);
+  const slot = { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height };
+  const drawable = markDrawable(cell.media), [w, h] = drawable ? [cell.media.width, cell.media.height] : [isFlag(cell.media) ? FLAG_ASPECT : 2, 1];
+  const box = isFlag(cell.media) ? flagFrame(slot, w, h, { most: FLAG_CELL_HEIGHT }) : logoFrame(slot, w, h, { area: LOGO_AREA });
+  nodes.push(cellMark(cell, box, cellId, { ...data, cellHeight: l.height, ...(isFlag(cell.media) ? {} : { logoArea: LOGO_AREA }) }));
+}
+
+/** A cell's mark in its box: the picture, or - its file still to come - the empty slot UNSOURCED_PICTURE counts. */
+function cellMark(cell, frame, cellId, data) {
+  if (!markDrawable(cell.media)) return flagPlaceholder({ id: stableId(cellId, "logo-placeholder"), role: "table-logo-placeholder", frame, data: { ...data, alt: cell.media.alt, ...(isFlag(cell.media) ? { flag: cell.media.flag } : {}) } });
+  const logo = mediaNode({ id: stableId(cellId, "logo"), frame, props: cell.media, role: "table-logo" });
+  logo.data = { ...logo.data, ...data };
+  return logo;
 }
 
 /** The implication marker in its gutter cell. */

@@ -837,21 +837,23 @@ def gate_unsourced_picture(slide_no, slide, findings):
     # A table's photo slot is a thumbnail, well under the size floor that keeps
     # an icon-sized frame out of this count - but it is still a photograph
     # nobody supplied, so it is counted whatever its size. So is a chart's
-    # empty logo or flag slot beside a category.
+    # empty logo or flag slot beside a category, and a table's beside a row's
+    # label or a column's.
     empty = [n for n in slide.get("nodes", [])
              if (str(n.get("role") or "") == "image-frame"
                  and (n.get("frame") or {}).get("width", 0) * (n.get("frame") or {}).get("height", 0) >= PHOTO_MIN_AREA)
-             or str(n.get("role") or "") in ("table-photo-placeholder", "category-logo-placeholder")]
+             or str(n.get("role") or "") in ("table-photo-placeholder", "category-logo-placeholder",
+                                             "table-logo-placeholder", "table-header-logo-placeholder")]
     if not empty:
         return
     findings.append(finding(
         slide_no, "UNSOURCED_PICTURE", len(empty), 0,
         "This page draws {} picture frame{} with no picture in {}. Writing a picture as `alt` with no "
         "`path` is how a page gets laid out before its photographs are cleared, and it is not how a deck "
-        "is delivered. The build fetches logos from Wikipedia and photographs from Wikimedia Commons; "
-        "one still empty found nothing: give it a `search` (or a player's `wikipedia` title) that names it "
-        "better, supply the file as `path`, or drop the picture and give the page the icons, the exhibit "
-        "or the width instead.".format(
+        "is delivered. The build fetches logos from Wikipedia, and photographs, illustrations and flags from "
+        "Wikimedia Commons; one still empty found nothing: give it a `search` (or a player's `wikipedia` title) "
+        "that names it better, supply the file as `path` (a flag as assets/flags/<code>.png), or drop the "
+        "picture and give the page the icons, the exhibit or the width instead.".format(
             len(empty), "" if len(empty) == 1 else "s", "it" if len(empty) == 1 else "them"),
     ))
 

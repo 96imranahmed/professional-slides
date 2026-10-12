@@ -41,6 +41,7 @@ import { craftFindings } from "./gates/craft_gates.mjs";
 import { varietyFindings } from "./gates/variety_gates.mjs";
 import { structureOf, drawnOf } from "./page-types.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
+import { autoFillFlags } from "./fetch-flags.mjs";
 import { autoFillPictures } from "./fetch-pictures.mjs";
 import { autoFillPlaces } from "./fetch-places.mjs";
 import { assetReport, assetsDeclaration, suppliedPictures } from "./asset-needs.mjs";
@@ -175,9 +176,11 @@ async function buildWith(specPath, outputDirectory, { preflight = false, render 
   // taken at its word: nothing is fetched, and what is not on disk is recorded.
   const fetchMissing = fetchLogos && assetsDeclaration(spec).fetch !== "none";
   const logos = await autoFillLogos(spec, baseDir, { hint: spec.playersHint, fetchMissing });
-  // Photographs planned as `{ alt }` come the same way, from Wikimedia Commons
-  // under a free licence, credited on a generated last page; map markers that
-  // name a place get its coordinates.
+  // The flags the pages name come from Wikimedia Commons by the country's name, reused from assets/flags/.
+  const flags = await autoFillFlags(spec, baseDir, { fetchMissing });
+  // Photographs and illustrations planned as `{ alt }` come the same way, from
+  // Wikimedia Commons under a free licence, credited on a generated last page;
+  // map markers that name a place get its coordinates.
   const pictures = await autoFillPictures(spec, baseDir, { fetchMissing });
   const places = await autoFillPlaces(spec, baseDir, { fetchMissing });
   // What the deck still lacks once the fetch has run or been declined: read by the reviewer's packet and delivery.
@@ -200,7 +203,7 @@ async function buildWith(specPath, outputDirectory, { preflight = false, render 
   // runs the gates of whichever it finds, and records `absent` for whichever it
   // does not. A deck built with no content plan is allowed - not every page of a
   // rebuild needs one - but the build output says the stage did not happen.
-  const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}), ...(assets ? { assets } : {}) };
+  const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(flags.filled || flags.failed.length ? { flags } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}), ...(assets ? { assets } : {}) };
   if (fetchedMs > 50) timings.assetsMs = fetchedMs;
   const stages = await gateStages({ spec, stem, baseDir, directory, result, source });
   validateStageContract(spec, stages);

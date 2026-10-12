@@ -1211,6 +1211,97 @@
    "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {
+   "id": "f-ranking-flags",
+   "type": "ranking",
+   "form": "bar",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Eight national railways ranked on one measure, each named by its flag beside its bar, with Northvale's share marked as the line it is read against",
+   "settles": {
+    "kind": "rank",
+    "what": "share of rail journeys made between the peaks on eight national railways, 2025"
+   },
+   "adds": "The points say what the leaders have in common and what reaching them is worth to Northvale",
+   "title": "Swiss and Japanese railways carry 47% and 44% of journeys off-peak, against Northvale's 36%",
+   "exhibit": {
+    "type": "chart.bar",
+    "heading": "Share of rail journeys made off-peak, 2025",
+    "unit": "% of journeys",
+    "categories": [
+     "Switzerland",
+     "Japan",
+     "Austria",
+     "Netherlands",
+     "Denmark",
+     "Germany",
+     "France",
+     "Poland"
+    ],
+    "series": [
+     {
+      "name": "Off-peak share",
+      "values": [
+       47,
+       44,
+       42,
+       39,
+       37,
+       35,
+       31,
+       26
+      ]
+     }
+    ],
+    "categoryIcons": {
+     "Switzerland": {
+      "flag": "Switzerland"
+     },
+     "Japan": {
+      "flag": "Japan"
+     },
+     "Austria": {
+      "flag": "Austria"
+     },
+     "Netherlands": {
+      "flag": "Netherlands"
+     },
+     "Denmark": {
+      "flag": "Denmark"
+     },
+     "Germany": {
+      "flag": "Germany"
+     },
+     "France": {
+      "flag": "France"
+     },
+     "Poland": {
+      "flag": "Poland"
+     }
+    },
+    "referenceLines": [
+     {
+      "value": 36,
+      "label": "Northvale 36%"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "A timetable, not a fare",
+     "text": "The four railways above 39% all run regional trains at least every half hour between the peaks, and none prices the off-peak more than 30% below the peak fare."
+    },
+    {
+     "lead": "Where Northvale sits",
+     "text": "At 36% Northvale would rank sixth of the eight, between Denmark and Germany, on an hourly off-peak timetable on three of its five lines."
+    },
+    {
+     "lead": "What the gap is worth",
+     "text": "Reaching Austria's 42% on Northvale's 48 million journeys means about five million more off-peak journeys a year, with the peak left as it is."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic national benchmarks"
+  },
+  {
    "id": "f-composition-stacked-bar",
    "type": "composition",
    "form": "stacked-bar",
@@ -5911,6 +6002,51 @@
     }
    ],
    "source": "Illustrations: illustrative drawings for a fictional operator"
+  },
+  {
+   "id": "f-picture-illustration",
+   "type": "picture",
+   "form": "picture-hero",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "The claim is about what an off-peak passenger looks for on the platform, which a drawing of the platform says better than a chart, so the argument sits beside it",
+   "settles": {
+    "kind": "qualitative",
+    "what": "why off-peak passengers choose the train, from an on-train survey of a fictional operator"
+   },
+   "adds": "The points say what passengers weigh and what the plan buys first",
+   "title": "Off-peak passengers choose the train by the wait, so the timetable comes before the fare",
+   "pictures": [
+    {
+     "kind": "illustration",
+     "path": "assets/platform.png",
+     "alt": "Illustration of two passengers waiting on a platform as a regional train arrives",
+     "credit": "An illustration drawn for this example"
+    }
+   ],
+   "points": [
+    {
+     "lead": "The wait decides",
+     "text": "Lapsed leisure riders name the wait between trains twice as often as the fare when they say why they drove instead. An hourly train turns a missed connection into an hour on a bench, and a family that has waited once takes the car the next time.",
+     "highlight": "twice as often as the fare"
+    },
+    {
+     "lead": "Groups, not commuters",
+     "text": "Two in three off-peak passengers travel with someone else, most of them in pairs or families. A fare that sells the second and third seat does more for them than a cheaper single ticket, which is priced for the commuter who already travels.",
+     "highlight": "Two in three"
+    },
+    {
+     "lead": "What the platform shows",
+     "text": "Passengers judge the service from where they stand: a departure board that says when the next train leaves, a shelter and a seat. Half the stations on the Dales and Valley lines have none of the three.",
+     "highlight": "Half the stations"
+    },
+    {
+     "lead": "What the plan buys first",
+     "text": "A train every half hour between the peaks, live departure boards at all forty stations and step-free access at the twelve busiest. The fare change follows in 2030, once the trains are there to sell.",
+     "highlight": "every half hour"
+    }
+   ],
+   "source": "Illustration drawn for this example; illustrative survey data for a fictional operator"
   },
   {
    "id": "f-picture-device",
