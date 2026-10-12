@@ -815,8 +815,12 @@ def gate_heading_wraps(slide_no, slide, findings):
         measure = wrapped if isinstance(wrapped, dict) else {}
         text = str(measure.get("text") or source_text(node))
         width, available = measure.get("width"), measure.get("available")
-        fit = (f" is {width}px on one line; this frame gives its heading {available}px, "
-               f"about {int(len(text) * available / width)} characters" if width and available else " wraps")
+        # The composer measures what of the heading fits its line (registry-chart-title.mjs): the cut to make, exactly.
+        fits = measure.get("fits") if isinstance(measure.get("fits"), dict) else None
+        room = (f": its first {fits['words']} word{'' if fits['words'] == 1 else 's'} ({fits['characters']} characters) fit, "
+                f"so a heading of {fits['characters']} characters or fewer, in words like these, sets on one line" if fits
+                else f", about {int(len(text) * available / width)} characters" if width and available else "")
+        fit = (f" is {width}px on one line; this frame gives its heading {available}px{room}" if width and available else " wraps")
         if measure.get("reason") == "unit":
             repair = (f"\"{text}\"{fit}. The unit is a phrase, so it cannot sit beside the heading: make it a unit "
                       "(\"$k\", \"% y/y\") and move the basis (\"published base-salary band\") into the note under the page.")

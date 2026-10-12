@@ -134,8 +134,55 @@ function filledRun(samples, least = 1) {
 // The findings that say a page carries too little: a band that stands empty, and words under the page's floor.
 const SHORT_CODES = new Set(["SCENE_VOID", "TEXT_COVERAGE_LOW"]);
 
-/** `page` with one lever set to `at`: its points run to that many words in one texture, or its table to that many rows. */
-const withLever = (page, lever, at, words, texture) => (lever === "points" ? withPointWords(page, at, words, texture) : withRows(page, at));
+// The page's other text slots, each one text a page runs shorter or longer: the lengths each is first read at, from the
+// shortest its check lets stand to past the longest its box holds. A heading is one line, a subtitle and a takeaway two.
+const SLOT_WORDS = Object.freeze({
+  caption: Object.freeze([8, 11, 15, 20, 26, 34, 44]), rail: Object.freeze([10, 14, 20, 28, 38, 50, 64]), bar: Object.freeze([8, 11, 15, 20, 26, 34]),
+  takeaway: Object.freeze([4, 8, 12, 16, 22, 30]), subtitle: Object.freeze([3, 6, 10, 14, 19, 26]), heading: Object.freeze([2, 4, 6, 8, 10, 13, 17]),
+});
+// Where each slot's text sits on a page: `at` is the exhibit for a caption or a heading.
+const SLOT_TEXT = Object.freeze({
+  caption: { get: (page, at) => exhibitsOf(page)[at]?.caption, set: (page, at, text) => { exhibitsOf(page)[at].caption = text; } },
+  heading: { get: (page, at) => exhibitsOf(page)[at]?.heading, set: (page, at, text) => { exhibitsOf(page)[at].heading = text; } },
+  ...Object.fromEntries(["rail", "bar", "takeaway", "subtitle"].map((key) => [key, { get: (page) => page[key], set: (page, _, text) => { page[key] = text; } }])),
+});
+const slotOf = (lever) => { const [slot, at] = String(lever).split(":"); return { slot, at: at === undefined ? 0 : Number(at) }; };
+
+/**
+ * The text slots of a page as written, apart from its points: each exhibit's
+ * caption and heading, the rail, the so-what bar, the takeaway and the
+ * subtitle - the ones the page writes as text, keyed `caption:0`, `rail` -
+ * with the words each has now. A subtitle the page leaves out is a slot too:
+ * what one would hold is a limit the author needs before writing it.
+ */
+function textSlots(page) {
+  const slots = {};
+  exhibitsOf(page).forEach((ex, at) => { for (const slot of ["heading", "caption"]) if (typeof ex[slot] === "string" && ex[slot].trim()) slots[`${slot}:${at}`] = wordsOf(ex[slot]).length; });
+  for (const slot of ["rail", "bar", "takeaway", "subtitle"]) if (typeof page[slot] === "string" && page[slot].trim()) slots[slot] = wordsOf(page[slot]).length;
+  if (!Object.hasOwn(slots, "subtitle")) slots.subtitle = 0;
+  return slots;
+}
+
+/** `page` with one text slot run to `n` words: its own words first, then the deck's, in one texture, as one sentence. */
+function withSlotWords(pageIn, lever, n, deckWords = [], texture = "lean") {
+  const page = structuredClone(pageIn), { slot, at } = slotOf(lever), place = SLOT_TEXT[slot];
+  delete page.highlight;
+  const own = wordsOf(place.get(page, at));
+  const whole = [...own, ...deckWords].map((word) => word.replace(/[.;:!?]+$/, "")).filter(Boolean);
+  const kept = TEXTURES[texture](whole.map((word) => word.length).sort((a, b) => a - b)), pool = whole.filter(kept);
+  const opening = own.filter(kept).slice(0, n);
+  const more = pool.length ? Array.from({ length: Math.max(0, n - opening.length) }, (_, i) => pool[i % pool.length]) : [];
+  // A heading is a label and takes no full stop; every other slot is a sentence.
+  const text = [...opening, ...more].join(" ");
+  place.set(page, at, slot === "heading" ? text.replace(/[.,;:!?]+$/, "") : runTo(text, n));
+  return page;
+}
+
+/** `page` with one lever set to `at`: its points run to that many words in one texture, its table to that many rows, or one text slot to that many words. */
+const withLever = (page, lever, at, words, texture) => (lever === AS_WRITTEN ? page : lever === "points" ? withPointWords(page, at, words, texture) : lever === "rows" ? withRows(page, at) : withSlotWords(page, lever, at, words, texture));
+// The page composed as it is given, every slot already set: how the ranges are checked together (slotGuidance).
+const AS_WRITTEN = "as-written";
+const textured = (lever) => lever !== "rows" && lever !== AS_WRITTEN;
 
 /**
  * Compose every `{ target, lever, at }` of `requests` and read it: a Map from
@@ -147,8 +194,8 @@ const withLever = (page, lever, at, words, texture) => (lever === "points" ? wit
  * where both do. One composition and one gate run for all.
  */
 async function measure(requests, { compile, compose, pageGates, words = [] }) {
-  const variants = requests.flatMap((request) => (request.lever === "points" ? Object.keys(TEXTURES) : [null]).map((texture) => {
-    const id = `${request.target.id}--fill-${request.lever}-${texture ? `${texture}-` : ""}${request.at}`;
+  const variants = requests.flatMap((request) => (textured(request.lever) ? Object.keys(TEXTURES) : [null]).map((texture) => {
+    const id = `${request.target.id}--fill-${String(request.lever).replace(/[^a-z0-9]+/gi, "-")}-${texture ? `${texture}-` : ""}${request.at}`;
     try { return { request, id, slide: { ...compile({ ...withLever(request.target.page, request.lever, request.at, words, texture), id }, request.target.index), id } }; }
     catch { return { request, id, slide: null }; }
   }));
@@ -165,10 +212,12 @@ async function measure(requests, { compile, compose, pageGates, words = [] }) {
     const budget = (gated.budget || []).find((row) => slides.some(([, no]) => row.slide === no));
     if (composes && budget && Number.isFinite(budget.floor) && budget.body < budget.floor && !codes.includes("TEXT_COVERAGE_LOW")) codes.push("TEXT_COVERAGE_LOW");
     const short = composes && codes.some((code) => SHORT_CODES.has(code));
-    return { fills: composes && !codes.length, short, over: !composes || codes.some((code) => !SHORT_CODES.has(code)) };
+    // What of a heading that wrapped fits its line, as the composer measured it (registry-chart-title.mjs): the characters it holds.
+    const room = slides.flatMap(([slide]) => (slide.nodes || []).map((node) => node?.data?.headingWrapped?.fits?.characters).filter(Number.isFinite));
+    return { fills: composes && !codes.length, short, over: !composes || codes.some((code) => !SHORT_CODES.has(code)), room: room.length ? Math.min(...room) : null };
   };
-  return new Map(requests.map((request) => { const each = variants.filter((variant) => variant.request === request).map(read);
-    return [request, { at: request.at, fills: each.every((one) => one.fills), short: each.some((one) => one.short), over: each.some((one) => one.over) }]; }));
+  return new Map(requests.map((request) => { const each = variants.filter((variant) => variant.request === request).map(read), rooms = each.map((one) => one.room).filter((room) => room !== null);
+    return [request, { at: request.at, fills: each.every((one) => one.fills), short: each.some((one) => one.short), over: each.some((one) => one.over), room: rooms.length ? Math.min(...rooms) : null }]; }));
 }
 
 /**
@@ -200,45 +249,95 @@ async function measure(requests, { compile, compose, pageGates, words = [] }) {
  * the shortest already over the ceiling or past the frame, and the lengths
  * tried - and `text`, the sentences its finding says.
  */
+// The lengths a lever is first read at: FILL's words a point, the table's own rows fewer and more, or a slot's SLOT_WORDS.
+const firstOf = (lever, count) => (lever === "points" ? FILL.pointWords : lever === "rows" ? FILL.rows.offsets.map((offset) => count + offset).filter((at) => at >= FILL.rows.min) : SLOT_WORDS[slotOf(lever).slot]);
+
+/**
+ * One or more levers of each of `asked` pages (`{ target, levers, lever,
+ * measured }`), read twice: at their first lengths, then between every two of
+ * those where the page turns. Each lever's reading is written into its
+ * `measured`. Every lever of every page is composed in the one batch.
+ */
+async function readLevers(asked, machinery) {
+  const coarse = await measure(asked.flatMap(({ target, levers, lever }) => firstOf(lever, levers[lever].count).map((at) => ({ target, lever, at }))), machinery);
+  const of = (results, target, lever) => [...results].filter(([request]) => request.target === target && request.lever === lever).map(([, sample]) => sample).sort((a, b) => a.at - b.at);
+  const fine = await measure(asked.flatMap(({ target, levers, lever }) => { const samples = of(coarse, target, lever);
+    return samples.slice(1).flatMap((b, i) => { const a = samples[i];
+      if (!(a.fills !== b.fills || (a.short && b.over && !a.over))) return [];
+      // Between two lengths where the page turns: evenly spaced words a point, every word of a slot and every count of rows but the table's own.
+      const step = lever === "points" ? Math.max(1, Math.round((b.at - a.at) / (FILL.between + 1))) : 1, inside = [];
+      for (let at = a.at + step; at < b.at; at += step) if (lever !== "rows" || at !== levers.rows.count) inside.push({ target, lever, at });
+      return inside; }); }), machinery);
+  for (const { target, levers, lever, measured } of asked) {
+    const samples = [...of(coarse, target, lever), ...of(fine, target, lever)].sort((a, b) => a.at - b.at);
+    const whole = filledRun(samples, lever === "points" ? 2 : 1);
+    // The two ends of the run are where a line more or less decides, so the range stated for points stops a line's worth of
+    // words inside each end; a run too narrow for that is stated as it was measured, and called narrow. A slot is read word
+    // by word at its turns, in shorter and in longer words, so its range is stated as measured.
+    const margin = (at) => (lever === "points" ? Math.max(FILL.margin.words, Math.round(at * FILL.margin.share)) : 0);
+    const wide = whole && whole.min + margin(whole.min) < whole.max - margin(whole.max);
+    const run = wide ? { min: whole.min + margin(whole.min), max: whole.max - margin(whole.max) } : whole;
+    const rooms = samples.map((sample) => sample.room).filter((room) => room !== null && room !== undefined);
+    measured[lever] = { ...levers[lever], min: run?.min ?? null, max: run?.max ?? null, ...(whole && !wide && lever === "points" ? { narrow: true } : {}), tried: samples.map((sample) => sample.at),
+      short: samples.filter((sample) => sample.short).map((sample) => sample.at).at(-1) ?? null, over: samples.filter((sample) => sample.over && !sample.short).map((sample) => sample.at)[0] ?? null,
+      ...(rooms.length ? { characters: Math.min(...rooms) } : {}) };
+  }
+}
+
+/**
+ * What each text slot of one page holds (R10): for its points and every slot
+ * textSlots names, the range of words at which the page composes as one page
+ * with no band left empty, nothing under its word floor, no heading wrapped
+ * and nothing past its frame or ceiling - read as fillGuidance reads points,
+ * by composing the page in the deck's sections with that slot run shorter and
+ * longer and the rest as written, in one batch for all of its slots. A
+ * heading that wraps also gives the characters its line holds. Then the page
+ * is composed once more with every slot at the middle of its range, in
+ * shorter and in longer words, and `joint` says whether it filled so: the
+ * ranges are each slot's with the others as written, and this is whether
+ * they hold together. Returns `{ slots: { <lever>: { count, min, max, ... } }, joint }`.
+ */
+export async function slotGuidance(target, machinery) {
+  const levers = { ...(fillLevers(target.page).points ? { points: fillLevers(target.page).points } : {}),
+    ...Object.fromEntries(Object.entries(textSlots(target.page)).map(([lever, count]) => [lever, { count }])) };
+  const measured = {};
+  await readLevers(Object.keys(levers).map((lever) => ({ target, levers, lever, measured })), machinery);
+  // Every slot at the middle of its range at once - a subtitle the page leaves out stays out - in each texture.
+  const middle = (m) => (m.min === null ? null : Math.round((m.min + m.max) / 2));
+  const together = Object.keys(TEXTURES).map((texture) => Object.entries(measured).reduce((page, [lever, m]) => (middle(m) === null || (lever === "subtitle" && !levers.subtitle.count) ? page
+    : withLever(page, lever, middle(m), machinery.words ?? [], texture)), target.page));
+  const joint = await measure(together.map((page, at) => ({ target: { ...target, page }, lever: AS_WRITTEN, at })), machinery);
+  return { slots: measured, joint: [...joint.values()].every((sample) => sample.fills) };
+}
+
 export async function fillGuidance(targets, machinery) {
   const read = targets.slice(0, FILL.pages).map((target) => ({ target, levers: fillLevers(target.page), measured: {} }));
-  const firstOf = (lever, count) => (lever === "points" ? FILL.pointWords : FILL.rows.offsets.map((offset) => count + offset).filter((at) => at >= FILL.rows.min));
-  // One lever of each of `asked` pages, read twice: at the lengths of FILL, then between every two of those where the page turns.
-  const readLever = async (asked) => {
-    const coarse = await measure(asked.flatMap(({ target, levers, lever }) => firstOf(lever, levers[lever].count).map((at) => ({ target, lever, at }))), machinery);
-    const of = (results, target) => [...results].filter(([request]) => request.target === target).map(([, sample]) => sample).sort((a, b) => a.at - b.at);
-    const fine = await measure(asked.flatMap(({ target, levers, lever }) => { const samples = of(coarse, target);
-      return samples.slice(1).flatMap((b, i) => { const a = samples[i];
-        if (!(a.fills !== b.fills || (a.short && b.over && !a.over))) return [];
-        // Between two lengths where the page turns: evenly spaced words a point, every count of rows but the table's own.
-        const step = lever === "rows" ? 1 : Math.max(1, Math.round((b.at - a.at) / (FILL.between + 1))), inside = [];
-        for (let at = a.at + step; at < b.at; at += step) if (lever !== "rows" || at !== levers.rows.count) inside.push({ target, lever, at });
-        return inside; }); }), machinery);
-    for (const { target, levers, lever, measured } of asked) {
-      const samples = [...of(coarse, target), ...of(fine, target)].sort((a, b) => a.at - b.at);
-      const whole = filledRun(samples, lever === "points" ? 2 : 1);
-      // The two ends of the run are where a line more or less decides, so the range stated for points stops a line's worth of
-      // words inside each end; a run too narrow for that is stated as it was measured, and called narrow.
-      const margin = (at) => (lever === "points" ? Math.max(FILL.margin.words, Math.round(at * FILL.margin.share)) : 0);
-      const wide = whole && whole.min + margin(whole.min) < whole.max - margin(whole.max);
-      const run = wide ? { min: whole.min + margin(whole.min), max: whole.max - margin(whole.max) } : whole;
-      measured[lever] = { ...levers[lever], min: run?.min ?? null, max: run?.max ?? null, ...(whole && !wide && lever === "points" ? { narrow: true } : {}), tried: samples.map((sample) => sample.at),
-        short: samples.filter((sample) => sample.short).map((sample) => sample.at).at(-1) ?? null, over: samples.filter((sample) => sample.over && !sample.short).map((sample) => sample.at)[0] ?? null };
-    }
-  };
+  const readLever = (asked) => readLevers(asked, machinery);
   // The words first: the points where the page has them. The table is read where the page has no points, and where no length of its points filled it.
   await readLever(read.filter((item) => item.levers.points || item.levers.rows).map((item) => ({ ...item, lever: item.levers.points ? "points" : "rows" })));
   const unfilled = read.filter((item) => item.measured.points && item.measured.points.min === null && item.levers.rows);
   if (unfilled.length) await readLever(unfilled.map((item) => ({ ...item, lever: "rows" })));
+  // A page with neither is filled by the text it does carry - its rail, its captions, its so-what bar, its takeaway - each
+  // read as the points are, so its finding names the words that fill each rather than "write more".
+  const bare = read.filter((item) => !item.levers.points && !item.levers.rows).map((item) => ({ ...item,
+    levers: Object.fromEntries(Object.entries(textSlots(item.target.page)).filter(([lever, count]) => count && !/^(heading|subtitle)/.test(lever)).map(([lever, count]) => [lever, { count }])) }));
+  if (bare.some((item) => Object.keys(item.levers).length)) await readLever(bare.flatMap((item) => Object.keys(item.levers).map((lever) => ({ ...item, lever }))));
   return new Map(read.map(({ target, measured }) => [target.id, { ...measured, text: fillText(measured, target) }]));
 }
 
 const range = (lever, unit) => (lever.min === lever.max ? `${lever.min} ${unit}` : `${lever.min} to ${lever.max} ${unit}`);
 
 /** What a page's measured levers say, as the sentences its finding ends on. */
-function fillText({ points, rows }, { page, ceiling = null, exhibit = null }) {
+function fillText({ points, rows, ...slots }, { page, ceiling = null, exhibit = null }) {
   const said = [], strip = Array.isArray(page?.metrics) && page.metrics.length ? `the strip of ${page.metrics.length} figures takes its own height and ` : "";
-  if (!points && !rows) return `This page has no points and no table whose length fills a band: ${strip}what fills it is the exhibit${exhibit ? `, ${exhibit}` : ""} - give it the height (another form or placement of the page, listed below where one passes) or more of the evidence in it.`;
+  if (!points && !rows) {
+    // The words each text slot fills the page at, measured as the points are, where some length of it does.
+    const name = (lever) => { const { slot, at } = slotOf(lever); return slot === "caption" ? `caption ${at + 1}` : slot === "bar" ? "so-what bar" : slot; };
+    const filled = Object.entries(slots).filter(([, m]) => m && m.min !== null).map(([lever, m]) => `its ${name(lever)} at ${range(m, "words")} (it has ${m.count})`);
+    const tail = `${strip}what fills it is the exhibit${exhibit ? `, ${exhibit}` : ""} - give it the height (another form or placement of the page, listed below where one passes) or more of the evidence in it.`;
+    return filled.length ? `This page has no points and no table: it fills with ${filled.join(", ")}, measured by composing this page with each run shorter and longer, in shorter and in longer words of the deck's own, the rest as written. Where none of those is a length the page's words can take, ${tail}`
+      : `This page has no points and no table whose length fills a band${Object.keys(slots).length ? `, and no length of its ${Object.keys(slots).map(name).join(" or ")} does` : ""}: ${tail}`;
+  }
   if (points && points.narrow) said.push(`Its ${points.count} point${points.count === 1 ? "" : "s"} ${points.placed} fill the page only between ${points.min} and ${points.max} words each, a window so narrow that a line more or less turns it (measured by composing this page with its points run to ${points.tried.length} lengths, each in shorter and in longer words of the deck's own); they average ${points.average}. Write to its middle, or let the exhibit carry the page`);
   else if (points && points.min !== null) said.push(`Its ${points.count} point${points.count === 1 ? "" : "s"} ${points.placed} fill the page at ${range(points, "words each")} (${points.min * points.count} to ${points.max * points.count} in all), measured by composing this page with its points run to ${points.tried.length} lengths, each in shorter and in longer words of the deck's own, and stated a line inside the lengths at which both filled; they average ${points.average}`);
   else if (points) said.push(`No length of its ${points.count} point${points.count === 1 ? "" : "s"} ${points.placed} fills the page${ceiling ? ` inside its ceiling of ${Math.floor(ceiling)} body words` : ""}: ` +

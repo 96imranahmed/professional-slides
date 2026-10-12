@@ -441,3 +441,53 @@ console.log(JSON.stringify({ drawnAtSpine, blind, summaryLine: p1.pages.find((p)
         self.assertEqual(result["restored"], [])  # the measure put back as it was recorded, the critique holds again
         # The spine said what the page would show, before anything was drawn.
         self.assertEqual(result["shown"], [["i-efficiency/cost-income", "proof"], ["i-efficiency/branches", "context"]])
+
+
+SPINE_LOCK = '''
+import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+import * as S from './skills/professional-slides/runtime/storyline.mjs';
+const page = (id, title) => ({ id, title, points: ['A point written as copy, eight words long.'], pageType: { type: 'trend', form: 'line', content: { claim: title, settles: { kind: 'change', what: `what ${id} measures`, measures: [] }, evidence: [`i-${id}`] } } });
+const base = { id: 'lock', slides: ['a', 'b', 'c', 'd'].map((id) => page(id, `Page ${id} states its claim in words`)), appendix: [page('e', 'Page e holds the detail behind the claims')] };
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'spine-lock-'));
+const history = path.join(dir, '.reviews', 'lock', 'storyline-history');
+await fs.mkdir(history, { recursive: true });
+// The critique closed ready on `base`, recorded as the storyline loop records a pass (binding version 5, storyline.mjs BINDING_VERSION).
+await fs.writeFile(path.join(history, 'pass-1.json'), JSON.stringify({ review: { verdict: 'ready' }, pass: 1, binding: S.storylineBinding(base), pageHashes: S.storylinePageHashes(base), bindingVersion: 5 }));
+const find = (spec, id) => [...spec.slides, ...spec.appendix].find((p) => p.id === id);
+const retitle = (spec, id, title) => { find(spec, id).title = title; find(spec, id).pageType.content.claim = title; };
+const lock = async (mutate) => { const spec = structuredClone(base); mutate(spec);
+  const held = await S.spineLock(spec, path.join(dir, 'out'), { deckPath: path.join(dir, 'lock.deck.json') });
+  return held && { pages: held.pages, deleted: held.deleted, moved: held.moved ?? [] }; };
+const out = {
+  copy: await lock((s) => { find(s, 'b').points = ['Copy rewritten after the critique, and only copy.']; find(s, 'c').subtitle = 'A subtitle added'; }),
+  title: await lock((s) => retitle(s, 'b', 'Page b states a narrower claim now')),
+  cut: await lock((s) => { s.slides = s.slides.filter((p) => p.id !== 'b'); }),
+  added: await lock((s) => { s.slides.splice(1, 0, page('x', 'A page the critique never read')); }),
+  swapped: await lock((s) => { [s.slides[1], s.slides[2]] = [s.slides[2], s.slides[1]]; }),
+  titleAndCut: await lock((s) => { retitle(s, 'c', 'Page c states a narrower claim now'); s.slides = s.slides.filter((p) => p.id !== 'b'); }),
+};
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify(out));
+'''
+
+
+class SpineLockTests(unittest.TestCase):
+    def test_the_lock_names_only_the_pages_whose_own_argument_moved(self):
+        """The lock hashed each page with its place - the page before it and
+        whether it stands in the appendix - so a page taken out flagged the page
+        after it, one added flagged its new neighbour and two swapped flagged
+        three: on one deck it named all 105 pages over a layout that moved about
+        fifteen arguments, and stopped being read. A page is named only where
+        its own title, type, settles, evidence or shown measures differ from
+        what the critique read; a page that kept its argument and changed place
+        is the deck's order, said once for the deck."""
+        result = run_node(SPINE_LOCK)
+        self.assertIsNone(result["copy"])  # copy edits move nothing the critique read
+        self.assertEqual(result["title"], {"pages": ["b"], "deleted": [], "moved": []})
+        self.assertEqual(result["cut"], {"pages": ["b"], "deleted": ["b"], "moved": []})  # not c, now after a
+        self.assertEqual(result["added"], {"pages": ["x"], "deleted": [], "moved": []})  # not b, now after x
+        self.assertEqual(result["titleAndCut"], {"pages": ["c", "b"], "deleted": ["b"], "moved": []})
+        # A page moved keeps its own argument: none is named, and the one that moved is the deck's to answer for.
+        self.assertEqual(result["swapped"]["pages"], [])
+        self.assertEqual(len(result["swapped"]["moved"]), 1)
+        self.assertIn(result["swapped"]["moved"][0], ("b", "c"))

@@ -245,5 +245,64 @@ console.log(JSON.stringify({ changed: revisionChanges(result.spec, inventory).co
         self.assertFalse(any(measured for _, measured in result["kept"]), result["kept"])
 
 
+SLOTS = '''
+import { execFileSync } from 'node:child_process';
+const FOUR = ['PAGE_DOES_NOT_COMPOSE', 'SCENE_VOID', 'HEADING_WRAPS', 'TEXT_COVERAGE_LOW'];
+// What `--scaffold <type> --id <page>` prints for a page of the worked deck: its limits, the slots among them.
+const scaffold = (type, id) => JSON.parse(execFileSync(process.execPath, ['skills/professional-slides/runtime/author-deck.mjs', `${BASE}/page-types.pages.json`, '--scaffold', type, '--id', id],
+  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).limits.slots;
+const middle = (range) => Math.round((range.min + range.max) / 2);
+// Every slot written to the middle of its stated range, in the page's own words: what a writer told the ranges does.
+const write = (p, slots) => { const exhibits = [p.exhibit, ...(p.exhibits || [])].filter(Boolean);
+  for (const [slot, limit] of Object.entries(slots)) {
+    const range = slot === 'points' ? limit.wordsEach : limit.words;
+    if (!range || range.min === undefined || (slot === 'subtitle' && !limit.has)) continue;
+    const [name, at] = slot.split(' ');
+    if (slot === 'points') setPoints(p, middle(range));
+    else if (name === 'heading') exhibits[Number(at)].heading = runTo(exhibits[Number(at)].heading, middle(range)).replace(/[.]$/, '');
+    else if (name === 'caption') exhibits[Number(at)].caption = runTo(exhibits[Number(at)].caption, middle(range));
+    else p[name] = runTo(p[name], middle(range));
+  } };
+const out = {};
+// Four forms, four placements: points beside a distribution, captions under a row of panels, a so-what bar, a rail.
+for (const [type, id] of [['ranking', 'p07b'], ['panels', 'p04'], ['ranking', 'p05'], ['trend', 'p03b']]) {
+  const slots = scaffold(type, id);
+  const result = await authorDeck((() => { const doc = structuredClone(worked); doc.pages = [...doc.pages, ...whole.pages.filter((p) => p.id === id && !KEPT.has(id))]; write(page(doc, id), slots); return doc; })(), { baseDir: BASE, fit: false, fitPages: new Set([id]) });
+  out[id] = { slots, codes: [...result.blocking, ...result.advisories].filter((f) => String(f.id) === id && f.severity !== 'advisory' && FOUR.includes(f.code)).map((f) => f.code) };
+}
+// A heading run past its line is told the words and characters of it that fit, measured where it is set.
+const long = await authorDeck((() => { const doc = structuredClone(worked); page(doc, 'p07b').exhibit.heading = runTo(page(doc, 'p07b').exhibit.heading, 30).replace(/[.]$/, ''); return doc; })(), { baseDir: BASE, fit: false, fitPages: new Set(['p07b']) });
+out.wrapped = [...long.blocking, ...long.advisories].filter((f) => f.code === 'HEADING_WRAPS' && String(f.id) === 'p07b').map((f) => f.repair);
+console.log(JSON.stringify(out));
+'''
+
+
+class SlotTests(unittest.TestCase):
+    def test_a_scaffold_states_each_slots_words_and_copy_written_to_them_composes(self):
+        """Writers fitted copy by trial: fifty-five pages of one deck met an
+        empty band, a short page, a wrapped heading or a page that would not
+        compose while their copy was written, and one writer looped over
+        variants by brute force. `--scaffold <type> --id <page>` states the
+        words each slot of the page holds where the deck sets it - its points,
+        captions, heading, rail, so-what bar, subtitle - measured on the
+        composer, and copy written to those ranges composes with none of the
+        four findings, on four forms with four commentary placements. A
+        heading that wraps is told the characters its line holds."""
+        result = run_node(DECK + SLOTS)
+        expected = {"p07b": {"points", "heading 0"}, "p04": {"caption 0", "caption 1", "heading 0", "heading 1", "subtitle"}, "p05": {"bar"}, "p03b": {"rail", "heading 0"}}
+        for page, slots in expected.items():
+            with self.subTest(page=page):
+                case = result[page]
+                self.assertTrue(case["slots"]["together"], case["slots"])
+                self.assertTrue(slots <= set(case["slots"]), case["slots"])
+                for slot in slots:
+                    limit = case["slots"][slot]
+                    words = limit["wordsEach"] if slot == "points" else limit["words"]
+                    self.assertLessEqual(words["min"], words["max"], (slot, limit))
+                self.assertEqual(case["codes"], [], case)
+        self.assertEqual(len(result["wrapped"]), 1, result["wrapped"])
+        self.assertRegex(result["wrapped"][0], r"its first \d+ words \(\d+ characters\) fit")
+
+
 if __name__ == "__main__":
     unittest.main()
