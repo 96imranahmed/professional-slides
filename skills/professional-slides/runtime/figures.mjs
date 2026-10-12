@@ -13,6 +13,7 @@ import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
 import { measureTextRuns } from "./text-layout.mjs";
+import { quoted } from "./text-contract.mjs";
 
 const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
@@ -312,24 +313,44 @@ function normalizeSpectrum(props) {
     return { id: clean(marker.id), label: clean(marker.label) };
   });
   if (markers && segments !== null) throw new Error("Markers sit on the continuous spectrum; a segmented scale marks one level a row");
-  return between(props.items, 2, 6, "A spectrum").map((item, i) => {
-    if (markers) {
-      if (!clean(item?.left) || !clean(item?.right)) throw new Error(`Spectrum row ${i + 1} needs both poles named`);
-      const values = markers.map((marker) => Number(item.values?.[marker.id]));
-      if (values.some((value) => !(value >= 0 && value <= 1))) throw new Error(`Spectrum row ${i + 1} places every marker - ${markers.map((marker) => marker.id).join(", ")} - at a fraction from 0 to 1 in \`values\``);
-      return { left: clean(item.left), right: clean(item.right), values, text: clean(item.text) };
-    }
-    if (segments !== null) {
-      if (!clean(item?.left)) throw new Error(`Spectrum row ${i + 1} needs its name in \`left\``);
-      const level = Number(item.level);
-      if (!(Number.isInteger(level) && level >= 1 && level <= segments)) throw new Error(`Spectrum row ${i + 1} sits on a segment from 1 to ${segments}; give its \`level\``);
-      return { left: clean(item.left), right: clean(item.right), level, value: (level - 0.5) / segments, text: clean(item.text) };
-    }
+  return between(props.items, 2, 6, "A spectrum").map((item, i) => ({ ...spectrumRow(item, i, { markers, segments }), quotes: poleQuotes(item, i) }));
+}
+
+// `quotes: { left, right }`: what someone at each pole says - "There are many
+// factors beyond my control" against "I can learn new things" - set under the
+// row, the left quote under the left pole and the right under the right, each
+// in quotation marks. A pole's voice is a sentence or two; past three lines in
+// its half of the row it is a passage. A row carries its note or its quotes,
+// not both: two kinds of text under one track read as one.
+const QUOTE_LINES = 3;
+function poleQuotes(item, i) {
+  if (item?.quotes === undefined) return null;
+  const quotes = item.quotes;
+  if (!quotes || typeof quotes !== "object" || Array.isArray(quotes) || Object.keys(quotes).some((key) => !["left", "right"].includes(key)) || (!clean(quotes.left) && !clean(quotes.right)))
+    throw new Error(`Spectrum row ${i + 1}'s \`quotes\` is { left, right }: what someone at each pole says, one of them at least`);
+  if (clean(item.text)) throw new Error(`Spectrum row ${i + 1} carries a note (\`text\`) and its poles' quotes; one line of text under a track reads as one voice - keep the quotes, or the note`);
+  if (clean(quotes.right) && !clean(item.right)) throw new Error(`Spectrum row ${i + 1} quotes its right pole, which it does not name; give the row its \`right\``);
+  return { left: clean(quotes.left) ? quoted(quotes.left) : null, right: clean(quotes.right) ? quoted(quotes.right) : null };
+}
+
+/** One row's poles and where the subject sits: a value, a level of a segmented scale, or each marker's place. */
+function spectrumRow(item, i, { markers, segments }) {
+  if (markers) {
     if (!clean(item?.left) || !clean(item?.right)) throw new Error(`Spectrum row ${i + 1} needs both poles named`);
-    const value = Number(item.value);
-    if (!(value >= 0 && value <= 1)) throw new Error(`Spectrum row ${i + 1} places its marker at a fraction from 0 to 1`);
-    return { left: clean(item.left), right: clean(item.right), value, text: clean(item.text) };
-  });
+    const values = markers.map((marker) => Number(item.values?.[marker.id]));
+    if (values.some((value) => !(value >= 0 && value <= 1))) throw new Error(`Spectrum row ${i + 1} places every marker - ${markers.map((marker) => marker.id).join(", ")} - at a fraction from 0 to 1 in \`values\``);
+    return { left: clean(item.left), right: clean(item.right), values, text: clean(item.text) };
+  }
+  if (segments !== null) {
+    if (!clean(item?.left)) throw new Error(`Spectrum row ${i + 1} needs its name in \`left\``);
+    const level = Number(item.level);
+    if (!(Number.isInteger(level) && level >= 1 && level <= segments)) throw new Error(`Spectrum row ${i + 1} sits on a segment from 1 to ${segments}; give its \`level\``);
+    return { left: clean(item.left), right: clean(item.right), level, value: (level - 0.5) / segments, text: clean(item.text) };
+  }
+  if (!clean(item?.left) || !clean(item?.right)) throw new Error(`Spectrum row ${i + 1} needs both poles named`);
+  const value = Number(item.value);
+  if (!(value >= 0 && value <= 1)) throw new Error(`Spectrum row ${i + 1} places its marker at a fraction from 0 to 1`);
+  return { left: clean(item.left), right: clean(item.right), value, text: clean(item.text) };
 }
 
 export function spectrumLayout(frame, props) {
@@ -340,18 +361,24 @@ export function spectrumLayout(frame, props) {
   const rightPole = segments === null || items.some((item) => item.right);
   const trackWidth = frame.width - (rightPole ? 2 : 1) * poleWidth - (rightPole ? 2 : 1) * v("space.4");
   if (trackWidth < 200) throw new Error("A spectrum is too narrow to show position; widen it");
-  const rows = items.map((item) => {
+  // The poles' quotes share the row under it, half each, a gutter between.
+  const quoteWidth = (frame.width - v("space.5")) / 2;
+  const rows = items.map((item, i) => {
     const left = measure(item.left, poleWidth, "type.body", true), right = item.right ? measure(item.right, poleWidth, "type.body", true) : null;
     const text = item.text ? measure(item.text, trackWidth, "type.compact") : null;
+    const quotes = item.quotes && Object.fromEntries(["left", "right"].map((side) => [side, item.quotes[side] ? measure(item.quotes[side], quoteWidth, "type.compact") : null]));
+    for (const side of ["left", "right"]) if (quotes?.[side] && quotes[side].lines.length > QUOTE_LINES)
+      throw new Error(`Spectrum row ${i + 1}'s ${side} quote runs to ${quotes[side].lines.length} lines in its half of the row; a pole's voice is ${QUOTE_LINES} lines at most - cut it to the words that make the pole`);
+    const said = quotes ? Math.max(quotes.left?.height ?? 0, quotes.right?.height ?? 0) : 0;
     const head = Math.max(left.height, right?.height ?? 0, 24);
-    return { item, left, right, text, head, height: head + (text ? v("space.2") + text.height : 0) };
+    return { item, left, right, text, quotes, head, height: head + (text ? v("space.2") + text.height : 0) + (said ? v("space.2") + said : 0) };
   });
   const gap = v("space.5");
   const segGap = 4, segWidth = segments ? (trackWidth - segGap * (segments - 1)) / segments : 0;
   const scale = segments && props.scale ? props.scale.map((step) => measure(step, segWidth, "type.label")) : null;
   const key = props.markers ? props.markers.map((marker) => measure(String(marker.label), trackWidth, "type.compact", true)) : null;
   const header = scale ? Math.max(...scale.map((m) => m.height)) + v("space.2") : key ? Math.max(...key.map((m) => m.height)) + v("space.4") : 0;
-  return { rows, segments, segGap, segWidth, scale, key, header, rightPole, poleWidth, trackWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
+  return { rows, segments, segGap, segWidth, scale, key, header, rightPole, poleWidth, trackWidth, quoteWidth, gap, height: header + rows.reduce((s, r) => s + r.height, 0) + gap * (rows.length - 1) };
 }
 
 export function spectrumNodes({ id, frame, props }) {
@@ -382,6 +409,12 @@ export function spectrumNodes({ id, frame, props }) {
     const rid = stableId(id, "row", i), mid = y + r.head / 2, dot = 16;
     out.push(label(stableId(rid, "left"), "spectrum-pole", { x: frame.x, y: mid - r.left.height / 2, width: L.poleWidth }, r.left, style("type.body", INK, true, "right")));
     if (r.right) out.push(label(stableId(rid, "right"), "spectrum-pole", { x: trackX + L.trackWidth + v("space.4"), y: mid - r.right.height / 2, width: L.poleWidth }, r.right, style("type.body", ACCENT, true, "left")));
+    // Each pole's voice under its own end of the row: the left quote set from the left edge, the right one to the right edge.
+    if (r.quotes) {
+      const qy = y + r.head + v("space.2");
+      if (r.quotes.left) out.push(label(stableId(rid, "quote-left"), "spectrum-quote", { x: frame.x, y: qy, width: L.quoteWidth }, r.quotes.left, style("type.compact", INK, false, "left")));
+      if (r.quotes.right) out.push(label(stableId(rid, "quote-right"), "spectrum-quote", { x: frame.x + frame.width - L.quoteWidth, y: qy, width: L.quoteWidth }, r.quotes.right, style("type.compact", INK, false, "right")));
+    }
     if (L.segments) {
       for (let k = 0; k < L.segments; k++) out.push(fillRect(stableId(rid, "segment", k), k === r.item.level - 1 ? "spectrum-level" : "spectrum-segment", { x: segX(k), y: mid - 7, width: L.segWidth, height: 14 }, k === r.item.level - 1 ? ACCENT : MUTED, { data: { level: k + 1, selected: k === r.item.level - 1 } }));
       if (r.text) out.push(label(stableId(rid, "text"), "spectrum-text", { x: trackX, y: y + r.head + v("space.2"), width: L.trackWidth }, r.text, style("type.compact", SECONDARY, false, "left")));

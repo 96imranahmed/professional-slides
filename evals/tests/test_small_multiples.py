@@ -101,6 +101,136 @@ console.log(JSON.stringify({
         self.assertIn("marks none", found["every"])
 
 
+STACKS = """
+const parts = ['Season', 'Day', 'Advance'];
+const stacked = regions.slice(0, 6).map((label, i) => ({ label, series: parts.map((name, k) => ({ name, values: years.map((_, j) => 2 + ((i + j + k) % 4)) })) }));
+const donuts = regions.slice(0, 6).map((label, i) => ({ label, values: [3 + i, 4, 2 + (i % 3)] }));
+const fills = (nodes, item) => nodes.filter((n) => n.role === 'chart-segment' && n.data.item === item).map((n) => [n.data.part, n.style.fill.tokenId]);
+"""
+
+
+class StackAndDonutTests(unittest.TestCase):
+    """A stacked or a donut trellis: each panel the same parts, a part one colour in every panel, keyed once.
+
+    A device audit found trellises of 100% stacked columns and of donuts on the
+    calibration pages, and the trellis refused both marks; five such panels
+    could only be drawn as a grid of four.
+    """
+
+    def test_every_panel_stacks_the_same_parts_in_one_colour_each(self):
+        run_node(PRELUDE + STACKS + """
+const nodes = render({ mark: 'stacked-column', categories: years, items: stacked, highlights: [{ category: 'East' }] });
+// One colour a part, the same in every panel.
+const colours = new Map();
+for (const item of stacked) for (const [part, fill] of fills(nodes, item.label)) { if (colours.has(part)) assert.equal(colours.get(part), fill, part); colours.set(part, fill); }
+assert.deepEqual([...colours.values()], ['color.chartSeries1', 'color.chartSeries2', 'color.chartSeries3']);
+// Keyed once, over the trellis.
+assert.deepEqual(nodes.filter((n) => n.role === 'legend-label').map((n) => n.text), parts);
+const key = Math.max(...nodes.filter((n) => n.role === 'legend-label').map((n) => n.frame.y + n.frame.height));
+assert.ok(nodes.filter((n) => n.role === 'chart-segment').every((n) => n.frame.y >= key), 'the key sits over the panels');
+// One scale: equal totals stand equal heights in every panel.
+const total = (item, j) => item.series.reduce((s, p) => s + p.values[j], 0);
+const height = (label, j) => nodes.filter((n) => n.role === 'chart-segment' && n.data.item === label && n.data.category === years[j]).reduce((s, n) => s + n.frame.height, 0);
+const [a, b] = [stacked[0], stacked[1]];
+if (total(a, 0) === total(b, 0)) assert.ok(Math.abs(height(a.label, 0) - height(b.label, 0)) < 0.5);
+assert.ok(Math.abs(height(a.label, 0) / height(a.label, 1) - total(a, 0) / total(a, 1)) < 0.01, 'heights stand in proportion to the totals');
+// The subject's panel keeps its parts' colours, set on the accent's tint under an accent title.
+assert.equal(nodes.filter((n) => n.role === 'chart-panel-highlight').map((n) => n.data.item).join(), 'East');
+assert.equal(nodes.find((n) => n.data?.panelTitle && n.text === 'East').style.color.tokenId, 'color.accent');
+assert.deepEqual(fills(nodes, 'East').map(([, f]) => f), fills(nodes, 'North').map(([, f]) => f));
+// Values print inside the segments that hold them.
+assert.ok(nodes.some((n) => n.role === 'data-label' && n.data.placement === 'inside' && n.data.part === 'Season'));
+console.log('{}');
+""")
+
+    def test_a_hundred_percent_stack_shares_each_category_out_of_its_total(self):
+        run_node(PRELUDE + STACKS + """
+import { percentStack } from './skills/professional-slides/runtime/compose-charts.mjs';
+const nodes = render({ mark: 'stacked-bar', percent: true, categories: years, items: stacked });
+// Every stack fills the plot's width: each is 100.
+const widths = new Map();
+for (const n of nodes.filter((n) => n.role === 'chart-segment')) { const k = `${n.data.item}|${n.data.category}`; widths.set(k, (widths.get(k) ?? 0) + n.frame.width); }
+const all = [...widths.values()];
+assert.ok(Math.max(...all) - Math.min(...all) < 0.5, 'every stack the same length');
+// The shares, to one decimal by largest remainder, sum to exactly 100.
+for (const item of stacked) for (const year of years) {
+  const shares = nodes.filter((n) => n.role === 'chart-segment' && n.data.item === item.label && n.data.category === year).map((n) => n.data.value);
+  assert.equal(Math.round(shares.reduce((a, b) => a + b, 0) * 10), 1000);
+}
+// The composer lets a trellis of stacks through with its unit said, where it refuses `percent` on a chart with no stack.
+assert.equal(percentStack({ type: 'chart.small-multiples', mark: 'stacked-bar', percent: true, items: stacked }).unit, '% of total');
+assert.throws(() => percentStack({ type: 'chart.line', percent: true }), /re-expresses a stack/);
+console.log('{}');
+""")
+
+    def test_a_donut_trellis_keys_its_parts_and_prints_the_centre_share(self):
+        run_node(PRELUDE + STACKS + """
+const nodes = render({ mark: 'donut', categories: parts, items: donuts, centre: 'Day', highlights: [{ category: 'South' }] });
+assert.equal(nodes.filter((n) => n.role === 'chart-segment').length, donuts.length * parts.length);
+for (const item of donuts) assert.deepEqual(fills(nodes, item.label).map(([, f]) => f), ['color.chartSeries1', 'color.chartSeries2', 'color.chartSeries3']);
+// One size of donut: each is a whole.
+const sizes = new Set(nodes.filter((n) => n.role === 'chart-segment').map((n) => Math.round(n.frame.width)));
+assert.equal(sizes.size, 1);
+// The hole prints the centre part's share, not printed again on the ring.
+const centre = nodes.filter((n) => n.role === 'chart-centre-value');
+assert.equal(centre.length, donuts.length);
+assert.equal(centre[0].text, `${Math.round(100 * 4 / 9)}%`);
+assert.ok(!nodes.some((n) => n.role === 'data-label' && n.data.part === 'Day'));
+// No axis: the parts are the key's.
+assert.deepEqual(nodes.filter((n) => n.role === 'legend-label').map((n) => n.text), parts);
+assert.ok(!nodes.some((n) => n.role === 'category-label' && n.data?.category !== undefined));
+assert.equal(nodes.find((n) => n.role === 'chart-hole' && n.data.item === 'South').style.fill.tokenId, 'color.accentTint', 'the subject\\'s hole is its tint');
+console.log('{}');
+""")
+
+    def test_what_a_stack_or_a_donut_cannot_draw_is_refused(self):
+        found = run_node(PRELUDE + STACKS + """
+const swap = stacked.map((item, i) => i === 2 ? { ...item, series: [item.series[1], item.series[0], item.series[2]] } : item);
+const seven = stacked.map((item) => ({ ...item, series: Array.from({ length: 7 }, (_, k) => ({ name: `P${k}`, values: [1, 1, 1, 1] })) }));
+console.log(JSON.stringify({
+  parts: error(() => render({ mark: 'stacked-column', categories: years, items: swap })),
+  negative: error(() => render({ mark: 'stacked-column', categories: years, items: stacked.map((item, i) => i ? item : { ...item, series: [{ ...item.series[0], values: [-1, 2, 3, 4] }, ...item.series.slice(1)] }) })),
+  seven: error(() => render({ mark: 'stacked-column', categories: years, items: seven })),
+  valuesOnStack: error(() => render({ mark: 'stacked-column', categories: years, items: items.slice(0, 6) })),
+  focus: error(() => render({ mark: 'stacked-bar', categories: years, items: stacked.map((item, i) => i ? item : { ...item, focus: 'FY24' }) })),
+  percentColumn: error(() => render({ mark: 'column', percent: true, categories: years, items })),
+  percentDonut: error(() => render({ mark: 'donut', percent: true, categories: parts, items: donuts })),
+  centreColumn: error(() => render({ mark: 'column', centre: 'FY24', categories: years, items })),
+  centreUnknown: error(() => render({ mark: 'donut', centre: 'Weekly', categories: parts, items: donuts })),
+  donutReference: error(() => render({ mark: 'donut', reference: 'average', categories: parts, items: donuts })),
+  donutOwn: error(() => render({ mark: 'donut', scale: 'own', categories: parts, items: donuts })),
+  donutEmpty: error(() => render({ mark: 'donut', categories: parts, items: donuts.map((item, i) => i ? item : { ...item, values: [5, 0, 0] }) })),
+  donutSmall: error(() => render({ mark: 'donut', categories: parts, items: donuts }, { ...frame, height: 120 })),
+}));
+""")
+        self.assertIn("same parts in the same order", found["parts"])
+        self.assertIn("falls below zero", found["negative"])
+        self.assertIn("2 to 6 parts", found["seven"])
+        self.assertIn("carries `series", found["valuesOnStack"])
+        self.assertIn("keeps one colour a part", found["focus"])
+        self.assertIn("draws no stack", found["percentColumn"])
+        self.assertIn("already a share", found["percentDonut"])
+        self.assertIn("draws no donut", found["centreColumn"])
+        self.assertIn("not one of the categories", found["centreUnknown"])
+        self.assertIn("no scale to rule", found["donutReference"])
+        self.assertIn("one scale already", found["donutOwn"])
+        self.assertIn("two or more above 0", found["donutEmpty"])
+        self.assertIn("too small to read", found["donutSmall"])
+
+    def test_a_page_counts_every_part_of_every_stack(self):
+        run_node(PRELUDE + STACKS + """
+const page = { id: 'p', type: 'panels', form: 'small-multiples', commentary: 'below', takeaway: false,
+  why: 'Six regions answer one question, and only a stack a year in each shows the mix moving',
+  settles: { kind: 'comparison', what: 'journeys by ticket type and region, FY23 to FY26' }, adds: 'The points say why one region moved',
+  title: 'Only the East moved its riders to day tickets', exhibit: { heading: 'Journeys by ticket type and region', unit: '%', mark: 'stacked-column', percent: true, categories: years, items: stacked },
+  points: [{ lead: 'One region moved', text: 'The East moved a third of its riders to day tickets in three years.' }, { lead: 'Why', text: 'It was the only region recast to a train every twenty minutes.' }] };
+const slide = compilePage(page);
+assert.equal(slide.exhibit.type, 'chart.small-multiples');
+assert.equal(slide.pageType.values, 6 * 3 * 4, 'a value a part a category a panel');
+console.log('{}');
+""")
+
+
 class PageTests(unittest.TestCase):
     PAGE = """
 const page = { id: 'p', type: 'panels', form: 'small-multiples', commentary: 'beside', takeaway: false,

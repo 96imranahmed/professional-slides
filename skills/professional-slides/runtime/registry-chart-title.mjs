@@ -7,6 +7,11 @@ import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { textWordList } from "./text-contract.mjs";
 import { judged } from "./judgements.mjs";
 import { FONT, COMPACT, INK, SECONDARY, WHITE, HAIRLINE, textStyle, boxStyle, openLine, SECTION_HEADING_TOKENS } from "./registry-shared.mjs";
+import { iconMarker, markerSize, MARK_TOKENS } from "./marks.mjs";
+import { iconDefinition, unknownIcon } from "./icons.mjs";
+
+// A heading's icon is a card's outline icon at the size a column of icon cards sets it (panels.mjs cardsLayout): 1.5 discs.
+const HEADING_ICON = () => Math.round(markerSize() * 1.5);
 
 function resolveChartTitleVariant(props = {}) {
   assertChartTitleCopy(props);
@@ -103,7 +108,11 @@ function chartTitleLayout(frame, props) {
   // falls back to the stacked unit line when the heading wraps or the unit
   // would not fit beside it.
   const unitGap = unit && !inline ? (band ? tokenValue(token("space.2")) : tokenValue(token("space.1")) / 2) : 0;
-  const block = heading.height + 2 * padY + (unit && !inline ? unitGap + unit.height : 0);
+  // `icon`: a line icon in a ring over the heading, as a card sets one over its title - the panel named by its picture
+  // before its words. It stands in the band, so peers that share the band keep their headings and rules level.
+  if (props.icon !== undefined && !iconDefinition(props.icon)) throw new Error(unknownIcon(props.icon, "chart heading icon"));
+  const iconSize = props.icon ? HEADING_ICON() : 0, iconBand = props.icon ? iconSize + tokenValue(token("space.2")) : 0;
+  const block = iconBand + heading.height + 2 * padY + (unit && !inline ? unitGap + unit.height : 0);
   const bandHeight = Math.max(block, props.headerBandHeight || 0);
   const ruled = variant === "underlined" && !band;
   const ruleGap = tokenValue(token("space.1")), contentGap = tokenValue(token("space.3"));
@@ -124,14 +133,15 @@ function chartTitleLayout(frame, props) {
     : heading.lines.length > 1 ? "heading" : unit && !inline && phrase ? "unit" : null;
   const wrapped = reason ? { reason, text: reason === "heading" ? headingText : `${headingText}, ${props.unit}`,
     width: reason === "heading" ? oneLine(headingText) : oneLine(`${headingText},`) + inlineGap + oneLine(props.unit, false), available: Math.floor(available) } : false;
-  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY };
+  return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY, iconSize, iconBand };
 }
 function chartTitleNodes({ id, frame, props }) {
   const layout = chartTitleLayout(frame, props);
   if (layout.height > frame.height) throw new Error(`Chart title ${id} exceeds its allocated height; shorten the heading or unit, or allocate more height`);
-  const blockTop = frame.y + layout.padY;
-  const nodes = [];
-  if (layout.band) nodes.push(rectPrimitive({ id: stableId(id, "band"), role: "chart-heading-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: layout.heading.height + 2 * layout.padY }, style: boxStyle(SECONDARY, "none", HAIRLINE, token("radius.none")) }));
+  // The heading's own top: under the icon where it has one.
+  const top = frame.y + layout.iconBand, blockTop = top + layout.padY;
+  const nodes = props.icon ? iconMarker({ id: stableId(id, "icon"), role: "chart-heading-icon", x: frame.x + layout.padX, y: frame.y, size: layout.iconSize, icon: props.icon, tone: "outline", data: { headingIcon: true } }) : [];
+  if (layout.band) nodes.push(rectPrimitive({ id: stableId(id, "band"), role: "chart-heading-band", frame: { x: frame.x, y: top, width: frame.width, height: layout.heading.height + 2 * layout.padY }, style: boxStyle(SECONDARY, "none", HAIRLINE, token("radius.none")) }));
   nodes.push(textPrimitive({
     id: stableId(id, "heading"),
     role: "section-heading",
@@ -155,7 +165,7 @@ function chartTitleNodes({ id, frame, props }) {
     const badge = measureText(String(props.badge), frame.width * 0.5, { fontFamily: tokenValue(FONT), fontSize: tokenValue(COMPACT), bold: true });
     if (badge.lines.length === 1) {
       const pad = tokenValue(token("space.2")), w = Math.ceil(badge.width) + 2 * pad, h = badge.height + tokenValue(token("space.1"));
-      const bx = frame.x + frame.width - w, by = frame.y + (layout.heading.height - h) / 2;
+      const bx = frame.x + frame.width - w, by = top + (layout.heading.height - h) / 2;
       nodes.push(rectPrimitive({ id: stableId(id, "badge-surface"), role: "chart-badge-surface", frame: { x: bx, y: by, width: w, height: h }, style: boxStyle(token("color.accent"), "none", HAIRLINE, token("radius.round")) }));
       nodes.push(textPrimitive({ id: stableId(id, "badge"), role: "chart-badge", frame: { x: bx + pad, y: by + (h - badge.height) / 2, width: w - 2 * pad, height: badge.height }, text: badge.text, style: { ...textStyle(COMPACT, WHITE, true, "center", "top"), lineHeight: badge.lineHeight, wrap: false }, data: { textLayout: badge } }));
     }
@@ -168,7 +178,7 @@ function chartTitleNodes({ id, frame, props }) {
 export function registerChartTitle(registry) {
   registry.set("chart-title", {
     id: "chart-title", version: "2.1.0", category: "shared", role: "chart-title",
-    tokens: [...SECTION_HEADING_TOKENS, "color.chartUnit", "color.accent", "color.textSecondary", "color.onPrimary", "type.compact", "space.1", "space.2", "space.3", "radius.round", "radius.none", ...STYLE_TOKENS],
+    tokens: [...SECTION_HEADING_TOKENS, ...MARK_TOKENS, "color.chartUnit", "color.accent", "color.textSecondary", "color.onPrimary", "type.compact", "space.1", "space.2", "space.3", "radius.round", "radius.none", ...STYLE_TOKENS],
     preferredSize: { width: 540, height: 76 }, sample: { heading: "(Insert chart title)", unit: "(Insert unit)" },
     variants: { underlined: {}, unit: { props: { unit: "Revenue share, %" } } }, defaultVariant: "underlined", variantProp: "variant", resolveVariant: resolveChartTitleVariant,
     measureContent: ({ frame, props }) => chartTitleLayout(frame, props),

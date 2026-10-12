@@ -284,6 +284,23 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 }
 
 /**
+ * Parts as shares of their whole, to one decimal, by largest remainder: each
+ * set sums to exactly 100. Rounding each share on its own can bring a stack to
+ * 100.1, past the 0-100 axis a 100% stack is drawn on. A whole of nothing is
+ * all zeros. A 100% stacked chart and a trellis of them share it.
+ */
+export function sharesOfWhole(parts) {
+  const total = parts.reduce((sum, value) => sum + (value || 0), 0);
+  if (!total) return parts.map(() => 0);
+  const exact = parts.map((value) => ((value || 0) / total) * 1000);
+  const floors = exact.map(Math.floor);
+  let short = 1000 - floors.reduce((a, b) => a + b, 0);
+  const order = exact.map((value, k) => [value - floors[k], k]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, k] of order) { if (short <= 0) break; floors[k] += 1; short -= 1; }
+  return floors.map((value) => value / 10);
+}
+
+/**
  * Which labels a crowded period axis keeps, given how many slots one label
  * needs: the first, then every nth, at a step - the one needed, or one more -
  * that lands on the latest period, so both ends of the series are named and

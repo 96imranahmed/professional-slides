@@ -146,7 +146,8 @@ export function plottedValues(ex, { printed = false } = {}) {
   if (Array.isArray(ex.values)) return ex.values.flat().filter(finite).length;
   // `printed`: a figure bound and printed ("29%") is a number the reader reads as a typed one (29) is - the evidence floor
   // counts both, so a page drawn at the spine and laid out reads the same; the binding gates count only what was typed.
-  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) || (printed && typeof item?.value === "string" && /\d/.test(item.value)) ? 1 : 0), 0);
+  // A trellis of stacks plots each panel's parts (`series`), a value a part a category.
+  if (Array.isArray(ex.items)) return ex.items.reduce((n, item) => n + (Array.isArray(item?.series) ? item.series.reduce((m, part) => m + counted(part?.values), 0) : Array.isArray(item?.values) ? counted(item.values) : finite(item?.value) || (printed && typeof item?.value === "string" && /\d/.test(item.value)) ? 1 : 0), 0);
   if (Array.isArray(ex.markers)) return ex.markers.length;
   return 0;
 }

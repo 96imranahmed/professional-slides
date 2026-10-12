@@ -36,6 +36,8 @@ const NOTE_LINE = /^\s*(source|sources|note|notes|footnote)\b[:\s]/i;
 // text split on whitespace, every token a word.
 export const textWordList = value => { const text = normalizeText(value); return text ? text.split(' ') : []; };
 export const textWords = value => textWordList(value).length;
+/** Words set as said - a table's quote cell, a spectrum pole's voice: in curly quotation marks, the author's own taken off first. */
+export const quoted = value => `“${String(value).trim().replace(/^[“"‘']+|[”"’']+$/g, '')}”`;
 // A paragraph as authored: a string, or `{ lead, text }` - the subheading a
 // reader scans by and the prose under it. Every reader of `paragraphs` takes
 // it through these two, so a lead is counted, checked and drawn wherever the

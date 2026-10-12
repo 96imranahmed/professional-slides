@@ -355,7 +355,7 @@ function typedMeasurements(ex, filled) {
   if (Array.isArray(ex.rows) && (isTable(ex) || ex.rows.every((row) => rowCells(row).length)))
     return ex.rows.flatMap((row) => resultCells(row).flatMap((cell) => (judgedCell(cell) ? [] : cell && typeof cell === "object" ? (typeof cell.value === "number" ? [String(cell.value)] : figure(cellText(cell))) : figure(cell))));
   if (Array.isArray(ex.items) && !Array.isArray(ex.series))
-    return ex.items.flatMap((item) => (!item || typeof item !== "object" || filled.has(item) ? [] : Array.isArray(item.values) ? item.values.filter((value) => typeof value === "number").map(String) : item.value === undefined || item.value === null ? [] : figure(item.value)));
+    return ex.items.flatMap((item) => (!item || typeof item !== "object" || filled.has(item) ? [] : Array.isArray(item.series) ? item.series.flatMap((part) => (part?.values || []).filter((value) => typeof value === "number").map(String)) : Array.isArray(item.values) ? item.values.filter((value) => typeof value === "number").map(String) : item.value === undefined || item.value === null ? [] : figure(item.value)));
   const plotted = plottedValues(JSON.parse(withoutTokens(JSON.stringify(ex))));
   return plotted ? [`${plotted} plotted value${plotted === 1 ? "" : "s"}`] : [];
 }
@@ -583,7 +583,9 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
       return { name: label, values: values.map((row) => row[j]), ...(from < 0 ? {} : assumed.every(Boolean) ? { state: "assumed" } : assumed.slice(from).every(Boolean) ? { assumedFrom: names[from] } : {}) }; });
     return null;
   }
-  // Small multiples draw a series an item, and the item says what its series is.
+  // Small multiples draw a series an item, and the item says what its series is. A trellis of stacks draws several
+  // series a panel, which one measure a panel cannot fill; a donut's panel is one measure shared out over its members.
+  if (kind === "chart.small-multiples" && ["stacked-column", "stacked-bar"].includes(ex.mark)) return `a trellis of stacks draws several parts a panel, and a measure a panel fills one: write each item's \`series\` (its parts and their values), or draw the trellis as "column", "bar", "line" or "donut"`;
   if (kind === "chart.sparklines" || kind === "chart.small-multiples") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); if (kind === "chart.small-multiples") ex.categories = labels; delete ex.series; return null; }
   if (kind === "chart.treemap") { ex.items = labels.map((label, j) => ({ label, value: values[0][j] })); delete ex.series; return null; }
   if (kind === "chart.bubble-grid") { ex.rows = labels; ex.columns = names; ex.values = labels.map((_, j) => values.map((row) => row[j])); delete ex.series; return null; }

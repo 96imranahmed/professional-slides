@@ -267,6 +267,7 @@ export function registerCharts(registry) {
   const headingProps = props => ({ heading: props.heading, unit: props.unit, variant: props.titleVariant,
     ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}),
     ...(props.badge ? { badge: props.badge } : {}),
+    ...(props.headingIcon !== undefined ? { icon: props.headingIcon } : {}),
     ...(props.headerBandHeight ? { headerBandHeight: props.headerBandHeight } : {}) });
   for (const chart of chartDefinitions) {
     const examples = chartExamples(chart.id);
@@ -320,7 +321,7 @@ export function registerCharts(registry) {
       ...(chart.id === "chart.bubble-grid" ? { measureContent: ({ frame, props = {} }) => ({ height: belowQuestion(frame, props, bubbleGridLayout) }) } : {}),
       measureHeader: ({ frame, props = {} }) => {
         if (!String(props.heading ?? "").trim()) return null;
-        const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}) } });
+        const layout = registry.get("chart-title").measureHeader({ frame, props: { heading: props.heading, unit: props.unit, variant: props.titleVariant, ...(props.unitPlacement ? { unitPlacement: props.unitPlacement } : {}), ...(props.headingIcon !== undefined ? { icon: props.headingIcon } : {}) } });
         return { top: frame.y, ruled: layout.ruled, height: layout.height };
       },
       render: ({ id, frame, props = {}, tokens }) => {
@@ -343,6 +344,8 @@ export function registerCharts(registry) {
         };
         if (!String(props.heading ?? "").trim()) {
           if (String(props.unit ?? "").trim()) throw new Error(`${id}: chart unit requires a nonempty chart heading; render both together or declare both visibly in the parent exhibit`);
+          // The icon stands over the heading; with none, it would be dropped unseen.
+          if (props.headingIcon !== undefined) throw new Error(`${id}: \`headingIcon\` stands over the chart's heading, and this chart has none; give it a \`heading\`, or drop the icon`);
           return { nodes: asked(frame) };
         }
         const title = registry.get("chart-title"), titleProps = headingProps(props);

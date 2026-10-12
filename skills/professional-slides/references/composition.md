@@ -116,7 +116,7 @@ Geometry that leaves a page empty is corrected where the page is composed:
 
 `tracker` names the navigation construction: `pills` (every section, the current one filled), `label` (the current section's name alone, at the left above the title), `breadcrumb` (the section under its parent), `number-strip` (the section numbers on a rail) or `side-rail` (every section as a tab down the page's right margin, the current one filled, each name turning once along its tab at most; the body keeps its width). A rail of either kind needs three sections. Left unset it is chosen from the section map rather than always taken as pills: six sections or more, or any name past fourteen characters, takes `label`; four or more with medium-length names takes `number-strip`.
 
-`pictures` carries one to five labelled photographs. A `metrics` strip uses `metricsPosition: "top" | "bottom"`; omit it when it duplicates the argument. 
+`pictures` carries one to five labelled photographs in a row, or six to twelve on a strip as a grid of two or three rows (eleven is three rows of four, the open cell left empty so every picture is one size). `crop: "circle"` on each picture, or on a page's `photo`, sets it as a round photo in the largest square its slot holds. A `metrics` strip uses `metricsPosition: "top" | "bottom"`; omit it when it duplicates the argument. 
 
 A `sidebar` page (`argument` form `sidebar`) sets `panel: { text, kicker, tone }` - a question, claim or figure in heading type down a filled left column - beside its exhibit, points or paragraphs.
 

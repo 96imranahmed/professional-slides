@@ -2515,6 +2515,345 @@
    "source": "Source: illustrative data for a fictional operator; train running records"
   },
   {
+   "id": "f-panels-small-multiples-stacked",
+   "type": "panels",
+   "form": "small-multiples",
+   "commentary": "beside",
+   "takeaway": false,
+   "why": "Six lines answer one question - did riders leave season tickets once trains came every twenty minutes - and only a stack a year on each line shows the mix moving",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by ticket type, as shares of each line's journeys, FY24 to FY26"
+   },
+   "adds": "The points say why the Eastern mix moved and what it means for revenue, which the shares show but cannot explain",
+   "title": "Only the Eastern line moved its riders from season tickets to day tickets",
+   "subtitle": "Journeys by ticket type as a share of each line's journeys, six lines, FY24 to FY26",
+   "exhibit": {
+    "heading": "Journeys by ticket type and line",
+    "unit": "% of journeys",
+    "mark": "stacked-column",
+    "percent": true,
+    "categories": [
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "items": [
+     {
+      "label": "City",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         4.2,
+         4.1,
+         4
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         3.5,
+         3.6,
+         3.7
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         2.3,
+         2.3,
+         2.4
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Valley",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         2.6,
+         2.6,
+         2.5
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         2,
+         2.1,
+         2.1
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1,
+         1,
+         1.1
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Eastern",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         2.9,
+         2.4,
+         1.9
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         2.2,
+         2.9,
+         3.6
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1.1,
+         1.2,
+         1.3
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Dales",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         0.9,
+         0.9,
+         0.9
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.4,
+         1.4,
+         1.5
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         0.8,
+         0.8,
+         0.8
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Coast",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         1.5,
+         1.5,
+         1.4
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.2,
+         1.2,
+         1.3
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         0.7,
+         0.7,
+         0.7
+        ]
+       }
+      ]
+     },
+     {
+      "label": "Airport",
+      "series": [
+       {
+        "name": "Season",
+        "values": [
+         0.6,
+         0.6,
+         0.6
+        ]
+       },
+       {
+        "name": "Day",
+        "values": [
+         1.8,
+         1.9,
+         1.9
+        ]
+       },
+       {
+        "name": "Advance",
+        "values": [
+         1.5,
+         1.6,
+         1.6
+        ]
+       }
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Eastern"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "One line's mix moved",
+     "text": "Season tickets fell from 47% to 28% of Eastern journeys in two years and day tickets rose from 36% to 53%; on the other five lines no ticket type moved by more than three points."
+    },
+    {
+     "lead": "Frequency, not price",
+     "text": "Eastern was the only line recast to a train every twenty minutes in FY25, and fares did not change; riders who no longer plan around a timetable stop buying a season ticket to cover it."
+    },
+    {
+     "lead": "What it does to revenue",
+     "text": "A day-ticket journey earns about a third more than a season journey, so the shift adds revenue as long as the trains keep coming; the same recast on the Valley line is the next test."
+    }
+   ],
+   "highlight": [
+    "47% to 28%",
+    "only line recast",
+    "a third more"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic ticket sales"
+  },
+  {
+   "id": "f-panels-small-multiples-donut",
+   "type": "panels",
+   "form": "small-multiples",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Eight lines each share out their own journeys, and a donut a line shows which one sells differently without asking the reader to compare stacks of unequal height",
+   "settles": {
+    "kind": "comparison",
+    "what": "journeys by ticket type on each of the eight lines, FY26"
+   },
+   "adds": "The points say why day tickets lead on one line and what that asks of the timetable elsewhere",
+   "title": "Day tickets carry half the Eastern line's journeys and under two in five elsewhere",
+   "subtitle": "All eight lines, every journey in FY26 by the ticket its rider bought",
+   "exhibit": {
+    "heading": "Journeys by ticket type and line, FY26",
+    "unit": "% of journeys",
+    "mark": "donut",
+    "categories": [
+     "Day",
+     "Season",
+     "Advance"
+    ],
+    "centre": "Day",
+    "items": [
+     {
+      "label": "City",
+      "values": [
+       3.7,
+       4,
+       2.4
+      ]
+     },
+     {
+      "label": "Valley",
+      "values": [
+       2.1,
+       2.5,
+       1.1
+      ]
+     },
+     {
+      "label": "Eastern",
+      "values": [
+       3.6,
+       1.9,
+       1.3
+      ]
+     },
+     {
+      "label": "Dales",
+      "values": [
+       1.2,
+       1.1,
+       0.8
+      ]
+     },
+     {
+      "label": "Coast",
+      "values": [
+       1.3,
+       1.4,
+       0.7
+      ]
+     },
+     {
+      "label": "Airport",
+      "values": [
+       1.5,
+       0.7,
+       1.6
+      ]
+     },
+     {
+      "label": "Lakes",
+      "values": [
+       1,
+       0.9,
+       0.7
+      ]
+     },
+     {
+      "label": "Borders",
+      "values": [
+       0.8,
+       0.9,
+       0.4
+      ]
+     }
+    ],
+    "highlights": [
+     {
+      "category": "Eastern"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "One line sells differently",
+     "text": "Day tickets are 53% of Eastern journeys; on the other seven lines they run from 37% to 39%, and season tickets still lead on four of them."
+    },
+    {
+     "lead": "Why it matters",
+     "text": "The Eastern line is the one running a train every twenty minutes, and its riders now buy on the day; the timetable, not the fare, sets the mix the other lines will move towards."
+    }
+   ],
+   "highlight": [
+    "53% of Eastern journeys",
+    "every twenty minutes"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic ticket sales"
+  },
+  {
    "id": "f-panels-dashboard",
    "type": "panels",
    "form": "dashboard",
@@ -2866,6 +3205,132 @@
     }
    ],
    "source": "Source: illustrative cost data for four fictional operators; synthetic"
+  },
+  {
+   "id": "f-panels-heading-icons",
+   "type": "panels",
+   "form": "row",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Three measures of the Eastern line answer one question - did the twenty-minute timetable work - and a panel each, headed by its icon, lets the reader find punctuality, crowding and revenue at a glance",
+   "settles": {
+    "kind": "comparison",
+    "what": "punctuality, peak crowding and revenue on the Eastern line, FY22 to FY26"
+   },
+   "adds": "The points say which measure moved first and why the others followed",
+   "title": "The Eastern line ran on time, emptier and richer once trains came every twenty minutes",
+   "exhibits": [
+    {
+     "type": "chart.column",
+     "heading": "Trains on time",
+     "headingIcon": "clock",
+     "unit": "%",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "On time",
+       "values": [
+        80.1,
+        80.6,
+        81.2,
+        86.4,
+        91.8
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Peak trains over capacity",
+     "headingIcon": "people",
+     "unit": "%",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Over capacity",
+       "values": [
+        24,
+        26,
+        27,
+        15,
+        9
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    },
+    {
+     "type": "chart.column",
+     "heading": "Fare revenue",
+     "headingIcon": "money",
+     "unit": "£m",
+     "categories": [
+      "FY22",
+      "FY23",
+      "FY24",
+      "FY25",
+      "FY26"
+     ],
+     "series": [
+      {
+       "name": "Revenue",
+       "values": [
+        41,
+        43,
+        44,
+        49,
+        55
+       ]
+      }
+     ],
+     "highlights": [
+      {
+       "category": "FY26"
+      }
+     ]
+    }
+   ],
+   "points": [
+    {
+     "lead": "Punctuality moved first",
+     "text": "Trains on time rose from 81.2% to 91.8% in the two years after the recast, because the slack at the two single-track sections absorbed the delays that used to cascade."
+    },
+    {
+     "lead": "Crowding followed",
+     "text": "With a train every twenty minutes the peak spread out: trains over capacity fell from 27% to 9%, though the line carries more riders than before."
+    },
+    {
+     "lead": "Revenue came last",
+     "text": "Fare revenue grew from £44m to £55m as riders moved to day tickets, which earn about a third more a journey than seasons."
+    }
+   ],
+   "highlight": [
+    "81.2% to 91.8%",
+    "27% to 9%",
+    "£44m to £55m"
+   ],
+   "source": "Source: illustrative data for a fictional operator; synthetic performance and revenue records"
   },
   {
    "id": "f-scorecard-heatmap",
@@ -3953,6 +4418,187 @@
    "source": "Source: illustrative data for a fictional operator; FY26 management accounts and the electrification business case"
   },
   {
+   "id": "f-lookup-header-icons",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up an option and reads across what it costs, how long it takes, who it serves and when its first trains run; an icon over each header lets the eye find the column before the words",
+   "settles": {
+    "kind": "structure",
+    "what": "cost, time to deliver, riders served and first trains of five timetable options"
+   },
+   "adds": "The last column says what each option needs before it can start",
+   "title": "Two of five timetable options can start before the electric fleet arrives",
+   "exhibit": {
+    "columns": [
+     "Option",
+     {
+      "label": "Cost, £m",
+      "headerIcon": "money",
+      "align": "right"
+     },
+     {
+      "label": "Years to deliver",
+      "headerIcon": "clock",
+      "align": "right"
+     },
+     {
+      "label": "Riders served, m a year",
+      "headerIcon": "people",
+      "align": "right"
+     },
+     {
+      "label": "First trains",
+      "headerIcon": "calendar"
+     },
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Half-hourly Dales line",
+      "12",
+      "1",
+      "2.1",
+      "Dec 2027",
+      "Two more crews at Skipton; the units are already in hand"
+     ],
+     [
+      "Later last trains on the Valley line",
+      "8",
+      "1",
+      "3.4",
+      "May 2028",
+      "Extended sidings at Halifax, due in May 2028"
+     ],
+     [
+      "Twenty-minute Valley service",
+      "46",
+      "3",
+      "3.4",
+      "2029",
+      "The electric fleet, and a signalling upgrade at Huddersfield"
+     ],
+     [
+      "Half-hourly Coast line",
+      "38",
+      "4",
+      "1.9",
+      "2030",
+      "A passing loop near Malton, not yet in the funding plan"
+     ],
+     [
+      "Eastern line electrification",
+      "310",
+      "5",
+      "1.2",
+      "2031",
+      "Government funding and a possession plan agreed with freight"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
+  },
+  {
+   "id": "f-lookup-side-labels",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a saving within its group - running the trains, or selling them - and reads across what it is worth and when it lands; the group names run down the side so every row keeps its width",
+   "settles": {
+    "kind": "structure",
+    "what": "seven cost and revenue options in two groups, with their yearly value and timing"
+   },
+   "adds": "The last column says what each option needs before its value can be counted",
+   "title": "Running the trains offers most of the £21m a year the plan finds",
+   "exhibit": {
+    "treatment": "categories",
+    "columns": [
+     {
+      "label": "",
+      "type": "category",
+      "vertical": true
+     },
+     {
+      "label": "Option",
+      "type": "text",
+      "bold": true
+     },
+     {
+      "label": "Value, £m a year",
+      "align": "right"
+     },
+     "Timing",
+     {
+      "label": "What it needs first",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      {
+       "text": "Running the trains",
+       "rowSpan": 4
+      },
+      "Crew rosters fitted to the recast timetable",
+      "6.4",
+      "FY28",
+      "Agreement with the drivers' union on rest-day working"
+     ],
+     [
+      null,
+      "Regenerative braking on the Valley fleet",
+      "3.1",
+      "FY29",
+      "Two substations upgraded to take the returned power"
+     ],
+     [
+      null,
+      "Closing the Malton depot",
+      "2.2",
+      "FY29",
+      "Overnight maintenance moved to York"
+     ],
+     [
+      null,
+      "Energy bought on a ten-year contract",
+      "1.8",
+      "FY28",
+      "A tender the board approves in FY27"
+     ],
+     [
+      {
+       "text": "Selling them",
+       "rowSpan": 3
+      },
+      "Off-peak day returns priced for leisure",
+      "4.1",
+      "FY28",
+      "The half-hourly Dales and Valley timetables"
+     ],
+     [
+      null,
+      "Advance fares sold in the app",
+      "2.0",
+      "FY27",
+      "Seat reservations on the Coast line"
+     ],
+     [
+      null,
+      "Station retail at Leeds and York",
+      "1.4",
+      "FY29",
+      "Leases renegotiated as they fall due"
+     ]
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; synthetic option appraisals"
+  },
+  {
    "id": "f-mechanism-flow",
    "type": "mechanism",
    "form": "flow",
@@ -4711,6 +5357,145 @@
    ],
    "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator"
+  },
+  {
+   "id": "f-mechanism-spectrum-quotes",
+   "type": "mechanism",
+   "form": "spectrum",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Each dimension runs between two kinds of rider, and a rider's own words at each pole say what the position means better than a scale would",
+   "settles": {
+    "kind": "qualitative",
+    "what": "where the operator's timetable sits between two kinds of rider on three dimensions, in riders' words"
+   },
+   "adds": "The points say which riders the plan moves towards and what it costs the others",
+   "title": "Northvale's timetable still serves the peak rider its market has left",
+   "exhibit": {
+    "items": [
+     {
+      "left": "Built for the peak",
+      "right": "Built for all day",
+      "value": 0.25,
+      "quotes": {
+       "left": "I travel at eight and at six, and those are the only trains that matter to me.",
+       "right": "I would take the train to the shops if there were one every half hour."
+      }
+     },
+     {
+      "left": "Season tickets",
+      "right": "Pay as you go",
+      "value": 0.6,
+      "quotes": {
+       "left": "My season ticket pays for itself if I go in four days a week.",
+       "right": "I go in twice a week now, so I buy a day return each time."
+      }
+     },
+     {
+      "left": "Hourly",
+      "right": "Turn up and go",
+      "value": 0.35,
+      "quotes": {
+       "left": "I plan my day around the train times, and I can live with that.",
+       "right": "If I miss one I wait an hour, so most days I drive instead."
+      }
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The market has moved",
+     "text": "Day and advance tickets are 74% of journeys, and three in five riders travel outside the peak at least once a week."
+    },
+    {
+     "lead": "The timetable has not",
+     "text": "Three of five lines still run hourly between the peaks; the half-hourly pattern serves the riders the plan needs."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative rider interviews for a fictional operator; synthetic"
+  },
+  {
+   "id": "f-lookup-quote-cells",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a line and reads what its riders and its staff say about the timetable, each voice signed, beside what the plan does there",
+   "settles": {
+    "kind": "structure",
+    "what": "what riders and staff on four lines say about the off-peak timetable, and the plan's answer"
+   },
+   "adds": "The last column says what the plan does on each line about what was said",
+   "title": "Riders and staff on every line ask for more trains between the peaks",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "What riders say",
+      "type": "quote"
+     },
+     {
+      "label": "What staff say",
+      "type": "quote"
+     },
+     {
+      "label": "What the plan does",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      {
+       "text": "On a sunny Saturday the 09:10 is so full that people are left on the platform at Skipton.",
+       "by": "Day walker, Leeds"
+      },
+      {
+       "text": "We could fill two trains an hour from April to October without trying.",
+       "by": "Conductor, Skipton"
+      },
+      "Half-hourly from December 2027"
+     ],
+     [
+      "Valley",
+      {
+       "text": "The last train home leaves before the film ends, so I drive into town.",
+       "by": "Student, Halifax"
+      },
+      {
+       "text": "The 22:40 is the busiest train of the evening, and it is the last one.",
+       "by": "Driver, Huddersfield"
+      },
+      "Later trains once the sidings open in May 2028"
+     ],
+     [
+      "Coast",
+      {
+       "text": "An hour between trains means I book a taxi to the hospital instead.",
+       "by": "Resident, Malton"
+      },
+      {
+       "text": "Half our off-peak riders are going to appointments they cannot move.",
+       "by": "Station manager, Scarborough"
+      },
+      "Half-hourly in FY31, after the passing loop"
+     ],
+     [
+      "Eastern",
+      {
+       "text": "Since the trains came every twenty minutes I have stopped checking the times.",
+       "by": "Commuter, Selby"
+      },
+      {
+       "text": "Delays no longer stack up behind the single-track sections.",
+       "by": "Signaller, York"
+      },
+      "Holds its pattern; electric trains from 2030"
+     ]
+    ]
+   },
+   "source": "Source: illustrative rider and staff interviews for a fictional operator; synthetic"
   },
   {
    "id": "f-mechanism-process",
@@ -6264,6 +7049,106 @@
     }
    ],
    "source": "Illustration drawn for this example; illustrative survey data for a fictional operator"
+  },
+  {
+   "id": "f-picture-circle-strip",
+   "type": "picture",
+   "form": "picture-strip",
+   "commentary": "captions",
+   "takeaway": "Each of the three places is reached by one line that runs hourly today; the plan's first half-hourly services go to all three.",
+   "why": "Three places the plan serves are told apart before a word is read, and round photos set them as the line's three destinations rather than three exhibits",
+   "settles": {
+    "kind": "qualitative",
+    "what": "what three Dales line destinations look like and who travels to each"
+   },
+   "adds": "Each caption names who travels there and what the half-hourly service changes for them",
+   "title": "The Dales line serves three markets with one hourly timetable",
+   "pictures": [
+    {
+     "path": "assets/viaduct.jpg",
+     "alt": "Illustration of a stone viaduct with a train crossing",
+     "label": "The viaduct walks",
+     "text": "Day walkers who decide the evening before and need a train home after 18:40.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    },
+    {
+     "path": "assets/moor.jpg",
+     "alt": "Illustration of a train crossing open moorland",
+     "label": "The moorland villages",
+     "text": "Residents who shop and see the doctor in Skipton and wait an hour for the next train back.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    },
+    {
+     "path": "assets/station.jpg",
+     "alt": "Illustration of a brick station building with a clock",
+     "label": "Skipton station",
+     "text": "Commuters to Leeds whose peak trains are full and whose off-peak trains run half empty.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    }
+   ],
+   "source": "Illustrations: illustrative drawings for a fictional operator"
+  },
+  {
+   "id": "f-picture-picture-grid",
+   "type": "picture",
+   "form": "picture-strip",
+   "commentary": "captions",
+   "takeaway": "Resignalling and the sea wall take £180m of the £280m; both must start by FY28, or the twenty-minute Valley service and the Coast line slip a year.",
+   "why": "Six assets the plan spends on are set out as a grid, so the reader sees what the money buys before reading what it costs",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the six assets the FY27 to FY31 capital plan renews, and what each costs"
+   },
+   "adds": "Each caption names the work and its cost, which the pictures cannot say",
+   "title": "Half the capital plan goes on two of the six assets it renews",
+   "pictures": [
+    {
+     "path": "assets/viaduct.jpg",
+     "alt": "Illustration of a stone viaduct with a train crossing",
+     "label": "Dales viaducts: £38m",
+     "text": "Waterproofing and pointing on four viaducts, done in weekend closures over three summers.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/signal.jpg",
+     "alt": "Illustration of three colour-light signals beside a track",
+     "label": "Valley signalling: £96m",
+     "text": "Resignalling Huddersfield so the Valley line can run a train every twenty minutes.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/platform.jpg",
+     "alt": "Illustration of a train standing at a covered platform",
+     "label": "Longer platforms: £24m",
+     "text": "Six stations lengthened to take the four-car electric trains due in 2030.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/station.jpg",
+     "alt": "Illustration of a brick station building with a clock",
+     "label": "Station buildings: £17m",
+     "text": "Step-free access and new waiting rooms at five of the busiest stations.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/coast.jpg",
+     "alt": "Illustration of a railway along a sea wall",
+     "label": "Coast sea wall: £84m",
+     "text": "Rebuilding two miles of wall at Scarborough that closed the line for nine days last winter.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/moor.jpg",
+     "alt": "Illustration of a train crossing open moorland",
+     "label": "Moorland drainage: £21m",
+     "text": "New culverts and cutting drains on the Dales line, where floods stop trains twice a year.",
+     "credit": "An illustration drawn for this example"
+    }
+   ],
+   "source": "Illustrations: illustrative drawings for a fictional operator; synthetic capital plan"
   },
   {
    "id": "f-picture-device",

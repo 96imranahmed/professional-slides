@@ -29,6 +29,7 @@ import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
 import { timePositions, describeGaps, isPeriodLabel, readablePeriod, gapsBroken } from "./time-axis.mjs";
 import { columnQuestion } from "./compose-tables.mjs";
+import { checkPictures } from "./compose-pictures.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
@@ -551,7 +552,7 @@ const FORM_DATA = {
   "profiles/radar": ["categories (3 to 8 attributes)", "series (1 to 4 players, one value per attribute)", "max (the scale's top)", "focusSeries (the subject)"],
   "schedule/horizons": ["horizons (2 to 5, each { label, title, description })", "variant (curves, stepped, stepped-minimal, stepped-bands)"],
   "panels/dashboard": ["exhibits (2 to 6, each with its `heading`, of any kind - charts, a table, a map, a `panel` of text, a `metric` - and an `area` { column, row, columnSpan, rowSpan } on the grid, or none to fill it in reading order)", "grid ({ columns, rows }: how many tracks each way, or their widths as weights - [2, 1, 1]; 4 columns and 3 rows at most)", "metrics (an optional strip of 2 to 6 figures over the grid)"],
-  "panels/small-multiples": ["one exhibit: mark (column, bar or line)", "categories (the axis every panel shares)", "items (5 to 12 panels, each { label, values, focus?, reference? })", "highlights (the panel the page is about)", "reference (\"average\" or a value)", "scale (shared or own)", "rowLabels and columnLabels (a grid read both ways)"],
+  "panels/small-multiples": ["one exhibit: mark (column, bar or line; stacked-column or stacked-bar, each panel a stack of the same parts; donut, each panel one whole)", "categories (the axis every panel shares; a donut's parts)", "items (5 to 12 panels, each { label, values, focus?, reference? }; a stacked panel { label, series: [{ name, values }] })", "percent (true: each stack as shares of its total)", "centre (the part whose share each donut's hole prints)", "highlights (the panel the page is about)", "reference (\"average\" or a value)", "scale (shared or own)", "rowLabels and columnLabels (a grid read both ways)"],
   "schedule/timeline": ["items (4 or more, each { date, label, text }: when, what happens, and a sentence on it, set at reading size and counted as the page's words)", "orientation (across or down; absent, the frame decides - rows where the page has the height, columns over commentary below)"],
   "schedule/roadmap": ["items (4 or more, each { label, period, text }: the stage, when it runs, and what it delivers)", "orientation (across or down; absent, the frame decides)"],
 };
@@ -1668,7 +1669,11 @@ function typedSlide(page, id, type, players) {
   } else if (page.type === "picture") {
     if (page.form === "photo-backdrop" ? !(page.photo && exhibits.length) : !(page.pictures || []).length)
       throw new Error(`${id}: ${page.form === "photo-backdrop" ? "a photo-backdrop page carries a `photo` and one exhibit" : `a ${page.form} page carries its \`pictures\``}`);
+    // How many pictures the form holds, and their one crop, said here in the page's words, not at composition.
+    if (page.form !== "photo-backdrop") checkPictures(page.pictures, id, page.form);
+    else if (page.photo?.crop !== undefined) throw new Error(`${id}: a backdrop runs to the slide's edges under its card, so it is not cropped to a circle; drop \`crop\`, or set the round photo on a picture-hero page`);
   }
+  if (page.photo && page.type !== "picture") checkPictures([page.photo], id);
 
   // Types the form implies for every exhibit it carries, set before any check reads them.
   if (page.type === "place") setType(slide.exhibit, "map");
@@ -1717,6 +1722,17 @@ function checkExhibitData({ page, id, slide, exhibits, primary }) {
     if (ex.type === "chart.waterfall" && page.commentary === "below" && (ex.annotations || []).length > WATERFALL_BELOW_CALLOUTS)
       throw new Error(`${id}: a bridge over commentary "below" carries ${WATERFALL_BELOW_CALLOUTS} callouts at most (this one has ${ex.annotations.length}) - the points take a third of its height; choose "rail" or "beside" for three, or move a note into the points`);
   }
+  // An icon over a chart's heading (`headingIcon`, registry-chart-title.mjs) names the panel by its picture before its
+  // words. It needs a heading to stand over - a table heads its columns with `columns[].headerIcon` - and panels side
+  // by side share one heading band, so an icon over one heading and not the next sets their headings at two heights.
+  const iconed = exhibitsOf(slide).filter((ex) => ex.headingIcon !== undefined);
+  for (const ex of iconed) {
+    if (!String(ex.type ?? "").startsWith("chart.")) throw new Error(`${id}: \`headingIcon\` stands over a chart's heading, and a ${ex.type} exhibit draws none${ex.type === "table" ? "; a table sets an icon over a column's header as `columns[].headerIcon`" : ""}`);
+    if (!String(ex.heading ?? "").trim()) throw new Error(`${id}: \`headingIcon\` stands over the chart's heading, and this chart has none; give it a \`heading\`, or drop the icon`);
+    if (!iconDefinition(ex.headingIcon)) throw new Error(`${id}: ${unknownIcon(ex.headingIcon, "heading icon")}`);
+  }
+  if (iconed.length && iconed.length < exhibitsOf(slide).length)
+    throw new Error(`${id}: ${iconed.length} of ${exhibitsOf(slide).length} panels carry a \`headingIcon\`; panels side by side share one heading band, so every one carries an icon or none does`);
   const formLimit = primary && LIMITS[`${page.type}/${page.form}`];
   if (formLimit) {
     const n = Array.isArray(primary[formLimit.key]) ? primary[formLimit.key].length : 0;

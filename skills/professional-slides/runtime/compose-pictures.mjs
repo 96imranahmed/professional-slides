@@ -157,10 +157,11 @@ export function resolveMediaRefs(value, baseDir, key = null) {
   return out;
 }
 
-/** `photo: { path, alt, credit }` on a content page: a cropped photograph column, or an illustration drawn whole in it. */
+/** `photo: { path, alt, credit, crop? }` on a content page: a cropped photograph column, an illustration drawn whole in it, or a round photo. */
 export function photoStrip(slide, id, baseDir, fr = 1) {
   if (!slide.photo) return null;
-  return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: isIllustration(slide.photo) ? "contain" : "cover" }, size: { width: { fr }, height: "fill" } };
+  checkPictures([slide.photo], id);
+  return { id, component: "image-frame", props: { ...imageProps(slide.photo, baseDir), fit: isIllustration(slide.photo) ? "contain" : "cover", ...(slide.photo.crop ? { crop: slide.photo.crop } : {}) }, size: { width: { fr }, height: "fill" } };
 }
 
 /**
@@ -182,12 +183,42 @@ export function photoStrip(slide, id, baseDir, fr = 1) {
  * pictures are cleared - the gap is then visible on the page instead of
  * invisible in the plan. A `path` that does not resolve is an error (above).
  */
-const PICTURES_MAX = 5;
+// A strip runs one row of up to five pictures. Six to twelve - the sites, the fleet, the people a page sets out - run as
+// a grid of two or three rows, where twelve across would shrink each to a stamp; past twelve the page is a contact sheet.
+export const PICTURES = Object.freeze({ across: 5, most: 12 });
+/**
+ * The rows a strip of `count` pictures takes: one up to five across, then two
+ * or three, five across at most - the count that leaves the fewest cells
+ * empty, two where they tie (six is two rows of three, nine three of three,
+ * eleven three of four with one cell open).
+ */
+export function pictureRows(count) {
+  if (count <= PICTURES.across) return 1;
+  const open = (rows) => rows * Math.ceil(count / rows) - count;
+  return [2, 3].filter((rows) => Math.ceil(count / rows) <= PICTURES.across).sort((a, b) => open(a) - open(b) || a - b)[0];
+}
+
+/**
+ * What a page's pictures may be: one to twelve, more than five only on a
+ * strip (the grid); each `crop` "circle" or none, and one crop for them all -
+ * a row of round portraits with one square photo among them reads as a
+ * mistake, not a choice.
+ */
+export function checkPictures(list, id, form = null) {
+  if (list.length > PICTURES.most) throw new Error(`${id}: ${list.length} pictures is a contact sheet, not a comparison; ${PICTURES.most} is the most one page can hold apart, in three rows`);
+  if (list.length > PICTURES.across && form && form !== "picture-strip")
+    throw new Error(`${id}: ${list.length} pictures run as a grid of two or three rows, which a picture-strip page sets; a ${form} page holds ${form === "picture-hero" ? "one" : form === "picture-pair" ? "two" : `up to ${PICTURES.across}`}`);
+  const crops = list.map((entry) => (entry && typeof entry === "object" ? entry.crop : undefined));
+  const odd = crops.find((crop) => crop !== undefined && crop !== "circle");
+  if (odd !== undefined) throw new Error(`${id}: a picture's \`crop\` is "circle" (a round photo) or left out (got ${JSON.stringify(odd)})`);
+  if (new Set(crops).size > 1) throw new Error(`${id}: ${crops.filter(Boolean).length} of ${list.length} pictures are cropped to a circle; a page's pictures take one crop - every one \`crop: "circle"\`, or none`);
+}
+
 export function normalizePictures(slide, id) {
   const list = slide.pictures;
   if (list === undefined) return [];
-  if (!Array.isArray(list) || !list.length) throw new Error(`${id}: \`pictures\` is a list of one to ${PICTURES_MAX} photographs`);
-  if (list.length > PICTURES_MAX) throw new Error(`${id}: ${list.length} pictures is a contact sheet, not a comparison; ${PICTURES_MAX} is the most one page can hold apart`);
+  if (!Array.isArray(list) || !list.length) throw new Error(`${id}: \`pictures\` is a list of one to ${PICTURES.most} photographs`);
+  checkPictures(list, id, typeof slide.layout === "string" && slide.layout.startsWith("picture-") ? slide.layout : null);
   if (slide.exhibit || slide.exhibits) throw new Error(`${id}: the pictures are the evidence on a picture page; move the exhibit to a page of its own`);
   return list.map((entry, i) => {
     const picture = typeof entry === "string" ? { path: entry } : { ...entry };
@@ -200,7 +231,7 @@ export function pictureFrame(picture, id, baseDir, size) {
   const props = picture.path
     ? { ...imageProps(picture, baseDir), fit: fitOf(picture) }
     : { alt: picture.alt };
-  return { id, component: "image-frame", props, size };
+  return { id, component: "image-frame", props: { ...props, ...(picture.crop ? { crop: picture.crop } : {}) }, size };
 }
 
 /**
