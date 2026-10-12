@@ -399,9 +399,11 @@ class InstructionsTests(unittest.TestCase):
                 self.assertTrue(path.exists(), target)
                 if anchor:
                     self.assertIn(anchor, anchors(path))
-        # README and Production point at the one pipeline rather than restating it.
+        # README and Production point at the one pipeline rather than restating it:
+        # Production at its section, the README (a product page) at the skill.
         self.assertIn("pipeline", anchors(SKILL_DIR / "SKILL.md"))
-        for doc in (ROOT / "README.md", SKILL_DIR / "references" / "tools" / "production.md"):
-            self.assertIn("SKILL.md#pipeline", doc.read_text(encoding="utf-8"))
+        for doc, link in ((ROOT / "README.md", "skills/professional-slides/SKILL.md"),
+                          (SKILL_DIR / "references" / "tools" / "production.md", "SKILL.md#pipeline")):
+            self.assertIn(link, doc.read_text(encoding="utf-8"))
             self.assertNotIn("--preflight\nnode", doc.read_text(encoding="utf-8"))
 

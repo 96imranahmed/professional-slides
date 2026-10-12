@@ -33,7 +33,7 @@ class SubmissionPackageTests(unittest.TestCase):
                 relative = Path(name).relative_to('professional-slides')
                 self.assertEqual(archive.read(name), (self.package / relative).read_bytes())
 
-    def test_public_manifest_matches_source_and_keeps_unknown_fields_absent(self):
+    def test_public_manifest_matches_source_and_confirmed_publication_details(self):
         data = json.loads((self.package / 'plugin.json').read_text())
         self.assertEqual(data, json.loads((ROOT / 'plugin.json').read_text()))
         self.assertEqual(data['version'], '0.0.1')
@@ -46,8 +46,18 @@ class SubmissionPackageTests(unittest.TestCase):
         for document in ['PRIVACY.md', 'TERMS.md']:
             self.assertTrue((ROOT / '.codex-plugin' / document).is_file(), document)
             self.assertFalse((self.package / '.codex-plugin' / document).exists(), document)
-        self.assertNotIn('countries', data['extensions']['com.openai']['publication'])
-        self.assertNotIn('review', data['extensions']['com.openai'])
+        self.assertEqual(data['author']['name'], 'Imran Ahmed')
+        self.assertEqual(interface['developerName'], 'Imran Ahmed')
+        self.assertEqual(interface['websiteURL'], 'https://shiphappens.xyz/slides')
+        self.assertEqual(interface['screenshots'], [
+            './assets/sample-trend.png', './assets/sample-comparison.png'])
+        for screenshot in interface['screenshots']:
+            source = ROOT / screenshot
+            self.assertTrue(source.is_file(), screenshot)
+            self.assertEqual((self.package / screenshot).read_bytes(), source.read_bytes())
+        self.assertEqual(data['extensions']['com.openai']['publication']['countries'], [])
+        self.assertIs(data['extensions']['com.openai']['review']['commerce'], False)
+        self.assertNotIn('test_cases', data['extensions']['com.openai']['review'])
 
     def test_public_copy_has_standalone_readme_and_dependency_command(self):
         self.assertEqual((self.package / 'README.md').read_bytes(),
