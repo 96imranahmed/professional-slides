@@ -27,7 +27,7 @@
 // covers the whole deck.
 import fs from "node:fs";
 import path from "node:path";
-import { partsOf } from "./pages-file.mjs";
+import { includedParts, partsOf } from "./pages-file.mjs";
 import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import { tokenOf } from "./spine-witness.mjs";
 
@@ -54,8 +54,10 @@ const insightLine = (id, insight) => {
 export function sectionPages(doc, section) {
   const all = pagesOf(doc);
   if (section === null || section === undefined) return { pages: all, part: null };
+  // A section is a part file the pages file includes, whether or not it holds a page yet: a section with no divider is briefed
+  // before its first page is written (the BA run's opening and appendix were refused until one was).
   const parts = partsOf(doc);
-  const names = [...new Set(parts.values())];
+  const names = [...new Set([...includedParts(doc), ...parts.values()])];
   const part = names.find((name) => name === section || partName(name) === section || partName(name) === partName(section));
   if (!part) return { why: names.length ? `No section "${section}" in the pages file; its sections are ${names.map(partName).join(", ")}` : "The pages file is not written in sections (no `include` of a part file), so --section has nothing to name: leave it out to brief the whole deck" };
   return { pages: all.filter((page) => parts.get(String(page.id)) === part), part };

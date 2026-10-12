@@ -19,10 +19,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const PARTS = new WeakMap();
+const PARTS = new WeakMap(), INCLUDED = new WeakMap();
 
 /** The part file each page id of `doc` was read from (relative to the pages file), for pages that came from one. */
 export const partsOf = (doc) => PARTS.get(doc) ?? new Map();
+
+/** Every part file `doc` includes, in order, relative to the pages file - one that holds no page yet among them. */
+export const includedParts = (doc) => INCLUDED.get(doc) ?? [];
 
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
@@ -102,6 +105,7 @@ export function readPagesFileSync(file) {
   for (const key of ["pages", "appendix"]) if (Array.isArray(doc[key])) whole[key] = expand(doc[key], root, [root]);
   if (Object.keys(registry).length) whole.sources = registry;
   PARTS.set(whole, parts);
+  INCLUDED.set(whole, [...included.keys()].map(relative));
   return whole;
 }
 

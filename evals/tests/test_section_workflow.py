@@ -137,6 +137,19 @@ class BriefTests(unittest.TestCase):
         self.assertTrue(slots, out)
         self.assertTrue(all("note" not in s and "together" in s for s in slots), slots)
 
+    def test_a_section_with_no_page_yet_is_briefed(self):
+        # The BA run's opening and appendix had no divider and no page when their skeletons were briefed, and the brief
+        # refused them as no section of the pages file: a section is a part file the pages file includes.
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned_finance(tmp)
+            doc = json.loads(Path(pages).read_text())
+            Path(tmp, "pages", "empty.pages.json").write_text(json.dumps({"pages": []}))
+            doc["pages"].append({"include": "pages/empty.pages.json"})
+            Path(pages).write_text(json.dumps(doc))
+            brief = self.brief(pages, "--brief", "skeleton", "--section", "empty")
+        self.assertEqual(brief.returncode, 0, brief.stderr)
+        self.assertIn("# skeleton brief: section empty (pages/empty.pages.json), 0 pages", brief.stdout)
+
     def test_each_role_gets_its_own_share_and_a_stranger_section_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             pages = sectioned_finance(tmp)
