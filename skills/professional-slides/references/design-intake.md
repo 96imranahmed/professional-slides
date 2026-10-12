@@ -31,7 +31,7 @@ A user who answers only some questions takes the defaults for the rest. With a s
 
 **A website answers the colours and the type.** `node runtime/preferences.mjs from-site <url>` reads the site's stylesheets and proposes `colours: "brand"` with `brand: { primary, accent }` and `typography: { body, display }`. Show the user what it found before storing it. A face the deck is set in is measured from its installed files (`$RUNTIME_PYTHON runtime/font-table.py --family "<face>"`); where it is not installed, the deck is set in Arial and says so.
 
-Once the user has given colours or picked a look, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB'` redraws the sheets in their frame for the remaining questions (it needs LibreOffice).
+Once the user has given colours or picked a look, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB'` redraws the sheets in their frame for the remaining questions (it needs PowerPoint or LibreOffice, and poppler).
 
 ## 3. Store and apply
 
