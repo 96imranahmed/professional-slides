@@ -4,7 +4,7 @@
 //   node runtime/doctor.mjs [--json] [--no-render]
 //
 // A build needs Node for the layout, one Python interpreter that imports every
-// package the emitter and the gates import, LibreOffice (`soffice`) to render,
+// package the emitter and the gates import, PowerPoint or LibreOffice to render,
 // and poppler (`pdftoppm`, `pdftotext`) to rasterise and read the rendered
 // pages. Each is checked here, before any work, and each missing piece gets an
 // install line for this platform. The interpreter the runtime runs is
@@ -19,7 +19,7 @@
 // `--json` prints one object: { ready, render, node, python, binaries, reviewer, optional, install }.
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { EXIT, UsageError, hostCli, isMain, parseCli, pythonBin, runCli } from "./cli.mjs";
@@ -99,12 +99,12 @@ async function pythonCheck(candidates, env, platform) {
   return { chosen: chosen?.path ?? null, runtimePython, export: chosen && chosen !== byDefault ? assign : null, candidates: probed };
 }
 
-function binaryCheck(env, platform) {
+function binaryCheck(env, platform, renderer = null) {
   const onPath = SOFFICE_NAMES.map((name) => which(name, env, platform)).find(Boolean);
-  const installed = onPath ? null : SOFFICE_PATHS.find((file) => fs.existsSync(file));
+  const installed = renderer ? renderer.candidates?.find((item) => item.id === "libreoffice")?.path : onPath ? null : SOFFICE_PATHS.find((file) => fs.existsSync(file));
   const found = (file) => ({ found: Boolean(file), path: file ?? null });
   return {
-    soffice: { ...found(onPath ?? installed), ...(installed ? { note: "not on PATH; the renderer also looks in this install location" } : {}) },
+    soffice: { ...found(installed ?? onPath), ...(installed && !onPath ? { note: "not on PATH; the renderer also looks in this install location" } : {}) },
     pdftoppm: found(which("pdftoppm", env, platform)),
     pdftotext: found(which("pdftotext", env, platform))
   };
@@ -142,8 +142,24 @@ async function reviewerCheck(env, platform, host = hostCli(env)) {
   return { host, wanted, chosen, ok: Boolean(chosen), clis };
 }
 
-/** Whether this machine can render: LibreOffice and poppler found. The author's final check renders where it can (author-deck.mjs --check --render). */
-export const rendererInstalled = (env = process.env, platform = process.platform) => Object.values(binaryCheck(env, platform)).every((binary) => binary.found);
+/** One discovery policy, owned by the exporter's dependency-free Python module. Does not launch PowerPoint. */
+export function rendererProbe(env = process.env, platform = process.platform, python = pythonBin(env)) {
+  const run = spawnSync(python, [path.join(runtime, "emit", "renderer_backends.py"), "--platform", platform], { env, encoding: "utf8", timeout: 20000, windowsHide: true });
+  if (!run.error && run.status === 0) {
+    try {
+      const report = JSON.parse(run.stdout);
+      if (Array.isArray(report.candidates) && report.missing && Object.hasOwn(report, "selected")) return report;
+    } catch { /* report the failing probe below */ }
+  }
+  return { requested: env.PROFESSIONAL_SLIDES_RENDERER ?? "auto", selected: null, candidates: [], missing: {},
+    error: run.error?.message || run.stderr?.trim() || "Renderer probe returned no report" };
+}
+
+/** Installed capability, not proof of activation, Automation permission, or a successful export. */
+export const rendererInstalled = (env = process.env, platform = process.platform) => {
+  const renderer = rendererProbe(env, platform);
+  return Boolean(renderer.selected) && !renderer.error && Object.keys(renderer.missing).length === 0;
+};
 
 // font-metrics.mjs's lookup: RUNTIME_NODE_MODULES first, else this checkout.
 async function canvasCheck(env) {
@@ -158,7 +174,7 @@ async function canvasCheck(env) {
 }
 
 /** One line per missing piece, for this platform; the RUNTIME_PYTHON line first when a complete interpreter needs selecting. */
-export function installLines({ node, python, binaries, platform, reviewer = null }) {
+export function installLines({ node, python, binaries, platform, reviewer = null, renderer = null }) {
   const lines = [];
   const win = platform === "win32", linux = platform === "linux";
   if (python.export) lines.push(python.export);
@@ -171,10 +187,15 @@ export function installLines({ node, python, binaries, platform, reviewer = null
     lines.push(`${py} -m pip install ${fs.existsSync(REQUIREMENTS) ? `-r ${quote(REQUIREMENTS)}` : packages}`);
     if (!win) lines.push(`if pip refuses an externally managed Python: ${py} -m venv "$HOME/.professional-slides/venv" && "$HOME/.professional-slides/venv/bin/python" -m pip install ${packages} && export RUNTIME_PYTHON="$HOME/.professional-slides/venv/bin/python"`);
   }
-  const poppler = !binaries.pdftoppm.found || !binaries.pdftotext.found;
-  if (linux && (!binaries.soffice.found || poppler)) lines.push(`sudo apt-get install -y ${[!binaries.soffice.found && "libreoffice-impress", poppler && "poppler-utils"].filter(Boolean).join(" ")}`);
-  if (!linux && !binaries.soffice.found) lines.push(win ? "winget install TheDocumentFoundation.LibreOffice, then add C:\\Program Files\\LibreOffice\\program to PATH" : "brew install --cask libreoffice");
-  if (!linux && poppler) lines.push(win ? "choco install poppler (or https://github.com/oschwartz10612/poppler-windows/releases, with its Library\\bin on PATH)" : "brew install poppler");
+  if (renderer) {
+    lines.push(...new Set(Object.values(renderer.missing)));
+    if (renderer.error && python.chosen) lines.push(`Renderer probe failed: ${renderer.error}`);
+  } else {
+    const poppler = !binaries.pdftoppm.found || !binaries.pdftotext.found;
+    if (linux && (!binaries.soffice.found || poppler)) lines.push(`sudo apt-get install -y ${[!binaries.soffice.found && "libreoffice-impress", poppler && "poppler-utils"].filter(Boolean).join(" ")}`);
+    if (!linux && !binaries.soffice.found) lines.push(win ? "winget install TheDocumentFoundation.LibreOffice, then add C:\\Program Files\\LibreOffice\\program to PATH" : "brew install --cask libreoffice");
+    if (!linux && poppler) lines.push(win ? "choco install poppler (or https://github.com/oschwartz10612/poppler-windows/releases, with its Library\\bin on PATH)" : "brew install poppler");
+  }
   // The CLI the skill is called from; from a plain terminal, the first of them (either serves).
   if (reviewer && !reviewer.ok) {
     const name = reviewer.wanted.find((cli) => reviewer.clis[cli].path) ?? reviewer.wanted[0], cli = REVIEWER_CLIS[name];
@@ -185,15 +206,16 @@ export function installLines({ node, python, binaries, platform, reviewer = null
 }
 
 /** Everything a build needs, checked; `candidates` and `env` replace the interpreters tried and the environment searched. */
-export async function diagnose({ env = process.env, platform = process.platform, candidates, render = true, nodeVersion = process.versions.node, host = hostCli(env) } = {}) {
+export async function diagnose({ env = process.env, platform = process.platform, candidates, render = true, renderer: rendererChoice, nodeVersion = process.versions.node, host = hostCli(env) } = {}) {
   const [major, minor] = nodeVersion.split(".").map(Number);
   const node = { version: nodeVersion, required: `>=${MIN_NODE.join(".")}`, ok: major > MIN_NODE[0] || (major === MIN_NODE[0] && minor >= MIN_NODE[1]) };
   const [python, optional, reviewer] = await Promise.all([pythonCheck(candidates ?? pythonCandidates(env, platform), env, platform), canvasCheck(env).then((canvas) => ({ "@napi-rs/canvas": canvas })),
     reviewerCheck(env, platform, host)]);
-  const binaries = binaryCheck(env, platform);
-  const rendered = Object.values(binaries).every((b) => b.found);
-  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render) && reviewer.ok, render, platform, node, python, binaries, reviewer, optional,
-    install: installLines({ node, python, binaries, platform, reviewer }) };
+  const renderer = rendererProbe(rendererChoice ? { ...env, PROFESSIONAL_SLIDES_RENDERER: rendererChoice } : env, platform, python.chosen ?? pythonBin(env));
+  const binaries = binaryCheck(env, platform, renderer);
+  const rendered = Boolean(renderer.selected) && !renderer.error && Object.keys(renderer.missing).length === 0;
+  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render) && reviewer.ok, render, platform, node, python, binaries, renderer, reviewer, optional,
+    install: installLines({ node, python, binaries, platform, reviewer, renderer }) };
 }
 
 /** The report as lines for a person. */
@@ -205,7 +227,8 @@ export function describe(report) {
     lines.push(`Python ${where}: ${state}`);
   }
   if (!report.python.chosen) lines.push(`Python: no interpreter imports ${Object.values(PYTHON_MODULES).join(", ")}`);
-  for (const [name, b] of Object.entries(report.binaries)) lines.push(`${name}: ${b.found ? b.path : "not found"}${b.note ? ` (${b.note})` : ""}${!b.found && !report.render ? " (not required with --no-render)" : ""}`);
+  for (const [name, b] of Object.entries(report.binaries)) lines.push(`${name}: ${b.found ? b.path : "not found"}${b.note ? ` (${b.note})` : ""}${name === "soffice" && report.renderer?.selected === "powerpoint" ? " (optional; PowerPoint selected)" : !b.found && !report.render ? " (not required with --no-render)" : ""}`);
+  if (report.renderer) lines.push(`Renderer: ${report.renderer.selected ?? "unavailable"} (requested: ${report.renderer.requested}). PowerPoint needs an activated desktop app and automation access; the export verifies that capability.`);
   const { reviewer } = report;
   const from = reviewer.host ? `called from ${REVIEWER_CLIS[reviewer.host].host}, the skill's fresh readers (storyline critique, deck review, copy judgements) run through the ${reviewer.host} CLI`
     : "run from a terminal, the skill's fresh readers (storyline critique, deck review, copy judgements) run through the claude or the codex CLI";
@@ -221,15 +244,16 @@ export function describe(report) {
   if (todo.length) lines.push("", "To install:", ...todo.map((line) => `  ${line}`));
   lines.push("", !report.ready ? "Not ready: install the missing pieces above and run the doctor again."
     : report.render ? "Ready for a full rendered build. Make the final check before each build with the render: node runtime/author-deck.mjs <id>.pages.json --check --render."
-      : "Ready for authoring and unrendered builds only (--no-render); a rendered build also needs soffice, pdftoppm and pdftotext.");
+      : "Ready for authoring and unrendered builds only (--no-render); a rendered build also needs PowerPoint or LibreOffice, pdftoppm and pdftotext.");
   return lines;
 }
 
 if (isMain(import.meta.url)) runCli(async (argv) => {
-  const usage = "Usage: doctor.mjs [--json] [--no-render]";
-  const { values, positionals } = parseCli(argv, { json: { type: "boolean" }, "no-render": { type: "boolean" } }, { usage, strict: true });
+  const usage = "Usage: doctor.mjs [--json] [--no-render] [--renderer auto|powerpoint|libreoffice]";
+  const { values, positionals } = parseCli(argv, { json: { type: "boolean" }, "no-render": { type: "boolean" }, renderer: { type: "string" } }, { usage, strict: true });
   if (positionals.length) throw new UsageError(`Unknown argument ${positionals[0]}\n${usage}`);
-  const report = await diagnose({ render: !values["no-render"] });
+  if (values.renderer && !["auto", "powerpoint", "libreoffice"].includes(values.renderer)) throw new UsageError(`Unknown renderer ${values.renderer}\n${usage}`);
+  const report = await diagnose({ render: !values["no-render"], renderer: values.renderer });
   console.log(values.json ? JSON.stringify(report, null, 2) : describe(report).join("\n"));
   return report.ready ? EXIT.ok : EXIT.refused;
 });

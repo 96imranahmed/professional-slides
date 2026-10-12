@@ -12,7 +12,7 @@ An AI skill that plans and builds editable PowerPoint decks inside Claude Code o
 
 Its source is published at [github.com/96imranahmed/professional-slides](https://github.com/96imranahmed/professional-slides), and copyright in it stays with its authors. Where the repository publishes a licence, that licence governs the source code. Otherwise, you may download, install and use the skill to make decks for yourself or your organisation, including for paid work, but you may not sell or redistribute the skill itself without permission.
 
-The skill needs Claude Code or Codex with a signed-in account, and Node, Python, LibreOffice and poppler on your computer. Your use of those is governed by their own terms, including Anthropic's and OpenAI's.
+The skill needs Claude Code or Codex with a signed-in account, and Node, Python, desktop PowerPoint or LibreOffice, and poppler on your computer. PowerPoint requires an appropriate Microsoft license and activation. Your use of those is governed by their own terms, including Microsoft's, Anthropic's and OpenAI's.
 
 ## Your content and your decks
 

@@ -55,7 +55,7 @@ Close the message with one optional line: fonts (only faces installed on the mac
 
 Never block on the intake for a one-page fix or an existing-deck revision; those keep the deck's own design.
 
-**Regenerate in the user's frame.** The stored sheets are drawn on the consulting system in its own colours. Once the user has given brand colours or picked a system, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB' [--wordmark "Name"] [--only trackers,title-treatments]` rebuilds the sheets through the real pipeline (it needs LibreOffice), so the remaining questions are answered on their own pages.
+**Regenerate in the user's frame.** The stored sheets are drawn on the consulting system in its own colours. Once the user has given brand colours or picked a system, `node runtime/design-options.mjs <out-dir> --design <system> --brand '#RRGGBB,#RRGGBB' [--wordmark "Name"] [--only trackers,title-treatments]` rebuilds the sheets through the real pipeline (it needs PowerPoint or LibreOffice plus poppler), so the remaining questions are answered on their own pages.
 
 **3. Store the answers** as soon as the user gives them: `node runtime/preferences.mjs set design=editorial colours=brand 'brand={"primary":"#0B6E4F","accent":"#F2A900"}' tracker=label titleRule=system surfaces=reference density=pre-read` (JSON values, or bare strings). In a host with memory, also save a one-line note that design preferences live in that file, if the host's conventions allow a note of that kind. `get`, `clear [key]` and `path` read, forget and locate them.
 

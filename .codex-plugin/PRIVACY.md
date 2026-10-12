@@ -28,7 +28,7 @@ The skill's own requests identify themselves as `professional-slides/1.0` and se
 
 - **In your project folder:** the deck and its rendered pages and checks, downloaded logos and photographs with their sources and licences, review files, and working logs and caches that are safe to delete.
 - **Your design answers** in `~/.professional-slides/preferences.json` (or under `$PROFESSIONAL_SLIDES_HOME` or `$XDG_CONFIG_HOME`). A reference deck is recorded only as a fingerprint of its file path, not its contents. Running `preferences.mjs clear` deletes these answers.
-- **Temporary files** in your system's temporary folder, including a LibreOffice profile kept to speed up rendering.
+- **Temporary files** in your system's temporary folder, including scratch PowerPoint copies and export scripts, renderer locks, and a LibreOffice profile kept to speed up rendering. On macOS, PowerPoint scratch exports use its app container to avoid repeated file-access prompts; those temporary decks and PDFs are removed after export. The renderer uses the installed local office application and does not upload decks to a conversion service.
 
 The skill never writes inside the installed plugin, and keeps nothing anywhere else. Deleting these folders removes everything it stored.
 

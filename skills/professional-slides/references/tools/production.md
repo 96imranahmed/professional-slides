@@ -4,7 +4,7 @@
 
 The pipeline, in order, with each step's stop condition, is in [SKILL.md](../../SKILL.md#pipeline); follow it rather than calling the build directly. The flags of every command and the exit codes (0 done, 1 crash, 2 refused, 3 waiting on a reviewer) are in the [runtime guide](../../runtime/README.md#commands).
 
-`build-deck.mjs` composes the deck/v3 spec, lays it out against measured text, emits an editable PPTX with python-pptx, renders it with LibreOffice, reads the saved file back and runs the page gates and the density profile. Only a blocker fails the build: exit 0 with status `built` (or `built-unrendered` under `--no-render`) when nothing blocks, with the advisories counted for the review; exit 2 with `built-with-blockers` and every blocker listed with its source (the deck is still written for inspection), or `Refused (CODE): ...` when the input breaks a stage contract before anything is built. `--preflight` runs the plan and story gates without export; it is a check, not a step toward delivery. A new deck is built from the full compile's deck, content and plan: a draft's content plan does not meet the text contract the build holds a new deck to ([Planning contract](../storyline-records.md#planning-contract)).
+`build-deck.mjs` composes the deck/v3 spec, lays it out against measured text, emits an editable PPTX with python-pptx, renders it with PowerPoint or LibreOffice, reads the saved file back and runs the page gates and the density profile. Only a blocker fails the build: exit 0 with status `built` (or `built-unrendered` under `--no-render`) when nothing blocks, with the advisories counted for the review; exit 2 with `built-with-blockers` and every blocker listed with its source (the deck is still written for inspection), or `Refused (CODE): ...` when the input breaks a stage contract before anything is built. `--preflight` runs the plan and story gates without export; it is a check, not a step toward delivery. A new deck is built from the full compile's deck, content and plan: a draft's content plan does not meet the text contract the build holds a new deck to ([Planning contract](../storyline-records.md#planning-contract)).
 
 `deliver-deck.mjs` hands over `out/<id>-DELIVERED.pptx` only when, in this order:
 
@@ -21,11 +21,12 @@ An acceptance writes `out/<id>-DELIVERED.pptx` and `delivery.json`, which record
 
 Run `node runtime/doctor.mjs` first (pipeline step 0). The skill needs a fresh model for what it cannot count - the storyline critique, the deck review and the copy judgements - and reaches one through an agent CLI, installed and signed in: the one it is called from, `claude` under Claude Code and `codex` under Codex, or either from a plain terminal. The doctor checks it (`claude auth status`, `codex login status`) and prints the lines that set it up: `npm install -g @anthropic-ai/claude-code` then `claude auth login` - the desktop app's own sign-in does not carry over to the CLI - or `npm install -g @openai/codex` then `codex login`.
 
-It also checks Node 20.9 or newer; finds a Python that imports python-pptx, lxml, Pillow, numpy and pypdf, trying `RUNTIME_PYTHON`, `python3`, `/usr/bin/python3` and `/opt/homebrew/bin/python3`, and prints the `export RUNTIME_PYTHON=...` line when the one it finds is not the default; checks `soffice` (LibreOffice), `pdftoppm` and `pdftotext` (poppler); and reports the optional `@napi-rs/canvas`. Each missing piece gets an install line for the platform. It exits 0 when ready and 2 when not; `--no-render` checks for authoring and unrendered builds only, and `--json` prints the result as one object.
+It also checks Node 20.9 or newer; finds a Python that imports python-pptx, lxml, Pillow, numpy and pypdf, trying `RUNTIME_PYTHON`, `python3`, `/usr/bin/python3` and `/opt/homebrew/bin/python3`, and prints the `export RUNTIME_PYTHON=...` line when the one it finds is not the default; checks installed PowerPoint or LibreOffice plus `pdftoppm` and `pdftotext` (poppler), using the same discovery policy as the renderer; and reports the optional `@napi-rs/canvas`. Each missing piece gets an install line for the platform. It exits 0 when ready and 2 when not; `--no-render` checks for authoring and unrendered builds only, and `--json` prints the result as one object.
 
 ```bash
 python3 -m pip install -r requirements.txt          # python-pptx, lxml, Pillow, numpy, pypdf
-brew install --cask libreoffice && brew install poppler                  # macOS
+brew install poppler                        # macOS; installed PowerPoint can render
+brew install --cask libreoffice              # macOS fallback when PowerPoint is unavailable
 sudo apt-get install -y libreoffice-impress poppler-utils                # Debian, Ubuntu
 ```
 
@@ -33,7 +34,25 @@ Set `RUNTIME_PYTHON` when the packages live in an environment of their own. No P
 
 ## Rendering
 
-The build renders with LibreOffice headless by default: exported PPTX to PNG per slide, plus a python-pptx readback that recovers each shape's frame, text and line count from the saved file.
+The build prefers installed desktop PowerPoint on macOS and Windows. macOS uses AppleScript; Windows uses PowerShell COM. LibreOffice is the automatic fallback and the Linux renderer. Both export the saved PPTX to PDF, then poppler produces numbered PNGs and page text for the same gates and reviews. The independent python-pptx readback still recovers each shape's frame, text and line count from the saved file.
+
+| OS | Preferred exporter | Fallback | Requirements |
+| --- | --- | --- | --- |
+| macOS | Desktop PowerPoint via AppleScript | LibreOffice | Activated PowerPoint, macOS Automation permission, poppler |
+| Windows | Desktop PowerPoint via PowerShell COM | LibreOffice | Activated PowerPoint with COM registration, PowerShell, poppler |
+| Linux | LibreOffice headless | None | LibreOffice Impress, poppler |
+
+PowerPoint is desktop automation, so select LibreOffice for servers and jobs without a user desktop session. The doctor checks installation without launching Office; activation and permission are verified by the actual export. It does not require LibreOffice when PowerPoint is available. On macOS, input and PDF export files are staged inside `~/Library/Containers/com.microsoft.Powerpoint/Data/tmp/ProfessionalSlides/` and deleted after export, avoiding the repeated PowerPoint Grant Access flow for external temporary paths. macOS may still ask once for permission to control PowerPoint. Only the scratch presentation is closed; the user's other presentations stay open.
+
+Set `PROFESSIONAL_SLIDES_RENDERER` to `auto` (default), `powerpoint`, or `libreoffice` for every runtime command, including the doctor and authoring render checks. For example:
+
+```bash
+export PROFESSIONAL_SLIDES_RENDERER=libreoffice          # macOS/Linux or noninteractive jobs
+node runtime/doctor.mjs --renderer powerpoint           # check a specific exporter
+python3 runtime/emit/render_pptx.py deck.pptx out --renderer powerpoint
+```
+
+On Windows PowerShell, set `$env:PROFESSIONAL_SLIDES_RENDERER = "powerpoint"`. An explicit choice never falls back. Automatic mode tries the available exporters in order, records failures in `rendererWarnings`, and names the actual successful exporter in `renderer`. A failed or incomplete PDF cannot pass as rendered acceptance: PDF page count must match the deck, including hidden slides. Concurrent PowerPoint exporters fail promptly with a busy message and can fall back to LibreOffice; normal LibreOffice renders retain private profiles.
 
 The exported file is the candidate of record. Keep meaning-bearing content native and separately addressable: one paragraph per real paragraph, `wrap="square"`, autofit on the body, title and body placeholders on a real layout set, native charts with embedded workbooks, and grouped diagram geometry. Then a reader can edit the deck, Reset Slide works, and a template swap keeps the content.
 

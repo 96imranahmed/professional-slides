@@ -47,7 +47,7 @@ One scheme for every command above (EXIT in `errors.mjs`):
 ## Modules
 
 ```
-doctor.mjs         step 0: Node, a Python that imports the emitter's packages (RUNTIME_PYTHON), soffice, pdftoppm, pdftotext; an install line per missing piece
+doctor.mjs         step 0: Node, a complete Python (RUNTIME_PYTHON), PowerPoint or LibreOffice, pdftoppm, pdftotext; shared renderer discovery and install advice
 import-deck.py     an existing PPTX, read and never written -> <id>.inventory.json (each slide as it shows: hidden flag, paragraphs in displayed order, pictures with their displayed box, rotation and mirroring), a starter <id>.pages.json (workflow "existing_deck_revision", stable ids, old copy as `draft`, `hidden: true` on a hidden slide) and assets/<id>/, with the deck itself kept as <id>.source.pptx. `--carry` writes the point-change starter: every slide a page marked `carry: true`
 revision.mjs       a revision's carried slides: a page marked `carry: true` is copied from the source deck, not composed; what each edit changes on its slide, the order the deck is assembled in, the checks on the edits (REVISION_CODES) and the words an edit left standing on another slide
 preferences.mjs    the design intake's answers, stored once per user outside any project
@@ -119,7 +119,8 @@ review-passes.mjs  the loop both reviews share: page lists, statuses, ledger, pa
 deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> build bars -> self-check -> review passes -> confirmation read -> <id>-DELIVERED.pptx or REJECTED.md
 emit/emit_pptx.py      scene -> editable PPTX (placeholders, native charts with workbooks, preset autoshapes and freeforms, palette -> theme)
 emit/assemble_pptx.py  a revision's deck: the source PPTX with its carried slides kept byte for byte, its edited slides' text rewritten in place and the composed slides set in with their own master; reads every carried slide back and compares it with the source (`revision.preserved`); `--check` tries the edits and writes nothing
-emit/render_pptx.py    PPTX -> PDF (LibreOffice) -> PNG per slide + montage
+emit/render_pptx.py    PPTX -> PDF (PowerPoint or LibreOffice) -> PNG per slide + montage
+emit/renderer_backends.py  shared discovery; macOS AppleScript and Windows PowerShell COM exporters (probe never launches an office app)
 emit/readback_pptx.py  the saved PPTX re-opened with python-pptx and compared to the scene; lists the hidden slides (`readback.hidden`) and reports HIDDEN_STATE when the file and the scene disagree
 emit/color.py          WCAG luminance and contrast, as palettes.mjs and core.mjs compute them, for the emitter and the template importer
 weight.json, weight.mjs  the numeric contract the composer and gates read: floors by fill, targets, deck lengths, rule versions
