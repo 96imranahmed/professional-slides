@@ -36,8 +36,6 @@ export const BRIEF_ROLES = Object.freeze(["skeleton", "writer", "critic", "judge
 const SPINE_FIELDS = ["id", "kind", "type", "form", "title", "why", "evidence", "settles", "basis"];
 // The keys of a limits block that explain a number rather than set one: the digest says the rules, the pack keeps the numbers.
 const EXPLAINING = new Set(["codes", "note"]);
-// How much of an insight's finding a line gives: enough to choose it by, the measures say the rest.
-const FINDING_CHARS = 120;
 
 const partName = (part) => path.basename(part).replace(/(\.pages)?\.json$/, "");
 const compact = (value) => JSON.stringify(value);
@@ -45,9 +43,11 @@ const pagesOf = (doc) => [...(doc.pages || []), ...(doc.appendix || [])].filter(
 const emptyObject = (value) => value && typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length;
 const numbersOf = (node) => (Array.isArray(node) ? node.map(numbersOf) : node && typeof node === "object"
   ? Object.fromEntries(Object.entries(node).filter(([key]) => !EXPLAINING.has(key)).map(([key, value]) => [key, numbersOf(value)]).filter(([, value]) => !emptyObject(value))) : node);
+// The finding whole: cut at a hundred and twenty characters it lost the numbers and comparators a title is written from - the
+// BA skeleton's writers met "profitable in only one of fif..." and wrote "rarely", and could not say whom BA cancels more than.
 const insightLine = (id, insight) => {
   const finding = String(insight?.finding ?? "");
-  return `${id}${insight?.strength ? ` (${insight.strength}${insight.shape ? `, ${insight.shape}` : ""})` : ""}${finding ? `: ${finding.length > FINDING_CHARS ? `${finding.slice(0, FINDING_CHARS)}...` : finding}` : ""}`;
+  return `${id}${insight?.strength ? ` (${insight.strength}${insight.shape ? `, ${insight.shape}` : ""})` : ""}${finding ? `: ${finding}` : ""}`;
 };
 
 /** The section's pages in deck order, `{ pages, part }`, or `{ why }` where `section` names no part of the pages file. */
@@ -168,8 +168,17 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
     // What a page may rest on: the insights the section's pages name, and those no page of the deck names yet.
     const named = new Set(evidenceOf(pagesOf(doc))), own = evidenceOf(pages);
     const free = [...insights.keys()].filter((id) => !named.has(id) && !insights.get(id)?.derived);
-    lines.push("", "## Insights your pages rest on", ...own.map((id) => `- ${insightLine(id, insights.get(id))}`));
-    if (free.length) lines.push("", "## Insights no page rests on yet", ...free.map((id) => `- ${insightLine(id, insights.get(id))}`));
+    // Each insight with the measures `settles.measures` may name: its name, unit and what it runs over.
+    const registry = measureRegistry(insights);
+    const withMeasures = (id) => {
+      const measures = [...registry.values()].filter((measure) => measure.owner === id).map((measure) => {
+        const axis = axisOf(measure), over = axis.kind === "scalar" ? "one value" : `${axis.labels.length} ${axis.kind}: ${axis.labels.length > 4 ? `${axis.labels[0]} ... ${axis.labels.at(-1)}` : axis.labels.join(", ")}`;
+        return `${measure.ref}${measure.unit ? ` (${measure.unit})` : ""} [${over}]`;
+      });
+      return `- ${insightLine(id, insights.get(id))}${measures.length ? `\n  measures: ${measures.join("; ")}` : ""}`;
+    };
+    lines.push("", "## Insights your pages rest on", ...own.map(withMeasures));
+    if (free.length) lines.push("", "## Insights no page rests on yet", ...free.map(withMeasures));
   }
   if (role === "writer") lines.push("", "## The measures your pages' evidence holds: each value, and the token that prints it", ...(insights ? measureLines(pages, insights) : ["No insight log beside the pages file: there are no measures to print by token."]));
   lines.push("", "## Commands", ...commandLines(role, { file, ids, deckFile: path.join(path.dirname(file), `${stem}.deck.json`) }));
