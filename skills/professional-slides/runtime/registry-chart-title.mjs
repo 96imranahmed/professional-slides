@@ -131,8 +131,13 @@ function chartTitleLayout(frame, props) {
   const phrase = Boolean(unit) && textWordList(props.unit).filter((word) => /[A-Za-z]{3,}/.test(word)).length >= 3;
   const reason = band || !(props.unitPlacement === "inline" || underlined) ? null
     : heading.lines.length > 1 ? "heading" : unit && !inline && phrase ? "unit" : null;
+  // What of a heading that wraps fits its one line, measured as it is set: its first words, and their characters. "Shorten
+  // the heading" sent an author cutting a word a compile; the room in words and characters is the cut to make.
+  const fits = (() => { const words = String(headingText).trim().split(/\s+/); let n = 0;
+    while (n < words.length && oneLine(words.slice(0, n + 1).join(" ")) <= available) n += 1;
+    return { words: n, characters: words.slice(0, n).join(" ").length }; });
   const wrapped = reason ? { reason, text: reason === "heading" ? headingText : `${headingText}, ${props.unit}`,
-    width: reason === "heading" ? oneLine(headingText) : oneLine(`${headingText},`) + inlineGap + oneLine(props.unit, false), available: Math.floor(available) } : false;
+    width: reason === "heading" ? oneLine(headingText) : oneLine(`${headingText},`) + inlineGap + oneLine(props.unit, false), available: Math.floor(available), ...(reason === "heading" ? { fits: fits() } : {}) } : false;
   return { heading, unit, unitSize, unitGap, inline, inlineGap, unitPlacement: unit ? (inline ? "inline" : "stacked") : "none", wrapped, block, bandHeight, ruleGap, contentHeight: bandHeight, ruled, variant, height, band, padX, padY, iconSize, iconBand };
 }
 function chartTitleNodes({ id, frame, props }) {

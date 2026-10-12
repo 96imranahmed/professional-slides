@@ -104,7 +104,7 @@ import os from "node:os";
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
-  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage } from "./page-types.mjs";
+  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS } from "./page-types.mjs";
 import { claimSheet, claimSheetLines } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
@@ -142,7 +142,7 @@ import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
 import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, freeChoices, openKindsOf, shapeStructure, stubsOf } from "./deck-structure.mjs";
 import { FIT, fitSearch } from "./fit-search.mjs";
-import { fillGuidance } from "./fill-guidance.mjs";
+import { fillGuidance, slotGuidance } from "./fill-guidance.mjs";
 import { briefOf, contributions, contributorsOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
 import { EVALUATION_MIN_PAGES, buildDeck, validateStageContract } from "./build-deck.mjs";
 import { contentsProblem, contentsRoom, coverageFindings } from "./compose-deck.mjs";
@@ -1266,6 +1266,63 @@ async function composeVariants(spec, baseDir, body, behind) {
   return { deck: { slides } };
 }
 
+// What a slot's length decides, which its range is read against (fill-guidance.mjs slotGuidance): anything else a page
+// carries as written - a claim to settle, a mark to draw - is not the slot's, and is not held against a length of it.
+const LENGTH_CODES = new Set([...FILL_CODES, "HEADING_WRAPS", "TITLE_LINES", "TAKEAWAY_LONG", "TEXT_BLOCK_TOO_LONG", "CPL", "INTERNAL_VOID", "DEAD_BAND", "COLUMN_VOID", "THIN_COLUMN"]);
+
+/**
+ * What each text slot of page `id` holds where this deck sets it, for
+ * `--scaffold <type> --id <page>` with a pages file: the page as the file
+ * holds it (its exhibits as written), or the scaffold `fallback` where the file
+ * has none or it does not compile, composed in the deck's own sections at its
+ * density. Writers fitted copy a compile at a time - fifty-five pages of one
+ * deck met an empty band, a short page, a wrapped heading or a page that would
+ * not compose while their copy was written - so each slot is told its range
+ * before a word is written: its points (words each), each caption and
+ * heading, the rail, the so-what bar, the takeaway and the subtitle, each read
+ * by composing the page with that slot run shorter and longer
+ * (fill-guidance.mjs slotGuidance), a heading also in the characters its line
+ * holds, and the title in the words and characters its band holds
+ * (spine-fit.mjs). Null where the deck has no page `id`.
+ */
+async function slotLimits(doc, { dir, stem, id, fallback }) {
+  const insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }).catch(() => null);
+  const { spec } = compileDeck(doc, { insights, partial: true, baseDir: dir });
+  const written = bindDeck(doc, insights).doc, pages = [...written.pages, ...(written.appendix || [])];
+  const index = pages.findIndex((page) => String(page?.id) === String(id));
+  if (index < 0) return null;
+  const compile = (page, at) => { const one = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true }); const refused = one.bindingFindings[0]?.repair ?? one.compileErrors[0]; if (refused) throw new Error(refused); return one.spec.slides[0]; };
+  const page = [pages[index], fallback ? bindDeck({ ...doc, pages: [fallback], appendix: [] }, insights).doc.pages[0] : null].find((candidate) => { try { return candidate && compile(candidate, index); } catch { return false; } });
+  if (!page) return null;
+  const appendix = index >= written.pages.length;
+  // The deck's first page leads every batch, so the gates read no variant as a cover; its shell carries the deck's fill and weight.
+  const shell = (await composeForAuthoring({ ...spec, slides: spec.slides.slice(0, 1), appendix: undefined }, dir)).deck;
+  const pageGates = (slides) => { const gated = sceneGateFindings({ ...shell, slides: [shell.slides[0], ...slides] }, undefined, spec, { ask: false });
+    return { ran: gated.ran, findings: gated.all.map((f) => ({ ...f, slide: f.slide ? f.slide - 1 : f.slide })), budget: (gated.budget ?? []).map((row) => ({ ...row, slide: row.slide - 1 })) }; };
+  const compose = (body, behind) => composeVariants(spec, dir, body, behind);
+  // What the page carries as written that no length mends is not held against a length of any slot.
+  const asWritten = { ...compile(page, index), id: `${id}--as-written` };
+  const drawn = (await compose(appendix ? [] : [{ slide: asWritten, after: String(id) }], appendix ? [asWritten] : [])).deck.slides;
+  const base = new Set(drawn.length ? pageGates(drawn).findings.filter((f) => isBlocker(f) && f.slide >= 1 && !LENGTH_CODES.has(f.code)).map((f) => f.code) : []);
+  const words = pages.flatMap((p) => [...(Array.isArray(p?.points) ? p.points : []), ...(Array.isArray(p?.blocks) ? p.blocks.flatMap((block) => (Array.isArray(block?.points) ? block.points : [])) : [])])
+    .flatMap((point) => String((typeof point === "string" ? point : point?.text) ?? "").trim().split(/\s+/).filter(Boolean));
+  const { slots, joint } = await slotGuidance({ id: String(id), page, index, appendix, base, ceiling: null }, { compile, compose, pageGates, words });
+  // The title's band, measured with the page's own title run long: the first words of it that fit, and their characters.
+  const own = [...spec.slides, ...(spec.appendix || [])].find((slide) => String(slide.id) === String(id));
+  const titleWords = String(own?.title ?? page.title ?? "").trim().split(/\s+/).filter(Boolean);
+  const long = Array.from({ length: TEXT_LIMITS.titleWords * 4 }, (_, i) => titleWords[i % Math.max(1, titleWords.length)] ?? "title").join(" ");
+  const roomed = own ? spineFitFindings({ ...spec, slides: spec.slides.map((slide) => (slide === own ? { ...slide, title: long } : slide)), appendix: (spec.appendix || []).map((slide) => (slide === own ? { ...slide, title: long } : slide)) }, dir).find((f) => String(f.id) === String(id))?.measured?.fits : null;
+  const range = (m) => (m.min === null ? { fits: null, short: m.short, over: m.over } : { min: m.min, max: m.max });
+  return {
+    note: `measured on ${page === pages[index] ? `${id} as the pages file holds it` : "this scaffold"}, composed where the deck sets it: the words each slot holds with the page composing as one page, no band left empty, nothing under its word floor, no heading wrapped and nothing past its frame or ceiling, each slot run shorter and longer with the rest as written; ${joint ? "written to the middle of every range at once, the page passes too" : "written to the middle of every range at once, the page does not pass: the ranges hold one slot at a time, so keep the rest near their length as written"}`,
+    together: joint,
+    ...(roomed ? { title: { words: { max: roomed.words }, characters: { max: roomed.characters }, measured: true } } : {}),
+    ...Object.fromEntries(Object.entries(slots).map(([lever, m]) => [lever === "points" ? "points" : lever.replace(":", " "),
+      lever === "points" ? { count: m.count, wordsEach: range(m), ...(m.narrow ? { narrow: true } : {}) }
+        : { words: range(m), ...(m.characters ? { characters: { max: m.characters } } : {}), has: m.count }])),
+  };
+}
+
 /** A page with each proposed mark (gates/dependency_gates.mjs claimMarks) written on the exhibit it names: what the page is once its bare chart's finding is mended. */
 function withMarks(page, marks) {
   const copy = structuredClone(page);
@@ -2048,12 +2105,16 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
 function spineLockFindings(lock) {
   const how = lock.closed === "spent" ? `spent its ${lock.spent} passes` : `closed ${lock.verdict} at pass ${lock.pass}`;
   const back = `To change the argument, run again with --reopen-spine and take the deck back to the critique (node runtime/storyline.mjs <id>.deck.json out/)${lock.closed === "spent" ? ", whose next pass is past its cap: only the user can grant it (--max-passes)" : ""}`;
-  if (!lock.pages.length) return [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
+  // The order is the deck's: pages that kept their argument and changed place are named in one finding for the deck, not as pages whose argument moved.
+  const moved = lock.moved ?? [], one = moved.length === 1;
+  const order = moved.length ? [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
+    repair: `The storyline critique ${how}, and the order of its pages has moved since: ${moved.join(", ")} ${one ? "stands" : "stand"} elsewhere than the critique read ${one ? "it" : "them"} - another place in the sequence, or into or out of the appendix - with ${one ? "its" : "their"} own argument unchanged. The layout keeps what the critique read: put ${one ? "it" : "them"} back. ${back}.` }] : [];
+  if (!lock.pages.length) return order.length ? order : [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
     repair: `The storyline critique ${how}, and the deck's answer, its request or the order of its pages has moved since. The layout keeps what the critique read: put it back. ${back}.` }];
-  return lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id,
+  return [...order, ...lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id,
     repair: lock.deleted.includes(id)
       ? `The storyline critique ${how} with ${id} in the deck, and it has been taken out since. The layout keeps the pages the critique read: put it back. ${back}.`
-      : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }));
+      : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
 }
 
 /** The CLI. Returns the exit code. */
@@ -2333,9 +2394,11 @@ async function catalogueCommand(values, file, say) {
     const standsFor = scoped?.deck?.workflow === REVISION && values.id ? [...(scoped.pages || [])].find((p) => p && typeof p === "object" && String(p.id) === String(values.id) && Number.isInteger(p.sourceSlide)) ?? null : null;
     const inventory = standsFor && typeof scoped.deck.inventory === "string" ? await readJson(path.resolve(path.dirname(path.resolve(file)), scoped.deck.inventory), { optional: true }).catch(() => null) : null;
     const revisionLimits = composedPageLimits((inventory?.slides || []).find((slide) => slide.index === standsFor?.sourceSlide), standsFor ? scoped.deck.inventory : null);
+    // Named with a page of the deck, the limits are that page's own: each slot's words where this deck sets it, measured.
+    const slots = own && file && !revisionLimits ? await slotLimits(scoped, { dir: path.dirname(path.resolve(file)), stem: scoped.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, ""), id: values.id, fallback: page }).catch((error) => { console.error(`The slots of ${values.id} could not be measured: ${error.message}`); return null; }) : null;
     if (revisionLimits) { say(withLimits({ ...page, sourceSlide: standsFor.sourceSlide }, density, { revision: revisionLimits }));
       console.error(`${values.id} stands for slide ${standsFor.sourceSlide} of the imported deck: paste the scaffold over the carried page (it keeps \`id\` and \`sourceSlide\`; \`carry\` and \`draft\` go), and replace the worked example's numbers with the slide's own, printed under \`limits.revision.slide\`. \`limits.revision\` says what the page is held to, what it may keep of the slide and the least evidence it owes.`); }
-    else say(withLimits(page, density));
+    else say(withLimits(page, density, slots ? { slots } : {}));
     if (page.form === "executive-summary") console.error(SUMMARY_AT_SPINE);
     // How far the page is bound to the insight is said, never left to be read off the JSON: what names its measures, what still
     // holds the worked example's numbers, and - where nothing bound - why, form by form.

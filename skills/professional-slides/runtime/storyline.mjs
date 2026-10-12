@@ -653,7 +653,49 @@ export function storylineBinding(spec, measures = null) {
  */
 export function storylinePageHashes(spec, measures = null) {
   const pages = storyStructure(spec, measures), appendix = new Set((spec.appendix || []).map((s) => String(s.id)));
-  return Object.fromEntries(pages.map((p, at) => [p.id, sha256(JSON.stringify({ ...p, after: pages[at - 1]?.id ?? null, appendix: appendix.has(String(p.id)) }))]));
+  return Object.fromEntries(pages.map((p, at) => [p.id, placedPageHash(p, pages[at - 1]?.id ?? null, appendix.has(String(p.id)))]));
+}
+const placedPageHash = (page, after, inAppendix) => sha256(JSON.stringify({ ...page, after, appendix: inAppendix }));
+
+/**
+ * The pages whose own argument moved since a pass recorded `prior` (its
+ * pageHashes): `{ changed, deleted, moved }`. A recorded hash holds the page's
+ * place as well as its argument - the page before it and whether it stands in
+ * the appendix - which is what a verification pass is scoped by. The lock asks
+ * a narrower question: whose title, type, `settles`, evidence, shown measures
+ * or view of them moved. So each page is hashed again at the place the pass
+ * recorded it in, and only one that still differs there has `changed`. Read
+ * with its place, a page taken out flagged the page after it, and one moved or
+ * added flagged its new neighbour: on one deck the lock named 105 pages over a
+ * layout that moved about fifteen arguments, and stopped being read. A page
+ * whose argument held while its place in the order changed is `moved` - the
+ * order is the deck's argument, said once for the deck - and a page the pass
+ * read that is gone is `deleted`.
+ */
+function movedArguments(prior, spec, measures = null) {
+  const pages = storyStructure(spec, measures), appendix = new Set((spec.appendix || []).map((s) => String(s.id)));
+  const recorded = Object.keys(prior), current = new Set(pages.map((p) => String(p.id)));
+  const changed = [], placed = [];
+  for (const page of pages) {
+    const id = String(page.id), at = recorded.indexOf(id);
+    if (at < 0) { changed.push(id); continue; }
+    // The place the pass read it in: the page recorded before it, in or out of the appendix.
+    const was = [false, true].find((inAppendix) => prior[id] === placedPageHash(page, at > 0 ? recorded[at - 1] : null, inAppendix));
+    if (was === undefined) changed.push(id);
+    else if (was !== appendix.has(id)) placed.push(id);
+  }
+  // The order of the pages both readings hold: a page outside their longest common run is one that moved.
+  const kept = pages.map((p) => String(p.id)).filter((id) => Object.hasOwn(prior, id) && !changed.includes(id)), before = recorded.filter((id) => kept.includes(id));
+  const run = longestCommonRun(before, kept);
+  return { changed, deleted: recorded.filter((id) => !current.has(id)), moved: [...new Set([...placed, ...kept.filter((id) => !run.has(id))])] };
+}
+// The ids of the longest subsequence two orders share.
+function longestCommonRun(a, b) {
+  const table = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i -= 1) for (let j = b.length - 1; j >= 0; j -= 1) table[i][j] = a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+  const run = new Set();
+  for (let i = 0, j = 0; i < a.length && j < b.length;) { if (a[i] === b[j]) { run.add(a[i]); i += 1; j += 1; } else if (table[i + 1][j] >= table[i][j + 1]) i += 1; else j += 1; }
+  return run;
 }
 
 const isContent = (p) => !p.kind || p.kind === "content";
@@ -1927,8 +1969,10 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
  * and delivery then refused the whole deck. So the compile refuses the edit
  * where it is made (author-deck.mjs SPINE_LOCKED), naming the pages, and an
  * author who means the change says so (`--reopen-spine`) and takes the deck
- * back to the critique. `{ closed, verdict, pass, spent, pages, deleted }`, or
- * null when the critique is still open or nothing it read has moved.
+ * back to the critique. `{ closed, verdict, pass, spent, pages, deleted,
+ * moved }` - `pages` those whose own argument moved or that were taken out,
+ * `moved` those that kept their argument and changed place (movedArguments) -
+ * or null when the critique is still open or nothing it read has moved.
  */
 /**
  * The passes a deck's critique may run: the three every deck has, or the
@@ -1951,8 +1995,9 @@ export async function spineLock(spec, directory, { deckPath = null, maxPasses: a
   if (!closed) return null;
   const measures = await readMeasures(spec, await locateDeck(spec, directory, deckPath));
   if (latest.binding === storylineBinding(spec, measures)) return null;
-  const moved = changedPages(latest.pageHashes, storylinePageHashes(spec, measures));
-  return { closed, verdict, pass: latest.pass, spent, pages: moved ? [...moved.changed, ...moved.deleted] : [], deleted: moved?.deleted ?? [] };
+  // Only a page whose own argument differs from what the pass read is named; a page that only changed place is the deck's order (movedArguments).
+  const moved = movedArguments(latest.pageHashes, spec, measures);
+  return { closed, verdict, pass: latest.pass, spent, pages: [...moved.changed, ...moved.deleted], deleted: moved.deleted, moved: moved.moved };
 }
 
 // The repair path after the deck review. A deck review reads the drawn pages
