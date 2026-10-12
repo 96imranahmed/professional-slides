@@ -131,6 +131,11 @@ class BriefTests(unittest.TestCase):
         self.assertIn("--check --page f1,f2 --json", out)
         self.assertIn("judge.mjs", out)
         self.assertIn("--page f1,f2", out)
+        # Each typed page carries the words its text slots hold where the deck sets it, measured as --scaffold --id
+        # measures them: the writer writes to them rather than fitting copy a check at a time.
+        slots = [json.loads(l.strip()[len("slots: "):]) for l in out.splitlines() if l.strip().startswith("slots: ")]
+        self.assertTrue(slots, out)
+        self.assertTrue(all("note" not in s and "together" in s for s in slots), slots)
 
     def test_each_role_gets_its_own_share_and_a_stranger_section_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:

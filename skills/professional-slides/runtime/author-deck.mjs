@@ -142,7 +142,7 @@ import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync } from "./pages-file.mjs";
-import { BRIEF_ROLES, briefDigest, briefLines } from "./brief.mjs";
+import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { axisOf, hasMeasures, insightLogRefusal, isPercentUnit, measureConflicts, measureRegistry, readInsightLog, unmeasuredInsights, valuesOf } from "./measures.mjs";
@@ -2285,7 +2285,20 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     if (!BRIEF_ROLES.includes(values.brief)) { console.error(`--brief is one of ${BRIEF_ROLES.join(", ")}`); return 1; }
     let insights = null;
     if (values.brief === "writer" || values.brief === "skeleton") try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
-    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief) });
+    // A writer is told, page by page, the words each text slot holds where the deck sets it - measured as --scaffold --id
+    // measures it, on the page as written or its scaffold - so copy is written once to what fits, not fitted a check at a time.
+    let slotsOf = null;
+    if (values.brief === "writer") {
+      slotsOf = new Map();
+      for (const own of (sectionPages(doc, values.section ?? null).pages ?? []).filter((page) => page.type && PAGE_TYPES[page.type])) {
+        const insight = (Array.isArray(own.evidence) ? own.evidence : []).map((id) => insights?.get(String(id))).find(Boolean) ?? null;
+        let stand = null;
+        try { stand = scaffoldReport(own.type, { id: String(own.id), form: Object.hasOwn(PAGE_TYPES[own.type].forms, own.form ?? "") ? own.form : null, insight, seed: doc.deck?.variation ?? null, featured: drawOf(doc.deck ?? {}), claim: own.settles ?? null }).page; } catch { /* the page as written, alone */ }
+        const slots = await slotLimits(doc, { dir, stem, id: String(own.id), fallback: stand }).catch(() => null);
+        if (slots) slotsOf.set(String(own.id), slots);
+      }
+    }
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf });
     if (brief.why) { console.error(brief.why); return 1; }
     say(brief.lines.join("\n"));
     return 0;

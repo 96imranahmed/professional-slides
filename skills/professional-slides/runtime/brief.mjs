@@ -51,7 +51,7 @@ const insightLine = (id, insight) => {
 };
 
 /** The section's pages in deck order, `{ pages, part }`, or `{ why }` where `section` names no part of the pages file. */
-function sectionPages(doc, section) {
+export function sectionPages(doc, section) {
   const all = pagesOf(doc);
   if (section === null || section === undefined) return { pages: all, part: null };
   const parts = partsOf(doc);
@@ -134,9 +134,9 @@ function commandLines(role, { file, ids, deckFile }) {
 /**
  * The brief for `role` over `section` of the pages file: `{ lines }`, or `{ why }` where the section is not one of the file's.
  * `limitsOf(page)` is the limits block `--scaffold` prints for a page; `insights` the insight log as author-deck reads it,
- * null where there is none; `digest` the role's rules.
+ * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id.
  */
-export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest }) {
+export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null }) {
   const found = sectionPages(doc, section);
   if (found.why) return { why: found.why };
   const { pages, part } = found;
@@ -155,10 +155,13 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
     if (sets.length) lines.push("", "## Limits (the `limits` block --scaffold prints, its numbers)", ...(Object.keys(shared).length ? [`every page: ${compact(shared)}`] : []),
       ...sets.map(([key, limits, held]) => `${key} (${held.join(", ")}): ${compact(limits)}`));
     lines.push("", `## Your pages${role === "skeleton" ? " (the fields the critique reads)" : ""}`);
+    if (slotsOf?.size) lines.push("`slots` under a page: the words each text slot holds where the deck sets it, measured by composing the page with that slot run shorter and longer and the rest as written (`together`: the page passes with every slot at the middle of its range). Write to them.");
     for (const page of pages) {
       const { id: _id, ...fields } = page;
       const shown = role === "writer" ? fields : Object.fromEntries(SPINE_FIELDS.filter((key) => key !== "id" && fields[key] !== undefined).map((key) => [key, fields[key]]));
       lines.push(`[${page.id}]${of.has(String(page.id)) ? ` limits: ${of.get(String(page.id))}` : page.type || page.kind ? "" : " (no type yet)"} ${compact(shown)}`);
+      // The words each of its text slots holds where the deck sets it (--scaffold --id prints the same): written to them, the page composes.
+      if (slotsOf?.has(String(page.id))) { const { note: _note, ...slots } = slotsOf.get(String(page.id)); lines.push(`  slots: ${compact(slots)}`); }
     }
   }
   if (role === "skeleton" && insights) {
