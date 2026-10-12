@@ -56,8 +56,10 @@ def load(path=None, oracle=None) -> None:
         _VERDICTS.update((json.loads(Path(path).read_text(encoding="utf-8")) or {}).get("verdicts") or {})
 
 
-def judged(kind: str, subject, context=None, where=None):
-    """The recorded answer to the question, or None - and the question listed as pending - where none is recorded."""
+def judged(kind: str, subject, context=None, where=None, beside=None):
+    """The recorded answer to the question, or None - and the question listed as pending - where none is recorded.
+    `beside` is shown to the reader with the question and not keyed (judgements.mjs judged): a neighbour edited since
+    leaves the answer standing."""
     key = judgement_key(kind, subject, context)
     if not _ACTIVE:
         return None
@@ -66,7 +68,7 @@ def judged(kind: str, subject, context=None, where=None):
         return {"verdict": said} if isinstance(said, str) else said
     if key in _VERDICTS:
         return _VERDICTS[key]
-    entry = _PENDING.setdefault(key, {"kind": kind, "subject": subject, "context": context, "where": []})
+    entry = _PENDING.setdefault(key, {"kind": kind, "subject": subject, "context": context, "where": [], **({"beside": beside} if beside is not None else {})})
     if where is not None and str(where) not in entry["where"]:
         entry["where"].append(str(where))
     return None

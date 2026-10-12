@@ -14,14 +14,17 @@
 // hashed from its kind, the kind's version, the subject and the context, so
 // the same page judged again gets the same verdict without asking, a page
 // edited since is asked again, and a question reworded (a new version) is
-// asked again everywhere. A rule whose question is not answered yet does not
-// hold: the compile lists it as pending (JUDGEMENTS_PENDING), `judge.mjs`
+// asked again everywhere. What a question shows its reader only to place the
+// subject - the rest of the page a line of commentary sits in - goes `beside`
+// it, unkeyed: a neighbour rewritten leaves the line's answer standing. A rule
+// whose question is not answered yet does not hold: the compile lists it as
+// pending (JUDGEMENTS_PENDING), `judge.mjs`
 // stages the pending questions for a model, and delivery refuses a deck with
 // any still open. gates/judgements.py reads the same file by the same key.
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readJsonSync } from "./cli.mjs";
+import { readJson, readJsonSync, schemaErrors } from "./cli.mjs";
 
 const DEFINITIONS = readJsonSync(new URL("./judgement-kinds.json", import.meta.url));
 /** Every kind of question a rule may ask: its version, question, verdicts and the fields an answer carries. */
@@ -75,12 +78,13 @@ export const activeJudgements = () => active;
  * - or null where none is recorded, in which case the question is added to the
  * session's pending list with where it was asked (`where`, a page id) and the
  * rule does not hold. With no session, nothing is recorded and nothing holds.
+ * `beside` is shown to the reader with the question and is not keyed.
  */
-export function judged(kind, subject, context = null, where = null, { image = null } = {}) {
+export function judged(kind, subject, context = null, where = null, { image = null, beside = null } = {}) {
   const known = recordedJudgement(kind, subject, context);
   if (known || !active) return known;
   const key = judgementKey(kind, subject, context);
-  const open = active.pending.get(key) ?? { key, kind, subject, context: context ?? null, where: [], ...(image ? { image } : {}) };
+  const open = active.pending.get(key) ?? { key, kind, subject, context: context ?? null, where: [], ...(image ? { image } : {}), ...(beside ? { beside } : {}) };
   if (where !== null && where !== undefined && !open.where.includes(String(where))) open.where.push(String(where));
   active.pending.set(key, open);
   return null;
@@ -102,7 +106,8 @@ export function addPending(session, request) {
   if (!session || !request?.kind || !JUDGEMENT_KINDS[request.kind]) return;
   const key = judgementKey(request.kind, request.subject, request.context ?? null);
   if (session.verdicts.has(key)) return;
-  const open = session.pending.get(key) ?? { key, kind: request.kind, subject: request.subject, context: request.context ?? null, where: [], ...(request.image ? { image: request.image } : {}) };
+  const open = session.pending.get(key) ?? { key, kind: request.kind, subject: request.subject, context: request.context ?? null, where: [], ...(request.image ? { image: request.image } : {}),
+    ...(request.beside ? { beside: request.beside } : {}) };
   for (const where of [].concat(request.where ?? [])) if (!open.where.includes(String(where))) open.where.push(String(where));
   session.pending.set(key, open);
 }
@@ -178,20 +183,38 @@ export function answerSchema(items) {
     judgements: { type: "array", items: { type: "object", additionalProperties: false, required: Object.keys(properties), properties } } } };
 }
 
-/** The prompt a packet's reader is given: each kind's question once, then its subjects, then the form of the answer. */
-export function judgementPrompt(packet) {
+// What a question is read against: its context and what is shown beside it. Questions that share it - the lines of one page
+// of commentary - are staged side by side and shown it once.
+const surroundings = (item) => canonical([item.context ?? null, item.beside ?? null]);
+
+/**
+ * The prompt a packet's reader is given: each kind's question once, then its subjects, then the form of the answer.
+ * `validate` is the command that checks the answer as it will be recorded (judge.mjs --validate), which the reader runs
+ * before handing back where it can run one.
+ */
+export function judgementPrompt(packet, { validate = null } = {}) {
   const byKind = new Map();
   for (const item of packet.items) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item]);
+  const asked = (item, shared) => `### ${item.key}\n${item.image ? `Image: ${item.image} (open it)\n` : ""}Subject: ${JSON.stringify(item.subject)}` +
+    `${!shared && item.context ? `\nContext: ${JSON.stringify(item.context)}` : ""}${!shared && item.beside ? `\nBeside it: ${JSON.stringify(item.beside)}` : ""}`;
   const sections = [...byKind].map(([kind, items]) => {
     const spec = JUDGEMENT_KINDS[kind];
     const verdicts = Object.entries(spec.verdicts).map(([verdict, meaning]) => `  - "${verdict}": ${meaning}`).join("\n");
     const fields = Object.entries(spec.fields || {}).map(([name, field]) => `  - \`${name}\`${field.for ? ` (with ${field.for.map((v) => `"${v}"`).join(" or ")})` : ""}: ${field.about}`).join("\n");
     const quoted = (spec.quoteFor || []).length ? `\nWith ${spec.quoteFor.map((v) => `"${v}"`).join(" or ")}, set \`quote\` to the words of the subject the verdict rests on, copied exactly.` : "";
+    const runs = [];
+    for (const item of items) { const last = runs.at(-1); if (last && surroundings(last[0]) === surroundings(item)) last.push(item); else runs.push([item]); }
     return `## ${kind}\n${spec.asks}\nSubject: ${spec.subject}\nVerdicts:\n${verdicts}${fields ? `\nFields:\n${fields}` : ""}${quoted}\n\n` +
-      items.map((item) => `### ${item.key}\n${item.image ? `Image: ${item.image} (open it)\n` : ""}Subject: ${JSON.stringify(item.subject)}${item.context ? `\nContext: ${JSON.stringify(item.context)}` : ""}`).join("\n\n");
+      runs.map((run) => {
+        const [first] = run;
+        if (run.length === 1 || !(first.context || first.beside)) return run.map((item) => asked(item, false)).join("\n\n");
+        return `The ${run.length} questions that follow are read against the same words:${first.context ? `\nContext: ${JSON.stringify(first.context)}` : ""}${first.beside ? `\nBeside each: ${JSON.stringify(first.beside)}` : ""}\n\n` +
+          run.map((item) => asked(item, true)).join("\n\n");
+      }).join("\n\n");
   });
+  const check = validate ? `\n## Before you hand back\nIf you can run commands, check the answer as it will be recorded: save it as answer.json in this packet's folder and run\n\n    ${validate}\n\nIt prints every reason the answer would be refused - a question unanswered or answered twice, a key not in this packet, a verdict its kind does not take, a field its verdict needs, a quote that is not the subject's words. Fix each and run it again until it says the answer would be recorded. A reader without a shell hands back as it is: the answer is checked when it is recorded.\n` : "";
   return `You are reading parts of a slide deck to answer a few precise questions about them, one at a time. Judge each from what is given - its subject and its context - and nothing else: do not look anything up, and do not judge the deck as a whole. Choose the verdict the words support; where the words leave it open, choose the verdict a careful editor would, and say why. Every answer gives its reason in a sentence.\n\n` +
-    `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null.\n`;
+    `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null.\n${check}`;
 }
 
 /** The packets staged in <dir>/judgements/, in order: `{ folder, packet, answered }`, `answered` where an answer.json waits beside it. */
@@ -216,8 +239,10 @@ export async function stagedPackets(dir) {
  * kept as it is - a reader may be answering it now - and one that is not is
  * removed, its open questions staged again with the rest. Returns `{ packets,
  * fresh }`: every packet waiting, and how many were staged by this call.
+ * `validate`, given a packet's folder, is the command its prompt tells the
+ * reader to check the answer with (judgementPrompt).
  */
-export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } = {}) {
+export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, validate = null } = {}) {
   const root = path.join(dir, PACKET_DIR);
   await fs.mkdir(root, { recursive: true });
   const open = new Map(requests.map((request) => [request.key, request]));
@@ -227,7 +252,9 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } 
     else await fs.rm(staged.folder, { recursive: true, force: true });
   }
   let number = Math.max(0, ...kept.map(({ folder }) => Number(path.basename(folder).slice("packet-".length))));
-  const rest = [...open.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
+  // Questions read against the same words sit together, so the prompt shows those words once.
+  const around = new Map([...open.values()].map((request) => [request.key, surroundings(request)]));
+  const rest = [...open.values()].sort((a, b) => a.kind.localeCompare(b.kind) || around.get(a.key).localeCompare(around.get(b.key)) || a.key.localeCompare(b.key));
   // As few packets as `max` allows, of even sizes, so readers working side by side finish together.
   const size = rest.length ? Math.ceil(rest.length / Math.ceil(rest.length / max)) : max;
   const fresh = [];
@@ -236,7 +263,7 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } 
     const folder = path.join(root, `packet-${String(number).padStart(2, "0")}`);
     await fs.mkdir(folder, { recursive: true });
     const items = [];
-    for (const { key, kind, subject, context, where, image } of rest.slice(at, at + size)) {
+    for (const { key, kind, subject, context, where, image, beside } of rest.slice(at, at + size)) {
       // A question about a picture carries a copy of it in the packet, named by the question's key.
       let staged = null;
       if (image) {
@@ -244,11 +271,11 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX } 
         await fs.mkdir(path.join(folder, "images"), { recursive: true });
         await fs.copyFile(image, path.join(folder, staged));
       }
-      items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}) });
+      items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}), ...(beside ? { beside } : {}) });
     }
     const packet = { schema: JUDGEMENTS_SCHEMA, batch: createHash("sha256").update(items.map((item) => item.key).join("\n")).digest("hex").slice(0, 16), items };
     await fs.writeFile(path.join(folder, "packet.json"), `${JSON.stringify(packet, null, 1)}\n`);
-    await fs.writeFile(path.join(folder, "prompt.md"), judgementPrompt(packet));
+    await fs.writeFile(path.join(folder, "prompt.md"), judgementPrompt(packet, { validate: validate ? validate(folder) : null }));
     await fs.writeFile(path.join(folder, "schema.json"), `${JSON.stringify(answerSchema(items), null, 1)}\n`);
     fresh.push({ folder, packet, answered: false });
   }
@@ -267,6 +294,27 @@ function packetProblems(packet, answer) {
   for (const key of given.keys()) if (!packet.items.some((item) => item.key === key)) problems.push(`${key}: no such question in the packet`);
   for (const item of packet.items) problems.push(...(given.has(item.key) ? answerProblems(item, given.get(item.key)) : [`${item.key} (${item.kind}): not answered`]));
   return { problems, given };
+}
+
+/**
+ * Every reason the recording would refuse the answer in `file`, found without
+ * recording anything: its packet is the one beside it (packet.json), else the
+ * one staged in `dir` for its batch; it is checked against that packet's schema
+ * (a field left out read as null, as the recording reads it) and then as
+ * recordAnswers checks it. An answering agent runs this before it hands back
+ * (judge.mjs --validate): its packet's schema had only been checked as "it
+ * parses", and an answer refused after hand-back is a whole packet asked of a
+ * fresh reader again. Returns `{ problems, packet }`.
+ */
+export async function validateAnswer(dir, file) {
+  let answer;
+  try { answer = JSON.parse(await fs.readFile(file, "utf8")); }
+  catch (error) { return { problems: [error.code === "ENOENT" ? `${file} does not exist: save the answer there first` : `${path.basename(file)} is not valid JSON (${error.message})`], packet: null }; }
+  const own = await readJson(path.join(path.dirname(file), "packet.json"), { optional: true }).catch(() => null);
+  const packet = own?.items ? own : (await stagedPackets(dir)).find((staged) => staged.packet.batch === answer?.batch)?.packet;
+  if (!packet) return { problems: [`no packet is staged beside ${file}, nor for batch "${answer?.batch}" in ${path.join(dir, PACKET_DIR)}: save the answer as answer.json in the folder of the packet it answers`], packet: null };
+  const shape = schemaErrors(answer, answerSchema(packet.items), "the answer", { absentIsNull: true, enums: false });
+  return { problems: [...shape, ...packetProblems(packet, answer).problems], packet };
 }
 
 /**

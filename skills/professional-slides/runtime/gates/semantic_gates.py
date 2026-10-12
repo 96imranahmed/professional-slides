@@ -63,8 +63,16 @@ def gate_restatement(slide_no, slide, findings):
     exhibit's words it reuses: a line has to name the members it is about
     ("Africa grew fastest" names Africa), and a reading of two categories shares
     their words by naming them, while a line that only reads a cell back can do
-    it in words of its own. So the exhibit and the commentary's lines are put to
-    a reader (commentary-restates), and the lines it names are the finding.
+    it in words of its own. So each line is put to a reader against the exhibit
+    (commentary-restates), and the lines it says read the exhibit back are the
+    finding.
+
+    Each line is its own question, keyed by the line and the exhibit it is read
+    against; the page's commentary is shown beside it and not keyed. Asked of
+    the whole block, one rewritten line re-asked the page, and on the BA deck a
+    second fresh reader then flagged lines the first had passed: the copy took
+    six judge rounds to settle. An unchanged line now keeps its verdict when a
+    neighbour changes.
     """
     commentary, exhibit = page_voices(slide)
     if not commentary or not exhibit:
@@ -74,18 +82,16 @@ def gate_restatement(slide_no, slide, findings):
     # A lead is the subheading its text is read under ("Ninth of twenty"), not a line of its own: it names what the text
     # beside it says, and is not put to the reader apart from it.
     said = [source_text(n) for n in text_nodes(slide) if n.get("role") in COMMENTARY_ROLES - LEAD_ROLES and source_text(n).strip()]
-    lines = [{"id": f"c{at + 1}", "text": text} for at, text in enumerate(said)]
-    if not lines:
+    if not said:
         return
-    shown = list(dict.fromkeys(t for t in exhibit if t not in callouts))
-    read = judged("commentary-restates", {"exhibit": shown, "callouts": list(dict.fromkeys(callouts)), "lines": lines}, None, slide_no)
-    if not read or read.get("verdict") != "restates":
-        return
-    restated = [line["text"] for line in lines if line["id"] in (read.get("lines") or [])]
+    shown = {"exhibit": list(dict.fromkeys(t for t in exhibit if t not in callouts)), "callouts": list(dict.fromkeys(callouts))}
+    # Every line is asked, so a line answered and a line still open hold apart: the answered ones are judged now.
+    read = [(text, judged("commentary-restates", text, shown, slide_no, beside={"commentary": said})) for text in said]
+    restated = [text for text, answer in read if answer and answer.get("verdict") == "restates"]
     if not restated:
         return
     findings.append(finding(
-        slide_no, "RESTATEMENT", {"lines": len(restated), "of": len(lines), "block": restated[0][:70], **({"callout": callouts[0][:70]} if callouts else {})},
+        slide_no, "RESTATEMENT", {"lines": len(restated), "of": len(said), "block": restated[0][:70], **({"callout": callouts[0][:70]} if callouts else {})},
         "commentary that says what the exhibit does not",
         ("The commentary reads the exhibit back: " + ", ".join(f"\"{text[:60]}\"" for text in restated[:3]) + ". "
          "Say what the exhibit cannot: what follows from the number, what it costs, which option it settles, "

@@ -12,6 +12,9 @@
 //   ... --max-passes n                                              lifts the cap of three passes, when the user asks for another
 //   ... --reason "<why>" [--user-approved]                          switching between --full and the spine critique
 //                                                                   (--spine) starts a new lineage; a second restart needs the user
+//   node runtime/storyline.mjs <id>.deck.json out/ --validate [file]
+//                                                                   every reason the loop would refuse a critique (or one part of a
+//                                                                   split one) as the answer to the packet waiting; records nothing
 //
 // Exit codes (EXIT in errors.mjs): 0 ready (or provisional: the answer is offered as provisional and every open item needs evidence the scope forbids), 3 a packet is waiting for
 // a critic, 2 revise, capped, refused or an invalid critique, 1 a crash or bad usage.
@@ -52,8 +55,9 @@ import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialC
 import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
-import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { EXIT, UsageError, commandLine, isMain, parseCli, readJson, runCli, schemaErrors, writeJson } from "./cli.mjs";
 import { textWords } from "./text-contract.mjs";
 import { registered } from "./errors.mjs";
 import {
@@ -872,6 +876,14 @@ const READY_NOTE = "The argument is settled: lay the pages out now, once - exhib
 const BINDING_VERSION = 5;
 const bindingVersionOf = (record) => record?.bindingVersion ?? 1;
 const PACKET_RECORD = "storyline-packet.json";
+const REVIEW_FILE = "storyline-review.json";
+const SELF = fileURLToPath(import.meta.url);
+// The last step of every critic's prompt, where the critic can run a command: its answer checked as the loop will record it
+// (validateStorylineAnswer). Critics had checked only that their JSON parsed, and the BA deck's first critique was refused
+// after hand-back for an item status the runtime does not take: redone, it cost 11 minutes. The critique's own file is the
+// one `--validate` reads when none is named, so its command does not name it twice.
+const validateStep = (specPath, out, file) => `\n\nBEFORE YOU HAND BACK, if you can run a command: save the answer as ${file} and run \`${commandLine("node", SELF, path.resolve(specPath), path.resolve(out), "--validate",
+  ...(file === path.join(path.resolve(out), REVIEW_FILE) ? [] : [file]))}\`, which prints every reason the runtime would refuse it. Fix each and run it again until it says "valid".`;
 
 /** The recorded passes of a deck's storyline lineage, from its lineage store (lineageStore). */
 export const readStorylineHistory = (store) => readPasses(path.join(store, HISTORY));
@@ -917,8 +929,10 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const dir = await stageReview("storyline", {}, { previous: previous?.staging });
   packet.staging = dir;
-  const main = scope ? storylineVerificationPrompt(packet) : mode === "full" ? storylinePrompt(packet) : spinePrompt(packet);
-  const parts = sections ? [...sections.map((section) => [section.id, storylineSectionPrompt(packet, section)]), ["spine", storylineSpinePrompt(packet)]] : [];
+  const main = (scope ? storylineVerificationPrompt(packet) : mode === "full" ? storylinePrompt(packet) : spinePrompt(packet))
+    + validateStep(specPath, outputDirectory, path.join(path.resolve(outputDirectory), REVIEW_FILE));
+  const parts = sections ? [...sections.map((section) => [section.id, storylineSectionPrompt(packet, section)]), ["spine", storylineSpinePrompt(packet)]]
+    .map(([id, text]) => [id, text + validateStep(specPath, outputDirectory, path.join(dir, "parts", `${id}.json`))]) : [];
   packet.promptHash = sha256([main, ...parts.map(([, text]) => text)].join("\u0000"));
   const signed = (text) => `${text}${provenanceLine(packet.promptHash)}`;
   // The staged copy says what the critic is given; the record keeps the ledger the answer is checked against.
@@ -1494,39 +1508,6 @@ ${itemRules()}
 
 Set pass to ${scope.pass} and verifies to "${scope.verifies}". Bind to ${packet.binding}.
 Return ONLY JSON matching this schema: ${JSON.stringify(offeredSchema(packet.mode, scope))}`;
-}
-
-/**
- * The subset of JSON Schema the review schemas use, checked field by field.
- * A schema with `additionalProperties: false` refuses fields it does not name:
- * a critique is what its schema asks for and nothing else.
- */
-function schemaErrors(value, schema, at) {
-  const errors = [];
-  const kind = Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
-  const types = [].concat(schema.type ?? []);
-  if (types.length && !types.some((t) => t === kind || (t === "integer" && kind === "number" && Number.isInteger(value))))
-    return [`${at} must be ${types.map((t) => (t === "object" ? "an object" : t === "null" ? "null" : `a ${t}`)).join(" or ")}`];
-  if (schema.enum && !schema.enum.includes(value)) errors.push(`${at} must be one of ${schema.enum.join(", ")}`);
-  if (kind === "string") {
-    if (schema.minLength && value.trim().length < schema.minLength) errors.push(`${at} must be at least ${schema.minLength} characters`);
-    if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${at} is malformed`);
-  }
-  if (kind === "number" && ((schema.minimum !== undefined && value < schema.minimum) || (schema.maximum !== undefined && value > schema.maximum)))
-    errors.push(`${at} must be between ${schema.minimum ?? "-"} and ${schema.maximum ?? "-"}`);
-  if (kind === "array") {
-    if (schema.minItems && value.length < schema.minItems) errors.push(`${at} needs at least ${schema.minItems} item${schema.minItems === 1 ? "" : "s"}`);
-    if (schema.items) value.forEach((item, i) => errors.push(...schemaErrors(item, schema.items, `${at}[${i}]`)));
-  }
-  if (kind === "object") {
-    for (const key of schema.required || []) if (value[key] === undefined) errors.push(`${at} is missing \`${key}\``);
-    if (schema.additionalProperties === false) {
-      const extra = Object.keys(value).filter((key) => !(key in (schema.properties || {})));
-      if (extra.length) errors.push(`${at} carries ${extra.map((k) => `\`${k}\``).join(", ")}, which the schema does not allow: return exactly the schema's fields`);
-    }
-    for (const [key, sub] of Object.entries(schema.properties || {})) if (value[key] !== undefined) errors.push(...schemaErrors(value[key], sub, `${at}.${key}`));
-  }
-  return errors;
 }
 
 /** Every item of a critique in ledger form: its findings, missing analyses and cuts. */
@@ -2235,6 +2216,55 @@ export function stampProvenance(review, packet, said = { mended: [] }) {
   return { ...review, provenance: { backend: "subagent", ...(review?.provenance && typeof review.provenance === "object" ? review.provenance : {}), promptHash: packet.promptHash } };
 }
 
+// A rule that reads the spine's copy - a title leading with a gap, a page against the answer - holds only where its question
+// is answered (judgements.mjs): a critique of a spine with one open would be bound to titles a rule may yet refuse. The
+// refusal, or null.
+function openSpineQuestions(spec) {
+  const open = Object.entries(spec.judgements?.kinds ?? {}).filter(([kind, n]) => n > 0 && JUDGEMENT_KINDS[kind]?.spine);
+  return open.length ? `The compile left questions about the spine unanswered (${open.map(([kind, n]) => `${kind} ${n}`).join(", ")}), so the rules that ask them did not hold: run node runtime/judge.mjs <id>.pages.json --draft until it exits 0, compile the draft again and rerun this` : null;
+}
+
+/**
+ * Every reason the loop would refuse the answer in `file`, found without
+ * recording anything (`--validate`): the checks advanceStoryline makes before it
+ * records a pass - the deck's request and its spine's open questions, the
+ * answer's form, its binding and pass against the packet waiting, and the
+ * critique judged against that packet (judgeCritique) - or, for one part of a
+ * split critique, the checks merge makes of that part. A critic runs it before
+ * handing back (validateStep). `{ status: valid | invalid, errors, formMended? }`:
+ * `formMended`, what the runtime would settle of the answer's page lists.
+ */
+async function validateStorylineAnswer(specPath, outputDirectory, file) {
+  const spec = await readJson(specPath);
+  const out = path.resolve(outputDirectory);
+  const errors = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
+  const unanswered = openSpineQuestions(spec);
+  if (unanswered) errors.push(unanswered);
+  const { review, invalid } = await readCritique(path.resolve(file));
+  const packet = await readJson(path.join(await lineageStore(spec, out, specPath), PACKET_RECORD), { optional: true });
+  if (invalid || !review || !packet) {
+    errors.push(invalid ?? (!review ? `${file} holds no answer: save the critique there first` : "no storyline packet is waiting: run storyline.mjs on the deck to write one"));
+    return { status: "invalid", errors };
+  }
+  if (bindingVersionOf(packet) !== BINDING_VERSION) errors.push(`the packet waiting was written under binding version ${bindingVersionOf(packet)}, and the runtime binds under version ${BINDING_VERSION}: the loop sets this answer aside, so run storyline.mjs for a fresh packet`);
+  const mended = [];
+  if (review.part) {
+    // One part of a split critique, read as merge reads it: its page lists settled, then its checks.
+    const { ids, contentIds } = packetContext(packet);
+    const settled = settleCritiqueForm(review, ids, contentIds);
+    mended.push(...settled.mended);
+    errors.push(...partErrors(settled.review, packet).map((e) => `${review.part.id ?? "part"}: ${e}`));
+  } else if (packet.binding !== review.binding || packet.pass !== review.pass) {
+    errors.push(`the answer does not answer the latest packet: it says binding ${review.binding} pass ${review.pass}, and the packet waiting is binding ${packet.binding} pass ${packet.pass}`);
+  } else {
+    // The prompt's hash is the runtime's to stamp, as the loop stamps it: not a thing for the critic to mend.
+    const judged = judgeCritique(stampProvenance(review, packet), { ...packetContext(packet), sectionFits: (title, ids) => sectionTitleFits(spec, path.dirname(path.resolve(specPath)), title, ids) });
+    mended.push(...judged.mended);
+    errors.push(...judged.errors);
+  }
+  return { status: errors.length ? "invalid" : "valid", errors, ...(mended.length ? { formMended: mendedLines(mended) } : {}) };
+}
+
 async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = MAX_PASSES, mode, reason, userApproved = false } = {}, said = { mended: [] }) {
   if (mode !== undefined && !STORYLINE_MODES.includes(mode)) throw new Error(`Unknown storyline mode ${mode}; one of ${STORYLINE_MODES.join(", ")}`);
   const spec = await readJson(specPath);
@@ -2242,10 +2272,8 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   const out = path.resolve(outputDirectory);
   const request = [...requestErrors(spec), ...(await scopeSourceErrors(spec, path.dirname(path.resolve(specPath))))];
   if (request.length) return { status: "refused", errors: request };
-  // A rule that reads the spine's copy - a title leading with a gap, a page against the answer - holds only where its question
-  // is answered (judgements.mjs): a critique of a spine with one open would be bound to titles a rule may yet refuse.
-  const open = Object.entries(spec.judgements?.kinds ?? {}).filter(([kind, n]) => n > 0 && JUDGEMENT_KINDS[kind]?.spine);
-  if (open.length) return { status: "refused", errors: [`The compile left questions about the spine unanswered (${open.map(([kind, n]) => `${kind} ${n}`).join(", ")}), so the rules that ask them did not hold: run node runtime/judge.mjs <id>.pages.json --draft until it exits 0, compile the draft again and rerun this`] };
+  const unanswered = openSpineQuestions(spec);
+  if (unanswered) return { status: "refused", errors: [unanswered] };
   const store = await lineageStore(spec, out, specPath);
   const historyDir = path.join(store, HISTORY);
   let history = await readPasses(historyDir);
@@ -2471,14 +2499,21 @@ export async function runStorylineReview(specPath, outputDirectory, backend = "a
   return { ...next, verdict: review.verdict, rating: review.rating, topFixes: review.topFixes };
 }
 
-const USAGE = "Usage: storyline.mjs [merge] <id>.deck.json output-directory [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]";
+const USAGE = "Usage: storyline.mjs [merge] <id>.deck.json output-directory [--full | --spine] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]\n       storyline.mjs <id>.deck.json output-directory --validate [parts/<id>.json] (out/storyline-review.json when no file is named)";
 
 async function main(argv) {
   const { values, positionals } = parseCli(argv, { full: { type: "boolean" }, spine: { type: "boolean" }, run: { type: "string", bare: "auto" }, model: { type: "string" },
-    "max-passes": { type: "string" }, reason: { type: "string" }, "user-approved": { type: "boolean" } }, { usage: USAGE });
+    "max-passes": { type: "string" }, reason: { type: "string" }, "user-approved": { type: "boolean" }, validate: { type: "string", bare: "", valueName: "an answer file" } }, { usage: USAGE });
   const merging = positionals[0] === "merge";
   const [spec, out] = merging ? positionals.slice(1) : positionals;
   if (!spec || !out) throw new UsageError(USAGE);
+  if (values.validate !== undefined) {
+    if (merging || values.run !== undefined) throw new UsageError(`--validate checks one answer and records nothing: not with merge or --run\n${USAGE}`);
+    // `--validate` alone reads the critique where the loop reads it.
+    const checked = await validateStorylineAnswer(path.resolve(spec), path.resolve(out), path.resolve(values.validate || path.join(out, REVIEW_FILE)));
+    console.log(JSON.stringify(checked));
+    return checked.status === "valid" ? EXIT.ok : EXIT.refused;
+  }
   if (values.full && values.spine) throw new UsageError(`--full and --spine are two modes; pass one\n${USAGE}`);
   const options = { maxPasses: values["max-passes"] ? Number(values["max-passes"]) : MAX_PASSES, mode: values.full ? "full" : values.spine ? "spine" : undefined,
     reason: values.reason, userApproved: Boolean(values["user-approved"]) };

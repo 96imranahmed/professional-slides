@@ -524,14 +524,17 @@ class RestatementGateTests(unittest.TestCase):
     def test_the_callouts_are_put_to_the_reader_apart_from_the_exhibit(self):
         """Fifty-six-page re-author: naming a chart's members was read as restating it, by a share of shared words. The
         reader is given the members, the callout and the caption apart, and judges whether the caption reads them back."""
-        with answering({"commentary-restates": "adds"}) as asked:
+        read_against = []
+        with answering({"commentary-restates": lambda subject, context: read_against.append(context) or "adds"}) as asked:
             findings = []
             page_gates.gate_restatement(1, self.page("Europe and East Asia earn 59% of all revenue"), findings)
         self.assertEqual(findings, [])
         [(_, subject)] = asked
-        self.assertIn("Africa", subject["exhibit"])
-        self.assertEqual(subject["callouts"], ["Europe and East Asia earn 59% of all revenue"])
-        self.assertNotIn("Europe and East Asia earn 59% of all revenue", subject["exhibit"])
+        [context] = read_against
+        self.assertEqual(subject, "Europe and East Asia with Australasia earn 59% of revenue; the Middle East only 7%")
+        self.assertIn("Africa", context["exhibit"])
+        self.assertEqual(context["callouts"], ["Europe and East Asia earn 59% of all revenue"])
+        self.assertNotIn("Europe and East Asia earn 59% of all revenue", context["exhibit"])
 
     def test_a_caption_that_repeats_the_callout_is_told_so(self):
         """Fifty-six-page re-author: a caption became a restatement the moment a callout was added."""
@@ -541,7 +544,7 @@ class RestatementGateTests(unittest.TestCase):
         slide["nodes"] = [n for n in slide["nodes"] if n["role"] != "panel-caption"] + [
             self.node("panel-caption", "Premium cabins earn the widest yield and cargo bellies lift winter margin")]
         findings = []
-        with answering({"commentary-restates": {"verdict": "restates", "lines": ["c1"]}}):
+        with answering({"commentary-restates": "restates"}):
             page_gates.gate_restatement(1, slide, findings)
         self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
         self.assertIn("callout", findings[0]["measured"])

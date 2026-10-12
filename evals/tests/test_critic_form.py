@@ -146,6 +146,52 @@ console.log(JSON.stringify({ refused: [refused.status, refused.errors, path.base
         self.assertEqual(result["broken"], ["invalid", "storyline-review.refused.json", True])
 
 
+class ValidateTests(unittest.TestCase):
+    def test_a_critique_is_checked_as_the_loop_would_record_it_and_nothing_is_recorded(self):
+        """BA v2: the first storyline critique was refused after hand-back - an item status the runtime does not take - and
+        redoing it cost 11 minutes. Its critic had checked only that the JSON parsed. `--validate` runs the checks the loop
+        makes before it records a pass and prints every reason it would refuse the answer, recording nothing; the prompt
+        tells the critic to run it before handing back."""
+        result = run_node(SECTIONED + '''
+const { spawnSync } = await import('node:child_process');
+const deck = await stage('finance', {}, sectioned);
+const one = await S.prepareStoryline(deck.specPath, deck.out);
+const p1 = await packetOf(one);
+const ids = p1.pages.filter((p) => p.kind === 'content').map((p) => p.id);
+const prompt = await fs.readFile(path.join(one.dir, 'prompt.md'), 'utf8');
+const file = path.join(deck.dir, 'critique.json');
+const check = async (review) => { await fs.writeFile(file, JSON.stringify(review));
+  const run = spawnSync(process.execPath, ['./skills/professional-slides/runtime/storyline.mjs', deck.specPath, deck.out, '--validate', file], { encoding: 'utf8' });
+  return [run.status, JSON.parse(run.stdout || 'null')]; };
+const problem = 'The closing page restates the answer without the condition the summary gives for it.';
+const bad = await check(withFindings(p1, ids, [finding('F1', ['f0', 'p49'], problem)]));
+const form = await check(withFindings(p1, ids, [finding('F1', ['f0', 'f6'], problem, { severity: 'grave' })]));
+const stale = await check({ ...withFindings(p1, ids, [finding('F1', ['f0', 'f6'], problem)]), pass: 2 });
+const good = await check(withFindings(p1, ids, [finding('F1', ['f0', 'f6'], problem)]));
+const untouched = [await exists(file), await exists(reviewPath(deck))];
+// `--validate` alone reads the critique where the loop reads it.
+await fs.writeFile(reviewPath(deck), JSON.stringify(withFindings(p1, ids, [finding('F1', ['f0', 'p49'], problem)])));
+const bare = spawnSync(process.execPath, ['./skills/professional-slides/runtime/storyline.mjs', deck.specPath, deck.out, '--validate'], { encoding: 'utf8' });
+// The answer the check passed is the answer the loop records.
+const recorded = await answer(deck, withFindings(p1, ids, [finding('F1', ['f0', 'f6'], problem)]));
+await clear(deck);
+console.log(JSON.stringify({ bad, form, stale, good, untouched, bare: [bare.status, bare.stdout.includes('unknown page p49')], recorded: recorded.status,
+  told: prompt.includes(`BEFORE YOU HAND BACK, if you can run a command: save the answer as ${reviewPath(deck)}`) && prompt.includes(`${deck.out} --validate\\``) }));
+''')
+        status, said = result["bad"]
+        self.assertEqual((status, said["status"]), (2, "invalid"))
+        self.assertTrue(any("unknown page p49" in e for e in said["errors"]), said)
+        self.assertEqual(result["form"][0], 2)
+        self.assertIn("findings[0].severity must be one of", " ".join(result["form"][1]["errors"]))
+        self.assertEqual(result["stale"][0], 2)
+        self.assertIn("does not answer the latest packet", " ".join(result["stale"][1]["errors"]))
+        self.assertEqual(result["good"], [0, {"status": "valid", "errors": []}])
+        self.assertEqual(result["untouched"], [True, False], "the check moves nothing aside and writes no critique")
+        self.assertEqual(result["bare"], [2, True])
+        self.assertEqual(result["recorded"], "revise")
+        self.assertTrue(result["told"])
+
+
 class VerificationFormTests(unittest.TestCase):
     def test_the_pass_that_verifies_a_repair_names_the_pages_that_moved_a_divider_among_them(self):
         result = run_node(SECTIONED + '''
