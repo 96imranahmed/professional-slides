@@ -4,6 +4,7 @@
 // fixed shapes (`KINDS`), and an analytical page takes the layout chosen for it
 // (compose-layouts.mjs) built from the arrangements (compose-arrangements.mjs).
 import { SIZE, HUG, LAYOUT } from "./compose-body.mjs";
+import { GROUNDS as GROUND_TONES } from "./palettes.mjs";
 import { imageProps, normalizePictures, sourcedPicture } from "./compose-pictures.mjs";
 import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem, itemsRelation } from "./compose-points.mjs";
 import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
@@ -102,7 +103,7 @@ export const SLIDE_KEYS = Object.freeze({
   sourceSlide: "on a revision's section or agenda page, the imported slide it stands for (a typed page keeps its own in `pageType`); never drawn",
   serves: "which ranked criteria this page answers",
   pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
-  tone: "dark or light, on the fixed-shape pages",
+  tone: "the page's ground: dark (the house's own dark) or primary (a field of its primary) on an analytical page, light to keep it on the light page in a dark deck; on a statement dark, light or primary, on takeaways dark or light",
   accent: "an accent phrase inside a statement",
   style: "a per-kind style switch (an agenda in columns, say)",
   stackWeights: "the height shares of stacked exhibits",
@@ -128,6 +129,19 @@ function assertKnownSlideKeys(slide, id) {
 }
 
 /**
+ * The page's `tone`, held to the grounds a page of its kind is drawn on (`allowed`).
+ * Each was read only where it meant something and passed over in silence
+ * elsewhere: a divider given a tone, or an analytical page given one the
+ * runtime had no ground for, drew as if it had none.
+ */
+function fixedTone(slide, id, allowed) {
+  if (slide.tone === undefined) return undefined;
+  if (!allowed.length) throw new Error(`${id}: a ${slide.kind} page takes no \`tone\` - it is drawn on the design system's own ground for it, on the deck's \`tone\``);
+  if (!allowed.includes(slide.tone)) throw new Error(`${id}: \`tone\` on a ${slide.kind ?? "content"} page is ${allowed.map((t) => `"${t}"`).join(", ")}; it was given ${JSON.stringify(slide.tone)}`);
+  return slide.tone;
+}
+
+/**
  * The four pages that are not analytical pages.
  *
  * Each is a fixed shape with no layout to negotiate, so each is one function
@@ -140,16 +154,18 @@ const KINDS = {
   statement: (slide, { id }) => (slide.exhibit || (slide.exhibits || []).length ? (() => { throw new Error(`${id}: a statement page is its one sentence and draws no exhibit - set the evidence on its own page, or put a photograph behind the sentence as \`image\``); })() : { kind: "statement", text: slide.text || slide.title,
     ...(slide.accent ? { accent: slide.accent } : {}),
     ...(slide.subtext ? { subtext: slide.subtext } : {}),
-    ...(slide.tone === "dark" ? { mode: "dark" } : {}) }),
-  takeaways: (slide) => ({ kind: "takeaways",
+    // Dark paints the statement's own navy surface; light and primary set the sentence on that ground.
+    ...(fixedTone(slide, id, ["dark", "light", "primary"]) === "dark" ? { mode: "dark" } : slide.tone ? { ground: slide.tone } : {}) }),
+  takeaways: (slide, { id }) => ({ kind: "takeaways",
     ...(slide.title ? { title: slide.title } : {}),
     items: slide.points || slide.items,
-    ...(slide.tone === "light" ? { mode: "light" } : {}) }),
-  section: (slide) => ({ kind: "divider", title: slide.title,
+    ...(fixedTone(slide, id, ["dark", "light"]) === "light" ? { mode: "light", ground: "light" } : {}) }),
+  // A divider's ground is the design system's (a navy panel, a field of the primary, the page) on the deck's own ground.
+  section: (slide, { id }) => ({ kind: "divider", title: slide.title, ...(fixedTone(slide, id, []) ?? {}),
     ...(slide.summary ? { subtitle: slide.summary } : {}),
     ...(Array.isArray(slide.contents) ? { contents: slide.contents, contentsActive: slide.contentsActive } : {}),
     ...(slide.number !== undefined ? { number: slide.number } : {}) }),
-  agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column",
+  agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column", ...(fixedTone(slide, id, ["dark", "light"]) ? { ground: slide.tone } : {}),
     items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items,
       ...(slide.active !== undefined ? { active: slide.active } : {}),
       ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] }),
@@ -370,5 +386,5 @@ function pageRecord(items, { id, slide, slideIn }) {
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.titlePlacement ? { titlePlacement: slide.titlePlacement } : {}), ...(slide.titleNumeral ? { titleNumeral: slide.titleNumeral } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(fixedTone(slide, id, GROUND_TONES) ? { ground: slide.tone } : {}), ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.titlePlacement ? { titlePlacement: slide.titlePlacement } : {}), ...(slide.titleNumeral ? { titleNumeral: slide.titleNumeral } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }

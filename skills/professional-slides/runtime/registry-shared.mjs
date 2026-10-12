@@ -5,7 +5,7 @@
 // heading and the content rail draw and measure alike, the plain list and the
 // chevron that more than one family sets.
 import { token, linePrimitive, assertSectionHeadingProps, tokenValue, stableId, textPrimitive, insetFrame, normalizeInsets, ellipsePrimitive,
-  rectPrimitive, shapePrimitive } from "./core.mjs";
+  rectPrimitive, shapePrimitive, reversedType } from "./core.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 
@@ -86,7 +86,7 @@ export function headingLayout(frame, props = {}) {
 
 export function sectionHeadingNodes({ id, frame, props = {} }) {
   const variant = props.variant || "standard";
-  const color = variant === "inverse" ? WHITE : variant === "accent" ? PRIMARY : INK;
+  const color = variant === "inverse" ? reversedType() : variant === "accent" ? PRIMARY : INK;
   const layout = headingLayout(frame, props);
   const { heading, headingWidth, bandHeight, ruleGap } = layout;
   // A blank heading is the row rule's doing: a panel whose neighbour is named

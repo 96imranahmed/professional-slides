@@ -358,6 +358,8 @@ function composeDeckWith(spec, baseDir) {
     // A cover photograph planned and not fetched yet is the build's to fill (fetch-pictures.mjs): until then the cover composes without it.
     if (spec.cover.image && sourcedPicture(spec.cover.image)) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }
     else cover.variant = spec.cover.tone === "light" ? "plain" : "dark";
+    // A light cover is a light page, on a dark deck too.
+    if (spec.cover.tone === "light") cover.ground = "light";
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
@@ -461,6 +463,8 @@ function composeDeckWith(spec, baseDir) {
   return {
     id: spec.id,
     palette: spec.palette || "midnight",
+    // The ground every page is set on unless it names its own (`tone` on the page).
+    ...(spec.tone ? { ground: spec.tone } : {}),
     ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
     ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
     ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),

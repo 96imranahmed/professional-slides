@@ -285,9 +285,18 @@ class Emitter:
         typography = scene.get("typography") or {}
         self.body_font = typography.get("body") or tokens.get("font.body", {}).get("value") or "Arial"
         self.display_font = typography.get("display") or tokens.get("font.display", {}).get("value") or self.body_font
-        self.colors = token_colors(scene)
-        self.series_colors = [self.colors.get(f"color.chartSeries{i}") for i in range(1, 7)]
+        self.deck_colors = token_colors(scene)
+        self.use_colors(self.deck_colors)
         self.stats = {"slides": 0, "text": 0, "native_charts": 0, "grouped": 0, "shapes": 0, "images": 0}
+
+    def use_colors(self, colors: dict):
+        """The colours the native charts and the text set outside the scene's
+        nodes are drawn in: the slide's own. A page set on a dark or a primary
+        ground (core.mjs groundOf) resolves every colour token for that ground,
+        and a chart on it drawn in the deck's light-page colours was navy on
+        navy."""
+        self.colors = colors
+        self.series_colors = [self.colors.get(f"color.chartSeries{i}") for i in range(1, 7)]
 
     # ---------------------------------------------------------------- text
     @staticmethod
@@ -650,6 +659,11 @@ class Emitter:
         chart = gf.chart
         chart.font.name = self.body_font
         chart.font.size = Pt(10)
+        # The chart's own text - axis labels, the legend, labels set no colour of
+        # their own - takes the theme's text colour, which is the deck's ink. A
+        # page whose ink is not the deck's (a page on another ground) says its own.
+        if self.colors.get("color.ink") != self.deck_colors.get("color.ink"):
+            chart.font.color.rgb = rgb(self.colors.get("color.ink"))
         chart.has_title = False
         chart.has_legend = bool(spec.get("legend"))
         if chart.has_legend:
@@ -685,6 +699,8 @@ class Emitter:
             plot.overlap = 100
         va = chart.value_axis
         va.has_major_gridlines = bool(spec.get("gridlines"))
+        if va.has_major_gridlines and self.colors.get("color.chartGrid") != self.deck_colors.get("color.chartGrid"):
+            va.major_gridlines.format.line.color.rgb = rgb(self.colors.get("color.chartGrid"))
         va.visible = spec.get("showValueAxis", not spec.get("dataLabels", True))
         va.tick_labels.font.size = Pt(10)  # chart furniture floor is 10 pt
         if spec.get("yMin") is not None:
@@ -967,6 +983,7 @@ class Emitter:
 
     # ---------------------------------------------------------------- slide
     def emit_slide(self, sl: dict):
+        self.use_colors({**self.deck_colors, **{k: v.get("value") for k, v in (sl.get("tokens") or {}).items() if v.get("kind") == "color"}})
         nodes = sl["nodes"]
         instances = {ci["instanceId"]: ci for ci in sl.get("componentInstances", [])}
         title_node = next((n for n in nodes if n["type"] == "text" and n.get("role") in ("action-title", "cover-title", "deck-title", "section-title")), None)
@@ -1037,7 +1054,9 @@ class Emitter:
     def theme(self, data: bytes) -> bytes:
         """theme1.xml with the scene palette written in, so the deck's theme *is* the palette."""
         slots = {}
-        tokens = self.scene["slides"][0]["tokens"] if self.scene.get("slides") else {}
+        # The deck's own tokens: on a dark deck its theme is dark, and a single
+        # page set on another ground does not recolour the deck's theme.
+        tokens = self.scene.get("tokens") or (self.scene["slides"][0]["tokens"] if self.scene.get("slides") else {})
         for tid, t in tokens.items():
             if t.get("kind") == "color" and t.get("themeSlot"):
                 slots[t["themeSlot"]] = t["value"].lstrip("#").upper()

@@ -174,9 +174,11 @@ const LISTED = [
     THIN_COLUMN PLOT_SPAN THIN_TABLE THIN_EVIDENCE MISSING_RENDER SCENE_VOID RENDER_DRIFT SCENE_INK TEXT_ON_LINE TEXT_ON_TEXT TEXT_ON_EDGE DESCENDER_ON_RULE`, FIT),
   ...codes("P", "MISSING_ARGUMENT POINT_DEPTH UNANNOTATED TWIN_CELLS RESTATEMENT PLANNING_VOICE CAVEAT_HEAVY CONTRADICTED_SHARE", COPY),
   ...codes("P", "METRIC_STACK NUMBERS_ON_MARKS NICE_TICKS UNSOURCED_PICTURE UNSCALED_FIGURE SCATTER_UNKEYED", LAYOUT),
+  // Type and marks lost on their ground (gates/scene_gates.py, page_gates.py): the page's `tone` or the deck's palette, or the export.
+  ...codes("P", "GROUND_CONTRAST RENDER_CONTRAST", LAYOUT),
   // The saved file read back against the scene (emit/readback_pptx.py).
   ...codes("P", `CANVAS_COLOR WRAP_NONE MISSING_SHAPE FRAME_DRIFT NO_TEXT_FRAME NO_AUTOFIT PARAGRAPH_COUNT TEXT_MISMATCH TITLE_NOT_PLACEHOLDER
-    MISSING_NATIVE_CHART SERIES_COUNT NATIVE_AXIS_DRIFT HIDDEN_STATE`, LAYOUT),
+    MISSING_NATIVE_CHART SERIES_COUNT NATIVE_AXIS_DRIFT HIDDEN_STATE TEXT_COLOR SHAPE_COLOR CHART_TEXT_COLOR`, LAYOUT),
 
   // --- G: deck aggregates ------------------------------------------------
   // What the chart pages plot is what the spine says each shows of its measures; a form that reads more of them is the layout's.

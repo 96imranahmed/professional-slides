@@ -22,7 +22,8 @@ from gate_config import (
 )
 # Reading the renders lives in its own module: it shares none of the gate
 # vocabulary and is the only part that needs Pillow and numpy.
-from ink import CANVAS_H, CANVAS_W, SURFACE_LUMINANCE, load_grey, relative
+from ink import CANVAS_H, CANVAS_W, SURFACE_LUMINANCE, load_grey, marked
+from scene_ink import dark_ground
 from nice_ticks import nice_axis, parse_number
 # One definition of a word, the text contract's.
 from text_stats import word_count
@@ -575,13 +576,12 @@ def gate_hero_exhibit(slide_no, slide, findings, image=None):
     if image is not None and big.get("component") not in ("image-frame", "device-frame"):
         f = big.get("frame") or {}
         try:
-            import numpy as np
             a = image if hasattr(image, "shape") else load_grey(image)
             x0, y0 = int(max(0, f["x"])), int(max(0, f["y"]))
             x1, y1 = int(min(CANVAS_W, f["x"] + f["width"])), int(min(CANVAS_H, f["y"] + f["height"]))
             if x1 > x0 and y1 > y0:
                 # Occupancy, not ink: a map's land or a card's tint carries the frame.
-                density = float((a[y0:y1, x0:x1] < relative(np.bincount(a.ravel(), minlength=256).tolist(), SURFACE_LUMINANCE)).mean())
+                density = float(marked(a, SURFACE_LUMINANCE, dark_ground(slide))[y0:y1, x0:x1].mean())
                 if density < THRESHOLDS["exhibit_ink_min"]:
                     findings.append(finding(
                         slide_no, "HERO_EXHIBIT", round(density, 4), THRESHOLDS["exhibit_ink_min"],

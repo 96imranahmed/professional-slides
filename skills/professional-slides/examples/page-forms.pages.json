@@ -612,6 +612,87 @@
    ]
   },
   {
+   "id": "f-ground-dark-chart",
+   "type": "trend",
+   "form": "line",
+   "commentary": "on-exhibit",
+   "takeaway": false,
+   "tone": "dark",
+   "why": "Three groups of lines over six years, where the claim is that the half-hourly trial lines pulled away from the hourly ones once the trial began; set on the deck's dark ground as the chart the board is shown on screen",
+   "settles": {
+    "kind": "rate",
+    "what": "off-peak journeys on the trial lines, the hourly lines and the Coast line FY21-FY26"
+   },
+   "adds": "The callouts say when the trial began and why the Coast line fell back",
+   "title": "Off-peak journeys on the trial lines grew 48% in three years, on hourly lines 9%",
+   "exhibit": {
+    "heading": "Off-peak journeys by group of lines",
+    "focus": "Half-hourly trial lines",
+    "unit": "million",
+    "categories": [
+     "FY21",
+     "FY22",
+     "FY23",
+     "FY24",
+     "FY25",
+     "FY26"
+    ],
+    "series": [
+     {
+      "name": "Half-hourly trial lines",
+      "values": [
+       2.1,
+       4.6,
+       6.3,
+       7.4,
+       8.4,
+       9.3
+      ]
+     },
+     {
+      "name": "Hourly lines",
+      "values": [
+       2.4,
+       4.4,
+       5.6,
+       5.9,
+       6.0,
+       6.1
+      ]
+     },
+     {
+      "name": "Coast line",
+      "values": [
+       0.7,
+       1.9,
+       2.7,
+       2.6,
+       2.4,
+       2.0
+      ]
+     }
+    ],
+    "annotations": [
+     {
+      "category": "FY23",
+      "series": "Half-hourly trial lines",
+      "text": "Half-hourly trial starts on the Dales and Valley lines"
+     },
+     {
+      "category": "FY25",
+      "series": "Coast line",
+      "text": "Coast units lent to the trial; its evening trains cut"
+     },
+     {
+      "category": "FY26",
+      "series": "Hourly lines",
+      "text": "Hourly lines flat at about 6 million since FY24"
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator"
+  },
+  {
    "id": "f-ranking-column",
    "type": "ranking",
    "form": "column",
@@ -3699,6 +3780,88 @@
    "source": "Source: illustrative data for a fictional operator; FY26 timetable and ticket sales"
   },
   {
+   "id": "f-ground-dark-table",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "tone": "dark",
+   "why": "The reader looks up a line and reads its cost of a train-km today against its cost once electric trains run, with the network beneath; set apart on the dark ground as the page the funding case turns on",
+   "settles": {
+    "kind": "structure",
+    "what": "cost per train-km by line, diesel today against electric from 2030"
+   },
+   "adds": "The last column says what electrification changes on each line and when",
+   "title": "Electric trains cut the cost of a train-km by about a quarter where they run",
+   "exhibit": {
+    "columns": [
+     "Line",
+     "Train-km, million",
+     "Cost per train-km today",
+     "Cost once electric",
+     {
+      "label": "What it means",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Eastern, Leeds-Selby",
+      "2.3",
+      "£21.40",
+      "£15.80",
+      "Electrified first, in 2030: the largest saving a train-km anywhere on the network"
+     ],
+     [
+      "Eastern, Selby-Hull",
+      "1.8",
+      "£21.40",
+      "£15.80",
+      "Electrified with Leeds-Selby in 2030, releasing its diesel units for the Coast line"
+     ],
+     [
+      "Valley",
+      "3.6",
+      "£16.80",
+      "£12.90",
+      "Electric from 2031 on the overhead line the Eastern work extends to Huddersfield"
+     ],
+     [
+      "Dales",
+      "3.9",
+      "£15.90",
+      "£12.20",
+      "Electric from 2031 on the same overhead line, once the Skipton depot is wired"
+     ],
+     [
+      "Airport",
+      "3.4",
+      "£14.20",
+      "£14.20",
+      "No change: its short runs already cost the least a train-km to operate"
+     ],
+     [
+      "Coast",
+      "3.2",
+      "£18.60",
+      "£18.60",
+      "Stays diesel, and takes eleven units freed from the Eastern line in 2030"
+     ],
+     {
+      "style": "total",
+      "cells": [
+       "Network",
+       "18.2",
+       "£17.60",
+       "£14.70",
+       "A sixth off the network's cost once three lines run electric"
+      ]
+     }
+    ]
+   },
+   "source": "Source: illustrative data for a fictional operator; FY26 management accounts and the electrification business case"
+  },
+  {
    "id": "f-mechanism-flow",
    "type": "mechanism",
    "form": "flow",
@@ -5462,6 +5625,60 @@
    ],
    "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; FY26 survey of 1,200 drivers"
+  },
+  {
+   "id": "f-ground-primary-kpi",
+   "type": "numbers",
+   "form": "fact-grid",
+   "commentary": "below",
+   "takeaway": false,
+   "tone": "primary",
+   "why": "Four numbers state what the plan buys and what it costs before the case is argued, set on the house colour as the page that opens the decision",
+   "settles": {
+    "kind": "count",
+    "what": "journeys added, capital, capital per added journey and payback of the FY27-FY31 plan"
+   },
+   "adds": "The points say what the four depend on and which of them can slip",
+   "title": "The plan adds 11.7 million journeys a year for £640 million of capital",
+   "highlight": [
+    "2029"
+   ],
+   "exhibit": {
+    "columns": 2,
+    "items": [
+     {
+      "value": "+11.7m",
+      "label": "journeys a year by FY31",
+      "text": "48.3m in FY26 to 60.0m"
+     },
+     {
+      "value": "£640m",
+      "label": "capital, FY27-FY31",
+      "text": "£390m of it the Eastern line"
+     },
+     {
+      "value": "£55",
+      "label": "of capital per added journey",
+      "text": "Over the assets' 30-year life"
+     },
+     {
+      "value": "11 years",
+      "label": "to pay back",
+      "text": "From the first electric train"
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "What the numbers depend on",
+     "text": "Half of the added journeys come from the off-peak timetable, which needs only crews, units already in the fleet and a depot extension, so the first five million arrive by FY28 whatever happens to the overhead line. The other half follow electrification and the new housing."
+    },
+    {
+     "lead": "What can slip",
+     "text": "The payback rests on the power upgrade landing by 2029: a year's slip moves the first electric train, and the payback with it, by a year, but it leaves the timetable's journeys where they are, and the capital is drawn in tranches, so none of it is spent ahead of the milestone it pays for."
+    }
+   ],
+   "source": "Source: illustrative data for a fictional operator; the FY27-FY31 business case"
   },
   {
    "id": "f-numbers-nested-circles",

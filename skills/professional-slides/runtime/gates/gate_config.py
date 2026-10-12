@@ -406,6 +406,10 @@ GATE_CODES = {
     # The page's visual weight, estimated from the scene (scene_ink.py).
     "SCENE_INK": "a page with an exhibit that will ink too little of its body to read as weighted at a glance",
     "DECK_INK": "the deck's median analytical page will ink too little of its body",
+    # Type and marks read against the ground they sit on: the scene's colours,
+    # then the render's pixels (scene_gates.ground_contrast, page_gates.render_contrast).
+    "GROUND_CONTRAST": "type, or every mark of an exhibit, the scene sets where it cannot be read on its ground",
+    "RENDER_CONTRAST": "type the scene sets legibly that the render shows lost on its ground",
 }
 
 # Distribution and furniture statistics prompt human review; they do not

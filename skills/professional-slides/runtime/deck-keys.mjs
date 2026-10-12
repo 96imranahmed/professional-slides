@@ -73,6 +73,8 @@ const DECK_KEYS = Object.freeze({
   chrome: key("{ left, right, titleTop, bodyTop, footerTop }", ["object"], "the page margins and the title band's place, in pixels"),
   pageTemplate: key("string | object", ["string", "object"], "the page furniture: footer, page number, logo slot"),
   surfaces: key("\"reference\" | \"open\"", ["string"], "the filled or the light set of table and card surfaces"),
+  tone: key("\"light\" | \"dark\"", ["string"], "the ground every page is set on: dark sets the deck on the house's own dark, every colour derived from its palette; a page's own `tone` overrides it",
+    (value) => (["light", "dark"].includes(value) ? null : `is "light" (the default) or "dark"; a single page takes "primary", the house's primary as its ground, with \`tone\` on the page`)),
   density: key("\"live-pitch\" | \"executive\" | \"pre-read\"", ["string"], "how much a page of this deck carries; it sets the body size and every word floor"),
   fill: key("string", ["string"], "how full a page reads, where it is not left to follow `density`"),
   weight: key("object", ["object"], "the weight contract a page is held to, where a house profile or the deck sets its own"),

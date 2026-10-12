@@ -106,8 +106,11 @@ console.log(JSON.stringify({ catalogue, out, others }));
             with self.subTest(form=key):
                 result = author("--example", key)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                [page] = json.loads(result.stdout)
-                self.assertEqual(f'{page["type"]}/{page["form"]}', key)
+                # A form may have more than one worked page - the fact grid also on the house colour (`tone: "primary"`) -
+                # and every page printed is of the form asked for.
+                pages = json.loads(result.stdout)
+                self.assertTrue(pages)
+                self.assertEqual({f'{page["type"]}/{page["form"]}' for page in pages}, {key})
 
     def test_the_worked_pages_are_about_the_fictional_operator(self):
         examples = json.loads((ROOT / "skills/professional-slides/examples/page-forms.pages.json").read_text(encoding="utf-8"))

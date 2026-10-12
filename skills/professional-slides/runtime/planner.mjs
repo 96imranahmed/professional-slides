@@ -354,6 +354,7 @@ function planCover(plan) {
   const spec = {
     id: plan.id,
     density: plan.density ?? "executive",
+    ...(plan.ground ? { ground: plan.ground } : {}),
     frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height },
     composition: absolute({ id: `${plan.id}-cover`, children: [componentNode({ id: "cover", component: "cover", props: { title: plan.title, ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.date ? { date: plan.date } : {}), ...(plan.logo ? { logo: plan.logo } : {}), ...(plan.marks?.length ? { marks: plan.marks } : {}), variant, ...(plan.image ? {image:plan.image} : {}), ...(plan.image && plan.tone ? { tone: plan.tone } : {}) }, frame: { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height }, role: "cover" })] })
   };
@@ -377,7 +378,7 @@ function planTakeaways(plan) {
   const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
   const props = { ...(plan.title ? { title: plan.title } : {}), items: plan.items, ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-takeaways`, children: [componentNode({ id: "takeaways", component: "takeaways", props, frame, role: "takeaways" })] }) },
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", ...(plan.ground ? { ground: plan.ground } : {}), frame, composition: absolute({ id: `${plan.id}-takeaways`, children: [componentNode({ id: "takeaways", component: "takeaways", props, frame, role: "takeaways" })] }) },
     decision: { layout: "structural", kind: "takeaways", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "takeaways", job: "close the deck", component: "takeaways" }] }
   };
 }
@@ -387,7 +388,7 @@ function planStatement(plan) {
   const frame = { x: 0, y: 0, width: SLIDE.width, height: SLIDE.height };
   const props = { text: plan.text, ...(plan.accent ? { accent: plan.accent } : {}), ...(plan.subtext ? { subtext: plan.subtext } : {}), ...(plan.mode ? { mode: plan.mode } : {}), ...(plan.pageNumber !== undefined ? { pageNumber: plan.pageNumber } : {}), ...(plan.companyName ? { companyName: plan.companyName } : {}), ...(plan.image ? { image: plan.image } : {}) };
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", frame, composition: absolute({ id: `${plan.id}-statement`, children: [componentNode({ id: "statement", component: "statement", props, frame, role: "statement" })] }) },
+    spec: { id: plan.id, notes: plan.notes || "", density: plan.density ?? "executive", ...(plan.ground ? { ground: plan.ground } : {}), frame, composition: absolute({ id: `${plan.id}-statement`, children: [componentNode({ id: "statement", component: "statement", props, frame, role: "statement" })] }) },
     decision: { layout: "structural", kind: "statement", density: { requested: "executive", recommended: "live-pitch", resolved: plan.density ?? "executive", selection: "explicit", reasons: [] }, itemJobs: [{ id: "statement", job: "state the message", component: "statement" }] }
   };
 }
@@ -416,7 +417,7 @@ export function planSlide(plan, registry = REGISTRY) {
   const titleDecision = titleVariant ?? "house-style";
   const body = makeComposition({...plan, gap: plan.gap ?? (["pre-read","appendix"].includes(content.density.resolved) && ["flow.row","flow.column"].includes(layoutKind(plan,plan.items)) ? "space.3" : undefined)}, plan.items, { root: true });
   return {
-    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(content.density.chart !== content.density.resolved ? { chartDensity: content.density.chart } : {}), ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.titlePlacement ? { titlePlacement: plan.titlePlacement } : {}), ...(plan.titleNumeral ? { titleNumeral: plan.titleNumeral } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, ...(plan.sourceForms ? { sourceForms: plan.sourceForms } : {}), note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
+    spec: { id: plan.id, notes: plan.notes || "", density: content.density.resolved, ...(plan.ground ? { ground: plan.ground } : {}), ...(content.density.chart !== content.density.resolved ? { chartDensity: content.density.chart } : {}), ...(plan.template ? { template: plan.template } : {}), chrome: { title: plan.title, titleVariant, ...(plan.titleLead ? { titleLead: plan.titleLead } : {}), ...(plan.titlePlacement ? { titlePlacement: plan.titlePlacement } : {}), ...(plan.titleNumeral ? { titleNumeral: plan.titleNumeral } : {}), ...(plan.tag ? { tag: plan.tag } : {}), ...(plan.kicker ? { kicker: plan.kicker } : {}), ...(plan.subtitle ? { subtitle: plan.subtitle } : {}), ...(plan.subtitleRole ? { subtitleRole: plan.subtitleRole } : {}), tracker: plan.tracker, source: plan.source, ...(plan.sourceForms ? { sourceForms: plan.sourceForms } : {}), note: plan.note, companyName: plan.companyName, pageNumber: plan.pageNumber, pageTemplate: plan.pageTemplate }, composition: body },
     decision: {
       titleVariant: titleDecision,
       density: content.density,
@@ -490,7 +491,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "takeaways" ? planTakeaways({ pageNumber: index + 1, ...slide })
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
-  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
+  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.ground ? { ground: deckPlan.ground } : {}), ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
   // Three keys the planned specs do not carry ride onto the scene slide: the
   // page's role, `hidden`, its show state in the file (emit_pptx.py), and - on
   // a page the composer split in two, a table past its rows - the id of the

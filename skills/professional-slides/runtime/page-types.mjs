@@ -40,6 +40,7 @@ import { POLARITIES } from "./tables.mjs";
 import { waivedRules, predatedRule, ruleIntroduced } from "./weight.mjs";
 import { textWordList, textWords, proseParts, PROSE_LEAD_FROM, PROSE_PARAGRAPH_MAX, PROSE_LEAD_WORDS } from "./text-contract.mjs";
 import { deckSchema } from "./deck-keys.mjs";
+import { GROUNDS } from "./palettes.mjs";
 import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
 import { judged } from "./judgements.mjs";
@@ -2385,6 +2386,7 @@ export function pageSchema(only = null) {
       settles: { type: "object", required: ["kind", "what"], properties: { kind: { enum: SETTLES_KINDS }, what: { type: "string", minLength: 8 } } },
       adds: { oneOf: [{ type: "null" }, { type: "string", minLength: 8 }], description: "what the commentary says that the exhibit cannot; required with commentary beside, beside-left, below, captions or on-exhibit" },
       evidence: { type: "array", items: { type: "string" }, description: "insight ids from <id>.insights.json; with an insight log, required for data-bearing types and it derives settles" },
+      tone: { enum: GROUNDS, description: "the page's ground: dark (the house's own dark) or primary (a field of its primary) sets this page apart, every colour derived for it; light keeps a page light in a deck whose `tone` is dark" },
       hidden,
     },
     not: { anyOf: OWNED.map((key) => ({ required: [key] })) },

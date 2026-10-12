@@ -14,6 +14,8 @@ import {
   houseStyle,
   readableOn,
   onFill,
+  reversedFill,
+  reversedType,
 } from "./core.mjs";
 import { measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { strongestContrastIndex } from "./palettes.mjs";
@@ -113,6 +115,8 @@ export const TABLE_TOKENS = [
   "color.componentPrimary",
   "color.componentPrimaryTint",
   "color.surfaceTint",
+  // A header band and a total row on a page whose type is pale (core.mjs reversedFill).
+  "color.band",
   "color.accent",
   "color.accentTint",
   "color.surface",
@@ -536,7 +540,7 @@ const foreground = onFill;
 // A group row is a subheading, not a band: drawn in the zebra's grey it read
 // as one more striped row, so it is a bold label on a heavier rule instead.
 const rowBand = (style) =>
-  style === "accented" ? t("color.accentTint") : style === "total" ? primary : null;
+  style === "accented" ? t("color.accentTint") : style === "total" ? reversedFill(primary) : null;
 const categorySurface = (cell, props) =>
   cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
@@ -1454,6 +1458,8 @@ function drawTableHeader(table) {
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
     const filledHeader = banded(column) || bandedGutter(c);
+    // The reversed white on the accent of the recommended column, the band's own type on the band.
+    const headerType = (at) => (at === props.highlightColumn ? white : reversedType());
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(
@@ -1462,7 +1468,7 @@ function drawTableHeader(table) {
           role: "table-header-cell",
           geometry: "chevron",
           frame: { x: xs[c], y: frame.y, width: m.widths[c] - m.gap, height: m.headerHeight },
-          style: box(ink),
+          style: box(reversedFill(ink)),
           data: { column: c, headerShape: "chevron" },
         }),
       );
@@ -1485,7 +1491,7 @@ function drawTableHeader(table) {
           },
           // The recommended column's header takes the accent so the column
           // reads as the answer from the header down.
-          style: box(c === props.highlightColumn ? t("color.accent") : ink),
+          style: box(c === props.highlightColumn ? t("color.accent") : reversedFill(ink)),
           data: { column: c, ...(c === props.highlightColumn ? { highlightColumn: true } : {}) },
         }),
       );
@@ -1498,7 +1504,7 @@ function drawTableHeader(table) {
         const markBox = { x: xs[c] + m.padding + inset, y: labelY + (m.headers[c].lineHeight - mark.height) / 2, width: mark.width, height: mark.height };
         // On a filled header the mark sits on a white chip: a dark wordmark
         // on the navy band is a mark nobody can see.
-        if (filledHeader) nodes.push(rectPrimitive({ id: stableId(id, "header-chip", c), role: "table-header-chip", frame: { x: markBox.x - 3, y: markBox.y - 2, width: markBox.width + 6, height: markBox.height + 4 }, style: { ...box(white), radius: t("radius.small") }, data: { column: c } }));
+        if (filledHeader) nodes.push(rectPrimitive({ id: stableId(id, "header-chip", c), role: "table-header-chip", frame: { x: markBox.x - 3, y: markBox.y - 2, width: markBox.width + 6, height: markBox.height + 4 }, style: { ...box(reversedType()), radius: t("radius.small") }, data: { column: c } }));
         nodes.push(mediaNode({ id: stableId(id, "header-logo", c), frame: markBox, props: column.logo, role: "table-header-logo" }));
       }
       const markShift = mark ? mark.width + v("space.2") : 0;
@@ -1513,7 +1519,7 @@ function drawTableHeader(table) {
         m.headers[c],
         textStyle(
           true,
-          filledHeader ? white : ink,
+          filledHeader ? headerType(c) : ink,
           chevron ? "center" : column.align ?? "left",
           m.textSize,
         ),
@@ -1528,7 +1534,7 @@ function drawTableHeader(table) {
             width: m.widths[c] - 2 * m.padding - 2 * inset,
           },
           m.units[c],
-          textStyle(false, filledHeader ? white : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
+          textStyle(false, filledHeader ? headerType(c) : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
         );
     }
     // One continuous header rule unless an open header has an implication gutter, or the header sits over a chevron or
@@ -1708,7 +1714,7 @@ function drawTableCell(table, cell, r, c) {
   const band = categoryTotal ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
   let fill = null;
   if (cell.type === "category" && categorySurface(cell, props) === "primary")
-    fill = primary;
+    fill = reversedFill(primary);
   // `surface: "bubble"` sets the value in a filled pill rather than a
   // tinted cell - the same device the change annotation uses on a chart, so
   // one column of an otherwise flat table carries the emphasis.

@@ -122,6 +122,53 @@ def canvas_of(slide):
     return canvas
 
 
+def _holds(node, x, y):
+    """Whether the point (x, y) falls on what `node` paints: its box, the disc
+    of an ellipse, the sector of a wedge (angles in degrees, clockwise from
+    three o'clock, as the scene draws them)."""
+    frame = node.get("frame") or {}
+    left, top = _number(frame.get("x")), _number(frame.get("y"))
+    width, height = _number(frame.get("width")), _number(frame.get("height"))
+    if not (left <= x <= left + width and top <= y <= top + height):
+        return False
+    if node.get("type") in ("ellipse", "wedge") and width > 0 and height > 0:
+        dx, dy = (x - left - width / 2) / (width / 2), (y - top - height / 2) / (height / 2)
+        if dx * dx + dy * dy > 1:
+            return False
+        data = node.get("data") or {}
+        start, end = data.get("startAngle"), data.get("endAngle")
+        if node.get("type") == "wedge" and isinstance(start, (int, float)) and isinstance(end, (int, float)) and end - start < 360:
+            return (math.degrees(math.atan2(dy, dx)) - start) % 360 <= (end - start) % 360
+    return True
+
+
+def ground_at(nodes, index, x, y, canvas):
+    """The colour under the point (x, y) of what `nodes[index]` is drawn on:
+    the topmost filled shape drawn before it that covers the point, else the
+    page's canvas. None over a picture, whose colour the scene does not know."""
+    for node in reversed(nodes[:index]):
+        if not node.get("frame") or not _holds(node, x, y):
+            continue
+        if node.get("type") == "image":
+            return None
+        if node.get("type") in SHAPE_TYPES:
+            style = node.get("style") or {}
+            fill, opacity = color_of(style.get("fill")), _number(style.get("opacity"), 1.0)
+            if fill and opacity >= 0.99:
+                return fill
+    return canvas
+
+
+def dark_ground(slide):
+    """Whether the page is set on a dark ground: its own canvas token is dark,
+    as on a page whose `tone` is dark or primary (core.mjs groundOf). The render's
+    marks are then lighter than the page (ink.marked). A light page that paints
+    a navy panel over the whole of itself - a divider, a dark cover - keeps its
+    light canvas and is read as it always was."""
+    canvas = color_of((slide.get("tokens") or {}).get("color.canvas"))
+    return bool(canvas) and grey_of(canvas) < 128
+
+
 class _Grid:
     def __init__(self, background):
         self.cells = [[background] * GRID_W for _ in range(GRID_H)]

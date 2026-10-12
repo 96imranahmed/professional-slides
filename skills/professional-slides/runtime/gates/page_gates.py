@@ -65,8 +65,9 @@ from semantic_gates import *  # noqa: E402,F401,F403
 from deck_gates import *  # noqa: E402,F401,F403
 # The driver reads the renders and the scene's ink through these names, so a
 # caller can substitute either for a run.
-from ink import ink_matrix, ink_rows, load_grey, load_ink_matrix, load_ink_rows, render_path  # noqa: E402
-from scene_ink import estimate as scene_ink_estimate  # noqa: E402
+from ink import grey_contrast, ink_matrix, ink_rows, load_grey, load_ink_matrix, load_ink_rows, render_path  # noqa: E402
+from scene_ink import NATIVE_PLOT_ROLES, canvas_of, color_of, dark_ground, ground_at, estimate as scene_ink_estimate  # noqa: E402
+from scene_gates import GROUND_CONTRAST, _text_box, contrast  # noqa: E402
 from density_profile import prose_blocks, scene_blocks, scene_fragmentation  # noqa: E402
 
 GATE_MODULES = (gate_config, render_gates, scene_gates, semantic_gates, deck_gates)
@@ -153,8 +154,16 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
             covers.append(slide_no)
         else:
             content_indexes.append(index)
-            empty_page_gates(run, slide_no, slide, render_dir)
+            # The render decoded once a content page; every pixel gate reads this array.
+            path = render_path(render_dir, slide_no) if render_dir else None
+            grey = load_grey(path) if path is not None else None
+            empty_page_gates(run, slide_no, slide, render_dir, grey)
             content_page_gates(run, slide_no, index, slide, slide_profile)
+            if run.wanted("RENDER_CONTRAST"):
+                gate_render_contrast(slide_no, slide, grey, run.findings)
+        # Type and marks lost on their ground, on every page: a cover or a divider set on a ground is read on it too.
+        if run.wanted("GROUND_CONTRAST"):
+            gate_ground_contrast(slide_no, slide, run.findings)
         if run.wanted("PLANNING_VOICE"):
             gate_planning_voice(slide_no, slide, run.findings)
         if run.wanted("TYPE_RANGE"):
@@ -213,7 +222,7 @@ def lost_text(slide, grey):
     and is not reported."""
     if grey is None:
         return []
-    ink = ink_matrix(grey)
+    ink = ink_matrix(grey, dark=dark_ground(slide))
     lost = []
     for node, (x, y, w, h) in scene_text_boxes(slide):
         x0, x1 = max(0, int(x) - 1), min(CANVAS_W, int(x + w) + 2)
@@ -223,6 +232,72 @@ def lost_text(slide, grey):
         if not ink[y0:y1, x0:x1].any():
             lost.append({"node": node.get("id"), "text": " ".join(str(source_text(node)).split())[:60], "box": [x0, y0, x1 - x0, y1 - y0]})
     return lost
+
+
+# The render read the way the scene is (scene_gates.ground_contrast): each run
+# of type the scene sets legibly on its ground, measured in the box the scene
+# put it in - the box's commonest grey for the ground, its most distant pixel for
+# the type, each read as the grey it is (ink.grey_contrast). On 3,406 runs of type
+# across every worked page the measure kept within a few tenths of the scene's
+# own ratio, and the least legible read 2.48:1 (a numeral the scene sets at
+# 3:1). Type the render shows under RENDER_CONTRAST_MIN did not reach the page
+# legibly whatever the scene drew: the file's background is not the scene's
+# ground, or its type kept a light page's colour. A native chart's own labels are
+# laid out by the renderer, not where the scene put them, and are read back from
+# the file instead (readback_pptx.py CHART_TEXT_COLOR).
+RENDER_CONTRAST_MIN = 1.5
+
+
+def render_contrast(slide, grey):
+    """The type the scene sets legibly that the render shows under
+    RENDER_CONTRAST_MIN on its ground: [{node, role, text, ratio, scene}],
+    the least legible first. `grey` is the decoded render (load_grey)."""
+    if grey is None:
+        return []
+    import numpy as np
+
+    natives = {c.get("instanceId") for c in slide.get("componentInstances") or [] if c.get("nativeChart")}
+    nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
+    canvas, lost = canvas_of(slide), []
+    for index, node in enumerate(nodes):
+        if node.get("type") != "text" or not source_text(node).strip():
+            continue
+        if node.get("role") in NATIVE_PLOT_ROLES and (node.get("data") or {}).get("componentInstance") in natives:
+            continue
+        color = color_of((node.get("style") or {}).get("color"))
+        x, y, w, h = _text_box(node)
+        ground = ground_at(nodes, index, x + w / 2, y + h / 2, canvas)
+        if not color or not ground or contrast(color, ground) < GROUND_CONTRAST["text"]:
+            continue  # unreadable in the scene already: GROUND_CONTRAST's to report
+        x0, x1 = max(0, int(x) - 1), min(CANVAS_W, int(x + w) + 2)
+        y0, y1 = max(0, int(y) - 1), min(CANVAS_H, int(y + h) + 2)
+        if x1 - x0 < 4 or y1 - y0 < 4:
+            continue
+        box = grey[y0:y1, x0:x1].astype(int)
+        levels, counts = np.unique(box, return_counts=True)
+        background = int(levels[counts.argmax()])
+        ratio = grey_contrast(background, int(box.flat[np.abs(box - background).argmax()]))
+        if ratio < RENDER_CONTRAST_MIN:
+            lost.append({"node": node.get("id"), "role": node.get("role"), "text": " ".join(source_text(node).split())[:60],
+                         "ratio": round(ratio, 2), "scene": round(contrast(color, ground), 2)})
+    return sorted(lost, key=lambda item: item["ratio"])
+
+
+def gate_render_contrast(slide_no, slide, grey, findings):
+    """RENDER_CONTRAST. Type the scene sets legibly on its ground that the
+    render shows lost on it (render_contrast). One finding a page."""
+    lost = render_contrast(slide, grey)
+    if not lost:
+        return
+    worst = lost[0]
+    findings.append(finding(
+        slide_no, "RENDER_CONTRAST", {**worst, "count": len(lost)}, RENDER_CONTRAST_MIN,
+        "The scene sets \"{}\" ({}) at {}:1 on its ground and the render shows it at {}:1{}: the file does not draw "
+        "the page the scene does. Read the build's readback for the slide - its background (CANVAS_COLOR) and the "
+        "colour of its type (TEXT_COLOR) - and repair the export; no change to the page's content closes it.".format(
+            worst["text"], worst["role"], worst["scene"], worst["ratio"],
+            ", with {} more runs like it".format(len(lost) - 1) if len(lost) > 1 else ""),
+    ))
 
 
 def void_origins(slide_no, scene_bands, render_bands, lost=()):
@@ -286,19 +361,21 @@ def void_causes(findings, origins):
     return marked, sorted(causes.values(), key=lambda c: (c["slide"], c["kind"]))
 
 
-def empty_page_gates(run, slide_no, slide, render_dir):
+def empty_page_gates(run, slide_no, slide, render_dir, grey=None):
     """The findings that say a content page is thin or half empty: HERO_EXHIBIT,
     the render's pixel gates when there is a render, THIN_PAGE and SCENE_VOID.
-    Each runs once a page; the deck count reads them all (`run.empties`)."""
+    Each runs once a page; the deck count reads them all (`run.empties`).
+    `grey` is the page's render as run_gates decoded it, once."""
     path = render_path(render_dir, slide_no) if render_dir else None
-    # The render decoded once; every pixel gate below reads this array.
-    grey = load_grey(path) if path is not None else None
+    if grey is None and path is not None:
+        grey = load_grey(path)
     # HERO_EXHIBIT once a page: its own finding, the deck count's, and
     # INK_COVERAGE's deference to a hero below.
     empty = []
     gate_hero_exhibit(slide_no, slide, empty, grey if grey is not None else path)
     if path is not None and (run.habit or any(run.wanted(c) for c in ("INK_COVERAGE", "DEAD_BAND", "INTERNAL_VOID", "COLUMN_VOID"))):
-        rows = ink_rows(grey) if grey is not None else load_ink_rows(path)
+        dark = dark_ground(slide)
+        rows = ink_rows(grey, dark=dark) if grey is not None else load_ink_rows(path, dark=dark)
         # No Pillow, no pixels: the renders cannot be measured, so the
         # pixel gates report nothing and the scene gates below still run.
         if rows is None:
@@ -338,13 +415,14 @@ def pixel_gates(slide_no, slide, path, grey, rows, hero, measured=None):
     # floor puts on the canvas, not the ink a chart page shows.
     text_page = not any(is_exhibit(c) for c in slide.get("componentInstances", []))
     pixels = []
-    surface = ink_matrix(grey, SURFACE_LUMINANCE) if grey is not None else None
-    occupied = surface.sum(axis=1).tolist() if surface is not None else load_ink_rows(path, SURFACE_LUMINANCE)
+    dark = dark_ground(slide)
+    surface = ink_matrix(grey, SURFACE_LUMINANCE, dark) if grey is not None else None
+    occupied = surface.sum(axis=1).tolist() if surface is not None else load_ink_rows(path, SURFACE_LUMINANCE, dark)
     inked = without_title_rule(rows, slide)
     if measured is not None:
         measured["bands"] = void_bands((occupied or inked)[:FOOTER_TOP])
     gate_ink_and_dead_band(slide_no, inked, pixels, occupied, text_page=text_page)
-    gate_column_void(slide_no, slide, surface if surface is not None else load_ink_matrix(path, SURFACE_LUMINANCE), pixels)
+    gate_column_void(slide_no, slide, surface if surface is not None else load_ink_matrix(path, SURFACE_LUMINANCE, dark), pixels)
     # A page carried by a qualifying hero exhibit is not empty, however thin
     # its marks (a line chart, a map): INK_COVERAGE then defers to the hero
     # and band gates.
