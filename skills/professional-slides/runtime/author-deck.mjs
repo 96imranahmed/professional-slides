@@ -28,7 +28,9 @@
 //                                                        moved since (SPINE_LOCKED) unless --reopen-spine is given
 //   node runtime/author-deck.mjs <id>.pages.json --check compile and gate; no deck is written (like every run it adds a
 //                                                        line to <id>.author-log.jsonl and may update the fit search's
-//                                                        cache, <id>.author-cache.json: both are safe to delete)
+//                                                        cache, <id>.author-cache.json, and the composer's and the
+//                                                        page gates' caches, <id>.compose-cache.json and
+//                                                        <id>.gate-cache.json: all are safe to delete)
 //   node runtime/author-deck.mjs <id>.pages.json --check --render
 //                                                        the final check before the build: the deck is emitted and
 //                                                        rendered in a temporary folder by the build's own stages and
@@ -40,6 +42,10 @@
 //                                                        or that one of them counts towards, their part in each deck
 //                                                        aggregate (the craft rates among them), and where the deck
 //                                                        stands; no deck is written; with --render, renders only them
+//   node runtime/author-deck.mjs <id>.pages.json --check --page <id>[,<id>...] --json
+//                                                        the same as one small object and nothing else: each page's
+//                                                        findings and repairs, advisories, budget and limits, and
+//                                                        the deck's verdict in a line
 //   node runtime/author-deck.mjs <id>.pages.json --plan  before the pages are written: the spine's structure rules on
 //                                                        what its pages declare, and a form and commentary placement
 //                                                        for each page that satisfies them as far as that goes - a
@@ -101,7 +107,7 @@ import { UsageError, isMain, parseCli, pythonBin, readJson, readJsonSync, runCli
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage } from "./page-types.mjs";
@@ -136,12 +142,12 @@ import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
 import { claimMarks, dependencyFindings, metricsOf, relationRepair, requiredCitations } from "./gates/dependency_gates.mjs";
 import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
-import { activeJudgements, addPending, loadJudgements, pendingFinding, withJudgements } from "./judgements.mjs";
+import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, pendingFinding, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
 import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, freeChoices, openKindsOf, shapeStructure, stubsOf } from "./deck-structure.mjs";
-import { FIT, fitSearch } from "./fit-search.mjs";
+import { FIT, fitLines, fitSearch } from "./fit-search.mjs";
 import { fillGuidance } from "./fill-guidance.mjs";
 import { briefOf, contributions, contributorsOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
 import { EVALUATION_MIN_PAGES, buildDeck, validateStageContract } from "./build-deck.mjs";
@@ -190,9 +196,11 @@ const COPY_CODES = /^TEXT_|^CONTENT_(?:ADDS_NOTHING|NO_HIGHLIGHT)$/;
  * fetched while authoring). Every page that fails to compose is reported in
  * the same run (compose-all.mjs), and the composed pages are what the content
  * plan's text and word floors are read from, so the author sees the numbers
- * the build will see.
+ * the build will see. `slideCache` is the composer's memory of the deck's
+ * slides (openComposeCache): a page whose planned slide is unchanged is read
+ * from it.
  */
-export async function composeForAuthoring(spec, baseDir) {
+export async function composeForAuthoring(spec, baseDir, { slideCache = null } = {}) {
   const copy = structuredClone(spec);
   await autoFillLogos(copy, baseDir, { hint: copy.playersHint, fetchMissing: false });
   await autoFillFlags(copy, baseDir, { fetchMissing: false });
@@ -200,7 +208,7 @@ export async function composeForAuthoring(spec, baseDir) {
   await autoFillPlaces(copy, baseDir, { fetchMissing: false });
   // Pages that fail to compose are set aside and reported; the rest are still
   // composed and checked, so one broken page does not hide every other finding.
-  try { const result = composeAll(copy, baseDir, { partial: true }); return { deck: result.deck, pageErrors: result.pageErrors ?? [] }; }
+  try { const result = composeAll(copy, baseDir, { partial: true, slideCache }); return { deck: result.deck, pageErrors: result.pageErrors ?? [] }; }
   catch (error) { return { error: `the deck does not compose - ${error.message}`, pageErrors: error.pageErrors }; }
 }
 
@@ -617,6 +625,12 @@ export function insightTypes(insights) {
   return Object.fromEntries([...(insights?.values() ?? [])].map((item) => [`${item.id} (${item.shape})`, typesForShape(item.shape).asking.join(", ") || `only the types that ask for no shape (${open.join(", ")})`]));
 }
 
+// The page gates' memory for a run of the command, `<id>.gate-cache.json` beside the pages file (page_gates.py
+// PageCache): every gate run it makes - the deck's, a draft's, the alternatives a search weighs - reads the pages
+// gated before. A writer's page check changes one page of a hundred, and gating all of them again took 3.3s of a
+// 5.4s check. Null outside the command, so a caller composing its own decks gates them afresh.
+let pageGateCache = null;
+
 /**
  * The build's own page gates, run on the composed deck in one pass: title
  * length, word ceilings, missing arguments, footer-heavy pages, flat shapes -
@@ -628,19 +642,23 @@ export function insightTypes(insights) {
  * recorded judgements without adding a question: for the trial pages a search
  * composes - a layout it weighs, a page padded to measure its fill, a draft's
  * placeholder copy - whose words are not the deck's, and whose questions no
- * reader should be given.
+ * reader should be given. `cache` is the file the gates keep each page's own
+ * results in (page_gates.py PageCache): a page gated before, unchanged, is
+ * read from it, and the deck's gates still read every page.
  */
-export function sceneGateFindings(deck, python = pythonBin(), spec = {}, { ask = true } = {}) {
+export function sceneGateFindings(deck, python = pythonBin(), spec = {}, { ask = true, cache = pageGateCache } = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "author-gates-"));
   try {
     const scene = path.join(dir, "scene.json"), out = path.join(dir, "gates.json"), budgetOut = path.join(dir, "budget.json");
-    writeFileSync(scene, JSON.stringify(deck));
+    // The deck's asset manifest is no gate's to read, and half the scene: the BA deck's was 6.5 of its 13MB.
+    writeFileSync(scene, JSON.stringify({ ...deck, manifest: undefined }));
     // A deck that records no version (absent, or null) is held to the current rules, so no flag is sent.
     const rules = [...(spec.workflow ? ["--workflow", String(spec.workflow)] : []), ...(spec.rulesVersion !== undefined && spec.rulesVersion !== null ? ["--rules-version", String(spec.rulesVersion)] : [])];
     // The gates that read a line's meaning read the run's judgements, and say which questions they found unanswered.
     const session = activeJudgements(), verdicts = path.join(dir, "judgements.json");
     if (session) writeFileSync(verdicts, JSON.stringify({ verdicts: Object.fromEntries(session.verdicts) }));
-    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out, "--budget-report", budgetOut, ...rules, ...(session ? ["--judgements", verdicts] : [])], { encoding: "utf8" });
+    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out, "--budget-report", budgetOut, ...rules, ...(session ? ["--judgements", verdicts] : []),
+      ...(cache ? ["--page-cache", cache] : [])], { encoding: "utf8" });
     if (run.error || ![0, 2].includes(run.status) || !existsSync(out))
       return { findings: [], advisories: [], all: [], standings: [], architectures: [], budget: [], ran: false, reason: String(run.error?.message ?? run.stderr ?? `exit ${run.status}`).trim().split("\n").slice(-3).join(" ") || `exit ${run.status}` };
     const report = readJsonSync(out);
@@ -876,7 +894,7 @@ function localFindings({ doc, structural, deck, spec, insights, uncomposed, unco
  * what advises, the content plan's findings apart (`contentReport`);
  * `blocking` and `advisories` hold every finding with its class.
  */
-export async function authorDeck(docIn, { baseDir, insights = null, draft = false, fit = !draft, fill = !draft, fitCap = FIT.perPage, fitCache = null, fitPages = null } = {}) {
+export async function authorDeck(docIn, { baseDir, insights = null, draft = false, fit = !draft, fill = !draft, fitCap = FIT.perPage, fitCache = null, fitPages = null, composeCache = null } = {}) {
   // A revision is read beside the inventory of the deck it was imported from: a picture the user's own deck embedded is
   // credited to that deck, and the slides it carries are checked against the slides the inventory holds (revision.mjs).
   const imported = docIn?.deck?.workflow === REVISION && typeof docIn.deck.inventory === "string" && baseDir ? readJsonSync(path.resolve(baseDir, docIn.deck.inventory), { optional: true }) : null;
@@ -902,7 +920,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   if (unread.length) spineFindings.push({ code: "SOURCE_NUMBERS_UNREAD", severity: "advisory", pages: unread.map((entry) => entry.id), measured: { insights: unread.length, measures: unread.flatMap((entry) => entry.measures.map((m) => `${entry.id}/${m}`)) },
     repair: `${unread.length} insight${unread.length === 1 ? " records" : "s record"} values its own source files do not print, or print with the other sign (${unread.slice(0, 6).map((entry) => `${entry.id}: ${entry.missing.slice(0, 3).join(", ")}`).join("; ")}${unread.length > 6 ? `; and ${unread.length - 6} more` : ""}). Open the file and check each: a slipped transcription is corrected in the log; a measure worked out from what the source prints - a share, a change, a spread - says how in \`computed\`; a number from another file names that file in the measure's own \`sources\`` });
   const { structural, declared, shaped, undrawn } = withStandIns(doc, spec, failed, insights, sourceKinds);
-  const composed = await composeForAuthoring(spec, baseDir);
+  const composed = await composeForAuthoring(spec, baseDir, { slideCache: composeCache });
   // A page the composer drew as two slides or more - a table past the rows one page holds at its densest setting - says so, and
   // why: the deck is a slide longer than its pages, each part repeats the title, and only the first carries the commentary.
   const splitInto = new Map();
@@ -1665,10 +1683,66 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
+const COMPOSE_CACHE_SCHEMA = "professional-slides.compose-cache/v1";
+
+/** The runtime's files by name, size and modification time: what a cache's key holds, so no entry is read under other code. */
+function runtimeStamp() {
+  const runtime = path.dirname(fileURLToPath(import.meta.url));
+  return [runtime, path.join(runtime, "gates")].flatMap((dir) => readdirSync(dir).filter((name) => /\.(mjs|py|json)$/.test(name)).sort().map((name) => { const at = statSync(path.join(dir, name)); return `${name}:${at.size}:${Math.round(at.mtimeMs)}`; }));
+}
+
+/**
+ * Every file under `dir` by path, size and modification time - a JSON file by its content, since the picture fill
+ * writes its `sources.json` again on every run, unchanged - and none where the folder does not exist.
+ */
+function folderStamp(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { recursive: true }).map(String).sort().map((name) => {
+    const file = path.join(dir, name), at = statSync(file);
+    return !at.isFile() ? name : name.endsWith(".json") ? `${name}:${digest(readFileSync(file, "utf8"))}` : `${name}:${at.size}:${Math.round(at.mtimeMs)}`;
+  });
+}
+
+/**
+ * The composer's memory, `<id>.compose-cache.json` beside the pages file: each
+ * slide the deck's composition compiled (core.mjs compileSlideAsWritten keys it
+ * by the slide as planned - its page, the layout the planner chose for it
+ * among its neighbours - its place, and the deck's tokens), under a key that
+ * also holds the runtime's files, the deck's own keys and the pictures and
+ * logos on disk. A page check edits one page of a hundred, and composing the
+ * other ninety-nine again took a second of it. Only the deck's own composition
+ * reads it, and the file keeps what the latest run composed: the alternatives
+ * a search weighs are not kept. Safe to delete.
+ */
+async function openComposeCache(file, { doc, baseDir }) {
+  const stored = await readJson(file, { optional: true }).catch(() => null);
+  const before = stored?.schema === COMPOSE_CACHE_SCHEMA && stored.slides && typeof stored.slides === "object" ? stored.slides : {};
+  const context = digest([runtimeStamp(), folderStamp(path.join(baseDir, "assets")), doc.deck ?? null]);
+  const keyOf = (key) => digest([context, key]);
+  // A slide is composed between `has` saying it is not held and `set`: what it asks of the deck's judgements meanwhile
+  // (a chart title's reading, a total row) is kept with it, and it is read again only while every answer stands.
+  const used = new Map();
+  let fresh = 0, stop = null;
+  const held = (at) => { const entry = used.get(at) ?? before[at]; return entry && typeof entry === "object" && entry.slide && answersStand(entry.asked) ? entry : null; };
+  return {
+    has: (key) => { stop?.(); stop = null; if (held(keyOf(key))) return true; stop = askingFrom(); return false; },
+    // The questions the slide asked, asked again: the run's pending questions are the ones composing it would leave.
+    get: (key) => { const at = keyOf(key), entry = held(at); used.set(at, entry); askAgain(entry.asked); return entry.slide; },
+    set: (key, slide) => { const asked = stop?.() ?? []; stop = null; used.set(keyOf(key), { slide, asked }); fresh += 1; },
+    // Written whole and renamed in only when something was composed, so a run that read every slide writes nothing.
+    async save() {
+      stop?.(); stop = null;
+      if (!fresh) return;
+      const tmp = `${file}.${process.pid}.tmp`;
+      await fs.writeFile(tmp, JSON.stringify({ schema: COMPOSE_CACHE_SCHEMA, note: "The composer's slides (author-deck.mjs). Safe to delete.", slides: Object.fromEntries(used) }));
+      await fs.rename(tmp, file);
+    },
+  };
+}
 
 /**
  * The fit search's memory, `<id>.author-cache.json` beside the pages file:
@@ -1682,8 +1756,7 @@ const CACHE_SCHEMA = "professional-slides.author-cache/v1";
 async function openFitCache(file, { doc, insights, fitCap }) {
   const stored = await readJson(file, { optional: true }).catch(() => null);
   const before = stored?.schema === CACHE_SCHEMA && stored.fits && typeof stored.fits === "object" ? stored.fits : {};
-  const runtime = path.dirname(fileURLToPath(import.meta.url));
-  const stamp = [runtime, path.join(runtime, "gates")].flatMap((dir) => readdirSync(dir).filter((name) => /\.(mjs|py|json)$/.test(name)).sort().map((name) => { const at = statSync(path.join(dir, name)); return `${name}:${at.size}:${Math.round(at.mtimeMs)}`; }));
+  const stamp = runtimeStamp();
   const pages = [...doc.pages, ...(doc.appendix || [])];
   // A recorded judgement can change what a page is refused for, so the verdicts are part of what a search's verdict rests on.
   const judged = [...(activeJudgements()?.verdicts ?? new Map())].map(([key, said]) => `${key}:${said?.verdict}`).sort();
@@ -2062,7 +2135,7 @@ async function main(argv) {
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
-    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" },
+    "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, "fetch-assets": { type: "boolean" }, json: { type: "boolean" },
     pending: { type: "string", valueName: "a file" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
@@ -2080,6 +2153,7 @@ async function main(argv) {
   // skill as a published budget or a better check (taste-review.md).
   const logPath = path.join(dir, `${stem}.author-log.jsonl`);
   const runs = readRunLog(logPath);
+  pageGateCache = path.join(dir, `${stem}.gate-cache.json`);
   // The rules that read what copy means ask it of the deck's recorded judgements (judgements.mjs), for the whole run.
   // `--pending <file>`: the questions this run found unanswered, written whatever the run's outcome, for judge.mjs to stage.
   const session = await loadJudgements(dir, stem);
@@ -2111,7 +2185,12 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];
-    const code = await planCommand(doc, { dir, stem, file, say, refusal, write: Boolean(values.write) });
+    // A plan writes nothing beside the pages file but its line of the run log, so its page gates keep their cache in a
+    // folder of the run's own: the gate runs within it - the placements weighed, the draft - still read what the others gated.
+    const scratch = mkdtempSync(path.join(os.tmpdir(), "author-plan-"));
+    pageGateCache = path.join(scratch, "gate-cache.json");
+    let code;
+    try { code = await planCommand(doc, { dir, stem, file, say, refusal, write: Boolean(values.write) }); } finally { rmSync(scratch, { recursive: true, force: true }); }
     await fs.appendFile(logPath, JSON.stringify({ at: new Date().toISOString(), run: runs.length + 1, v: RUN_LOG_VERSION, mode: PLAN_MODE, pages: doc.pages.length + (doc.appendix || []).length, ok: code === 0, findings: refusal }) + "\n");
     return code;
   }
@@ -2121,6 +2200,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   const known = new Set([...doc.pages, ...(doc.appendix || [])].map((page, index) => String(page?.id ?? `page-${index + 1}`)));
   const strangers = [...(named ?? [])].filter((id) => !known.has(id));
   if (named && (!named.size || strangers.length)) { console.error(named.size ? `No page ${strangers.map((id) => `"${id}"`).join(", ")} in ${path.basename(file)}; its pages are ${[...known].join(", ")}` : "--page names one or more page ids, comma-separated"); return 1; }
+  if (values.json && !named) { console.error("--json reports the pages a run names: --check --page <id>[,<id>...] --json"); return 1; }
   const fitCap = values["fit-cap"] === undefined ? FIT.perPage : Number(values["fit-cap"]);
   if (!Number.isInteger(fitCap) || fitCap < 0) { console.error("--fit-cap is the most alternatives the fit search composes for a page: a whole number, 0 to switch the search off"); return 1; }
   // Each entry says which run it was - a draft, a check, a full compile, or a page run (`--page`, with the pages it named) - whether it
@@ -2139,8 +2219,10 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     // wrong thing, are seen at the compile rather than after the build. The choice is the build's (fetch-pictures.mjs).
     if (values["fetch-assets"]) console.error(await fetchAssets(doc, { insights, baseDir: dir }));
     const fitCache = await openFitCache(path.join(dir, `${stem}.author-cache.json`), { doc, insights, fitCap });
-    compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named });
+    const composeCache = await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
+    compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named, composeCache });
     await fitCache.save();
+    await composeCache.save();
   } catch (error) {
     await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0], message })) });
     console.error(error.message); return 2;
@@ -2157,20 +2239,22 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (refusalRecord) console.error(`This compile raises, on the storyline the critique passed as ready, what only a change to that storyline mends and what the draft of the same pages passed (${refusalRecord.findings.map((f) => `${f.id}: ${f.code}`).join("; ")}): the runtime disagrees with itself. Mend those pages; \`node runtime/storyline.mjs\` then writes one verification pass for them that does not count against the critique's cap - once in a lineage, and only while no other page's argument changes.\n`);
   // The storyline as the critique closed it is held through the layout (storyline.mjs spineLock): a page whose argument moved
   // since is refused here, where the edit was made, unless the run means it (--reopen-spine) and takes the deck back to the critique.
+  // `--json` prints its one object and nothing else: what these notices say of the whole deck the whole-deck run says.
+  const notice = values.json ? () => {} : (text) => console.error(text);
   const lock = draft || values["reopen-spine"] ? null
     : await spineLock(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`) }).catch(() => null);
   const locked = lock ? spineLockFindings(lock) : [];
-  if (values["reopen-spine"] && !draft) console.error("--reopen-spine: the argument may change; every page whose argument moved goes back to the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) before delivery.\n");
+  if (values["reopen-spine"] && !draft) notice("--reopen-spine: the argument may change; every page whose argument moved goes back to the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) before delivery.\n");
   const revision = revisionStatement(spec, compiled.imported);
-  if (revision) console.error(`${revisionLine(revision)}\n`);
+  if (revision) notice(`${revisionLine(revision)}\n`);
   // Where a composed page is read as changed because the inventory cannot say otherwise, the run says so (review-passes.mjs unheldLine).
   const readAsChanged = revision ? revisionChanges(spec, compiled.imported) : null;
-  if (unheldLine(readAsChanged)) console.error(`${unheldLine(readAsChanged)}\n`);
+  if (unheldLine(readAsChanged)) notice(`${unheldLine(readAsChanged)}\n`);
   // The deck's network needs, on every run that has any, refused or not: read here, they are decided before the build.
-  if (compiled.assets) console.error(`${assetNotice(compiled.assets)}\n`);
+  if (compiled.assets) notice(`${assetNotice(compiled.assets)}\n`);
   // The page gates are the build's; when they cannot run here the author is
   // told so, rather than handed a clean run that checked nothing.
-  if (!pageGatesRan) console.error(`page gates did not run: ${pageGatesError || "no reason given"}\n  (the build runs them; \`node runtime/doctor.mjs\` finds a Python that can)\n`);
+  if (!pageGatesRan) notice(`page gates did not run: ${pageGatesError || "no reason given"}\n  (the build runs them; \`node runtime/doctor.mjs\` finds a Python that can)\n`);
   // The final check renders: the build's own stages, in a temporary folder, with their findings filed with the rest.
   const rendered = values.render && !draft ? await renderCheck(compiled, { dir, stem, named }) : null;
   // The alternatives the fit search passed are verified on the render too, so nothing is called verified that was not rendered.
@@ -2187,7 +2271,8 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   const standings = rendered?.standings?.length ? readStandings([...compiled.standings.filter((st) => !measured.has(st.code) && !(st.code === "DECK_SCENE_VOID" && measured.has("DECK_THIN_PAGES"))), ...rendered.standings]) : compiled.standings;
   // A page run answers for its pages: every blocking finding that names one of them - a claim two pages share names both -
   // and every aggregate one of them is counted in on the wrong side: a page holding a bare chart answers for the deck's bare charts.
-  const about = (f) => (f.class === "G" ? contributorsOf(f, standings, { parts: compiled.parts, rates: CRAFT_RATES }) : pagesOf(f)).some((id) => named.has(id));
+  const answering = (f) => (f.class === "G" ? contributorsOf(f, standings, { parts: compiled.parts, rates: CRAFT_RATES }) : pagesOf(f));
+  const about = (f) => answering(f).some((id) => named.has(id));
   const blocking = named ? everything.filter(about) : everything;
   const beyond = named ? everything.filter((f) => f.class === "S" && !about(f)) : [];
   const aggregatesBeyond = named ? everything.filter((f) => f.class === "G" && !about(f)) : [];
@@ -2221,6 +2306,12 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   ].join("\n\n");
   // The message is kept, so `--log` can say which limit keeps coming back.
   await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, class: f.class, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), ...(f.repair ?? f.reason ? { message: String(f.repair ?? f.reason).slice(0, 300) } : {}) })) });
+  // `--json`: the named pages' part of all of the above, and the deck's verdict in a line - the same findings, read compactly.
+  if (values.json) {
+    say(JSON.stringify(pageReport({ named, blocking, advice: advice.filter((f) => !f.waived?.imported), budget, doc, open,
+      concerns: (f, id) => answering(f).includes(id), elsewhere: beyond.length + aggregatesBeyond.length, unGated: pageGatesRan ? null : pageGatesError || "no reason given" })));
+    return blocking.length ? 2 : 0;
+  }
   if (blocking.length) {
     const counts = ["S", "P", "G"].map((cls) => [cls, blocking.filter((f) => f.class === cls).length]).filter(([, n]) => n).map(([cls, n]) => `${cls} ${n}`).join(", ");
     console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)} (${counts}):\n${findingsText(blocking, order)}\n\n${tail}`);
@@ -2397,6 +2488,69 @@ function pageBudgetLedger(budget, pageGateAdvisories, spec) {
       `${ink ? `, light: ink ~${(ink.measured * 100).toFixed(1)}% of the body (floor ${Math.round(ink.threshold * 100)}%) - keep the house surfaces on, set loose text as a table or cards, or pair the lone chart; not more words` : ""}`;
   });
   return ledger;
+}
+
+/**
+ * A limits block (limits.mjs pageLimits) as numbers alone: the codes that hold each limit and the notes that explain
+ * it are `--limits`'s to print. (A `note` that is an object is the page's note line, and its limits are kept.)
+ */
+function limitNumbers(value) {
+  if (Array.isArray(value)) return value.map(limitNumbers);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).filter(([key, inner]) => key !== "codes" && !(key === "note" && typeof inner === "string")).map(([key, inner]) => [key, limitNumbers(inner)])
+    .filter(([, inner]) => !(inner && typeof inner === "object" && !Array.isArray(inner) && !Object.keys(inner).length)));
+}
+
+/**
+ * The fit search's alternatives for a page (fit-search.mjs fitSearch) as `--json` gives them: the forms and placements
+ * that fit, those that fit by dropping content and what they drop, where none fits the content three more would
+ * need, and how many failed or were not tried. The finding's repair leads with the best of them, as the text does;
+ * the run without `--json` lists every alternative with why it failed.
+ */
+function alternativesOfFit(fit) {
+  const choice = (alt) => `${alt.form}/${alt.commentary}`;
+  return { pass: fit.pass.map(choice), ...(fit.partial?.length ? { dropping: fit.partial.map((alt) => ({ choice: choice(alt), drops: alt.drops })) } : {}),
+    ...(fit.needs.length && !fit.pass.length ? { needs: fit.needs.slice(0, 3).map((item) => ({ choices: item.choices.slice(0, 4).map(choice), needs: item.needs })) } : {}),
+    failed: fit.fail.length, untried: fit.untried.length };
+}
+
+/**
+ * A page run's report as one small object (`--json`): for each page named, the
+ * findings it answers for with their repairs, its own advisories, its budget -
+ * its body words against its floor and ceiling, and how much of the body it
+ * fills - and the limits its type, form and placement hold it to; and the
+ * deck's verdict in a line. A writer's check printed 24 to 61 thousand
+ * characters - the whole deck's standings and every page's budget - and the
+ * BA deck's writers searched it for their own page 205 times: this is what
+ * they searched for. `concerns(f, id)` says whether finding `f` is page `id`'s
+ * to answer, as the page run decides it.
+ */
+function pageReport({ named, blocking, advice, budget, doc, concerns, elsewhere, open, unGated = null }) {
+  const pages = new Map([...doc.pages, ...(doc.appendix || [])].map((page, index) => [String(page?.id ?? `page-${index + 1}`), page]));
+  const appendix = new Set((doc.appendix || []).map((page, index) => String(page?.id ?? `page-${doc.pages.length + index + 1}`)));
+  const shown = (f) => ({ code: f.code, class: f.class, ...(f.severity && f.severity !== "blocker" ? { severity: f.severity } : {}), ...(f.part ? { part: f.part } : {}),
+    ...(f.measured !== undefined ? { measured: f.measured } : {}), repair: `${fitLines(f.alternatives).lead}${f.repair ?? f.reason ?? ""}`,
+    ...(f.alternatives ? { alternatives: alternativesOfFit(f.alternatives) } : {}), ...(f.provisional ? { provisional: f.provisional } : {}), ...(f.partial ? { partial: f.partial } : {}) });
+  const budgetOf = (b) => ({ words: b.body, floor: Math.round(b.floor), ...(b.ceiling ? { ceiling: b.ceiling } : {}), task: b.readingTask,
+    ...(b.footer ? { footerShare: b.footerRatio } : {}),
+    fill: { internalVoid: b.internalVoid, deadBand: b.deadBand, void: b.void, ...(b.columnVoid ? { columnVoid: b.columnVoid } : {}),
+      roomLines: Object.fromEntries((b.columns || []).filter((c) => c.text).map((c) => [c.column, c.lines])) } });
+  const limitsOf = (id) => {
+    const page = pages.get(id);
+    if (!page?.type) return null;
+    try { return limitNumbers(pageLimits(page.type, page.form, { commentary: page.commentary, density: page.density ?? (appendix.has(id) ? "appendix" : doc.deck?.density) })); } catch { return null; }
+  };
+  const report = Object.fromEntries([...named].map((id) => {
+    const rows = budget.filter((b) => String(b.id ?? "") === id && b.floor).map(budgetOf), own = advice.filter((f) => pagesOf(f).includes(id));
+    return [id, { findings: blocking.filter((f) => concerns(f, id)).map(shown), ...(own.length ? { advisories: own.map(shown) } : {}),
+      budget: rows.length > 1 ? rows : rows[0] ?? null, limits: limitsOf(id) }];
+  }));
+  const counts = ["S", "P", "G"].map((cls) => [cls, blocking.filter((f) => f.class === cls).length]).filter(([, n]) => n).map(([cls, n]) => `${cls} ${n}`).join(", ");
+  const deck = [blocking.length ? `not ready: ${blocking.length} finding${blocking.length === 1 ? "" : "s"} on these pages to fix (${counts})` : "ready on these pages: nothing on them blocks",
+    elsewhere ? `${elsewhere} finding${elsewhere === 1 ? "" : "s"} elsewhere in the deck these pages are not in (the whole-deck run holds them)` : "nothing elsewhere in the deck blocks",
+    ...(unGated ? [`page gates did not run (${unGated}): nothing the build gates on the page was checked`] : []),
+    ...(open ? [`${open.measured.pending} question${open.measured.pending === 1 ? "" : "s"} of the copy open (JUDGEMENTS_PENDING): the rules that ask them did not hold`] : [])].join("; ");
+  return { ok: !blocking.length, deck, pages: report };
 }
 
 /** What a run reports of the deck it compiled: the type and commentary mix, the sequence, the structure drawn, the evidence plotted, and the advisories. */

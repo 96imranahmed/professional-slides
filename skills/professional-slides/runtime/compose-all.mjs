@@ -30,13 +30,17 @@ function withReadingTasks(result, spec) {
   return result;
 }
 
-/** `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page. */
-export function composeAll(spec, baseDir, { partial = false } = {}) {
+/**
+ * `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page.
+ * `slideCache` ({ has, get, set }) holds slides compiled before, by the slide as planned, its place and the deck's
+ * tokens (core.mjs compileSlideAsWritten): a page whose planned slide is unchanged is not compiled again.
+ */
+export function composeAll(spec, baseDir, { partial = false, slideCache = null } = {}) {
   const errors = [];
   let working = structuredClone(spec);
   for (let round = 0; round < 6; round += 1) {
     try {
-      const result = planDeck(toDeckPlan(structuredClone(working), baseDir));
+      const result = planDeck(toDeckPlan(structuredClone(working), baseDir), undefined, { slideCache });
       if (!errors.length) return withReadingTasks(result, working);
       // The pages that composed, for a caller that reports the failures and
       // still checks everything else in the same run.

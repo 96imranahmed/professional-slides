@@ -9,6 +9,7 @@ hero-exhibit area and the rest of GATE_CODES.
     page_gates.py scene.json render_dir/ [--report out.json] [--budget-report budget.json]
                   [--profile executive|pre-read|live-pitch]
                   [--workflow existing_deck_revision --rules-version N]
+    page_gates.py scene.json [...] --page-cache cache.json   (no render: unchanged pages read from the cache)
     page_gates.py scene.json --budget [--report budget.json]
     page_gates.py --thresholds-markdown
 
@@ -43,6 +44,7 @@ Conventions
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -126,10 +128,149 @@ class GateRun:
         return self.inks[key]
 
 
-def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
+PAGE_CACHE_SCHEMA = "professional-slides.page-gate-cache/v1"
+# The pages a cache file keeps beyond those its latest run read: the
+# alternatives a fit search weighed and the page as it stood an edit ago, so
+# a writer who undoes an edit, or a search that weighs the same alternative
+# again, is not gated afresh - and few enough that reading the file costs a
+# fraction of gating one page.
+PAGE_CACHE_SPARE = 300
+
+
+def rules_digest():
+    """The gates' own source and every contract they read, hashed: a page is
+    read from the cache only under the rules that gated it."""
+    here = Path(__file__).resolve().parent
+    digest = hashlib.sha256()
+    for path in sorted([*here.glob("*.py"), *here.glob("*.json"), *here.parent.glob("*.json"), here.parent / "emit" / "emit_pptx.py"]):
+        digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes())
+    return digest.hexdigest()
+
+
+class PageCache:
+    """Each page's own gate results from earlier runs, by what decides them.
+
+    A page's findings, the questions it asked, its empty-page findings for the
+    deck count, its estimated ink, its text blocks and its budget depend on
+    its scene, its place (a first page may be a cover) and the deck's settings
+    and rules, and on nothing else in the deck. A writer's page check changes
+    one page of a hundred, and the gates took 3.3s to read all of them again:
+    a page whose key is held is read from the file instead. Every deck-level
+    gate, standing and count is still read over every page, so the report is
+    the one a run without the cache writes. A cached page is read only while
+    each judgement it asked has the answer it had (judgements.replay)."""
+
+    def __init__(self, path, context):
+        self.path = Path(path)
+        self.context = context
+        try:
+            stored = json.loads(self.path.read_text(encoding="utf-8"))
+            entries = stored.get("entries") if isinstance(stored, dict) and stored.get("schema") == PAGE_CACHE_SCHEMA else None
+        except (OSError, ValueError):
+            entries = None
+        self.entries = entries if isinstance(entries, dict) else {}
+        # This run's records, by key, and each slide's key by its object.
+        self.used, self.keys = {}, {}
+        self.fresh = 0
+
+    def key(self, slide_no, slide):
+        if id(slide) not in self.keys:
+            text = json.dumps(slide, separators=(",", ":"), ensure_ascii=False)
+            self.keys[id(slide)] = hashlib.sha256(f"{self.context}|{slide_no}|{text}".encode("utf-8")).hexdigest()[:32]
+        return self.keys[id(slide)]
+
+    def replay(self, run, slide_no, slide):
+        """Add the page's cached findings to `run`, as gating it would: False where none is held."""
+        key = self.key(slide_no, slide)
+        record = self.entries.get(key)
+        if not isinstance(record, dict) or not judgements.replay(record.get("asked", [])):
+            return False
+        run.findings.extend(record["findings"])
+        run.empties.extend(record["empties"])
+        if record.get("ink") is not None:
+            run.inks[id(slide)] = record["ink"]
+        self.used[key] = record
+        return True
+
+    def start(self, run):
+        """Mark where the page's own findings begin, and record its questions."""
+        judgements.recording(True)
+        return len(run.findings), len(run.empties)
+
+    def keep(self, run, slide_no, slide, mark):
+        """The page's findings since `mark`, copied as they stand: a later gate never sees the cached ones change."""
+        asked = judgements.recording(False)
+        self.used[self.key(slide_no, slide)] = json.loads(json.dumps(
+            {"findings": run.findings[mark[0]:], "empties": run.empties[mark[1]:], "asked": asked}))
+        self.fresh += 1
+
+    def inked(self, run, slides):
+        """Each page's estimated ink, once the deck's gates have read it."""
+        for slide in slides:
+            record = self.used.get(self.keys.get(id(slide)))
+            if record is not None and id(slide) in run.inks and record.get("ink") is None:
+                record["ink"] = run.inks[id(slide)]
+                self.fresh += 1
+
+    def record_of(self, slide):
+        return self.used.get(self.keys.get(id(slide)))
+
+    def blocks(self, slide):
+        """scene_blocks, read from the page's record where it holds them."""
+        record = self.record_of(slide)
+        if record is None:
+            return scene_blocks(slide)
+        if "blocks" not in record:
+            record["blocks"] = scene_blocks(slide)
+            self.fresh += 1
+        return record["blocks"]
+
+    def budget(self, slide, measure):
+        """The page's budget line, read from its record where it holds it, else `measure()`."""
+        record = self.record_of(slide)
+        if record is None:
+            return measure()
+        if "budget" not in record:
+            record["budget"] = json.loads(json.dumps(measure()))
+            self.fresh += 1
+        return record["budget"]
+
+    def save(self):
+        """Write this run's records first, then the rest the file held, to PAGE_CACHE_SPARE more: the file never
+        grows past what a run and its neighbours read. Written whole and renamed in, so a reader never sees half."""
+        if not self.fresh:
+            return
+        kept = dict(self.used)
+        for key, record in self.entries.items():
+            if len(kept) >= len(self.used) + PAGE_CACHE_SPARE:
+                break
+            kept.setdefault(key, record)
+        tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
+        try:
+            tmp.write_text(json.dumps({"schema": PAGE_CACHE_SCHEMA, "entries": kept}, separators=(",", ":")), encoding="utf-8")
+            os.replace(tmp, self.path)
+        except OSError:
+            # A cache that cannot be written costs the next run its time, never its answer.
+            tmp.unlink(missing_ok=True)
+
+
+def page_cache_context(scene, profile=None, gates=None, deck=None):
+    """What every page's results rest on beyond its own scene: the rules, the deck's fill, weight and rules version,
+    the density profile and the codes reported."""
+    rules = deck if deck is not None else scene
+    return hashlib.sha256(json.dumps([rules_digest(), scene.get("fill"), scene.get("weight"), profile, sorted(gates or []),
+                                      (rules or {}).get("workflow"), (rules or {}).get("rulesVersion")], default=str).encode("utf-8")).hexdigest()
+
+
+def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None, cache=None):
     """The gate report for `scene`, its pixel gates read off `render_dir`.
     `deck` ({workflow, rulesVersion}, by default the scene's own) says which
-    rules the deck predates (configure_rules)."""
+    rules the deck predates (configure_rules). `cache` (PageCache) holds each
+    page's own results from earlier runs: a page found there is not gated
+    again, and the deck's gates read every page either way. A render is
+    measured afresh, so a run with one reads no cache."""
+    if render_dir or not judgements.answerable():
+        cache = None
     if profile is not None and profile not in PROFILES:
         raise ValueError(f"Unknown density profile: {profile}")
     fill = configure(scene.get("fill"), scene.get("weight"))
@@ -150,10 +291,15 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
         # is a list of attributions and no page gate has anything to say to it.
         if GENERATED_PAGE.match(str(slide.get("id") or "")):
             continue
-        if is_cover(slide, index):
+        cover = is_cover(slide, index)
+        if cover:
             covers.append(slide_no)
         else:
             content_indexes.append(index)
+        if cache is not None and cache.replay(run, slide_no, slide):
+            continue
+        mark = cache.start(run) if cache is not None else None
+        if not cover:
             # The render decoded once a content page; every pixel gate reads this array.
             path = render_path(render_dir, slide_no) if render_dir else None
             grey = load_grey(path) if path is not None else None
@@ -170,7 +316,11 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
             gate_type_range(slide_no, slide, run.findings, slide_profile)
         if run.wanted("NICE_TICKS"):
             gate_nice_ticks(slide_no, slide, run.findings)
+        if cache is not None:
+            cache.keep(run, slide_no, slide, mark)
     deck_level_gates(run, slides, content_indexes, fill, rendered=bool(render_dir) and not run.skipped_pixel_gates)
+    if cache is not None:
+        cache.inked(run, slides)
 
     by_code = {}
     for item in run.findings:
@@ -195,7 +345,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None):
         # Where the deck stands against every deck-level rule, broken or not (gate_config.standing). The one rule only a
         # render measures on the page's text - the words a block (density_profile.py) - is estimated from the scene
         # until there is a render, and says so.
-        "standings": [*STANDINGS, *([] if render_dir else scene_fragmentation(scene)["standings"])],
+        "standings": [*STANDINGS, *([] if render_dir else scene_fragmentation(scene, cache.blocks if cache is not None else scene_blocks)["standings"])],
         # Each content page's architecture as PAGE_SHAPE_FLAT reads it, for the author's deck-structure report.
         "architectures": [{"slide": index + 1, "id": slides[index].get("sourceSlideId") or slides[index].get("id"),
                            "architecture": page_architecture(slides[index])} for index in content_indexes],
@@ -604,7 +754,7 @@ def column_room(slide, mask, line):
     return out
 
 
-def page_budget(scene, profile=None):
+def page_budget(scene, profile=None, cache=None):
     """Each content page's word and space budget, for the author to write to.
 
     The gates say what a page got wrong after it is composed; the author needs
@@ -627,40 +777,47 @@ def page_budget(scene, profile=None):
         slide_profile = profile or slide.get("density") or DEFAULT_PROFILE
         if slide_profile not in PROFILES:
             raise ValueError(f"Unknown density profile: {slide_profile}")
-        _band_body, footer, ratio = footer_share(slide)
-        mask = scene_mask(slide)
-        bands, void = scene_void(slide, mask)
-        column = void if void and "column" in void else None
-        line = body_line(slide)
-        out.append({
-            "slide": index + 1,
-            "id": slide.get("id"),
-            "readingTask": slide.get("readingTask"),
-            # The page's text blocks as the render will read them, estimated from the scene (density_profile.scene_blocks):
-            # what the page adds to the deck's median words a block (TEXT_FRAGMENTED), and whether it carries prose.
-            "blocks": (lambda blocks: {"count": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0,
-                                       "prose": prose_blocks(blocks)})(scene_blocks(slide)),
-            "body": body_words(slide),
-            "floor": body_floor(slide),
-            "ceiling": words_limit(slide, slide_profile),
-            "footer": footer,
-            "footerRatio": round(ratio, 3) if ratio is not None else 0.0,
-            # SCENE_VOID's own decision (scene_void), so a "!" on the budget
-            # line and the advisory are the same finding.
-            "internalVoid": round(bands["internalVoid"], 3),
-            "deadBand": round(bands["deadBand"], 3),
-            "void": void is not None,
-            # A column's band the page's rows cannot see (column_bands, which
-            # SCENE_VOID also reads): which column, its share of the column's
-            # own height, and where it runs.
-            "columnVoid": {"column": column["name"], "band": round(column["band"], 3),
-                           "from": column["from"], "to": column["to"]} if column else None,
-            # The room at the foot of each column, and the height of a body
-            # line to count it in (column_room).
-            "line": line,
-            "columns": column_room(slide, mask, line),
-        })
+        # A page an earlier run measured, under the same rules and in the same place, is read from the cache.
+        out.append(cache.budget(slide, lambda: page_budget_line(index, slide, slide_profile, cache)) if cache is not None
+                   else page_budget_line(index, slide, slide_profile))
     return out
+
+
+def page_budget_line(index, slide, slide_profile, cache=None):
+    """One content page's budget (page_budget), `index` its place in the deck."""
+    _band_body, footer, ratio = footer_share(slide)
+    mask = scene_mask(slide)
+    bands, void = scene_void(slide, mask)
+    column = void if void and "column" in void else None
+    line = body_line(slide)
+    # The page's text blocks as the render will read them, estimated from the scene (density_profile.scene_blocks):
+    # what the page adds to the deck's median words a block (TEXT_FRAGMENTED), and whether it carries prose.
+    blocks = cache.blocks(slide) if cache is not None else scene_blocks(slide)
+    return {
+        "slide": index + 1,
+        "id": slide.get("id"),
+        "readingTask": slide.get("readingTask"),
+        "blocks": {"count": len(blocks), "wordsPerBlock": round(sum(blocks) / len(blocks), 1) if blocks else 0, "prose": prose_blocks(blocks)},
+        "body": body_words(slide),
+        "floor": body_floor(slide),
+        "ceiling": words_limit(slide, slide_profile),
+        "footer": footer,
+        "footerRatio": round(ratio, 3) if ratio is not None else 0.0,
+        # SCENE_VOID's own decision (scene_void), so a "!" on the budget
+        # line and the advisory are the same finding.
+        "internalVoid": round(bands["internalVoid"], 3),
+        "deadBand": round(bands["deadBand"], 3),
+        "void": void is not None,
+        # A column's band the page's rows cannot see (column_bands, which
+        # SCENE_VOID also reads): which column, its share of the column's
+        # own height, and where it runs.
+        "columnVoid": {"column": column["name"], "band": round(column["band"], 3),
+                       "from": column["from"], "to": column["to"]} if column else None,
+        # The room at the foot of each column, and the height of a body
+        # line to count it in (column_room).
+        "line": line,
+        "columns": column_room(slide, mask, line),
+    }
 
 
 def _share(value):
@@ -779,6 +936,10 @@ def main(argv=None):
     parser.add_argument("--judgements", default=None,
                         help="The deck's recorded judgements (<id>.judgements.json): the gates that read a line's meaning hold "
                              "only where it is answered, and list what is not in the report's `judgementsNeeded`")
+    parser.add_argument("--page-cache", default=None,
+                        help="A file of each page's own results from earlier runs (PageCache): a page whose scene, place and "
+                             "rules are unchanged is read from it rather than gated again, and the deck's gates still read "
+                             "every page. Written back after the run; safe to delete; never read with a render")
     args = parser.parse_args(argv)
 
     if args.thresholds_markdown:
@@ -793,11 +954,14 @@ def main(argv=None):
     gates = {c.strip() for c in args.only.split(",")} if args.only else None
     deck = {"workflow": args.workflow, "rulesVersion": args.rules_version} if args.workflow or args.rules_version is not None else None
     judgements.load(args.judgements)
-    report = run_gates(scene, args.render_dir, args.profile, gates, deck)
+    cache = PageCache(args.page_cache, page_cache_context(scene, args.profile, gates, deck)) if args.page_cache and not args.render_dir else None
+    report = run_gates(scene, args.render_dir, args.profile, gates, deck, cache)
     report["judgementsNeeded"] = judgements.needed()
     write_json(report, args.report)
     if args.budget_report:
-        write_json(page_budget(scene, args.profile), args.budget_report)
+        write_json(page_budget(scene, args.profile, cache), args.budget_report)
+    if cache is not None:
+        cache.save()
     counts = ", ".join(f"{k}={v}" for k, v in report["countsByCode"].items()) or "none"
     print(f"page gates: {'accepted' if report['accepted'] else 'REJECTED'} | {counts}", file=sys.stderr)
     return 0 if report["accepted"] else 2

@@ -22,6 +22,10 @@ _VERDICTS: dict = {}
 _PENDING: dict = {}
 _ACTIVE = False
 _ORACLE = None
+# While page_gates gates one page for its page cache: every question the page
+# asked, in order, with the answer it was given, so a later run can read the
+# page from the cache only while each answer still stands (replay).
+_ASKED = None
 
 
 def canonical(value) -> str:
@@ -64,6 +68,9 @@ def judged(kind: str, subject, context=None, where=None):
     said = _ORACLE(kind, subject, context) if _ORACLE else None
     if said:
         return {"verdict": said} if isinstance(said, str) else said
+    if _ASKED is not None:
+        _ASKED.append({"key": key, "kind": kind, "subject": subject, "context": context, "where": where,
+                       "known": key in _VERDICTS, "said": _VERDICTS.get(key)})
     if key in _VERDICTS:
         return _VERDICTS[key]
     entry = _PENDING.setdefault(key, {"kind": kind, "subject": subject, "context": context, "where": []})
@@ -81,6 +88,33 @@ def verdict_of(kind: str, subject, context=None, where=None):
 def needed() -> list:
     """The questions met with no recorded answer, for the report."""
     return list(_PENDING.values())
+
+
+def recording(on: bool = True) -> list:
+    """Start recording the questions asked (`on`), or stop; returns those recorded since the last start."""
+    global _ASKED
+    asked, _ASKED = _ASKED or [], ([] if on else None)
+    return asked
+
+
+def answerable() -> bool:
+    """Whether a page's questions can be recorded and asked again: the recorded judgements are read, and no test oracle
+    answers in their place (an oracle's answers are not the file's, so no cached page is read under one)."""
+    return _ACTIVE and _ORACLE is None
+
+
+def replay(asked: list) -> bool:
+    """Ask again what a cached page asked (`recording`): False, asking nothing, where a recorded answer has changed since -
+    a question answered or its answer revised - so the page is gated again; else True, with each question still
+    unanswered pending again with where it was met, as asking it would have left it."""
+    if any((q["key"] in _VERDICTS) != q["known"] or (q["known"] and _VERDICTS[q["key"]] != q["said"]) for q in asked):
+        return False
+    for q in asked:
+        if not q["known"]:
+            entry = _PENDING.setdefault(q["key"], {"kind": q["kind"], "subject": q["subject"], "context": q["context"], "where": []})
+            if q["where"] is not None and str(q["where"]) not in entry["where"]:
+                entry["where"].append(str(q["where"]))
+    return True
 
 
 def unload() -> None:
