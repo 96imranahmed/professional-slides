@@ -17,7 +17,7 @@ import { DECK_LENGTH, PLAN } from "./weight.mjs";
 import { exhibitKinds, fitStandings, varietyFindings } from "./gates/variety_gates.mjs";
 import { drawOrder, formDraw, kindOfForm, pageFit, otherTypes, sharedKinds } from "./claim-fit.mjs";
 import { featuredDraw } from "./design-systems.mjs";
-import { runPlanGates, styleEntropy } from "./gates/plan_gates.mjs";
+import { architecture, planBlockers, runPlanGates, styleEntropy } from "./gates/plan_gates.mjs";
 import { classOf, standingRoom } from "./gates/gate_classes.mjs";
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
@@ -91,8 +91,18 @@ export function shapeVariety(shapes) {
   const counts = new Map();
   for (const shape of shapes) counts.set(shape, (counts.get(shape) || 0) + 1);
   const window = Math.min(10, shapes.length), windows = shapes.length - window + 1;
+  // The window slides a page at a time, its distinct shapes counted as it goes: a structure search reads this for every
+  // candidate deck, and a set built afresh for each of a hundred windows was a tenth of the search.
+  const inWindow = new Map();
+  const enter = (shape) => inWindow.set(shape, (inWindow.get(shape) ?? 0) + 1);
+  const leave = (shape) => { const left = inWindow.get(shape) - 1; if (left) inWindow.set(shape, left); else inWindow.delete(shape); };
+  for (let at = 0; at < window - 1; at += 1) enter(shapes[at]);
   let total = 0;
-  for (let at = 0; at < windows; at += 1) total += (new Set(shapes.slice(at, at + window)).size * 10) / window;
+  for (let at = 0; at < windows; at += 1) {
+    if (window) enter(shapes[at + window - 1]);
+    total += (inWindow.size * 10) / window;
+    if (window) leave(shapes[at]);
+  }
   const [commonest, count] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
   return { perTen: windows > 0 ? total / windows : 0, commonest, count, pages: shapes.length };
 }
@@ -132,9 +142,11 @@ export function shapeStructure(pages, { airy = false } = {}) {
  * declared slides: the variety contract and the plan record's gates, with
  * where the deck stands against each. `planOf` builds the plan record
  * (author-deck.mjs); findings of other classes the two raise come back too,
- * for the caller to file.
+ * for the caller to file. `weighing` asks only what a search weighs a deck by
+ * (structureCost): the standings and the blocking findings of the structure
+ * class, the plan's advisories left unread (plan_gates.mjs planBlockers).
  */
-export function declaredStructure(spec, { planOf, insights = undefined, sourceKinds = null, memo = null }) {
+export function declaredStructure(spec, { planOf, insights = undefined, sourceKinds = null, memo = null, weighing = false }) {
   const standings = [];
   // `memo` is a structure search's: the page objects it swaps in and out are read once each, however often the deck is read.
   const structureOfSlide = memo ? (slide) => { if (!memo.structures.has(slide)) memo.structures.set(slide, structureOf(slide)); return memo.structures.get(slide); } : structureOf;
@@ -146,9 +158,9 @@ export function declaredStructure(spec, { planOf, insights = undefined, sourceKi
   standings.push(...fit.standings);
   variety.push(...fit.findings);
   const plan = planOf(spec, memo ? { records: memo.records } : undefined);
-  const report = runPlanGates(plan, { deck: spec, reads: memo?.reads });
+  const report = weighing ? { findings: planBlockers(plan, { deck: spec, reads: memo?.reads, shapes: memo?.shapes }) } : runPlanGates(plan, { deck: spec, reads: memo?.reads });
   const content = plan.pages.filter((page) => !page.kind || page.kind === "content");
-  const entropy = styleEntropy(content);
+  const entropy = memo ? styleEntropy(content, (page) => { if (!memo.shapes.has(page)) memo.shapes.set(page, architecture(page)); return memo.shapes.get(page); }) : styleEntropy(content);
   if (entropy.declared && entropy.pages) {
     const [commonest, count] = [...entropy.counts].sort((a, b) => b[1] - a[1])[0];
     const applies = content.length >= DECK_LENGTH.plan;
@@ -576,12 +588,15 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     return { ...doc.deck, slides, ...(appendix.length ? { appendix } : {}) };
   };
   // The search reads the deck tens of thousands of times with one page swapped: each page object's reads are kept for the search.
-  const memo = { structures: new WeakMap(), tables: new WeakMap(), records: new WeakMap(), reads: new WeakMap() };
-  const evaluate = (override = null) => {
+  const memo = { structures: new WeakMap(), tables: new WeakMap(), records: new WeakMap(), reads: new WeakMap(), shapes: new WeakMap(), architectures: new WeakMap(),
+    families: new WeakMap(), kinds: new WeakMap(), marks: new WeakMap(), players: new WeakMap() };
+  const architectureOf = (slide) => { if (!memo.architectures.has(slide)) memo.architectures.set(slide, declaredArchitecture(slide)); return memo.architectures.get(slide); };
+  // `weighing`: a candidate the search only weighs (structureCost), read for its standings and structure blockers alone.
+  const evaluate = (override = null, weighing = false) => {
     evaluations += 1;
     const spec = specOf(override), slides = spec.slides, appendix = spec.appendix ?? [];
-    const declared = declaredStructure(spec, { planOf, memo });
-    const shape = shapeStructure([...slides, ...appendix].filter((slide) => slide.pageType).map((slide) => ({ id: slide.id, architecture: declaredArchitecture(slide) })),
+    const declared = declaredStructure(spec, { planOf, memo, weighing });
+    const shape = shapeStructure([...slides, ...appendix].filter((slide) => slide.pageType).map((slide) => ({ id: slide.id, architecture: architectureOf(slide) })),
       { airy: resolveFill(spec) === "airy" });
     // The deck's median words a block under these choices, where the caller read each page's off its scene (`blocksOf`: the
     // page as its copy is written, never a stand-in for copy to come): it steers the free choices and never refuses a plan -
@@ -593,6 +608,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
       applies: true, blocks: false, estimated: "read from the scene of the pages as their copy is written, the way --check reads it; the render measures it", tolerance: BLOCKS.tolerance, each: Object.fromEntries(read.map(([entry, blocks]) => [String(entry.page.id ?? `page-${entry.index + 1}`), blocks.wordsPerBlock])) })) : [];
     return { findings: [...declared.findings, ...shape.findings], standings: [...declared.standings, ...shape.standings, ...estimate] };
   };
+  const weigh = (override) => structureCost(evaluate(override, true));
   const typed = entries.filter((entry) => !entry.fixed);
   const before = evaluate();
   // Each open page in turn takes the choice that leaves the cost lowest. Where its choices are forms that carry its claim
@@ -606,7 +622,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
   const settle = (entry) => { for (const kind of kindsUnder(entry, entry.choice)) decided.set(kind, (decided.get(kind) ?? 0) + 1); };
   typed.filter((e) => e.declared).forEach(settle);
   for (const entry of typed.filter((e) => !e.declared)) {
-    const weighed = entry.options.map((choice) => ({ choice, cost: structureCost(evaluate({ entry, choice })),
+    const weighed = entry.options.map((choice) => ({ choice, cost: weigh({ entry, choice }),
       spread: entry.fitted && !revision ? kindsUnder(entry, choice).reduce((sum, kind) => sum + (decided.get(kind) ?? 0), 0) : 0 }));
     // The rules first, then the deck's draw (claim-fit.mjs drawOrder), then the room under the caps. What told the form from the
     // others it could have taken is the first thing it and the strongest of them differ on.
@@ -640,7 +656,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
         // A form chosen among equals by the spread and the draw is changed to mend a broken rule, never for room alone:
         // room is made with placements, or the seed's choices would be undone wherever a rule sat at its bar.
         if (!broken && entry.fitted && choice.form !== entry.choice.form) continue;
-        const next = structureCost(evaluate({ entry, choice }));
+        const next = weigh({ entry, choice });
         if (free ? cheaper(next, best?.cost ?? cost) : cheaper(held(next), held(best?.cost ?? cost))) best = { entry, choice, cost: next };
       }
       if (best) break;
@@ -653,14 +669,14 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
       const counted = new Set(current.standings.filter((standing) => standing.blocks && ["over", "short"].includes(standingRoom(standing).state)).flatMap((standing) => standing.pages ?? []).map(String));
       pairs: for (const entry of open.filter((e) => counted.has(String(e.page.id ?? `page-${e.index + 1}`)))) for (const choice of sameFormFirst(entry, entry.options)) {
         if (choice.form === entry.choice.form && choice.commentary === entry.choice.commentary) continue;
-        const moved = structureCost(evaluate({ entry, choice }));
+        const moved = weigh({ entry, choice });
         if (moved.blockers > cost.blockers || moved.lacking > cost.lacking + 1e-9 || evaluations >= maxEvaluations) continue;
         const kept = entry.choice;
         entry.choice = choice;
         seconds: for (const other of open) for (const next of sameFormFirst(other, other.options)) {
           if (evaluations >= maxEvaluations) break seconds;
           if (other === entry || (next.form === other.choice.form && next.commentary === other.choice.commentary)) continue;
-          const after = structureCost(evaluate({ entry: other, choice: next }));
+          const after = weigh({ entry: other, choice: next });
           if (cheaper(after, best?.cost ?? cost)) best = { entry: other, choice: next, cost: after, first: { entry, choice } };
         }
         entry.choice = kept;

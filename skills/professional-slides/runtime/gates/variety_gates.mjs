@@ -203,6 +203,9 @@ export function structureMix(slides, { drawnOf } = {}) {
 
 const isContent = (slide) => (!slide.kind || slide.kind === "content" || slide.kind === "statement" || slide.kind === "takeaways") && slide.title !== undefined;
 const share = (n, of) => Math.round((n / of) * 100) / 100;
+// What a page object reads as, kept in `cache` (a structure search's memo, deck-structure.mjs allocateStructure): the search
+// swaps the same page objects in and out of the deck tens of thousands of times, and none is changed while it runs.
+const once = (cache, key, read) => { if (!cache.has(key)) cache.set(key, read()); return cache.get(key); };
 
 // The evidence families, by exhibit type. One vocabulary for the plan, which
 // names an exhibit per page (plan_gates.mjs family), and for the compiled
@@ -266,11 +269,13 @@ export const exhibitKinds = (slide) => {
  * the pages in it, and the distinct exhibits per ten pages. Printed in the
  * author's summary and read by the two rules below.
  */
-export function exhibitMix(slides) {
+export function exhibitMix(slides, memo = null) {
   const content = slides.filter(isContent);
+  const familyOf = memo ? (s) => once(memo.families, s, () => pageFamily(s)) : pageFamily;
+  const kindsOf = memo ? (s) => once(memo.kinds, s, () => exhibitKinds(s)) : exhibitKinds;
   const families = {};
-  for (const s of content) (families[pageFamily(s)] ??= []).push(s.id ?? null);
-  const kinds = new Set(content.flatMap(exhibitKinds));
+  for (const s of content) (families[familyOf(s)] ??= []).push(s.id ?? null);
+  const kinds = new Set(content.flatMap((s) => kindsOf(s)));
   return { pages: content.length, families: Object.fromEntries(Object.entries(families).map(([f, ids]) => [f, { pages: ids.length, share: share(ids.length, content.length || 1), ids }])),
     distinct: kinds.size, perTen: content.length ? Math.round((kinds.size / content.length) * 1000) / 100 : 0, kinds: [...kinds].sort() };
 }
@@ -470,7 +475,7 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [], memo = n
       "sees one layout repeated. Go back to what each has to show and draw the pages that are not one exhibit as what they are: " +
       `${redraws()}. A deck's rhythm comes from pages that ask the reader to do different things.`, ids);
   }
-  findings.push(...mixFindings(slides, stand));
+  findings.push(...mixFindings(slides, stand, memo));
   findings.push(...reviewedDeckFindings(spec, slides, stand, memo));
   return findings;
 }
@@ -480,10 +485,10 @@ function contractFindings(spec, { structureOf, drawnOf, standings = [], memo = n
  * `plan.mixEnforced` names, and the exhibit range floor, on the compiled
  * pages. The deck is already long enough to judge (VARIETY.from).
  */
-function mixFindings(slides, stand) {
+function mixFindings(slides, stand, memo = null) {
   const findings = [];
   const block = (code, measured, threshold, repair, pages = null, rule = null) => findings.push({ slide: pages, code, ...(rule ? { rule } : {}), severity: "blocker", measured, threshold, repair });
-  const mix = exhibitMix(slides);
+  const mix = exhibitMix(slides, memo);
   for (const band of PLAN.mixEnforced.bands) {
     const [family, side] = band.split(".");
     const limit = PLAN.mix[family]?.[side];
@@ -629,7 +634,7 @@ export function tableConstruction(slide) {
 function reviewedDeckFindings(spec, slides, stand, memo = null) {
   const findings = [];
   // A structure search reads one deck thousands of times, each page in ten windows: within it a page's construction is read once.
-  const constructionOf = memo ? (slide) => { if (!memo.tables.has(slide)) memo.tables.set(slide, tableConstruction(slide)); return memo.tables.get(slide); } : tableConstruction;
+  const constructionOf = memo ? (slide) => once(memo.tables, slide, () => tableConstruction(slide)) : tableConstruction;
   const block = (code, measured, threshold, repair, pages = null) => findings.push({ slide: pages, code, severity: "blocker", measured, threshold, repair });
   const analytical = slides.filter((s) => s.pageType && !["statement", "summary"].includes(s.pageType.type));
   // Table monotony: the worst window of ten analytical pages.
@@ -651,10 +656,13 @@ function reviewedDeckFindings(spec, slides, stand, memo = null) {
 
   // Identity: the entities the deck declares it compares, each shown early by the mark it declares. Only a declaration
   // counts: names that recur in the titles are not taken for players, since which names a deck compares is the deck's to say.
-  const entities = playerEntries(spec.players);
+  // Within a structure search the players and each early page's marks are read once: walking a page for its marks was a sixth of the search.
+  const entities = memo && spec.players && typeof spec.players === "object" ? once(memo.players, spec.players, () => playerEntries(spec.players)) : playerEntries(spec.players);
+  const marksOf = (page) => { const kept = memo?.marks.get(page); if (kept && kept.players === spec.players) return kept.found;
+    const found = introducedOn(page, spec.players); memo?.marks.set(page, { players: spec.players, found }); return found; };
   if (entities.length >= 2) {
     const early = [spec.cover, ...analytical.slice(0, REVIEWED.earlyPages)].filter(Boolean);
-    const shown = new Set(early.flatMap((page) => [...introducedOn(page, spec.players)]));
+    const shown = new Set(early.flatMap((page) => [...marksOf(page)]));
     const named = entities.map((entity) => entity.name), unmarked = entities.filter((entity) => !shown.has(entity.name));
     stand("PLAYERS_UNMARKED", `declared players with no mark of their kind (logo, outline, photograph) on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
     if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked: unmarked.map((entity) => entity.name), marks: Object.fromEntries(unmarked.map((entity) => [entity.name, entity.kind])), pages: early.map((p) => p.id ?? "cover") }, 0,
