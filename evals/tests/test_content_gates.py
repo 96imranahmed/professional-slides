@@ -27,7 +27,9 @@ decides the neighborhood" a hedge.
 
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -36,7 +38,7 @@ GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
 sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 from node_probe import example_scene  # noqa: E402
-from judgement_oracle import answering  # noqa: E402
+from judgement_oracle import answering, judgements  # noqa: E402
 
 
 def text(role, body, **data):
@@ -110,9 +112,9 @@ class TwinCellTests(unittest.TestCase):
 
 class RestatementTests(unittest.TestCase):
     """The commentary reads the exhibit back to the reader. Whether a line
-    does is read (commentary-restates): the exhibit's words, its callouts and
-    the commentary's lines go to a reader, and the lines it names are the
-    finding."""
+    does is read (commentary-restates): each line goes to a reader against the
+    exhibit's words and its callouts, with the page's commentary beside it, and
+    the lines it says read the exhibit back are the finding."""
 
     EXHIBIT = table([
         ["Prior sequence", "Marvel describes Endgame as the conclusion to a 22-film sequence"],
@@ -127,19 +129,52 @@ class RestatementTests(unittest.TestCase):
 
     @staticmethod
     def reader(subject, context):
-        """Names each line whose words are an exhibit cell's, as a reader would."""
-        cells = {t.rstrip(".") for t in subject["exhibit"]}
-        back = [line["id"] for line in subject["lines"] if line["text"].rstrip(".") in cells]
-        return {"verdict": "restates", "lines": back} if back else "adds"
+        """Says a line restates where its words are an exhibit cell's, as a reader would."""
+        return "restates" if subject.rstrip(".") in {t.rstrip(".") for t in context["exhibit"]} else "adds"
 
-    def test_the_exhibit_and_each_line_are_put_to_the_reader(self):
-        with answering({"commentary-restates": self.reader}) as asked:
-            run(page_gates.gate_restatement, 35, page(self.EXHIBIT + self.OWN + [self.BACK]))
-        [(kind, subject)] = asked
-        self.assertEqual(kind, "commentary-restates")
-        self.assertIn("Story mechanism", subject["exhibit"])
-        self.assertEqual([line["id"] for line in subject["lines"]], ["c1", "c2", "c3"])
-        self.assertEqual(subject["callouts"], [])
+    @staticmethod
+    def asked_of(slide):
+        """The questions the gate asks of a page, with what each is read against: none is answered."""
+        judgements.load()
+        try:
+            run(page_gates.gate_restatement, 35, slide)
+            return judgements.needed()
+        finally:
+            judgements.unload()
+
+    def test_each_line_is_put_to_the_reader_against_the_exhibit_with_the_page_beside_it(self):
+        said = [node["text"] for node in self.OWN + [self.BACK]]
+        asked = self.asked_of(page(self.EXHIBIT + self.OWN + [self.BACK]))
+        self.assertEqual([(q["kind"], q["subject"]) for q in asked], [("commentary-restates", line) for line in said])
+        self.assertIn("Story mechanism", asked[0]["context"]["exhibit"])
+        self.assertEqual(asked[0]["context"]["callouts"], [])
+        self.assertTrue(all(q["beside"] == {"commentary": said} for q in asked))
+
+    def test_a_line_rewritten_leaves_its_neighbours_verdicts_standing(self):
+        """BA v2: the commentary was one question per page, keyed by the whole block. Rewriting one line re-asked the
+        page, and a second fresh reader then flagged lines the first had passed - the copy took six judge rounds. Each
+        line is its own question now: the page beside it is shown and not keyed, so a rewritten line is the only one
+        asked again, and the line that reads the table back stays reported on the verdict it was given."""
+        slide = page(self.EXHIBIT + self.OWN + [self.BACK])
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp, "deck.judgements.json")
+            verdicts = {judgements.judgement_key(q["kind"], q["subject"], q["context"]): {
+                "kind": q["kind"], "version": 2, "verdict": self.reader(q["subject"], q["context"]), "reason": "As a reader would.", "subject": q["subject"]}
+                for q in self.asked_of(slide)}
+            store.write_text(json.dumps({"verdicts": verdicts}))
+            rewritten = page(self.EXHIBIT + [text("list-item", "Twenty-two films of prior investment is a toll every newcomer pays at the door.")]
+                             + self.OWN[1:] + [self.BACK])
+            judgements.load(store)
+            try:
+                before = run(page_gates.gate_restatement, 35, slide)
+                after = run(page_gates.gate_restatement, 35, rewritten)
+                asked_again = [q["subject"] for q in judgements.needed()]
+            finally:
+                judgements.unload()
+        self.assertEqual([f["code"] for f in before], ["RESTATEMENT"])
+        self.assertEqual(asked_again, ["Twenty-two films of prior investment is a toll every newcomer pays at the door."])
+        self.assertEqual([f["code"] for f in after], ["RESTATEMENT"])
+        self.assertIn("Thanos", after[0]["measured"]["block"])
 
     def test_one_restating_line_is_reported_whatever_the_lines_around_it_say(self):
         """Three sentences that bring their own words and one that reads the
@@ -161,8 +196,7 @@ class RestatementTests(unittest.TestCase):
         # read-back of the ranking it names.
         with answering({"commentary-restates": self.reader}) as asked:
             run(page_gates.gate_restatement, 35, page(self.EXHIBIT + [text("list-lead", "Prior sequence")] + self.OWN))
-        [(_, subject)] = asked
-        self.assertEqual([line["text"] for line in subject["lines"]], [t["text"] for t in self.OWN])
+        self.assertEqual([subject for _, subject in asked], [t["text"] for t in self.OWN])
 
     def test_an_unanswered_question_does_not_hold(self):
         with answering({}) as asked:

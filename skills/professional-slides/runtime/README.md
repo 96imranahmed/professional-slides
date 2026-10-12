@@ -15,7 +15,9 @@ node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
 node runtime/analysis.mjs <id>.pages.json [--catalogue]
 node runtime/author-deck.mjs <id>.pages.json --brief skeleton|writer|critic|judge [--section <part>]
 node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--page <id>[,<id>...]] [--run claude|codex [--parallel n]] [--model m] [--timeout seconds]
+node runtime/judge.mjs <id>.pages.json --validate judgements/packet-NN/answer.json
 node runtime/storyline.mjs [merge] <id>.deck.json out/ [--full | --spine] [--split] [--run codex|claude] [--model m] [--max-passes n] [--reason text] [--user-approved]
+node runtime/storyline.mjs <id>.deck.json out/ --validate [parts/<id>.json]
 node runtime/build-deck.mjs <id>.deck.json out/ [--no-fetch] [--no-render] [--preflight]
 node runtime/deliver-deck.mjs <id>.deck.json out/ [--reviewer auto|codex|claude|packet] [--model m]
     [--review review.json|confirmation.json|parts-dir] [--skip-build] [--full-review --reason text [--user-approved]] [--max-passes n]
@@ -104,7 +106,7 @@ table-variants.mjs the table variants a deck may name, in the component gallery'
 claims.mjs         the claim ledger (claims.json) for the author's self-check, and its validation
 judgements.mjs     the questions a rule asks of the copy (judgement-kinds.json) in place of a list of words: asked of a model once, recorded in <id>.judgements.json under a key of the kind, its version, the subject and the context, and replayed; an unanswered one holds nothing and is listed (JUDGEMENTS_PENDING); gates/judgements.py reads the same file by the same key
 brief.mjs          a section subagent's context pack (`author-deck.mjs --brief`): its role's digest from references/briefs/, its pages with the limits --scaffold prints, the tokens that print its evidence's values, and its commands
-judge.mjs          the questions the compile asked and no judgement answers, staged at once in judgements/packet-NN/ (a page run's, `--page`, in judgements/<section>/) for fresh models to answer side by side (or `--run`, several at a time), each answer checked and recorded until none is open
+judge.mjs          the questions the compile asked and no judgement answers, staged at once in judgements/packet-NN/ (a page run's, `--page`, in judgements/<section>/) for fresh models to answer side by side (or `--run`, several at a time), each answer checked and recorded until none is open; `--validate` checks one answer as it would be recorded, which each packet's prompt has its reader run before handing back
 gates/page_gates.py     the page gates' command and facade: runs every gate on the scene and the render; `--thresholds-markdown` prints the threshold table
 gates/gate_config.py    the thresholds, the weight floors, the code tables (GATE_CODES, ADVISORY_CODES, COMPOSE_CODES), severity rules and the scene readers every gate shares
 gates/render_gates.py   the page's own gates: ink and bands on the render, and the title, type, measure, words and pictures

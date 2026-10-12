@@ -452,7 +452,9 @@ console.log(JSON.stringify({ status: step.status, mode: step.mode, bytes: Buffer
   commentary: prompt.includes('does not read'), refused }));
 ''')
         self.assertEqual([result['status'], result['mode']], ['packet-written', 'spine'])
-        self.assertLess(result['bytes'], 20000)  # a line a page and the standard; the full listing ran to 124 KB
+        # A line a page and the standard; the full listing ran to 124 KB. The last 600 bytes or so are the check the critic
+        # runs before handing back (storyline.mjs --validate), whose command names the runtime, the deck and the output by path.
+        self.assertLess(result['bytes'], 21000)
         self.assertTrue(result['request'])
         self.assertFalse(result['commentary'])
         self.assertEqual(result['refused']['status'], 'refused')

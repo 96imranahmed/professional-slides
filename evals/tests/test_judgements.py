@@ -241,6 +241,95 @@ class PythonGateTests(unittest.TestCase):
         self.assertEqual(second["judgementsNeeded"], [])
 
 
+class LineQuestionTests(unittest.TestCase):
+    def test_a_line_is_keyed_alone_and_staged_beside_its_page_whose_words_are_shown_once(self):
+        """BA v2: one question per page of commentary, keyed by the whole block, re-asked the page whenever a line changed.
+        A line is its own question now, keyed by the line and the exhibit; the page's commentary goes `beside` it, shown and
+        not keyed, so a neighbour rewritten leaves its key. The lines of one page sit together in the packet, and the words
+        they are read against are printed once."""
+        result = run_node(CORE + """
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'judgements-'));
+const exhibit = { exhibit: ['Prior sequence', 'Thanos supplies the problem'], callouts: [] };
+const ask = (session, lines, page = 'p4', shown = exhibit) => J.withJudgements(session, () => { for (const line of lines) J.judged('commentary-restates', line, shown, page, { beside: { commentary: lines } }); });
+const lines = ['Twenty-two films is the price of admission.', 'Budget ninety minutes of catch-up.', 'Thanos supplies the problem.'];
+const open = J.judgementSession();
+ask(open, ['A line on another page.'], 'p9', { exhibit: ['Other'], callouts: [] });
+ask(open, lines);
+const rewritten = J.judgementSession();
+ask(rewritten, ['Twenty-two films is a toll every newcomer pays.', ...lines.slice(1)]);
+const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, [...open.pending.values()]);
+const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
+await fs.rm(dir, { recursive: true, force: true });
+const keyOf = (line) => J.judgementKey('commentary-restates', line, exhibit);
+const at = packet.items.map((item) => item.subject);
+console.log(JSON.stringify({ keys: lines.map((line) => packet.items.find((item) => item.subject === line)?.key === keyOf(line)),
+  kept: lines.slice(1).map((line) => rewritten.pending.has(keyOf(line))), beside: packet.items.filter((item) => lines.includes(item.subject)).map((item) => item.beside),
+  together: lines.map((line) => at.indexOf(line)).sort().every((n, i, all) => i === 0 || n === all[i - 1] + 1),
+  shownOnce: prompt.split(JSON.stringify(exhibit)).length - 1, besideOnce: prompt.split(JSON.stringify({ commentary: lines })).length - 1, shared: prompt.includes('The 3 questions that follow are read against the same words') }));
+""")
+        self.assertEqual(result["keys"], [True] * 3, "a line's key is its words and the exhibit's, not its neighbours'")
+        self.assertEqual(result["kept"], [True, True], "a neighbour rewritten leaves the other lines' keys as they were")
+        self.assertTrue(all(b == {"commentary": [
+            "Twenty-two films is the price of admission.", "Budget ninety minutes of catch-up.", "Thanos supplies the problem."]} for b in result["beside"]))
+        self.assertTrue(result["together"])
+        self.assertEqual([result["shownOnce"], result["besideOnce"]], [1, 1])
+        self.assertTrue(result["shared"])
+
+
+class ValidateTests(unittest.TestCase):
+    def test_an_answer_is_checked_as_it_would_be_recorded_and_nothing_is_recorded(self):
+        """S4: answering agents had checked their answer only as "it parses", and an answer refused after hand-back is a
+        packet asked of a fresh reader again. `judge.mjs --validate` checks one answer against its packet's schema and its
+        questions - each answered once, no key the packet does not hold, a verdict of its kind, the fields its verdict
+        needs - prints every problem and records nothing. A field left out is read as null, as the recording reads it."""
+        result = run_node(CORE + """
+const { spawnSync } = await import('node:child_process');
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'judgements-'));
+const pages = path.join(dir, 'deck.pages.json');
+const open = J.judgementSession();
+J.withJudgements(open, () => {
+  J.judged('title-leads-with-gap', 'Leadership cannot be ranked on public evidence', null, 'p3');
+  J.judged('tiles-one-measure', [{ id: 't1', value: '25.8%', label: 'Jan 2025 cohort retained' }, { id: 't2', value: '45%', label: 'Feb 2026 cohort retained' }], null, 'p7');
+});
+const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, [...open.pending.values()], { validate: (at) => `node judge.mjs deck.pages.json --validate ${path.join(at, 'answer.json')}` });
+const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
+const [tiles, title] = packet.items;
+const good = [{ key: title.key, verdict: 'gap', reason: 'The title leads with what cannot be ranked.', quote: 'cannot be ranked' },
+  { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'] }];
+const check = async (judgements, batch = packet.batch) => {
+  await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch, judgements }));
+  const run = spawnSync(process.execPath, ['./skills/professional-slides/runtime/judge.mjs', pages, '--validate', path.join(folder, 'answer.json')], { encoding: 'utf8' });
+  return [run.status, run.stderr];
+};
+const said = {
+  good: await check(good),
+  unknown: await check([{ ...good[0], verdict: 'maybe' }, good[1]]),
+  missing: await check([good[0]]),
+  stranger: await check([...good, { ...good[0], key: 'no-such-key' }]),
+  extra: await check([{ ...good[0], confidence: 0.9 }, good[1]]),
+  field: await check([good[0], { ...good[1], pair: null }]),
+  stale: await check(good, 'another-batch'),
+};
+const recorded = await fs.access(J.judgementStorePath(dir, 'deck')).then(() => true, () => false);
+const left = await fs.access(path.join(folder, 'answer.json')).then(() => true, () => false);
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ said, recorded, left, told: prompt.includes('## Before you hand back') && prompt.includes(`--validate ${path.join(folder, 'answer.json')}`) }));
+""")
+        status, said = result["said"]["good"]
+        self.assertEqual(status, 0, said)
+        self.assertIn("would be recorded", said)
+        for name, needle in (("unknown", 'verdict "maybe" is none of'), ("missing", "not answered"), ("stranger", "no-such-key: no such question"),
+                             ("extra", "`confidence`, which the schema does not allow"), ("field", "`pair` is a list"), ("stale", "the packet is")):
+            with self.subTest(refusal=name):
+                status, said = result["said"][name]
+                self.assertEqual(status, 2, said)
+                self.assertIn("would be refused", said)
+                self.assertIn(needle, said)
+        self.assertFalse(result["recorded"], "validating records nothing")
+        self.assertTrue(result["left"], "the answer stays where its reader saved it")
+        self.assertTrue(result["told"], "the prompt tells the reader to run the check before handing back")
+
+
 # A stand-in for the `claude` CLI judge.mjs --run calls: it reads the packet's prompt from stdin, answers every question with
 # its kind's passing verdict (quoting the subject where that verdict is quoted), and logs where and when it ran. Its first
 # answer is refused on purpose (a verdict no kind has), so the packet it was for must be asked again.

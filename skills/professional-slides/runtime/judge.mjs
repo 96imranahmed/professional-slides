@@ -2,6 +2,7 @@
 // Answer the questions the rules ask of a deck's copy (judgements.mjs).
 //
 //   node runtime/judge.mjs <id>.pages.json [--draft | --fetch-assets] [--page <id>[,<id>...]] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]
+//   node runtime/judge.mjs <id>.pages.json --validate <packet folder>/answer.json
 //
 // A rule that turns on what a piece of copy means - whether a column judges,
 // a title leads with a gap, four paragraphs are alternatives - asks a model
@@ -30,21 +31,30 @@
 // section's packet already holds is not staged twice. The answers are recorded
 // as ever: by this run, or by any later one, a plain run among them.
 //
-// Exit codes: 0 every question the rules ask is answered; 2 an answer was
-// refused (its packet's reasons are printed; the other packets' answers are
-// recorded); 3 packets are waiting for their answers; 1 a crash or bad usage.
+// `--validate <answer.json>` checks one answer as it would be recorded - its
+// packet's schema, every question answered once, no key the packet does not
+// hold, each verdict its kind's, each field its verdict needs - and prints
+// every problem, recording nothing. Each packet's prompt tells its reader to
+// run it before handing back: an answer refused after hand-back costs the
+// packet a fresh reader.
+//
+// Exit codes: 0 every question the rules ask is answered (with --validate, the
+// answer would be recorded); 2 an answer was refused (its packet's reasons are
+// printed; the other packets' answers are recorded); 3 packets are waiting for
+// their answers; 1 a crash or bad usage.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { EXIT, UsageError, commandLine, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
 import { createHash } from "node:crypto";
 import { partsOf, readPagesFile } from "./pages-file.mjs";
-import { PACKET_DIR, packetName, recordAnswers, stageJudgements } from "./judgements.mjs";
+import { PACKET_DIR, packetName, recordAnswers, stageJudgements, validateAnswer } from "./judgements.mjs";
 import { callReviewer, detectBackend, stageReview } from "./review-passes.mjs";
 
-const USAGE = "Usage: judge.mjs <id>.pages.json [--draft | --fetch-assets] [--page <id>[,<id>...]] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]";
+const USAGE = "Usage: judge.mjs <id>.pages.json [--draft | --fetch-assets] [--page <id>[,<id>...]] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]\n       judge.mjs <id>.pages.json --validate <packet folder>/answer.json";
+const SELF = fileURLToPath(import.meta.url);
 // Every packet is asked at once, so a deck's questions are answered in a round or two: one that has not finished in this
 // many has met an answer that does not converge (a model that keeps failing the checks).
 const ROUNDS_MAX = 6;
@@ -118,7 +128,7 @@ export async function judge(file, { draft = false, fetchAssets = false, pages = 
       say(`Every question the rules ask of ${whose}${draft ? "'s spine" : ""} is answered. Compile again: the rules that ask them now hold.`);
       return EXIT.ok;
     }
-    const { packets, elsewhere = [] } = await stageJudgements(dir, pending, { scope });
+    const { packets, elsewhere = [] } = await stageJudgements(dir, pending, { scope, validate: (folder) => commandLine("node", SELF, path.resolve(file), "--validate", path.join(folder, "answer.json")) });
     const held = elsewhere.length ? `\nSome of them are already in ${elsewhere.length === 1 ? "a packet" : `${elsewhere.length} packets`} another run staged: ${elsewhere.map(({ folder }) => packetName(dir, folder)).join(", ")}.` : "";
     if (!run) {
       say(`${pending.length} question${pending.length === 1 ? "" : "s"} the rules ask${pages ? ` of ${whose}` : ""} ${pending.length === 1 ? "is" : "are"} not answered. Staged in ${packets.length} packet${packets.length === 1 ? "" : "s"}:\n` +
@@ -149,10 +159,26 @@ export async function judge(file, { draft = false, fetchAssets = false, pages = 
   return EXIT.waiting;
 }
 
+/** Whether the answer in `answer` would be recorded, every reason it would not printed: nothing is recorded. */
+async function validate(file, answer, { say = (text) => process.stderr.write(`${text}\n`) } = {}) {
+  const at = path.resolve(answer), shown = path.relative(process.cwd(), at) || at;
+  const { problems, packet } = await validateAnswer(path.dirname(path.resolve(file)), at);
+  if (!problems.length) {
+    say(`${shown} answers all ${packet.items.length} question${packet.items.length === 1 ? "" : "s"} of its packet and would be recorded as it is.`);
+    return EXIT.ok;
+  }
+  say(`${shown} would be refused:\n${problems.map((p) => `  - ${p}`).join("\n")}\nFix each and run this again.`);
+  return EXIT.refused;
+}
+
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { draft: { type: "boolean" }, "fetch-assets": { type: "boolean" }, run: { type: "string", valueName: "claude or codex" }, model: { type: "string" },
-    timeout: { type: "string", valueName: "seconds" }, parallel: { type: "string", valueName: "a number of packets" }, page: { type: "string", valueName: "one or more page ids, comma-separated" } }, { usage: USAGE });
+    timeout: { type: "string", valueName: "seconds" }, parallel: { type: "string", valueName: "a number of packets" }, page: { type: "string", valueName: "one or more page ids, comma-separated" }, validate: { type: "string", valueName: "an answer.json" } }, { usage: USAGE });
   if (!file) throw new UsageError(USAGE);
+  if (values.validate !== undefined) {
+    if (values.run !== undefined || values.draft || values["fetch-assets"] || values.parallel !== undefined) throw new UsageError(`--validate checks one answer and records nothing: it takes no other option\n${USAGE}`);
+    return validate(file, values.validate);
+  }
   if (values.run !== undefined && !["auto", "claude", "codex"].includes(values.run)) throw new UsageError(`--run is auto, claude or codex\n${USAGE}`);
   // `auto`: the CLI the skill is called from, else whichever is installed; with none, the packets are staged for readers.
   const backend = values.run === "auto" ? detectBackend("auto") : values.run;

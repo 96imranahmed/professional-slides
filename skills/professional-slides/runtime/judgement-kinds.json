@@ -1,5 +1,5 @@
 {
- "about": "The questions a rule may ask of a model in place of a list of words (judgements.mjs). Each kind is one question about one subject: `asks` is the question, `subject` what it is asked of, `verdicts` the answers it takes with what each means, `quoteFor` the verdicts whose answer quotes the words of the subject they rest on, and `fields` what an answer carries beside its verdict. A recorded answer is replayed under a key of the kind, its `version`, the subject and the context: raise the version when the question's meaning changes, and every subject is asked again. A kind marked `spine` reads what the storyline critique is bound to: the critique waits until its questions are answered.",
+ "about": "The questions a rule may ask of a model in place of a list of words (judgements.mjs). Each kind is one question about one subject: `asks` is the question, `subject` what it is asked of, `verdicts` the answers it takes with what each means, `quoteFor` the verdicts whose answer quotes the words of the subject they rest on, and `fields` what an answer carries beside its verdict. A recorded answer is replayed under a key of the kind, its `version`, the subject and the context: raise the version when the question's meaning changes, and every subject is asked again. What a question shows its reader beside the subject without keying on it (`beside`, judgements.mjs) - the rest of the page a line sits in - may change and leave the answer standing. A kind marked `spine` reads what the storyline critique is bound to: the critique waits until its questions are answered.",
  "kinds": {
   "answer-contradicted": {
    "version": 1,
@@ -167,22 +167,12 @@
    }
   },
   "commentary-restates": {
-   "version": 1,
-   "asks": "Which lines of this commentary only read the exhibit back - say again what its headings, labels, cells or callouts already say - rather than say what the exhibit cannot: what follows from it, what it costs, what it settles, what would change it? A line that names the exhibit's members to say something new of them is not a read-back; a callout is part of the exhibit.",
-   "subject": "the exhibit's words, its callouts, and the commentary's lines, each with its id",
+   "version": 2,
+   "asks": "Does this line of a slide's commentary only read the exhibit back - say again what its headings, labels, cells or callouts already say - rather than say what the exhibit cannot: what follows from it, what it costs, what it settles, what would change it? A line that names the exhibit's members to say something new of them is not a read-back; a callout is part of the exhibit. The page's commentary is shown beside the line so it is read in its place: judge this line alone, not its neighbours.",
+   "subject": "one line of the commentary; its context, the exhibit's words and its callouts; beside it, the page's commentary lines",
    "verdicts": {
-    "restates": "one or more lines only read the exhibit back, given in `lines`",
-    "adds": "every line says something the exhibit does not"
-   },
-   "fields": {
-    "lines": {
-     "type": "list",
-     "of": "id",
-     "for": [
-      "restates"
-     ],
-     "about": "the ids of the lines that only read the exhibit back"
-    }
+    "restates": "the line only reads the exhibit back",
+    "adds": "the line says something the exhibit does not"
    }
   },
   "file-is-logo": {
