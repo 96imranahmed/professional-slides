@@ -129,6 +129,26 @@ class PluginDistributionTests(unittest.TestCase):
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
 
+    def test_a_file_removed_while_the_tree_is_packaged_is_left_out(self):
+        # The suite runs side by side: one test plants a stray file beside the examples and removes it while another
+        # packages the tree. A file listed and gone before it is copied was never part of the source.
+        with tempfile.TemporaryDirectory() as tmp:
+            source, dest = Path(tmp)/'source', Path(tmp)/'package'
+            for name in [*MANIFESTS, 'skills/demo/SKILL.md', 'skills/demo/examples/stray.json']:
+                p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
+            copy = packager.shutil.copyfile
+            def vanishing(src, dst, *args, **kwargs):
+                if Path(src).name == 'stray.json':
+                    Path(src).unlink()
+                return copy(src, dst, *args, **kwargs)
+            packager.shutil.copyfile = vanishing
+            try:
+                packager.package(source, dest)
+            finally:
+                packager.shutil.copyfile = copy
+            files = json.loads((dest/'package-manifest.json').read_text())['files']
+            self.assertEqual(set(files), {*MANIFESTS, 'skills/demo/SKILL.md'})
+
     def test_the_allowlist_admits_the_skill_and_refuses_what_only_the_suite_uses(self):
         ships = lambda rel: packager.shipped(packager.PurePosixPath(rel))
         for rel in ['requirements.txt', 'README.md', 'assets/icon.png', 'skills/s/SKILL.md', 'skills/s/agents/openai.yaml',
