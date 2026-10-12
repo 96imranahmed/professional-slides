@@ -48,10 +48,88 @@ assert.equal(shapeOf({{...page(1),points:['A point that runs to a sentence about
 // The older `photo` page draws the same way and used to be recorded as `text`,
 // so a deck's variety measure never saw that one of its pages was a picture.
 assert.equal(shapeOf({{title:'A title that states the finding for this page',photo:{{path:'{PHOTO}',alt:'A site',credit:'examples/assets/source.json'}},points:['A point that runs to a sentence about the site.']}}),'picture-hero');
-assert.throws(()=>composeSlide(page(6),0,'{BASE}'),/contact sheet/);
+// Six to twelve run as a grid of two or three rows on the strip (the calibration pages' photo grids); past twelve the
+// page is a contact sheet.
+assert.equal(shapeOf(page(6)),'picture-strip');
+assert.throws(()=>composeSlide(page(13),0,'{BASE}'),/contact sheet/);
 console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])
+
+    def test_six_to_twelve_pictures_run_in_rows_of_equal_cells(self):
+        # A strip stopped at one row of five; the strong pages that set out a
+        # set of photographs - the sites, the fleet - run two or three rows.
+        result = run_node(f'''
+import assert from 'node:assert/strict';
+import {{composeSlide}} from './evals/support/compose.mjs';
+import {{pictureRows}} from './skills/professional-slides/runtime/compose-pictures.mjs';
+assert.deepEqual([1, 5, 6, 7, 8, 9, 10, 11, 12].map(pictureRows), [1, 1, 2, 2, 2, 3, 2, 3, 3]);
+const picture=(label)=>({{alt:label+' station',label,text:label+' takes the four-car trains from 2030.'}});
+const page=(n)=>({{title:'A title that states the finding for this page',pictures:[...Array(n)].map((_,i)=>picture('Station '+i)),soWhat:'One of them wins.'}});
+const rowsOf=(n)=>composeSlide(page(n),0,'{BASE}').items.filter(i=>/-pictures-\\d$/.test(i.id));
+const seven=rowsOf(7);
+assert.deepEqual(seven.map(r=>r.items.filter(i=>i.component==='image-frame').length),[4,3]);
+// The short row keeps the columns: its open cell is an empty column of the same width.
+assert.equal(seven[1].items.length,4);
+assert.deepEqual(seven[1].items.at(-1).items,[]);
+const items=composeSlide(page(7),0,'{BASE}').items;
+assert.deepEqual(items.filter(i=>/picture-cards/.test(i.id)).map(i=>i.id),['s01-picture-cards-1','s01-picture-cards-row-2'],'a row of cards under each row of pictures');
+assert.deepEqual(rowsOf(12).map(r=>r.items.length),[4,4,4]);
+console.log(JSON.stringify({{ok:true}}));
+''')
+        self.assertTrue(result["ok"])
+
+    def test_a_picture_cropped_to_a_circle_is_round_and_square_framed(self):
+        result = run_node(f'''
+import assert from 'node:assert/strict';
+import {{ REGISTRY }} from './skills/professional-slides/runtime/registry.mjs';
+import {{ imageProps }} from './skills/professional-slides/runtime/compose-pictures.mjs';
+const props={{...imageProps({{path:'{PHOTO}',alt:'Layered hills',credit:'drawn for this example'}},'{BASE}'),fit:'cover'}};
+const frame={{x:100,y:100,width:400,height:260}};
+const draw=(p)=>REGISTRY.get('image-frame').render({{id:'f',frame,props:p}}).nodes;
+const [round]=draw({{...props,crop:'circle'}});
+assert.equal(round.data.circular,true,'the emitter clips it to an ellipse');
+assert.deepEqual([round.frame.width,round.frame.height],[260,260],'the frame is the slot\\'s largest square');
+assert.equal(round.frame.x,100+(400-260)/2,'centred in its slot');
+assert.ok(round.data.crop.left>0,'the photograph covers the square, cropped evenly');
+// Not yet cleared, the frame is the circle with its alt line, so the page is measured as it will be drawn.
+const [ring,alt]=draw({{alt:'Layered hills',crop:'circle'}});
+assert.equal(ring.type,'ellipse');
+assert.equal(ring.frame.width,260);
+assert.equal(alt.text,'Layered hills');
+assert.throws(()=>draw({{...props,crop:'square'}}),/crop` is "circle"/);
+assert.throws(()=>draw({{...props,crop:'circle',bleed:'sides'}}),/cannot also be cropped/);
+// A content page's photo strip takes the same crop.
+const {{composeSlide}}=await import('./evals/support/compose.mjs');
+const find=(items)=>items.flatMap((i)=>[i,...find(i.items||[])]);
+const strip=find(composeSlide({{title:'A title that states the finding for this page',photo:{{path:'{PHOTO}',alt:'A site',credit:'drawn for this example',crop:'circle'}},points:['A point that runs to a sentence about the site.']}},0,'{BASE}').items).find((i)=>i.component==='image-frame');
+assert.equal(strip.props.crop,'circle');
+console.log(JSON.stringify({{ok:true}}));
+''')
+        self.assertTrue(result["ok"])
+
+    def test_what_a_picture_page_cannot_hold_is_refused_at_the_compile(self):
+        result = run_node(f'''
+import {{compilePage}} from './skills/professional-slides/runtime/page-types.mjs';
+const error=(fn)=>{{try{{fn();return null;}}catch(e){{return e.message;}}}};
+const picture=(i,o={{}})=>({{path:'{PHOTO}',alt:'Hills '+i,label:'Place '+i,credit:'drawn for this example',...o}});
+const page=(form,pictures,o={{}})=>({{id:'p',type:'picture',form,commentary:'captions',takeaway:'The places differ in who travels to them.',why:'The places are told apart by sight',
+  settles:{{kind:'qualitative',what:'what the places look like'}},adds:'The captions name who travels',title:'Three places the line serves differ in who travels there',pictures,...o}});
+console.log(JSON.stringify({{
+  many: error(()=>compilePage(page('picture-strip',[...Array(13)].map((_,i)=>picture(i))))),
+  pair: error(()=>compilePage(page('picture-pair',[...Array(6)].map((_,i)=>picture(i))))),
+  mixed: error(()=>compilePage(page('picture-strip',[picture(0,{{crop:'circle'}}),picture(1),picture(2)]))),
+  odd: error(()=>compilePage(page('picture-strip',[0,1,2].map((i)=>picture(i,{{crop:'square'}}))))),
+  backdrop: error(()=>compilePage({{...page('photo-backdrop',undefined),commentary:'below',photo:{{path:'{PHOTO}',alt:'Hills',crop:'circle'}},exhibit:{{type:'chart.column',heading:'Journeys',categories:['FY24','FY25','FY26'],series:[{{name:'J',values:[1,2,3]}}]}}}})),
+  round: error(()=>compilePage(page('picture-strip',[0,1,2].map((i)=>picture(i,{{crop:'circle'}}))))),
+}}));
+''')
+        self.assertIn("contact sheet", result["many"])
+        self.assertIn("picture-strip page sets", result["pair"])
+        self.assertIn("take one crop", result["mixed"])
+        self.assertIn('is "circle"', result["odd"])
+        self.assertIn("not cropped to a circle", result["backdrop"])
+        self.assertIsNone(result["round"])
 
     def test_the_pictures_take_the_height_the_cards_leave(self):
         # The other way round - a fixed band with the cards spread beneath it -

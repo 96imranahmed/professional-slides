@@ -29,6 +29,7 @@ import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
 import { timePositions, describeGaps, isPeriodLabel, readablePeriod, gapsBroken } from "./time-axis.mjs";
 import { columnQuestion } from "./compose-tables.mjs";
+import { checkPictures } from "./compose-pictures.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { focusFromTitle } from "./compose-charts.mjs";
 import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
@@ -1665,7 +1666,11 @@ function typedSlide(page, id, type, players) {
   } else if (page.type === "picture") {
     if (page.form === "photo-backdrop" ? !(page.photo && exhibits.length) : !(page.pictures || []).length)
       throw new Error(`${id}: ${page.form === "photo-backdrop" ? "a photo-backdrop page carries a `photo` and one exhibit" : `a ${page.form} page carries its \`pictures\``}`);
+    // How many pictures the form holds, and their one crop, said here in the page's words, not at composition.
+    if (page.form !== "photo-backdrop") checkPictures(page.pictures, id, page.form);
+    else if (page.photo?.crop !== undefined) throw new Error(`${id}: a backdrop runs to the slide's edges under its card, so it is not cropped to a circle; drop \`crop\`, or set the round photo on a picture-hero page`);
   }
+  if (page.photo && page.type !== "picture") checkPictures([page.photo], id);
 
   // Types the form implies for every exhibit it carries, set before any check reads them.
   if (page.type === "place") setType(slide.exhibit, "map");

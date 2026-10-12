@@ -6463,6 +6463,106 @@
    "source": "Illustrations: illustrative drawings for a fictional operator"
   },
   {
+   "id": "f-picture-circle-strip",
+   "type": "picture",
+   "form": "picture-strip",
+   "commentary": "captions",
+   "takeaway": "Each of the three places is reached by one line that runs hourly today; the plan's first half-hourly services go to all three.",
+   "why": "Three places the plan serves are told apart before a word is read, and round photos set them as the line's three destinations rather than three exhibits",
+   "settles": {
+    "kind": "qualitative",
+    "what": "what three Dales line destinations look like and who travels to each"
+   },
+   "adds": "Each caption names who travels there and what the half-hourly service changes for them",
+   "title": "The Dales line serves three markets with one hourly timetable",
+   "pictures": [
+    {
+     "path": "assets/viaduct.jpg",
+     "alt": "Illustration of a stone viaduct with a train crossing",
+     "label": "The viaduct walks",
+     "text": "Day walkers who decide the evening before and need a train home after 18:40.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    },
+    {
+     "path": "assets/moor.jpg",
+     "alt": "Illustration of a train crossing open moorland",
+     "label": "The moorland villages",
+     "text": "Residents who shop and see the doctor in Skipton and wait an hour for the next train back.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    },
+    {
+     "path": "assets/station.jpg",
+     "alt": "Illustration of a brick station building with a clock",
+     "label": "Skipton station",
+     "text": "Commuters to Leeds whose peak trains are full and whose off-peak trains run half empty.",
+     "credit": "An illustration drawn for this example",
+     "crop": "circle"
+    }
+   ],
+   "source": "Illustrations: illustrative drawings for a fictional operator"
+  },
+  {
+   "id": "f-picture-picture-grid",
+   "type": "picture",
+   "form": "picture-strip",
+   "commentary": "captions",
+   "takeaway": "Resignalling and the sea wall take £180m of the £280m; both must start by FY28, or the twenty-minute Valley service and the Coast line slip a year.",
+   "why": "Six assets the plan spends on are set out as a grid, so the reader sees what the money buys before reading what it costs",
+   "settles": {
+    "kind": "qualitative",
+    "what": "the six assets the FY27 to FY31 capital plan renews, and what each costs"
+   },
+   "adds": "Each caption names the work and its cost, which the pictures cannot say",
+   "title": "Half the capital plan goes on two of the six assets it renews",
+   "pictures": [
+    {
+     "path": "assets/viaduct.jpg",
+     "alt": "Illustration of a stone viaduct with a train crossing",
+     "label": "Dales viaducts: £38m",
+     "text": "Waterproofing and pointing on four viaducts, done in weekend closures over three summers.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/signal.jpg",
+     "alt": "Illustration of three colour-light signals beside a track",
+     "label": "Valley signalling: £96m",
+     "text": "Resignalling Huddersfield so the Valley line can run a train every twenty minutes.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/platform.jpg",
+     "alt": "Illustration of a train standing at a covered platform",
+     "label": "Longer platforms: £24m",
+     "text": "Six stations lengthened to take the four-car electric trains due in 2030.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/station.jpg",
+     "alt": "Illustration of a brick station building with a clock",
+     "label": "Station buildings: £17m",
+     "text": "Step-free access and new waiting rooms at five of the busiest stations.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/coast.jpg",
+     "alt": "Illustration of a railway along a sea wall",
+     "label": "Coast sea wall: £84m",
+     "text": "Rebuilding two miles of wall at Scarborough that closed the line for nine days last winter.",
+     "credit": "An illustration drawn for this example"
+    },
+    {
+     "path": "assets/moor.jpg",
+     "alt": "Illustration of a train crossing open moorland",
+     "label": "Moorland drainage: £21m",
+     "text": "New culverts and cutting drains on the Dales line, where floods stop trains twice a year.",
+     "credit": "An illustration drawn for this example"
+    }
+   ],
+   "source": "Illustrations: illustrative drawings for a fictional operator; synthetic capital plan"
+  },
+  {
    "id": "f-picture-device",
    "type": "picture",
    "form": "device",

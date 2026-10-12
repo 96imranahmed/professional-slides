@@ -6,13 +6,13 @@
 // takeaways, statement and cover can carry, and the icon-trends and
 // logo-collage components with their sample media. The media primitives they
 // draw with are media.mjs's.
-import { rectPrimitive, primitive, stableId, textPrimitive, insetFrame, token, tokenValue, SLIDE } from "./core.mjs";
+import { rectPrimitive, ellipsePrimitive, primitive, stableId, textPrimitive, insetFrame, token, tokenValue, SLIDE } from "./core.mjs";
 import { iconMarker } from "./marks.mjs";
 import { sampleImage, MEDIA_SAMPLE, WORDMARK_RECORDS, mediaNode } from "./media.mjs";
 import { SECONDARY, MUTED_SURFACE, RULE, HAIRLINE, SMALL_RADIUS, LABEL, textStyle, boxStyle, component, INK, DISPLAY } from "./registry-shared.mjs";
 
 function defineImageFrame() {
-  return component({ id: "image-frame", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => { if (props.dataUri) {
+  return component({ id: "image-frame", category: "media", role: "image", tokens: ["color.surfaceMuted", "color.rule", "color.textSecondary", "font.body", "type.label", "line.hairline", "radius.small", "radius.round"], preferredSize: { width: 520, height: 300 }, sample: { alt: "(Insert image)" }, render: ({ id, frame, props }) => { if (props.dataUri) {
     if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(props.dataUri) || !props.alt?.trim() || !props.authorization?.trim()) throw new Error("Image requires embedded PNG/JPEG, alt text and authorization");
     return { nodes: [primitive({ type: "image", id: stableId(id, "image"), role: "image", frame, data: { dataUri: props.dataUri, alt: props.alt, authorization: props.authorization, circular: false } })] };
   } return ({
@@ -157,13 +157,26 @@ function withSourcedMedia(registry) {
   // `fit: "cover"` fills the frame and crops (a photo panel beside a chart).
   // `bleed: "sides"` runs it to both edges of the slide at its own height: the
   // photograph a card of evidence sits on, not a picture inside the margins.
+  // `crop: "circle"` takes the largest square the frame centres, fills it and clips the photograph to the circle in it,
+  // as a person card's portrait is: a round photo heading a picture page or a strip. Until the picture is cleared the
+  // frame is that circle, carrying its alt line, so the page is measured as it will be drawn.
   image.render = (input) => {
     if (input.props.bleed !== undefined && input.props.bleed !== "sides") throw new Error(`An image's \`bleed\` is "sides" (to both edges of the slide) or left out (got ${JSON.stringify(input.props.bleed)})`);
-    const { bleed, ...props } = input.props;
-    const frame = bleed ? { ...input.frame, x: 0, width: SLIDE.width } : input.frame;
-    return props.dataUri && props.width
-      ? { nodes: [mediaNode({ ...input, frame, props: (({ fit, ...rest }) => rest)(props), id: stableId(input.id, "image"), fit: props.fit ?? "contain" })] }
-      : imageRender({ ...input, frame, props });
+    if (input.props.crop !== undefined && input.props.crop !== "circle") throw new Error(`An image's \`crop\` is "circle" (a round photo, the frame's shorter side across) or left out (got ${JSON.stringify(input.props.crop)})`);
+    if (input.props.crop && input.props.bleed) throw new Error("A photograph run to the slide's edges fills its band; it cannot also be cropped to a circle");
+    const { bleed, crop, ...props } = input.props;
+    const bled = bleed ? { ...input.frame, x: 0, width: SLIDE.width } : input.frame;
+    const side = Math.min(bled.width, bled.height);
+    const frame = crop ? { x: bled.x + (bled.width - side) / 2, y: bled.y + (bled.height - side) / 2, width: side, height: side } : bled;
+    if (props.dataUri && props.width) {
+      const node = mediaNode({ ...input, frame, props: (({ fit, ...rest }) => rest)(props), id: stableId(input.id, "image"), fit: crop ? "cover" : props.fit ?? "contain" });
+      return { nodes: [crop ? { ...node, data: { ...node.data, circular: true } } : node] };
+    }
+    if (crop) return { nodes: [
+      ellipsePrimitive({ id: stableId(input.id, "frame"), role: "image-frame", frame, style: boxStyle(MUTED_SURFACE, RULE, HAIRLINE, token("radius.round")), data: { alt: props.alt, circular: true } }),
+      textPrimitive({ id: stableId(input.id, "alt"), role: "image-alt", frame: insetFrame(frame, side * 0.15), text: props.alt, style: { ...textStyle(LABEL, SECONDARY, true, "center"), valign: "mid" } }),
+    ] };
+    return imageRender({ ...input, frame, props });
   };
   for (const name of ["icon", "logo"]) {
     const owner = registry.get(name),
