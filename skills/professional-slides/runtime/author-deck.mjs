@@ -112,7 +112,7 @@ import os from "node:os";
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
-  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS } from "./page-types.mjs";
+  typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS, alsoRefused } from "./page-types.mjs";
 import { claimSheet, claimSheetLines } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
@@ -120,6 +120,7 @@ import { runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose-page.mjs";
 import { composeAll } from "./compose-all.mjs";
+import { halvesProblems } from "./compose-layouts.mjs";
 import { chartDraws } from "./charts.mjs";
 import { autoFillLogos } from "./fetch-logos.mjs";
 import { autoFillFlags } from "./fetch-flags.mjs";
@@ -181,7 +182,7 @@ export const AUTHORING_CODES = Object.freeze({
   ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
   COMMENTARY_MOVED: "a page whose points are declared beside its exhibit and drawn under it, because they fill too little of the column beside a chart that uses its width - advised, with what holds the column",
-  PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows one page holds - advised, with the rows a page holds",
+  PAGE_SPLITS: "a page the composer draws as two slides or more - refused where it is one table past the rows a page holds, with what holds it on one; advised otherwise",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
   SOURCE_NUMBERS_UNREAD: "an insight measure more than half of whose recorded values its own source files do not print, or print with the other sign - a slipped transcription, or a file that is not the one the number came from - advised, with the values",
   JUDGEMENTS_PENDING: "questions the rules ask of the copy - whether a column judges, a title leads with a gap, a picture shows what was asked - that no recorded judgement answers yet, so the rules that ask them did not hold: advised, until judge.mjs records the answers (delivery refuses a deck with any open)",
@@ -209,8 +210,25 @@ export async function composeForAuthoring(spec, baseDir) {
   await autoFillPlaces(copy, baseDir, { fetchMissing: false });
   // Pages that fail to compose are set aside and reported; the rest are still
   // composed and checked, so one broken page does not hide every other finding.
-  try { const result = composeAll(copy, baseDir, { partial: true }); return { deck: result.deck, pageErrors: result.pageErrors ?? [] }; }
+  try { const result = composeAll(copy, baseDir, { partial: true }); return { deck: result.deck, pageErrors: result.pageErrors ?? [], tableSplits: result.tableSplits ?? [] }; }
   catch (error) { return { error: `the deck does not compose - ${error.message}`, pageErrors: error.pageErrors }; }
+}
+
+/**
+ * The refusal of a lone table the composer cut across slides, naming what holds
+ * it on one page (compose-deck.mjs splitEstimate): the rows a page holds at the
+ * densest step, the author's own `density` where it keeps the table from a
+ * step that fits, the page without its commentary where that frees the height,
+ * and the halves where the table can be halved.
+ */
+function tableSplitRepair(estimate, exhibit) {
+  const { id, rows, density, holds, pages, pinned, unpinned, bare } = estimate;
+  const ways = [`cut the table to ${holds} rows or fewer - the members the claim compares - and move the rest to the appendix`];
+  if (unpinned) ways.push(`drop its \`density: "${pinned}"\`: set ${unpinned}, all ${rows} rows fit`);
+  if (bare) ways.push(`drop the page's commentary (commentary "none"): the table takes the height and the width it held, and all ${rows} rows fit set ${bare}`);
+  if (exhibit && !halvesProblems(exhibit, { asked: true }).length) ways.push(`set it in halves (\`split: "halves"\`), ${Math.ceil(rows / 2)} rows a side`);
+  return `${id}: its table of ${rows} rows does not fit one page - set ${density}, its densest, a page holds ${holds} - so the composer cuts it into ${pages} slides, and the render refuses the cut: the content plan holds the page as one (TEXT_PLAN_PAGINATION). ` +
+    `To hold one page, ${ways.join("; or ")}`;
 }
 
 // The sources registry's own check is its module's (sources-registry.mjs), so the research step reads it too (analysis.mjs).
@@ -350,14 +368,15 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     return { record: { id: idAt(index), title: String(page.title ?? ""), ...kept, pageType: { type: page.type, form: page.form, commentary: page.commentary, refused: true,
       content: { claim: String(page.title ?? ""), ...(page.settles && typeof page.settles === "object" ? { settles: page.settles } : {}), ...(Array.isArray(page.evidence) ? { evidence: page.evidence } : {}) },
       ...(dependencies ? { dependencies: dependencies.declared } : {}) } } }; };
-  // Every length the title band is held to is said with the page's first refusal, whatever that refusal is: the compile shows
-  // one refusal a page, and a title or a subtitle found long only once that one is mended costs a run for each.
+  // Every length the title band is held to is said with the page's refusals, whatever they are: a page stopped at its shape
+  // or its copy is not read past it, and a title or a subtitle found long only once that is mended costs a run for each.
+  // They join the page's other refusals in its one message (page-types.mjs alsoRefused).
   for (const [index, refusal] of refusals) {
     const page = authored[index];
     if (!page || typeof page !== "object" || !PAGE_TYPES[page.type] || isCarried(page)) continue;
     const more = titleBandProblems(page, idAt(index), { rules: doc.deck }).refused.filter((message) => !refusal.message.includes(message.slice(`${idAt(index)}: `.length, `${idAt(index)}: `.length + 40)));
     if (!more.length || /TITLE_WORDS|: the subtitle /.test(refusal.message)) continue;
-    const added = `${refusal.message.replace(/[.\s]*$/, "")}. Also refused on this page, so mend it in the same edit: ${more.map((message) => message.slice(`${idAt(index)}: `.length)).join("; and ")}`;
+    const added = alsoRefused(refusal.message, more);
     errors[errors.indexOf(refusal.message)] = added;
     refusals.set(index, { ...refusal, message: added });
   }
@@ -912,13 +931,22 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     repair: `${unread.length} insight${unread.length === 1 ? " records" : "s record"} values its own source files do not print, or print with the other sign (${unread.slice(0, 6).map((entry) => `${entry.id}: ${entry.missing.slice(0, 3).join(", ")}`).join("; ")}${unread.length > 6 ? `; and ${unread.length - 6} more` : ""}). Open the file and check each: a slipped transcription is corrected in the log; a measure worked out from what the source prints - a share, a change, a spread - says how in \`computed\`; a number from another file names that file in the measure's own \`sources\`` });
   const { structural, declared, shaped, undrawn } = withStandIns(doc, spec, failed, insights, sourceKinds);
   const composed = await composeForAuthoring(spec, baseDir);
-  // A page the composer drew as two slides or more - a table past the rows one page holds at its densest setting - says so, and
-  // why: the deck is a slide longer than its pages, each part repeats the title, and only the first carries the commentary.
+  // A page the composer drew as two slides or more says so, and why: the deck is a slide longer than its pages, each part
+  // repeats the title, and only the first carries the commentary. A lone table cut across pages is refused: the content plan
+  // holds the page as one, so the render refuses its parts (TEXT_PLAN_PAGINATION) - a render later than the composer knew,
+  // which passed the compile and the check. The refusal is not a new rule for a revision under an older version to be
+  // spared: it is the render's, said first. It names what holds the table on one page (compose-deck.mjs splitEstimate).
   const splitInto = new Map();
   for (const slide of composed.deck?.slides ?? []) if (slide.sourceSlideId) splitInto.set(String(slide.sourceSlideId), (splitInto.get(String(slide.sourceSlideId)) ?? 0) + 1);
+  const cut = new Map((composed.tableSplits ?? []).map((estimate) => [estimate.id, estimate]));
   for (const [id, count] of splitInto) {
     if (count < 2) continue;
     const page = [...spec.slides, ...(spec.appendix || [])].find((slide) => String(slide.id) === id), rows = [page?.exhibit, ...(page?.exhibits || [])].map((ex) => (Array.isArray(ex?.rows) ? ex.rows.length : 0)).find((n) => n > 0) ?? null;
+    if (cut.has(id)) {
+      const estimate = cut.get(id);
+      spineFindings.push({ code: "PAGE_SPLITS", severity: "blocker", id, measured: { slides: count, rows: estimate.rows, holds: estimate.holds, density: estimate.density }, repair: tableSplitRepair(estimate, page?.exhibit) });
+      continue;
+    }
     spineFindings.push({ code: "PAGE_SPLITS", severity: "advisory", id, measured: { slides: count, ...(rows ? { rows, rowsASlide: Math.ceil(rows / count) } : {}) },
       repair: `${id} is drawn as ${count} slides${rows ? `: its table has ${rows} rows, and one page holds ${Math.ceil(rows / count)} of them at the densest setting a table takes` : ": its exhibits do not share one page"}. Each part repeats the title with (1/${count}) to (${count}/${count}), the commentary stays with the first, and the deck is ${count - 1} slide${count === 2 ? "" : "s"} longer than its pages (a requested length counts them). Keep it where the reader looks rows up${rows ? `; to hold one page, cut the table to ${Math.ceil(rows / count)} rows or fewer - the members the claim compares - and move the rest to the appendix` : ""}` });
   }

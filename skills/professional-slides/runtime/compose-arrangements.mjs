@@ -325,8 +325,10 @@ function commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }
   return null;
 }
 
-export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle }) {
-  const stair = slide.pageType ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
+// `halves`: the exhibit is a table set in halves (`split: "halves"`), and its points run in columns under the two panels
+// as they do under one: set as one list across the page, they ran past the measure a line is read at.
+export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves = false }) {
+  const stair = slide.pageType && !halves ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
   if (stair) { items.push(stair); return; }
   // Three or four facts in a row over two or three points are a strip of
   // tiles and a strip of text with a third of the page empty under them. When
@@ -352,8 +354,8 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // A wide exhibit - ten categories, a twelve-row table - has no width to
   // give a side column, and three findings read better as three columns than
   // as three stacked paragraphs in a 360px gutter.
-  const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
-  if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+  const item = halves ? null : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
+  if (String(exhibits[0].type).startsWith("chart.") && item?.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
   // A point's lead becomes the column's heading only when its sentence can
   // stand without it. Points are often written to run on from the lead ("Core
   // regionals carry the most activity" + "with 54 use cases in ideation"),
@@ -404,7 +406,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   const headBelow = !columns.every((column) => column.heading)
     ? belowHeading : slide.pointsHeading || null;
   items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
-    headedPanel(exhibits[0], item, `${id}-exhibit`, false),
+    halves ? halvesRow(id, exhibits[0], baseDir) : headedPanel(exhibits[0], item, `${id}-exhibit`, false),
     { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG, ...pointColumns(columns, `${id}-below`) },
   ] });
 }
@@ -706,7 +708,11 @@ export function fullWidthExhibit(items, { id, slide, exhibits, baseDir, metricsB
 // to 12 top-left to bottom-right, and both panels repeat the header, which
 // is what makes them readable as halves of one table rather than two.
 export function tableHalves(items, { id, exhibits, baseDir }) {
-  const ex = exhibits[0];
+  items.push(halvesRow(id, exhibits[0], baseDir));
+}
+
+/** The two panels of a halved table, side by side in one row. */
+function halvesRow(id, ex, baseDir) {
   const rows = ex.rows || [];
   if (rows.length < 2) throw new Error(`${id}: a halved table needs rows to halve`);
   const at = Math.ceil(rows.length / 2);
@@ -714,10 +720,16 @@ export function tableHalves(items, { id, exhibits, baseDir }) {
   // Widths derived per half can put a column nine pixels further right on
   // the right-hand panel, and two tables that nearly line up read worse than
   // two that plainly do not.
-  const shared = styleTable(ex).columns;
-  const half = (part, suffix) => exhibitItem({ ...ex, columns: shared, rows: part, heading: suffix === "a" ? ex.heading : undefined },
+  const styled = styleTable(ex), shared = styled.columns;
+  // A column of bars - the author's (`bar: true` on a table asked to halve) or the one the composer draws on a measure with
+  // a unit - is drawn to one scale across both panels: the halves take the whole table's bar cells and its scale, as a
+  // table cut across pages does (compose-deck.mjs paginateTable). Set over the raw rows, each half met a bar column with
+  // no scale, and a ranking of twenty stations with its journeys in millions did not compose.
+  const barred = shared.some((column) => column?.type === "bars");
+  const body = barred ? styled.rows : rows;
+  const half = (part, suffix) => exhibitItem({ ...ex, columns: shared, rows: part, heading: suffix === "a" ? ex.heading : undefined, ...(barred ? { scales: styled.scales } : {}) },
     `${id}-exhibit-${suffix}`, baseDir, { width: { fr: 1 }, height: "fill" });
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(rows.slice(0, at), "a"), half(rows.slice(at), "b")] });
+  return { id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(body.slice(0, at), "a"), half(body.slice(at), "b")] };
 }
 
 // One figure carries the page: the number set large with its explanation,

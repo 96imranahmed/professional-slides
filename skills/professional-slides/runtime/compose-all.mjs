@@ -36,7 +36,10 @@ export function composeAll(spec, baseDir, { partial = false } = {}) {
   let working = structuredClone(spec);
   for (let round = 0; round < 6; round += 1) {
     try {
-      const result = planDeck(toDeckPlan(structuredClone(working), baseDir));
+      const plan = toDeckPlan(structuredClone(working), baseDir);
+      const result = planDeck(plan);
+      // The tables the composer cut across pages, with what would hold each on one (compose-deck.mjs splitEstimate).
+      if (plan.tableSplits) result.tableSplits = plan.tableSplits;
       if (!errors.length) return withReadingTasks(result, working);
       // The pages that composed, for a caller that reports the failures and
       // still checks everything else in the same run.

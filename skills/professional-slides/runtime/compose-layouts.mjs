@@ -155,18 +155,41 @@ function needsFullWidth(ex) {
 function halvable(ex) {
   if (!ex || ex.type !== "table") return false;
   if (ex.split === false || ex.paginate === false) return false;
-  const columns = ex.columns || [];
-  const rows = ex.rows || [];
-  if (columns.length > 3 || rows.length < 10) return false;
+  return !halvesProblems(ex).length;
+}
+
+/**
+ * Why a table cannot be set in halves, each reason in the author's words; none
+ * for one that can. A ranking of twenty cities with points under it was
+ * neither halved - the layout halved a table only on a page with no
+ * commentary and no bar column - nor could be asked to be: written as two
+ * tables of ten it was refused as two panels to merge. `split: "halves"` asks
+ * (`asked`), and a bar column then halves too, its scale shared by both
+ * panels; everything else that keeps a table whole keeps it whole when asked.
+ */
+export function halvesProblems(ex, { asked = false } = {}) {
+  const columns = ex?.columns || [];
+  const rows = ex?.rows || [];
+  const problems = [];
+  if (columns.length > HALVES.columns) problems.push(`it has ${columns.length} columns, and two panels side by side hold ${HALVES.columns} each`);
+  if (rows.length < HALVES.rows) problems.push(`it has ${rows.length} rows; under ${HALVES.rows} a table reads down one column`);
   // Grouped headers, total rows and row styles belong to one table read
   // top to bottom; cutting it in half puts the total in the middle of the page.
-  if (ex.total === true || ex.total === "auto" || (ex.derive || []).length) return false;
-  if (columns.some((c) => c && typeof c === "object" && (c.group || c.implication || c.bar || c.heat || c.bubble))) return false;
-  if (rows.some((row) => !Array.isArray(row) && row?.style)) return false;
+  if (ex?.total === true || ex?.total === "auto" || (ex?.derive || []).length) problems.push("its total closes the whole table and would land between the halves");
+  const kept = columns.filter((c) => c && typeof c === "object" && (c.group || c.implication || (c.bar && !asked) || c.heat || c.bubble));
+  if (kept.length) problems.push(`its ${kept.map((c) => `"${c.label ?? c.group ?? "column"}"`).join(", ")} column${kept.length === 1 ? " is" : "s are"} grouped, an implication or shaded down the whole table`);
+  if (rows.some((row) => !Array.isArray(row) && row?.style)) problems.push("its rows carry a style (a total, a group) that orders the whole table");
   const cells = rows.flatMap((row) => (Array.isArray(row) ? row : row?.cells || []));
-  if (cells.some((cell) => cell && typeof cell === "object" && cell.type)) return false;
-  return Math.max(0, ...cells.map((cell) => String(cell?.text ?? cell ?? "").length)) <= 28;
+  if (cells.some((cell) => cell && typeof cell === "object" && cell.type)) problems.push("its cells are typed (pills, ratings), wider than a half-width column holds");
+  const longest = Math.max(0, ...cells.map((cell) => String(cell?.text ?? cell ?? "").length));
+  if (longest > HALVES.cellChars) problems.push(`a cell runs to ${longest} characters, and a half-width column holds ${HALVES.cellChars}`);
+  return problems;
 }
+
+// Ten rows is where the single column starts running past the page's natural
+// reading length; three columns is where two panels plus their gutter stop
+// fitting the body width, and 28 characters what a half-width column holds.
+const HALVES = Object.freeze({ rows: 10, columns: 3, cellChars: 28 });
 
 export function chooseLayout(slide, recent = []) {
   if (slide.layout === "text" && (slide.exhibit || slide.exhibits?.length)) throw new Error("A text layout cannot discard an authored exhibit; select an evidence layout");
@@ -183,6 +206,13 @@ export function chooseLayout(slide, recent = []) {
   }
   if (slide.layout && slide.layout !== "auto") return slide.layout;
   const exhibits = slide.exhibits || (slide.exhibit ? [slide.exhibit] : []);
+  // A table the author asked to halve (`split: "halves"`) is halved, its commentary under the halves, or refused saying why
+  // it cannot be; the page compile says the same in the page's words (page-types.mjs).
+  if (exhibits.length === 1 && exhibits[0]?.split === "halves") {
+    const problems = exhibits[0].type === "table" ? halvesProblems(exhibits[0], { asked: true }) : [`a ${exhibits[0].type} is not a table`];
+    if (problems.length) throw new Error(`${slide.id ?? "page"}: the table cannot be set in halves (\`split: "halves"\`) - ${problems.join("; ")}`);
+    return "table-halves";
+  }
   // An explicit arrangement is the author overriding the choice, not a hint.
   if (slide.arrange === "dashboard") return "dashboard";
   if (slide.arrange === "stack") return "stack";

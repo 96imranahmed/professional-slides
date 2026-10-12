@@ -110,9 +110,63 @@ function pointsBelowHeight(slide) {
  * that wrap, stay one table.
  */
 export function paginateTable(slide, bodyScale = 1) {
-  if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return [slide];
+  const fit = tableFit(slide, bodyScale);
+  if (!fit) return [slide];
+  const { ex, fits } = fit;
+  // `_densityChosen`: the estimate picked this step, not the author, so the
+  // page may still set it a step up if the real frame holds it.
+  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits, _densityChosen: true } }];
+  const { densest, pages, per } = fit;
+  // One scale for the whole table, fixed before it is cut: the halves are two
+  // views of one measure, and a bar on page two means what it means on page one.
+  validateCategoryLabels(ex);
+  const shared = barScales(ex);
+  // The same numeric domain is insufficient when auto-width changes the plot.
+  // Freeze column geometry from the whole table before slicing its rows.
+  const sharedColumns = ex.columns.map((column, index) => ({ width: columnWeight(ex, index),
+    ...(typeof column === "string" ? { label: column, bold: index === 0 } : column) }));
+  return Array.from({ length: pages }, (_, i) => {
+    const rows = ex.rows.slice(i * per, (i + 1) * per);
+    // A highlighted row travels with the page that holds it; other pages drop the key.
+    const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
+    const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
+    const { highlightRow, ...rest } = ex;
+    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows,
+      ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
+      ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
+    if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
+    if (i !== 0) delete page.points;
+    return page;
+  });
+}
+
+/**
+ * What would hold a table `paginateTable` splits on one page, for the author
+ * to choose from: the rows a page holds at the densest step; the step the
+ * author's own `density` keeps it from (`unpinned`); the step it fits at with
+ * the page's commentary dropped, the table then taking the page's width and
+ * the height the points took (`bare`). A split page is two planned pages to
+ * the text plan, which the render refuses (TEXT_PLAN_PAGINATION): the
+ * authoring compile reads this and refuses it first, naming the way out.
+ */
+function splitEstimate(slide, bodyScale) {
+  const fit = tableFit(slide, bodyScale);
+  const { exhibit: ex } = slide;
+  const { points, insight, callout, soWhat, ...bare } = slide;
+  return { id: String(slide.sourceSlideId ?? slide.id), rows: ex.rows.length, density: fit.densest, holds: fit.rowsPerPage, pages: fit.pages,
+    pinned: ex.density ?? null, unpinned: ex.density === undefined ? null : tableFit({ ...slide, exhibit: { ...ex, density: undefined } }, bodyScale)?.fits ?? null,
+    bare: points?.length || insight || callout || soWhat ? tableFit(bare, bodyScale)?.fits ?? null : null };
+}
+
+/**
+ * Where a lone table under an auto layout lands: the density step it fits at
+ * (`fits`), or the cut a split makes - the densest step, the rows a page holds
+ * there, the pages and the rows each takes. null for a page it does not lay out.
+ */
+function tableFit(slide, bodyScale) {
+  if (slide.layout && !["auto", "exhibit-full"].includes(slide.layout)) return null;
   const ex = slide.exhibit;
-  if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return [slide];
+  if (!ex || ex.type !== "table" || !Array.isArray(ex.rows) || slide.exhibits) return null;
   // The page holds about 16 body lines of table (compact rows in a dense deck
   // run to 14–20 one-line rows): a row of short cells counts one line, longer
   // cells wrap, so a ranking table keeps a dozen rows on a page while a text
@@ -157,34 +211,12 @@ export function paginateTable(slide, bodyScale = 1) {
   // rows rather than splitting them. `density` on the exhibit still wins.
   const ladder = ex.density === undefined ? ["body", "compact", "dense"] : [ex.density];
   const fits = ladder.find((density) => heightAt(density) <= available);
-  // `_densityChosen`: the estimate picked this step, not the author, so the
-  // page may still set it a step up if the real frame holds it.
-  if (fits) return [fits === "body" || fits === ex.density ? slide : { ...slide, exhibit: { ...ex, density: fits, _densityChosen: true } }];
+  if (fits) return { ex, fits };
   const densest = ladder[ladder.length - 1];
   const perRow = Math.max(20, heightAt(densest) / Math.max(1, ex.rows.length));
   const rowsPerPage = Math.max(3, Math.floor(available / perRow));
   const pages = Math.ceil(ex.rows.length / rowsPerPage), per = Math.ceil(ex.rows.length / pages);
-  // One scale for the whole table, fixed before it is cut: the halves are two
-  // views of one measure, and a bar on page two means what it means on page one.
-  validateCategoryLabels(ex);
-  const shared = barScales(ex);
-  // The same numeric domain is insufficient when auto-width changes the plot.
-  // Freeze column geometry from the whole table before slicing its rows.
-  const sharedColumns = ex.columns.map((column, index) => ({ width: columnWeight(ex, index),
-    ...(typeof column === "string" ? { label: column, bold: index === 0 } : column) }));
-  return Array.from({ length: pages }, (_, i) => {
-    const rows = ex.rows.slice(i * per, (i + 1) * per);
-    // A highlighted row travels with the page that holds it; other pages drop the key.
-    const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
-    const keeps = ex.highlightRow === undefined ? false : Number.isInteger(ex.highlightRow) ? ex.highlightRow >= i * per && ex.highlightRow < (i + 1) * per : rows.some((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
-    const { highlightRow, ...rest } = ex;
-    const page = { ...slide, exhibit: { ...rest, columns: sharedColumns, density: densest, rows,
-      ...(Object.keys(shared).length ? { scales: { ...shared, ...(rest.scales || {}) } } : {}),
-      ...(keeps ? { highlightRow: Number.isInteger(highlightRow) ? highlightRow - i * per : highlightRow } : {}) }, title: `${slide.title} (${i + 1}/${pages})` };
-    if (slide.id) { page.id = `${slide.id}-${i + 1}`; page.sourceSlideId = slide.sourceSlideId ?? slide.id; }
-    if (i !== 0) delete page.points;
-    return page;
-  });
+  return { ex, fits: null, densest, rowsPerPage, pages, per };
 }
 
 /**
@@ -426,7 +458,14 @@ function composeDeckWith(spec, baseDir) {
   // chooser breaks a tie on variety, so a section spreads across its repertoire
   // instead of repeating whichever shape fitted first.
   const recent = [], recentStyles = [];
-  const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => paginateTable(p, bodyScale));
+  // Each lone table cut across pages, with what would hold it on one (splitEstimate): carried beside the plan, never on a
+  // slide, for the authoring compile to refuse the page with.
+  const tableSplits = [];
+  const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => {
+    const parts = paginateTable(p, bodyScale);
+    if (parts.length > 1) tableSplits.push(splitEstimate(p, bodyScale));
+    return parts;
+  });
   // A revision that carries slides from its source deck (revision.mjs) composes only some of the deck's pages: each stands
   // among the carried slides, and prints the number of its place in the deck, not of its place among the composed pages.
   const places = Array.isArray(spec.carried) && spec.carried.length ? composedPlaces(spec, [...slides, ...expanded]) : null;
@@ -472,6 +511,7 @@ function composeDeckWith(spec, baseDir) {
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
     fill,
     weight,
+    ...(tableSplits.length ? { tableSplits } : {}),
     slides: slides.map((s, index) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
       if (places && s.kind !== "cover" && page.pageNumber === undefined) page.pageNumber = placeOf(index);

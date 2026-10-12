@@ -207,7 +207,11 @@ console.log(JSON.stringify({ drawn: spec.slides.find((s) => s.id === 'x2').exhib
 
 
 class SplitTableTests(unittest.TestCase):
-    def test_a_table_too_long_for_one_page_says_it_splits_and_why_and_its_text_is_read(self):
+    def test_a_table_too_long_for_one_page_is_refused_at_the_compile_naming_what_holds_it(self):
+        """A lone table the composer cut across slides passed the compile and the check, and only the render refused it
+        (TEXT_PLAN_PAGINATION): the content plan holds the page as one. The composer's own estimate says it first, and what
+        holds the table on one page - the rows a page holds at the densest step, the author's `density` where it keeps the
+        table from a step that fits, the page without its commentary, the halves."""
         result = run_node(WORKED + '''
 const long = (which, n) => { const page = structuredClone(worked.pages.find((p) => `${p.type}/${p.form}` === which)); const rows = page.exhibit.rows;
   page.exhibit.rows = Array.from({ length: n }, (_, i) => rows[i % rows.length].map((cell, k) => (k === 0 ? `${typeof cell === 'string' ? cell : cell.text ?? 'Row'} ${i + 1}` : cell)));
@@ -216,7 +220,15 @@ const read = async (which, deck = {}) => { const page = long(which, 30);
   const run = await authorDeck(deckOf([page], deck), { baseDir: './skills/professional-slides/examples', fit: false });
   const all = [...run.blocking, ...run.advisories].filter((f) => f.id === page.id);
   return { codes: all.map((f) => f.code), split: all.filter((f) => f.code === 'PAGE_SPLITS').map((f) => [f.severity, f.class, f.measured, f.repair]), blocks: run.content.pages.find((p) => p.id === page.id).textPlan.length }; };
-console.log(JSON.stringify({ heat: await read('scorecard/heatmap'), table: await read('lookup/table'), revision: await read('lookup/table', { workflow: 'existing_deck_revision' }) }));
+// A ranking of 18 stations its author pinned at body density, and one of 20 under a so-what bar: each would hold one page.
+const stations = (n) => ({ heading: 'Journeys by station, FY26', columns: ['Station', 'Journeys, million', 'Growth FY23-FY26'],
+  rows: Array.from({ length: n }, (_, i) => [`Station ${i + 1}`, String((60 - i * 1.3).toFixed(1)), `${40 - i}%`]) });
+const lookup = worked.pages.find((p) => `${p.type}/${p.form}` === 'lookup/table');
+const ways = async (page) => { const run = await authorDeck(deckOf([page]), { baseDir: './skills/professional-slides/examples', fit: false });
+  return run.blocking.filter((f) => f.code === 'PAGE_SPLITS').map((f) => [f.measured, f.repair]); };
+const pinned = await ways({ ...lookup, exhibit: { ...stations(18), density: 'body' } });
+const barred = await ways({ ...lookup, commentary: 'so-what-bar', bar: worked.pages.find((p) => p.id === 'f-trend-column').bar, exhibit: stations(20) });
+console.log(JSON.stringify({ heat: await read('scorecard/heatmap'), table: await read('lookup/table'), revision: await read('lookup/table', { workflow: 'existing_deck_revision' }), pinned, barred }));
 ''')
         for name in ("heat", "table", "revision"):
             page = result[name]
@@ -224,9 +236,99 @@ console.log(JSON.stringify({ heat: await read('scorecard/heatmap'), table: await
             self.assertGreater(page["blocks"], 60, name)                  # both parts' text reaches the content plan
             self.assertEqual(len(page["split"]), 1, name)
             severity, cls, measured, repair = page["split"][0]
-            self.assertEqual([severity, cls, measured], ["advisory", "P", {"slides": 2, "rows": 30, "rowsASlide": 15}], name)
-            self.assertIn("is drawn as 2 slides: its table has 30 rows, and one page holds 15 of them at the densest setting a table takes", repair)
-            self.assertIn("to hold one page, cut the table to 15 rows or fewer", repair)
+            self.assertEqual([severity, cls, measured["slides"], measured["rows"], measured["density"]], ["blocker", "P", 2, 30, "dense"], name)
+            self.assertIn(f"its table of 30 rows does not fit one page - set dense, its densest, a page holds {measured['holds']}", repair)
+            self.assertIn("the render refuses the cut: the content plan holds the page as one (TEXT_PLAN_PAGINATION)", repair)
+            self.assertIn(f"To hold one page, cut the table to {measured['holds']} rows or fewer", repair)
+            self.assertLess(measured["holds"], 30, name)
+        [(measured, repair)] = result["pinned"]
+        self.assertEqual(measured["density"], "body")
+        self.assertIn('or drop its `density: "body"`: set dense, all 18 rows fit', repair)
+        self.assertIn('or set it in halves (`split: "halves"`), 9 rows a side', repair)
+        [(measured, repair)] = result["barred"]
+        self.assertIn('or drop the page\'s commentary (commentary "none"): the table takes the height and the width it held, and all 20 rows fit set dense', repair)
+
+
+class EveryRefusalTests(unittest.TestCase):
+    def test_a_page_with_three_defects_hears_all_three_in_one_compile(self):
+        """A page's rules each returned their first refusal, so an axis that skips years, value labels turned off and a
+        so-what bar left unwritten took three compiles to hear (the BA run). They are three independent mends: said in
+        one message, in the order the checks find them, the first keeping its `<id>: CODE - ` head. Two tables stacked
+        that are each too short are two reasons of one rule, asked past each other; and a page with nothing wrong but
+        what the compile waives for a revision is not refused."""
+        result = run_node(WORKED + '''
+const page = structuredClone(worked.pages.find((p) => p.id === 'f-trend-column'));
+page.exhibit.categories = ['FY15', 'FY16', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY26'];
+delete page.exhibit.heading; delete page.exhibit.unit;
+page.exhibit.dataLabels = false; page.bar = 'Too short';
+const failed = (pages, deck = {}) => compileDeck(deckOf(pages, deck), { partial: true }).failed.map((f) => [f.stage ?? null, f.message]);
+const short = (heading, columns) => ({ type: 'table', heading, columns, rows: [['North', '12'], ['South', '9']] });
+const stacked = { ...worked.pages.find((p) => p.type === 'panels' && p.form === 'row'), form: 'stack', commentary: 'none', exhibit: undefined,
+  exhibits: [short('Trains a day', ['Line', 'Trains']), short('Staff on shift', ['Depot', 'Staff'])] };
+const labelsOff = structuredClone(worked.pages.find((p) => p.id === 'f-trend-column')); labelsOff.exhibit.dataLabels = false;
+console.log(JSON.stringify({ three: failed([page]), stacked: failed([stacked]), waived: failed([labelsOff], { workflow: 'existing_deck_revision', rulesVersion: 2 }) }));
+''')
+        [[stage, message]] = result["three"]
+        self.assertEqual(stage, "evidence")
+        self.assertTrue(message.startswith("f-trend-column: TIME_AXIS_UNEVEN - "), message)
+        self.assertIn(". Also refused on this page, so mend it in the same edit: the column switches its value labels off", message)
+        self.assertIn('; and commentary "so-what-bar" closes the page on the implication', message)
+        [[_, message]] = result["stacked"]
+        self.assertIn(": TABLE_STACK - 2 tables are set one above another", message)
+        self.assertIn("Also refused on this page, so mend it in the same edit: TABLE_TOO_SHORT - a table of 2 rows", message)
+        self.assertEqual(result["waived"], [])
+
+
+class HalvesTests(unittest.TestCase):
+    def test_a_ranking_asked_for_in_halves_is_halved_and_a_table_that_cannot_be_is_refused_saying_why(self):
+        """Twenty ranked cities with their points could be set neither as one table (it split across two slides) nor as two
+        tables of ten (TABLE_PANELS_MERGE, which read the cities as measures and asked for a twenty-column table), and the
+        halves layout was chosen only on a page with no commentary and no bar column. `split: "halves"` asks for it: the
+        halves are set with the points in columns under them and a bar column drawn to one scale, a table that cannot be
+        halved is refused with the reasons, and two tables that are one ranking cut in two are told to be one in halves."""
+        result = run_node(WORKED + '''
+const lookup = worked.pages.find((p) => `${p.type}/${p.form}` === 'lookup/table');
+const below = worked.pages.find((p) => p.commentary === 'below' && (p.points || []).length >= 2);
+const cities = ['Leeds', 'York', 'Hull', 'Bradford', 'Wakefield', 'Halifax', 'Harrogate', 'Skipton', 'Selby', 'Goole', 'Malton', 'Whitby', 'Ripon', 'Keighley', 'Ilkley', 'Otley', 'Batley', 'Dewsbury', 'Pontefract', 'Castleford'];
+const ranked = (bar) => ({ heading: 'Journeys by station, FY26', columns: ['Station', bar ? { label: 'Journeys', unit: 'million', bar: true } : 'Journeys, million', 'Growth FY23-FY26'],
+  rows: cities.map((city, i) => [city, (30 - i * 1.3).toFixed(1), `${20 - i}%`]) });
+const page = (exhibit, extra = {}) => ({ ...lookup, commentary: 'below', points: below.points, exhibit, ...extra });
+const tree = (node) => [node, ...(node?.items || []).flatMap(tree)];
+const run = async (p) => { const done = await authorDeck(deckOf([p]), { baseDir: './skills/professional-slides/examples', fit: false });
+  return { blocking: done.blocking.map((f) => `${f.code}: ${f.repair ?? f.message}`), layout: done.spec.slides[0]?.layout ?? null }; };
+const halves = await run(page({ ...ranked(false), split: 'halves' }));
+const barred = await run(page({ ...ranked(true), split: 'halves' }));
+// The composed halves: two panels in reading order, the points in columns under them, one scale for the bars.
+import { composeSlide } from './evals/support/compose.mjs';
+const composed = tree({ items: composeSlide({ id: 's1', title: 'Leeds carries more journeys than the next three stations together', layout: 'table-halves', points: below.points, exhibit: { type: 'table', ...ranked(true), split: 'halves' } }, 0).items });
+const panel = (suffix) => composed.find((node) => node.id === `s1-exhibit-${suffix}`).props;
+const scaleOf = (props) => props.rows.map((row) => row.find((cell) => cell?.type === 'bars')?.scale);
+const refused = async (p) => compileDeck(deckOf([p]), { partial: true }).failed.map((f) => f.message);
+const twins = { ...lookup, type: 'panels', form: 'row', commentary: 'none', points: undefined, exhibit: undefined,
+  exhibits: [{ type: 'table', ...ranked(false), rows: ranked(false).rows.slice(0, 10) }, { type: 'table', ...ranked(false), heading: undefined, rows: ranked(false).rows.slice(10) }] };
+console.log(JSON.stringify({ halves, barred,
+  panels: { a: panel('a').rows.map((row) => row[0]), b: panel('b').rows.map((row) => row[0]), scales: [...new Set([...scaleOf(panel('a')), ...scaleOf(panel('b'))])],
+    same: JSON.stringify(panel('a').scales) === JSON.stringify(panel('b').scales), below: composed.some((node) => node.id === 's1-below') },
+  wide: await refused(page({ ...lookup.exhibit, split: 'halves' })), beside: await refused(page({ ...ranked(false), split: 'halves' }, { commentary: 'beside' })),
+  twins: await refused(twins) }));
+''')
+        for name in ("halves", "barred"):
+            self.assertEqual(result[name], {"blocking": [], "layout": "table-halves"}, name)
+        panels = result["panels"]
+        self.assertEqual(panels["a"], ["Leeds", "York", "Hull", "Bradford", "Wakefield", "Halifax", "Harrogate", "Skipton", "Selby", "Goole"])
+        self.assertEqual(panels["b"][0], "Malton")
+        self.assertEqual(len(panels["scales"]), 1)
+        self.assertTrue(panels["same"])
+        self.assertTrue(panels["below"])
+        [wide] = result["wide"]
+        self.assertIn('the table cannot be set in halves (`split: "halves"`) - it has 6 columns, and two panels side by side hold 3 each', wide)
+        self.assertIn("a cell runs to", wide)
+        [beside] = result["beside"]
+        self.assertIn('a table in halves takes the page\'s width, and commentary "beside" sets it beside a column', beside)
+        [twins] = result["twins"]
+        self.assertIn('TABLE_PANELS_MERGE - 2 tables on the page share the columns "Station | Journeys, million | Growth FY23-FY26" and run one ranking on: 20 members, ordered by "Journeys, million"', twins)
+        self.assertIn('Set them as one table of the 20 rows with `split: "halves"`', twins)
+        self.assertNotIn("the members as columns", twins)
 
 
 if __name__ == "__main__":
