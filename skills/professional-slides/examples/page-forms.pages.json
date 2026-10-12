@@ -5009,6 +5009,145 @@
    "source": "Source: illustrative data for a fictional operator"
   },
   {
+   "id": "f-mechanism-spectrum-quotes",
+   "type": "mechanism",
+   "form": "spectrum",
+   "commentary": "below",
+   "takeaway": false,
+   "why": "Each dimension runs between two kinds of rider, and a rider's own words at each pole say what the position means better than a scale would",
+   "settles": {
+    "kind": "qualitative",
+    "what": "where the operator's timetable sits between two kinds of rider on three dimensions, in riders' words"
+   },
+   "adds": "The points say which riders the plan moves towards and what it costs the others",
+   "title": "Northvale's timetable still serves the peak rider its market has left",
+   "exhibit": {
+    "items": [
+     {
+      "left": "Built for the peak",
+      "right": "Built for all day",
+      "value": 0.25,
+      "quotes": {
+       "left": "I travel at eight and at six, and those are the only trains that matter to me.",
+       "right": "I would take the train to the shops if there were one every half hour."
+      }
+     },
+     {
+      "left": "Season tickets",
+      "right": "Pay as you go",
+      "value": 0.6,
+      "quotes": {
+       "left": "My season ticket pays for itself if I go in four days a week.",
+       "right": "I go in twice a week now, so I buy a day return each time."
+      }
+     },
+     {
+      "left": "Hourly",
+      "right": "Turn up and go",
+      "value": 0.35,
+      "quotes": {
+       "left": "I plan my day around the train times, and I can live with that.",
+       "right": "If I miss one I wait an hour, so most days I drive instead."
+      }
+     }
+    ]
+   },
+   "points": [
+    {
+     "lead": "The market has moved",
+     "text": "Day and advance tickets are 74% of journeys, and three in five riders travel outside the peak at least once a week."
+    },
+    {
+     "lead": "The timetable has not",
+     "text": "Three of five lines still run hourly between the peaks; the half-hourly pattern serves the riders the plan needs."
+    }
+   ],
+   "pointsHeading": false,
+   "source": "Source: illustrative rider interviews for a fictional operator; synthetic"
+  },
+  {
+   "id": "f-lookup-quote-cells",
+   "type": "lookup",
+   "form": "table",
+   "commentary": "in-exhibit",
+   "takeaway": false,
+   "why": "The reader looks up a line and reads what its riders and its staff say about the timetable, each voice signed, beside what the plan does there",
+   "settles": {
+    "kind": "structure",
+    "what": "what riders and staff on four lines say about the off-peak timetable, and the plan's answer"
+   },
+   "adds": "The last column says what the plan does on each line about what was said",
+   "title": "Riders and staff on every line ask for more trains between the peaks",
+   "exhibit": {
+    "columns": [
+     "Line",
+     {
+      "label": "What riders say",
+      "type": "quote"
+     },
+     {
+      "label": "What staff say",
+      "type": "quote"
+     },
+     {
+      "label": "What the plan does",
+      "implication": true
+     }
+    ],
+    "rows": [
+     [
+      "Dales",
+      {
+       "text": "On a sunny Saturday the 09:10 is so full that people are left on the platform at Skipton.",
+       "by": "Day walker, Leeds"
+      },
+      {
+       "text": "We could fill two trains an hour from April to October without trying.",
+       "by": "Conductor, Skipton"
+      },
+      "Half-hourly from December 2027"
+     ],
+     [
+      "Valley",
+      {
+       "text": "The last train home leaves before the film ends, so I drive into town.",
+       "by": "Student, Halifax"
+      },
+      {
+       "text": "The 22:40 is the busiest train of the evening, and it is the last one.",
+       "by": "Driver, Huddersfield"
+      },
+      "Later trains once the sidings open in May 2028"
+     ],
+     [
+      "Coast",
+      {
+       "text": "An hour between trains means I book a taxi to the hospital instead.",
+       "by": "Resident, Malton"
+      },
+      {
+       "text": "Half our off-peak riders are going to appointments they cannot move.",
+       "by": "Station manager, Scarborough"
+      },
+      "Half-hourly in FY31, after the passing loop"
+     ],
+     [
+      "Eastern",
+      {
+       "text": "Since the trains came every twenty minutes I have stopped checking the times.",
+       "by": "Commuter, Selby"
+      },
+      {
+       "text": "Delays no longer stack up behind the single-track sections.",
+       "by": "Signaller, York"
+      },
+      "Holds its pattern; electric trains from 2030"
+     ]
+    ]
+   },
+   "source": "Source: illustrative rider and staff interviews for a fictional operator; synthetic"
+  },
+  {
    "id": "f-mechanism-process",
    "type": "mechanism",
    "form": "process",

@@ -20,6 +20,7 @@ import { strongestContrastIndex } from "./palettes.mjs";
 import { contrastRatio } from "./color.mjs";
 import { numberMarker, stateMarker, iconMarker, markerSize, MARK_TOKENS } from "./marks.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
+import { quoted, textWords } from "./text-contract.mjs";
 import { measureAt } from "./draw.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 
@@ -45,7 +46,10 @@ export const CELL_TYPES = Object.freeze([
   "check",
   "trend",
   "sparkline",
+  "quote",
 ]);
+// A quote cell holds a voice in a sentence or two: past this it is a passage, and the table a transcript.
+const QUOTE_CELL_WORDS = 40;
 // A sparkline cell's line: its least width, and the most points it draws before it is a chart, not a cell.
 const SPARK = Object.freeze({ width: 56, height: 18, points: 24 });
 // A photo cell's height: three body lines, which is where a thumbnail stops
@@ -351,6 +355,14 @@ function normalize(props) {
       if (cell.accent === undefined && (typeof cell.highlight === "string" || Array.isArray(cell.highlight))) { cell.accent = cell.highlight; delete cell.highlight; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
+      // `quote`: what someone said, in quotation marks, and `by` the voice under it - the market feedback a well-made
+      // page sets a column of. `by` names who said a quote, so on any other cell it would be dropped unseen.
+      if (cell.by !== undefined && cell.type !== "quote") throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" names \`by\`, who said it, and is a ${cell.type ?? "text"} cell; set \`type: "quote"\` on the cell or its column`);
+      if (cell.type === "quote" && !cell.blank) {
+        const said = textWords(cell.text);
+        if (said > QUOTE_CELL_WORDS) throw new Error(`Table quote "${String(cell.text).slice(0, 40)}..." runs to ${said} words; a cell holds a voice in a sentence or two (${QUOTE_CELL_WORDS} words at most) - cut it to the words that carry the point`);
+        if (cell.by !== undefined && !(typeof cell.by === "string" && cell.by.trim())) throw new Error("A quote cell's `by` names who said it, as text");
+      }
       if (!["left", "center", "right"].includes(cell.align ?? "left"))
         throw new Error("Unknown table alignment");
       if (cell.sectionNumber !== undefined) {
@@ -607,6 +619,8 @@ function contentLayout(cell, width, props, used) {
   // measure column carries two readings in one width.
   const subText = typeof cell.sub === "string" && cell.sub.trim() ? cell.sub.trim() : null;
   const sub = subText ? measure(subText, inner - offset, false, "type.label") : null;
+  // A quote's voice, bold at the right under its words, as a well-made page signs each one.
+  const by = cell.type === "quote" && typeof cell.by === "string" && cell.by.trim() ? measure(cell.by.trim(), inner, true, "type.label") : null;
   // `accent`: the phrase inside the cell that reads in the house colour.
   // (`highlight: true` is the older flag that marks a whole cell.)
   if (cell.accent !== undefined && cell.accent !== null) {
@@ -619,7 +633,7 @@ function contentLayout(cell, width, props, used) {
   }
   const blockHeight = (blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
-    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0);
+    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0) + (by ? v("space.1") + by.height : 0);
   const numberMarker =
     cell.type === "number" && cell.numberDisplay !== "plain"
       ? Math.max(
@@ -642,6 +656,7 @@ function contentLayout(cell, width, props, used) {
     blocks,
     lead,
     sub,
+    by,
     bold,
     size,
     marker,
@@ -822,6 +837,8 @@ function cellTexts(cell, { gap, marker, bold }) {
       throw new Error("Table bullets require items");
     texts = cell.items.map((s) => requireText(s, "bullet"));
     offset = v("space.4");
+  } else if (cell.type === "quote") {
+    texts = [quoted(requireText(cell.text, "quote"))];
   } else if (cell.type === "category" && cell.sectionNumber !== undefined && !String(cell.text ?? "").trim()) {
     texts = []; // a bare numbered disc, as in a "#" column
   } else {
@@ -2327,6 +2344,15 @@ function drawCellText(table, cell, at, y) {
       { x: inner.x + l.offset, y: y - m.gap, width: inner.width - l.offset },
       l.sub,
       textStyle(false, onLabel ? readableOn(t("color.textSecondary"), tint) : t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
+      data,
+    );
+  if (l.by)
+    putText(
+      stableId(id, "cell-by", r, c),
+      "table-cell-attribution",
+      { x: inner.x, y: y - m.gap + (l.sub ? l.sub.height : 0) + v("space.1"), width: inner.width },
+      l.by,
+      textStyle(true, color, "right", "type.label"),
       data,
     );
 }
