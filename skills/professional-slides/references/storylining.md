@@ -191,7 +191,7 @@ Research and analysis split cleanly, so when the harness can spawn subagents, fa
 | --- | --- | --- |
 | Find the data | Workstream: the subject's series; each player group; market and demand; geography; pipeline; the counter-case | Files under `sources/<workstream>/` with URL and retrieval date, and what it could not find |
 | Extract the insights | The same workstreams | `insights/<workstream>.json` in the insight-log format - `{ "insights": [...] }` - every finding with its calculation, sources and `measures` |
-| Lay out the pages | Section, once the spine critique is `ready` | The section's pages, drawn only from the merged insight log |
+| Lay out the pages | Section, once the spine critique is `ready` ([Run in parallel](parallel-run.md)) | The section's pages, drawn only from the merged insight log |
 | Critique | A fresh subagent every pass; one per section plus a spine critic for a long storyline | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
 
 **Keep each brief small.** A subagent's brief names its files, its pages, the commands that check its work and the one or two things this deck asks of it - the voice, the counter-case to keep - and links the references for the rest; it does not restate them. A brief that copies the rules runs to pages, is read in chunks, and drifts from the rules as they change; a stalled worker is relaunched more often than a slow one finishes. Each writer works in a scratch folder of its own (`scratch/<part>/`), and checks its pages with `--check --page` and `--claims`, never the whole deck while others write.
