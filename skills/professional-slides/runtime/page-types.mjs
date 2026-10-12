@@ -49,6 +49,7 @@ import { registered } from "./errors.mjs";
 import { describeFit, rightFor } from "./claim-fit.mjs";
 import { judged } from "./judgements.mjs";
 import { bandAxis } from "./chart-bands.mjs";
+import { measureRegistry, normalUnit } from "./measures.mjs";
 
 // The limits the page gates hold the page's text to, published in `--types`
 // so an author meets them by reading rather than by failing, and checked at
@@ -273,7 +274,7 @@ export const PRESET_ROUTES = Object.freeze({
 // takes the page's height, where under them it is held to a band; a chart
 // over its own data table keeps the table under it, so its commentary sits
 // beside it or on it.
-export const FORM_COMMENTARY = Object.freeze({
+const FORM_COMMENTARY = Object.freeze({
   "trend/sparklines": [...ANY_TEXT], "ranking/boxplot": [...ANY_TEXT], "composition/pictogram": [...ANY_TEXT],
   "profiles/radar": ["beside", "beside-left", "rail", "below", "none"], "trend/model": ["beside", "on-exhibit"],
   // A trellis is one exhibit: its commentary sits beside or under it as a chart's does, and its panels carry no captions.
@@ -327,13 +328,47 @@ export function exhibitRange(type, form) {
 export const trellisPage = (type, form) => type === "panels" && form === "small-multiples";
 const commentaryOf = (type, form) => FORM_COMMENTARY[`${type}/${form}`] ?? PAGE_TYPES[type]?.commentary ?? [];
 /**
+ * Whether the exhibit a page of `type` and `form` draws can carry the page's
+ * explanation on itself: a chart says which marks it draws (its registry
+ * `decorations`, charts.mjs), and commentary "on-exhibit" is written there as
+ * a sentence callout (`annotations`) or a number mark (NUMBER_MARKS). A bullet
+ * chart draws neither, a waffle only a highlight: on the BA retest the plan
+ * gave on-exhibit to ranking/bullet and composition/waffle and the writer found
+ * each could not compose. An exhibit that is not a chart (a diagram, a map, a
+ * model page's chart over its table) declares no marks: its explanation is in
+ * its own labels, steps and notes, and the placement stays its type's.
+ */
+const takesOnExhibit = (type, form) => {
+  const drawn = REGISTRY.get(String(PAGE_TYPES[type]?.forms?.[form] ?? ""))?.decorations?.draws;
+  return !drawn || drawn.some((key) => key === "annotations" || NUMBER_MARKS.includes(key));
+};
+
+/**
+ * The units a page's declared measures (`settles.measures`) are recorded in,
+ * as one scale reads them (measures.mjs normalUnit), from the insight log's
+ * measures (`registry`, measures.mjs measureRegistry): read before any exhibit
+ * is written, so a layout that sets them on one scale is refused at the spine.
+ */
+// The insight log's measures by ref, read once per log: every page of a spine compile asks of the same one.
+const REGISTRIES = new WeakMap();
+const registryOf = (insights) => { if (!REGISTRIES.has(insights)) REGISTRIES.set(insights, measureRegistry(insights)); return REGISTRIES.get(insights); };
+export const declaredUnits = (page, registry) => [...new Set((Array.isArray(page?.settles?.measures) ? page.settles.measures : [])
+  .map((ref) => registry?.get?.(String(ref))?.unit).filter((unit) => unit !== undefined && unit !== null && String(unit).trim()).map(normalUnit))];
+
+/**
  * The commentary placements a page of `type` and `form` compiles with: the
  * form's list, less the placements a later compile check refuses for that
  * form - row blocks carry their commentary in their bullets, a metric strip
- * leaves no room for points, aligned bars take no callouts.
+ * leaves no room for points, aligned bars take no callouts, a chart that
+ * draws no callout and no number mark takes no "on-exhibit". None at all for
+ * a trellis whose page declares measures in more than one unit (`units`,
+ * declaredUnits): its panels share one scale, which the binding refuses to
+ * set two units on (BINDING_UNRESOLVED) - na10 on the BA retest set
+ * passengers in millions beside a load factor in percent.
  */
-export function placementsOf(type, form) {
-  const all = commentaryOf(type, form);
+export function placementsOf(type, form, { units = null } = {}) {
+  const all = commentaryOf(type, form).filter((c) => c !== "on-exhibit" || takesOnExhibit(type, form));
+  if (trellisPage(type, form) && Array.isArray(units) && units.length > 1) return [];
   if (form === "labelled-rows") return all.filter((c) => ["in-exhibit", "so-what-bar"].includes(c));
   if (type === "numbers" && form === "metric-strip") return all.filter((c) => c === "none");
   if (type === "ranking" && form === "aligned-bars") return all.filter((c) => c !== "on-exhibit");
@@ -1436,6 +1471,17 @@ function spineOf(page, id, { insights = null, sources = null, rules = null, waiv
   const forms = Object.keys(type.forms);
   if (!forms.includes(page.form)) throw new Error(choose(id, "form", forms, page.form));
   if (!commentaryOf(page.type, page.form).includes(page.commentary)) throw new Error(choose(id, "commentary", commentaryOf(page.type, page.form), page.commentary));
+  // A chart that draws no callout and no number mark cannot carry the explanation on itself: refused here, before copy is written
+  // to it, rather than when the writer finds no callout will draw (the BA retest's bullet and waffle pages).
+  if (page.commentary === "on-exhibit" && !takesOnExhibit(page.type, page.form)) {
+    const drawn = REGISTRY.get(String(type.forms[page.form])).decorations.draws;
+    throw new Error(`${id}: a ${page.form} chart draws no callout and no number mark${drawn.length ? ` (it draws ${drawn.map((key) => `\`${key}\``).join(", ")})` : ""}, so commentary "on-exhibit" has nowhere to write the explanation - choose ${placementsOf(page.type, page.form).map((c) => `"${c}"`).join(", ")}, or a form whose chart takes callouts`);
+  }
+  // A trellis sets every panel on one scale: measures the page declares in two units are refused at the spine, as the binding
+  // refuses them once the exhibit names them (BINDING_UNRESOLVED) - the BA retest's na10, passengers beside a load factor.
+  const units = trellisPage(page.type, page.form) && insights ? declaredUnits(page, registryOf(insights)) : [];
+  if (units.length > 1)
+    throw new Error(`${id}: a ${page.form} page sets every panel on one scale, and the measures it declares (\`settles.measures\`) are in ${units.join(", ")}: one scale is one unit. Choose a panels form that gives each exhibit its own scale (${Object.keys(type.forms).filter((form) => !trellisPage(page.type, form)).map((form) => `"${form}"`).join(", ")}), or declare the measures of one unit`);
   // Row blocks carry their explanation in their own bullets; a band of points
   // under five rows of bullets says it twice.
   if (page.form === "labelled-rows" && !["in-exhibit", "so-what-bar"].includes(page.commentary))

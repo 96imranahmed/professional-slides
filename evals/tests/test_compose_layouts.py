@@ -612,6 +612,24 @@ console.log(JSON.stringify({ n: pages.length, id: pages[0]?.id, rows: pages[0]?.
         self.assertEqual(result['rows'], [['Cover', 'Hub', 'A, CC BY-SA 4.0, via Wikimedia Commons'], ['{{page:fleet}}', 'Cabin', 'B, CC BY 4.0, via Wikimedia Commons']])
         self.assertEqual(result['none'], 0)
 
+    def test_credits_past_one_page_continue_on_the_next(self):
+        """BA retest: 13 credited pictures against the 12 rows the credits page holds drew PAGE_SPLITS on a page no
+        author wrote, and the render refuses a split page. The credits are the runtime's own list: they continue on a
+        second page of their own (picture-credits-2), carrying no `sourceSlideId`, so nothing reads them as one page cut."""
+        result = run_node('''
+import { composeDeck } from './evals/support/compose.mjs';
+const credited = Array.from({ length: 40 }, (_, i) => ({ alt: `Aircraft ${i + 1} at the gate of a long-haul hub`, path: `p${i}.jpg`,
+  credit: `Photo: Photographer number ${i + 1}, CC BY-SA 4.0, via Wikimedia Commons, from the airline fleet category` }));
+const deck = composeDeck({ schema: 'professional-slides.deck/v3', id: 'credits', contents: false, cover: { title: 'Credits', archive: credited },
+  slides: [{ id: 'one', title: 'One page that argues something about the fleet', points: ['The fleet is old.'] }] });
+const credits = deck.slides.filter((s) => /^picture-credits/.test(String(s.id)));
+console.log(JSON.stringify({ ids: credits.map((s) => s.id), cut: credits.filter((s) => s.sourceSlideId).length }));
+''')
+        self.assertGreater(len(result['ids']), 1, result)
+        self.assertEqual(result['ids'][0], 'picture-credits')
+        self.assertEqual(result['ids'][1], 'picture-credits-2')
+        self.assertEqual(result['cut'], 0)
+
 
 class RailWidthTests(unittest.TestCase):
     def test_a_rail_takes_a_quarter_of_the_row_where_its_statement_fits_there(self):

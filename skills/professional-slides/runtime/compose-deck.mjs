@@ -6,7 +6,7 @@
 import path from "node:path";
 import { mapAll } from "./core.mjs";
 import { measureTable } from "./tables.mjs";
-import { resolveWeight, normalizeWeight } from "./weight.mjs";
+import { GENERATED, resolveWeight, normalizeWeight } from "./weight.mjs";
 import { readJsonSync } from "./cli.mjs";
 import { applyDesign } from "./design-systems.mjs";
 import { composedPlaces } from "./revision.mjs";
@@ -463,6 +463,10 @@ function composeDeckWith(spec, baseDir) {
   const tableSplits = [];
   const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => {
     const parts = paginateTable(p, bodyScale);
+    // The runtime's own lists - the picture credits, the sources' limits - are no planned page held on one: one that runs past
+    // a page continues on the next, each part a page of its own (picture-credits-2), not one page cut in parts the compile
+    // refuses (PAGE_SPLITS) and the render with it. The BA retest credited 13 pictures, one past what the page holds.
+    if (parts.length > 1 && GENERATED.test(String(p.id ?? ""))) return parts.map(({ sourceSlideId: _cut, ...part }, i) => ({ ...part, id: i ? `${p.id}-${i + 1}` : p.id }));
     if (parts.length > 1) tableSplits.push(splitEstimate(p, bodyScale));
     return parts;
   });

@@ -8,7 +8,7 @@
 // compiles, and on its declared choices (page-types.mjs declaredSlide) where
 // it does not, so that fixing a page never reveals a structure rule the run
 // before could have reported.
-import { PAGE_TYPES, dataKeys, declaredSlide, drawnOf, placementsOf, plannableForms, structureOf, undrawnExhibit, exhibitRange } from "./page-types.mjs";
+import { PAGE_TYPES, dataKeys, declaredSlide, declaredUnits, drawnOf, placementsOf, plannableForms, structureOf, undrawnExhibit, exhibitRange } from "./page-types.mjs";
 import { TYPE_SHAPES } from "./evidence.mjs";
 import { axisOf, measureRegistry } from "./measures.mjs";
 import { declaredPlot, refsOf } from "./gates/dependency_gates.mjs";
@@ -50,6 +50,10 @@ const isEvidence = (type) => type.startsWith("chart.") || TABLES.has(type) || DI
  */
 // How PAGE_SHAPE_FLAT counts a rail, said on its standing line (the page gates say the same on theirs: gate_config.py RAIL_AS_CLOSE).
 const RAIL_AS_CLOSE = "a rail, a so-what bar and a takeaway are one claim each and leave a page evidence-only; points, paragraphs, captions and cards make it evidence-with-commentary";
+// The placements that put developed text on the page (page-types.mjs COMMENTARY): points beside or under the exhibit, a
+// caption under each panel. The others - a rail, a so-what bar, callouts on the plot, the exhibit's own cells, none - leave
+// it to what the page writes.
+const PLACED_COMMENTARY = Object.freeze(["beside", "beside-left", "below", "captions"]);
 
 export function declaredArchitecture(slide) {
   if (!slide?.pageType || slide.kind === "statement" || slide.kind === "takeaways") return null;
@@ -59,7 +63,11 @@ export function declaredArchitecture(slide) {
   // A findings matrix is drawn as a table, and a model page sets its chart over its own data table.
   if (slide.shape === "findings-matrix" || slide.shape === "model-page") evidence.push("table");
   const captioned = slide.pageType.commentary === "captions" || exhibitsOf(slide).some((ex) => typeof ex.caption === "string" && ex.caption.trim());
-  const comments = (slide.points || []).length > 0 || (slide.paragraphs || []).length > 0 || captioned || blocks.some((block) => (block?.points || []).length) || types.includes("cards");
+  // A page declared with its commentary beside or below the exhibit is written with it - the compile refuses the placement
+  // without the points it places - so a spine page is counted by its placement before its copy exists. On the BA retest the
+  // lead moved nine pages to commentary placements and the provisional count, which read only written points, did not move.
+  const placed = PLACED_COMMENTARY.includes(slide.pageType.commentary);
+  const comments = placed || (slide.points || []).length > 0 || (slide.paragraphs || []).length > 0 || captioned || blocks.some((block) => (block?.points || []).length) || types.includes("cards");
   const metrics = Boolean(slide.kpi) || (slide.metrics || []).length > 0 || blocks.some((block) => block?.metric);
   if (evidence.length) {
     if (metrics && slide.layout === "metrics-over-exhibit") return "metrics-over-evidence";
@@ -384,14 +392,16 @@ const openForms = (type, closing = false) => (type === "summary" && closing ? ["
  * type's first form reads (a summary's by its place: `closing`, it comes after
  * the deck's first analytical page). Each with the placement the page declares where
  * that form compiles with it, or with every placement the form takes. Empty
- * for a page with no known type.
+ * for a page with no known type. `units`, the units the page's declared
+ * measures are in (page-types.mjs declaredUnits), leave out a form that
+ * cannot set them: a trellis of two units.
  */
-export function freeChoices(page, fitted = null, closing = false) {
+export function freeChoices(page, fitted = null, closing = false, { units = null } = {}) {
   const type = page && typeof page === "object" ? PAGE_TYPES[page.type] : null;
   if (!type) return [];
   const forms = Object.hasOwn(type.forms, page.form ?? "") ? [page.form] : fitted?.length ? fitted : openForms(page.type, closing);
   // A placement the page declares is kept on every form that compiles with it.
-  return forms.flatMap((form) => { const placements = placementsOf(page.type, form);
+  return forms.flatMap((form) => { const placements = placementsOf(page.type, form, { units });
     return (placements.includes(page.commentary) ? [page.commentary] : placements).map((commentary) => ({ form, commentary })); });
 }
 
@@ -539,8 +549,8 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     const most = revision && !asSource.length && candidates.length ? Math.max(...candidates.map(used)) : 0;
     const conventional = most > 0 ? candidates.filter((form) => used(form) === most) : [];
     const given = asSource.length ? asSource.filter((form) => !best.length || best.includes(form)).concat(asSource).slice(0, 1) : conventional.length ? conventional : candidates;
-    const options = freeChoices(page, given);
-    const declared = formDeclared && placementsOf(page.type, page.form).includes(page.commentary);
+    const units = declaredUnits(page, registry), options = freeChoices(page, given, false, { units });
+    const declared = formDeclared && placementsOf(page.type, page.form, { units }).includes(page.commentary);
     // Every choice the plan may take to mend a broken rule when the free ones cannot. A page whose fit is read never leaves the
     // forms that carry its claim best - a rule those cannot meet is reported unmet, not met with a weaker picture - and a
     // declared form whose fit is read is changed only for one that carries the claim at least as directly.
@@ -552,7 +562,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
     const drawnCount = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object").length;
     const carried = drawnCount || (formDeclared ? exhibitRange(page.type, page.form)[0] : 0);
     const holds = (form) => { const [lo, hi] = exhibitRange(page.type, form); return !carried || (carried >= lo && carried <= hi); };
-    const wider = page.type === "summary" ? [] : mendable.filter(holds).flatMap((form) => placementsOf(page.type, form).map((commentary) => ({ form, commentary })));
+    const wider = page.type === "summary" ? [] : mendable.filter(holds).flatMap((form) => placementsOf(page.type, form, { units }).map((commentary) => ({ form, commentary })));
     // The page as the compile reads it, where it compiles as written under the choices it declares.
     const written = declared ? compiled?.get?.(String(page.id ?? `page-${index + 1}`)) ?? null : null;
     return { page, index, appendix, type, options, wider, declared, formDeclared, written, slides: new Map(), fit, best, open, fitted: best.length > 0, imported: revision && page.sourceSlide !== undefined,

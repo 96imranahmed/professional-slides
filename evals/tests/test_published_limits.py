@@ -36,7 +36,7 @@ def rounded(value):
 LIMITS = '''
 import fs from 'node:fs';
 import { deckLimits, pageLimits } from './skills/professional-slides/runtime/limits.mjs';
-import { PAGE_TYPES, LIMITS, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, FORM_COMMENTARY, compilePage, exhibitRange } from './skills/professional-slides/runtime/page-types.mjs';
+import { PAGE_TYPES, LIMITS, TEXT_LIMITS, SUBTITLE_WORDS, COPY_LIMITS, CALLOUTS_MAX, EVIDENCE_FLOOR, compilePage, exhibitRange, placementsOf } from './skills/professional-slides/runtime/page-types.mjs';
 import { compileDeck, composeForAuthoring, workedExamples } from './skills/professional-slides/runtime/author-deck.mjs';
 import { CONTENT_THRESHOLDS } from './skills/professional-slides/runtime/gates/content_gates.mjs';
 import { AGENDA_LIMITS } from './skills/professional-slides/runtime/panels.mjs';
@@ -168,7 +168,7 @@ console.log(JSON.stringify({ out, relief: 1 - PICTURE_SHARE_MAX }));
 const out = {};
 for (const [type, t] of Object.entries(PAGE_TYPES)) for (const [form, target] of Object.entries(t.forms)) {
   const held = LIMITS[`${type}/${form}`] ?? LIMITS[target] ?? null, printed = pageLimits(type, form);
-  out[`${type}/${form}`] = { held, exhibit: printed.exhibit ?? null, commentary: printed.commentary, allowed: FORM_COMMENTARY[`${type}/${form}`] ?? t.commentary,
+  out[`${type}/${form}`] = { held, exhibit: printed.exhibit ?? null, commentary: printed.commentary, allowed: placementsOf(type, form),
     exhibits: printed.exhibits, count: exhibitRange(type, form),
     plotted: printed.plottedValues?.min ?? null, periods: printed.periods?.min ?? null, members: printed.members?.min ?? null, type: { periods: t.periods ?? null, members: t.minCategories ?? null } };
 }
