@@ -2812,7 +2812,7 @@ function movedLines(spec) {
 }
 
 // The advisories a run prints with their text: the consistency of what the pages state, and the build bars.
-const SAID_IN_FULL = /^(?:NUMBERS_DISAGREE|NUMBER_STALE|WORDING_STALE|NUMBER_FORMATS_DIFFER|PROOF_REPEATS|BAR_[A-Z_]+)$/;
+const SAID_IN_FULL = /^(?:NUMBERS_DISAGREE|NUMBER_STALE|WORDING_STALE|NUMBER_FORMATS_DIFFER|BRIDGE_UNRECONCILED|PROOF_REPEATS|BAR_[A-Z_]+)$/;
 
 function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, pageGatesError }) {
   const typed = spec.slides.filter((s) => s.pageType);

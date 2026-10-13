@@ -241,7 +241,10 @@ function quotedPrecision(slide) {
   (slide.points || []).forEach(point); (slide.paragraphs || []).forEach(point); (slide.metrics || []).forEach(tile); tile(slide.kpi);
   (slide.blocks || []).forEach((block) => { (block?.points || []).forEach(point); tile(block?.metric); });
   const exhibits = [slide.exhibit, ...(slide.exhibits || []), ...(slide.blocks || []).map((block) => block?.exhibit)].filter((ex) => ex && typeof ex === "object");
-  for (const ex of exhibits) add(ex.caption);
+  // A chart's own callouts quote its values too: the BA retest's hb02 called 2025 out as 174.5 a flight over a bar the
+  // chart rounded to 175, since the callouts were not read and the chart's precision was whole numbers past a hundred.
+  const said = (ex, key) => (Array.isArray(ex?.[key]) ? ex[key] : []).forEach((note) => (typeof note === "string" ? add(note) : add(note?.text)));
+  for (const ex of exhibits) { add(ex.caption); said(ex, "annotations"); said(ex, "callouts"); (ex.charts || []).forEach((chart) => { said(chart?.props ?? chart, "annotations"); said(chart?.props ?? chart, "callouts"); }); }
   const quotedFigures = figuresWithDecimals(texts);
   if (!quotedFigures.length) return slide;
   const hand = (ex) => {

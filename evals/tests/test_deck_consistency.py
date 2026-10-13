@@ -399,5 +399,84 @@ console.log(JSON.stringify({
         self.assertEqual(result["unchanged"], [])
 
 
+class PrintedArithmeticTests(unittest.TestCase):
+    """One rounding per value, and what is said to add up adds up as printed (the BA retest's review blockers)."""
+
+    PRINTED = LOG + """
+const more = [
+  { ...graded, id: 'i6', shape: 'series', measures: { perFlight: { unit: 'passengers per flight', population: 'Heathrow', periods: ['2022', '2023', '2024', '2025'], values: [160.4, 170.6, 174, 174.5] } } },
+  { ...graded, id: 'i7', shape: 'series', measures: { conn: { unit: 'passengers m', population: 'Heathrow connecting', periods: ['2019', '2022', '2025'], values: [27.06, 15.01, 21.74] } } },
+  { ...graded, id: 'A-fall', shape: 'point', measures: { change: { unit: 'passengers m', population: 'Heathrow connecting', period: '2019 to 2025', value: -5.32 } } },
+  { ...graded, id: 'i8', shape: 'peer-set', measures: {
+    dec: { unit: 'aircraft', population: 'firm orders', period: '31 Dec 2025', members: ['A', 'B', 'C', 'D'], values: [10, 5, 2, 3] },
+    jun: { unit: 'aircraft', population: 'firm orders', period: '30 Jun 2026', members: ['A', 'B', 'C', 'D'], values: [12, 5, 0, 6] } } },
+  { ...graded, id: 'i9', shape: 'peer-set', measures: { spread: { unit: 'pence per ASK', population: 'BA', period: '2024 to 2025', members: ['2024', 'Revenue', 'Non-fuel', 'Fuel', '2025'], values: [1.24, 0.14, 0.14, 0, 1.52] } } },
+];
+const log = new Map([...items, ...more].map((i) => [i.id, i]));
+log.analysis = { plan: { analyses: [{ id: 'A-fall', op: 'growth', inputs: ['i7/conn'], from: '2019', to: '2025' }] }, results: [] };
+const page = (id, evidence, title, exhibit, more = {}) => ({ id, type: 'trend', form: 'line', commentary: 'none', why: 'The movement over time is the claim', evidence, title,
+  settles: { kind: 'rate', what: 'the series', measures: exhibit.series.map((s) => s.measure) }, exhibit, ...more });
+const run = (pages) => find(pages, {}, log).filter((f) => ['NUMBER_FORMATS_DIFFER', 'BRIDGE_UNRECONCILED'].includes(f.code));
+"""
+
+    def test_one_page_prints_a_value_at_one_precision(self):
+        """BA retest hb02: 174 in the title, 175 on the bar and 174.5 in the callout, the record being 174.5."""
+        result = run_node(self.PRINTED + """
+const exhibit = (form, note) => ({ heading: 'Passengers per flight', series: [{ measure: 'i6/perFlight', name: 'Passengers per flight' }], annotations: [{ category: '2025', text: note }] });
+console.log(JSON.stringify({
+  tie: run([{ ...page('p1', ['i6'], 'Passengers per flight rose to 174 in 2025 as aircraft grew', exhibit('column', '{{i6/perFlight@2025 | 0.0}} a flight in 2025')), form: 'column' }]),
+  one: run([{ ...page('p1', ['i6'], 'Passengers per flight rose to {{i6/perFlight@2025 | 0.0}} in 2025 as aircraft grew', exhibit('column', '{{i6/perFlight@2025 | 0.0}} a flight in 2025')), form: 'column' }]) }));
+""")
+        self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["tie"]], [["NUMBER_FORMATS_DIFFER", "blocker", ["p1"]]])
+        self.assertEqual(result["tie"][0]["measured"], {"cell": "i6/perFlight@2025", "format": "0.0"})
+        self.assertIn('"174" is not 174.5 rounded once; print it at `0.0`', result["tie"][0]["repair"])
+        self.assertEqual(result["one"], [])
+
+    def test_a_chart_label_is_held_to_the_figure_another_page_prints(self):
+        """BA retest sh04 against pr11: a chart's label printed a rate as 1.6 that another page printed as 1.58; no check read a label."""
+        result = run_node(self.PRINTED + """
+const columns = { ...trend('p1', [{ measure: 'i4/visits', name: 'Aster' }]), form: 'column' };
+const quoted = trend('p2', [{ measure: 'i4/visits', name: 'Aster' }], { title: 'Aster saw {{i4/visits@FY25 | 0.00}} million visits in FY25' });
+console.log(JSON.stringify({ apart: run([columns, quoted]), alike: run([columns, trend('p2', [{ measure: 'i4/visits', name: 'Aster' }], { title: 'Aster saw {{i4/visits@FY25 | 0.0}} million visits in FY25' })]) }));
+""")
+        self.assertEqual([[f["code"], f["pages"]] for f in result["apart"]], [["NUMBER_FORMATS_DIFFER", ["p1", "p2"]]])
+        self.assertIn('i4/visits@FY25 is "47.3" on p1 and "47.32" on p2; `0.00` prints it as recorded (47.32)', result["apart"][0]["repair"])
+        self.assertEqual(result["alike"], [])
+
+    def test_a_change_agrees_with_the_ends_the_deck_prints(self):
+        """BA retest lc04 against sy07: 'lost 5.3 million' beside ends printed as 27.1m and 21.7m, 5.4 apart."""
+        result = run_node(self.PRINTED + """
+const series = { heading: 'Connecting passengers', series: [{ measure: 'i7/conn', name: 'Connecting' }] };
+const said = (format) => page('p1', ['i7', 'A-fall'], `Connecting passengers fell {{A-fall/change | ${format} | abs}} million since 2019`, series);
+const ends = (format) => page('p2', ['i7'], `Connecting passengers went from {{i7/conn@2019 | ${format}}}m to {{i7/conn@2025 | ${format}}}m`, series);
+console.log(JSON.stringify({ apart: run([said('0.0'), ends('0.0')]), whole: run([said('0.00'), ends('0.00')]) }));
+""")
+        self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["apart"]], [["BRIDGE_UNRECONCILED", "blocker", ["p1", "p2"]]])
+        self.assertEqual(result["apart"][0]["measured"], {"change": "A-fall/change", "printed": ["5.3", "27.1", "21.7"], "reconciles": "0.00"})
+        self.assertEqual(result["whole"], [])
+
+    def test_a_total_beside_its_parts_adds_up(self):
+        """BA retest fd12: 217 and 234 firm orders beside three lines that rose by 19, the line that fell by two left out."""
+        result = run_node(self.PRINTED + """
+const book = { heading: 'Firm orders', series: [{ measure: 'i8/jun', name: 'Orders' }] };
+const text = (more) => `The book rose from 20 to 23 orders: A from {{i8/dec@A | 0}} to {{i8/jun@A | 0}}, D from {{i8/dec@D | 0}} to {{i8/jun@D | 0}}${more}`;
+console.log(JSON.stringify({ short: run([page('p1', ['i8'], text(''), book)]), full: run([page('p1', ['i8'], text(', C from {{i8/dec@C | 0}} to {{i8/jun@C | 0}}'), book)]) }));
+""")
+        self.assertEqual([[f["code"], f["pages"]] for f in result["short"]], [["BRIDGE_UNRECONCILED", ["p1"]]])
+        self.assertEqual(result["short"][0]["measured"]["left"], ["C"])
+        self.assertIn("the page leaves out C 2 to 0", result["short"][0]["repair"])
+        self.assertEqual(result["full"], [])
+
+    def test_a_bridge_whose_declared_format_does_not_add_up_is_refused(self):
+        """BA retest fd06: a bridge printed 0.63, +0.0, -0.1, +0.2 and 0.71; at one place 1.2 + 0.1 + 0.1 is not 1.5, and the refusal names the precision that adds up."""
+        result = run_node(self.PRINTED + """
+const bridge = (format) => ({ id: 'p1', type: 'bridge', form: 'waterfall', commentary: 'none', why: 'What the change is made of', evidence: ['i9'], title: 'Cheaper fuel lifted the spread in 2025',
+  settles: { kind: 'structure', what: 'the spread', measures: ['i9/spread'] }, exhibit: { measure: 'i9/spread', totals: [0, 4], heading: 'Unit spread', ...(format ? { valueFormat: format } : {}) } });
+console.log(JSON.stringify({ one: run([bridge({ decimals: 1, sign: 'auto' })]).map((f) => [f.code, f.measured]), chosen: run([bridge(null)]) }));
+""")
+        self.assertEqual(result["one"], [["BRIDGE_UNRECONCILED", {"exhibit": '"Unit spread"', "printed": ["1.2", "0.1", "0.1", "0.0", "1.5"], "decimals": 1, "reconciles": "0.00"}]])
+        self.assertEqual(result["chosen"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

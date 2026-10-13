@@ -110,7 +110,7 @@ const LISTED = [
   // What the pages state between them (consistency_gates.mjs): a number written two ways is mended in the copy or in the record,
   // a proof shown twice by another view of the measure or one page fewer.
   ...codes("S", "NUMBERS_DISAGREE NUMBER_STALE", ["copy", "record"]),
-  ...codes("S", "NUMBER_FORMATS_DIFFER WORDING_STALE", COPY),
+  ...codes("S", "NUMBER_FORMATS_DIFFER WORDING_STALE BRIDGE_UNRECONCILED", COPY),
   ...codes("S", "PROOF_REPEATS", ["view", "pages"]),
   // The plan record, which is the pages' declared choices (plan_gates.mjs); one step diagram too many is a count of forms.
   ...codes("S", `PLAN_SCHEMA PLAN_TITLE_LENGTH PLAN_TABLE_SHARE PLAN_MEASURED_PAGES PLAN_EXHIBIT_MIX PLAN_EXHIBIT_RUN PLAN_STYLE_ENTROPY
@@ -178,7 +178,7 @@ const LISTED = [
   // The composed scene and its render (gates/page_gates.py, validate-overlap.mjs): what the page holds, and what its words and marks say.
   ...codes("P", "TITLE_LINES TITLE_WORDS TITLE_COUNT", ["title"]),
   ...codes("P", `INK_COVERAGE DEAD_BAND INTERNAL_VOID COLUMN_VOID TYPE_RANGE CPL TAKEAWAY_LONG WORDS HERO_EXHIBIT HEADING_WRAPS THIN_PAGE NOTE_HEAVY
-    THIN_COLUMN PLOT_SPAN THIN_TABLE THIN_EVIDENCE MISSING_RENDER SCENE_VOID RENDER_DRIFT SCENE_INK TEXT_ON_LINE TEXT_ON_TEXT TEXT_ON_EDGE DESCENDER_ON_RULE`, FIT),
+    THIN_COLUMN PLOT_SPAN THIN_TABLE THIN_EVIDENCE MISSING_RENDER SCENE_VOID RENDER_DRIFT SCENE_INK TEXT_ON_LINE TEXT_ON_TEXT TEXT_ON_EDGE DESCENDER_ON_RULE MAP_LABEL_ASTRAY`, FIT),
   ...codes("P", "MISSING_ARGUMENT POINT_DEPTH UNANNOTATED TWIN_CELLS RESTATEMENT PLANNING_VOICE CAVEAT_HEAVY CONTRADICTED_SHARE", COPY),
   ...codes("P", "METRIC_STACK NUMBERS_ON_MARKS NICE_TICKS UNSOURCED_PICTURE UNSCALED_FIGURE SCATTER_UNKEYED", LAYOUT),
   // Type and marks lost on their ground (gates/scene_gates.py, page_gates.py): the page's `tone` or the deck's palette, or the export.
@@ -288,7 +288,7 @@ export function classOf(code) {
 // content, and finding it by hand costs a run a try.
 export const LAYOUT_CODES = Object.freeze(new Set(["PAGE_DOES_NOT_COMPOSE", "SCENE_VOID", "DEAD_BAND", "INTERNAL_VOID", "COLUMN_VOID",
   "TEXT_COVERAGE_LOW", "THIN_PAGE", "THIN_COLUMN", "INK_COVERAGE", "HERO_EXHIBIT", "WORDS", "TITLE_LINES", "HEADING_WRAPS", "CPL",
-  "PLOT_SPAN", "THIN_TABLE", "NOTE_HEAVY", "TEXT_ON_LINE", "TEXT_ON_TEXT", "TEXT_ON_EDGE"]));
+  "PLOT_SPAN", "THIN_TABLE", "NOTE_HEAVY", "TEXT_ON_LINE", "TEXT_ON_TEXT", "TEXT_ON_EDGE", "MAP_LABEL_ASTRAY"]));
 
 // Every structure and aggregate rule says where the deck stands against it on
 // every run (`standing`, below) - except these, which have no quantity to
@@ -298,7 +298,7 @@ export const STANDING_FREE = Object.freeze(Object.fromEntries([
   ...reasons("holds or fails on a named statement, insight, analysis, section or file; nothing is counted toward a bar", `GENERATOR_SIGNATURE PILLAR_UNSUPPORTED
     REVISION_UNMAPPED REVISION_INVENTORY_MISSING REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED ANALYSIS_UNRESTED SOURCES_UNFILED SOURCE_NUMBERS_UNREAD SPINE_LOCKED REQUEST_MISSING WAIVERS_INVALID STATEMENT_INVALID
     CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE STAGE_CONTRACT STAGE_MISSING SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
-    NUMBERS_DISAGREE NUMBER_STALE WORDING_STALE NUMBER_FORMATS_DIFFER PROOF_REPEATS`),
+    NUMBERS_DISAGREE NUMBER_STALE WORDING_STALE NUMBER_FORMATS_DIFFER PROOF_REPEATS BRIDGE_UNRECONCILED`),
   ...reasons("an advisory on the families a plan declares; the variety contract and the craft floors hold the same quantity on the compiled deck, and theirs is the standing", `PLAN_TITLE_LENGTH
     PLAN_TABLE_SHARE PLAN_MEASURED_PAGES PLAN_EXHIBIT_MIX PLAN_EXHIBIT_RUN PLAN_NO_PICTURES PLAN_NO_ICONS PLAN_NO_INSIGHT PLAN_TABLE_DEPTH PLAN_TABLE_MONOTONY
     PLAN_UNANNOTATED_CHARTS PLAN_NO_HIGHLIGHT PLAN_EXHIBIT_VARIETY PLAN_CHART_MONOTONY`),
