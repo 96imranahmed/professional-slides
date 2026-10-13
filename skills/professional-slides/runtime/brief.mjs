@@ -133,8 +133,11 @@ function limitSets(pages, limitsOf) {
 }
 
 /** The commands a role runs on its section, exactly as it runs them. */
-function commandLines(role, { file, ids, deckFile }) {
+function commandLines(role, { file, ids, deckFile, part, spine }) {
   const pages = ids.join(",");
+  // A self-check's answer is validated before it is handed back, as a critic's is: a page left without a verdict, a replacement
+  // past its slot or printing a number no record holds, or a field the page does not have is refused while the checker can mend it.
+  const answer = `out/self-check/${spine ? "spine/" : ""}${part ? partName(part) : "deck"}.json`;
   const judge = `node runtime/judge.mjs ${file} --page ${pages}`;
   return {
     skeleton: [`- check the spine of your pages: \`node runtime/author-deck.mjs ${file} --draft --page ${pages} --json\` - hand back when nothing blocks on them`,
@@ -143,7 +146,9 @@ function commandLines(role, { file, ids, deckFile }) {
       `- check your pages: \`node runtime/author-deck.mjs ${file} --check --page ${pages} --json\` - every blocking finding on them is yours to repair`,
       `- stage the questions the rules ask of your pages: \`${judge}\` (exit 3: packets wait, each for a fresh reader; exit 0: none open)`],
     critic: [`- the section packets are staged by \`node runtime/storyline.mjs ${deckFile} <out> --split\`: answer the section prompt you were given, save its JSON where the prompt says, and \`node runtime/storyline.mjs merge ${deckFile} <out>\` validates every part against its packet`],
-    selfcheck: [`- save your answer as out/self-check/<part>.json beside ${file} (the form above); the lead records the deck's with \`node runtime/self-check.mjs ${file} out/\` after the build`],
+    selfcheck: [`- save your answer as ${answer} beside ${file} (the form above), then run \`node runtime/self-check.mjs --validate ${answer} ${file}\` - it prints every reason the answer would be refused; mend each and run it again until it says the answer would be recorded`,
+      ...(spine ? ["- the lead applies your replacements to the titles and summaries before the storyline critique closes"]
+        : [`- the lead records the deck's with \`node runtime/self-check.mjs ${file} out/\` after the build: a page whose replacements were applied word for word keeps your verdict`])],
     judge: [`- stage your section's questions: \`${judge}\` (exit 3: packets wait in judgements/<section>/; exit 0: none open)`,
       "- give each packet's prompt.md to its own fresh reader, save its JSON as answer.json in the packet's folder, and run the same command again to record it",
       `- a plain \`node runtime/judge.mjs ${file}\` records every section's answered packets`],
@@ -153,16 +158,17 @@ function commandLines(role, { file, ids, deckFile }) {
 /**
  * The brief for `role` over `section` of the pages file: `{ lines }`, or `{ why }` where the section is not one of the file's.
  * `limitsOf(page)` is the limits block `--scaffold` prints for a page; `insights` the insight log as author-deck reads it,
- * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id.
+ * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id; `sheet`, for a
+ * self-checker, its pages' claims (claim-sheet.mjs), and `spine` where they are the titles and divider summaries alone.
  */
-export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null }) {
+export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null, spine = false }) {
   const found = sectionPages(doc, section);
   if (found.why) return { why: found.why };
   const { pages, part } = found;
   const ids = pages.map((page) => String(page.id)), mine = new Set(ids);
   const deck = doc.deck ?? {};
   const said = (value) => (typeof value === "string" ? value : compact(value));
-  const lines = [`# ${role} brief: ${part ? `section ${partName(part)} (${part})` : "the whole deck"}, ${pages.length} page${pages.length === 1 ? "" : "s"}`, "", digest.trim(), "", "## The deck",
+  const lines = [`# ${role} brief${spine ? " (titles and divider summaries)" : ""}: ${part ? `section ${partName(part)} (${part})` : "the whole deck"}, ${pages.length} page${pages.length === 1 ? "" : "s"}`, "", digest.trim(), "", "## The deck",
     ...(deck.request ? [`Request: ${said(deck.request)}`] : []), ...(deck.answer ? [`Answer: ${said(deck.answer)}`] : []), ...(deck.density ? [`Density: ${deck.density}`] : [])];
   // What the answer critique raised before the skeleton (answer-critique.mjs): a page that builds on a claim the log does not
   // support is a page the storyline critique sends back, so the skeleton and its writers see what is open.
@@ -180,7 +186,8 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
   else if (role === "selfcheck") {
     // Each page's sentences beside the record behind their numbers (claim-sheet.mjs), and the records whole: the checker
     // reads ranks, comparisons and causes against the findings and calculations, not against the page's own exhibit.
-    lines.push("", "## Your pages' claims (`ok`: every number is a recorded value at its printed precision; `CHECK`: one is not)", ...claimSheetLines(sheet ?? []));
+    lines.push("", `## Your pages' ${spine ? "titles and divider summaries" : "claims"} (\`ok\`: every number is a recorded value at its printed precision; \`CHECK\`: one is not; \`fits\`: the room of the slot the text sits in, which a replacement fits; \`as written\`: the text with the tokens that print its numbers)`,
+      ...claimSheetLines(sheet ?? []));
     const rests = [...new Set(evidenceOf(pages))].map((id) => insights?.get?.(String(id))).filter(Boolean);
     lines.push("## The records they rest on", ...rests.flatMap((insight) => insightLines(insight)));
   }
@@ -219,7 +226,7 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
     if (free.length) lines.push("", "## Insights no page rests on yet", ...free.map(withMeasures));
   }
   if (role === "writer") lines.push("", "## The measures your pages' evidence holds: each value, and the token that prints it", ...(insights ? measureLines(pages, insights) : ["No insight log beside the pages file: there are no measures to print by token."]));
-  lines.push("", "## Commands", ...commandLines(role, { file, ids, deckFile: path.join(path.dirname(file), `${stem}.deck.json`) }));
+  lines.push("", "## Commands", ...commandLines(role, { file, ids, deckFile: path.join(path.dirname(file), `${stem}.deck.json`), part, spine }));
   return { lines };
 }
 

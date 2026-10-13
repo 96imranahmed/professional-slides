@@ -345,7 +345,7 @@ function relationFindings(page, id, registry) {
 
 // Keys of a page that are not something it says to the reader about a number: what the page rests on and how it is
 // built, and the names along an axis (a category, a column head, a series), which are labels whatever digits they hold.
-const NOT_PROSE = new Set(["id", "type", "form", "kind", "commentary", "why", "adds", "evidence", "settles", "source", "basis", "measure", "format", "select", "role", "relevance",
+export const NOT_PROSE = new Set(["id", "type", "form", "kind", "commentary", "why", "adds", "evidence", "settles", "source", "basis", "measure", "format", "select", "role", "relevance",
   "icon", "treatment", "variant", "arrangement", "placement", "tone", "categories", "labels", "columns", "category", "name", "unit", "secondaryUnit", "indexBase", "subject",
   "focusSeries", "forecastFrom", "from", "to", "at", "period", "alt", "src", "image", "photo", "player", "logo", "url", "key", "highlight", "series", "values"]);
 
