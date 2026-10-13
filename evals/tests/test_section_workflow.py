@@ -53,7 +53,7 @@ const plain = await J.stageJudgements(dir, [...a, ...b, ...ask(4, 500, 'c1')]);
 const afterPlain = await names();
 // Section a's reader answers; any run records it, and the section's folder goes with its last packet.
 const [{ folder, packet }] = first.packets;
-await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch: packet.batch, judgements: packet.items.map((item) => ({ key: item.key, verdict: 'count-only', reason: 'The title says how many and nothing more.', quote: item.subject })) }));
+await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch: packet.batch, judgements: packet.items.map((item) => ({ key: item.key, verdict: 'compares', reason: 'The title sets the count against the fleet it is part of.', quote: item.subject })) }));
 const recorded = await J.recordAnswers(dir, 'deck');
 const store = JSON.parse(await fs.readFile(path.join(dir, 'deck.judgements.json'), 'utf8'));
 const left = await names(), partA = await fs.access(path.join(dir, 'judgements', 'part-a')).then(() => true, () => false);
