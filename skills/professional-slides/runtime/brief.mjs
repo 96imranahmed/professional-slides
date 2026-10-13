@@ -150,12 +150,48 @@ function commandLines(role, { file, ids, deckFile }) {
   }[role];
 }
 
+// The caps a writer chooses within: where the commentary sits and whether the page closes on a line. The rest are the skeleton's.
+const PLACEMENT_QUOTAS = new Set(["VARIETY_COMMENTARY", "VARIETY_COLUMN", "VARIETY_TAKEAWAY"]);
+
+/**
+ * The section's room under each of the deck's caps (deck-structure.mjs
+ * sectionQuotas), as lines: the cap in pages, what the other sections hold
+ * (by section), what that leaves this one and what it holds. A skeleton is
+ * told every quota and the kinds of exhibit; a writer the placements it
+ * chooses. On the BA retest each section met the deck's caps only once all
+ * were written - 2a wrote four numbers pages of six against a deck cap of
+ * nine, and a writer's `below` on hw04 tipped VARIETY_COMMENTARY for all.
+ */
+function quotaLines(quotas, role, parts) {
+  const bySection = (ids) => {
+    const tally = new Map();
+    for (const id of ids) { const part = parts.get(String(id)); const name = part ? partName(part) : "the pages file"; tally.set(name, (tally.get(name) ?? 0) + 1); }
+    return [...tally].sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} ${count}`).join(", ");
+  };
+  const lines = quotas.quotas.filter((q) => role === "skeleton" || PLACEMENT_QUOTAS.has(q.code)).map((q) => {
+    const left = Math.max(q.room, 0), over = q.own.length - left;
+    const change = q.code === "VARIETY_TYPE_SHARE" ? "type" : q.code === "VARIETY_EXHIBIT_MIX" ? "exhibit" : "placement";
+    const standing = over > 0 ? `: ${over} over - give ${over === 1 ? "one" : `${over} of them`} another ${change}` : over === 0 ? ": at the cap" : `: ${-over} to spare`;
+    return `- ${q.what} (${q.code}${q.key ? `.${q.key}` : ""}, at most ${Math.round(q.share * 100)}%): the deck's cap is ${q.cap} of ${q.of} pages; the other sections hold ${q.others.length}` +
+      `${q.others.length ? ` (${bySection(q.others)})` : ""}, which leaves this section ${left}${q.room < 0 ? ` (they are ${-q.room} over it already)` : ""}; it holds ${q.own.length}${q.own.length ? ` (${q.own.join(", ")})` : ""}${standing}`;
+  });
+  if (role === "skeleton") {
+    const k = quotas.kinds;
+    lines.push(`- kinds of exhibit (VARIETY_EXHIBIT_RANGE, at least ${k.perTen} per ten pages; advisory at the spine, held at the full compile): the floor is ${k.floor} for ${quotas.pages} pages, and the deck draws ${k.deck} so far - ` +
+      `the other sections ${k.others.length}${k.others.length ? ` (${k.others.join(", ")})` : ""}; this section ${k.own.length}${k.own.length ? ` (${k.own.join(", ")})` : ""}, ${k.only.length} no other section draws${k.only.length ? ` (${k.only.join(", ")})` : ""}`,
+    k.adds.length ? `  kinds the deck does not draw that this section's evidence holds (each read as --scaffold <type>/<form> --evidence reads it): ${k.adds.map((item) => `${item.id} as ${item.type}/${item.form} (${item.change === "form" ? "form change" : `type change from ${item.from}`}) adds ${item.adds.join(", ")}`).join("; ")}`
+      : "  no form this section's evidence holds draws a kind the deck does not draw yet");
+  }
+  return lines;
+}
+
 /**
  * The brief for `role` over `section` of the pages file: `{ lines }`, or `{ why }` where the section is not one of the file's.
  * `limitsOf(page)` is the limits block `--scaffold` prints for a page; `insights` the insight log as author-deck reads it,
- * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id.
+ * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id; `quotas`,
+ * for a skeleton or a writer briefed on a section, its room under the deck's caps (deck-structure.mjs sectionQuotas).
  */
-export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null }) {
+export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null, quotas = null }) {
   const found = sectionPages(doc, section);
   if (found.why) return { why: found.why };
   const { pages, part } = found;
@@ -201,6 +237,10 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
         lines.push(read === "limits" ? `  slots (its limits - the page does not compose before its copy is written, so no slot was measured): ${compact(slots)}` : `  slots: ${compact(slots)}`);
       }
     }
+  }
+  if (quotas && ["skeleton", "writer"].includes(role)) {
+    lines.push("", `## The deck's caps: this section's room, as the other sections stand now${role === "writer" ? " (the placements you choose)" : ""}`,
+      "Choose within it: a page over its section's room tips the deck's cap for every section, and the whole-deck check refuses it.", ...quotaLines(quotas, role, partsOf(doc)));
   }
   if (role === "skeleton" && insights) {
     // What a page may rest on: the insights the section's pages name, and those no page of the deck names yet.
