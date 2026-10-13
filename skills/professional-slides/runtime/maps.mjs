@@ -360,6 +360,36 @@ function markerCoordinate(marker, geography, projected) {
 const BADGE_PAD = 10;
 // A hub that is a badge is ringed, the ring this far outside the disc: a dot in its middle would cover the figure.
 const HUB_RING = 4;
+// The dot that keeps a spread marker's place, and how far a marker moves before it needs one.
+const ANCHOR = 6, MOVED = 2;
+const moved = (place, centre) => Math.hypot(centre[0] - place[0], centre[1] - place[1]) > MOVED;
+
+/**
+ * Where each marker is drawn: at its place, except where its disc would
+ * overlap another's - then the two are pushed apart along the line between
+ * them, a little at a time, until every disc clears every other by 2px, kept
+ * inside `frame`. Valued discs over five hubs a few hundred kilometres apart
+ * (the BA retest's Heathrow, Amsterdam, Paris, Frankfurt and Munich at the
+ * scale of Europe) otherwise sit on each other and cover each other's values.
+ */
+function spreadMarkers(places, radii, frame) {
+  const at = places.map(([x, y]) => [x, y]);
+  const keep = (i) => { at[i][0] = Math.min(Math.max(at[i][0], frame.x + radii[i]), frame.x + frame.width - radii[i]); at[i][1] = Math.min(Math.max(at[i][1], frame.y + radii[i]), frame.y + frame.height - radii[i]); };
+  for (let round = 0; round < 400; round += 1) {
+    let overlapping = false;
+    for (let i = 0; i < at.length; i += 1) for (let j = i + 1; j < at.length; j += 1) {
+      const dx = at[j][0] - at[i][0], dy = at[j][1] - at[i][1], d = Math.hypot(dx, dy), need = radii[i] + radii[j] + 2;
+      if (d >= need) continue;
+      overlapping = true;
+      // Two markers on one point part along a fixed angle, so the same map spreads the same way every time.
+      const [ux, uy] = d > 1e-6 ? [dx / d, dy / d] : [Math.cos(j * 2.4), Math.sin(j * 2.4)], push = (need - d) / 2 + 0.25;
+      at[i][0] -= ux * push; at[i][1] -= uy * push; at[j][0] += ux * push; at[j][1] += uy * push;
+      keep(i); keep(j);
+    }
+    if (!overlapping) break;
+  }
+  return at;
+}
 const badgeText = (marker) => String(marker.display ?? marker.value);
 const badgeLayout = (marker) => measureText(badgeText(marker), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(LABEL), bold: true });
 const badgeDiameter = (markers) => Math.max(0, ...markers.filter((marker) => marker?.style === "badge").map((marker) => { const layout = badgeLayout(marker); return Math.max(layout.width, layout.height) + BADGE_PAD; }));
@@ -375,19 +405,29 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
   }
   const badges = badgeDiameter(markers);
   if (badges && markers.some((marker) => Number.isFinite(marker?.value) && marker.style !== "badge")) throw new Error("A map's valued markers are all badges (the figure printed) or none (sized by area against a key); mixed, the key reads the badges wrong");
+  // Where each marker stands, and where it is drawn: close markers are spread until their discs clear (spreadMarkers), and a
+  // marker moved off its place keeps a dot there with a hairline to its disc.
+  const places = markers.map((marker) => markerCoordinate(marker, geography, projected));
+  const radii = markers.map((marker) => markerDiameter(marker, maxValue, badges) / 2 + 1 + (marker?.style === "badge" && marker.hub ? HUB_RING : 0));
+  const centres = spreadMarkers(places, radii, frame);
   // Every marker's footprint, before any label is placed, so a label never
-  // lands on a marker that comes later in the list.
-  const occupied = markers.map((marker) => {
-    const [x, y] = markerCoordinate(marker, geography, projected);
-    const r = markerDiameter(marker, maxValue, badges) / 2 + 1 + (marker?.style === "badge" && marker.hub ? HUB_RING : 0);
-    return { x: x - r, y: y - r, width: 2 * r, height: 2 * r };
-  });
+  // lands on a marker that comes later in the list - and the dot that marks
+  // the place of a marker drawn away from it.
+  const occupied = centres.flatMap(([x, y], i) => [{ x: x - radii[i], y: y - radii[i], width: 2 * radii[i], height: 2 * radii[i] },
+    ...(moved(places[i], centres[i]) ? [{ x: places[i][0] - ANCHOR, y: places[i][1] - ANCHOR, width: 2 * ANCHOR, height: 2 * ANCHOR }] : [])]);
+  // How far a label's frame is from a marker's disc: a label is read as the name of the marker nearest it.
+  const reach = (f, i) => Math.max(0, Math.hypot(Math.max(f.x - centres[i][0], 0, centres[i][0] - f.x - f.width), Math.max(f.y - centres[i][1], 0, centres[i][1] - f.y - f.height)) - radii[i]);
   const nodes = [];
   for (const [index, marker] of markers.entries()) {
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("Map marker must be an object");
     if (marker.size !== undefined && (!Number.isFinite(marker.size) || marker.size <= 0)) throw new Error("Map marker size must be positive and finite");
     if (marker.fraction !== undefined && (!Number.isFinite(marker.fraction) || marker.fraction < 0 || marker.fraction > 1)) throw new Error("Map marker fraction must be a number from zero to one");
-    const [centerX, centerY] = markerCoordinate(marker, geography, projected);
+    const [centerX, centerY] = centres[index];
+    if (moved(places[index], centres[index])) {
+      const [px, py] = places[index], d = Math.hypot(centerX - px, centerY - py);
+      nodes.push(linePrimitive({ id: stableId(id, "marker-leader", index), role: "map-marker-leader", x1: px, y1: py, x2: centerX - (centerX - px) / d * radii[index], y2: centerY - (centerY - py) / d * radii[index], style: { stroke: INK, lineWidth: HAIRLINE }, data: { markerIndex: index } }));
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-place", index), role: "map-marker-place", frame: { x: px - ANCHOR / 2, y: py - ANCHOR / 2, width: ANCHOR, height: ANCHOR }, style: { fill: INK, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, markerIndex: index } }));
+    }
     // A numbered pin is the deck's numbered disc, so the side list matches it.
     if (marker.number !== undefined) {
       const disc = markerSize(), pinFrame = { x: centerX - disc / 2, y: centerY - disc / 2, width: disc, height: disc };
@@ -414,10 +454,10 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
     if (marker.style === "badge") {
       const layout = badgeLayout(marker);
       if (marker.hub) nodes.push(ellipsePrimitive({ id: stableId(id, "marker-ring", index), role: "map-marker", frame: { x: markerFrame.x - HUB_RING, y: markerFrame.y - HUB_RING, width: size + 2 * HUB_RING, height: size + 2 * HUB_RING },
-        style: { fill: SURFACE, stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { geography: geography.id, hub: true } }));
-      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, badge: true, value: marker.value } }));
+        style: { fill: SURFACE, stroke: PRIMARY, lineWidth: token("line.standard"), radius: token("radius.round") }, data: { geography: geography.id, hub: true, markerIndex: index } }));
+      nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: PRIMARY, stroke: SURFACE, lineWidth: HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, badge: true, value: marker.value, markerIndex: index } }));
       nodes.push(textPrimitive({ id: stableId(id, "marker-value", index), role: "map-marker-value", frame: { x: centerX - layout.width / 2 - 1, y: centerY - layout.height / 2, width: Math.ceil(layout.width) + 2, height: layout.height }, text: badgeText(marker), style: { fontFamily: FONT, fontSize: LABEL, color: WHITE, bold: true, align: "center", valign: "top", lineHeight: layout.lineHeight, wrap: false }, data: { value: marker.value, textLayout: layout } }));
-    } else nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub) } }));
+    } else nodes.push(ellipsePrimitive({ id: stableId(id, "marker-base", index), role: "map-marker", frame: markerFrame, style: { fill: SURFACE, stroke: marker.hub ? PRIMARY : INK, lineWidth: marker.hub ? token("line.standard") : HAIRLINE, radius: token("radius.round") }, data: { geography: geography.id, hub: Boolean(marker.hub), markerIndex: index } }));
     if (marker.hub && marker.style !== "badge") {
       const dot = size * 0.45, dotFrame = { x: centerX - dot / 2, y: centerY - dot / 2, width: dot, height: dot };
       nodes.push(ellipsePrimitive({ id: stableId(id, "marker-fill", index), role: "map-marker-fill", frame: dotFrame, style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, radius: token("radius.round") } }));
@@ -444,7 +484,11 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
         [centerX - width / 2, centerY - half - height - 16, "center"], [centerX - width / 2, centerY + half + 16, "center"],
       ].map(([x, y, align]) => ({ frame: { x, y, width, height }, align }));
       const inside = (f) => f.x >= frame.x && f.y >= frame.y && f.x + f.width <= frame.x + frame.width && f.y + f.height <= frame.y + frame.height;
-      const clear = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);
+      // Clear of every footprint, and nearer its own marker than any other: the BA retest's hub map set Heathrow's name over
+      // Amsterdam's disc, so its +4.4% read as Amsterdam's (validate-overlap.mjs MAP_LABEL_ASTRAY refuses what still does).
+      const own = (f) => centres.every((_, other) => other === index || reach(f, other) >= reach(f, index) + 1);
+      const free = (f) => !occupied.some((o) => f.x < o.x + o.width && o.x < f.x + f.width && f.y < o.y + o.height && o.y < f.y + f.height);
+      const clear = (f) => own(f) && free(f);
       let chosen = candidates.find((c) => inside(c.frame) && clear(c.frame));
       let leader = null;
       if (!chosen) {
@@ -459,7 +503,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
           const ux = Math.cos(degrees * Math.PI / 180), uy = Math.sin(degrees * Math.PI / 180);
           const cx = centerX + ux * (half + reach + width / 2 * Math.abs(ux)), cy = centerY + uy * (half + reach + height / 2 * Math.abs(uy));
           const f = { x: cx - width / 2, y: cy - height / 2, width, height };
-          if (!inside(f) || !clear(f)) continue;
+          if (!inside(f) || !free(f)) continue;
           const x1 = centerX + ux * (half + 2), y1 = centerY + uy * (half + 2);
           const x2 = Math.max(f.x - 2, Math.min(f.x + f.width + 2, cx - ux * (width / 2 + 2))), y2 = Math.max(f.y, Math.min(f.y + f.height, cy - uy * (height / 2 + 2)));
           if (!pathClear(x1, y1, x2, y2)) continue;
@@ -472,7 +516,7 @@ function markerNodes({ id, frame, geography, projected, markers, highlighted = n
       occupied.push(chosen.frame);
       if (leader) nodes.push(linePrimitive({ id: stableId(id, "marker-label-leader", index), role: "map-label-leader", ...leader, style: { stroke: SECONDARY, lineWidth: HAIRLINE }, data: { markerIndex: index } }));
       nodes.push(rectPrimitive({ id: stableId(id, "marker-label-backing", index), role: "map-label-backing", frame: { x: chosen.frame.x - 1, y: chosen.frame.y + 1, width: chosen.frame.width + 2, height: chosen.frame.height - 2 }, style: { fill: token("color.canvas"), stroke: "none", lineWidth: HAIRLINE, radius: token("radius.small") } }));
-      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: chosen.frame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: marker.hub ? INK : SECONDARY, bold: true, align: chosen.align, valign: "mid" }, data: { textLayout: measured } }));
+      nodes.push(textPrimitive({ id: stableId(id, "marker-label", index), role: "map-label", frame: chosen.frame, text: marker.label, style: { fontFamily: FONT, fontSize: LABEL, color: marker.hub ? INK : SECONDARY, bold: true, align: chosen.align, valign: "mid" }, data: { textLayout: measured, markerIndex: index } }));
     }
   }
   return nodes;

@@ -13,6 +13,7 @@ export const OVERLAP_CODES = Object.freeze({
   DESCENDER_ON_RULE: "a display-face numeral's old-style descender set on a rule under it",
   SCATTER_UNKEYED: "a scatter coloured by series with no key and no named ends",
   TEXT_ON_TEXT: "two labels whose ink overlaps",
+  MAP_LABEL_ASTRAY: "a map marker's label set nearer another marker than its own, with no leader to its own",
 });
 
 const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption", "exhibit-link-label"]);
@@ -150,6 +151,32 @@ export function sceneChartFindings(slide) {
     const coloured = new Set(mine.filter((n) => n.role === "chart-marker").map((n) => n.style?.fill?.tokenId ?? n.style?.fill)).size > 1;
     if (series.size > 1 && coloured && !named) findings.push({ code: "SCATTER_UNKEYED", slide: slide.id, instance, series: [...series] });
   }
+  return [...findings, ...mapLabelsAstray(slide)];
+}
+
+/**
+ * A map marker's label nearer another marker's disc than its own, with no
+ * leader drawn to its own (MAP_LABEL_ASTRAY): a reader takes a name for the
+ * marker it sits beside. The BA retest's hub map set London Heathrow's name
+ * beside Amsterdam's +4.4% disc and Amsterdam's beside Heathrow's -4.1%, so
+ * the page read Heathrow as shrinking - the reverse of its title. Read off the
+ * scene: each label and disc carries the index of the marker it belongs to
+ * (maps.mjs), and distance is from the label's frame to the disc's edge.
+ */
+function mapLabelsAstray(slide) {
+  const nodes = slide.nodes || [], findings = [];
+  const discs = nodes.filter((n) => n.role === "map-marker" && Number.isInteger(n.data?.markerIndex) && n.frame);
+  const led = new Set(nodes.filter((n) => n.role === "map-label-leader" && Number.isInteger(n.data?.markerIndex)).map((n) => `${n.data?.componentInstance ?? ""}|${n.data.markerIndex}`));
+  const reach = (f, disc) => { const r = disc.frame.width / 2, cx = disc.frame.x + r, cy = disc.frame.y + disc.frame.height / 2;
+    return Math.max(0, Math.hypot(Math.max(f.x - cx, 0, cx - f.x - f.width), Math.max(f.y - cy, 0, cy - f.y - f.height)) - r); };
+  for (const label of nodes.filter((n) => n.role === "map-label" && Number.isInteger(n.data?.markerIndex) && n.frame)) {
+    const map = label.data?.componentInstance ?? "", index = label.data.markerIndex;
+    if (led.has(`${map}|${index}`)) continue;
+    const mine = discs.filter((d) => (d.data?.componentInstance ?? "") === map);
+    const own = Math.min(...mine.filter((d) => d.data.markerIndex === index).map((d) => reach(label.frame, d)));
+    const nearer = mine.filter((d) => d.data.markerIndex !== index && reach(label.frame, d) + 1 < own).sort((a, b) => reach(label.frame, a) - reach(label.frame, b))[0];
+    if (Number.isFinite(own) && nearer) findings.push({ code: "MAP_LABEL_ASTRAY", slide: slide.id, text: label.id, label: String(label.text ?? ""), marker: index, nearer: nearer.data.markerIndex, gap: [Math.round(own), Math.round(reach(label.frame, nearer))] });
+  }
   return findings;
 }
 
@@ -160,7 +187,7 @@ export function sceneChartFindings(slide) {
  * reader needs to tell its colours apart. A label within 2px of a neighbouring
  * box is cramped but legible - a spacing question, read beside the page.
  */
-export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_ON_EDGE: "advisory" });
+export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_ON_EDGE: "advisory", MAP_LABEL_ASTRAY: "blocker" });
 
 const OVERLAP_REPAIR = Object.freeze({
   TEXT_ON_LINE: "Move the label off the line: set a reference label at the end of its line clear of the series, a flow label above its arrow, a value label on the side of its point the line leaves open - or shorten it so it fits between the marks.",
@@ -168,6 +195,7 @@ const OVERLAP_REPAIR = Object.freeze({
   DESCENDER_ON_RULE: "Set the numeral in lining figures (the body face) or lift it off the rule by its descent.",
   SCATTER_UNKEYED: "Keep the scatter's legend, or connect each series (connect: true) so its name sits at its end.",
   TEXT_ON_TEXT: "Set one label clear of the other: fewer or shorter callouts on that part of the chart, a callout moved to the category its point leaves open, a shorter category name, or a wider slot.",
+  MAP_LABEL_ASTRAY: "Set each marker's name beside its own marker: fewer markers in the cluster, a wider `crop` or a region map that spreads them, shorter names - or move the cluster's values into a ranked bar or a callout list beside the map.",
 });
 
 /**

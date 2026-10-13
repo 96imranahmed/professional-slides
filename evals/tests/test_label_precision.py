@@ -126,13 +126,14 @@ const silent = plan([page('Announced face values; payment timing is undisclosed'
 const native = (deck) => deck.slides[0].componentInstances.find((c) => c.component === 'chart.bar')?.nativeChart ?? null;
 console.log(JSON.stringify({ quoted: labels(quoted), silent: labels(silent), nativeQuoted: native(quoted), nativeSilent: Boolean(native(silent)) }));
 ''')
-        self.assertIn('11.6', result['quoted'])
-        self.assertIn('250', result['quoted'])
+        # The quote raises the whole chart, not its one bar: the BA retest's lollipop printed Air France's 1.58% as 1.6
+        # beside BA's quoted 1.60, higher-looking yet lower.
+        self.assertEqual(result['quoted'], ['250.0', '100.0', '100.0', '11.6'])
         # Unquoted, the chart keeps its one precision: whole numbers past 100.
         self.assertIn('12', result['silent'])
         self.assertNotIn('11.6', result['silent'])
-        # A series of mixed precision is drawn, not handed to one native number format.
-        self.assertIsNone(result['nativeQuoted'])
+        # One precision is one native number format, so both charts go native.
+        self.assertTrue(result['nativeQuoted'])
         self.assertTrue(result['nativeSilent'])
 
     def test_only_figures_written_with_decimals_are_quoted(self):

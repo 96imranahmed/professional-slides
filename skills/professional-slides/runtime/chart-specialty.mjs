@@ -3,7 +3,7 @@
 // waffle, bubble grid and marimekko measure their height from the same layout
 // they draw (`*Layout`), which their registry entries answer measureContent from.
 import { linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValue, ellipsePrimitive, TOKENS, onFill } from "./core.mjs";
-import { formatValue } from "./value-format.mjs";
+import { bridgeLabelProps, formatValue } from "./value-format.mjs";
 import { measureText, ENGINE_RESERVE } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, PRIMARY, CHART_LABEL, AXIS_LABEL, LABEL_BAND, chartFrame, labelBold, textStyle, lineStyle, fillStyle,
   assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend } from "./chart-axes.mjs";
@@ -16,6 +16,8 @@ export function waterfall({ id, frame, props }) {
   if (props.orientation !== undefined && !["vertical", "horizontal"].includes(props.orientation)) throw new Error(`${id}: a bridge's \`orientation\` is "vertical" (the default, steps across) or "horizontal" (steps down the page, names in a column)`);
   if (props.orientation === "horizontal") return horizontalWaterfall({ id, frame, props });
   assertGridlineOption(props);
+  // Every label at the one precision at which the printed steps add up to the printed totals (value-format.mjs bridgeLabelProps).
+  const labelled = bridgeLabelProps(props);
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
@@ -80,7 +82,7 @@ export function waterfall({ id, frame, props }) {
       const y = bar.y + bar.height - 26 - dy;
       nodes.push(linePrimitive({ id: stableId(id, "axis-break", category, at), role: "chart-axis-break", x1: bar.x - 4, y1: y + 5, x2: bar.x + bar.width + 4, y2: y - 5, style: lineStyle(token("color.surface"), token("line.medium")) }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, labelled) : `${value >= 0 ? "+" : ""}${formatValue(value, labelled)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
     const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38 };
     pointMap.set(`value:${category}`, point);
@@ -106,6 +108,7 @@ function horizontalWaterfall({ id, frame, props }) {
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
+  const labelled = bridgeLabelProps(props);
   for (const key of ["annotations", "referenceLines", "changeAnnotations", "annotationRail", "periods", "events"]) {
     const value = props[key];
     if (Array.isArray(value) ? value.length : value) throw new Error(`${id}: a horizontal bridge takes its notes in the page's commentary - \`${key}\` is drawn on the vertical bridge; drop it or the orientation`);
@@ -146,7 +149,7 @@ function horizontalWaterfall({ id, frame, props }) {
     const name = names[index];
     nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y + (rowHeight - name.height) / 2, width: nameWidth, height: name.height }, text: name.text, style: { ...textStyle(AXIS_LABEL, INK, Boolean(isTotal), "right"), valign: "top", lineHeight: name.lineHeight, wrap: false }, data: { textLayout: name } }));
     // The figure at the end the step runs to: past the right end of a rise or a total, before the left end of a fall.
-    const text = isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`;
+    const text = isTotal ? formatValue(value, labelled) : `${value >= 0 ? "+" : ""}${formatValue(value, labelled)}`;
     const right = isTotal || value >= 0;
     nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: right ? bar.x + bar.width + 4 : bar.x - HBRIDGE.labelRoom, y: y + (rowHeight - 24) / 2, width: HBRIDGE.labelRoom - 4, height: 24 }, text, style: textStyle(CHART_LABEL, INK, labelBold(), right ? "left" : "right"), data: { category, value } }));
     if (lastBar) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: xScale(previous), y1: lastBar.y + lastBar.height, x2: xScale(previous), y2: bar.y, style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));

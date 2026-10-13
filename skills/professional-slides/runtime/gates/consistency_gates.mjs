@@ -41,7 +41,8 @@
 //                                two exhibits give different numbers under the
 //                                same pair of names
 //   NUMBER_FORMATS_DIFFER        one value printed at different precision or
-//                                scale on different pages
+//                                scale on one page (a chart's labels read at the
+//                                precision it labels at), or on two pages
 //   NUMBER_STALE                 a revision: a number changed on one page and
 //                                still standing in its old form on another.
 //                                Two kinds of change feed it. A text edit on a
@@ -64,6 +65,13 @@
 //                                does not: the same line on the same frame
 //                                (blocks where both claim the same measures and
 //                                show exactly the same views)
+//   BRIDGE_UNRECONCILED          what is said to add up and does not, as printed:
+//                                a waterfall's printed steps against its printed
+//                                ends; a growth analysis's change printed on one
+//                                page against the two ends of it printed on
+//                                any; a page that prints a measure's total at
+//                                two dates and the changes of some of its
+//                                members, where the members it leaves out moved
 //   WORDING_STALE                a revision: words changed on one page that
 //                                another still carries. The old words of a
 //                                `replace` that drops no figure, and a title of
@@ -99,14 +107,16 @@ import { registered } from "../errors.mjs";
 import { readJsonSync } from "../cli.mjs";
 import { carriedStated, printsWords } from "../revision.mjs";
 import { pagePool, pageTexts, refsOf, statedCells, typedNumbers } from "./dependency_gates.mjs";
+import { bridgeDecimals, chartDecimals, figuresWithDecimals, roundHalfAway } from "../value-format.mjs";
 import { judged } from "../judgements.mjs";
 
 export const CONSISTENCY_CODES = Object.freeze({
   NUMBERS_DISAGREE: "two pages state different values for one measure at one period or member; as an advisory, for what reads as one quantity under two measures, or under one pair of names in two exhibits",
   NUMBER_STALE: "a number a revision changed on one page - by a text edit on a carried slide or on a page composed in its place - that another page still prints in its old form",
-  NUMBER_FORMATS_DIFFER: "one value printed at different precision or scale on different pages",
+  NUMBER_FORMATS_DIFFER: "one value printed at different precision or scale on one page - title, callout, chart label, tile or table cell - or on two pages",
   WORDING_STALE: "words a revision changed on one page - a title, a name, the old words of a `replace` - that another page still carries in their old form",
   PROOF_REPEATS: "a page that plots, as proof, a measure over the same periods or members as another page plots it; it blocks where the two claim the same measures and show exactly the same views",
+  BRIDGE_UNRECONCILED: "a bridge, a change or a total that does not add up as printed: a waterfall's printed steps against its printed ends, a change against the ends of it the deck prints, a total against the changes of its parts printed beside it",
 });
 
 const REVISION = "existing_deck_revision";
@@ -319,15 +329,155 @@ function statedOf(doc, insights, inventory, carried = new Map()) {
       ...(counted.length ? counted : countedNumbers(texts, everyUnit))];
     pages.push({ id, source, mapped: true, only: Array.isArray(authored[index]?.only) ? authored[index].only.map(String) : [],
       // A typed number's scale is read against its measure's, as a token's modifier is: "1.3bn" of a record kept in millions is the format "0.0bn | /1000".
-      byMeasure: [...(bound.stated.get(page) ?? []), ...typed.map(({ field, number, cell }) => ({ ...cell, how: "typed", shown: number.shown, decimals: number.decimals,
+      byMeasure: [...labelled(page, bound.stated.get(page) ?? []), ...typed.map(({ field, number, cell }) => ({ ...cell, how: "typed", shown: number.shown, decimals: number.decimals, n: number.n,
         factor: number.scale && unitScale(registry.get(cell.ref)?.unit) ? unitScale(registry.get(cell.ref).unit) / number.scale : 1, field: `\`${field}\`` }))],
+      exhibits: exhibitsOf(page), pool,
       byName: exhibitsOf(page).flatMap(keyedOf), texts, title: typeof page.title === "string" ? page.title : "",
       // Where each number stands is read only for a revision, which is the one reader of it.
       stands: inventory ? occurrences(texts, exhibitsOf(page)) : [] });
   });
+  for (const page of pages) if (page.mapped && page.pool?.length) page.byMeasure.push(...tiesOf(page));
   for (const page of pages) page.prints = [...page.texts.flatMap(({ text }) => printedNumbers(text).map((number) => number.n)), ...page.byMeasure.map((entry) => Math.abs(entry.value)), ...page.byName.map((entry) => Math.abs(entry.value))];
   return { pages, registry };
 }
+
+// The chart forms that print a label on every value they draw: what they print is read as a number the page states. A line,
+// a scatter or a map labels some of its marks, chosen as it lays out, and is not read.
+const LABELLED = new Set(["bar", "column", "lollipop", "waterfall", "bridge"]);
+const formOf = (page, ex) => String(ex?.type ?? page?.form ?? "").replace(/^chart\./, "");
+const whatOf = (ex, i) => (typeof ex.heading === "string" && ex.heading.trim() ? `"${ex.heading.trim()}"` : `exhibit ${i + 1}`);
+const SCALES_OF = { k: 1e3, m: 1e6, bn: 1e9 };
+
+/**
+ * The printed format of what a bound chart labels, by the rule the chart labels
+ * by (value-format.mjs chartDecimals and bridgeDecimals, over the figures the
+ * page quotes): each value a labelled chart draws is given the `decimals` and
+ * `shown` it prints at. The BA retest's sh04 lollipop printed a rate as 1.6
+ * that pr11 printed as 1.58, and no check read a chart's labels.
+ */
+function labelled(page, entries) {
+  const exhibits = exhibitsOf(page);
+  if (!entries.some((entry) => entry.how === "exhibit") || !exhibits.length) return entries;
+  const quoted = figuresWithDecimals(pageTexts(page).map((item) => item.text));
+  const formats = new Map();
+  exhibits.forEach((ex, i) => {
+    const form = formOf(page, ex);
+    if (!LABELLED.has(form) || ex.dataLabels === false) return;
+    const values = [...(Array.isArray(ex.series) ? ex.series.flatMap((item) => item?.values ?? []) : []), ...(Array.isArray(ex.values) ? ex.values : [])].filter(Number.isFinite);
+    if (!values.length) return;
+    const declared = ex.valueFormat && typeof ex.valueFormat === "object" ? ex.valueFormat : null;
+    const own = chartDecimals(values, quoted);
+    const decimals = declared ? (declared.decimals ?? (declared.compactUnit ? 1 : 0)) : Array.isArray(ex.totals) && Array.isArray(ex.values) ? bridgeDecimals(ex.values, ex.totals, own) ?? own : own;
+    formats.set(whatOf(ex, i), { decimals, factor: declared?.compactUnit ? 1 / (SCALES_OF[declared.compactUnit] ?? 1) : 1 });
+  });
+  return entries.map((entry) => {
+    const format = entry.how === "exhibit" ? formats.get(entry.field) : null;
+    return format && Number.isFinite(entry.value) ? { ...entry, ...format, shown: roundHalfAway(Math.abs(entry.value) * format.factor, format.decimals).toFixed(format.decimals) } : entry;
+  });
+}
+
+/**
+ * The numbers a page's words round from a recorded tie the other way from the
+ * runtime - "174" for 174.5, which the runtime prints as 175 at no places -
+ * read as prints of that value where the page also prints it by token or
+ * figure: the BA retest's hb02 said "rose to 174" over a callout of 174.5 a
+ * flight and a bar the chart rounded to 175. A typed number of the page's own
+ * measures that is no tie is traced by the typed reading, above.
+ */
+function tiesOf(page) {
+  const named = new Set(page.byMeasure.filter((entry) => entry.how === "token" || entry.how === "figure").map((entry) => cellOf(entry.ref, entry.label)));
+  if (!named.size) return [];
+  const cells = page.pool.flatMap((m) => { const labels = m.members ?? m.periods ?? [null], values = Array.isArray(m.values) ? m.values : [m.value];
+    return labels.map((label, i) => ({ ref: m.ref, label, value: values[i] })).filter((cell) => Number.isFinite(cell.value) && named.has(cellOf(cell.ref, cell.label))); });
+  return page.texts.flatMap(({ field, text }) => printedNumbers(text).filter((number) => !number.scale).flatMap((number) => cells.filter((cell) => {
+    const kept = (String(Math.abs(cell.value)).split(".")[1] ?? "").length, half = 0.5 * 10 ** -number.decimals;
+    return kept > number.decimals && Math.abs(Math.abs(number.n - Math.abs(cell.value)) - half) < 1e-9 && number.n !== roundHalfAway(Math.abs(cell.value), number.decimals);
+  }).map((cell) => ({ ...cell, how: "typed", shown: number.shown, decimals: number.decimals, n: number.n, factor: 1, field: `\`${field}\`` }))));
+}
+
+/** The places `value` was recorded to: 1 for 174.5. */
+const placesOf = (value) => Math.min(6, (String(Math.abs(value)).split(".")[1] ?? "").length);
+/** The number an entry prints, as a number: a typed one as typed, the runtime's own rounded half away from zero. */
+const printedOf = (entry) => (entry.how === "typed" && Number.isFinite(entry.n) ? entry.n : roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals));
+
+const places = (format) => `\`${format}\` (${format.includes(".") ? format.split(".")[1].length : 0} decimal place${format === "0.0" ? "" : "s"})`;
+const formatAt = (decimals) => (decimals ? `0.${"0".repeat(decimals)}` : "0");
+
+/**
+ * What is said to add up and does not, as printed (BRIDGE_UNRECONCILED): each
+ * `{ pages, repair, measured }`. Every number is read as the page prints it,
+ * since a reader adds what is printed: the BA retest's unit-spread bridge
+ * printed 0.63, +0.0, -0.1, +0.2 and 0.71, which add to 0.73; its connections
+ * page said connecting passengers lost 5.3 million where the deck printed the
+ * two ends as 27.1m and 21.7m, 5.4 apart; and its order-book page printed 217
+ * and 234 firm orders beside three lines that rose by 19, the line that fell by
+ * two left out. Structure says what adds: a bridge's totals, an analysis's
+ * inputs and its from and to, a typed number that is the sum of a measure's
+ * members.
+ */
+function unreconciled(pages, stating, registry, plan, involves) {
+  const out = [];
+  // A bridge: its labels' printed steps against its printed totals.
+  for (const page of pages) (page.exhibits ?? []).forEach((ex, i) => {
+    if (!Array.isArray(ex.values) || !Array.isArray(ex.totals) || ex.values.length < 3 || !involves(page.id)) return;
+    const entry = page.byMeasure.find((item) => item.how === "exhibit" && item.field === whatOf(ex, i) && Number.isInteger(item.decimals));
+    if (!entry) return;
+    const fits = bridgeDecimals(ex.values, ex.totals, entry.decimals);
+    if (fits === entry.decimals) return;
+    const shown = ex.values.map((value) => roundHalfAway(value, entry.decimals).toFixed(entry.decimals));
+    out.push({ pages: [page.id], measured: { exhibit: whatOf(ex, i), printed: shown, decimals: entry.decimals, reconciles: fits === null ? null : formatAt(fits) },
+      repair: `${page.id}: the bridge ${whatOf(ex, i)} prints ${shown.join(", ")}, and its printed steps do not add up to its printed totals. ${fits === null
+        ? "Its recorded steps do not add up to its recorded totals at any precision: correct the record, or add the step it leaves out"
+        : `At ${places(formatAt(fits))} they do: set the exhibit's \`valueFormat\` to { "decimals": ${fits} }, or drop the \`valueFormat\` and the chart prints every step at the precision that adds up`}` });
+  });
+  // A change printed on one page against its two ends printed on any.
+  for (const analysis of Array.isArray(plan?.analyses) ? plan.analyses : []) {
+    if (analysis?.op !== "growth" || !Array.isArray(analysis.inputs) || analysis.inputs.length !== 1 || analysis.from === undefined || analysis.to === undefined) continue;
+    const [input] = analysis.inputs, change = stating.get(cellOf(`${analysis.id}/change`, null)) ?? [];
+    const from = stating.get(cellOf(input, String(analysis.from))) ?? [], to = stating.get(cellOf(input, String(analysis.to))) ?? [];
+    const printed = (list) => list.filter((entry) => Number.isInteger(entry.decimals) && Math.round(Math.log10(entry.factor ?? 1)) === Math.round(Math.log10(list[0]?.factor ?? 1)));
+    const [c, f, t] = [printed(change), printed(from), printed(to)];
+    if (!c.length || !f.length || !t.length) continue;
+    const factorOf = (entry) => Math.round(Math.log10(entry.factor ?? 1));
+    const miss = c.flatMap((said) => f.flatMap((a) => t.filter((b) => factorOf(a) === factorOf(said) && factorOf(b) === factorOf(said)).map((b) => ({ said, a, b })))).find(({ said, a, b }) => {
+      const at = Math.min(said.decimals, Math.max(a.decimals, b.decimals));
+      return Math.abs(roundHalfAway(Math.abs(printedOf(b) - printedOf(a)), at) - roundHalfAway(printedOf(said), at)) > 1e-9;
+    });
+    if (!miss || !involves(miss.said.page, miss.a.page, miss.b.page)) continue;
+    const { said, a, b } = miss, scale = said.factor ?? 1;
+    let fits = null;
+    for (let d = Math.max(said.decimals, a.decimals, b.decimals); d <= 6 && fits === null; d += 1)
+      if (Math.abs(roundHalfAway(Math.abs(roundHalfAway(b.value * scale, d) - roundHalfAway(a.value * scale, d)), d) - roundHalfAway(Math.abs(said.value) * scale, d)) < 1e-9) fits = d;
+    const apart = roundHalfAway(Math.abs(printedOf(b) - printedOf(a)), Math.max(a.decimals, b.decimals));
+    out.push({ pages: [...new Set([said.page, a.page, b.page])], measured: { change: `${analysis.id}/change`, printed: [said.shown ?? String(printedOf(said)), a.shown ?? String(printedOf(a)), b.shown ?? String(printedOf(b))], reconciles: fits === null ? null : formatAt(fits) },
+      repair: `${said.page} prints ${analysis.id}/change as ${said.shown ?? printedOf(said)}, and ${a.page === b.page ? a.page : `${a.page} and ${b.page}`} print${a.page === b.page ? "s" : ""} the two ends it is the change between, ${input}@${analysis.from} as ${a.shown ?? printedOf(a)} and @${analysis.to} as ${b.shown ?? printedOf(b)}, which are ${apart} apart. A reader who subtracts finds the change misprinted. ${fits === null ? "Print the change as the difference of the printed ends" : `At ${places(formatAt(fits))} all three agree: print the ends and the change at \`${formatAt(fits)}\`, or print the change as the difference of the printed ends`}` });
+  }
+  // A measure's total at two dates printed beside the changes of some of its members.
+  for (const page of pages) {
+    const said = page.texts.flatMap(({ text }) => printedNumbers(text));
+    if (!said.length || !page.pool?.length || !involves(page.id)) continue;
+    const lists = page.pool.filter((m) => Array.isArray(m.members) && Array.isArray(m.values) && m.members.length >= 3 && m.values.every(Number.isFinite) && !percentUnit(m.unit));
+    const sumOf = (m) => m.values.reduce((sum, v) => sum + v, 0);
+    const totalled = lists.filter((m) => said.some((number) => !number.decimals && !number.scale && Math.abs(number.n - sumOf(m)) < 1e-9));
+    // Earlier to later, where the two records date themselves; otherwise in the order the page rests on them.
+    const dated = (m) => Date.parse(String(m.period ?? "")), order = (x, y) => (Number.isFinite(dated(x)) && Number.isFinite(dated(y)) && dated(x) > dated(y) ? [y, x] : [x, y]);
+    for (const [i, first] of totalled.entries()) for (const second of totalled.slice(i + 1)) {
+      const [a, b] = order(first, second);
+      if (a.members.length !== b.members.length || !a.members.every((member) => b.members.includes(member))) continue;
+      const printedAt = (m, member) => page.byMeasure.find((entry) => entry.ref === m.ref && entry.label === member && Number.isInteger(entry.decimals));
+      const both = a.members.filter((member) => printedAt(a, member) && printedAt(b, member));
+      if (!both.length) continue;
+      const parts = both.reduce((sum, member) => sum + printedOf(printedAt(b, member)) - printedOf(printedAt(a, member)), 0), whole = sumOf(b) - sumOf(a);
+      if (Math.abs(parts - whole) < 1e-9) continue;
+      const left = a.members.filter((member) => !both.includes(member) && b.values[b.members.indexOf(member)] !== a.values[a.members.indexOf(member)]);
+      const moved = left.map((member) => `${member} ${a.values[a.members.indexOf(member)]} to ${b.values[b.members.indexOf(member)]}`);
+      out.push({ pages: [page.id], measured: { totals: [a.ref, b.ref], printed: [sumOf(a), sumOf(b)], parts: Math.round(parts * 1e6) / 1e6, left },
+        repair: `${page.id} prints the totals of ${a.ref} and ${b.ref}, ${sumOf(a)} and ${sumOf(b)} (${whole >= 0 ? "+" : ""}${Math.round(whole * 1e6) / 1e6}), beside the changes of ${both.length} of their members, which add to ${parts >= 0 ? "+" : ""}${Math.round(parts * 1e6) / 1e6}. The record adds up; the page leaves out ${moved.length ? listedOf(moved) : "the members that moved"}. Print the change of every member that moved, or say beside the totals what the listed changes leave out` });
+    }
+  }
+  return out;
+}
+const listedOf = (items) => listed(items, ", ");
 
 /** Does a page print `value`, at whatever precision: what a page that sets two figures side by side does of both. */
 const printsValue = (page, value) => page.prints.some((n) => valuesAgree(n, Math.abs(value)));
@@ -388,30 +538,55 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
       `A reader meets two numbers for one thing, and no page of these prints both${both.length ? ` (${listed(both, ", ")} do${both.length === 1 ? "es" : ""})` : ""}. Use one of them on every page; or, where they are two dates or two definitions, say which beside each number, or set both in one note the other pages repeat`,
       { kind, cells: [cellOf(x.ref, x.label), cellOf(y.ref, y.label)], values: [x.value, y.value], sources: sourcesOf([x.ref, y.ref]) });
   }
-  // One value printed at two precisions on two pages (a chart's own labels are the layout's, and are not read). It is read
-  // value by value, not measure by measure: a printed number keeps two significant figures (printed-numbers.mjs), so the
-  // small values of a measure take decimal places its large ones do not, and one format for the whole measure is not the rule.
-  // A table's cells are not read either: a detailed table prints 5.84% where the pages that argue from it say 5.8%, and a
-  // reader looks a number up there at the precision it was recorded to.
+  // One value printed at two precisions. It is read value by value, not measure by measure: a printed number keeps two
+  // significant figures (printed-numbers.mjs), so the small values of a measure take decimal places its large ones do not,
+  // and one format for the whole measure is not the rule. A chart that labels every value it draws is read at the precision
+  // it labels at (labelled, above): what it labels is a number the page prints.
+  //
+  // On one page every print of a value is held to one format - title, callout, data label, tile and table cell alike - and
+  // a typed number to the recorded value rounded once at its places: the BA retest's hb02 printed 2025's passengers per
+  // flight as 174 in its title, 175 on its bar and 174.5 in its callout, the record being 174.5 (itself a rounding of
+  // 174.46), so the title's 174 and the bar's 175 were two roundings of one tie. Between pages a table's cells are not
+  // read: a detailed table prints 5.84% where the pages that argue from it say 5.8%, and a reader looks a number up there
+  // at the precision it was recorded to.
   const inTable = (entry) => /`[^`]*\b(?:rows|cells)[[.]/.test(String(entry.field ?? ""));
+  const formOfEntry = (entry) => `${entry.decimals}|${Math.round(Math.log10(entry.factor ?? 1))}`;
+  const whereOf = (entry) => (entry.how === "exhibit" ? `the label of ${entry.field}` : entry.how === "typed" ? `typed in ${entry.field}` : String(entry.field ?? "").replace(/^the token \{\{[^}]*\}\} in /, "the token in "));
   const formats = [];
   for (const [key, entries] of stating) {
-    const printed = entries.filter((entry) => entry.how !== "exhibit" && entry.decimals !== undefined && !inTable(entry));
+    const printed = entries.filter((entry) => entry.decimals !== undefined && entry.decimals !== null);
+    if (!printed.length) continue;
+    // The one format that prints the record as recorded: its own places, or more where a chart that labels it prints more -
+    // a chart prints all its labels at one precision, and 1.70 is the recorded 1.7 unrounded.
+    const recorded = printed[0].value, oneFormat = (list) => formatAt(Math.max(placesOf(recorded), ...list.filter((entry) => entry.how === "exhibit").map((entry) => entry.decimals)));
+    const asRecorded = oneFormat(printed);
+    // On each page: two formats of the value, or a typed number that is not the record rounded once at its places.
+    for (const id of new Set(printed.map((entry) => entry.page))) {
+      const here = printed.filter((entry) => entry.page === id);
+      const misrounded = here.filter((entry) => entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9);
+      if ((new Set(here.map(formOfEntry)).size < 2 && !misrounded.length) || !involves(id)) continue;
+      const shown = [...new Map(here.map((entry) => [`${entry.shown ?? printedOf(entry)}|${whereOf(entry)}`, `"${entry.shown ?? printedOf(entry)}" (${whereOf(entry)})`])).values()];
+      formats.push({ key, pages: [id], format: oneFormat(here), text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it` });
+    }
+    // Between pages, tables aside.
+    const apart = printed.filter((entry) => !inTable(entry));
     const forms = new Map();
-    for (const entry of printed) { const form = `${entry.decimals}|${Math.round(Math.log10(entry.factor ?? 1))}`; forms.set(form, [...(forms.get(form) ?? []), entry]); }
+    for (const entry of apart) { const form = formOfEntry(entry); forms.set(form, [...(forms.get(form) ?? []), entry]); }
     const apartPages = [...forms.values()].map((group) => new Set(group.map((entry) => entry.page)));
-    // Two formats on two pages: a page that prints the value both ways itself - rounded in its title, exact in its table - has said they are one number.
-    if (forms.size < 2 || !apartPages.some((a, i) => apartPages.some((b, j) => i !== j && [...a].some((id) => !b.has(id)) && [...b].some((id) => !a.has(id)))) || !involves(...printed.map((entry) => entry.page))) continue;
-    formats.push({ key, pages: printed.map((entry) => entry.page), text: `${key} is ${[...forms.values()].map((group) => `"${shownOf(group[0])}" on ${listed([...new Set(group.map((entry) => entry.page))], ", ")}`).join(" and ")}` });
+    // Two formats on two pages: a page printing both ways is said above, on that page.
+    if (forms.size < 2 || !apartPages.some((a, i) => apartPages.some((b, j) => i !== j && [...a].some((id) => !b.has(id)) && [...b].some((id) => !a.has(id)))) || !involves(...apart.map((entry) => entry.page))) continue;
+    formats.push({ key, pages: apart.map((entry) => entry.page), format: asRecorded, text: `${key} is ${[...forms.values()].map((group) => `"${shownOf(group[0])}" on ${listed([...new Set(group.map((entry) => entry.page))], ", ")}`).join(" and ")}; \`${asRecorded}\` prints it as recorded (${recorded})` });
   }
   // Two records of one measure kept at different precision, each printed by a page, are the same finding.
   for (const conflict of conflicts.filter((c) => c.kind === "precision")) for (const cell of conflict.at) {
     const [a, b] = [pagesAt(conflict.refs[0], cell.labels[0]), pagesAt(conflict.refs[1], cell.labels[1])];
     if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions` });
   }
-  if (formats.length) finding("NUMBER_FORMATS_DIFFER", "blocker", formats.flatMap((f) => f.pages),
-    `${formats.length} value${formats.length === 1 ? " is" : "s are"} rounded differently on different pages: ${listed(formats.map((f) => f.text))}. A reader who meets 53 on one page and 53.2 on another checks whether they are one number. Print each value in one format on every page - the same decimal places and scale in its token, figure or typed number - or say on the page that rounds that it does`,
-    formats.slice(0, LISTED).map((f) => f.key));
+  // One finding for each value, so every page it names is told its own disagreement and the format that ends it.
+  for (const f of formats) finding("NUMBER_FORMATS_DIFFER", "blocker", f.pages,
+    `${f.text}. A reader who meets 53 on one page and 53.2 on another, or 174 in a title over a bar labelled 175, checks whether they are one number. Print the value in one format wherever it is printed - a token's format (\`{{ref@label | 0.0}}\`) in place of a typed number, a chart's \`valueFormat\` - or say on the page that rounds that it does`,
+    f.format ? { cell: f.key, format: f.format } : [f.key]);
+  for (const item of unreconciled(pages, stating, registry, insights?.analysis?.plan, involves)) finding("BRIDGE_UNRECONCILED", "blocker", item.pages, item.repair, item.measured);
 
   // --- by name --------------------------------------------------------------
   const named = new Map();
