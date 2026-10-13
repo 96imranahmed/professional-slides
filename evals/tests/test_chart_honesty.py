@@ -174,13 +174,16 @@ class TimelineStepTests(unittest.TestCase):
 import {{ elapsedSteps }} from '{RUNTIME}/time-axis.mjs';
 const dates = ['Jul 2023', 'Jan 2025', 'Sep 2025', 'Nov 2025', 'Jun 2026', '2029', 'c. 2030', '2035'];
 const items = dates.map((date, i) => ({{ date, label: `Milestone ${{i + 1}}`, text: 'What happens then.' }}));
-const when = (list) => REGISTRY.get('timeline').render({{ id: 't', frame: {{ x: 60, y: 160, width: 1160, height: 300 }}, props: {{ items: list }} }}).nodes.filter((n) => n.role === 'timeline-when').map((n) => n.text);
+// Each date with the step under it, a line of its own the runtime writes (not the author's words).
+const when = (list) => {{ const nodes = REGISTRY.get('timeline').render({{ id: 't', frame: {{ x: 60, y: 160, width: 1160, height: 300 }}, props: {{ items: list }} }}).nodes;
+  const step = (stage) => nodes.find((n) => n.role === 'timeline-elapsed' && n.data.stage === stage)?.text;
+  return nodes.filter((n) => n.role === 'timeline-when').map((n) => [n.text, step(n.data.stage)].filter(Boolean).join(' | ')); }};
 console.log(JSON.stringify({{ steps: elapsedSteps(dates), when: when(items), even: when(['2024', '2025', '2026'].map((date) => ({{ date, label: date, text: 'x' }}))) }}));
 """)
         self.assertEqual(result["steps"], [None, 18, 8, 2, 7, 31, 12, 60])
         said = " ".join(result["when"]).replace("\n", " ")
-        self.assertIn("2035, 5 years on", said)
-        self.assertIn("Nov 2025, 2 months on", said)
+        self.assertIn("2035 | 5 years on", said)
+        self.assertIn("Nov 2025 | 2 months on", said)
         self.assertEqual(result["even"], ["2024", "2025", "2026"])  # even steps say nothing
 
 

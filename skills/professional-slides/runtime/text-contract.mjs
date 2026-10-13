@@ -74,10 +74,11 @@ const resolvePages = (value, scene) => String(value).replace(/\{\{page:([^}]+)\}
   return numbers.length ? numbers.length>1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]) : `{{page:${id}}}`;
 });
 // Text the runtime writes rather than the author: axis ticks, page numbers,
-// tracker and contents labels, numbering, the deck footer, legend values. It
-// is checked by the runtime's own gates; the text plan need not list it, and
-// the audits subtract it after matching what the plan does list.
-export const GENERATED_ROLES = /^(page-number|axis-label|tracker-|agenda-marker-label|table-section-number|table-row-number|footer-(left|right)|divider-number|divider-contents|map-size-legend-label)/;
+// tracker and contents labels, numbering, the deck footer, legend values, a
+// timeline's step between dates (schedule-stages.mjs). It is checked by the
+// runtime's own gates; the text plan need not list it, and the audits subtract
+// it after matching what the plan does list.
+export const GENERATED_ROLES = /^(page-number|axis-label|tracker-|agenda-marker-label|table-section-number|table-row-number|footer-(left|right)|divider-number|divider-contents|map-size-legend-label|timeline-elapsed)/;
 // Pages the runtime inserts: the contents pages, the appendix divider, the picture credits and the sources' declared limits.
 export const GENERATED_PAGE = new RegExp(`^(agenda-\\d+|appendix-divider)$|${GENERATED.source}`);
 // A structural page (cover, divider, contents, statement, takeaways) keeps its

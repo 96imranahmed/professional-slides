@@ -133,17 +133,21 @@ console.log(JSON.stringify({ ref: pick(render({ design: 'editorial', identity: {
         self.assertEqual({n["fillToken"] for n in journal}, {"color.surface"})
 
     def test_a_lone_line_takes_weight_and_an_area_and_two_lines_do_not(self):
+        # The area is filled from zero, so a lone line takes it on a scale that reaches zero; on a scale from a floor near its
+        # low the fill would draw a small move as a large one (the BA retest's jet fuel), and the line stays bare.
         result = run_node(RENDER + '''
 const cats = ['FY17', 'FY18', 'FY19', 'FY20', 'FY21', 'FY22'];
-const one = render({}, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
+const one = render({}, 'chart.line', { categories: cats, yMin: 0, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
+const floored = render({}, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
 const two = render({}, 'chart.line', { categories: cats, series: [{ name: 'A', values: [1, 2, 3, 4, 5, 6] }, { name: 'B', values: [2, 3, 3, 4, 4, 5] }] });
 const light = render({ surfaces: 'open' }, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
 const summary = (nodes) => ({ areas: nodes.filter((n) => n.role === 'chart-area').map((n) => n.data.lone ?? false),
   lines: [...new Set(nodes.filter((n) => n.role === 'chart-line').map((n) => n.lineToken))],
   markers: [...new Set(nodes.filter((n) => n.role === 'chart-marker').map((n) => n.frame.width))] });
-console.log(JSON.stringify({ one: summary(one), two: summary(two), light: summary(light) }));
+console.log(JSON.stringify({ one: summary(one), floored: summary(floored), two: summary(two), light: summary(light) }));
 ''')
         self.assertEqual(result["one"], {"areas": [True], "lines": ["line.medium"], "markers": [12]})
+        self.assertEqual(result["floored"], {"areas": [], "lines": ["line.medium"], "markers": [12]})
         self.assertEqual(result["two"]["areas"], [])
         self.assertEqual(result["two"]["lines"], ["line.medium"])
         self.assertEqual(result["light"], {"areas": [], "lines": ["line.standard"], "markers": [10]})
