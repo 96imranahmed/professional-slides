@@ -15,7 +15,8 @@
 // critique ready for the deck's current spine; the build bars measured on the
 // composed scene (build-bars.mjs), where a miss blocks unless the deck waives
 // that bar and the review confirms the waiver; the author's self-check over the
-// claim ledger (claims.json). Then the review: pass 1 reads the whole deck
+// claim ledger (claims.json), which holds acceptance but not the staging of the
+// review, so the two read side by side. Then the review: pass 1 reads the whole deck
 // exhaustively; after a rejection, each later pass verifies (reviewer.mjs,
 // review-passes.mjs). A pass accepts at a rating of 8 or more with no major or
 // blocker finding from any pass open and every waiver confirmed. When the
@@ -226,8 +227,15 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
     waiver: `if the deck is right to miss this bar, record \`waivers: [{ "code": "${f.code}", "reason": "<a sentence saying why>" }]\` on \`deck\` in <id>.pages.json, recompile and rebuild - the reviewer is shown the waiver and must confirm it` })));
   const waivers = bars.waived;
 
-  // The author reproduces every claim before anyone reviews the deck: a review
-  // spent finding a mistyped figure is a round the deck did not need.
+  // The author reproduces every claim before the deck is accepted. The check
+  // holds acceptance, not the staging of the review: the review reads the
+  // rendered pages, which the self-check's fixes rarely move, so on a clean
+  // build both readings run side by side and their fixes go back in one pass
+  // (on the BA retest delivery refused at the self-check with the build clean,
+  // and the 19-minute review ran after the last self-check round). An
+  // incomplete self-check is carried to every outcome below: a staged packet
+  // names it as a gate still open, a rejection lists it with the review's
+  // findings, and nothing is delivered while it stands.
   report.stage = "self-check";
   const ledger = (await readJson(path.join(directory, "claims.json"), { optional: true })) ?? await writeLedger(directory);
   const selfCheck = await readJson(path.join(directory, "self-check.json"), { optional: true });
@@ -236,8 +244,11 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
   // hold: the claims are the author's to reproduce, and the form is not theirs to guess.
   const shape = carriedCount(spec) ? ` For this revision the record is exactly: ${JSON.stringify({ pages: Object.fromEntries(Object.entries(ledger.pageHashes).map(([id, claims]) => [id, { claims, verified: true }])),
     findings: Object.fromEntries(ledger.findings.map((f) => [findingKey(f), "<what was done about it, in a sentence>"])) })} - one entry in \`pages\` for each page that makes claims (the pages composed and the slides whose lines were rewritten; \`claims\` is that page's hash in out/claims.json, \`verified: true\` once each of its claims is reproduced from the user's figures), one in \`findings\` for each ledger finding, and no \`spine\` entry` : "";
-  if (unchecked.length) return refuse("self-check", unchecked.map((reason) => ({ slide: null, code: registered(CLAIM_CODES, "SELF_CHECK_INCOMPLETE"), severity: "blocker", reason,
-    repair: `Work through out/claims.json against the source records, fix what fails, and record out/self-check.json (references/taste-review.md#self-check).${shape}` })));
+  const selfCheckOpen = unchecked.map((reason) => ({ slide: null, code: registered(CLAIM_CODES, "SELF_CHECK_INCOMPLETE"), severity: "blocker", reason,
+    repair: `Work through out/claims.json against the source records, fix what fails, and record out/self-check.json (references/taste-review.md#self-check).${shape}` }));
+  context.selfCheckOpen = selfCheckOpen;
+  if (selfCheckOpen.length) report.openGates = [{ stage: "self-check", code: selfCheckOpen[0].code, reasons: unchecked,
+    note: "The review is staged beside the self-check; the deck is accepted only once both are complete. Rerun delivery after recording out/self-check.json." }];
 
   report.stage = "review";
   const store = await lineageStore(spec, directory, specPath);
@@ -403,6 +414,7 @@ function approval(prior, confirmations, binding) {
  */
 async function redeliver(shared, build, score) {
   const { directory, delivered, binding } = shared;
+  if (shared.selfCheckOpen?.length) return reject(shared, "self-check", shared.selfCheckOpen);
   const recorded = await readJson(path.join(directory, "delivery.json"), { optional: true }).catch(() => null);
   if (!(recorded?.accepted === true && recorded.binding === binding && recorded.deliverable === delivered
     && recorded.score?.rating === score.rating && recorded.score?.from === score.from)) return deliver(shared, build, score);
@@ -419,6 +431,8 @@ async function handOver({ directory, delivered, rejectedNote }, build) {
 
 async function deliver(shared, build, score) {
   const { report, directory, delivered, binding } = shared;
+  // An accepting review does not deliver a deck whose self-check is still open: it was staged beside the check, not instead of it.
+  if (shared.selfCheckOpen?.length) return reject(shared, "self-check", shared.selfCheckOpen);
   await handOver(shared, build);
   report.accepted = true; report.stage = "delivered"; report.binding = binding; report.deliverable = delivered; report.score = score;
   // What goes to the user with a revised deck, beside the file: every change made to their deck, and what was found in the
@@ -460,7 +474,7 @@ const REACHES = Object.freeze({
     intro: "The review on record does not say what these repairs change, and by their codes it could be either: read each repair. One that changes a title, a claim, the evidence, what an exhibit shows or the pages belongs with the group above." },
 });
 
-async function reject({ report, directory, delivered, rejectedNote, advisories = [] }, stage, blockers) {
+async function reject({ report, directory, delivered, rejectedNote, advisories = [], selfCheckOpen = [] }, stage, blockers) {
   await fs.rm(delivered, { force: true });
   const listed = DRAWN_STAGES.includes(stage) ? advisories : [];
   report.accepted = false; report.rejectedAt = stage; report.blockers = blockers;
@@ -479,6 +493,8 @@ async function reject({ report, directory, delivered, rejectedNote, advisories =
   }
   if (bars.length) lines.push("## Build bars missed (waivable)", "", ...bars.map((b) => `${line(b, "build bar missed")}; or waive it: ${b.waiver}`), "");
   if (listed.length) lines.push("## Advisories (not blocking)", "", "The build raised these as advisories and delivery does not block on them; the reviewer may still judge the pages.", "", ...listed.map((b) => line(b)), "");
+  // A review read beside an open self-check: what the check still holds is repaired in the same pass as the review's findings.
+  if (selfCheckOpen.length && stage !== "self-check") lines.push("## Gates still open", "", "The review was staged beside the self-check; the deck is accepted only once both are complete.", "", ...selfCheckOpen.map((b) => line(b)), "");
   await fs.writeFile(rejectedNote, lines.join("\n"));
   await writeJson(path.join(directory, "delivery.json"), report);
   return report;

@@ -122,6 +122,8 @@ const LISTED = [
   ...codes("S", "NO_SUMMARY NO_SECTIONS NO_CONTENTS STAGE_CONTRACT", ["pages"]),
   ...codes("S", "MISSING_EVIDENCE EVALUATION_TOO_SHORT", ["layout", "pages"]),
   ...codes("S", "STAGE_MISSING CONTENT_REJECTED PLAN_REJECTED VARIETY_REJECTED SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT", LAYOUT),
+  // A deck.json older than its pages (build-deck.mjs): the repair is the full compile that writes a current one.
+  ...codes("S", "DECK_OLDER_THAN_PAGES", ["record"]),
 
   // --- P: page-local -----------------------------------------------------
   // Compile and composition (author-deck.mjs, page-types.mjs). A page that does not compile is refused in every mode; one that does
@@ -297,7 +299,7 @@ const reasons = (why, list) => list.split(/\s+/).filter(Boolean).map((code) => [
 export const STANDING_FREE = Object.freeze(Object.fromEntries([
   ...reasons("holds or fails on a named statement, insight, analysis, section or file; nothing is counted toward a bar", `GENERATOR_SIGNATURE PILLAR_UNSUPPORTED
     REVISION_UNMAPPED REVISION_INVENTORY_MISSING REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED ANALYSIS_UNRESTED SOURCES_UNFILED SOURCE_NUMBERS_UNREAD SPINE_LOCKED REQUEST_MISSING WAIVERS_INVALID STATEMENT_INVALID
-    CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE STAGE_CONTRACT STAGE_MISSING SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
+    CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE STAGE_CONTRACT STAGE_MISSING DECK_OLDER_THAN_PAGES SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
     NUMBERS_DISAGREE NUMBER_STALE WORDING_STALE NUMBER_FORMATS_DIFFER PROOF_REPEATS BRIDGE_UNRECONCILED`),
   ...reasons("an advisory on the families a plan declares; the variety contract and the craft floors hold the same quantity on the compiled deck, and theirs is the standing", `PLAN_TITLE_LENGTH
     PLAN_TABLE_SHARE PLAN_MEASURED_PAGES PLAN_EXHIBIT_MIX PLAN_EXHIBIT_RUN PLAN_NO_PICTURES PLAN_NO_ICONS PLAN_NO_INSIGHT PLAN_TABLE_DEPTH PLAN_TABLE_MONOTONY

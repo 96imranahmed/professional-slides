@@ -175,6 +175,42 @@ console.log(JSON.stringify({ pending1: [pending1.review.status, pending1.review.
         # The lineage lives beside the deck, not in out/.
         self.assertEqual(result['history'], ['confirmation-1.json', 'pass-1.json', 'pass-2.json'])
 
+    def test_the_review_is_staged_beside_an_open_self_check_and_acceptance_waits_for_it(self):
+        """On the BA retest delivery refused at SELF_CHECK_INCOMPLETE with the
+        build clean and every bar met, so the 19-minute review ran after the
+        last self-check round. The review is staged while the self-check is
+        open, the output names the gate still open, a rejection lists it beside
+        the review's findings, and an accepting review delivers nothing until
+        the self-check is recorded - then a rerun hands the approved build over."""
+        result = run_node(FIXTURES + '''
+const open = async (d) => { await fs.writeFile(path.join(d.out, 'claims.json'), JSON.stringify({ pageHashes: { p01: 'h-p01' }, findings: [] }));
+  await fs.writeFile(path.join(d.out, 'self-check.json'), JSON.stringify({ pages: {}, findings: {}, spine: 'Read the titles alone; no two pages prove the same proposition.' })); };
+const d = await prebuilt(); await storylineReady(d); await open(d);
+const staged = await deliver(d, { reviewer: 'packet' });
+const rec = await record(d);
+const held = await deliver(d, { reviewFile: await write(d, 'r1.json', firstPass(rec, d.ids)) });
+const heldDelivered = await exists(path.join(d.out, 'fixture-DELIVERED.pptx'));
+await fs.writeFile(path.join(d.out, 'self-check.json'), JSON.stringify({ pages: { p01: { claims: 'h-p01', verified: true } }, findings: {}, spine: 'Read the titles alone; no two pages prove the same proposition.' }));
+const handed = await deliver(d, { reviewer: 'packet' });
+const handedDelivered = await exists(path.join(d.out, 'fixture-DELIVERED.pptx'));
+await done(d);
+const e = await prebuilt(); await storylineReady(e); await open(e);
+await deliver(e, { reviewer: 'packet' });
+const rejected = await deliver(e, { reviewFile: await write(e, 'r1.json', firstPass(await record(e), e.ids, [major()])) });
+const note = await fs.readFile(path.join(e.out, 'REJECTED.md'), 'utf8');
+await done(e);
+console.log(JSON.stringify({ staged: [staged.review?.status, staged.review?.mode, (staged.openGates || []).map((g) => [g.stage, g.code])],
+  held: [held.accepted, held.rejectedAt, held.blockers.map((b) => b.code), held.review?.accepted, heldDelivered],
+  handed: [handed.accepted, handed.stage, handedDelivered, handed.openGates ?? null],
+  rejected: [rejected.rejectedAt, rejected.blockers.map((b) => b.code), note.includes('## Gates still open'), /SELF_CHECK_INCOMPLETE/.test(note)] }));
+''')
+        self.assertEqual(result['staged'], ['pending', 'full', [['self-check', 'SELF_CHECK_INCOMPLETE']]])
+        # The review accepted, but the self-check is open: the deck is held at it, and no deliverable is written.
+        self.assertEqual(result['held'], [False, 'self-check', ['SELF_CHECK_INCOMPLETE'], True, False])
+        # Recorded, the self-check lets a rerun hand over the build the review already accepted.
+        self.assertEqual(result['handed'], [True, 'delivered', True, None])
+        self.assertEqual(result['rejected'], ['review pass 1 of 3', ['MISLEADING_TIME_AXIS', 'REVIEW_RATING'], True, True])
+
     def test_a_confirmation_that_raises_a_major_rejects_and_spends_the_read(self):
         result = run_node(FIXTURES + '''
 const d = await prebuilt();

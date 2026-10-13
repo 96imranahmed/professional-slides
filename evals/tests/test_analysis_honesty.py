@@ -287,6 +287,43 @@ class ResearchNoticeTests(unittest.TestCase):
             import shutil
             shutil.rmtree(home, ignore_errors=True)
 
+    def test_a_new_deck_reads_its_registry_from_the_sources_its_research_recorded(self):
+        """On the BA retest the insight log came with its `insights/*.sources.json`
+        files but the pages file had no registry, and the skeleton spent its draft
+        rounds on a refusal ("`source` lists registry keys ... but the pages file
+        has no `sources` registry") no section could fix from its own part file;
+        the per-file sources also kept names over 16 words. The compile reads the
+        registry the log's parts record where the pages file has none, and the
+        research step flags a long name in the file that holds it."""
+        home = Path(tempfile.mkdtemp(prefix="log-sources-"))
+        try:
+            fixture = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+            for name in ("finance.pages.json", "finance.insights.json", "finance.analysis.json"):
+                (home / name).write_bytes((fixture / name).read_bytes())
+            pages = json.loads((home / "finance.pages.json").read_text(encoding="utf-8"))
+            registry = pages.pop("sources")
+            (home / "finance.pages.json").write_text(json.dumps(pages), encoding="utf-8")
+            log = json.loads((home / "finance.insights.json").read_text(encoding="utf-8"))
+            (home / "insights").mkdir()
+            (home / "insights" / "fin.json").write_text(json.dumps({"insights": log["insights"]}), encoding="utf-8")
+            (home / "insights" / "fin.sources.json").write_text(json.dumps(registry), encoding="utf-8")
+            (home / "finance.insights.json").write_text(json.dumps({"schema": log.get("schema"), "include": ["insights/fin.json"], "insights": []}), encoding="utf-8")
+            check = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(home / "finance.pages.json"), "--check"], capture_output=True, text=True, timeout=300)
+            self.assertEqual(check.returncode, 0, check.stderr[-800:])
+            self.assertNotIn("has no `sources` registry - add", check.stderr)
+            self.assertIn(f"reads the {len(registry)} sources the insight log's parts record (insights/fin.sources.json)", check.stderr)
+            # The research records a source by its caveats: flagged in the file that holds it, while the research is open.
+            key = next(iter(registry))
+            registry[key]["name"] = "Regional regulator annual returns 2026, as filed by each union and read before the adjustment for the merger that closed in March"
+            (home / "insights" / "fin.sources.json").write_text(json.dumps(registry), encoding="utf-8")
+            run = subprocess.run([NODE, str(RUNTIME / "analysis.mjs"), str(home / "finance.pages.json"), "--catalogue"], capture_output=True, text=True, timeout=120)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            research = json.loads(run.stdout)["research"]
+            self.assertTrue(any(line.startswith(f'insights/fin.sources.json: source "{key}": `name` runs to') for line in research.get("sourcesRegistry", [])), research)
+        finally:
+            import shutil
+            shutil.rmtree(home, ignore_errors=True)
+
 
 class EvidenceMeasureTests(unittest.TestCase):
     def test_the_measure_says_what_it_does_not_catch_and_which_catches_only_advise(self):

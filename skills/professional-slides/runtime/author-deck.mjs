@@ -26,7 +26,10 @@
 //                                                        the storyline gate in out/ (or --out <dir>) is not ready, and
 //                                                        once the critique has closed refuses a page whose argument
 //                                                        moved since (SPINE_LOCKED) unless --reopen-spine is given
-//   node runtime/author-deck.mjs <id>.pages.json --check compile and gate; no deck is written (like every run it adds a
+//                                                        (the deck.json records the hash of the pages file and its
+//                                                        parts, and the build refuses it once they change: DECK_OLDER_THAN_PAGES)
+//   node runtime/author-deck.mjs <id>.pages.json --check compile and gate; no deck is written, and it says so, with
+//                                                        whether the deck.json on disk is these pages (like every run it adds a
 //                                                        line to <id>.author-log.jsonl and may update the fit search's
 //                                                        cache, <id>.author-cache.json, and the composer's and the
 //                                                        page gates' caches, <id>.compose-cache.json and
@@ -144,7 +147,7 @@ import { sourceKindsOf } from "./fit-review.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
-import { readPagesFile, withParts, editPagesSync } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile } from "./pages-file.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
 import { RECORD_FILE as ANSWER_CRITIQUE_FILE, answerHazards as answerHazardsOf, openAnswerItems } from "./answer-critique.mjs";
 import * as WEIGHT from "./weight.mjs";
@@ -245,7 +248,7 @@ function tableSplitRepair(estimate, exhibit) {
 
 // The sources registry's own check is its module's (sources-registry.mjs), so the research step reads it too (analysis.mjs).
 export { registryProblems } from "./sources-registry.mjs";
-import { registryProblems } from "./sources-registry.mjs";
+import { logSources, registryProblems } from "./sources-registry.mjs";
 
 /** A page still carrying an imported slide's old copy, not yet given a page type. */
 const unmapped = (page) => page && typeof page === "object" && page.draft !== undefined && !page.type && !page.kind;
@@ -2304,6 +2307,17 @@ async function main(argv) {
   try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return 2; }
   const dir = path.dirname(path.resolve(file));
   const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
+  // A pages file with no `sources` registry, in itself or its parts, reads the one the research recorded beside the
+  // insight log's parts (sources-registry.mjs logSources): on the BA retest the skeleton spent its draft rounds on a
+  // registry refusal it could not fix from its own part file, with the log's sources files beside it all along.
+  if (doc.sources === undefined) {
+    const logged = await readInsightLog(dir, stem).then((log) => logSources(dir, log)).catch(() => null);
+    if (logged?.problems.length) { console.error(`The insight log's sources files cannot be read as the deck's registry:\n- ${logged.problems.join("\n- ")}`); return 2; }
+    if (logged) {
+      doc.sources = logged.registry;
+      if (!values.json) console.error(`The pages file has no \`sources\` registry: the compile reads the ${Object.keys(logged.registry).length} sources the insight log's parts record (${logged.files.map((f) => f.file).join(", ")}). Copy them into the pages file to change one for this deck alone.\n`);
+    }
+  }
   // Every run is logged beside the pages file. A finding that comes back run
   // after run is the cost this tool exists to cut: it names a limit the author
   // could not see or a message that did not say what to do, and belongs in the
@@ -2508,6 +2522,9 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (blocking.length) {
     const counts = ["S", "P", "G"].map((cls) => [cls, blocking.filter((f) => f.class === cls).length]).filter(([, n]) => n).map(([cls, n]) => `${cls} ${n}`).join(", ");
     console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)} (${counts}):\n${findingsText(blocking, order)}\n\n${tail}`);
+    // The deck.json left on disk, where it is not these pages: the build refuses it until a compile of them passes.
+    const left = named ? null : (await unwrittenDeck({ dir, stem, file, why: "the pages are not ready" })).record;
+    if (left?.onDisk === "stale") console.error(`\nThe ${left.file} on disk was compiled from older pages; the build refuses it (DECK_OLDER_THAN_PAGES) until ${left.writes} passes.`);
     return 2;
   }
   // A page run's summary lists its own pages' advisories - the typed numbers no measure holds among them - beside the deck's.
@@ -2521,10 +2538,15 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   if (values.check || named) {
     // Once a deck passes the scene's checks, the render is the one instrument left: said where a renderer is installed.
     if (!values.render && !draft && !named && rendererInstalled()) console.error("A renderer is installed: make the final check before the build with `--check --render`, which renders the deck with the build's own stages and reports what only the render shows.\n");
-    say(JSON.stringify({ ok: true, ...summary }, null, 1)); return 0;
+    // A clean check is not a compile: it says it wrote no deck.json, why, and what writes one, so the build is not run on an older one.
+    const deckJson = await unwrittenDeck({ dir, stem, file, why: named ? "a page run compiles the deck as context and writes nothing" : "--check checks the pages and writes nothing", open });
+    console.error(`${deckJson.text}\n`);
+    say(JSON.stringify({ ok: true, ...summary, deckJson: deckJson.record }, null, 1)); return 0;
   }
   // A deck written with questions open says so: delivery refuses it until they are answered and the deck compiled again.
   if (open) spec.judgements = { pending: open.measured.pending, kinds: open.measured.kinds }; else delete spec.judgements;
+  // The pages file and parts it was compiled from, by hash: the build refuses this deck.json once they change (DECK_OLDER_THAN_PAGES).
+  spec.compiledFrom = compiledFrom(doc);
   await writeJson(path.join(dir, `${stem}.deck.json`), spec);
   await writeJson(path.join(dir, `${stem}.plan.json`), planOf(spec));
   await writeJson(path.join(dir, `${stem}.content.json`), content);
@@ -2537,6 +2559,26 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     if (story) console.error(story);
   }
   return 0;
+}
+
+/**
+ * What a run that writes no deck.json says of it: that it wrote none, `why`,
+ * the compile that writes one, and whether the one on disk is these pages
+ * (`current`), older pages the build refuses (`stale`), a deck compiled
+ * before the fingerprint was recorded (`unrecorded`), or none (`missing`).
+ * On the BA retest a clean `--check --render` was taken for a compile and the
+ * build read a deck.json ten minutes older than the pages.
+ */
+async function unwrittenDeck({ dir, stem, file, why, open = null }) {
+  const deckFile = `${stem}.deck.json`, writes = `node runtime/author-deck.mjs ${path.basename(file)}`;
+  const onDisk = await readJson(path.join(dir, deckFile), { optional: true }).catch(() => null);
+  const state = !onDisk ? "missing" : !onDisk.compiledFrom ? "unrecorded" : staleCompile(onDisk, dir) ? "stale" : "current";
+  const standing = { missing: "There is none on disk yet.", current: "The one on disk was compiled from these pages as they stand.",
+    stale: "The one on disk was compiled from older pages, and the build refuses it (DECK_OLDER_THAN_PAGES).",
+    unrecorded: "The one on disk does not record the pages it was compiled from, so it may be older than they are: compile before building." }[state];
+  const questions = open ? ` The compile records the ${open.measured.pending} question${open.measured.pending === 1 ? "" : "s"} the rules ask of the copy that no judgement answers yet, and delivery refuses the deck until they are answered (node runtime/judge.mjs).` : "";
+  return { text: `No ${deckFile} was written: ${why}. \`${writes}\` writes it, and the build reads only that file. ${standing}${questions}`,
+    record: { file: deckFile, written: false, why, writes, onDisk: state } };
 }
 
 /** Every countable limit a page is held to under the deck's density: the `limits` block --scaffold prints, and --brief beside each page. */

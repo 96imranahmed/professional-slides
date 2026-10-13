@@ -34,6 +34,7 @@ import { EXIT, UsageError, isMain, parseCli, pythonBin, readJson, runCli, writeJ
 
 import { deckStem } from "./artifact-path.mjs";
 import { assertOutputDirectory } from "./output-path.mjs";
+import { staleCompile } from "./pages-file.mjs";
 import { auditContent } from "./content-audit.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
 import { runPlanGates } from "./gates/plan_gates.mjs";
@@ -64,9 +65,19 @@ export const REFUSAL_CODES = Object.freeze({
   VARIETY_REJECTED: "the compiled pages break the variety contract",
   TEXT_PLAN_CHANGED: "composition changed the text the content plan records",
   CONTENT_LOST: "composition lost authored content or visual intent",
+  DECK_OLDER_THAN_PAGES: "the deck.json was compiled from a pages file, or a part of it, that has changed since",
 });
 
 const refuse = (code, message, findings = []) => new RefusalError(registered(REFUSAL_CODES, code), message, findings);
+
+/** What the build says of a deck.json older than its pages (pages-file.mjs staleCompile), and the compile that writes a current one. */
+function staleMessage(stale, deckFile) {
+  const what = stale.unreadable ? `${stale.pages} no longer reads (${stale.unreadable})`
+    : [stale.changed.length ? `changed: ${stale.changed.join(", ")}` : null, stale.added.length ? `added: ${stale.added.join(", ")}` : null,
+      stale.removed.length ? `no longer included: ${stale.removed.join(", ")}` : null].filter(Boolean).join("; ") || "its parts were reordered";
+  return `${deckFile} was compiled from ${stale.pages} as it stood before the pages changed (${what}), so a build would report on pages that are no longer there. `
+    + `Run node runtime/author-deck.mjs ${stale.pages} to write a current ${deckFile} (a --check writes none), then build again.`;
+}
 // Stages run side by side are all awaited before a failure is thrown, so no
 // process is left writing into the output directory after the build has ended.
 async function together(...stages) {
@@ -168,6 +179,11 @@ async function buildWith(specPath, outputDirectory, { preflight = false, render 
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
   const stem = deckStem(spec);
   const baseDir = source?.baseDir ?? path.dirname(path.resolve(specPath));
+  // A deck.json stands for its pages as they were when it was compiled. One whose pages file or parts changed since is
+  // refused, not built: on the BA retest the last `--check --render` wrote no deck.json, and the build read one ten
+  // minutes older and reported five blockers the pages had already fixed.
+  const stale = source ? null : staleCompile(spec, baseDir);
+  if (stale) throw refuse("DECK_OLDER_THAN_PAGES", staleMessage(stale, path.basename(specPath)));
   // The logos of the declared players marked by one load themselves: reused
   // from assets/logos/, fetched when missing, left as placeholders only when
   // that fails. A player marked by its photograph is fetched with the deck's

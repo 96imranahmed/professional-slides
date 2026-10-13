@@ -233,6 +233,33 @@ console.log(JSON.stringify(run.advisories.filter((f) => f.code === 'COMMENTARY_M
         self.assertEqual(result, [["p03", "beside", "below"]])
 
 
+class UnwrittenDeckTests(unittest.TestCase):
+    def test_a_check_says_it_wrote_no_deck_json_and_whether_the_one_on_disk_is_these_pages(self):
+        """On the BA retest a clean `--check --render` was taken for a compile:
+        it wrote no deck.json, said nothing of it, and the build read one ten
+        minutes older than the pages. A full compile records the pages it was
+        compiled from; a check says it wrote none, why, the command that
+        writes one, and whether the one on disk is these pages."""
+        with tempfile.TemporaryDirectory() as tmp:
+            file = worked_deck(tmp)
+            self.assertEqual(cli(file).returncode, 0)
+            deck = Path(tmp) / "page-types.deck.json"
+            self.assertEqual(list(json.loads(deck.read_text())["compiledFrom"]["files"]), ["page-types.pages.json"])
+            current = cli(file, "--check")
+            self.assertEqual(current.returncode, 0, current.stderr[-600:])
+            self.assertEqual(json.loads(current.stdout)["deckJson"], {"file": "page-types.deck.json", "written": False, "why": "--check checks the pages and writes nothing",
+                                                                      "writes": "node runtime/author-deck.mjs page-types.pages.json", "onDisk": "current"})
+            self.assertIn("No page-types.deck.json was written: --check checks the pages and writes nothing.", current.stderr)
+            # The same pages written again: the deck.json on disk is no longer theirs, and the check and the build both say so.
+            file.write_text(json.dumps(json.loads(file.read_text()), indent=1), encoding="utf-8")
+            stale = cli(file, "--check")
+            self.assertEqual(json.loads(stale.stdout)["deckJson"]["onDisk"], "stale")
+            self.assertIn("The one on disk was compiled from older pages, and the build refuses it (DECK_OLDER_THAN_PAGES).", stale.stderr)
+            built = cli(deck, Path(tmp) / "out", "--no-render", "--no-fetch", script=BUILD)
+            self.assertEqual(built.returncode, 2, built.stderr[-600:])
+            self.assertIn("Refused (DECK_OLDER_THAN_PAGES)", built.stderr)
+
+
 class PageRunTests(unittest.TestCase):
     def test_a_finding_about_two_pages_is_reported_to_a_run_of_either(self):
         def repeated(doc):

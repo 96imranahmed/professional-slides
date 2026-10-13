@@ -19,6 +19,10 @@
 // rounds across the sections. Read here, the answer's are one edit, analysis or search before the skeleton is briefed, and
 // the log's hazards - the comparisons its own records say they cannot support - are named before any page is written on
 // them. Both carry forward: the skeleton and writer briefs print them, and the storyline critique's first pass is told.
+//
+// A reading is bound to the answer and to the records it cites, not to the whole log: the research a critique asks for
+// runs beside it, so an insight added while a critic reads leaves the reading's items standing, and the record names what
+// it was read before (readingStands).
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,7 +94,9 @@ export const insightLines = (insight) => [
 
 /**
  * What the critique reads: the deck's statement, the insight log (its parts merged, measures.mjs readInsightLog) and the
- * analyses the runtime computed over it. `binding` changes when any of them does, so a record names the answer it read.
+ * analyses the runtime computed over it. `binding` changes when any of them does; `statementHash` when the statement
+ * does, and `read` holds each insight's and analysis's own hash, so a reading can be held to the answer and to the
+ * records it cites rather than to the whole log (readingStands).
  */
 export async function answerEvidence(pagesFile) {
   const file = path.resolve(pagesFile);
@@ -101,9 +107,33 @@ export async function answerEvidence(pagesFile) {
   const insights = Array.isArray(log?.insights) ? log.insights : [];
   const analysis = log ? await readAnalysis(base, stem, log, { alternatives: alternativesOf(doc.deck) }) : { results: [] };
   const analyses = (analysis.results ?? []).map((r) => ({ id: r.id, line: analysisLine(r) }));
+  const read = Object.fromEntries([...insights.map((i) => [i.id, sha256(JSON.stringify([i.id, i.finding, i.calculation, i.measures ?? null]))]),
+    ...analyses.map((a) => [a.id, sha256(a.line)])]);
   const binding = sha256(JSON.stringify({ statement, insights: insights.map((i) => [i.id, i.finding, i.calculation, i.measures ?? null]), analyses }));
-  return { file, base, stem, statement, insights, analyses, binding, answerHash: answerHashOf(statement.answer) };
+  return { file, base, stem, statement, insights, analyses, binding, answerHash: answerHashOf(statement.answer), statementHash: sha256(JSON.stringify(statement)), read };
 }
+
+/** The insight and analysis ids a reading cites: its items' and its hazards'. */
+const citedBy = (reading) => [...new Set([...(Array.isArray(reading?.items) ? reading.items : []), ...(Array.isArray(reading?.hazards) ? reading.hazards : [])]
+  .flatMap((entry) => (Array.isArray(entry?.insights) ? entry.insights : [])).filter((id) => typeof id === "string"))];
+
+/**
+ * Whether a reading made against the log as `then` held it (`{ statementHash, read }`, a packet's or a record's) stands
+ * on the log as it is now: the statement is the one it read, and no record it cites has changed or gone. Insights and
+ * analyses added since, or changed without being cited, do not void it: the stage table runs the research a critique
+ * asks for beside the critique, so on the BA retest three research agents added five insights while the confirming
+ * pass read, and its seven-minute reading was deleted unrecorded. They are named instead (`readBefore`).
+ */
+function readingStands(then, evidence, cited) {
+  if (!then || then.statementHash !== evidence.statementHash || !then.read || typeof then.read !== "object") return false;
+  return cited.every((id) => !Object.hasOwn(then.read, id) || then.read[id] === evidence.read[id]);
+}
+
+/** The insights and analyses the log holds now that a reading made against `read` did not read as they are: added or changed since. */
+const readBefore = (read, evidence) => Object.keys(evidence.read).filter((id) => read?.[id] !== evidence.read[id]);
+
+/** Whether the recorded critique still reads the deck's answer: the same evidence, or the same statement with every record it cites unchanged. */
+const recordStands = (record, evidence) => Boolean(record) && (record.binding === evidence.binding || readingStands(record, evidence, citedBy(record)));
 
 const ITEM_FIELDS = ["id", "check", "severity", "claim", "insights", "problem", "remedy", "fix"];
 
@@ -232,12 +262,17 @@ async function writePacket(evidence, out, prior, waiting) {
   const dir = path.join(out, PACKET_DIR);
   await fs.mkdir(dir, { recursive: true });
   const answerFile = path.join(dir, ANSWER_FILE);
-  // An answer saved for an earlier packet answers another statement: left there, the next run would record it against this one.
+  // An answer saved for an earlier packet answers another statement, or cites a record that has changed since (the caller
+  // records every other): left there, the next run would record it against this one.
   if (waiting?.binding !== evidence.binding) await fs.rm(answerFile, { force: true });
   await fs.writeFile(path.join(dir, "prompt.md"), `${answerPrompt(evidence, { answerFile, prior })}\n`);
-  await writeJson(path.join(dir, "packet.json"), { schema: "professional-slides.answer-critique-packet/v1", binding: evidence.binding, answerHash: evidence.answerHash, prior: prior.map((item) => item.id) });
+  await writeJson(path.join(dir, "packet.json"), { schema: "professional-slides.answer-critique-packet/v1", binding: evidence.binding, answerHash: evidence.answerHash,
+    statementHash: evidence.statementHash, read: evidence.read, prior: prior.map((item) => item.id) });
   return { dir, answerFile };
 }
+
+/** The line said of a reading made before the log grew: its items stand, and the records it did not read are named. */
+const readBeforeNote = (ids) => `This reading was made before ${ids.join(", ")} ${ids.length === 1 ? "was" : "were"} added to the log or changed: its items stand, since none of them cites ${ids.length === 1 ? "it" : "those"}. A pass over a revised answer reads the whole log.`;
 
 /** Stage, or record what was returned: the run as the CLI makes it. Returns the exit code. */
 export async function answerCritique(pagesFile, outputDirectory, { say = console.log, warn = console.error } = {}) {
@@ -245,29 +280,40 @@ export async function answerCritique(pagesFile, outputDirectory, { say = console
   await fs.mkdir(out, { recursive: true });
   const evidence = await answerEvidence(pagesFile);
   const record = await readAnswerCritique(out);
-  if (record?.binding === evidence.binding) {
+  if (recordStands(record, evidence)) {
     const open = openAnswerItems(record).filter((item) => OPEN_SEVERITIES.has(item.severity));
-    say(JSON.stringify({ status: record.verdict, items: openAnswerItems(record).map(itemLine) }, null, 1));
+    const before = record.read ? readBefore(record.read, evidence) : [];
+    say(JSON.stringify({ status: record.verdict, items: openAnswerItems(record).map(itemLine), ...(before.length ? { readBefore: before, note: readBeforeNote(before) } : {}) }, null, 1));
     return open.length ? EXIT.refused : EXIT.ok;
   }
-  // The earlier record read another answer: its items go to the next critic to settle.
+  // The earlier record read another answer, or cites a record that changed: its items go to the next critic to settle.
   const prior = record ? openAnswerItems(record) : [];
   const dir = path.join(out, PACKET_DIR), answerFile = path.join(dir, ANSWER_FILE);
   const waiting = await readJson(path.join(dir, "packet.json"), { optional: true });
   let returned = null;
-  if (waiting?.binding === evidence.binding) {
+  // A reading is taken for the packet it answers while the statement is the one staged; whether the records it cites
+  // still stand is read once it is in (readingStands).
+  if (waiting?.binding === evidence.binding || (waiting?.statementHash && waiting.statementHash === evidence.statementHash)) {
     try { returned = await readJson(answerFile, { optional: true }); } catch (error) {
       warn(`The answer critique in ${answerFile} is refused: it is not JSON (${error.message})`);
       return EXIT.refused;
     }
   }
+  if (returned && waiting.binding !== evidence.binding && !readingStands(waiting, evidence, citedBy(returned))) {
+    const moved = citedBy(returned).filter((id) => Object.hasOwn(waiting.read ?? {}, id) && waiting.read[id] !== evidence.read[id]);
+    warn(`The answer critique in ${answerFile} cites ${moved.join(", ")}, which ${moved.length === 1 ? "has" : "have"} changed since it was staged: it is not recorded, and a new packet is staged over the log as it is.`);
+    returned = null;
+  }
   if (returned) {
     const errors = answerCritiqueErrors(returned, evidence, { prior });
     if (errors.length) { warn(`The answer critique in ${answerFile} is refused:\n${errors.map((e) => `- ${e}`).join("\n")}`); return EXIT.refused; }
     const items = returned.items;
+    // What the critic read is the packet's log; what was added or changed beside it is named, and the items stand.
+    const read = waiting.read ?? evidence.read, before = readBefore(read, evidence);
     await writeJson(path.join(out, RECORD_FILE), { schema: "professional-slides.answer-critique/v1", binding: evidence.binding, answerHash: evidence.answerHash,
-      pass: (record?.pass ?? 0) + 1, verdict: returned.verdict, summary: returned.summary, items, hazards: returned.hazards, ...(prior.length ? { prior: returned.prior } : {}) });
-    say(JSON.stringify({ status: returned.verdict, items: items.map(itemLine) }, null, 1));
+      statementHash: evidence.statementHash, read, pass: (record?.pass ?? 0) + 1, verdict: returned.verdict, summary: returned.summary, items, hazards: returned.hazards,
+      ...(prior.length ? { prior: returned.prior } : {}), ...(before.length ? { readBefore: before } : {}) });
+    say(JSON.stringify({ status: returned.verdict, items: items.map(itemLine), ...(before.length ? { readBefore: before, note: readBeforeNote(before) } : {}) }, null, 1));
     if (returned.verdict === "revise") warn("Narrow the answer, compute the analyses or find the data the items name, then run this again: the next critic reads the revised answer and settles each item. The skeleton brief prints what is open.");
     return returned.verdict === "revise" ? EXIT.refused : EXIT.ok;
   }
@@ -282,7 +328,7 @@ async function validate(pagesFile, outputDirectory, file) {
   const out = path.resolve(outputDirectory);
   const evidence = await answerEvidence(pagesFile);
   const record = await readAnswerCritique(out);
-  const prior = record && record.binding !== evidence.binding ? openAnswerItems(record) : [];
+  const prior = record && !recordStands(record, evidence) ? openAnswerItems(record) : [];
   const answerFile = file ?? path.join(out, PACKET_DIR, ANSWER_FILE);
   let review = null, errors = [];
   try { review = JSON.parse(await fs.readFile(answerFile, "utf8")); } catch (error) { errors = [`${answerFile}: ${error.code === "ENOENT" ? "no answer saved there" : `not JSON (${error.message})`}`]; }

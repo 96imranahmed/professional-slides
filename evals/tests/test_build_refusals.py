@@ -79,8 +79,35 @@ class RefusalTests(unittest.TestCase):
 import { REFUSAL_CODES } from './skills/professional-slides/runtime/build-deck.mjs';
 console.log(JSON.stringify(Object.fromEntries(Object.entries(REFUSAL_CODES).map(([code, about]) => [code, String(about).trim().length > 0]))));
 """)
-        for code in ("CONTENT_REJECTED", "PLAN_REJECTED", "VARIETY_REJECTED", "STAGE_CONTRACT", "STAGE_MISSING", "TEXT_PLAN_CHANGED", "CONTENT_LOST"):
+        for code in ("CONTENT_REJECTED", "PLAN_REJECTED", "VARIETY_REJECTED", "STAGE_CONTRACT", "STAGE_MISSING", "TEXT_PLAN_CHANGED", "CONTENT_LOST", "DECK_OLDER_THAN_PAGES"):
             self.assertTrue(codes.get(code), code)
+
+    def test_a_deck_json_older_than_its_pages_is_refused_naming_the_compile(self):
+        """On the BA retest the last `--check --render` wrote no deck.json, and
+        the build read one ten minutes older than the pages and reported five
+        blockers already fixed. The deck.json records the hash of the pages
+        file and each part; the build refuses one whose sources changed since,
+        naming the file that changed and the compile that writes a current one."""
+        (self.tmp / "pages").mkdir()
+        part = self.tmp / "pages" / "a.pages.json"
+        part.write_text(json.dumps({"pages": [{"id": "p1", "title": "One finding"}]}), encoding="utf-8")
+        (self.tmp / "probe.pages.json").write_text(json.dumps({"deck": {"id": "probe"}, "pages": [{"include": "pages/a.pages.json"}]}), encoding="utf-8")
+        compiled = run_node(f"""
+import {{ readPagesFileSync, compiledFrom }} from './skills/professional-slides/runtime/pages-file.mjs';
+console.log(JSON.stringify(compiledFrom(readPagesFileSync({json.dumps(str(self.tmp / "probe.pages.json"))}))));
+""")
+        self.assertEqual([compiled["pages"], sorted(compiled["files"])], ["probe.pages.json", ["pages/a.pages.json", "probe.pages.json"]])
+        # Its pages as they were compiled: the build goes on to the next refusal, as before.
+        current = self.build(spec(purpose="evaluation", compiledFrom=compiled), "--preflight")
+        self.assertIn("Refused (EVALUATION_TOO_SHORT)", current.stderr)
+        part.write_text(json.dumps({"pages": [{"id": "p1", "title": "One finding, retitled"}]}), encoding="utf-8")
+        stale = self.build(spec(purpose="evaluation", compiledFrom=compiled), "--preflight")
+        self.assertEqual(stale.returncode, 2, stale.stderr)
+        self.assertIn("Refused (DECK_OLDER_THAN_PAGES)", stale.stderr)
+        self.assertIn("changed: pages/a.pages.json", stale.stderr)
+        self.assertIn("Run node runtime/author-deck.mjs probe.pages.json", stale.stderr)
+        self.assertNotIn("    at ", stale.stderr)
+        self.assertFalse((self.tmp / "out" / "scene.json").exists())
 
 
 @requires_python_package("pptx")
