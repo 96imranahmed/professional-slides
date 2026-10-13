@@ -432,6 +432,19 @@ console.log(JSON.stringify({
         self.assertIn('"174" is not 174.5 rounded once; print it at `0.0`', result["tie"][0]["repair"])
         self.assertEqual(result["one"], [])
 
+    def test_a_revision_under_version_ten_hears_the_one_page_rule_as_advisory(self):
+        """Version 8 read two pages; reading one page's prints against each other is version 11's (`NUMBER_FORMATS_DIFFER.onePage`)."""
+        result = run_node(self.PRINTED + """
+const exhibit = { heading: 'Passengers per flight', series: [{ measure: 'i6/perFlight', name: 'Passengers per flight' }], annotations: [{ category: '2025', text: '{{i6/perFlight@2025 | 0.0}} a flight in 2025' }] };
+const tie = run([{ ...page('p1', ['i6'], 'Passengers per flight rose to 174 in 2025 as aircraft grew', exhibit), form: 'column' }]);
+const columns = { ...trend('p1', [{ measure: 'i4/visits', name: 'Aster' }]), form: 'column' };
+const apart = run([columns, trend('p2', [{ measure: 'i4/visits', name: 'Aster' }], { title: 'Aster saw {{i4/visits@FY25 | 0.00}} million visits in FY25' })]);
+const under = (version) => (findings) => applyRulesVersion(findings, { workflow: 'existing_deck_revision', rulesVersion: version }).map((f) => [f.rule ?? f.code, f.severity]);
+console.log(JSON.stringify({ ten: [...under(10)(tie), ...under(10)(apart)], eleven: [...under(11)(tie), ...under(11)(apart)] }));
+""")
+        self.assertEqual(result["ten"], [["NUMBER_FORMATS_DIFFER.onePage", "advisory"], ["NUMBER_FORMATS_DIFFER", "blocker"]])
+        self.assertEqual(result["eleven"], [["NUMBER_FORMATS_DIFFER.onePage", "blocker"], ["NUMBER_FORMATS_DIFFER", "blocker"]])
+
     def test_a_chart_label_is_held_to_the_figure_another_page_prints(self):
         """BA retest sh04 against pr11: a chart's label printed a rate as 1.6 that another page printed as 1.58; no check read a label."""
         result = run_node(self.PRINTED + """

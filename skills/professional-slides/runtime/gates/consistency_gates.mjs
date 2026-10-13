@@ -566,7 +566,7 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
       const misrounded = here.filter((entry) => entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9);
       if ((new Set(here.map(formOfEntry)).size < 2 && !misrounded.length) || !involves(id)) continue;
       const shown = [...new Map(here.map((entry) => [`${entry.shown ?? printedOf(entry)}|${whereOf(entry)}`, `"${entry.shown ?? printedOf(entry)}" (${whereOf(entry)})`])).values()];
-      formats.push({ key, pages: [id], format: oneFormat(here), text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it` });
+      formats.push({ key, pages: [id], format: oneFormat(here), rule: "NUMBER_FORMATS_DIFFER.onePage", text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it` });
     }
     // Between pages, tables aside.
     const apart = printed.filter((entry) => !inTable(entry));
@@ -583,9 +583,11 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
     if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions` });
   }
   // One finding for each value, so every page it names is told its own disagreement and the format that ends it.
-  for (const f of formats) finding("NUMBER_FORMATS_DIFFER", "blocker", f.pages,
+  // A value printed two ways on one page is the rule's variant `onePage` (weight.json rules version 11; version 8 read two pages).
+  for (const f of formats) { finding("NUMBER_FORMATS_DIFFER", "blocker", f.pages,
     `${f.text}. A reader who meets 53 on one page and 53.2 on another, or 174 in a title over a bar labelled 175, checks whether they are one number. Print the value in one format wherever it is printed - a token's format (\`{{ref@label | 0.0}}\`) in place of a typed number, a chart's \`valueFormat\` - or say on the page that rounds that it does`,
     f.format ? { cell: f.key, format: f.format } : [f.key]);
+    if (f.rule) out[out.length - 1].rule = f.rule; }
   for (const item of unreconciled(pages, stating, registry, insights?.analysis?.plan, involves)) finding("BRIDGE_UNRECONCILED", "blocker", item.pages, item.repair, item.measured);
 
   // --- by name --------------------------------------------------------------
