@@ -43,7 +43,8 @@ class EventBandTests(unittest.TestCase):
         result = run_node('''
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const frame = { x: 0, y: 0, width: 900, height: 420 };
-const base = { categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], series: [{ name: 'Flights', values: [470, 200, 194, 380, 455, 476, 484] }], heading: 'Heathrow flights, thousands', unit: 'thousands' };
+// From zero, so the lone line's fill (its top the plot's) is drawn: a line over a floor above zero takes none (test_chart_honesty.py).
+const base = { categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], series: [{ name: 'Flights', values: [470, 200, 194, 380, 455, 476, 484] }], heading: 'Heathrow flights, thousands', unit: 'thousands', yMin: 0 };
 const one = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid' }] } }).nodes;
 const two = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid grounds most flying' }, { at: '2022', label: 'Recovery begins across the network' }] } }).nodes;
 const flag = (nodes) => nodes.filter((n) => n.role === 'chart-event-label').map((n) => ({ y: n.frame.y, bottom: n.frame.y + n.frame.height }));
@@ -159,7 +160,8 @@ const render=(id,props,box=frame)=>REGISTRY.get(id).render({id:'review',frame:bo
         """PR #4 review: a line or area legend's swatches took default colours rather than the plot's, and direct labels squeezed into a narrow frame."""
         self.check_js("""
 for(const id of ['chart.line','chart.area']) {
- const props={categories:['A','B'],series:[{name:'One',values:[100,110]},{name:'Two',values:[105,108]}],colorIndices:[3,5]};
+ // Values that move well clear of zero: an area of 100 against 110 draws flat from zero and is refused for a line.
+ const props={categories:['A','B'],series:[{name:'One',values:[40,110]},{name:'Two',values:[55,108]}],colorIndices:[3,5]};
  const nodes=render(id,props);
  assert.deepEqual(nodes.filter(n=>n.role==='legend-swatch').map(n=>n.style.fill.tokenId),['color.chartSeries4','color.chartSeries6']);
  assert.throws(()=>render(id,{...props,directLabels:'end'},{...frame,width:300}),/plot width/);

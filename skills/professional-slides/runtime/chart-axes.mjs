@@ -334,12 +334,13 @@ export function axisLabelWidth(bounds) {
   return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL) }).width)));
 }
 
-export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
+export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48, inverted = false } = {}) {
   steps = tickCount(yMin, yMax, steps);
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
-      const y = plot.y + plot.height - plot.height * index / steps;
+      // A rank's axis is turned over (chart-line.mjs): its least value, first place, at the top.
+      const y = inverted ? plot.y + plot.height * index / steps : plot.y + plot.height - plot.height * index / steps;
       if (gridlines) {
         nodes.push(linePrimitive({
           id: stableId(id, "grid", index),

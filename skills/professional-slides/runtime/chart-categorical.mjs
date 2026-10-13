@@ -251,6 +251,10 @@ function categoricalData(chart) {
   assertGridlineOption(props);
   if (horizontal && props.categoryColumns) throw new Error(`${id}: a data table's columns run across the page, and a bar chart's categories run down it - set the table beside the bars as a column, or draw columns`);
   const { categories, series } = normalizedCategoricalData(props);
+  // A rank (measures.mjs isRankMeasure) is a place with 1 at the top: a bar's length would draw the worst place as the
+  // most. The BA retest's Skytrax panel drew 23rd as a longer bar than 2nd. Dots on a rank axis, or a table, say it.
+  const ranks = series.filter((item) => item.rank === true);
+  if (ranks.length) throw new Error(`RANK_FILLED: ${ranks.map((item) => item.name).join(", ")} is a rank, and a ${horizontal ? "bar" : "column"}'s length would draw the worst place as the largest - set the places in a table (a ranking page), or draw a change of rank over time as chart.line, which sets 1 at the top`);
   const stackLabels = stackLabelPlan(props, categories, series, stacked);
   const highlights = normalizedHighlights(props, { categories, series, allowBar: !stacked,
     defaultStyle: stacked ? "region-tint" : defaultHighlightStyle(horizontal ? "chart.bar" : "chart.column", { series }) });

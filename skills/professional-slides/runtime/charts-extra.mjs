@@ -10,7 +10,7 @@ import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SEC
 import { withDecorations, withReferenceValues } from "./chart-decorations.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
-import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
+import { timePositions, spacedLabelIndices, missingPeriods } from "./time-axis.mjs";
 import { smallMultiplesChart, smallMultiplesLayout } from "./chart-small-multiples.mjs";
 
 const ACCENT = token("color.accent");
@@ -427,6 +427,13 @@ function stackedAreaChart({ id, frame, props }) {
   // behind them shows only above the stack, and its label sits on the fills.
   if ((props.referenceLines || []).length) throw new Error(`${id}: a stacked area's layers fill the plot and would hide a reference line behind them - state the level in a callout at the period the total reaches it, or draw the total as a line chart with its reference line`);
   const { series, categories, totals, bounds, labelWidth, plot } = stackedAreaLayout(frame, props);
+  // Layers fill from zero, so a rank (measures.mjs isRankMeasure) is never one; and a fill carried across periods the run
+  // leaves out (time-axis.mjs missingPeriods) states values the record does not have - the BA retest's stack of Heathrow's
+  // passengers drew about 70m through 2020-21, when it carried about 20m. A line breaks at the gap; columns stand apart.
+  const ranks = series.filter((s) => s.rank === true);
+  if (ranks.length) throw new Error(`RANK_FILLED: ${ranks.map((s) => s.name).join(", ")} is a rank, and a filled layer draws the worst place as the largest - draw it as chart.line, which sets 1 at the top`);
+  const gaps = missingPeriods(categories);
+  if (gaps.length) throw new Error(`AREA_GAP: the run leaves out the periods between ${gaps.map((gap) => `${gap.from} and ${gap.to}`).join(", ")}, and a stacked area would fill straight across them - draw stacked columns (each period its own stack), or the series as chart.line, which breaks at a gap`);
   // Uneven dated observations sit where they fall in time (time-axis.mjs), and
   // only the labels whose 80px slots clear their neighbours' are set.
   const spacing = timePositions(categories);
@@ -446,7 +453,7 @@ function stackedAreaChart({ id, frame, props }) {
   layers.forEach(({ sr, lower, upper }, si) => {
     const top = upper.map((v, i) => norm(plot, xAt(i), yAt(v)));
     const bottom = lower.map((v, i) => norm(plot, xAt(i), yAt(v))).reverse();
-    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name } }));
+    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name, baselineValue: bounds.min } }));
     const last = categories.length - 1, mid = (upper[last] + lower[last]) / 2;
     if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: yAt(mid) - 10, width: 64, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
   });

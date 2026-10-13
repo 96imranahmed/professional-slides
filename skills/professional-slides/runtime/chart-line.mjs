@@ -4,7 +4,7 @@
 import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenValue, shapePrimitive, rectPrimitive } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { timePositions, spacedLabelIndices, monthlyLabelStep } from "./time-axis.mjs";
+import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods } from "./time-axis.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
@@ -12,6 +12,8 @@ import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabe
 import { normalizeIntervals, intervalValues, intervalLabelWidth, intervalNodes } from "./chart-bands.mjs";
 
 const SPARSE_DIRECT_LABEL_LIMIT = 8;
+// An area's values that move under this share of their height above zero draw flat from a zero baseline: a line instead.
+const AREA_FLAT_SHARE = 0.25;
 
 // Explicit sparse observations use numeric positions; no category slot or invented value.
 function sparseLineChart({ id, frame, props }) {
@@ -181,6 +183,21 @@ function lineOptions(chart) {
     ? (series[seriesIndex].name === props.focusSeries ? token("color.componentPrimary") : token("color.rule"))
     : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
+  // A rank is a place, 1 the top (measures.mjs isRankMeasure): its line runs on an axis with 1 at the top, so a climb from
+  // 8th to 4th draws as a rise, and an area - whose fill would make the worst place the largest - is refused it. The BA
+  // retest drew IAG's climb to 4th as a fall and BA's fall to 23rd as a filled climb.
+  const ranks = series.filter((item) => item.rank === true);
+  if (ranks.length && area) throw new Error(`RANK_FILLED: ${ranks.map((item) => item.name).join(", ")} is a rank, a place with 1 at the top, and an area's fill draws the worst place as the largest - draw it as chart.line, which sets 1 at the top of the axis`);
+  if (ranks.length && ranks.length !== series.length) throw new Error(`${ranks.map((item) => item.name).join(", ")} is a rank and ${series.filter((item) => item.rank !== true).map((item) => item.name).join(", ")} a quantity: they cannot share one axis - draw the rank in a panel of its own`);
+  const rank = ranks.length > 0;
+  // An area encodes each value as the area from its baseline, so its scale starts at zero: filled down to a floor near a
+  // series' low, a doubling draws as a five-fold rise (the BA retest's jet fuel and low-cost share). Where zero would leave
+  // the values a sliver at the top of the plot, the area is refused for a line, which reads the change off its own scale.
+  if (area) {
+    const lo = Math.min(...series.flatMap((item) => item.values)), hi = Math.max(...series.flatMap((item) => item.values));
+    if (Number.isFinite(props.yMin) && props.yMin > 0) throw new Error(`AREA_BASELINE: an area fills from its baseline, so its scale starts at zero, not at yMin ${props.yMin} - drop yMin, or draw the series as chart.line`);
+    if (lo > 0 && (hi - lo) / hi < AREA_FLAT_SHARE) throw new Error(`AREA_BASELINE: an area fills from zero, and these values (${formatValue(lo, props)} to ${formatValue(hi, props)}) move under ${Math.round(AREA_FLAT_SHARE * 100)}% of their height above it, so the fill would draw them flat - draw the series as chart.line, which reads the change off its own scale`);
+  }
   const endLabels = props.directLabels === "end" || props.endLabels === true;
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
   const values = series.flatMap((item) => item.values);
@@ -210,17 +227,22 @@ function lineOptions(chart) {
   const intervals = normalizeIntervals(props, categories);
   if (endLabels && intervals.some((interval) => interval.label)) throw new Error("a labelled interval is named at the line's end, where end labels name the series; name the series in a legend (drop directLabels: \"end\") or drop the interval's label");
   const reach = [...values, ...intervalValues(props)];
-  const bounds = numericBounds(withReferenceValues(reach, props, { base: props.yMin ?? Math.min(...reach), padded: tight }), { min: props.yMin, max: props.yMax, axis: "y", tight });
+  // An area's axis runs from zero. A rank's takes the ladder its places span, turned over (linePlot), so its ticks stay whole steps.
+  const floor = area ? Math.min(0, ...reach) : undefined;
+  const bounds = numericBounds(withReferenceValues(reach, props, { base: props.yMin ?? floor ?? Math.min(...reach), padded: tight }), { min: props.yMin ?? floor, max: props.yMax, axis: "y", tight, includeZero: area });
   const labelWidth = axisLabelWidth(bounds);
   const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height; } catch { return 28; } }));
+  // A period the run leaves out at its own cadence (time-axis.mjs missingPeriods) breaks every line there: a segment drawn
+  // across 2020-21 states values the record does not have.
+  const breaks = new Set(missingPeriods(categories).map((gap) => gap.after));
   return { categories, series, lineColor, endLabels, showLegend, seriesGrowth, spacing, labelAt, showDataLabels, showValueAxis, bounds,
-    labelWidth, labelHeightAt, intervals };
+    labelWidth, labelHeightAt, intervals, rank, breaks };
 }
 
 /** The plot inside the frame, the period labels' slot and height at its width, and the two scales. */
 function linePlot(chart) {
   const { frame, props, categories, endLabels, showLegend, seriesGrowth, spacing, showDataLabels, showValueAxis, bounds, labelWidth,
-    labelHeightAt, intervals } = chart;
+    labelHeightAt, intervals, rank } = chart;
   // The period labels sit 16px under the plot, clear of the markers on its
   // floor; the band keeps their measured height and no more, estimated at the
   // narrowest slot a label gets and settled once the plot is laid out.
@@ -242,19 +264,19 @@ function linePlot(chart) {
   });
   const labelSlot = labelSlotAt(plot.width);
   const labelHeight = labelHeightAt(labelSlot);
-  const yScale = (value) => plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height;
+  const yScale = (value) => (rank ? plot.y + (value - bounds.min) / bounds.span * plot.height : plot.y + plot.height - (value - bounds.min) / bounds.span * plot.height);
   const xScale = (index) => plot.x + (categories.length === 1 ? plot.width / 2 : spacing ? plot.width * spacing[index] : plot.width * index / (categories.length - 1));
   return { plot, labelSlot, labelHeight, yScale, xScale };
 }
 
 /** The legend, the axes and the period labels - every nth when they are dense, the ones clear of their neighbours on a time axis. */
 function lineAxes(chart) {
-  const { id, frame, props, categories, series, showLegend, spacing, showValueAxis, bounds, labelWidth, plot, labelSlot, labelHeight, xScale } = chart;
+  const { id, frame, props, categories, series, showLegend, spacing, showValueAxis, bounds, labelWidth, plot, labelSlot, labelHeight, xScale, rank } = chart;
   const nodes = [
     // Where a series says it is assumed or a reference, the key is a line - solid for a record, dashed for the rest - and says which.
     ...(showLegend ? topLegend({ id, frame, variant: statesSeries(props) ? "line" : "swatch", items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: props.colorIndices?.[index] ?? index,
       ...(seriesState(item, categories).state !== "recorded" ? { state: "forecast" } : {}) })) }) : []),
-    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth })
+    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth, inverted: rank })
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -295,31 +317,33 @@ function drawIntervals(chart) {
 
 /** Each series: its area or lone fill, segments, markers and value labels; returns the end labels still to place. */
 function drawLines(chart) {
-  const { id, props, area, categories, series, lineColor, endLabels, labelAt, showDataLabels, bounds, plot, yScale, xScale, nodes, pointMap } = chart;
+  const { id, props, area, categories, series, lineColor, endLabels, labelAt, showDataLabels, bounds, plot, yScale, xScale, nodes, pointMap, rank, breaks } = chart;
   const pendingEndLabels = [];
   const weight = markWeight();
   // A line alone on its plot takes a light fill beneath it (markWeight); two
   // or more lines keep bare strokes, where fills would stack into mud.
   // The fill is the weight of a record: a line that is an assumption, in whole or from part-way, stays a bare stroke; so does
   // a line in its own interval, whose envelope is the shading.
-  const lone = !area && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
+  // The fill is an area from zero, so a line whose scale does not reach zero, or a rank's, keeps a bare stroke: filled down
+  // to a floor near its low, the BA retest's jet fuel drew a doubling as a five-fold rise.
+  const lone = !area && !rank && bounds.min <= 0 && bounds.max >= 0 && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
+  // The runs of periods a line joins: a break (lineOptions) ends one run and starts the next.
+  const runs = categories.reduce((all, _, index) => (index && !breaks.has(index - 1) ? all.at(-1).push(index) : all.push([index]), all), []);
   series.forEach((item, seriesIndex) => {
     const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
     if (area || lone) {
-      const baselineValue = bounds.min <= 0 && bounds.max >= 0 ? 0 : bounds.min;
+      const baselineValue = 0;
       const baselineY = yScale(baselineValue);
-      const polygonPoints = [
-        ...points.map(point => [Number(((point.x - plot.x) / plot.width).toFixed(6)), Number(((point.y - plot.y) / plot.height).toFixed(6))]),
-        [Number(((points.at(-1).x - plot.x) / plot.width).toFixed(6)), Number(((baselineY - plot.y) / plot.height).toFixed(6))],
-        [Number(((points[0].x - plot.x) / plot.width).toFixed(6)), Number(((baselineY - plot.y) / plot.height).toFixed(6))]
-      ];
-      nodes.push(shapePrimitive({
+      const at = (x, y) => [Number(((x - plot.x) / plot.width).toFixed(6)), Number(((y - plot.y) / plot.height).toFixed(6))];
+      // Each run fills on its own; a period alone between two gaps has no width to fill and is its marker.
+      const paths = runs.filter((run) => run.length > 1).map((run) => [...run.map((index) => at(points[index].x, points[index].y)), at(points[run.at(-1)].x, baselineY), at(points[run[0]].x, baselineY)]);
+      if (paths.length) nodes.push(shapePrimitive({
         id: stableId(id, "area", item.name),
         role: "chart-area",
         geometry: "customPolygon",
         frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height },
         style: { fill: lineColor(seriesIndex), stroke: "none", lineWidth: token("line.hairline"), opacity: area ? 0.18 : weight.loneArea },
-        data: { paths: [polygonPoints], series: item.name, baselineValue, ...(lone ? { lone: true } : {}) }
+        data: { paths, series: item.name, baselineValue, ...(lone ? { lone: true } : {}) }
       }));
     }
     // What the series is decides its stroke (chart-decorations.mjs SERIES_STATES): a record is solid with filled markers; an
@@ -327,7 +351,7 @@ function drawLines(chart) {
     // among the series a thin dashed rule with no markers at all.
     const { state, from: assumedAt } = seriesState(item, categories);
     const reference = state === "reference", assumed = (index) => state === "assumed" && index >= assumedAt;
-    points.slice(1).forEach((point, index) => nodes.push(linePrimitive({
+    points.slice(1).forEach((point, index) => !breaks.has(index) && nodes.push(linePrimitive({
       id: stableId(id, "segment", item.name, index),
       role: "chart-line",
       x1: points[index].x,
@@ -337,7 +361,7 @@ function drawLines(chart) {
       style: reference || assumed(index + 1) ? lineStyle(lineColor(seriesIndex), token("line.standard"), "dash") : lineStyle(lineColor(seriesIndex), weight.line),
       ...(reference || assumed(index + 1) ? { data: { series: item.name, state } } : {})
     })));
-    const labelSides = lineLabelSides(points.map(point => point.value));
+    const labelSides = lineLabelSides(points.map(point => (rank ? -point.value : point.value)));
     const radius = weight.marker / 2;
     points.forEach((point, pointIndex) => {
       if (!reference) nodes.push(ellipsePrimitive({
@@ -451,6 +475,10 @@ export function comboChart({ id, frame, props }) {
   const lineSeries = series[1];
   const lineRange = Math.max(...lineSeries.values) - Math.min(...lineSeries.values);
   const secondary = props.secondaryAxis === true;
+  // A rank (measures.mjs isRankMeasure) is a place, not an amount: never a column, and as the line, on a scale of its own
+  // with 1 at the top - the BA retest drew IAG's climb from 8th to 4th as a fall.
+  if (barSeries.rank === true) throw new Error(`RANK_FILLED: ${barSeries.name} is a rank, and a column's height would draw the worst place as the largest - draw it as the combo's line, or in a line panel of its own`);
+  if (lineSeries.rank === true && !secondary) throw new Error(`${lineSeries.name} is a rank and ${barSeries.name} a quantity: the rank's line takes a scale of its own (secondaryAxis: true), with 1 at the top`);
   // Independent units get separate vertical fields on the same categories.
   // Reserve their label clearance before scaling, including when the primary
   // value axis is visible; padding its domain alone lets the line cross labels.
@@ -471,7 +499,7 @@ export function comboChart({ id, frame, props }) {
   const bounds = numericBounds(withReferenceValues(secondary ? barSeries.values : series.flatMap(item => item.values), props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
   const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
   const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * lineShare - 30) };
-  const y2Scale = (value) => lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height;
+  const y2Scale = (value) => (lineSeries.rank === true ? lineBand.top + (value - lineBounds.min) / lineBounds.span * lineBand.height : lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height);
   const lineScale = secondary ? y2Scale : yScale;
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;

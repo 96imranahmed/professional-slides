@@ -69,6 +69,17 @@ export function isPercentUnit(unit) {
 }
 
 
+/**
+ * Is the measure a rank: recorded in a rank unit ("rank", "rank, 1 = best", a
+ * position) and not said to be better higher. A rank is a place, not an
+ * amount - 1 is the top, and a move from 13th to 23rd is a fall - so it plots
+ * on an axis with 1 at the top, and never as a bar, a column or a filled area,
+ * whose size would draw the worst place as the most (the BA retest's Skytrax
+ * and loyalty ranks, drawn the wrong way up). Read off the recorded unit and
+ * `better`, never the measure's name.
+ */
+export const isRankMeasure = (measure) => /^(rank|ranking|position)\b/.test(normalUnit(measure?.unit)) && measure?.better !== "up";
+
 /** Is the unit a bare ratio, fraction or multiple: a number that a hundred times over is a percentage. */
 export const isRatioUnit = (unit) => /^(ratio|fraction|proportion|multiple|times|x)\b/.test(normalUnit(unit));
 
