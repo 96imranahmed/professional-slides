@@ -1030,6 +1030,8 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // So are columns over uneven dates (chart-categorical.mjs rowLabelling), unless a broken axis or a data table keeps their slots.
+  if (["column", "stacked-column"].includes(type) && !props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(props.categories)) return null;
   // A rank's line runs with 1 at the top, which the native line's axis does not say (chart-line.mjs): that chart stays drawn.
   if (Array.isArray(props.series) && props.series.some((item) => item?.rank === true)) return null;
   // A series that says it is assumed or a reference is drawn dashed, lighter or as a reference line (chart-decorations.mjs

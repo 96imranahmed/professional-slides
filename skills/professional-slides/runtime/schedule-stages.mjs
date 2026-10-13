@@ -25,6 +25,7 @@
 // `orientation: "across" | "down"` on the exhibit settles it by hand.
 import { token, tokenValue, ellipsePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, readableOn } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
+import { elapsedSteps, sayElapsed } from "./time-axis.mjs";
 import { BODY, COMPACT, INK, SECONDARY, PRIMARY, SURFACE, RULE, HAIRLINE, STANDARD, SMALL_RADIUS, textStyle, boxStyle, openLine } from "./registry-shared.mjs";
 
 export const STAGE_TOKENS = ["font.body", "type.heading", "type.body", "type.compact", "color.ink", "color.textSecondary", "color.componentPrimary",
@@ -118,6 +119,10 @@ export function stagesLayout(frameIn, props, { roadmap = false, id = "schedule" 
   if (!Array.isArray(props.items) || !props.items.length) throw new Error(`${id} requires ordered stages`);
   if (props.orientation !== undefined && !["across", "down"].includes(props.orientation)) throw new Error(`${id}: \`orientation\` is "across" (the stages in columns) or "down" (the stages in rows)`);
   const stages = props.items.map((item, index) => stageOf(item, index, id));
+  // A timeline sets its milestones in even columns, so where the time between them is uneven each date says how long after
+  // the last it falls ("Jun 2026, 7 months on", "2035, 5 years on"): two months and five years are not one step.
+  const steps = roadmap ? null : elapsedSteps(props.items.map((item) => (item && typeof item === "object" ? item.date ?? item.period : null)));
+  if (steps) stages.forEach((stage, index) => { if (steps[index] !== null && stage.when) stage.when = `${stage.when}, ${sayElapsed(steps[index])} on`; });
   // Eras take room of their own: a bracket row over the columns, or a heading
   // before each era's first row. The stages are laid out in what is left.
   const eras = erasOf(props.eras, stages, id);

@@ -396,6 +396,7 @@ GATE_CODES = {
     "DECK_CRAFT": "the deck emphasises, sources or comments at a rate strong decks do not",
     "DECK_VOCABULARY": "the deck draws a couple of devices and leaves the rest of the vocabulary unused",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
+    "AREA_BASELINE": "a filled area whose baseline is not zero, so its fill overstates every change",
     "TITLE_COUNT": "the title states a count the page's own exhibit does not show",
     "DECK_THIN_PAGES": "nearly a third or more of the deck's pages are thin or half empty",
     # Read off the composed scene, so they run at authoring as well as at the

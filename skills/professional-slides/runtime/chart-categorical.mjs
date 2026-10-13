@@ -14,6 +14,7 @@ import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, 
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
+import { timePositions } from "./time-axis.mjs";
 import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings, normalizeRowNotes, rowNoteNodes, ROW_NOTE_GAP } from "./chart-marks.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
@@ -669,13 +670,13 @@ function drawValueBreaks(chart) {
  * - drawn as a "//" across the axis line midway to the next category.
  */
 function drawCategoryBreaks(chart) {
-  const { id, props, horizontal, categories, plot, nodes, categorySpan } = chart;
+  const { id, props, horizontal, categories, plot, nodes, categorySpan, slotStart } = chart;
   if (props.categoryBreaks === undefined) return;
   if (!Array.isArray(props.categoryBreaks) || !props.categoryBreaks.length) throw new Error("categoryBreaks names the categories the axis breaks after: a nonempty list");
   for (const name of props.categoryBreaks) {
     const at = categories.indexOf(name);
     if (at < 0 || at === categories.length - 1) throw new Error(`categoryBreaks names "${name}", which is not a category the axis continues past (${categories.slice(0, 8).join(", ")})`);
-    const mid = (horizontal ? plot.y : plot.x) + (at + 1) * categorySpan;
+    const mid = slotStart(at) + categorySpan;
     const axisAt = horizontal ? plot.x : plot.y + plot.height;
     const mask = horizontal ? { x: axisAt - 6, y: mid - 4, width: 12, height: 8 } : { x: mid - 4, y: axisAt - 6, width: 8, height: 12 };
     nodes.push(rectPrimitive({ id: stableId(id, "category-break", name), role: "chart-break", frame: mask, style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") }, data: { after: name } }));
@@ -754,7 +755,14 @@ function categoricalAxes(chart) {
 /** How a crowded bar chart labels its rows: the size its names are set at, and which rows are named. */
 function rowLabelling(chart) {
   const { props, horizontal, stacked, categories, barHighlighted, axisFont, plot } = chart;
-  const categorySpan = (horizontal ? plot.height : plot.width) / categories.length;
+  // Columns over dates at uneven gaps stand where the dates fall (time-axis.mjs timePositions): the BA retest set 2019, 2024
+  // and a 2027 plan one slot apart, so five years and three drew as one step each. Each lane is as wide as the closest two
+  // dates allow, and the even run is the case where every lane is a plot's width over the count. A data table's columns
+  // and a broken axis (`categoryBreaks`, which says outright that it skips) keep their slots.
+  const spacing = !horizontal && !props.categoryColumns && !(props.categoryBreaks || []).length ? timePositions(categories) : null;
+  const closest = spacing ? Math.min(...spacing.slice(1).map((at, i) => at - spacing[i])) : 0;
+  const categorySpan = spacing ? plot.width * closest / (1 + closest) : (horizontal ? plot.height : plot.width) / categories.length;
+  const slotStart = (index) => (spacing ? plot.x + spacing[index] * (plot.width - categorySpan) : (horizontal ? plot.y : plot.x) + index * categorySpan);
   // Forty members down a 420px plot give each row 10px, under the 13px line of
   // the chart's label face, and every name and value set in a box that tall
   // prints at six pixels, the subject's among them. When a row is thinner
@@ -777,7 +785,7 @@ function rowLabelling(chart) {
   const named = new Set([...barHighlighted, ...(props.annotations || []).map((a) => a?.category).filter(Boolean)]);
   const rowShown = (index) => rowEvery === 1 || named.has(categories[index])
     || (index % rowEvery === 0 && !categories.some((category, at) => named.has(category) && Math.abs(at - index) < rowEvery));
-  return { categorySpan, rowSize, rowLine, rowShown };
+  return { categorySpan, slotStart, timeSpaced: Boolean(spacing), rowSize, rowLine, rowShown };
 }
 
 /** Each category's group of bars: its width (narrowed for stack labels set outside, or a bracket) and each bar's. */
@@ -833,11 +841,11 @@ function drawDeltaHeadings(chart) {
  * label, note and icon.
  */
 function drawCategory(chart, category, categoryIndex) {
-  const { horizontal, stacked, plot, categoryMap, categorySpan, groupSpan, stackExternalWidth } = chart;
-  const categoryStart = (horizontal ? plot.y : plot.x) + categoryIndex * categorySpan + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2) + (chart.labelBlock || 0) / 2;
+  const { horizontal, stacked, plot, categoryMap, categorySpan, groupSpan, stackExternalWidth, slotStart } = chart;
+  const categoryStart = slotStart(categoryIndex) + (stackExternalWidth ? tokenValue(token("space.2")) : (categorySpan - groupSpan) / 2) + (chart.labelBlock || 0) / 2;
   categoryMap.set(category, horizontal
     ? { x: plot.x, y: categoryStart, width: plot.width, height: groupSpan }
-    : { x: categoryStart, y: plot.y, width: groupSpan, height: plot.height, labelSpan: categorySpan, labelCenter: stacked ? categoryStart+(groupSpan-4)/2 : plot.x+(categoryIndex+.5)*categorySpan });
+    : { x: categoryStart, y: plot.y, width: groupSpan, height: plot.height, labelSpan: categorySpan, labelCenter: stacked ? categoryStart+(groupSpan-4)/2 : slotStart(categoryIndex)+categorySpan/2 });
   const { positiveCumulative, negativeCumulative } = drawCategoryMarks(chart, category, categoryIndex, categoryStart);
   drawStackBracket(chart, category, categoryIndex);
   drawCategoryDelta(chart, category, categoryStart);
@@ -1007,7 +1015,7 @@ function setCategoryPoint(chart, category, categoryIndex, categoryStart, positiv
  * under a bar, or beside a column on a leader, spread so none overlap.
  */
 function placeStackLabels(chart, category, categoryIndex) {
-  const { frame, horizontal, stacked, showDataLabels, showValueAxis, barLabelGap, plot, nodes, categorySpan } = chart;
+  const { frame, horizontal, stacked, showDataLabels, showValueAxis, barLabelGap, plot, nodes, categorySpan, slotStart } = chart;
   if (stacked && showDataLabels) {
     const labels = nodes.filter(node => node.role === "data-label" && node.data.category === category);
     const marks = nodes.filter(node => node.role === "chart-mark" && node.data.category === category);
@@ -1029,7 +1037,7 @@ function placeStackLabels(chart, category, categoryIndex) {
         Object.assign(label, textPrimitive({ id: label.id, role: label.role, frame: spot, text: label.text, data: { ...label.data, outside: true }, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
         continue;
       }
-      const boundary = plot.x + (categoryIndex + 1) * categorySpan, laneStart = plot.x + categoryIndex * categorySpan;
+      const laneStart = slotStart(categoryIndex), boundary = laneStart + categorySpan;
       // Right of the column, or - when the lane ends first - left of it.
       let x = mark.frame.x + mark.frame.width + 6;
       if (x + metrics.width > boundary && mark.frame.x - 6 - metrics.width >= laneStart) x = mark.frame.x - 6 - metrics.width;
@@ -1150,11 +1158,11 @@ function drawCategoryIcon(chart, category, categoryStart) {
 
 /** The dashed divider between the actual and the forecast categories. */
 function drawForecastDivider(chart) {
-  const { id, props, horizontal, forecastKeyed, plot, forecastIndex, nodes, categorySpan } = chart;
+  const { id, props, horizontal, forecastKeyed, plot, forecastIndex, nodes, categorySpan, slotStart } = chart;
   if (forecastKeyed && forecastIndex > 0) {
     // Midway between the last actual and the first forecast mark, across the
     // plot, dashed as the period dividers are: the non-colour half of the key.
-    const at = (horizontal ? plot.y : plot.x) + forecastIndex * categorySpan;
+    const at = (slotStart(forecastIndex - 1) + categorySpan + slotStart(forecastIndex)) / 2;
     nodes.push(linePrimitive({ id: stableId(id, "forecast-divider"), role: "chart-forecast-divider",
       ...(horizontal ? { x1: plot.x, y1: at, x2: plot.x + plot.width, y2: at } : { x1: at, y1: plot.y, x2: at, y2: plot.y + plot.height }),
       style: lineStyle(SECONDARY, token("line.hairline"), "dash"), data: { forecastFrom: props.forecastFrom } }));

@@ -734,6 +734,34 @@ def gate_unscaled_figure(slide_no, slide, findings):
             break
 
 
+def gate_area_baseline(slide_no, slide, findings):
+    """AREA_BASELINE. A filled area whose baseline is not zero.
+
+    An area encodes each value as the area between it and the baseline, so a
+    fill drawn down to a floor near the series' low makes a doubling look like
+    a five-fold rise: the BA retest's jet fuel line was filled to about USD 1.45
+    a gallon and its low-cost share to about 29%. The chart renderers fill from
+    zero or not at all (chart-line.mjs, charts-extra.mjs); this reads the scene
+    they drew, so a fill from any other floor - a new renderer's, a hand-drawn
+    one - is refused wherever it comes from.
+    """
+    for node in slide.get("nodes", []):
+        if str(node.get("role") or "") != "chart-area":
+            continue
+        data = node.get("data") or {}
+        base = data.get("baselineValue")
+        if not isinstance(base, (int, float)) or isinstance(base, bool) or base == 0:
+            continue
+        findings.append(finding(
+            slide_no, "AREA_BASELINE",
+            {"node": node.get("id"), "series": data.get("series"), "baselineValue": base},
+            "an area filled from zero",
+            f"The area under {data.get('series') or 'a series'} is filled down to {base:g}, not to zero, so its "
+            "filled height overstates every change. Start the value scale at zero (drop a yMin above zero), or "
+            "draw the series as a line, which reads its change off its own scale.",
+        ))
+
+
 # "Three of four", "five of the six": a title that counts is a title a reader
 # checks, in about a second, against the thing underneath it.
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,

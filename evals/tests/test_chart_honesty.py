@@ -9,9 +9,13 @@ drew as a fall and a fall to 23rd as a filled climb. Heathrow's stacked
 passengers (lc04) filled straight across 2020-21, periods the survey does not
 have. The leverage line (fd09) set 2019, 2022 and H1 2026 one step apart each.
 """
+import sys
 import unittest
 
-from node_probe import run_node
+from node_probe import ROOT, run_node
+
+sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates"))
+import page_gates  # noqa: E402
 
 RUNTIME = "./skills/professional-slides/runtime"
 
@@ -125,6 +129,59 @@ console.log(JSON.stringify({{ at: timePositions(years).map((v) => Math.round(v *
         self.assertEqual(result["at"], [0, 30, 40, 50, 60, 65])
         self.assertEqual(result["gaps"], "0.5-3 years")
         self.assertIsNone(result["odd"])  # a season beside calendar periods stays on its slots
+
+
+class AreaBaselineGateTests(unittest.TestCase):
+    def test_the_scene_gate_refuses_an_area_filled_from_a_floor(self):
+        """BA retest hw01: the scene held a fill down to about USD 1.45 a gallon, and no gate read it."""
+        def slide(base):
+            return {"id": "hw01", "nodes": [{"type": "shape", "role": "chart-area", "id": "fill", "data": {"series": "Jet fuel", "baselineValue": base}}]}
+
+        findings = []
+        page_gates.gate_area_baseline(85, slide(1.45), findings)
+        self.assertEqual([f["code"] for f in findings], ["AREA_BASELINE"])
+        self.assertEqual(findings[0]["measured"]["baselineValue"], 1.45)
+        clean = []
+        page_gates.gate_area_baseline(85, slide(0), clean)
+        self.assertEqual(clean, [])
+
+
+class TimeSpacedColumnTests(unittest.TestCase):
+    def test_columns_over_uneven_years_stand_where_the_years_fall(self):
+        """BA retest sh07: columns for 2019, 2024 and the 2027 plan stood one slot apart, five years and three alike."""
+        result = run_node(DRAW + """
+const centres = (id, categories) => {
+  const drawn = render(id, { categories, series: [{ name: 'Leisure', values: [46, 51, 61] }, { name: 'Other', values: [54, 49, 39] }] });
+  const marks = drawn.nodes.filter((n) => n.role === 'chart-mark' && n.data?.series === 'Leisure');
+  return { x: marks.map((n) => n.frame.x + n.frame.width / 2), widths: marks.map((n) => n.frame.width), native: nativeChartSpec(id, drawn.props, frame, drawn.nodes) !== null };
+};
+const uneven = centres('chart.stacked-column', ['2019', '2024', '2027']), even = centres('chart.stacked-column', ['2019', '2020', '2021']);
+const broken = render('chart.stacked-column', { categories: ['2019', '2024', '2027'], categoryBreaks: ['2019'], series: [{ name: 'Leisure', values: [46, 51, 61] }] }).nodes.filter((n) => n.role === 'chart-mark').map((n) => n.frame.x);
+console.log(JSON.stringify({ ratio: (uneven.x[2] - uneven.x[1]) / (uneven.x[1] - uneven.x[0]), even: Math.abs((even.x[2] - even.x[1]) - (even.x[1] - even.x[0])) < 0.5,
+  overlap: uneven.x[1] - uneven.x[0] < uneven.widths[0], native: [uneven.native, even.native], brokenEven: Math.abs((broken[2] - broken[1]) - (broken[1] - broken[0])) < 0.5 }));
+""")
+        self.assertAlmostEqual(result["ratio"], 3 / 5, places=2)
+        self.assertTrue(result["even"])
+        self.assertFalse(result["overlap"])
+        self.assertEqual(result["native"], [False, True])  # PowerPoint would set them one slot apart again
+        self.assertTrue(result["brokenEven"])  # an axis that marks its break keeps its slots
+
+
+class TimelineStepTests(unittest.TestCase):
+    def test_a_timeline_of_uneven_milestones_says_each_step(self):
+        """BA retest hb11: Jul 2023 to 2035 sat at equal intervals, two months and five years one step each."""
+        result = run_node(DRAW + f"""
+import {{ elapsedSteps }} from '{RUNTIME}/time-axis.mjs';
+const dates = ['Jul 2023', 'Jan 2025', 'Sep 2025', 'Nov 2025', 'Jun 2026', '2029', 'c. 2030', '2035'];
+const items = dates.map((date, i) => ({{ date, label: `Milestone ${{i + 1}}`, text: 'What happens then.' }}));
+const when = (list) => REGISTRY.get('timeline').render({{ id: 't', frame: {{ x: 60, y: 160, width: 1160, height: 300 }}, props: {{ items: list }} }}).nodes.filter((n) => n.role === 'timeline-when').map((n) => n.text);
+console.log(JSON.stringify({{ steps: elapsedSteps(dates), when: when(items), even: when(['2024', '2025', '2026'].map((date) => ({{ date, label: date, text: 'x' }}))) }}));
+""")
+        self.assertEqual(result["steps"], [None, 18, 8, 2, 7, 31, 12, 60])
+        said = " ".join(result["when"]).replace("\n", " ")
+        self.assertIn("2035, 5 years on", said)
+        self.assertIn("Nov 2025, 2 months on", said)
+        self.assertEqual(result["even"], ["2024", "2025", "2026"])  # even steps say nothing
 
 
 if __name__ == "__main__":

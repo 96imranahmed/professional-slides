@@ -185,6 +185,39 @@ export function missingPeriods(categories) {
   return times.gaps.flatMap((gap, after) => (gap >= 2 * cadence - 0.01 ? [{ after, from: String(categories[after]), to: String(categories[after + 1]) }] : []));
 }
 
+// A date given as approximate ("c. 2030", "circa 2030", "~2030") is still that date for the time between milestones.
+const APPROXIMATE = /^(?:c\.|ca\.|circa|~)\s*/i;
+// Kinds that name a moment on the calendar; a bare month or a scenario's "Year 2" has no year to measure from.
+const DATED = new Set(["year", "half", "quarter", "month", "day", "season"]);
+
+/**
+ * The time from each milestone to the one before it, in months, as a list as
+ * long as the labels (null for the first and wherever either date does not
+ * parse), or null when the steps are even - every known step within half as
+ * much again of the shortest - or fewer than two are known. A timeline sets
+ * its milestones in even columns so their text reads; the BA retest's runway
+ * timeline set Jul 2023 to 2035 that way, two months and five years one step
+ * each, so the steps are said where they are uneven (schedule-stages.mjs).
+ */
+export function elapsedSteps(labels) {
+  if (!Array.isArray(labels) || labels.length < 3) return null;
+  const at = labels.map((label) => {
+    const parsed = parsePeriod(String(label ?? "").trim().replace(APPROXIMATE, ""));
+    return parsed && DATED.has(parsed.kind) ? parsed.t : null;
+  });
+  const steps = at.map((t, i) => (i && t !== null && at[i - 1] !== null && t > at[i - 1] ? Math.round(t - at[i - 1]) : null));
+  const known = steps.filter((step) => step !== null);
+  if (known.length < 2 || Math.max(...known) < 1.5 * Math.min(...known)) return null;
+  return steps;
+}
+
+/** A step in months as a reader says it: "2 months", "18 months", "5 years". */
+export function sayElapsed(months) {
+  if (months < 24) return `${months} month${months === 1 ? "" : "s"}`;
+  const years = Math.round(months / 6) / 2;
+  return `${years} years`;
+}
+
 /** The gaps as a reader would say them, for a message: "1-3 months", "1-4 years". */
 export function describeGaps(categories) {
   const times = periodTimes(categories);

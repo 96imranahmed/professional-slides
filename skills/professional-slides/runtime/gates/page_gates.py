@@ -601,6 +601,8 @@ def content_page_gates(run, slide_no, index, slide, slide_profile):
         gate_unsourced_picture(slide_no, slide, findings)
     if wanted("UNSCALED_FIGURE"):
         gate_unscaled_figure(slide_no, slide, findings)
+    if wanted("AREA_BASELINE"):
+        gate_area_baseline(slide_no, slide, findings)
     if wanted("TITLE_COUNT"):
         gate_title_count(slide_no, slide, findings)
     if wanted("THIN_COLUMN") or wanted("POINT_DEPTH"):
