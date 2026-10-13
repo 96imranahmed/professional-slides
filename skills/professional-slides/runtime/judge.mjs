@@ -51,6 +51,7 @@ import { EXIT, UsageError, commandLine, isMain, parseCli, readJson, runCli, writ
 import { createHash } from "node:crypto";
 import { partsOf, readPagesFile } from "./pages-file.mjs";
 import { PACKET_DIR, packetName, recordAnswers, stageJudgements, validateAnswer } from "./judgements.mjs";
+import { copyLimits } from "./limits.mjs";
 import { callReviewer, detectBackend, stageReview } from "./review-passes.mjs";
 
 const USAGE = "Usage: judge.mjs <id>.pages.json [--draft | --fetch-assets] [--page <id>[,<id>...]] [--run auto|claude|codex [--parallel n]] [--model m] [--timeout seconds]\n       judge.mjs <id>.pages.json --validate <packet folder>/answer.json";
@@ -128,7 +129,10 @@ export async function judge(file, { draft = false, fetchAssets = false, pages = 
       say(`Every question the rules ask of ${whose}${draft ? "'s spine" : ""} is answered. Compile again: the rules that ask them now hold.`);
       return EXIT.ok;
     }
-    const { packets, elsewhere = [] } = await stageJudgements(dir, pending, { scope, validate: (folder) => commandLine("node", SELF, path.resolve(file), "--validate", path.join(folder, "answer.json")) });
+    // A failing answer carries its line's replacement, held to the slot the writer brief prints for that line (limits.mjs).
+    const { textBlock, title } = copyLimits();
+    const { packets, elsewhere = [] } = await stageJudgements(dir, pending, { scope, slots: { textBlock, title },
+      validate: (folder) => commandLine("node", SELF, path.resolve(file), "--validate", path.join(folder, "answer.json")) });
     const held = elsewhere.length ? `\nSome of them are already in ${elsewhere.length === 1 ? "a packet" : `${elsewhere.length} packets`} another run staged: ${elsewhere.map(({ folder }) => packetName(dir, folder)).join(", ")}.` : "";
     if (!run) {
       say(`${pending.length} question${pending.length === 1 ? "" : "s"} the rules ask${pages ? ` of ${whose}` : ""} ${pending.length === 1 ? "is" : "are"} not answered. Staged in ${packets.length} packet${packets.length === 1 ? "" : "s"}:\n` +

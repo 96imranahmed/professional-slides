@@ -1,5 +1,5 @@
 {
- "about": "The questions a rule may ask of a model in place of a list of words (judgements.mjs). Each kind is one question about one subject: `asks` is the question, `subject` what it is asked of, `verdicts` the answers it takes with what each means, `quoteFor` the verdicts whose answer quotes the words of the subject they rest on, and `fields` what an answer carries beside its verdict. A recorded answer is replayed under a key of the kind, its `version`, the subject and the context: raise the version when the question's meaning changes, and every subject is asked again. What a question shows its reader beside the subject without keying on it (`beside`, judgements.mjs) - the rest of the page a line sits in - may change and leave the answer standing. A kind marked `spine` reads what the storyline critique is bound to: the critique waits until its questions are answered.",
+ "about": "The questions a rule may ask of a model in place of a list of words (judgements.mjs). Each kind is one question about one subject: `asks` is the question, `subject` what it is asked of, `verdicts` the answers it takes with what each means, `quoteFor` the verdicts whose answer quotes the words of the subject they rest on, and `fields` what an answer carries beside its verdict. A recorded answer is replayed under a key of the kind, its `version`, the subject and the context: raise the version when the question's meaning changes, and every subject is asked again. What a question shows its reader beside the subject without keying on it (`beside`, judgements.mjs) - the rest of the page a line sits in - may change and leave the answer standing. A kind marked `spine` reads what the storyline critique is bound to: the critique waits until its questions are answered. `fix` is how an answer whose verdict is one of its `for` mends what it found, so one reading is the last: `replace`, the answer gives the subject's new text (`replacement`) in the slot `slot` names (limits.mjs), using only figures the page already prints, with the reader's own reason that it passes (`replacementReason`), and the replacement is recorded with the verdict `passes` - the writer applies it word for word and the compile finds it answered; `choose`, no one line settles it (a layout or another page), and the answer names the change in words (`fix`) for the writer to make.",
  "kinds": {
   "answer-contradicted": {
    "version": 1,
@@ -148,22 +148,20 @@
    }
   },
   "commentary-caveats": {
-   "version": 1,
-   "asks": "Which of these lines of a slide's commentary state what the evidence does not show, settle or establish, rather than a finding? A finding in contrastive form ('X does not decide the city; it decides the neighbourhood') is a finding.",
-   "subject": "the commentary lines, each with its id",
+   "version": 2,
+   "asks": "Does this line of a slide's commentary state what the evidence does not show, settle or establish, rather than a finding? A finding in contrastive form ('X does not decide the city; it decides the neighbourhood') is a finding. The page's commentary is shown beside the line so it is read in its place: judge this line alone, not its neighbours.",
+   "subject": "one line of the commentary; beside it, the page's commentary lines",
    "verdicts": {
-    "some-caveats": "one or more lines are caveats",
-    "no-caveats": "every line states a finding"
+    "caveat": "the line states what the evidence does not show, settle or establish",
+    "finding": "the line states a finding"
    },
-   "fields": {
-    "caveats": {
-     "type": "list",
-     "of": "id",
-     "for": [
-      "some-caveats"
-     ],
-     "about": "the ids of the lines that are caveats"
-    }
+   "fix": {
+    "for": [
+     "caveat"
+    ],
+    "by": "replace",
+    "passes": "finding",
+    "slot": "textBlock"
    }
   },
   "commentary-restates": {
@@ -173,6 +171,14 @@
    "verdicts": {
     "restates": "the line only reads the exhibit back",
     "adds": "the line says something the exhibit does not"
+   },
+   "fix": {
+    "for": [
+     "restates"
+    ],
+    "by": "replace",
+    "passes": "adds",
+    "slot": "textBlock"
    }
   },
   "file-is-logo": {
@@ -395,6 +401,12 @@
      "about": "the ids of the two tiles that give one measure",
      "size": 2
     }
+   },
+   "fix": {
+    "for": [
+     "one-measure"
+    ],
+    "by": "choose"
    }
   },
   "title-count-check": {
@@ -428,7 +440,15 @@
    },
    "quoteFor": [
     "count-only"
-   ]
+   ],
+   "fix": {
+    "for": [
+     "count-only"
+    ],
+    "by": "replace",
+    "passes": "compares",
+    "slot": "title"
+   }
   },
   "title-leads-with-gap": {
    "version": 1,

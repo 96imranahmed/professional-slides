@@ -268,12 +268,12 @@ class CaveatTests(unittest.TestCase):
                                   "earlier screen adaptations."),
                 text("list-item", "Dates establish an order. They do not establish artistic quality."),
                 text("list-item", "The comparison boundary is the two selected titles and nothing wider.")]
-        caveats = {"verdict": "some-caveats", "caveats": ["l2", "l3", "l4"]}
-        with answering({"commentary-caveats": caveats}) as asked:
+        lines = [node["text"] for node in said]
+        with answering({"commentary-caveats": lambda line, _: "caveat" if line in lines[1:] else "finding"}) as asked:
             findings = run(page_gates.gate_caveat_heavy, 33, page(said))
         self.assertEqual([f["code"] for f in findings], ["CAVEAT_HEAVY"])
         self.assertGreater(findings[0]["measured"]["caveats"], page_gates.THRESHOLDS["caveats_max"])
-        self.assertEqual([line["id"] for line in asked[0][1]], ["l1", "l2", "l3", "l4"])
+        self.assertEqual([subject for _, subject in asked], lines, "each line is its own question")
 
     def test_a_finding_in_contrastive_form_is_not_a_hedge(self):
         """The first version of this gate fired on the sharpest line in a
@@ -282,14 +282,43 @@ class CaveatTests(unittest.TestCase):
         said = [text("list-item", "Education does not decide the city; it decides the neighborhood."),
                 text("list-item", "The two state scales are set separately and are not comparable."),
                 text("list-item", "Pay bands overlap; the role, not the salary, separates the offers.")]
-        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l2"]}}):
+        with answering({"commentary-caveats": lambda line, _: "caveat" if line.startswith("The two state") else "finding"}):
             self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
 
     def test_a_page_with_no_more_lines_than_the_caveats_it_may_carry_is_not_asked_about(self):
         said = [text("list-item", "The survey is unverified."), text("list-item", "It does not cover weekend riders.")]
-        with answering({"commentary-caveats": {"verdict": "some-caveats", "caveats": ["l1", "l2"]}}) as asked:
+        with answering({"commentary-caveats": "caveat"}) as asked:
             self.assertEqual(run(page_gates.gate_caveat_heavy, 4, page(said)), [])
         self.assertEqual(asked, [])
+
+
+    def test_a_line_edited_re_asks_that_line_alone_and_the_repair_carries_the_judges_replacements(self):
+        """ba4 (runtime-defects 62): the caveats were one question of the page's whole block, so every edit to one line
+        re-asked the page, and a failed line came back with no fix, so the writer's rewrite was asked again. Each line is
+        now its own question, and the repair hands the writer the replacements the judge already passed."""
+        said = [text("list-item", "The fleet grew by 16 aircraft in 2025."),
+                text("list-item", "The data do not show whether the new seats were sold."),
+                text("list-item", "Nor do they show the fare paid on the added routes."),
+                text("list-item", "The record does not settle what a seat earned.")]
+        lines = [node["text"] for node in said]
+        fixes = {line: f"{line[:-1]}, so the call rests on yield." for line in lines[1:]}
+        answers = {judgements.judgement_key("commentary-caveats", line): {"verdict": "caveat" if line in fixes else "finding",
+                   "reason": "A sentence of reason.", **({"replacement": fixes[line]} if line in fixes else {})} for line in lines}
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "deck.judgements.json"
+            store.write_text(json.dumps({"verdicts": answers}), encoding="utf-8")
+            judgements.load(store)
+            try:
+                findings = run(page_gates.gate_caveat_heavy, 7, page(said))
+                edited = [said[0], text("list-item", "The fleet grew by 16 aircraft over 2025."), *said[2:]]
+                run(page_gates.gate_caveat_heavy, 7, page(edited))
+                open_after_edit = [q["subject"] for q in judgements.needed()]
+            finally:
+                judgements.unload()
+        self.assertEqual([f["code"] for f in findings], ["CAVEAT_HEAVY"])
+        self.assertIn(f'"{lines[2]}" -> "{fixes[lines[2]]}"', findings[0]["repair"])
+        self.assertNotIn(f'"{lines[1]}" ->', findings[0]["repair"], "the first caveat is the one kept")
+        self.assertEqual(open_after_edit, ["The fleet grew by 16 aircraft over 2025."])
 
 
 class TableSchemaTests(unittest.TestCase):

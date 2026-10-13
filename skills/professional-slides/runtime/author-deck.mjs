@@ -153,7 +153,7 @@ import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
 import { claimMarks, dependencyFindings, hazardFindings, metricsOf, relationRepair, requiredCitations, tileMeasures } from "./gates/dependency_gates.mjs";
 import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
-import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, pendingFinding, withJudgements } from "./judgements.mjs";
+import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, notePageFigures, pendingFinding, pendingRequests, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
@@ -2312,7 +2312,7 @@ async function main(argv) {
   // `--pending <file>`: the questions this run found unanswered, written whatever the run's outcome, for judge.mjs to stage.
   const session = await loadJudgements(dir, stem);
   try { return await withJudgements(session, () => authorRun({ values, file, doc, dir, stem, logPath, runs, say })); }
-  finally { if (values.pending) await writeJson(path.resolve(values.pending), [...session.pending.values()]); }
+  finally { if (values.pending) await writeJson(path.resolve(values.pending), pendingRequests(session)); }
 }
 
 /** One run of the command on a pages file, with the deck's judgements the rules read. */
@@ -2411,6 +2411,8 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     console.error(error.message); return 2;
   }
   const { spec, pageGateAdvisories = [], budget = [], pageGatesRan, pageGatesError, content, order } = compiled;
+  // What each page prints, for the questions it leaves open: a judge's replacement for a line uses only these figures.
+  notePageFigures(activeJudgements(), spec.slides);
   // A revision says first what it does with each slide of the deck it was imported from: what it is judged on, and what it is not.
   // A full compile that raises, on the storyline its critique passed as ready, a finding only a change to that storyline mends -
   // and that the draft of the same pages does not raise - is recorded in the deck's lineage: the storyline loop grants its one

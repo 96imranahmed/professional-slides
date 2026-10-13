@@ -19,6 +19,8 @@ A section is one part file, `pages/<part>.pages.json`, of about five to eight pa
 
 A section moves to its next stage as soon as it passes: the lead does not wait for every section to be written before the first is judged.
 
+A judge answers a section once. Its failing answers carry their mends: the line's replacement, already judged, or, where no one line settles it, the change named in words. The section's writer applies them word for word in the same pass as the self-check's fixes and runs `--check`; a replacement applied as given is found answered, so no second judge round follows. Only a line both answers mend, or a replacement reworded, is asked again.
+
 Stage the critique as early as the draft allows. A structure rule that only a change of page type can meet does not hold it back: `--plan --write` writes its forms anyway and says so, and the types change beside the critic's reading (each changed page is verified on its own). The confirming critic of a pass's blocking items reads while the lead starts the fixes. The full critique of the written deck (`storyline.mjs --full`) splits by section for a long deck, and `--split` asks for that split at any length. Data gaps a critic finds go to one research agent per gap, in parallel, while the sections they do not touch are written.
 
 ## What each agent is given
