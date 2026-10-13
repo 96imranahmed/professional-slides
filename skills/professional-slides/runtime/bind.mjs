@@ -72,7 +72,7 @@
 // ordinary typed page; the dependency gate does not re-check what the runtime
 // wrote, and reads every number that is still typed.
 import { cellText, isTable, judgedCell, plottedValues, resultCells, rowCells } from "./evidence.mjs";
-import { axisOf, isPercentUnit, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
+import { axisOf, isPercentUnit, isRankMeasure, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
 import { decimalsNeeded, leadingScale, matches, measurementsIn, unitScale } from "./printed-numbers.mjs";
 import { registered } from "./errors.mjs";
 import { kindOfForm } from "./claim-fit.mjs";
@@ -736,7 +736,9 @@ function bindExhibit(ex, what, context) {
     return rests.every(Boolean) ? { state: "assumed" } : rests.some(Boolean) && kind === "periods" ? { assumedFrom: labels[rests.indexOf(true)] } : {};
   };
   // A series that says its own `state` keeps it, in whichever shape the exhibit's kind is written.
-  const states = named.map((s, i) => (bySeries && (s.state !== undefined || s.assumedFrom !== undefined) ? { ...(s.state !== undefined ? { state: s.state } : {}), ...(s.assumedFrom !== undefined ? { assumedFrom: s.assumedFrom } : {}) } : stateOf(series[i])));
+  // A series of ranks says so (measures.mjs isRankMeasure), for the chart to set 1 at the top and to refuse it a filled mark.
+  const states = named.map((s, i) => ({ ...(bySeries && (s.state !== undefined || s.assumedFrom !== undefined) ? { ...(s.state !== undefined ? { state: s.state } : {}), ...(s.assumedFrom !== undefined ? { assumedFrom: s.assumedFrom } : {}) } : stateOf(series[i])),
+    ...(series[i].kind !== "scalar" && series[i].measures.length && series[i].measures.every(isRankMeasure) ? { rank: true } : {}) }));
   // Each value's own footing, measure by measure and label by label: what a table turned over reads its series' states from.
   const rests = series.map((s) => labels.map((label) => (s.kind === "scalar" ? false : Boolean(s.at.get(label).assumed))));
   const shaped = bySeries || drawnAs === "chart.treemap" ? shapeBound(ex, drawnAs, { labels, names: seriesNames, values, pivot, states, rests }) : undefined;

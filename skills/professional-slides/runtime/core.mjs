@@ -1030,6 +1030,10 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // So are columns over uneven dates (chart-categorical.mjs rowLabelling), unless a broken axis or a data table keeps their slots.
+  if (["column", "stacked-column"].includes(type) && !props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(props.categories)) return null;
+  // A rank's line runs with 1 at the top, which the native line's axis does not say (chart-line.mjs): that chart stays drawn.
+  if (Array.isArray(props.series) && props.series.some((item) => item?.rank === true)) return null;
   // A series that says it is assumed or a reference is drawn dashed, lighter or as a reference line (chart-decorations.mjs
   // SERIES_STATES), which a native series cannot say: that chart stays drawn.
   if (Array.isArray(props.series) && props.series.some((item) => item?.state !== undefined || item?.assumedFrom !== undefined)) return null;
@@ -1132,7 +1136,8 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
     unit: props.unit ?? null,
-    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
+    // An area fills from its baseline, so its native axis starts at zero as the drawn one does (chart-line.mjs).
+    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column", "area"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
     yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
