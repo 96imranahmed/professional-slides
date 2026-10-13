@@ -49,7 +49,7 @@ import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from 
 import { SHAPES } from "./evidence.mjs";
 import { axisOf, composeUnit, insightLogRefusal, isPercentUnit, measureRegistry, normalUnit, readInsightLog, valuesOf } from "./measures.mjs";
 import { notJson, readPagesFileSync } from "./pages-file.mjs";
-import { registryProblems } from "./sources-registry.mjs";
+import { logSources, registryProblems } from "./sources-registry.mjs";
 import { PLAN } from "./weight.mjs";
 
 /** The operations an analysis can be: what each computes, and from how many measures. */
@@ -759,11 +759,17 @@ export function shapeBalance(insights, deck = {}) {
     advice: floor !== null && charted < floor ? [`The deck of ${target} pages needs at least ${floor} chart pages (a ${Math.round(PLAN.mix.chart.min * 100)}% floor) and the log holds ${charted} insights a chart can draw - ${CHARTED.join(", ")}. Record the series, the peer sets and the mixes behind the facts now, while the research is open: an outline cannot draw a chart from a fact`] : [] };
 }
 
-/** The pages file's `sources` registry as the compile will read it - its parts spliced in where they read - checked now. */
-function registryNow(file, doc) {
+/**
+ * The `sources` registry as the compile will read it - the pages file's, its parts spliced in where they read - and the
+ * sources files the research recorded beside the insight log's parts, which the compile reads where the pages file has
+ * no registry (sources-registry.mjs logSources), checked now. Each file is checked whether or not it is read yet: on the
+ * BA retest the per-file sources kept names over 16 words that ba3 had shortened in its registry, found only at a compile.
+ */
+async function registryNow(file, doc, log) {
   let sources = doc.sources;
   try { sources = readPagesFileSync(file).sources ?? sources; } catch { /* a part still being written: the registry as the file holds it */ }
-  return registryProblems(sources);
+  const logged = await logSources(path.dirname(file), log);
+  return [...registryProblems(sources), ...(logged?.problems ?? []), ...(logged?.files ?? []).flatMap((f) => registryProblems(f.sources).map((problem) => `${f.file}: ${problem}`))];
 }
 
 async function main(argv) {
@@ -780,7 +786,7 @@ async function main(argv) {
   const unread = insightLogRefusal(log.insights || []);
   if (unread) { console.error(`${unread}\nThe analyses run over the log author-deck.mjs compiles the pages over, so it is refused here for what the compile would refuse it for.`); return EXIT.refused; }
   // While the research is open: the sources registry as the compile will refuse it, and the log's shapes against the chart floor.
-  const registry = registryNow(path.resolve(file), doc), balance = shapeBalance(log.insights || [], doc.deck);
+  const registry = await registryNow(path.resolve(file), doc, log), balance = shapeBalance(log.insights || [], doc.deck);
   if (registry.length) console.error(`The \`sources\` registry will be refused at the compile:\n- ${registry.join("\n- ")}`);
   if (balance.advice.length) console.error(balance.advice.join("\n"));
   const research = { shapes: balance.counts, ...(balance.chartFloor !== undefined ? { chartFloor: balance.chartFloor, charted: balance.charted } : {}), ...(registry.length ? { sourcesRegistry: registry } : {}) };

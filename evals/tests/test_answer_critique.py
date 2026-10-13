@@ -147,6 +147,58 @@ console.log(JSON.stringify({{ held: [held.status, held.errors ?? []], staged: st
             self.assertIn("give A1 a status", refused.stderr)
 
 
+    def test_a_reading_made_while_the_log_grew_is_recorded_flagged_and_only_a_cited_change_restages_it(self):
+        """The stage table runs the research a critique asks for beside the
+        critique: on the BA retest three research agents added five insights
+        while the confirming pass read, the binding over the whole log changed,
+        and its seven-minute reading was deleted unrecorded. A reading made
+        against an older log is recorded, its items standing, with the records
+        added or changed since named; the packet re-stages only when the answer
+        changed or a record the reading cites did."""
+        def grow(tmp, edit):
+            log_file = Path(tmp) / "finance.insights.json"
+            log = json.loads(log_file.read_text(encoding="utf-8"))
+            edit(log["insights"])
+            log_file.write_text(json.dumps(log), encoding="utf-8")
+        deposits = {"id": "i-deposits", "finding": "Deposits grew from 500 to 702 between FY19 and FY26", "shape": "series", "calculation": "member deposits at year end, FY19-FY26",
+                    "sources": ["sources/i-loans.csv"], "strength": "strong", "measures": {"deposits": {"unit": "GBP m", "population": "Harbour Credit Union",
+                    "periods": ["FY19", "FY20", "FY21", "FY22", "FY23", "FY24", "FY25", "FY26"], "values": [500, 520, 545, 571, 602, 640, 668, 702]}}}
+        restate = lambda name, field, text: lambda insights: next(i for i in insights if i["id"] == name).update({field: text})
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = stage_fixture(tmp)
+            out = Path(tmp) / "out"
+            self.assertEqual(run(pages, out).returncode, 3)
+            # Research lands while the critic reads; the critic's answer cites i-peers only.
+            grow(tmp, lambda insights: insights.append(deposits))
+            (out / "answer-critique" / "answer.json").write_text(json.dumps(critique()), encoding="utf-8")
+            recorded = run(pages, out)
+            self.assertEqual(recorded.returncode, 2, recorded.stdout + recorded.stderr)
+            self.assertEqual(json.loads(recorded.stdout)["readBefore"], ["i-deposits"])
+            record = json.loads((out / "answer-critique.json").read_text(encoding="utf-8"))
+            self.assertEqual([record["verdict"], [item["id"] for item in record["items"]], record["readBefore"]], ["revise", ["A1"], ["i-deposits"]])
+            # More research, and an uncited insight restated: the reading stands and names them; nothing is staged.
+            grow(tmp, restate("i-loans", "calculation", "loan book at year end net of provisions, FY19-FY26"))
+            standing = run(pages, out)
+            self.assertEqual(standing.returncode, 2, standing.stdout)
+            self.assertEqual([json.loads(standing.stdout)["status"], sorted(json.loads(standing.stdout)["readBefore"])], ["revise", ["i-deposits", "i-loans"]])
+            # A record the reading cites changes: the reading no longer stands, and a new packet carries its items to settle.
+            grow(tmp, restate("i-peers", "calculation", "capital ratio among the six peers that publish it, FY26"))
+            restaged = run(pages, out)
+            self.assertEqual(restaged.returncode, 3, restaged.stdout + restaged.stderr)
+            self.assertEqual(json.loads(restaged.stdout)["prior"], ["A1"])
+        with tempfile.TemporaryDirectory() as tmp:
+            # A cited record that changes while the critic reads: that reading is not recorded.
+            pages = stage_fixture(tmp)
+            out = Path(tmp) / "out"
+            run(pages, out)
+            grow(tmp, restate("i-peers", "calculation", "capital ratio among the six peers that publish it, FY26"))
+            (out / "answer-critique" / "answer.json").write_text(json.dumps(critique()), encoding="utf-8")
+            again = run(pages, out)
+            self.assertEqual(again.returncode, 3, again.stdout + again.stderr)
+            self.assertIn("cites i-peers, which has changed since it was staged", again.stderr)
+            self.assertFalse((out / "answer-critique.json").exists())
+
+
 class BriefTests(unittest.TestCase):
     def test_the_skeleton_brief_prints_what_the_answer_critique_left_open(self):
         with tempfile.TemporaryDirectory() as tmp:

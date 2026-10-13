@@ -5,8 +5,43 @@
 // with a problem (author-deck.mjs compileDeck); the research step reads the
 // same check (analysis.mjs), so a source written as a caveat is caught by the
 // worker who wrote it, not at the first draft of the spine.
+//
+// The research records its sources beside the insight log's parts: each part
+// `insights/<workstream>.json` with `insights/<workstream>.sources.json`, a
+// registry of the same form. A pages file with no registry of its own reads
+// theirs (logSources), so a new deck's skeleton is not refused for a registry
+// the research already wrote (on the BA retest the skeleton spent its draft
+// rounds on that refusal, which no section could fix from its own part file).
+import fs from "node:fs/promises";
+import path from "node:path";
 import { SOURCE_TITLE_WORDS } from "./page-template.mjs";
 import { textWords } from "./text-contract.mjs";
+
+/**
+ * The registries the insight log's parts record beside them (`log` as
+ * measures.mjs readInsightLog returns it), merged in the log's order:
+ * `{ registry, files: [{ file, sources }], problems }`, or null where no part
+ * has one. `problems` are the files that are not a registry and the keys two
+ * files record differently (the first is kept); each file's entries are held
+ * to registryProblems by the caller.
+ */
+export async function logSources(baseDir, log) {
+  const files = [], problems = [], registry = {}, from = new Map();
+  for (const { file } of Array.isArray(log?.parts) ? log.parts : []) {
+    const name = file.replace(/\.json$/, ".sources.json");
+    let text;
+    try { text = await fs.readFile(path.resolve(baseDir, name), "utf8"); } catch { continue; }
+    let sources;
+    try { sources = JSON.parse(text); } catch { problems.push(`${name} is not valid JSON: it is read as the sources registry of ${file}`); continue; }
+    if (!sources || typeof sources !== "object" || Array.isArray(sources)) { problems.push(`${name} is a registry - { key: { name, url, status } } - of the sources ${file} cites`); continue; }
+    files.push({ file: name, sources });
+    for (const [key, entry] of Object.entries(sources)) {
+      if (!Object.hasOwn(registry, key)) { registry[key] = entry; from.set(key, name); }
+      else if (JSON.stringify(registry[key]) !== JSON.stringify(entry)) problems.push(`source "${key}" is recorded twice with different entries: in ${from.get(key)} and in ${name}. Keep one entry for the key, or give the second source its own key`);
+    }
+  }
+  return files.length || problems.length ? { registry, files, problems } : null;
+}
 
 // What a source can be declared not to name, and the length of the reason: a sentence, long enough to say something.
 const SOURCE_MISSING = Object.freeze(["publisher", "date", "document"]);
