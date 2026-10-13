@@ -60,14 +60,17 @@
 //                                                        reader meets it, beside the findings of the insights the
 //                                                        page rests on, each number with the recorded value it
 //                                                        states - CHECK where none: the writer's self-check
-//   node runtime/author-deck.mjs <id>.pages.json --brief skeleton|writer|critic|judge [--section <part>]
+//   node runtime/author-deck.mjs <id>.pages.json --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]
 //                                                        the context pack a section's subagent reads in place of
 //                                                        the references and the insight log (brief.mjs): its
 //                                                        role's rules as a short digest, the section's pages with
 //                                                        the limits --scaffold prints for each, for a writer the
 //                                                        token that prints every value its evidence holds, and
 //                                                        the commands it runs; a section is a part file
-//                                                        (pages/<part>.pages.json), the whole deck without one
+//                                                        (pages/<part>.pages.json), the whole deck without one;
+//                                                        `--brief selfcheck --spine` sets out the titles and the
+//                                                        divider summaries alone, for a reading beside the
+//                                                        storyline critique
 //   node runtime/author-deck.mjs <id>.pages.json --repair-relation <page-id>
 //                                                        the one exhibit that sets a page's split measures on one
 //                                                        scale, built from the page's own exhibits, to paste in
@@ -119,7 +122,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS, alsoRefused } from "./page-types.mjs";
-import { claimSheet, claimSheetLines } from "./claim-sheet.mjs";
+import { claimSheet, claimSheetLines, recordSheets } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
@@ -1795,7 +1798,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2290,7 +2293,7 @@ async function main(argv) {
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
     "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, accept: { type: "boolean" }, "fetch-assets": { type: "boolean" }, json: { type: "boolean" },
-    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" } }, { usage: USAGE });
+    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
@@ -2343,8 +2346,11 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     if (["writer", "skeleton", "selfcheck"].includes(values.brief)) try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
     // A writer is told, page by page, the words each text slot holds where the deck sets it - measured as --scaffold --id
     // measures it, on the page as written or its scaffold - so copy is written once to what fits, not fitted a check at a time.
+    if (values.spine && values.brief !== "selfcheck") { console.error("--spine sets out the titles and divider summaries for a self-check: --brief selfcheck --spine"); return 1; }
+    // A self-checker is told the same room as the writer, so a replacement it writes fits the slot it replaces: on ba4 six
+    // title fixes ran to 16-19 words against the 15-word cap and two headings wrapped, and the writers trimmed them by hand.
     let slotsOf = null;
-    if (values.brief === "writer") {
+    if (values.brief === "writer" || (values.brief === "selfcheck" && !values.spine)) {
       slotsOf = new Map();
       for (const own of (sectionPages(doc, values.section ?? null).pages ?? []).filter((page) => page.type && PAGE_TYPES[page.type])) {
         const insight = (Array.isArray(own.evidence) ? own.evidence : []).map((id) => insights?.get(String(id))).find(Boolean) ?? null;
@@ -2356,14 +2362,16 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     }
     const answerRecord = readJsonSync(path.join(dir, "out", ANSWER_CRITIQUE_FILE), { optional: true });
     const answerItems = openAnswerItems(answerRecord), answerHazards = answerHazardsOf(answerRecord);
-    // A section's self-checker reads its pages' claims beside the records, as soon as the section checks clean (brief.mjs).
-    const sheet = values.brief === "selfcheck" && insights ? claimSheet(doc, insights, (sectionPages(doc, values.section ?? null).pages ?? []).map((page) => String(page.id))) : null;
-    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf, answerItems, answerHazards, sheet });
+    // A section's self-checker reads its pages' claims beside the records, as soon as the section checks clean (brief.mjs); the
+    // sheets it is shown are kept by hash, so the join can carry a verdict through its own replacements and name any other line.
+    const sheet = values.brief === "selfcheck" && insights ? claimSheet(doc, insights, (sectionPages(doc, values.section ?? null).pages ?? []).map((page) => String(page.id)), { spine: Boolean(values.spine), slotsOf }) : null;
+    if (sheet && !values.spine) await recordSheets(path.join(dir, "out"), sheet);
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf: values.brief === "writer" ? slotsOf : null, answerItems, answerHazards, sheet, spine: Boolean(values.spine) });
     if (brief.why) { console.error(brief.why); return 1; }
     say(brief.lines.join("\n"));
     return 0;
   }
-  if (values.section !== undefined) { console.error("--section names the part file a --brief covers"); return 1; }
+  if (values.section !== undefined || values.spine) { console.error(`${values.spine ? "--spine" : "--section"} names what a --brief covers`); return 1; }
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];
