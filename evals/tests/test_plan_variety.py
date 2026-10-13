@@ -67,6 +67,13 @@ const rounds = { deck: { ...doc.deck, variation: 's1' }, pages: [...round(1), ..
 """
 
 
+# The fixture's analytical pages three times over (96 pages): the best-fit forms meet every rule but the kinds floor, which
+# forms that only serve their claims would meet - the case of the BA retest's plan, which would not write while it was short.
+TRIPLED = """
+const thrice = (d) => ({ ...d, deck: { ...d.deck, variation: 's1' }, pages: [...d.pages, ...['b', 'c'].flatMap((copy) => d.pages.filter((page) => page.type).map((page) => ({ ...page, id: `${page.id}${copy}` })))] });
+"""
+
+
 def cli(*args, script=AUTHOR, timeout=600):
     return subprocess.run([NODE, str(script), *map(str, args)], cwd=ROOT, capture_output=True, text=True, timeout=timeout,
                           env={**os.environ, "RUNTIME_NODE_MODULES": str(ROOT / "node_modules")})
@@ -233,11 +240,12 @@ console.log(JSON.stringify({ unsatisfied: again.unsatisfied.map((u) => u.code), 
 import { TYPE_SHAPES } from './skills/professional-slides/runtime/evidence.mjs';
 const one = (id, type, evidence, measures) => ({ id, type, title: `Page ${id} states a finding of its own about the operator`, why: 'the claim decides the type', evidence, settles: { kind: 'comparison', what: 'w', measures } });
 const few = { deck: { ...doc.deck, variation: 's1' }, pages: Array.from({ length: 10 }, (_, n) => [one(`t${n}`, 'trend', ['i-journeys'], ['i-journeys/journeys']), one(`r${n}`, 'ranking', ['i-punctual'], ['i-punctual/punctuality'])]).flat() };
-const p = plan(few), range = p.unsatisfied.find((u) => u.code === 'VARIETY_EXHIBIT_RANGE');
-console.log(JSON.stringify({ range, draws: [...new Set(p.pages.flatMap((page) => page.draws))].sort(), types: Object.fromEntries(few.pages.map((page) => [page.id, page.type])),
+const p = plan(few), range = p.advisory.find((u) => u.code === 'VARIETY_EXHIBIT_RANGE');
+console.log(JSON.stringify({ range, unsatisfied: p.unsatisfied.map((u) => u.code), draws: [...new Set(p.pages.flatMap((page) => page.draws))].sort(), types: Object.fromEntries(few.pages.map((page) => [page.id, page.type])),
   shapes: { trend: insights.get('i-journeys').shape, ranking: insights.get('i-punctual').shape }, asks: TYPE_SHAPES }));
 """)
         range_, draws = result["range"], result["draws"]
+        self.assertNotIn("VARIETY_EXHIBIT_RANGE", result["unsatisfied"])
         self.assertEqual(range_["drawn"], draws)
         self.assertTrue(0 < len(range_["adders"]) <= 12, range_["adders"])
         for item in range_["adders"]:
@@ -255,7 +263,73 @@ console.log(JSON.stringify({ range, draws: [...new Set(p.pages.flatMap((page) =>
         self.assertGreater(len({item["adds"][0] for item in range_["adders"]}), 6)
 
 
+    def test_the_kinds_floor_is_advisory_at_the_spine_and_no_choice_or_suggestion_hides_a_series(self):
+        """On the BA retest the plan held the spine to the kinds floor and would not write while it was short, and a
+        deck-level fix took lc04 off its line to a stacked area that joined 2019 to 2022 across 2020-21; ranks drew as
+        bars. The floor is now an advisory at the spine, and no form the plan gives a page or suggests for a kind fills
+        an area across periods its series skips or draws a rank as a length. Here the journeys skip FY21 and the
+        punctuality measure is a rank: before, the plan gave v02 an area and suggested v02 as a stacked area and v09 as
+        aligned bars."""
+        result = run_node(LOAD + TRIPLED + """
+import { seriesHidden } from './skills/professional-slides/runtime/deck-structure.mjs';
+const skip = (m) => (Array.isArray(m.periods) ? { ...m, periods: m.periods.filter((_, at) => at !== 2), values: m.values.filter((_, at) => at !== 2) } : m);
+const changed = new Map(log.map((item) => [item.id, item.id === 'i-journeys' ? { ...item, measures: Object.fromEntries(Object.entries(item.measures).map(([k, m]) => [k, skip(m)])) }
+  : item.id === 'i-punctual' ? { ...item, measures: { punctuality: { ...item.measures.punctuality, unit: 'rank', better: 'down' } } } : item]));
+const p = allocateStructure(thrice(doc), { insights: changed, planOf });
+const range = p.advisory.find((u) => u.code === 'VARIETY_EXHIBIT_RANGE');
+const kindOf = (type, form) => String(PAGE_TYPES[type].forms[form]);
+console.log(JSON.stringify({ satisfied: p.satisfied, unsatisfied: p.unsatisfied.map((u) => u.code), adders: range.adders, refused: range.refused,
+  journeys: p.pages.filter((page) => page.type === 'trend' && /^v02/.test(page.id)).map((page) => kindOf(page.type, page.form)),
+  hidden: range.adders.map((item) => seriesHidden([kindOf(item.type, item.form)], [...measureRegistry(changed).values()].filter((m) => m.owner === (item.id.startsWith('v02') ? 'i-journeys' : item.id.startsWith('v09') ? 'i-punctual' : '')))).filter(Boolean),
+  line: seriesHidden(['chart.line'], [{ ref: 'r', unit: 'm journeys', periods: ['FY19', 'FY20', 'FY22'], values: [1, 2, 3] }]),
+  area: seriesHidden(['chart.area'], [{ ref: 'r', unit: 'm journeys', periods: ['FY19', 'FY20', 'FY21'], values: [30, 31, 33] }]),
+  stack: seriesHidden(['chart.stacked-column'], [{ ref: 'a', unit: 'm journeys', periods: ['FY19', 'FY20', 'FY21'], values: [1, 2, 3] }, { ref: 'b', unit: '%', periods: ['FY19', 'FY20', 'FY21'], values: [1, 2, 3] }]) }));
+""")
+        # The kinds floor is short and advised; every rule the plan is held to is met.
+        self.assertTrue(result["satisfied"], result["unsatisfied"])
+        self.assertEqual(result["unsatisfied"], [])
+        self.assertTrue(result["adders"])
+        # No page over the gapped journeys is given an area, and no suggestion draws a gapped series or a rank so.
+        self.assertTrue(result["journeys"])
+        self.assertFalse({"chart.area", "chart.stacked-area"} & set(result["journeys"]), result["journeys"])
+        self.assertEqual(result["hidden"], [])
+        refused = {f"{item['id']} {item['type']}/{item['form']}" for item in result["refused"]}
+        self.assertIn("v02 trend/stacked-area", refused)
+        self.assertIn("v09 ranking/aligned-bars", refused)
+        # A line keeps its gaps as points; an area over values far from zero, or a stack of two units, does not hold.
+        self.assertIsNone(result["line"])
+        self.assertTrue(result["area"])
+        self.assertTrue(result["stack"])
+
+
 class PlanWriteTests(unittest.TestCase):
+    def test_the_plan_writes_what_it_meets_while_the_kinds_floor_is_short_and_suggests_only_what_the_evidence_holds(self):
+        """On the BA retest the plan's own progress toward the kinds floor was written only once every rule held, so
+        the lead copied its choices by hand onto ten pages, and its suggestions named a bubble for a measure pair and
+        a sankey for three single values, which the sections then refused. --write now writes the allocation while
+        the advisory floor is short, and each suggestion is checked as --scaffold <type>/<form> --evidence checks it."""
+        home = Path(tempfile.mkdtemp(prefix="plan-kinds-"))
+        try:
+            spine = run_node(LOAD + TRIPLED + "console.log(JSON.stringify(thrice(doc)));")
+            shutil.copy(FIXTURE / "variety.insights.json", home / "variety.insights.json")
+            file = home / "variety.pages.json"
+            file.write_text(json.dumps(spine), encoding="utf-8")
+            run = cli(file, "--plan", "--write")
+            printed = json.loads(run.stdout)["plan"]
+            self.assertTrue(printed["satisfied"], run.stderr[-2000:])
+            self.assertIn("written into", run.stderr)
+            self.assertIn("Advisory at the spine", run.stderr)
+            self.assertEqual([item["code"] for item in printed["advisory"]], ["VARIETY_EXHIBIT_RANGE"])
+            written = [page for page in json.loads(file.read_text(encoding="utf-8"))["pages"] if page.get("type")]
+            self.assertTrue(all(page.get("form") for page in written))
+            # v14 rests on a measure pair in two units: a bubble needs three measures and a bubble grid one unit.
+            offered = {f"{item['id']} {item['type']}/{item['form']}" for item in printed["advisory"][0]["adders"]}
+            refused = {f"{item['id']} {item['type']}/{item['form']}" for item in printed["advisory"][0]["refused"]}
+            self.assertFalse({"v14 relationship/bubble", "v14 relationship/bubble-grid"} & offered, offered)
+            self.assertIn("v14 relationship/bubble-grid", refused)
+        finally:
+            shutil.rmtree(home, ignore_errors=True)
+
     def test_the_plan_writes_its_choices_into_the_file_each_page_is_written_in(self):
         """A hundred-page spine's allocation was copied into seven part files by a script; --write puts each
         choice where its page is written, and leaves what a page declares as it is."""

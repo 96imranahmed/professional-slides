@@ -142,6 +142,34 @@ class BriefTests(unittest.TestCase):
         self.assertTrue(slots, out)
         self.assertTrue(all("note" not in s and "together" in s for s in slots), slots)
 
+    def test_a_section_is_briefed_its_room_under_each_of_the_decks_caps(self):
+        """On the BA retest fourteen skeleton agents each saw the deck's caps only on their own draft: 84 pages came
+        back with 21 numbers pages against a cap of 9, and four batches of type changes went back to the sections; after
+        the writers, each met the takeaway, column and below caps as unclearable, one section's fix tipping another's.
+        A section's brief now prints each cap with what the other sections hold and what that leaves it: a skeleton
+        every capped quota and the kinds, a writer the placements it chooses."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned_finance(tmp)
+            skeleton = self.brief(pages, "--brief", "skeleton", "--section", "a")
+            writer = self.brief(pages, "--brief", "writer", "--section", "a")
+        self.assertEqual(skeleton.returncode, 0, skeleton.stderr)
+        self.assertEqual(writer.returncode, 0, writer.stderr)
+        caps = lambda out: [line for line in out.split("## The deck's caps")[1].split("\n## ")[0].splitlines() if line.startswith("- ")]
+        held, placed = caps(skeleton.stdout), caps(writer.stdout)
+        # f1, f3 and f6 close on a so-what bar; section b holds two against a cap of one in seven pages, so a's f1 is over.
+        close = next(line for line in placed if "(VARIETY_TAKEAWAY," in line)
+        self.assertIn("the deck's cap is 1 of 7 pages; the other sections hold 2 (b 2), which leaves this section 0 (they are 1 over it already); it holds 1 (f1): 1 over", close)
+        self.assertEqual(close, next(line for line in held if "(VARIETY_TAKEAWAY," in line))
+        # The writer is told the placements it chooses, the skeleton the types, the numbers family and the kinds too.
+        self.assertEqual(sorted(line.split("(", 1)[1].split(",")[0] for line in placed), ["VARIETY_COLUMN", "VARIETY_COMMENTARY.below", "VARIETY_TAKEAWAY"])
+        trend = next(line for line in held if "(VARIETY_TYPE_SHARE.trend," in line)
+        self.assertIn("the other sections hold 2 (b 2)", trend)
+        self.assertIn("it holds 1 (f1)", trend)
+        self.assertTrue(any("(VARIETY_EXHIBIT_MIX.numbers," in line for line in held))
+        kinds = next(line for line in held if "(VARIETY_EXHIBIT_RANGE," in line)
+        self.assertIn("advisory at the spine", kinds)
+        self.assertIn("the floor is 3 for 7 pages", kinds)
+
     def test_a_section_with_no_page_yet_is_briefed(self):
         # The BA run's opening and appendix had no divider and no page when their skeletons were briefed, and the brief
         # refused them as no section of the pages file: a section is a part file the pages file includes.
