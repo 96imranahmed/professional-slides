@@ -68,10 +68,22 @@ export function declaredArchitecture(slide) {
   // lead moved nine pages to commentary placements and the provisional count, which read only written points, did not move.
   const placed = PLACED_COMMENTARY.includes(slide.pageType.commentary);
   const comments = placed || (slide.points || []).length > 0 || (slide.paragraphs || []).length > 0 || captioned || blocks.some((block) => (block?.points || []).length) || types.includes("cards");
-  const metrics = Boolean(slide.kpi) || (slide.metrics || []).length > 0 || blocks.some((block) => block?.metric);
+  // A panel of figures is figures, as the composed page's gate reads it (gates/deck_gates.py page_architecture).
+  const metrics = Boolean(slide.kpi) || (slide.metrics || []).length > 0 || blocks.some((block) => block?.metric) || types.includes("metrics");
+  // Where the figures sit against the evidence - over it or beside it - is what the gate reads off the composed page. A page
+  // not yet composed has no layout; its form says where they will sit: a numbers page's hero number or metric strip
+  // (page-types.mjs), an executive summary's measures across the top (compose-passes.mjs), a panel of figures at either end
+  // of a row or a sequence, or atop a stack. Read as commentary instead, the BA deck's executive summary and its fuel
+  // sequence (two charts, then IAG's guidance as figures) put the declared count two pages over the composed one, and the
+  // written deck a page over its cap.
+  const panels = exhibitsOf(slide).map((ex) => String(ex.type ?? "")), form = slide.pageType.form;
+  const figuresAt = (at) => panels.length > 1 && panels.at(at) === "metrics";
+  const layout = slide.layout ?? (form === "hero-number" ? "hero-number"
+    : form === "metric-strip" || slide.role === "executive-summary" || (slide.arrange === "stack" && figuresAt(0)) ? "metrics-over-exhibit"
+    : ["row", "sequence"].includes(slide.arrange) && (figuresAt(0) || figuresAt(-1)) ? "hero-number" : null);
   if (evidence.length) {
-    if (metrics && slide.layout === "metrics-over-exhibit") return "metrics-over-evidence";
-    if (metrics && slide.layout === "hero-number") return "hero-number-with-evidence";
+    if (metrics && layout === "metrics-over-exhibit") return "metrics-over-evidence";
+    if (metrics && layout === "hero-number") return "hero-number-with-evidence";
     if (comments) return "evidence-with-commentary";
     if (evidence.length === 1) return DIAGRAMS.has(evidence[0]) ? evidence[0] : evidence[0] === "chart.waterfall" ? "reconciliation" : "evidence-only";
     return evidence.length > 2 ? "evidence-grid" : slide.arrange === "stack" || slide.shape === "model-page" ? "evidence-stack" : "paired-evidence";

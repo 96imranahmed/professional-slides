@@ -81,6 +81,32 @@ console.log(JSON.stringify(Object.fromEntries(['beside', 'beside-left', 'below',
         for close in ("rail", "so-what-bar", "on-exhibit", "none"):
             self.assertEqual(result[close], "evidence-only", close)
 
+    def test_figures_are_counted_where_the_form_sets_them_not_as_commentary(self):
+        """The plan's declared count read the BA deck two pages over its composed one, and the written deck over its cap.
+
+        The executive summary's measures sit across the top and the fuel sequence ends in a panel of IAG's guidance figures:
+        composed, the gate reads them as figures over and beside the evidence. Declared, with no layout yet, they read as
+        evidence with commentary.
+        """
+        result = run_node(PRELUDE + """
+const chart = { type: 'chart.line', categories: ['2024', '2025'], series: [{ name: 'v', values: [1, 2] }] };
+const figures = { type: 'metrics', items: [{ value: '8.3bn', label: 'Fuel guide' }] };
+const summary = { id: 'o01', title: 'The answer', role: 'executive-summary', pageType: { type: 'summary', form: 'executive-summary', commentary: 'none' },
+  points: ['a', 'b', 'c'], metrics: [{ value: '12%', label: 'Margin' }], exhibit: { type: 'table', columns: ['A'], rows: [['1']] } };
+const panels = (arrange, exhibits) => ({ id: 'hw01', title: 'Fuel', arrange, pageType: { type: 'panels', form: arrange, commentary: 'captions' }, exhibits });
+console.log(JSON.stringify({ summary: declaredArchitecture(summary),
+  sequence: declaredArchitecture(panels('sequence', [chart, chart, figures])), first: declaredArchitecture(panels('row', [figures, chart])),
+  stack: declaredArchitecture(panels('stack', [figures, chart])), middle: declaredArchitecture(panels('sequence', [chart, figures, chart])),
+  charts: declaredArchitecture(panels('row', [chart, chart])) }));
+""")
+        self.assertEqual(result["summary"], "metrics-over-evidence")
+        self.assertEqual(result["sequence"], "hero-number-with-evidence")
+        self.assertEqual(result["first"], "hero-number-with-evidence")
+        self.assertEqual(result["stack"], "metrics-over-evidence")
+        # Figures between two charts sit inside the evidence: the captions are the commentary, as before.
+        self.assertEqual(result["middle"], "evidence-with-commentary")
+        self.assertEqual(result["charts"], "evidence-with-commentary")
+
 
 if __name__ == "__main__":
     unittest.main()
