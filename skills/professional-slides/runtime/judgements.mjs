@@ -26,6 +26,7 @@ import fs from "node:fs/promises";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readJson, readJsonSync, schemaErrors } from "./cli.mjs";
+import { numbersIn } from "./claims.mjs";
 
 const DEFINITIONS = readJsonSync(new URL("./judgement-kinds.json", import.meta.url));
 /** Every kind of question a rule may ask: its version, question, verdicts and the fields an answer carries. */
@@ -57,7 +58,30 @@ export function judgementKey(kind, subject, context = null) {
  * verdict, a verdict record or null.
  */
 export function judgementSession({ verdicts = {}, oracle = null, file = null } = {}) {
-  return { verdicts: new Map(Object.entries(verdicts)), pending: new Map(), read: new Set(), oracle, file };
+  return { verdicts: new Map(Object.entries(verdicts)), pending: new Map(), read: new Set(), oracle, file, figures: new Map() };
+}
+
+// Page furniture, whose numbers are not the page's facts: its number, footer, sources and tracker.
+const FURNITURE_ROLE = /^(page-number|footer|source|tracker)/;
+/**
+ * The figures each composed page prints, kept on the session by page id: what a judge's replacement for one of its lines
+ * may use (answerProblems). A replacement brings no number the page does not already print - a new figure is a new fact
+ * for the self-check and the critique to read, and the closed fix is closed because it adds none.
+ */
+export function notePageFigures(session, slides) {
+  for (const slide of session ? slides ?? [] : []) {
+    const printed = (slide.nodes ?? []).filter((node) => node?.type === "text" && !FURNITURE_ROLE.test(String(node.role ?? "")))
+      .flatMap((node) => numbersIn(node.data?.textLayout?.source ?? node.text ?? "").map((figure) => figure.raw.replace(/,/g, "")));
+    session.figures.set(String(slide.id), [...new Set(printed)]);
+  }
+}
+
+/** The session's pending questions, each with the figures its pages print (notePageFigures), for judge.mjs to stage. */
+export function pendingRequests(session) {
+  return [...(session?.pending?.values() ?? [])].map((item) => {
+    const figures = [...new Set(item.where.flatMap((id) => session.figures?.get(String(id)) ?? []))];
+    return figures.length ? { ...item, figures } : item;
+  });
 }
 
 let active = null;
@@ -203,6 +227,31 @@ export function answerProblems(item, answer) {
       }
     }
   }
+  return [...problems, ...fixProblems(item, answer)];
+}
+
+/**
+ * Every problem with the fix a failing answer carries (judgement-kinds.json `fix`). A failure that came back without one
+ * cost ba4 a round per rewrite: the writer rewrote the line, the new line was asked again, and o01 failed three times. So
+ * a `replace` answer gives the line's replacement - checked here to be a new text, within its slot, and to print no
+ * figure the page does not already print - with the reader's reason that it passes; a `choose` answer names the change.
+ */
+function fixProblems(item, answer) {
+  const fix = JUDGEMENT_KINDS[item.kind].fix, at = `${item.key} (${item.kind})`;
+  if (!fix || !fix.for.includes(answer.verdict)) return [];
+  if (fix.by === "choose") return words(answer.fix) < 4 ? [`${at}: a "${answer.verdict}" verdict names the change that mends it in \`fix\`, in a sentence the writer can act on`] : [];
+  const text = String(answer.replacement ?? "").trim();
+  if (!text) return [`${at}: a "${answer.verdict}" verdict gives \`replacement\`: the ${fix.slot === "title" ? "title" : "line"} rewritten so this question, asked of it, answers "${fix.passes}", using only what the page already says`];
+  const problems = [];
+  if (squeeze(text) === squeeze(item.subject)) problems.push(`${at}: \`replacement\` is the ${fix.slot === "title" ? "title" : "line"} as it stands: rewrite it so it answers "${fix.passes}"`);
+  if (words(answer.replacementReason) < 4) problems.push(`${at}: give in \`replacementReason\` your answer to this question for the replacement - why it is "${fix.passes}" - in a sentence`);
+  const span = item.slot?.words ?? {};
+  if (Number.isFinite(span.max) && words(text) > span.max) problems.push(`${at}: \`replacement\` is ${words(text)} words, and its slot holds ${span.max} at most`);
+  if (Number.isFinite(span.min) && words(text) < span.min) problems.push(`${at}: \`replacement\` is ${words(text)} words, and its slot takes ${span.min} at least`);
+  // The page's figures as it prints them, and every figure the question itself shows (its subject, context and what is beside it).
+  const printed = [...(item.figures ?? []), ...flat([item.subject, item.context ?? null, item.beside ?? null]).flatMap((said) => numbersIn(said).map((f) => f.raw.replace(/,/g, "")))].map(Number);
+  const added = numbersIn(text).filter((figure) => !printed.includes(figure.value)).map((figure) => figure.raw);
+  if (added.length) problems.push(`${at}: \`replacement\` prints ${added.map((raw) => `"${raw}"`).join(", ")}, which the page does not: a replacement uses only the figures the page already prints, and adds no number, cause or comparison`);
   return problems;
 }
 
@@ -220,8 +269,11 @@ export function answerSchema(items) {
       : field.of === "pair" ? { type: "array", items: { type: "string" } }
       : { type: "string" } });
   const fields = Object.fromEntries(kinds.flatMap((kind) => Object.entries(JUDGEMENT_KINDS[kind].fields || {})).map(([name, field]) => [name, typed(field)]));
+  // What a failing answer mends its subject with (fixProblems): a replacement and the reason it passes, or the change named.
+  const fixes = new Set(kinds.map((kind) => JUDGEMENT_KINDS[kind].fix?.by).filter(Boolean));
+  const mends = { ...(fixes.has("replace") ? { replacement: { type: ["string", "null"] }, replacementReason: { type: ["string", "null"] } } : {}), ...(fixes.has("choose") ? { fix: { type: ["string", "null"] } } : {}) };
   const properties = { key: { type: "string", enum: items.map((item) => item.key) }, verdict: { type: "string", enum: [...new Set(kinds.flatMap((kind) => Object.keys(JUDGEMENT_KINDS[kind].verdicts)))] },
-    reason: { type: "string" }, quote: { type: ["string", "null"] }, ...fields };
+    reason: { type: "string" }, quote: { type: ["string", "null"] }, ...fields, ...mends };
   return { type: "object", additionalProperties: false, required: ["batch", "judgements"], properties: {
     batch: { type: "string" },
     judgements: { type: "array", items: { type: "object", additionalProperties: false, required: Object.keys(properties), properties } } } };
@@ -239,8 +291,18 @@ const surroundings = (item) => canonical([item.context ?? null, item.beside ?? n
 export function judgementPrompt(packet, { validate = null } = {}) {
   const byKind = new Map();
   for (const item of packet.items) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item]);
+  // A question whose failure is mended by a replacement shows what the replacement may use: its slot and the page's figures.
+  const span = (slot) => [Number.isFinite(slot?.words?.min) ? `at least ${slot.words.min}` : null, Number.isFinite(slot?.words?.max) ? `at most ${slot.words.max}` : null].filter(Boolean).join(" and ");
+  const mendable = (item) => JUDGEMENT_KINDS[item.kind].fix?.by === "replace"
+    ? `${span(item.slot) ? `\nSlot: ${span(item.slot)} words` : ""}${item.figures?.length ? `\nFigures the page prints: ${item.figures.join(", ")}` : ""}` : "";
   const asked = (item, shared) => `### ${item.key}\n${item.image ? `Image: ${item.image} (open it)\n` : ""}Subject: ${JSON.stringify(item.subject)}` +
-    `${!shared && item.context ? `\nContext: ${JSON.stringify(item.context)}` : ""}${!shared && item.beside ? `\nBeside it: ${JSON.stringify(item.beside)}` : ""}`;
+    `${!shared && item.context ? `\nContext: ${JSON.stringify(item.context)}` : ""}${!shared && item.beside ? `\nBeside it: ${JSON.stringify(item.beside)}` : ""}${mendable(item)}`;
+  const mend = (spec) => {
+    const failing = (spec.fix?.for || []).map((v) => `"${v}"`).join(" or ");
+    if (spec.fix?.by === "replace") return `\nWith ${failing}, mend it in the same answer, so this is the last reading: set \`replacement\` to the ${spec.fix.slot === "title" ? "title" : "line"} rewritten so this question, asked of it, answers "${spec.fix.passes}", and \`replacementReason\` to that answer's reason in a sentence. The writer applies it word for word and it is recorded as judged, so it must stand on its own: use only facts the page already gives - no figure it does not print (the figures are listed under each question), no new cause or comparison - and keep within the slot given.`;
+    if (spec.fix?.by === "choose") return `\nWith ${failing}, no one line mends it: set \`fix\` to the change the writer makes, in a sentence (which ${spec.subject.split(",")[0].replace(/^the /, "")} to merge, redraw or drop, and how).`;
+    return "";
+  };
   const sections = [...byKind].map(([kind, items]) => {
     const spec = JUDGEMENT_KINDS[kind];
     const verdicts = Object.entries(spec.verdicts).map(([verdict, meaning]) => `  - "${verdict}": ${meaning}`).join("\n");
@@ -248,7 +310,7 @@ export function judgementPrompt(packet, { validate = null } = {}) {
     const quoted = (spec.quoteFor || []).length ? `\nWith ${spec.quoteFor.map((v) => `"${v}"`).join(" or ")}, set \`quote\` to the words of the subject the verdict rests on, copied exactly.` : "";
     const runs = [];
     for (const item of items) { const last = runs.at(-1); if (last && surroundings(last[0]) === surroundings(item)) last.push(item); else runs.push([item]); }
-    return `## ${kind}\n${spec.asks}\nSubject: ${spec.subject}\nVerdicts:\n${verdicts}${fields ? `\nFields:\n${fields}` : ""}${quoted}\n\n` +
+    return `## ${kind}\n${spec.asks}\nSubject: ${spec.subject}\nVerdicts:\n${verdicts}${fields ? `\nFields:\n${fields}` : ""}${quoted}${mend(spec)}\n\n` +
       runs.map((run) => {
         const [first] = run;
         if (run.length === 1 || !(first.context || first.beside)) return run.map((item) => asked(item, false)).join("\n\n");
@@ -256,9 +318,9 @@ export function judgementPrompt(packet, { validate = null } = {}) {
           run.map((item) => asked(item, true)).join("\n\n");
       }).join("\n\n");
   });
-  const check = validate ? `\n## Before you hand back\nIf you can run commands, check the answer as it will be recorded: save it as answer.json in this packet's folder and run\n\n    ${validate}\n\nIt prints every reason the answer would be refused - a question unanswered or answered twice, a key not in this packet, a verdict its kind does not take, a field its verdict needs, a quote that is not the subject's words. Fix each and run it again until it says the answer would be recorded. A reader without a shell hands back as it is: the answer is checked when it is recorded.\n` : "";
+  const check = validate ? `\n## Before you hand back\nIf you can run commands, check the answer as it will be recorded: save it as answer.json in this packet's folder and run\n\n    ${validate}\n\nIt prints every reason the answer would be refused - a question unanswered or answered twice, a key not in this packet, a verdict its kind does not take, a field its verdict needs, a quote that is not the subject's words, a failing verdict without its replacement, a replacement past its slot or printing a figure the page does not. Fix each and run it again until it says the answer would be recorded. A reader without a shell hands back as it is: the answer is checked when it is recorded.\n` : "";
   return `You are reading parts of a slide deck to answer a few precise questions about them, one at a time. Judge each from what is given - its subject and its context - and nothing else: do not look anything up, and do not judge the deck as a whole. Choose the verdict the words support; where the words leave it open, choose the verdict a careful editor would, and say why. Every answer gives its reason in a sentence.\n\n` +
-    `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null.\n${check}`;
+    `${sections.join("\n\n")}\n\n## Answer\nReturn JSON only: { "batch": "${packet.batch}", "judgements": [ { "key": "<the question's key>", "verdict": "<one of its verdicts>", "reason": "<a sentence>", "quote": "<where asked, else null>", ... } ] }, one judgement for each of the ${packet.items.length} keys above; a field its kind does not ask for, or its verdict does not take, is null - a replacement or a fix included, where the verdict passes.\n${check}`;
 }
 
 const PACKET_NAME = /^packet-\d+$/;
@@ -305,9 +367,11 @@ export const packetName = (dir, folder) => path.relative(path.join(dir, PACKET_D
  * packet staged, a page run's included, against every open question, as before.
  *
  * `validate`, given a packet's folder, is the command its prompt tells the
- * reader to check the answer with (judgementPrompt).
+ * reader to check the answer with (judgementPrompt). `slots`, by name, are the
+ * limits the writer brief prints (limits.mjs deckLimits: `textBlock`, `title`):
+ * a question whose failure is mended by a replacement carries its kind's slot.
  */
-export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, scope = null, validate = null } = {}) {
+export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, scope = null, validate = null, slots = null } = {}) {
   const root = path.join(dir, PACKET_DIR), home = scope ? path.join(root, scope) : root;
   await fs.mkdir(home, { recursive: true });
   const open = new Map(requests.map((request) => [request.key, request]));
@@ -332,7 +396,7 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, s
     const folder = path.join(home, `packet-${String(number).padStart(2, "0")}`);
     await fs.mkdir(folder, { recursive: true });
     const items = [];
-    for (const { key, kind, subject, context, where, image, beside } of rest.slice(at, at + size)) {
+    for (const { key, kind, subject, context, where, image, beside, figures } of rest.slice(at, at + size)) {
       // A question about a picture carries a copy of it in the packet, named by the question's key.
       let staged = null;
       if (image) {
@@ -340,7 +404,10 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, s
         await fs.mkdir(path.join(folder, "images"), { recursive: true });
         await fs.copyFile(image, path.join(folder, staged));
       }
-      items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}), ...(beside ? { beside } : {}) });
+      // A question a replacement mends carries what the replacement may use: the slot's limits the writer brief prints, and the page's figures.
+      const fix = JUDGEMENT_KINDS[kind].fix, slot = fix?.by === "replace" ? slots?.[fix.slot] ?? null : null;
+      items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}), ...(beside ? { beside } : {}),
+        ...(fix?.by === "replace" && figures?.length ? { figures } : {}), ...(slot ? { slot } : {}) });
     }
     const packet = { schema: JUDGEMENTS_SCHEMA, batch: createHash("sha256").update(items.map((item) => item.key).join("\n")).digest("hex").slice(0, 16), items };
     await fs.writeFile(path.join(folder, "packet.json"), `${JSON.stringify(packet, null, 1)}\n`);
@@ -397,12 +464,13 @@ export async function validateAnswer(dir, file) {
  * judgements file. A packet is recorded whole or not at all: one whose answer
  * has a problem is left staged with its answer, and the problems are returned
  * under its folder's name; the others are recorded and their folders removed.
+ * A failing answer's replacement is recorded too, under its own key, as judged.
  * Returns `{ recorded, problems, refused, waiting }`: `refused`, the folders
  * whose answers were not recorded; `waiting`, the packets still without one.
  */
 export async function recordAnswers(dir, stem, { by = null } = {}) {
   judgementStoreNow(dir, stem);  // a store that is not JSON is said before anything is read against it
-  const verdicts = {};
+  const verdicts = {}, replaced = {};
   const at = new Date().toISOString(), problems = [], refused = [], answeredFolders = [];
   let recorded = 0, waiting = 0;
   for (const { folder, packet, answered } of await stagedPackets(dir)) {
@@ -415,17 +483,23 @@ export async function recordAnswers(dir, stem, { by = null } = {}) {
     if (checked.problems.length) { problems.push(...checked.problems.map((problem) => `${name}: ${problem}`)); refused.push(folder); continue; }
     for (const item of packet.items) {
       const { key: _key, ...said } = checked.given.get(item.key);
-      verdicts[item.key] = { kind: item.kind, version: JUDGEMENT_KINDS[item.kind].version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+      const spec = JUDGEMENT_KINDS[item.kind], replacement = spec.fix?.by === "replace" && spec.fix.for.includes(said.verdict) ? String(said.replacement).trim() : null;
+      verdicts[item.key] = { kind: item.kind, version: spec.version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+      // The replacement is judged as it is given: recorded under its own words in the question's context, with the verdict it
+      // passes on and the reader's reason, so the writer who applies it word for word is not asked again (runtime-defects 62).
+      if (replacement) replaced[judgementKey(item.kind, replacement, item.context ?? null)] = { kind: item.kind, version: spec.version, verdict: spec.fix.passes,
+        reason: said.replacementReason, subject: replacement, replaces: item.key, answeredAt: at, ...(by ? { by } : {}) };
     }
     recorded += packet.items.length;
     answeredFolders.push(folder);
   }
   // Sections are judged side by side (judge.mjs --page), so another run may have recorded since this one began: the store is
   // read again as it stands and written in the same tick, whole, by a rename - never from a copy read before the answers were.
+  // A question asked in its own right keeps its own reading over a replacement that happens to say the same words.
   if (recorded) {
     const file = judgementStorePath(dir, stem), staged = `${file}.${process.pid}.tmp`;
     const standing = judgementStoreNow(dir, stem).verdicts ?? {};
-    writeFileSync(staged, `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: Object.assign(standing, verdicts) }, null, 1)}\n`);
+    writeFileSync(staged, `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: Object.assign(standing, replaced, verdicts) }, null, 1)}\n`);
     renameSync(staged, file);
   }
   // A packet's folder goes only once its answers are in the store.

@@ -98,7 +98,7 @@ const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, [...open.
 const [tiles, title] = packet.items;
 const answer = async (judgements, batch = packet.batch) => { await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch, judgements })); return J.recordAnswers(dir, 'deck'); };
 const good = [{ key: title.key, verdict: 'gap', reason: 'The title leads with what cannot be ranked.', quote: 'cannot be ranked' },
-  { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'] }];
+  { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'], fix: 'Plot six-month retention for both cohorts on one axis and drop the tiles.' }];
 const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
 const refused = {
   unknown: await answer([{ ...good[0], verdict: 'maybe' }, good[1]]),
@@ -172,7 +172,8 @@ const first = await J.stageJudgements(dir, ask(130));
 const sizes = first.packets.map(({ packet }) => packet.items.length), names = first.packets.map(({ folder }) => path.basename(folder));
 // One packet answered, one answered wrongly, one not yet: the right one is recorded alone, the wrong one stays with its answer.
 const answer = async ({ folder, packet }, verdict) => fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch: packet.batch,
-  judgements: packet.items.map((item) => ({ key: item.key, verdict, reason: 'The title says how many and nothing more.', quote: verdict === 'count-only' ? item.subject : null })) }));
+  judgements: packet.items.map((item) => ({ key: item.key, verdict, reason: 'The title says how many and nothing more.', quote: verdict === 'count-only' ? item.subject : null,
+  ...(verdict === 'count-only' ? { replacement: `${item.subject}, too few to grow the network`, replacementReason: 'It says what the count means for the network.' } : {}) })) }));
 await answer(first.packets[0], 'count-only');
 await answer(first.packets[1], 'maybe');
 const recorded = await J.recordAnswers(dir, 'deck');
@@ -199,6 +200,66 @@ console.log(JSON.stringify({ sizes, names, recorded: [recorded.recorded, recorde
         self.assertEqual(result["kept"], ["packet-02", "packet-03"], "a packet a reader may be answering keeps its folder and its batch")
         self.assertEqual(result["fewer"], [["packet-03", 42], ["packet-04", 10], ["packet-05", 43]])
         self.assertEqual(result["emptied"], 0, "with nothing open, nothing stays staged")
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class ClosedFixTests(unittest.TestCase):
+    """ba4 (runtime-defects 62): nine judge rounds followed the writers, because a failed line came back with no fix - the
+    writer rewrote it, the rewrite was asked again, and o01 failed three times. A failing answer now carries its line's
+    replacement, within the slot the writer brief prints and using only the figures the page prints, and the replacement is
+    recorded as judged: applied word for word, the compile finds it answered."""
+
+    def test_a_failing_answer_is_recorded_only_with_a_replacement_that_fits_and_adds_no_figure(self):
+        result = run_node(CORE + """
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'judgements-'));
+const line = 'IAG flew 13.4 million North Atlantic passengers in 2025, flat on 2024.';
+const shown = { exhibit: ['13.4 million', 'North Atlantic passengers, 2025'], callouts: [] };
+const tiles = [{ id: 't1', value: '83.5%', label: 'Load factor, 2025' }, { id: 't2', value: '84.6%', label: 'Load factor, 2024' }];
+const open = J.judgementSession();
+J.notePageFigures(open, [{ id: 'na13', nodes: [{ type: 'text', role: 'action-title', text: 'Extra seats went unfilled as passengers held at 13.4 million' },
+  { type: 'text', role: 'paragraph', text: line }, { type: 'text', role: 'page-number', text: '38' }] }]);
+J.withJudgements(open, () => { J.judged('commentary-restates', line, shown, 'na13', { beside: { commentary: [line] } }); J.judged('tiles-one-measure', tiles, null, 'na13'); });
+const requests = J.pendingRequests(open);
+const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, requests, { slots: { textBlock: { words: { max: 16 } } } });
+const restates = packet.items.find((item) => item.kind === 'commentary-restates'), pair = packet.items.find((item) => item.kind === 'tiles-one-measure');
+const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
+const fixed = 'With passengers flat at 13.4 million, the seats IAG added in 2025 went unsold.';
+const reason = 'It names what the flat passenger count cost, which the exhibit does not say.';
+const tilesAnswer = { key: pair.key, verdict: 'one-measure', reason: 'Both tiles are load factor at two dates.', pair: ['t1', 't2'], fix: 'Draw load factor for 2024 and 2025 as one bar pair and drop the second tile.' };
+const answer = async (mine, other = tilesAnswer) => { await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch: packet.batch, judgements: [{ key: restates.key, verdict: 'restates', reason: 'It reads the tile back in words.', ...mine }, other] })); return J.recordAnswers(dir, 'deck'); };
+const refused = {
+  bare: await answer({}),
+  unchanged: await answer({ replacement: line, replacementReason: reason }),
+  figure: await answer({ replacement: 'At 13.4 million passengers, flat on 2024, IAG needs 5% more to fill its new seats.', replacementReason: reason }),
+  long: await answer({ replacement: `${fixed} That leaves yield as the lever the call has to pull this year and next.`, replacementReason: reason }),
+  unnamed: await answer({ replacement: fixed, replacementReason: reason }, { ...tilesAnswer, fix: null }),
+};
+const recorded = await answer({ replacement: fixed, replacementReason: reason });
+const replay = await J.loadJudgements(dir, 'deck');
+const applied = J.withJudgements(replay, () => J.judged('commentary-restates', fixed, shown, 'na13'));
+const store = JSON.parse(await fs.readFile(J.judgementStorePath(dir, 'deck'), 'utf8')).verdicts;
+await fs.rm(dir, { recursive: true, force: true });
+console.log(JSON.stringify({ refused: Object.fromEntries(Object.entries(refused).map(([k, v]) => [k, [v.recorded, v.problems.join(' | ')]])), recorded: recorded.recorded,
+  applied: applied && { verdict: applied.verdict, reason: applied.reason, replaces: applied.replaces }, pending: replay.pending.size, restatesKey: restates.key,
+  failed: store[restates.key]?.verdict, tilesFix: store[pair.key]?.fix, figures: restates.figures, slot: restates.slot, tileSlot: pair.slot ?? null,
+  prompt: ['Figures the page prints: 13.4, 2025, 2024', 'Slot: at most 16 words', '`replacement`', '`fix`'].map((said) => prompt.includes(said)) }));
+""")
+        for name, needle in (("bare", "gives `replacement`"), ("unchanged", "as it stands"), ("figure", 'prints "5"'), ("long", "its slot holds 16 at most"),
+                             ("unnamed", "names the change that mends it in `fix`")):
+            with self.subTest(refusal=name):
+                recorded, problems = result["refused"][name]
+                self.assertEqual(recorded, 0)
+                self.assertIn(needle, problems)
+        self.assertEqual(result["recorded"], 2)
+        self.assertEqual(result["applied"], {"verdict": "adds", "reason": "It names what the flat passenger count cost, which the exhibit does not say.",
+                                             "replaces": result["restatesKey"]}, "a replacement applied word for word is already answered")
+        self.assertEqual(result["pending"], 0)
+        self.assertEqual(result["failed"], "restates", "the line as it stood keeps its own reading")
+        self.assertIn("one bar pair", result["tilesFix"])
+        self.assertEqual(result["figures"], ["13.4", "2025", "2024"], "the page's figures, not its page number")
+        self.assertEqual(result["slot"], {"words": {"max": 16}})
+        self.assertIsNone(result["tileSlot"], "a fix the writer chooses has no slot")
+        self.assertEqual(result["prompt"], [True] * 4)
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")
@@ -352,7 +413,7 @@ const { packets: [{ folder, packet }] } = await J.stageJudgements(dir, [...open.
 const prompt = await fs.readFile(path.join(folder, 'prompt.md'), 'utf8');
 const [tiles, title] = packet.items;
 const good = [{ key: title.key, verdict: 'gap', reason: 'The title leads with what cannot be ranked.', quote: 'cannot be ranked' },
-  { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'] }];
+  { key: tiles.key, verdict: 'one-measure', reason: 'Both tiles are six-month retention at two dates.', pair: ['t1', 't2'], fix: 'Plot six-month retention for both cohorts on one axis and drop the tiles.' }];
 const check = async (judgements, batch = packet.batch) => {
   await fs.writeFile(path.join(folder, 'answer.json'), JSON.stringify({ batch, judgements }));
   const run = spawnSync(process.execPath, ['./skills/professional-slides/runtime/judge.mjs', pages, '--validate', path.join(folder, 'answer.json')], { encoding: 'utf8' });

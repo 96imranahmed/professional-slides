@@ -25,7 +25,7 @@ sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
 from node_probe import requires_python_package, example_scene, example_scene_file  # noqa: E402
-from judgement_oracle import answering  # noqa: E402
+from judgement_oracle import answering, judgements  # noqa: E402
 
 # The three gates that read the renders need Pillow (see requirements.txt).
 # Everything else in this file works off the scene.
@@ -535,6 +535,33 @@ class RestatementGateTests(unittest.TestCase):
         self.assertIn("Africa", context["exhibit"])
         self.assertEqual(context["callouts"], ["Europe and East Asia earn 59% of all revenue"])
         self.assertNotIn("Europe and East Asia earn 59% of all revenue", context["exhibit"])
+
+    def test_a_moved_callout_or_a_page_laid_out_again_keeps_the_commentary_answered(self):
+        """ba4 (runtime-defects 62): a render fix that only moved a callout (hb04) re-asked the page's commentary, because
+        the exhibit's words were keyed in the order the nodes were drawn. They are keyed as what they say: a callout moved
+        or the nodes drawn in another order ask nothing, and a label edited asks again."""
+        slide = self.page("Europe and East Asia earn 59% of all revenue")
+        slide["nodes"].append(self.node("annotation-text", "The Middle East earns least of the eight"))
+        caption = "Europe and East Asia with Australasia earn 59% of revenue; the Middle East only 7%"
+        asked = []
+        with answering({"commentary-restates": lambda subject, context: asked.append(context) or "adds"}):
+            page_gates.gate_restatement(1, slide, [])
+        key = judgements.judgement_key("commentary-restates", caption, asked[0])
+        moved = {**slide, "nodes": list(reversed(slide["nodes"]))}
+        relabelled = {**slide, "nodes": [self.node("category-label", "Europe (all)") if n["text"] == "Europe" else n for n in slide["nodes"]]}
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "deck.judgements.json"
+            store.write_text(json.dumps({"verdicts": {key: {"verdict": "adds", "reason": "It says what follows."}}}), encoding="utf-8")
+            judgements.load(store)
+            try:
+                page_gates.gate_restatement(1, moved, [])
+                after_move = len(judgements.needed())
+                page_gates.gate_restatement(1, relabelled, [])
+                after_relabel = len(judgements.needed())
+            finally:
+                judgements.unload()
+        self.assertEqual(after_move, 0, "a callout moved, or the nodes drawn in another order, asks nothing")
+        self.assertEqual(after_relabel, 1, "a label of the exhibit edited asks the line again")
 
     def test_a_caption_that_repeats_the_callout_is_told_so(self):
         """Fifty-six-page re-author: a caption became a restatement the moment a callout was added."""

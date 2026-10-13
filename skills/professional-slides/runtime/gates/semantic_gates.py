@@ -73,6 +73,11 @@ def gate_restatement(slide_no, slide, findings):
     second fresh reader then flagged lines the first had passed: the copy took
     six judge rounds to settle. An unchanged line now keeps its verdict when a
     neighbour changes.
+
+    The exhibit is keyed as what it says, not where it is drawn: its words and
+    its callouts as sets. On ba4 a render fix that only moved a callout (hb04)
+    re-asked the page's commentary, as a page laid out again reorders the
+    nodes its words are read from; neither changes what a line restates.
     """
     commentary, exhibit = page_voices(slide)
     if not commentary or not exhibit:
@@ -84,16 +89,18 @@ def gate_restatement(slide_no, slide, findings):
     said = [source_text(n) for n in text_nodes(slide) if n.get("role") in COMMENTARY_ROLES - LEAD_ROLES and source_text(n).strip()]
     if not said:
         return
-    shown = {"exhibit": list(dict.fromkeys(t for t in exhibit if t not in callouts)), "callouts": list(dict.fromkeys(callouts))}
+    shown = {"exhibit": sorted({t for t in exhibit if t not in callouts}), "callouts": sorted(set(callouts))}
     # Every line is asked, so a line answered and a line still open hold apart: the answered ones are judged now.
     read = [(text, judged("commentary-restates", text, shown, slide_no, beside={"commentary": said})) for text in said]
-    restated = [text for text, answer in read if answer and answer.get("verdict") == "restates"]
+    restated = [(text, answer) for text, answer in read if answer and answer.get("verdict") == "restates"]
     if not restated:
         return
+    replaced = replacements(restated)
     findings.append(finding(
-        slide_no, "RESTATEMENT", {"lines": len(restated), "of": len(said), "block": restated[0][:70], **({"callout": callouts[0][:70]} if callouts else {})},
+        slide_no, "RESTATEMENT", {"lines": len(restated), "of": len(said), "block": restated[0][0][:70], **({"callout": callouts[0][:70]} if callouts else {})},
         "commentary that says what the exhibit does not",
-        ("The commentary reads the exhibit back: " + ", ".join(f"\"{text[:60]}\"" for text in restated[:3]) + ". "
+        replaced or
+        ("The commentary reads the exhibit back: " + ", ".join(f"\"{text[:60]}\"" for text, _ in restated[:3]) + ". "
          "Say what the exhibit cannot: what follows from the number, what it costs, which option it settles, "
          "what would change it. If the only honest sentence is the one already in the table, the page does not "
          "need a commentary column."
@@ -101,6 +108,22 @@ def gate_restatement(slide_no, slide, findings):
             "finding reads it back: let the callout carry the figure and the commentary say what follows from it - or drop the callout."
             if callouts else "")),
     ))
+
+
+def replacements(failed):
+    """The judge's replacements for lines it failed, as a repair - or None where a line has none.
+
+    A failing answer carries the line's replacement, which the same reader has
+    already passed and which is recorded under its own words (judgements.mjs
+    recordAnswers): applied word for word, the next compile finds it answered.
+    Rewritten by the writer instead, it is a new line and asked again - on ba4
+    one line (o01) was rewritten three times, a judge round each.
+    """
+    if not failed or not all(answer.get("replacement") for _, answer in failed):
+        return None
+    return ("Apply the judge's replacements word for word, each figure written by the token that prints it: "
+            + "; ".join(f"\"{text}\" -> \"{answer['replacement']}\"" for text, answer in failed)
+            + ". Each is already judged, so no judge round follows: run --check.")
 
 
 def gate_planning_voice(slide_no, slide, findings):
@@ -146,20 +169,23 @@ def gate_caveat_heavy(slide_no, slide, findings):
     if len(lines) <= THRESHOLDS["caveats_max"]:
         return
     # Which lines state a limit rather than a finding is read (commentary-caveats): "Education does not decide the city; it
-    # decides the neighborhood" is a finding in contrastive form, which a count of negations punished as a hedge.
-    said = judged("commentary-caveats", [{"id": f"l{at + 1}", "text": line} for at, line in enumerate(lines)], None, slide_no)
-    if not said or said.get("verdict") != "some-caveats":
-        return
-    picked = {str(i) for i in said.get("caveats") or []}
-    hits = [line[:70] for at, line in enumerate(lines) if f"l{at + 1}" in picked]
+    # decides the neighborhood" is a finding in contrastive form, which a count of negations punished as a hedge. Each line
+    # is its own question, the page's lines shown beside it and not keyed, as the restatement's are: asked of the block,
+    # every edit to one line of a ba4 page re-asked the page (runtime-defects 62).
+    read = [(line, judged("commentary-caveats", line, None, slide_no, beside={"commentary": lines})) for line in lines]
+    caveats = [(line, answer) for line, answer in read if answer and answer.get("verdict") == "caveat"]
+    hits = [line[:70] for line, _ in caveats]
     if len(hits) <= THRESHOLDS["caveats_max"]:
         return
+    # Every caveat but the one kept is mended by the judge's replacement, already judged a finding.
+    replaced = replacements(caveats[1:])
     findings.append(finding(
         slide_no, "CAVEAT_HEAVY", {"caveats": len(hits), "of": len(lines), "first": hits[:3]},
         THRESHOLDS["caveats_max"],
         "Keep one statement of what this evidence does not settle, in the note or "
         "the insight, and give the commentary back to what it does settle. A page "
-        "that qualifies itself three times reads as a page with nothing to say.",
+        "that qualifies itself three times reads as a page with nothing to say."
+        + (f" Keep \"{caveats[0][0][:60]}\". {replaced}" if replaced else ""),
     ))
 
 

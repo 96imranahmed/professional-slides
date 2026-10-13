@@ -1218,7 +1218,9 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set(), tileMeas
     const read = judged("tiles-one-measure", tiles.map((tile, at) => ({ id: `t${at + 1}`, value: String(tile.value), label: label(tile) })), null, id);
     const [a, b] = read?.verdict === "one-measure" ? (read.pair || []).map((tid) => tiles[Number(String(tid).slice(1)) - 1]) : [];
     if (a && b)
-      return { code: "TILES_ONE_MEASURE", message: `${id}: the tiles ${a.value} ("${a.label}") and ${b.value} ("${b.label}") are one measure at two dates or for two members, which the reader has to compare in separate boxes; plot the measure on one axis - a \`trend\` page across the dates, a \`ranking\` across the members, or the chart the page already carries - and keep tiles for measures that differ` };
+      return { code: "TILES_ONE_MEASURE", message: `${id}: the tiles ${a.value} ("${a.label}") and ${b.value} ("${b.label}") are one measure at two dates or for two members, which the reader has to compare in separate boxes; plot the measure on one axis - a \`trend\` page across the dates, a \`ranking\` across the members, or the chart the page already carries - and keep tiles for measures that differ${
+        // No one line mends two tiles, so the judge names the change for the writer to make (judgement-kinds.json `fix`).
+        String(read.fix ?? "").trim() ? `. The judge's fix, for the writer to make: ${String(read.fix).trim()}` : ""}` };
   }
   // A strip over a chart that prints the same figures says them twice.
   if (page.type === "numbers" && page.form === "metric-strip" && (page.metrics || []).length) {
@@ -1373,7 +1375,8 @@ export const titleGap = (title, where = null) => {
 // against what or so what. A title with a number that is not a year is read
 // (title-count-only).
 const COUNT = /(?<![\p{L}\d])(?!(?:19|20)\d\d(?![\d.,]))\d[\d,.]*/u;
-export const countOnlyTitle = (title, where = null) => { const t = String(title ?? "").trim(); return COUNT.test(t) && judged("title-count-only", t, null, where)?.verdict === "count-only"; };
+// The answer where the title is a count alone - it carries the judge's replacement title - else false.
+export const countOnlyTitle = (title, where = null) => { const t = String(title ?? "").trim(); const read = COUNT.test(t) ? judged("title-count-only", t, null, where) : null; return read?.verdict === "count-only" ? read : false; };
 
 // A point's own figure: its first quantity with a currency, a percentage or a
 // unit, else its first number that is not a year. In a point of evidence the
@@ -1559,8 +1562,11 @@ function spineOf(page, id, { insights = null, sources = null, rules = null, waiv
     if (measured && settles.kind === "qualitative")
       throw new Error(`${id}: a ${page.type} page ${familyOf(page.type, page.form) === "table" ? "tabulates" : "plots"} a measure, so its claim is not settled by a "qualitative" judgement; name what the ${familyOf(page.type, page.form) === "table" ? "table" : "chart"} settles - ${SETTLES_KINDS.filter((k) => k !== "qualitative").join(", ")} - or, where the evidence is statements rather than measures, choose the type that carries them (matrix, mechanism, argument, parallel)`);
   }
-  const titleAdvisories = countOnlyTitle(page.title, id)
-    ? [`TITLE_COUNT_ONLY: the title states a number without a comparator or consequence ("${page.title}"); say against what, or what follows - the finding, not only the measurement`] : [];
+  const countOnly = countOnlyTitle(page.title, id);
+  // The judge's replacement is already judged under its own words: applied word for word, no judge round follows (runtime-defects 62).
+  const titleAdvisories = countOnly
+    ? [`TITLE_COUNT_ONLY: the title states a number without a comparator or consequence ("${page.title}"); say against what, or what follows - the finding, not only the measurement${
+      countOnly.replacement ? `. Apply the judge's replacement word for word, each figure written by the token that prints it: "${countOnly.replacement}"` : ""}`] : [];
   return { type, settles, evidence, titleAdvisories };
 }
 
