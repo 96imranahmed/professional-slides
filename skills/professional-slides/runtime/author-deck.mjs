@@ -151,7 +151,7 @@ import { DATA_KEYS, GRADE, FIT_WORDS, READING_TASKS, boundKeys, drawOrder, exhib
 import { featuredDraw } from "./design-systems.mjs";
 import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
-import { claimMarks, dependencyFindings, metricsOf, relationRepair, requiredCitations } from "./gates/dependency_gates.mjs";
+import { claimMarks, dependencyFindings, hazardFindings, metricsOf, relationRepair, requiredCitations, tileMeasures } from "./gates/dependency_gates.mjs";
 import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
 import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, pendingFinding, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
@@ -298,6 +298,8 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
   const written = draft ? bindDeck(withKeys(docIn), insights) : null;
   const proof = draft ? spineProof(withKeys(docIn), { insights, measured, written, baseDir, sourceKinds }) : null;
   const binding = proof ? bindDeck(proof.doc, insights) : bindDeck(withKeys(docIn), insights);
+  // Each page as it was before its references were written out: what the compile's tiles print by reference is read off it.
+  const unbound = proof ? [...proof.doc.pages, ...(proof.doc.appendix || [])] : [...docIn.pages, ...(docIn.appendix || [])];
   const doc = binding.doc;
   const revision = doc.deck.workflow === REVISION;
   const errors = [], waiting = [], refusals = new Map(), cited = new Map(), witnessed = new Map();
@@ -328,7 +330,7 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     }
     let slide;
     const { page: authored, dependencies } = withoutDependencies(page, measured, binding.bound.printed.get(page));
-    try { slide = compilePage(authored, index, options); } catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
+    try { slide = compilePage(authored, index, { ...options, tileMeasures: tileMeasures(unbound[index], page, measured) }); } catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (unknown.length) return refuse(index, `${slide.id ?? `page ${index + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`, { stage: "shape" });
@@ -1180,12 +1182,15 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   const assets = baseDir ? await assetFindings(spec, baseDir) : { statement: null, findings: [] };
 
   // --- every finding, with its class and, for a draft, whether it is held yet
+  // The comparisons the answer critique found the insight log cannot support (out/answer-critique.json), said on each page
+  // that rests on the insights one of them names together - in a draft too, before the copy is written on them.
+  const hazards = baseDir ? hazardFindings(doc, answerHazardsOf(readJsonSync(path.join(baseDir, "out", ANSWER_CRITIQUE_FILE), { optional: true }))) : [];
   const classed = (list, more = {}) => list.map((f) => ({ ...f, ...more, class: classOf(f.code) }));
   const gathered = [
     ...classed(compiled), ...classed(bindingFindings), ...classed(composingShown), ...classed(unfitShown), ...classed(undrawable), ...classed(undetermined), ...classed(spineFindings), ...classed(inventory), ...classed(carry),
     ...classed(structure.findings).map((f) => (f.class === "S" && standIn ? { ...f, provisional: standIn } : f)),
     ...classed(provisionalShape.findings, { provisional: standIn ?? "not every page composed" }), ...classed(stages),
-    ...classed(consistency), ...classed(local.depends), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
+    ...classed(consistency), ...classed(local.depends), ...classed(hazards), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
   // An aggregate read while pages are missing is read from the pages that composed, and says so.
   ].map((f) => (f.class === "G" && partial ? { ...f, partial } : f));
   // A draft is the spine, and the storyline critique is then bound to it. So a draft holds everything whose repair writes a

@@ -52,7 +52,8 @@ export const TYPE_SHAPES = Object.freeze({
 const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], mix: ["parts"], "measure-pair": ["members"], bridge: ["steps"] };
 
 /**
- * How wide an insight's data is: its `breadth` counts, over the counts read off its `data`.
+ * How wide an insight's data is: its `breadth` counts, over the counts read off its `data` - or, where it records neither,
+ * off its `measures`.
  *
  * A mix's parts are what its chart splits the whole into. Where two or more
  * series stack over the categories (stacked bar or column, marimekko), each
@@ -64,6 +65,7 @@ const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], m
 export function breadthOf(insight) {
   const data = insight?.data && typeof insight.data === "object" ? insight.data : null;
   const n = (list) => (Array.isArray(list) ? list.length : undefined);
+  const typed = insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : null;
   const read = {};
   if (data) {
     const rows = n(data.categories) ?? n(data.labels) ?? n(data.points) ?? n(data.rows) ?? n(data.items) ?? n(data.values);
@@ -72,10 +74,38 @@ export function breadthOf(insight) {
     if (insight.shape === "peer-set" || insight.shape === "measure-pair") read.members = rows;
     if (insight.shape === "mix") read.parts = series >= 2 ? series : rows;
     if (insight.shape === "bridge" && rows !== undefined) read.steps = rows - 2;
-  }
-  const counts = { ...read, ...(insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : {}) };
+  } else if (!typed) Object.assign(read, measuredBreadth(insight));
+  const counts = { ...read, ...(typed ?? {}) };
   return Object.fromEntries(Object.entries(counts).filter(([, v]) => Number.isFinite(v)));
 }
+
+/**
+ * How wide an insight's recorded `measures` are, for a shape that is counted
+ * in periods, members or parts: the record already says it. On the BA retest
+ * `net-uk-europe-country-flows` recorded two measures over 27 countries and,
+ * with no `breadth` typed beside them, was refused as too narrow for a peer
+ * set until `breadth.members: 27` was typed in by hand. A series is as long as
+ * its longest measure over periods, and as many series as run that long; a
+ * peer set, a measure pair or a mix as wide as its widest measure over members.
+ */
+function measuredBreadth(insight) {
+  const measures = insight?.measures && typeof insight.measures === "object" && !Array.isArray(insight.measures)
+    ? Object.values(insight.measures).filter((m) => m && typeof m === "object") : [];
+  const longest = (key) => Math.max(0, ...measures.map((m) => (Array.isArray(m[key]) ? m[key].length : 0)));
+  const periods = longest("periods"), members = longest("members");
+  if (insight.shape === "series" && periods) return { periods, series: measures.filter((m) => Array.isArray(m.periods) && m.periods.length === periods).length };
+  if ((insight.shape === "peer-set" || insight.shape === "measure-pair") && members) return { members };
+  if (insight.shape === "mix" && members) return { parts: members };
+  return {};
+}
+
+/**
+ * A figure tile as the compile reads it - its label and its value as printed -
+ * so what is known of the tile before its reference is written out (the
+ * recorded measure it prints, author-deck.mjs compileDeck) is found again on
+ * the tile the compile checks (page-types.mjs chartFormDefect).
+ */
+export const tileKey = (tile) => `${String(tile?.label ?? "").trim()}\u0000${String(tile?.value ?? "")}`;
 
 /**
  * Why an insight's data is too narrow for its shape, or null. A chart-bearing

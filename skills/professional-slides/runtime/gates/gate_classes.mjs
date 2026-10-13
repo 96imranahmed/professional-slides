@@ -153,6 +153,13 @@ const LISTED = [
   ...codes("P", "NUMBER_UNTRACED", COPY),
   // A title's number no record holds (dependency_gates.mjs): printed at the record's rounding, or recorded.
   ...codes("P", "TITLE_NUMBER_UNTRACED", ["title", "copy", "record"]),
+  // What a page's figures print against the record itself (dependency_gates.mjs RECORD_CODES). One recorded measure in two
+  // tiles is mended by what the page shows of it - one axis, or one tile - so it holds in a draft; a decimal the record does
+  // not carry is the copy's format; a comparison the answer critique says the log cannot support is kept to its rule in the
+  // copy, or the page rests on one of the insights.
+  ...codes("P", "TILES_SAME_MEASURE", ["view", "type"]),
+  ...codes("P", "PRECISION_UNRECORDED", COPY),
+  ...codes("P", "COMPARISON_UNSUPPORTED", ["copy", "evidence", "settles"]),
   // What the critique binds, proven layable at the spine (spine-fit.mjs): a title that does not fit where the deck's design sets
   // it, an exhibit the spine fully determines that no chart can draw, and a summary that cannot fill its page as declared.
   ...codes("P", "SPINE_UNFIT", ["title"]),

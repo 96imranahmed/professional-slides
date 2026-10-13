@@ -37,7 +37,7 @@ import { REVIEWED, CODED, playerNames } from "./gates/variety_gates.mjs";
 import { playerEntries, plannedMark, planPlayerMarks } from "./players.mjs";
 import { planFlags } from "./flags.mjs";
 import { planPictureKinds } from "./compose-pictures.mjs";
-import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells } from "./evidence.mjs";
+import { SHAPES, TYPE_SHAPES, breadthOf, breadthProblem, plottedValues, trivialChart, isTable, rowCells, finite, counted, cellText, rowLabel, resultCells, tileKey } from "./evidence.mjs";
 import { wordBudgetOf } from "./derive-content.mjs";
 import { iconDefinition, unknownIcon, ICON_NAMES } from "./icons.mjs";
 import { POLARITIES } from "./tables.mjs";
@@ -1153,7 +1153,7 @@ export const CHART_FORM_CODES = Object.freeze({
  * boxes, a strip that prints what the chart under it prints, and value marks
  * with nothing to read them by. Each is refused with the form that says it.
  */
-function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
+function chartFormDefect(page, id, exhibits, players, skip = new Set(), tileMeasures = null) {
   for (const chart of exhibits.flatMap(chartsIn)) {
     if (["chart.scatter", "chart.bubble"].includes(chart?.type)) {
       const xs = (chart.points || []).map((p) => Number(p?.x)).filter(Number.isFinite);
@@ -1203,9 +1203,15 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set()) {
   // Tiles of one measure at two dates or for two members: the reader
   // compares them, and a comparison belongs on one axis. Two tiles in one unit
   // under different labels may be one measure or two, which is read
-  // (tiles-one-measure); tiles in different units never are.
+  // (tiles-one-measure); tiles in different units never are. Two tiles that
+  // print one recorded measure are that by their references, refused off the
+  // record (gates/dependency_gates.mjs TILES_SAME_MEASURE): the reader is
+  // shown one tile of each recorded measure (`tileMeasures`, the measure each
+  // tile prints by reference), and asked only whether different measures are one.
+  const recorded = (tile) => tileMeasures?.get(tileKey(tile)) ?? null;
   const tiles = [...(page.metrics || []), ...exhibits.filter((ex) => ["fact-grid", "stat-list"].includes(ex?.type)).flatMap((ex) => ex.items || [])]
-    .filter((item) => item && typeof item === "object" && figureOf(item.value) !== null);
+    .filter((item) => item && typeof item === "object" && figureOf(item.value) !== null)
+    .filter((tile, at, all) => recorded(tile) === null || all.findIndex((other) => recorded(other) === recorded(tile)) === at);
   const label = (tile) => String(tile.label ?? "").trim();
   const paired = tiles.some((a, i) => tiles.slice(i + 1).some((b) => unitOf(a.value) === unitOf(b.value) && label(a) && label(b) && label(a).toLowerCase() !== label(b).toLowerCase()));
   if (paired && !skip.has("TILES_ONE_MEASURE")) {
@@ -1690,7 +1696,7 @@ export function withChoice(page, form, commentary) {
  * last the cells. A blank total refused before the table is found too short
  * to be a table would be a fix made and then thrown away.
  */
-export function compilePage(pageIn, index = 0, { insights = null, players = null, spineOnly = false, sources = null, rules = null } = {}) {
+export function compilePage(pageIn, index = 0, { insights = null, players = null, spineOnly = false, sources = null, rules = null, tileMeasures = null } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
@@ -1719,7 +1725,7 @@ export function compilePage(pageIn, index = 0, { insights = null, players = null
   const staged = (stage, run) => { try { return run(); } catch (error) { if (error && typeof error === "object" && error.stage === undefined) error.stage = stage; throw error; } };
   const { slide, target, exhibits, setType, primary } = staged("shape", () => typedSlide(page, id, type, players));
   staged("evidence", () => checkExhibitData({ page, id, slide, exhibits, primary }));
-  const { values, isChart, refused } = staged("evidence", () => checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }));
+  const { values, isChart, refused } = staged("evidence", () => checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories, tileMeasures }));
   // A page whose shape and type hold, refused on what its exhibits do - a blank total, labels turned off - has its copy
   // checked as well, and hears every refusal in one message: none of those mends touches the copy, so a refusal of the copy
   // found only once they are made would cost the author another compile.
@@ -1876,7 +1882,7 @@ function checkExhibitData({ page, id, slide, exhibits, primary }) {
  * page, a marked subject, periods, members and the floor on the values, the
  * chart's form, and the table or rows the type is built from.
  */
-function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories }) {
+function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, rules, waived, waivedAdvisories, tileMeasures = null }) {
   const held = { waived, rules, advisories: waivedAdvisories };
   // A page the review would send to another shape hears every reason it would, and nothing past them: a mend made to a
   // table the page is told to set another way is a mend thrown away.
@@ -1907,7 +1913,7 @@ function checkTypeEvidence({ page, id, type, slide, exhibits, primary, players, 
   // independent: each is its own mend on a page whose shape and type hold, so they are said together, with what the
   // type's table checks below find, and compilePage adds the copy's.
   const refused = unwaived((skip) => reviewedDefect(page, id, [...exhibits, ...(page.blocks || []).map((block) => block?.exhibit).filter(Boolean)], skip), held);
-  for (const form of unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip), held)) {
+  for (const form of unwaived((skip) => chartFormDefect(page, id, exhibitsOf(slide), players, skip, tileMeasures), held)) {
     registered(CHART_FORM_CODES, form.code);
     refused.push(form.message);
   }

@@ -128,6 +128,11 @@ class BriefTests(unittest.TestCase):
         line = next(l for l in out.splitlines() if l.startswith("- loans "))
         self.assertIn("{{i-loans/loans@<period> | ", line)
         self.assertTrue(all(f"{period} {value}" in line for period, value in zip(measure["periods"], measure["values"])), line)
+        # Each token at the record's own precision: loans recorded in whole millions print whole, arrears recorded to a
+        # tenth print a tenth (BA retest: OAG shares recorded as 34 were briefed `| 0.0` and printed 34.0%).
+        self.assertIn("{{i-loans/loans@<period> | 0}} for", line)
+        arrears = next(l for l in out.splitlines() if l.startswith("- arrears "))
+        self.assertIn("{{i-credit/arrears@<period> | 0.0}} for", arrears)
         self.assertIn("--check --page f1,f2 --json", out)
         self.assertIn("judge.mjs", out)
         self.assertIn("--page f1,f2", out)

@@ -28,8 +28,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { includedParts, partsOf } from "./pages-file.mjs";
-import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
-import { tokenOf } from "./spine-witness.mjs";
+import { axisOf, isPercentUnit, measureRegistry, valuesOf } from "./measures.mjs";
+import { decimalsNeeded } from "./printed-numbers.mjs";
+import { recordedPlaces } from "./gates/dependency_gates.mjs";
 import { hazardLine, insightLines, itemLine } from "./answer-critique.mjs";
 import { claimSheetLines } from "./claim-sheet.mjs";
 
@@ -66,9 +67,22 @@ export function sectionPages(doc, section) {
 }
 
 /**
- * A measure's values with the tokens that print them (spine-witness.mjs tokenOf, the token the runtime itself writes): the
- * values that print in one format are listed under one token, its label standing for each - `{{i3/journeys@<period> | 0.0}}`
- * for `FY25 47.5` is exactly `{{i3/journeys@FY25 | 0.0}}`.
+ * The token that prints one value of a measure at the record's own precision: the decimal places the value needs to keep
+ * what it states (one at least, as the runtime's own tokens print it - spine-witness.mjs tokenOf), never more than any
+ * recorded value of the measure carries. On the BA retest every token was briefed as `| 0.0`, and the OAG seat shares
+ * recorded as 34, 16 and 14 were printed 34.0% (gates/dependency_gates.mjs PRECISION_UNRECORDED).
+ */
+function tokenOf(ref, label, measure) {
+  const value = label === null ? valuesOf(measure)[0] : valuesOf(measure)[axisOf(measure).labels.indexOf(label)];
+  if (typeof value !== "number") return "n/a";
+  const places = Math.min(recordedPlaces(measure) ?? 1, Math.max(1, decimalsNeeded(value, { percent: isPercentUnit(measure.unit) })));
+  return `{{${ref}${label === null ? "" : `@${label}`} | ${places ? `0.${"0".repeat(places)}` : "0"}}}`;
+}
+
+/**
+ * A measure's values with the tokens that print them (tokenOf): the values that print in one format are listed under one
+ * token, its label standing for each - `{{i3/journeys@<period> | 0.0}}` for `FY25 47.5` is exactly
+ * `{{i3/journeys@FY25 | 0.0}}`, and `{{oag/share@<member> | 0}}` for `BA 34` is `{{oag/share@BA | 0}}`.
  */
 function measureLine(measure) {
   const axis = axisOf(measure), values = valuesOf(measure);
