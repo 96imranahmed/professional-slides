@@ -1043,6 +1043,13 @@ function localFindings({ doc, structural, deck, spec, insights, uncomposed, unco
  * reported beside it. `findings` and `pageGateAdvisories` are what blocks and
  * what advises, the content plan's findings apart (`contentReport`);
  * `blocking` and `advisories` hold every finding with its class.
+ *
+ * `pages`, a set of page ids, makes it a page run (page-run.mjs): those pages
+ * compiled, composed and gated among the deck's structural pages, every other
+ * page read off what it declares, and of the findings only the page-local
+ * ones and those of the rules it reads across the deck (PAGE_RUN_HOLDS); the
+ * deck's own rules and where the deck stands are the whole-deck run's, and
+ * `standings` is empty.
  */
 export async function authorDeck(docIn, { baseDir, insights = null, draft = false, fit = !draft, fill = !draft, fitCap = FIT.perPage, fitCache = null, fitPages = null, composeCache = null, pages = null } = {}) {
   // A revision is read beside the inventory of the deck it was imported from: a picture the user's own deck embedded is
