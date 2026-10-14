@@ -82,8 +82,9 @@ console.log(JSON.stringify({{ compiled: error(() => compilePage(page({{ items, c
   bare: new Set(bare.map((t) => t.frame.y)).size,
   told: Math.max(...tiles.map((t) => t.frame.y + t.frame.height)), across: across.length && new Set(across.map((t) => t.frame.y)).size, face: value.style.fontFamily.tokenId }}));
 """)
-        self.assertIn("give every tile its sentence", result["compiled"])
-        self.assertNotIn("give every tile its sentence", result["toldCompiles"] or "")
+        # A one-column grid of bare figures is the writer's choice; it compiles, with its sentences or without.
+        self.assertIsNone(result["compiled"])
+        self.assertIsNone(result["toldCompiles"])
         self.assertEqual(result["bare"], 1, "a one-column grid compiled before the refusal draws its facts across")
         self.assertLess(result["told"], 440, "a one-column grid keeps its natural height")
         self.assertEqual(result["across"], 1)

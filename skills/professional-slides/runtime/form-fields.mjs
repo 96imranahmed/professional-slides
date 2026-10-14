@@ -8,15 +8,15 @@
 // model turn. This is that reference, kept beside the code it describes: for a
 // form, the exhibit kind it draws, every field that kind reads (its data, its
 // options, and each mark it draws with the shape it is written in), the fields
-// a bound exhibit names its measures by, the deck's conventions it answers to,
-// and the page's own fields its placements read. What can be read off the code
+// a bound exhibit names its measures by, and the page's own fields its
+// placements read. What can be read off the code
 // is: the kind a form draws (page-types.mjs PAGE_TYPES), its placements
 // (placementsOf), the marks a chart draws (its registry `decorations`) and what
 // a form requires of its exhibit (pageSchema); the words are written here, and
 // a test holds them to the code - every form has its kind's fields, every key
 // of a kind's registered sample is described, and every mark a chart can draw
 // has its shape.
-import { CHART_DECORATIONS } from "./chart-decorations.mjs";
+
 import { PAGE_TYPES, exhibitRange, pageSchema, placementsOf } from "./page-types.mjs";
 import { REGISTRY } from "./registry.mjs";
 
@@ -27,7 +27,7 @@ const CHART = {
   unitPlacement: "\"inline\" - the unit on the heading's line (falls back under it where it does not fit)",
   headingIcon: "icon name - over the heading; on every panel of a row or none",
   badge: "string - a pill at the heading's right (\"CAGR 2024-30: +13%\")",
-  caption: "string - the finding under the panel; 8+ words with commentary \"captions\"",
+  caption: "string - the finding under the panel",
   question: "{ text, base? } - a survey question under the heading, 3 lines at most; `base` a count (n = 1,204) or a string",
   valueFormat: "{ decimals 0-6, prefix, suffix, compactUnit: \"k\"|\"m\"|\"bn\", sign: \"auto\"|\"always\", grouping } - how values print; unset, one precision for the chart",
   focus: "string | string[] - the subject: a series name becomes `focusSeries`, a category a highlighted bar, points on a scatter",
@@ -55,7 +55,7 @@ const SERIES_EXTRAS = {
   focusSeries: "series name - the subject in the primary, the rest grey (2+ series)",
   colorIndices: "int[one per series, 0-5] - each series' palette colour",
   forecastFrom: "category - from there on drawn as forecast (single-series columns or bars: tinted, keyed; `forecastKey: false`, `actualLabel`, `forecastLabel`)",
-  change: "false | true | { from, to, text? } | \"steps\" - the growth arrow or bracket the claim compares; unset, asked of a lone column of 4+ periods",
+  change: "false | true | { from, to, text? } | \"steps\" - the growth arrow or bracket the claim compares; unset, none",
   cagr: "{ from, to, label? } - the compound rate on an arrow (a stack: its totals)",
   dataTable: "true | [{ label, values }] - a value table under the chart, aligned to the categories (the runtime then sets `categoryColumns`, the table's label column: not written)",
   split: "true - 2-4 series drawn as one panel each",
@@ -148,10 +148,10 @@ export const KINDS = Object.freeze({
   "model-page": { chart: true, axis: true, labels: true, bound: true, data: CATEGORICAL, options: { type: "chart.column | chart.line | chart.area | chart.stacked-column | chart.combo - the series over its own data table", dataTable: "true (the form's default) - the values under the chart" } },
   table: { table: true, bound: true, data: {
     columns: "(string | { label, type?, unit?, group?, width?, minWidth?, align?, bold?, heat?, domain?, better?, bar?, barScale?, bubble?, implication?, headerIcon?, logo?, scale?, numberDisplay?, labelDisplay?, vertical? })[] - the header; a column's keys reach each of its cells",
-    rows: "(cell[one per column] | { cells, style?: plain|accented|total|group, better?: up|down, icon? })[] - 3+ body rows (TABLE_TOO_SHORT); the label is the first cell",
+    rows: "(cell[one per column] | { cells, style?: plain|accented|total|group, better?: up|down, icon? })[] - the body rows; the label is the first cell",
   }, options: {
     "cell": "string | number | { text, value, type?, highlight?: true | phrase, bold?, tone?: positive|negative, sub?, icon?, blank? } - typed cells: harvey 0-4, rag (on-track, behind, at-risk, complete, not-started, ...), lights green|amber|red, check / dot true|\"yes\", progress 0-100, trend up|flat|down (+ `better`), binary yes|no|missing, sparkline { values }, bars { values, scale }, bullets { items, lead? }, category { text, rowSpan?, sectionNumber? }, quote { text, by? }, logo { player | media }",
-    "columns[].heat": "true - the column shaded by its figures (whole 1-5 as scores; else 5 steps over its range or `domain: [lo, hi]`); `better: \"down\"` turns it where the deck's `conventions.heat` is \"dark-is-better\"",
+    "columns[].heat": "true - the column shaded by its figures (whole 1-5 as scores; else 5 steps over its range or `domain: [lo, hi]`); `better: \"down\"` turns it",
     "columns[].better": "\"up\" | \"down\" - on a heat column, the direction that is good; a row's or a cell's `better` colours its trend cells",
     "columns[].bar": "true - in-cell bars on one scale (needs `label` and `unit`; `barScale` shares one across columns)",
     "columns[].implication": "true - a \"therefore\" chevron before the column; its header names the inference",
@@ -300,35 +300,28 @@ export const MARKS = Object.freeze({
   categoryIcons: "{ <category>: icon | { icon } | { image: { path | alt } } | { flag } } | array in category order - a mark beside each label",
 });
 
-// How a bound exhibit names its measures, and how a typed one says which it shows (bind.mjs, gates/dependency_gates.mjs).
+// How a bound exhibit names its measures, and how a typed one says which it shows (bind.mjs, page-numbers.mjs).
 const BOUND = Object.freeze({
   "series[].measure": "\"<insight>/<measure>\" | [ref, ref] - the runtime writes the categories, values, unit and basis (two refs: a record then a scenario, one line)",
-  "series[].role": "\"context\" with `relevance` (6+ words) - a series beside the claim's own",
+  "series[].role": "\"context\" - a series beside the claim's own",
   select: "{ from?, to? } | { periods: [...] } over periods; { members: [...], order?: descending|ascending } over members - narrows the axis",
   pivot: "true - each series' measure a category, each selected period or member a series",
   measure: "ref - one measure for the whole exhibit (its slices the categories, or a pie's labels)",
   basis: "{ measures: [ref] | measure, role?: proof|context, relevance?, as?: chart|table|figure, labels?, members? } - what a typed exhibit shows; on a bound one only `role` and `relevance`",
   tokens: "`{{<insight>/<measure>@<period or member> | <format>}}` in any text prints the recorded number",
 });
-// The deck's conventions an exhibit answers to (conventions.mjs, gates/convention_gates.mjs).
-const CONVENTIONS = Object.freeze({
-  peers: "set name - the `deck.conventions.peerSets` set it compares (PEER_SET_UNDECLARED); its members by name, `short` or alias",
-  omits: "{ <member>: \"<why it is not shown>\" } - each set member left out, printed as a note line (PEERS_OMITTED_UNSAID)",
-});
 // The page's own fields the placements read, each with the placements that read it.
 const PLACED = Object.freeze({
   points: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text, icon?, highlight? }] - the commentary: a column beside, or up to 3 across under the exhibit" },
-  paragraphs: { in: ["beside", "beside-left", "below"], line: "[{ lead (2-8 words), text (<= 60 words) }] - prose in place of points" },
-  adds: { in: ["beside", "beside-left", "below", "captions", "on-exhibit"], line: "string - what the commentary says that the exhibit cannot (required)" },
-  rail: { in: ["rail"], line: "string - one claim in a filled side panel, 10-42 words" },
-  bar: { in: ["so-what-bar"], line: "string - the implication across the foot, 8+ words, 2 lines; `takeaway: false`" },
-  "exhibits[].caption": { in: ["captions"], line: "string - a finding under each panel, 8+ words" },
+  paragraphs: { in: ["beside", "beside-left", "below"], line: "[string | { lead, text }] - prose in place of points" },
+  rail: { in: ["rail"], line: "string - one claim in a filled side panel, eight lines at most" },
+  bar: { in: ["so-what-bar"], line: "string - the implication across the foot, 2 lines" },
+  "exhibits[].caption": { in: ["captions"], line: "string - a finding under each panel" },
 });
 const PAGE = Object.freeze({
-  title: "string - the claim, <= 15 words, 2 lines", why: "string - why this type fits the claim",
-  settles: "{ kind, what } - with an insight log, derived from `evidence`", evidence: "insight id[] - the insights the page rests on",
-  subtitle: "string - one line, <= 16 words", takeaway: "false | string - a closing line", source: "string | registry key[]",
-  note: "string | string[] - the footer note (NOTE_HEAVY)", footnotes: "[{ on, text }] - a marker on a figure", highlight: "phrase | phrase[] - set in the accent",
+  title: "string - the claim, 2 lines at most", evidence: "insight id[] - optional: the insights the page rests on",
+  subtitle: "string - one line", takeaway: "false | string - a closing line", source: "string | registry key[]",
+  note: "string | string[] - the footer note", footnotes: "[{ on, text }] - a marker on a figure", highlight: "phrase | phrase[] - set in the accent",
 });
 
 /** The kind a form draws, as KINDS names it: the form's own entry where PAGE_TYPES maps it to one, else its alias. */
@@ -336,7 +329,7 @@ const kindOf = (type, form) => { const own = PAGE_TYPES[type]?.forms?.[form]; re
 const drawn = (kind) => REGISTRY.get(kind)?.decorations?.draws ?? [];
 const defined = (fields) => Object.fromEntries(Object.entries(fields ?? {}).filter(([, line]) => line !== undefined));
 
-/** What an exhibit of `kind` reads: its own fields, the chart's and the axis's where it is a chart, its marks, its bound and convention fields. */
+/** What an exhibit of `kind` reads: its own fields, the chart's and the axis's where it is a chart, its marks and its bound fields. */
 function exhibitFields(kind) {
   const entry = KINDS[kind];
   if (!entry) return null;
@@ -350,7 +343,6 @@ function exhibitFields(kind) {
     ...defined({ ...own.data }), ...defined({ ...own.options }), ...(entry.note ? { note: entry.note } : {}), ...shared,
     ...(Object.keys(marks).length ? { marks } : {}),
     ...(own.bound ? { bound: own.table ? { tokens: BOUND.tokens, basis: BOUND.basis } : own.chart ? BOUND : { "items[].measure": "ref + `format` - the runtime writes the value", tokens: BOUND.tokens } } : {}),
-    ...(own.chart || own.table ? { conventions: CONVENTIONS } : {}),
   };
 }
 

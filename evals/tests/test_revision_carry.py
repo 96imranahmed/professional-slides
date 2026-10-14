@@ -32,7 +32,6 @@ IMPORT = RUNTIME / "import-deck.py"
 ASSEMBLE = RUNTIME / "emit" / "assemble_pptx.py"
 AUTHOR = RUNTIME / "author-deck.mjs"
 BENCH = ROOT / "evals" / "point-change"
-WEIGHT = json.loads((RUNTIME / "weight.json").read_text())
 
 
 def load(name: str, file: Path):
@@ -108,10 +107,9 @@ class CarriedDeck(unittest.TestCase):
 
 
 class ImportTests(CarriedDeck):
-    def test_the_carry_starter_keeps_every_slide_and_records_what_it_was_made_under(self):
+    def test_the_carry_starter_keeps_every_slide(self):
         deck, pages = self.starter["deck"], self.starter["pages"]
-        self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "deck", "workflow": "existing_deck_revision", "inventory": "deck.inventory.json",
-                                "rulesVersion": WEIGHT["rulesVersion"], "request": ""})
+        self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "deck", "workflow": "existing_deck_revision", "inventory": "deck.inventory.json"})
         # Every slide is a page, the title slide among them: nothing of the user's deck is the runtime's to redraw until the author says so.
         self.assertEqual([(p["id"], p["sourceSlide"], p["carry"]) for p in pages], [(f"s0{n}", n, True) for n in range(1, 9)])
         self.assertTrue(all("draft" in p and "type" not in p for p in pages))
@@ -157,7 +155,6 @@ class ImportTests(CarriedDeck):
         doc = json.loads((out / "deck.pages.json").read_text())
         self.assertEqual(doc["deck"]["cover"], {"title": "Harbour Coffee: FY26 review", "subtitle": "Board pre-read, March 2026"})
         self.assertEqual(doc["deck"]["footer"], "Harbour Coffee | Board pre-read | Confidential")
-        self.assertEqual(doc["deck"]["rulesVersion"], WEIGHT["rulesVersion"])
         self.assertEqual([p["id"] for p in doc["pages"]], [f"s0{n}" for n in range(2, 9)])
         self.assertTrue(all("carry" not in p for p in doc["pages"]))
         # An unmapped slide is still refused - and the refusal says it can be carried instead.
@@ -170,13 +167,12 @@ class ImportTests(CarriedDeck):
 class CompileScopeTests(CarriedDeck):
     def test_the_starter_compiles_as_written_in_every_mode(self):
         work = self.revise()
-        for flags in (["--draft"], ["--check"], []):
+        for flags in (["--check"], []):
             done = self.author(work, *flags)
             self.assertEqual(done.returncode, 0, f"{flags}: {done.stderr[:800]}")
         spec = json.loads((work / "deck.deck.json").read_text())
         self.assertEqual(spec["slides"], [])
         self.assertEqual([(c["id"], c["sourceSlide"], c["after"]) for c in spec["carried"]], [(f"s0{n}", n, None) for n in range(1, 9)])
-        self.assertEqual(spec["rulesVersion"], WEIGHT["rulesVersion"])
         summary = last_json(done.stdout)
         self.assertEqual(summary["revision"]["carried"], 8)
         self.assertEqual(summary["revision"]["composed"], [])
@@ -318,37 +314,6 @@ const doc = { deck: { workflow: spec.workflow }, pages: spec.carried.map((entry)
 console.log(JSON.stringify(consistencyFindings(doc, null, { spec, inventory, changed: ["s1"] }).filter((f) => f.code === "NUMBER_STALE").map((f) => ({ severity: f.severity, pages: f.pages }))));
 ''')
         self.assertEqual(result, [{"severity": "blocker", "pages": ["s1", "s3"]}, {"severity": "advisory", "pages": ["s1", "s4"]}])
-
-    def test_no_recorded_version_excuses_what_a_revision_leaves_behind_and_a_lowered_one_says_why(self):
-        def older(reason=None):
-            def change(doc):
-                doc["deck"]["rulesVersion"] = 5
-                if reason:
-                    doc["deck"]["rulesVersionReason"] = reason
-                self.page(doc, "s02")["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
-            return change
-        # The import stamped the current version: a pages file that records a lower one is asking to be held to less, and says why.
-        self.assertEqual(self.inventory["rulesVersion"], WEIGHT["rulesVersion"])
-        work = self.revise(older())
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 2)
-        self.assertEqual(set(self.refused(work)), {("NUMBER_STALE", "s02"), ("REVISION_RULES_VERSION", None)})
-        self.assertIn('`"rulesVersionReason": "..."`', done.stderr)
-        # With its reason the version stands - and the stale rule is no version's: it judges only what this revision changed.
-        work = self.revise(older("The deck was authored and accepted under version five last quarter"))
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 2)
-        self.assertEqual(self.refused(work), [("NUMBER_STALE", "s02")])
-        self.assertIn(f"Held to rules version 5, below the {WEIGHT['rulesVersion']} its import stamped", done.stderr)
-
-        def everywhere(doc):
-            older("The deck was authored and accepted under version five last quarter")(doc)
-            self.page(doc, "s08")["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
-            self.page(doc, "s04")["replace"] = [{"old": "12.4", "new": "12.6"}]
-        work = self.revise(everywhere)
-        self.assertEqual(self.author(work).returncode, 0)
-        # The version the deck records is kept: the compile does not stamp today's over it.
-        self.assertEqual(json.loads((work / "deck.deck.json").read_text())["rulesVersion"], 5)
 
 
 @unittest.skipUnless(NODE, "needs Node.js")

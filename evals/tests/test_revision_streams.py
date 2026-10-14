@@ -112,7 +112,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { authorDeck, readInsights } from './skills/professional-slides/runtime/author-deck.mjs';
 import { readPagesFile } from './skills/professional-slides/runtime/pages-file.mjs';
-import { loadJudgements, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const dir = DIR;
 const doc = (await readPagesFile(path.join(dir, 'deck.pages.json'))).doc ?? JSON.parse(fs.readFileSync(path.join(dir, 'deck.pages.json'), 'utf8'));
 const insights = await readInsights(dir, 'deck', {}).catch(() => null);
@@ -217,7 +216,7 @@ class OneStaleRuleTests(ContentsDeck):
             self.page(doc, "s04")["replace"] = [{"old": "158", "new": "160"}]
         work = answered(self.revise(change))
         result = run_node(PROBE.replace("DIR", json.dumps(str(work))) + '''
-const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? 'deck'), () => authorDeck(doc, { baseDir: dir, insights, fit: false, fill: false }));
+const result = await authorDeck(doc, { baseDir: dir, insights });
 console.log(JSON.stringify([...result.blocking, ...result.advisories].filter((f) => f.code === 'NUMBER_STALE').map(brief)));
 ''')
         naming = [f for f in result if "s05" in f["pages"]]
@@ -287,7 +286,7 @@ console.log(JSON.stringify({{ untouched: [untouched.content, untouched.unheld, u
         pages = [{**page, **({"sourceSlide": by_title[flat(page.get("title"))]} if page.get("type") and flat(page.get("title")) in by_title else {})} for page in self.authored["pages"]]
         mapped = [page["id"] for page in pages if "sourceSlide" in page]
         self.assertGreaterEqual(len(mapped), 20)
-        doc = {"deck": {**self.authored["deck"], "id": "deck", "workflow": starter["deck"]["workflow"], "inventory": starter["deck"]["inventory"], "rulesVersion": starter["deck"]["rulesVersion"]}, "pages": pages}
+        doc = {"deck": {**self.authored["deck"], "id": "deck", "workflow": starter["deck"]["workflow"], "inventory": starter["deck"]["inventory"]}, "pages": pages}
         shutil.copytree(self.home / "own" / "assets", work / "assets", dirs_exist_ok=True)
         (work / "deck.pages.json").write_text(json.dumps(doc, indent=1))
         done = sh(NODE, RUNTIME / "author-deck.mjs", work / "deck.pages.json", "--check")

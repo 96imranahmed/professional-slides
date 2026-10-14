@@ -491,7 +491,7 @@ export function planDeck(deckPlan, registry = REGISTRY, {slideCache}={}) {
     : slide.kind === "takeaways" ? planTakeaways({ pageNumber: index + 1, ...slide })
     : slide.kind === "statement" ? planStatement({ pageNumber: index + 1, ...slide })
     : planSlide({ ...slide, titleVariant: slide.titleVariant === undefined ? deckPlan.titleVariant : slide.titleVariant }, registry));
-  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.ground ? { ground: deckPlan.ground } : {}), ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), ...(deckPlan.weight ? { weight: deckPlan.weight } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
+  const deck = compileDeck({ id: deckPlan.id, palette: deckPlan.palette, typography: deckPlan.typography, pageTemplate: deckPlan.pageTemplate, ...(deckPlan.ground ? { ground: deckPlan.ground } : {}), ...(deckPlan.chrome ? { chrome: deckPlan.chrome } : {}), ...(deckPlan.fill ? { fill: deckPlan.fill } : {}), slides: planned.map((item) => item.spec) }, registry, {slideCache});
   // Three keys the planned specs do not carry ride onto the scene slide: the
   // page's role, `hidden`, its show state in the file (emit_pptx.py), and - on
   // a page the composer split in two, a table past its rows - the id of the

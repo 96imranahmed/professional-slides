@@ -52,9 +52,7 @@ export const TITLE_TREATMENTS = Object.freeze({
   none: { "style.titleRule": "none" }
 });
 
-// Density in the reader's terms. The floors are weight.json's `pageWords` for
-// the fill each density implies (airy, balanced, full); the live-pitch figure
-// is the importer's own threshold for a presented deck.
+// Density in the reader's terms: how much a page of each carries, as a guide to write to.
 export const DENSITIES = Object.freeze({
   "live-pitch": "presented to a room: one idea a page, about 40 body words or fewer, the largest type",
   executive: "presented or sent: about 95 to 120 body words a page with commentary beside the evidence",

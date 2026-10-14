@@ -6,7 +6,7 @@
 import path from "node:path";
 import { mapAll } from "./core.mjs";
 import { measureTable } from "./tables.mjs";
-import { GENERATED, resolveWeight, normalizeWeight } from "./weight.mjs";
+import { GENERATED } from "./text-contract.mjs";
 import { readJsonSync } from "./cli.mjs";
 import { applyDesign } from "./design-systems.mjs";
 import { composedPlaces } from "./revision.mjs";
@@ -17,7 +17,7 @@ import { pointsPerRow, resolveFill } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
-import { AGENDA_LIMITS, agendaStyleFor } from "./panels.mjs";
+import { agendaStyleFor } from "./panels.mjs";
 
 const V3 = "professional-slides.deck/v3";
 
@@ -319,29 +319,6 @@ export function agendaPages(slidesIn, agenda, agendaStyle) {
   return out;
 }
 
-/**
- * The generated page that states, once, what the deck's sources are declared
- * not to name: one row for each source the registry marks `missing` (a
- * publisher, a date, a document) that a page cites, with the reason the
- * registry gives and the pages that cite it - read from what the compile
- * recorded on each page (`settles.stated.limits`, author-deck.mjs). A deck
- * whose records name no publisher says so here rather than on every page
- * that prints one of their numbers; each page's own source line still names
- * its sources. None when no cited source declares a limit.
- */
-export function sourceLimitPages(spec) {
-  const limits = new Map();
-  for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const limit of slide?.pageType?.content?.settles?.stated?.limits ?? []) {
-    const entry = limits.get(limit.key) ?? { ...limit, pages: [] };
-    if (slide.id) entry.pages.push(`{{page:${slide.id}}}`);
-    limits.set(limit.key, entry);
-  }
-  if (!limits.size) return [];
-  return [{ id: "source-limits", kind: "content", density: "appendix", title: "What the sources do not name",
-    exhibit: { type: "table", columns: [{ label: "Source", type: "text" }, { label: "Does not name", type: "text", width: 130 }, { label: "Why, and what is known of it", type: "text" }, { label: "Cited on page", type: "text", width: 150 }],
-      rows: [...limits.values()].map((limit) => [limit.name, limit.missing.join(", "), `${limit.reason}.`, limit.pages.join(", ")]) } }];
-}
-
 /** Expand a v3 deck into the deckPlan the planner consumes. */
 export function composeDeck(spec, baseDir = process.cwd()) {
   return withDesignLayout(spec.designLayout, () => withDeckDensity(spec.density, () => composeDeckWith(spec, baseDir)));
@@ -378,17 +355,13 @@ function composeDeckWith(spec, baseDir) {
   const run = spec.pageRun ?? null;
   const appendix = appendixOf(spec, { divider: Boolean(run?.appendix) });
   const credits = pictureCredits(spec);
-  const storySlides = [...spec.slides, ...appendix, ...sourceLimitPages(spec), ...credits];
+  const storySlides = [...spec.slides, ...appendix, ...credits];
   const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
   // A tracker above the title drops the body a step (slide-chrome's trackerGap),
   // which the table budget has to know or it plans rows the page cannot hold.
   const trackerGap = spec.chrome && tabs ? 11 : 0;
   const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140) - trackerGap) / 508)) : 1;
   const fill = resolveFill(spec);
-  // The weight contract: what a page of this deck is expected to carry. The
-  // deck's own `weight` wins, then the house profile a template produced, then
-  // the fill level.
-  const weight = resolveWeight(spec, fill);
   // The shapes the last few analytical pages took, most recent first: the
   // chooser breaks a tie on variety, so a section spreads across its repertoire
   // instead of repeating whichever shape fitted first.
@@ -450,7 +423,7 @@ function composeDeckWith(spec, baseDir) {
     const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
     if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
     remember(raw);
-    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles, { conventions: spec.conventions, players: spec.players });
+    const composed = composeSlide(page, slides.length, baseDir, fill, 1, recent, recentStyles, { players: spec.players });
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
     if (hidden) composed.hidden = true;
     slides.push(composed);
@@ -468,7 +441,6 @@ function composeDeckWith(spec, baseDir) {
     ...(spec.typography ? { typography: spec.typography } : {}),
     ...(spec.chrome ? { chrome: spec.chrome } : {}),
     fill,
-    weight,
     ...(tableSplits.length ? { tableSplits } : {}),
     slides: slides.map((s, index) => {
       const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
@@ -563,11 +535,8 @@ export function applyTemplate(spec, baseDir = process.cwd()) {
   if (!spec.pageTemplate && house.pageTemplate) out.pageTemplate = house.pageTemplate;
   if (!spec.density && house.density) out.density = house.density;
   if (!Object.hasOwn(spec, "footer") && house.footer) out.footer = house.footer;
-  // A template deck also sets how full its pages read: the importer measures the
-  // template's own words, elements and body coverage and writes them as `fill`
-  // and `weight`, so a deck built on a dense house is judged by that house.
+  // A template deck also sets how full its pages read (`fill`), as the importer measured the template.
   if (!spec.fill && house.fill) out.fill = house.fill;
-  if (!spec.weight && house.weight) out.weight = normalizeWeight(house.weight, "template weight");
   return out;
 }
 

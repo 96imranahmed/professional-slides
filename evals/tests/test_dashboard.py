@@ -57,7 +57,7 @@ console.log(JSON.stringify({
         self.assertIn("holds 2 rows", found["rows"])
         self.assertIn("2 to 6 exhibits", found["seven"])
         self.assertIn("free cells", found["full"])
-        self.assertIn("choose `commentary`", found["captions"])
+        self.assertIn("`commentary` is one of", found["captions"])
 
 
 class ComposeTests(unittest.TestCase):

@@ -32,9 +32,6 @@ const PARTS = new WeakMap(), INCLUDED = new WeakMap(), BUDGETS = new WeakMap(), 
 /** The part file each page id of `doc` was read from (relative to the pages file), for pages that came from one. */
 export const partsOf = (doc) => PARTS.get(doc) ?? new Map();
 
-/** Every part file `doc` includes, in order, relative to the pages file - one that holds no page yet among them. */
-export const includedParts = (doc) => INCLUDED.get(doc) ?? [];
-
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
   const parts = partsOf(doc);

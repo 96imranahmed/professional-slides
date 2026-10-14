@@ -5,25 +5,10 @@
 // figures want - bars on one shared scale, open-ended and range bars,
 // ratings, icons - and leaves untreated a grid that reads as text. `heavyTable` says when a table needs a page of its own.
 import { groupThousands } from "./draw.mjs";
-import { SCALAR_FIGURE, figureUnit, withUnit } from "./value-format.mjs";
+import { figureUnit, withUnit } from "./value-format.mjs";
 import { decade } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
 
-/**
- * Table treatment is chosen from what the table says, not from the first option
- * in the list. An explicit `treatment`, `variant` or object column wins.
- *   sequence  (rows numbered, or a Stage/Step/Phase first column) → numbered category
- *             markers on a filled first column ("categories" treatment)
- *   scorecard (criteria × options, ≥ 4 columns)                   → filled header ("standard")
- *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
- *   listing   (anything else)                                      → open rules only
- */
-// A column of words stays words: a status, a direction or progress is drawn as
-// a pill, a ring or a bar where the page types the column (`type: "rag"`, ...).
-// Ticks and crosses are marks, not words, and are read as such.
-const CELL_WORDS_MAX = 5;
-const BLANK_CELL = /^[\s\-–—]*$/;
-const PERCENT = /^(\d{1,3}(?:\.\d+)?)\s*%$/;
 // A cell the highlight pass has already claimed arrives as {text, highlight}
 // rather than as a string, and is still read for its state: a scorecard
 // whose highlight phrase is its own verdict word keeps the pill on the rows
@@ -35,21 +20,6 @@ const wordsOf = (cell) => {
   const text = claimedText(cell);
   return typeof text === "string" || typeof text === "number" ? String(text).trim() : null;
 };
-
-/**
- * The column-reads question a column puts: its header and the distinct words
- * of its short cells, with the table's headers as context. Null where it is
- * not asked: a column with fewer than two cells of five words or less, or
- * fewer such cells than half its written ones, is prose or figures, and a
- * figure other than a percentage (which may be progress) is a measure.
- */
-export function columnQuestion(header, cells, headers) {
-  const written = (cells || []).filter((cell) => !(cell === null || cell === undefined || (typeof cell !== "object" && BLANK_CELL.test(String(cell)))));
-  const plain = written.map(wordsOf).filter((text) => text && !BLANK_CELL.test(text) && !/^(✓|✔|✗|✘|✕)$/.test(text)
-    && text.split(/\s+/).length <= CELL_WORDS_MAX && (!SCALAR_FIGURE.test(text) || PERCENT.test(text)));
-  if (plain.length < 2 || plain.length * 2 < written.length) return null;
-  return { subject: { header: String(header ?? ""), cells: [...new Set(plain)] }, context: { headers: (headers || []).map((h) => String(h ?? "")) } };
-}
 
 /** A cell with ✓ or ✗ as a check; any other cell as written. */
 export function readCell(value) {

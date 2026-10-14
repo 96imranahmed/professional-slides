@@ -146,8 +146,8 @@ const page = { id: 'p', type: 'trend', form: 'column', commentary: 'on-exhibit',
   exhibit: { heading: 'Trains on time', unit: '%', ...punctual, bands: [{ from: 90, to: 95, label: 'Target range' }] } };
 const slide = compilePage(page);
 assert.equal(slide.exhibit.bands.length, 1);
-// Unlabelled, a band names no figure: the page still needs a mark that says one.
-assert.throws(() => compilePage({ ...page, exhibit: { ...page.exhibit, bands: [{ from: 90, to: 95 }] } }), /mark it with a number/);
+// Unlabelled, a band is still drawn: what marks the chart is the writer's call.
+assert.ok(compilePage({ ...page, exhibit: { ...page.exhibit, bands: [{ from: 90, to: 95 }] } }));
 // A month written as an ISO key is renamed in the band as on the axis.
 const monthly = compilePage({ ...page, exhibit: { heading: 'Trains on time', unit: '%', categories: ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07', '2025-08'], series: punctual.series,
   bands: [{ from: 90, to: 95, label: 'Target range' }, { from: '2025-06', to: '2025-08', style: 'box' }] } });

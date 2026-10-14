@@ -48,7 +48,7 @@ import { readPagesFile, withParts, compiledFrom, staleCompile } from "./pages-fi
 import { exhibitKinds, formFields, kindFields } from "./form-fields.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { insightLogRefusal, measureConflicts, measureRegistry, readInsightLog } from "./measures.mjs";
-import { dependencyFindings, metricsOf, primaryCitations, requiredCitations } from "./gates/dependency_gates.mjs";
+import { metricsOf, primaryCitations, requiredCitations, untracedFindings } from "./page-numbers.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { buildDeck } from "./build-deck.mjs";
 import { isRefusal } from "./errors.mjs";
@@ -59,19 +59,6 @@ import { logSources, registryProblems } from "./sources-registry.mjs";
 export { registryProblems } from "./sources-registry.mjs";
 
 export const REVISION = "existing_deck_revision";
-
-/** The codes the compile raises beyond the page types', the page gates' and the number checks'. */
-export const AUTHORING_CODES = Object.freeze({
-  COMPILE: "a page that does not compile: its type, form or fields, said by the page-type compiler",
-  PAGE_DOES_NOT_COMPOSE: "a page that compiles and cannot be composed: its content does not fit the layout its form and commentary set",
-  PAGE_SPLITS: "a page the composer draws as two slides or more - a table past the rows a page holds is continued on the next",
-  REVISION_UNMAPPED: "an imported slide still carrying only its old copy, not yet given a page type or carried",
-  REVISION_INVENTORY_MISSING: "a revision's source inventory is not beside its pages file",
-  MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
-  // Advisories the page-type compiler raises (page-types.mjs).
-  TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
-  POINT_UNMARKED: "a commentary point with no figure to mark and no highlighted phrase",
-});
 
 const isBlocker = (f) => f.severity === "blocker" || f.severity === "blocking";
 const idOfMessage = (message) => String(message).match(/^(?:Cannot render )?([^:\s]+):/)?.[1];
@@ -261,6 +248,8 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const add = (list) => found.push(...list);
   add(failed.filter((f) => !f.unbound).map(({ id, message, code }) => ({ code: code ?? "COMPILE", id: idOfMessage(message) ?? id, severity: "blocker", repair: message })));
   add(bindingFindings);
+  for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const note of slide?.pageType?.advisories ?? [])
+    add([{ code: "PAGE_ADJUSTED", id: String(slide.id), severity: "advisory", repair: `${slide.id}: ${String(note).replace(/^PAGE_ADJUSTED:\s*/, "")}` }]);
   const composing = (composed.pageErrors ?? (composed.error ? [composed.error] : [])).map((message) => ({ code: "PAGE_DOES_NOT_COMPOSE", id: idOfMessage(message), severity: "blocker", repair: message }));
   add(composing);
   // A page the composer drew as two slides or more: a table past the rows a page holds is continued, its title marked.
@@ -272,10 +261,10 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
     repair: `${waiting.length} imported slide${waiting.length === 1 ? " carries" : "s carry"} only their old copy (${waiting.join(", ")}): keep each as it is - \`carry: true\` beside its \`draft\`, and the build copies the slide from the source deck - or give it its \`type\` and write its copy` }]);
   if (spec.workflow === REVISION && spec.inventory && baseDir && !existsSync(path.resolve(baseDir, String(spec.inventory))))
     add([{ code: "REVISION_INVENTORY_MISSING", severity: "blocker", repair: `The deck records its source inventory as "${spec.inventory}", which is not beside the pages file; run runtime/import-deck.py again or correct the path` }]);
-  add([...(baseDir ? carriedFindings(spec, imported, baseDir) : []), ...revisionRecordFindings(spec, imported)]);
+  add([...(baseDir ? carriedFindings(spec, imported, baseDir) : []), ...revisionRecordFindings(spec)]);
   add(insights?.conflicts ?? []);
   // A number typed on a page that no measure of the log holds: advised, with the token that prints the recorded one.
-  if (insights) add(dependencyFindings(doc, insights).filter((f) => f.code === "NUMBER_UNTRACED"));
+  if (insights) add(untracedFindings(doc, insights));
   const revised = imported ? revisionChanges(spec, imported) : null;
   add(consistencyFindings(doc, insights, { spec, inventory: imported, changed: revised?.content ?? null }));
   const gates = composed.deck ? sceneGateFindings(composed.deck, python) : { ran: false, findings: [], advisories: [], reason: composed.error };
@@ -421,6 +410,7 @@ export function scaffoldReport(type, { id = "p00", form = null, example = worked
   if (typeof page.source === "string") page.source = "(publisher, title, date)";
   return { page, form: source.form };
 }
+/** A page of `type` that compiles, as `--scaffold` prints it, without the limits block. */
 export const scaffoldPage = (type, options = {}) => scaffoldReport(type, options).page;
 
 /**

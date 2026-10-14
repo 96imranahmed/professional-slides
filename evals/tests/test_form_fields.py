@@ -66,16 +66,16 @@ console.log(JSON.stringify({ forms: Object.fromEntries(forms), samples, decorati
 
 
 class NamedFormsTests(unittest.TestCase):
-    def test_a_chart_form_prints_its_series_bindings_marks_conventions_and_axis_bounds(self):
+    def test_a_chart_form_prints_its_series_bindings_marks_and_axis_bounds(self):
         code, out, _ = schema("trend/column")
         self.assertEqual(code, 0)
         fields = json.loads(out)
         self.assertEqual(fields["draws"], "chart.column")
         exhibit = keys(fields["exhibit"])
-        for key in ("series", "categories", "select", "categoryBreaks", "highlights", "annotations", "peers", "omits", "yMin", "yMax", "dataTable", "valueFormat"):
+        for key in ("series", "categories", "select", "categoryBreaks", "highlights", "annotations", "yMin", "yMax", "dataTable", "valueFormat"):
             self.assertIn(key, exhibit, key)
         self.assertIn("categoryColumns", fields["exhibit"]["dataTable"])  # the runtime's own, named where it comes from
-        self.assertIn("deck.conventions.peerSets", fields["exhibit"]["conventions"]["peers"])
+        self.assertNotIn("conventions", fields["exhibit"])
         self.assertIn("NICE_TICKS", fields["exhibit"]["yMin"])
 
     def test_schedule_forms_print_their_items_and_rows(self):
@@ -94,14 +94,15 @@ class NamedFormsTests(unittest.TestCase):
         for key in ("columns", "rows", "columns[].heat", "columns[].better", "tokens"):
             self.assertIn(key, keys(table) | set(table), key)
         self.assertIn("heat?", table["columns"])
-        self.assertIn("dark-is-better", table["columns[].heat"])
+        self.assertIn('`better: "down"` turns it', table["columns[].heat"])
         harvey = json.loads(schema("scorecard/harvey")[1])
         self.assertIn('`type: "harvey"` cells, 0-4', harvey["coded"])
 
     def test_a_form_prints_what_it_requires_and_its_placements_fields(self):
         indexed = json.loads(schema("trend/indexed")[1])
-        self.assertEqual(indexed["required"][:4], ["categories", "series", "indexBase", "subject"])
-        self.assertIn("series: 4-8", indexed["required"])
+        # The base and the subject default to the first period and the first series.
+        self.assertEqual(indexed["required"][:2], ["categories", "series"])
+        self.assertIn("series: 1-8", indexed["required"])
         self.assertIn("indexBase", indexed["exhibit"])
         self.assertIn("(rail)", indexed["page"]["rail"])
         rollout = json.loads(schema("parallel/labelled-rows")[1])

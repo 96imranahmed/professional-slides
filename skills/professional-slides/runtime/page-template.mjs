@@ -1,7 +1,6 @@
 import { CHROME, SLIDE, component, linePrimitive, stableId, textPrimitive, token, tokenValue } from "./core.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { textWords } from "./text-contract.mjs";
-import { REFERENCE_PAGE_BANDS } from "./weight.mjs";
 
 export const PAGE_RULES = ["none", "bottom", "top-and-bottom"];
 export const PAGE_BRANDING = ["footer-company", "top-right-logo", "none"];
@@ -39,20 +38,8 @@ function assertPageCount(value) {
 // its shorter forms (`sourceForms`, page-types.mjs citationForms) and is set
 // in the fullest that fits, so the runtime never refuses its own footer.
 export const FOOTER_LINES_MAX = 3;
-// The words a derived citation is held to: the reference footer's median and a quarter more (weight.json reference.slides.bands.footer).
-export const FOOTER_WORDS = Math.round(REFERENCE_PAGE_BANDS.footer * 1.25);
-// A registry source's `name` is its title - the publisher, the publication and
-// its year - `short` the form the footer falls back to, and `status` what kind
-// of record it is ("audited", "company-reported", "unaudited half-year
-// release"). The runtime writes them into the footer as a derived citation,
-// and each is held to the length of what it is: the long titles of real
-// publications (an agency and the full name of its annual survey, with year
-// and edition) run to twelve or fourteen words and the examples' longest is
-// seven; a status is a label of a word or two, and five words hold the longest
-// honest one. A caveat or a method is a `note`. The footer as drawn is counted
-// by `NOTE_HEAVY` whoever wrote it, so these limits are not what keeps prose
-// out of the footer; they keep a registry entry what it says it is.
-export const SOURCE_TITLE_WORDS = Object.freeze({ name: 16, short: 8, status: 5 });
+// The words a derived citation is held to: a footer of about thirteen words and a quarter more.
+export const FOOTER_WORDS = 16;
 
 export function resolvePageTemplate(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("pageTemplate must be an object");

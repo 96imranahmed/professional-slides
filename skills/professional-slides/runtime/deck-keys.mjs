@@ -1,8 +1,8 @@
 // The deck-level keys of a pages file, in one table.
 //
-// `deck` in `<id>.pages.json` carries what is true of the whole deck: the
-// request and the answer the reviews judge against, the entities it compares,
-// its design and its page furniture. Until this table nothing listed them, so
+// `deck` in `<id>.pages.json` carries what is true of the whole deck: who
+// reads it and what they already know, the entities it compares, its design
+// and its page furniture. Until this table nothing listed them, so
 // a key was learned from a reference page or from the refusal of whichever
 // stage first read it - and an author's own key (`template`, to record which
 // storyline template the deck follows) could collide with one the runtime
@@ -14,7 +14,6 @@
 // stays with the stage that reads it, which still checks it.
 import { MARK_KINDS, playerProblems } from "./players.mjs";
 import { assetsDeclarationErrors } from "./asset-needs.mjs";
-import { CONVENTION_KEYS, conventionProblems } from "./conventions.mjs";
 
 // The kinds a value is read as: what `accepts` names, checked shallowly.
 const KINDS = Object.freeze({
@@ -33,45 +32,23 @@ const key = (type, accepts, about, test = null) => Object.freeze({ type, accepts
 const DECK_KEYS = Object.freeze({
   // what the deck is
   schema: key("\"professional-slides.deck/v3\"", ["string"], "the deck spec's schema"),
-  id: key("string", ["string"], "the deck's id: it names the files beside the pages file (<id>.insights.json, <id>.analysis.json, <id>.deck.json)"),
+  id: key("string", ["string"], "the deck's id: it names the files beside the pages file (<id>.insights.json, <id>.deck.json)"),
   workflow: key("\"new_deck\" | \"existing_deck_revision\"", ["string"], "a new deck, or a revision of an imported one"),
   inventory: key("string (a path)", ["string"], "a revision's source inventory, <id>.inventory.json beside the pages file, as import-deck.py wrote it"),
-  purpose: key("\"evaluation\" | \"catalogue\"", ["string"], "an evaluation deck is held to 50 rendered pages; a catalogue makes no argument and skips the storyline gate - never set on a deck that argues something"),
-  rulesVersion: key("number", ["number"], "the rules version the deck was authored under; the compile stamps the current one where it is absent"),
-  rulesVersionReason: key("a sentence", ["string"], "on a revision that records a `rulesVersion` below the one its import stamped: why the deck is held to the older rules, for the reviewer to check"),
-  // the brief: what the reviews judge against
-  request: key("string", ["string"], "the user's request, verbatim; a new deck without it is refused"),
-  requestProvenance: key("\"verbatim\" | \"reconstructed\" | \"paraphrased\"", ["string"], "how `request` came to be; the reviews are told"),
-  evidenceScope: key("{ retrieval: \"open\" | \"closed\", note, quote, source }", ["object"], "closed where only the evidence supplied may be used, quoting the words that set the limit: from the `request` where it is verbatim, and from the file named in `source` (the brief, saved as text beside the pages file) where the request is reconstructed or paraphrased"),
+  // who reads it
   audience: key("string", ["string"], "who reads the deck, and on what occasion"),
+  readerKnows: key("string", ["string"], "what the reader already knows - the source, its terms, the context - so the pages explain what they do not and skip what they do"),
   decision: key("string", ["string"], "the decision the deck is for"),
-  question: key("string", ["string"], "the governing question the answer answers"),
-  subQuestions: key("array", ["array"], "every sub-question the request asks, each to be answered with a lean"),
-  brief: key("string | object", ["string", "object"], "the brief the request was read into: horizon, set compared, criteria, constraints"),
-  criteria: key("array of strings", ["array"], "the brief's ranked criteria; each must be served by a page that carries an exhibit (`serves` on the page)"),
-  targetPages: key("number", ["number"], "the length the request asks for; the storyline critique is told"),
-  storylinePasses: key("{ max, granted }", ["object"], "the storyline passes the user allowed when approving the outline - `max` of 4 to 8, past the three every deck has - with their words in `granted`; a later title change then takes its pass without asking again",
-    (value) => (Number.isInteger(value.max) && value.max >= 4 && value.max <= 8 && typeof value.granted === "string" && value.granted.trim().split(/\s+/).length >= 2 && Object.keys(value).every((k) => ["max", "granted", "at"].includes(k))
-      ? null : "is { max: 4 to 8, granted: \"the user's words\", at: \"a date\" } - set only on the user's say-so, quoting it")),
-  // the answer
-  answer: key("string", ["string"], "the governing thought: one answer to the request, sharp enough to be wrong; the opening page carries it"),
-  answerStatus: key("\"final\" | \"provisional\"", ["string"], "provisional where the evidence in scope cannot settle the answer"),
-  answerLimits: key("array of strings", ["array"], "what a provisional answer leaves open, a sentence each"),
+  question: key("string", ["string"], "the question the deck answers"),
+  brief: key("string | object", ["string", "object"], "the author's notes on the brief: horizon, set compared, criteria, constraints"),
   // who and what it shows
   // Each entry declares the mark it is introduced by, by what it is (players.mjs): a name alone is an organisation marked by its logo.
   players: key("array of names or { name, short, aliases, mark, logo | outline | image, ... }", ["array"],
     `the entities the deck compares, each introduced by its own mark before it is compared. \`mark\` says which: ${Object.entries(MARK_KINDS).map(([kind, about]) => `"${kind}"${kind === "logo" ? " (the default)" : ""} - ${about}`).join("; ")}`,
     (value) => { const problems = playerProblems(value); return problems.length ? `declares what the build cannot draw - ${problems.join("; ")}` : null; }),
   playersHint: key("string", ["string"], "a word that tells the logo search what the players marked by logos are (\"bank\", \"retailer\")"),
-  // What holds across the pages that no one page declares (conventions.mjs): written before the skeleton, so the section
-  // writers working side by side draw the subject, name the players, pick the peers and print currencies and heat one way.
-  conventions: key(`{ ${Object.keys(CONVENTION_KEYS).join(", ")} }`, ["object"],
-    `the deck's cross-page conventions, every key optional: ${Object.entries(CONVENTION_KEYS).map(([name, about]) => `\`${name}\` ${about}`).join("; ")}`,
-    (value, deck, context) => { const problems = conventionProblems(value, deck?.players, context); return problems.length ? `is not valid: ${problems.join("; ")}` : null; }),
   assets: key("{ fetch: \"build\" | \"none\", reason }", ["object"], "whether the build may fetch logos, photographs and places; \"none\" declares the deck is built without the network, with the reason",
     (value, deck) => { const errors = assetsDeclarationErrors(deck); return errors.length ? `is not in the form the build reads: ${errors.join("; ")}` : null; }),
-  noPictures: key("string", ["string"], "why a deck about a subject with nothing to look at carries no photograph, in a sentence"),
-  waivers: key("array of { code, reason }", ["array"], "build bars the deck asks to be excused from, each with a reason the review confirms"),
   // the design
   design: key("string (a design system)", ["string"], "the design system: the frame of every page"),
   variation: key("string | number", ["string", "number"], "the seed of what the design leaves open; a new deck takes a fresh one (variation.mjs)"),
@@ -83,9 +60,8 @@ const DECK_KEYS = Object.freeze({
   surfaces: key("\"reference\" | \"open\"", ["string"], "the filled or the light set of table and card surfaces"),
   tone: key("\"light\" | \"dark\"", ["string"], "the ground every page is set on: dark sets the deck on the house's own dark, every colour derived from its palette; a page's own `tone` overrides it",
     (value) => (["light", "dark"].includes(value) ? null : `is "light" (the default) or "dark"; a single page takes "primary", the house's primary as its ground, with \`tone\` on the page`)),
-  density: key("\"live-pitch\" | \"executive\" | \"pre-read\"", ["string"], "how much a page of this deck carries; it sets the body size and every word floor"),
+  density: key("\"live-pitch\" | \"executive\" | \"pre-read\"", ["string"], "how much a page of this deck carries; it sets the body size"),
   fill: key("string", ["string"], "how full a page reads, where it is not left to follow `density`"),
-  weight: key("object", ["object"], "the weight contract a page is held to, where a house profile or the deck sets its own"),
   template: key("string (a path ending .json)", ["string"], "a house profile written by import-template.py from a template deck - its palette, typography, chrome and density become the deck's defaults. Not a storyline template: record that in `brief`",
     (value) => (/\.json$/i.test(value) ? null : "names a house profile `.json` beside the pages file (run runtime/import-template.py on the template .pptx first); to record which storyline template or decision architecture the deck follows, use `brief`")),
   // the front matter and the navigation
@@ -103,6 +79,10 @@ const DECK_KEYS = Object.freeze({
   sectionTabs: key("boolean", ["boolean"], "false takes the section tracker off every page"),
 });
 
+// Keys older pages files carry that nothing reads any more: read past, as a comment is.
+const RETIRED = new Set(["purpose", "rulesVersion", "rulesVersionReason", "request", "requestProvenance", "evidenceScope", "subQuestions", "criteria",
+  "targetPages", "storylinePasses", "answer", "answerStatus", "answerLimits", "conventions", "noPictures", "waivers", "weight"]);
+
 const kindOf = (value) => (value === null ? "null" : Array.isArray(value) ? "an array" : typeof value === "object" ? "an object" : `a ${typeof value}`);
 
 /** The known keys nearest `name`: one a slip of the keyboard away, or one that contains it or is contained in it. */
@@ -118,15 +98,14 @@ function nearest(name, known) {
 /**
  * Every problem with the keys of `deck`, as sentences: a key the table does
  * not hold, with the keys it is nearest to, and a value that is not of a kind
- * its key takes. A key that begins with `$` is a comment and is read past,
- * and so is a key set to null, which sets nothing. `context.sections` are the
- * part files the pages file includes, by which `conventions` keys its sections.
+ * its key takes. A key that begins with `$` is a comment and is read past, as
+ * is a retired key, and a key set to null, which sets nothing.
  */
-export function deckKeyProblems(deck, context = {}) {
+export function deckKeyProblems(deck) {
   if (!deck || typeof deck !== "object" || Array.isArray(deck)) return [];
   const known = Object.keys(DECK_KEYS), problems = [];
   for (const [name, value] of Object.entries(deck)) {
-    if (name.startsWith("$") || value === undefined || value === null) continue;
+    if (name.startsWith("$") || RETIRED.has(name) || value === undefined || value === null) continue;
     const entry = DECK_KEYS[name];
     if (!entry) {
       const near = nearest(name, known);
@@ -134,7 +113,7 @@ export function deckKeyProblems(deck, context = {}) {
       continue;
     }
     if (!entry.accepts.some((kind) => KINDS[kind](value))) { problems.push(`\`${name}\` on \`deck\` is ${entry.type} - ${entry.about}; it was given ${kindOf(value)}`); continue; }
-    const wrong = entry.test?.(value, deck, context);
+    const wrong = entry.test?.(value, deck);
     if (wrong) problems.push(`\`${name}\` on \`deck\` ${wrong}`);
   }
   return problems;

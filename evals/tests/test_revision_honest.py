@@ -41,10 +41,8 @@ PROBE = """
 import fs from 'node:fs';
 import path from 'node:path';
 import { authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
-import { loadJudgements, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
 const dir = DIR, doc = JSON.parse(fs.readFileSync(path.join(dir, NAME + '.pages.json'), 'utf8'));
-// The answers recorded beside the pages file are read, as the compile reads them.
-const result = await withJudgements(await loadJudgements(dir, doc.deck?.id ?? NAME), () => authorDeck(doc, { baseDir: dir, insights: null, fit: false, fill: false }));
+const result = await authorDeck(doc, { baseDir: dir, insights: null });
 const brief = (f) => ({ code: f.code, id: f.id ?? null, severity: f.severity, pages: f.pages ?? null, measured: f.measured ?? null, waived: f.waived ?? null, repair: f.repair ?? f.reason ?? '' });
 console.log(JSON.stringify({ blocking: result.blocking.map(brief), advisories: result.advisories.map(brief) }));
 """
@@ -334,39 +332,18 @@ console.log(JSON.stringify({
         self.assertTrue(result["other"]["spineChanged"])
         self.assertEqual(result["shell"]["spine"], ["s02", "s04"])
 
-    def test_what_a_composed_page_keeps_of_its_slide_is_checked_against_the_inventory_and_only_that_is_excused(self):
+    def test_what_a_composed_page_keeps_of_its_slide_is_checked_against_the_inventory(self):
         result = run_node(self.PROBE + '''
-import { applyRulesVersion } from './skills/professional-slides/runtime/weight.mjs';
-const judge = (title) => { const spec = stampKept(deck([carry(1), carry(2), { ...carry(4), after: 's03' }], [typed('s03', title, 3)]), inventory);
-  return [spec.slides[0].pageType.kept ?? null, ...['CONTENT_NO_CLAIM', 'SOURCE_UNCITED', 'TITLE_WORDS', 'PAGE_DOES_NOT_COMPOSE'].map((code) => applyRulesVersion([{ code, id: 's03', severity: 'blocker' }], spec)[0].severity)]; };
+const kept = (title) => stampKept(deck([carry(1), carry(2), { ...carry(4), after: 's03' }], [typed('s03', title, 3)]), inventory).slides[0].pageType.kept ?? null;
 const added = stampKept(deck([carry(1)], [{ id: 'n01', title: 'Sales by channel', pageType: { type: 'composition' } }]), inventory);
-console.log(JSON.stringify({ own: judge('Sales by channel'), spaced: judge('  Sales   by channel '), retitled: judge('Channel mix'), added: applyRulesVersion([{ code: 'CONTENT_NO_CLAIM', id: 'n01', severity: 'blocker' }], added)[0].severity,
-  // A new deck is not a revision: nothing is kept.
-  fresh: applyRulesVersion([{ code: 'CONTENT_NO_CLAIM', id: 's03', severity: 'blocker' }], { workflow: 'new_deck', slides: [{ id: 's03', pageType: { kept: { title: true } } }] })[0].severity }));''')
-        # The slide's own title, word for word: the rule that a title is a claim advises, and every other rule on the page holds.
-        self.assertEqual(result["own"], [{"title": True}, "advisory", "blocker", "blocker", "blocker"])
-        self.assertEqual(result["spaced"][:2], [{"title": True}, "advisory"])
-        # A title the revision wrote - a label of its own - is the revision's, and is refused; so is a page that stands for no slide.
-        self.assertEqual(result["retitled"], [None, "blocker", "blocker", "blocker", "blocker"])
-        self.assertEqual(result["added"], "blocker")
-        self.assertEqual(result["fresh"], "blocker")
+console.log(JSON.stringify({ own: kept('Sales by channel'), spaced: kept('  Sales   by channel '), retitled: kept('Channel mix'), added: added.slides[0].pageType.kept ?? null }));''')
+        # The slide's own title, word for word, is the slide's; a title the revision wrote, or a page that stands for no slide, keeps nothing.
+        self.assertEqual(result["own"], {"title": True})
+        self.assertEqual(result["spaced"], {"title": True})
+        self.assertIsNone(result["retitled"])
+        self.assertIsNone(result["added"])
 
 class ComposedPageOnARevisionTests(RevisedDeck):
-    def test_a_breadth_recorded_under_another_shapes_key_is_told_the_key_not_sent_to_research(self):
-        result = run_node("""
-import { breadthProblem } from './skills/professional-slides/runtime/evidence.mjs';
-const mix = (breadth) => breadthProblem({ id: 'i-mix', shape: 'mix', breadth });
-console.log(JSON.stringify({ wrongKey: mix({ members: 4 }), narrow: mix({ parts: 2 }), right: mix({ parts: 4 }), series: breadthProblem({ id: 'i-s', shape: 'series', breadth: { members: 9 } }) }));""")
-        # Four parts recorded as `members`: the data is wide enough, and the message says which key a mix is counted in.
-        self.assertIn("`breadth` records `members`, and a mix is counted in `parts`", result["wrongKey"])
-        self.assertIn("Write `breadth: { parts: n }`", result["wrongKey"])
-        self.assertNotIn("research task", result["wrongKey"])
-        # Data that really is too narrow is still a research task.
-        self.assertIn("the data has 2 parts", result["narrow"])
-        self.assertIn("research task", result["narrow"])
-        self.assertIsNone(result["right"])
-        self.assertIn("counted in `periods` and `series`", result["series"])
-
     def test_the_delivery_record_lists_every_change_the_revision_made(self):
         result = run_node("""
 import { changesMade } from './skills/professional-slides/runtime/revision.mjs';
@@ -391,7 +368,7 @@ console.log(JSON.stringify({ made: changesMade(revision, spec).map((line) => [li
 class ClaimCitationTests(unittest.TestCase):
     def test_a_claim_about_a_measure_the_page_does_not_show_still_cites_its_source(self):
         result = run_node('''
-import { dependencyFindings, requiredCitations } from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
+import { requiredCitations } from './skills/professional-slides/runtime/page-numbers.mjs';
 import { measureRegistry } from './skills/professional-slides/runtime/measures.mjs';
 const YEARS = ['Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6', 'Y7', 'Y8'];
 const graded = { finding: 'a finding', calculation: 'a calculation', soWhat: 'It bears on the decision at hand', strength: 'strong', sources: ['sources/a.csv'] };
@@ -404,17 +381,9 @@ const SOURCES = { accounts: { name: 'Orchard Bakeries annual accounts' }, tills:
 const page = (claimed, shown, source) => ({ id: 'p1', type: 'trend', form: 'line', commentary: 'so-what-bar', why: 'The movement over time is the claim, so the series is drawn', evidence: ['i1'],
   title: 'Loaves sold grew faster than sales in every year of the eight', bar: 'Volume is outrunning price, which is what the plan assumes it will keep doing for three more years',
   settles: { kind: 'rate', what: 'growth a year', measures: claimed.map((name) => `i1/${name}`) }, exhibit: { heading: 'Growth', series: shown.map((name) => ({ measure: `i1/${name}`, name })), highlights: [{ category: 'Y8' }] }, ...(source ? { source } : {}) });
-const uncited = (p) => dependencyFindings({ deck: { schema: 'professional-slides.deck/v3', id: 'probe', workflow: 'new_deck', request: 'How has the bakery grown?' }, sources: SOURCES, pages: [p] }, insights).filter((f) => f.code === 'SOURCE_UNCITED').map((f) => f.measured);
-console.log(JSON.stringify({ needs: requiredCitations(page(['sales', 'loaves'], ['sales']), registry), shownOnly: requiredCitations(page(['sales'], ['sales']), registry),
-  // The claim is about sales and loaves, the chart shows sales alone, and the citation names the accounts alone.
-  wider: uncited(page(['sales', 'loaves'], ['sales'], ['accounts'])), both: uncited(page(['sales', 'loaves'], ['sales'], ['accounts', 'tills'])),
-  // What the page neither shows nor claims - the rest of the insight - is still not asked.
-  exact: uncited(page(['sales'], ['sales'], ['accounts'])) }));''')
+console.log(JSON.stringify({ needs: requiredCitations(page(['sales', 'loaves'], ['sales']), registry), shownOnly: requiredCitations(page(['sales'], ['sales']), registry) }));''')
         self.assertEqual(result["needs"], ["accounts", "tills"])
         self.assertEqual(result["shownOnly"], ["accounts"])
-        self.assertEqual(result["wider"], [["tills"]])
-        self.assertEqual(result["both"], [])
-        self.assertEqual(result["exact"], [])
 
 
 if __name__ == "__main__":

@@ -76,7 +76,7 @@ import { axisOf, isPercentUnit, isRankMeasure, isRatioUnit, measureRegistry, nor
 import { decimalsNeeded, leadingScale, matches, measurementsIn, unitScale } from "./printed-numbers.mjs";
 import { registered } from "./errors.mjs";
 import { roundHalfAway } from "./value-format.mjs";
-import { kindOfForm } from "./claim-fit.mjs";
+import { PAGE_TYPES } from "./page-types.mjs";
 import { chartDraws } from "./charts.mjs";
 
 export const BINDING_CODES = Object.freeze({
@@ -636,6 +636,9 @@ export function headingClearOfUnit(heading, unit) {
   if (!end || end.index === 0 || normalUnit(end[1]) !== normalUnit(unit)) return heading;
   return heading.slice(0, end.index).trimEnd();
 }
+
+// The kind a page's form draws its first exhibit as (page-types.mjs PAGE_TYPES), before the compiler types it.
+const kindOfForm = (type, form) => PAGE_TYPES[type]?.forms?.[form] ?? null;
 
 /** An exhibit that names its measures - in its series, as its one `measure`, or item by item - filled from them. */
 function bindExhibit(ex, what, context) {

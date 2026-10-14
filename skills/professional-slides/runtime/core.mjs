@@ -1243,7 +1243,7 @@ function compileDeckInner(deckSpec, registry, {slideCache}={}) {
     return compileSlide(slideSpec, slideIndex, { registry, designTokens: tokensOn(ground), ground, typography, pageTemplate, palette, slideCache });
   });
   const templateSequences = templateSequencesOf(slides);
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });

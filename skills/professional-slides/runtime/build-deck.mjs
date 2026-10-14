@@ -44,8 +44,7 @@ import { assetReport, assetsDeclaration } from "./asset-needs.mjs";
 import { auditExportText } from "./text-contract.mjs";
 import { deriveContent } from "./derive-content.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
-import { carriedCount } from "./weight.mjs";
-import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE, REVISION_CODES, assemblyOrder, carriedSaid, sourceDeckPath } from "./revision.mjs";
+import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE, REVISION_CODES, assemblyOrder, carriedCount, carriedSaid, sourceDeckPath } from "./revision.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 
@@ -273,7 +272,7 @@ async function readBackAndRender({ render, spec, directory, py, result, deck, sc
       result.renderSkipped = result.render?.message ?? "The deck was not rendered: the renderer is not installed.";
     } else {
       // Every text the scene drew, found on its rendered page.
-      result.textCoverage = auditExportText(deriveContent(spec, deck), deck, await readReport(result.render.pageText), { deck: spec });
+      result.textCoverage = auditExportText(deriveContent(spec, deck), deck, await readReport(result.render.pageText));
       await writeJson(path.join(directory, "rendered-text-coverage.json"), result.textCoverage);
       result.renderDirectory = renderDirectory;
       // The page gates and the contact sheets each read the renders and nothing else, so they run together.

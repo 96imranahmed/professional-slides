@@ -140,10 +140,11 @@ const slides = compose(['Op01', 'Op31', 'Op40'].map((c) => page(c, note(c))));
 const boxes = slides.map((s) => { const box = s.nodes.find((n) => n.role === 'annotation-surface');
   const clash = s.nodes.filter((n) => n.role === 'chart-mark').some((m) => !(box.frame.x + box.frame.width <= m.frame.x || m.frame.x + m.frame.width <= box.frame.x || box.frame.y + box.frame.height <= m.frame.y || m.frame.y + m.frame.height <= box.frame.y));
   return { clash }; });
-console.log(JSON.stringify({ boxes, second: error(() => compilePage(page('Op31', [...note('Op31'), { category: 'Op01', text: 'The field leader' }]))) }));
+console.log(JSON.stringify({ boxes, second: compilePage(page('Op31', [...note('Op31'), { category: 'Op01', text: 'The field leader' }])).pageType.advisories }));
 """)
         self.assertEqual(result['boxes'], [{'clash': False}] * 3)
-        self.assertIn('a distribution carries one callout', result['second'])
+        # A second callout has no room between rows ten pixels apart: it is set aside, and the page says so.
+        self.assertTrue(any("rows are too close for a second callout" in note for note in result['second']))
 
 
 class BridgeCalloutTests(unittest.TestCase):
@@ -215,7 +216,7 @@ const spec = nativeChartSpec('chart.line', props, frame, nodes);
 const named = ['Northern', 'Southern', 'Atlantic', 'Pacifica', 'Midlands', 'Highland', 'Lowlands', 'Eastward', 'Westward', 'Frontier'];
 const namedRow = { ...row, id: 'n', exhibits: row.exhibits.map((ex) => ({ ...ex, categories: named })) };
 console.log(JSON.stringify({ sequence: labels(s), row: labels(r), legends, hidden: spec.hiddenCategoryIndices, drawn: nodes.filter((n) => n.role === 'category-label').map((n) => n.text),
-  named: error(() => compose([namedRow])), catalogue: describeTypes() }));
+  named: error(() => compose([namedRow])) }));
 """)
         self.assertEqual(result['sequence'], ['FY17', 'FY20', 'FY23', 'FY26'] * 3)
         self.assertEqual(result['row'], ['FY17', 'FY20', 'FY23', 'FY26'] * 3)
@@ -225,7 +226,6 @@ console.log(JSON.stringify({ sequence: labels(s), row: labels(r), legends, hidde
         # Names are never dropped; the refusal says what a panel holds.
         self.assertIn('Column names are wider than their columns', result['named'])
         self.assertIn('holds about', result['named'])
-        self.assertRegex(result['catalogue'], r'a column panel holds about \d+ named columns .* in a row of two, \d+ in a row of three and \d+ in a row of four')
 
 
 class NativeChartAgreementTests(unittest.TestCase):

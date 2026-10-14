@@ -122,27 +122,6 @@ console.log(JSON.stringify({units:Object.fromEntries(figures.map((f)=>[f,figureU
         self.assertEqual(result["rail"], [True] * 10, "a bubble takes what a pill takes")
         self.assertEqual(result["railWords"], [False] * 5)
 
-    def test_the_verdict_check_reads_measures_by_the_same_pattern(self):
-        # Read off the compiler's refusals: a verdict column of figures is a
-        # measure exactly where SCALAR_FIGURE reads a figure, and words where it does not.
-        result = run_node(r"""
-import {SCALAR_FIGURE} from './skills/professional-slides/runtime/value-format.mjs';
-import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
-import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// A column of words is asked whether it judges its rows: a reader says "Confidence" does. A column of figures is never asked.
-const reader=judgementSession({oracle:(kind,subject)=>kind==='column-reads'?(subject.header==='Confidence'?'judges':'facts'):null});
-const base={takeaway:false,why:'The page compares the two firms on the same terms',settles:{kind:'comparison',what:'Company filings, 2025 to 2026'},adds:'The commentary names what the exhibit cannot'};
-const page=(cell)=>({...base,id:'p1',type:'lookup',form:'table',commentary:'none',title:'The near-term commercial call is split between the two firms',
-  exhibit:{columns:[{label:'Criterion',type:'category'},'Confidence','Reason'],rows:[['Consumer reach',cell,'Weekly users'],['Enterprise adoption',cell,'Ramp panel'],['Coding',cell,'Units differ']]}});
-const refused=(cell)=>withJudgements(reader,()=>{try{compilePage(page(cell));return false;}catch(e){return /VERDICT_TABLE_PLAIN/.test(e.message);}});
-const cells=['+25bps','12 pts','4.5/5','$12.5bn','3.2x','~40%','−1.5pp','1,200','€4bn+','High','Medium','Duration unclear','about 50','~50–60'];
-console.log(JSON.stringify(cells.map((cell)=>({cell,figure:SCALAR_FIGURE.test(cell),refused:refused(cell)}))));
-""")
-        self.assertTrue(any(r["figure"] for r in result) and any(not r["figure"] for r in result))
-        for row in result:
-            with self.subTest(cell=row["cell"]):
-                self.assertEqual(row["refused"], not row["figure"])
-
 
 class FlatComboLineTests(unittest.TestCase):
     def test_a_flat_line_on_its_own_scale_is_drawn_and_a_shallow_one_still_refused(self):

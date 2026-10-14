@@ -1,130 +1,15 @@
-// The evidence a page rests on, read without the layout engine: the shape of
-// an insight's data and how wide it is (the insight log's vocabulary), and how
-// many values an exhibit plots. The compiler (page-types.mjs) and the gates
-// read these without loading the layout engine.
+// Tables and exhibits read without the layout engine: what a table is, its
+// rows and cells as the reader reads them, and how many values an exhibit
+// plots. The compiler (page-types.mjs), the binding and the number checks
+// read these.
 
-import { isPeriodLabel } from "./time-axis.mjs";
 
-// The table vocabulary the compiler and the variety contract both read: one
-// definition of "a table", so no two checks disagree about what is one.
+// One definition of "a table", so no two checks disagree about what is one.
 const TABLE_TYPES = new Set(["table", "comparison-table", "heatmap", "trend-rows", "insight-tree-table"]);
 /** Is this exhibit a grid of rows the table checks read? */
 export const isTable = (ex) => TABLE_TYPES.has(String(ex?.type ?? "")) && Array.isArray(ex.rows);
 /** A table row's cells: a row is an array, or `{ cells, label?, style? }`. */
 export const rowCells = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);
-
-// The shape of the data behind a claim: a page type can only be chosen where
-// the evidence has its shape - a ranking needs the whole peer set, a trend a
-// series over time (page-types.mjs TYPE_SHAPES).
-//
-// A shape also has a breadth. Strong decks' chart pages plot a median of about
-// twenty-two values; research that stops at the subject and one comparator - a
-// "series" of four years, a "peer set" of three - plots about five. So each
-// chart-bearing shape records how wide its data is - `breadth: { periods,
-// series, members, parts, steps }`, or the `data` itself (`categories`,
-// `series`, `points`, ...) for the counts to be read from - and the insight
-// log refuses a shape narrower than a page needs while finding the longer
-// window or the rest of the peer set is still research.
-export const SHAPES = Object.freeze({
-  series: { kind: "rate", means: "one measure over six or more periods, or four or more for two or more series (the subject and its peers or a benchmark)",
-    needs: ({ periods = 0, series = 1 }) => periods >= 6 || (periods >= 4 && series >= 2),
-    deepen: "the longer window (six or more periods), or the same measure for the peers or a benchmark over the same periods" },
-  "peer-set": { kind: "rank", means: "one measure for every member of the set, six or more members",
-    needs: ({ members = 0 }) => members >= 6, deepen: "the whole peer set on the same basis, six members or more" },
-  mix: { kind: "share", means: "the parts of a whole, three or more", needs: ({ parts = 0 }) => parts >= 3, deepen: "the whole broken into three or more parts" },
-  "measure-pair": { kind: "comparison", means: "two measures for each of eight or more members",
-    needs: ({ members = 0 }) => members >= 8, deepen: "both measures for eight or more members of the set" },
-  bridge: { kind: "structure", means: "the three or more steps between two totals",
-    needs: ({ steps = 0 }) => steps >= 3, deepen: "the drivers of the change, three or more steps between the totals" },
-  geography: { kind: "structure", means: "places with coordinates or regions" },
-  schedule: { kind: "sequence", means: "dated phases, milestones or workstreams" },
-  roster: { kind: "count", means: "the named members and their attributes" },
-  fact: { kind: "count", means: "a few measured numbers" },
-  qualitative: { kind: "qualitative", means: "sourced statements, judgements or mechanisms" },
-});
-const QUANT = ["series", "peer-set", "mix", "measure-pair", "bridge", "fact"];
-export const TYPE_SHAPES = Object.freeze({
-  trend: ["series"], ranking: ["peer-set"], composition: ["mix"], relationship: ["measure-pair"], bridge: ["bridge"],
-  place: ["geography"], schedule: ["schedule"], profiles: ["roster", "peer-set"], numbers: [...QUANT],
-  panels: [...QUANT], scorecard: ["peer-set", "roster", "qualitative", "measure-pair"], lookup: [...QUANT, "roster"],
-});
-const BREADTH_KEYS = { series: ["periods", "series"], "peer-set": ["members"], mix: ["parts"], "measure-pair": ["members"], bridge: ["steps"] };
-
-/**
- * How wide an insight's data is: its `breadth` counts, over the counts read off its `data` - or, where it records neither,
- * off its `measures`.
- *
- * A mix's parts are what its chart splits the whole into. Where two or more
- * series stack over the categories (stacked bar or column, marimekko), each
- * category - a member, a period, a column - is a whole and the series are its
- * parts. Otherwise each category, label, item or row is a part and the one
- * series, if any, holds their values: a donut, pie, waffle, treemap,
- * pictogram or one-series stacked bar over A, B and C is three parts.
- */
-export function breadthOf(insight) {
-  const data = insight?.data && typeof insight.data === "object" ? insight.data : null;
-  const n = (list) => (Array.isArray(list) ? list.length : undefined);
-  const typed = insight?.breadth && typeof insight.breadth === "object" ? insight.breadth : null;
-  const read = {};
-  if (data) {
-    const rows = n(data.categories) ?? n(data.labels) ?? n(data.points) ?? n(data.rows) ?? n(data.items) ?? n(data.values);
-    const series = n(data.series);
-    if (insight.shape === "series") Object.assign(read, { periods: rows, series: series ?? 1 });
-    if (insight.shape === "peer-set" || insight.shape === "measure-pair") read.members = rows;
-    if (insight.shape === "mix") read.parts = series >= 2 ? series : rows;
-    if (insight.shape === "bridge" && rows !== undefined) read.steps = rows - 2;
-  } else if (!typed) Object.assign(read, measuredBreadth(insight));
-  const counts = { ...read, ...(typed ?? {}) };
-  return Object.fromEntries(Object.entries(counts).filter(([, v]) => Number.isFinite(v)));
-}
-
-/**
- * How wide an insight's recorded `measures` are, for a shape that is counted
- * in periods, members or parts: the record already says it. On the BA retest
- * `net-uk-europe-country-flows` recorded two measures over 27 countries and,
- * with no `breadth` typed beside them, was refused as too narrow for a peer
- * set until `breadth.members: 27` was typed in by hand. A series is as long as
- * its longest measure over periods, and as many series as run that long; a
- * peer set, a measure pair or a mix as wide as its widest measure over members.
- */
-function measuredBreadth(insight) {
-  const measures = insight?.measures && typeof insight.measures === "object" && !Array.isArray(insight.measures)
-    ? Object.values(insight.measures).filter((m) => m && typeof m === "object") : [];
-  const longest = (key) => Math.max(0, ...measures.map((m) => (Array.isArray(m[key]) ? m[key].length : 0)));
-  const periods = longest("periods"), members = longest("members");
-  if (insight.shape === "series" && periods) return { periods, series: measures.filter((m) => Array.isArray(m.periods) && m.periods.length === periods).length };
-  if ((insight.shape === "peer-set" || insight.shape === "measure-pair") && members) return { members };
-  if (insight.shape === "mix" && members) return { parts: members };
-  return {};
-}
-
-/**
- * A figure tile as the compile reads it - its label and its value as printed -
- * so what is known of the tile before its reference is written out (the
- * recorded measure it prints, author-deck.mjs compileDeck) is found again on
- * the tile the compile checks (page-types.mjs chartFormDefect).
- */
-export const tileKey = (tile) => `${String(tile?.label ?? "").trim()}\u0000${String(tile?.value ?? "")}`;
-
-/**
- * Why an insight's data is too narrow for its shape, or null. A chart-bearing
- * shape with no breadth recorded is refused with what to record, so a log
- * that records none names every insight to update at once.
- */
-export function breadthProblem(insight) {
-  const shape = SHAPES[insight?.shape];
-  if (!shape?.needs) return null;
-  const id = insight.id ?? "?", counts = breadthOf(insight);
-  if (!Object.keys(counts).length)
-    return `${id} (${insight.shape}): record how wide its data is - \`breadth: { ${BREADTH_KEYS[insight.shape].map((k) => `${k}: n`).join(", ")} }\` or the \`data\` itself - so the pages resting on it can be held to what a ${insight.shape} is: ${shape.means}`;
-  if (shape.needs(counts)) return null;
-  // A breadth recorded under another shape's key says nothing this shape reads: the repair is the key, not more research.
-  const read = BREADTH_KEYS[insight.shape], other = Object.keys(counts).filter((key) => !read.includes(key));
-  if (other.length && !read.some((key) => key in counts))
-    return `${id} (${insight.shape}): \`breadth\` records ${other.map((key) => `\`${key}\``).join(", ")}, and a ${insight.shape} is counted in ${read.map((key) => `\`${key}\``).join(" and ")} - ${shape.means}. Write \`breadth: { ${read.map((key) => `${key}: n`).join(", ")} }\`${other.length === 1 && read.length === 1 ? ` (the ${counts[other[0]]} recorded as ${other[0]} ${counts[other[0]] === 1 ? "is its part" : `are its ${read[0]}`}, if that is what they count)` : ""}, or leave \`breadth\` out and give the \`data\` itself`;
-  return `${id} (${insight.shape}): the data has ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}; a ${insight.shape} is ${shape.means}. ` +
-    `That is a research task before any page is written: find ${shape.deepen}. If the data does not exist, record the shape it has (\`fact\`) and carry it on a numbers page`;
-}
 
 // How many values an exhibit plots: every number a reader can read off it - a
 // bar, a point on a line, a slice, a dot on a scatter, a box's five figures, a
@@ -151,7 +36,7 @@ export const resultCells = (row) => rowCells(row).slice(labelInCells(row) ? 1 : 
 // A scorecard's judged cell - a Harvey ball, a RAG state, a lamp, a tick, a dot,
 // an arrow, one of two states - is a grade on the author's scale, not a measurement:
 // no measure holds it, so it is neither bound nor counted as a plotted value.
-export const JUDGED_CELLS = new Set(["harvey", "rag", "lights", "check", "dot", "trend", "binary"]);
+const JUDGED_CELLS = new Set(["harvey", "rag", "lights", "check", "dot", "trend", "binary"]);
 export const judgedCell = (cell) => Boolean(cell) && typeof cell === "object" && JUDGED_CELLS.has(cell.type);
 const numericCells = (ex) => ex.rows.reduce((n, row) => n + resultCells(row).filter((c) => !judgedCell(c) && /\d/.test(cellText(c))).length, 0);
 
@@ -183,16 +68,5 @@ export function plottedValues(ex, { printed = false } = {}) {
   // A marker plots its value; one that only places a city on the map plots nothing - its coordinates are where, not how much.
   if (Array.isArray(ex.markers)) return ex.markers.filter((marker) => finite(marker?.value)).length;
   return 0;
-}
-
-const isChart = (ex) => String(ex.type ?? "").startsWith("chart.");
-
-/** A chart that shows two numbers of one series: a metric pair with a chart drawn round it. */
-export function trivialChart(ex) {
-  if (!isChart(ex) || ["chart.scatter", "chart.bubble", "chart.bubble-grid", "chart.waffle"].includes(ex.type)) return false;
-  // A trellis's panels (small multiples' `items`) are its series: five cuts of a before and after plot ten numbers.
-  const series = Array.isArray(ex.series) ? ex.series.length : Array.isArray(ex.items) ? ex.items.length : 1;
-  const categories = Array.isArray(ex.categories) ? ex.categories.length : Array.isArray(ex.rows) ? ex.rows.length : Infinity;
-  return series <= 1 && categories <= 2;
 }
 

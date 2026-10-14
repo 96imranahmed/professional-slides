@@ -9,26 +9,6 @@
 // same run as one that failed earlier.
 import { toDeckPlan } from "./compose-deck.mjs";
 import { planDeck } from "./planner.mjs";
-import { readingTaskOf, bodyWordsOf, wordBudgetOf } from "./derive-content.mjs";
-
-// Each composed page carries its reading task, so every word check - the
-// author's, the page gates', the text contract's - holds it to one floor: the
-// lower quartile for pages doing that job (reading-tasks.json), scaled by the
-// deck's density (derive-content.mjs wordBudgetOf).
-function withReadingTasks(result, spec) {
-  const byId = new Map([...(spec.slides || []), ...(spec.appendix || [])].filter((s) => s.id && s.pageType).map((s) => [s.id, s]));
-  for (const slide of result.deck.slides) {
-    const source = byId.get(slide.sourceSlideId ?? slide.id);
-    if (source) {
-      slide.readingTask = readingTaskOf(source.pageType.family, [slide]);
-      const budget = wordBudgetOf(slide.readingTask, slide, spec.density);
-      if (budget) { slide.wordFloor = budget.floor; slide.wordCeiling = budget.ceiling; slide.wordFence = budget.fence; }
-    }
-    // One counter: the page gates read this rather than counting again.
-    slide.planBodyWords = bodyWordsOf([slide]);
-  }
-  return result;
-}
 
 /**
  * `{ deck, decisions }` when every page composes; otherwise throws with `pageErrors` naming every failing page.
@@ -44,10 +24,10 @@ export function composeAll(spec, baseDir, { partial = false, slideCache = null }
       const result = planDeck(plan, undefined, { slideCache });
       // The tables the composer cut across pages, with what would hold each on one (compose-deck.mjs splitEstimate).
       if (plan.tableSplits) result.tableSplits = plan.tableSplits;
-      if (!errors.length) return withReadingTasks(result, working);
+      if (!errors.length) return result;
       // The pages that composed, for a caller that reports the failures and
       // still checks everything else in the same run.
-      if (partial) return { ...withReadingTasks(result, working), pageErrors: [...new Set(errors)] };
+      if (partial) return { ...result, pageErrors: [...new Set(errors)] };
       break;
     } catch (error) {
       const found = error.pageErrors ?? [error.message];

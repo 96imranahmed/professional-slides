@@ -98,7 +98,6 @@ console.log(JSON.stringify({accepted:true}));
         result = run_node(f'''
 import {{ compilePage, calloutCapacity, describeTypes }} from '{KIT}';
 import {{ countInWords }} from './skills/professional-slides/runtime/chart-annotations.mjs';
-import {{ REDRAWS }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const long = 'Traffic fell to a fifth of its level when the whole network was grounded for the spring and summer';
 let refusal = null;
@@ -107,14 +106,13 @@ try {{ compilePage({{ id: 't', type: 'trend', form: 'line', commentary: 'on-exhi
   exhibit: {{ categories: years, series: [{{ name: 'Pax', values: [5, 1, 2, 4, 5, 6, 6, 7] }}], annotations: [{{ category: '2020', text: long }}] }} }}); }}
 catch (e) {{ refusal = e.message; }}
 const n = calloutCapacity();
-console.log(JSON.stringify({{ n, words: countInWords(n), refusal, redraw: REDRAWS.find((r) => r.holding === 'notes on particular marks').choice,
+console.log(JSON.stringify({{ n, words: countInWords(n), refusal,
   types: describeTypes().includes(`a chart callout holds about ${{n}} words`) }}));
 ''')
         self.assertGreater(result['n'], 4)
         self.assertIn(f"a callout holds about {result['words']} words", result['refusal'])
-        self.assertIn(f"about {result['words']} words each", result['redraw'])
         self.assertTrue(result['types'])
-        self.assertNotIn('about twelve words', result['refusal'] + result['redraw'])
+        self.assertNotIn('about twelve words', result['refusal'])
 
 
 class LeaderTests(unittest.TestCase):

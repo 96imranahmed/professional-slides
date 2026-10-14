@@ -138,27 +138,20 @@ console.log(JSON.stringify({one:check(one),two:check(two)}));
 
     def test_a_page_type_takes_a_one_line_standfirst_that_adds_to_its_title(self):
         result = run_node(r"""
-import {compilePage, pageSchema, describeTypes, SUBTITLE_WORDS} from './skills/professional-slides/runtime/page-types.mjs';
+import {compilePage, pageSchema, describeTypes} from './skills/professional-slides/runtime/page-types.mjs';
 import {planRole} from './skills/professional-slides/runtime/derive-content.mjs';
 import fs from 'node:fs';
 const base=JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json','utf8')).pages.find(p=>p.id==='p03');
 const error=(page)=>{ try { compilePage(page); return null; } catch (e) { return e.message; } };
 const ok=compilePage({...base,subtitle:'Passenger journeys a year, all lines, FY19 to FY26'});
 const schema=pageSchema().properties.pages.items.oneOf.filter(t=>t.properties.type);
-console.log(JSON.stringify({kept:ok.subtitle, limit:SUBTITLE_WORDS,
-  long:error({...base,subtitle:'Passenger journeys a year on every one of the five lines in the network, counted at the gates, FY19 to FY26'}),
-  restates:error({...base,subtitle:base.title.split(' ').slice(0,8).join(' ')}),
-  empty:error({...base,subtitle:' '}),
+console.log(JSON.stringify({kept:ok.subtitle,
   statement:error({id:'s',type:'statement',form:'statement',commentary:'none',takeaway:false,why:'The claim stands alone as the message page',text:'The peak is full',title:'The peak is full',subtitle:'All lines'}),
   schema:schema.every(t=>t.properties.subtitle && !t.required.includes('subtitle')),
   described:/`subtitle`/.test(describeTypes()),
   roles:[planRole('action-subtitle'),planRole('takeaway-standfirst'),planRole('action-title')]}));
 """)
         self.assertEqual(result["kept"], "Passenger journeys a year, all lines, FY19 to FY26")
-        self.assertEqual(result["limit"], 16)
-        self.assertIn("words", result["long"])
-        self.assertIn("repeats the title", result["restates"])
-        self.assertIn("one line", result["empty"])
         self.assertIn("no title band", result["statement"])
         self.assertTrue(result["schema"])
         self.assertTrue(result["described"])

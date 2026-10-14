@@ -14,9 +14,6 @@
 // rounds on that refusal, which no section could fix from its own part file).
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SOURCE_TITLE_WORDS } from "./page-template.mjs";
-import { textWords } from "./text-contract.mjs";
-import { axisOf, measureRegistry, valuesOf } from "./measures.mjs";
 import { parsePeriod } from "./time-axis.mjs";
 
 /**
@@ -83,34 +80,17 @@ const PERIOD_SPAN = Object.freeze({ quarter: 3, half: 6, month: 1, day: 1 / 31, 
 /** Where a period begins, at the latest it can: its end less its length, a year twelve months. */
 const periodStart = (label) => { const end = periodEnd(label), p = parsePeriod(String(label ?? "").trim()); return end === null || !p ? null : end - (p.kind === "year" ? 12 : PERIOD_SPAN[p.kind] ?? 0); };
 
-// What a source can be declared not to name, and the length of the reason: a sentence, long enough to say something.
-const SOURCE_MISSING = Object.freeze(["publisher", "date", "document"]);
-const MISSING_REASON = Object.freeze({ min: 5, max: 40 });
-
-/** Every problem with the pages file's `sources` registry, as sentences. */
+/** Every problem with the pages file's `sources` registry, as sentences: a source with no name, a key no source takes, a date the source line cannot print. */
 export function registryProblems(sources) {
   if (sources === undefined) return [];
   if (!sources || typeof sources !== "object" || Array.isArray(sources)) return ["`sources` is a registry - { key: { name, url, status } }"];
   return Object.entries(sources).flatMap(([key, entry]) => {
     if (!entry || typeof entry !== "object" || typeof entry.name !== "string" || !entry.name.trim()) return [`source "${key}" needs its \`name\` - the publisher and title as the citation prints them`];
+    // `missing` and `reason` are older declarations of what a record does not name: read past.
     const extra = Object.keys(entry).filter((k) => !["name", "short", "url", "status", "retrieved", "date", "missing", "reason"].includes(k));
-    const undated = entry.date !== undefined && !DATE.test(String(entry.date).trim()) ? [`source "${key}": \`date\` is when the record was published or stands as at - "2025-08-04", "2025-08" or "2025" - which the source line prints and the measures citing it are held to`] : [];
-    // A record that names no publisher, no date or no document says so once, here, with the reason: the deck then states the
-    // limit once (compose-deck.mjs sourceLimitPages) and each page that cites the record carries it for the reviewers, rather
-    // than every such page being found wanting on its own. It is not a way to leave a source unnamed: `name` still says what it is.
-    const listed = Array.isArray(entry.missing) && entry.missing.length > 0 && entry.missing.every((item) => SOURCE_MISSING.includes(item)) && new Set(entry.missing).size === entry.missing.length;
-    const reasoned = typeof entry.reason === "string" && textWords(entry.reason) >= MISSING_REASON.min && textWords(entry.reason) <= MISSING_REASON.max;
-    const provenance = [
-      ...(entry.missing !== undefined && !listed ? [`source "${key}": \`missing\` lists what the record does not name - one or more of ${SOURCE_MISSING.map((item) => `"${item}"`).join(", ")}, each once - or is left out for a source that names all three`] : []),
-      ...(listed && !reasoned ? [`source "${key}" declares it names no ${entry.missing.join(", no ")}: say why in \`reason\` - who supplied the record and what is known of it - in ${MISSING_REASON.min} to ${MISSING_REASON.max} words; the deck states it once, on the page it derives for the sources' limits`] : []),
-      ...(entry.missing === undefined && entry.reason !== undefined ? [`source "${key}": \`reason\` says why the record names no publisher, date or document, and goes with \`missing\`; a source that names all three needs none`] : []),
-      ...(listed && entry.missing.includes("publisher") && typeof entry.url === "string" && entry.url.trim() ? [`source "${key}" declares it names no publisher and gives a \`url\`: a record with a URL has a publisher - name it in \`name\` and take "publisher" out of \`missing\``] : [])];
-    // A name is a title and a status a label: each is held to the length of what it is, so a registry entry cannot carry a page's caveats.
-    const kind = { name: "its title - the publisher, the publication and its year -", short: "its title in brief", status: "the kind of record it is (\"audited\", \"company-reported\") -" };
-    const wordy = Object.entries(SOURCE_TITLE_WORDS).filter(([k, max]) => typeof entry[k] === "string" && textWords(entry[k]) > max)
-      .map(([k, max]) => `source "${key}": \`${k}\` runs to ${textWords(entry[k])} words, and a source's \`${k}\` is ${kind[k]} in ${max} words or fewer. A caveat, a scope or a method is a note, not a source: write it in the page's \`note\`, where it is counted (NOTE_HEAVY) and fitted to the footer`);
-    return [...(extra.length ? [`source "${key}": unknown key${extra.length === 1 ? "" : "s"} ${extra.join(", ")} - a source is { name, short, url, status, retrieved, date }, with { missing: ["publisher" | "date" | "document"], reason } where the record does not name one`] : []), ...undated,
-      ...["short", "url", "status", "retrieved", "date"].filter((k) => entry[k] !== undefined && typeof entry[k] !== "string").map((k) => `source "${key}": \`${k}\` is text`), ...wordy, ...provenance];
+    const undated = entry.date !== undefined && !DATE.test(String(entry.date).trim()) ? [`source "${key}": \`date\` is when the record was published or stands as at - "2025-08-04", "2025-08" or "2025" - which the source line prints`] : [];
+    return [...(extra.length ? [`source "${key}": unknown key${extra.length === 1 ? "" : "s"} ${extra.join(", ")} - a source is { name, short, url, status, retrieved, date }`] : []), ...undated,
+      ...["short", "url", "status", "retrieved", "date"].filter((k) => entry[k] !== undefined && typeof entry[k] !== "string").map((k) => `source "${key}": \`${k}\` is text`)];
   });
 }
 

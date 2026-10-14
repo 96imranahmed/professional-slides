@@ -197,11 +197,7 @@ console.log(JSON.stringify({
   period: focusFromTitle(years,'Revenue tripled after 2022').highlights ?? null,
   token: namedInTitle(['Direct consumer attention','Selected enterprise paid adoption','Coding monetization'],'OpenAI leads on consumer attention'),
   shared: namedInTitle(['Enterprise API','Enterprise seats','Consumer'],'Enterprise buyers pay first'),
-  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell'),
-  // The compile counts the mark the title names: a trend whose title names one of its lines is marked.
-  compile: await (async () => { const {scaffoldPage}=await import('./skills/professional-slides/runtime/author-deck.mjs'); const {compilePage}=await import('./skills/professional-slides/runtime/page-types.mjs');
-    const p=scaffoldPage('trend'), ex=p.exhibit, series=[{name:'Eastern',values:ex.series[0].values.map(v=>v/2)},{name:'Dales',values:ex.series[0].values.map(v=>v/3)}];
-    return ['Journeys grew fastest on the Eastern line','Journeys grew on both lines'].map((title)=>{ try { compilePage({...p,title,exhibit:{type:ex.type,heading:ex.heading,unit:ex.unit,categories:ex.categories,series}},0); return 'compiled'; } catch (e) { return /marks its finding on the plot/.test(e.message) ? 'unmarked' : 'other'; } }); })() }));
+  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell') }));
 ''')
         self.assertEqual(result["series"], "Anthropic")
         self.assertIsNone(result["both"], "a title that names both compares them")
@@ -210,7 +206,6 @@ console.log(JSON.stringify({
         self.assertEqual(result["token"], "Direct consumer attention")
         self.assertIsNone(result["shared"], "a word two labels carry names neither")
         self.assertIsNone(result["plural"])
-        self.assertEqual(result["compile"], ["other", "unmarked"])
 
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
         result = run_node(r'''

@@ -141,13 +141,13 @@ console.log(JSON.stringify({{ same: JSON.stringify(a) === JSON.stringify(b), sli
     def test_a_finding_names_the_part_file_its_page_came_from(self):
         pages = self.doc["pages"]
         broken = dict(pages[8])
-        broken["title"] = " ".join(["word"] * 16)  # past the title's word limit
+        broken["form"] = "no-such-form"  # a form its type does not have
         self.doc["pages"] = pages[:8] + [broken] + pages[9:]
         parts = self.split()
         result = author(str(parts), "--check")
         self.assertEqual(result.returncode, 2)
         self.assertIn(f"[{broken['id']} in pages/second.pages.json]", result.stderr)
-        self.assertIn("TITLE_WORDS", result.stderr)
+        self.assertIn("`form` is one of", result.stderr)
 
     def test_the_deck_level_readers_leave_the_includes_as_written(self):
         # `preferences.mjs apply` writes the deck keys back: the parts stay parts.

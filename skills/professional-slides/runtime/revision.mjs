@@ -21,14 +21,10 @@
 //             title changed, and by the review.
 //   composed  a page given a `type` (or a section, or the cover). The runtime
 //             composes it, and it is the revision's own page: every page rule
-//             holds on it in full, under the rules version the deck records.
+//             holds on it in full.
 //
 // A source slide no page names is dropped, with every part of the package
-// only it drew on. A rule that measures the deck is read over the pages the
-// runtime composed and held wherever they are enough for it to be read
-// (weight.mjs notHeldOn, where "enough" is stated once): one carried slide
-// does not change what forty composed pages are held to, and one composed
-// page among thirty carried slides is held to no deck rule.
+// only it drew on.
 //
 // An edit is made to whole words. `replace` names words as the slide prints
 // them, and the slide prints them where they stand as tokens of their own -
@@ -52,7 +48,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { fileURLToPath } from "node:url";
 import { pythonBin } from "./cli.mjs";
 import { registered } from "./errors.mjs";
-import { RULES_VERSION, deckRulesLine } from "./weight.mjs";
 
 /** The codes a revision's carried slides raise, each with what it is about. */
 export const REVISION_CODES = Object.freeze({
@@ -60,10 +55,11 @@ export const REVISION_CODES = Object.freeze({
   REVISION_SOURCE_MISSING: "the copy of the source deck a revision carries slides from is not beside its inventory, or is not the deck the inventory was read from",
   REVISION_SLIDE_SIZE: "a revision that sets composed pages beside carried slides of a deck whose slide size is not the size the runtime composes at",
   REVISION_CARRY_DRIFT: "a carried slide whose parts in the built file are not the source deck's, byte for byte",
-  REVISION_RULES_VERSION: "a revision that records a rules version below the one its import stamped and gives no reason the reviewer can check",
 });
 
 const REVISION = "existing_deck_revision";
+/** How many of a deck's slides are carried from its source deck, not composed here: `carried` on the compiled spec. */
+export const carriedCount = (deck) => (deck?.workflow === REVISION && Array.isArray(deck.carried) ? deck.carried.length : 0);
 // What the build writes of a revision's assembled deck, beside the composed pages' own scene and renders (build-deck.mjs
 // assembleRevision): the deck slide by slide, and the folder of its renders.
 export const ASSEMBLED_SCENE = "deck-scene.json";
@@ -392,10 +388,9 @@ export function revisionStatement(spec, inventory) {
   // A composed cover stands for the title slide it was imported from.
   const dropped = inventory.slides.filter((slide) => !used.has(slide.index) && !(slide.index === 1 && spec.cover)).map((slide) => slide.id);
   return { source: inventory.source?.file ?? null, slides: inventory.slides.length, carried: carried.length - edited.length, edited,
-    composed: [...(spec.cover ? ["cover"] : []), ...pages.filter((slide) => slide.id !== undefined).map((slide) => String(slide.id))], dropped, rulesVersion: spec.rulesVersion ?? null,
-    // What the revision says it leaves standing on purpose, and why its rules are older than its import's: each is the reviewer's to check.
-    ...(excusedPages(spec).length ? { excused: excusedPages(spec) } : {}), ...(loweredVersion(spec, inventory) ? { lowered: loweredVersion(spec, inventory) } : {}),
-    deckRules: deckRulesLine(spec) };
+    composed: [...(spec.cover ? ["cover"] : []), ...pages.filter((slide) => slide.id !== undefined).map((slide) => String(slide.id))], dropped,
+    // What the revision says it leaves standing on purpose: the reviewer's to check.
+    ...(excusedPages(spec).length ? { excused: excusedPages(spec) } : {}) };
 }
 
 /**
@@ -410,27 +405,10 @@ export function excusedPages(spec) {
   return [...edits, ...composed];
 }
 
-// A reason is a sentence someone can check, as a waiver's is (build-bars.mjs waiverErrors).
-const REASON_WORDS = 6;
-/** A rules version a revision records below the one its import stamped (`rulesVersion` on the inventory): `{ recorded, stamped, reason }`, or null. */
-function loweredVersion(spec, inventory) {
-  const recorded = Number(spec?.rulesVersion), stamped = Number(inventory?.rulesVersion ?? NaN);
-  return Number.isFinite(recorded) && Number.isFinite(stamped) && recorded < stamped ? { recorded, stamped, reason: typeof spec.rulesVersionReason === "string" ? spec.rulesVersionReason.trim() : "" } : null;
-}
-
-/**
- * What a revision's own record is held to, whether or not it carries a
- * slide: a rules version below the one the import stamped is the author's
- * choice to be held to less, and says why (`rulesVersionReason` on `deck`);
- * and every page an edit or a composed page excuses with `only` is a page of
- * the deck.
- */
-export function revisionRecordFindings(spec, inventory) {
+/** What a revision's own record is held to, whether or not it carries a slide: every page an edit or a composed page excuses with `only` is a page of the deck. */
+export function revisionRecordFindings(spec) {
   if (spec?.workflow !== REVISION) return [];
   const findings = [];
-  const lowered = loweredVersion(spec, inventory);
-  if (lowered && lowered.reason.split(/\s+/).filter(Boolean).length < REASON_WORDS) findings.push({ code: registered(REVISION_CODES, "REVISION_RULES_VERSION"), severity: "blocker",
-    repair: `This revision records \`rulesVersion: ${lowered.recorded}\`, and the import of its source deck stamped ${lowered.stamped}${lowered.stamped === RULES_VERSION ? ", the version this runtime enforces" : ""}: every rule introduced since would be an advisory to it. Put back \`rulesVersion: ${lowered.stamped}\`, or - where the deck really was made under version ${lowered.recorded} - say so on \`deck\` in a sentence the reviewer can check: \`"rulesVersionReason": "..."\`` });
   const ids = new Set([...(spec.carried || []).map((entry) => String(entry.id)), ...[...(spec.slides || []), ...(spec.appendix || [])].map((slide) => String(slide.id))]);
   for (const item of excusedPages(spec)) { const unknown = item.only.filter((id) => !ids.has(id) || id === item.page);
     if (unknown.length) findings.push({ code: registered(REVISION_CODES, "REVISION_CARRY_INVALID"), severity: "blocker", id: item.page,
@@ -445,11 +423,10 @@ export function revisionLine(statement) {
   const parts = [carried || edited.length ? `${carried} carried as ${carried === 1 ? "it is" : "they are"}` : null, edited.length ? `${edited.length} edited in place${some(edited)}` : null,
     composed.length ? `${composed.length} page${composed.length === 1 ? "" : "s"} composed by the runtime${some(composed)}` : null, dropped.length ? `${dropped.length} dropped${some(dropped)}` : null].filter(Boolean);
   const held = carried || edited.length
-    ? `A carried slide is copied from the source deck unchanged and is not judged; a page the runtime composes is the revision's own and is held to every page rule. ${statement.deckRules ?? ""}`.trim()
+    ? "A carried slide is copied from the source deck unchanged and is not judged; a page the runtime composes is the revision's own and is held to every page rule."
     : "Every slide is recomposed, so every page is held to the rules as a new deck's is; a slide to keep as it is takes `carry: true` beside its `draft`.";
   const excused = (statement.excused || []).length ? ` Left standing on purpose (\`only\`), for the reviewer to check: ${statement.excused.map((item) => `${item.page}${item.old ? ` "${item.old}"` : ""} not looked for on ${item.only.join(", ")}`).join("; ")}.` : "";
-  const lowered = statement.lowered ? ` Held to rules version ${statement.lowered.recorded}, below the ${statement.lowered.stamped} its import stamped${statement.lowered.reason ? `: "${statement.lowered.reason}"` : ""}.` : "";
-  return `Revision of ${statement.source ?? "the imported deck"} (${statement.slides} slide${statement.slides === 1 ? "" : "s"}): ${parts.join("; ") || "nothing mapped yet"}. ${held}${excused}${lowered}`;
+  return `Revision of ${statement.source ?? "the imported deck"} (${statement.slides} slide${statement.slides === 1 ? "" : "s"}): ${parts.join("; ") || "nothing mapped yet"}. ${held}${excused}`;
 }
 
 /**
@@ -485,9 +462,8 @@ export function changesMade(revision, spec) {
 // On a page composed where a slide stood, what the slide already had and the revision did not change is the user's: its
 // title, its source line. It is carried into the page, advised on and never refused. What the revision wrote is the
 // revision's, and held in full. So each is checked against the inventory here, once, at the compile, and recorded on the
-// compiled page (`pageType.kept`), where the one decision on what a deck is held to reads it (weight.mjs notHeldOn,
-// weight.json rules.kept): a title is kept where it is the slide's own word for word; a typed source line where it is a
-// source line the slide printed, over numbers every one of which the slide already showed.
+// compiled page (`pageType.kept`): a title is kept where it is the slide's own word for word; a typed source line where it
+// is a source line the slide printed, over numbers every one of which the slide already showed.
 const sourceLine = (text) => normalTitle(text).replace(/^(?:sources?|notes?)\s*:\s*/i, "").replace(/[.\s]+$/, "").toLowerCase();
 // The keys of an exhibit that set how it is drawn, whose numbers are not numbers it shows.
 const DRAWING_KEYS = new Set(["basis", "pageType", "id", "type", "decimals", "max", "min", "step", "width", "height", "size", "gap", "fontSize", "ratio", "span", "weight", "level", "levels", "columnsWidth", "rowHeight"]);

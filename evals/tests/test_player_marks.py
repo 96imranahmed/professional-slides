@@ -111,23 +111,6 @@ console.log(JSON.stringify({{ header: table.columns[1].logo, cell: table.rows[0]
         self.assertEqual(result["picture"], {"alt": "Germany logo", "label": "Germany", "text": "A picture entry is not a mark"})
 
 
-DECK = f"""
-import {{ compileDeck }} from '{RUNTIME}/author-deck.mjs';
-import {{ introducedOn }} from '{RUNTIME}/gates/variety_gates.mjs';
-const S = {{ kind: 'comparison', what: 'Market and fleet filings, 2025 to 2026' }};
-const base = {{ takeaway: false, why: 'The page compares the players on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' }};
-const years = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
-const chart = {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: {{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}, {{ name: 'y', values: [2, 3, 4, 5, 6, 7, 8, 9] }}],
-  annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}] }} }};
-const coded = {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }};
-const roster = (cells) => ({{ type: 'profiles', form: 'logo-table', commentary: 'in-exhibit', exhibit: {{ columns: [{{ label: '', type: 'logo' }}, 'Player', 'Size'],
-  rows: cells.map((cell, at) => [cell, ['France', 'Germany', 'Boeing 787'][at], ['68m', '84m', '1,100 built'][at]]) }} }});
-const kinds = [chart, coded, chart, coded, chart, coded, chart, coded, chart, coded, chart, coded];
-const make = (list) => list.map((k, i) => ({{ id: 'c' + i, ...base, title: 'Finding number ' + i + ' of the deck', ...structuredClone(k) }}));
-const unmarked = (pages, deck = {{}}) => compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd', players, ...deck }}, pages }}).findings.filter((f) => f.code === 'PLAYERS_UNMARKED');
-"""
-
-
 class CompositionTests(unittest.TestCase):
     def test_a_cell_naming_a_place_draws_its_outline_and_one_naming_a_thing_its_photograph(self):
         result = run_node(PLAYERS + PNG + f'''
@@ -168,7 +151,6 @@ import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'
 import {{ assetNeeds }} from '{RUNTIME}/asset-needs.mjs';
 import {{ autoFillLogos }} from '{RUNTIME}/fetch-logos.mjs';
 import {{ choosePictures, picturePlaceholders }} from '{RUNTIME}/fetch-pictures.mjs';
-import {{ judgementSession, withJudgements }} from '{RUNTIME}/judgements.mjs';
 const mixed = ['North Rail', ...players];
 const photo = {{ alt: 'A Boeing 787 in flight', search: 'Boeing 787 Dreamliner', mark: 'image', player: 'Boeing 787' }};
 const outline = {{ alt: 'France outline', mark: 'outline', player: 'France', outline: {{ geography: 'europe', region: 'FRA' }} }};
@@ -182,7 +164,7 @@ const searched = [];
 const candidate = {{ title: 'File:787.jpg', url: 'u', page: 'd', license: 'CC BY 4.0', artist: 'Jo', credit: 'Photo: Jo' }};
 const search = async (query) => {{ searched.push(query); return [candidate]; }};
 const placeholders = picturePlaceholders(spec);
-const {{ chosen }} = await withJudgements(judgementSession({{ oracle: () => 'shows' }}), () => choosePictures(placeholders, {{ search }}));
+const {{ chosen }} = await choosePictures(placeholders, {{ search }});
 fs.rmSync(dir, {{ recursive: true, force: true }});
 console.log(JSON.stringify({{ needs, logos, placeholders: placeholders.map((p) => p.alt), searched, chosen: placeholders.map((p) => chosen.get(p)?.title ?? null) }}));
 ''')

@@ -112,7 +112,7 @@ export function sceneCollisions(slide) {
       // annotation's label is the crossing this refuses.
       const key = line.data?.annotationKey;
       if (["annotation-leader", "data-label-leader"].includes(line.role) && ["annotation-text", "data-label"].includes(text.role) && (key === undefined || key === text.data?.annotationKey)) continue;
-      // An event's rule and label were read from rules version 12 (weight.json): the rule's variant `event`.
+      // An event's rule and label cross under their own variant `event`.
       const event = line.role === "chart-event-line" || text.role === "chart-event-label";
       if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role], ...(event ? { rule: "TEXT_ON_LINE.event" } : {}) });
     }

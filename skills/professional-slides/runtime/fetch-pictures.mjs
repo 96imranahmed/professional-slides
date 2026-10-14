@@ -43,12 +43,15 @@
 // for, through the API and the cache photographs already use.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isMain, parseCli, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
+import { isMain, parseCli, readJson, readJsonSync, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { UA, slugOf } from "./fetch-logos.mjs";
-import { contentWords } from "./gates/content_gates.mjs";
 import { playerEntries, playerPhotographs } from "./players.mjs";
 import { isFlagRef } from "./flags.mjs";
 import { isIllustration } from "./compose-pictures.mjs";
+
+const STOPWORDS = new Set(readJsonSync(new URL("./gates/stopwords.json", import.meta.url)).content);
+/** The content words of `text`: lower-case runs of letters, four and up, that are not stopwords. */
+const contentWords = (text) => new Set(String(text ?? "").toLowerCase().match(/[a-z][a-z']+/g)?.filter((w) => !STOPWORDS.has(w) && w.length > 3) ?? []);
 
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
 const FREE = /^(cc0|cc[- ]by(-sa)?(\s[\d.]+)?(\s\w+)?|public domain|pd\b|pdm|attribution(-sharealike)?)/i;

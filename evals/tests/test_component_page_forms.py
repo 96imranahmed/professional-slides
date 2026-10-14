@@ -23,7 +23,6 @@ import assert from 'node:assert/strict';
 import { compilePage, PAGE_TYPES } from './skills/professional-slides/runtime/page-types.mjs';
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 import { workedExamples } from './skills/professional-slides/runtime/author-deck.mjs';
-import { carrierOf } from './skills/professional-slides/runtime/claim-fit.mjs';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
 const compose = (page) => composeAll({ schema: 'professional-slides.deck/v3', id: 't', slides: [compilePage(page)] }, './skills/professional-slides/examples').deck.slides[0];
@@ -31,7 +30,7 @@ const compose = (page) => composeAll({ schema: 'professional-slides.deck/v3', id
 
 
 class FormTests(unittest.TestCase):
-    def test_every_new_form_has_a_worked_page_that_composes_and_a_fit_row(self):
+    def test_every_new_form_has_a_worked_page_that_composes(self):
         run_node(PRELUDE + f"""
 const pages = workedExamples().pages;
 for (const key of {FORMS!r}) {{
@@ -40,8 +39,6 @@ for (const key of {FORMS!r}) {{
   const page = pages.find((p) => p.type === type && p.form === form);
   assert.ok(page, `${{key}} has a worked page for --example`);
   assert.ok(compose(page).nodes.length > 10, `${{key}} composes`);
-  const row = carrierOf(type, form);
-  assert.ok(row && (row.shows || Object.keys(row.carries).length), `${{key}} is graded`);
 }}
 console.log('{{}}');
 """)
@@ -81,7 +78,7 @@ console.log('{}');
         run_node(PRELUDE + """
 const page = workedExamples().pages.find((p) => p.type === 'picture' && p.form === 'device');
 assert.ok(compilePage(page));
-assert.match(error(() => compilePage({ ...page, commentary: 'captions' })), /choose `commentary`/);
+assert.match(error(() => compilePage({ ...page, commentary: 'captions' })), /`commentary` is one of/);
 assert.ok(compilePage({ ...page, commentary: 'below' }));
 console.log('{}');
 """)

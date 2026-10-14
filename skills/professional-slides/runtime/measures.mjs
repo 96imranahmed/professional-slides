@@ -8,7 +8,7 @@
 // evidence as data - `unit`, `population`, the `periods` or `members` it runs
 // over, and its `values` - so the runtime can compute with it (analysis.mjs)
 // and hold each exhibit to the measure it says it plots
-// (gates/dependency_gates.mjs).
+// (page-numbers.mjs).
 //
 //   "measures": {
 //     "cash":   { "unit": "GBP m", "population": "the subject", "periods": ["FY24", "FY25", "FY26"], "values": [42.9, 49.7, 54.9] },
@@ -34,11 +34,7 @@
 import path from "node:path";
 import { readJson } from "./cli.mjs";
 import { inside, notJson } from "./pages-file.mjs";
-import { SHAPES, breadthProblem } from "./evidence.mjs";
-import { textWords } from "./text-contract.mjs";
 
-// Shapes whose evidence is numbers: an insight of one of these records its measures.
-const MEASURED_SHAPES = Object.freeze(["series", "peer-set", "mix", "measure-pair", "bridge", "fact"]);
 const NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 const POLARITIES = ["up", "down"];
 
@@ -67,7 +63,6 @@ export function isPercentUnit(unit) {
   if (!PERCENT_UNITS.has(key)) { const { num, den } = factorsOf(normalUnit(unit)); PERCENT_UNITS.set(key, num.some((factor) => PERCENT_WORD.test(factor)) && !den.some((factor) => PERCENT_WORD.test(factor))); }
   return PERCENT_UNITS.get(key);
 }
-
 
 /**
  * Is the measure a rank: recorded in a rank unit ("rank", "rank, 1 = best", a
@@ -145,7 +140,7 @@ export function measureProblems(insight) {
     for (const field of ["cite", "sources"]) if (m[field] !== undefined && !(Array.isArray(m[field]) && m[field].length && m[field].every((entry) => typeof entry === "string" && entry.trim())))
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
     // Where each member or period of a measure comes from its own record - a ranking of groups, each from its own results -
-    // `citeBy` says which: the source line then names the one behind the number the title prints (dependency_gates.mjs primaryCitations).
+    // `citeBy` says which: the source line then names the one behind the number the title prints (page-numbers.mjs primaryCitations).
     if (m.citeBy !== undefined && !(m.citeBy && typeof m.citeBy === "object" && !Array.isArray(m.citeBy) && Object.entries(m.citeBy).every(([label, keys]) => axis.labels.includes(label)
       && Array.isArray(keys) && keys.length && keys.every((key) => typeof key === "string" && key.trim() && (m.cite ?? insight.cite ?? []).includes(key)))))
       problems.push(`${at}: \`citeBy\` is { "<period or member>": ["<registry key>"] } - for a ${axis.kind === "periods" ? "period" : "member"} the measure records, the keys of its \`cite\` (or its insight's) that hold that value - or left out`);
@@ -366,34 +361,12 @@ export async function readInsightLog(baseDir, stem) {
   return { ...log, insights, parts };
 }
 
-// How an insight is graded, and what makes a measurement a finding: one
-// definition, read wherever the insight log is read (insightLogRefusal).
-const INSIGHT_STRENGTHS = Object.freeze(["strong", "supporting", "context"]);
-export function insightGradeProblems(item) {
-  const id = item?.id ?? "?";
-  return [...(INSIGHT_STRENGTHS.includes(item?.strength) ? [] : [`${id}: \`strength\` is one of ${INSIGHT_STRENGTHS.join(", ")}${item?.strength === undefined ? "" : ` (got ${JSON.stringify(item.strength)})`}`]),
-    ...(typeof item?.soWhat === "string" && textWords(item.soWhat) >= 4 ? [] : [`${id}: \`soWhat\` says what follows for the decision, in a sentence`])];
-}
-
 /**
  * Why a log's insights cannot be compiled over, as the message every command
- * that reads the log refuses with, or null: its measures are well formed, each
- * insight records the shape of its data and is graded, and no chart-bearing
- * shape is too narrow to carry a page. One function, so a log the analyses run
- * over (analysis.mjs) is a log the pages compile over (author-deck.mjs
- * readInsights): the first command to read a log says everything any later
- * one would refuse it for. Each kind of problem lists every insight that has it.
+ * that reads the log refuses with, or null: its measures are well formed.
+ * Every insight with a problem is listed at once.
  */
 export function insightLogRefusal(items) {
   const measured = items.flatMap(measureProblems);
-  if (measured.length) return `The insight log's measures are not valid:\n- ${measured.join("\n- ")}`;
-  const unshaped = items.filter((item) => !SHAPES[item.shape]).map((item) => item.id ?? "?");
-  if (unshaped.length) return `The insight log records no data shape for ${unshaped.join(", ")}: give each insight a \`shape\` - one of ${Object.keys(SHAPES).join(", ")} - so the pages can be checked against the evidence they rest on`;
-  const graded = items.flatMap(insightGradeProblems);
-  if (graded.length) return `The insight log's findings are not graded:\n- ${graded.join("\n- ")}`;
-  // A shape is only as good as its breadth: a four-year "series" or a three-member "peer set" becomes a chart page too thin
-  // to argue anything. Every narrow insight is named at once, before a page rests on it.
-  const narrow = items.map(breadthProblem).filter(Boolean);
-  if (narrow.length) return `The insight log's data is too narrow for ${narrow.length} insight${narrow.length === 1 ? "" : "s"}:\n- ${narrow.join("\n- ")}`;
-  return null;
+  return measured.length ? `The insight log's measures are not valid:\n- ${measured.join("\n- ")}` : null;
 }

@@ -61,6 +61,12 @@ COMPOSE = '''
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 import { sceneGateFindings } from './skills/professional-slides/runtime/author-deck.mjs';
 import { stagesLayout } from './skills/professional-slides/runtime/schedule-stages.mjs';
+import { planRole } from './skills/professional-slides/runtime/derive-content.mjs';
+import { textWords } from './skills/professional-slides/runtime/text-contract.mjs';
+// A page's body words: its body, exhibit and qualification text, notes and sources left out.
+const textOf = (n) => String(n.data?.textLayout?.source ?? n.text ?? '');
+const bodyWords = (scene) => scene.nodes.filter((n) => n.type === 'text' && ['body', 'exhibit', 'qualification'].includes(planRole(n.role)) && !/^\s*(source|sources|note|notes|footnote)\b[:\s]/i.test(textOf(n)))
+  .reduce((sum, n) => sum + textWords(textOf(n)), 0);
 function measure(page) {
   const spec = { schema: 'professional-slides.deck/v3', id: 'sched', design: 'consulting', slides: [page] };
   let deck;
@@ -73,7 +79,7 @@ function measure(page) {
   const voids = [...gates.findings, ...gates.advisories].filter((f) => /VOID|DEAD_BAND/.test(f.code)).map((f) => ({ code: f.code, severity: f.severity, kind: f.measured?.kind, band: f.measured?.band }));
   const roles = own.filter((n) => n.type === 'text').reduce((m, n) => ({ ...m, [n.role]: (m[n.role] || 0) + 1 }), {});
   const texts = own.filter((n) => /-text$/.test(n.role));
-  return { words: scene.planBodyWords, roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
+  return { words: bodyWords(scene), roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
     rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size, voids,
     inside: own.every((n) => n.frame.x >= frame.x - 1 && n.frame.x + (n.frame.width || 0) <= frame.x + frame.width + 1 && n.frame.y + (n.frame.height || 0) <= frame.y + frame.height + 1) };
 }

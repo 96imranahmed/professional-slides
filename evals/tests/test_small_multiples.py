@@ -14,7 +14,7 @@ PRELUDE = """
 import assert from 'node:assert/strict';
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { compilePage } from './skills/professional-slides/runtime/page-types.mjs';
-import { carrierOf, boundKeys } from './skills/professional-slides/runtime/claim-fit.mjs';
+import { plottedValues } from './skills/professional-slides/runtime/evidence.mjs';
 const frame = { x: 60, y: 160, width: 1160, height: 480 };
 const chart = REGISTRY.get('chart.small-multiples');
 const render = (props, f = frame) => chart.render({ id: 'c', frame: f, props }).nodes;
@@ -241,7 +241,7 @@ const page = { id: 'p', type: 'panels', form: 'small-multiples', commentary: 'be
   points: [{ lead: 'One region moved', text: 'The East moved a third of its riders to day tickets in three years.' }, { lead: 'Why', text: 'It was the only region recast to a train every twenty minutes.' }] };
 const slide = compilePage(page);
 assert.equal(slide.exhibit.type, 'chart.small-multiples');
-assert.equal(slide.pageType.values, 6 * 3 * 4, 'a value a part a category a panel');
+assert.equal(plottedValues([slide.exhibit], { printed: true }), 6 * 3 * 4, 'a value a part a category a panel');
 console.log('{}');
 """)
 
@@ -261,10 +261,10 @@ const slide = compilePage(page);
 assert.equal(slide.exhibit.type, 'chart.small-multiples');
 assert.equal(slide.layout, 'exhibit-left');
 assert.equal(slide.arrange, undefined, 'not a row of panels');
-assert.equal(slide.pageType.values, 32, 'every panel counts towards the evidence');
-assert.throws(() => compilePage({ ...page, exhibit: { ...page.exhibit, items: items.slice(0, 4) } }), /five or more cuts/);
+assert.equal(plottedValues([slide.exhibit], { printed: true }), 32, 'every panel counts towards the evidence');
+assert.ok(compilePage({ ...page, exhibit: { ...page.exhibit, items: items.slice(0, 4) } }), "four cuts are the writer's choice");
 assert.throws(() => compilePage({ ...page, exhibit: undefined, exhibits: [page.exhibit, page.exhibit] }), /carries 1 exhibit/);
-assert.throws(() => compilePage({ ...page, commentary: 'captions' }), /choose `commentary`/);
+assert.throws(() => compilePage({ ...page, commentary: 'captions' }), /`commentary` is one of/);
 console.log('{}');
 """)
 
@@ -274,16 +274,7 @@ console.log('{}');
 const ends = ['FY23', 'FY26'], pairs = items.map((item) => ({ ...item, values: [item.values[0], item.values.at(-1)] }));
 const slide = compilePage({ ...page, exhibit: { ...page.exhibit, categories: ends, items: pairs } });
 assert.equal(slide.exhibit.type, 'chart.small-multiples');
-assert.equal(slide.pageType.values, 16);
-console.log('{}');
-""")
-
-    def test_it_carries_many_cuts_where_rows_and_grids_stop(self):
-        run_node(PRELUDE + """
-const row = carrierOf('panels', 'small-multiples');
-assert.equal(row.carries.cuts({ cuts: 8 }), 2, 'the best fit for eight cuts');
-assert.equal(row.carries.cuts({ cuts: 3 }), 0);
-assert.equal(carrierOf('panels', 'row').needs({ cuts: 8 }) !== null, true, 'a row cannot take eight');
+assert.equal(plottedValues([slide.exhibit], { printed: true }), 16);
 console.log('{}');
 """)
 

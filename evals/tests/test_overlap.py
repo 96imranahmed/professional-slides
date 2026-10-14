@@ -178,17 +178,14 @@ class SceneDesignFindingTests(unittest.TestCase):
         result = run_node(f"""
 import {{ sceneDesignFindings, OVERLAP_CODES, OVERLAP_SEVERITY }} from '{RUNTIME}/validate-overlap.mjs';
 import {{ withFindings, buildOutcome }} from '{RUNTIME}/build-deck.mjs';
-import {{ applyRulesVersion }} from '{RUNTIME}/weight.mjs';
 const text = (id, frame) => ({{ id, type: 'text', role: 'flow-arrow-label', text: 'agent role', frame, style: {{ align: 'left', valign: 'top', fontSize: {{ value: 10 }} }}, data: {{}} }});
 const arrow = {{ id: 'a', type: 'line', role: 'flow-arrow', frame: {{ x: 80, y: 107, width: 120, height: 0 }}, data: {{ x1: 80, y1: 107, x2: 200, y2: 107 }} }};
 const box = {{ id: 'b', type: 'rect', role: 'flow-step', frame: {{ x: 300, y: 80, width: 100, height: 60 }} }};
 const scene = {{ slides: [{{ id: 'cover', nodes: [] }}, {{ id: 'p1', nodes: [text('t', {{ x: 100, y: 100, width: 60, height: 14 }}), arrow] }}, {{ id: 'p2', nodes: [text('e', {{ x: 240, y: 100, width: 59, height: 14 }}), box] }}] }};
 const found = sceneDesignFindings(scene);
 const outcome = (findings) => buildOutcome({{ preflight: withFindings({{ passed: true, findings: [] }}, findings), readback: {{ accepted: true }} }}, {{ render: false }});
-const older = applyRulesVersion(found, {{ workflow: 'existing_deck_revision', rulesVersion: 2 }});
 console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.severity]), codes: Object.keys(OVERLAP_CODES).sort(), held: Object.keys(OVERLAP_SEVERITY).sort(),
-  status: outcome(found).status, blockers: outcome(found).blockers.map((b) => b.code), edgeOnly: outcome(found.filter((f) => f.code === 'TEXT_ON_EDGE')).status,
-  older: outcome(older).status }}));
+  status: outcome(found).status, blockers: outcome(found).blockers.map((b) => b.code), edgeOnly: outcome(found.filter((f) => f.code === 'TEXT_ON_EDGE')).status }}));
 """)
         self.assertEqual(result["codes"], result["held"], "every scene check has a severity")
         self.assertIn([2, "p1", "TEXT_ON_LINE", "blocker"], result["found"])
@@ -196,7 +193,6 @@ console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.
         self.assertEqual(result["status"], "built-with-blockers")
         self.assertEqual(result["blockers"], ["TEXT_ON_LINE"])
         self.assertEqual(result["edgeOnly"], "built-unrendered")
-        self.assertEqual(result["older"], "built-unrendered", "a revision under older rules hears it as advice")
 
     def test_the_build_and_authoring_run_the_scene_checks(self):
         """Fifty-page audit: the checks shipped unwired, imported by the eval suite alone."""
@@ -230,7 +226,7 @@ console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.
             preflight = json.loads((tmp / "out" / "preflight-gates.json").read_text())
             self.assertIn("planted", [f.get("id") for f in preflight["findings"]], "the build does not report the scene checks")
             authored = subprocess.run([*hooked, "--input-type=module", "--eval", f"""
-import {{ authorDeck, scaffoldPage }} from {json.dumps((ROOT / "skills/professional-slides/runtime/author-deck.mjs").as_uri())};
+import {{ authorDeck, scaffoldPage }} from './skills/professional-slides/runtime/author-deck.mjs';
 const doc = {{ deck: {{ schema: 'professional-slides.deck/v3', id: 'probe' }}, pages: [scaffoldPage('trend', {{ id: 'p01' }})] }};
 const out = await authorDeck(doc, {{ baseDir: {json.dumps(str(tmp))} }});
 console.log(JSON.stringify([...out.blocking, ...out.advisories].map((f) => f.id ?? null)));

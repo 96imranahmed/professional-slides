@@ -58,13 +58,11 @@ class WordParityTests(unittest.TestCase):
         os.environ["TEXT_STATS_CORPUS"] = json.dumps(CORPUS + [None])
         cls.js = run_node("""
 import {normalizeText, textWords} from './skills/professional-slides/runtime/text-contract.mjs';
-import {contentWords} from './skills/professional-slides/runtime/gates/content_gates.mjs';
 const corpus = JSON.parse(process.env.TEXT_STATS_CORPUS);
 console.log(JSON.stringify(corpus.map((text) => ({
   normalized: normalizeText(text),
   count: textWords(text),
   words: normalizeText(text).split(/\\s+/).filter(Boolean),
-  content: [...contentWords(text)].sort(),
 }))));
 """)
 

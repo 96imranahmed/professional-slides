@@ -45,12 +45,6 @@ def evals_text_files():
 
 
 class CorpusIsolationTests(unittest.TestCase):
-    def test_shipped_task_targets_are_numbers_only(self):
-        tasks = json.loads((SKILL / 'runtime' / 'reading-tasks.json').read_text())['tasks']
-        for name, task in tasks.items():
-            self.assertEqual(set(task), {'commentary', 'bodyWords', 'totalWords'}, name)
-            self.assertLessEqual(task['bodyWords']['q1'], task['bodyWords']['median'])
-
     def test_nothing_in_the_package_mentions_the_corpus(self):
         # Scan the real package, not the source tree: it is what gets shared.
         with tempfile.TemporaryDirectory() as tmp:
@@ -81,19 +75,7 @@ class CorpusIsolationTests(unittest.TestCase):
             package_plugin.package(ROOT, dest)
             files = json.loads((dest / 'package-manifest.json').read_text())['files']
             self.assertFalse([f for f in files if f.startswith('evals/')])
-            self.assertIn('skills/professional-slides/runtime/reading-tasks.json', files)
-
-    def test_a_page_names_its_task_and_is_held_to_its_numbers(self):
-        from node_probe import run_node
-        result = run_node('''
-import { checkTextPlan } from './skills/professional-slides/runtime/text-contract.mjs';
-const page = (task) => ({ n: 1, id: 'p', textPlan: [{ id: 't', role: 'title', text: 'A title' }, { id: 'b', role: 'body', text: 'word '.repeat(20) }], textReference: { task } });
-const run = (task) => checkTextPlan({ textContract: 'complete', pages: [page(task)] }).findings.map(f => f.code);
-console.log(JSON.stringify({ none: run(undefined), thin: run('chart-with-commentary'), led: run('chart-led') }));
-''')
-        self.assertEqual(result['none'], ['TEXT_REFERENCE_MISSING'])
-        self.assertIn('TEXT_COVERAGE_LOW', result['thin'])
-        self.assertIn('TEXT_COVERAGE_LOW', result['led'])
+            self.assertIn('skills/professional-slides/SKILL.md', files)
 
 
 if __name__ == '__main__':

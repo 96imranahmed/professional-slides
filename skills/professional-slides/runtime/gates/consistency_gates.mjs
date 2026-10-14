@@ -23,9 +23,8 @@
 //                the same thing
 //
 // With numbers bound to measures two pages cannot state different values of
-// one measure at one label - the runtime writes both, and a typed chart is
-// held to its measure value by value (dependency_gates.mjs BASIS_VALUES). What
-// is left, and what is reported:
+// one measure at one label - the runtime writes both. What is left, and what
+// is reported:
 //
 //   NUMBERS_DISAGREE (blocks)    two pages each print one of two records the
 //                                log's own conflict check calls one measure
@@ -91,7 +90,7 @@ import { measurementsIn, percentUnit, printedNumbers, unitScale } from "../print
 import { registered } from "../errors.mjs";
 import { readJsonSync } from "../cli.mjs";
 import { carriedStated, printsWords } from "../revision.mjs";
-import { pagePool, pageTexts, refsOf, statedCells, typedNumbers } from "./dependency_gates.mjs";
+import { pagePool, pageTexts, refsOf, statedCells, typedNumbers } from "../page-numbers.mjs";
 import { bridgeDecimals, chartDecimals, figuresWithDecimals, roundHalfAway } from "../value-format.mjs";
 
 export const CONSISTENCY_CODES = Object.freeze({

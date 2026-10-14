@@ -24,7 +24,7 @@ AUTHOR = ROOT / "skills" / "professional-slides" / "runtime" / "author-deck.mjs"
 # A log on a subject of its own: five series for one company, a peer set and a few single values.
 LOG = '''
 import { bindDeck } from './skills/professional-slides/runtime/bind.mjs';
-import { dependencyFindings } from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
+import { untracedFindings } from './skills/professional-slides/runtime/page-numbers.mjs';
 const FY = ['FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'];
 const graded = { finding: 'a finding', calculation: 'a calculation', soWhat: 'It bears on the decision at hand', strength: 'strong' };
 const one = (unit, value) => ({ unit, population: 'the company', period: 'FY26', value });
@@ -48,9 +48,9 @@ const deckOf = (...pages) => ({ deck: { schema: 'professional-slides.deck/v3', i
 const bind = (p) => { const out = bindDeck(deckOf(p), insights); return { page: out.doc.pages[0], findings: out.findings }; };
 const exhibitOf = (ex, o) => bind(page({ exhibit: ex, ...o })).page.exhibit;
 const problems = (p) => bind(p).findings.map((f) => f.repair);
-const codes = (p) => dependencyFindings(deckOf(p), insights).map((f) => f.code);
-// What the trace finds: a title's number no record holds is refused (TITLE_NUMBER_UNTRACED), any other advised (NUMBER_UNTRACED).
-const advised = (p) => dependencyFindings(deckOf(p), insights).flatMap((f) => f.code === 'NUMBER_UNTRACED' ? f.measured : f.code === 'TITLE_NUMBER_UNTRACED' ? f.measured.map((shown) => `title: ${shown}`) : []);
+// What the trace finds: a typed number no record holds is advised (NUMBER_UNTRACED), with its field.
+const advised = (p) => untracedFindings(deckOf(p), insights).flatMap((f) => f.measured);
+const codes = (p) => untracedFindings(deckOf(p), insights).map((f) => f.code);
 '''
 
 
@@ -128,11 +128,11 @@ const run = await authorDeck(deckOf(broken, good), { baseDir: process.cwd(), ins
 console.log(JSON.stringify({
   unknown: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'i-bal/cahs', name: 'Cash' }] } })), bare: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'cash' }] } })),
   noLog: bindDeck(deckOf(page({ exhibit: cash })), null).findings.map((f) => f.repair),
-  unrested: problems(broken), found: dependencyFindings(deckOf(broken), insights).map((f) => [f.code, f.id, f.severity, f.measured]),
+  unrested: problems(broken), found: untracedFindings(deckOf(broken), insights).map((f) => [f.code, f.id, f.severity, f.measured]),
   partial: [partial.spec.slides.map((s) => s.id), partial.compileErrors, partial.bindingFindings.map((f) => f.code)], thrown,
   authored: [[...run.blocking, ...run.advisories].map((f) => `${f.code} ${f.id ?? ''}`.trim()), [...run.failedIds]],
   typedBeside: problems(page({ exhibit: { ...cash, categories: FY } })), typedSeries: problems(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })),
-  mixedSeries: codes(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })),
+  mixedSeries: bind(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })).findings.map((f) => f.code),
   basisBeside: problems(page({ exhibit: { ...cash, basis: { measures: ['i-bal/debt'] } } })), unit: problems(page({ exhibit: { ...cash, unit: 'USD m' } })), sameUnit: problems(page({ exhibit: { ...cash, unit: 'gbp m.' } })),
   units: problems(page({ exhibit: { heading: 'Cash and staff', series: [{ measure: 'i-bal/cash' }, { measure: 'i-bal/staff' }] } })),
   axes: problems(page({ exhibit: { heading: 'Cash and margin', series: [{ measure: 'i-bal/cash' }, { measure: 'i-peers/margin' }] } })),
@@ -149,7 +149,7 @@ console.log(JSON.stringify({
         self.assertEqual(len(result["unrested"]), 1)
         self.assertIn("names a measure of i-peers, which the page does not name in `evidence`", result["unrested"][0])
         self.assertIn("and 2 more references on the page with the same fault", result["unrested"][0])
-        self.assertEqual(result["found"], [["BINDING_UNRESOLVED", "p1", "blocker", ["i-peers/margin"]]])  # and nothing else about the page: it has no numbers to hold yet
+        self.assertEqual(result["found"], [])  # the binding's finding is the page's: it has no numbers to trace yet
         # The page is left out of the compile, the rest of the deck compiles, and the finding is the binding's.
         self.assertEqual(result["partial"], [["p2"], [], ["BINDING_UNRESOLVED"]])
         self.assertIn("1 page could not be compiled", result["thrown"])
@@ -227,8 +227,8 @@ console.log(JSON.stringify({ title: bound.title, subtitle: bound.subtitle, metri
         self.assertEqual(result["gate"], [])
         # A table whose every number is a token has said what it shows; an undisclosed value prints as n/a.
         self.assertEqual(result["table"], [[["Alpha", "20m", "15%"], ["Beta", "3m", "8%"], ["Gamma", "n/a", "n/a"]], {"measures": ["i-peers/profit", "i-peers/margin"], "role": "proof", "labels": {"i-peers/profit": ["Alpha", "Beta", "Gamma"], "i-peers/margin": ["Alpha", "Beta"]}, "bound": True}, []])
-        # One that also types numbers says which measures those are.
-        self.assertEqual(result["mixed"], [None, ["BASIS_MISSING", "PROOF_MISSING"]])
+        # One that also types numbers is traced like any typed number: these are recorded values.
+        self.assertEqual(result["mixed"], [None, []])
         self.assertEqual(result["mixedWithBasis"], [])
         # A scorecard's judged cells - Harvey balls, RAG states - are grades no measure holds: beside tokens they type nothing.
         # For the evidence floor, a figure bound and printed ("29%") is read as a number as a typed one is; "n/a" is not.
@@ -273,7 +273,7 @@ console.log(JSON.stringify(Object.fromEntries(['CHF1.3bn in FY26, up 4.3% on 500
         result = run_node(LOG + '''
 const cash = { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] };
 const say = (o) => advised(page({ exhibit: cash, ...o }));
-const all = dependencyFindings(deckOf(page({ exhibit: cash, title: 'Cash reached 56.5 million' })), insights);
+const all = untracedFindings(deckOf(page({ exhibit: cash, title: 'Cash reached 56.5 million' })), insights);
 console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, f.measured]), repair: all[0].repair,
   recorded: say({ title: 'Cash reached 55 million from 15 million as debt fell to GBP 56m', bar: 'Revenue of CHF1.3bn leaves a rate of -0.9%, or 35% of staff cost' }),
   wrong: say({ title: 'Cash reached 57 million from 15.5 million', subtitle: 'Revenue CHF1.4bn, a rate of +0.9%', bar: 'Debt fell 42.7% to 56 million over the five years' }),
@@ -286,13 +286,13 @@ console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, 
   cells: advised(page({ type: 'lookup', form: 'table', evidence: ['i-peers'], settles: { kind: 'comparison', what: 'carrier margins', measures: ['i-peers/margin'] }, exhibit: { type: 'table', columns: ['Carrier', 'Margin', 'Note'],
     rows: [['Alpha', '15%', 'ahead'], ['Beta', 9, 'Line 2 of 3'], { cells: ['Delta', { text: '22%' }, '21 points'] }], basis: { measures: ['i-peers/margin'] } } })),
   // A typed metric with a basis is already held to its measure: it is refused there, and not reported twice.
-  metric: dependencyFindings(deckOf(page({ type: 'numbers', form: 'metric-strip', metrics: [{ value: '-9.9%', label: 'Rate', sublabel: 'against 7.7% a year earlier', basis: { measures: ['i-bal/rate'] } }, { value: '12.5%', label: 'No basis' }], exhibit: cash })), insights).map((f) => [f.code, f.measured]),
+  metric: untracedFindings(deckOf(page({ type: 'numbers', form: 'metric-strip', metrics: [{ value: '-9.9%', label: 'Rate', sublabel: 'against 7.7% a year earlier', basis: { measures: ['i-bal/rate'] } }, { value: '12.5%', label: 'No basis' }], exhibit: cash })), insights).map((f) => [f.code, f.measured]),
   tokens: say({ title: 'Cash reached {{i-bal/cash@FY26 | 0.0}} million, or {{i-bal/perHead | 0%| x100}} of 99.9 million' }),
   qualitative: advised({ ...page({ exhibit: undefined, settles: undefined, type: 'argument', form: 'memo', title: 'A judgement with 12.5% in it' }), evidence: [] }) }));
 ''')
-        # A title's number no record holds is refused where it is written, not advised.
-        self.assertEqual(result["finding"], [["TITLE_NUMBER_UNTRACED", "p1", "blocker", ["56.5 million"]]])
-        self.assertIn("the title states 56.5 million", result["repair"])
+        # A title's number no record holds is advised, as any other typed number is.
+        self.assertEqual(result["finding"], [["NUMBER_UNTRACED", "p1", "advisory", ["title: 56.5 million"]]])
+        self.assertIn("56.5 million in `title`", result["repair"])
         self.assertIn("{{<insight id>/<measure>@<period or member> | 0.0}}", result["repair"])
         self.assertEqual(result["recorded"], [])  # recorded values in any dress: scaled, signed, with a currency, a ratio as a percentage
         self.assertEqual(result["wrong"], ["title: 57 million", "title: 15.5 million", "bar: 42.7%", "subtitle: CHF1.4bn", "subtitle: +0.9%"])
@@ -303,41 +303,21 @@ console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, 
         self.assertEqual(result["fields"], ["exhibit.caption: 99.5 million", "exhibit.annotations[0].text: 77.7%", "points[0]: 3.3x", "points[1].text: 44.4%", "takeaway: 66.6 million"])
         # Every figure cell of a table is read, typed as text or as a number; a row's name and a count in a note are not.
         self.assertEqual(result["cells"], ["exhibit.rows[1][1]: 9", "exhibit.rows[2][1]: 22%"])
-        self.assertEqual(result["metric"], [["NUMBER_UNTRACED", ["metrics[0].sublabel: 7.7%", "metrics[1].value: 12.5%"]], ["BASIS_VALUES", {"printed": "-9.9%", "recorded": [-0.86]}]])
+        self.assertEqual(result["metric"], [["NUMBER_UNTRACED", ["metrics[0].sublabel: 7.7%", "metrics[1].value: 12.5%"]]])
         self.assertEqual(result["tokens"], ["title: 99.9 million"])  # what the runtime wrote is not traced; what is typed beside it is
-        self.assertEqual(result["qualitative"], [])  # a page that rests on no measured insight has nothing to be traced to
+        self.assertEqual(result["qualitative"], ["title: 12.5%"])  # a page that names no insight is traced to every measure the log records
 
     def test_a_printed_number_states_a_record_at_the_precision_the_page_prints(self):
-        result = run_node(LOG + '''
+        result = run_node('''
 import { matches } from './skills/professional-slides/runtime/printed-numbers.mjs';
-const cash = { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] };
-const metric = (value, ref) => codes(page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, metrics: [{ value, label: 'A figure', basis: { measures: [ref] } }], exhibit: cash }));
-const plotted = (values) => codes(page({ settles: { kind: 'rate', what: 'the yearly swing', measures: ['i-bal/swing'] }, exhibit: { heading: 'Swing', unit: 'GBP m', categories: FY, series: [{ name: 'Swing', values }], basis: { measures: ['i-bal/swing'] } } }));
-const cells = (cell) => codes(page({ type: 'lookup', form: 'table', commentary: 'none', bar: undefined, settles: { kind: 'count', what: 'revenue', measures: ['i-bal/revenue'] },
-  exhibit: { type: 'table', columns: ['Measure', 'FY26'], rows: [['Revenue', cell]], basis: { measures: ['i-bal/revenue'] } } })).filter((code) => code !== 'NUMBER_UNTRACED');
-console.log(JSON.stringify({
-  // -0.86% printed to one decimal place: refused by two significant figures, which the first contract asked of every number.
-  percent: Object.fromEntries(['-0.9%', '-0.86%', '-1%', '+0.9%', '-0.8%'].map((v) => [v, metric(v, 'i-bal/rate')])),
-  // Outside a percentage, two significant figures stand: 0.349 is not 0.3, and 3.4 is not 3.
-  ratio: Object.fromEntries(['0.35', '0.3', '0.349'].map((v) => [v, metric(v, 'i-bal/perHead')])), whole: Object.fromEntries(['3.4m', '3m'].map((v) => [v, metric(v, 'i-bal/margin')])),
-  // A letter before the digits: read as a number, so a right one passes and a wrong one is refused - in a metric and in a cell alike.
-  prefixed: Object.fromEntries(['CHF1.3bn', 'CHF1,300m', 'CHF1.4bn', 'CHF 1.3bn'].map((v) => [v, metric(v, 'i-bal/revenue')])), cells: Object.fromEntries(['CHF1.3bn', 'CHF1.4bn'].map((v) => [v, cells(v)])),
-  // A small value in a series keeps two significant figures of its own, whatever the size of its neighbours: -0.86 beside -21.4 is not -0.9, and 0.04 is not 0.0.
-  series: { exact: plotted([4.3, -21.4, -0.86, 2.2, 0.04, 9.1]), printed: plotted([4.3, -21.4, -0.9, 2.2, 0.0, 9.1]), whole: plotted([4, -21, -1, 2, 0, 9]), wrong: plotted([4.3, -21.4, -1.9, 2.2, 0.0, 9.1]) },
-  rule: [matches(55, 54.9), matches(54.9, 54.93), matches(3, 3.4), matches(3, 3.04), matches(-0.9, -0.86), matches(-0.9, -0.86, { percent: true }), matches(0.0, 0.04, { decimals: 1, scale: 21.4 }), matches(0.3, 0.349, { scale: 0.438 })] }));
+console.log(JSON.stringify([matches(55, 54.9), matches(54.9, 54.93), matches(3, 3.4), matches(3, 3.04), matches(-0.9, -0.86), matches(-0.9, -0.86, { percent: true }), matches(0.0, 0.04, { decimals: 1, scale: 21.4 }), matches(0.3, 0.349, { scale: 0.438 })]));
 ''')
-        self.assertEqual(result["percent"], {"-0.9%": [], "-0.86%": [], "-1%": ["BASIS_VALUES"], "+0.9%": ["BASIS_VALUES"], "-0.8%": ["BASIS_VALUES"]})
-        self.assertEqual(result["ratio"], {"0.35": [], "0.3": ["BASIS_VALUES"], "0.349": []})
-        self.assertEqual(result["whole"], {"3.4m": [], "3m": ["BASIS_VALUES"]})
-        self.assertEqual(result["prefixed"], {"CHF1.3bn": [], "CHF1,300m": [], "CHF1.4bn": ["BASIS_VALUES"], "CHF 1.3bn": []})
-        self.assertEqual(result["cells"], {"CHF1.3bn": [], "CHF1.4bn": ["BASIS_VALUES"]})
-        self.assertEqual(result["series"], {"exact": [], "printed": ["BASIS_VALUES"], "whole": ["BASIS_VALUES"], "wrong": ["BASIS_VALUES"]})
-        # The last two were once passed "on the series' scale"; nothing but the value's own two figures, and a percentage's one decimal place, is read now.
-        self.assertEqual(result["rule"], [True, True, False, True, False, True, False, False])
+        # Nothing but the value's own two figures, and a percentage's one decimal place, is read.
+        self.assertEqual(result, [True, True, False, True, False, True, False, False])
 
 
 class RowMetricTests(unittest.TestCase):
-    def test_a_metric_on_a_labelled_row_and_a_fact_grid_item_count_as_proof(self):
+    def test_a_row_metric_and_a_fact_grid_item_keep_their_figures_and_drop_their_basis(self):
         result = run_node(LOG + '''
 import { compileDeck, withoutDependencies } from './skills/professional-slides/runtime/author-deck.mjs';
 const block = (label, metric) => ({ label, points: [`${label} moved in each of the five years to the latest year end.`, 'The movement came from retained earnings rather than new borrowing.'], ...(metric ? { metric } : {}) });
@@ -347,59 +327,20 @@ const rows = (cash, debt) => ({ id: 'p1', type: 'parallel', form: 'labelled-rows
   blocks: [block('Cash', cash), block('Debt', debt)] });
 const typed = rows({ value: '55m', label: 'cash at FY26', basis: { measures: ['i-bal/cash'] } }, { value: '56m', label: 'debt at FY26', basis: { measures: ['i-bal/debt'] } });
 const bound = rows({ measure: 'i-bal/cash@FY26', format: '0m', label: 'cash at FY26' }, { measure: 'i-bal/debt@FY26', format: '0m', label: 'debt at FY26' });
-const bare = rows({ value: '55m', label: 'cash at FY26' }, { value: '56m', label: 'debt at FY26' });
-const wrong = rows({ value: '65m', label: 'cash at FY26', basis: { measures: ['i-bal/cash'] } }, { value: '56m', label: 'debt at FY26', basis: { measures: ['i-bal/debt'] } });
 const grid = (items) => ({ id: 'p1', type: 'numbers', form: 'fact-grid', commentary: 'none', title: 'Cash stands at more than twice the floor', why: 'Two counts that each need their own sentence', evidence: ['i-bal'],
   settles: { kind: 'count', what: 'cash and the floor', measures: ['i-bal/cash', 'i-bal/floor'] }, exhibit: { columns: 2, items } });
 const item = (value, label, basis) => ({ value, label, text: 'What the number measures, in a sentence of its own', ...(basis ? { basis } : {}) });
 const compiled = compileDeck(deckOf(typed, { ...bound, id: 'p2' }), { insights, partial: true });
 const stripped = withoutDependencies(grid([item('55m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')]));
-console.log(JSON.stringify({ typed: codes(typed), bound: codes(bound), bare: codes(bare), wrong: codes(wrong),
-  errors: compiled.compileErrors,
+console.log(JSON.stringify({ errors: compiled.compileErrors,
   leaked: JSON.stringify(compiled.spec.slides.map((s) => ({ ...s, pageType: null }))).includes('"basis"'), values: compiled.spec.slides.map((s) => s.blocks.map((b) => b.metric.value)),
-  item: codes(grid([item('55m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')])), itemWrong: codes(grid([item('65m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')])),
-  noItemBasis: codes(grid([item('55m', 'cash'), item('25m', 'the floor')])), itemStripped: [JSON.stringify(stripped.page).includes('"basis"'), stripped.dependencies.declared.metrics.length] }));
+  itemStripped: [JSON.stringify(stripped.page).includes('"basis"'), stripped.dependencies.declared.metrics.length] }));
 ''')
-        self.assertEqual(result["typed"], [])  # was PROOF_MISSING: the row's metric was not read
-        self.assertEqual(result["bound"], [])
-        self.assertEqual(result["bare"], ["PROOF_MISSING"])  # a row metric that names no measure proves nothing
-        self.assertEqual(result["wrong"], ["BASIS_VALUES"])  # and one that names a measure is held to it
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["leaked"])  # `basis` is the author's statement, not a prop the composer draws
         self.assertEqual(result["values"], [["55m", "56m"], ["55m", "56m"]])
-        self.assertEqual(result["item"], [])
-        self.assertEqual(result["itemWrong"], ["BASIS_VALUES"])
-        self.assertEqual(result["noItemBasis"], ["PROOF_MISSING"])
         self.assertEqual(result["itemStripped"], [False, 1])
 
-
-class RecordReadingTests(unittest.TestCase):
-    """What a page's figures print against the record itself, read off the references and the recorded values."""
-
-    def test_a_number_printed_past_the_records_precision_is_advised_with_the_format_that_keeps_it(self):
-        """BA retest: the OAG seat shares were recorded as 34, 16 and 14 and printed 34.0% - a precision nobody measured -
-        because the writer brief offered `| 0.0` for every token."""
-        result = run_node(LOG + '''
-const advice = (p) => dependencyFindings(deckOf(p), insights).filter((f) => f.code === 'PRECISION_UNRECORDED').map((f) => [f.severity, f.measured, f.repair]);
-const titled = (title) => advice(page({ title }));
-const metric = (measure, format) => advice(page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, metrics: [{ measure, format, label: 'A figure' }], exhibit: { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] } }));
-console.log(JSON.stringify({
-  whole: titled('Cash rose to {{i-bal/cash@FY26 | 0.0}} million while debt fell'), kept: titled('Cash rose to {{i-bal/cash@FY26 | 0}} million while debt fell'),
-  // The most places any recorded value carries: 0.04 among the swings carries two, so a swing of 4.3 at one place is the record's.
-  swing: titled('The swing reached {{i-bal/swing@FY21 | 0.0}} million'), unpatterned: titled('Cash rose to {{i-bal/cash@FY26}} million while debt fell'),
-  figure: metric('i-bal/cash@FY26', 'GBP 0.0m'), scaled: metric('i-bal/perHead', '0.00% | x100'), scaledKept: metric('i-bal/perHead', '0.0% | x100') }));
-''')
-        [(severity, measured, repair)] = result["whole"]
-        self.assertEqual(severity, "advisory")
-        self.assertEqual(measured, ['i-bal/cash@FY26: "0"'])
-        self.assertIn("the token {{i-bal/cash@FY26 | 0.0}} in `title` prints 55.0 where i-bal/cash@FY26 records 55: write \"0\"", repair)
-        self.assertEqual(result["kept"], [])
-        self.assertEqual(result["swing"], [])
-        self.assertEqual(result["unpatterned"], [], "a token with no pattern prints no more places than its value has")
-        self.assertEqual(result["figure"][0][1], ['i-bal/cash@FY26: "GBP 0m"'])
-        # A ratio printed as a percentage carries the places its record has once scaled: 0.349 is 34.9%.
-        self.assertEqual(result["scaled"][0][1], ['i-bal/perHead: "0.0% | x100"'])
-        self.assertEqual(result["scaledKept"], [])
 
 if __name__ == "__main__":
     unittest.main()
