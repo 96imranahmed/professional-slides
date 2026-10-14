@@ -13,6 +13,7 @@
 // of the wrong kind with what the key takes. What each value means in detail
 // stays with the stage that reads it, which still checks it.
 import { MARK_KINDS, playerProblems } from "./players.mjs";
+import { CONVENTION_KEYS, conventionProblems } from "./conventions.mjs";
 
 // The kinds a value is read as: what `accepts` names, checked shallowly.
 const KINDS = Object.freeze({
@@ -61,6 +62,11 @@ const DECK_KEYS = Object.freeze({
     `the entities the deck compares, each introduced by its own mark before it is compared. \`mark\` says which: ${Object.entries(MARK_KINDS).map(([kind, about]) => `"${kind}"${kind === "logo" ? " (the default)" : ""} - ${about}`).join("; ")}`,
     (value) => { const problems = playerProblems(value); return problems.length ? `declares what the build cannot draw - ${problems.join("; ")}` : null; }),
   playersHint: key("string", ["string"], "a word that tells the logo search what the players marked by logos are (\"bank\", \"retailer\")"),
+  // What holds across the pages that no one page declares (conventions.mjs): written before the skeleton, so the section
+  // writers working side by side draw the subject, name the players, pick the peers and print currencies and heat one way.
+  conventions: key(`{ ${Object.keys(CONVENTION_KEYS).join(", ")} }`, ["object"],
+    `the deck's cross-page conventions, every key optional: ${Object.entries(CONVENTION_KEYS).map(([name, about]) => `\`${name}\` ${about}`).join("; ")}`,
+    (value, deck, context) => { const problems = conventionProblems(value, deck?.players, context); return problems.length ? `is not valid: ${problems.join("; ")}` : null; }),
   assets: key("{ fetch: \"build\" | \"none\", reason }", ["object"], "whether the build may fetch logos, photographs and places; \"none\" declares the deck is built without the network, with the reason the reviews are shown"),
   noPictures: key("string", ["string"], "why a deck about a subject with nothing to look at carries no photograph, in a sentence"),
   waivers: key("array of { code, reason }", ["array"], "build bars the deck asks to be excused from, each with a reason the review confirms"),
@@ -111,9 +117,10 @@ function nearest(name, known) {
  * Every problem with the keys of `deck`, as sentences: a key the table does
  * not hold, with the keys it is nearest to, and a value that is not of a kind
  * its key takes. A key that begins with `$` is a comment and is read past,
- * and so is a key set to null, which sets nothing.
+ * and so is a key set to null, which sets nothing. `context.sections` are the
+ * part files the pages file includes, by which `conventions` keys its sections.
  */
-export function deckKeyProblems(deck) {
+export function deckKeyProblems(deck, context = {}) {
   if (!deck || typeof deck !== "object" || Array.isArray(deck)) return [];
   const known = Object.keys(DECK_KEYS), problems = [];
   for (const [name, value] of Object.entries(deck)) {
@@ -125,7 +132,7 @@ export function deckKeyProblems(deck) {
       continue;
     }
     if (!entry.accepts.some((kind) => KINDS[kind](value))) { problems.push(`\`${name}\` on \`deck\` is ${entry.type} - ${entry.about}; it was given ${kindOf(value)}`); continue; }
-    const wrong = entry.test?.(value, deck);
+    const wrong = entry.test?.(value, deck, context);
     if (wrong) problems.push(`\`${name}\` on \`deck\` ${wrong}`);
   }
   return problems;

@@ -27,6 +27,7 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readJson, readJsonSync, schemaErrors } from "./cli.mjs";
 import { numbersIn } from "./claims.mjs";
+import { measureText } from "./text-layout.mjs";
 
 const DEFINITIONS = readJsonSync(new URL("./judgement-kinds.json", import.meta.url));
 /** Every kind of question a rule may ask: its version, question, verdicts and the fields an answer carries. */
@@ -105,7 +106,7 @@ export const activeJudgements = () => active;
  * rule does not hold. With no session, nothing is recorded and nothing holds.
  * `beside` is shown to the reader with the question and is not keyed.
  */
-export function judged(kind, subject, context = null, where = null, { image = null, beside = null } = {}) {
+export function judged(kind, subject, context = null, where = null, { image = null, beside = null, slot = null } = {}) {
   // The answer read here is this question's own, recorded once as the question.
   const recording = asked;
   asked = null;
@@ -114,7 +115,9 @@ export function judged(kind, subject, context = null, where = null, { image = nu
   asked?.push({ ask: "judged", kind, subject, context, where, image, beside, said: known ?? null });
   if (known || !active) return known;
   const key = judgementKey(kind, subject, context);
-  const open = active.pending.get(key) ?? { key, kind, subject, context: context ?? null, where: [], ...(image ? { image } : {}), ...(beside ? { beside } : {}) };
+  // `slot`: the slot this one line sits in where its kind's `fix.slot` does not say it - a title asked with the commentary
+  // (player-name-form) - `{ name, measure? }`, its replacement held to that slot's limits, and its lines measured in the band.
+  const open = active.pending.get(key) ?? { key, kind, subject, context: context ?? null, where: [], ...(image ? { image } : {}), ...(beside ? { beside } : {}), ...(slot ? { slot } : {}) };
   if (where !== null && where !== undefined && !open.where.includes(String(where))) open.where.push(String(where));
   active.pending.set(key, open);
   return null;
@@ -248,6 +251,12 @@ function fixProblems(item, answer) {
   const span = item.slot?.words ?? {};
   if (Number.isFinite(span.max) && words(text) > span.max) problems.push(`${at}: \`replacement\` is ${words(text)} words, and its slot holds ${span.max} at most`);
   if (Number.isFinite(span.min) && words(text) < span.min) problems.push(`${at}: \`replacement\` is ${words(text)} words, and its slot takes ${span.min} at least`);
+  // A title's replacement is held to the title's lines as well, measured in the band the page sets it in.
+  const band = item.slot?.measure, most = item.slot?.lines?.max;
+  if (band && Number.isFinite(most) && band.width > 0) {
+    const set = measureText(text, band.width, { fontFamily: band.fontFamily, fontSize: band.fontSize, bold: Boolean(band.bold) }).lines.length;
+    if (set > most) problems.push(`${at}: \`replacement\` sets on ${set} lines where its slot holds ${most}: shorten it to fit`);
+  }
   // The page's figures as it prints them, and every figure the question itself shows (its subject, context and what is beside it).
   const printed = [...(item.figures ?? []), ...flat([item.subject, item.context ?? null, item.beside ?? null]).flatMap((said) => numbersIn(said).map((f) => f.raw.replace(/,/g, "")))].map(Number);
   const added = numbersIn(text).filter((figure) => !printed.includes(figure.value)).map((figure) => figure.raw);
@@ -294,7 +303,7 @@ export function judgementPrompt(packet, { validate = null } = {}) {
   // A question whose failure is mended by a replacement shows what the replacement may use: its slot and the page's figures.
   const span = (slot) => [Number.isFinite(slot?.words?.min) ? `at least ${slot.words.min}` : null, Number.isFinite(slot?.words?.max) ? `at most ${slot.words.max}` : null].filter(Boolean).join(" and ");
   const mendable = (item) => JUDGEMENT_KINDS[item.kind].fix?.by === "replace"
-    ? `${span(item.slot) ? `\nSlot: ${span(item.slot)} words` : ""}${item.figures?.length ? `\nFigures the page prints: ${item.figures.join(", ")}` : ""}` : "";
+    ? `${span(item.slot) ? `\nSlot: ${span(item.slot)} words${item.slot?.measure && Number.isFinite(item.slot?.lines?.max) ? `, on ${item.slot.lines.max} lines at most as the page sets it` : ""}` : ""}${item.figures?.length ? `\nFigures the page prints: ${item.figures.join(", ")}` : ""}` : "";
   const asked = (item, shared) => `### ${item.key}\n${item.image ? `Image: ${item.image} (open it)\n` : ""}Subject: ${JSON.stringify(item.subject)}` +
     `${!shared && item.context ? `\nContext: ${JSON.stringify(item.context)}` : ""}${!shared && item.beside ? `\nBeside it: ${JSON.stringify(item.beside)}` : ""}${mendable(item)}`;
   const mend = (spec) => {
@@ -396,7 +405,7 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, s
     const folder = path.join(home, `packet-${String(number).padStart(2, "0")}`);
     await fs.mkdir(folder, { recursive: true });
     const items = [];
-    for (const { key, kind, subject, context, where, image, beside, figures } of rest.slice(at, at + size)) {
+    for (const { key, kind, subject, context, where, image, beside, figures, slot: own } of rest.slice(at, at + size)) {
       // A question about a picture carries a copy of it in the packet, named by the question's key.
       let staged = null;
       if (image) {
@@ -405,7 +414,9 @@ export async function stageJudgements(dir, requests, { max = PACKET_ITEMS_MAX, s
         await fs.copyFile(image, path.join(folder, staged));
       }
       // A question a replacement mends carries what the replacement may use: the slot's limits the writer brief prints, and the page's figures.
-      const fix = JUDGEMENT_KINDS[kind].fix, slot = fix?.by === "replace" ? slots?.[fix.slot] ?? null : null;
+      // A question that names its own slot (judged `slot`) is held to that one, with the band its lines are measured in.
+      const fix = JUDGEMENT_KINDS[kind].fix, named = slots?.[own?.name ?? fix?.slot];
+      const slot = fix?.by === "replace" && named ? { ...named, ...(own?.measure ? { measure: own.measure } : {}) } : null;
       items.push({ key, kind, subject, context: context ?? null, where: where ?? [], ...(staged ? { image: staged } : {}), ...(beside ? { beside } : {}),
         ...(fix?.by === "replace" && figures?.length ? { figures } : {}), ...(slot ? { slot } : {}) });
     }

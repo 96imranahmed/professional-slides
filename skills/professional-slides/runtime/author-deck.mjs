@@ -148,6 +148,8 @@ import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile } from "./pages-file.mjs";
+import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
+import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
 import { recordPageChecks } from "./page-check.mjs";
 import { RECORD_FILE as ANSWER_CRITIQUE_FILE, answerHazards as answerHazardsOf, openAnswerItems } from "./answer-critique.mjs";
@@ -296,7 +298,8 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
   const registry = registryProblems(docIn.sources);
   if (registry.length) throw new Error(`The \`sources\` registry is not valid:\n- ${registry.join("\n- ")}`);
   // Every deck-level key is one the runtime reads, of the kind it reads it as (deck-keys.mjs): said here, in one message, rather than by whichever stage first trips on it.
-  const keyed = deckKeyProblems(docIn.deck);
+  const parts = sectionsOf(docIn);
+  const keyed = deckKeyProblems(docIn.deck, { sections: sectionNames(docIn) });
   if (keyed.length) throw new Error(`The deck-level keys of \`deck\` are not valid:\n- ${keyed.join("\n- ")}`);
   // The deck-level fields the reviews read may sit beside `deck` as well as on it.
   const deckKeys = Object.fromEntries(["request", "waivers", "rulesVersion"].filter((key) => docIn[key] !== undefined && docIn.deck[key] === undefined).map((key) => [key, docIn[key]]));
@@ -345,6 +348,11 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (unknown.length) return refuse(index, `${slide.id ?? `page ${index + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`, { stage: "shape" });
+    // The deck's conventions, written onto the slide where the composer and the page's own gates read them (conventions.mjs):
+    // the page's subject - its own, its section's, the deck's - and each heat column's direction, from the measure it prints.
+    if (page.subject !== undefined && !playerNamed(doc.deck.players, page.subject))
+      return refuse(index, `${id}: \`subject\` names "${page.subject}", which is not a declared player - a page's subject is one of \`players\` (by name or \`short\`), drawn in the accent wherever the page's charts plot it`, { stage: "shape" });
+    stampConventions(slide, unbound[index] ?? page, { conventions: conventionsOf(doc.deck), players: doc.deck.players, section: parts(page), measured });
     // What the page declares it rests on and what the binding recorded of it are kept on its record, where the storyline critique
     // and the reviewers read them (`recorded`): of a draft's page, what the spine itself declares; of its witness, what the completed page does.
     const recorded = (target, source, deps, bound) => {
@@ -907,6 +915,8 @@ function contentFindings(structural, deck, spec, { uncomposed = new Set(), uncom
 function localFindings({ doc, structural, deck, spec, insights, uncomposed, uncompiled, witness = null }) {
   // A reference that could not be bound is reported by the compile, which left its page out (compileDeck `bindingFindings`).
   const depends = spineDependencies(doc, insights, spec, witness);
+  // The deck's conventions on each compiled page (gates/convention_gates.mjs): what the renderer does not apply itself.
+  const conventions = conventionFindings(spec, deck).filter((f) => !uncompiled.has(String(f.id)));
   const design = deck ? WEIGHT.applyRulesVersion(sceneDesignFindings(deck), spec) : [];
   const { findings: copy, content, report } = contentFindings(structural, deck, spec, { uncomposed, uncompiled });
   // An explicit visual choice or authored commentary that did not survive composition: the build refuses it (CONTENT_LOST).
@@ -915,7 +925,7 @@ function localFindings({ doc, structural, deck, spec, insights, uncomposed, unco
     repair: f.code === "MISSING_AUTHORED_CONTENT" ? `The composed page does not carry this authored text: "${String(f.text).slice(0, 120)}". Its form or commentary placement has no place for it: move it to a field the page draws, or choose the placement that draws it`
       : `The page asks for a ${f.kind} ("${f.value}") that its composition does not draw; the build refuses a page that drops an explicit choice. Remove the choice, or choose the form that draws it` }))
     .filter((f) => f.id !== undefined && !uncomposed.has(String(f.id)) && !uncompiled.has(String(f.id))) : [];
-  return { depends, design, copy, kept, content, report };
+  return { depends, conventions, design, copy, kept, content, report };
 }
 
 /**
@@ -1207,7 +1217,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     ...classed(compiled), ...classed(bindingFindings), ...classed(composingShown), ...classed(unfitShown), ...classed(undrawable), ...classed(undetermined), ...classed(spineFindings), ...classed(inventory), ...classed(carry),
     ...classed(structure.findings).map((f) => (f.class === "S" && standIn ? { ...f, provisional: standIn } : f)),
     ...classed(provisionalShape.findings, { provisional: standIn ?? "not every page composed" }), ...classed(stages),
-    ...classed(consistency), ...classed(local.depends), ...classed(hazards), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
+    ...classed(consistency), ...classed(local.depends), ...classed(local.conventions), ...classed(hazards), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
   // An aggregate read while pages are missing is read from the pages that composed, and says so.
   ].map((f) => (f.class === "G" && partial ? { ...f, partial } : f));
   // A draft is the spine, and the storyline critique is then bound to it. So a draft holds everything whose repair writes a
@@ -1271,7 +1281,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
       localFindings: (variant, deck, pages) => { const swap = (list) => (list || []).map((page) => pages.get(String(page?.id)) ?? page);
         // The pages that did not compile are missing from the variant too: the rules read over the whole deck are told so, and wait.
         const found = localFindings({ doc: { ...doc, pages: swap(doc.pages), appendix: swap(doc.appendix) }, structural: variant, deck, spec: variant, insights, uncomposed: new Set(), uncompiled: new Set(uncompiled) });
-        return [...found.depends, ...found.design, ...found.kept, ...found.copy].filter((f) => f.id !== undefined && classOf(f.code) === "P"); },
+        return [...found.depends, ...found.conventions, ...found.design, ...found.kept, ...found.copy].filter((f) => f.id !== undefined && classOf(f.code) === "P"); },
       // The structure rules a swap would newly break: the contract and the plan's gates on the swapped deck, and the page's architecture in PAGE_SHAPE_FLAT.
       structure: (id, slide) => { const after = [...declaredStructure(swapped(id, slide), { planOf }).findings, ...shapeStructure(shapesWith({ id, slide }), { airy }).findings];
         return [...new Set(after.filter((f) => isBlocker(f) && classOf(f.code) === "S" && !baseline.has(f.code)).map((f) => f.code))]; },

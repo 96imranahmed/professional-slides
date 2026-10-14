@@ -10,6 +10,8 @@ import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, sta
 import { legendRowCount, legendNodes } from "./legends.mjs";
 import { STEP_LADDER, decade, stepCandidates, onLadder } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
+import { contrastRatio } from "./color.mjs";
+import { MARK_CONTRAST } from "./palettes.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, evidenceBandSpan, evidenceRailWidth } from "./chart-annotations.mjs";
 
 export const FONT = token("font.body");
@@ -29,6 +31,18 @@ export const SERIES = [
   token("color.chartSeries5"),
   token("color.chartSeries6")
 ];
+
+/**
+ * The one token the deck's declared subject is drawn in on every kind - a line, a bar or its highlight, a table row's
+ * marker (conventions.mjs `subjectAccent`, `subjectRow`) - decided once per palette: the accent, where it reads at a mark's
+ * 3:1 (palettes.mjs MARK_CONTRAST) against the comparator grey, else the primary everywhere. The accent cleared it on the
+ * consulting, editorial and journal designs (4.2, 4.5, 4.3 to 1) and not on keynote (2.5), the graphite palette (1.7) or
+ * the toolkit palette (2.0), where a subject in the accent would sit in its peers' grey.
+ */
+export function subjectToken() {
+  const accent = tokenValue("color.accent"), grey = tokenValue("color.chartComparator");
+  return /^#[0-9A-Fa-f]{6}$/.test(String(accent)) && /^#[0-9A-Fa-f]{6}$/.test(String(grey)) && contrastRatio(accent, grey) < MARK_CONTRAST ? "color.componentPrimary" : "color.accent";
+}
 
 export const MIN_PLOT_HEIGHT = 100;
 

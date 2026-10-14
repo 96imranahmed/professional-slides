@@ -307,6 +307,26 @@
     "planning-label"
    ]
   },
+  "player-name-form": {
+   "version": 1,
+   "asks": "Does this line name one of the deck's players by a form the deck refuses - a form that could mean another company as well (\"Lufthansa\" for the group or for its airline) - rather than by the name the deck declares? The declared names, each with the forms it refuses, are given; a refused form inside a declared name (\"Lufthansa\" in \"Lufthansa Group\") is the declared name, and a line that names no player is canonical. The page's other lines are shown beside it so it is read in its place: judge this line alone.",
+   "subject": "one line of a page - its title or a line of its commentary; beside it, the page's other lines; the context holds the declared names and the forms each refuses",
+   "verdicts": {
+    "refused-form": "the line names a player by a form the deck refuses",
+    "canonical": "every player the line names is named as the deck declares it, or it names none"
+   },
+   "quoteFor": [
+    "refused-form"
+   ],
+   "fix": {
+    "for": [
+     "refused-form"
+    ],
+    "by": "replace",
+    "passes": "canonical",
+    "slot": "textBlock"
+   }
+  },
   "prose-alternatives": {
    "version": 1,
    "asks": "Are these paragraphs alternatives the reader is asked to compare - scenarios, options, paths, cases, futures - rather than the steps of one argument?",
