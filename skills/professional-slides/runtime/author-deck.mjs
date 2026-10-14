@@ -263,6 +263,37 @@ function tableSplitRepair(estimate, exhibit) {
     `To hold one page, ${ways.join("; or ")}`;
 }
 
+/**
+ * A page short of its word floor (TEXT_COVERAGE_LOW, `measured.short` words) told where its body is written: each text field
+ * the floor counts - points, paragraphs, a rail, a bar, a takeaway, a panel, captions - by the path an edit names it with
+ * and its words now, and where the words it lacks go, each point held to the text block's cap. A page whose placement
+ * writes none is told its body is the exhibit's own words, and the placements that carry more. The fill search, where it
+ * ran (fill-guidance.mjs), measures the lengths that fill the page; this says where, on every page it refuses.
+ */
+function withBodyFields(f, page, density) {
+  const short = f.measured?.short;
+  if (!page?.type || !Number.isFinite(short)) return f;
+  const words = (text) => (typeof text === "string" ? textWords(text) : 0);
+  const pointWords = (point) => (typeof point === "string" ? words(point) : words(point?.lead) + words(point?.text));
+  const fields = [];
+  const list = (key, items, each) => { if (Array.isArray(items) && items.length) fields.push({ key, count: items.length, words: items.map(each) }); };
+  list("points", page.points, pointWords);
+  list("paragraphs", page.paragraphs, pointWords);
+  for (const key of ["rail", "bar", "takeaway"]) if (typeof page[key] === "string" && page[key].trim()) fields.push({ key, words: [words(page[key])] });
+  if (typeof page.panel?.text === "string") fields.push({ key: "panel.text", words: [words(page.panel.text)] });
+  (page.blocks || []).forEach((block, i) => list(`blocks[${i}].points`, block?.points, pointWords));
+  [["exhibit", page.exhibit], ...(page.exhibits || []).map((ex, i) => [`exhibits[${i}]`, ex])].forEach(([at, ex]) => { if (typeof ex?.caption === "string") fields.push({ key: `${at}.caption`, words: [words(ex.caption)] }); });
+  let cap = null;
+  try { cap = pageLimits(page.type, page.form, { commentary: page.commentary, density })?.textBlock?.words?.max ?? null; } catch { cap = null; }
+  const where = fields.map((field) => (field.count ? `\`${field.key}\` ${field.count} of ${field.words.join(", ")} words` : `\`${field.key}\` ${field.words[0]} words`));
+  const points = fields.find((field) => field.key === "points" || field.key === "paragraphs");
+  const per = points ? Math.ceil(short / points.count) : null;
+  const said = !fields.length
+    ? ` The page writes no body text of its own (commentary "${page.commentary}"): its body is the exhibit's words. Give it the placement that carries the explanation - points \`beside\` or \`below\` (a higher floor), a \`rail\`, or a \`so-what-bar\` - or move it to the reading task it performs.`
+    : ` Its body is written in ${where.join("; ")}. Add the ${short} words there${points ? ` - about ${per} more to each of the ${points.count} ${points.key}${cap ? `, each at most ${cap} words with its lead (TEXT_BLOCK_TOO_LONG)` : ""}, or another of them (\`{ "page": "${page.id}", "field": "${points.key}", "append": true, "value": { "lead": "...", "text": "..." } }\` with --apply)` : ""}.`;
+  return { ...f, reason: `${f.reason ?? ""}${said}` };
+}
+
 // The sources registry's own check is its module's (sources-registry.mjs), so the research step reads it too (analysis.mjs).
 export { registryProblems } from "./sources-registry.mjs";
 import { logSources, registryProblems, sourceAgeProblems } from "./sources-registry.mjs";
@@ -1170,6 +1201,9 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     gateFindings = gateFindings.map(withFill);
     local.copy = local.copy.map(withFill);
   }
+  // A page short of its floor that the fill search did not measure is told where its body is written, field by field.
+  const authoredById = new Map([...doc.pages, ...(doc.appendix || [])].map((page, at) => [String(page?.id ?? `page-${at + 1}`), page]));
+  local.copy = local.copy.map((f) => (f.code === "TEXT_COVERAGE_LOW" && !f.fills ? withBodyFields(f, authoredById.get(String(f.id)), doc.deck?.density) : f));
   const stages = [];
   try { validateStageContract(structural, { content: local.content, plan: planOf(structural) }); }
   catch (error) { if (!isRefusal(error)) throw error; stages.push({ code: error.code, severity: "blocker", repair: `${error.message} - the build refuses the deck here. Give every page a unique \`id\`, and open the deck on a \`summary\` page (form \`executive-summary\`) ahead of its first section` }); }
@@ -2375,7 +2409,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
 }
 
 /** SPINE_LOCKED, one finding a page whose argument moved after the critique closed (storyline.mjs spineLock). */
-function spineLockFindings(lock) {
+export function spineLockFindings(lock) {
   const how = lock.closed === "spent" ? `spent its ${lock.spent} passes` : `closed ${lock.verdict} at pass ${lock.pass}`;
   const back = `To change the argument, run again with --reopen-spine and take the deck back to the critique (node runtime/storyline.mjs <id>.deck.json out/)${lock.closed === "spent" ? ", whose next pass is past its cap: only the user can grant it (--max-passes)" : ""}`;
   // The order is the deck's: pages that kept their argument and changed place are named in one finding for the deck, not as pages whose argument moved.
@@ -2384,10 +2418,30 @@ function spineLockFindings(lock) {
     repair: `The storyline critique ${how}, and the order of its pages has moved since: ${moved.join(", ")} ${one ? "stands" : "stand"} elsewhere than the critique read ${one ? "it" : "them"} - another place in the sequence, or into or out of the appendix - with ${one ? "its" : "their"} own argument unchanged. The layout keeps what the critique read: put ${one ? "it" : "them"} back. ${back}.` }] : [];
   if (!lock.pages.length) return order.length ? order : [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
     repair: `The storyline critique ${how}, and the deck's answer, its request or the order of its pages has moved since. The layout keeps what the critique read: put it back. ${back}.` }];
-  return [...order, ...lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id,
+  return [...order, ...lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id, ...(lock.facts?.[id]?.length ? { measured: { moved: lock.facts[id] } } : {}),
     repair: lock.deleted.includes(id)
       ? `The storyline critique ${how} with ${id} in the deck, and it has been taken out since. The layout keeps the pages the critique read: put it back. ${back}.`
-      : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
+      : (lock.added ?? []).includes(id)
+        ? `The storyline critique ${how}, and ${id} has been added since: the critique never read it. The layout keeps the pages the critique read: take it out, or carry its copy on a page the critique read without moving that page's argument. ${back}.`
+        : `The storyline critique ${how}, and ${id}'s argument has moved since: ${movedText(id, lock.facts?.[id] ?? null)} The layout keeps what the critique read; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
+}
+
+/**
+ * What moved of a locked page's argument, said field by field where the lock read the page as the critique was shown it
+ * (storyline.mjs spineLock `facts`): each declared fact with what it was and what it is, and the edits that put the
+ * page's own fields back. Where nothing it declares moved, what it shows of a measure or the measure's record did; where
+ * the lock could not read the page as the critique was shown it, the facts it may be.
+ */
+function movedText(id, facts) {
+  if (!facts) return "its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. Put the page back as it was.";
+  if (!facts.length) return "what it shows of a measure - which periods or members, and whether plotted, tabulated or stated as a figure - or a measure's recorded values, none of which its title, type, `settles`, `evidence` or measures say. Put the exhibit back to the view the critique read (its `select`, its `basis` view), or the record back to the values it read.";
+  const shown = (value) => (Array.isArray(value) ? `[${value.join(", ")}]` : JSON.stringify(value));
+  const said = facts.map((fact) => `\`${fact.field}\` was ${shown(fact.was)}, now ${shown(fact.now)}`).join("; ");
+  // The page's own fields an edit puts back; what settles a claim is read off its evidence where the page declares none.
+  const own = facts.filter((fact) => ["title", "type", "evidence"].includes(fact.field));
+  const edits = own.map((fact) => `{ "page": "${id}", "field": "${fact.field}", "value": ${JSON.stringify(fact.was)} }`);
+  const rest = facts.filter((fact) => !own.includes(fact)).map((fact) => `\`${fact.field}\``);
+  return `${said}. Put ${facts.length === 1 ? "it" : "them"} back${edits.length ? ` - ${edits.join(", ")} with --apply` : ""}${rest.length ? `${edits.length ? ", and " : " - "}${rest.join(", ")} as the critique read ${rest.length === 1 ? "it" : "them"}` : ""}.`;
 }
 
 /** The CLI. Returns the exit code. */

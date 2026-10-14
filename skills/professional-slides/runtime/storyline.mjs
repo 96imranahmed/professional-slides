@@ -2056,7 +2056,8 @@ export const passCap = (spec, asked = MAX_PASSES) => Math.max(asked, Number.isIn
 export async function spineLock(spec, directory, { deckPath = null, maxPasses: asked = MAX_PASSES } = {}) {
   const maxPasses = passCap(spec, asked);
   if (spec?.purpose === "catalogue") return null;
-  const history = await readStorylineHistory(await lineageStore(spec, directory, deckPath));
+  const store = await lineageStore(spec, directory, deckPath);
+  const history = await readStorylineHistory(store);
   const latest = history.at(-1);
   if (!latest || bindingVersionOf(latest) !== BINDING_VERSION) return null;
   const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL].includes(h.kind)).length;
@@ -2067,7 +2068,36 @@ export async function spineLock(spec, directory, { deckPath = null, maxPasses: a
   if (latest.binding === storylineBinding(spec, measures)) return null;
   // Only a page whose own argument differs from what the pass read is named; a page that only changed place is the deck's order (movedArguments).
   const moved = movedArguments(latest.pageHashes, spec, measures);
-  return { closed, verdict, pass: latest.pass, spent, pages: [...moved.changed, ...moved.deleted], deleted: moved.deleted, moved: moved.moved };
+  // What each such page declared when the critique read it, where the packet that pass answered is still the store's record
+  // (its pages are the spine as the critic was shown it): each declared fact that moved, with what it was and what it is now.
+  const packet = await readJson(path.join(store, PACKET_RECORD), { optional: true }).catch(() => null);
+  const read = packet && bindingVersionOf(packet) === BINDING_VERSION && packet.binding === latest.binding && packet.pass === latest.pass
+    ? new Map((packet.pages || []).map((page) => [String(page.id), page])) : null;
+  const now = new Map(storyStructure(spec, measures).map((page) => [String(page.id), page]));
+  const facts = read ? Object.fromEntries(moved.changed.filter((id) => read.has(id) && now.has(id)).map((id) => [id, movedFacts(read.get(id), now.get(id))])) : null;
+  const added = moved.changed.filter((id) => !Object.hasOwn(latest.pageHashes ?? {}, id));
+  return { closed, verdict, pass: latest.pass, spent, pages: [...moved.changed, ...moved.deleted], deleted: moved.deleted, moved: moved.moved, added, ...(facts ? { facts } : {}) };
+}
+
+/**
+ * The declared facts of a page that differ between the page the critique read (`was`, its line of the critique's packet)
+ * and the page now (`now`, storyStructure): `[{ field, was, now }]` over its title, its page type, what settles its claim
+ * (`settles.kind`, `settles.what`), the insights it rests on (`evidence`) and the measures it shows. Empty where the
+ * argument moved in what none of these says - which periods or members of a measure it shows and how, or a measure's
+ * recorded values - which the lock's message names instead.
+ */
+function movedFacts(was, now) {
+  const list = (items) => [...new Set(items)].sort();
+  const refOf = (entry) => String(entry).slice(String(entry).indexOf(":") + 1);
+  const pairs = [
+    ["title", String(was.title ?? ""), String(now.title ?? "")],
+    ["type", was.type ?? null, now.type ?? null],
+    ["settles.kind", was.settles?.kind ?? null, now.settles?.kind ?? null],
+    ["settles.what", was.settles?.what ?? null, now.settles?.what ?? null],
+    ["evidence", list((was.evidence || []).map((item) => item?.id ?? item)), list(now.rests || [])],
+    ["measures shown", list((was.measures || []).map((item) => item?.ref ?? item)), list((now.shows || []).map(refOf))],
+  ];
+  return pairs.filter(([, a, b]) => JSON.stringify(a) !== JSON.stringify(b)).map(([field, a, b]) => ({ field, was: a, now: b }));
 }
 
 // The repair path after the deck review. A deck review reads the drawn pages

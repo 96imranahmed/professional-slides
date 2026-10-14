@@ -126,6 +126,9 @@ const listed = (items, join = "; ") => `${items.slice(0, LISTED).join(join)}${it
 const nameOf = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const cellOf = (ref, label) => `${ref}${label === null || label === undefined ? "" : `@${label}`}`;
 const exhibitsOf = (page) => [page?.exhibit, ...(Array.isArray(page?.exhibits) ? page.exhibits : []), ...(Array.isArray(page?.blocks) ? page.blocks.map((block) => block?.exhibit) : [])].filter((ex) => ex && typeof ex === "object");
+// The field path of each of exhibitsOf's exhibits, in its order, as an edit names it: `exhibit`, `exhibits[1]`, `blocks[0].exhibit`.
+const exhibitPathsOf = (page) => [["exhibit", page?.exhibit], ...(Array.isArray(page?.exhibits) ? page.exhibits.map((ex, i) => [`exhibits[${i}]`, ex]) : []),
+  ...(Array.isArray(page?.blocks) ? page.blocks.map((block, i) => [`blocks[${i}].exhibit`, block?.exhibit]) : [])].filter(([, ex]) => ex && typeof ex === "object").map(([at]) => at);
 const idOf = (page, index) => String(page?.id ?? `page-${index + 1}`);
 
 // A unit a count is written with in a sentence: a plain word ("clinics", "branches"), not a scale, a currency or a percentage.
@@ -359,7 +362,7 @@ function labelled(page, entries) {
   const exhibits = exhibitsOf(page);
   if (!entries.some((entry) => entry.how === "exhibit") || !exhibits.length) return entries;
   const quoted = figuresWithDecimals(pageTexts(page).map((item) => item.text));
-  const formats = new Map();
+  const formats = new Map(), paths = exhibitPathsOf(page);
   exhibits.forEach((ex, i) => {
     const form = formOf(page, ex);
     if (!LABELLED.has(form) || ex.dataLabels === false) return;
@@ -368,7 +371,7 @@ function labelled(page, entries) {
     const declared = ex.valueFormat && typeof ex.valueFormat === "object" ? ex.valueFormat : null;
     const own = chartDecimals(values, quoted);
     const decimals = declared ? (declared.decimals ?? (declared.compactUnit ? 1 : 0)) : Array.isArray(ex.totals) && Array.isArray(ex.values) ? bridgeDecimals(ex.values, ex.totals, own) ?? own : own;
-    formats.set(whatOf(ex, i), { decimals, factor: declared?.compactUnit ? 1 / (SCALES_OF[declared.compactUnit] ?? 1) : 1 });
+    formats.set(whatOf(ex, i), { decimals, factor: declared?.compactUnit ? 1 / (SCALES_OF[declared.compactUnit] ?? 1) : 1, path: paths[i] });
   });
   return entries.map((entry) => {
     const format = entry.how === "exhibit" ? formats.get(entry.field) : null;
@@ -552,6 +555,13 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
   const inTable = (entry) => /`[^`]*\b(?:rows|cells)[[.]/.test(String(entry.field ?? ""));
   const formOfEntry = (entry) => `${entry.decimals}|${Math.round(Math.log10(entry.factor ?? 1))}`;
   const whereOf = (entry) => (entry.how === "exhibit" ? `the label of ${entry.field}` : entry.how === "typed" ? `typed in ${entry.field}` : String(entry.field ?? "").replace(/^the token \{\{[^}]*\}\} in /, "the token in "));
+  // The edit that prints one print of a value at `format`, by the field it is written in: a typed number becomes the value's
+  // token at that format, a chart's labels take it as their `valueFormat`, a token takes it as its own format.
+  const placesIn = (format) => (String(format).split(".")[1] ?? "").replace(/[^0#]/g, "").length;
+  const editOf = (entry, key, format, page = null) => `${page ? `on ${page}, ` : ""}${entry.how === "exhibit" ? `set \`${entry.path ?? "exhibit"}.valueFormat\` to { "decimals": ${placesIn(format)} }`
+    : entry.how === "typed" ? `write \`{{${key} | ${format}}}\` for "${entry.shown ?? printedOf(entry)}" in ${entry.field}` : `give ${whereOf(entry)} the format \`| ${format}\``}`;
+  // The prints of a value off `format`: those another format or a misrounding sets apart, one edit each.
+  const offFormat = (entries, format) => entries.filter((entry) => entry.decimals !== placesIn(format) || (entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9));
   const formats = [];
   for (const [key, entries] of stating) {
     const printed = entries.filter((entry) => entry.decimals !== undefined && entry.decimals !== null);
@@ -566,7 +576,8 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
       const misrounded = here.filter((entry) => entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9);
       if ((new Set(here.map(formOfEntry)).size < 2 && !misrounded.length) || !involves(id)) continue;
       const shown = [...new Map(here.map((entry) => [`${entry.shown ?? printedOf(entry)}|${whereOf(entry)}`, `"${entry.shown ?? printedOf(entry)}" (${whereOf(entry)})`])).values()];
-      formats.push({ key, pages: [id], format: oneFormat(here), rule: "NUMBER_FORMATS_DIFFER.onePage", text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it` });
+      formats.push({ key, pages: [id], format: oneFormat(here), rule: "NUMBER_FORMATS_DIFFER.onePage", text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it`,
+        edits: offFormat(here, oneFormat(here)).map((entry) => editOf(entry, key, oneFormat(here))) });
     }
     // Between pages, tables aside.
     const apart = printed.filter((entry) => !inTable(entry));
@@ -575,17 +586,19 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
     const apartPages = [...forms.values()].map((group) => new Set(group.map((entry) => entry.page)));
     // Two formats on two pages: a page printing both ways is said above, on that page.
     if (forms.size < 2 || !apartPages.some((a, i) => apartPages.some((b, j) => i !== j && [...a].some((id) => !b.has(id)) && [...b].some((id) => !a.has(id)))) || !involves(...apart.map((entry) => entry.page))) continue;
-    formats.push({ key, pages: apart.map((entry) => entry.page), format: asRecorded, text: `${key} is ${[...forms.values()].map((group) => `"${shownOf(group[0])}" on ${listed([...new Set(group.map((entry) => entry.page))], ", ")}`).join(" and ")}; \`${asRecorded}\` prints it as recorded (${recorded})` });
+    formats.push({ key, pages: apart.map((entry) => entry.page), format: asRecorded, text: `${key} is ${[...forms.values()].map((group) => `"${shownOf(group[0])}" on ${listed([...new Set(group.map((entry) => entry.page))], ", ")}`).join(" and ")}; \`${asRecorded}\` prints it as recorded (${recorded})`,
+      edits: offFormat(apart, asRecorded).map((entry) => editOf(entry, key, asRecorded, entry.page)) });
   }
   // Two records of one measure kept at different precision, each printed by a page, are the same finding.
   for (const conflict of conflicts.filter((c) => c.kind === "precision")) for (const cell of conflict.at) {
     const [a, b] = [pagesAt(conflict.refs[0], cell.labels[0]), pagesAt(conflict.refs[1], cell.labels[1])];
-    if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions` });
+    if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions`,
+      edits: [`keep one record of it in the insight log - \`${conflict.refs[0]}\` or \`${conflict.refs[1]}\`, at the precision its source prints - and name that one on ${listed([...new Set([...a, ...b])], ", ")}`] });
   }
   // One finding for each value, so every page it names is told its own disagreement and the format that ends it.
   // A value printed two ways on one page is the rule's variant `onePage` (weight.json rules version 11; version 8 read two pages).
   for (const f of formats) { finding("NUMBER_FORMATS_DIFFER", "blocker", f.pages,
-    `${f.text}. A reader who meets 53 on one page and 53.2 on another, or 174 in a title over a bar labelled 175, checks whether they are one number. Print the value in one format wherever it is printed - a token's format (\`{{ref@label | 0.0}}\`) in place of a typed number, a chart's \`valueFormat\` - or say on the page that rounds that it does`,
+    `${f.text}${f.edits?.length ? `. To print it one way: ${f.edits.join("; ")}` : ""}. A reader who meets 53 on one page and 53.2 on another, or 174 in a title over a bar labelled 175, checks whether they are one number. Print the value in one format wherever it is printed - a token's format (\`{{ref@label | 0.0}}\`) in place of a typed number, a chart's \`valueFormat\` - or say on the page that rounds that it does`,
     f.format ? { cell: f.key, format: f.format } : [f.key]);
     if (f.rule) out[out.length - 1].rule = f.rule; }
   for (const item of unreconciled(pages, stating, registry, insights?.analysis?.plan, involves)) finding("BRIDGE_UNRECONCILED", "blocker", item.pages, item.repair, item.measured);

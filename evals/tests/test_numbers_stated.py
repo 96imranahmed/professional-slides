@@ -176,7 +176,7 @@ console.log(JSON.stringify({
         self.assertIn("x100 prints a ratio or a fraction as a percentage and nothing else", h[2][1])
         m = result["metric"]
         self.assertEqual([row[0] for row in m], [None, "3.4%", None, "CHF 1.6bn"])
-        self.assertIn("metric 1", m[0][1])
+        self.assertIn("`metrics[0]` (\"A figure\")", m[0][1])  # the field a fix is written in
         self.assertIn('The format "0.0%" states it', m[0][1])
 
     def test_a_refused_format_is_a_binding_the_compile_reports(self):
