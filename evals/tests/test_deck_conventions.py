@@ -211,7 +211,7 @@ console.log(JSON.stringify(found.map((f) => ({{ code: f.code, id: f.id, cls: cla
         repairs = {(f["id"], f["code"]): f["repair"] for f in result}
         self.assertIn('"Lufthansa Group" or "Lufthansa Airlines"', repairs[("pr02", "PLAYER_NAME_REFUSED")])
         self.assertIn('"£"', repairs[("pr02", "CURRENCY_FORM")])
-        self.assertIn('omits: { "Air France-KLM"', repairs[("fd06", "PEERS_OMITTED_UNSAID")])
+        self.assertIn('set `exhibit.omits` to { "Air France-KLM"', repairs[("fd06", "PEERS_OMITTED_UNSAID")])
 
     def test_a_line_naming_a_refused_form_is_asked_and_its_replacement_held(self):
         """What a title names is read, not matched: one question a line, and a refused form comes back with its replacement."""
@@ -228,6 +228,72 @@ console.log(JSON.stringify({{ asked: asked.map((q) => q.subject), missing }}));
 ''')
         self.assertEqual(sorted(result["asked"]), sorted(["IAG's margin was triple Lufthansa's", "IAG led every year."]))
         self.assertTrue(any("replacement" in problem for problem in result["missing"]))
+
+
+class PeerSetMembersTests(unittest.TestCase):
+    """A peer set's members are read through the lookup a chart's labels are read through.
+
+    A set that wrote a player by its declared `short` name held nothing a label
+    resolved to: the label "Northwind" was read as the player Northwind
+    Airlines, the set held the string "Northwind", and the exhibit was refused
+    as comparing a set the deck does not declare. And each refusal names the
+    exhibit's field to edit, the deck key, and the counts it read.
+    """
+
+    PROBE = f'''
+import {{ conventionFindings }} from '{RUNTIME}/gates/convention_gates.mjs';
+const players = [{{ name: "Northwind Airlines", short: "Northwind" }}, {{ name: "Harbour Air", aliases: ["Harbour"] }}, "Cobalt Jet", "Delta Shore", "Ember Air"];
+const conventions = {{ peerSets: {{ "short-haul": ["Northwind", "Harbour", "Cobalt Jet", "Ember Air"], "coastal": ["Delta Shore", "Cobalt Jet"] }} }};
+const bar = (categories, more = {{}}) => ({{ type: "chart.bar", heading: "Seats flown, 2025", categories, series: [{{ name: "Seats", values: categories.map((_, i) => i + 1) }}], ...more }});
+const findings = (slides) => conventionFindings({{ players, conventions, slides }}).map((f) => ({{ code: f.code, id: f.id, repair: f.repair, measured: f.measured }}));
+'''
+
+    def test_a_set_member_written_by_a_short_name_or_alias_holds_the_player(self):
+        result = run_node(self.PROBE + '''
+console.log(JSON.stringify({
+  // Labelled by the full names, the short names and the aliases alike: one set, nothing refused.
+  full: findings([{ id: "p1", title: "t", exhibit: bar(["Northwind Airlines", "Harbour Air", "Cobalt Jet", "Ember Air"]) }]),
+  short: findings([{ id: "p2", title: "t", exhibit: bar(["Northwind", "Harbour", "Cobalt Jet", "Ember Air"]) }]),
+  named: findings([{ id: "p3", title: "t", exhibit: bar(["Northwind", "Cobalt Jet"], { peers: "short-haul", omits: { "Harbour Air": "no 2025 filing", "Ember": "x" } }) }]),
+}));
+''')
+        self.assertEqual(result["full"], [])
+        self.assertEqual(result["short"], [])
+        # A reason keyed by the player's full name says why the set's "Harbour" is left out; "Ember" names no player and Ember Air is left unsaid.
+        self.assertEqual([f["code"] for f in result["named"]], ["PEERS_OMITTED_UNSAID"])
+        self.assertEqual(result["named"][0]["measured"]["unsaid"], ["Ember Air"])
+
+    def test_each_peer_refusal_names_the_field_the_deck_key_and_the_counts(self):
+        result = run_node(self.PROBE + '''
+console.log(JSON.stringify(findings([
+  { id: "u1", title: "t", exhibits: [bar(["Ember Air", "Delta Shore", "Harbour Air"]), bar(["Northwind", "Cobalt Jet", "Harbour Air"], { peers: "long-haul" })] },
+  { id: "u2", title: "t", exhibit: bar(["Northwind", "Cobalt Jet", "Delta Shore"], { peers: "short-haul" }) },
+  { id: "u3", title: "t", exhibit: bar(["Northwind", "Cobalt Jet"]) },
+  { id: "o1", title: "t", exhibit: bar(["Northwind", "Cobalt Jet"], { peers: "short-haul" }) },
+])));
+''')
+        repairs = {}
+        for f in result:
+            repairs.setdefault((f["id"], f["code"]), []).append(f["repair"])
+        # No set holds the three: the field to set, the deck key, the members counted, and the set to declare.
+        first = repairs[("u1", "PEER_SET_UNDECLARED")]
+        self.assertIn("`exhibits[0]` (\"Seats flown, 2025\") compares 3 players by its categories", first[0])
+        self.assertIn('none holds all 3, so declare the set in `deck.conventions.peerSets` - `"<set name>": ["Ember Air", "Delta Shore", "Harbour Air"]` - and set `exhibits[0].peers` to its name', first[0])
+        # A set the deck does not declare: the field, the sets there are, and the one that holds the members.
+        self.assertIn('names `exhibits[1].peers` "long-haul", which `deck.conventions.peerSets` does not declare (its 2 sets:', first[1])
+        self.assertIn('Set `exhibits[1].peers` to "short-haul", which holds all 3 players its categories compare, with `exhibits[1].omits` { "Ember Air": "<why it is not shown>" }', first[1])
+        # A member outside the named set: how many, which, and the three edits that mend it.
+        outside = repairs[("u2", "PEER_SET_UNDECLARED")][0]
+        self.assertIn('names `exhibit.peers` "short-haul" (4 members) and also compares 1 player by its categories that the set does not hold, "Delta Shore"', outside)
+        self.assertIn('add it to `deck.conventions.peerSets["short-haul"]`', outside)
+        # No set named and the members a subset of one: name it, and say why the rest are left out.
+        subset = repairs[("u3", "PEER_SET_UNDECLARED")][0]
+        self.assertIn('"short-haul" holds all 2 and 2 more - set `exhibit.peers` to "short-haul" and `exhibit.omits` to { "Harbour": "<why it is not shown>", "Ember Air": "<why it is not shown>" } for the 2 it leaves out', subset)
+        # Left out unsaid: the set's size, how many are shown, which are left out and the field to write.
+        omitted = repairs[("o1", "PEERS_OMITTED_UNSAID")][0]
+        self.assertIn('draws on the "short-haul" set of 4 and shows 2; it leaves out 2 without a reason - "Harbour", "Ember Air": set `exhibit.omits` to { "Harbour": "<why it is not shown>", "Ember Air": "<why it is not shown>" }', omitted)
+        measured = [f["measured"] for f in result if f["id"] == "o1"][0]
+        self.assertEqual((measured["shown"], measured["of"], measured["field"]), (2, 4, "exhibit.omits"))
 
 
 class BriefTests(unittest.TestCase):
