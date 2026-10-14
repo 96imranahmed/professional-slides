@@ -905,7 +905,7 @@ function localFindings({ doc, structural, deck, spec, insights, uncomposed, unco
   // A reference that could not be bound is reported by the compile, which left its page out (compileDeck `bindingFindings`).
   const depends = spineDependencies(doc, insights, spec, witness);
   // The deck's conventions on each compiled page (gates/convention_gates.mjs): what the renderer does not apply itself.
-  const conventions = conventionFindings(spec).filter((f) => !uncompiled.has(String(f.id)));
+  const conventions = conventionFindings(spec, deck).filter((f) => !uncompiled.has(String(f.id)));
   const design = deck ? WEIGHT.applyRulesVersion(sceneDesignFindings(deck), spec) : [];
   const { findings: copy, content, report } = contentFindings(structural, deck, spec, { uncomposed, uncompiled });
   // An explicit visual choice or authored commentary that did not survive composition: the build refuses it (CONTENT_LOST).

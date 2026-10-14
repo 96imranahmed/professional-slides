@@ -80,6 +80,78 @@ console.log(JSON.stringify(slide));
         self.assertIn("Left out of the network groups: Air France-KLM (reports in euros", result["note"])
 
 
+class OneSubjectColourTests(unittest.TestCase):
+    COMPOSE = f'''
+import {{ composeAll }} from '{RUNTIME}/compose-all.mjs';
+const players = {PLAYERS};
+const slides = [
+  {{ id: "fd01", title: "IAG's margin beat Lufthansa Group's in every year outside the Covid losses", subject: "IAG", exhibit: {{ type: "chart.line", heading: "Operating margin, 2021-2025", unit: "%", categories: ["2021", "2022", "2023", "2024", "2025"],
+    series: [{{ name: "IAG operating margin", values: [-10, 5, 12, 14, 15] }}, {{ name: "Lufthansa Group adjusted EBIT margin", values: [-6, 4, 6, 5, 5] }}] }} }},
+  {{ id: "fd02", title: "IAG's 15.1% margin was the second highest of the four groups", subject: "IAG", exhibit: {{ type: "chart.bar", heading: "Operating margin, 2025", unit: "%", categories: ["Ryanair", "IAG", "Air France-KLM", "Lufthansa Group"], series: [{{ name: "Margin", values: [16, 15, 6, 5] }}] }} }},
+  {{ id: "ap03", title: "IAG leads the network groups on margin and leverage at year-end", subject: "IAG", exhibit: {{ type: "table", columns: ["Group", "Margin, %"], rows: [["Ryanair", "15.8"], ["IAG", "15.1"], ["Air France-KLM", "6.1"]] }} }},
+];
+const tokens = (design, conventions) => {{
+  const out = composeAll({{ schema: "professional-slides.deck/v3", id: "d", design, players, ...(conventions ? {{ conventions }} : {{}}), slides }}, ".", {{ partial: true }});
+  const seen = {{}};
+  const walk = (node, id) => {{ if (Array.isArray(node)) return node.forEach((n) => walk(n, id)); if (!node || typeof node !== "object") return;
+    const fill = node.style?.fill?.tokenId ?? node.style?.stroke?.tokenId;
+    if (node.role === "chart-line" && fill) (seen[`${{id}} line`] ??= new Set()).add(fill);
+    if (node.role === "chart-mark" && node.data?.category === "IAG") (seen[`${{id}} IAG bar`] ??= new Set()).add(fill);
+    if (node.role === "table-row-subject") (seen[`${{id}} row`] ??= new Set()).add(fill);
+    for (const value of Object.values(node)) if (value && typeof value === "object") walk(value, id); }};
+  for (const slide of out.deck.slides) walk(slide, slide.id);
+  return Object.fromEntries(Object.entries(seen).map(([k, v]) => [k, [...v].sort()]));
+}};
+'''
+
+    def test_a_line_a_bar_and_a_table_row_carry_one_token_for_the_subject(self):
+        """fd01 drew IAG's bar in the accent and IAG's line beside it in navy: with a declared subject all three take the accent."""
+        result = run_node(self.COMPOSE + '''
+console.log(JSON.stringify({ declared: tokens("consulting", { subject: "IAG" }), none: tokens("consulting", null), keynote: tokens("keynote", { subject: "IAG" }) }));
+''')
+        declared = result["declared"]
+        self.assertEqual(declared["fd01 line"], ["color.accent", "color.chartComparator"])
+        self.assertEqual(declared["fd02 IAG bar"], ["color.accent"])
+        self.assertEqual(declared["ap03 row"], ["color.accent"])
+        # A deck that declares no conventions draws as it did: no subject, no marker, no accent on the line.
+        self.assertNotIn("ap03 row", result["none"])
+        self.assertNotIn("color.accent", result["none"].get("fd01 line", []))
+        # Keynote's accent reads at 2.5 to 1 on its comparator grey, under a mark's 3:1: its subject keeps the primary.
+        self.assertEqual(result["keynote"]["fd01 line"], ["color.chartComparator", "color.componentPrimary"])
+
+    def test_the_accent_clears_the_grey_on_the_designs_that_take_it(self):
+        """The subject is told from its peers by colour alone: the accent it takes reads at 3:1 against their grey."""
+        result = run_node(f'''
+import {{ DESIGN_SYSTEMS }} from '{RUNTIME}/design-systems.mjs';
+import {{ contrastRatio }} from '{RUNTIME}/color.mjs';
+import {{ resolvePalette, MARK_CONTRAST }} from '{RUNTIME}/palettes.mjs';
+import {{ TOKENS, THEME_SLOT_TOKENS }} from '{RUNTIME}/core.mjs';
+const value = (t, k) => (typeof t[k] === "string" ? t[k] : t[k]?.value);
+console.log(JSON.stringify({{ floor: MARK_CONTRAST, ratios: Object.fromEntries(Object.entries(DESIGN_SYSTEMS).map(([name, d]) => {{
+  const t = resolvePalette({{ base: d.base, colors: d.colors }}, TOKENS, THEME_SLOT_TOKENS).tokens;
+  return [name, contrastRatio(value(t, "color.accent"), value(t, "color.chartComparator"))]; }})) }}));
+''')
+        for name in ("consulting", "editorial", "journal"):
+            self.assertGreaterEqual(result["ratios"][name], result["floor"], name)
+        self.assertLess(result["ratios"]["keynote"], result["floor"])
+
+    def test_a_title_replacement_is_held_to_the_title_lines_and_tiles_print_the_currency(self):
+        """A title fixed by the names question is held to the title's words and lines; a tile's figure takes the deck's currency."""
+        result = run_node(f'''
+import {{ answerProblems }} from '{RUNTIME}/judgements.mjs';
+import {{ copyLimits }} from '{RUNTIME}/limits.mjs';
+import {{ SLIDE_PASSES }} from '{RUNTIME}/compose-passes.mjs';
+const item = {{ key: "k", kind: "player-name-form", subject: "IAG beat Lufthansa", slot: {{ ...copyLimits().title, measure: {{ width: 300, fontFamily: "Arial", fontSize: 24 }} }} }};
+const long = answerProblems(item, {{ verdict: "refused-form", reason: "It names Lufthansa alone, which is ambiguous.", quote: "Lufthansa", replacement: "IAG's margin beat Lufthansa Group's in every year of the decade outside Covid", replacementReason: "It names the group as the deck declares it." }});
+const run = SLIDE_PASSES.find(([name]) => name === "deck-conventions")[1];
+const slide = run({{ id: "hb06", metrics: [{{ value: "USD 120m", label: "paid by Oman Air for one slot pair" }}], kpi: {{ value: "GBP 4bn", label: "k" }} }}, {{ conventions: {{ currency: "symbols" }}, players: [] }});
+console.log(JSON.stringify({{ long, metric: slide.metrics[0].value, kpi: slide.kpi.value }}));
+''')
+        self.assertTrue(any("lines where its slot holds" in problem for problem in result["long"]))
+        self.assertEqual(result["metric"], "$120m")
+        self.assertEqual(result["kpi"], "£4bn")
+
+
 class HeatDirectionTests(unittest.TestCase):
     def test_a_rank_shades_darkest_at_its_best_beside_a_score(self):
         """ap05 shaded a Skytrax rank by size, so dark meant worse there and better in the score column beside it."""

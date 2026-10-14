@@ -5,7 +5,7 @@ import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenV
 import { formatValue } from "./value-format.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods } from "./time-axis.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
@@ -179,8 +179,12 @@ function lineOptions(chart) {
   // `focusSeries`: one line in the primary, the others a muted grey, so the
   // subject reads first among its peers.
   if (props.focusSeries !== undefined && !series.some((item) => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
+  // The deck's declared subject (`subjectAccent`, conventions.mjs) is the accent's alone, on a line as on a bar: fd01 drew
+  // IAG's bar in the accent and IAG's line beside it in navy.
+  // Its peers then take the bars' comparator grey, which the accent clears; `color.rule` sat at 1.0 to 2.4 to 1 under it.
+  const subjectTone = props.subjectAccent ? subjectToken() : null;
   const lineColor = (seriesIndex) => props.focusSeries !== undefined
-    ? (series[seriesIndex].name === props.focusSeries ? token("color.componentPrimary") : token("color.rule"))
+    ? (series[seriesIndex].name === props.focusSeries ? token(subjectTone ?? "color.componentPrimary") : token(subjectTone ? "color.chartComparator" : "color.rule"))
     : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
   if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
   // A rank is a place, 1 the top (measures.mjs isRankMeasure): its line runs on an axis with 1 at the top, so a climb from

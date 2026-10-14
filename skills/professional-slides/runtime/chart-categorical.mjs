@@ -8,7 +8,7 @@ import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
 import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
@@ -715,7 +715,8 @@ function categoricalColors(chart) {
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
-    if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? primary : comparator;
+    // The deck's declared subject takes the accent, as its bar does (`subjectAccent`, conventions.mjs).
+    if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? (props.subjectAccent ? token(subjectToken()) : primary) : comparator;
     if (twoMarkContrast) return categoryIndex === focusCategoryIndex ? primary : comparator;
     return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
   };

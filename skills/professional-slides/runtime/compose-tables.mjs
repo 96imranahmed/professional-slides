@@ -988,7 +988,9 @@ export function styleTable(ex) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const at = Number.isInteger(ex.highlightRow) ? ex.highlightRow : rowsIn.findIndex((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     if (at < 0 || at >= rowsIn.length) throw new Error(`Table highlightRow "${ex.highlightRow}" is not a row label or index`);
-    rowsIn[at] = Array.isArray(rowsIn[at]) ? { style: "accented", cells: rowsIn[at] } : { ...rowsIn[at], style: "accented" };
+    // The deck's declared subject (`subjectRow`, conventions.mjs) also takes the accent's own mark, as its bar and line do.
+    const subject = ex.subjectRow === true ? { subject: true } : {};
+    rowsIn[at] = Array.isArray(rowsIn[at]) ? { style: "accented", cells: rowsIn[at], ...subject } : { ...rowsIn[at], style: "accented", ...subject };
   }
   // A "#" column of row numbers becomes numbered discs with no filled box.
   const head0Raw = String(columns[0].label || "").trim();

@@ -237,11 +237,12 @@ export function subjectFocus(ex, subject, players) {
   const { series = [], categories = [], points = [], rows } = memberLabels(ex);
   if (rows) {
     const at = rows.findIndex(is);
-    return at >= 0 && rows.filter((label) => playerInLabel(players, label)).length >= 2 ? { ...ex, highlightRow: at } : ex;
+    return at >= 0 && rows.filter((label) => playerInLabel(players, label)).length >= 2 ? { ...ex, highlightRow: at, subjectRow: true } : ex;
   }
   if (POINTS.has(type)) { const point = points.find(is); return point && points.length > 2 ? { ...ex, focus: [ex.points[points.indexOf(point)].name] } : ex; }
   const inSeries = series.findIndex(is), category = categories.findIndex(is);
-  if (inSeries >= 0 && SERIES_CHARTS.has(type) && series.length >= 2) return { ...ex, focusSeries: ex.series[inSeries].name };
+  // One colour for the subject on every kind: its series in the accent (`subjectAccent`), as its bar and its row's marker.
+  if (inSeries >= 0 && SERIES_CHARTS.has(type) && series.length >= 2) return { ...ex, focusSeries: ex.series[inSeries].name, subjectAccent: true };
   if (category >= 0 && (SERIES_CHARTS.has(type) || STACKS.has(type)) && !["chart.line", "chart.area"].includes(type))
     return { ...ex, highlights: [{ category: String(ex.categories[category]), style: ONE_BAR.has(type) && series.length <= 1 ? "bar" : "region-tint" }] };
   if (inSeries < 0 && category < 0 && series.length < SERIES_COLOURS && ((SERIES_CHARTS.has(type) && series.length >= 3) || (STACKS.has(type) && series.length >= 2)))
@@ -255,7 +256,8 @@ export function subjectFocus(ex, subject, players) {
  * declares "dark-is-better", and an exhibit's `omits` - the peer-set members it leaves out, with why - as a note line.
  */
 export function applyConventions(slide, { conventions = null, players = null } = {}) {
-  const subject = slide.subject ?? (conventions ? pageSubject(conventions, {}, null, players) : null);
+  // The subject is the deck's convention: a deck that declares none draws exactly as it did.
+  const subject = conventions ? slide.subject ?? pageSubject(conventions, {}, null, players) : null;
   const form = conventions?.currency, merit = conventions?.heat === "dark-is-better";
   const notes = [];
   const apply = (exIn) => {
@@ -282,6 +284,14 @@ export function applyConventions(slide, { conventions = null, players = null } =
   const out = { ...slide, ...(slide.exhibit ? { exhibit: apply(slide.exhibit) } : {}), ...(Array.isArray(slide.exhibits) ? { exhibits: slide.exhibits.map(apply) } : {}),
     ...(Array.isArray(slide.blocks) ? { blocks: slide.blocks.map((block) => (block?.exhibit ? { ...block, exhibit: apply(block.exhibit) } : block)) } : {}) };
   if (notes.length) out.note = Array.isArray(slide.note) ? [...slide.note, ...notes] : [slide.note, ...notes].filter(Boolean).join(" ");
+  // A tile's figure is printed from its measure in the format the page typed ("USD 0m" on hb06, "£0m" on pr04): its currency
+  // is written in the deck's form, as a chart's unit is.
+  if (form) {
+    const tile = (m) => (typeof m === "string" ? currencyText(m, form) : m && typeof m === "object"
+      ? { ...m, ...(typeof m.value === "string" ? { value: currencyText(m.value, form) } : {}), ...(typeof m.unit === "string" ? { unit: currencyUnit(m.unit, form) } : {}) } : m);
+    if (Array.isArray(slide.metrics)) out.metrics = slide.metrics.map(tile);
+    if (slide.kpi && typeof slide.kpi === "object") out.kpi = tile(slide.kpi);
+  }
   return out;
 }
 

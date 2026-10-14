@@ -42,11 +42,19 @@ function authorMarks(ex) {
   return [...[ex.focus].flat(), ex.focusSeries, ...(Array.isArray(ex.highlights) ? ex.highlights.map((h) => h?.category) : [])].filter((label) => typeof label === "string");
 }
 
+/** The band a page's composed action title is set in, `{ width, fontFamily, fontSize, bold }`, or null where none is composed. */
+function titleBand(deck, id) {
+  const slide = (deck?.slides || []).find((s) => String(s?.id) === id);
+  const node = (slide?.nodes || []).find((n) => n?.role === "action-title");
+  const value = (style) => (style && typeof style === "object" ? style.value : style);
+  return node?.frame?.width > 0 ? { width: node.frame.width, fontFamily: value(node.style?.fontFamily) ?? "Arial", fontSize: value(node.style?.fontSize) ?? 24, bold: Boolean(value(node.style?.bold)) } : null;
+}
+
 /**
  * Every convention finding on the compiled pages of `spec` (`spec.slides`, `spec.appendix`): one list, each finding on the
- * page it is mended on, with a repair that names the fix.
+ * page it is mended on, with a repair that names the fix. `deck` is the composed scene, where the page's title band is read.
  */
-export function conventionFindings(spec) {
+export function conventionFindings(spec, deck = null) {
   const conventions = conventionsOf(spec), players = spec?.players;
   if (!conventions) return [];
   const out = [], refused = refusedForms(conventions), form = conventions.currency;
@@ -104,15 +112,18 @@ export function conventionFindings(spec) {
     // Typed copy prints the deck's currency form: a code or a symbol is a closed set of ISO forms, read as formatting.
     if (form) {
       const typed = [...copyLines(slide), ...exhibitsOfPage(slide).flatMap((ex) => (Array.isArray(ex?.rows) ? ex.rows.flatMap((row) => cellsOf(row).map(text)) : [])),
-        ...(Array.isArray(slide.metrics) ? slide.metrics.flatMap((m) => (typeof m === "string" ? [m] : [m?.value, m?.label, m?.sublabel].map(text))) : []), ...[slide.note].flat().map(text)];
+        // A tile's figure is written in the deck's form by the composer (conventions.mjs applyConventions); its words are typed.
+        ...(Array.isArray(slide.metrics) ? slide.metrics.flatMap((m) => (typeof m === "string" ? [] : [m?.label, m?.sublabel].map(text))) : []), ...[slide.note].flat().map(text)];
       const wrong = new Map(typed.flatMap((line) => currencyFormsIn(line, form)).map((f) => [f.wrote, f.write]));
       if (wrong.size) add("CURRENCY_FORM", `the page types ${[...wrong].map(([wrote, write]) => `"${wrote}" where the deck writes "${write}"`).join(", ")} (\`conventions.currency: "${form}"\`): write ${[...wrong.values()].map((write) => `"${write}"`).join(", ")} in the title, commentary, cells and notes; units and headings the runtime writes itself`, { wrote: [...wrong.keys()] });
     }
     // What a line of copy names is read, not matched: each line is its own question, the page's lines beside it.
     if (askNames) {
-      const lines = copyLines(slide);
+      const lines = copyLines(slide), title = typeof slide.title === "string" ? slide.title.trim() : null;
+      // The title's replacement is held to the title's slot - its words and its lines, measured in the band this page sets it in.
+      const band = titleBand(deck, id);
       for (const line of lines) {
-        const said = judged("player-name-form", line, { names }, id, { beside: { page: lines } });
+        const said = judged("player-name-form", line, { names }, id, { beside: { page: lines }, ...(line === title ? { slot: { name: "title", ...(band ? { measure: band } : {}) } } : {}) });
         if (said?.verdict === "refused-form")
           add("PLAYER_NAME_REFUSED", `"${line.slice(0, 90)}" names a player by a form the deck refuses ("${said.quote ?? ""}"): ${said.replacement ? `write "${said.replacement}"` : `name the player as \`conventions.names\` declares it (${Object.keys(names).map((name) => `"${name}"`).join(", ")})`}`, { line, quote: said.quote ?? null });
       }
