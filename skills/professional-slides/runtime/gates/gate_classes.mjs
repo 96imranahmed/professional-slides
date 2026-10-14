@@ -216,7 +216,8 @@ const LISTED = [
   // What a reviewer raises reading the rendered deck (reviewer.mjs).
   ...codes("R", `FACTUAL_ERROR UNSUPPORTED_CLAIM MISLEADING_COMPARISON UNCLEAR_ARGUMENT UNREADABLE OVERFLOW BROKEN_GEOMETRY PROVENANCE DEAD_SPACE
     NO_HERO_EXHIBIT OVERSIZED_TYPE WALL_OF_TEXT BURIED_NUMBER HEDGED_TITLE INCONSISTENT_ENCODING NO_VISUAL_ANCHOR UNANNOTATED_PLOT TABLE_MONOTONY
-    MIXED_GRAMMAR DECORATION NARROW_REPERTOIRE TRIVIAL_CHART NO_INSIGHT_CHART DEVICE_OVERUSE FLAT_TABLE MISSING_CONTEXT MAP_DESIGN DENSITY_MISMATCH EDITORIAL`),
+    MIXED_GRAMMAR DECORATION NARROW_REPERTOIRE TRIVIAL_CHART NO_INSIGHT_CHART DEVICE_OVERUSE FLAT_TABLE MISSING_CONTEXT MAP_DESIGN DENSITY_MISMATCH EDITORIAL
+    COUNTER_EVIDENCE_OMITTED MISSING_MEMBER`),
 ];
 // One class a code: a code on two lists would silently keep the last.
 const twice = LISTED.map(([code]) => code).filter((code, at, all) => all.indexOf(code) !== at);
@@ -268,6 +269,8 @@ const REVIEW_REPAIRS = Object.freeze(Object.fromEntries([
   ...codes("R", "UNCLEAR_ARGUMENT", ["copy", "title", "settles"]),
   ...codes("R", "UNSUPPORTED_CLAIM", ["title", "settles", "evidence"]),
   ...codes("R", "MISLEADING_COMPARISON", ["copy", "view", "basis"]),
+  ...codes("R", "COUNTER_EVIDENCE_OMITTED", ["copy", "settles", "evidence"]),
+  ...codes("R", "MISSING_MEMBER", ["view", "basis", "evidence"]),
 ].map(([code, , repairs]) => [code, repairs])));
 
 /**

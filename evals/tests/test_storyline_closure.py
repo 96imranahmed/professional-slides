@@ -63,6 +63,8 @@ const first = (packet, ids, missingAnalyses, o = {{}}) => ({{ pass: 1, verifies:
   pillars: [{{ pillar: 'Demand and handover', pages: ids, verdict: 'weak', overlap: 'One pillar; nothing overlaps.', strongestCounter: 'Vehicles, not crews, may bind.', reversal: 'Vehicle availability below crews on shift.', answered: false }}],
   numbers: 'The figures agree across the pages that print them.', sectionFlow: 'One section, opened and closed in order.', execSummary: 'No summary page in this short spine; the titles carry it.',
   missingAnalyses, cutOrMerge: [], findings: [], topFixes: ['Run the missing analyses'],
+  // The argument reading's verdicts: every title and comparison holds unless a test says otherwise (spine-argument.mjs).
+  ...(packet.argument?.items.length ? {{ argument: packet.argument.items.map((item) => ({{ item: item.id, verdict: 'holds' }})) }} : {{}}),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({{ check, result: check === 'missing' ? 'findings' : 'clean', note: check === 'missing' ? 'Filed the missing analyses.' : `Checked ${{check}} across the spine and found nothing to raise.` }})), ...o }});
 const verification = (packet, verifies, statuses, o = {{}}) => ({{ pass: 2, verifies, verdict: 'ready', rating: 8, binding: packet.binding, summary: 'Each open item was checked against what the packet now holds.',
   ...judged(true, 'sufficient'), provenance: {{ backend: 'subagent', model: 'fixture', promptHash: packet.promptHash }}, statuses, findings: [], topFixes: [], ...o }});

@@ -165,25 +165,32 @@ RUNTIME = SKILL / "runtime"
 CODE = r"[A-Z][A-Z0-9_]{2,}"
 
 
-def vocabularies():
+def vocabularies(spread=False):
     """Every code vocabulary the runtime declares, keyed module:table.
 
     A vocabulary is a table of code -> the line that says what it is about:
     `export const X_CODES = Object.freeze({ ... })` (the reviewer's is `CODES`)
     in Node, `X_CODES = { "CODE": "...", ... }` in Python. Sets of codes that
     select from a vocabulary (ADVISORY_CODES) have no lines and are not one.
+    A Node table may spread another (`...ARGUMENT_CODES`, the reviewer's and
+    the storyline critic's one table of argument codes): the codes stay the
+    spread table's, and `spread=True` reads the spreading table with them.
     """
-    tables = {}
+    tables, spreads = {}, {}
     for path in sorted(RUNTIME.rglob("*.mjs")):
         source = path.read_text(encoding="utf-8")
         for m in re.finditer(r"^export const (\w*CODES) = Object\.freeze\(\{\n(.*?)^\}\);", source, re.M | re.S):
             tables[f"{path.relative_to(RUNTIME)}:{m.group(1)}"] = set(re.findall(rf"^\s+({CODE}):", m.group(2), re.M))
+            spreads[f"{path.relative_to(RUNTIME)}:{m.group(1)}"] = re.findall(r"^\s+\.\.\.(\w*CODES),", m.group(2), re.M)
     for path in sorted(RUNTIME.rglob("*.py")):
         source = path.read_text(encoding="utf-8")
         for m in re.finditer(r"^(\w*CODES) = \{\n(.*?)^\}", source, re.M | re.S):
             keys = set(re.findall(rf'^\s+"({CODE})":', m.group(2), re.M))
             if keys:
                 tables[f"{path.relative_to(RUNTIME)}:{m.group(1)}"] = keys
+    if spread:
+        named = {key.split(":")[1]: codes for key, codes in tables.items()}
+        tables = {key: codes.union(*(named.get(name, set()) for name in spreads.get(key, []))) for key, codes in tables.items()}
     return tables
 
 
@@ -228,8 +235,8 @@ class GateVocabularyTests(unittest.TestCase):
 
     def test_the_vocabularies_are_read_from_their_modules(self):
         # The parse above is what the other tests stand on: it must find the
-        # tables the modules import, not a subset of them.
-        tables = vocabularies()
+        # tables the modules import, not a subset of them - the reviewer's with the argument codes it spreads.
+        tables = vocabularies(spread=True)
         self.assertEqual(tables["gates/gate_config.py:GATE_CODES"], set(page_gates.GATE_CODES))
         self.assertEqual(tables["gates/gate_config.py:COMPOSE_CODES"], set(page_gates.COMPOSE_CODES))
         result = run_node('''
@@ -272,7 +279,7 @@ console.log(JSON.stringify({ reviewer: Object.keys(CODES), delivery: Object.keys
         # own codes and confirms a build check's under that check's code
         # (MISSING_EVIDENCE, LAYOUT_MONOTONY); a material code in neither is a
         # promise nothing can keep.
-        tables = vocabularies()
+        tables = vocabularies(spread=True)
         raisable = tables["reviewer.mjs:CODES"] | tables["gates/gate_config.py:GATE_CODES"] | tables["gates/gate_config.py:COMPOSE_CODES"]
         material = json.loads((SKILL / "references" / "evaluation" / "rules.json").read_text(encoding="utf-8"))["materialCodes"]
         self.assertFalse(set(material) - raisable, "rules.json marks codes no review can raise")

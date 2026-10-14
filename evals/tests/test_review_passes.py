@@ -48,6 +48,8 @@ function storyReady(spec, o = {}) {
     pillars: [{ pillar: 'Growth', pages: ids, verdict: 'holds', overlap: 'No overlap with any other pillar.', strongestCounter: 'The base is still small.', reversal: 'Growth below the peer median for two years.', answered: true }],
     numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.',
     execSummary: 'The summary states the answer the body proves.', missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+    // Every title holds in the argument reading (spine-argument.mjs); these fixtures settle nothing, so a title is every item.
+    argument: [...spec.slides, ...(spec.appendix || [])].filter((s) => String(s.title ?? '').trim()).map((s) => ({ item: `title:${s.id}`, verdict: 'holds' })),
     completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })),
     // The two judgements and the rating follow the verdict, as a critic's would.
     ...(o.verdict === 'revise' ? { rating: 6, compliance: { verdict: 'incomplete', note: 'An open item is still within reach of the team.' }, sufficiency: { verdict: 'insufficient', note: 'The answer outruns its evidence while the item is open.' } } : { compliance: { verdict: 'complete', note: 'Nothing the evidence in scope allows is left undone.' }, sufficiency: { verdict: 'sufficient', note: 'The evidence supports the answer as it is stated.' } }), ...o };
@@ -781,7 +783,7 @@ const critique = { pass: 1, verifies: null, binding: packet.binding, rating: 6, 
   spine: 'Read alone, the titles give the answer first, then prove the demand and then the opening it leaves.', answer: 'Enter the north this year, because its demand grows twice as fast as the south.', answerParts: [{ part: 'Should we enter the northern market this year', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Demand and opening', pages: ids, verdict: 'holds', overlap: 'One pillar; nothing overlaps.', strongestCounter: 'The base may be small.', reversal: 'Northern demand below a tenth of southern.', answered: true }],
   numbers: 'The figures agree across the pages that print them.', sectionFlow: 'No sections; the titles carry the order.', execSummary: 'The first page states the answer.',
-  findings: [item('F1', 'major')], missingAnalyses: [], cutOrMerge: [], topFixes: ['Print the base on p02'],
+  findings: [item('F1', 'major')], missingAnalyses: [], cutOrMerge: [], topFixes: ['Print the base on p02'], argument: (packet.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'claim' ? 'findings' : 'clean', note: `Checked ${check} across the spine.` })) };
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(critique));
 const asked = await S.prepareStoryline(specPath, out);

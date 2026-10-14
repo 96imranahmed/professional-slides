@@ -423,7 +423,7 @@ const ready = (packet, ids) => ({{ pass: 1, verifies: null, verdict: 'ready', ra
   answerParts: [{{ part: 'Is the growth safe', verdict: 'answered', missingEvidence: '' }}, {{ part: 'How does it compare with its peers', verdict: 'answered', missingEvidence: '' }}],
   pillars: [{{ pillar: 'Growth on thinner liquidity', pages: ids, verdict: 'holds', overlap: 'One pillar; nothing overlaps.', strongestCounter: 'The cushion may rebuild as loans season.', reversal: 'Liquid assets above short-term liabilities by the old margin.', answered: true }}],
   numbers: 'The figures agree across the pages that print them.', sectionFlow: 'One section, opened and closed in order.', execSummary: 'The summary page states the answer and its proof.',
-  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'], argument: (packet.argument?.items || []).map((item) => ({{ item: item.id, verdict: 'holds' }})),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({{ check, result: 'clean', note: `Checked ${{check}} across the spine and found nothing to raise.` }})) }});
 const page = (d, id) => d.pages.find((p) => p.id === id);
 '''
