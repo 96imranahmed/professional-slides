@@ -6,6 +6,12 @@
 //                                                        (with the type's countable limits as `x-limits`)
 //   node runtime/author-deck.mjs --schema deck           the deck-level keys `deck` takes: each with its type and
 //                                                        what it is for; the compile refuses a key not listed
+//   node runtime/author-deck.mjs --schema <type>/<form>  every field that form reads (form-fields.mjs): the exhibit
+//                                                        kind it draws, that kind's data, options and the marks it
+//                                                        draws with their shapes, the fields a bound exhibit names its
+//                                                        measures by, `peers` and `omits`, and the page's own fields
+//                                                        its placements read
+//   node runtime/author-deck.mjs --schema kinds          every exhibit kind, with the type/forms that draw it
 //   node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
 //                                                        every countable limit, before a page is written: the
 //                                                        deck's, or one type's or form's (under the deck's density,
@@ -160,6 +166,7 @@ import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts, notJson } from "./pages-file.mjs";
 import { applyChanges, changeLine, editsFrom, planEdits } from "./page-edits.mjs";
+import { exhibitKinds, formFields, kindFields } from "./form-fields.mjs";
 import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
 import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
@@ -1877,7 +1884,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --apply <edits.json> [--dry-run] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --apply <edits.json> [--dry-run] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [<type> | <type>/<form> | <kind> | kinds | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2834,8 +2841,17 @@ async function catalogueCommand(values, file, say) {
   if (values.schema !== undefined) {
     // The deck-level keys, from the table the compile holds `deck` to.
     if (values.schema === "deck") { say(JSON.stringify(deckSchema(), null, 2)); return 0; }
+    // Every field a form reads - its exhibit kind's data, options and marks among them - and every kind with the forms that draw it (form-fields.mjs).
+    if (values.schema === "kinds") { say(JSON.stringify(exhibitKinds(), null, 1)); return 0; }
+    if (values.schema.includes("/")) {
+      const [type, form] = values.schema.split("/");
+      try { say(JSON.stringify(formFields(type, form), null, 1)); return 0; } catch (error) { console.error(error.message); return 1; }
+    }
+    // An exhibit kind - what a typed exhibit (`{ type: "chart.column", ... }` in a panel) reads.
+    if (values.schema && !PAGE_TYPES[values.schema] && kindFields(values.schema)) { say(JSON.stringify(kindFields(values.schema), null, 1)); return 0; }
     // One type's schema carries that type's countable limits, form by form.
-    try { say(JSON.stringify({ ...pageSchema(values.schema || null), ...(values.schema ? { "x-limits": pageLimits(values.schema) } : {}) }, null, 2)); return 0; } catch (error) { console.error(error.message); return 1; }
+    try { say(JSON.stringify({ ...pageSchema(values.schema || null), ...(values.schema ? { "x-limits": pageLimits(values.schema) } : {}) }, null, 2)); return 0; }
+    catch (error) { console.error(`${error.message}; or <type>/<form> for the fields a form reads, an exhibit kind (\`--schema kinds\` lists them), or deck`); return 1; }
   }
   // The limits a page is held to are those of the deck it is written for: a
   // live pitch's word floors are a quarter of a pre-read's.
