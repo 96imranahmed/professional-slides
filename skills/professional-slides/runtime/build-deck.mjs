@@ -184,8 +184,8 @@ async function assembleRevision({ spec, stem, baseDir, directory, py, result, de
   // A carried slide the written file does not hold byte for byte is not the user's slide: the build says so rather than deliver it.
   if (report.preserved?.drifted?.length) result.revisionFindings = report.preserved.drifted.map((index) => ({ code: registered(REVISION_CODES, "REVISION_CARRY_DRIFT"), severity: "blocker", slide: index,
     repair: `Source slide ${index} was carried, and a part it draws on in ${path.basename(pptxPath)} is not the source deck's byte for byte: the assembled file is not the user's deck. This is a fault of the assembler, not of the pages file - report it with the source deck` }));
-  // The assembled deck as the review reads it (reviewer.mjs reviewedDeck): every slide in its place - a composed page as the
-  // scene holds it, a carried slide by its title and its words, which is all the runtime knows of it.
+  // The assembled deck's scene: every slide in its place - a composed page as the scene holds it, a carried slide by its
+  // title and its words, which is all the runtime knows of it.
   const said = new Map(carriedSaid(spec, inventory).map((item) => [item.id, item]));
   const text = (role, value) => ({ type: "text", role, text: value });
   await fs.writeFile(path.join(directory, ASSEMBLED_SCENE), JSON.stringify({ id: deck.id, assembled: true, source: inventory?.source?.file ?? null,

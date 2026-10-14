@@ -75,45 +75,6 @@ console.log(JSON.stringify({{
         self.assertIn('caption', result['noCaption'])
 
 
-class VarietyContractTests(unittest.TestCase):
-    def test_a_stamped_deck_is_refused_and_a_chosen_one_compiles(self):
-        result = run_node(f'''
-import {{ compileDeck }} from '{AUTHOR}';
-import {{ varietyFindings }} from './skills/professional-slides/runtime/gates/variety_gates.mjs';
-import {{ structureOf }} from '{KIT}';
-const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
-const chart = (extra = {{}}) => ({{ categories: years, series: [{{ name: 'x', values: [1, 2, 3, 4, 5, 6, 7, 8] }}], annotations: [{{ category: '2021', text: 'The turn came when grounded capacity returned to the network' }}], ...extra }});
-const stamped = Array.from({{ length: 14 }}, (_, i) => ({{ id: 's' + i, type: 'trend', form: 'line', commentary: 'below', takeaway: 'So what ' + i, adds: 'The commentary names the mechanism the exhibit cannot show',
-  why: 'Every page takes the same shape here', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, exhibit: chart(), points: ['a', 'b', 'c'], highlight: ['a', 'b', 'c'] }}));
-let refused = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: stamped }}).findings.map((f) => f.code).sort();
-const kinds = [
-  {{ type: 'trend', form: 'line', commentary: 'on-exhibit', exhibit: chart() }},
-  {{ type: 'ranking', form: 'bar', commentary: 'beside', points: ['a'], exhibit: {{ categories: ['A','B','C','D','E','F','G','H'], series: [{{ name: 'x', values: [8,7,6,5,4,3,2,1] }}], highlights: [{{ category: 'A' }}] }} }},
-  {{ type: 'panels', form: 'row', commentary: 'captions', exhibits: [0, 1].map((i) => ({{ type: 'chart.column', categories: ['A','B','C','D'], series: [{{ name: 'x', values: [1, 2, 3, 4] }}], caption: 'Segment ' + i + ' grew fastest where capacity was added first' }})) }},
-  {{ type: 'scorecard', form: 'harvey', commentary: 'in-exhibit', exhibit: {{ columns: ['Option', {{ label: 'Fit', type: 'harvey' }}], rows: [['A', {{ type: 'harvey', value: 2 }}], ['B', {{ type: 'harvey', value: 3 }}], ['C', {{ type: 'harvey', value: 1 }}]] }} }},
-  {{ type: 'mechanism', form: 'flow', commentary: 'rail', rail: 'Capacity is lost at the junction before the trains reach the platform', exhibit: {{ nodes: [{{ id: 'x' }}, {{ id: 'y' }}, {{ id: 'z' }}], edges: [] }} }},
-  {{ type: 'numbers', form: 'hero-number', commentary: 'none', kpi: {{ value: '5', label: 'x' }}, exhibit: {{ type: 'table', columns: ['A', 'B'], rows: [['x', '1'], ['y', '2'], ['z', '3']] }} }},
-  {{ type: 'argument', form: 'memo', commentary: 'none', paragraphs: ['Prose.'], panel: {{ text: 'The conclusion the reader keeps: what the argument settles, the condition it rests on, and the evidence that would reverse it before the next review of the plan.' }} }},
-];
-const chosen = Array.from({{ length: 14 }}, (_, i) => ({{ id: 'c' + i, takeaway: i % 7 === 0 ? 'Close' : false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'Chosen for what this page has to show', settles: {{ kind: 'comparison', what: 'The evidence recorded for this page' }}, title: 'Finding ' + i, ...structuredClone(kinds[i % kinds.length]) }}));
-const ok = compileDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: chosen }});
-const untyped = varietyFindings({{ slides: Array.from({{ length: 13 }}, (_, i) => ({{ id: 'u' + i, title: 't' }})) }}, {{ structureOf }}).map((f) => f.code);
-const edited = structuredClone(ok.spec); edited.slides[0].layout = 'exhibit-top';
-console.log(JSON.stringify({{ refused, chosen: ok.findings.map((f) => f.code), untyped,
-  edited: varietyFindings(edited, {{ structureOf }}).map((f) => f.code) }}));
-''')
-        # Panels counts from 15 pages; fourteen trends of eight values each sit on the page floor, so the deck is thin
-        # too; fourteen line charts are one kind of exhibit (VARIETY_EXHIBIT_RANGE); and points under every exhibit
-        # break both the commonest placement's cap and the cap on points below.
-        self.assertEqual(result['refused'], ['EVIDENCE_DEPTH', 'VARIETY_COMMENTARY', 'VARIETY_COMMENTARY', 'VARIETY_EXHIBIT_RANGE', 'VARIETY_SIGNATURE',
-                                             'VARIETY_TAKEAWAY', 'VARIETY_TYPE_RANGE', 'VARIETY_TYPE_RUN', 'VARIETY_TYPE_SHARE'])
-        # A hero number with its points beside its proof is drawn as the ranking
-        # beside its points, so the chosen deck's hero numbers stand alone.
-        self.assertEqual(result['chosen'], [])
-        self.assertEqual(result['untyped'], ['PAGE_TYPE_UNDECLARED'])
-        self.assertEqual(result['edited'], ['PAGE_TYPE_EDITED'])
-
-
 class BeyondOneColumnTests(unittest.TestCase):
     """Pages that are not one exhibit with a text column beside it.
 
@@ -155,11 +116,11 @@ const charts = rows({ blocks: [0, 1].map((i) => ({ label: 'Area ' + (i + 1), poi
 const pages = [rows(), { ...charts, id: 'rows-charts' }, rows({ id: 'rows-bar', commentary: 'so-what-bar', bar: 'The three constraints together cap the peak until the depot is extended in 2029' }, 5),
   sequence(), sequence({ id: 'seq-two', commentary: 'so-what-bar', exhibits: sequence().exhibits.slice(0, 2).map(({ caption, ...ex }) => ex),
     bar: 'Faster trains win journeys on every flow, so electrification leads the second phase of the plan' }), ranked()];
-const { spec, findings } = compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages });
+const { spec } = compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages });
 const { deck } = composeAll(spec, '.');
 const nodes = (id) => deck.slides.find((s) => s.id === id).nodes;
 const count = (id, test) => nodes(id).filter(test).length;
-console.log(JSON.stringify({ findings: findings.map((f) => f.code), composed: deck.slides.map((s) => s.id),
+console.log(JSON.stringify({ composed: deck.slides.map((s) => s.id),
   layouts: Object.fromEntries(spec.slides.map((s) => [s.id, s.layout ?? s.arrange])),
   labels: count('rows', (n) => n.role === 'side-panel'), labelsFive: count('rows-bar', (n) => n.role === 'side-panel'),
   metrics: count('rows', (n) => n.role === 'metric-value'), rowCharts: count('rows-charts', (n) => n.role === 'chart-mark'),
@@ -167,7 +128,6 @@ console.log(JSON.stringify({ findings: findings.map((f) => f.code), composed: de
   bars: ['rows-bar', 'seq-two', 'bar'].map((id) => count(id, (n) => n.role === 'insight-surface')),
   closes: spec.slides.map((s) => s.soWhat?.style ?? null) }));
 ''')
-        self.assertEqual(result['findings'], [])  # a short deck: the contract starts at twelve pages
         self.assertEqual(sorted(result['composed']), sorted(['rows', 'rows-charts', 'rows-bar', 'seq', 'seq-two', 'bar']))
         self.assertEqual(result['layouts']['rows'], 'labelled-rows')
         self.assertEqual(result['layouts']['seq'], 'sequence')
@@ -213,7 +173,6 @@ console.log(JSON.stringify({
   barElsewhere: error(() => compilePage(ranked({ commentary: 'on-exhibit', exhibit: { ...ranked().exhibit, annotations: [{ category: 'E', text: 'Northvale discounts least of the seven operators in the set' }] } }))),
   longBar: error(() => compilePage(ranked({ bar: long }))),
   barPoints: error(() => compilePage(ranked({ points: ['a', 'b'] }))),
-  draftBar: compileDeck({ deck: { id: 'd' }, pages: [ranked({ bar: undefined })] }, { draft: true, partial: true }).compileErrors[0] ?? null,
 }));
 ''')
         self.assertIn('"in-exhibit", "so-what-bar"', result['rowsBelow'])
@@ -232,7 +191,6 @@ console.log(JSON.stringify({
         self.assertIn('choose commentary "so-what-bar"', result['barElsewhere'])
         self.assertIn('two lines', result['longBar'])
         self.assertIn('second commentary', result['barPoints'])
-        self.assertIsNone(result['draftBar'])  # a draft spine need not carry its copy yet
 
     def test_the_catalogue_and_schema_publish_the_new_forms(self):
         result = run_node(f'''
@@ -256,11 +214,10 @@ console.log(JSON.stringify({{ types: describeTypes(), parallelForms: parallel.pr
 import fs from 'node:fs';
 import {{ compileDeck }} from '{AUTHOR}';
 const doc = JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json', 'utf8'));
-const {{ spec, findings }} = compileDeck(doc);
+const {{ spec }} = compileDeck(doc);
 const typed = spec.slides.filter((s) => s.pageType);
-console.log(JSON.stringify({{ findings: findings.map((f) => f.code), forms: typed.map((s) => s.pageType.form), commentary: typed.map((s) => s.pageType.commentary) }}));
+console.log(JSON.stringify({{ forms: typed.map((s) => s.pageType.form), commentary: typed.map((s) => s.pageType.commentary) }}));
 ''')
-        self.assertEqual(result['findings'], [])
         self.assertIn('labelled-rows', result['forms'])
         self.assertIn('sequence', result['forms'])
         self.assertIn('so-what-bar', result['commentary'])
@@ -434,8 +391,6 @@ console.log(JSON.stringify({{
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import {{ compilePage }} from '{KIT}';
 import {{ authorDeck }} from '{AUTHOR}';
-import {{ deriveContent, wordBudgetOf }} from './skills/professional-slides/runtime/derive-content.mjs';
-import {{ runContentGates }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
 const years = ['2019','2020','2021','2022','2023','2024','2025','2026'];
 const error = (fn) => {{ try {{ fn(); return null; }} catch (e) {{ return e.message; }} }};
 const S = {{ kind: 'comparison', what: 'The operator statement of its plan' }};
@@ -454,15 +409,8 @@ const bad = {{ id: 'bad', type: 'trend', form: 'line', commentary: 'none', takea
 const memo = {{ id: 'm1', type: 'argument', form: 'memo', commentary: 'none', takeaway: false, adds: 'The commentary names the mechanism the exhibit cannot show', why: 'A short argument page for the test', settles: S,
   title: 'The plan rests on three commitments made this year', paragraphs: ['One short sentence.'], panel: {{ text: 'All three commitments are funded this year: the £340 million grant, the £160 million loan drawn in tranches, and the fare reform that waits for the new timetable.' }} }};
 const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [broken, bad, memo] }}, {{ baseDir: dir }});
-const content = deriveContent(out.spec, out.deck);
-const page = content.pages.find((p) => p.id === 'm1');
-const slide = out.deck.slides.find((s) => s.id === 'm1');
-const gates = runContentGates(content, {{ required: true }});
 console.log(JSON.stringify({{ long: error(() => compilePage(trend)), strip: error(() => compilePage(strip)),
-  failed: [...out.failedIds].sort(), composed: out.deck.slides.map((s) => s.id), codes: out.findings.map((f) => f.code + ':' + (f.id ?? '')),
-  floor: slide?.wordFloor ?? null, ceiling: slide?.wordCeiling ?? null, budget: wordBudgetOf('text-page'),
-  task: page.textReference.task, claim: page.claim, planned: page.textPlan.some((b) => b.text === 'One short sentence.'),
-  low: gates.findings.some((f) => f.code === 'TEXT_COVERAGE_LOW' && f.id === 'm1') }}));
+  failed: [...out.failedIds].sort(), composed: out.deck.slides.map((s) => s.id), codes: out.blocking.map((f) => f.code + ':' + (f.id ?? '')) }}));
 ''')
         self.assertIn('callout box', result['long'])
         self.assertIn('metric strip', result['strip'])
@@ -471,12 +419,6 @@ console.log(JSON.stringify({{ long: error(() => compilePage(trend)), strip: erro
         self.assertIn('COMPILE:bad', result['codes'])
         self.assertIn('PAGE_DOES_NOT_COMPOSE:b', result['codes'])
         self.assertIn('m1', result['composed'])  # the page that compiled was composed and gated in the same run
-        self.assertEqual(result['floor'], result['budget']['floor'])  # the text page's floor, the one floor every check reads
-        self.assertGreater(result['ceiling'], result['floor'])
-        self.assertEqual(result['task'], 'text-page')
-        self.assertEqual(result['claim'], 'The plan rests on three commitments made this year')  # the claim is the title
-        self.assertTrue(result['planned'])  # the text plan is the page as composed
-        self.assertTrue(result['low'])  # and a short page is held to its reading task's floor
 
     def test_evidence_shapes_draft_and_every_error_at_once(self):
         result = run_node(f'''
@@ -496,12 +438,11 @@ try {{ composeAll({{ schema: 'professional-slides.deck/v3', id: 'x', slides: [
   {{ id: 'b', title: 'Another page that is fine now', points: ['ok'] }},
   {{ id: 'c', title: 'A second bad chart page', exhibit: {{ type: 'chart.nope' }} }}] }}, '.'); }} catch (e) {{ all = e.pageErrors; }}
 console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']), 0, {{ insights }})), missing: error(() => compilePage(ranking([]), 0, {{ insights }})),
-  settles: derived.pageType.content.settles, draft: compileDeck({{ deck: {{ id: 'd' }}, pages: [onExhibit] }}, {{ draft: true, partial: true }}).compileErrors[0] ?? null, full: error(() => compilePage(onExhibit)), all }}));
+  settles: derived.pageType.content.settles, full: error(() => compilePage(onExhibit)), all }}));
 ''')
         self.assertIn('peer-set', result['twoNumbers'])  # a ranking needs the whole set; two numbers are a research task
         self.assertIn('evidence', result['missing'])
         self.assertEqual(result['settles']['kind'], 'rank')  # settles derived from the insight's shape
-        self.assertIsNone(result['draft'])  # a draft spine need not carry its callouts yet
         self.assertIn('annotations', result['full'])
         self.assertEqual(len(result['all']), 2)  # both broken pages, in one run
         self.assertTrue(any(e.startswith('c:') for e in result['all']))
@@ -604,11 +545,10 @@ console.log(JSON.stringify({{
         for published in ('3 callouts', 'rail about', 'values 10 characters'):
             self.assertIn(published, result['catalogue'])
 
-    def test_a_column_page_budget_counts_the_room_in_each_column(self):
+    def test_a_column_over_its_height_says_by_how_much(self):
         # A hero number with points beside its exhibit went from a band left
         # empty, to a column over its height, to an empty column, one point at
-        # a time. The budget gives each column's room in lines, and a column
-        # over its height says by how much.
+        # a time. A column over its height says by how much.
         result = run_node(f'''
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import {{ authorDeck }} from '{AUTHOR}';
@@ -619,16 +559,10 @@ const long = 'On the low case the path flattens after FY29 and ends at 56.5 mill
 const over = {{ ...hero, id: 'over', points: [...hero.points, long, long, long, long], highlight: hero.highlight }};
 const run = async (page) => authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [page] }}, {{ baseDir: dir }});
 const fits = await run(hero), overflows = await run(over);
-console.log(JSON.stringify({{ budget: fits.budget.find((b) => b.id === hero.id) ?? null,
-  overflow: overflows.findings.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').map((f) => f.repair) }}));
+console.log(JSON.stringify({{ fits: fits.blocking.map((f) => f.code),
+  overflow: overflows.blocking.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').map((f) => f.repair) }}));
 ''')
-        budget = result['budget']
-        self.assertIsNotNone(budget)
-        self.assertGreater(budget['line'], 0)
-        written = [c for c in budget['columns'] if c['text']]
-        self.assertTrue(written, budget['columns'])
-        for column in written:
-            self.assertEqual(column['lines'], column['free'] // budget['line'])
+        self.assertEqual(result['fits'], [])
         self.assertEqual(len(result['overflow']), 1)
         self.assertRegex(result['overflow'][0], r'-side: the column holds \d+px of content in \d+px - over by \d+px, about \d+ lines? of body text')
 

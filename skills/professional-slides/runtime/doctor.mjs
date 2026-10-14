@@ -149,9 +149,6 @@ async function reviewerCheck(env, platform, host = hostCli(env)) {
   return { host, wanted, chosen, ok: Boolean(chosen), clis };
 }
 
-/** Whether this machine can render: LibreOffice and poppler found. The author's final check renders where it can (author-deck.mjs --check --render). */
-export const rendererInstalled = (env = process.env, platform = process.platform) => Object.values(binaryCheck(env, platform)).every((binary) => binary.found);
-
 // font-metrics.mjs's lookup: RUNTIME_NODE_MODULES first, else this checkout.
 async function canvasCheck(env) {
   try {

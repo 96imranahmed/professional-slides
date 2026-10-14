@@ -286,32 +286,6 @@ export function sectionTabs(slidesIn, mode = "pills") {
 /** Whether the deck draws a contents page: `contents` where the deck sets it, otherwise from `agenda`, otherwise once it has two sections. */
 const contentsModeOf = (spec) => spec.contents ?? (spec.agenda === "once" ? "once" : spec.agenda ? true : (spec.slides || []).filter((s) => s?.kind === "section").length >= 2);
 
-/**
- * Why the deck's contents page cannot hold its sections, or null: the style
- * the deck names (`agendaStyle`) holds fewer, or the deck has more sections
- * than any style lists. Read where the deck is authored, so a style the
- * author chose is refused before a page is composed; a style the deck did
- * not name is the runtime's to fit (`agendaStyleFor`). The appendix opens
- * behind a divider of its own, which the contents page lists too.
- */
-export function contentsProblem(spec) {
-  const room = contentsRoom(spec);
-  return room && room.sections > room.max ? room : null;
-}
-
-/**
- * Where the deck stands against its contents page, or null when it has none:
- * its sections (the appendix divider is one), the style it is held to - the
- * one the deck names, otherwise the list, which holds the most - and what
- * that style holds.
- */
-export function contentsRoom(spec) {
-  const sections = (spec.slides || []).filter((s) => s?.kind === "section").length + (Array.isArray(spec.appendix) && spec.appendix.length ? 1 : 0);
-  if (!contentsModeOf(spec) || sections < AGENDA_LIMITS.list.min) return null;
-  const style = spec.agendaStyle === "columns" ? "columns" : "list";
-  return { sections, style, ...AGENDA_LIMITS[style] };
-}
-
 export function agendaPages(slidesIn, agenda, agendaStyle) {
   const sections = slidesIn.filter((s) => s.kind === "section");
   if (!agenda || sections.length < 2) return slidesIn;
@@ -566,39 +540,6 @@ const appendixOf = (spec, { divider = false } = {}) => (Array.isArray(spec.appen
   ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
      ...(spec.appendix || []).map((page) => ({ density: "appendix", ...page }))]
   : [];
-
-/**
- * Where each page of a deck stands, counted from 1 as its slides are
- * numbered, read off its pages as declared: the cover, the contents pages
- * its navigation adds, each section and page one slide, the appendix behind
- * its divider. `spec` is the deck-level keys with `slides` and `appendix` as
- * the pages file writes them. A page run composes the pages it names among
- * the deck's structural pages alone (page-run.mjs), and they print these
- * places and every reference to a page resolves to one (`pageRun.places`):
- * a page the composer cuts in two, or one that does not compile, moves the
- * pages after it, which a page run does not read.
- */
-export function declaredPlaces(spec) {
-  const { contentsMode, agendaMode } = navigationOf(spec);
-  const pages = agendaPages([...spec.slides, ...appendixOf(spec)], contentsMode === false ? false : agendaMode, spec.agendaStyle);
-  const first = spec.cover ? 2 : 1;
-  return Object.fromEntries(pages.map((page, at) => [page?.id, first + at]).filter(([id]) => id !== undefined && id !== null).map(([id, place]) => [String(id), place]));
-}
-
-/**
- * Coverage: when the spec lists the brief's ranked `criteria`,
- * every criterion must be served by at least one page that carries an exhibit
- * (`serves: ["education", …]` on the slide). Returns findings; empty when covered.
- */
-export function coverageFindings(spec) {
-  if (!isV3(spec) || !Array.isArray(spec.criteria) || !spec.criteria.length) return [];
-  const served = new Map(spec.criteria.map((c) => [String(c).toLowerCase(), []]));
-  spec.slides.forEach((slide, i) => {
-    const hasExhibit = Boolean(slide.exhibit || (slide.exhibits || []).length);
-    for (const c of slide.serves || []) if (served.has(String(c).toLowerCase()) && hasExhibit) served.get(String(c).toLowerCase()).push(i + 1);
-  });
-  return [...served.entries()].filter(([, pages]) => !pages.length).map(([criterion]) => ({ slide: null, code: "MISSING_EVIDENCE", measured: criterion, threshold: "one comparative exhibit", repair: `Add a page whose exhibit compares every option on "${criterion}", and mark it serves: ["${criterion}"].` }));
-}
 
 /**
  * `template: "house.json"` applies a house profile written by

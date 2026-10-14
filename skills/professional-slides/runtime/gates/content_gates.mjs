@@ -281,19 +281,6 @@ const repeatFindings = (pages, pairs) => pairs.map(([i, j]) => finding(pages[j].
   + "step rather than the same step with different evidence."));
 
 /**
- * The claims of a deck's content pages read against one another as the deck
- * gates read them (CONTENT_CLAIM_REPEATS), for a page run: `pages` every page
- * of the deck as its content plan records it, from what each declares. Claims
- * written word for word alike repeat on their face; the reading of every claim
- * at once (claims-repeat) is a question of the whole deck, which the whole-deck
- * run asks - a page run reads the answer it recorded and asks nothing.
- */
-export function claimRepeatFindings(pages) {
-  if (pages.length < CONTENT_THRESHOLDS.from) return [];
-  return repeatFindings(pages, claimRepeats(pages, true, { ask: false }));
-}
-
-/**
  * The pairs of pages, as indexes, that make the same claim. Two claims
  * written word for word alike repeat on their face. Otherwise whether two
  * claims are one finding is read, not counted in shared words: two claims

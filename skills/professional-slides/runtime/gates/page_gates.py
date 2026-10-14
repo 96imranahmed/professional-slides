@@ -318,7 +318,6 @@ def run_gates(scene, render_dir=None, profile=None, gates=None, deck=None, cache
             gate_nice_ticks(slide_no, slide, run.findings)
         if cache is not None:
             cache.keep(run, slide_no, slide, mark)
-    deck_level_gates(run, slides, content_indexes, fill, rendered=bool(render_dir) and not run.skipped_pixel_gates)
     if cache is not None:
         cache.inked(run, slides)
 
@@ -631,40 +630,6 @@ def content_page_gates(run, slide_no, index, slide, slide_profile):
         gate_twin_cells(slide_no, slide, findings)
     if wanted("CONTRADICTED_SHARE"):
         gate_contradicted_share(slide_no, slide, findings)
-
-
-def deck_level_gates(run, slides, content_indexes, fill, rendered):
-    """The deck gates over the content pages, then the half-empty habit (on
-    the render when `rendered`, else on the scene) and the deck's ink."""
-    findings, wanted = run.findings, run.wanted
-    if wanted("LAYOUT_MONOTONY"):
-        gate_layout_monotony(slides, content_indexes, findings)
-    if wanted("IMAGE_BUDGET") or wanted("IMAGE_RUN"):
-        gate_image_budget(slides, content_indexes, findings)
-    if wanted("EVIDENCE_MIX") or wanted("PAGE_VARIETY"):
-        gate_evidence_mix(slides, content_indexes, findings)
-    if wanted("DECK_CRAFT"):
-        gate_deck_craft(slides, content_indexes, findings)
-    if wanted("DECK_VOCABULARY"):
-        gate_deck_vocabulary(slides, content_indexes, findings)
-    if wanted("NO_SECTIONS"):
-        gate_deck_structure(slides, content_indexes, findings)
-    if wanted("NO_CONTENTS") or wanted("NO_SUMMARY"):
-        gate_deck_front_matter(slides, content_indexes, findings, fill)
-    if wanted("DECK_FLAT"):
-        gate_deck_shape(slides, content_indexes, findings, fill)
-    if wanted("PAGE_SHAPE_FLAT"):
-        gate_page_shape_flat(slides, content_indexes, findings, fill)
-    if wanted("COLUMN_MONOTONY"):
-        gate_column_monotony(slides, content_indexes, findings)
-    if wanted("TABLE_SCHEMA_FLAT"):
-        gate_table_schema_flat(slides, content_indexes, findings)
-    if run.habit:
-        deck = []
-        gate_deck_empty_pages(content_indexes, deck, rendered=rendered, counted=run.empties)
-        run.report(deck)
-    if wanted("DECK_INK"):
-        gate_deck_ink(slides, content_indexes, findings, run.ink_of)
 
 
 def median(values):

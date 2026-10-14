@@ -19,7 +19,6 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -27,7 +26,6 @@ GATES = Path(__file__).resolve().parents[2] / "skills" / "professional-slides" /
 sys.path.insert(0, str(GATES))
 import judgements  # noqa: E402
 
-JUDGE = GATES.parent / "judge.mjs"
 
 
 @contextlib.contextmanager
@@ -105,50 +103,3 @@ const quantityReader = () => quantitySession({{ oracle: (kind, subject) => {{
   return by ? {{ verdict: 'replaced', by: [by.id] }} : 'not-replaced';
 }} }});
 """
-
-
-def answer_everything(node, pages, *flags, rounds=6, answer=passing):
-    """Run judge.mjs on a pages file and answer every packet it stages - each question with `answer(item)` - until it
-    exits 0; returns the packets answered and the last run. A deck compiled after it holds every rule that reads copy."""
-    root, packets = Path(pages).parent / "judgements", []
-    run = lambda: subprocess.run([str(node), str(JUDGE), str(pages), *flags], capture_output=True, text=True, timeout=600)
-    done, round_ = run(), 0
-    while done.returncode == 3 and round_ < rounds:
-        for folder in sorted(root.glob("packet-*")):
-            packet = json.loads((folder / "packet.json").read_text())
-            packets.append(packet)
-            said = [{"key": item["key"], **answer(item)} for item in packet["items"]]
-            (folder / "answer.json").write_text(json.dumps({"batch": packet["batch"], "judgements": said}))
-        done, round_ = run(), round_ + 1
-    return packets, done
-
-
-def _swapped(value, old, new, whole):
-    """`value` with the line `old` put as `new`, as a reader reads a question once a replacement is applied: a string that is
-    the line, or - for a line of three words or more - that holds it."""
-    if isinstance(value, str):
-        return new if value == old else value.replace(old, new) if not whole and old in value else value
-    if isinstance(value, list):
-        return [_swapped(v, old, new, whole) for v in value]
-    if isinstance(value, dict):
-        return {k: _swapped(v, old, new, whole) for k, v in value.items()}
-    return value
-
-
-def self_check_judgements(questions, swaps=(), answer=passing):
-    """The `judgements` block of a self-check answer (self-check.mjs): every question its brief listed answered by `answer`,
-    and one that reads a line the answer replaces answered of the replacement (`"on": "replacement"`). `swaps` are
-    `(page, line, replacement)` as the sheet reads them, a line's written form (with its tokens) given as one more swap."""
-    said = []
-    for item in questions:
-        asked, on = dict(item), None
-        for page, old, new in swaps:
-            if page not in item["where"]:
-                continue
-            whole = len(old.split()) < 3
-            subject, context = _swapped(asked["subject"], old, new, whole), _swapped(asked.get("context"), old, new, whole)
-            if (subject, context) != (asked["subject"], asked.get("context")):
-                asked.update(subject=subject, context=context)
-                on = "replacement"
-        said.append({"key": item["key"], **answer(asked), "on": on})
-    return said

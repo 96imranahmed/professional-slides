@@ -48,7 +48,7 @@ console.log(JSON.stringify(units(['test_revision_carry', 'test_revision_streams'
 ''')
         # Through a fixture class declared in the module, through one imported from another module, and directly.
         for unit in ("test_revision_carry.StaleTextTests", "test_revision_carry.AssemblerTests", "test_revision_streams.OneStaleRuleTests",
-                     "test_revision_streams.ComposedPagesAloneTests", "test_pages_parts.PagesFileTests", "test_runner_discovery.RunnerDiscoveryTests"):
+                     "test_revision_streams.CarriedSlidesBetweenThemTests", "test_pages_parts.PagesFileTests", "test_runner_discovery.RunnerDiscoveryTests"):
             self.assertIn(unit, result)
         # A helper that is no test class is not scheduled as one.
         self.assertFalse([unit for unit in result if unit.split(".")[-1][:1].islower() and "." in unit])

@@ -134,21 +134,6 @@ assert.equal(planDeck(plan).deck.slides[0].role,'executive-summary');
 console.log('{}');
 """)
 
-    def test_a_review_cannot_survive_a_changed_render(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
-import {reviewBinding,validateReviewBinding} from './skills/professional-slides/runtime/reviewer.mjs';
-const dir=await fs.mkdtemp(path.join(os.tmpdir(),'review-binding-'));
-try{await fs.mkdir(path.join(dir,'rendered'));await fs.writeFile(path.join(dir,'scene.json'),JSON.stringify({slides:[{id:'a'}]}));await fs.writeFile(path.join(dir,'deck.pptx'),'editable');await fs.writeFile(path.join(dir,'build-result.json'),JSON.stringify({pptxPath:path.join(dir,'deck.pptx')}));await fs.writeFile(path.join(dir,'rendered/slide-1.png'),'pixels');
-const review={binding:await reviewBinding(dir),inspectedSlides:['a'],rating:7};
-assert.deepEqual(await validateReviewBinding(review,dir,['a']),[]);
-await fs.writeFile(path.join(dir,'rendered/slide-1.png'),'different pixels');
-assert.ok((await validateReviewBinding(review,dir,['a'])).length);
-}finally{await fs.rm(dir,{recursive:true,force:true});}
-console.log('{}');
-""")
-
     def test_automatic_cards_do_not_discard_authored_phrase_focus(self):
         run_node("""
 import assert from 'node:assert/strict';

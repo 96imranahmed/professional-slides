@@ -97,9 +97,30 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         self.assertNotIn("SCENE_VOID", codes(report))
 
 
+# A page and a deck as the gates see them: top-level component instances, image primitives and text nodes.
+def shape_page(index, components=(), photos=0, texts=(), stacked=False):
+    """A page as the gates see it: top-level component instances, image
+    primitives and text nodes."""
+    sid = f"s{index:02d}"
+    instances = [{"id": "chrome", "component": "slide-chrome"}]
+    for i, component in enumerate(components):
+        frame = {"x": 60 + (0 if stacked else i * 300), "y": 162 + (i * 200 if stacked else 0),
+                 "width": 560, "height": 180 if stacked else 400}
+        instances.append({"id": f"{sid}-{i}", "component": component, "frame": frame})
+    nodes = [{"type": "image", "role": "image",
+              "frame": {"x": 60 + i * 260, "y": 200, "width": 240, "height": 200}}
+             for i in range(photos)]
+    nodes += [{"type": "text", "role": "body", "text": text} for text in texts]
+    return {"id": sid, "componentInstances": instances, "nodes": nodes}
+
+
+def shape_deck(slides, **kw):
+    return {"slides": [{"id": "cover", "componentInstances": [{"id": "cover", "component": "cover"}], "nodes": []}] + slides, **kw}
+
+
 class EvidenceMultiplicityTests(unittest.TestCase):
     def test_area_and_label_counts_preserve_review_findings_without_forcing_filler(self):
-        from test_deck_shape import page, deck
+        page, deck = shape_page, shape_deck
         process = page(1, ['chevron-process'])
         process['contentFrame'] = {'x': 60, 'y': 152, 'width': 1160, 'height': 516}
         process['componentInstances'] = [{'component': 'chevron-process', 'frame':
@@ -117,7 +138,7 @@ class EvidenceMultiplicityTests(unittest.TestCase):
         self.assertFalse(report['accepted'])
 
     def test_summary_and_single_exhibit_counts_do_not_waive_missing_argument(self):
-        from test_deck_shape import page, deck
+        page, deck = shape_page, shape_deck
         gates = {"THIN_EVIDENCE", "MISSING_ARGUMENT"}
         summary = {**page(1, ['points']), 'role': 'executive-summary'}
         bridge = page(2, ['chart.waterfall'])

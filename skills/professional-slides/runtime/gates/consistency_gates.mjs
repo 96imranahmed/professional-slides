@@ -40,9 +40,6 @@
 //                                page prints both; or, with no measures named,
 //                                two exhibits give different numbers under the
 //                                same pair of names
-//   NUMBER_FORMATS_DIFFER        one value printed at different precision or
-//                                scale on one page (a chart's labels read at the
-//                                precision it labels at), or on two pages
 //   NUMBER_STALE                 a revision: a number changed on one page and
 //                                still standing in its old form on another.
 //                                Two kinds of change feed it. A text edit on a
@@ -52,19 +49,9 @@
 //                                slide blocks, its bare number there advises,
 //                                and an edit marked `only` is this slide's
 //                                alone. A page composed where a slide stood is
-//                                read against that slide: the page shows what
-//                                the number was changed to and another page
-//                                still states the old value of the same thing,
-//                                under the same names or as the same quantity
-//                                in a model's reading (blocks); the old value
-//                                read as the same quantity with no replacement
-//                                shown, or in its digits alone (advisory)
-//   PROOF_REPEATS                a page that plots, as proof, a measure over the
-//                                same periods or members as the page before
-//                                plots it, or shows nothing an earlier page
-//                                does not: the same line on the same frame
-//                                (blocks where both claim the same measures and
-//                                show exactly the same views)
+//                                read against that slide: another page still
+//                                states the old value under the same names
+//                                (blocks), or in its digits alone (advisory)
 //   BRIDGE_UNRECONCILED          what is said to add up and does not, as printed:
 //                                a waterfall's printed steps against its printed
 //                                ends; a growth analysis's change printed on one
@@ -95,27 +82,22 @@
 // under it advises unless both exhibits name the same measure, and a stale
 // value blocks under it only where the other page holds the very number the
 // revision replaced - and one thing under two spellings ("FY26", "2025-26") is
-// not seen at all. Whether a number in a sentence states the quantity another
-// number states is read by a model (same-quantity, number-replaced-by), never
-// matched on the words around the two.
+// not seen at all. A number a page says again in other words is taken to stand:
+// whether two sentences state one quantity is not matched on their words.
 import { bindDeck, withoutTokens } from "../bind.mjs";
 import { cellText, isTable, rowCells } from "../evidence.mjs";
 import { measureConflicts, measureNeighbours, measureRegistry, normalUnit, valuesAgree } from "../measures.mjs";
 import { measurementsIn, percentUnit, printedNumbers, unitScale } from "../printed-numbers.mjs";
-import { recordedMeasures, storyStructure } from "../storyline.mjs";
 import { registered } from "../errors.mjs";
 import { readJsonSync } from "../cli.mjs";
 import { carriedStated, printsWords } from "../revision.mjs";
 import { pagePool, pageTexts, refsOf, statedCells, typedNumbers } from "./dependency_gates.mjs";
 import { bridgeDecimals, chartDecimals, figuresWithDecimals, roundHalfAway } from "../value-format.mjs";
-import { judged } from "../judgements.mjs";
 
 export const CONSISTENCY_CODES = Object.freeze({
   NUMBERS_DISAGREE: "two pages state different values for one measure at one period or member; as an advisory, for what reads as one quantity under two measures, or under one pair of names in two exhibits",
   NUMBER_STALE: "a number a revision changed on one page - by a text edit on a carried slide or on a page composed in its place - that another page still prints in its old form",
-  NUMBER_FORMATS_DIFFER: "one value printed at different precision or scale on one page - title, callout, chart label, tile or table cell - or on two pages",
   WORDING_STALE: "words a revision changed on one page - a title, a name, the old words of a `replace` - that another page still carries in their old form",
-  PROOF_REPEATS: "a page that plots, as proof, a measure over the same periods or members as another page plots it; it blocks where the two claim the same measures and show exactly the same views",
   BRIDGE_UNRECONCILED: "a bridge, a change or a total that does not add up as printed: a waterfall's printed steps against its printed ends, a change against the ends of it the deck prints, a total against the changes of its parts printed beside it",
 });
 
@@ -400,8 +382,6 @@ function tiesOf(page) {
   }).map((cell) => ({ ...cell, how: "typed", shown: number.shown, decimals: number.decimals, n: number.n, factor: 1, field: `\`${field}\`` }))));
 }
 
-/** The places `value` was recorded to: 1 for 174.5. */
-const placesOf = (value) => Math.min(6, (String(Math.abs(value)).split(".")[1] ?? "").length);
 /** The number an entry prints, as a number: a typed one as typed, the runtime's own rounded half away from zero. */
 const printedOf = (entry) => (entry.how === "typed" && Number.isFinite(entry.n) ? entry.n : roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals));
 
@@ -491,9 +471,9 @@ const shownOf = (entry) => entry.shown ?? String(entry.value);
 /**
  * The findings on what the deck's pages state between them (see the head of
  * this file). `doc` is the pages document as authored, `insights` the Map by
- * id author-deck reads (or null), `spec` the compiled deck where PROOF_REPEATS
- * is wanted, `inventory` a revision's inventory and `changed` the ids of the
- * pages it changed (review-passes.mjs revisionChanges; null for new work,
+ * id author-deck reads (or null), `spec` the compiled deck, `inventory` a
+ * revision's inventory and `changed` the ids of the pages it changed
+ * (revision.mjs revisionChanges; null for new work,
  * where every page is the author's). Blocking rules are returned as blockers:
  * the caller applies the deck's rules version.
  */
@@ -543,66 +523,6 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
       `A reader meets two numbers for one thing, and no page of these prints both${both.length ? ` (${listed(both, ", ")} do${both.length === 1 ? "es" : ""})` : ""}. Use one of them on every page; or, where they are two dates or two definitions, say which beside each number, or set both in one note the other pages repeat`,
       { kind, cells: [cellOf(x.ref, x.label), cellOf(y.ref, y.label)], values: [x.value, y.value], sources: sourcesOf([x.ref, y.ref]) });
   }
-  // One value printed at two precisions. It is read value by value, not measure by measure: a printed number keeps two
-  // significant figures (printed-numbers.mjs), so the small values of a measure take decimal places its large ones do not,
-  // and one format for the whole measure is not the rule. A chart that labels every value it draws is read at the precision
-  // it labels at (labelled, above): what it labels is a number the page prints.
-  //
-  // On one page every print of a value is held to one format - title, callout, data label, tile and table cell alike - and
-  // a typed number to the recorded value rounded once at its places: the BA retest's hb02 printed 2025's passengers per
-  // flight as 174 in its title, 175 on its bar and 174.5 in its callout, the record being 174.5 (itself a rounding of
-  // 174.46), so the title's 174 and the bar's 175 were two roundings of one tie. Between pages a table's cells are not
-  // read: a detailed table prints 5.84% where the pages that argue from it say 5.8%, and a reader looks a number up there
-  // at the precision it was recorded to.
-  const inTable = (entry) => /`[^`]*\b(?:rows|cells)[[.]/.test(String(entry.field ?? ""));
-  const formOfEntry = (entry) => `${entry.decimals}|${Math.round(Math.log10(entry.factor ?? 1))}`;
-  const whereOf = (entry) => (entry.how === "exhibit" ? `the label of ${entry.field}` : entry.how === "typed" ? `typed in ${entry.field}` : String(entry.field ?? "").replace(/^the token \{\{[^}]*\}\} in /, "the token in "));
-  // The edit that prints one print of a value at `format`, by the field it is written in: a typed number becomes the value's
-  // token at that format, a chart's labels take it as their `valueFormat`, a token takes it as its own format.
-  const placesIn = (format) => (String(format).split(".")[1] ?? "").replace(/[^0#]/g, "").length;
-  const editOf = (entry, key, format, page = null) => `${page ? `on ${page}, ` : ""}${entry.how === "exhibit" ? `set \`${entry.path ?? "exhibit"}.valueFormat\` to { "decimals": ${placesIn(format)} }`
-    : entry.how === "typed" ? `write \`{{${key} | ${format}}}\` for "${entry.shown ?? printedOf(entry)}" in ${entry.field}` : `give ${whereOf(entry)} the format \`| ${format}\``}`;
-  // The prints of a value off `format`: those another format or a misrounding sets apart, one edit each.
-  const offFormat = (entries, format) => entries.filter((entry) => entry.decimals !== placesIn(format) || (entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9));
-  const formats = [];
-  for (const [key, entries] of stating) {
-    const printed = entries.filter((entry) => entry.decimals !== undefined && entry.decimals !== null);
-    if (!printed.length) continue;
-    // The one format that prints the record as recorded: its own places, or more where a chart that labels it prints more -
-    // a chart prints all its labels at one precision, and 1.70 is the recorded 1.7 unrounded.
-    const recorded = printed[0].value, oneFormat = (list) => formatAt(Math.max(placesOf(recorded), ...list.filter((entry) => entry.how === "exhibit").map((entry) => entry.decimals)));
-    const asRecorded = oneFormat(printed);
-    // On each page: two formats of the value, or a typed number that is not the record rounded once at its places.
-    for (const id of new Set(printed.map((entry) => entry.page))) {
-      const here = printed.filter((entry) => entry.page === id);
-      const misrounded = here.filter((entry) => entry.how === "typed" && Math.abs(printedOf(entry) - roundHalfAway(Math.abs(entry.value) * (entry.factor ?? 1), entry.decimals)) > 1e-9);
-      if ((new Set(here.map(formOfEntry)).size < 2 && !misrounded.length) || !involves(id)) continue;
-      const shown = [...new Map(here.map((entry) => [`${entry.shown ?? printedOf(entry)}|${whereOf(entry)}`, `"${entry.shown ?? printedOf(entry)}" (${whereOf(entry)})`])).values()];
-      formats.push({ key, pages: [id], format: oneFormat(here), rule: "NUMBER_FORMATS_DIFFER.onePage", text: `${id} prints ${key} (recorded ${recorded}) as ${listed(shown, ", ")}${misrounded.length ? ` - ${misrounded.map((entry) => `"${entry.shown}"`).join(", ")} is not ${recorded} rounded once` : ""}; print it at \`${oneFormat(here)}\`, as recorded, wherever the page prints it`,
-        edits: offFormat(here, oneFormat(here)).map((entry) => editOf(entry, key, oneFormat(here))) });
-    }
-    // Between pages, tables aside.
-    const apart = printed.filter((entry) => !inTable(entry));
-    const forms = new Map();
-    for (const entry of apart) { const form = formOfEntry(entry); forms.set(form, [...(forms.get(form) ?? []), entry]); }
-    const apartPages = [...forms.values()].map((group) => new Set(group.map((entry) => entry.page)));
-    // Two formats on two pages: a page printing both ways is said above, on that page.
-    if (forms.size < 2 || !apartPages.some((a, i) => apartPages.some((b, j) => i !== j && [...a].some((id) => !b.has(id)) && [...b].some((id) => !a.has(id)))) || !involves(...apart.map((entry) => entry.page))) continue;
-    formats.push({ key, pages: apart.map((entry) => entry.page), format: asRecorded, text: `${key} is ${[...forms.values()].map((group) => `"${shownOf(group[0])}" on ${listed([...new Set(group.map((entry) => entry.page))], ", ")}`).join(" and ")}; \`${asRecorded}\` prints it as recorded (${recorded})`,
-      edits: offFormat(apart, asRecorded).map((entry) => editOf(entry, key, asRecorded, entry.page)) });
-  }
-  // Two records of one measure kept at different precision, each printed by a page, are the same finding.
-  for (const conflict of conflicts.filter((c) => c.kind === "precision")) for (const cell of conflict.at) {
-    const [a, b] = [pagesAt(conflict.refs[0], cell.labels[0]), pagesAt(conflict.refs[1], cell.labels[1])];
-    if (a.length && b.length && new Set([...a, ...b]).size > 1 && involves(...a, ...b)) formats.push({ key: cellOf(conflict.refs[0], cell.labels[0]), pages: [...a, ...b], text: `${cell.values[0]} (${cellOf(conflict.refs[0], cell.labels[0])}) on ${a[0]} and ${cell.values[1]} (${cellOf(conflict.refs[1], cell.labels[1])}) on ${b[0]} are one number recorded at two precisions`,
-      edits: [`keep one record of it in the insight log - \`${conflict.refs[0]}\` or \`${conflict.refs[1]}\`, at the precision its source prints - and name that one on ${listed([...new Set([...a, ...b])], ", ")}`] });
-  }
-  // One finding for each value, so every page it names is told its own disagreement and the format that ends it.
-  // A value printed two ways on one page is the rule's variant `onePage` (weight.json rules version 11; version 8 read two pages).
-  for (const f of formats) { finding("NUMBER_FORMATS_DIFFER", "blocker", f.pages,
-    `${f.text}${f.edits?.length ? `. To print it one way: ${f.edits.join("; ")}` : ""}. A reader who meets 53 on one page and 53.2 on another, or 174 in a title over a bar labelled 175, checks whether they are one number. Print the value in one format wherever it is printed - a token's format (\`{{ref@label | 0.0}}\`) in place of a typed number, a chart's \`valueFormat\` - or say on the page that rounds that it does`,
-    f.format ? { cell: f.key, format: f.format } : [f.key]);
-    if (f.rule) out[out.length - 1].rule = f.rule; }
   for (const item of unreconciled(pages, stating, registry, insights?.analysis?.plan, involves)) finding("BRIDGE_UNRECONCILED", "blocker", item.pages, item.repair, item.measured);
 
   // --- by name --------------------------------------------------------------
@@ -645,63 +565,27 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
           `This revision changed "${now.name}" at "${now.label}" on ${page.id} from ${shownOf(was)} to ${shownOf(now)}, and ${listed([...new Set(still.map((entry) => entry.page))], ", ")} still print${new Set(still.map((entry) => entry.page)).size === 1 ? "s" : ""} ${shownOf(still[0])} under the same names: the deck now gives one thing two values. Change it there too - the new value on a composed page; on a carried slide \`replace\` for a table's cell, and a \`type\` in place of \`carry\` for a chart's values - or, where the other page states a different thing, name its series or label apart`,
           { name: now.name, label: now.label, was: was.value, now: now.value });
       }
-      // What the slide stated and the page changed. Whether two numbers state one quantity is read, not matched on the words
-      // around them: two sentences rarely put one quantity in the same words, and two about different things often share most
-      // of theirs. So a number the slide stated and the page no longer states is put to a reader with the page's numbers of its
-      // kind (number-replaced-by), and the one it names is what it was changed to; and another page's number of the old value
-      // and kind is put to a reader beside it (same-quantity). One the reader says states the same quantity blocks where the
-      // page shows what it was changed to, and is asked of the author where it does not; the same quantity in a notation that
-      // says its kind blocks too, and the same digits alone are asked - unless a reader has said they are another thing.
-      // A number said with no words around it - a tile's "+4.3%" - gives a reader nothing to judge it by, and is not put to one.
+      // What the slide stated and the page no longer states. A number the page says again, in any words, stands; one it
+      // dropped that another page still prints in the same notation - a percentage, a stated scale - is asked of the author.
+      // A number said with no words around it - a tile's "+4.3%" - says nothing of what it counts, and is not followed.
       const kept = new Set(page.prints), was = occurrences(slideTexts(page.source), slideExhibits(page.source));
-      const told = (item) => ({ number: item.shown, said: item.said });
       const worded = (item) => item.said.replace(/^"|"$/g, "").trim() !== item.shown;
       const alike = (old, there) => valuesAgree(there.n, old.n) && sameKind(old, there) && sameCount(old, there);
-      const oneQuantity = (old, there) => (worded(old) && worded(there) ? judged("same-quantity", [told(old), told(there)], null, page.id)?.verdict ?? null : "different");
-      // A number stands where the page still says it in the same words; where the page has it only in other words, a reader
-      // says whether that is the same quantity, and until it is answered it is taken to stand.
-      const stands = (old) => page.stands.filter((now) => alike(old, now)).some((now, _, all) => now.said === old.said
-        || (!all.some((other) => other.said === old.said) && worded(old) && oneQuantity(old, now) !== "different"));
-      const changedTo = (old) => {
-        const options = worded(old) ? page.stands.filter((now) => worded(now) && sameKind(old, now) && sameCount(old, now) && (old.percent === true) === (now.percent === true) && !valuesAgree(old.n, now.n)) : [];
-        if (!options.length) return null;
-        const numbers = options.map((now, at) => ({ id: `n${at + 1}`, ...told(now) }));
-        const read = judged("number-replaced-by", { number: told(old), numbers }, null, page.id);
-        return read?.verdict === "replaced" ? options[numbers.findIndex((item) => item.id === String(read.by?.[0] ?? ""))] ?? null : null;
-      };
-      const digits = (old, other, apartFrom) => (old.marked ? other.stands.find((there) => !apartFrom.has(there) && there.marked && there.n === old.n && sameKind(old, there)) ?? null : null);
-      // The same quantity in whatever notation: the value, with a kind both say - a percentage, or one stated scale ("12.4" under
-      // "Revenue (£m)" is "£12.4m", "£12.4 million" and "GBP 12.40m").
-      const quantity = (old, other, apartFrom) => (old.percent !== null && (old.percent || old.scale !== null) ? other.stands.find((there) => !apartFrom.has(there) && there.n === old.n && there.percent === old.percent && (old.percent || there.scale === old.scale)) ?? null : null);
-      const certain = [], loose = [];
+      const digits = (old, other) => (old.marked ? other.stands.find((there) => there.marked && there.n === old.n && sameKind(old, there)) ?? null : null);
+      const loose = [];
       for (const old of was) {
-        if (stands(old)) continue;
-        const now = changedTo(old);
-        if (!now && kept.has(old.n)) continue;
+        if (page.stands.some((now) => alike(old, now)) || kept.has(old.n) || !worded(old)) continue;
         // A page this one says states the same figure of another thing (`only`) is not looked at.
         for (const other of pages.filter((item) => item.id !== page.id && !page.only?.includes(item.id))) {
           if (stale.has(`${other.id}|${old.n}`)) continue;
-          const read = other.stands.filter((there) => alike(old, there) && worded(old) && worded(there)).map((there) => ({ there, verdict: oneQuantity(old, there) }));
-          const labelled = read.find((item) => item.verdict === "same")?.there ?? null;
-          const apartFrom = new Set(read.filter((item) => item.verdict === "different").map((item) => item.there));
-          // Where no reader says so, the quantity itself does - once the page shows what it was changed to and no longer prints it.
-          const same = labelled ?? (now && !kept.has(old.n) ? quantity(old, other, apartFrom) : null);
-          const there = labelled ?? (!kept.has(old.n) ? digits(old, other, apartFrom) : null);
-          if (same && now) certain.push({ old, now, page: other.id, there: same, by: labelled ? "label" : "quantity" });
-          else if (there) loose.push({ old, now, page: other.id, there, labelled: Boolean(labelled) });
+          const there = digits(old, other);
+          if (there) loose.push({ old, page: other.id, there });
         }
-      }
-      for (const item of certain) stale.add(`${item.page}|${item.old.n}`);
-      for (const [key, items] of Map.groupBy(certain, (item) => `${item.old.n}|${item.now.n}`)) {
-        const { old, now } = items[0], each = items.filter((item, at) => items.findIndex((other) => other.page === item.page) === at);
-        finding("NUMBER_STALE", "blocker", [page.id, ...each.map((item) => item.page)],
-          `This revision changed ${old.shown} to ${now.shown} on ${page.id} (${now.said}; the slide said ${old.said}), and ${listed(each.map((item) => `${item.page} still states ${item.there.shown} ${item.by === "label" ? "- the same quantity, as a reader reads the two" : "- the same quantity, whatever it is said of there"} (${item.there.said})`))}: the deck now gives one number two values${each.some((item) => item.by === "quantity") ? ", unless the other page means another thing by it" : ""}. Change it there too - \`replace: [{ old, new }]\` on a carried slide, the new number on a composed page - or, where the other page states a different thing, say so on ${page.id}: \`"only": [${each.map((item) => `"${item.page}"`).join(", ")}]\` names the pages whose figure is another thing, and each is listed for the reviewer`,
-          { was: old.n, now: now.n, key });
       }
       const open = loose.filter((item) => !stale.has(`${item.page}|${item.old.n}`)).filter((item, at, all) => all.findIndex((other) => other.page === item.page && other.old.n === item.old.n) === at);
       if (open.length) finding("NUMBER_STALE", "advisory", [page.id, ...open.map((item) => item.page)],
-        `${page.id} no longer states ${listed([...new Set(open.map((item) => `${item.old.shown}${item.now ? ` (now ${item.now.shown})` : ""}`))], ", ")}, which the slide it was imported from did (${listed([...new Set(open.map((item) => item.old.said))].slice(0, 3))}), and ${listed([...new Set(open.map((item) => `${item.page} still states ${item.there.shown} (${item.there.said})`))])}. ` +
-        `${open.some((item) => item.labelled) ? `A reader reads ${open.filter((item) => item.labelled).length === 1 ? "it" : "them"} as the same quantity, but ${page.id} shows no number that replaced it` : "Nothing but the digits says these are the figure the revision changed"}, so check each: where it is, change it there too`,
+        `${page.id} no longer states ${listed([...new Set(open.map((item) => item.old.shown))], ", ")}, which the slide it was imported from did (${listed([...new Set(open.map((item) => item.old.said))].slice(0, 3))}), and ${listed([...new Set(open.map((item) => `${item.page} still states ${item.there.shown} (${item.there.said})`))])}. ` +
+        "Nothing but the digits says these are the figure the revision changed, so check each: where it is, change it there too",
         [...new Set(open.map((item) => item.old.shown))].slice(0, LISTED));
       out.push(...staleWording(page, pages, registered(CONSISTENCY_CODES, "WORDING_STALE")));
     }
@@ -710,8 +594,6 @@ export function consistencyFindings(doc, insights = null, { spec = null, invento
       imported.slice(0, LISTED).map((item) => item.text));
   }
 
-  // --- a page that re-proves its neighbour ----------------------------------
-  if (spec) out.push(...repeatedProofs(spec, registry.size ? recordedMeasures(items) : null).filter((f) => involves(...f.pages)));
   return out;
 }
 
@@ -937,62 +819,3 @@ function staleEdits(carried, spec, stale) {
   return findings;
 }
 
-/**
- * The pages whose proof another page already gave: read from what the
- * storyline binding reads of each page (storyline.mjs storyStructure) - the
- * measures it shows as proof, the class each is shown in and the periods or
- * members shown - so the two agree on what a page shows. A page repeats the
- * page before it where it plots, as proof, a measure over the periods or
- * members that page plots it over: the same line on the same frame. Where
- * every view of every measure it shows as proof is one the other page shows
- * too it repeats it whole, and that is looked for against every earlier page
- * of the deck, not only its neighbour; otherwise the finding names the
- * measures replotted beside the ones that are new. A whole repeat blocks
- * (the rule `PROOF_REPEATS.identical`) where the two pages are the same
- * page twice by what they declare: their claims are about the same measures
- * (`settles.measures`) and each shows exactly the views the other shows.
- * Everything else advises. A single value drawn on both - a threshold, a
- * target - is a reference, not a repeat, and a table or a figure of a measure
- * another page plots is another reading of it. With no measures recorded,
- * the numbers each exhibit draws are what is compared, with the page before
- * alone, and only a page all of whose exhibits redraw its neighbour's is
- * reported.
- */
-function repeatedProofs(spec, measures) {
-  const out = [];
-  const lists = [storyStructure({ ...spec, appendix: [] }, measures), storyStructure({ ...spec, slides: spec.appendix || [], appendix: [] }, measures)];
-  const argues = (shown) => shown && shown.kind === "content" && shown.type;
-  const proofOf = (shown) => (shown.shows || []).filter((entry) => entry.startsWith("proof:")).map((entry) => entry.slice("proof:".length)).filter((ref) => shown.views?.[ref]);
-  const views = (shown, ref) => new Set(shown.views?.[ref] ?? []);
-  const drawn = (shown) => (shown.drawn || []).map((item) => JSON.stringify(item));
-  const plots = (shown, ref) => [...views(shown, ref)].filter((view) => JSON.parse(view)[0] === "chart");
-  // Does every view `shown` gives of its proof stand on `other` too, with every number it draws from no measure.
-  const within = (shown, other) => proofOf(shown).every((ref) => [...views(shown, ref)].every((view) => views(other, ref).has(view))) && drawn(shown).every((item) => drawn(other).includes(item));
-  const claimed = (shown) => [...new Set(shown.settles?.measures ?? [])].sort().join("|");
-  for (const pages of lists) pages.forEach((page, at) => {
-    if (!argues(page)) return;
-    const proof = proofOf(page);
-    // The measures over periods or members this page plots as proof, and of those the ones `other` plots over the same.
-    const plotted = proof.filter((ref) => measures?.[ref]?.axis.kind !== "scalar" && plots(page, ref).length);
-    const againOn = (other) => plotted.filter((ref) => plots(page, ref).some((view) => views(other, ref).has(view)));
-    const wholeOn = (other) => againOn(other).length > 0 && within(page, other);
-    const beside = argues(pages[at - 1]) ? pages[at - 1] : null;
-    const before = pages.slice(0, at).find((other) => argues(other) && wholeOn(other)) ?? beside;
-    if (!before) return;
-    const again = againOn(before), whole = wholeOn(before);
-    const byNumbers = before === beside && !proof.length && drawn(page).length > 0 && drawn(page).every((item) => drawn(before).includes(item)) && (page.drawn || []).some((item) => item.class === "chart");
-    if (!again.length && !byNumbers) return;
-    const identical = whole && claimed(page) !== "" && claimed(page) === claimed(before) && within(before, page);
-    const fresh = plotted.filter((ref) => !again.includes(ref));
-    const where = before === beside ? `${before.id}, the page before,` : `${before.id}, earlier in the deck,`;
-    const what = byNumbers ? `its exhibits draw the numbers ${before.id} draws, and nothing else`
-      : whole ? `${listed(again, ", ")} ${again.length === 1 ? "is" : "are"} plotted on both over the same periods or members, and ${page.id} shows nothing else as proof`
-      : `${page.id} plots ${listed(again, ", ")} over the same periods or members as ${before.id} does${fresh.length ? `, beside ${listed(fresh, ", ")}` : ""}`;
-    const repairs = "another window of the series (`select: { from, to }`), the relation between the measures computed and drawn in place of the levels (a gap, a ratio, an index: `node runtime/analysis.mjs`), only the measures the first page does not show - or one page that carries both claims";
-    out.push({ code: registered(CONSISTENCY_CODES, "PROOF_REPEATS"), id: page.id, ...(identical ? { rule: "PROOF_REPEATS.identical" } : {}), severity: identical ? "blocker" : "advisory", pages: [before.id, page.id],
-      measured: byNumbers ? { drawn: (page.drawn || []).length } : { repeated: again, whole, ...(identical ? { identical } : {}) },
-      repair: identical ? `${page.id} is ${before.id} a second time: both claims are about ${listed([...new Set(page.settles.measures)], ", ")}, and each page shows exactly what the other shows - ${what}. Two pages cannot prove one thing with one exhibit. Merge them into one page that carries both titles' point, or make ${page.id} show what ${before.id} does not: ${repairs}`
-        : `${page.id} proves its claim with what ${where} already showed: ${what}. A reader meets the same line on the same frame twice, under two titles. What would make them two pages: ${repairs}. Where the repeat is meant, as a comparator the second page reads something new against, leave it: this is an advisory` });
-  });
-  return out;
-}

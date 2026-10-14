@@ -123,27 +123,6 @@ function selectedLabels(value, axis) {
   const from = value.from === undefined ? 0 : axis.labels.indexOf(String(value.from)), to = value.to === undefined ? axis.labels.length - 1 : axis.labels.indexOf(String(value.to));
   return from < 0 || to < from ? null : axis.labels.slice(from, to + 1);
 }
-/** The periods or members of the measure `ref` (over `axis`) a basis declares the page shows; null where it declares none of this measure's, which is then shown whole. */
-export function declaredLabels(basis, ref, axis) {
-  const own = perMeasure(basis.labels) ? [basis.labels[ref]] : [basis.labels, basis.members];
-  return own.map((value) => selectedLabels(value, axis)).find(Boolean) ?? null;
-}
-/**
- * How many values an exhibit not drawn yet will plot, by what its `basis`
- * declares: for each measure it names, the periods or members of its declared
- * view (all of them where it declares none) that hold a number. Null where it
- * names no measure the log holds - nothing says how much it will plot, and
- * that is not the same as plotting nothing.
- */
-export function declaredPlot(basis, registry) {
-  const refs = refsOf(basis).filter((ref) => registry.has(ref));
-  if (!refs.length) return null;
-  return refs.reduce((sum, ref) => {
-    const measure = registry.get(ref), axis = axisOf(measure), values = valuesOf(measure);
-    const labels = axis.kind === "scalar" ? null : declaredLabels(basis, ref, axis) ?? axis.labels;
-    return sum + (labels ? labels.filter((label) => typeof values[axis.labels.indexOf(label)] === "number").length : typeof values[0] === "number" ? 1 : 0);
-  }, 0);
-}
 /** Every problem with the view a `basis` declares, as `{ code, text }`: a class that is not one, and periods or members no measure it names runs over. */
 function declaredViewProblems(basis, registry) {
   if (!declaresView(basis)) return [];
@@ -539,41 +518,6 @@ function headlineRepeats(page, authored, bound, registry, titled) {
 }
 
 /**
- * The mark each page's own claim names on its charts: where the title states
- * a number of a measure at one period or member - by a token, or typed and
- * traced to exactly one such value of the measures the page rests on - and a
- * chart of the page plots that measure over a category of that name, the
- * category is what the title is about, and a highlight on it marks the claim
- * on the plot. A Map from page id to `[{ exhibit, at, category, mark, because
- * }]`: `exhibit` the chart as the page names it, `at` its place among the
- * page's exhibits, `mark` the JSON to write on it. Nothing is written: the
- * author is told the exact mark, and what the page says about it stays theirs.
- * Empty without measures, and for a title that states no such number.
- */
-export function claimMarks(doc, insights) {
-  const registry = measureRegistry(insights), out = new Map();
-  if (!registry.size) return out;
-  const { doc: written, bound } = bindDeck(doc, insights);
-  const authored = [...(doc.pages || []), ...(doc.appendix || [])];
-  [...(written.pages || []), ...(written.appendix || [])].forEach((page, index) => {
-    if (!page || typeof page !== "object" || !page.type) return;
-    const id = String(page.id ?? `page-${index + 1}`);
-    if (bound.failed.has(id)) return;
-    const stated = titleCells(page, authored[index]?.title, bound, pagePool(page, registry)).filter((cell) => cell.label !== null && cell.label !== undefined);
-    const marks = [];
-    exhibitsOf(page).forEach((ex, at) => {
-      const categories = (Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : []).map(String), refs = refsOf(ex.basis);
-      const named = stated.filter((cell) => refs.includes(cell.ref) && categories.includes(String(cell.label)) && !(ex.highlights || []).some((mark) => String(mark?.category) === String(cell.label)));
-      const each = [...new Map(named.map((cell) => [String(cell.label), cell])).values()];
-      if (each.length) marks.push({ exhibit: nameOf(ex, at), at, category: each.map((cell) => String(cell.label)), mark: { highlights: [...(ex.highlights || []), ...each.map((cell) => ({ category: String(cell.label) }))] },
-        because: each.map((cell) => `the title's ${cell.shown} is ${cell.ref} at ${cell.label}`).join("; ") });
-    });
-    if (marks.length) out.set(id, marks);
-  });
-  return out;
-}
-
-/**
  * The figures a page sets in boxes for the reader to read across: a strip's
  * metrics, a hero's `kpi`, and the items of a fact grid or a stat list - by
  * its own `type`, or the kind its page's form draws the first exhibit as.
@@ -595,19 +539,6 @@ function recordedCell(tile, registry) {
   if (named === undefined) return null;
   const cell = cellOfReference(named);
   return registry.has(cell.ref) ? cell : null;
-}
-
-/**
- * The recorded measure each tile of `bound` prints by reference, keyed by the
- * tile as the compile reads it (evidence.mjs tileKey), read off `authored` -
- * the same page before its references were written out, which keeps the
- * reference the binding takes off. The compile asks the judge whether two
- * tiles are one measure only of tiles that print different recorded measures.
- */
-export function tileMeasures(authored, bound, registry) {
-  const shown = tilesOf(bound), out = new Map();
-  tilesOf(authored).forEach((tile, at) => { const cell = recordedCell(tile, registry); if (cell && shown[at]) out.set(tileKey(shown[at]), cell.ref); });
-  return out;
 }
 
 /**
@@ -678,37 +609,6 @@ function overPrecise(page, registry) {
   };
   walk(page, "");
   return found;
-}
-
-/**
- * The pages that rest on insights the answer critique named together as a
- * comparison the log cannot support (answer-critique.mjs answerHazards: each
- * `{ insights, problem, rule }`). On the BA benchmark such a comparison - a
- * share set beside rivals' on a basis the log's own calculation note says
- * differs - was found only by the storyline critique, after pages were
- * written on it. A page whose `evidence` or `settles.measures` draw on two or
- * more insights one hazard names hears the hazard's rule where the page is
- * checked, as an advisory: drawing on both is not yet comparing them. Read
- * by ids alone; the hazard's words are quoted, never read.
- */
-export function hazardFindings(doc, hazards) {
-  const named = (Array.isArray(hazards) ? hazards : []).map((hazard) => ({ ids: [...new Set((Array.isArray(hazard?.insights) ? hazard.insights : []).map(String))], rule: String(hazard?.rule ?? "").trim() }))
-    .filter((hazard) => hazard.ids.length >= 2);
-  if (!named.length) return [];
-  const out = [];
-  [...(doc?.pages || []), ...(doc?.appendix || [])].forEach((page, index) => {
-    if (!page || typeof page !== "object" || !page.type) return;
-    const id = String(page.id ?? `page-${index + 1}`);
-    const drawn = new Set([...(Array.isArray(page.evidence) ? page.evidence.map(String) : []),
-      ...(Array.isArray(page.settles?.measures) ? page.settles.measures : []).map((ref) => parseRef(ref)?.owner).filter(Boolean)]);
-    for (const hazard of named) {
-      const both = hazard.ids.filter((insight) => drawn.has(insight));
-      if (both.length < 2) continue;
-      out.push({ code: registered(RECORD_CODES, "COMPARISON_UNSUPPORTED"), id, severity: "advisory", measured: { insights: both, rule: hazard.rule },
-        repair: `${id}: the page draws on ${both.join(" and ")}, which the answer critique (out/answer-critique.json) names together as a comparison the insight log cannot support. The rule it sets: "${hazard.rule}" - keep every title, exhibit and point of the page to it, or rest the page on one of them (\`evidence\`, \`settles.measures\`)` });
-    }
-  });
-  return out;
 }
 
 /**
@@ -809,80 +709,3 @@ export function dependencyFindings(doc, insights) {
   return out;
 }
 
-/**
- * What a page declares for a reviewer to judge, in a line each: the measures
- * it shows as context with the relevance it claims for them, and the relation
- * its claim asserts. `bases` are the page's declared `basis` records, named by
- * their measures - which exhibit draws them is the layout's. `settles.stated`
- * is what the binding recorded of the page (bind.mjs): every assumed measure
- * it shows, with where the page says so, and every negative value it prints
- * without its sign; and what the compile recorded of its citation
- * (author-deck.mjs compileDeck): every source it cites that the registry declares
- * names no publisher, date or document, with the reason it gives; and what
- * the deck's own consistency check read of it (author-deck.mjs authorDeck):
- * every earlier page whose proof it shows again.
- */
-export function dependencyNotes({ bases = [], settles = null }) {
-  // One line for each relevance claimed: the context measures of a basis that share it, whether the whole exhibit is context or one series of it.
-  const notes = bases.filter(Boolean).flatMap((basis) => { const claimed = new Map(); for (const ref of refsIn(basis, "context")) { const said = String(roleFor(basis, ref).relevance ?? "").trim(); claimed.set(said, [...(claimed.get(said) ?? []), ref]); }
-    return [...claimed].map(([said, refs]) => `context ${refs.join(", ")} - relevance claimed: "${said}"`); });
-  const relation = settles?.relation;
-  if (relation?.kind === "separate") notes.push(`the claim's measures are drawn separately by choice - reason given: "${String(relation.reason ?? "").trim()}"`);
-  else if (relation?.kind) notes.push(`the claim asserts a ${relation.kind} between its measures`);
-  for (const item of settles?.stated?.assumed ?? []) notes.push(`${item.ref} is assumed, not recorded${item.rationale ? ` ("${String(item.rationale).trim()}")` : ""} - ${item.said ? `said on the page by ${item.said}` : "printed in the page's text, where nothing marks it as an assumption"}`);
-  for (const item of settles?.stated?.unsigned ?? []) notes.push(`${item.ref} is printed without its sign: "${item.shown}" for a recorded ${item.recorded}`);
-  // A proof another page already gave (consistency_gates.mjs PROOF_REPEATS), for the critic to judge: a comparator read anew, or one page twice.
-  for (const item of settles?.stated?.repeats ?? []) notes.push(`${item.measures.length ? `plots ${item.measures.join(", ")}` : "draws the numbers"} over the same periods or members as ${item.page} does${item.whole ? ", and shows nothing else as proof" : ""}: judge whether this page proves something ${item.page} does not`);
-  // What a cited source is declared not to name is a limit of the evidence the deck states once, not a fault of each page that cites it.
-  for (const item of settles?.stated?.limits ?? []) notes.push(`cites "${item.name}", which the deck declares names no ${item.missing.join(", no ")} (${item.reason}): a declared limit of the evidence, stated once for the deck on its page of what the sources do not name. Judge whether the limit is declared truthfully and whether the claim can bear it; do not file the missing ${item.missing.join(" or ")} against this page`);
-  return notes;
-}
-
-/**
- * One exhibit showing a split pair on one basis, built from the page's own
- * exhibits: the two series on one scale where they share a unit. It is
- * written bound - each series names its measure and the runtime writes the
- * values - wherever every series the page draws is one of its measures, and
- * typed with its `basis` otherwise. Every plotted number, category, heading,
- * caption and highlight of the originals is kept (`kept` compares the numbers
- * before and after); null where the page has no pair this can merge. It is
- * offered to the author to paste, with a `note` on what the page then needs;
- * nothing is rewritten for them.
- */
-export function relationRepair(pageIn, insights) {
-  const registry = measureRegistry(insights);
-  const page = bindDeck({ pages: [pageIn] }, insights).doc.pages[0];
-  const pair = splitPairs(page, registry).find((p) => p.sameUnit);
-  if (!pair) return null;
-  const holders = [pair.a, pair.b].map((ref) => exhibitsOf(page).find((ex) => ex.basis && refsIn(ex.basis, "proof").includes(ref)));
-  const plotted = holders.map((ex) => plottedSeries(ex));
-  if (plotted.some((p) => !p)) return null;
-  const categories = [...plotted[0].categories, ...plotted[1].categories.filter((label) => !plotted[0].categories.includes(label))];
-  const series = holders.flatMap((ex, i) => plotted[i].series.map((s) => ({ name: plotted[i].series.length === 1 && ex.heading ? ex.heading : s.name, values: categories.map((label) => { const at = plotted[i].categories.indexOf(label); return at < 0 ? null : s.values[at]; }) })));
-  // A series over periods is a line; members side by side are bars. Each caption stays a sentence, and what was marked stays marked.
-  const sentence = (text) => (/[.!?]$/.test(String(text).trim()) ? String(text).trim() : `${String(text).trim()}.`);
-  const captions = holders.map((ex) => ex.caption).filter(Boolean);
-  const highlights = [...new Map(holders.flatMap((ex) => (Array.isArray(ex.highlights) ? ex.highlights : [])).map((h) => [JSON.stringify(h), h])).values()];
-  const kind = axisOf(registry.get(pair.a)).kind;
-  const dress = { type: kind === "periods" ? "chart.line" : "chart.bar", heading: holders.map((ex) => ex.heading).filter(Boolean).join(" and "),
-    ...(captions.length ? { caption: captions.map(sentence).join(" ") } : {}), ...(highlights.length ? { highlights } : {}) };
-  const refs = [...new Set(holders.flatMap((ex) => refsOf(ex.basis)))];
-  // A measure the originals showed as context keeps its role and its relevance in the merged exhibit.
-  const beside = Object.fromEntries(holders.flatMap((ex) => refsIn(ex.basis, "context").map((ref) => [ref, { role: "context", ...(roleFor(ex.basis, ref).relevance !== undefined ? { relevance: roleFor(ex.basis, ref).relevance } : {}) }])));
-  const typed = { ...dress, unit: registry.get(pair.a).unit, categories, series, basis: { measures: refs, role: "proof", ...(Object.keys(beside).length ? { roles: beside } : {}) } };
-  // The same exhibit by reference: each drawn series named as the measure it draws, over the categories the page drew - with a `select` only where those are not the whole axis.
-  const drawn = holders.flatMap((ex, i) => plotted[i].series.map((s) => refsOf(ex.basis).find((ref) => registry.has(ref) && drawsMeasure(plotted[i].categories, s.values, registry.get(ref)))));
-  const byReference = (select) => ({ ...dress, series: series.map((s, i) => ({ measure: drawn[i], name: s.name, ...(beside[drawn[i]] ?? {}) })), ...(select ? { select } : {}), role: "proof" });
-  const writtenFrom = (exhibit) => { const out = bindDeck({ pages: [{ ...page, exhibit: structuredClone(exhibit), exhibits: undefined, blocks: undefined }] }, insights); return out.findings.length ? null : out.doc.pages[0].exhibit; };
-  const bound = (drawn.every(Boolean) ? [byReference(), byReference({ [kind === "periods" ? "periods" : "members"]: categories })] : [])
-    .map((exhibit) => ({ exhibit, written: writtenFrom(exhibit) })).find(({ written }) => written && written.categories.length === categories.length && written.categories.every((label, i) => label === categories[i]));
-  const numbers = (list) => list.flatMap((s) => s.values).filter((v) => typeof v === "number").sort((a, b) => a - b);
-  const exhibit = bound ? bound.exhibit : typed;
-  const remaining = exhibitsOf(page).length - 1;
-  const before = numbers(plotted.flatMap((p) => p.series)), after = numbers(bound ? bound.written.series : series);
-  return { pair: [pair.a, pair.b], replaces: holders.map((ex) => exhibitsOf(page).indexOf(ex)), exhibit, remaining,
-    // The merge is offered, not applied: a page left with one exhibit is no longer a page of panels, and which type it becomes is the author's reading of the claim.
-    note: remaining < 2 ? `the page is left with ${remaining} exhibit${remaining === 1 ? "" : "s"}: retype it for one exhibit (its \`type\`, \`form\` and \`commentary\`) and keep the title, \`evidence\` and \`settles\`` : `the page keeps ${remaining} exhibits: replace the two listed in \`replaces\` with this one`,
-    // Bound, the numbers are the records' own, so they agree with what the page drew at the precision it printed them.
-    kept: { numbers: before.length === after.length && before.every((v, i) => v === after[i] || (Boolean(bound) && matches(v, after[i]))), categories: plotted.every((p) => p.categories.every((label) => categories.includes(label))) } };
-}

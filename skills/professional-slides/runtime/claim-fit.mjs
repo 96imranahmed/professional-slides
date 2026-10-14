@@ -347,30 +347,6 @@ export function handOf(seed) {
 }
 
 /**
- * Where a mark falls in a deck's hand for one reading task, lowest first: a
- * kind of the hand by its place in it; any other mark - a form that is a page
- * construction, as `<type>/<form>` - at a place the seed draws among them,
- * before the lead, between two marks or after the last each as likely: so a
- * construction of equal fit is taken about as often as a mark of the hand,
- * and neither ahead of every chart nor behind every one by construction.
- */
-export function markRank(seed, task, mark) {
-  const hand = handOf(seed).get(task) ?? [], at = hand.indexOf(mark);
-  return at >= 0 ? at : drawRank(seed, "mark", task ?? "", mark) * (hand.length + 1) - 1;
-}
-
-/**
- * A form as a deck's draw ranks it for a reading task: by the kind it draws,
- * so a page that draws its ranking as a form and one that draws it as a panel
- * take the same mark; a form that draws no chart by its own name; two forms of
- * one kind told apart by their names.
- */
-export function formDraw(seed, type, form, task) {
-  const kind = kindOfForm(type, form), own = `${type}/${form}`;
-  return markRank(seed, task, String(kind).startsWith("chart.") ? kind : own) + drawRank(seed, "mark", task ?? "", own) / 1e6;
-}
-
-/**
  * Whose turn it is among marks of equal fit: a mark's load, lowest first -
  * how many exhibits the deck already draws in it (`count`), weighed by its
  * place in the deck's hand for the task (`place`, 0 for the lead). The lead
@@ -382,36 +358,6 @@ export function formDraw(seed, type, form, task) {
  * every deck the same mixture.
  */
 const turnOf = (count, place) => (count + 1) * (place + 1);
-
-/**
- * Marks of equal fit in the order a deck's draw takes them: `{ ordered,
- * by(a, b) }`, `by` naming what tells two apart. A mark is an exhibit kind,
- * or a form as `<type>/<form>` (formDraw); `mark(item)` reads an item's.
- * In turn: what the caller weighs ahead of the draw (`before`, each
- * `[by, (a, b) => number]` - the structure rules, panels that match, a
- * revision's convention); one the draw features from the design system's
- * repertoire (`featured`, a set of marks: a deck uses what it features
- * wherever the evidence allows); where the deck has a draw (`seed`), whose
- * turn it is in its hand for `task` - `load(item)` the exhibits it already
- * draws so (turnOf) - then the mark's place in the hand ("seed": one order a
- * deck, so every page that reads one task and can take the deck's mark takes
- * it); a deck with no draw takes what it draws least ("spread"); then
- * `after`; then the order given ("order"). The spread comes after the draw
- * and never before it: it is the same under every seed, and gave every deck
- * from one spine the same mixture. The one order of the plan's forms
- * (deck-structure.mjs allocateStructure), the kinds it gives open exhibits
- * (openKinds) and a scaffold's form and kinds, so a scaffold takes what the
- * plan gives its page.
- */
-export function drawOrder(items, { seed = null, task = null, featured = null, load = null, mark = (item) => item, before = [], after = [] } = {}) {
-  const drawn = seed !== null && seed !== undefined;
-  const rank = (m) => { const [type, form] = String(m).split("/"); return form === undefined ? markRank(seed, task, m) : formDraw(seed, type, form, task); };
-  const place = new Map(drawn ? [...new Set(items.map(mark))].sort((a, b) => rank(a) - rank(b)).map((m, at) => [m, at]) : []);
-  const keys = [...before, ["featured", (a, b) => Boolean(featured?.has(mark(b))) - Boolean(featured?.has(mark(a)))],
-    ...(drawn ? [...(load ? [["seed", (a, b) => turnOf(load(a), place.get(mark(a))) - turnOf(load(b), place.get(mark(b)))]] : []), ["seed", (a, b) => place.get(mark(a)) - place.get(mark(b))]]
-      : load ? [["spread", (a, b) => load(a) - load(b)]] : []), ...after];
-  return { ordered: [...items].sort((a, b) => keys.map(([, key]) => key(a, b)).find((d) => d !== 0) ?? 0), by: (a, b) => keys.find(([, key]) => key(a, b) !== 0)?.[0] ?? "order" };
-}
 
 /**
  * The fit table as the catalogue prints it (`--types`): for each reading task
@@ -618,17 +564,6 @@ export function carriersFor(task, p, { type = null } = {}) {
   return { ranked, top, equal: ranked.filter((item) => item.grade === top), lacking };
 }
 
-/**
- * Why a form or a kind has the grade it has for a task, in a sentence: what
- * a plan, a scaffold and the fit search print beside a choice. `name` is the
- * form or kind as the author writes it.
- */
-export function fitSentence(name, task, grade, lacks = null) {
-  const asks = READING_TASKS[task] ?? "what the page claims";
-  if (lacks) return `\`${name}\` would carry it and the measures do not fill it: it needs ${lacks}`;
-  return `\`${name}\` ${grade === GRADE.direct ? "is a best fit" : grade === GRADE.work ? "serves" : "is a weak fit"}: it ${FIT_WORDS[grade]} (${asks})`;
-}
-
 const exhibitsOf = (page) => [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object");
 // An exhibit a spine declares by its `basis` alone, with no kind named (page-types.mjs undrawnExhibit, less the ones that name a `type`).
 const undrawnStub = (ex) => Boolean(ex) && typeof ex === "object" && ex.basis !== undefined && Object.keys(ex).every((key) => key === "basis");
@@ -733,72 +668,6 @@ export function pageFit(page, { registry, insights = null } = {}) {
   ];
   return { id: d.id, type: d.type, form: d.form, imported: d.imported, task: known ? task : null, profile: known ? profile : null, forms: known ? forms : { ranked: [], top: GRADE.none, equal: [] }, chosen, exhibits, left };
 }
-
-/**
- * The forms of other page types that carry a page's claim more directly than
- * any form of its own type: `[{ type, form, grade }]`, for a plan to say before
- * the critique binds the type. `shapes` are the shapes of the page's evidence
- * and `carriedBy` the page types each shape can rest under (evidence.mjs
- * TYPE_SHAPES): a type the evidence cannot carry is not offered. With
- * `equal`, the forms of other types that carry it as directly as the best of
- * its own, where its own carries it directly: the latitude a page has in its
- * type - which the evidence contract leaves almost none of, since a type
- * rests on one shape of evidence (measured by evals/quality/variability.mjs).
- */
-export function otherTypes(page, { registry, insights = null, carriedBy = () => true, equal = false } = {}) {
-  const d = describe(page);
-  // A page of another kind - a summary, a diagram, a set of cards - is not a chart some type would draw better; and measures the
-  // claim says are read each on its own are a lookup by the author's own statement.
-  if (!d.type || !(d.type in TYPE_AXIS || d.type === "lookup") || !registry?.size || d.settles.relation?.kind === "separate") return [];
-  const claimed = Array.isArray(d.settles.measures) ? d.settles.measures : [];
-  const profile = profileOf(claimed, { registry, insights, evidence: d.evidence, prefer: TYPE_AXIS[d.type] ?? null }), task = taskOf(profile, d.settles, d.type);
-  if (!task || !profile.series) return [];
-  // A lookup page chose exact values over a picture of them: only its measures' own task says whether a chart carries them.
-  const read = d.type === "lookup" || d.type === "scorecard" ? taskOf(profile, d.settles) : task;
-  const own = d.type === "lookup" || d.type === "scorecard" ? GRADE.work : carriersFor(task, profile, { type: d.type }).top;
-  if ((own >= D) !== equal) return [];
-  return CARRIERS.filter((row) => row.type !== d.type && !row.judged && String(row.kind ?? "").startsWith("chart") && carriedBy(row.type)).map((row) => ({ type: row.type, form: row.form, ...gradeOf(row, read, profile) }))
-    .filter((item) => item.grade === D && !item.lacks).map(({ type, form, grade }) => ({ type, form, grade, task: read }));
-}
-
-/**
- * Where another page type carries what a page's measures ask of a reader
- * directly and its own does not, the sentence saying so, for a storyline
- * critic's check of the evidence's shape - the type is settled at the spine,
- * so this is the one thing the fit says that only the critique can mend. A
- * chart page whose type has no best-fit form for its measures, or a lookup
- * table of measures a chart would carry: the critic judges whether the exact
- * values are what the reader needs. "" where the type carries the claim
- * directly, where no task is read, and for a scorecard, whose coding is a
- * judgement no measure makes.
- */
-export function typeFitNote(page, context = {}) {
-  const d = describe(page);
-  if (!d.type || !(d.type in TYPE_AXIS || d.type === "lookup") || d.type === "scorecard") return "";
-  const better = otherTypes(page, context);
-  if (!better.length) return "";
-  const forms = better.slice(0, 3).map((item) => `${item.type}/${item.form}`).join(" or ");
-  return d.type === "lookup" ? `its measures ask the reader to read ${READING_TASKS[better[0].task]}, which ${forms} would carry directly; a table of them is right where the exact values are what the reader needs`
-    : `its measures ask the reader to read ${READING_TASKS[better[0].task]}, which no form of a ${d.type} page carries directly; ${forms} would`;
-}
-
-/** The exhibit kinds every one of a page's cuts can take at its own best grade: what lets panels read across in one encoding. */
-export function sharedKinds(exhibits) {
-  const sets = exhibits.map((item) => item.kinds.equal.map((kind) => kind.kind));
-  return sets.length > 1 ? sets[0].filter((kind) => sets.every((set) => set.includes(kind))) : [];
-}
-
-/** A profile in a phrase: what the page shows, as the plan and a scaffold say it. */
-export function profileWords(p) {
-  if (!p) return "";
-  if (p.cuts !== undefined && p.series === undefined) return `${p.cuts} cut${p.cuts === 1 ? "" : "s"}`;
-  if (!p.series) return `${p.scalars} single value${p.scalars === 1 ? "" : "s"}`;
-  return `${p.series} measure${p.series === 1 ? "" : "s"} over ${p.labels} ${p.labels === 1 ? p.axis.slice(0, -1) : p.axis}${p.units > 1 ? ` in ${p.units} units` : ""}${p.scalars ? ` and ${p.scalars} single value${p.scalars === 1 ? "" : "s"}` : ""}`;
-}
-
-// The data a chart reads, whatever its kind: what a scaffold clears before it writes an exhibit from measures.
-export const DATA_KEYS = Object.freeze(["categories", "labels", "values", "series", "measure", "items", "points", "boxes", "rows", "columns", "bridge", "unit", "referenceLines", "forecastFrom", "periods", "totals",
-  "focusSeries", "max", "targets", "ranges", "xScale", "yScale", "xLabel", "yLabel", "yMin", "yMax", "sizeLegend", "select", "pivot", "secondaryAxis", "secondaryUnit", "indexBase", "subject"]);
 
 /**
  * An exhibit of `kind` written from an insight's measures, by reference: the

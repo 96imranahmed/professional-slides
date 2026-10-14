@@ -336,8 +336,8 @@ function bindPage(page, registry, bound) {
   for (const item of owners) if (bound.shown.has(item) && item.basis === undefined && !typing.has(item)) item.basis = basisOf(item, [...bound.shown.get(item)]);
   // What the runtime wrote into an exhibit or a figure is exactly what it shows of each measure it names: the periods or members
   // are recorded on its basis (`labels`, a list a measure, in the measure's own order) and the basis is marked `bound`, so the
-  // storyline critique reads the view from the references themselves, never from the wording of a header or a row label
-  // (storyline.mjs shownOf). One that still types a measurement is read as a typed exhibit is; `bound` is the runtime's to write.
+  // view is read from the references themselves, never from the wording of a header or a row label. One that still types a
+  // measurement is read as a typed exhibit is; `bound` is the runtime's to write.
   for (const item of owners) {
     const views = bound.views.get(item);
     // Written whole by the runtime (a bound chart, a bound figure), or printing every measurement it states by token.
@@ -781,8 +781,7 @@ function bindExhibit(ex, what, context) {
     ex[!bySeries && /pie|donut/.test(String(ex.type ?? page.form ?? "")) ? "labels" : "categories"] = labels;
   }
   // A dated event a measure records (`events`: { "<period>": "what happened" }) is drawn where the exhibit plots that period,
-  // as the chart's own event marker: the critic reads it beside the values (storyline.mjs measureLine), and the reader sees
-  // it on the axis, from the one record. `events: false` on the exhibit draws none; events the author wrote stand.
+  // as the chart's own event marker: the reader sees it on the axis, from the one record. `events: false` on the exhibit draws none; events the author wrote stand.
   if (ex.events === false) delete ex.events;
   else if (kind === "periods" && ex.events === undefined && chartDraws(drawnAs, "events") === true) {
     const marked = new Map();

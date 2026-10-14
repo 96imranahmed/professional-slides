@@ -50,11 +50,11 @@ async function page(source, sources, { base = chart, note } = {}) {
   const composed = await composeForAuthoring(spec, dir);
   const slide = composed.deck?.slides.find((s) => s.id === base.id);
   const node = slide?.nodes.find((n) => n.role === 'source-text');
-  const gates = composed.deck ? sceneGateFindings(composed.deck, undefined, spec) : null;
-  const budget = gates?.budget.find((b) => b.id === base.id);
+  const gates = composed.deck ? sceneGateFindings(composed.deck) : null;
+  const bands = slide ? pageBandsOf(slide) : null;
   return { error: composed.error ?? null, pageErrors: composed.pageErrors ?? [], text: node?.text ?? null, lines: node?.data.textLayout.lines.length ?? null, derived: node?.data.derived === true,
-    notes: slide?.notes ?? null, compiledSource: spec.slides[0].source, forms: spec.slides[0].sourceForms ?? null, bands: slide ? pageBandsOf(slide) : null, share: NOTE_SHARE_MAX,
-    footer: budget?.footer, body: budget?.body, codes: gates ? [...gates.findings, ...gates.advisories].filter((f) => f.id === base.id).map((f) => f.code) : [] };
+    notes: slide?.notes ?? null, compiledSource: spec.slides[0].source, forms: spec.slides[0].sourceForms ?? null, bands, share: NOTE_SHARE_MAX,
+    footer: bands?.footer, body: bands?.body, codes: gates ? [...gates.findings, ...gates.advisories].filter((f) => f.id === base.id).map((f) => f.code) : [] };
 }
 '''
 
@@ -243,11 +243,10 @@ const chart = example.pages.find((p) => p.type === 'trend' && p.form === 'line')
 const columnsSeed = Array.from({ length: 200 }, (_, i) => `seed-${i}`).find((seed) => variationChoices(seed).agendaStyle === 'columns');
 async function deck(sections, deckKeys = {}, summary = null) {
   const pages = Array.from({ length: sections }, (_, i) => [{ kind: 'section', id: `s${i}`, title: `Part ${i + 1}`, ...(summary ? { summary } : {}) }, { ...chart, id: `p${i}` }]).flat();
-  const { spec, spineFindings } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined, ...deckKeys }, pages });
+  const { spec } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined, ...deckKeys }, pages });
   const composed = await composeForAuthoring(spec, dir);
   const agenda = composed.deck?.slides.find((s) => s.id === 'agenda-1');
-  return { unfit: spineFindings.filter((f) => f.code === 'CONTENTS_UNFIT').map((f) => ({ severity: f.severity, measured: f.measured, repair: f.repair })),
-    pageErrors: (composed.pageErrors ?? []).filter((m) => /agenda/.test(m)), error: composed.error ?? null,
+  return { pageErrors: (composed.pageErrors ?? []).filter((m) => /agenda/.test(m)), error: composed.error ?? null,
     style: agenda?.componentInstances.find((c) => c.component === 'agenda')?.variant ?? null,
     details: agenda ? agenda.nodes.filter((n) => n.role === 'agenda-detail').length : null, labels: agenda ? agenda.nodes.filter((n) => n.role === 'agenda-label').length : null };
 }
@@ -264,36 +263,7 @@ console.log(JSON.stringify({ seed: columnsSeed, limits: AGENDA_LIMITS, six: awai
         # Seven sections under the same draw: the list, not a refusal at composition.
         self.assertEqual(result["seven"]["style"], "list")
         self.assertEqual(result["seven"]["pageErrors"], [])
-        self.assertEqual(result["seven"]["unfit"], [])
         self.assertEqual(result["seven"]["labels"], result["limits"]["columns"]["max"] + 1)
-
-    def test_a_named_style_that_cannot_fit_is_refused_at_compile(self):
-        result = run_node(CONTENTS + '''
-console.log(JSON.stringify({ limits: AGENDA_LIMITS, fits: await deck(AGENDA_LIMITS.columns.max, { agendaStyle: 'columns' }), over: await deck(AGENDA_LIMITS.columns.max + 1, { agendaStyle: 'columns' }),
-  many: await deck(AGENDA_LIMITS.list.max + 1), most: await deck(AGENDA_LIMITS.list.max), hidden: await deck(AGENDA_LIMITS.list.max + 1, { contents: false }) }));
-''')
-        limits = result["limits"]
-        self.assertEqual(result["fits"]["unfit"], [])
-        self.assertEqual(result["fits"]["style"], "columns")  # the author's style wins where it fits
-        [finding] = result["over"]["unfit"]
-        self.assertEqual(finding["severity"], "blocker")
-        self.assertEqual(finding["measured"], {"sections": limits["columns"]["max"] + 1, "style": "columns", "holds": [limits["columns"]["min"], limits["columns"]["max"]]})
-        self.assertIn("Remove `agendaStyle`", finding["repair"])
-        self.assertEqual(result["over"]["pageErrors"], [])  # and the page still composes, as the list
-        # Past what any style holds, the deck is told so where it is authored.
-        [finding] = result["many"]["unfit"]
-        self.assertEqual(finding["measured"]["style"], "list")
-        self.assertEqual(result["most"]["unfit"], [])
-        self.assertEqual(result["hidden"]["unfit"], [])  # no contents page, nothing to hold
-
-    def test_the_repair_applied_literally_clears_it(self):
-        # "Remove `agendaStyle` - the runtime then sets the list".
-        result = run_node(CONTENTS + '''
-console.log(JSON.stringify({ removed: await deck(AGENDA_LIMITS.columns.max + 1, {}) }));
-''')
-        self.assertEqual(result["removed"]["unfit"], [])
-        self.assertEqual(result["removed"]["style"], "list")
-        self.assertEqual(result["removed"]["pageErrors"], [])
 
     def test_a_list_too_tall_with_its_summaries_drops_them_rather_than_failing(self):
         long = "A long summary of what this section covers, running to several lines so that ten of them cannot fit one page, and then some more words to be sure."

@@ -88,17 +88,17 @@ class FastTierTests(unittest.TestCase):
     def test_the_fast_tier_leaves_out_the_listed_classes_and_modules_and_keeps_the_rest(self):
         result = run_node('''
 import {units,fastTier,heavyTests,parseArgs} from './evals/scripts/run_tests.mjs';
-const u=units(['test_spine_witness','test_run_tests']);
-console.log(JSON.stringify({u,fast:fastTier(u),byModule:fastTier(u,{test_spine_witness:'every class of the module'}),flag:parseArgs(['--fast']).fast,plain:parseArgs([]).fast,heavy:heavyTests()}));
+const u=units(['test_pages_parts','test_run_tests']);
+console.log(JSON.stringify({u,fast:fastTier(u),byModule:fastTier(u,{test_pages_parts:'every class of the module'}),flag:parseArgs(['--fast']).fast,plain:parseArgs([]).fast,heavy:heavyTests()}));
 ''')
         self.assertTrue(result["flag"])
         self.assertFalse(result["plain"], "the default stays the full suite")
         listed = [unit for unit in result["u"] if unit in result["heavy"]]
-        self.assertIn("test_spine_witness.GridFinanceTests", listed)
+        self.assertIn("test_pages_parts.AuthoringFromPartsTests", listed)
         self.assertEqual(result["fast"], [unit for unit in result["u"] if unit not in result["heavy"]])
-        self.assertIn("test_spine_witness.DeferredListTests", result["fast"])
+        self.assertIn("test_pages_parts.PagesFileTests", result["fast"])
         self.assertIn("test_run_tests.FastTierTests", result["fast"])
-        self.assertEqual(result["byModule"], [unit for unit in result["u"] if not unit.startswith("test_spine_witness.")])
+        self.assertEqual(result["byModule"], [unit for unit in result["u"] if not unit.startswith("test_pages_parts.")])
 
     def test_every_heavy_entry_names_what_the_runner_schedules_and_says_why(self):
         result = run_node('''
@@ -184,12 +184,12 @@ class RunnerCommandTests(unittest.TestCase):
         if not NODE:
             self.skipTest("Node.js is not available")
         heavy = json.loads((ROOT / "evals" / "heavy-tests.json").read_text(encoding="utf-8"))["classes"]
-        out = self.run_runner("--fast", "--pattern", "test_spine_witness.py", "--verbose")
+        out = self.run_runner("--fast", "--pattern", "test_pages_parts.py", "--verbose")
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
-        left = len([key for key in heavy if key.startswith("test_spine_witness.")])
-        self.assertIn(f"--fast: {left} heavy classes not run (evals/heavy-tests.json)", out.stdout)
-        self.assertIn("test_spine_witness.DeferredListTests", out.stderr)
-        self.assertNotIn("test_spine_witness.GridFinanceTests", out.stderr)
+        left = len([key for key in heavy if key.startswith("test_pages_parts.")])
+        self.assertIn(f"--fast: {left} heavy class{'' if left == 1 else 'es'} not run (evals/heavy-tests.json)", out.stdout)
+        self.assertIn("test_pages_parts.PagesFileTests", out.stderr)
+        self.assertNotIn("test_pages_parts.AuthoringFromPartsTests", out.stderr)
 
     def test_serial_is_one_process(self):
         if not NODE:

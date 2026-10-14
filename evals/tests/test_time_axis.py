@@ -39,37 +39,6 @@ console.log(JSON.stringify({{ kinds,
         self.assertIsNone(result["mixed"])
         self.assertIsNone(result["backwards"])
 
-    def test_one_period_recogniser_reads_a_trend_axis(self):
-        """Fifty-page review: the compiler took "H3 2024" for a period while the craft floor kept its own copy of the pattern."""
-        # The compiler took "H3 2024" for a period; the craft floor kept its own copy of the pattern.
-        result = run_node(f'''
-import {{ compilePage }} from '{KIT}';
-import {{ isPeriodLabel }} from '{TIME}';
-import {{ trendChart }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-{PAGE}
-const trend = (categories) => ({{ id: 'p1', type: 'trend', form: 'column', commentary: 'on-exhibit', ...base, title: 'Revenue rose in every period of the run',
-  exhibit: {{ heading: 'Revenue, $B', categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
-    annotations: [{{ category: categories[1], text: 'The launch doubled revenue as the new product reached every region' }}] }} }});
-const halves = ['H1 2024', 'H2 2024', 'H3 2024', 'H4 2024'];
-console.log(JSON.stringify({{
-  periods: ['2025', 'FY25', 'FY25 LTM', '2024 YTD', '2020-24', 'FY20-FY24', 'FY2024-25', 'Q1', '2H', 'Q1-Q3 2025', 'Jan-Mar', 'September', 'FY26 (est.)', 'Year 1', 'Year +3',
-    // An airline schedule's seasons: a slot share runs over them (hundred-page review).
-    'Summer 2019', 'Winter 2021-22', 'Winter 2021/22', 'S19', 'W21', 'Summer 2025 season', 'Spring 2024'].filter((c) => !isPeriodLabel(c)),
-  members: ['H3 2024', 'H4', 'Q5', 'Northern', 'Mayor', '10-12', 'Plan', 'Leeds to York', 'Year', 'Years 2', 'Winter', 'S1', 'Summer Plaza'].filter(isPeriodLabel),
-  seasons: error(() => compilePage(trend(['Summer 2019', 'Winter 2019-20', 'Summer 2020', 'Winter 2020-21']))),
-  halves: error(() => compilePage(trend(halves))), quarters: error(() => compilePage(trend(['Q1', 'Q2', 'Q3', 'Q4']))),
-  qualified: error(() => compilePage(trend(['FY22', 'FY23', 'FY24', 'FY25 LTM']))),
-  craft: [trendChart({{ type: 'chart.line', categories: halves }}), trendChart({{ type: 'chart.line', categories: ['2020-21', '2021-22', '2022-23', '2023-24'] }})],
-}}));
-''')
-        self.assertEqual(result["periods"], [])
-        self.assertEqual(result["members"], [])
-        self.assertIn("four or more periods", result["halves"])
-        self.assertIsNone(result["quarters"])
-        self.assertIsNone(result["seasons"], "a run of schedule seasons is a trend's axis, evenly spaced")
-        self.assertIsNone(result["qualified"])
-        self.assertEqual(result["craft"], [False, True])
-
     def test_iso_months_read_as_months_and_tick_by_the_quarter(self):
         """Fifty-page audit: ISO month ticks ("2025-08") on a monthly line."""
         result = run_node(f"""

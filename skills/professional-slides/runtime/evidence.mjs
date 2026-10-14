@@ -1,8 +1,7 @@
 // The evidence a page rests on, read without the layout engine: the shape of
 // an insight's data and how wide it is (the insight log's vocabulary), and how
-// many values an exhibit plots. The compiler (page-types.mjs), the storyline
-// critique (storyline.mjs) and the variety contract (gates/variety_gates.mjs)
-// all read these, so none of them needs the others to load.
+// many values an exhibit plots. The compiler (page-types.mjs) and the gates
+// read these without loading the layout engine.
 
 import { isPeriodLabel } from "./time-axis.mjs";
 
@@ -197,8 +196,3 @@ export function trivialChart(ex) {
   return series <= 1 && categories <= 2;
 }
 
-/** A chart over time: four or more period categories. */
-export function trendChart(ex) {
-  const categories = Array.isArray(ex.categories) ? ex.categories.map(String) : [];
-  return isChart(ex) && categories.length >= 4 && categories.filter(isPeriodLabel).length >= Math.ceil(categories.length * 0.75);
-}

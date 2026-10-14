@@ -98,34 +98,6 @@ function factorsOf(unit) {
   return { num, den: [...rest.map((f) => f.trim()).filter(Boolean), ...den] };
 }
 
-/**
- * The unit of a product of measures over other measures, with what cancels
- * cancelled: clinics times (m per clinic) is m, x over x is a ratio.
- * `{ unit, simple, scale }`: `simple` is false where more than one factor is
- * left above or below the line - a unit nobody would say, which the caller
- * reports rather than prints as if it were one. With `fractions`, a
- * percentage is applied as the fraction it is (46% of 140 m is 64.4 m): it
- * leaves the unit, and `scale` is what the value is multiplied by.
- */
-export function composeUnit(multiplied, divided = [], { fractions = false } = {}) {
-  let num = [], den = [], scale = 1;
-  for (const [units, flip] of [[multiplied, false], [divided, true]]) for (const unit of units) {
-    const f = factorsOf(unit);
-    (flip ? den : num).push(...f.num);
-    (flip ? num : den).push(...f.den);
-  }
-  if (fractions) {
-    scale = 0.01 ** (num.filter(isPercentUnit).length - den.filter(isPercentUnit).length);
-    num = num.filter((f) => !isPercentUnit(f)); den = den.filter((f) => !isPercentUnit(f));
-  }
-  for (const f of [...num]) {
-    const i = den.findIndex((d) => normalUnit(d) === normalUnit(f));
-    if (i >= 0) { den.splice(i, 1); num.splice(num.indexOf(f), 1); }
-  }
-  const unit = !num.length && !den.length ? "ratio" : `${num.join(" x ")}${den.length ? `${num.length ? " " : ""}per ${den.join(" per ")}` : ""}`;
-  return { unit, simple: num.length <= 1 && den.length <= 1, scale };
-}
-
 /** The axis a measure runs over: its periods, its members, or neither (one value). */
 export function axisOf(measure) {
   if (Array.isArray(measure?.periods)) return { kind: "periods", labels: measure.periods.map(String) };
@@ -190,15 +162,6 @@ export function measureProblems(insight) {
   }
   return problems;
 }
-
-/** The ids of the number-bearing insights that record no measures. */
-export function unmeasuredInsights(insights) {
-  return [...(insights?.values?.() ?? insights ?? [])].filter((item) => !item?.derived && MEASURED_SHAPES.includes(item?.shape) && SHAPES[item.shape]
-    && !(item.measures && typeof item.measures === "object" && Object.keys(item.measures).length)).map((item) => item.id ?? "?");
-}
-
-/** Does any insight of the log record measures: the log then holds every page to them. */
-export const hasMeasures = (insights) => [...(insights?.values?.() ?? insights ?? [])].some((item) => item?.measures && typeof item.measures === "object" && Object.keys(item.measures).length > 0);
 
 /**
  * Every measure of the insight log (and of the analyses computed from it, which
@@ -404,8 +367,7 @@ export async function readInsightLog(baseDir, stem) {
 }
 
 // How an insight is graded, and what makes a measurement a finding: one
-// definition, read wherever the insight log is read (insightLogRefusal) and
-// where the critic is shown it (storyline.mjs).
+// definition, read wherever the insight log is read (insightLogRefusal).
 const INSIGHT_STRENGTHS = Object.freeze(["strong", "supporting", "context"]);
 export function insightGradeProblems(item) {
   const id = item?.id ?? "?";

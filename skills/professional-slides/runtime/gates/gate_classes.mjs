@@ -29,45 +29,6 @@
 // One registry, here: a test fails when a vocabulary holds a code this file
 // does not class, or this file classes a code no vocabulary holds.
 
-export const CLASSES = Object.freeze({
-  S: "Deck structure - what the pages' types, forms, placements, sections and evidence add up to; a change here changes which page takes which form, so settle it first",
-  P: "Page-local - each page against its own evidence and the deck's constants",
-  G: "Deck aggregates - measured across the composed pages; each page's line says where it pulls one",
-  R: "Review - raised after the build by the critique, the reviewers or delivery",
-});
-
-/** The classes a compile reports, in report order. */
-export const CLASS_ORDER = Object.freeze(["S", "P", "G"]);
-
-// What a finding's repair writes, beside its class: the third thing every code says of itself.
-//
-// A draft is the spine, written before its copy, and the storyline critique
-// is then bound to it (storyline.mjs BOUND_FIELDS: the request, the answer,
-// the pages and their order, each title, type, `settles`, `evidence`, every
-// `basis`, the view of each measure, and the record). So a draft may leave to
-// the full compile only what is mended without touching any of that:
-//
-//   copy    the page's words - points, captions, headings, callouts, a note
-//           or a citation - and the marks made on an exhibit
-//   layout  the page's form and commentary placement, a chart's form within
-//           its class, devices, treatments and the deck's settings; and an
-//           exhibit the spine has not drawn yet
-//   fit     how much the composed page holds: bands left empty, words against
-//           a floor or a ceiling, a line that wraps
-//
-// Every code lists what its repair can write, in those three words and in the
-// names of the binding's fields. A finding every repair of which writes a
-// bound field blocks in a draft: mended after the critique is ready, it would
-// reopen it. One that lists both is decided where it is raised, by proof - an
-// allocation of forms the plan found, an exhibit composed with placeholder
-// copy - and the emitter says which (`touches` on the finding); unproven, it
-// waits for the full compile. Review codes are raised after the build and
-// list nothing.
-export const SETTLED_LATER = Object.freeze({
-  copy: "the copy",
-  layout: "the layout",
-  fit: "the fit",
-});
 const COPY = ["copy"], LAYOUT = ["layout"], FIT = ["fit"];
 const codes = (cls, list, repairs = []) => list.split(/\s+/).filter(Boolean).map((code) => [code, cls, Object.freeze([...repairs])]);
 
@@ -225,35 +186,7 @@ const LISTED = [
 const twice = LISTED.map(([code]) => code).filter((code, at, all) => all.indexOf(code) !== at);
 if (twice.length) throw new Error(`gates/gate_classes.mjs lists ${[...new Set(twice)].join(", ")} under two classes`);
 export const GATE_CLASSES = Object.freeze(Object.fromEntries(LISTED.map(([code, cls]) => [code, cls])));
-/** What the repair of each structure, page and aggregate code can write: `copy`, `layout`, `fit`, or the binding's fields (see above). */
-export const REPAIRS = Object.freeze(Object.fromEntries(LISTED.filter(([, cls]) => cls !== "R").map(([code, , repairs]) => [code, repairs])));
 
-/**
- * What a finding's repair can write: what the emitter proved of this finding
- * (`touches`), or what its code lists. `settledLater` is the first of copy,
- * layout and fit among them - what a draft says the finding waits on - or
- * null where every repair writes a field the critique is bound to.
- */
-export function repairOf(finding) {
-  const touches = Array.isArray(finding.touches) ? finding.touches : REPAIRS[finding.code] ?? [];
-  return { touches, settledLater: Object.keys(SETTLED_LATER).find((kind) => touches.includes(kind)) ?? null };
-}
-
-// What the repair of a review finding changes, in the words a reviewer picks
-// from (`touches` on a deck-review finding, reviewer.mjs), and what each
-// writes in the registry's own words above. A reviewer reads the rendered
-// page, so it says what its repair changes there; the registry says whether
-// that is the layout's - done again freely on a `ready` critique - or a fact
-// the critique is bound to, which reopens it.
-export const REVIEW_TOUCHES = Object.freeze({
-  copy: { writes: COPY, about: "the page's words - points, captions, headings, callouts, a note, a source line - and the marks made on an exhibit: an annotation, a highlight, a label" },
-  layout: { writes: [...LAYOUT, ...FIT], about: "how the page is drawn: its form, where its commentary sits, a chart's form within charts (a line as columns), a table's treatment, spacing, sizes and alignment" },
-  "exhibit-view": { writes: ["view", "basis"], about: "what an exhibit shows: a measure, period or member added or dropped, or a chart swapped for a table or a figure" },
-  title: { writes: ["title"], about: "a page's title or a section's" },
-  claim: { writes: ["settles", "answer"], about: "what a page claims or what settles it, or the governing answer" },
-  evidence: { writes: ["evidence", "record"], about: "the insights, analyses or recorded numbers a page rests on" },
-  structure: { writes: ["pages", "type"], about: "the pages themselves: one added, cut, merged, moved, or given another page type" },
-});
 // What the repair of each of the reviewer's own codes can write, for a finding
 // that does not say (`touches` absent: a finding recorded before every new one
 // had to carry it, or an item the runtime files itself). A reviewer's own
@@ -274,38 +207,6 @@ const REVIEW_REPAIRS = Object.freeze(Object.fromEntries([
   ...codes("R", "COUNTER_EVIDENCE_OMITTED", ["copy", "settles", "evidence"]),
   ...codes("R", "MISSING_MEMBER", ["view", "basis", "evidence"]),
 ].map(([code, , repairs]) => [code, repairs])));
-
-/**
- * What the repair of a deck-review finding writes: `{ stated, touches,
- * settledLater }`. `stated` is true where the reviewer said it (`touches`, in
- * REVIEW_TOUCHES's words) and `touches` is then everything that repair
- * writes, in the registry's words; otherwise `touches` is what a repair of
- * the finding's code can write - a gate's code by REPAIRS, the reviewer's own
- * by REVIEW_REPAIRS, and nothing for a code neither lists. `settledLater` is
- * repairOf's: the first of copy, layout and fit among them, or null.
- */
-export function reviewRepairOf(finding) {
-  const words = Array.isArray(finding?.touches) ? finding.touches.filter((word) => Object.hasOwn(REVIEW_TOUCHES, word)) : [];
-  const touches = words.length ? [...new Set(words.flatMap((word) => REVIEW_TOUCHES[word].writes))] : REPAIRS[finding?.code] ?? REVIEW_REPAIRS[finding?.code] ?? [];
-  return { stated: words.length > 0, ...repairOf({ touches }) };
-}
-
-/** The class of `code`. A code no class holds is a bug in this registry, and throws. */
-export function classOf(code) {
-  const cls = GATE_CLASSES[code];
-  if (!cls) throw new Error(`Unclassified finding code: ${code}; give it a class in gates/gate_classes.mjs`);
-  return cls;
-}
-
-// The page-local findings that say a page does not fit the layout its form
-// and commentary placement chose: it does not compose, a band of it stands
-// empty, its words fall short of the floor or past the ceiling its placement
-// sets. For these the compiler tries the type's other forms and placements
-// itself (fit-search.mjs) - the remedy is usually another layout for the same
-// content, and finding it by hand costs a run a try.
-export const LAYOUT_CODES = Object.freeze(new Set(["PAGE_DOES_NOT_COMPOSE", "SCENE_VOID", "DEAD_BAND", "INTERNAL_VOID", "COLUMN_VOID",
-  "TEXT_COVERAGE_LOW", "THIN_PAGE", "THIN_COLUMN", "INK_COVERAGE", "HERO_EXHIBIT", "WORDS", "TITLE_LINES", "HEADING_WRAPS", "CPL",
-  "PLOT_SPAN", "THIN_TABLE", "NOTE_HEAVY", "TEXT_ON_LINE", "TEXT_ON_TEXT", "TEXT_ON_EDGE", "MAP_LABEL_ASTRAY"]));
 
 // Every structure and aggregate rule says where the deck stands against it on
 // every run (`standing`, below) - except these, which have no quantity to
@@ -357,59 +258,7 @@ const WHOLE_DECK = new Set(`NO_SUMMARY NO_SECTIONS NO_CONTENTS CONTENT_ANSWER_UN
 /** Does `code`, a rule that measures the deck, ask what the deck as a whole has - where every other such rule counts over a population of pages. */
 export const readsWholeDeck = (code) => measuresDeck(code) && WHOLE_DECK.has(code);
 
-/**
- * The room a standing leaves: `{ margin, unit, state }`. `standing` is the
- * record every deck-level rule writes (variety_gates.mjs `stand`,
- * gate_config.py `standing`). A share is counted in pages - how many more
- * pages of the kind the cap allows, or how many the floor lacks, with the
- * deck's length held - and any other quantity in its own unit. `state` is
- * "over" or "short" (the rule is broken), "at" (one more page breaks it),
- * "ok", or "unread" while the deck is too short for the rule.
- */
-export function standingRoom(standing) {
-  const { value, bar, side, count, of } = standing;
-  const pages = count !== undefined && of;
-  // The rules compare the exact share with the bar, so the most pages a cap
-  // allows is the floor of bar x pages and the fewest a floor needs its ceiling.
-  // A rule that compares its share another way says its own room (`margin`: a build bar reads the share to two places).
-  const margin = standing.margin !== undefined ? standing.margin
-    : pages ? (side === "max" ? Math.floor(bar * of + 1e-9) - count : count - Math.ceil(bar * of - 1e-9))
-    : Math.round((side === "max" ? bar - value : value - bar) * 1000) / 1000;
-  // A count sits at its bar when one more (or one fewer) breaks the rule; a measured quantity has no such step.
-  const counted = pages || (Number.isInteger(value) && Number.isInteger(bar) && standing.unit !== "present");
-  // A rule that allows none has no room to watch: none is simply none.
-  const state = !standing.applies ? "unread" : margin < 0 ? (side === "max" ? "over" : "short") : margin === 0 && counted && bar !== 0 ? "at" : "ok";
-  return { margin, unit: pages ? (standing.counted ? standing.counted[1] : "pages") : standing.unit ?? "", state };
-}
-
 const percent = (x) => `${Math.round(x * 1000) / 10}%`;
 // A share is counted in pages unless its rule counts something else (`counted`: the thing, one and many).
 const plural = (n, unit, counted = ["page", "pages"]) => (unit === counted[1] ? `${n} ${n === 1 ? counted[0] : counted[1]}` : unit === "share" ? percent(n) : `${n}${unit && unit !== "present" ? ` ${unit}` : ""}`);
 
-/**
- * One line saying where the deck stands against a rule: the value, the bar
- * and the room, "tables 14 of 46 pages, 30.4%; cap 30%: over by 1 page". A
- * rule that reads a page in a way its name does not say carries a `note`,
- * printed at the end of its line: how each of two rules counts a rail. A bar
- * held by a later stage names itself (`barName`: "delivery floor"), so the
- * line shows that stage's number from the first compile.
- */
-export function standingLine(standing) {
-  const { code, key, what, value, bar, side, count, of } = standing;
-  const { margin, unit, state } = standingRoom(standing);
-  const word = standing.barName ?? (side === "max" ? "cap" : "floor");
-  const share = count !== undefined && of;
-  const measured = standing.unit === "present" ? `${what}: ${value ? "present" : "absent"}`
-    : share ? `${what} ${count} of ${of}${standing.counted ? "" : " pages"}, ${percent(count / of)}` : `${what} ${standing.unit === "share" ? percent(value) : value}`;
-  const held = standing.unit === "present" ? "" : `; ${word} ${share || standing.unit === "share" ? percent(bar) : bar}`;
-  const size = plural(Math.abs(margin), unit, standing.counted);
-  const breaks = standing.blocks ? "blocks" : "is advised against";
-  const room = state === "unread" ? "not held yet (the deck as it stands is outside what this rule reads)"
-    : standing.unit === "present" ? (value ? "ok" : "missing")
-    : state === "over" ? `over by ${size}` : state === "short" ? `short by ${size}`
-    : state === "at" ? (side === "max" ? `at the ${word}, 1 more ${breaks}` : `at the ${word}, 1 fewer ${breaks}`)
-    : side === "max" ? (bar === 0 ? "none allowed, none found" : `room for ${size} more`) : `${size} to spare`;
-  // An estimate says so, and says what it estimates: a rule the render measures blocks there, not here.
-  const consequence = (state === "over" || state === "short" || (standing.unit === "present" && !value && standing.applies)) ? (standing.estimated ? (Math.abs(margin) <= (standing.tolerance ?? 0) ? ` - inside the estimate's margin of ${standing.tolerance} ${unit}: the render decides` : " - would block at the render") : standing.blocks ? " - BLOCKS" : " - advisory") : "";
-  return `${code}${key ? `.${key}` : ""}: ${measured}${held}: ${room}${consequence}${standing.estimated ? ` (${standing.estimated === true ? "estimated from the scene; the render measures it: --check --render" : standing.estimated})` : ""}${standing.provisional ? " (provisional)" : ""}${standing.note ? ` [${standing.note}]` : ""}`;
-}

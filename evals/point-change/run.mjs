@@ -21,18 +21,11 @@
  *               check passes on any finding whose code holds STALE that
  *               names them: NUMBER_STALE or WORDING_STALE, the runtime's
  *               one check for a text edit and for a composed page alike
- *   scoped      the storyline critique is staged only when a title changed,
- *               and marks only the changed pages; the deck review's packet
- *               asks for the changed pages and no other
+ *   scoped      no check refuses a page the task does not change
  *   asked       nothing was changed that the request did not ask for: every
  *               slide the revision edited, redrew or cut is one the task
  *               names, and every line that differs on an edited slide - its
  *               speaker notes too - is the task's own change (`accept.edits`)
- *   delivered   where the task says so (`deliver`): a scripted reviewer reads
- *               the packet, accepts the changed pages, and delivery hands the
- *               deck over - with every change it made listed, and what the
- *               critic found in a slide nobody asked to change reported to
- *               the user, that slide untouched
  *
  * and it counts what the run cost: the runtime commands, in order, and every
  * refusal with whether it named a page the task changes or one it does not.
@@ -41,16 +34,12 @@
  *
  * Offline the author is scripted: each task's `moves` (tasks.json) are
  * written into the pages file, the next one only when a compile refused the
- * one before; the copy questions the compile asks are answered so their
- * rules pass (evals/support/answer-judgements.mjs), a staged critique is
- * answered by the quality eval's fake critic, and the run stops at the deck
- * review's packet. `--agent <name>`
- * gives the request and the deck to a real agent CLI instead (an entry of
+ * one before, and the run ends with the build. `--agent <name>` gives the
+ * request and the deck to a real agent CLI instead (an entry of
  * evals/quality/config.json `agents`), told to build the revision in `work/`
- * beside the deck, and scores what it leaves behind on `made`, `preserved`,
- * `asked` and on the review packet it reached (`packet`: it asks for the
- * task's changed pages and no other), with the cost its author log records,
- * the wall time, and the agent's transcript kept beside the workspace.
+ * beside the deck, and scores what it leaves behind on `made`, `preserved`
+ * and `asked`, with the wall time and the agent's transcript kept beside the
+ * workspace.
  *
  * `--tasks <file>` runs another task file - a deck of your own, named by a
  * task's `deck` (a path to the .pptx, in place of `fixture`), with the files
@@ -66,15 +55,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain, parseCli, pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
 import { lastJson } from "../../skills/professional-slides/runtime/process.mjs";
-import { readRunLog, runCost } from "../../skills/professional-slides/runtime/run-log.mjs";
-import { ASSESSMENT_KEYS, DIMENSIONS, PAGE_DIMENSIONS } from "../../skills/professional-slides/runtime/reviewer.mjs";
 import { fillTemplate } from "../quality/lib.mjs";
-import { answerJudgements } from "../support/answer-judgements.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const RUNTIME = path.join(ROOT, "skills", "professional-slides", "runtime");
-const FAKE_CRITIC = path.join(ROOT, "evals", "quality", "fixtures", "fake-critic.mjs");
 const DEFAULT_TASKS = path.join(HERE, "tasks.json");
 /** The tasks of a task file, each with the folder its own paths resolve from. */
 const readTasks = (file = DEFAULT_TASKS) => JSON.parse(readFileSync(file, "utf8")).tasks.map((task) => ({ ...task, base: path.dirname(path.resolve(file)) }));
@@ -114,10 +99,12 @@ function applyMove(doc, move) {
   return out;
 }
 
-/** The refusals of the author run just logged: each finding with whether it names a page the task changes. */
-function refusalsOf(dir, changed) {
-  const last = readRunLog(path.join(dir, `${DECK_ID}.author-log.jsonl`)).at(-1);
-  return (last?.findings || []).map((f) => ({ code: f.code, ...(f.id ? { id: f.id } : {}), about: !f.id ? "deck" : changed.includes(f.id) ? "changed" : "untouched", message: String(f.message ?? "").slice(0, 240) }));
+/** The refusals a check printed (author-deck.mjs: "  CODE [page]" over what to do): each with whether it names a page the task changes. */
+function refusalsOf(stderr, changed) {
+  return [...stderr.matchAll(/^ {2}([A-Z][A-Z_]+)(?: \[([^\]]+)\])?\n {4}(.*)$/gm)].map(([, code, where, message]) => {
+    const id = where ? where.split(": ").at(-1).split(", ")[0] : null;
+    return { code, ...(id ? { id } : {}), about: !id ? "deck" : changed.includes(id) ? "changed" : "untouched", message: message.slice(0, 240) };
+  });
 }
 
 /** What the built deck prints, slide by slide, read by the runtime's own importer. */
@@ -225,99 +212,29 @@ function runTask(task, work) {
     writeFileSync(pagesFile, `${JSON.stringify(doc, null, 1)}\n`);
     const checked = step("check", node("author-deck.mjs", pagesFile, "--check"), { move: at + 1 });
     if (checked.code === 0) { compiled = true; break; }
-    const found = refusalsOf(dir, changed);
+    const found = refusalsOf(checked.stderr, changed);
     refusals.push(...found.map((f) => ({ ...f, step: "check", move: at + 1 })));
     // The other slides a stale finding names, read from what the run printed in full: each is said to "still" print or state the old figure.
     const named = found.some((f) => /STALE/.test(f.code)) ? (checked.stderr.match(/\bs\d{2,3}(?= (?:itself )?still )/g) || []) : [];
     if (named.length) stale = [...new Set([...(stale || []), ...named])];
   }
   if (!compiled) return { task: task.id, commands, refusals, error: "the scripted moves did not compile" };
-  // The copy questions the rules ask (judge.mjs): a run gives each staged packet to a fresh reader, and the scripted run
-  // answers each so its rule passes - the questions are what the run reaches, not what it scores.
-  const judged = answerJudgements(pagesFile);
-  commands.push({ step: "judge", exit: judged.code });
-  if (judged.code !== 0) return { task: task.id, commands, refusals, error: `the copy questions were not all answered: ${judged.stderr.slice(-400)}` };
   const full = step("compile", node("author-deck.mjs", pagesFile));
-  if (full.code !== 0) { refusals.push(...refusalsOf(dir, changed).map((f) => ({ ...f, step: "compile" }))); return { task: task.id, commands, refusals, error: "the full compile refused the deck" }; }
-
-  // The storyline: ready without a critique where no title changed; a critique of the changed pages where one did.
-  let critique = { staged: false, changed: [] };
-  const story = step("storyline", node("storyline.mjs", deckFile, out));
-  if (story.code === 3) {
-    const said = lastJson(story.stdout), packet = readJson(path.join(said.dir, "packet.json"));
-    critique = { staged: true, changed: packet.revision?.changed ?? null, pages: packet.pages.length };
-    const answer = run([process.execPath, FAKE_CRITIC], { cwd: said.dir });
-    mkdirSync(out, { recursive: true });
-    writeFileSync(path.join(out, "storyline-review.json"), scriptedCritique(JSON.parse(answer.stdout).result, task.critic));
-    const again = step("storyline", node("storyline.mjs", deckFile, out));
-    critique.status = lastJson(again.stdout)?.status ?? null;
-  } else critique.status = lastJson(story.stdout)?.status ?? null;
-
+  if (full.code !== 0) { refusals.push(...refusalsOf(full.stderr, changed).map((f) => ({ ...f, step: "compile" }))); return { task: task.id, commands, refusals, error: "the full compile refused the deck" }; }
   const built = step("build", node("build-deck.mjs", deckFile, out));
   const result = existsSync(path.join(out, "build-result.json")) ? readJson(path.join(out, "build-result.json")) : null;
-  if (built.code !== 0 || !result?.revision) return { task: task.id, commands, refusals, critique, error: `the build did not assemble the deck: ${(result?.blockers || []).map((b) => b.code).join(", ") || built.stderr.slice(-600)}` };
-
-  // The self-check the author owes: the claims the revision wrote or rewrote, and no other page's.
-  const ledger = readJson(path.join(out, "claims.json"));
-  writeFileSync(path.join(out, "self-check.json"), JSON.stringify({ pages: Object.fromEntries(Object.entries(ledger.pageHashes).map(([id, claims]) => [id, { claims, verified: true }])),
-    findings: Object.fromEntries(ledger.findings.map((f) => [`${f.code}:${f.claim ?? f.slide}`, "Checked against the figure the request states; it is the user's own."])) }));
-  const delivered = step("deliver", node("deliver-deck.mjs", deckFile, out, "--skip-build", "--reviewer", "packet"));
-  const report = lastJson(delivered.stdout) ?? {};
-  const review = { exit: delivered.code, mode: report.reviewMode ?? null, pages: report.review?.pages ?? null, of: result.revision.order.length, rejectedAt: report.rejectedAt ?? null,
-    changed: delivered.code === 3 && report.review?.packet ? readJson(path.join(report.review.packet, "packet.json")).revision?.changed ?? null : null };
-  // Where the task says so, the run goes on to an accepted delivery: a scripted reviewer answers the packet for the pages it asks for.
-  let handed = null;
-  if (task.deliver && delivered.code === 3) {
-    const record = readJson(path.join(dir, ".reviews", DECK_ID, "review-packet.json")), file = path.join(dir, "scripted-review.json");
-    writeFileSync(file, JSON.stringify(scriptedReview(record, review.changed ?? changed)));
-    const done = step("deliver", node("deliver-deck.mjs", deckFile, out, "--skip-build", "--review", file));
-    const final = lastJson(done.stdout) ?? {};
-    const told = (final.aboutImported || []).flatMap((item) => item.pages || []);
-    handed = { exit: done.code, accepted: final.accepted === true, stage: final.stage ?? null, rejectedAt: final.rejectedAt ?? null, made: (final.made || []).map((line) => line.text), aboutImported: final.aboutImported || [],
-      deliverable: final.deliverable && existsSync(final.deliverable) ? final.deliverable : null,
-      // Every change listed for the user, and what was found in the slides nobody asked to change said to them - those slides untouched (`preserved`).
-      ok: final.accepted === true && (final.made || []).length > 0 && (task.accept.aboutImported || []).every((id) => told.includes(id)) };
-  }
+  if (built.code !== 0 || !result?.revision) return { task: task.id, commands, refusals, error: `the build did not assemble the deck: ${(result?.blockers || []).map((b) => b.code).join(", ") || built.stderr.slice(-600)}` };
 
   const scored = scoreDeck(task, { source, revised: result.pptxPath, order: result.revision.order, dir });
-  const same = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
-  const wantsCritique = task.accept.critique.length > 0;
-  const checks = { ...scored, ...(task.deliver ? { delivered: handed ?? { ok: false, error: "the review packet was not reached" } } : {}),
+  const checks = { ...scored,
     stale: task.accept.stale ? { ok: task.accept.stale.every((id) => (stale || []).includes(id)), wanted: task.accept.stale, named: stale || [] } : { ok: true, wanted: null },
     // The first move is refused for what the task says it must be: an edit that would have rewritten longer numbers, say.
-    ...(task.accept.refusedFor ? { refusedFor: { ok: task.accept.refusedFor.every((code) => refusals.some((f) => f.code === code && f.move === 1)), wanted: task.accept.refusedFor, got: [...new Set(refusals.filter((f) => f.move === 1).map((f) => f.code))] } } : {}),
-    scoped: { ok: !refusals.some((f) => f.about === "untouched") && critique.staged === wantsCritique && (!wantsCritique || (same(critique.changed, task.accept.critique) && critique.status === "ready"))
-        && review.exit === 3 && same(review.changed, changed) && review.pages === changed.length,
-      refusalsOnUntouched: refusals.filter((f) => f.about === "untouched").length, critique, review },
+    ...(task.accept.refusedFor ? { refusedFor: { ok: task.accept.refusedFor.every((code) => refusals.some((f) => f.code === code && f.move === 1)), wanted: task.accept.refusedFor, got: [...new Set(refusals.filter((f) => f.move === 1).map((f) => f.code))].sort() } } : {}),
+    scoped: { ok: !refusals.some((f) => f.about === "untouched"), refusalsOnUntouched: refusals.filter((f) => f.about === "untouched").length },
   };
   return { task: task.id, fixture: task.fixture ?? path.basename(task.deck), accepted: Object.values(checks).every((check) => check.ok), checks,
     cost: { commands: commands.length, sequence: commands.map((c) => `${c.step}${c.exit ? `(${c.exit})` : ""}`), refusedRuns: commands.filter((c) => c.exit === 2).length, refusals,
       composed: result.revision.composed, carried: result.revision.carried, edited: result.revision.edited, seconds: Math.round((result.timings?.wallMs ?? 0) / 100) / 10 } };
-}
-
-/**
- * The scripted critic's answer (evals/quality/fixtures/fake-critic.mjs: a
- * clean spine, ready), with what a task has its critic find (`critic` on the
- * task): `aboutImported` - a finding whose remedy is a slide the revision
- * did not change, filed as the critic's prompt asks: flagged, at its own
- * severity, naming that slide beside the changed page. It leaves the verdict
- * as it was: such a finding is the user's to hear, and blocks nothing.
- */
-function scriptedCritique(answer, critic) {
-  if (!critic?.aboutImported) return answer;
-  const critique = JSON.parse(answer), found = critic.aboutImported;
-  critique.findings = [...critique.findings, { id: "F9", scope: "spine", pages: found.pages, check: "numbers", severity: found.severity ?? "major", problem: found.problem, fix: found.fix, ...(found.ifUnfixed ? { ifUnfixed: found.ifUnfixed } : {}), aboutImported: true }];
-  critique.completeness = critique.completeness.map((entry) => (entry.check === "numbers" ? { ...entry, result: "findings", note: "Filed an item under numbers, about the imported deck." } : entry));
-  return JSON.stringify(critique);
-}
-
-/** A scripted reviewer's answer to a first-pass packet (`record`: the packet's record beside the deck): the pages it asks for, read and accepted. */
-function scriptedReview(record, ids) {
-  return { pass: 1, verifies: null, accepted: true, summary: "The changed pages read as part of the deck they sit in. Nothing must change.", rating: 8.5, binding: record.binding, opened: [...ids],
-    provenance: { backend: "subagent", model: "scripted-reviewer", promptHash: record.promptHash },
-    pages: ids.map((slide) => ({ slide, verdict: "ok", checks: Object.fromEntries(PAGE_DIMENSIONS.map((dimension) => [dimension, `checked ${dimension} on the page`])) })), findings: [],
-    completeness: DIMENSIONS.map((dimension) => ({ dimension, result: "clean", note: `Checked ${dimension} on the changed pages and found nothing to raise.` })),
-    assessment: Object.fromEntries(ASSESSMENT_KEYS.map((key) => [key, `A sentence about ${key}.`])), density: { deck: "No density profile was built for this deck, so no medians are compared.", pages: [] } };
 }
 
 // Folders of a workspace that hold copies of a deck, not the run's own.
@@ -339,7 +256,7 @@ function runAgentTask(task, work, agent, plugin) {
   cpSync(source, path.join(workspace, name));
   for (const [file, from] of Object.entries(task.files || {})) cpSync(path.resolve(task.base, from), path.join(workspace, file), { recursive: true });
   // The agent is told where a revision is built, as SKILL.md tells an author: a task folder beside the user's deck.
-  const prompt = `${task.request}\n\nThe deck is ${name}, in this folder. It is a change to an existing deck, not a new one: keep every slide the request does not name exactly as it is, build the revision in the folder work/ beside the deck, and take the revised deck as far as the deck review's packet.`;
+  const prompt = `${task.request}\n\nThe deck is ${name}, in this folder. It is a change to an existing deck, not a new one: keep every slide the request does not name exactly as it is, build the revision in the folder work/ beside the deck, and and build the revised deck.`;
   const started = Date.now();
   const done = run(fillTemplate(withTranscript(agent.command), { prompt, workspace, plugin: plugin ?? "" }), { cwd: workspace, timeoutMinutes: agent.timeoutMinutes ?? 60 });
   const seconds = Math.round((Date.now() - started) / 1000);
@@ -352,28 +269,20 @@ function runAgentTask(task, work, agent, plugin) {
   const named = [...new Set((done.stdout.match(/\/[^"'\s\\|]+?build-result\.json/g) || []).filter((file) => existsSync(file)))];
   const builds = [...new Set([...findAll(workspace, "build-result.json"), ...named])].map((file) => ({ file, result: readJson(file) })).filter((b) => b.result.revision && existsSync(b.result.pptxPath ?? "")).sort((a, b) => statSync(b.file).mtimeMs - statSync(a.file).mtimeMs);
   if (!builds.length) return { task: task.id, fixture: task.fixture ?? path.basename(task.deck), accepted: false, agent: about, error: "the agent left no assembled revision (no build-result.json with `revision`)" };
-  const { file, result } = builds[0], outDir = path.dirname(file), deckDir = path.dirname(outDir);
+  const { file, result } = builds[0], outDir = path.dirname(file);
   const scored = scoreDeck(task, { source, revised: result.pptxPath, order: result.revision.order, dir: outDir });
-  // The review packet the agent reached, from delivery's own record of it: it asks for the task's changed pages and no other.
-  const delivery = existsSync(path.join(outDir, "delivery.json")) ? readJson(path.join(outDir, "delivery.json")) : null;
-  const staged = delivery?.review?.packet && existsSync(path.join(delivery.review.packet, "packet.json")) ? readJson(path.join(delivery.review.packet, "packet.json")) : null;
-  const same = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
-  const packet = { ok: delivery?.accepted === true || (Boolean(staged) && same(staged.revision?.changed, task.accept.changed)), reached: Boolean(staged) || delivery?.accepted === true, changed: staged?.revision?.changed ?? null,
-    stage: delivery?.stage ?? null, rejectedAt: delivery?.rejectedAt ?? null, aboutImported: (delivery?.aboutImported || []).map((item) => item.pages) };
-  const checks = { ...scored, packet };
-  const logs = [...findAll(workspace, "author-log.jsonl"), ...(existsSync(deckDir) ? readdirSync(deckDir).filter((f) => f.endsWith(".author-log.jsonl")).map((f) => path.join(deckDir, f)) : [])];
-  const runs = logs.length ? readRunLog(logs[0]) : [];
-  return { task: task.id, fixture: task.fixture ?? path.basename(task.deck), accepted: Object.values(checks).every((check) => check.ok), checks, agent: about, built: outDir, ...(runs.length ? { cost: runCost(runs) } : {}) };
+  const checks = scored;
+  return { task: task.id, fixture: task.fixture ?? path.basename(task.deck), accepted: Object.values(checks).every((check) => check.ok), checks, agent: about, built: outDir };
 }
 
 const mark = (check) => (check?.ok ? "yes" : "NO");
 /** The results as the table a run prints. */
 function table(results) {
-  const lines = ["| task | made | preserved (untouched slides identical) | asked (nothing else changed) | stale caught | scoped | delivered | review packet | commands | refused runs | refusals on untouched pages | seconds |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"];
+  const lines = ["| task | made | preserved (untouched slides identical) | asked (nothing else changed) | stale caught | scoped | commands | refused runs | refusals on untouched pages | seconds |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"];
   for (const r of results) {
-    if (!r.checks) { lines.push(`| ${r.task} | - | - | - | - | - | - | - | ${r.commands?.length ?? "-"} | - | ${r.error} | ${r.agent?.seconds ?? "-"} |`); continue; }
+    if (!r.checks) { lines.push(`| ${r.task} | - | - | - | - | - | ${r.commands?.length ?? "-"} | - | ${r.error} | ${r.agent?.seconds ?? "-"} |`); continue; }
     const c = r.checks, cost = r.cost ?? {};
-    lines.push(`| ${r.task} | ${mark(c.made)} | ${mark(c.preserved)} (${c.preserved.identical} of ${c.preserved.untouched}${c.preserved.editedInPlace ? `; ${c.preserved.editedInPlace} edited in place, furthest shape moved ${c.preserved.furthest} px` : ""}) | ${mark(c.asked)}${c.asked.unasked.length ? ` (${c.asked.unasked.length}: ${c.asked.unasked.slice(0, 2).map((item) => `slide ${item.slide} ${item.what}`).join("; ")})` : ""} | ${c.stale ? (c.stale.wanted ? mark(c.stale) : "n/a") : "-"} | ${c.scoped ? mark(c.scoped) : "-"} | ${c.delivered ? `${mark(c.delivered)}${c.delivered.aboutImported?.length ? ` (${c.delivered.aboutImported.length} reported about the imported deck)` : ""}` : "n/a"} | ${c.packet ? `${mark(c.packet)}${c.packet.reached ? "" : " (not reached)"}` : "-"} | ${cost.commands ?? cost.runs ?? "-"}${cost.sequence ? ` (${cost.sequence.join(", ")})` : ""} | ${cost.refusedRuns ?? cost.refused ?? "-"} | ${c.scoped ? c.scoped.refusalsOnUntouched : "-"} | ${r.agent?.seconds ?? cost.seconds ?? "-"} |`);
+    lines.push(`| ${r.task} | ${mark(c.made)} | ${mark(c.preserved)} (${c.preserved.identical} of ${c.preserved.untouched}${c.preserved.editedInPlace ? `; ${c.preserved.editedInPlace} edited in place, furthest shape moved ${c.preserved.furthest} px` : ""}) | ${mark(c.asked)}${c.asked.unasked.length ? ` (${c.asked.unasked.length}: ${c.asked.unasked.slice(0, 2).map((item) => `slide ${item.slide} ${item.what}`).join("; ")})` : ""} | ${c.stale ? (c.stale.wanted ? mark(c.stale) : "n/a") : "-"} | ${c.scoped ? mark(c.scoped) : "-"} | ${cost.commands ?? cost.runs ?? "-"}${cost.sequence ? ` (${cost.sequence.join(", ")})` : ""} | ${cost.refusedRuns ?? cost.refused ?? "-"} | ${c.scoped ? c.scoped.refusalsOnUntouched : "-"} | ${r.agent?.seconds ?? cost.seconds ?? "-"} |`);
   }
   return lines.join("\n");
 }

@@ -354,31 +354,6 @@ class DeckSceneVoidTests(unittest.TestCase):
         return {"slides": [cover()] + [half_empty_page(f"e{i}") for i in range(empty)]
                 + [full_page(f"f{i}") for i in range(full)]}
 
-    def test_a_third_of_the_deck_half_empty_blocks(self):
-        report = page_gates.run_gates(self.deck(5, 9))
-        deck = [f for f in report["findings"] if f["code"] == "DECK_SCENE_VOID"]
-        self.assertEqual(len(deck), 1)
-        self.assertEqual(deck[0]["measured"], 5)
-        self.assertEqual(deck[0]["severity"], "blocker")
-        self.assertFalse(report["accepted"])
-
-    def test_the_scene_counts_what_the_build_counts(self):
-        # Pages the scene calls thin or small-exhibit, with no band of air: the
-        # build's DECK_THIN_PAGES blocks on them, so the author's count must too.
-        # One habit, one refusal: with no render the deck count is the scene's,
-        # and the two codes no longer both fire on the same pages.
-        thin = [content_page(f"t{i}", [text("paragraph", y, 40, lines=2) for y in range(162, 668, 46)], planBodyWords=10)
-                for i in range(5)]
-        report = page_gates.run_gates({"slides": [cover()] + thin + [full_page(f"f{i}") for i in range(9)]})
-        codes = [f["code"] for f in report["findings"]]
-        self.assertNotIn("SCENE_VOID", codes)
-        self.assertEqual([c for c in codes if c in ("DECK_THIN_PAGES", "DECK_SCENE_VOID")], ["DECK_SCENE_VOID"])
-        # With the renders measured, the same count is the render's alone.
-        rendered = []
-        page_gates.gate_deck_empty_pages(list(range(14)), rendered, rendered=True,
-                                         counted=[f for f in report["findings"] if f["code"] == "THIN_PAGE"])
-        self.assertEqual([f["code"] for f in rendered], ["DECK_THIN_PAGES"])
-
     def test_the_build_refuses_one_habit_once(self):
         # The build runs the gates on the scene before the render and again
         # after it. Both counts blocked, so one half-empty habit was listed
@@ -400,10 +375,6 @@ console.log(JSON.stringify({ rendered: rendered.blockers.map((b) => b.code), sce
     def test_a_short_deck_does_not(self):
         report = page_gates.run_gates(self.deck(5, 4))
         self.assertNotIn("DECK_SCENE_VOID", {f["code"] for f in report["findings"]})
-
-    def test_only_the_deck_gate_still_counts_the_pages(self):
-        report = page_gates.run_gates(self.deck(5, 9), gates={"DECK_SCENE_VOID"})
-        self.assertEqual([f["code"] for f in report["findings"]], ["DECK_SCENE_VOID"])
 
     def test_a_void_page_advises_and_a_deck_of_them_blocks(self):
         # Registration and documentation are held for every gate code at once
@@ -558,13 +529,6 @@ class ColumnVoidTests(unittest.TestCase):
         found = []
         page_gates.gate_column_void(2, page, matrix, found)
         self.assertEqual(found, [])
-
-    def test_the_deck_counts_half_empty_columns(self):
-        scene = {"slides": [cover()] + [floating_waffle(f"w{i}") for i in range(5)] + [full_page(f"f{i}") for i in range(9)]}
-        report = page_gates.run_gates(scene)
-        self.assertEqual(report["countsByCode"].get("SCENE_VOID"), 5)
-        deck = [f for f in report["findings"] if f["code"] == "DECK_SCENE_VOID"]
-        self.assertEqual([f["measured"] for f in deck], [5])
 
     def test_the_code_is_advisory_and_its_bar_sits_in_the_corpus_tail(self):
         # Registration and documentation are held for every gate code at once

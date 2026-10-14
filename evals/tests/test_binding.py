@@ -21,9 +21,8 @@ from node_probe import NODE, ROOT, run_node
 FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
 AUTHOR = ROOT / "skills" / "professional-slides" / "runtime" / "author-deck.mjs"
 
-# A log on a subject of its own: five series for one company, a peer set, a few single values, and three analyses.
+# A log on a subject of its own: five series for one company, a peer set and a few single values.
 LOG = '''
-import { runAnalyses, analysisInsights } from './skills/professional-slides/runtime/analysis.mjs';
 import { bindDeck } from './skills/professional-slides/runtime/bind.mjs';
 import { dependencyFindings } from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
 const FY = ['FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'];
@@ -40,14 +39,9 @@ const recorded = [
   { ...graded, id: 'i-peers', shape: 'fact', sources: ['sources/b.csv'], cite: ['regulator'], measures: {
       profit: { unit: 'GBP m', population: 'four couriers', period: 'latest year', members: ['Alpha', 'Beta', 'Gamma'], values: [20, 3, null], unavailable: { Gamma: 'reports in another currency' } },
       margin: { unit: '%', population: 'four couriers', period: 'latest year', members: ['Alpha', 'Beta', 'Delta'], values: [15, 8, 21] } } }];
-const { results } = runAnalyses({ analyses: [
-  { id: 'A-path', op: 'scenario', inputs: ['i-bal/cash'], method: 'linear', horizon: ['FY27', 'FY28', 'FY29'], assumptions: [{ name: 'annual cash use', value: -12, rationale: 'the disruption year repeats without recovery' }] },
-  { id: 'A-index', op: 'index', inputs: ['i-bal/cash', 'i-bal/staff', 'i-bal/debt', 'i-bal/sites'] },
-  { id: 'A-net', op: 'gap', inputs: ['i-bal/debt', 'i-bal/cash'] },
-].map((a) => ({ soWhat: 'It changes what the answer can claim', strength: 'strong', ...a })) }, recorded);
-const insights = new Map([...recorded, ...analysisInsights(results)].map((i) => [i.id, i]));
+const insights = new Map(recorded.map((i) => [i.id, i]));
 const page = (o = {}) => ({ id: 'p1', type: 'trend', form: 'line', commentary: 'so-what-bar', title: 'Cash rose every year while debt fell by half',
-  why: 'The movement over time is the claim, so the series is drawn', evidence: ['i-bal', 'A-path', 'A-index', 'A-net', 'i-peers'],
+  why: 'The movement over time is the claim, so the series is drawn', evidence: ['i-bal', 'i-peers'],
   settles: { kind: 'rate', what: 'cash and debt at each year end', measures: ['i-bal/cash'] }, bar: 'The balance sheet has room for one more year of investment at this pace', ...o });
 const deckOf = (...pages) => ({ deck: { schema: 'professional-slides.deck/v3', id: 'probe', workflow: 'new_deck', request: 'How has the balance sheet moved?' },
   sources: { 'annual-report': { name: 'Annual report 2026', status: 'illustrative' }, regulator: { name: 'Regulator returns 2026', status: 'illustrative' } }, pages });
@@ -122,73 +116,6 @@ console.log(JSON.stringify({
         self.assertEqual(result["donut"]["categories"], ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26"])
         self.assertEqual(result["donut"]["items"][0]["values"], [15, 21, 37, 43, 50, 55])
 
-    def test_a_recorded_series_and_a_scenario_are_one_line_with_the_assumed_run_marked(self):
-        result = run_node(LOG + '''
-import { compileDeck, composeForAuthoring } from './skills/professional-slides/runtime/author-deck.mjs';
-const joined = { heading: 'Cash, recorded and assumed', series: [{ measure: ['i-bal/cash', 'A-path/path'], name: 'Cash' }, { measure: 'i-bal/floor', name: 'Floor' }] };
-const p = page({ settles: { kind: 'rate', what: 'cash at each year end, then carried forward', measures: ['i-bal/cash', 'A-path/path'] }, exhibit: joined });
-const { spec, compileErrors, bindingFindings } = compileDeck(deckOf(p), { insights, partial: true });
-const composed = await composeForAuthoring(spec, process.cwd());
-// The same line typed by hand, as the first contract asked: one series over two measures matched neither.
-const typed = page({ settles: p.settles, exhibit: { heading: 'Cash', unit: 'GBP m', categories: [...FY, 'FY27', 'FY28', 'FY29'], series: [{ name: 'Cash', values: [15, 21, 37, 43, 50, 55, 43, 31, 19] }], basis: { measures: ['i-bal/cash', 'A-path/path'] } } });
-console.log(JSON.stringify({ exhibit: exhibitOf(joined), compiled: [compileErrors, bindingFindings, composed.error ?? null, composed.pageErrors], slide: spec.slides[0].exhibit.periods, source: spec.slides[0].source,
-  gate: codes(p), typed: codes(typed),
-  alone: exhibitOf({ heading: 'Cash under the assumption', series: [{ measure: 'A-path/path', name: 'Cash' }] }).periods,
-  ownMark: exhibitOf({ ...joined, type: 'chart.column', series: joined.series.slice(0, 1), forecastFrom: 'FY27' }),
-  wrongMark: problems(page({ exhibit: { ...joined, forecastFrom: 'FY25' } })),
-  units: problems(page({ exhibit: { heading: 'Cash and staff', series: [{ measure: ['i-bal/cash', 'i-bal/staff'], name: 'x' }] } })),
-  members: problems(page({ exhibit: { heading: 'Margin', series: [{ measure: ['i-peers/margin', 'i-peers/profit'], name: 'x' }] } })) }));
-''')
-        ex = result["exhibit"]
-        self.assertEqual(ex["categories"], ["FY21", "FY22", "FY23", "FY24", "FY25", "FY26", "FY27", "FY28", "FY29"])
-        # FY26 is in both: the record is kept, not the assumption that starts from it.
-        self.assertEqual(ex["series"][0]["values"], [15, 21, 37, 43, 50, 55, 43, 31, 19])
-        self.assertEqual(ex["periods"], [{"from": "FY21", "to": "FY26", "label": "Recorded"}, {"from": "FY27", "to": "FY29", "label": "Assumed"}])
-        self.assertEqual(ex["basis"]["measures"], ["i-bal/cash", "A-path/path", "i-bal/floor"])
-        self.assertEqual(result["compiled"], [[], [], None, []])  # it compiles and composes from references alone
-        self.assertEqual(result["slide"], ex["periods"])  # the bracket reaches the page
-        self.assertEqual(result["source"], "Source: Annual report 2026 (illustrative)")
-        self.assertEqual(result["gate"], [])
-        self.assertEqual(result["typed"], ["BASIS_VALUES"])
-        # A path drawn alone starts at the recorded value it was carried from: that period is the record, and the run after it the
-        # assumption (a stabilised-income path bracketed its recorded 2024 base as "Assumed").
-        self.assertEqual(result["alone"], [{"from": "FY26", "to": "FY26", "label": "Recorded"}, {"from": "FY27", "to": "FY29", "label": "Assumed"}])
-        # An exhibit that marks the run itself keeps its own mark, where it starts at the first assumed period.
-        self.assertEqual([result["ownMark"].get("forecastFrom"), "periods" in result["ownMark"]], ["FY27", False])
-        self.assertIn("start it at FY27", result["wrongMark"][0])
-        self.assertIn("one line is one unit", result["units"][0])
-        self.assertIn("do not run over periods", result["members"][0])
-
-    def test_an_indexed_trend_compiles_from_references_alone(self):
-        result = run_node(LOG + '''
-import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
-const names = ['cash', 'staff', 'debt', 'sites'];
-const indexed = (series, more = {}) => page({ form: 'indexed', settles: { kind: 'rate', what: 'four measures rebased to their first year', measures: names.map((n) => `A-index/${n}`), relation: { kind: 'index' } },
-  exhibit: { heading: 'Growth since FY21', subject: 'cash', series, ...more } });
-const computed = indexed(names.map((n) => ({ measure: `A-index/${n}`, name: n })));
-const raw = indexed(names.map((n) => ({ measure: `i-bal/${n}`, name: n })), { indexBase: 'FY22' });
-const compiled = (p) => { const { spec, compileErrors, bindingFindings } = compileDeck(deckOf(p), { insights, partial: true }); const ex = spec.slides[0]?.exhibit;
-  return { errors: [...compileErrors, ...bindingFindings.map((f) => f.repair)], unit: ex?.unit, cash: ex?.series[0].values, focus: ex?.focusSeries, leaked: JSON.stringify(spec.slides).includes('"measure"') }; };
-// What the first contract refused: raw values under an index unit, and an index basis under raw values.
-const typedRaw = indexed(names.map((n) => ({ name: n, values: insights.get('i-bal').measures[n].values })), { unit: 'index, FY21 = 100', categories: FY, indexBase: 'FY21', basis: { measures: names.map((n) => `i-bal/${n}`) } });
-console.log(JSON.stringify({ computed: compiled(computed), raw: compiled(raw), gates: [codes(computed), codes(raw)], typedRaw: codes(typedRaw),
-  base: insights.get('A-index').measures.cash.base,
-  noBase: problems(indexed(names.map((n) => ({ measure: `i-bal/${n}`, name: n })))), twoBases: problems(indexed(names.map((n) => ({ measure: `A-index/${n}`, name: n })), { indexBase: 'FY23' })),
-  mixed: problems(indexed([{ measure: 'A-index/cash' }, { measure: 'i-bal/staff' }, { measure: 'i-bal/debt' }, { measure: 'i-bal/sites' }])),
-  unitTyped: problems(indexed(names.map((n) => ({ measure: `i-bal/${n}`, name: n })), { indexBase: 'FY22', unit: 'GBP m' })) }));
-''')
-        # An index analysis's measures carry their base: nothing is typed, and the compiler's rebasing leaves them as they are.
-        self.assertEqual(result["base"], "FY21")
-        self.assertEqual(result["computed"], {"errors": [], "unit": "index, FY21 = 100", "cash": [100, 140, 246.7, 286.7, 333.3, 366.7], "focus": "cash", "leaked": False})
-        # Raw series in four units, rebased by the runtime at the period the page names.
-        self.assertEqual(result["raw"], {"errors": [], "unit": "Index, FY22 = 100", "cash": [71.4, 100, 176.2, 204.8, 238.1, 261.9], "focus": "cash", "leaked": False})
-        self.assertEqual(result["gates"], [[], []])
-        self.assertIn("BASIS_UNIT", result["typedRaw"])
-        self.assertIn("say the `indexBase` period", result["noBase"][0])
-        self.assertIn("leave `indexBase` out", result["twoBases"][0])
-        self.assertIn("some are raw series, some already indexed", result["mixed"][0])
-        self.assertIn("leave `unit` out", result["unitTyped"][0])
-
     def test_a_reference_that_cannot_be_bound_is_one_finding_and_the_page_is_not_compiled(self):
         result = run_node(LOG + '''
 import { compileDeck, authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
@@ -197,13 +124,13 @@ const broken = page({ evidence: ['i-bal'], title: 'Margins of {{i-peers/margin@A
 const good = page({ id: 'p2', exhibit: cash });
 const partial = compileDeck(deckOf(broken, good), { insights, partial: true });
 let thrown = null; try { compileDeck(deckOf(broken), { insights }); } catch (error) { thrown = error.message; }
-const run = await authorDeck(deckOf(broken, good), { baseDir: process.cwd(), insights, draft: true });
+const run = await authorDeck(deckOf(broken, good), { baseDir: process.cwd(), insights });
 console.log(JSON.stringify({
   unknown: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'i-bal/cahs', name: 'Cash' }] } })), bare: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'cash' }] } })),
   noLog: bindDeck(deckOf(page({ exhibit: cash })), null).findings.map((f) => f.repair),
   unrested: problems(broken), found: dependencyFindings(deckOf(broken), insights).map((f) => [f.code, f.id, f.severity, f.measured]),
   partial: [partial.spec.slides.map((s) => s.id), partial.compileErrors, partial.bindingFindings.map((f) => f.code)], thrown,
-  authored: [run.findings.map((f) => `${f.code} ${f.id ?? ''}`.trim()), [...run.failedIds]],
+  authored: [[...run.blocking, ...run.advisories].map((f) => `${f.code} ${f.id ?? ''}`.trim()), [...run.failedIds]],
   typedBeside: problems(page({ exhibit: { ...cash, categories: FY } })), typedSeries: problems(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })),
   mixedSeries: codes(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })),
   basisBeside: problems(page({ exhibit: { ...cash, basis: { measures: ['i-bal/debt'] } } })), unit: problems(page({ exhibit: { ...cash, unit: 'USD m' } })), sameUnit: problems(page({ exhibit: { ...cash, unit: 'gbp m.' } })),
@@ -223,7 +150,7 @@ console.log(JSON.stringify({
         self.assertIn("names a measure of i-peers, which the page does not name in `evidence`", result["unrested"][0])
         self.assertIn("and 2 more references on the page with the same fault", result["unrested"][0])
         self.assertEqual(result["found"], [["BINDING_UNRESOLVED", "p1", "blocker", ["i-peers/margin"]]])  # and nothing else about the page: it has no numbers to hold yet
-        # The page is left out of the compile, the rest of the deck compiles, and the finding is the binding's - in a draft too.
+        # The page is left out of the compile, the rest of the deck compiles, and the finding is the binding's.
         self.assertEqual(result["partial"], [["p2"], [], ["BINDING_UNRESOLVED"]])
         self.assertIn("1 page could not be compiled", result["thrown"])
         self.assertIn("i-peers", result["thrown"])
@@ -267,7 +194,7 @@ console.log(JSON.stringify([[-21.428, '+0.0%'], [4.255, '+0.0%'], [1251, 'CHF 0.
 import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
 import { plottedValues } from './skills/professional-slides/runtime/evidence.mjs';
 const cash = { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }] };
-const strip = page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, title: 'Cash reached {{i-bal/cash@FY26}} million as net debt fell to {{A-net/result@FY26 | 0}} million',
+const strip = page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, title: 'Cash reached {{i-bal/cash@FY26}} million across {{i-bal/sites@FY26 | 0}} sites',
   subtitle: 'Revenue {{i-bal/revenue | CHF0.0bn | /1000}}; rate {{i-bal/rate | +0.0%}}',
   metrics: [{ measure: 'i-bal/rate', format: '+0.0%', label: 'Rate' }, { measure: 'i-bal/debt@FY26', format: 'GBP 0m', label: 'Debt', role: 'context', relevance: 'It is what the cash is set against' },
     { value: '{{i-bal/revenue | CHF0.0bn | /1000}}', label: 'Revenue' }, { value: '21', label: 'Typed', sublabel: 'from {{i-bal/cash@FY21}}' }],
@@ -289,7 +216,7 @@ console.log(JSON.stringify({ title: bound.title, subtitle: bound.subtitle, metri
   grid: [bind(grid).page.exhibit.items.map((item) => item.value), bind(grid).page.exhibit.basis, codes(grid)], hero: [bind(hero).page.kpi, codes(hero)],
   cited: cited.spec.slides[0]?.source ?? cited.compileErrors }));
 ''')
-        self.assertEqual(result["title"], "Cash reached 55 million as net debt fell to 1 million")
+        self.assertEqual(result["title"], "Cash reached 55 million across 52 sites")
         self.assertEqual(result["subtitle"], "Revenue CHF1.3bn; rate -0.9%")
         self.assertEqual(result["metrics"][0], {"label": "Rate", "value": "-0.9%", "basis": {"measures": ["i-bal/rate"], "role": "proof", "bound": True}})
         self.assertEqual(result["metrics"][1], {"label": "Debt", "value": "GBP 56m", "basis": {"measures": ["i-bal/debt"], "role": "context", "relevance": "It is what the cash is set against", "labels": {"i-bal/debt": ["FY26"]}, "bound": True}})
@@ -348,14 +275,12 @@ const cash = { heading: 'Cash', series: [{ measure: 'i-bal/cash', name: 'Cash' }
 const say = (o) => advised(page({ exhibit: cash, ...o }));
 const all = dependencyFindings(deckOf(page({ exhibit: cash, title: 'Cash reached 56.5 million' })), insights);
 console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, f.measured]), repair: all[0].repair,
-  recorded: say({ title: 'Cash reached 55 million from 15 million as debt fell to GBP 56m', bar: 'Net debt of 1 million and revenue of CHF1.3bn leave a rate of -0.9%, or 35% of staff cost' }),
-  wrong: say({ title: 'Cash reached 57 million from 15.5 million', subtitle: 'Revenue CHF1.4bn, a rate of +0.9%', bar: 'Net debt fell 42.7% to 1 million over the five years' }),
+  recorded: say({ title: 'Cash reached 55 million from 15 million as debt fell to GBP 56m', bar: 'Revenue of CHF1.3bn leaves a rate of -0.9%, or 35% of staff cost' }),
+  wrong: say({ title: 'Cash reached 57 million from 15.5 million', subtitle: 'Revenue CHF1.4bn, a rate of +0.9%', bar: 'Debt fell 42.7% to 56 million over the five years' }),
   labels: say({ title: 'In FY26 and 2026 the 500X and M25 fleets, 8 branches and the 15th of 30 options held', bar: 'From 20 September 2026 the Q3 plan covers 2024-25 routes on a 5-year view' }),
   // A percentage is not matched against money, nor money against a percentage: 20% is not Alpha's profit of 20, and 15m is not its margin of 15%.
   units: advised({ ...page({ exhibit: undefined, settles: undefined, title: 'Profit rose 20% to 15m' }), evidence: ['i-peers'] }),
   ratio: say({ title: 'Staff cost per head is 35% of the peer level' }),
-  assumption: say({ title: 'Cash use of 12.0 million a year is assumed' }),
-  lineage: advised(page({ exhibit: cash, evidence: ['A-net'], settles: undefined, type: 'argument', form: 'memo', title: 'Net debt fell as cash reached 55.0 million' })),
   unrested: advised(page({ exhibit: cash, evidence: ['i-bal'], title: 'Alpha earns a margin of 15.0% on its routes' })),
   fields: advised(page({ exhibit: { ...cash, caption: 'Cash rose to 99.5 million over the five years shown', annotations: [{ category: 'FY26', text: 'Up 77.7% on the year before' }] }, points: ['A first point with 3.3x leverage in it.', { lead: 'A lead', text: 'and its text at 44.4%' }], takeaway: 'It closes at 66.6 million' })),
   cells: advised(page({ type: 'lookup', form: 'table', evidence: ['i-peers'], settles: { kind: 'comparison', what: 'carrier margins', measures: ['i-peers/margin'] }, exhibit: { type: 'table', columns: ['Carrier', 'Margin', 'Note'],
@@ -374,8 +299,6 @@ console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, 
         self.assertEqual(result["labels"], [])  # years, periods, dates, model names, ordinals and counts of things are not measurements
         self.assertEqual(result["units"], ["title: 20%", "title: 15m"])
         self.assertEqual(result["ratio"], [])
-        self.assertEqual(result["assumption"], [])  # a stated assumption of an analysis the page rests on
-        self.assertEqual(result["lineage"], [])  # a value of the records an analysis was computed from
         self.assertEqual(result["unrested"], ["title: 15.0%"])  # recorded, by an insight this page does not rest on
         self.assertEqual(result["fields"], ["exhibit.caption: 99.5 million", "exhibit.annotations[0].text: 77.7%", "points[0]: 3.3x", "points[1].text: 44.4%", "takeaway: 66.6 million"])
         # Every figure cell of a table is read, typed as text or as a number; a row's name and a count in a note are not.
@@ -432,7 +355,7 @@ const item = (value, label, basis) => ({ value, label, text: 'What the number me
 const compiled = compileDeck(deckOf(typed, { ...bound, id: 'p2' }), { insights, partial: true });
 const stripped = withoutDependencies(grid([item('55m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')]));
 console.log(JSON.stringify({ typed: codes(typed), bound: codes(bound), bare: codes(bare), wrong: codes(wrong),
-  errors: compiled.compileErrors, kept: compiled.spec.slides.map((s) => s.pageType.dependencies.metrics.map((b) => b.measures)),
+  errors: compiled.compileErrors,
   leaked: JSON.stringify(compiled.spec.slides.map((s) => ({ ...s, pageType: null }))).includes('"basis"'), values: compiled.spec.slides.map((s) => s.blocks.map((b) => b.metric.value)),
   item: codes(grid([item('55m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')])), itemWrong: codes(grid([item('65m', 'cash', { measures: ['i-bal/cash'] }), item('25m', 'the floor')])),
   noItemBasis: codes(grid([item('55m', 'cash'), item('25m', 'the floor')])), itemStripped: [JSON.stringify(stripped.page).includes('"basis"'), stripped.dependencies.declared.metrics.length] }));
@@ -442,7 +365,6 @@ console.log(JSON.stringify({ typed: codes(typed), bound: codes(bound), bare: cod
         self.assertEqual(result["bare"], ["PROOF_MISSING"])  # a row metric that names no measure proves nothing
         self.assertEqual(result["wrong"], ["BASIS_VALUES"])  # and one that names a measure is held to it
         self.assertEqual(result["errors"], [])
-        self.assertEqual(result["kept"], [[["i-bal/cash"], ["i-bal/debt"]], [["i-bal/cash"], ["i-bal/debt"]]])
         self.assertFalse(result["leaked"])  # `basis` is the author's statement, not a prop the composer draws
         self.assertEqual(result["values"], [["55m", "56m"], ["55m", "56m"]])
         self.assertEqual(result["item"], [])
@@ -453,43 +375,6 @@ console.log(JSON.stringify({ typed: codes(typed), bound: codes(bound), bare: cod
 
 class RecordReadingTests(unittest.TestCase):
     """What a page's figures print against the record itself, read off the references and the recorded values."""
-
-    def test_one_recorded_measure_in_two_tiles_is_refused_and_the_judge_reads_only_different_measures(self):
-        """BA retest: hb10's 2027 cap beside its 2025 charge, and hw03's carbon bill for two halves, each cost a judge round
-        (tiles-one-measure) where both tiles named one `<insight>/<measure>` at two periods. The references say it; the judge
-        is asked only whether tiles of different measures are one."""
-        result = run_node(LOG + '''
-import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
-import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
-const asked = [];
-const reader = judgementSession({ oracle: (kind, subject) => { asked.push({ kind, subject }); return kind === 'tiles-one-measure' ? 'different-measures' : null; } });
-const item = (ref, label) => ({ measure: ref, format: 'GBP 0m', label, text: 'held at the year end on the balance sheet' });
-const grid = (items) => page({ type: 'numbers', form: 'fact-grid', commentary: 'none', bar: undefined, title: 'Cash rose to its highest level as debt fell by half',
-  exhibit: { items }, settles: { kind: 'comparison', what: 'cash and debt at year end', measures: ['i-bal/cash', 'i-bal/debt'] } });
-const strip = (metrics, kpi) => page({ type: 'numbers', form: 'metric-strip', commentary: 'none', bar: undefined, metrics, ...(kpi ? { kpi } : {}), exhibit: { heading: 'Staff', series: [{ measure: 'i-bal/staff', name: 'Staff' }] } });
-const judged = (p) => { asked.length = 0; let out; withJudgements(reader, () => { out = compileDeck(deckOf(p), { insights, partial: true }); }); return { errors: out.compileErrors, asked: asked.filter((q) => q.kind === 'tiles-one-measure').map((q) => q.subject.map((t) => t.label)) }; };
-const found = (p) => dependencyFindings(deckOf(p), insights).filter((f) => f.code === 'TILES_SAME_MEASURE');
-const twice = grid([item('i-bal/cash@FY25', 'Cash, FY25'), item('i-bal/cash@FY26', 'Cash, FY26'), item('i-bal/debt@FY26', 'Debt, FY26')]);
-const once = grid([item('i-bal/cash@FY26', 'Cash, FY26'), item('i-bal/debt@FY26', 'Debt, FY26'), item('i-bal/debt@FY26', 'Debt again, FY26')]);
-const allOne = grid([item('i-bal/cash@FY24', 'Cash, FY24'), item('i-bal/cash@FY25', 'Cash, FY25'), item('i-bal/cash@FY26', 'Cash, FY26')]);
-console.log(JSON.stringify({
-  twice: found(twice).map((f) => [f.severity, f.measured, f.repair]), once: found(once).length,
-  token: found(strip([{ value: '{{i-bal/cash@FY24 | GBP 0m}}', label: 'Cash, FY24' }, { measure: 'i-bal/cash@FY26', format: 'GBP 0m', label: 'Cash, FY26' }])).map((f) => f.measured),
-  kpi: found(strip([{ measure: 'i-bal/debt@FY26', format: 'GBP 0m', label: 'Debt' }], { measure: 'i-bal/debt@FY21', format: 'GBP 0m', label: 'Debt then' })).map((f) => f.measured),
-  judged: { twice: judged(twice), allOne: judged(allOne) } }));
-''')
-        [(severity, measured, repair)] = result["twice"]
-        self.assertEqual(severity, "blocker")
-        self.assertEqual(measured, {"measure": "i-bal/cash", "labels": ["FY25", "FY26"]})
-        self.assertIn("print one recorded measure, i-bal/cash at FY25 and at FY26", repair)
-        self.assertIn("plot the measure on one axis".capitalize(), repair)
-        self.assertIn("keep one tile and say the other in the copy", repair)
-        self.assertEqual(result["once"], 0, "one measure at one period twice is not two periods of it")
-        self.assertEqual(result["token"], [{"measure": "i-bal/cash", "labels": ["FY24", "FY26"]}], "a tile whose value is one token names its measure too")
-        self.assertEqual(result["kpi"], [{"measure": "i-bal/debt", "labels": ["FY26", "FY21"]}], "a hero figure is a tile beside the strip")
-        # The judge reads one tile of each recorded measure: the two cash tiles are the record's to refuse, not its to read.
-        self.assertEqual(result["judged"]["twice"], {"errors": [], "asked": [["Cash, FY25", "Debt, FY26"]]})
-        self.assertEqual(result["judged"]["allOne"], {"errors": [], "asked": []})
 
     def test_a_number_printed_past_the_records_precision_is_advised_with_the_format_that_keeps_it(self):
         """BA retest: the OAG seat shares were recorded as 34, 16 and 14 and printed 34.0% - a precision nobody measured -
@@ -515,170 +400,6 @@ console.log(JSON.stringify({
         # A ratio printed as a percentage carries the places its record has once scaled: 0.349 is 34.9%.
         self.assertEqual(result["scaled"][0][1], ['i-bal/perHead: "0.0% | x100"'])
         self.assertEqual(result["scaledKept"], [])
-
-    def test_a_page_resting_on_insights_a_hazard_names_together_hears_its_rule(self):
-        """The answer critique names the comparisons the log cannot support (out/answer-critique.json `hazards`); a page that
-        draws on two of the insights one hazard names - by `evidence` or by `settles.measures` - is told the rule, by ids alone."""
-        result = run_node(LOG + '''
-import { hazardFindings } from './skills/professional-slides/runtime/gates/dependency_gates.mjs';
-const hazards = [{ insights: ['i-bal', 'i-peers'], problem: 'The peers report a calendar year and the company a fiscal one.', rule: 'Never set the company beside the peers as one year.' },
-  { insights: ['i-peers'], problem: 'One insight alone.', rule: 'Read nowhere here.' }];
-const both = page();
-const alone = page({ id: 'p2', evidence: ['i-bal'] });
-const settled = page({ id: 'p3', evidence: ['i-bal'], settles: { kind: 'comparison', what: 'margins', measures: ['i-bal/cash', 'i-peers/margin'] } });
-console.log(JSON.stringify(hazardFindings(deckOf(both, alone, settled), hazards).map((f) => [f.code, f.id, f.severity, f.measured.insights, f.repair])));
-''')
-        self.assertEqual([row[:4] for row in result], [["COMPARISON_UNSUPPORTED", "p1", "advisory", ["i-bal", "i-peers"]], ["COMPARISON_UNSUPPORTED", "p3", "advisory", ["i-bal", "i-peers"]]])
-        self.assertIn('The rule it sets: "Never set the company beside the peers as one year."', result[0][4])
-
-
-class AuthoringSurfaceTests(unittest.TestCase):
-    """What the author meets at the command line: a scaffold already bound, one finding for a bad reference, and the list of untraced numbers."""
-
-    def author(self, tmp, *args):
-        return subprocess.run([NODE, str(AUTHOR), str(Path(tmp) / "finance.pages.json"), *args], capture_output=True, text=True, timeout=180)
-
-    def stage(self, tmp, mutate=None):
-        for file in FIXTURES.glob("finance.*"):
-            (Path(tmp) / file.name).write_text(file.read_text(encoding="utf-8"), encoding="utf-8")
-        if mutate:
-            path = Path(tmp) / "finance.pages.json"
-            doc = json.loads(path.read_text(encoding="utf-8"))
-            mutate({page["id"]: page for page in doc["pages"]})
-            path.write_text(json.dumps(doc), encoding="utf-8")
-
-    def test_a_scaffold_from_an_insight_names_its_measures(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            self.stage(tmp)
-            trend = self.author(tmp, "--scaffold", "trend", "--evidence", "i-liquidity", "--id", "f9")
-            self.assertEqual(trend.returncode, 0, trend.stderr)  # it is bound and compiled before it is printed
-            page = json.loads(trend.stdout)
-            self.assertEqual(page["exhibit"]["series"], [{"measure": "i-liquidity/liquid", "name": "liquid"}, {"measure": "i-liquidity/short-liabilities", "name": "short-liabilities"}])
-            self.assertFalse({"categories", "unit", "values"} & set(page["exhibit"]))
-            self.assertEqual(page["settles"], {"measures": ["i-liquidity/liquid", "i-liquidity/short-liabilities"]})
-            self.assertNotIn("source", page)  # the citation is written from the measures
-            # A form asked for is the form given: the figure is bound, and the chart the insight has no series for is said to be the example's.
-            hero = self.author(tmp, "--scaffold", "numbers/hero-number", "--evidence", "A-ocf")
-            numbers = json.loads(hero.stdout)
-            self.assertEqual(numbers["kpi"]["measure"], "A-ocf/change")
-            self.assertIn("values", numbers["exhibit"]["series"][0])  # no series in the insight: the example's chart stays, to be replaced
-            self.assertIn("Still the worked example's own numbers, to replace: `exhibit`", hero.stderr)
-
-    def test_a_scaffold_binds_wherever_the_insight_has_measures_its_exhibit_can_take_and_says_when_it_fell_back(self):
-        # A run asked for seven scaffolds from its insights and mostly got the worked example back, unbound and unexplained:
-        # a bridge, a table, a page of panels, a grid of figures and a mix of one measure all fell back in silence. A scaffold
-        # binds a table by token, panels a measure each, a bridge as one measure, and takes the form of the type the measures
-        # fill; where nothing binds it says so, and why.
-        result = run_node('''
-import { scaffoldReport } from './skills/professional-slides/runtime/author-deck.mjs';
-import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
-const members = ['North', 'South', 'East', 'West', 'Centre', 'Coast'];
-const insights = {
-  bridge: { id: 'i-bridge', shape: 'bridge', breadth: { steps: 3 }, finding: 'f', soWhat: 's', strength: 'strong', measures: { effect: { unit: 'GBP m', population: 'the company, effect on profit', period: 'FY25 to FY26', members: ['FY25 profit', 'Revenue', 'Fuel', 'Staff', 'FY26 profit'], values: [200, 40, 15, -25, 230] } } },
-  pair: { id: 'i-pair', shape: 'mix', breadth: { parts: 6 }, finding: 'f', soWhat: 's', strength: 'strong', measures: { served: { unit: 'depots', population: 'depots in service', period: 'FY26', members, values: [12, 9, 7, 6, 4, 3] },
-    planned: { unit: 'depots', population: 'depots planned', period: 'FY26', members, values: [3, 5, 2, 6, 1, 2] } } },
-  facts: { id: 'i-facts', shape: 'fact', finding: 'f', soWhat: 's', strength: 'supporting', measures: { vans: { unit: 'vans', population: 'the fleet', period: 'FY26', value: 410 }, drivers: { unit: 'people', population: 'drivers', period: 'FY26', value: 620 },
-    depots: { unit: 'depots', population: 'the network', period: 'FY26', value: 41 }, routes: { unit: 'routes', population: 'the network', period: 'FY26', value: 180 } } },
-  roster: { id: 'i-roster', shape: 'roster', finding: 'f', soWhat: 's', strength: 'supporting', measures: { vans: { unit: 'vans', population: 'the couriers', period: 'FY26', members, values: [12, 9, 7, 6, 4, 3] } } },
-  mix: { id: 'i-mix', shape: 'mix', breadth: { parts: 6 }, finding: 'f', soWhat: 's', strength: 'strong', measures: { share: { unit: '%', population: 'revenue by region', period: 'FY26', members, values: [31, 28, 16, 10, 8, 7] } } },
-};
-const of = (type, insight, form) => { const report = scaffoldReport(type, { id: 'p9', insight, form });
-  // What is printed binds and compiles against the insight's own log.
-  const compiled = compileDeck({ deck: { id: 'd', design: 'consulting' }, pages: [report.page] }, { insights: new Map([[insight.id, insight]]), partial: true });
-  return { form: report.form, bound: report.bound, typed: report.typed, fallback: report.fallback, passed: (report.passed ?? []).map((item) => item.form), page: report.page, fit: report.fit ?? null,
-    compiles: compiled.compileErrors.length === 0 && compiled.bindingFindings.length === 0 }; };
-console.log(JSON.stringify({ bridge: of('bridge', insights.bridge), panels: of('panels', insights.pair), lookup: of('lookup', insights.pair), numbers: of('numbers', insights.facts),
-  hero: of('numbers', insights.facts, 'hero-number'), composition: of('composition', insights.mix), scorecard: of('scorecard', insights.roster), harvey: of('scorecard', insights.roster, 'harvey') }));
-''')
-        bridge = result["bridge"]
-        self.assertEqual([bridge["bound"], bridge["typed"], bridge["compiles"]], [["i-bridge/effect"], [], True])
-        self.assertEqual({key: bridge["page"]["exhibit"][key] for key in ("measure", "totals")}, {"measure": "i-bridge/effect", "totals": [0, 4]})
-        self.assertFalse({"categories", "values"} & set(bridge["page"]["exhibit"]))
-        # Panels take a measure each, and the worked example's own panels are gone.
-        panels = result["panels"]
-        self.assertEqual([[s["measure"] for s in ex["series"]] for ex in panels["page"]["exhibits"]], [["i-pair/served"], ["i-pair/planned"]])
-        self.assertEqual([panels["typed"], panels["compiles"]], [[], True])
-        # A table prints each measure by token, a member a row.
-        lookup = result["lookup"]
-        self.assertEqual(lookup["bound"], ["i-pair/served", "i-pair/planned"])
-        self.assertEqual(lookup["page"]["exhibit"]["rows"][0][:3], ["North", "{{i-pair/served@North | 0.0}}", "{{i-pair/planned@North | 0.0}}"])
-        self.assertEqual([lookup["typed"], lookup["compiles"]], [[], True])
-        # Single values fill a grid or a list of figures, not the chart under a hero number: the forms that carry four figures
-        # are read from the measures (claim-fit.mjs), one of them is taken, and the other is named as fitting as well.
-        numbers = result["numbers"]
-        self.assertIn(numbers["form"], ("fact-grid", "stat-list"))
-        self.assertEqual(numbers["fit"]["task"], "figures")
-        self.assertEqual({numbers["form"], *numbers["fit"]["equal"]}, {"fact-grid", "stat-list"})
-        self.assertEqual([numbers["typed"], numbers["compiles"]], [[], True])
-        self.assertTrue(all("measure" in item for item in numbers["page"]["exhibit"]["items"]))
-        # Asked for by form, the hero number is given, and what still holds the example's numbers is listed.
-        self.assertEqual([result["hero"]["form"], result["hero"]["typed"]], ["hero-number", ["exhibit"]])
-        self.assertEqual(result["hero"]["page"]["kpi"]["measure"], "i-facts/vans")
-        # One measure over six parts fills a form that takes six, not the type's first.
-        self.assertEqual([result["composition"]["typed"], result["composition"]["compiles"], result["composition"]["bound"]], [[], True, ["i-mix/share"]])
-        self.assertNotEqual(result["composition"]["form"], "stacked-column")
-        # A scorecard of a recorded measure over members binds it, a token a cell under a coded column.
-        scorecard = result["scorecard"]
-        self.assertEqual([scorecard["form"], scorecard["bound"], scorecard["typed"], scorecard["compiles"]], ["bars", ["i-roster/vans"], [], True])
-        self.assertTrue(scorecard["page"]["exhibit"]["columns"][1]["bar"])
-        self.assertEqual(scorecard["page"]["exhibit"]["rows"][0][:2], ["North", "{{i-roster/vans@North | 0.0}}"])
-        # A form whose cells are a judgement takes no measure: the page is the worked example, and says so and why.
-        harvey = result["harvey"]
-        self.assertEqual(harvey["bound"], [])
-        self.assertEqual(len(harvey["fallback"]), 1)
-        self.assertIn("code a judgement, which no measure records", harvey["fallback"][0])
-        self.assertIn("--scaffold lookup --evidence i-roster", harvey["fallback"][0])
-
-    def test_the_scaffold_command_says_what_it_bound_and_why_it_fell_back(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            self.stage(tmp)
-            bound = self.author(tmp, "--scaffold", "trend", "--evidence", "i-liquidity")
-            self.assertIn("Bound to i-liquidity: trend/line names i-liquidity/liquid, i-liquidity/short-liabilities, and the runtime writes the numbers.", bound.stderr)
-            # A scorecard of recorded measures binds them in a form that codes magnitudes; a judged form, asked for by name, does not.
-            coded = self.author(tmp, "--scaffold", "scorecard", "--evidence", "i-peers")
-            self.assertIn("Bound to i-peers: scorecard/", coded.stderr)
-            self.assertIn("{{i-peers/margin@Harbour | 0.0}}", coded.stdout)
-            fallback = self.author(tmp, "--scaffold", "scorecard/harvey", "--evidence", "i-peers")
-            self.assertEqual(fallback.returncode, 0, fallback.stderr)
-            self.assertIn("Not bound to i-peers: the page printed is the worked example of scorecard/harvey with the insight named as `evidence`, and its numbers are the example's own.", fallback.stderr)
-            self.assertIn("Why:", fallback.stderr)
-            table = self.author(tmp, "--scaffold", "lookup", "--evidence", "i-peers")
-            self.assertIn("{{i-peers/margin@Harbour | 0.0}}", table.stdout)
-            self.assertIn("Bound to i-peers: lookup/", table.stderr)
-            self.assertEqual(self.author(tmp, "--scaffold", "trend/nothing", "--evidence", "i-liquidity").returncode, 1)
-
-    def test_a_bad_reference_refuses_the_run_once_and_untraced_numbers_are_listed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            def recell(pages):
-                pages["f0"]["exhibit"]["rows"][6][1] = "64.5%"
-            self.stage(tmp, recell)
-            checked = self.author(tmp, "--check")
-            self.assertEqual(checked.returncode, 0, checked.stderr)  # advice, not a refusal
-            summary = json.loads(checked.stdout)
-            self.assertEqual(summary["untracedNumbers"], {"f0": ["exhibit.rows[6][1]: 64.5%"]})
-            self.assertIn("NUMBER_UNTRACED [f0]", summary["advisories"])
-
-            # In a title the same slip is refused: the title is the claim the critique reads.
-            def retitle(pages):
-                pages["f3"]["title"] = "The liquidity cushion narrowed from 43.5 million to 8 million"
-            self.stage(tmp, retitle)
-            titled = self.author(tmp, "--check")
-            self.assertEqual(titled.returncode, 2, titled.stderr[-1500:])
-            self.assertIn("TITLE_NUMBER_UNTRACED [f3]", titled.stderr)
-            self.assertIn('["43.5 million"]', titled.stderr)
-
-            def unbind(pages):
-                pages["f3"]["exhibit"]["series"][0]["measure"] = "i-liquidity/liquidity"
-                pages["f1"]["title"] = "Loans grew {{A-loans/percent | 0%}} to {{i-loans/loans@FY27}} million"
-            self.stage(tmp, unbind)
-            refused = self.author(tmp, "--check")
-            self.assertEqual(refused.returncode, 2)
-            self.assertIn("2 findings to fix", refused.stderr)
-            self.assertIn("BINDING_UNRESOLVED [f3]", refused.stderr)
-            self.assertIn('names "i-liquidity/liquidity", which the insight log\'s measures do not hold', refused.stderr)
-            self.assertIn("BINDING_UNRESOLVED [f1]", refused.stderr)
-            self.assertNotIn("COMPILE", refused.stderr)  # the page's finding is the binding's, not a second one about its missing values
-
 
 if __name__ == "__main__":
     unittest.main()

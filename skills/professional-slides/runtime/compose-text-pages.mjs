@@ -19,19 +19,6 @@ const PROSE_ROOM = BODY_WIDTH - COLUMN_GAP - PANEL_MIN_WIDTH;
 const QUARTER = 0.9 * (BODY_WIDTH - COLUMN_GAP) / 4;
 export const fitsQuarter = (props) => { try { sideStatementLayout({ x: 0, y: 0, width: QUARTER, height: BODY_WIDTH }, props); return true; } catch { return false; } };
 
-/**
- * For a page that is prose beside its panel and nothing else - a memo, or a
- * rail page of paragraphs - the words of prose that fill the column the
- * composer sets them in (compose-points.mjs proseFillRange), at the page's
- * `density`, or null for any other page. `most` is the most words of prose
- * the page's word ceiling leaves it.
- */
-export function proseFill(slide, density, most) {
-  const paragraphs = (slide?.paragraphs || []).filter((p) => proseParts(p).text.trim());
-  const beside = typeof slide?.panel?.text === "string" && slide.panel.text.trim() && paragraphs.length && !(slide.points || []).length && !slide.exhibit && !(slide.exhibits || []).length;
-  return beside ? proseFillRange(paragraphs, PROSE_ROOM, density, most) : null;
-}
-
 // A side panel carrying the page's statement, the content beside it: a
 // strong deck sets a question, a claim or a headline figure in a dark panel down
 // the left and lets the evidence or the points take the rest. The panel is

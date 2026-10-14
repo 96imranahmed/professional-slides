@@ -187,5 +187,3 @@ export function schemaErrors(value, schema, at, { absentIsNull = false, enums = 
   return errors;
 }
 
-/** A command an agent is told to run, each argument quoted for a POSIX shell: a deck's path may hold a space ("Side Projects"). */
-export const commandLine = (...args) => args.map((arg) => (/^[\w@%+=:,./-]+$/.test(String(arg)) ? String(arg) : `'${String(arg).replace(/'/g, "'\\''")}'`)).join(" ");

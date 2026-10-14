@@ -128,67 +128,6 @@ const unmarked = (pages, deck = {{}}) => compileDeck({{ deck: {{ schema: 'profes
 """
 
 
-class IntroductionTests(unittest.TestCase):
-    def test_an_outline_and_a_photograph_introduce_their_entities_and_a_logo_does_not(self):
-        result = run_node(PLAYERS + DECK + '''
-const named = (page) => [...introducedOn(page, players)].sort();
-const said = unmarked(make(kinds));
-console.log(JSON.stringify({
-  none: said.map((f) => [f.measured.unmarked, f.measured.marks, f.repair]),
-  cells: unmarked(make([chart, roster(['France', 'Germany', 'Boeing 787'].map((player) => ({ type: 'logo', player }))), ...kinds.slice(2)])).length,
-  late: unmarked(make([...kinds.slice(0, 6), roster(['France', 'Germany', 'Boeing 787'].map((player) => ({ type: 'logo', player }))), ...kinds.slice(7)])).map((f) => f.measured.unmarked),
-  // The runtime's name for a logo, written where the roster's marks go, is planned as each player's own mark.
-  conventional: unmarked(make([chart, roster([{ media: { alt: 'France logo' } }, { media: { alt: 'Germany logo' } }, { media: { alt: 'Boeing 787 logo' } }]), ...kinds.slice(2)])).length,
-  // A logo is not a place's mark, nor a manufacturer's wordmark a thing's photograph.
-  logos: named({ exhibit: { type: 'table', columns: [{ label: '', type: 'logo' }], rows: [[{ type: 'logo', media: { alt: 'France logo', path: 'flags/france.png' } }], [{ type: 'logo', media: { alt: 'Boeing logo', path: 'boeing.png' } }]] } }),
-  outline: named({ exhibit: { type: 'cards', items: [{ title: 'Germany', logo: { alt: 'Germany outline', mark: 'outline', player: 'Germany', outline: { geography: 'europe', region: 'DEU' } } }] } }),
-  photograph: named({ pictures: [{ alt: 'A Boeing 787 in flight', label: '787' }] }),
-  otherPhoto: named({ pictures: [{ alt: 'A 787 cabin', label: '787' }] }),
-  titles: compileDeck({ deck: { schema: 'professional-slides.deck/v3', id: 'd' }, pages: make(kinds).map((p, i) => ({ ...p, title: (i % 2 ? 'France leads Germany on measure ' : 'Germany trails France on measure ') + i })) })
-    .findings.filter((f) => f.code === 'PLAYERS_UNMARKED').length,
-}));
-''')
-        [(unmarked, marks, repair)] = result["none"]
-        self.assertEqual(unmarked, ["France", "Germany", "Boeing 787"])
-        self.assertEqual(marks, {"France": "outline", "Germany": "outline", "Boeing 787": "image"})
-        self.assertIn("An outline is drawn from the runtime's own geography", repair)
-        self.assertIn('A photograph is the entity\'s own `image` ("A Boeing 787 in flight")', repair)
-        self.assertNotIn("Wikipedia infobox", repair)                 # no player here is marked by a logo
-        self.assertEqual(result["cells"], 0)                           # a cell naming each player draws, and counts, its mark
-        self.assertEqual(result["late"], [["France", "Germany", "Boeing 787"]])
-        self.assertEqual(result["conventional"], 0)
-        self.assertEqual(result["logos"], [])
-        self.assertEqual(result["outline"], ["Germany"])
-        self.assertEqual(result["photograph"], ["Boeing 787"])
-        self.assertEqual(result["otherPhoto"], [])
-        self.assertEqual(result["titles"], 0)                          # names in the titles are not taken for players
-
-    def test_the_craft_floor_counts_outlines_and_player_photographs_drawn(self):
-        result = run_node(PLAYERS + f'''
-import {{ craftFindings, sceneStatistics }} from '{RUNTIME}/gates/craft_gates.mjs';
-const slides = Array.from({{ length: 12 }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i }}));
-const scene = (...nodes) => ({{ slides: [{{ id: 'p0', nodes: [{{ type: 'text', role: 'action-title', text: 'The three players' }}, ...nodes] }}] }});
-const outline = {{ type: 'shape', role: 'profile-mark', data: {{ geometry: 'customPolygon', mark: 'outline', player: 'France', paths: [[[0, 0], [1, 0], [1, 1]]] }} }};
-const photograph = {{ type: 'image', role: 'image', data: {{ alt: 'A Boeing 787 in flight' }} }};
-const another = {{ type: 'image', role: 'image', data: {{ alt: 'An airport at dusk' }} }};
-const floor = (sc) => {{ const standings = []; const found = craftFindings({{ slides, players }}, sc, {{ standings }}).filter((f) => f.code === 'CRAFT_PLAYERS_UNINTRODUCED');
-  return {{ found: found.map((f) => [f.severity, f.measured.kinds, f.repair]), value: standings.find((s) => s.code === 'CRAFT_PLAYERS_UNINTRODUCED')?.value }}; }};
-console.log(JSON.stringify({{ none: floor(scene(another)), outline: floor(scene(outline)), photograph: floor(scene(photograph)),
-  marks: sceneStatistics(scene(outline, photograph, another), players).marks, undeclared: sceneStatistics(scene(photograph)).marks }}));
-''')
-        [(severity, kinds, repair)] = result["none"]["found"]
-        self.assertEqual(severity, "blocker")
-        self.assertEqual(kinds, ["outline", "image"])
-        self.assertIn("A place's outline is drawn from the runtime's own geography", repair)
-        self.assertIn("A photograph is the player's own `image: { alt, search }`", repair)
-        self.assertEqual(result["none"]["value"], 0)                  # another photograph is not a player's mark
-        for drawn in ("outline", "photograph"):
-            self.assertEqual(result[drawn]["found"], [], drawn)
-            self.assertEqual(result[drawn]["value"], 1, drawn)
-        self.assertEqual(result["marks"], 2)
-        self.assertEqual(result["undeclared"], 0)                     # a photograph marks a player only where one declares it
-
-
 class CompositionTests(unittest.TestCase):
     def test_a_cell_naming_a_place_draws_its_outline_and_one_naming_a_thing_its_photograph(self):
         result = run_node(PLAYERS + PNG + f'''

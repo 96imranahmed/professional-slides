@@ -233,7 +233,7 @@ console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.
 import {{ authorDeck, scaffoldPage }} from {json.dumps((ROOT / "skills/professional-slides/runtime/author-deck.mjs").as_uri())};
 const doc = {{ deck: {{ schema: 'professional-slides.deck/v3', id: 'probe' }}, pages: [scaffoldPage('trend', {{ id: 'p01' }})] }};
 const out = await authorDeck(doc, {{ baseDir: {json.dumps(str(tmp))} }});
-console.log(JSON.stringify([...out.findings, ...out.pageGateAdvisories].map((f) => f.id ?? null)));
+console.log(JSON.stringify([...out.blocking, ...out.advisories].map((f) => f.id ?? null)));
 """], cwd=ROOT, capture_output=True, text=True, timeout=300)
             self.assertEqual(authored.returncode, 0, authored.stderr)
             self.assertIn("planted", json.loads(authored.stdout.strip().splitlines()[-1]), "authoring does not read the scene checks")

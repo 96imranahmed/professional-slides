@@ -83,46 +83,6 @@ const PERIOD_SPAN = Object.freeze({ quarter: 3, half: 6, month: 1, day: 1 / 31, 
 /** Where a period begins, at the latest it can: its end less its length, a year twelve months. */
 const periodStart = (label) => { const end = periodEnd(label), p = parsePeriod(String(label ?? "").trim()); return end === null || !p ? null : end - (p.kind === "year" ? 12 : PERIOD_SPAN[p.kind] ?? 0); };
 
-/**
- * The recorded measures whose latest period ends after the date of the newest
- * source they cite (or, with `citeBy`, a period after the newest of its own) -
- * `[{ ref, period, key, name, date }]` - which no record can report: on the BA retest pr01 stated 39.7m international premium passengers
- * for 2025 from IATA's World Air Transport Statistics, and the source the
- * measure cited was the 2024 edition, published in August 2025. A source with
- * no `date` is not read; nor is a computed or assumed measure, or one marked
- * `projected` - a plan, a target, a forecast or an announced rate, published
- * ahead of the periods it is for.
- */
-export function sourceAgeProblems(registry, insights) {
-  if (!registry || typeof registry !== "object") return [];
-  const out = [];
-  for (const m of measureRegistry(insights).values()) {
-    if (m.derived || m.assumed || m.projected === true) continue;
-    const axis = axisOf(m), values = valuesOf(m);
-    // A series assumed from a period on (`assumedFrom`) states its later periods as announced or planned, not reported: those are
-    // held to no record's date, as a measure assumed whole is not.
-    const from = axis.kind === "periods" && m.assumedFrom !== undefined ? axis.labels.indexOf(String(m.assumedFrom)) : -1;
-    const labels = axis.kind === "periods" ? axis.labels.filter((_, i) => values[i] !== null && values[i] !== undefined && (from < 0 || i < from)) : [m.period];
-    const ends = labels.map((label) => ({ label, end: periodEnd(label) })).filter((p) => p.end !== null);
-    if (!ends.length) continue;
-    // A series cites a record for each stretch of it - IAG's 2016-2025 margins cite its results for each year - so one older
-    // than the latest period is no fault: the measure is held to the newest record it cites, which has to be able to report
-    // that period (ba5: every historical series was refused for its first year's results). Where the record says which source
-    // holds which period or member (`citeBy`), each is held to its own.
-    const newest = (keys) => keys.map((key) => ({ key, date: sourceDate(registry[key]) })).filter((item) => item.date).reduce((a, b) => (!a || b.date.through > a.date.through ? b : a), null);
-    const held = m.citeBy && typeof m.citeBy === "object" ? ends.filter((p) => Array.isArray(m.citeBy[p.label])).map((p) => ({ ...p, keys: m.citeBy[p.label] })) : [];
-    const checks = held.length ? held : [{ ...ends.reduce((a, b) => (b.end > a.end ? b : a)), keys: m.cite ?? [] }];
-    for (const { label, end, keys } of checks) {
-      const record = newest(keys);
-      // Published before the period began, the record cannot report it at all; published part-way through, it reports the
-      // period as at its date - the Skytrax 2026 ranking of September 2026, a month's outages counted on its tenth day.
-      if (record && end > record.date.through + 1e-9) out.push({ ref: m.ref, period: label, key: record.key, name: registry[record.key].short ?? registry[record.key].name, date: record.date.printed,
-        before: record.date.through + 1e-9 < (periodStart(label) ?? end) ? "start" : "end" });
-    }
-  }
-  return out;
-}
-
 // What a source can be declared not to name, and the length of the reason: a sentence, long enough to say something.
 const SOURCE_MISSING = Object.freeze(["publisher", "date", "document"]);
 const MISSING_REASON = Object.freeze({ min: 5, max: 40 });

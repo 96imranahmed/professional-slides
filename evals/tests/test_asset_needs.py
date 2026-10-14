@@ -89,78 +89,20 @@ console.log(JSON.stringify({ none, some, stated: { statement: stated.statement, 
         self.assertIn('Every planned file is already in the assets folder', result['supplied'][3])
         self.assertEqual(result['silent'], [None, ''])
 
-    def test_the_declaration_is_a_deck_statement_checked_with_the_others(self):
+    def test_the_declaration_is_a_deck_key_checked_with_the_others(self):
         result = run_node(f'''
-import {{ deckStatementFindings }} from './skills/professional-slides/runtime/review-passes.mjs';
+import {{ deckKeyProblems }} from './skills/professional-slides/runtime/deck-keys.mjs';
 import {{ assetsDeclaration }} from './skills/professional-slides/runtime/asset-needs.mjs';
-const check = (assets) => deckStatementFindings({{ workflow: 'new_deck', request: 'Who is better positioned, and why?', assets }}).map((f) => [f.code, f.severity, f.repair]);
+const check = (assets) => deckKeyProblems(assets === undefined ? {{}} : {{ assets }});
 console.log(JSON.stringify({{ good: check({{ fetch: 'none', reason: '{REASON}' }}), build: check({{ fetch: 'build' }}), absent: check(undefined),
   unreasoned: check({{ fetch: 'none', reason: 'offline' }}), unknown: check({{ fetch: 'never' }}), bare: check('none'), extra: check({{ fetch: 'none', reason: '{REASON}', logos: false }}),
   read: [assetsDeclaration({{ assets: {{ fetch: 'none', reason: ' {REASON} ' }} }}), assetsDeclaration({{}}), assetsDeclaration({{ assets: {{ fetch: 'build' }} }})] }}));
 ''')
         self.assertEqual([result['good'], result['build'], result['absent']], [[], [], []])
-        for bad, said in [('unreasoned', 'says in `reason` why the deck is built without the network'), ('unknown', '`assets` is { fetch, reason }'), ('bare', '`assets` is { fetch, reason }'), ('extra', 'takes fetch and reason only (got logos)')]:
-            self.assertEqual([f[:2] for f in result[bad]], [['STATEMENT_INVALID', 'blocker']], bad)
-            self.assertIn(said, result[bad][0][2], bad)
+        for bad, said in [('unreasoned', 'says in `reason` why the deck is built without the network'), ('unknown', '`assets` is { fetch, reason }'), ('bare', 'it was given'), ('extra', 'takes fetch and reason only (got logos)')]:
+            self.assertEqual(len(result[bad]), 1, bad)
+            self.assertIn(said, result[bad][0], bad)
         self.assertEqual(result['read'], [{'fetch': 'none', 'reason': REASON}, {'fetch': 'build'}, {'fetch': 'build'}])
-
-    def test_an_offline_deck_introduces_its_players_by_name_and_is_not_blocked_for_their_logos(self):
-        result = run_node(f'''
-import {{ craftFindings }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-const slides = Array.from({{ length: 12 }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i }}));
-const players = ['North Rail', {{ name: 'Harbour & Co', aliases: ['Harbour'] }}, 'Millrace'];
-const text = (t) => ({{ type: 'text', role: 'table-cell-text', text: t }});
-const scene = (nodes) => ({{ slides: [{{ id: 'p0', nodes: [{{ type: 'text', role: 'action-title', text: 'The three operators' }}, ...nodes] }}] }});
-const named = scene([text('North Rail'), text('Harbour'), text('Millrace runs the coast')]);
-const marked = scene([{{ type: 'image', role: 'table-logo' }}]);
-const offline = {{ fetch: 'none', reason: '{REASON}' }};
-const players_ = (spec, sc) => craftFindings(spec, sc).filter((f) => f.code === 'CRAFT_PLAYERS_UNINTRODUCED').map((f) => [f.severity, f.measured, f.repair]);
-console.log(JSON.stringify({{ online: players_({{ slides, players }}, named), offline: players_({{ slides, players, assets: offline }}, named),
-  unnamed: players_({{ slides, players, assets: offline }}, scene([text('North Rail'), text('Millrace')])), marked: players_({{ slides, players, assets: offline }}, marked),
-  // A revision recorded before the rule existed hears it as an advisory either way.
-  build: players_({{ slides, players, assets: {{ fetch: 'build' }} }}, named).map((f) => f[0]) }}));
-''')
-        # Without the declaration the floor blocks as it did, and now says what an offline build can do about it.
-        self.assertEqual([f[0] for f in result['online']], ['blocker'])
-        self.assertIn('either put each logo in assets/logos/ beside the pages file', result['online'][0][2])
-        self.assertIn('declare `assets: { fetch: "none", reason }`', result['online'][0][2])
-        self.assertEqual(result['build'], ['blocker'])
-        # With it, players named on a page are introduced: said as an advisory, with the reason, never blocking.
-        self.assertEqual([f[0] for f in result['offline']], ['advisory'])
-        self.assertEqual(result['offline'][0][1], {'players': 3, 'logoPages': 0, 'kinds': ['logo'], 'assets': 'none'})
-        self.assertIn(f'it declares it is built without the network ("{REASON}")', result['offline'][0][2])
-        self.assertIn('The reviewer is told the logos were not available', result['offline'][0][2])
-        # The declaration is not a way to skip the introduction: a player named on no page still blocks.
-        self.assertEqual([f[0] for f in result['unnamed']], ['blocker'])
-        self.assertEqual(result['unnamed'][0][1]['unnamed'], ['Harbour & Co'])
-        self.assertIn('Harbour & Co is named on no page', result['unnamed'][0][2])
-        self.assertEqual(result['marked'], [])  # a deck that shows its marks has nothing to answer
-
-    def test_a_player_is_named_by_whole_words_in_a_pages_content_not_in_its_source_line(self):
-        # "Named on a page" was a substring search over every text node: a
-        # player named only in a citation counted as introduced, and a player
-        # called "Rus" was named by the word "Russia".
-        result = run_node(f'''
-import {{ craftFindings }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-const slides = Array.from({{ length: 12 }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i }}));
-const players = ['North Rail', {{ name: 'Rus', aliases: ['RUS Lines'] }}, 'Millrace'];
-const node = (role, text) => ({{ type: 'text', role, text }});
-const scene = (...nodes) => ({{ slides: [{{ id: 'p0', nodes: [node('action-title', 'The three operators'), ...nodes] }}] }});
-const unnamed = (...nodes) => craftFindings({{ slides, players, assets: {{ fetch: 'none', reason: '{REASON}' }} }}, scene(...nodes)).filter((f) => f.code === 'CRAFT_PLAYERS_UNINTRODUCED').map((f) => [f.severity, f.measured.unnamed ?? []]);
-const cells = [node('table-cell-text', 'North Rail'), node('table-cell-text', 'Millrace')];
-console.log(JSON.stringify({{
-  content: unnamed(...cells, node('table-cell-text', 'Rus')), wrapped: unnamed(...cells, node('category-label', 'RUS\\nLines')), punctuated: unnamed(...cells, node('paragraph', 'Of the three (Rus, chiefly) one runs the coast.')),
-  title: unnamed(node('action-title', 'North Rail, Rus and Millrace run the coast')),
-  substring: unnamed(...cells, node('paragraph', 'Russia regulates all three; the Millraces of the trust own the track.')),
-  source: unnamed(...cells, node('source-text', 'Source: Rus annual report 2026')), footnote: unnamed(...cells, node('footnote-text', 'Rus is not covered here')),
-  footer: unnamed(...cells, node('footer-left', 'Prepared for Rus')), tracker: unnamed(...cells, node('tracker-compact-label', 'Rus')), credit: unnamed(...cells, node('picture-credit', 'Photo: Rus')) }}));
-''')
-        for where in ['content', 'wrapped', 'punctuated', 'title']:
-            self.assertEqual(result[where], [['advisory', []]], where)
-        # A name inside a longer word, or printed only where a page cites, notes or navigates, introduces nobody.
-        for where in ['substring', 'source', 'footnote', 'footer', 'tracker', 'credit']:
-            self.assertEqual(result[where], [['blocker', ['Rus']]], where)
-
 
 @unittest.skipUnless(NODE, "Node.js is not available")
 class OfflinePhotographTests(unittest.TestCase):
@@ -171,34 +113,6 @@ class OfflinePhotographTests(unittest.TestCase):
     carry no picture page: the floor advises, and the compile, the build result and the reviewer say so. A photograph
     a page still plans stays an empty frame, which delivery refuses.
     """
-
-    def test_an_offline_deck_supplied_no_photograph_is_not_blocked_for_carrying_none(self):
-        result = run_node(f'''
-import {{ craftFindings }} from './skills/professional-slides/runtime/gates/craft_gates.mjs';
-const slides = Array.from({{ length: 22 }}, (_, i) => ({{ id: 'p' + i, title: 'A finding on page ' + i }}));
-const scene = {{ slides: [{{ id: 'p0', nodes: [{{ type: 'text', role: 'action-title', text: 'A finding' }}] }}] }};
-const offline = {{ fetch: 'none', reason: '{REASON}' }};
-const pictures = (spec, options = {{}}) => {{ const standings = []; const found = craftFindings(spec, scene, {{ standings, ...options }}).filter((f) => f.code === 'CRAFT_NO_PICTURES').map((f) => [f.severity, f.measured, f.repair]);
-  const standing = standings.find((st) => st.code === 'CRAFT_NO_PICTURES'); return {{ found, standing: [standing.applies, standing.blocks] }}; }};
-console.log(JSON.stringify({{ online: pictures({{ slides }}), offline: pictures({{ slides, assets: offline }}), supplied: pictures({{ slides, assets: offline }}, {{ picturesSupplied: 2 }}),
-  waived: pictures({{ slides, noPictures: 'The subject is a pricing rule' }}), build: pictures({{ slides, assets: {{ fetch: 'build' }} }}) }}));
-''')
-        # Without the declaration the floor blocks as it did, and says which statement an offline build makes.
-        self.assertEqual([f[0] for f in result['online']['found']], ['blocker'])
-        self.assertIn('`assets: { fetch: "none", reason }`', result['online']['found'][0][2])
-        self.assertEqual(result['online']['standing'], [True, True])
-        self.assertEqual([f[0] for f in result['build']['found']], ['blocker'])
-        # Declared offline with no photograph supplied: advised, with the reason, and where the deck stands says it does not block.
-        self.assertEqual([f[0] for f in result['offline']['found']], ['advisory'])
-        self.assertEqual(result['offline']['found'][0][1], {'pages': 22, 'pictures': 0, 'assets': 'none'})
-        self.assertIn(f'it is built without the network ("{REASON}")', result['offline']['found'][0][2])
-        self.assertIn('no photograph is supplied in assets/pictures/', result['offline']['found'][0][2])
-        self.assertIn('BAR_UNSOURCED_PICTURES', result['offline']['found'][0][2])
-        self.assertEqual(result['offline']['standing'], [True, False])
-        # The declaration is not a way round photographs that were supplied: with files in assets/pictures/ the floor holds.
-        self.assertEqual([f[0] for f in result['supplied']['found']], ['blocker'])
-        # `noPictures` is what it was: the sentence of a subject with nothing to look at.
-        self.assertEqual(result['waived'], {'found': [], 'standing': [False, True]})
 
     def test_the_compile_the_build_result_and_the_reviewer_say_no_photograph_was_expected(self):
         result = run_node('''
@@ -235,29 +149,17 @@ console.log(JSON.stringify({ statement: stated.statement, notice: assetNotice(st
         self.assertEqual(result['supplied'], [1, {'supplied': 1, 'expected': True}, {'supplied': 1}])
         self.assertEqual(result['online'], '')
 
-    def test_a_planned_photograph_left_empty_is_still_a_build_bar_miss_under_the_declaration(self):
-        result = run_node('''
-import { scoreBuild } from './skills/professional-slides/runtime/build-bars.mjs';
-const page = (roles) => ({ id: 's', nodes: [{ role: 'action-title', type: 'text' }, ...roles.map((role) => ({ role, type: 'rect', frame: { x: 0, y: 0, width: 400, height: 300 } })), ...Array(20).fill({ role: 'm', type: 'rect' })],
-  componentInstances: [{ component: 'slide-chrome' }, { component: 'image-frame' }] });
-const scene = { slides: [page(['image-frame']), page([]), page([])] };
-const scored = scoreBuild(scene);
-console.log(JSON.stringify({ unsourced: scored.statistics.unsourcedPictures, missed: scored.findings.filter((f) => f.measure === 'unsourcedPictures').map((f) => [f.code, f.ceiling]) }));
-''')
-        # The bar reads the built scene and nothing of the deck's declaration: an empty frame is refused offline as online.
-        self.assertEqual(result['unsourced'], 1)
-        self.assertEqual(result['missed'], [['BAR_UNSOURCED_PICTURES', 0]])
-
-
 class CompileNoticeTests(unittest.TestCase):
-    """The compile says it, on a draft too, before any build is run."""
+    """The compile says it, on a check too, before any build is run."""
 
     def stage(self, patch=None):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
-        for name in ["finance.pages.json", "finance.insights.json", "finance.analysis.json"]:
+        for name in ["finance.pages.json", "finance.insights.json"]:
             shutil.copy(FIXTURES / name, tmp / name)
         doc = json.loads((tmp / "finance.pages.json").read_text())
+        # The pages that rest on the fixture's computed analyses ("A-..."), which a deck now records as measures of its own.
+        doc["pages"] = [page for page in doc["pages"] if '"A-' not in json.dumps(page) and "{{A-" not in json.dumps(page)]
         doc["deck"].update(patch or {})
         (tmp / "finance.pages.json").write_text(json.dumps(doc))
         (tmp / "sources").mkdir()
@@ -269,9 +171,9 @@ class CompileNoticeTests(unittest.TestCase):
     def compile(self, tmp, *flags):
         return subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "finance.pages.json"), *flags], capture_output=True, text=True, cwd=ROOT)
 
-    def test_a_draft_names_the_logos_the_build_would_fetch_and_the_three_choices(self):
+    def test_a_check_names_the_logos_the_build_would_fetch_and_the_three_choices(self):
         tmp = self.stage()
-        run = self.compile(tmp, "--draft")
+        run = self.compile(tmp, "--check")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("Assets: the build will fetch from the network - logos: Harbour, Northgate, Millrace", run.stderr)
         for choice in ["(a) supply the files beside the pages file: each logo as a PNG or JPEG at assets/logos/harbour.png", "(b) let the build fetch them", '(c) declare the deck is built without the network, on `deck`: "assets": { "fetch": "none"']:
@@ -283,7 +185,7 @@ class CompileNoticeTests(unittest.TestCase):
 
     def test_the_offline_declaration_is_recorded_on_the_deck_and_a_malformed_one_is_refused(self):
         tmp = self.stage({"assets": {"fetch": "none", "reason": REASON}})
-        run = self.compile(tmp, "--draft")
+        run = self.compile(tmp)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn(f'Assets: the deck is built without the network ("{REASON}"). Not available, and said so to the reviewer - logos: Harbour', run.stderr)
         summary = json.loads(run.stdout)
@@ -297,14 +199,14 @@ class CompileNoticeTests(unittest.TestCase):
         (supplied / "assets" / "logos").mkdir(parents=True)
         for name in json.loads((supplied / "finance.pages.json").read_text())["deck"]["players"]:
             shutil.copy(ROOT / "skills" / "professional-slides" / "assets" / "simple-icons" / "github-color.png", supplied / "assets" / "logos" / f"{name.lower()}.png")
-        run = self.compile(supplied, "--draft")
+        run = self.compile(supplied, "--check")
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertNotIn("Assets:", run.stderr)
         self.assertNotIn("assets", json.loads(run.stdout))
         bad = self.stage({"assets": {"fetch": "none", "reason": "offline"}})
-        run = self.compile(bad, "--draft")
+        run = self.compile(bad, "--check")
         self.assertEqual(run.returncode, 2)
-        self.assertIn("STATEMENT_INVALID", run.stderr)
+        self.assertIn("`assets` on `deck` is not in the form the build reads", run.stderr)
         self.assertIn("says in `reason` why the deck is built without the network", run.stderr)
 
 

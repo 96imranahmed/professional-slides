@@ -13,6 +13,7 @@
 // of the wrong kind with what the key takes. What each value means in detail
 // stays with the stage that reads it, which still checks it.
 import { MARK_KINDS, playerProblems } from "./players.mjs";
+import { assetsDeclarationErrors } from "./asset-needs.mjs";
 import { CONVENTION_KEYS, conventionProblems } from "./conventions.mjs";
 
 // The kinds a value is read as: what `accepts` names, checked shallowly.
@@ -67,7 +68,8 @@ const DECK_KEYS = Object.freeze({
   conventions: key(`{ ${Object.keys(CONVENTION_KEYS).join(", ")} }`, ["object"],
     `the deck's cross-page conventions, every key optional: ${Object.entries(CONVENTION_KEYS).map(([name, about]) => `\`${name}\` ${about}`).join("; ")}`,
     (value, deck, context) => { const problems = conventionProblems(value, deck?.players, context); return problems.length ? `is not valid: ${problems.join("; ")}` : null; }),
-  assets: key("{ fetch: \"build\" | \"none\", reason }", ["object"], "whether the build may fetch logos, photographs and places; \"none\" declares the deck is built without the network, with the reason the reviews are shown"),
+  assets: key("{ fetch: \"build\" | \"none\", reason }", ["object"], "whether the build may fetch logos, photographs and places; \"none\" declares the deck is built without the network, with the reason",
+    (value, deck) => { const errors = assetsDeclarationErrors(deck); return errors.length ? `is not in the form the build reads: ${errors.join("; ")}` : null; }),
   noPictures: key("string", ["string"], "why a deck about a subject with nothing to look at carries no photograph, in a sentence"),
   waivers: key("array of { code, reason }", ["array"], "build bars the deck asks to be excused from, each with a reason the review confirms"),
   // the design

@@ -59,7 +59,9 @@ const REASON_WORDS = 6;
 /** The deck's declaration, read: `{ fetch: "none", reason }` when it is built without the network, else `{ fetch: "build" }`. */
 export const assetsDeclaration = (deck) => (deck?.assets?.fetch === "none" ? { fetch: "none", reason: String(deck.assets.reason ?? "").trim() } : { fetch: "build" });
 
-/** Why a deck's `assets` is not in the form the build and the reviews read, as sentences; none when it is absent or well formed. */
+const exists = (file) => fs.access(file).then(() => true, () => false);
+
+/** Why a deck's `assets` is not in the form the build reads, as sentences; none when it is absent or well formed. */
 export function assetsDeclarationErrors(deck) {
   const assets = deck?.assets;
   if (assets === undefined) return [];
@@ -67,10 +69,8 @@ export function assetsDeclarationErrors(deck) {
   if (!assets || typeof assets !== "object" || Array.isArray(assets) || !Object.hasOwn(FETCH, assets.fetch)) return [form];
   const extra = Object.keys(assets).filter((key) => !["fetch", "reason"].includes(key));
   return [...(extra.length ? [`\`assets\` takes fetch and reason only (got ${extra.join(", ")})`] : []),
-    ...(assets.fetch === "none" && textWords(assets.reason) < REASON_WORDS ? [`\`assets.fetch: "none"\` says in \`reason\` why the deck is built without the network, in a sentence: the reviewer is shown it`] : [])];
+    ...(assets.fetch === "none" && textWords(assets.reason) < REASON_WORDS ? [`\`assets.fetch: "none"\` says in \`reason\` why the deck is built without the network, in a sentence`] : [])];
 }
-
-const exists = (file) => fs.access(file).then(() => true, () => false);
 
 /** How many photographs are supplied beside the deck: the image files in its assets/pictures/ folder. */
 export async function suppliedPictures(baseDir) {
@@ -139,7 +139,7 @@ function choices(needs) {
  * and the advisory `findings` that carry it (ASSETS_NEEDED while the build is
  * to fetch, ASSETS_OFFLINE under an offline declaration). Both are empty when
  * the deck needs nothing and declares nothing. A malformed declaration is
- * refused with the deck's other statements (review-passes.mjs deckStatementFindings).
+ * refused with the deck's other keys (deck-keys.mjs).
  */
 // What is not on disk, by kind, as the statement, the build record and the reviewers name it.
 const namesOf = (needs) => ({ logos: needs.logos.map((logo) => logo.name), flags: needs.flags.map((flag) => flag.country), pictures: needs.pictures.map((picture) => picture.alt),

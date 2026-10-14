@@ -18,7 +18,7 @@ import { FOOTER_LINES_MAX, SOURCE_TITLE_WORDS } from "./page-template.mjs";
 import { PLAN, PICTURE_SHARE_MAX } from "./weight.mjs";
 import { SECTION_TITLE_LINES, sectionTitleCapacity } from "./registry-chrome.mjs";
 
-/** The limits every analytical page shares, whatever its type; a judge's replacement for a line is held to its slot's (judge.mjs). */
+/** The limits every analytical page shares, whatever its type. */
 export function copyLimits() {
   return {
     title: { words: { min: CONTENT_THRESHOLDS.claimWordsMin, max: TEXT_LIMITS.titleWords, target: TEXT_LIMITS.titleTarget }, lines: { max: TEXT_LIMITS.titleLines }, codes: ["TITLE_WORDS", "TITLE_LINES", "CONTENT_NO_CLAIM"] },

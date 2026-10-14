@@ -593,19 +593,6 @@ const FORM_DATA = {
   "schedule/timeline": ["items (4 or more, each { date, label, text }: when, what happens, and a sentence on it, set at reading size and counted as the page's words)", "orientation (across or down; absent, the frame decides - rows where the page has the height, columns over commentary below)"],
   "schedule/roadmap": ["items (4 or more, each { label, period, text }: the stage, when it runs, and what it delivers)", "orientation (across or down; absent, the frame decides)"],
 };
-/**
- * The forms a plan can give a page of `type` before the page is written
- * (deck-structure.mjs allocateStructure): the type's first form, and every
- * other form that is not built for particular data. An indexed trend, a
- * distribution, small multiples, a radar (FORM_DATA), and a page construction
- * among a type's chart or component forms - aligned bars, labelled rows, a
- * table in halves - are chosen by an author who holds that data.
- */
-export function plannableForms(type) {
-  const forms = Object.entries(PAGE_TYPES[type]?.forms ?? {});
-  const built = ([, target]) => Boolean(CONSTRUCTION_DATA[target]);
-  return forms.filter((entry, at) => at === 0 || !(FORM_DATA[`${type}/${entry[0]}`] || (built(entry) && !built(forms[0])))).map(([form]) => form);
-}
 const sampleKeys = (exhibitType) => { const sample = REGISTRY.get(exhibitType)?.sample; return sample ? Object.keys(sample).filter((key) => !STYLING.has(key)) : []; };
 export function dataKeys(exhibitType, { type, form, variant } = {}) {
   // A variant with its own sample reads that sample's data, not the default's:
@@ -1181,7 +1168,7 @@ function chartFormDefect(page, id, exhibits, players, skip = new Set(), tileMeas
   }
   // A metric is a figure: "Below plan", "Asia", "Strikes" or "Seven" set where
   // a number belongs is a label in a number's place, which a hundred-page
-  // deck's self-check found rested on nothing the record held. A date is a
+  // deck's review found rested on nothing the record held. A date is a
   // figure (a milestone's "2030"); a count is written in digits.
   const worded = [...(page.metrics || []), ...(page.kpi && typeof page.kpi === "object" ? [page.kpi] : [])]
     .find((tile) => tile && typeof tile === "object" && tile.measure === undefined && typeof tile.value === "string" && tile.value.trim() && !/\d/.test(tile.value));
@@ -1342,19 +1329,6 @@ export function typesForShape(shape) {
 const typesLine = (shapes) => {
   const lines = [...new Set(shapes)].map((shape) => { const { asking } = typesForShape(shape); return `${shape} carries ${asking.length ? asking.join(", ") : "none of the data types"}`; });
   return `${lines.join("; ")}; any shape carries ${typesForShape(null).open.join(", ")}`;
-};
-
-// A title leads with the finding. One that states a gap or a method note -
-// what the evidence lacks, cannot settle or leaves undisclosed - puts the
-// limitation where the answer belongs; the limitation goes in the `subtitle`
-// or a footnote, and the title says which way the evidence leans. Whether a
-// title leads with its gap is read (title-leads-with-gap): the words it
-// rests on, where it does; null where it does not or is not yet read.
-export const titleGap = (title, where = null) => {
-  const text = String(title ?? "").trim();
-  if (!text) return null;
-  const read = judged("title-leads-with-gap", text, null, where);
-  return read?.verdict === "gap" ? read.quote ?? text : null;
 };
 
 // A title that is only a measurement - "The fleet is 116 aircraft": a count
@@ -1596,106 +1570,8 @@ const formDraws = (type, form) => {
 const declaredExhibits = (type, form) => (trellisPage(type, form) ? 1 : type === "panels" || (type === "options" && form !== "compare") ? 2
   : type === "picture" ? (["photo-backdrop", "device"].includes(form) ? 1 : 0) : ["argument", "summary", "matrix"].includes(type) || form === "labelled-rows" || form === "statement" ? 0 : 1);
 
-/** An exhibit a spine declares and has not drawn: nothing but its `basis`, its `type`, or neither. */
-export const undrawnExhibit = (ex) => Boolean(ex) && typeof ex === "object" && Object.keys(ex).every((key) => key === "type" || key === "basis");
-
 // An exhibit that names the measures the runtime is to write its numbers from, and carries none yet.
 const unfilledExhibit = (ex) => plottedValues(ex) === 0 && /"measure"\s*:/.test(JSON.stringify(ex));
-
-/**
- * A page as its declared choices alone describe it: the slide its `type`,
- * `form` and `commentary` would compile to, with the record the variety
- * contract counts (`pageType`), and nothing checked. It stands in for a page
- * that does not compile, and for a page of a plan whose exhibit is not
- * written yet, so the rules that read a deck's structure are evaluated on
- * every page on every run (deck-structure.mjs); `pageType.declared` marks it
- * as provisional. The page's own exhibits are kept where it has them;
- * otherwise it carries as many as its form draws, typed by the form or, where
- * the author names the exhibit, by `exhibitType` (the kind its evidence takes,
- * or a list of kinds, one for each exhibit in turn);
- * an unwritten profiles page carries the deck's `players`. An exhibit the
- * page declares with a `basis` stub and has not drawn is read as the stub
- * declares it (`stubs`, deck-structure.mjs stubsOf): its kind where the form
- * leaves it open, and the values its measures hold - or no count at all where
- * it names none, since an undrawn exhibit plots nothing yet rather than zero.
- * Null for a page with no known type; a form or placement the type does not
- * offer is left out of the record.
- */
-export function declaredSlide(pageIn, index = 0, { exhibitType = "table", players = null, stubs = null } = {}) {
-  const page = pageIn && typeof pageIn === "object" ? pageIn : {};
-  const type = PAGE_TYPES[page.type];
-  if (!type) return null;
-  const form = Object.hasOwn(type.forms, page.form ?? "") ? page.form : null;
-  const commentary = form && commentaryOf(page.type, form).includes(page.commentary) ? page.commentary : type.commentary.includes(page.commentary) ? page.commentary : null;
-  const target = form ? type.forms[form] : null;
-  const draws = formDraws(page.type, form);
-  const own = exhibitsOf(page).map((ex) => ({ ...ex }));
-  // An exhibit the spine declares and has not drawn (a `basis` stub) is read as what it declares, never as one drawn with nothing in it.
-  const written = own.filter((ex) => !undrawnExhibit(ex));
-  const exhibits = own.length ? own : Array.from({ length: form ? declaredExhibits(page.type, form) : 0 }, () => ({}));
-  const estimate = (at) => (Array.isArray(exhibitType) ? exhibitType[at % exhibitType.length] ?? "table" : exhibitType);
-  exhibits.forEach((ex, at) => { if (!ex.type) ex.type = at === 0 && draws ? draws : draws && page.type !== "numbers" ? draws : stubs?.kinds?.[at] ?? estimate(at); });
-  if (target === "aligned-bars" && exhibits[0]) exhibits[0].aligned = true;
-  // A profiles page not yet written will introduce the deck's players by their marks, each in the kind it declares.
-  if (page.type === "profiles" && !written.length && exhibits[0] && form !== "radar" && Array.isArray(players))
-    exhibits[0].items = playerEntries(players).map((entry) => ({ name: entry.name, logo: plannedMark(entry) }));
-  const slide = { id: page.id ?? `page-${index + 1}`, title: page.title ?? "" };
-  const text = ["beside", "beside-left", "below"].includes(commentary);
-  if (Array.isArray(page.points) ? page.points.length : text || form === "executive-summary") slide.points = Array.isArray(page.points) ? page.points : [""];
-  for (const key of ["blocks", "rows", "metrics", "kpi", "photo", "pictures", "paragraphs"]) if (page[key] !== undefined) slide[key] = page[key];
-  if (exhibits.length === 1 && (page.type !== "panels" || trellisPage(page.type, form))) slide.exhibit = exhibits[0]; else if (exhibits.length) slide.exhibits = exhibits;
-  // The layout each choice sets, as layOutPage sets it on a page that compiles.
-  const layoutFor = { beside: "exhibit-left", "beside-left": "exhibit-right", below: "exhibit-top", rail: "sidebar" };
-  if (trellisPage(page.type, form)) slide.layout = layoutFor[commentary] ?? "exhibit-full";
-  else if (page.type === "panels") slide.arrange = form ?? "row";
-  else if (page.type === "numbers") {
-    slide.layout = form === "hero-number" ? "hero-number" : form === "metric-strip" ? "metrics-over-exhibit" : layoutFor[commentary] ?? "exhibit-full";
-    if (form === "metric-strip" && !slide.metrics) slide.metrics = [{}];
-  } else if (page.type === "picture" || form === "labelled-rows" || page.type === "argument" || (page.type === "options" && form !== "compare")) { if (target) slide.layout = target; }
-  else if (page.type === "statement") { if (form === "statement") slide.kind = "statement"; }
-  else if (page.type === "summary") { if (form === "takeaways") slide.kind = "takeaways"; else slide.role = "executive-summary"; }
-  else if (target === "model-page") { slide.shape = "model-page"; slide.layout = "stack"; }
-  else if (page.type === "options") { /* a comparison table sets no layout */ }
-  else if (!type.rows && form !== "measure-table") slide.layout = layoutFor[commentary] ?? "exhibit-full";
-  else if (layoutFor[commentary]) slide.layout = layoutFor[commentary];
-  if (type.rows) slide.shape = "findings-matrix";
-  if (form === "measure-table") slide.shape = "measure-table";
-  if (form === "photo-backdrop" && !slide.photo) slide.photo = {};
-  // An argument's prose sets beside its panel in either form.
-  if (page.type === "argument") slide.panel = page.panel ?? { text: "" };
-  if (commentary === "rail") slide.panel = { text: String(page.rail ?? page.title ?? "") };
-  if (commentary === "so-what-bar") slide.soWhat = { text: String(page.bar ?? ""), style: "bar" };
-  if (typeof page.takeaway === "string" && page.takeaway.trim()) slide.soWhat = page.takeaway.trim();
-  const drawn = exhibitsOf(slide);
-  slide.pageType = { type: page.type, ...(form ? { form } : {}), ...(commentary ? { commentary } : {}), takeaway: typeof page.takeaway === "string" && Boolean(page.takeaway.trim()),
-    ...(page.series ? { series: String(page.series) } : {}), why: String(page.why ?? "").trim(), family: familyOf(page.type, form),
-    // What the page plots: its drawn exhibits' values and, for its stubs, the values their measures hold - unread where a stub names none.
-    // An exhibit that names its measures and has not been filled from them is as undrawn as a stub: its depth is not read as zero.
-    ...(own.length && !written.some(unfilledExhibit) && (written.length === own.length || Number.isFinite(stubs?.values)) ? { values: plottedValues(written) + (written.length === own.length ? 0 : stubs.values) } : {}),
-    ...(chartPage(page.type, drawn) ? { chart: true } : {}), declared: true,
-    // A revision's page stands in with the slide it was imported from, as its compiled record carries it.
-    ...(page.sourceSlide !== undefined ? { sourceSlide: page.sourceSlide } : {}), ...(Array.isArray(page.only) && page.only.length ? { only: page.only.map(String) } : {}),
-    content: { claim: String(page.title ?? page.text ?? "").trim(), ...(page.settles && typeof page.settles === "object" ? { settles: page.settles } : {}), adds: page.adds ?? null,
-      ...(Array.isArray(page.evidence) && page.evidence.length ? { evidence: page.evidence } : {}) } };
-  slide.pageType.structure = structureOf(slide);
-  slide.pageType.skeleton = skeletonOf(slide);
-  slide.pageType.drawn = drawnOf(slide);
-  return slide;
-}
-
-/**
- * `page` with another `form` and `commentary` chosen and its content left as
- * written, for the fit search to compile (fit-search.mjs). An exhibit `type`
- * the page wrote only to repeat what its form draws is dropped, so the new
- * form sets it; any other type stays, and the compiler says so if the form
- * cannot draw it.
- */
-export function withChoice(page, form, commentary) {
-  const out = structuredClone(page);
-  const first = out.exhibit ?? out.exhibits?.[0];
-  if (form !== page.form && first && typeof first === "object" && first.type !== undefined && first.type === formDraws(page.type, page.form)) delete first.type;
-  return Object.assign(out, { form, commentary });
-}
 
 /**
  * Compile one typed page into a deck-spec slide. Throws with the choice to
@@ -1727,10 +1603,8 @@ export function compilePage(pageIn, index = 0, { insights = null, players = null
   // under an older version hears the refusals introduced since as advisories.
   const waived = waivedRules(rules ?? {}), waivedAdvisories = [];
   const { type, settles, evidence, titleAdvisories } = spineOf(page, id, { insights, sources, rules, waived, waivedAdvisories, sourcePrimary });
-  // There is one compile. A page whose references do not bind yet has nothing past its spine to check - its type and
-  // choices, its title, what settles it, the insights it rests on (`spineOnly`); every other page, a draft's among them, is
-  // compiled whole. A draft reaches here with the page completed by placeholder copy (spine-witness.mjs), so nothing below
-  // is waived for it: a declaration the compile refuses, it refuses in a draft.
+  // A page whose references do not bind yet has nothing past its spine to check - its type and choices, its title, what
+  // settles it, the insights it rests on (`spineOnly`); every other page is compiled whole.
   if (spineOnly) return null;
   if (page.adds !== undefined && page.adds !== null && typeof page.adds !== "string") throw new Error(`${id}: \`adds\` is what the commentary says that the exhibit cannot - a sentence, or null`);
   // Each refusal says which step made it (`stage` on the error): the page's shape - the exhibits its form carries and their
@@ -2382,30 +2256,6 @@ export function markPlayerCells(slide, players) {
     const count = Math.max(...slide.rows.map((row) => (Array.isArray(row?.cells) ? row.cells.length : 0)));
     slide.columns = markHeaders(slide.columns, slide.columns.length > count ? 1 : 0);
   }
-}
-
-/**
- * The normalized plan-gate architecture a compiled page type stands for. The
- * plan record reads the declared placement, so a rail is declared here as
- * commentary beside its evidence (PLAN_STYLE_ENTROPY counts it so);
- * PAGE_SHAPE_FLAT, read on the composed page, counts a rail as the close of an
- * evidence-only page.
- */
-export function architectureOf(slide) {
-  const t = slide.pageType;
-  if (!t) return null;
-  if (t.type === "panels") return t.form === "stack" ? "evidence-stack" : "paired-evidence";
-  if (t.type === "numbers") return t.form === "hero-number" ? "hero-number-with-evidence" : t.form === "metric-strip" ? "metrics-over-evidence" : "metrics-with-text";
-  if (t.type === "picture") return "picture-led";
-  if (t.type === "parallel" || t.type === "profiles") return "card-grid";
-  if (t.type === "argument" || t.type === "statement" || t.type === "summary") return "text";
-  if (t.type === "schedule") return t.form === "gantt" ? "gantt" : t.form === "roadmap" ? "roadmap" : "timeline";
-  if (t.type === "mechanism") return ({ tree: "tree", cycle: "cycle", steps: "steps", process: "process", "chevron-process": "chevron-process", flow: "flow",
-    quadrants: "quadrants", matrix: "matrix", "relationship-network": "relationship-network" })[t.form] ?? "flow";
-  if (t.type === "matrix" || t.type === "scorecard") return "matrix";
-  if (t.type === "options") return "paired-evidence";
-  if (t.type === "bridge") return "reconciliation";
-  return ["on-exhibit", "none", "in-exhibit"].includes(t.commentary) ? "evidence-only" : "evidence-with-commentary";
 }
 
 /** How many words of ordinary prose a chart callout holds, by the renderer's own measure (chart-annotations.mjs). */

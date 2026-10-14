@@ -1,5 +1,5 @@
 {
- "$comment": "The verdict of each judgement kind under which its rule refuses nothing: what a test's or a scripted run's reader answers when the answer is not the point (evals/tests/judgement_oracle.py, evals/support/answer-judgements.mjs).",
+ "$comment": "The verdict of each judgement kind under which its rule refuses nothing: what a test's reader answers when the answer is not the point (evals/tests/judgement_oracle.py).",
  "verdicts": {
   "answer-contradicted": "consistent",
   "answer-lead": "no-verdict",
