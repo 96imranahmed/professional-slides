@@ -185,6 +185,22 @@ console.log(JSON.stringify({ same, wrote, after }));
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")
+class PreflightTests(unittest.TestCase):
+    def test_the_records_and_the_decks_keys_are_read_before_any_page(self):
+        # A deck key the runtime does not read would first refuse the plan, with every section's skeleton waiting on the lead.
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned(tmp, A_HOLDS, B_HOLDS)
+            doc = json.loads(pages.read_text())
+            doc["deck"]["sectionCount"] = 2
+            pages.write_text(json.dumps(doc))
+            run = author(pages, "--allocate")
+        self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+        self.assertIn("## The records and the deck's keys, before any page", run.stdout)
+        self.assertIn("DECK_KEY", run.stdout)
+        self.assertIn("sectionCount", run.stdout)
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
 class PeerSetProposalTests(unittest.TestCase):
     def test_a_measure_over_declared_players_no_set_holds_is_proposed_as_a_set(self):
         with tempfile.TemporaryDirectory() as tmp:

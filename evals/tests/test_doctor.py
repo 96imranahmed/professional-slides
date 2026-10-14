@@ -234,3 +234,33 @@ console.log(JSON.stringify(report));
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class CapacityTests(unittest.TestCase):
+    """How many section agents the machine runs side by side: each agent's checks take about a core and three quarters of a
+    gigabyte while they run, and a machine already swapping stalls every check at once, so it is advised half as many."""
+
+    def capacity(self, **machine):
+        return run_node(f"""
+import {{ capacity }} from './skills/professional-slides/runtime/doctor.mjs';
+console.log(JSON.stringify(capacity({json.dumps(machine)})));
+""")
+
+    def test_the_cores_limit_a_machine_with_memory_to_spare(self):
+        out = self.capacity(cpus=10, totalGb=32, availableGb=24)
+        self.assertEqual(out["agents"], 9)
+        self.assertIn("cores: 10, one kept back", out["why"][0])
+
+    def test_the_memory_limits_a_machine_whose_memory_another_process_holds(self):
+        out = self.capacity(cpus=10, totalGb=32, availableGb=5)
+        self.assertEqual(out["agents"], 4)
+        self.assertIn("memory: 5.0 GB of 32 GB free for new work", out["why"][0])
+
+    def test_a_swapping_machine_is_advised_half_as_many_and_told_why(self):
+        out = self.capacity(cpus=10, totalGb=32, availableGb=24, swap={"totalGb": 10, "usedGb": 8})
+        self.assertEqual(out["agents"], 4)
+        self.assertIn("the machine is swapping (8.0 of 10.0 GB of swap in use)", out["why"][1])
+
+    def test_one_agent_at_least(self):
+        self.assertEqual(self.capacity(cpus=1, totalGb=4, availableGb=1)["agents"], 1)

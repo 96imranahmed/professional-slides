@@ -16,8 +16,15 @@
 // or either when it is run from a plain terminal. Exit 0 when ready, 2 when
 // not, 1 on a crash. `--no-render` checks for authoring and unrendered builds
 // (`build-deck.mjs --no-render`): the three binaries are reported, not required.
-// `--json` prints one object: { ready, render, node, python, binaries, reviewer, optional, install }.
+// `--json` prints one object: { ready, render, node, python, binaries, reviewer, optional, capacity, install }.
+//
+// It also says how many agents the machine runs side by side (`capacity`). A long deck is written by section, an agent a
+// section, and each agent's checks compile and compose pages on this machine: a check needs about a core and a few hundred
+// megabytes. Sixteen at once on a machine whose memory another process holds swap together, and every check stalls until
+// the memory comes back - a check of three seconds then takes minutes, and a tool's timeout sends it to the background. The
+// line is advice for the lead's fan-out, never a reason to refuse.
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
@@ -184,6 +191,44 @@ export function installLines({ node, python, binaries, platform, reviewer = null
   return lines;
 }
 
+// What one agent's checks take while they run: a core, and the compile's and the page gates' memory with room beside it.
+const AGENT_MEMORY_GB = 0.75;
+// Memory left to the system and the agents' host, whatever the checks take.
+const RESERVED_GB = 2;
+
+/**
+ * How many section agents the machine runs side by side: `{ cpus, totalGb, availableGb, swap, agents, why }`. `availableGb`
+ * is the memory free for new work (free and reclaimable pages where the platform says, else the free memory), `swap` the
+ * swap in use and its total where the platform says; `agents` is the most whose checks fit the cores and that memory, one at
+ * least, and `why` names what limits it - and says when the machine is already swapping, which stalls every check at once.
+ */
+export function capacity({ cpus, totalGb, availableGb, swap = null }) {
+  const byCores = Math.max(1, cpus - 1), byMemory = Math.max(1, Math.floor((availableGb - RESERVED_GB) / AGENT_MEMORY_GB));
+  const swapping = Boolean(swap && swap.totalGb > 0 && swap.usedGb / swap.totalGb > 0.5);
+  // Swapping already, the memory the platform calls free is what the other process will take back: half as many, then.
+  const agents = Math.max(1, Math.floor(Math.min(byCores, byMemory) / (swapping ? 2 : 1)));
+  const why = [byMemory < byCores ? `memory: ${availableGb.toFixed(1)} GB of ${totalGb.toFixed(0)} GB free for new work, about ${AGENT_MEMORY_GB} GB an agent's checks with ${RESERVED_GB} GB kept back` : `cores: ${cpus}, one kept back`,
+    ...(swapping ? [`the machine is swapping (${swap.usedGb.toFixed(1)} of ${swap.totalGb.toFixed(1)} GB of swap in use): another process holds the memory, and checks run side by side stall together until it is freed - free it, or run fewer agents at once`] : [])];
+  return { cpus, totalGb, availableGb, swap, agents, why };
+}
+
+/** The machine's cores and memory, read from the platform: free and reclaimable pages and the swap on macOS, free memory elsewhere. */
+async function machineCapacity(platform = process.platform) {
+  const totalGb = os.totalmem() / 2 ** 30;
+  let availableGb = os.freemem() / 2 ** 30, swap = null;
+  if (platform === "darwin") {
+    const vm = await run("vm_stat", [], process.env).catch(() => null);
+    const page = Number(/page size of (\d+) bytes/.exec(vm?.stdout ?? "")?.[1]);
+    const pages = (name) => Number(new RegExp(`Pages ${name}:\\s+(\\d+)`).exec(vm?.stdout ?? "")?.[1] ?? NaN);
+    const free = ["free", "inactive", "speculative", "purgeable"].map(pages).filter(Number.isFinite).reduce((sum, n) => sum + n, 0);
+    if (page && free) availableGb = (free * page) / 2 ** 30;
+    const usage = await run("sysctl", ["-n", "vm.swapusage"], process.env).catch(() => null);
+    const mb = (name) => Number(new RegExp(`${name} = ([\\d.]+)M`).exec(usage?.stdout ?? "")?.[1] ?? NaN);
+    if (Number.isFinite(mb("total"))) swap = { totalGb: mb("total") / 1024, usedGb: mb("used") / 1024 };
+  }
+  return capacity({ cpus: os.cpus().length, totalGb, availableGb, swap });
+}
+
 /** Everything a build needs, checked; `candidates` and `env` replace the interpreters tried and the environment searched. */
 export async function diagnose({ env = process.env, platform = process.platform, candidates, render = true, nodeVersion = process.versions.node, host = hostCli(env) } = {}) {
   const [major, minor] = nodeVersion.split(".").map(Number);
@@ -192,7 +237,8 @@ export async function diagnose({ env = process.env, platform = process.platform,
     reviewerCheck(env, platform, host)]);
   const binaries = binaryCheck(env, platform);
   const rendered = Object.values(binaries).every((b) => b.found);
-  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render) && reviewer.ok, render, platform, node, python, binaries, reviewer, optional,
+  const machine = await machineCapacity(platform).catch(() => null);
+  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render) && reviewer.ok, render, platform, node, python, binaries, reviewer, optional, capacity: machine,
     install: installLines({ node, python, binaries, platform, reviewer }) };
 }
 
@@ -216,6 +262,7 @@ export function describe(report) {
   const state = reviewer.wanted.length > 1 ? "neither is installed and signed in" : reviewer.clis[reviewer.wanted[0]].path ? "it is not signed in" : "it is not installed";
   if (!reviewer.ok) lines.push(`Reviewer: ${from}, and ${state}. This skill needs one: set it up with the lines below.`);
   for (const [name, o] of Object.entries(report.optional)) lines.push(`${name}: ${o.found ? "installed" : "not installed"} (${o.note})`);
+  if (report.capacity) lines.push(`Side by side: at most ${report.capacity.agents} section agent${report.capacity.agents === 1 ? "" : "s"} at once on this machine - ${report.capacity.why.join("; ")}`);
   if (report.python.export) lines.push("", `RUNTIME_PYTHON must name the complete interpreter; run: ${report.python.export}`);
   const todo = report.install.filter((line) => line !== report.python.export);
   if (todo.length) lines.push("", "To install:", ...todo.map((line) => `  ${line}`));

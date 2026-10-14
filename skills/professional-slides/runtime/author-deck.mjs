@@ -2525,6 +2525,15 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     const budgets = partBudgets(doc);
     const report = allocationReport(doc, insights, { fills: evidenceFills(insights), budgets });
     say(report.lines.join("\n"));
+    // The checks that read the records and the deck's own keys alone, run now rather than first at the plan: a measure recorded
+    // twice, a source older than the period it reports, players no analysis compares, a convention written in a shape the
+    // runtime does not read. Each would otherwise surface with every section's skeleton waiting on the lead to mend it.
+    const keyed = deckKeyProblems(doc.deck, { sections: sectionNames(doc) });
+    const records = [...keyed.map((problem) => ({ code: "DECK_KEY", severity: "blocker", repair: problem })),
+      ...deckSpineFindings(doc, insights).filter((f) => (REPAIRS[f.code] ?? []).includes("record"))];
+    if (records.length) say(["", "## The records and the deck's keys, before any page (fix these now; the plan refuses the blocking ones)",
+      ...records.map((f) => `- ${f.code}${f.severity === "blocker" ? "" : " (advisory)"}: ${String(f.repair).slice(0, 600)}`)].join("\n"));
+    const recordsBlock = records.some((f) => f.severity === "blocker");
     if (values.write) {
       if (report.blocking) { say("\nNothing written: settle the homes listed first, then run --allocate --write again."); return 2; }
       const written = [];
@@ -2534,7 +2543,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
       }
       say(`\nWritten: ${written.length ? written.join(", ") : "nothing changed"} - each part's \`allocation\`, which its skeleton and writer briefs print and its pages' check holds.`);
     }
-    return report.blocking || report.short ? 2 : 0;
+    return report.blocking || report.short || recordsBlock ? 2 : 0;
   }
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
