@@ -135,6 +135,21 @@ console.log(JSON.stringify(sourceAgeProblems(reg, insights).map((p) => [p.ref, p
         self.assertEqual(result, [["i/split", "2025", "fy17", "start"], ["i/half", "H1 2026", "h1", "end"]])
 
 
+    def test_a_series_assumed_from_a_period_on_is_held_to_its_records_before_it(self):
+        """A tax rate announced for next year beside the rates in force: the series is assumed only from the announced
+        period on, so that period is held to no record's date, and the periods in force still are."""
+        result = run_node(f'''
+import {{ sourceAgeProblems }} from '{RT}/sources-registry.mjs';
+const reg = {{ rates: {{ name: "Rates", date: "2026-08" }} }};
+const m = (extra) => ({{ unit: "GBP", population: "x", periods: ["2025-26", "2026-27", "2027-28"], values: [200, 244, 250], cite: ["rates"], ...extra }});
+const insights = [{{ id: "i", measures: {{ announced: m({{ assumedFrom: "2027-28" }}), unmarked: m({{}}), early: m({{ assumedFrom: "2026-27", cite: ["old"] }}) }} }}];
+console.log(JSON.stringify(sourceAgeProblems({{ ...reg, old: {{ name: "Old", date: "2025-01" }} }}, insights).map((p) => [p.ref, p.period, p.before])));
+''')
+        # The rate in force, read part-way through its year, is advised as of its record's date; the announced year is not read;
+        # unmarked, the announced year is refused; assumed from 2026-27, the series is held to its 2025-26 record alone.
+        self.assertEqual(result, [["i/announced", "2026-27", "end"], ["i/unmarked", "2027-28", "start"], ["i/early", "2025-26", "end"]])
+
+
 class UnitHeadingTests(unittest.TestCase):
     def test_a_heading_ending_in_its_unit_keeps_it_once(self):
         result = run_node(f'''

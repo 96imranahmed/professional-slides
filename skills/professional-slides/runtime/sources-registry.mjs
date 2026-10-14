@@ -99,7 +99,10 @@ export function sourceAgeProblems(registry, insights) {
   for (const m of measureRegistry(insights).values()) {
     if (m.derived || m.assumed || m.projected === true) continue;
     const axis = axisOf(m), values = valuesOf(m);
-    const labels = axis.kind === "periods" ? axis.labels.filter((_, i) => values[i] !== null && values[i] !== undefined) : [m.period];
+    // A series assumed from a period on (`assumedFrom`) states its later periods as announced or planned, not reported: those are
+    // held to no record's date, as a measure assumed whole is not.
+    const from = axis.kind === "periods" && m.assumedFrom !== undefined ? axis.labels.indexOf(String(m.assumedFrom)) : -1;
+    const labels = axis.kind === "periods" ? axis.labels.filter((_, i) => values[i] !== null && values[i] !== undefined && (from < 0 || i < from)) : [m.period];
     const ends = labels.map((label) => ({ label, end: periodEnd(label) })).filter((p) => p.end !== null);
     if (!ends.length) continue;
     // A series cites a record for each stretch of it - IAG's 2016-2025 margins cite its results for each year - so one older
