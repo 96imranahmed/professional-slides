@@ -270,7 +270,7 @@ await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify({ pas
   answer: 'No: cash flow fell by a fifth in the latest year, so growth needs outside funding.', answerParts: [{ part: 'Can the firm fund its growth', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Cash', pages: ['p01'], verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'One weak year', reversal: 'Cash flow recovers above its peak.', answered: true }],
   numbers: 'One figure, printed once; nothing to reconcile.', sectionFlow: 'A single page; there are no sections to order.', execSummary: 'The title is the summary and states the answer.',
-  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'], argument: (packet.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} on this one-page storyline; nothing to raise.` })) }));
 const ready = await S.prepareStoryline(specPath, out);
 const gate = async (exhibit) => { await write(exhibit); return S.storylineGate(spec(exhibit), out, { deckPath: specPath }); };
@@ -386,7 +386,7 @@ const critique = (extra) => ({ pass: 1, verifies: null, verdict: 'ready', rating
   answer: 'Yes: the subject grew fastest of the five rivals, on every measure the log records.', answerParts: [{ part: 'Is the subject winning', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Growth', pages: ['p01', 'p02'], verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'One strong year', reversal: 'A rival outgrows it next year.', answered: true }],
   numbers: 'No figure is printed twice; nothing to reconcile.', sectionFlow: 'Two pages in one section; the order follows the claim.', execSummary: 'The first title is the summary and states the answer.',
-  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+  missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'], argument: (second.packet.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} on this two-page storyline; nothing to raise.` })), ...extra });
 const answer = async (extra) => { await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(critique(extra))); return S.prepareStoryline(specPath, out); };
 const gone = 'The spine now names the five rivals of the log and the claim matches their recorded growth.';
@@ -454,7 +454,9 @@ console.log(JSON.stringify({ status: step.status, mode: step.mode, bytes: Buffer
         self.assertEqual([result['status'], result['mode']], ['packet-written', 'spine'])
         # A line a page and the standard; the full listing ran to 124 KB. The last 600 bytes or so are the check the critic
         # runs before handing back (storyline.mjs --validate), whose command names the runtime, the deck and the output by path.
-        self.assertLess(result['bytes'], 21000)
+        # The argument reading adds its rubric once, about 4 KB (the deck review's argument codes and the fixes it checks), and
+        # nothing a page for a page that rests on no measure: its title item is read off its line in the listing.
+        self.assertLess(result['bytes'], 25000)
         self.assertTrue(result['request'])
         self.assertFalse(result['commentary'])
         self.assertEqual(result['refused']['status'], 'refused')
@@ -481,7 +483,7 @@ const first = { pass: 1, verifies: null, verdict: 'revise', rating: 6, binding: 
   pillars: [{ pillar: 'Growth', pages: ['p01', 'p02'], verdict: 'holds', overlap: 'A single pillar here.', strongestCounter: 'Growth bought with discounts.', reversal: 'Retention below peers.', answered: false }],
   numbers: 'The two pages print no shared figure.', sectionFlow: 'One section opens and closes in the order a reader follows.', execSummary: 'No summary page in this probe; the title carries the answer.',
   missingAnalyses: [{ id: 'M1', analysis: 'Cohort retention by vintage', why: 'Retention decides whether growth is winning.', data: 'Company filings cohort tables', public: 'known', remedy: 'retrieval', severity: 'major', ifUnfixed: 'The committee would back growth that retention may not support.' }],
-  cutOrMerge: [], findings: [], topFixes: ['Run cohort retention'], completeness: S.STORYLINE_DIMENSIONS.map(clean) };
+  cutOrMerge: [], findings: [], topFixes: ['Run cohort retention'], argument: [...spec('The subject grew fastest').slides, ...(spec('The subject grew fastest').appendix || [])].filter((s) => String(s.title ?? '').trim()).map((s) => ({ item: `title:${s.id}`, verdict: 'holds' })), completeness: S.STORYLINE_DIMENSIONS.map(clean) };
 await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify(first));
 await S.prepareStoryline(specPath, out);
 await fs.writeFile(specPath, JSON.stringify(spec('The subject grew fastest of five rivals')));

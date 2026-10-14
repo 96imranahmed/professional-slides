@@ -43,7 +43,7 @@ const critique = (packet, { findings = [], statuses = null, open = findings.leng
     answerParts: [{ part: 'short run', verdict: 'answered', missingEvidence: '' }, { part: 'long run', verdict: 'answered', missingEvidence: '' }],
     pillars: [{ pillar: 'Lead', pages, verdict: open ? 'weak' : 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'The base is small.', reversal: 'Growth below peers for two years.', answered: true }],
     numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.', execSummary: 'The summary states the answer the body proves.',
-    missingAnalyses: [], cutOrMerge: [], findings, topFixes: ['None material'],
+    missingAnalyses: [], cutOrMerge: [], findings, topFixes: ['None material'], argument: (packet.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
     completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: findings.some((f) => f.check === check) ? 'findings' : 'clean', note: findings.some((f) => f.check === check) ? 'Filed the item above.' : `Checked ${check} across the spine and found nothing to raise.` })) };
 };
 const staged = async (step) => JSON.parse(await fs.readFile(path.join(step.dir, 'packet.json'), 'utf8'));
@@ -115,7 +115,8 @@ console.log(JSON.stringify({ at: Object.fromEntries(items.map((i) => [i.id, i.de
         self.assertEqual(result['agreement']['blocking'], 5)
         self.assertEqual(result['agreement']['label'], 'visible at the spine')
         self.assertTrue(result['every'])
-        self.assertEqual(result['codes'], ['FACTUAL_ERROR', 'UNSUPPORTED_CLAIM', 'MISLEADING_COMPARISON', 'UNCLEAR_ARGUMENT', 'HEDGED_TITLE'])
+        # The argument codes, the reviewer's and the storyline critic's one table: the two ba4's reviewer coined among them.
+        self.assertEqual(result['codes'], ['FACTUAL_ERROR', 'UNSUPPORTED_CLAIM', 'MISLEADING_COMPARISON', 'UNCLEAR_ARGUMENT', 'HEDGED_TITLE', 'COUNTER_EVIDENCE_OMITTED', 'MISSING_MEMBER'])
 
     def test_two_measures_that_may_be_one_quantity_recorded_twice_are_put_to_the_critic(self):
         result = run_node(FIXTURES + '''

@@ -120,6 +120,7 @@ gates/consistency_gates.mjs  what the pages state between them: one number given
 gates/gate_classes.mjs  the class of every finding code (deck structure, page-local, deck aggregate, review), the layout codes the fit search answers, and a standing as one line
 build-bars.mjs     the bars delivery measures on the built scene (BUILD_BAR_CODES), read by the compile and the build too (barStandings) and the measures that let a partly fixed deck finding drop (DOWNGRADE_MEASURES)
 storyline.mjs      the storyline critique: spine or full packet, validation, the gate the deck review and delivery wait for
+spine-argument.mjs the critique's first-pass argument reading: every title and comparison as an item, the records behind each, the deck review's argument codes, fixes checked and closed when applied as given
 reviewer.mjs       the deck review: rubric, pass-one, verification and confirmation schemas, section split and merge; backends codex | claude | packet
 review-passes.mjs  the loop both reviews share: page lists, statuses, ledger, pass cap, lineage under <deck dir>/.reviews/<id>/, staging, provenance, exit codes
 deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> build bars -> self-check -> review passes -> confirmation read -> <id>-DELIVERED.pptx or REJECTED.md

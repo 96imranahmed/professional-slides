@@ -85,6 +85,7 @@ import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 import { carriedSaid, withCarriedPages } from "./revision.mjs";
 import { naturalClass } from "./spine-witness.mjs";
 import { JUDGEMENT_KINDS } from "./judgements.mjs";
+import { argumentErrors, argumentLedgerItems, argumentPacket, argumentPrompt, fixApplied, withArgumentFixes } from "./spine-argument.mjs";
 import { answerCritiqueRefusal, answerHashOf, answerHazards, hazardLine as answerHazardLine, itemLine as answerItemLine, openAnswerItems, readAnswerCritique } from "./answer-critique.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
@@ -231,6 +232,8 @@ export const STORYLINE_SCHEMA = {
     mergedFrom: { type: "array", items: { type: "string" } },
     // One answer for each blocking item a retired lineage left open (review-passes.mjs carriedErrors); absent where the packet carries none.
     carried: CARRIED_SCHEMA,
+    // A verdict on every argument item of a first pass (spine-argument.mjs): its form is checked item by item against the packet.
+    argument: { type: "array", items: { type: "object" } },
   }
 };
 
@@ -283,13 +286,15 @@ const schemaFor = (mode, scope) => (scope ? (mode === "full" ? STORYLINE_VERIFIC
 // Nor is a critic offered what the runtime reads off its items (DERIVED), or the fields an older pillar carried, which an
 // answer may still hold and which nothing reads.
 const LEGACY_PILLAR = ["overlap", "strongestCounter", "reversal", "answered"];
-function offered(schema, { carried = false } = {}) {
-  const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => !DERIVED.includes(key) && (carried || key !== "carried")));
+function offered(schema, { carried = false, argument = false } = {}) {
+  const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => !DERIVED.includes(key) && (carried || key !== "carried") && (argument || key !== "argument")));
   if (properties.pillars) properties.pillars = { ...properties.pillars, items: { ...PILLAR, properties: Object.fromEntries(Object.entries(PILLAR.properties).filter(([key]) => !LEGACY_PILLAR.includes(key))) } };
-  return { ...schema, properties };
+  // Offered, the argument reading is owed: validation refuses an answer without a verdict on every item.
+  return { ...schema, ...(argument && properties.argument ? { required: [...schema.required, "argument"] } : {}), properties };
 }
-const offeredSchema = (mode, scope, { carried = false } = {}) => offered(schemaFor(mode, scope), { carried: Boolean(scope) || carried });
-const offeredPart = (kind) => offered(STORYLINE_PART_SCHEMAS[kind]);
+const offeredSchema = (mode, scope, { carried = false, argument = false } = {}) => offered(schemaFor(mode, scope), { carried: Boolean(scope) || carried, argument: !scope && argument });
+// The spine part answers the argument items of a split first pass: its critic reads every title.
+const offeredPart = (kind, { argument = false } = {}) => offered(STORYLINE_PART_SCHEMAS[kind], { argument: kind === "spine" && argument });
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 
@@ -898,7 +903,7 @@ async function storyPages(spec, specPath, { max }) {
     .map((page, i) => ({ ...page, n: i + 1 }));
   const shown = new Map();
   for (const page of composed) for (const { ref } of page.measures) if (registry.has(ref)) shown.set(ref, [...(shown.get(ref) ?? []), page.id]);
-  return { pages, content, log, analysis, measures, reconcile: (only) => recordedTwice(shown, registry, only) };
+  return { pages, content, log, analysis, measures, registry, insights, reconcile: (only) => recordedTwice(shown, registry, only) };
 }
 
 // A spine past this many content pages is critiqued page by page (--full) by
@@ -951,7 +956,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   const base = path.dirname(specPath);
   const store = await lineageStore(spec, outputDirectory, specPath);
   // The spine packet gives a measure in a few values; the page-level packet gives the series.
-  const { pages, content, log, analysis, measures, reconcile } = await storyPages(spec, specPath, { max: MEASURE_VALUES });
+  const { pages, content, log, analysis, measures, registry, insights: insightMap, reconcile } = await storyPages(spec, specPath, { max: MEASURE_VALUES });
   // Sources sit in workstream folders (sources/<workstream>/...), so list them all.
   const sources = await sourceFiles(base);
   const insights = checkInsights(log, sources, pages.map((p) => ({ kind: p.kind === "section" ? "section" : isContent(p) && p.type ? "content" : "other", title: p.title, evidence: (p.evidence || []).map((e) => e.id) })));
@@ -979,8 +984,11 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     // What the answer critique raised before the skeleton: a first pass is told, so it files what the spine still carries.
     ...(!scope && answerRecord && (openAnswerItems(answerRecord).length || answerHazards(answerRecord).length)
       ? { answerCritique: { verdict: answerRecord.verdict, changed: answerRecord.answerHash !== answerHashOf(answer), items: openAnswerItems(answerRecord), hazards: answerHazards(answerRecord) } } : {}),
+    // The argument reading, read once, by the first pass: every title and comparison with the records behind it (spine-argument.mjs).
+    ...(!scope ? { argument: argumentPacket(pages, { registry, insights: insightMap, sources: spec.sources ?? {}, conventions: spec.conventions ?? spec.deck?.conventions ?? null }) } : {}),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
-  const schema = offeredSchema(mode, scope, { carried: !scope && carried.length > 0 });
+  const argued = Boolean(packet.argument?.items.length);
+  const schema = offeredSchema(mode, scope, { carried: !scope && carried.length > 0, argument: argued });
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const dir = await stageReview("storyline", {}, { previous: previous?.staging });
   packet.staging = dir;
@@ -999,7 +1007,7 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     await fs.mkdir(path.join(dir, "sections"), { recursive: true });
     await fs.mkdir(path.join(dir, "parts"), { recursive: true });
     await writeJson(path.join(dir, "part-schema.json"), offeredPart("section"));
-    await writeJson(path.join(dir, "spine-part-schema.json"), offeredPart("spine"));
+    await writeJson(path.join(dir, "spine-part-schema.json"), offeredPart("spine", { argument: argued }));
     for (const [id, text] of parts) await fs.writeFile(path.join(dir, "sections", `${id}.md`), signed(text));
   }
   await fs.mkdir(store, { recursive: true });
@@ -1369,7 +1377,7 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map((p) => marked(packet, compactLine(p), p)).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}
+${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1382,7 +1390,8 @@ Work through it in this order.
 3. The pillars, on their check above. For each in \`pillars\`: its pages, your verdict and a note on what holds it up or what it lacks.
 4. The pages, from their lines, on every page check - and a title (a section's too) that claims more than the periods or members its pages show, a comparison with one member - each as a finding on its pages.
 5. \`numbers\`: set every figure in a title or claim beside the measures recorded on its page and on each other page stating that quantity. \`sectionFlow\` and \`execSummary\`, a sentence or two each.
-6. Missing analyses, each with \`public\` known or speculative; cut or merge.
+6. Missing analyses, each with \`public\` known or speculative; cut or merge.${packet.argument?.items.length ? `
+6b. The argument reading: \`argument\`, a verdict on every one of its ${packet.argument.items.length} items, read on the records above.` : ""}
 7. Rate the storyline on the scale below and rank the top fixes (none, where nothing needs fixing).
 
 ${JUDGEMENT_RULES}
@@ -1413,7 +1422,7 @@ ${analysesLines(packet)}
 
 THE STORYLINE (title, page type, what settles the claim, the measures it shows with their recorded values, the insights it rests on; drafted exhibits and copy are the author's sketch):
 ${packet.pages.map((p) => marked(packet, spineLine(p), p)).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}
+${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1486,14 +1495,14 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map(compactLine).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}
+${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
 ${CALIBRATION}
 
-You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\` - and file spine findings listing every page they concern (${SPINE_CHECKS.join(", ")}). Leave \`pages\` empty. Your rating and summary become the critique's.
+You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\`${packet.argument?.items.length ? ", and `argument`, a verdict on every argument item" : ""} - and file spine findings listing every page they concern (${SPINE_CHECKS.join(", ")}). Leave \`pages\` empty. Your rating and summary become the critique's.
 
 ${JUDGEMENT_RULES}
 
@@ -1502,7 +1511,7 @@ ${ANSWER_RULES}
 ${itemRules()}
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", pages: packet.pages.filter(isContent).map((p) => p.id) })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spine"))}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spine", { argument: Boolean(packet.argument?.items.length) }))}`;
 }
 
 export function storylineVerificationPrompt(packet) {
@@ -1584,6 +1593,8 @@ export function storylineItems(review) {
     reason: `${m.analysis}: ${m.why}`, repair: `Run it on ${m.data}`, public: m.public ?? null, remedy: m.remedy ?? null });
   for (const c of review?.cutOrMerge || []) items.push({ id: c.id, code: registered(STORYLINE_CODES, c.action === "cut" ? "CUT_PAGE" : "MERGE_PAGES"), dimension: "cuts", scope: "spine", severity: c.severity,
     pages: c.pages || [], reason: `${c.action} ${(c.pages || []).join(", ")}`, repair: c.freedUse });
+  // A failing argument item blocks until its fix stands applied (closeAppliedFixes): the reviewer's code, on its one page.
+  items.push(...argumentLedgerItems(review?.argument));
   return items;
 }
 
@@ -1762,7 +1773,7 @@ function unavailableErrors(review, ledger, sources) {
  * against and `promptHash` the packet's (its provenance is checked when given).
  */
 export function validateStorylineRecord(review, { ids, contentIds, scope = null, ledger = [], insightIds = null, mode = "full", sources = [], pageText = null, promptHash, revision = null,
-  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null, carried = [], limits = null, dividers = [], sectionFits = null, untouched = null } = {}) {
+  analyses = [], rested = new Set(), evidenceScope = null, answerStatus = null, artifacts = null, carried = [], limits = null, dividers = [], sectionFits = null, untouched = null, argument = null } = {}) {
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
@@ -1787,6 +1798,8 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
     if (mode === "full") errors.push(...coverageErrors(review.pages, revision ? revision.changed : contentIds, "page"));
     if (revision) errors.push(...revisionItemErrors(items, revision.changed));
     errors.push(...carriedErrors(review, carried, items.map((item) => item.id)));
+    // The argument reading: a verdict on every item the packet listed, each failing one with a fix that holds as given.
+    if (argument) errors.push(...argumentErrors(review.argument, { ...argument, insightIds, limits, dividers, sectionFits }));
     for (const [i, pillar] of review.pillars.entries()) {
       const unknown = pillar.pages.filter((id) => !ids.includes(id));
       if (unknown.length) errors.push(`pillars[${i}]: unknown page${unknown.length === 1 ? "" : "s"} ${unknown.join(", ")}`);
@@ -1843,6 +1856,8 @@ export const packetContext = (packet) => ({
   analyses: packet.analyses ?? [], rested: new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id))),
   evidenceScope: packet.evidenceScope ?? null, answerStatus: packet.answerStatus ?? null, artifacts: packet.artifacts ?? null, carried: packet.carried ?? [],
   limits: packet.limits ?? null, dividers: packet.pages.filter((p) => p.kind === "section").map((p) => p.id),
+  // What a first pass's argument items are checked against: the items, the records and declared peer sets, each page's measures.
+  argument: packet.argument && !packet.scope ? { items: packet.argument.items, records: packet.argument.records, peerSets: packet.argument.peerSets, pages: packet.argument.pages } : null,
   // The slides a revision carries and did not edit: what a finding about the imported deck names. Null for a deck that carries none.
   untouched: packet.pages.some((p) => p.kind === "carried") ? packet.pages.filter((p) => p.kind === "carried" && !p.edited).map((p) => p.id) : null,
 });
@@ -2148,6 +2163,54 @@ async function setAside(out) {
 // whether it blocks; an item it does not confirm is recorded as minor - still in the ledger, no longer holding the deck -
 // and the verdict is read off the items as ever. `PS_STORYLINE_CONFIRM=0` switches it off (the test harness does, to
 // drive the loop with fixture answers; one test drives the confirmation itself).
+// The record of an argument reading's fixes found applied (closeAppliedFixes): the runtime's, not a critic's, and not a pass
+// against the cap.
+const APPLIED = "applied-fixes";
+/**
+ * What a pass that files failing argument items records beside them, so the fixes can close with no second reading:
+ * `argumentFixes` { expect, binding } - each fixed page's hash, and the spine's binding, as they will read with every fix
+ * applied word for word (spine-argument.mjs withArgumentFixes). Computed only where the spine is the one the packet read;
+ * a spine edited while the critic read it has no such expectation, and its fixed pages are verified as moved.
+ */
+async function argumentExpectation(spec, specPath, packet, ledger) {
+  const entries = openEntries(ledger).filter((e) => e.fix && e.dimension === "argument");
+  if (!entries.length) return {};
+  const measures = await readMeasures(spec, specPath);
+  if (storylineBinding(spec, measures) !== packet.binding) return { argumentFixes: { expect: {}, binding: null } };
+  const fixed = withArgumentFixes(spec, entries), hashes = storylinePageHashes(fixed, measures);
+  const pages = [...new Set(entries.flatMap((e) => e.pages || []))];
+  return { argumentFixes: { expect: Object.fromEntries(pages.filter((id) => hashes[id]).map((id) => [id, hashes[id]])), binding: storylineBinding(fixed, measures) } };
+}
+
+/**
+ * Close every open argument item whose fix stands applied as given (spine-argument.mjs fixApplied), and record that as the
+ * runtime's own pass (APPLIED): the review the critic gave, its verdict read off the new ledger. A fixed page whose hash is
+ * the one its fixes were read to give keeps the critique's verdict - it is the page the critic passed, with the critic's own
+ * words in - so it is not a page that moved; anything else that moved still goes to a verification pass. The binding moves
+ * to the spine as it stands only where the spine is exactly the one read with every fix in. Null where nothing closes.
+ * On ba4 the self-check's own fixes voided 70 of 89 pages' verdicts and the spine reopened for a third pass over six titles:
+ * a fix applied as given is not a change to read again.
+ */
+async function closeAppliedFixes(last, spec, { specPath, measures, historyDir, out }) {
+  const pending = last?.ledger ? openEntries(last.ledger).filter((e) => e.fix && e.dimension === "argument") : [];
+  if (!pending.length) return null;
+  const { log } = await readEvidence(spec, specPath);
+  const registry = measureRegistry(log?.insights || []);
+  const done = new Set(pending.filter((e) => fixApplied(e, spec, registry)).map((e) => e.id));
+  if (!done.size) return null;
+  const ledger = last.ledger.map((e) => (done.has(e.id) ? { ...e, status: "fixed", evidence: "applied word for word as the argument reading gave it: closed by the runtime, with no second reading", updatedIn: last.pass } : e));
+  const now = storylinePageHashes(spec, measures), expect = last.argumentFixes?.expect ?? {};
+  const pageHashes = { ...last.pageHashes };
+  for (const e of pending.filter((x) => done.has(x.id))) for (const id of e.pages || []) if (expect[id] && now[id] === expect[id]) pageHashes[id] = now[id];
+  const current = storylineBinding(spec, measures), whole = last.argumentFixes?.binding === current;
+  const review = withJudgements({ ...last.review, binding: whole ? current : last.binding }, ledger, { answerStatus: answerStatusOf(spec), evidenceScope: evidenceScopeOf(spec) });
+  const remaining = openEntries(ledger).some((e) => e.fix && e.dimension === "argument");
+  const { record } = await recordPass(historyDir, { review, pageHashes: whole ? now : pageHashes, ledger, bindingVersion: BINDING_VERSION, mode: last.mode, answerHash: last.answerHash, kind: APPLIED,
+    applied: [...done], artifacts: last.artifacts ?? null, rested: last.rested ?? [], ...(remaining ? { argumentFixes: last.argumentFixes } : {}) });
+  await writeJson(path.join(out, "storyline-review.json"), review);
+  return record;
+}
+
 const CONFIRM_FILE = "storyline-confirm.json";
 const CONFIRM_REASON = 20;
 const confirming = () => process.env.PS_STORYLINE_CONFIRM !== "0";
@@ -2414,7 +2477,8 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
       ...(packet.scope?.postReview && packet.scope.postReview.origin !== "compile" ? { kind: POST_REVIEW, postReview: { key: packet.scope.postReview.key, reviewPass: packet.scope.postReview.reviewPass, pages: packet.scope.postReview.pages, findings: packet.scope.postReview.findings.map((f) => f.id) } } : {}),
       // So does the pass a compile refusal allowed: its kind, the pages it read and the refusals that earned it.
       ...(packet.scope?.postReview?.origin === "compile" ? { kind: COMPILE_REFUSAL, compileRefusal: { key: packet.scope.postReview.key, pages: packet.scope.postReview.pages, refusals: packet.scope.postReview.findings.map((f) => ({ page: f.pages[0], code: f.code, reason: f.reason })) } } : {}),
-      artifacts: packet.artifacts ?? null, rested: [...new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id)))] })).record);
+      artifacts: packet.artifacts ?? null, rested: [...new Set(packet.pages.flatMap((p) => (p.evidence || []).filter((e) => !e.missing).map((e) => e.id)))],
+      ...(await argumentExpectation(spec, specPath, packet, ledger)) })).record);
     if (packet.carried?.length) await settleCarried(historyDir, review.binding);
   }
   const lineageMode = history.at(-1)?.mode ?? (history.length ? "full" : null);
@@ -2426,6 +2490,9 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   }
   const measures = await readMeasures(spec, specPath);
   const binding = storylineBinding(spec, measures);
+  // An argument item whose fix stands applied word for word closes here, with no second reading, and its page keeps the verdict.
+  const applied = await closeAppliedFixes(history.at(-1), spec, { specPath, measures, historyDir, out });
+  if (applied) history.push(applied);
   const latest = history.at(-1);
   const changes = latest ? null : revisionChanges(spec, await readInventory(spec, specPath));
   if (changes && !changes.spineChanged) return { status: "ready", pass: 0, mode: wanted, binding, note: "A revision that leaves the user's spine unchanged - every title, its order and its source slide - needs no storyline critique" };
@@ -2456,7 +2523,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   if (scope && latest.artifacts && Array.isArray(latest.rested)) scope.prior = { artifacts: latest.artifacts, rested: latest.rested };
   if (scope) {
     // The cap counts the critique's own passes; a post-review pass is granted by the deck review and counted against that.
-    const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL].includes(h.kind)).length;
+    const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL, APPLIED].includes(h.kind)).length;
     scope.capped = spent + 1 > maxPasses;
     const moved = changedPages(latest.pageHashes, storylinePageHashes(spec, measures)) ?? { changed: scope.changed, deleted: scope.deleted };
     const reviewDir = path.join(store, REVIEW_HISTORY);
@@ -2485,8 +2552,10 @@ function partErrors(part, packet) {
   if (!meta || !["section", "spine"].includes(meta.kind)) return ["part must say { kind: section|spine, id, pages }"];
   const structure = schemaErrors(part, STORYLINE_PART_SCHEMAS[meta.kind], meta.id);
   if (structure.length) return structure;
-  const { ids, insightIds, promptHash, limits, dividers } = packetContext(packet);
+  const { ids, insightIds, promptHash, limits, dividers, argument } = packetContext(packet);
   const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null, { limits, dividers }), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
+  if (meta.kind === "spine" && argument) errors.push(...argumentErrors(part.argument, { ...argument, insightIds, limits, dividers }));
+  if (meta.kind === "section" && part.argument !== undefined) errors.push("`argument` is the spine part's to answer: leave it out of a section's part");
   if (meta.kind === "section") errors.push(...coverageErrors(part.pages, meta.pages, "page"), ...sourcingErrors(part.pages, storylineLedger([], part), insightIds));
   return errors;
 }
@@ -2508,6 +2577,7 @@ export function mergeStorylineParts(partsIn, packet) {
     spine: lead.spine, answer: lead.answer, answerParts: lead.answerParts, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
+    ...(lead.argument ? { argument: lead.argument } : {}),
     // The spine critic answers the carried items; an item it files one as is renamed with its other items.
     ...(lead.carried ? { carried: lead.carried.map((answer) => (answer.finding ? { ...answer, finding: rename(lead, answer.finding) } : answer)) } : {}),
   };

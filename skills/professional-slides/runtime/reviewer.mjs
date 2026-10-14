@@ -45,6 +45,7 @@ import {
   uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, deckStatementFindings, unknownKeyErrors, stageReview, lineageStore, isAuthFailure, readConfirmations,
   requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, RUBRIC_CLAUSES, dimensionAt, ratingScale, REVIEW_HISTORY, SAMPLING_WORDS, COMPLETENESS_NOTE, groupErrors,
+  ARGUMENT_CODES,
 } from "./review-passes.mjs";
 
 export { MAX_PASSES, MAX_CONFIRMATIONS, designStatistics };
@@ -55,11 +56,8 @@ export { MAX_PASSES, MAX_CONFIRMATIONS, designStatistics };
 // comparison page with no argument drawn on it, so the reviewer's broader
 // judgement is UNCLEAR_ARGUMENT.
 export const CODES = Object.freeze({
-  // facts and evidence
-  FACTUAL_ERROR: "a stated number, name or date is wrong",
-  UNSUPPORTED_CLAIM: "a claim the cited evidence does not support",
-  MISLEADING_COMPARISON: "values compared across incompatible bases without saying so",
-  UNCLEAR_ARGUMENT: "the page's purpose or necessary inference is unclear from its title, evidence and commentary together",
+  // facts and evidence, and the title's commitment: defined once, with the storyline critic's argument reading (review-passes.mjs ARGUMENT_CODES)
+  ...ARGUMENT_CODES,
   // legibility and geometry
   UNREADABLE: "text too small, clipped or low-contrast to read",
   OVERFLOW: "content exceeds its box or the slide",
@@ -71,7 +69,6 @@ export const CODES = Object.freeze({
   OVERSIZED_TYPE: "body or chart type set larger than a reader expects on a slide",
   WALL_OF_TEXT: "prose doing the work an exhibit should do",
   BURIED_NUMBER: "a decisive number in a sentence instead of on a mark",
-  HEDGED_TITLE: "an action title that does not commit to a finding",
   INCONSISTENT_ENCODING: "the same measure encoded differently across pages",
   // beautification - the pass a threshold cannot make
   NO_VISUAL_ANCHOR: "recognition or visible evidence matters, but the page supplies no useful visual anchor",
@@ -101,7 +98,7 @@ export const CODES = Object.freeze({
 // at the spine is recorded as such (deckItems `decidable`): the argument held
 // at `ready` and found wanting on the page is the measure of whether the two
 // judges agree, and each one is a check the critique owed the author earlier.
-export const CODES_AT_SPINE = Object.freeze(["FACTUAL_ERROR", "UNSUPPORTED_CLAIM", "MISLEADING_COMPARISON", "UNCLEAR_ARGUMENT", "HEDGED_TITLE"]);
+export const CODES_AT_SPINE = Object.freeze(Object.keys(ARGUMENT_CODES));
 export const SPINE_LABEL = "visible at the spine";
 /** "spine" where the storyline critic could have decided the finding from its packet, "page" where it needs the rendered page. */
 export function decidableAt(finding) {

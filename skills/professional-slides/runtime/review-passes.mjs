@@ -106,6 +106,29 @@ const RATING_SCALE = Object.freeze([
 export const ratingScale = ({ rendered = false, capped = true } = {}) => `${RATING_SCALE.map((anchor) => `${anchor.at} - ${anchor.means}${rendered ? anchor.rendered ?? "" : ""}`).join("; ")}${capped ? `. With a blocker open the rating is ${RATING_CAPS.blocker} or less; with a major open, ${RATING_CAPS.major} or less; ${ACCEPT_RATING} or more says nothing major is open` : ""}`;
 
 /**
+ * The deck review's codes for a defect of the argument: a claim, its evidence,
+ * a comparison's bases or members. Each is decidable from the spine and its
+ * records (reviewer.mjs CODES_AT_SPINE), so the reviewer files them on the
+ * drawn deck and the storyline critic's argument reading files the same codes,
+ * in these words, on the spine (spine-argument.mjs): one table, so the two
+ * judges cannot drift. On ba4 the reviewer rejected the deck for 34 findings
+ * the spine already showed - a record margin set against a year before IFRS 16,
+ * a seat share across all ventures beside IAG's own, BA's premium share against
+ * sister airlines only - and the critic, reading for flow, passed them all.
+ */
+export const ARGUMENT_CODES = Object.freeze({
+  FACTUAL_ERROR: "a stated number, name or date is wrong",
+  UNSUPPORTED_CLAIM: "a claim the cited evidence does not support",
+  MISLEADING_COMPARISON: "values compared across incompatible bases without saying so",
+  UNCLEAR_ARGUMENT: "the page's purpose or necessary inference is unclear from its title, evidence and commentary together",
+  HEDGED_TITLE: "an action title that does not commit to a finding",
+  // Both coined by the ba4 reviewer for defects no code named: Qatar Airways' stake in IAG left out of a page casting Doha as the
+  // rival, and Doha's traffic on none of the pages of a section named for it.
+  COUNTER_EVIDENCE_OMITTED: "the record holds evidence that cuts against the claim - a stake, a partner, a basis change, a fall - and the page leaves it out",
+  MISSING_MEMBER: "a comparison leaves out a member of the set its claim names or the deck declares (conventions.peerSets), or compares a subset as if it were the set",
+});
+
+/**
  * The deck review's rubric, clause by clause, and where each clause is first
  * decidable. A clause with a `spine` check is decidable from the spine packet
  * - the request, the answer, the titles in order, and each page's claim, type,

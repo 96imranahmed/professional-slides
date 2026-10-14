@@ -67,7 +67,7 @@ async function prebuilt({ count = 6, rich = true, deck = {} } = {}) {
 // The storyline gate, brought to ready through its own loop.
 async function storylineReady({ out, specPath, spec }) {
   const step = await S.prepareStoryline(specPath, out);
-  const hash = JSON.parse(await fs.readFile(path.join(step.dir, 'packet.json'), 'utf8')).promptHash;
+  const staged = JSON.parse(await fs.readFile(path.join(step.dir, 'packet.json'), 'utf8')), hash = staged.promptHash;
   const pages = spec.slides.filter((s) => !s.kind).map((s) => s.id);
   await fs.writeFile(path.join(out, 'storyline-review.json'), JSON.stringify({ pass: 1, verifies: null, verdict: 'ready', rating: 8, binding: S.storylineBinding(spec),
     summary: 'The answer is sharp and the pillars hold on the evidence shown.', provenance: { backend: 'subagent', model: 'fixture-critic', promptHash: hash },
@@ -76,7 +76,7 @@ async function storylineReady({ out, specPath, spec }) {
     answerParts: [{ part: 'short run', verdict: 'answered', missingEvidence: '' }, { part: 'long run', verdict: 'answered', missingEvidence: '' }],
     pillars: [{ pillar: 'Lead', pages, verdict: 'holds', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'The base is small.', reversal: 'Growth below peers for two years.', answered: true }],
     numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.', execSummary: 'The summary states the answer the body proves.',
-    missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'],
+    missingAnalyses: [], cutOrMerge: [], findings: [], topFixes: ['None material'], argument: (staged.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
     completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: 'clean', note: `Checked ${check} across the spine and found nothing to raise.` })) }));
   const ready = await S.prepareStoryline(specPath, out);
   if (ready.status !== 'ready') throw new Error(`storyline fixture not ready: ${JSON.stringify(ready)}`);
@@ -670,7 +670,7 @@ const critique = (findings) => ({ pass: 1, verifies: null, verdict: 'revise', ra
   answer: 'The subject leads on both horizons, on the evidence shown.', answerParts: [{ part: 'short run', verdict: 'answered', missingEvidence: '' }],
   pillars: [{ pillar: 'Lead', pages: ['p01', 'p02', 'p03'], verdict: 'weak', overlap: 'A single pillar; nothing overlaps.', strongestCounter: 'The base is small.', reversal: 'Growth below peers.', answered: true }],
   numbers: 'Every figure matches across the pages that print it.', sectionFlow: 'The sections open, develop and close in order.', execSummary: 'The summary states the answer the body proves.',
-  missingAnalyses: [], cutOrMerge: [], findings, topFixes: ['Pull the claim back to the evidence'],
+  missingAnalyses: [], cutOrMerge: [], findings, topFixes: ['Pull the claim back to the evidence'], argument: (packet.argument?.items || []).map((item) => ({ item: item.id, verdict: 'holds' })),
   completeness: S.STORYLINE_DIMENSIONS.map((check) => ({ check, result: check === 'claim' ? 'findings' : 'clean', note: check === 'claim' ? 'Filed F1 on the claim.' : `Checked ${check} and found nothing to raise.` })) });
 const item = (page) => ({ id: 'F1', scope: 'page', pages: [page], check: 'claim', severity: 'major', ifUnfixed: 'The committee would act on a claim the deck does not show.', problem: 'The title claims more than its evidence shows on this page.', fix: 'Pull the title back to the finding the evidence supports.' });
 await fs.writeFile(path.join(moved.out, 'storyline-review.json'), JSON.stringify(critique([item('p02')])));
