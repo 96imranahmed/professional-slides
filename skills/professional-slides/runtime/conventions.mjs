@@ -244,7 +244,7 @@ export function subjectFocus(ex, subject, players) {
   // One colour for the subject on every kind: its series in the accent (`subjectAccent`), as its bar and its row's marker.
   if (inSeries >= 0 && SERIES_CHARTS.has(type) && series.length >= 2) return { ...ex, focusSeries: ex.series[inSeries].name, subjectAccent: true };
   if (category >= 0 && (SERIES_CHARTS.has(type) || STACKS.has(type)) && !["chart.line", "chart.area"].includes(type))
-    return { ...ex, highlights: [{ category: String(ex.categories[category]), style: ONE_BAR.has(type) && series.length <= 1 ? "bar" : "region-tint" }] };
+    return { ...ex, highlights: [{ category: String(ex.categories[category]), style: ONE_BAR.has(type) && series.length <= 1 ? "bar" : "region-tint" }], subjectAccent: true };
   if (inSeries < 0 && category < 0 && series.length < SERIES_COLOURS && ((SERIES_CHARTS.has(type) && series.length >= 3) || (STACKS.has(type) && series.length >= 2)))
     return { ...ex, colorIndices: series.map((_, i) => (i === 0 ? 0 : i + 1)) };
   return ex;

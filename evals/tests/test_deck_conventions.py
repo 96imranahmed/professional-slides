@@ -116,8 +116,12 @@ console.log(JSON.stringify({ declared: tokens("consulting", { subject: "IAG" }),
         # A deck that declares no conventions draws as it did: no subject, no marker, no accent on the line.
         self.assertNotIn("ap03 row", result["none"])
         self.assertNotIn("color.accent", result["none"].get("fd01 line", []))
-        # Keynote's accent reads at 2.5 to 1 on its comparator grey, under a mark's 3:1: its subject keeps the primary.
-        self.assertEqual(result["keynote"]["fd01 line"], ["color.chartComparator", "color.componentPrimary"])
+        # Keynote's accent reads at 2.5 to 1 on its comparator grey, under a mark's 3:1: its subject takes the primary, on the
+        # line, the bar and the table row alike - one colour, decided once for the palette.
+        keynote = result["keynote"]
+        self.assertEqual(keynote["fd01 line"], ["color.chartComparator", "color.componentPrimary"])
+        self.assertEqual(keynote["fd02 IAG bar"], ["color.componentPrimary"])
+        self.assertEqual(keynote["ap03 row"], ["color.componentPrimary"])
 
     def test_the_accent_clears_the_grey_on_the_designs_that_take_it(self):
         """The subject is told from its peers by colour alone: the accent it takes reads at 3:1 against their grey."""

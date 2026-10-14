@@ -711,7 +711,8 @@ function categoricalColors(chart) {
     const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
     // Highlight the answer: the bar the title is about takes the accent; the
     // others keep their series colour (navy), never grey. Forecast periods are lighter.
-    if (barHighlighted.has(categories[categoryIndex])) return accent;
+    // The deck's declared subject takes its one colour (subjectToken): the accent, or the primary where the accent does not clear the grey.
+    if (barHighlighted.has(categories[categoryIndex])) return props.subjectAccent ? token(subjectToken()) : accent;
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
