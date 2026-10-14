@@ -167,7 +167,7 @@ export function seededRandom(seed) {
 }
 
 /**
- * The page types each system is built from (references/theming.md#design-systems),
+ * The page types each system is built from (references/design-intake.md),
  * each as the author reads it (`say`) and, where the entry names forms of the
  * catalogue or exhibit kinds, as the plan reads it: the `forms`
  * (`<type>/<form>`) and `kinds` a deck that features the entry prefers among

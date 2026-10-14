@@ -85,7 +85,7 @@ class PluginDistributionTests(unittest.TestCase):
 
     def test_no_manifest_claims_google_slides_output(self):
         # The runtime writes PPTX. Google Slides is an import the user verifies
-        # separately (references/tools/production.md), not an output format.
+        # separately (SKILL.md, Setup), not an output format.
         for name in MANIFESTS:
             data = json.loads((ROOT/name).read_text())
             with self.subTest(manifest=name):

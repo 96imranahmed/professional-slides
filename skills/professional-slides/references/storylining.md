@@ -1,422 +1,73 @@
 # Storylining
 
-Storylining owns the decision, the answer, the proof and the page sequence. Design begins only when those are coherent. The one-page core below is the method; the sections after it are how each part is done. The records the runtime derives (the content plan, the plan file, the text contract) are documented in [Storyline records](storyline-records.md).
+A storyline is the order in which one reader needs to hear an argument. Write it for the person who will read the deck, starting from what they already know, and settle it with the user before any page is drawn.
 
-## The one-page core
+## Start from the reader
 
-| Part | What it is | Where it lives |
-| --- | --- | --- |
-| Request | The user's words, verbatim, and every sub-question in them | `request` on `deck`; reviewers judge against it |
-| Governing thought | One sentence that answers the request, sharp enough to be wrong | `answer` on `deck`, with the reasons, rivals and thresholds it turns on; the executive summary's title leads with its verdict and the summary's points carry the rest (`CONTENT_ANSWER_UNCARRIED`) |
-| Pillars | Three to five reasons that together prove the governing thought: mutually exclusive, collectively exhaustive (MECE) | One section per pillar; the section title states the pillar's claim |
-| Titles | Each page title is a child of its section's claim: it proves part of it | `title` on each page, within the title limit (`TITLE_WORDS`, see [Action titles](copy.md#action-titles)) |
-| Situation, complication, question | The executive summary opens on what the reader knows, what changed, and the question that raises, then answers it | The summary's first two statements ([Copy](copy.md#executive-summary)) |
-| Signposting | The tracker names the pillars in order, so the reader always knows which claim a page is proving | `tracker` labels are the section titles |
+Ask before writing a title:
 
-**Vertical logic.** Read down: governing thought → pillar → page title. Each level answers "why?" or "how do we know?" of the level above. A page whose title does not prove its section's claim is in the wrong section, or the pillar is missing a claim.
+- **Who reads it, and how.** A board walked through it in twenty minutes, a team reading it alone, a room watching it presented. This sets how many pages, how much text a page carries (`density`: `live-pitch`, `executive`, `pre-read`) and whether the deck needs an appendix.
+- **What they already know.** Have they seen the source? Do they know its terms, the method, the players? A deck summarising a benchmark for people who have never seen the benchmark must first say what was measured, on what, and how it was scored; the same deck for the benchmark's own team skips that and goes straight to the findings. Record the answer as `readerKnows` on `deck`.
+- **What it is for.** A decision, a recommendation, an update, an explanation. Record it as `decision`, and the question the deck answers as `question`.
 
-**Horizontal logic.** Read across a level: the pillars do not overlap (MECE) and together leave nothing needed to accept the answer. For a comparison, one pillar per criterion that decides it, the same criteria for every player; for a recommendation, one per condition the choice depends on.
+When the user gives a source and no more ("make a deck from this"), ask these three questions in one message, each with a recommended default. Do not guess the reader.
 
-**Length follows the evidence.** The body carries about one page per strong insight in each pillar; pillars × strong insights sets the body, and everything else - supporting detail, method, reference schedules - goes to the appendix. A requested length is met with appendix pages and a wider evidence base, never with generic pages padding the body: an evaluation's 50 pages count the appendix.
+## The shape of a storyline
 
-| Audience and occasion | Body | Appendix |
-| --- | --- | --- |
-| Board or steering committee, presented | 8-15 pages | as needed for questions |
-| Decision pre-read, read alone | 15-30 pages | reference schedules, method, sources |
-| Diligence or evaluation pack | 25-40 pages | 10-25 pages; counts toward a requested total |
-| Live pitch | 10-15 pages, one idea each | none, or a short backup |
+1. **The setup the reader needs.** Only what this reader lacks: what the subject is, how the evidence was gathered, what the terms mean. One to three pages for a reader new to the source; none for one who knows it.
+2. **The answer.** One sentence that answers the question, sharp enough to be wrong. It opens the deck as the executive summary's title, or the first finding's.
+3. **The findings that prove it.** Three to five sections, each a claim that holds part of the answer up. Together they leave nothing needed to accept it; no two say the same thing. For a comparison, one section per criterion that decides it; for a recommendation, one per condition the choice depends on.
+4. **Pages under each finding.** Each page title proves part of its section's claim. A page whose title does not prove its section's claim is in the wrong section, or the section is missing a claim.
+5. **What follows.** The implication, the recommendation, the limits of the evidence and what would change the answer. Close on it.
 
-### Answer under uncertainty
+Read the titles down the deck alone: they should tell the whole argument. Read each level across: the sections should not overlap and together should be enough.
 
-A deck that will not answer is not finished. Every sub-question in the request gets a directional answer:
+**Length follows the evidence and the occasion.** A board deck presented live runs eight to fifteen pages; a pre-read fifteen to thirty; detail, method and reference tables go to the appendix. Do not pad a deck to a length, and do not split one table or one chart across pages to make more of them.
 
-- **The lean** - which way the evidence points, in the title, with its magnitude.
-- **The confidence** - high, medium or low, and why, in the subtitle, a note or the summary.
-- **The reversal trigger** - the observation that would flip the lean, named so the reader can watch for it.
+## Find the data first
 
-"Cannot rank" is allowed at most once in a deck, and only when it names the decisive missing evidence and what the reader would need to see. An evidence gap is a finding about the evidence, not a title: lead with what the evidence does show and put the limitation in the `subtitle` or a note. `author-deck.mjs` refuses a deck whose titles lead with a gap - what the evidence lacks, leaves unproven or cannot settle, each title read by a model (`judge.mjs`) - on more than 15% of its analytical pages (`TITLE_GAP_SHARE`).
+The titles a deck can prove depend on the data it has. Before writing them, read the source fully and collect what it measures: series over time, the whole set of members compared, shares, the steps of a change. Record each set of numbers in `<id>.insights.json` as a measure:
+
+```json
+{ "schema": "professional-slides.insights/v1", "insights": [
+  { "id": "i-scores", "finding": "Agent A scored highest on every task family",
+    "measures": { "score": { "unit": "points", "population": "seven agents", "period": "pilot run",
+      "members": ["A", "B", "C"], "values": [71, 64, 58] } }, "cite": ["benchmark"] } ] }
+```
+
+A page then prints the numbers by reference - an exhibit's `series: [{ "measure": "i-scores/score", "name": "Score" }]`, or `{{i-scores/score@A | 0}}` in any text - and the runtime writes them, so a number is typed once. A number typed on a page that matches no recorded value is advised (`NUMBER_UNTRACED`). Cite each source once in the pages file's `sources` registry and name it on the page by key (`source: ["benchmark"]`); the footer line is written from it.
+
+## Titles
+
+Each title states the finding, not the topic: the subject, what it did, and by how much or against what - in two lines at most, about ten words as the norm. The period, population and unit go in the `subtitle`.
 
 | Instead of | Write |
 | --- | --- |
-| Long-run leadership remains unranked | Firm A leans ahead on paid work (medium confidence); matched retention would reverse it |
-| Headline run rates cannot settle the revenue race | Firm B's run rate is about twice Firm A's on company-reported figures |
-| Neither firm has a provably better capital structure | Firm B has the deeper funding access; Firm A the lower committed burn |
+| Financial performance, 2015-2022 | Costs grew 9% a year against revenue's 5%, turning profit into loss by 2022 |
+| Agent results | Agent A completed four tasks in five; the next best completed three |
+| Runtime and score | The fastest agents scored no lower than the slowest |
 
-A judgement that is sharp enough to be wrong is the standard for the governing thought and every pillar. Where the evidence is thin, narrow the claim's scope (a segment, a period, a measure) rather than dropping its direction.
+Match the verb to the evidence: a measured result *is*, a sensitivity *could reach*, an approved plan *will*. Where the evidence is thinner than the wording, narrow the claim - a segment, a period, a softer verb - and keep its direction; the limitation goes in the subtitle or a note, not in place of the finding. Hedges (*may*, *potentially*, *various*, *considerations*) mark a finding not yet written: replace each with the measured fact.
 
-## Define the communication job
+Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`.
 
-Above the dot-dash, record the audience, the actual choice or learning objective, the baseline and alternatives, the horizon, the ranked criteria, the fixed constraints, the evidence gaps and the condition that changes the answer. Distinguish the user's preferences from assumptions. Resolve the decision stage: diagnosis, option selection, recommendation, authorization or explanation. A sourced annual comparison cannot answer a three-year commitment merely by being labelled correctly.
+## The executive summary
 
-Pick the decision architecture from the [templates](templates/index.md) when one matches the audience's primary decision - commercial due diligence, a competitive position, a startup pitch, a project update - and write the storyline directly when none does.
+A summary carries the answer and the case for it, in four to six developed statements: each a claim, the evidence for it, and what follows. The first states the situation and the question; the rest answer it, one per section, with the material limitation and what would change the answer. Read alone, it should let the reader explain the answer and the strongest case against it. Use `summary` form `executive-summary` (developed points) or `parallel` form `labelled-rows` (a label and its points per row).
 
-For authorization, keep one approval unit - the workflow, population, exposure, resources and permission requested - and carry the same unit into the summary and the close. Preparation, testing, live exposure and expansion are different commitments. Ask only for missing information that would change the argument; an existing authorization persists.
+## Body copy
 
-## Find the data before the dot-dash
+- **A page says one thing.** The title is the claim; the exhibit is the evidence; the commentary says what the exhibit cannot - the mechanism, the cause, the consequence. It does not read the chart back.
+- **Points are sentences**, each a claim with its evidence: "Agent A finished in half the time on the long tasks, where the others timed out" rather than "Agent A: faster".
+- **Prose runs in short paragraphs**, each under a bold `lead` the reader can scan: `{ "lead": "Timing is the real exposure", "text": "..." }`.
+- **Numbers are exact and consistent.** One figure has one value on every page, at one precision. Say the unit once, in the heading or the subtitle.
+- **Notes carry method and caveats**, in `note` or a footnote, not in the title or the points.
+- **Labels are short**: a chart's heading names the measure and the population; an axis names its unit; a table's header names what its column holds.
 
-A dot-dash written from what the author already knows produces pages of two numbers each: one company against another on a count. The rich page - a trend with its growth rate, the whole peer set ranked, a share shifting, a network on a map - needs a dataset, and the datasets decide which titles can be proved, so they are found first.
+## Approve the storyline
 
-For a subject with public records, search for and download:
+Show the user the titles in order, each with its page type and the data behind it, and ask for approval in one message. The user can reorder, cut, merge or add pages there, where it is cheap. Once approved, write each page once; change a title afterwards only when the evidence changes.
 
-- **Series over time** for the measures the question turns on, five or more periods, from annual reports, investor presentations, regulators, statistics offices and industry bodies. Country series come in one call: `node runtime/fetch-series.mjs worldbank NY.GDP.MKTP.CD NOR,SWE,DNK --from 2010` or `... owid <grapher-slug> "Norway,Sweden"` writes the CSV, its source and retrieval date, each series' CAGR and a chart block.
-- **The whole peer set** on the same measures and the same basis, not the subject against one rival.
-- **Composition and share**: segments, regions, product lines, and how they have shifted.
-- **Geography**: locations, networks and routes, with coordinates ([Geography](geography.md)).
-- **Pipeline and commitments**: orders, plans, announcements, each with its status (announced, firm, delivered).
-- **Ratios that remove size**: per unit, per head, per route, per asset.
+## Revising a deck
 
-Save what is downloaded under the task's `sources/` with its URL and retrieval date. Where a series is not published, say so and use the nearest defensible one. Declare what the deck compares - organisations, places, products - as `players` on the deck so the deck introduces them, each by the mark it declares (a logo, a place's outline, a photograph), before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)). Only a declaration counts: the runtime does not guess the players from the titles. Research a comparison on the same measures for every member; `n/a` in a table is a finding where a substitute metric would hide it.
-
-### Deck conventions
-
-Section writers working side by side each choose an accent, a peer set, a name and a currency form unless the deck has already chosen them, and the deck review is then the first reader to see the choices disagree. The lead declares them in `deck.conventions` before the skeleton is written, each optional:
-
-- `subject`: the player drawn in the accent wherever a chart plots it; `sectionSubjects: { "<section>": "<player>" }` sets a section's own (the section as `--section` names it), and a page's own `subject` overrides both. The runtime marks the subject on every chart and players' table; an exhibit that names its own focus keeps it, and is refused if it marks another player beside the subject (`SUBJECT_NOT_ACCENTED`).
-- `names: { "<player>": { not: ["<ambiguous form>"] } }`: a form that could mean two companies ("Lufthansa" for the group or its airline). A label in that form is refused, and each title and commentary line is asked whether it uses one (`PLAYER_NAME_REFUSED`).
-- `peerSets: { "<set>": ["<player>", ...] }`: the comparison sets. An exhibit comparing players is one set exactly, or names its set in `peers` and what it leaves out, and why, in `omits` (printed as a note): `PEER_SET_UNDECLARED`, `PEERS_OMITTED_UNSAID`.
-- `currency: "symbols" | "codes"`: units and runtime headings are written in that form; a typed £ or GBP that breaks it is refused (`CURRENCY_FORM`).
-- `heat: "dark-is-better" | "dark-is-more"`: under dark-is-better a heat column shades by its measure's recorded `better` (a rank is better lower), and a column with no direction beside one better lower is refused (`HEAT_DIRECTION_UNRECORDED`).
-
-Every name it uses is a declared player's name or `short`. The skeleton, writer and self-check briefs print the conventions and each page's subject where it is not the deck's.
-
-A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge. If the candidate exhibits are mostly single-period comparisons of two entities, the research is not finished.
-
-## Extract the insights before the titles
-
-Data is not yet a finding. Work each dataset the way an analyst would and record what it says in `<id>.insights.json`:
-
-```json
-{ "schema": "professional-slides.insights/v1",
-  "insights": [
-    { "id": "i-launch-ramp",
-      "finding": "Northvale Rail opened 14 routes in its first 16 months, faster than any of four peers in their first two years",
-      "shape": "series",
-      "breadth": { "periods": 16, "series": 5 },
-      "calculation": "routes in service by month since first timetabled service, per operator",
-      "measures": { "northvale": { "unit": "routes", "population": "Northvale Rail", "periods": ["M1", "M4", "M8", "M12", "M16"], "values": [2, 5, 8, 11, 14] } },
-      "sources": ["sources/northvale-routes-2026-09.csv", "sources/peer-routes-2004-2012.csv"], "cite": ["northvale-timetable"],
-      "soWhat": "the ramp, not the size, is the evidence that the entrant is gaining ground",
-      "strength": "strong",
-      "exhibit": "trend: routes by month since launch, five operators, Northvale highlighted" } ] }
-```
-
-Every number a measure records is read back from the insight's own `sources` at each compile - or from the files the measure names in its own `sources`, where the insight draws on several - at whatever scale or rounding the log keeps it (`SOURCE_NUMBERS_UNREAD`, advised). A figure the source prints signed - `-12.4`, `−12.4`, `+12.4`, or `(12.4)` standing as a table cell - is found only at that sign, so a loss recorded as a gain is told; one it prints unsigned, its direction in words ("fell 12.4"), is found at either. A measure worked out from what the source prints - a share, a change, a spread, a sum - says how in `computed` ("Manhattan net homes over the city's, each year"); better still, it is an analysis the runtime computes (below).
-
-A dated event the values turn on - a switch, a law, a launch - is recorded on the measure itself, `events: { "2023 Q3": "Switch to moving blocks" }` (a period the measure records, six words or fewer). The storyline critic reads it beside the values, which is where a claim like "faults fell after the switch" is checked, and a chart bound to the measure draws it as an event marker at that period (`events: false` on the exhibit draws none). Put in a callout or a calculation alone, the date never reaches the spine the critique reads.
-
-Ask of every dataset:
-
-- **Rate:** how fast is it growing, over what span? What rate would the target need?
-- **Rank:** where does the subject sit in the whole set, and who is nearest?
-- **Share and mix:** what share does it take, and how has the share moved?
-- **Ratio:** what does it look like with size removed?
-- **Gap:** how far is it from the benchmark, the target or the leader, and is the gap closing?
-- **Break:** where does the series change direction, and what explains it?
-- **Counter:** what in the data argues against the answer?
-
-Keep the insights that are specific, surprising or decisive. Each records its `shape` - `series`, `peer-set`, `mix`, `measure-pair`, `bridge`, `geography`, `schedule`, `roster`, `fact` or `qualitative` - which decides the [page types](page-types.md#evidence-shapes) it can carry, and the `breadth` of its data. The log is refused when an insight is ungraded (`strength` is `strong`, `supporting` or `context`), has no `soWhat`, or is too narrow for its shape: a series under six periods (four with peers beside it), a peer set under six members. Widen the dataset while it is still research.
-
-An insight whose evidence is numbers records them as `measures` as well as in its sentence: `{ name: { unit, population, periods | members | period, values | value } }`, with `better: "down"` where less is good news, `boundaries: { label: "..." }` where a member's period or entity differs, and `null` with its reason in `unavailable` where a value is undisclosed. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it; a measure can, and the compile holds each exhibit to the measure it says it plots ([The evidence contract](page-types.md#the-evidence-contract)). `cite` names the `sources` registry keys the insight is cited to, so a page's citation is written from what it plots. A log that leaves a number-bearing insight as a sentence is refused (`MEASURES_MISSING`).
-
-Two kinds of value are recorded as what they are, so the chart can draw them honestly:
-
-- **A plan, guidance, target or forecast** for a period, rather than an outturn: `assumed: true`, `assumedFrom: "<its first such period>"` and a `rationale` saying whose plan or forecast it is. Don't record it as a note in `boundaries`, which no chart reads. The chart draws that run distinguished (columns lighter, a line dashed), and its key says so.
-- **A position in a ranking:** the unit `rank` (1 = best) with `better: "down"`. The chart sets 1 at the top of a line, and refuses bars, columns or an area, whose size would draw the worst place as the largest.
-
-A page then writes its numbers by reference, not by hand: an exhibit names the measure and the runtime draws it (`series: [{ "measure": "i-launch-ramp/northvale" }]`), and `{{i-launch-ramp/northvale@M16}}` in a title prints the recorded value. Whatever is still typed is held to the measure it names, or traced to the measures the page rests on.
-
-A finding is the record a page's words are held to, so it says only what its measures show. A ranking names a population the measures hold - record the rivals and their values, or say whose ranking it is ("Europe's largest by ACI's count") - and a claim about every member, or only one, is written where the data shows it.
-
-A single value that is a limit, target or covenant other measures are tested against says so with `standard: true`: the analysis catalogue then offers every measure in its unit a `threshold` against it.
-
-Write the titles from the insights. Every analytical page names the insights it rests on in `evidence`, and each pillar rests on at least one `strong` insight (`PILLAR_UNSUPPORTED` otherwise). An insight with no page is either cut or missing a page; a page with no insight is either cut or missing its analysis. `author-deck.mjs --draft` prints, for each insight, the page types its shape can carry.
-
-## Run the analyses before the outline
-
-An insight log is a list of records, and a storyline written from it record by record is a walk through them: each page restates one, and the findings that need two - every alternative on the same measures, the gap between two series, the headroom to a threshold - have no record, so they get no page. Before the titles are written, say which analyses the answer turns on in `<id>.analysis.json` and let the runtime compute them over the log's measures:
-
-```json
-{ "schema": "professional-slides.analysis/v1",
-  "analyses": [
-    { "id": "A-peers", "op": "compare", "inputs": ["i-profit/pat", "i-volume/customers", "i-product/rank"],
-      "soWhat": "The lead holds on two of three measures and reverses on the third", "strength": "strong" },
-    { "id": "A-net-debt", "op": "gap", "inputs": ["i-balance/liabilities", "i-balance/cash"], "soWhat": "...", "strength": "strong" },
-    { "id": "A-crews", "op": "scenario", "inputs": ["i-crews/on-shift"], "method": "linear", "horizon": ["FY27", "FY28", "FY29"],
-      "assumptions": [{ "name": "net leavers a year", "value": -8, "unit": "crews a year", "rationale": "leavers continue at the last two years' pace and recruitment stays frozen" }],
-      "soWhat": "...", "strength": "supporting" } ] }
-```
-
-`node runtime/analysis.mjs <id>.pages.json` runs the plan and writes `<id>.analysis-results.json`; the compile runs it again on every pass, so a result is never typed and never stale. The operations are `compare` (members by measures, n/a kept where a member is undisclosed, the rank and leader on each measure, and who leads when each measure in turn is the priority - no weights are invented), `gap`, `ratio`, `sum` (two or more measures in one unit, or the periods or members of one), `product` (two or more measures multiplied, divided by each measure in `over`), `index`, `growth`, `rank`, `share`, `threshold` (the headroom between a value and a recorded or stated limit) and `scenario` (a value carried over a horizon under stated assumptions, and where it crosses a threshold).
-
-Two defaults are the plan's to override. A `compare` sets the deck's declared `players` against each other where it declares them, and every member the measures record where it does not; `members: ["...", "..."]` names the members to compare instead, a player or not, and the finding says how many recorded members were left out. A scenario's path starts at the series' last period, or the one `at` names, and for a measure of one value at its recorded `period` - "base" only where it records none, or the horizon already uses that label. The `horizon` is period labels: calendar or fiscal periods, or years counted from the start ("Year 1", "Year 2") where a projection is not tied to a date.
-
-Where a dated rule sets the rate - a regulator's annual guideline, a contracted step-up, a published tariff schedule - the path follows it rather than holding one rate: a driver `{ "name", "ref": "<insight id>/<measure>", "at": ["<period>", ...], "rationale" }` reads each step's rate from the record at the period `at` names, one per step of the horizon, and a driver whose `ref` is a single value (a recorded gap, an analysis's result) applies it at every step. The record is the result's input, cited and checked like any other, and the rationale says why each step takes the period it does. One rate held over years the record already sets is a number nobody recorded on those years, and a critic will rebuild the path from the rule.
-
-**Start from the catalogue.** `node runtime/analysis.mjs <id>.pages.json --catalogue` lists the analyses the recorded measures already allow, each as a plan entry to paste (`entry`: a suggested id, the op, its inputs) with the finding it computes and the plan's analyses that already run it (`inPlan`):
-
-- `growth` over the span of every series;
-- the `gap` and `ratio` of two measures in one unit over one axis: any two of one insight, and across insights one quantity for two populations or two quantities of one population - but never two differently named percentages (a margin less an occupancy rate is no quantity, whoever each describes); a pair with the same numbers at every label the two share is one number recorded twice, and is not listed;
-- the `rank` of every peer set and the `share` of every `mix`;
-- the `compare` over the declared players on every measure that lists two of them;
-- a `threshold` for every measure against a single value marked `standard: true` in its unit.
-
-Pairs are capped (six an insight, thirty across insights, pairs between two declared players first) and `capped` says what was left out. Choose the entries the answer turns on, give each its `soWhat` and `strength`, and leave the rest: the catalogue is what a critic would otherwise call missing but computable, not a list to run in full. A scenario is never listed, since its assumptions are the author's to state. The draft's summary points here (`catalogue`) when the plan runs none of the listed analyses about the declared players beyond the comparison itself.
-
-**One calculation is one analysis.** `gap`, `ratio`, `sum` and `product` set their inputs label against label. A single value stands against every period or member of the others. Two measures that run over different axes, or share no label, are not aligned for you: say which value of each to read in `at`, and the result records the choice among its boundaries.
-
-```json
-{ "id": "A-clinics-with-planned", "op": "sum", "inputs": ["i-clinics/open", "i-clinics/planned"], "soWhat": "...", "strength": "supporting" },
-{ "id": "A-newcomer-ceiling", "op": "product", "inputs": ["A-clinics-with-planned/result", "i-largest/visits"], "over": ["i-largest/clinics"],
-  "at": { "A-clinics-with-planned/result": "Newcomer", "i-largest/visits": "FY26", "i-largest/clinics": "FY26" },
-  "assumptions": [{ "name": "the newcomer sees the largest group's visits per clinic", "rationale": "the newcomer publishes no visit count, so the largest group's throughput stands in as a ceiling" }],
-  "soWhat": "...", "strength": "strong" }
-```
-
-Units are composed from the inputs and cancelled: clinics times visits per clinic is visits, a ratio of one unit is a `ratio` (or `%` with `percent: true`), and a percentage in a `product` is applied as the fraction it is (45% of 140 m is 63 m). Where the composed unit does not simplify the result says so; state the result's `unit` with a `unitRationale` where it has a plainer name. A premise nobody recorded - one entity's ratio standing in for another's - goes in `assumptions` as `{ name, rationale }`, and makes the result `assumed`. `growth` on a measure in % reports the change in percentage points and nothing else: a margin moving from 9.4% to -6.1% is 15.5 points down, and the percentage of a percentage is computed only with `relative: true`, labelled as one.
-
-What a result did with its inputs is said among its boundaries:
-
-- a unit is a percentage wherever it says so (`%`, `margin %`, `share (%)`, `per cent`, `percentage points`); a `product` applies it as a fraction, where a `ratio` divides by the number as recorded (140 m over 45% is 3.1 m per point) and says that it did;
-- a result that combines measures of different populations names them;
-- a `sum` of one measure over its periods says how many periods it adds: right for a flow, wrong for a stock or a level.
-
-Every result says what it is. `computed` rests on records alone. `assumed` rests on an assumption, each listed with its value and rationale: a number nobody recorded is said as one. `unavailable` names the input the records do not hold - list what is needed in the analysis's `missing` where no measure exists to point at - and carries no page; the critic is shown it as the gap it is. A computed or assumed result joins the log as a derived insight under its id: a page names it in `evidence`, an exhibit names its measure (`series: [{ "measure": "A-net-debt/result" }]`) and a sentence prints its number (`{{A-net-debt/result@FY26}}`).
-
-Two results are drawn without typing a number. An `index` result's measures carry their base, so a `trend` of form `indexed` names them and nothing else. A scenario's `path` joins the recorded series it starts from as one line (`"measure": ["i-crews/on-shift", "A-crews/path"]`), with the assumed run marked on the chart.
-
-A deck that declares two or more `players` compares them: without a computed `compare` that places every declared player, the spine is refused (`ANALYSIS_REQUIRED`). A player is placed when a compared measure lists it - with its number, or with `null` and the reason in `unavailable`, which is a finding - and at least two players have a number on one measure. A comparison over measures that name none of the players has not compared them. A deck that compares nothing is asked for no matrix.
-
-## Prove the governing answer
-
-Build a hypothesis tree for a decision, or a concept map for an explanation, with stable node IDs. For each terminal branch keep the provisional answer, the confirming and disconfirming evidence, the consequence, the evidence status and its disposition (body, appendix, or the one allowed unranked question). Siblings divide the same parent question. Stop expanding when more detail cannot change the answer.
-
-Name the actual competing route and the constraint it can or cannot change. "Test whether ownership helps" is a research question, not evidence of a mechanism. State the common outcome and the observation that would reject the proposed advantage. Where a difference is not measured, the page states the lean the evidence supports and names the missing measure as its reversal trigger ([Answer under uncertainty](#answer-under-uncertainty)); it does not replace the gap with invented precision, and it does not make the gap its title.
-
-Under each title state the evidence that settles it, what it builds on, what is new and the audience consequence. A comparative title needs comparable proof on both sides. A selected example establishes an instance; a median establishes location, not consistency; a correlation or arithmetic bridge does not establish causality. A decomposition states its baseline and allocation order.
-
-Place a governing prerequisite before the first comparison that relies on it, or show its decisive proof locally in that comparison. Keep a constraint beside its first consequential use rather than in a later section that forces the reader to reconstruct it.
-
-**Merge before layout.** Compare every page with its closest sibling and draft the merged alternative. Keep separate pages only when joining them materially harms a necessary comparison, explanation or lookup; different titles, extra caveats and another arithmetic step are not enough. A ratio, its distance from a threshold and the same distance in currency normally belong in one comparison. Consolidate preview scorecards and repeated endings. Audit detail earns its appendix place, but it is not another persuasive premise.
-
-Give secondary obstacles proportionate space: if an option already fails an essential prerequisite, attach a further cost to that option unless it could reopen the choice. Adjacent schedules that repeat the same activities under different headings join on one time axis. When deletion takes a deck below a requested length, return to evidence breadth - a genuinely unanswered question the sources support - or move reference material to the appendix; never split a page to recover the count.
-
-## Read the answer against the log
-
-Before the skeleton is written, a fresh critic reads the answer against the insight log: `node runtime/answer-critique.mjs <id>.pages.json out/`. At exit 3 give `out/answer-critique/prompt.md` to the critic, save its JSON as `out/answer-critique/answer.json` and run it again. It has the request, the question, the answer, every insight with its calculation note and recorded values, and the computed analyses. No page exists yet, so each item it raises costs one edit, not a rewrite of the sections.
-
-It reads each claim of the answer five ways:
-
-- **Support:** some insight records evidence for it.
-- **Scope:** a ranked or universal word ("best", "leads", "only", "every") holds against the whole set the log records.
-- **Basis:** two figures set against each other share a definition, population and period, as the calculation notes say.
-- **Edition:** a change is read within one source edition, not across two editions or a restatement.
-- **Analysis or gap:** what the reasoning needs is computed from the log's measures, or researched.
-
-Each item says its remedy: **narrow** the answer, **compute** the analysis, or **research** the data. Do all three before the skeleton. The same critic names the log's hazards: comparisons its own records cannot support, whatever the answer says.
-
-The skeleton and writer briefs print the open items and the hazards. The storyline critique's first pass is told of them, and files any the spine still carries. While the answer stands unchanged after a `revise`, the storyline critique refuses to stage.
-
-On the BA benchmark the storyline critique's first pass raised four blocking or major items, three quarters of an hour in. All four were in the log before any page existed: "the best returns" against a rival's higher margin, a recommendation the log's own series undercut, a share compared on another basis, and a series across two survey editions. The first two were in the answer itself, the last two in the log's calculation notes.
-
-## Work in parallel with subagents
-
-Research and analysis split cleanly, so when the harness can spawn subagents, fan them out. The lead keeps the request, the answer, the players and the title spine; subagents do bounded work and return files.
-
-| Stage | Fan out by | Each subagent returns |
-| --- | --- | --- |
-| Find the data | Workstream: the subject's series; each player group; market and demand; geography; pipeline; the counter-case | Files under `sources/<workstream>/` with URL and retrieval date, and what it could not find |
-| Extract the insights | The same workstreams | `insights/<workstream>.json` in the insight-log format - `{ "insights": [...] }` - every finding with its calculation, sources and `measures` |
-| Lay out the pages | Section, once the spine critique is `ready` ([Run in parallel](parallel-run.md)) | The section's pages, drawn only from the merged insight log |
-| Critique | A fresh subagent every pass; one per section plus a spine critic for a long storyline | `storyline-review.json` ([stress-test](#stress-test-the-storyline)) |
-
-**Keep each brief small.** `author-deck.mjs <id>.pages.json --brief <role> --section <part>` prints one for a section's skeleton, writer, critic or judge. A subagent's brief names its files, its pages, the commands that check its work and the one or two things this deck asks of it - the voice, the counter-case to keep - and links the references for the rest; it does not restate them. A brief that copies the rules runs to pages, is read in chunks, and drifts from the rules as they change; a stalled worker is relaunched more often than a slow one finishes. Each writer works in a scratch folder of its own (`scratch/<part>/`), and checks its pages with `--check --page` and `--claims`, never the whole deck while others write.
-
-The lead does not paste the parts together: `<id>.insights.json` lists them - `{ "include": ["insights/subject.json", "insights/peers.json"], "insights": [...] }`, paths beside the log, the log's own insights first - and every reader of the log merges them in that order. Give each workstream its own id prefix. A part is a file in the log's folder or under it (one outside it - `../`, an absolute path, a link that leads out of it - is refused), and a file that is not JSON is named in one line.
-
-An id recorded twice - in two parts, or twice in one file - is refused with both places named, and one measure recorded twice - the same name, population and unit in two insights - is reported (`MEASURES_CONFLICT`): it blocks where the two records hold different numbers for one period or member, and is advised where they agree or differ only in rounding. The check reads structure only, and does not catch:
-
-- one quantity under two measure names, or one population spelled two ways;
-- one quantity in two scales (millions in one record, billions in the other);
-- one period under two labels (a two-digit year and a four-digit one);
-- an entity's own record against its row in a peer set.
-
-Agree the measure names, populations, units and period labels in the brief.
-
-Use at most four workstreams, each with a budget of about fifteen searches and a list of the decisive series to find; tell it to stop when those are found and to record what it could not find. Brief each subagent completely - the request, the answer so far, exactly what to find, the file formats and folders, the evidence date, and to record rather than invent what it cannot find. Only the lead edits the title spine. A harness with no subagents runs the same stages in sequence.
-
-## Stress-test the storyline
-
-Before any page is laid out, the spine goes through a mock problem-solving session with a reader who did not write it. The order is fixed: evidence, analyses, the draft spine, the critique brought to `ready`, then one layout pass and the build. Do not draw exhibits or write copy to prepare for the critique: it does not read them, and every pass that sends the spine back would send the layout back with it.
-
-`node runtime/storyline.mjs <id>.deck.json out/` (on the deck `author-deck.mjs --draft` wrote) stages a packet - the request, the answer, the pillars, the titles with their one-line claims, the page types, what settles each claim, the insight ids and the measures each page shows with their recorded values - and a prompt for the senior reader who must sign the storyline off, and exits 3. The default is this spine critique, which returns at most ten items. `--full` adds the page-level checks (claim, shape, sourcing, restatement, consequence on every content page); above 30 content pages a full critique splits into section prompts of at most 16 pages plus a spine prompt, whose answers `storyline.mjs merge <id>.deck.json out/` joins.
-
-`--split` stages that split at any length, so sections written side by side are critiqued side by side; it takes the page-level critique (the spine critique is one reading, capped at ten items, and refuses it), and only a first pass splits.
-
-1. **Spawn a fresh subagent** as the critic - the harness's agent or task tool, or `--run codex` / `--run claude`. Give it only the path to the printed `prompt.md`. A critic that knows what the author meant forgives what the page fails to show.
-2. **Save** its JSON as `out/storyline-review.json` and run `storyline.mjs` again: it validates the critique against the packet it answered and records it under `<deck dir>/.reviews/<id>/storyline-history/`. What the form asks and what the runtime settles for the critic:
-   - a page is named by the id in brackets on its line of the listing - a section's divider has one too - never by its position;
-   - a range in a page list (`"p16-p19"`) is read as every content page between its ends, and a page a spine item's own `problem`, `fix` or `freedUse` names by id is added to its list. The result says so (`formMended`), the pass's record keeps it and the answer file is rewritten with the settled lists;
-   - an answer refused for its form (`invalid`, exit 2) is moved to `out/storyline-review.refused.json`, so the corrected answer is written to a path that holds no file: give the critic the errors and the refused answer, and have it save the correction as `out/storyline-review.json`;
-   - a title a fix proposes, or a length it asks for, is given in the finding's `retitle` - one entry a page, its `page` one of the finding's `pages`, with `title`, `words` (`{ min, max }`) or both - and never read out of the fix's sentence. It is held to the title limits the packet prints, and a section title (an entry whose page is a divider) is composed on its divider and refused where it does not fit; the prompt gives the words that always fit and the most the divider holds of short ones.
-3. **Revise at the root.** A missing analysis means the analysis, not a new sentence: each one names its `remedy` - `computable` from the measures already in the log, runnable under a stated `assumption`, or needing `retrieval` of data the packet does not hold - and closes on its artifact, the computed analysis or insight a page now rests on: one that is new, changed, or newly rested on since the pass that left the item open - an analysis that already stood there, unchanged, is what the critic judged insufficient. A finding closes as `fixed` where the argument moved: on a page it names, on the page the status names in `artifact` (the verification prompt lists the ids of the pages that moved, a divider among them), or in the answer - a redrawn exhibit or reworded copy moves nothing. These are checks that something changed; whether the change answers the item is the critic's judgement. A page that says what the evidence does not establish has qualified the gap, not closed it. A two-number chart becomes the whole peer set or the trend; an unranked question becomes a lean with its confidence and reversal trigger; an obvious page is cut or merged.
-4. **Verify.** With the argument changed, `storyline.mjs` writes a verification packet: the critic gives every open item a status and may add only a major or blocker item that the revision introduced.
-5. **Stop at `ready` (exit 0), or at three passes.** A storyline still sent back after the third pass goes to the user with its open items. Where the evidence scope is closed, a retrieval the team may not make is `scope-limited`: it stays open at its severity, and the loop can end as `provisional` (also exit 0) only when nothing else is open and the deck offers its answer as provisional. An item the answer no longer needs, because the answer now claims less, closes as `narrowed`; the runtime checks only that the answer changed, and the critic judges that it claims less.
-
-   A pass past three is the user's to allow; ask for it once, when they approve the outline, since a title the self-check narrows later sends the spine back for a pass: their answer is recorded on the deck as `storylinePasses: { max, granted, at }` - `max` of four to eight, `granted` in their words - and the loop runs to that many without stopping to ask again.
-
-   Two passes do not count against the three, and neither is the author's to claim. A rejected deck review allows one for the pages its findings reopen. And where a full compile raises, on the storyline a critique passed as ready, a finding only a change to that storyline mends - a dependency between what a page declares - that the draft of the same pages did not raise, the compile records it in the deck's lineage (it says so), and the loop then writes one verification pass for those pages and the answer: shown the findings, once in a lineage, refused where any other page's argument moved. A page the page compile refuses does not earn it: a page the draft passed has a layout the compile takes, so that refusal is mended by the layout. A draft is the full compile, so this should never be needed; it is there so that a disagreement of the runtime with itself does not cost a deck.
-
-**One standard with the deck review.** The critic's checks carry, after each check's own question, every clause of the deck review's rubric that the spine already decides, in the reviewer's words; its severity levels and its rating scale are the reviewer's ([Taste review](taste-review.md#one-standard-applied-earlier) lists which clauses, and owns the scales). So an item the review would file on the argument - a title that claims more than the periods or members its page shows, a comparison with one member, two pages stating one quantity differently - is the critic's to file first, and a rating of 8 means the same at the spine as on the deck.
-
-**A calibrated critic.** A critic that sends a sound storyline back costs as much as one that passes a broken one: the team spends a pass mending what was never wrong. So:
-
-- the critic is told the prior a fair reader brings - most storylines a competent team brings are ready with a few minor items, and an answer with no items is valid;
-- a blocking item (major or blocker) says in `ifUnfixed` what the decision-maker would wrongly conclude or decide if it stays; one that does not is recorded as minor (`formMended` says so);
-- the severity scale names consequences, not kinds of defect: a sharper claim, a better order, a counter-argument worth a line, an analysis that would deepen the answer without changing it are minor however many pages they touch;
-- the verdict and the two judgements are read off the items (`withJudgements`), never asked of the critic, and the rating stays its own second reading;
-- a verification pass closes an item filed in error as `withdrawn`, quoting the packet line that shows it.
-
-`evals/quality/critic-calibration.mjs` measures the critic on frozen packets: each planted defect found at its place, the same test quiet there on the clean twin, the clean decks passed.
-
-**The form of a critique.** Every critic prompt lists, under FORM, the rules validation enforces on an answer, from the table the validator's refusals are read against (`storylineFormRules` in `runtime/storyline.mjs`): the item cap, the page lists, no page list by example and the form of `retitle`, with the title limits what it proposes keeps to. A long spine's section and spine parts each have their own schema (`part-schema.json`, `spine-part-schema.json`).
-
-**A second critic on what blocks.** One critic's majors vary from run to run: fresh critics on one deck file a different major each time, and a deck could go to its cap on whichever it drew. So when a pass files blocking items, the loop does not record it yet: it writes `confirm.md` beside the packet and returns `confirm`. Give that file to a second fresh critic - it reads the same packet and says of each item whether it blocks - and save its JSON as `out/storyline-confirm.json`, then run the loop again. An item the second critic does not confirm is recorded as minor, still in the ledger but no longer holding the deck, and the verdict is read off the items as ever. `--run` asks the same backend for both.
-
-**The research a critique asks for.** Every pass that leaves work open writes `out/research-tasks.json` beside the critique, and the run prints it, blocking tasks first: each missing analysis with why it matters, the data it runs on, its remedy and what closes it (`analysis`); each open blocking finding with the fix the critic named, since a finding like "build the path year by year from the recorded orders" is analysis work too (`revision`); and, where the deck's chart pages plot fewer values than strong decks', its thinnest trend, ranking and comparison pages, each a peer set, a second series or a longer window short (`depth`). Run them before revising the pages: a verification pass reads a missing analysis closed only on its artifact (the analysis, or the insight a page rests on) or on the searches that show the data cannot be had, never on a page reworded around the gap.
-
-**Through the layout.** Once the critique closes - ready, provisional, or its own passes spent - the compile holds what it read: a page whose title, page type, settled claim, evidence or shown measures moved since is refused as `SPINE_LOCKED`, naming the page. The layout, the copy and a chart redrawn in another chart form stay free. To change the argument on purpose, compile with `--reopen-spine` and take the deck back to the critique; where its passes are spent, the next one is the user's to grant.
-
-**After a deck review.** A review finding whose repair changes a bound fact reopens the critique for the pages it names. Each rejected deck-review pass allows one verification pass for that, outside the cap of three and scoped to those pages and the answer ([After a rejection](taste-review.md#after-a-rejection)); a spent cap otherwise stops the loop.
-
-The loop's rules - exhaustive first pass, verification passes, the cap, lineage, provenance, and restarts with `--reason` (switching between the spine and `--full` is one) - are the deck review's, owned by [Taste review](taste-review.md#order-of-the-reviews). Each pass records the version of the binding it was made under. A lineage whose latest pass was recorded under an older version cannot say which pages changed since, so the next `storyline.mjs` run archives it (`storyline-history/retired-<n>/`, logged in `lineage.json` with the reason) and writes a first pass: not a restart, and nothing of the old lineage counts against the cap.
-
-What was open in a retired lineage is not dropped with it. Its blocking items still open are listed in the new packet as open when the earlier lineage was retired, each with its text, and `lineage.json` records how many were carried. The critic says of each, in `carried`, whether it still stands on the spine as it is now, and files the ones that do as items of the new pass; a critique that leaves one unanswered is refused.
-
-The critic holds the deck to the request: every sub-question answered with a lean, distinct pillars that together prove the answer, pages carrying evidence a reader could not assemble in five minutes. No deck review is prepared, and no deck delivered (`STORYLINE_UNREVIEWED`), until the gate is `ready` for the current spine. A revision whose titles, order and source slides are unchanged needs no critique. Set `targetPages` on the deck when the user asked for a length; the appendix counts toward it.
-
-### What the critique is bound to
-
-The gate binds to the argument, so that the layout is done once, after `ready`, and a layout repair that leaves what each page shows as the critic read it does not reopen the critique.
-
-| Bound: changing it needs a verification pass | Not bound: the layout, free after `ready` |
-| --- | --- |
-| The `request`, its provenance and the evidence scope; the `answer` and its status | The brief, the audience, the design and every other deck setting |
-| The pages and sections, in order: a page added, cut or moved | - |
-| A page's `title` (its claim) and its `type`, the reading task; a section's title | Its `form`, where its `commentary` sits, `takeaway`, `why`, `adds`, the subtitle; a section's `summary` |
-| `settles`: its `kind`, `what`, `measures` and `relation` - as written, or, on a page that leaves `settles` out, as derived from the findings of the insights it names | A chart's form within its class (a line redrawn as columns, a bar as a lollipop, a row as a stack), headings, captions, highlights, annotations |
-| `evidence`: the insights and analyses the page rests on | Points, the rail, the so-what bar, table cells and every other piece of copy |
-| The measures the page shows, each as proof or context, measure by measure (one chart can show both): the claim's measures, and every `basis` on an exhibit, block or metric | A second exhibit that shows a measure the same way as the first |
-| What the page shows of each measure, exhibit by exhibit: which of its periods or members (a window, a dropped period or member), and the exhibit's class - a plotted chart, a table, or a figure (a metric, a hero figure, a fact grid, a stat list) | The numbers a chart plots on its category axis for a measure it names: the evidence contract holds them to the record |
-| In a table, or any exhibit with no category axis: the recorded number each period or member it names is stated with, and every value it types (a bar cell's `value`, a scatter's points) | A cell's wording, so long as the cell still states the recorded number its header and row name |
-| The numbers drawn by an exhibit that names no recorded measure, with its class - every numeric exhibit of a deck with no insight log | A number written into a label or a cell's text |
-| The recorded values, unit and periods or members of each measure the page shows, from the insight log and the analyses | The insights' wording, and measures no page shows |
-
-So the spine says, before anything is drawn, what each page will show. `settles.measures` names the claim's measures, which count as shown; a page that will show more - further members of a peer set, a context measure - declares it at the spine as an exhibit holding only its `basis` (`"exhibits": [{ "basis": { "measures": ["i-efficiency/branches"], "role": "context", "relevance": "..." } }]`), which `--draft` accepts and the layout pass fills in. A measure first shown at layout is a changed argument on that page: the gate names the page, and the next `storyline.mjs` run writes a verification pass that reads it.
-
-**State at the spine what each page shows of each measure** - a window, a subset of members, a table or a single figure - because that is part of the argument the critic reads, and the layout is held to it:
-
-- A page that will show the whole measure plotted needs nothing, where its type can plot it. Undrawn and undeclared, a measure is read as shown whole - every period or member - plotted, or tabulated where its page type's exhibit is a table (`lookup`, `scorecard`, `options`), a measure of one value as a figure. The draft writes exactly that exhibit into the page and compiles it: where the type cannot show the measure so - a summary, whose exhibit is a table of a few cells; a matrix or a memo, which carry none - the page is refused (`SPINE_UNDETERMINED`) until the spine says what it will show.
-- Any other view is written at the spine. The normal way is the bound exhibit, one line the layout keeps: `{ "series": [{ "measure": "i-cash/ocf", "name": "Cash flow" }], "select": { "from": "FY21" } }`. Where the exhibit is not written yet, its `basis` stub states the view: `{ "basis": { "measures": ["i-cash/ocf"], "as": "table", "labels": ["FY25", "FY26"] } }` ([the fields](page-types.md#the-evidence-contract)).
-- `--draft` and `--plan` print, for every page, how each measure it does not draw yet will be read (`readings`: "p12 i-cash/ocf: read as plotted, every one of its 8 periods"), and the packet says the same in brackets after the measure ("tabulated, 2 of its 8 periods: FY25, FY26"). Read the list before staging the critique.
-
-**Bound titles are proven layable before the critique.** `--draft` and `--plan` compose every section title on its divider, the contents page, the tracker and each page's title band under the deck's own design, and refuse one that does not fit with the room it has (`SPINE_UNFIT`, [the rule](page-types.md#spine-rules)). A title is never first found too long after `ready`, when shortening it would cost a pass.
-
-**So is everything else whose repair would change a bound fact.** A draft is the full compile of the spine completed with placeholder copy: it refuses what the compile refuses, refuses as `SPINE_UNDETERMINED` a page whose laid-out view the critic would not have been told, and defers one closed list - copy, unbound content, layout, fit ([the list](page-types.md#the-pages-file-is-the-dot-dash)):
-
-- every exhibit the spine determines - a bound or typed chart, a stub's view, a measure read whole - is composed with placeholder copy and refused where no chart can draw it, such as a measure with an undisclosed member plotted whole (`SPINE_UNDRAWABLE`; the repair names the choice, `select: { members: [...] }` over the disclosed ones or a table);
-- the dependency contract on what the page has declared - a relation left undeclared, context nothing explains, a claim's measures not shown - blocks in the draft, not after `ready`;
-- the executive summary is composed at its word ceiling and refused where it cannot fill its page (`SPINE_UNFILLED`): write its answer table at the spine.
-
-Laid out to the view the critic read, the page keeps the critique. Another window, a dropped period or member, or another class first drawn at layout reopens that page alone.
-
-How a drawn exhibit is read: a chart shows the periods or members on its category axis. A table - any exhibit with no axis - shows the ones its column headers and row labels name, where a number under that header or in that row states the recorded value (what a cell says in passing is copy); with none named, the ones whose recorded value it states. A header kept over other numbers shows nothing of the measure. The values such an exhibit types - a bar cell's `value`, a scatter's points - are bound as themselves, so an exhibit that types values is written at the spine, bound, not declared by a stub.
-
-The critic is shown the same thing it is bound to: the spine packet lists no exhibit form and no drawn number, and the `--full` packet shows a drafted exhibit or sentence marked as a draft, which the critic is told not to file items on.
-
-### What the reviews are told
-
-The critic and the deck's reviewer judge against the request, so they are told what it is. `requestProvenance` on the deck says how the `request` came to be - `verbatim` (the default), `reconstructed` or `paraphrased` - and a request that is not the user's own words is read for what it asks, not held to its wording or to an answer its phrasing presumes. `evidenceScope: { retrieval: "closed", note, quote }` says the author may use only the evidence supplied: a missing analysis that needs other data then keeps its severity and cannot be asked of the team. The limit is the user's to set, so `quote` gives the words that set it, and the runtime checks where they are written: in the `request` itself where it is verbatim; where it is reconstructed or paraphrased - the user's own words are not on record, which is a fact about the request and not about the evidence - in the file `source` names, the brief or message saved as text beside the pages file (`"source": "sources/brief.md"`). The compile and the storyline loop read that file and refuse a quote it does not hold; the critic, shown the words and where they come from, says whether they set a limit; and the delivery record carries the closed scope with its quote, its source and the request's provenance. An author cannot close the scope by saying so, and need not call a reconstructed request verbatim to keep a limit the brief sets. A provisional pass is a pass the earlier rules did not have: a storyline with a decisive retrieval open can reach the deck review, as provisional, where before it was sent back or closed on a search log. `answerStatus: "provisional"` with `answerLimits` offers the answer as provisional and says what it leaves open; delivery records a deck accepted on a provisional storyline as provisional, with the items left open.
-
-Each recorded pass carries two judgements beside its verdict, read off its ledger: `compliance` (has the team done everything the evidence in scope allows - `complete` only when nothing it could still act on is open) and `sufficiency` (does the evidence support the answer as stated - `sufficient` only when nothing is open at all). A team can comply and the answer still not be sufficient. The rating is on the deck review's anchored scale ([Taste review](taste-review.md#benchmark-and-score)) and is the critic's own reading: it is not held to the items, so a ready verdict rated 6 is a signal to read the critique, not a contradiction.
-
-## Reconcile evidence before design
-
-Verify factual premises and dated source status: rumour, announcement, agreement, approval and completion are distinct. Track whether research is resolved, uncertain, unavailable after lookup, not yet performed or needs the user's input; do not describe unperformed research as unavailable.
-
-Keep one record for each reused measure: definition, member values, exclusions, population, unit, period, evidence state, inputs, formula and rounding. Sum members before drafting totals, and derive shares and distributions from the records. A parameter's identity travels with its values into labels, notes and summaries; changing it reopens every page that uses it.
-
-Match alternatives on the same horizon and feasible commitment, and separate economic value from cash, one-off from annual, gross from net. When sensitivities govern the same outcome, join them into one feasible case rather than a series of isolated calculations. Match uncertainty to the sampling unit: repeated observations are not independent cases. Synthetic or illustrative records demonstrate a mechanism; they do not establish demand or uplift. [Production](tools/production.md#portable-evidence-and-release) owns reproduction.
-
-Take a picture inventory with the evidence. List every subject a reader would recognise on sight - a product, a brand, a place, a person, a site - and give each a source: a cleared asset with its credit, one only the user can supply (ask for it), or none because the subject has nothing to look at. Plan the pictures still to come as `{ alt }`; the build lays them out and `UNSOURCED_PICTURE` holds delivery until they are filled.
-
-## Approve it
-
-The ghost dot-dash - the title spine in order, with each page's type and the insights it rests on - is the one point where the user approves the argument before copy is written ([pipeline step 5](../SKILL.md#pipeline)). A standing instruction to proceed satisfies it; a requested change authorizes that change and its dependencies. Internal reviews are not approval steps.
-
-## Revising an existing deck
-
-A revision writes a new PPTX from the user's deck; the original is never edited. It is one of two things, and the import's starter says which.
-
-Build it in a task folder of its own beside the user's deck - `<work>/` holds the pages file, the inventory, the copy of the source deck and `out/` - not in a scratch or temporary directory: the files there are the record of what was changed, and the delivery is read from them.
-
-**A point change** (`import-deck.py deck.pptx <work>/ --carry`) changes what the request names and nothing else. Every slide starts as a page marked `carry: true` beside its `draft`, and the build copies a carried slide from the source deck - the copy the import keeps as `<id>.source.pptx` - part for part: its XML, its layout, master and theme, its charts and their workbooks, its pictures and its notes are the user's bytes. A carried slide is not compiled, composed, gated, critiqued or reviewed. The author changes a page in one of three ways:
-
-| The change | Written as | What the runtime does |
-| --- | --- | --- |
-| Words on a slide: a figure, a name, a line | `replace: [{ "old": "£12.4m", "new": "£12.6m" }]` on the carried page; a new `title` | rewrites the words inside the slide's own text - its shapes, its table cells and its speaker notes - so every shape, font and position is the slide's; `old` is whole words as the slide prints them, in one paragraph |
-| What a slide shows: a chart's numbers, another exhibit, a new layout | a `type` and its choices in place of `carry` and `draft`, keeping `id` and `sourceSlide` | composes the page in the deck's `design`, at its place and with its page number, and holds it to every page rule; the inventory has the slide's table cells and chart values |
-| A page added, cut or moved | a typed page where it belongs; the page deleted from `pages`; the pages reordered | sets the composed page among the carried slides; drops the source slide with every part only it drew on - its notes, its chart and the chart's workbook, a picture no kept slide shows (`revision.removed` in `out/build-result.json` lists them) |
-
-An edit rewrites whole words. "12.4" is not printed by "£12.4m", "12.4%" or "£112.45": each is another word, which an edit of 12.4 must not reach, so `old` names the figure as the slide prints it ("£12.4m"). An `old` the slide prints only inside longer words, or more than once, is refused with the places named (`REVISION_CARRY_INVALID`): write more of the words around the one you mean, or say every one is meant with `"all": true`. The stale check reads a slide the same way.
-
-What is preserved, and what is not:
-
-- A slide carried untouched is identical to the source's, byte for byte, with every part it draws on. The build proves it: it reads each one back from the written file and compares (`revision.preserved` in `out/build-result.json`; a difference is `REVISION_CARRY_DRIFT`). Only the three parts that list the slides are rewritten, and not even those when no slide is added, cut or moved.
-- A slide edited in place keeps its shapes where they were; the run of text the old words stood in takes the new words and keeps its own formatting. Nothing checks that longer words still fit the user's box: look at the edited slide in `out/deck/`.
-- A composed page is redrawn. It takes this skill's design, not the user's template: it brings its own layout, master and theme into the file beside theirs, and prints its place in the deck as its page number. It does not join the source deck's own navigation - a tracker or a contents slide the user's deck draws is theirs, and a contents slide that lists a changed title is found by `WORDING_STALE`, not rewritten.
-- A chart's or a diagram's own data is not text: `replace` cannot change it (`REVISION_CARRY_INVALID`), and the page that holds it is redrawn by giving it a `type`.
-- Composed pages are 1280 x 720 px. A deck of another slide size takes text edits and no composed page (`REVISION_SLIDE_SIZE`); the import says so (`decide`).
-
-What a point change is judged on:
-
-- **The pages it composes** answer for every page rule, under the rules version the deck records (`rulesVersion`, which the import stamps on the pages file and on the inventory, and the compile keeps: a rule introduced later is an advisory to it). A pages file that records a version below the one its import stamped is asking to be held to less, and says why in a sentence the reviewer can check (`rulesVersionReason` on `deck`; without it, `REVISION_RULES_VERSION`).
-- **What a composed page keeps of its slide is the user's.** A page composed where a slide stood may keep the slide's own title, word for word, and the slide's own source line over numbers the slide already showed. The compile checks each against the inventory; kept, they are advised on and never refused - the swap "redraw the pie as a donut, leave everything else" compiles under the slide's label title. A title or a source line the revision writes instead is the revision's own: a new title is a claim, and a new source line cites the measures the page shows, as on a new deck.
-- **A deck rule is held over the composed pages wherever they are enough to read it.** A rule that counts across pages - a share, a rate, a run - is read over the pages the runtime composed once there are as many as the shortest deck any deck rule reads (eight); a rule on what the deck as a whole must have - a summary, sections, the answer up front - once those pages are also most of the deck. Below that it is an advisory, printed in one line with the reason (`Not held`). So one composed page among twenty-seven carried slides is held to no deck rule, and one carried slide beside forty composed pages changes nothing they are held to. A rule about a named page, statement or record of the revision's own always holds.
-- **The delivery bars are held on the composed pages.** A build bar (`BAR_CHARTS_ANNOTATED` and its siblings) reads what the runtime drew, so the compile, the build and delivery hold it over the pages the revision composed - a floor from as many analytical pages as any deck's, a cap from the first - and every stage says it is not held on the carried slides. The three stages ask one decision of every finding, so what the compile passes delivery does not refuse.
-- **It may not leave the deck saying two things.** A `replace` names the old words and the new, and a composed page stands where a slide stood, so the compile looks for what each changed on every slide: a figure left behind is `NUMBER_STALE`, old words or an old title `WORDING_STALE` ([What the pages say between them](page-types.md#what-the-pages-say-between-them)). No recorded rules version excuses either.
-  - The carried slides are read from the inventory as their edits leave them, speaker notes included.
-  - A figure is looked for as a quantity - its value, its kind and its scale - so "£12.4m", "£12.4 million", "GBP 12.40m" and a table's 12.4 under "Revenue (£m)" block alike; the same amount at another scale ("£12,400k"), a chart's data it rounds (12.43) and the bare digits are listed to check.
-  - Where the same words on another page are a different thing, name that page on the edit - `"only": ["s05"]` - or on the composed page: it is not read for that change, and is listed for the reviewer to check.
-  - What the untouched slides say between them is one advisory about the imported deck.
-- **A carried slide rests on itself; a composed page that draws numbers needs its record.** A slide of the user's own - carried, or edited in place - has no insight log and is asked for none: the critic judges a changed title against what the slide says. A page the runtime composes may bring a log for itself - measures, bound exhibits, tokens - and nothing is then asked of the rest of the deck; where it draws numbers the critic reads what it rests on, and the least it needs is one record in `<id>.insights.json` for those numbers, citing the inventory as its source (`--scaffold <type> --id <page>` prints the record with the slide's own values).
-- **The critique reads a changed spine only.** A text edit, a carried slide, and a page composed to show what its slide showed - the slide's title over evidence the slide already held, a redrawn exhibit - leave the spine the user's: no critique. A new title (written as `title` or through `replace`), a page added, cut or moved, and a page composed to show other figures than its slide held, or standing for a slide that held only its title, stage one; the packet says what the deck is made of from its counts, lists every carried slide by its title and what it says, marks the changed pages, and takes items only where one is involved.
-- **A finding about the imported deck goes to the user.** The critic or the reviewer may find that a changed page is right and a slide nobody asked to change says otherwise - a retitled slide that now contradicts the summary. It files that with `aboutImported: true`, naming the untouched slide (a finding that lists an untouched slide - or, on the spine, names one by id in its own text, which the runtime adds to its list - says `true` or `false`, and one that leaves it unsaid is refused on form; the critic is shown an edited slide's whole record - every table row and chart value - to judge which of the two is wrong): it keeps its severity, blocks nothing, and is not the author's to mend - do not edit a slide the user did not ask to change. Delivery reports each to the user (`aboutImported` in `out/delivery.json`), who decides.
-- **The self-check and the review read what changed.** `out/claims.json` lists the claims on the composed pages and the lines the revision rewrote on carried slides, and no other; `out/self-check.json` is `{ "pages": { "<page id>": { "claims": "<its hash in claims.json>", "verified": true } }, "findings": { "<CODE>:<claim id>": "<what was done>" } }` with no `spine` entry, and delivery prints the record it expects. The review's packet asks for the composed and the edited pages at full size and shows the rest in the spreads, as context. Delivery lists every change the revision made, edit by edit (`made` in `out/delivery.json`): report them to the user, so an edit they did not ask for is one they can see.
-
-**A rebuild** (`import-deck.py deck.pptx <work>/`, without `--carry`) recomposes the deck in this skill's design: the starter takes a cover from slide 1 and the footer from a line repeated on the slides, and every other slide is a page to map.
-
-1. **Inventory.** `<id>.inventory.json` holds every slide's layout, hidden flag, title, text with its levels, table cells, chart series, pictures and notes; each paragraph that is page furniture carries its `role` (a repeated footer, the page number, a source or note line), and `unheld` counts what a slide draws that the inventory does not hold. The starter has stable ids (`s01`, `s02`, ...), `workflow: "existing_deck_revision"`, `inventory` and `rulesVersion` on `deck`, each page's `sourceSlide`, and each slide's old copy as `draft`. It refuses to overwrite an existing pages file unless given `--force`. The inventory records each slide as it shows: paragraphs in the order their displayed positions read, through turned and mirrored groups, and each picture's `width` and `height` as the box it covers on the slide, its `rotation` in degrees clockwise net of every group's turns, and `mirrored` when an odd number of flips shows it reversed.
-2. **Map.** Give each slide a page type by its stable id: its claim decides the type, and the inventory holds the data its exhibit needs (`author-deck.mjs --scaffold <type>` prints a page to fill).
-   - `--plan` on a revision restyles nothing: a page that declares its form keeps it, one mapped to a type only is given the form that draws what its source slide drew, and a page the revision adds is drawn as the source deck draws its like before the deck's `variation` is consulted ([Which form carries which claim](design.md#which-form-carries-which-claim)).
-   - A slide that is dropped is deleted from `pages`; a slide the inventory cannot rebuild (`decide` names them) is kept as it is with `carry: true`, which changes nothing the other pages are held to; a slide neither mapped nor carried is `REVISION_UNMAPPED`, reported by `--draft` and refused by the full compile.
-   - A hidden slide's starter page carries `hidden: true` beside its `draft`: keep it when mapping, or set it to `false` to show the slide (a page mapped without it stays hidden); a hidden title slide stays a page rather than becoming the cover ([Composition](composition.md#page-and-deck-keys)).
-3. **Revise the affected claims and their dependencies.** A changed number reopens every page, summary line and close that states it; unaffected slides keep their claims and wording.
-4. **Critique and review what changed.** Then build and deliver from pipeline step 6.
-   - Every page a rebuild composes is held to the page rules, and the deck they make to the deck rules, as a new deck's is - the deck states its `question` and `answer`, and opens on a summary. A slide kept with `carry: true` is the user's and is not judged; it does not excuse the composed pages from a deck rule they are enough to be read by (above).
-   - A page composed to show evidence its slide did not hold, a changed title, a moved page or a cut one changes the spine and sends the revision through the storyline critique (pipeline step 5); a revision whose every page shows what its slide showed under its slide's title skips it.
-   - The deck review's first pass reads the pages whose copy changed, that are drawn unlike their source slide, or that the revision hides or shows again, and every page of a restyle ([Taste review](taste-review.md#acceptance-confirmation-and-build-bars) owns the scope). A review finding that reopens the argument of a changed page is verified by a pass that reads that page alone.
-
-## Worked example: who is better positioned
-
-A comparison of two firms on four criteria. The request asks who is better positioned now, in the long run, and on capital.
-
-| Part | Content |
-| --- | --- |
-| Governing thought | Firm A is better positioned today on paid enterprise work; the long-run lead turns on retention, which currently favours A at medium confidence |
-| Pillars | Demand (who wins paid work), capability (whose models lead on the tasks buyers pay for), distribution (who reaches buyers), capital (who can fund the build-out) |
-| Near-term | A leads paid enterprise adoption, 44% to 40% of panel firms buying (high confidence; a reversal in the panel's next two months would flip it) |
-| Long-run | A leans ahead because its cohorts retain better (medium confidence; matched net retention published by B would reverse it) |
-| Capital | B has the deeper funding access, twice A's committed capital (high confidence); A's lower burn narrows the gap only if its growth holds |
-| Unranked | None: every sub-question carries a lean, a confidence and a reversal trigger |
-
-Each pillar is a section whose title states its claim, and each page title proves part of it. The [competitive position template](templates/competitive-position.md) sets the criteria, their weights and the scorecard that makes the call.
+A change to an existing deck keeps everything the user did not ask to change. When a figure changes, every page that states it changes with it: the compile names the other pages that still state the old value (`NUMBER_STALE`) or the old words (`WORDING_STALE`). When the user's request reopens the argument - a new finding, a different answer - go back to the storyline, show the new titles, and only then redraw the pages.

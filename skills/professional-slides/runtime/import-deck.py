@@ -21,9 +21,8 @@ Four things land in out-dir:
                          `unheld` counts what the slide draws that the
                          inventory does not hold (shapes drawn without text, a
                          diagram, an embedded object, a film)
-    <id>.pages.json      the starter: a deck/v3 head that names the inventory
-                         and the rules version the revision is made under, and
-                         a page per slide carrying its old copy as `draft`
+    <id>.pages.json      the starter: a deck/v3 head that names the inventory,
+                         and a page per slide carrying its old copy as `draft`
                          (its furniture left out) and, when the slide was
                          hidden, `hidden: true`
     <id>.source.pptx     the deck itself, byte for byte: what a carried slide

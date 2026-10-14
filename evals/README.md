@@ -3,7 +3,7 @@
 Verification for `skills/professional-slides` covers the pages file's contract,
 binding, composition, export, readback and rendered geometry.
 Passing these checks does not establish editorial or visual taste. The pipeline
-the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#pipeline);
+the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#the-process);
 none of it is repeated here.
 
 ## Point changes
@@ -79,16 +79,7 @@ python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 `{slide, code, measured, threshold, repair}`.
 
-See the [evaluation contract](../skills/professional-slides/references/evaluation/index.md)
-for blocking checks and advisory statistics. Each generated report carries
-the thresholds actually used; the [page-gate implementation](../skills/professional-slides/runtime/gates/page_gates.py)
-owns the profile and role-specific rules.
-
-Whether a page needs additional interpretation is an editorial review decision. There is no mandatory closing-consequence gate: a necessary caveat may complete the evidence, and a separate `soWhat` is optional.
-
-Content-stage summaries distinguish quantitative evidence kinds from structured
-qualitative kinds. Neither share certifies that a claim is sourced or correct;
-the reviewer must inspect its evidence.
+The codes the gates raise, grouped by what they catch, are listed in the [runtime guide](../skills/professional-slides/runtime/README.md#what-is-checked); each generated report carries the thresholds actually used, and [gate_config.py](../skills/professional-slides/runtime/gates/gate_config.py) owns them.
 
 Install Node test dependencies with `npm ci`, then install the browser used by
 rendered overlap tests with `npx playwright install chromium`. Use Node 20.9+

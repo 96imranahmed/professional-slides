@@ -44,7 +44,7 @@ console.log('{{}}');
 """)
 
     def test_the_routed_components_are_documented_and_reach_a_page(self):
-        doc = (ROOT / "skills/professional-slides/references/page-types.md").read_text(encoding="utf-8")
+        doc = (ROOT / "skills/professional-slides/references/drawing.md").read_text(encoding="utf-8")
         routes = re.search(r"\*\*Components without a page form\.\*\*(.*?)\n\n[^-]", doc, re.S).group(1)
         for component in ROUTED:
             self.assertIn(f"`{component}`", routes, component)

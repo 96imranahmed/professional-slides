@@ -9,27 +9,16 @@
 // pages. Each is checked here, before any work, and each missing piece gets an
 // install line for this platform. The interpreter the runtime runs is
 // RUNTIME_PYTHON, else `python3` on PATH; when a complete one exists elsewhere
-// the doctor prints the line that selects it. The skill also needs a fresh
-// model to read what it cannot count - the storyline critique, the deck
-// review and the copy judgements - through an agent CLI, signed in: the one
-// the skill is called from (`claude` under Claude Code, `codex` under Codex),
-// or either when it is run from a plain terminal. Exit 0 when ready, 2 when
-// not, 1 on a crash. `--no-render` checks for authoring and unrendered builds
+// the doctor prints the line that selects it. Exit 0 when ready, 2 when not,
+// 1 on a crash. `--no-render` checks for authoring and unrendered builds
 // (`build-deck.mjs --no-render`): the three binaries are reported, not required.
-// `--json` prints one object: { ready, render, node, python, binaries, reviewer, optional, capacity, install }.
-//
-// It also says how many agents the machine runs side by side (`capacity`). A long deck is written by section, an agent a
-// section, and each agent's checks compile and compose pages on this machine: a check needs about a core and a few hundred
-// megabytes. Sixteen at once on a machine whose memory another process holds swap together, and every check stalls until
-// the memory comes back - a check of three seconds then takes minutes, and a tool's timeout sends it to the background. The
-// line is advice for the lead's fan-out, never a reason to refuse.
+// `--json` prints one object: { ready, render, node, python, binaries, optional, install }.
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { EXIT, UsageError, hostCli, isMain, parseCli, pythonBin, runCli } from "./cli.mjs";
+import { EXIT, UsageError, isMain, parseCli, pythonBin, runCli } from "./cli.mjs";
 
 const runtime = path.dirname(fileURLToPath(import.meta.url));
 const REQUIREMENTS = path.resolve(runtime, "..", "..", "..", "requirements.txt");
@@ -117,38 +106,6 @@ function binaryCheck(env, platform) {
   };
 }
 
-// The agent CLIs a fresh reader runs through: how each is installed, signed in, and asked whether it is.
-export const REVIEWER_CLIS = Object.freeze({
-  claude: { install: "npm install -g @anthropic-ai/claude-code", signIn: "claude auth login", status: ["auth", "status", "--json"], key: "ANTHROPIC_API_KEY",
-    host: "Claude Code", note: "the desktop app's own sign-in does not carry over to the CLI" },
-  codex: { install: "npm install -g @openai/codex", signIn: "codex login", status: ["login", "status"], key: null, host: "Codex", note: null },
-});
-
-/** Whether a CLI is signed in, by its own status command: `claude auth status --json` says `loggedIn`, `codex login status` exits 0. */
-async function signedIn(name, file, env) {
-  const { error, stdout, stderr } = await run(file, REVIEWER_CLIS[name].status, env);
-  if (name === "claude") {
-    try { if (JSON.parse(stdout).loggedIn === true) return true; } catch { /* an older CLI: read below */ }
-    return Boolean(env.ANTHROPIC_API_KEY);
-  }
-  return !error && !/not logged in|logged out/i.test(`${stdout}\n${stderr}`);
-}
-
-/**
- * The agent CLI the skill's fresh readers run through: the host's own where
- * the skill is called from Claude Code or Codex, else whichever is installed
- * and signed in. `{ host, wanted, chosen, ok, clis: { name: { path, signedIn } } }`.
- */
-async function reviewerCheck(env, platform, host = hostCli(env)) {
-  const wanted = host ? [host] : Object.keys(REVIEWER_CLIS);
-  const clis = Object.fromEntries(await Promise.all(Object.keys(REVIEWER_CLIS).map(async (name) => {
-    const file = which(name, env, platform);
-    return [name, { path: file, signedIn: file ? await signedIn(name, file, env) : false }];
-  })));
-  const chosen = wanted.find((name) => clis[name].path && clis[name].signedIn) ?? null;
-  return { host, wanted, chosen, ok: Boolean(chosen), clis };
-}
-
 // font-metrics.mjs's lookup: RUNTIME_NODE_MODULES first, else this checkout.
 async function canvasCheck(env) {
   try {
@@ -162,7 +119,7 @@ async function canvasCheck(env) {
 }
 
 /** One line per missing piece, for this platform; the RUNTIME_PYTHON line first when a complete interpreter needs selecting. */
-export function installLines({ node, python, binaries, platform, reviewer = null }) {
+export function installLines({ node, python, binaries, platform }) {
   const lines = [];
   const win = platform === "win32", linux = platform === "linux";
   if (python.export) lines.push(python.export);
@@ -179,69 +136,18 @@ export function installLines({ node, python, binaries, platform, reviewer = null
   if (linux && (!binaries.soffice.found || poppler)) lines.push(`sudo apt-get install -y ${[!binaries.soffice.found && "libreoffice-impress", poppler && "poppler-utils"].filter(Boolean).join(" ")}`);
   if (!linux && !binaries.soffice.found) lines.push(win ? "winget install TheDocumentFoundation.LibreOffice, then add C:\\Program Files\\LibreOffice\\program to PATH" : "brew install --cask libreoffice");
   if (!linux && poppler) lines.push(win ? "choco install poppler (or https://github.com/oschwartz10612/poppler-windows/releases, with its Library\\bin on PATH)" : "brew install poppler");
-  // The CLI the skill is called from; from a plain terminal, the first of them (either serves).
-  if (reviewer && !reviewer.ok) {
-    const name = reviewer.wanted.find((cli) => reviewer.clis[cli].path) ?? reviewer.wanted[0], cli = REVIEWER_CLIS[name];
-    if (!reviewer.clis[name].path) lines.push(cli.install);
-    lines.push(`${cli.signIn}${cli.note ? ` (${cli.note})` : ""}`);
-  }
   return lines;
 }
 
-// What one agent's checks take while they run: a core, and the compile's and the page gates' memory with room beside it.
-const AGENT_MEMORY_GB = 0.75;
-// Memory left to the system and the agents' host, whatever the checks take.
-const RESERVED_GB = 2;
-
-/**
- * How many section agents the machine runs side by side: `{ cpus, totalGb, availableGb, swap, agents, why }`. `availableGb`
- * is the memory free for new work (free and reclaimable pages where the platform says, else the free memory), `swap` the
- * swap in use and its total where the platform says; `agents` is the most whose checks fit the cores and that memory, one at
- * least, and `why` names what limits it - and says when the machine is already swapping, which stalls every check at once.
- */
-export function capacity({ cpus, totalGb, availableGb, swap = null, pressure = null }) {
-  const byCores = Math.max(1, cpus - 1), byMemory = Math.max(1, Math.floor((availableGb - RESERVED_GB) / AGENT_MEMORY_GB));
-  // Under pressure now: the platform's own reading where it gives one (swap in use outlasts the pressure that put it there);
-  // otherwise swap mostly in use with little memory free beside it.
-  const swapping = pressure ? pressure !== "normal" : Boolean(swap && swap.totalGb > 0 && swap.usedGb / swap.totalGb > 0.5 && availableGb < RESERVED_GB + 4 * AGENT_MEMORY_GB);
-  // Swapping already, the memory the platform calls free is what the other process will take back: half as many, then.
-  const agents = Math.max(1, Math.floor(Math.min(byCores, byMemory) / (swapping ? 2 : 1)));
-  const why = [byMemory < byCores ? `memory: ${availableGb.toFixed(1)} GB of ${totalGb.toFixed(0)} GB free for new work, about ${AGENT_MEMORY_GB} GB an agent's checks with ${RESERVED_GB} GB kept back` : `cores: ${cpus}, one kept back`,
-    ...(swapping ? [`the machine is under memory pressure${pressure ? ` (${pressure})` : ""}${swap ? `, ${swap.usedGb.toFixed(1)} of ${swap.totalGb.toFixed(1)} GB of swap in use` : ""}: another process holds the memory, and checks run side by side stall together until it is freed - free it, or run fewer agents at once`] : [])];
-  return { cpus, totalGb, availableGb, swap, pressure, agents, why };
-}
-
-/** The machine's cores and memory, read from the platform: free and reclaimable pages and the swap on macOS, free memory elsewhere. */
-async function machineCapacity(platform = process.platform) {
-  const totalGb = os.totalmem() / 2 ** 30;
-  let availableGb = os.freemem() / 2 ** 30, swap = null, pressure = null;
-  if (platform === "darwin") {
-    const vm = await run("vm_stat", [], process.env).catch(() => null);
-    const page = Number(/page size of (\d+) bytes/.exec(vm?.stdout ?? "")?.[1]);
-    const pages = (name) => Number(new RegExp(`Pages ${name}:\\s+(\\d+)`).exec(vm?.stdout ?? "")?.[1] ?? NaN);
-    const free = ["free", "inactive", "speculative", "purgeable"].map(pages).filter(Number.isFinite).reduce((sum, n) => sum + n, 0);
-    if (page && free) availableGb = (free * page) / 2 ** 30;
-    const usage = await run("sysctl", ["-n", "vm.swapusage"], process.env).catch(() => null);
-    const mb = (name) => Number(new RegExp(`${name} = ([\\d.]+)M`).exec(usage?.stdout ?? "")?.[1] ?? NaN);
-    if (Number.isFinite(mb("total"))) swap = { totalGb: mb("total") / 1024, usedGb: mb("used") / 1024 };
-    // The kernel's own reading of memory pressure: 1 normal, 2 warning, 4 critical.
-    const level = Number((await run("sysctl", ["-n", "kern.memorystatus_vm_pressure_level"], process.env).catch(() => null))?.stdout?.trim());
-    if (Number.isFinite(level) && level > 0) pressure = level >= 4 ? "critical" : level >= 2 ? "warning" : "normal";
-  }
-  return capacity({ cpus: os.cpus().length, totalGb, availableGb, swap, pressure });
-}
-
 /** Everything a build needs, checked; `candidates` and `env` replace the interpreters tried and the environment searched. */
-export async function diagnose({ env = process.env, platform = process.platform, candidates, render = true, nodeVersion = process.versions.node, host = hostCli(env) } = {}) {
+export async function diagnose({ env = process.env, platform = process.platform, candidates, render = true, nodeVersion = process.versions.node } = {}) {
   const [major, minor] = nodeVersion.split(".").map(Number);
   const node = { version: nodeVersion, required: `>=${MIN_NODE.join(".")}`, ok: major > MIN_NODE[0] || (major === MIN_NODE[0] && minor >= MIN_NODE[1]) };
-  const [python, optional, reviewer] = await Promise.all([pythonCheck(candidates ?? pythonCandidates(env, platform), env, platform), canvasCheck(env).then((canvas) => ({ "@napi-rs/canvas": canvas })),
-    reviewerCheck(env, platform, host)]);
+  const [python, optional] = await Promise.all([pythonCheck(candidates ?? pythonCandidates(env, platform), env, platform), canvasCheck(env).then((canvas) => ({ "@napi-rs/canvas": canvas }))]);
   const binaries = binaryCheck(env, platform);
   const rendered = Object.values(binaries).every((b) => b.found);
-  const machine = await machineCapacity(platform).catch(() => null);
-  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render) && reviewer.ok, render, platform, node, python, binaries, reviewer, optional, capacity: machine,
-    install: installLines({ node, python, binaries, platform, reviewer }) };
+  return { ready: node.ok && Boolean(python.chosen) && (rendered || !render), render, platform, node, python, binaries, optional,
+    install: installLines({ node, python, binaries, platform }) };
 }
 
 /** The report as lines for a person. */
@@ -254,17 +160,7 @@ export function describe(report) {
   }
   if (!report.python.chosen) lines.push(`Python: no interpreter imports ${Object.values(PYTHON_MODULES).join(", ")}`);
   for (const [name, b] of Object.entries(report.binaries)) lines.push(`${name}: ${b.found ? b.path : "not found"}${b.note ? ` (${b.note})` : ""}${!b.found && !report.render ? " (not required with --no-render)" : ""}`);
-  const { reviewer } = report;
-  const from = reviewer.host ? `called from ${REVIEWER_CLIS[reviewer.host].host}, the skill's fresh readers (storyline critique, deck review, copy judgements) run through the ${reviewer.host} CLI`
-    : "run from a terminal, the skill's fresh readers (storyline critique, deck review, copy judgements) run through the claude or the codex CLI";
-  for (const name of reviewer.wanted) {
-    const cli = reviewer.clis[name];
-    lines.push(`${name} CLI: ${cli.path ? `${cli.path}, ${cli.signedIn ? "signed in" : "not signed in"}` : "not installed"}${name === reviewer.chosen ? " (chosen)" : ""}`);
-  }
-  const state = reviewer.wanted.length > 1 ? "neither is installed and signed in" : reviewer.clis[reviewer.wanted[0]].path ? "it is not signed in" : "it is not installed";
-  if (!reviewer.ok) lines.push(`Reviewer: ${from}, and ${state}. This skill needs one: set it up with the lines below.`);
   for (const [name, o] of Object.entries(report.optional)) lines.push(`${name}: ${o.found ? "installed" : "not installed"} (${o.note})`);
-  if (report.capacity) lines.push(`Side by side: at most ${report.capacity.agents} section agent${report.capacity.agents === 1 ? "" : "s"} at once on this machine - ${report.capacity.why.join("; ")}`);
   if (report.python.export) lines.push("", `RUNTIME_PYTHON must name the complete interpreter; run: ${report.python.export}`);
   const todo = report.install.filter((line) => line !== report.python.export);
   if (todo.length) lines.push("", "To install:", ...todo.map((line) => `  ${line}`));

@@ -11,7 +11,7 @@
 //   node runtime/preferences.mjs path                       where the file lives (which location, and why, on stderr)
 //   node runtime/preferences.mjs from-site <url>            the brand's colours and typefaces read off its website, as answers to set
 //
-// The intake (references/theming.md#design-intake) asks how a user's decks
+// The intake (references/design-intake.md) asks how a user's decks
 // should look: a reference deck, the design system, colours, tracker, title
 // treatment, surfaces and density. Those are a person's habits, not a deck's,
 // so asking them before every deck is friction and silently defaulting them

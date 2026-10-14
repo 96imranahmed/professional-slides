@@ -63,9 +63,8 @@ class DoctorReportTests(DoctorFolder, unittest.TestCase):
         result = doctor("--json")
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 0 if report["ready"] else 2, result.stderr)
-        self.assertLessEqual({"ready", "render", "node", "python", "binaries", "reviewer", "optional", "install"}, set(report))
-        self.assertLessEqual({"host", "wanted", "chosen", "ok", "clis"}, set(report["reviewer"]))
-        self.assertEqual(set(report["reviewer"]["clis"]), {"claude", "codex"})
+        self.assertLessEqual({"ready", "render", "node", "python", "binaries", "optional", "install"}, set(report))
+        self.assertNotIn("reviewer", report)  # no agent CLI is needed: nothing is put to a fresh reader
         self.assertTrue(report["render"])
         self.assertEqual(report["node"]["required"], ">=20.9")
         self.assertTrue(report["node"]["ok"])
@@ -152,55 +151,6 @@ class DoctorBinaryTests(DoctorFolder, unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "Node.js is not available")
-class DoctorReviewerTests(DoctorFolder, unittest.TestCase):
-    """The skill's fresh readers - the storyline critique, the deck review, the copy judgements - run through an agent CLI: the
-    one the skill is called from, signed in. A first run with a CLI that was installed but not signed in found out only when
-    every call failed, mid-deck."""
-
-    def report(self, host, clis):
-        bin_dir = self.folder / f"bin-{host}-{'-'.join(sorted(clis))}"
-        bin_dir.mkdir()
-        for name, body in clis.items():
-            script(bin_dir, name, body)
-        return run_node(f'''
-import {{ diagnose, describe }} from './skills/professional-slides/runtime/doctor.mjs';
-const report = await diagnose({{ env: {{ PATH: {json.dumps(str(bin_dir))} }}, platform: 'darwin', render: false, host: {json.dumps(host)} }});
-console.log(JSON.stringify({{ reviewer: report.reviewer, install: report.install, said: describe(report).join("\\n") }}));
-''')
-
-    SIGNED_IN = {"claude": "echo '{\"loggedIn\": true}'", "codex": "echo 'Logged in using ChatGPT'"}
-    SIGNED_OUT = {"claude": "echo '{\"loggedIn\": false, \"authMethod\": \"none\"}'", "codex": "echo 'Not logged in'; exit 1"}
-
-    def test_called_from_claude_code_the_claude_cli_must_be_signed_in(self):
-        out = self.report("claude", {"claude": self.SIGNED_OUT["claude"], "codex": self.SIGNED_IN["codex"]})
-        self.assertFalse(out["reviewer"]["ok"], "a signed-in codex does not stand in for the host's own CLI")
-        self.assertEqual(out["reviewer"]["wanted"], ["claude"])
-        self.assertTrue(any(line.startswith("claude auth login") for line in out["install"]), out["install"])
-        self.assertFalse(any("npm install" in line for line in out["install"]), "it is installed: only the sign-in is missing")
-        self.assertIn("called from Claude Code", out["said"])
-        self.assertIn("it is not signed in", out["said"])
-        ready = self.report("claude", {"claude": self.SIGNED_IN["claude"]})
-        self.assertEqual((ready["reviewer"]["ok"], ready["reviewer"]["chosen"]), (True, "claude"))
-
-    def test_called_from_codex_the_codex_cli_is_installed_and_signed_in(self):
-        out = self.report("codex", {"claude": self.SIGNED_IN["claude"]})
-        self.assertFalse(out["reviewer"]["ok"])
-        self.assertIn("npm install -g @openai/codex", out["install"])
-        self.assertIn("codex login", out["install"])
-        self.assertIn("it is not installed", out["said"])
-        signed_out = self.report("codex", {"codex": self.SIGNED_OUT["codex"]})
-        self.assertEqual(signed_out["install"][-1], "codex login")
-
-    def test_from_a_plain_terminal_either_cli_serves(self):
-        out = self.report(None, {"codex": self.SIGNED_IN["codex"], "claude": self.SIGNED_OUT["claude"]})
-        self.assertEqual((out["reviewer"]["ok"], out["reviewer"]["chosen"]), (True, "codex"))
-        neither = self.report(None, {})
-        self.assertFalse(neither["reviewer"]["ok"])
-        self.assertIn("neither is installed and signed in", neither["said"])
-        self.assertIn("npm install -g @anthropic-ai/claude-code", neither["install"])
-
-
-@unittest.skipUnless(NODE, "Node.js is not available")
 class InstallLineTests(unittest.TestCase):
     def test_each_platform_names_its_installers(self):
         lines = run_node('''
@@ -234,40 +184,3 @@ console.log(JSON.stringify(report));
 
 if __name__ == "__main__":
     unittest.main()
-
-
-@unittest.skipUnless(NODE, "Node.js is not available")
-class CapacityTests(unittest.TestCase):
-    """How many section agents the machine runs side by side: each agent's checks take about a core and three quarters of a
-    gigabyte while they run, and a machine already swapping stalls every check at once, so it is advised half as many."""
-
-    def capacity(self, **machine):
-        return run_node(f"""
-import {{ capacity }} from './skills/professional-slides/runtime/doctor.mjs';
-console.log(JSON.stringify(capacity({json.dumps(machine)})));
-""")
-
-    def test_the_cores_limit_a_machine_with_memory_to_spare(self):
-        out = self.capacity(cpus=10, totalGb=32, availableGb=24)
-        self.assertEqual(out["agents"], 9)
-        self.assertIn("cores: 10, one kept back", out["why"][0])
-
-    def test_the_memory_limits_a_machine_whose_memory_another_process_holds(self):
-        out = self.capacity(cpus=10, totalGb=32, availableGb=5)
-        self.assertEqual(out["agents"], 4)
-        self.assertIn("memory: 5.0 GB of 32 GB free for new work", out["why"][0])
-
-    def test_a_machine_under_memory_pressure_is_advised_half_as_many_and_told_why(self):
-        out = self.capacity(cpus=10, totalGb=32, availableGb=24, swap={"totalGb": 10, "usedGb": 8}, pressure="warning")
-        self.assertEqual(out["agents"], 4)
-        self.assertIn("the machine is under memory pressure (warning), 8.0 of 10.0 GB of swap in use", out["why"][1])
-
-    def test_swap_left_in_use_after_the_pressure_has_passed_does_not_halve_the_advice(self):
-        # Swapped pages stay out after the memory comes back: the platform's own pressure reading decides.
-        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=12, swap={"totalGb": 8, "usedGb": 6.5}, pressure="normal")["agents"], 9)
-        # Where the platform gives no reading, swap mostly in use counts only with little memory free beside it.
-        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=12, swap={"totalGb": 8, "usedGb": 6.5})["agents"], 9)
-        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=4, swap={"totalGb": 8, "usedGb": 6.5})["agents"], 1)
-
-    def test_one_agent_at_least(self):
-        self.assertEqual(self.capacity(cpus=1, totalGb=4, availableGb=1)["agents"], 1)
