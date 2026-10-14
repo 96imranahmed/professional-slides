@@ -200,17 +200,36 @@ def nice_range(values: Sequence[float], include_zero: bool = False) -> dict:
             "step": to_fixed(step, places), "steps": steps}
 
 
+def whole_steps(low: float, high: float, count: int) -> bool:
+    """Whether [low, high] in `count` equal steps is an axis `nice_axis` passes:
+    the step on the ladder and every tick a whole number of steps
+    (nice-numbers.mjs `wholeSteps`). The renderer divides a domain by this rule,
+    so the axis it chooses is one the gate passes: -3,000 to 3,000 in three
+    steps of 2,000 is on the ladder, and its ticks are not whole steps."""
+    step = (high - low) / count
+    if not step > 0 or not math.isfinite(step):
+        return False
+    normalized = step / 10 ** math.floor(math.log10(step))
+    if not any(abs(normalized - value) < 1e-9 for value in (1, 2, 2.5, 5, 10)):
+        return False
+    scale = max(abs(low), abs(high)) or 1.0
+    return abs(round(low / step) * step - low) <= scale * 1e-6
+
+
 def tick_count(low: float, high: float, preferred: int = 4) -> int:
     """How many steps the renderer divides [low, high] into (charts.mjs
-    `tickCount()`): the preferred count if it lands on the ladder, else three,
-    five, six or two."""
+    `tickCount()`): the preferred count if its ticks are whole ladder steps
+    (`whole_steps`), else three, five, six or two; where none is, the first
+    whose step is on the ladder."""
+    counts = (preferred, 3, 5, 6, 2)
+
     def on_ladder(count):
         step = (high - low) / count
         if not step > 0 or not math.isfinite(step):
             return False
         normalized = step / 10 ** math.floor(math.log10(step))
         return any(abs(normalized - value) < 1e-9 for value in (1, 2, 2.5, 5, 10))
-    return next((count for count in (preferred, 3, 5, 6, 2) if on_ladder(count)), preferred)
+    return next((count for count in counts if whole_steps(low, high, count)), next((count for count in counts if on_ladder(count)), preferred))
 
 
 def axis_ticks(low: float, high: float, preferred: int = 4) -> list:

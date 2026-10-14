@@ -140,7 +140,7 @@ console.log(JSON.stringify(pairs.map(([low, high]) => [false, true].map((include
 
     def test_tick_count_is_the_renderers_tick_count(self):
         domains_ = [[nt.nice_range([low, high])[k] for k in ("min", "max")] for low, high in domains(600, SEED + 4)]
-        domains_ += [[0, 6], [0, 7], [0, 12.5], [0, 15], [-1, 1], [0, 0.3]]
+        domains_ += [[0, 6], [0, 7], [0, 12.5], [0, 15], [-1, 1], [0, 0.3], [-3000, 3000], [-0.3, 0.3], [-1.5, 1.5], [1, 7], [-75, 25]]
         os.environ["TICK_COUNT_DOMAINS"] = json.dumps(domains_)
         result = run_node("""
 import {tickCount} from './skills/professional-slides/runtime/charts.mjs';
@@ -178,6 +178,54 @@ console.log(JSON.stringify(out));
             self.assertEqual(drawn, nt.axis_ticks(domain["min"], domain["max"]), f"values={values}")
             compared += 1
         self.assertGreater(compared, 50, "the parity fuzz did not compare enough axes")
+
+
+class AutomaticAxisPassesTheGateTests(unittest.TestCase):
+    """The axis the renderer chooses is one the tick gate passes.
+
+    An automatic domain of -3,000 to 3,000 is six whole steps of 1,000; the
+    ticks were then drawn in three steps of 2,000 - a ladder step, but -1,000
+    and 1,000 are no whole step of it - and the page failed NICE_TICKS on an
+    axis no author chose. The renderer now divides a domain by the gate's own
+    rule (whole ladder steps), across signs and magnitudes.
+    """
+
+    def test_a_symmetric_domain_is_divided_into_whole_steps(self):
+        for low, high, steps in ((-3000, 3000, 6), (-0.3, 0.3, 6), (-30, 30, 6), (-1.5, 1.5, 6), (-2, 2, 4), (-75, 25, 4)):
+            self.assertEqual(nt.tick_count(low, high), steps, (low, high))
+            self.assertTrue(nt.nice_axis(nt.axis_ticks(low, high))[0], (low, high))
+            self.assertTrue(nt.whole_steps(low, high, steps))
+        # A ladder step whose ticks are not whole steps of it is not taken: three steps of 2,000 from -3,000.
+        self.assertFalse(nt.whole_steps(-3000, 3000, 3))
+
+    def test_every_automatic_axis_across_signs_and_magnitudes_passes_the_tick_gate(self):
+        cases = []
+        for exponent in range(-3, 7):
+            magnitude = 10.0 ** exponent
+            for half in (1, 1.5, 2.5, 3, 4, 7, 9):
+                top = half * magnitude
+                cases.append([round(v, 9) for v in (-0.93 * top, -0.4 * top, 0.3 * top, 0.97 * top)])  # symmetric
+                cases.append([round(v, 9) for v in (-0.93 * top, 0.2 * top, 1.4 * top, 1.9 * top)])   # lopsided
+        os.environ["SIGNED_AXIS_CASES"] = json.dumps(cases)
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const cases = JSON.parse(process.env.SIGNED_AXIS_CASES);
+console.log(JSON.stringify(cases.map((values) => ['chart.column', 'chart.bar', 'chart.line'].map((kind) => {
+  const props = {categories: ['a', 'b', 'c', 'd'], series: [{name: 'value', values}], gridlines: true, dataLabels: false};
+  try { return REGISTRY.get(kind).render({id: 'c', frame: {x: 0, y: 0, width: 900, height: 460}, props}).nodes.filter((n) => n.role === 'axis-label').map((n) => n.data.value); }
+  catch (error) { return {error: error.message}; }
+}))));
+""")
+        checked = 0
+        for values, drawn in zip(cases, result):
+            for kind, ticks in zip(("column", "bar", "line"), drawn):
+                if isinstance(ticks, dict) or not ticks:
+                    continue
+                ok, detail = nt.nice_axis(ticks)
+                self.assertTrue(ok, f"{kind} {values}: {detail}")
+                self.assertLess(min(ticks), 0)
+                checked += 1
+        self.assertGreater(checked, len(cases) * 2, "too few axes were drawn to hold the rule")
 
 
 if __name__ == "__main__":

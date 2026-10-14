@@ -8,7 +8,7 @@
 // its own (evals/scripts/check_source_quality.mjs).
 import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, stableId, textPrimitive } from "./core.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
-import { STEP_LADDER, decade, stepCandidates, onLadder } from "./nice-numbers.mjs";
+import { STEP_LADDER, decade, stepCandidates, onLadder, wholeSteps } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
 import { contrastRatio } from "./color.mjs";
 import { MARK_CONTRAST } from "./palettes.mjs";
@@ -242,13 +242,19 @@ function range(values, includeZero) {
 }
 
 /**
- * How many ticks divide a domain into ladder steps: the preferred count if it
- * does, else three, five, six or two. An explicit domain keeps a readable
- * interval (four intervals on 0-6 print 1.5 steps and fail the tick gate),
- * and an automatic one is built on one of these counts (range above).
+ * How many ticks divide a domain into whole ladder steps (nice-numbers.mjs
+ * wholeSteps, the tick gate's own rule): the preferred count if it does, else
+ * three, five, six or two. An automatic domain is built on one of these counts
+ * (range above), whole steps from zero, so one of them always passes; drawn
+ * with a step that is on the ladder and not whole, -3,000 to 3,000 took three
+ * steps and printed -1,000 and 1,000, and the page failed NICE_TICKS on the
+ * axis the runtime chose. An explicit domain no count divides into whole steps
+ * keeps a ladder step where one count gives it (four intervals on 0-6 print
+ * 1.5 steps), and the tick gate says what to set.
  */
 export function tickCount(min, max, preferred = 4) {
-  return [preferred, 3, 5, 6, 2].find((count) => onLadder((max - min) / count)) ?? preferred;
+  const counts = [preferred, 3, 5, 6, 2];
+  return counts.find((count) => wholeSteps(min, max, count)) ?? counts.find((count) => onLadder((max - min) / count)) ?? preferred;
 }
 
 export function assertGridlineOption(props) {
