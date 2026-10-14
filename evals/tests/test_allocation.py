@@ -196,7 +196,7 @@ class PreflightTests(unittest.TestCase):
             run = author(pages, "--allocate")
         self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
         self.assertIn("## The records and the deck's keys, before any page", run.stdout)
-        self.assertIn("DECK_KEY", run.stdout)
+        self.assertIn("a deck-level key the compile refuses", run.stdout)
         self.assertIn("sectionCount", run.stdout)
 
 

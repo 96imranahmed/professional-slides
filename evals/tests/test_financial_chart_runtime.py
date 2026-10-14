@@ -800,8 +800,9 @@ assert.equal(stackedMarks.length,2);
 assert.ok(stackedMarks.every(node=>node.frame.height>1));
 assert.ok(stackedMarks[0].frame.y+stackedMarks[0].frame.height<=stackedMarks[1].frame.y+0.01||stackedMarks[1].frame.y+stackedMarks[1].frame.height<=stackedMarks[0].frame.y+0.01);
 const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['Loss','Gain'],series:[{name:'Measure',values:[-30,50]}],yMin:-40,yMax:60,gridlines:true}}).nodes;
-assert.equal(horizontal.filter(node=>node.role==='axis-label').length,5);
-assert.equal(horizontal.filter(node=>node.role==='chart-gridline').length,5);
+// -40 to 60 in whole ladder steps of 20, zero among them: the step the tick gate holds every axis to (NICE_TICKS).
+assert.equal(horizontal.filter(node=>node.role==='axis-label').length,6);
+assert.equal(horizontal.filter(node=>node.role==='chart-gridline').length,6);
 const area=REGISTRY.get('chart.area').render({id:'area',frame,props:{categories:['Q1','Q2','Q3'],series:[{name:'Demand',values:[10,24,18]}]}}).nodes.filter(node=>node.role==='chart-area');
 assert.equal(area.length,1);
 assert.equal(area[0].type,'shape');

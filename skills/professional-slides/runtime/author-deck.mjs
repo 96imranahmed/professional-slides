@@ -2857,10 +2857,11 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     // twice, a source older than the period it reports, players no analysis compares, a convention written in a shape the
     // runtime does not read. Each would otherwise surface with every section's skeleton waiting on the lead to mend it.
     const keyed = deckKeyProblems(doc.deck, { sections: sectionNames(doc) });
-    const records = [...keyed.map((problem) => ({ code: "DECK_KEY", severity: "blocker", repair: problem })),
+    // A deck key the runtime does not read refuses every compile before any rule runs: it is said as the compile says it.
+    const records = [...keyed.map((problem) => ({ label: "a deck-level key the compile refuses", severity: "blocker", repair: problem })),
       ...deckSpineFindings(doc, insights).filter((f) => (REPAIRS[f.code] ?? []).includes("record"))];
     if (records.length) say(["", "## The records and the deck's keys, before any page (fix these now; the plan refuses the blocking ones)",
-      ...records.map((f) => `- ${f.code}${f.severity === "blocker" ? "" : " (advisory)"}: ${String(f.repair).slice(0, 600)}`)].join("\n"));
+      ...records.map((f) => `- ${f.code ?? f.label}${f.severity === "blocker" ? "" : " (advisory)"}: ${String(f.repair).slice(0, 600)}`)].join("\n"));
     const recordsBlock = records.some((f) => f.severity === "blocker");
     if (values.write) {
       if (report.blocking) { say("\nNothing written: settle the homes listed first, then run --allocate --write again."); return 2; }
