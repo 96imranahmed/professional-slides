@@ -2988,13 +2988,14 @@
     },
     {
      "lead": "Money follows milestones",
-     "text": "Capital is released in tranches as milestones pass, so a stalled lever cannot draw ahead of its evidence or hold back the timetable."
+     "text": "Capital is released in tranches as milestones pass, so a stalled lever cannot draw ahead of its evidence."
     },
     {
      "lead": "Electrification carries the risk",
-     "text": "Tom Hardcastle holds both at-risk 2027 milestones, power and grid, so his report opens every board; the others report by exception."
+     "text": "Tom Hardcastle holds both at-risk 2027 milestones, so his report opens every board; the others report by exception."
     }
    ],
+   "pointsHeading": "Holding owners to account",
    "highlight": [
     "from the first month",
     "red rows first",
