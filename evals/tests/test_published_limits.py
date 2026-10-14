@@ -131,7 +131,8 @@ console.log(JSON.stringify({ executive: deckLimits().bodyWords, pitch: deckLimit
         for task, bank in TASKS.items():
             words = bank["bodyWords"]
             self.assertEqual(result["executive"][task]["min"], rounded(words["q1"]), task)
-            self.assertEqual(result["executive"][task]["max"], rounded(words["q3"] + 1.5 * (words["q3"] - words["q1"])), task)
+            # The ceiling is the upper quartile, the band the density profile flags for the review (derive-content.mjs wordBudgetOf).
+            self.assertEqual(result["executive"][task]["max"], rounded(words["q3"]), task)
             # A live pitch is held to a quarter of the floor, and to the same ceiling.
             self.assertLess(result["pitch"][task]["min"], result["executive"][task]["min"], task)
             self.assertEqual(result["pitch"][task]["max"], result["executive"][task]["max"], task)

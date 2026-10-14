@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from node_probe import requires_python_package, run_node
 
@@ -154,6 +155,24 @@ class RulesVersionTests(unittest.TestCase):
                 self.assertEqual(page_gates.severity(finding(code, measured))["severity"], "blocker")
                 page_gates.configure_rules({"workflow": "existing_deck_revision", "rulesVersion": 2})
                 self.assertEqual(page_gates.severity(finding(code, measured))["severity"], older)
+
+    def test_a_page_between_its_upper_quartile_and_the_old_fence_breaks_words_as_tightened(self):
+        # The ceiling fell from each reading task's outlier fence to its upper
+        # quartile (ba4: seven pages under the fence were judged too dense), a
+        # bar that differs page by page, so the finding carries its own.
+        import gate_config
+        import render_gates
+        slide = {"id": "p1", "planBodyWords": 200, "wordFloor": 96, "wordCeiling": 175, "wordFence": 293, "nodes": []}
+        found = []
+        render_gates.gate_words(2, slide, found, "executive")
+        self.assertEqual([(f["code"], f["measured"], f["threshold"], f.get("before")) for f in found], [("WORDS", 200, 175, 293)])
+        self.assertEqual(gate_config.rule_of(found[0]), "WORDS")   # no version lowered it yet: the coordinator records one
+        with mock.patch.dict(gate_config.RULES["tightened"], {"WORDS": {"version": 12}}):
+            self.assertEqual(gate_config.rule_of(found[0]), "WORDS.tightened")
+            self.assertEqual(gate_config.rule_of({**found[0], "measured": 300}), "WORDS")
+        over = []
+        render_gates.gate_words(2, {**slide, "planBodyWords": 170}, over, "executive")
+        self.assertEqual(over, [])
 
     def test_every_rule_names_a_version_after_the_first(self):
         introduced = CONTRACT["rules"]["introduced"]

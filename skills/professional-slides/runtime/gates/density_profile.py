@@ -320,6 +320,28 @@ def band(value, low, high) -> str:
     return "below" if value < low else "above" if value > high else "within"
 
 
+def held_band(slide: dict, reference: dict) -> tuple[int, int, int] | None:
+    """(count, floor, ceiling) for a page composed from a page type: the body
+    count its writer was held to (`planBodyWords`) and the band its composition
+    set (`wordFloor`/`wordCeiling`, derive-content.mjs wordBudgetOf, which the
+    content plan's textReference repeats). None for a page that carries no band.
+
+    The writer's check and this profile read one band on one count, so the
+    review is never asked to cut a page the check let through. On the BA retest
+    (ba4) they read two: the writer the outlier fence on the plan's count, the
+    profile the middle half on the render's, and seven pages that cleared every
+    gate came back from the review as too dense. The render's count still
+    stands as `bodyWords` - a chart's heading and axis rows are in it, as they
+    were on the reference pages - and the deck's medians read it."""
+    count = slide.get("planBodyWords")
+    low = slide.get("wordFloor", (reference or {}).get("floor"))
+    high = slide.get("wordCeiling", (reference or {}).get("ceiling"))
+    numbers = (count, low, high)
+    if not all(isinstance(n, (int, float)) and not isinstance(n, bool) for n in numbers) or high <= 0:
+        return None
+    return int(count), int(low), int(high)
+
+
 # A page carries prose when it sets this many words, one block of them at least
 # PROSE_BLOCK long: the pages the band was measured on (measure_text_form.py
 # reads the reference pages by this rule), where a page of labels alone is not.
@@ -359,11 +381,20 @@ def profile(pdf: Path, scene: dict, content: dict | None, rules: dict | None = N
             q1, median, q3 = target["q1"], target["median"], target["q3"]
             entry["target"] = {"bodyWordsQ1": round(q1), "bodyWordsMedian": round(median), "bodyWordsQ3": round(q3)}
             entry["bodyWordsVsTaskMedian"] = round(body / median, 2) if median else None
-            position = band(body, q1, q3)
+            held = held_band(slide, reference)
+            if held:
+                # The page's own band, on the count its writer was held to.
+                count, low, high = held
+                entry["held"] = {"bodyWords": count, "floor": low, "ceiling": high}
+                position = band(count, low, high)
+                against = f"{count} body words against its band of {low} to {high}"
+            else:
+                position = band(body, q1, q3)
+                against = f"{body} body words against a target of {round(q1)} to {round(q3)}"
             if position == "below":
-                entry["flags"].append(f"thin for its task: {body} body words against a target of {round(q1)} to {round(q3)}")
+                entry["flags"].append(f"thin for its task: {against}")
             elif position == "above":
-                entry["flags"].append(f"dense for its task: {body} body words against a target of {round(q1)} to {round(q3)}")
+                entry["flags"].append(f"dense for its task: {against}")
         if entry["longestBlock"] > TEXT_FORM["longestBlockMax"]:
             entry["flags"].append(f"a block of {entry['longestBlock']} words; three strong pages in four keep every block under {round(TEXT_FORM['longestBlockMax'])}")
         if entry["blocks"] > TEXT_FORM["blocksPerPage"]["max"] - 2:

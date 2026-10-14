@@ -60,7 +60,13 @@ for (const id of ['p07b', 'p24', 'p23']) {
 }
 console.log(JSON.stringify(out));
 ''')
-        for page, placed, count in (("p07b", "beside its exhibit", 3), ("p24", "under its exhibit", 3), ("p23", "under its exhibit", 2)):
+        # Under the band the review reads (the upper quartile, 180 body words) no length of p24's points fills the page
+        # under its row of profiles: the guidance says so and sends the author to the exhibit, rather than a range.
+        p24 = result["p24"]
+        self.assertTrue(p24["short"])
+        self.assertIsNone(p24["fills"]["points"]["min"])
+        self.assertIn("Text alone does not fill this page", p24["repair"])
+        for page, placed, count in (("p07b", "beside its exhibit", 3), ("p23", "under its exhibit", 2)):
             with self.subTest(page=page):
                 case = result[page]
                 self.assertTrue(case["short"], "six words a point should leave the page short")

@@ -498,8 +498,9 @@ def gate_takeaway_long(slide_no, slide, findings):
 
 def words_limit(slide, profile):
     """The WORDS ceiling for one page. A page composed from a page type carries
-    its own (`wordCeiling`: its reading task's outlier fence, on the same body
-    count as its floor - derive-content.mjs wordBudgetOf). Otherwise the exhibit
+    its own (`wordCeiling`: its reading task's upper quartile, the band the
+    review reads, on the same body count as its floor - derive-content.mjs
+    wordBudgetOf). Otherwise the exhibit
     page's prose budget when an exhibit carries it, the benchmark page's when
     its evidence is its prose. The ceiling follows the reading task because a
     chart page with commentary and a table page carry different medians."""
@@ -519,7 +520,7 @@ def gate_words(slide_no, slide, findings, profile):
         limit = words_limit(slide, profile)
         if total > limit:
             summary = slide.get("role") == "executive-summary"
-            findings.append(finding(
+            item = finding(
                 slide_no, "WORDS", total, limit,
                 "An executive summary is read first and in full, so it is held to "
                 "the upper quartile of text pages: keep each point to its finding "
@@ -527,9 +528,18 @@ def gate_words(slide_no, slide, findings, profile):
                 "pages that carry the evidence. The ceiling is on every word of the "
                 "body, the cells of its table with its points: a table of long cells "
                 "leaves the points no room, so keep each cell to a call of a few words." if summary else
-                "Above the fence for pages doing this job: cut the page to its "
-                "claim, its evidence and its consequence, or split it in two.",
-            ))
+                f"Above the ceiling for pages doing this job ({limit} body words), "
+                "the band the review reads: cut the words that restate the title or "
+                "the exhibit, keep the claim, its evidence and its consequence, or "
+                "split the page in two.",
+            )
+            # The bar before the ceiling fell to the upper quartile: a page
+            # between the two breaks WORDS as tightened, which an older
+            # revision hears as advice (gate_config.rule_of, rules.tightened).
+            fence = slide.get("wordFence")
+            if isinstance(fence, (int, float)) and not isinstance(fence, bool) and fence > limit:
+                item["before"] = int(fence)
+            findings.append(item)
         return
     total = 0
     for node in text_nodes(slide):

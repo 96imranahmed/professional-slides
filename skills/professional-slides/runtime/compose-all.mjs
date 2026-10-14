@@ -22,7 +22,7 @@ function withReadingTasks(result, spec) {
     if (source) {
       slide.readingTask = readingTaskOf(source.pageType.family, [slide]);
       const budget = wordBudgetOf(slide.readingTask, slide, spec.density);
-      if (budget) { slide.wordFloor = budget.floor; slide.wordCeiling = budget.ceiling; }
+      if (budget) { slide.wordFloor = budget.floor; slide.wordCeiling = budget.ceiling; slide.wordFence = budget.fence; }
     }
     // One counter: the page gates read this rather than counting again.
     slide.planBodyWords = bodyWordsOf([slide]);

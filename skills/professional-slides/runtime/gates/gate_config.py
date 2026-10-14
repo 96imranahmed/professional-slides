@@ -470,10 +470,13 @@ def void_bar(item):
 
 def rule_of(item):
     """The rule a finding breaks: its code, or `CODE.tightened` when it falls
-    between a bar a rules version lowered and the bar before (rules.tightened)."""
+    between a bar a rules version lowered and the bar before (rules.tightened).
+    A bar that differs page by page - WORDS, whose ceiling is each reading
+    task's own - is carried on the finding as its `before`."""
     tightened = RULES.get("tightened", {}).get(item["code"])
     measured = item.get("measured")
-    if tightened and isinstance(measured, (int, float)) and not isinstance(measured, bool) and measured <= tightened["before"]:
+    before = item.get("before", (tightened or {}).get("before"))
+    if tightened and isinstance(measured, (int, float)) and not isinstance(measured, bool) and isinstance(before, (int, float)) and measured <= before:
         return item["code"] + ".tightened"
     return item["code"]
 
