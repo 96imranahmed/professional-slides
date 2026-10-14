@@ -200,3 +200,28 @@ export function editPagesSync(file, ids, edit) {
   visit(root);
   return written;
 }
+
+/**
+ * Where each page of a pages file is written: a Map from page id to `{ file,
+ * part, route }` - the file it is written in (absolute), that file relative to
+ * the pages file's folder, and the steps from that file's root to the page
+ * (`["pages", 3]` in the pages file, `["pages", 0]` or `[0]` in a part). The
+ * includes are followed as readPagesFileSync follows them, so a page is found
+ * where an edit to it belongs (author-deck.mjs --apply).
+ */
+export function pageHomesSync(file) {
+  const root = path.resolve(file), base = path.dirname(root), homes = new Map(), seen = new Set();
+  const visit = (at) => {
+    if (seen.has(at)) return;
+    seen.add(at);
+    const doc = JSON.parse(fs.readFileSync(at, "utf8"));
+    const lists = at === root ? ["pages", "appendix"].filter((key) => Array.isArray(doc?.[key])).map((key) => [[key], doc[key]])
+      : Array.isArray(doc) ? [[[], doc]] : Array.isArray(doc?.pages) ? [[["pages"], doc.pages]] : [];
+    for (const [route, list] of lists) list.forEach((entry, index) => {
+      if (isInclude(entry)) { const target = path.resolve(path.dirname(at), entry.include); if (inside(base, target)) visit(target); return; }
+      if (entry && typeof entry === "object" && entry.id !== undefined && !homes.has(String(entry.id))) homes.set(String(entry.id), { file: at, part: path.relative(base, at) || path.basename(at), route: [...route, index] });
+    });
+  };
+  visit(root);
+  return homes;
+}

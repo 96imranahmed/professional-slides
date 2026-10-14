@@ -49,6 +49,17 @@
 //                                                        the same as one small object and nothing else: each page's
 //                                                        findings and repairs, advisories, budget and limits, and
 //                                                        the deck's verdict in a line
+//   node runtime/author-deck.mjs <id>.pages.json --apply <edits.json> [--dry-run]
+//                                                        field edits written into the files the pages are written in
+//                                                        (page-edits.mjs): a list of { page, field, value } (or
+//                                                        "delete": true, or "append": true), or a self-check answer,
+//                                                        a section-review answer or a judge's answer.json, each closed
+//                                                        fix of it - every byte the edits do not change kept as it
+//                                                        was; then what --check --page <the pages edited> --json
+//                                                        prints, and its exit code. Nothing is written where an edit
+//                                                        is refused (no such page or field, an `old` the field does
+//                                                        not read); --dry-run prints each change, was and now, and
+//                                                        writes nothing
 //   node runtime/author-deck.mjs <id>.pages.json --plan  before the pages are written: the spine's structure rules on
 //                                                        what its pages declare, and a form and commentary placement
 //                                                        for each page that satisfies them as far as that goes - a
@@ -125,7 +136,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS, alsoRefused } from "./page-types.mjs";
-import { claimSheet, claimSheetLines, recordSheets } from "./claim-sheet.mjs";
+import { claimSheet, claimSheetLines, fieldAt, recordSheets } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
@@ -147,7 +158,8 @@ import { sourceKindsOf } from "./fit-review.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
-import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts, notJson } from "./pages-file.mjs";
+import { applyChanges, changeLine, editsFrom, planEdits } from "./page-edits.mjs";
 import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
 import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
@@ -1831,7 +1843,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --apply <edits.json> [--dry-run] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2385,11 +2397,21 @@ async function main(argv) {
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
     "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, accept: { type: "boolean" }, "fetch-assets": { type: "boolean" }, json: { type: "boolean" },
-    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" } }, { usage: USAGE });
+    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" },
+    apply: { type: "string", valueName: "a file of edits, or a reader's answer" }, "dry-run": { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
   if (!file) throw new UsageError(USAGE);
+  if (values["dry-run"] && values.apply === undefined) throw new UsageError(`--dry-run shows what an --apply would change: --apply <edits.json> --dry-run\n${USAGE}`);
+  // The edits are written first, and the run goes on as the check of the pages they name: the pages file is read after them.
+  if (values.apply !== undefined) {
+    const clash = ["draft", "plan", "brief", "claims", "log", "repair-relation", "page", "render", "write", "accept", "spine", "section"].filter((key) => values[key] !== undefined && values[key] !== false);
+    if (clash.length) throw new UsageError(`--apply runs its own check of the pages it changes (--check --page <them> --json), and takes no ${clash.map((key) => `--${key}`).join(", ")}\n${USAGE}`);
+    const applied = await applyCommand(values, file, say);
+    if (applied.code !== undefined) return applied.code;
+    Object.assign(values, { check: true, json: true, page: applied.pages.join(",") });
+  }
   // The pages file with its parts spliced in (pages-file.mjs): sections authored in separate files are one deck here.
   // A pages file or a part that cannot be read is said in a line, as every other refusal of the file is.
   let doc;
@@ -2419,6 +2441,52 @@ async function main(argv) {
   const session = await loadJudgements(dir, stem);
   try { return await withJudgements(session, () => authorRun({ values, file, doc, dir, stem, logPath, runs, say })); }
   finally { if (values.pending) await writeJson(path.resolve(values.pending), pendingRequests(session)); }
+}
+
+/**
+ * `--apply <edits.json>` (page-edits.mjs): the edits the file holds, checked
+ * against the pages as written and written into the files the pages are
+ * written in - all of them, or none where one is refused. Returns `{ code }`
+ * where the run ends here (a refusal, a dry run, nothing to change), else
+ * `{ pages }`: the pages the edits name, which the run then checks as
+ * `--check --page <them> --json` does. What the file holds that is not a closed
+ * fix - a finding routed elsewhere, a judge's choice, a line that is not the
+ * whole of one field - is said, for the writer to act on.
+ */
+async function applyCommand(values, file, say) {
+  const dir = path.dirname(path.resolve(file));
+  // An answer is named as its brief names it, beside the pages file (out/self-check/<part>.json): found there where it is not found from here.
+  const at = [path.resolve(values.apply), path.resolve(dir, values.apply)].find((candidate) => existsSync(candidate));
+  if (!at) { console.error(`No edits file at ${path.resolve(values.apply)}`); return { code: 1 }; }
+  let input, doc;
+  try { input = JSON.parse(readFileSync(at, "utf8")); } catch (error) { console.error(notJson(at, error)); return { code: 2 }; }
+  try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return { code: 2 }; }
+  const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
+  const listed = (d) => [...(d.pages || []), ...(d.appendix || [])].filter((page) => page && typeof page === "object" && page.id !== undefined).map((page) => [String(page.id), page]);
+  // The pages as their reader reads them, tokens written out: what a self-check's `claim` and a judge's line were read as.
+  let insights = null;
+  try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch { insights = null; }
+  const printed = new Map(listed(bindDeck(doc, insights).doc));
+  const { kind, edits, open, why } = await editsFrom(input, { at, dir, pages: new Map(listed(doc)), printed });
+  if (why) { console.error(why); return { code: 2 }; }
+  const plan = planEdits(file, edits, { readAs: (id, field) => fieldAt(printed.get(id), field) });
+  const from = `${path.relative(process.cwd(), at) || at}${kind && kind !== "edits" ? ` (a ${kind} answer)` : ""}`;
+  const openText = open.length ? `\nNot applied - not a closed fix, so the writer's to act on (${open.length}):\n${open.map((line) => `  - ${line}`).join("\n")}` : "";
+  if (plan.refusals.length) {
+    console.error(`Nothing was written: ${plan.refusals.length} of the ${edits.length} edit${edits.length === 1 ? "" : "s"} in ${from} ${plan.refusals.length === 1 ? "is" : "are"} refused - mend ${plan.refusals.length === 1 ? "it" : "them"} and apply the file again:\n${plan.refusals.map((line) => `  - ${line}`).join("\n")}${openText}`);
+    return { code: 2 };
+  }
+  const already = plan.unchanged.length ? `\nAlready so (${plan.unchanged.length}): ${plan.unchanged.map((u) => `${u.page} ${u.field}`).join(", ")}` : "";
+  const pages = [...new Set([...plan.changes, ...plan.unchanged].map((change) => change.page))];
+  if (values["dry-run"]) {
+    say(plan.changes.length ? `${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"} --apply would write from ${from} (nothing written):\n${plan.changes.map(changeLine).join("\n")}${already}${openText}` : `Nothing to change from ${from}.${already}${openText}`);
+    return { code: 0 };
+  }
+  if (!pages.length) { console.error(`Nothing to change from ${from}.${openText}`); return { code: open.length ? 2 : 0 }; }
+  const written = plan.changes.length ? applyChanges(plan) : [];
+  console.error(`${plan.changes.length ? `Applied ${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"} from ${from} to ${written.join(", ")}:\n${plan.changes.map(changeLine).join("\n")}` : `Nothing to change from ${from}: the pages already read so.`}${already}${openText}\n` +
+    `Checking ${pages.join(", ")} (--check --page ${pages.join(",")} --json):\n`);
+  return { pages };
 }
 
 /** One run of the command on a pages file, with the deck's judgements the rules read. */
