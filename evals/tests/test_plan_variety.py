@@ -221,10 +221,11 @@ console.log(JSON.stringify({ unsatisfied: again.unsatisfied.map((u) => u.code), 
 """)
         # Every page declares the choice the plan gave it; PAGE_SHAPE_FLAT is still broken, and three changes lower it.
         self.assertEqual(result["unsatisfied"], ["PAGE_SHAPE_FLAT"])
-        # Three changes lower it: the two f pages and one of the interchangeable a pages (which one is the search's tie-break).
+        # Two changes lower it, the two f pages. Before the headline cap (deck-structure.mjs HEADLINE_CROWDED) both became
+        # metric strips and an a page was changed too for the architecture they left short; two strips of figures over their
+        # exhibits now crowd the cap, so f1 takes a form that is its own architecture and no a page has to move.
         changed = sorted(page["id"] for page in result["changed"])
-        self.assertEqual((len(changed), changed[1:]), (3, ["f1", "f2"]), changed)
-        self.assertTrue(changed[0].startswith("a"), changed)
+        self.assertEqual(changed, ["f1", "f2"], changed)
         for page in result["changed"]:
             with self.subTest(page=page["id"]):
                 self.assertTrue(page["why"]["mends"], page)

@@ -16,7 +16,8 @@
  * arguments is the schema itself, as JSON. FAKE_CRITIC_SENDS_BACK makes it a
  * critic that tells nothing apart: `every-check` files a major under every
  * check a plant is caught on, on every deck, planted or clean; `numbers`
- * sends every deck back for one item no plant is caught on.
+ * sends every deck back for one item no plant is caught on. A first pass's
+ * argument items (packet.argument) are each answered as holding.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -72,6 +73,9 @@ const critique = { pass: 1, verifies: null, verdict: open ? "revise" : "ready", 
   pillars: [{ pillar: "The argument", pages: ids, verdict: open ? "weak" : "holds", overlap: "One pillar; nothing overlaps.", strongestCounter: "The base may be too small to generalise.", reversal: "The lead measure reverses for two periods.", answered: !open }],
   numbers: "The figures agree across the pages that print them.", sectionFlow: "The pages open, develop and close in order.", execSummary: "No summary page in this short spine; the titles carry the answer.",
   missingAnalyses, cutOrMerge, findings, topFixes: [open ? "Repair the items filed" : "None material"],
-  completeness: checks.map((check) => ({ check, result: filed.has(check) ? "findings" : "clean", note: filed.has(check) ? `Filed an item under ${check}.` : `Checked ${check} across the spine and found nothing to raise.` })) };
+  completeness: checks.map((check) => ({ check, result: filed.has(check) ? "findings" : "clean", note: filed.has(check) ? `Filed an item under ${check}.` : `Checked ${check} across the spine and found nothing to raise.` })),
+  // A first pass gives a verdict on every argument item the packet lists (spine-argument.mjs); the calibration's plants are
+  // read above, on the spine, so each item here holds.
+  ...(packet.argument?.items?.length ? { argument: packet.argument.items.map((item) => ({ item: item.id, verdict: "holds" })) } : {}) };
 if (process.env.FAKE_CRITIC_INVALID === String(run)) delete critique.answerParts;
 process.stdout.write(JSON.stringify({ type: "result", result: JSON.stringify(critique) }));

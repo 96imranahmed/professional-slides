@@ -223,7 +223,7 @@ console.log(JSON.stringify({
 }));
 ''')
         self.assertEqual(result["summary"], 204)  # the text page's upper quartile
-        self.assertEqual(result["text"], 329)  # other text pages keep the fence
+        self.assertEqual(result["text"], 204)  # every text page now: the band the deck review reads (ba4), the fence kept for the appendix
         self.assertTrue(result["leadAndItem"])
         self.assertFalse(result["twoPoints"])
         self.assertTrue(result["card"])
