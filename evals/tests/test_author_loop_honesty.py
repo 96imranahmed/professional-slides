@@ -6,9 +6,10 @@ field the page wrote; `--plan` judged a spine on exhibit kinds it had guessed,
 under a wall-clock budget that changed its answer on a loaded machine; a page
 with a reference that did not bind hid its own compile refusal until the next
 run, and a section written without an id compiled and then failed the build;
-`--page` filed a finding about two pages under one of them and passed a page
-that a blocking aggregate counted; and a scaffold bound to the author's
-insight kept the worked example's words. These hold the repair.
+`--page` filed a finding about two pages under one of them; and a scaffold
+bound to the author's insight kept the worked example's words. These hold the
+repair. (A page run now leaves the deck's aggregates to the whole-deck run, and
+says so.)
 """
 from __future__ import annotations
 
@@ -269,11 +270,15 @@ class PageRunTests(unittest.TestCase):
             for page in ("p05", "p06"):
                 run = cli(file, "--check", "--page", page)
                 self.assertEqual(run.returncode, 2, f"{page}: {run.stderr[:300]}")
-                self.assertIn("CONTENT_CLAIM_REPEATS", run.stderr.split("Where the deck stands")[0])
+                self.assertIn("CONTENT_CLAIM_REPEATS", run.stderr.split("deck-level rules are the whole-deck run's")[0])
             # A page the finding does not name still passes: the finding is not spread over the deck.
             self.assertEqual(cli(file, "--check", "--page", "p02").returncode, 0)
 
-    def test_a_page_counted_in_a_blocking_aggregate_answers_for_it(self):
+    def test_a_page_run_leaves_a_blocking_aggregate_to_the_whole_deck_run(self):
+        """A page run once answered for every aggregate one of its pages was counted in - a page holding a bare chart for
+        the deck's share of marked charts - and each section's writer chased a rate the whole deck sets. An aggregate is
+        read over every page composed, which a page run does not compose: the whole-deck run holds it, and the page run
+        says so in its one line, and answers for the page's own findings."""
         # The deck's marked charts taken out, and the marks off the rest: the share of charts marking anything falls under its floor.
         def bare(doc):
             marked = lambda p: any(key in ex for ex in exhibits_of(p) for key in MARKS)
@@ -290,42 +295,19 @@ class PageRunTests(unittest.TestCase):
             whole = cli(file, "--check")
             self.assertEqual(whole.returncode, 2)
             self.assertIn("CRAFT_CHARTS_BARE", whole.stderr.split("Where the deck stands")[0])
-            run = cli(file, "--check", "--page", charted)
-            self.assertEqual(run.returncode, 2)
-            findings, rest = run.stderr.split("Each page's part in the deck's aggregates:")
-            self.assertIn("G. Deck aggregates", findings.split("Deck aggregate findings these pages are not counted in")[0])
-            self.assertIn("CRAFT_CHARTS_BARE", findings.split("Deck aggregate findings these pages are not counted in")[0])
-            # Its part in the aggregates names the rate it counts towards - by the delivery bar, which is the one standing the
-            # rate now has: the floor under it is the finding above - and which way it pulls.
-            self.assertIn(f"{charted}: BAR_CHARTS_ANNOTATED: this page counts as 1 chart page, 0 marking something on the plot", " ".join(rest.split()))
-            self.assertIn("floor 0.65", " ".join(rest.split()))
-            self.assertIn("pulls the deck the wrong way", rest)
-            # A page with no chart has no part in it: the finding is listed apart, and the run answers for the page alone.
-            other = cli(file, "--check", "--page", "p02")
-            self.assertIn("Deck aggregate findings these pages are not counted in (not counted in this run's exit code; the whole-deck run holds them):", other.stderr)
-            self.assertNotIn("p02: BAR_CHARTS_ANNOTATED", other.stderr)
-            self.assertNotIn("p02: CRAFT_CHARTS_BARE", other.stderr)
+            run = cli(file, "--check", "--page", charted, "--json")
+            report = json.loads(run.stdout)
+            self.assertEqual(run.returncode, 0, report)
+            self.assertEqual(report["pages"][charted]["findings"], [])
+            self.assertIn("deck-level rules are the whole-deck run's", report["deck"])
+            self.assertNotIn("CRAFT_CHARTS_BARE", run.stdout)
 
-    def test_the_pages_a_finding_is_made_of_are_read_off_its_rule(self):
+    def test_the_pages_a_finding_names_are_read_off_it_its_own_first(self):
         result = run_node('''
-import { contributorsOf, contributions, pagesOf } from './skills/professional-slides/runtime/deck-report.mjs';
-const standings = [
-  { code: 'RATE', class: 'G', what: 'charts marked', value: 0.2, bar: 0.3, side: 'min', state: 'short' },
-  { code: 'EACH', class: 'G', what: 'numbers a page', value: 9, bar: 15, side: 'min', state: 'short', each: { p1: 4, p2: 30 } },
-  { code: 'CAP', class: 'G', what: 'pages of one kind', value: 3, bar: 2, side: 'max', state: 'over', pages: ['p2', 'p3'] }];
-const parts = { p1: { charts: 1, chartsAnnotated: 0 }, p2: { charts: 1, chartsAnnotated: 1 }, p3: { charts: 0, chartsAnnotated: 0 } };
-const rates = { RATE: { of: 'charts', done: 'chartsAnnotated', noun: 'chart page', verb: 'marked' } };
-const of = (code, more = {}) => contributorsOf({ code, class: 'G', ...more }, standings, { parts, rates });
-console.log(JSON.stringify({ rate: of('RATE'), each: of('EACH'), cap: of('CAP'), named: of('OTHER', { slide: ['p3'] }), none: of('OTHER'),
-  pages: [pagesOf({ id: 'p6', pages: ['p5', 'p6'] }), pagesOf({ slide: ['p1', null] }), pagesOf({ id: 'p1' })], lines: contributions(standings, ['p1', 'p3'], { parts, rates }) }));
+import { pagesOf } from './skills/professional-slides/runtime/deck-report.mjs';
+console.log(JSON.stringify([pagesOf({ id: 'p6', pages: ['p5', 'p6'] }), pagesOf({ slide: ['p1', null] }), pagesOf({ id: 'p1' }), pagesOf({ code: 'X' })]));
 ''')
-        self.assertEqual(result["rate"], ["p1"])   # the page holding a chart that is not marked
-        self.assertEqual(result["each"], ["p1"])   # the page on the wrong side of the bar
-        self.assertEqual(result["cap"], ["p2", "p3"])  # the pages counted against the cap
-        self.assertEqual([result["named"], result["none"]], [["p3"], []])
-        self.assertEqual(result["pages"], [["p6", "p5"], ["p1"], ["p1"]])
-        self.assertEqual(result["lines"]["p1"][0], "RATE: this page counts as 1 chart page, 0 marked (deck 0.2 charts marked; floor 0.3) - pulls the deck the wrong way")
-        self.assertFalse([line for line in result["lines"]["p3"] if line.startswith("RATE")])
+        self.assertEqual(result, [["p6", "p5"], ["p1"], ["p1"], []])
 
 
 class ScaffoldTests(unittest.TestCase):

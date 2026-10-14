@@ -46,15 +46,20 @@
 //                                                        the render's gates are reported with the rest, so the build
 //                                                        finds nothing this did not (nothing is fetched)
 //   node runtime/author-deck.mjs <id>.pages.json --page <id>[,<id>...]  (with --check or --draft)
-//                                                        the whole deck compiled as context, and what those pages
-//                                                        answer for: every blocking finding that names one of them
-//                                                        or that one of them counts towards, their part in each deck
-//                                                        aggregate (the craft rates among them), and where the deck
-//                                                        stands; no deck is written; with --render, renders only them
+//                                                        those pages compiled, composed and gated among the deck's
+//                                                        structural pages, every other page read off what it declares
+//                                                        (page-run.mjs): every finding that names one of them - its
+//                                                        page-local rules, and the rules that read it against its
+//                                                        neighbours (a run of one type, crowded headline figures, a
+//                                                        claim or a number two pages state, the spine lock) - and the
+//                                                        deck-level rules in one line, which the whole-deck run holds;
+//                                                        its cost is its pages', not the deck's; no deck is written;
+//                                                        with --render, renders them and records each page's check in
+//                                                        out/page-check/, whatever the deck's other pages are doing
 //   node runtime/author-deck.mjs <id>.pages.json --check --page <id>[,<id>...] --json
 //                                                        the same as one small object and nothing else: each page's
 //                                                        findings and repairs, advisories, budget and limits, and
-//                                                        the deck's verdict in a line
+//                                                        the verdict on these pages in a line, which ends on the deck's rules
 //   node runtime/author-deck.mjs <id>.pages.json --plan  before the pages are written: the spine's structure rules on
 //                                                        what its pages declare, and a form and commentary placement
 //                                                        for each page that satisfies them as far as that goes - a
@@ -134,7 +139,7 @@ import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, dra
 import { claimSheet, claimSheetLines, recordQuestions, recordSheets } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
-import { runContentGates } from "./gates/content_gates.mjs";
+import { claimRepeatFindings, runContentGates } from "./gates/content_gates.mjs";
 import { varietyFindings, evidenceDepth, structureMix, typeSequence, VARIETY } from "./gates/variety_gates.mjs";
 import { SLIDE_KEYS } from "./compose-page.mjs";
 import { composeAll } from "./compose-all.mjs";
@@ -167,15 +172,15 @@ import { featuredDraw } from "./design-systems.mjs";
 import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
 import { claimMarks, dependencyFindings, hazardFindings, metricsOf, pagePool, primaryCitations, relationRepair, requiredCitations, tileMeasures, titleCells } from "./gates/dependency_gates.mjs";
-import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
+import { craftFindings } from "./gates/craft_gates.mjs";
 import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, notePageFigures, pendingFinding, pendingRequests, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
 import { consistencyFindings } from "./gates/consistency_gates.mjs";
 import { LAYOUT_CODES, REPAIRS, SETTLED_LATER, classOf, repairOf } from "./gates/gate_classes.mjs";
-import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, freeChoices, openKindsOf, sectionQuotas, shapeStructure, stubsOf } from "./deck-structure.mjs";
+import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evidenceExhibits, fitsOf, freeChoices, headlineStructure, openKindsOf, sectionQuotas, shapeStructure, stubsOf } from "./deck-structure.mjs";
 import { FIT, fitLines, fitSearch } from "./fit-search.mjs";
 import { fillGuidance, slotGuidance } from "./fill-guidance.mjs";
-import { briefOf, contributions, contributorsOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
+import { briefOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
 import { EVALUATION_MIN_PAGES, buildDeck, validateStageContract } from "./build-deck.mjs";
 import { contentsProblem, contentsRoom, coverageFindings } from "./compose-deck.mjs";
 import { resolveFill } from "./compose-points.mjs";
@@ -184,6 +189,7 @@ import { auditContent } from "./content-audit.mjs";
 import { isRefusal } from "./errors.mjs";
 import { rendererInstalled } from "./doctor.mjs";
 import { bindDeck, withPlaceholders } from "./bind.mjs";
+import { deckRulesLine, heldOnPageRun, layoutsBetween, namesOneOf, pageContext } from "./page-run.mjs";
 import { PLAN_MODE, RUN_LOG_VERSION, readRunLog, runCost } from "./run-log.mjs";
 import { sectionTitleRoom, spineFitFindings } from "./spine-fit.mjs";
 import { spineExhibitFindings } from "./spine-exhibits.mjs";
@@ -303,7 +309,7 @@ const unmapped = (page) => page && typeof page === "object" && page.draft !== un
  * compiled whole, and where an exhibit or a metric is still unfilled its
  * spine is - its choices, its `why`, its title, what settles it.
  */
-export function compileDeck(docIn, { insights = null, draft = false, partial = false, baseDir = null, sourceKinds = null } = {}) {
+export function compileDeck(docIn, { insights = null, draft = false, partial = false, baseDir = null, sourceKinds = null, openKinds = null } = {}) {
   if (!docIn || typeof docIn !== "object" || !docIn.deck || !Array.isArray(docIn.pages)) throw new Error("A pages file is { deck: {...}, pages: [...] }");
   if (docIn.deck.slides || docIn.deck.appendix) throw new Error("`deck` carries the deck-level keys only; the pages go in `pages` and `appendix`");
   const registry = registryProblems(docIn.sources);
@@ -319,7 +325,9 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
   // A draft: the spine as written, bound - what the deck's own rules on the spine read, and what a page's record keeps of what
   // it declares - and its witness, each page completed in a layout of its type that holds it.
   const written = draft ? bindDeck(withKeys(docIn), insights) : null;
-  const proof = draft ? spineProof(withKeys(docIn), { insights, measured, written, baseDir, sourceKinds }) : null;
+  // `openKinds` is the kind the deck's plan gives each untyped stub (openKindsByPage), where the caller read it off the whole
+  // deck: a page run compiles its own pages, and the plan's kinds are the whole deck's.
+  const proof = draft ? spineProof(withKeys(docIn), { insights, measured, written, baseDir, sourceKinds, open: openKinds }) : null;
   const binding = proof ? bindDeck(proof.doc, insights) : bindDeck(withKeys(docIn), insights);
   // Each page as it was before its references were written out: what the compile's tiles print by reference is read off it.
   const unbound = proof ? [...proof.doc.pages, ...(proof.doc.appendix || [])] : [...docIn.pages, ...(docIn.appendix || [])];
@@ -470,10 +478,10 @@ const openKindsByPage = (doc, insights, sourceKinds = null) => new Map([...openK
  * a one-page deck with the deck's own settings, and - where the deck's folder
  * is known - composed alone under them.
  */
-function spineProof(doc, { insights, measured, written, baseDir, sourceKinds = null }) {
+function spineProof(doc, { insights, measured, written, baseDir, sourceKinds = null, open: given = null }) {
   const examples = workedExamples();
   // The kind the deck's plan gives each untyped stub (openKindsByPage), by place on its page: the witness draws that kind.
-  const open = openKindsByPage(doc, insights, sourceKinds);
+  const open = given ?? openKindsByPage(doc, insights, sourceKinds);
   const exampleOf = (type, form) => examples.pages.find((page) => page.type === type && page.form === form) ?? examples.pages.find((page) => page.type === type) ?? null;
   const spines = new Map([...written.doc.pages, ...(written.doc.appendix || [])].map((page, index) => [String(page?.id ?? `page-${index + 1}`), page]));
   const settings = { ...doc.deck, ...(doc.sources ? { sources: doc.sources } : {}) };
@@ -794,15 +802,20 @@ function fragmentationShift(budget, id, blocks) {
  * declared choices (page-types.mjs declaredSlide), in page order: what the
  * deck's structure rules are read from, so a page that fails to compile
  * still counts as the type, form and placement it declares. `declared` lists
- * the stand-ins.
+ * the stand-ins. `open` is the kind the deck's plan gives each untyped stub,
+ * where the caller has read it. `records`, the insight log's measures by ref,
+ * gives each stand-in the record a compiled page keeps of what it declares it
+ * shows - its bases, and the claim's measures in what settles it - which the
+ * storyline's structure and the proofs two pages share are read from: a page
+ * run stands every page it does not compile in so (page-run.mjs).
  */
-function withStandIns(doc, spec, failed, insights, sourceKinds = null) {
+function withStandIns(doc, spec, failed, insights, sourceKinds = null, { open: given = null, records = null } = {}) {
   const missing = new Set(failed.map((f) => f.index));
   // A page that did not compile is stood in for as the binding wrote it: an exhibit that names its measures stands in with the values it will plot.
   const written = new Map(failed.filter((f) => f.page).map((f) => [f.index, f.page]));
   const revision = doc.deck.workflow === REVISION, declared = [], undrawn = [];
   // An exhibit a page of open kinds has not typed is stood in for as the kind the deck's plan gives it (openKindsByPage): the draft and the plan read one stub as one kind.
-  const open = openKindsByPage(doc, insights, sourceKinds);
+  const open = given ?? openKindsByPage(doc, insights, sourceKinds);
   const standFor = (page, index) => declaredSlide(page, index, { exhibitType: open.get(String(page?.id))?.map((item) => item.kind) ?? evidenceExhibits(page, insights, drawOf(doc.deck)), players: doc.deck.players, stubs: stubsOf(page, insights, open.get(String(page?.id)) ?? null) });
   // A spine page with no exhibit drawn yet - its exhibits declared by `basis` stubs, or not written at all, and stood in for in
   // its witness (`pageType.pending`) - is read for the structure rules as its choices declare it, the way a plan reads it: the
@@ -826,11 +839,18 @@ function withStandIns(doc, spec, failed, insights, sourceKinds = null) {
         if (slide) shapes.set(slide, shapeOf(slide, page, offset + i));
         return slide ? [slide] : [];
       }
-      const stand = standFor(written.get(offset + i) ?? page, offset + i);
+      const source = written.get(offset + i) ?? page, stand = standFor(source, offset + i);
       if (!stand) return [];
+      // What the page declares it shows, as compileDeck records it: a `settles` written without its kind is the claim's measures, and the page is settled by its insights.
+      const own = records ? withoutDependencies(source, records) : null;
+      if (own && own.page.settles === undefined) delete stand.pageType.content.settles;
       // A page that names its insights is settled by them (page-types.mjs spineOf).
       const lead = (stand.pageType.content.evidence || []).map((key) => insights?.get(key)).find(Boolean);
       if (!stand.pageType.content.settles && lead) stand.pageType.content.settles = { kind: SHAPES[lead.shape]?.kind ?? "qualitative", what: String(lead.finding ?? "") };
+      if (own?.dependencies) {
+        stand.pageType.dependencies = own.dependencies.declared;
+        if (own.dependencies.claim) stand.pageType.content.settles = { ...(stand.pageType.content.settles ?? {}), ...own.dependencies.claim };
+      }
       declared.push(String(stand.id));
       return [stand];
     });
@@ -857,9 +877,10 @@ const waitsFor = (f) => repairOf(f).settledLater;
  * it leaves unsatisfied no form or placement mends - only another page type,
  * another page or other evidence, all of which the critique is bound to.
  */
-function structurePlan(doc, insights, sourceKinds = null) {
-  let compiled = new Map();
-  try { const { spec } = compileDeck(doc, { insights, partial: true }); compiled = new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])); }
+function structurePlan(doc, insights, sourceKinds = null, { compiled: given = null } = {}) {
+  // `compiled`, where the caller has it, is the pages compiled so far (a page run's own): the rest are read as they declare themselves.
+  let compiled = given ?? new Map();
+  if (!given) try { const { spec } = compileDeck(doc, { insights, partial: true }); compiled = new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])); }
   catch { compiled = new Map(); }
   // Any form the catalogue allows, whatever its fit: a draft holds a rule against a spine only where nothing the layout can choose meets it.
   return allocateStructure(doc, { insights, planOf, compiled, forms: "any", sourceKinds });
@@ -922,10 +943,11 @@ const opensOnSummary = (spec) => { const first = spec.slides.find((s) => s.pageT
  * compile refusal alone (`uncompiled`); the rules on the claims the pages
  * make between them read every page, stand-ins included.
  */
-function contentFindings(structural, deck, spec, { uncomposed = new Set(), uncompiled = new Set() } = {}) {
+function contentFindings(structural, deck, spec, { uncomposed = new Set(), uncompiled = new Set(), pages = false } = {}) {
   const content = deriveContent(structural, deck ?? { slides: [] });
   // A page with no composition is marked for the content gates (`uncomposed`): it has no text to hold to a plan, and where it is the opening page only its title can carry the answer.
-  const report = runContentGates(content, { required: true, deck: spec, uncomposed: new Set([...uncomposed, ...uncompiled]) });
+  // A page run's content is of its own pages (`pages`): the rules over the deck's claims and its answer are not read on it.
+  const report = runContentGates(content, { required: true, deck: spec, uncomposed: new Set([...uncomposed, ...uncompiled]), ...(pages ? { pages: true } : {}) });
   const idOf = new Map(content.pages.map((page) => [page.n, page.id]));
   // A finding that sets pages against each other (a claim two pages both prove) names every one of them, by id.
   const named = (f) => (Array.isArray(f.measured?.pages) ? f.measured.pages.map((n) => (typeof n === "number" ? idOf.get(n) : n)).filter((id) => typeof id === "string") : []);
@@ -934,14 +956,61 @@ function contentFindings(structural, deck, spec, { uncomposed = new Set(), uncom
   return { content, report, findings };
 }
 
+/**
+ * A page run's deck as the rules that read a page against its neighbours read
+ * it: every page of the pages file in order, the run's own compiled (`spec`,
+ * the compile of its context, and `failed`, what of it did not compile) and
+ * every other stood in for by what it declares - its choices, the exhibits the
+ * binding writes out of its references, and the bases it declares, as a
+ * compiled page records them (withStandIns). Nothing is composed.
+ * `structural` and `shaped` as withStandIns returns them, the slides a
+ * revision carries from its source deck among them.
+ */
+function aroundPages(whole, scope, { spec, failed, insights, sourceKinds = null, open = null }) {
+  const bound = bindDeck(whole, insights).doc, written = [...bound.pages, ...(bound.appendix || [])];
+  const all = [...whole.pages, ...(whole.appendix || [])];
+  // The run's own pages that did not compile, by their place in the deck, and every page it does not compile at all.
+  const standing = [...failed.map((f) => ({ ...f, index: scope.indexOf.get(String(f.id)) })).filter((f) => f.index !== undefined),
+    ...all.flatMap((page, index) => (scope.ids.has(scope.order[index]) ? [] : [{ index, id: scope.order[index], page: written[index] ?? page }]))];
+  const { structural, shaped } = withStandIns(whole, spec, standing, insights, sourceKinds, { open, records: measureRegistry(insights) });
+  const carried = whole.deck.workflow === REVISION ? carriedEntries(whole.pages) : [];
+  const withCarried = (deck) => ({ ...deck, ...(carried.length ? { carried } : {}) });
+  return { structural: withCarried(structural), shaped: withCarried(shaped) };
+}
+
+/**
+ * The structure rules a page run reads across the deck (page-run.mjs
+ * PAGE_RUN_HOLDS), over `around` (aroundPages), that name one of its pages
+ * (`named`): the page types in a row (the variety contract's VARIETY_TYPE_RUN)
+ * and the headline figures in ten consecutive pages (HEADLINE_CROWDED), each
+ * read as declaredStructure reads it.
+ */
+function acrossPages(around, named) {
+  const runs = varietyFindings(around.shaped, { structureOf, drawnOf }).filter((f) => f.code === "VARIETY_TYPE_RUN");
+  return [...runs, ...headlineStructure(around.shaped.slides || []).findings].filter((f) => namesOneOf(f, named));
+}
+
+/**
+ * The claims of a page run's deck read against one another as the content
+ * plan reads them (CONTENT_CLAIM_REPEATS), from what every page declares
+ * (`deck`, aroundPages' structural deck): each finding that names one of the
+ * run's pages (`named`), by id, as contentFindings files it.
+ */
+function claimsAcross(deck, named) {
+  const { pages } = deriveContent(deck, { slides: [] });
+  const idOf = new Map(pages.map((page) => [page.n, page.id]));
+  return claimRepeatFindings(pages).map((f) => ({ ...f, severity: "blocking", id: idOf.get(f.page), pages: f.measured.pages.map((n) => idOf.get(n)).filter((id) => typeof id === "string") }))
+    .filter((f) => namesOneOf(f, named));
+}
+
 /** The page-local findings a composed deck answers beyond the page gates: what each exhibit rests on, the scene's design checks, the copy, and what composition kept. */
-function localFindings({ doc, structural, deck, spec, insights, uncomposed, uncompiled, witness = null }) {
+function localFindings({ doc, structural, deck, spec, insights, uncomposed, uncompiled, witness = null, pages = false }) {
   // A reference that could not be bound is reported by the compile, which left its page out (compileDeck `bindingFindings`).
   const depends = spineDependencies(doc, insights, spec, witness);
   // The deck's conventions on each compiled page (gates/convention_gates.mjs): what the renderer does not apply itself.
   const conventions = conventionFindings(spec, deck).filter((f) => !uncompiled.has(String(f.id)));
   const design = deck ? WEIGHT.applyRulesVersion(sceneDesignFindings(deck), spec) : [];
-  const { findings: copy, content, report } = contentFindings(structural, deck, spec, { uncomposed, uncompiled });
+  const { findings: copy, content, report } = contentFindings(structural, deck, spec, { uncomposed, uncompiled, pages });
   // An explicit visual choice or authored commentary that did not survive composition: the build refuses it (CONTENT_LOST).
   const byTitle = new Map([...structural.slides, ...(structural.appendix || [])].map((slide) => [String(slide.title ?? "").normalize("NFKC").replace(/\s+/g, " ").trim(), slide.id]));
   const kept = deck ? auditContent(spec, deck).findings.map((f) => ({ ...f, id: byTitle.get(f.title), severity: "blocker",
@@ -975,32 +1044,48 @@ function localFindings({ doc, structural, deck, spec, insights, uncomposed, unco
  * what advises, the content plan's findings apart (`contentReport`);
  * `blocking` and `advisories` hold every finding with its class.
  */
-export async function authorDeck(docIn, { baseDir, insights = null, draft = false, fit = !draft, fill = !draft, fitCap = FIT.perPage, fitCache = null, fitPages = null, composeCache = null } = {}) {
+export async function authorDeck(docIn, { baseDir, insights = null, draft = false, fit = !draft, fill = !draft, fitCap = FIT.perPage, fitCache = null, fitPages = null, composeCache = null, pages = null } = {}) {
   // A revision is read beside the inventory of the deck it was imported from: a picture the user's own deck embedded is
   // credited to that deck, and the slides it carries are checked against the slides the inventory holds (revision.mjs).
   const imported = docIn?.deck?.workflow === REVISION && typeof docIn.deck.inventory === "string" && baseDir ? readJsonSync(path.resolve(baseDir, docIn.deck.inventory), { optional: true }) : null;
-  const doc = imported ? withImportedCredits(docIn, imported) : docIn;
+  const whole = imported ? withImportedCredits(docIn, imported) : docIn;
+  // A page run (`pages`, the set of ids it names) compiles, composes and gates those pages among the deck's structural pages -
+  // `doc` from here on is that pages document (page-run.mjs pageContext) - and reads every other page off what it declares,
+  // for the rules that read a page against its neighbours; the rules over the whole deck are the whole-deck run's.
+  const scope = pages ? pageContext(whole, pages) : null;
+  const doc = scope ? scope.doc : whole;
   // What each slide of a revision's source deck drew: the kinds its like is drawn in, read by the plan and by a draft alike.
   const sourceKinds = baseDir ? await sourceKindsOf(doc.deck, path.join(baseDir, "deck")) : null;
-  const { spec, spineFindings, bindingFindings, unmapped: waiting, failed, witness } = compileDeck(doc, { insights, draft, partial: true, baseDir, sourceKinds });
+  // The kind the deck's plan gives each untyped stub is the whole deck's to give (openKindsByPage): a page run reads it off the whole deck.
+  const open = scope ? openKindsByPage(whole, insights, sourceKinds) : null;
+  const { spec, spineFindings: spineRules, bindingFindings, unmapped: waiting, failed, witness } = compileDeck(doc, { insights, draft, partial: true, baseDir, sourceKinds, openKinds: open });
+  // The rules on the spine are read over the whole deck (deckSpineFindings): a page run's are the whole-deck run's.
+  const spineFindings = scope ? [] : spineRules;
   // What each page composed where a slide stood keeps of that slide - its title, its source line - checked against the inventory
   // and recorded on the page: those are the user's, and the rules that judge them advise there (revision.mjs stampKept).
   stampKept(spec, imported);
   const authoredIds = new Set([...doc.pages, ...(doc.appendix || [])].map((page, index) => String(page?.id ?? `page-${index + 1}`)));
   // A closed evidence scope on a request that is not the user's own words quotes its limit from the file that sets it: read here,
   // where the deck's folder is, so the author is told before the critic that the file is missing or says no such thing.
-  const scopeSource = baseDir ? await scopeSourceErrors(doc.deck, baseDir) : [];
+  const scopeSource = baseDir && !scope ? await scopeSourceErrors(doc.deck, baseDir) : [];
   if (scopeSource.length) spineFindings.push({ code: "STATEMENT_INVALID", severity: "blocker", repair: scopeSource.join("; ") });
   // What the critic will be told of the log is told to the author first, all of it at once: every insight whose `sources`
   // are not files the deck holds. It is advice here as it is a problem there - the critic weighs it - so nothing is refused.
-  const unfiled = baseDir && insights ? unfiledSources([...insights.values()].filter((item) => !item.derived), await sourceFiles(baseDir)) : [];
+  const unfiled = baseDir && insights && !scope ? unfiledSources([...insights.values()].filter((item) => !item.derived), await sourceFiles(baseDir)) : [];
   if (unfiled.length) spineFindings.push({ code: "SOURCES_UNFILED", severity: "advisory", pages: unfiled.map((entry) => entry.id), measured: { insights: unfiled.length, none: unfiled.filter((entry) => entry.none).map((entry) => entry.id) },
     repair: `${unfiled.length} insight${unfiled.length === 1 ? " names" : "s name"} sources that are not files under sources/ (${unfiled.slice(0, 8).map((entry) => (entry.none ? `${entry.id}: none` : `${entry.id}: ${entry.missing.slice(0, 2).map((f) => JSON.stringify(f)).join(", ")}${entry.missing.length > 2 ? ", ..." : ""}`)).join("; ")}${unfiled.length > 8 ? `; and ${unfiled.length - 8} more` : ""}). An insight's \`sources\` are the paths of the files its finding was read from - "sources/accounts-fy26.csv" - beside the pages file; a publisher's name or a key of the \`sources\` registry is a citation, which goes on the measure (\`cite\`) or the page (\`source\`). Save each file under sources/ and name its path, or the storyline critic is told the log has ${unfiled.length} unsourced finding${unfiled.length === 1 ? "" : "s"}` });
   // And every recorded number its own source file does not print: the citation is the author's to check, file in hand.
-  const unread = baseDir && insights ? await unreadNumbers([...insights.values()].filter((item) => !item.derived), baseDir) : [];
+  const unread = baseDir && insights && !scope ? await unreadNumbers([...insights.values()].filter((item) => !item.derived), baseDir) : [];
   if (unread.length) spineFindings.push({ code: "SOURCE_NUMBERS_UNREAD", severity: "advisory", pages: unread.map((entry) => entry.id), measured: { insights: unread.length, measures: unread.flatMap((entry) => entry.measures.map((m) => `${entry.id}/${m}`)) },
     repair: `${unread.length} insight${unread.length === 1 ? " records" : "s record"} values its own source files do not print, or print with the other sign (${unread.slice(0, 6).map((entry) => `${entry.id}: ${entry.missing.slice(0, 3).join(", ")}`).join("; ")}${unread.length > 6 ? `; and ${unread.length - 6} more` : ""}). Open the file and check each: a slipped transcription is corrected in the log; a measure worked out from what the source prints - a share, a change, a spread - says how in \`computed\`; a number from another file names that file in the measure's own \`sources\`` });
-  const { structural, declared, shaped, undrawn } = withStandIns(doc, spec, failed, insights, sourceKinds);
+  const { structural, declared, shaped, undrawn } = withStandIns(doc, spec, failed, insights, sourceKinds, { open });
+  // A page run's deck as the rules that read a page against its neighbours read it: every page in order, the run's own as
+  // compiled and every other stood in for by what it declares (aroundPages). What the rest of the deck decides of the run's
+  // pages as they are composed goes with the spec (compose-deck.mjs `pageRun`): each page's place, the appendix's divider,
+  // and the layouts the analytical pages between them take.
+  const around = scope ? aroundPages(whole, scope, { spec, failed, insights, sourceKinds, open }) : null;
+  if (scope) spec.pageRun = { places: scope.places, appendix: scope.appendix,
+    between: layoutsBetween([...around.structural.slides, ...(around.structural.appendix || [])], { context: scope.ids, composed: new Set([...spec.slides, ...(spec.appendix || [])].map((slide) => String(slide.id))) }) };
   const composed = await composeForAuthoring(spec, baseDir, { slideCache: composeCache });
   // A page the composer drew as two slides or more says so, and why: the deck is a slide longer than its pages, each part
   // repeats the title, and only the first carries the commentary. A lone table cut across pages is refused: the content plan
@@ -1090,10 +1175,17 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   structure.findings = structure.findings.filter((f) => !/^PLAN_/.test(f.code) || isBlocker(f));
   // A kinds floor the deck misses goes to the sections that owe a kind the allocation gave them (allocation.mjs): the lead
   // routes each to its section, which draws it on the page its evidence suits, rather than redrawing pages to add any kind.
-  const owing = owedKinds(docIn, [...shaped.slides, ...(shaped.appendix || [])]);
+  // A page run's kinds floor is the whole-deck run's, and so is what the sections owe of it.
+  const owing = scope ? [] : owedKinds(docIn, [...shaped.slides, ...(shaped.appendix || [])]);
   if (owing.length) structure.findings = structure.findings.map((f) => (f.code === "VARIETY_EXHIBIT_RANGE" ? { ...f, measured: { ...(f.measured ?? {}), owed: owing },
     repair: `${f.repair}. The allocation gave these kinds to sections that do not draw them yet: ${owing.map((o) => `${o.section} (${o.owed.join(", ")})`).join("; ")} - each is that section's to draw, on the page its evidence suits` } : f));
-  const typed = [...shaped.slides, ...(shaped.appendix || [])].filter((slide) => slide.pageType);
+  // A page run reads the plan gates' rules on each of its pages here; its structure rules over more than one page are read
+  // over the whole deck as it declares itself (acrossPages), and the rest are the whole-deck run's.
+  if (scope) structure.findings = structure.findings.filter((f) => classOf(f.code) === "P");
+  // The deck the structure rules read a page's other forms against (the fit search, below): a page run's is the whole deck,
+  // its own pages compiled and the rest as they declare themselves.
+  const ruled = scope ? around : { structural, shaped };
+  const typed = [...ruled.shaped.slides, ...(ruled.shaped.appendix || [])].filter((slide) => slide.pageType);
   // The page's architecture as the gates measured it, or as its choices declare it where it did not compose.
   const measuredShape = new Map();
   for (const item of scene.architectures) measuredShape.set(String(item.id), [...(measuredShape.get(String(item.id)) || []), item.architecture]);
@@ -1129,7 +1221,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     return room ? { ...f, fits: room, repair: `${f.repair ?? ""} ${room.words ? `Its first ${room.words} words (${room.characters} characters) fit the two lines` : "Not even its first word fits the two lines"} in this deck's title band; the storyline critique is bound to the title, so a change sends the page back to it`.trim() } : f; };
   let gateFindings = scene.all.filter((f) => !(draft && f.code === "TITLE_LINES" && overLines.has(String(f.id)))).map(withProseFill).map(withTitleRoom), gateStandings = scene.standings.map((st) => ({ ...st, ...(st.pages ? { pages: st.pages.map(named) } : {}),
     ...(st.each ? { each: Object.fromEntries(Object.entries(st.each).map(([key, value]) => [named(key), value])) } : {}) }));
-  const provisionalShape = complete && scene.ran ? { findings: [], standings: [] } : shapeStructure(shapesWith(), { airy });
+  const provisionalShape = (complete && scene.ran) || scope ? { findings: [], standings: [] } : shapeStructure(shapesWith(), { airy });
   if (!(complete && scene.ran)) {
     const opens = opensOnSummary(structural), long = typed.length >= WEIGHT.DECK_LENGTH.frontMatter;
     gateFindings = gateFindings.filter((f) => f.code !== "PAGE_SHAPE_FLAT" && !(f.code === "NO_SUMMARY" && opens));
@@ -1139,7 +1231,9 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
       repair: "The deck's first analytical page is not its executive summary. Open on the answer, its proof, the consequence and the action: a `summary` page, form `executive-summary`, ahead of the first section" });
   }
   // What the build checks of the stages before it composes: the stage contract of a new deck, an evaluation's length, the brief's ranked criteria.
-  const local = localFindings({ doc, structural, deck: composed.deck, spec, insights, uncomposed, uncompiled, witness: witness?.doc ?? null });
+  const local = localFindings({ doc, structural, deck: composed.deck, spec, insights, uncomposed, uncompiled, witness: witness?.doc ?? null, pages: Boolean(scope) });
+  // A page run's claims are read against every other page's as it declares itself (claimsAcross): its content plan is of its own pages.
+  if (scope) local.copy.push(...claimsAcross(around.structural, pages));
   // A page the witness refused, or one a particular proof speaks of, has said why: what the dependency contract would say of the same page laid out is that refusal again.
   if (draft) local.depends = local.depends.filter((f) => !(isBlocker(f) && (refusedIds.has(String(f.id)) || proven.has(String(f.id)) || undetermined.some((u) => String(u.id) === String(f.id)))));
   // What a revision changed, against the deck it was imported from: the pages whose words, numbers or drawing differ from
@@ -1177,11 +1271,12 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     gateFindings = gateFindings.map(withFill);
     local.copy = local.copy.map(withFill);
   }
-  const stages = [];
-  try { validateStageContract(structural, { content: local.content, plan: planOf(structural) }); }
+  const stages = [], standings = [];
+  // The stage contract, an evaluation's length, the brief's ranked criteria, the contents page and the share of titles that
+  // lead with a gap are read over the whole deck: a page run leaves them to the whole-deck run.
+  if (!scope) try { validateStageContract(structural, { content: local.content, plan: planOf(structural) }); }
   catch (error) { if (!isRefusal(error)) throw error; stages.push({ code: error.code, severity: "blocker", repair: `${error.message} - the build refuses the deck here. Give every page a unique \`id\`, and open the deck on a \`summary\` page (form \`executive-summary\`) ahead of its first section` }); }
-  const standings = [];
-  if (spec.purpose === "evaluation") {
+  if (spec.purpose === "evaluation" && !scope) {
     // Each page still to compose will add at least a slide.
     // The deck's length is every page it renders, the slides a revision carries among them (the build counts the same).
     const slides = (composed.deck?.slides.length ?? 0) + new Set([...uncompiled, ...uncomposed]).size + WEIGHT.carriedCount(spec);
@@ -1189,12 +1284,12 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     if (slides < EVALUATION_MIN_PAGES) stages.push({ code: "EVALUATION_TOO_SHORT", severity: "blocker", measured: slides, threshold: EVALUATION_MIN_PAGES,
       repair: `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${slides}. Widen the evidence, not the repetition, or drop \`purpose: "evaluation"\` for a diagnostic` });
   }
-  stages.push(...coverageFindings(structural).map((f) => ({ ...f, slide: undefined, severity: "blocker" })));
+  if (!scope) stages.push(...coverageFindings(structural).map((f) => ({ ...f, slide: undefined, severity: "blocker" })));
   // The sections the contents page lists, against what its style holds (deckSpineFindings).
-  const contents = contentsRoom({ ...doc.deck, slides: doc.pages, appendix: doc.appendix });
+  const contents = scope ? null : contentsRoom({ ...doc.deck, slides: doc.pages, appendix: doc.appendix });
   if (contents) standings.push({ code: "CONTENTS_UNFIT", what: `sections on the contents page (${contents.style === "columns" ? "the column style the deck names" : "a list"})`, value: contents.sections, bar: contents.max, side: "max", unit: "sections", applies: true, blocks: true });
   // The titles that lead with a gap, against the share the spine allows (deckSpineFindings).
-  const titled = [...doc.pages, ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && page.type);
+  const titled = scope ? [] : [...doc.pages, ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && page.type);
   if (titled.length) { const gaps = titled.filter((page) => titleGap(page.title, page.id));
     standings.push({ code: "TITLE_GAP_SHARE", what: "titles stating what the evidence cannot settle", value: gaps.length, bar: Math.max(1, Math.floor(TITLE_GAP_SHARE * titled.length)), side: "max", unit: "pages", applies: true, blocks: true, pages: gaps.map((page) => page.id) }); }
 
@@ -1215,7 +1310,10 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // What the pages state between them (gates/consistency_gates.mjs): one number given two values, a number a revision changed
   // that another page still prints, a proof the page before already gave. A revision is read for what it changed: the pages
   // it composed and the carried slides it edited in place, each carried slide read from the inventory as its edits leave it.
-  const consistency = consistencyFindings(doc, insights, { spec, inventory: imported, changed: revised?.content ?? null });
+  // A page run reads them over the whole deck as it declares itself, and keeps those that name one of its pages: every page
+  // states its numbers in its pages file, and a number printed two ways is on both pages to answer.
+  const consistency = scope ? consistencyFindings(whole, insights, { spec: around.structural, inventory: imported, changed: (imported ? revisionChanges(around.structural, imported) : null)?.content ?? null }).filter((f) => namesOneOf(f, pages))
+    : consistencyFindings(doc, insights, { spec, inventory: imported, changed: revised?.content ?? null });
   // A proof another page already gave is kept with what settles the later page's claim, where the critic's and the reviewer's
   // notes read it (gates/dependency_gates.mjs dependencyNotes): the storyline critique sees the overlap on the spine.
   for (const f of consistency.filter((item) => item.code === "PROOF_REPEATS")) {
@@ -1239,13 +1337,15 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // --- every finding, with its class and, for a draft, whether it is held yet
   // The comparisons the answer critique found the insight log cannot support (out/answer-critique.json), said on each page
   // that rests on the insights one of them names together - in a draft too, before the copy is written on them.
+  // A page run's structure rules over more than one page, read with every other page as it declares itself (acrossPages).
+  const across = scope ? acrossPages(around, pages) : [];
   const hazards = baseDir ? hazardFindings(doc, answerHazardsOf(readJsonSync(path.join(baseDir, "out", ANSWER_CRITIQUE_FILE), { optional: true }))) : [];
   const classed = (list, more = {}) => list.map((f) => ({ ...f, ...more, class: classOf(f.code) }));
   const gathered = [
     ...classed(compiled), ...classed(bindingFindings), ...classed(composingShown), ...classed(unfitShown), ...classed(undrawable), ...classed(undetermined), ...classed(spineFindings), ...classed(inventory), ...classed(carry),
     ...classed(structure.findings).map((f) => (f.class === "S" && standIn ? { ...f, provisional: standIn } : f)),
     ...classed(provisionalShape.findings, { provisional: standIn ?? "not every page composed" }), ...classed(stages),
-    ...classed(consistency), ...classed(local.depends), ...classed(local.conventions), ...classed(hazards), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
+    ...classed(consistency), ...classed(across), ...classed(local.depends), ...classed(local.conventions), ...classed(hazards), ...classed(local.design), ...classed(local.kept), ...classed(gateFindings.map(withMark)), ...classed(craft.map(withMark)), ...classed(assets.findings),
   // An aggregate read while pages are missing is read from the pages that composed, and says so.
   ].map((f) => (f.class === "G" && partial ? { ...f, partial } : f));
   // A draft is the spine, and the storyline critique is then bound to it. So a draft holds everything whose repair writes a
@@ -1253,17 +1353,24 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // made on the spine's witness; the spine's own rules; the content plan's rules on claims; the dependency contract, read off
   // the witness; a structure rule no allocation of forms and placements satisfies. What a draft leaves to the full compile is
   // the closed list spine-witness.mjs DEFERRED states - the copy, unbound content, the layout, the fit - and nothing else.
-  const unmet = new Map((draft ? structurePlan(doc, insights, sourceKinds).unsatisfied : []).map((u) => [u.code, u]));
+  // A page run reads the plan's allocation only where a rule it holds across the deck is broken on its pages and a form or a
+  // placement could mend it: over the whole deck as it declares itself, its own pages as compiled. The rest of the allocation
+  // is the whole-deck run's.
+  const allocates = draft && (!scope || across.some((f) => isBlocker(f) && waitsFor(f) && boundOnly(f.code).length));
+  const unmet = new Map((allocates ? structurePlan(scope ? whole : doc, insights, sourceKinds, scope ? { compiled: new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])) } : {}).unsatisfied : []).map((u) => [u.code, u]));
   const NO_ALLOCATION = "No allocation of forms and commentary placements satisfies this rule (`--plan` prints the closest one found): what mends it is another page type, another page, or other evidence on a page - which the storyline critique is bound to, so settle it before the critique";
   // A structure or aggregate rule the layout can usually mend is the spine's where the plan's allocation cannot satisfy it.
   const settled = gathered.map((f) => (draft && isBlocker(f) && waitsFor(f) && boundOnly(f.code).length && unmet.has(f.code) ? { ...f, touches: boundOnly(f.code), repair: `${f.repair ?? ""} ${NO_ALLOCATION}`.trim() } : f));
   // One the draft's own reading does not raise, and the allocation still leaves broken, is said too: the plan and the draft refuse the same spines.
-  for (const [code, u] of unmet) if (!settled.some((f) => f.code === code && isBlocker(f)))
+  // A page run's allocation is read for the rules it raised, and the rest of it is the whole-deck run's to say.
+  for (const [code, u] of scope ? [] : unmet) if (!settled.some((f) => f.code === code && isBlocker(f)))
     settled.push({ ...(u.finding ?? { code, severity: "blocker" }), code, severity: "blocker", class: classOf(code), touches: boundOnly(code).length ? boundOnly(code) : ["pages"],
       repair: `${u.standing ? `${readStandings([u.standing])[0].line}. ` : u.finding?.repair ? `${u.finding.repair} ` : ""}${NO_ALLOCATION}` });
   // One decision for every gate's findings, whichever raised them (weight.mjs notHeldOn): a rule the deck's recorded version
   // predates, and - on a revision that carries slides - a rule that measures the deck, is an advisory marked with why.
-  const judged = WEIGHT.applyRulesVersion(settled, spec), copy = WEIGHT.applyRulesVersion(classed(local.copy), spec);
+  // A page run reports what it holds (page-run.mjs heldOnPageRun): every page-local rule, and the rules it read across the deck.
+  const held = (list) => (scope ? list.filter(heldOnPageRun) : list);
+  const judged = held(WEIGHT.applyRulesVersion(settled, spec)), copy = held(WEIGHT.applyRulesVersion(classed(local.copy), spec));
   const spineCodes = new Set([...compiled, ...bindingFindings, ...unfit, ...undrawable, ...undetermined, ...spineFindings, ...inventory, ...carry].map((f) => f.code));
   const holds = (f) => isBlocker(f) && (!draft || spineCodes.has(f.code) || !waitsFor(f));
   const copyHolds = (f) => isBlocker(f) && !(draft && COPY_CODES.test(f.code));
@@ -1276,12 +1383,15 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     .filter((id) => !fitPages || fitPages.has(id));
   let fits = new Map();
   if (fit && misfit.length && typed.length) {
-    const baseline = new Set([...structure.findings, ...provisionalShape.findings, ...(complete && scene.ran ? scene.all.filter((f) => f.code === "PAGE_SHAPE_FLAT") : [])].filter((f) => isBlocker(f) && classOf(f.code) === "S").map((f) => f.code));
+    // A page run weighs a swap against the whole deck as it declares itself (`ruled`), and what is broken there already is the baseline.
+    const broken = scope ? [...declaredStructure(ruled.shaped, { planOf }).findings, ...shapeStructure(shapesWith(), { airy }).findings]
+      : [...structure.findings, ...provisionalShape.findings, ...(complete && scene.ran ? scene.all.filter((f) => f.code === "PAGE_SHAPE_FLAT") : [])];
+    const baseline = new Set(broken.filter((f) => isBlocker(f) && classOf(f.code) === "S").map((f) => f.code));
     // An alternative keeps of its slide what the page as written keeps (revision.mjs stampKept): it is the same title over another form.
     const compileOne = (page, index) => { const one = compileDeck({ ...doc, pages: [page], appendix: [] }, { insights, partial: true }); const refused = one.bindingFindings[0]?.repair ?? one.compileErrors[0]; if (refused) throw new Error(refused);
       stampKept(one.spec, imported); return { ...one.spec.slides[0], id: one.spec.slides[0].id ?? `page-${index + 1}` }; };
     const alone = new Map();
-    const swapped = (id, slide) => { const swap = (list) => (list || []).map((s) => (String(s.id) === id ? slide : s)); return { ...structural, slides: swap(structural.slides), ...(structural.appendix ? { appendix: swap(structural.appendix) } : {}) }; };
+    const swapped = (id, slide) => { const swap = (list) => (list || []).map((s) => (String(s.id) === id ? slide : s)); return { ...ruled.structural, slides: swap(ruled.structural.slides), ...(ruled.structural.appendix ? { appendix: swap(ruled.structural.appendix) } : {}) }; };
     fits = await fitSearch(misfit.map((id) => ({ id, ...authored.get(id) })), {
       spec, deck: composed.deck, perPage: fitCap,
       // How well each form of the page's type carries its claim (claim-fit.mjs): the alternatives are tried best fit first.
@@ -1308,7 +1418,7 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
       marks: (target) => marks.get(String(target.id)) ?? null, marked: withMarks, marksDrawn: (slides) => slides.length > 0 && slides.every((slide) => pageChartAnnotated(slide) !== false) && slides.some((slide) => pageChartAnnotated(slide) === true),
       localFindings: (variant, deck, pages) => { const swap = (list) => (list || []).map((page) => pages.get(String(page?.id)) ?? page);
         // The pages that did not compile are missing from the variant too: the rules read over the whole deck are told so, and wait.
-        const found = localFindings({ doc: { ...doc, pages: swap(doc.pages), appendix: swap(doc.appendix) }, structural: variant, deck, spec: variant, insights, uncomposed: new Set(), uncompiled: new Set(uncompiled) });
+        const found = localFindings({ doc: { ...doc, pages: swap(doc.pages), appendix: swap(doc.appendix) }, structural: variant, deck, spec: variant, insights, uncomposed: new Set(), uncompiled: new Set(uncompiled), pages: Boolean(scope) });
         return [...found.depends, ...found.conventions, ...found.design, ...found.kept, ...found.copy].filter((f) => f.id !== undefined && classOf(f.code) === "P"); },
       // The structure rules a swap would newly break: the contract and the plan's gates on the swapped deck, and the page's architecture in PAGE_SHAPE_FLAT.
       structure: (id, slide) => { const after = [...declaredStructure(swapped(id, slide), { planOf }).findings, ...shapeStructure(shapesWith({ id, slide }), { airy }).findings];
@@ -1320,22 +1430,17 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   const withFit = (f) => (f.class === "P" && LAYOUT_CODES.has(f.code) && fits.has(String(f.id)) ? { ...f, alternatives: fits.get(String(f.id)) } : f);
 
   // --- where the deck stands against every structure and aggregate rule ----
-  const read = readStandings([...structure.standings, ...provisionalShape.standings, ...gateStandings, ...standings, ...(local.report.standings || []),
+  // A page run reads none of them: they are the whole-deck run's (page-run.mjs deckRulesLine).
+  const read = scope ? [] : readStandings([...structure.standings, ...provisionalShape.standings, ...gateStandings, ...standings, ...(local.report.standings || []),
     // The two aggregates only a render measures are named, so their rules are met here first; the words a block are
     // estimated from the scene where the page gates ran (gates/density_profile.py scene_fragmentation), and marked so.
     ...["DECK_THIN_PAGES", "TEXT_FRAGMENTED"].filter((code) => !gateStandings.some((st) => st.code === code)).map((code) => ({ code, what: code === "TEXT_FRAGMENTED" ? "median words a block on the prose pages" : "pages the render shows thin or half empty", unmeasured: "measured on the render (--check --render)" }))],
     { provisional: standIn, partial });
-  const order = [...doc.pages, ...(doc.appendix || [])].map((page, index) => String(page?.id ?? `page-${index + 1}`));
+  const order = scope ? scope.order : [...doc.pages, ...(doc.appendix || [])].map((page, index) => String(page?.id ?? `page-${index + 1}`));
   const blocking = inClassOrder([...findings, ...copy.filter(copyHolds)].map(withFit), order);
   // What a draft leaves to the full compile says which of the copy, the layout and the fit settles it.
   const advisories = inClassOrder([...judged.filter((f) => !holds(f)), ...copy.filter((f) => !copyHolds(f))].map((f) => (draft && isBlocker(f) ? { ...f, deferred: true, settledBy: waitsFor(f) ?? "copy" } : f)), order);
-  // Each composed page's own counts of what the craft rates read over the deck (sceneStatistics), by page id: what a page run reports of its part in them.
-  const parts = {};
-  for (const slide of composed.deck?.slides ?? []) {
-    const id = String(slide.sourceSlideId ?? slide.id), own = sceneStatistics({ slides: [slide] });
-    parts[id] = Object.fromEntries(Object.entries(own).filter(([, n]) => typeof n === "number").map(([key, n]) => [key, (parts[id]?.[key] ?? 0) + n]));
-  }
-  return { spec, deck: composed.deck ?? { slides: [] }, failedIds, compiled: !refusals.length, complete, unmapped: waiting, declared, assets: assets.statement, parts,
+  return { spec, deck: composed.deck ?? { slides: [] }, failedIds, compiled: !refusals.length, complete, unmapped: waiting, declared, assets: assets.statement,
     findings: findings.map(withFit),
     // A draft has no copy yet: what the copy settles is reported, not enforced.
     pageGateAdvisories: judged.filter((f) => !holds(f)),
@@ -1346,7 +1451,9 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     // A draft's witness: the spine completed, as a pages document any compile takes, and what was completed on each page.
     witness: witness ? { doc: witness.doc, pages: witness.pages } : null,
     // The pages the page compile refused, each with the step that refused it and the record of what it declares.
-    refused: failed.filter((f) => !f.unbound).map((f) => ({ id: f.id, stage: f.stage ?? null, message: f.message, record: f.record ?? null })) };
+    refused: failed.filter((f) => !f.unbound).map((f) => ({ id: f.id, stage: f.stage ?? null, message: f.message, record: f.record ?? null })),
+    // A page run's pages, the pages it compiled and composed them among, and every page of the deck in order.
+    pageRun: scope ? { named: [...pages], context: [...scope.ids], order: scope.order } : null };
 }
 
 // How many pages back the composer looks when it breaks a tie between layouts on variety (compose-deck.mjs keeps this many).
@@ -1844,12 +1951,6 @@ function tokenTable(measures, formatOf, implication) {
   return single.length >= 3 ? { columns: ["(What the rows are)", "Value", ...close], rows: single.map((x) => [`${x.name}${typeof x.m.unit === "string" && x.m.unit.trim() ? `, ${x.m.unit}` : ""}`, token(x, null, 0), ...cell]), refs: single.map((x) => x.ref) } : null;
 }
 
-// The craft rates read over the deck's exhibits, by what each counts in a page's own statistics (gates/craft_gates.mjs sceneStatistics).
-// A build bar and the craft floor under it read one rate, so a page answers for both by the same count.
-const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: "chart page", verb: "marking something on the plot" });
-const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
-const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
-
 const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --allocate [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
@@ -1946,18 +2047,40 @@ async function openFitCache(file, { doc, insights, fitCap }) {
 }
 
 /**
+ * What a page run renders (`compiled.pageRun`, page-run.mjs): its deck - the
+ * pages it names among the deck's structural pages - less those of its own
+ * pages that did not compile or compose (`left`), with the content plan cut
+ * to the pages kept; `only` is the named pages kept.
+ */
+function pagesToRender(compiled) {
+  const named = compiled.pageRun.named.map(String), failed = new Set([...(compiled.failedIds ?? [])].map(String));
+  const keep = (slide) => !failed.has(String(slide.id));
+  const spec = { ...compiled.spec, slides: compiled.spec.slides.filter(keep), ...(compiled.spec.appendix ? { appendix: compiled.spec.appendix.filter(keep) } : {}) };
+  const ids = new Set(["cover", ...[...spec.slides, ...(spec.appendix || [])].map((slide) => String(slide.id))]);
+  return { spec, content: { ...compiled.content, pages: (compiled.content?.pages || []).filter((page) => ids.has(String(page.id))) },
+    only: new Set(named.filter((id) => !failed.has(id))), left: named.filter((id) => failed.has(id)) };
+}
+
+/**
  * The deck emitted and rendered by the build's own stages, in a temporary
  * folder, and what the build would say of it: its blockers, the render
  * gates' advisories, and where the rendered deck stands. Nothing is fetched,
  * and nothing is written beside the pages file. `named` renders those pages
- * alone, and then only what the build says of a page is read.
+ * alone, and then only what the build says of a page is read. A page run's
+ * deck (`compiled.pageRun`) is built as a part of the deck (build-deck.mjs
+ * `scope: "pages"`): its pages render whatever the rest of the deck's pages
+ * are doing, so a section is rendered while another is still being written,
+ * and a page of its own that did not compile or compose is left out and said.
  */
 async function renderCheck(compiled, { dir, stem, named }) {
-  if (!compiled.complete) return { ran: false, reason: "not every page compiled and composed; the render is of the deck as the build will build it" };
+  const run = compiled.pageRun ? pagesToRender(compiled) : null;
+  if (run && !run.only.size) return { ran: false, reason: `${run.left.join(", ")} did not compile or compose: a page is rendered once it composes`, left: run.left };
+  if (!run && !compiled.complete) return { ran: false, reason: "not every page compiled and composed; the render is of the deck as the build will build it" };
+  const spec = run?.spec ?? compiled.spec;
   const work = mkdtempSync(path.join(os.tmpdir(), "author-render-"));
   try {
     let result;
-    try { result = await buildDeck(path.join(dir, `${stem}.deck.json`), path.join(work, "out"), { fetchLogos: false, only: named, source: { spec: compiled.spec, baseDir: dir, content: compiled.content, plan: planOf(compiled.spec) } }); }
+    try { result = await buildDeck(path.join(dir, `${stem}.deck.json`), path.join(work, "out"), { fetchLogos: false, only: run?.only ?? named, ...(run ? { scope: "pages" } : {}), source: { spec, baseDir: dir, content: run?.content ?? compiled.content, plan: planOf(spec) } }); }
     catch (error) {
       if (!isRefusal(error)) throw error;
       return { ran: false, reason: `the build refuses the deck before it renders (${error.code})`, blockers: [{ code: error.code, severity: "blocker", repair: error.message, class: classOf(error.code) }], advisories: [], standings: [] };
@@ -1984,7 +2107,7 @@ async function renderCheck(compiled, { dir, stem, named }) {
     // What each page drew, with the density profile's reading of it: the page check's record (page-check.mjs), which a section review binds to.
     const drawn = saved ? new Map(scene.slides.map((slide) => [String(slide.sourceSlideId ?? slide.id), slide])) : null;
     const densityOf = saved ? new Map((profile?.pages ?? []).map((page) => [String(page.id), page])) : null;
-    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories, ...(saved ? { saved, drawn, densityOf } : {}),
+    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories, ...(saved ? { saved, drawn, densityOf } : {}), ...(run?.left.length ? { left: run.left } : {}),
       standings: named || !result.gates ? [] : [...(result.gates.standings ?? []).map(numbered), ...(profile?.standings ?? [])] };
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
@@ -2058,7 +2181,8 @@ async function verifyFitsOnRender(compiled, { doc, dir, stem, insights }) {
     const spec = { ...compiled.spec, slides: swap(compiled.spec.slides), ...(compiled.spec.appendix ? { appendix: swap(compiled.spec.appendix) } : {}) };
     const composed = await composeForAuthoring(spec, dir);
     const whole = Boolean(composed.deck) && !(composed.pageErrors ?? []).length;
-    const rendered = whole ? await renderCheck({ complete: true, spec, content: deriveContent(spec, composed.deck) }, { dir, stem, named: new Set(swaps.keys()) })
+    // A page run's alternatives are rendered as its pages are: a part of the deck, among its structural pages.
+    const rendered = whole ? await renderCheck({ complete: true, spec, content: deriveContent(spec, composed.deck), ...(compiled.pageRun ? { pageRun: { ...compiled.pageRun, named: [...swaps.keys()] } } : {}) }, { dir, stem, named: new Set(swaps.keys()) })
       : { ran: false, reason: "another page of the deck does not compose, and the build renders the deck whole" };
     for (const [id, { alt, fit }] of swaps) {
       if (!rendered.ran) { alt.unrendered = rendered.reason; continue; }
@@ -2391,7 +2515,8 @@ function spineLockFindings(lock) {
   const back = `To change the argument, run again with --reopen-spine and take the deck back to the critique (node runtime/storyline.mjs <id>.deck.json out/)${lock.closed === "spent" ? ", whose next pass is past its cap: only the user can grant it (--max-passes)" : ""}`;
   // The order is the deck's: pages that kept their argument and changed place are named in one finding for the deck, not as pages whose argument moved.
   const moved = lock.moved ?? [], one = moved.length === 1;
-  const order = moved.length ? [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
+  // The pages that moved are named on the finding, so a page run of any of them answers for it.
+  const order = moved.length ? [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null, pages: moved,
     repair: `The storyline critique ${how}, and the order of its pages has moved since: ${moved.join(", ")} ${one ? "stands" : "stand"} elsewhere than the critique read ${one ? "it" : "them"} - another place in the sequence, or into or out of the appendix - with ${one ? "its" : "their"} own argument unchanged. The layout keeps what the critique read: put ${one ? "it" : "them"} back. ${back}.` }] : [];
   if (!lock.pages.length) return order.length ? order : [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
     repair: `The storyline critique ${how}, and the deck's answer, its request or the order of its pages has moved since. The layout keeps what the critique read: put it back. ${back}.` }];
@@ -2411,30 +2536,29 @@ export async function loggedSources(doc, dir, stem) {
 }
 
 /**
- * The deck compiled for a check, as context: with the fit search's, the composer's and the page gates' caches beside the
- * pages file, read and saved. `named` keeps the fit search to the pages a page run reports; `fill` measures what fills a
- * page short of its words or past them. Every run that checks pages compiles through here.
+ * The deck compiled for a check: with the fit search's and the page gates' caches beside the pages file, read and saved,
+ * and the composer's for a whole-deck run. `named` makes it a page run (page-run.mjs): those pages compiled, composed and
+ * gated among the deck's structural pages, and the fit search kept to them; the composer's memory holds the deck's slides
+ * by their places in the deck (openComposeCache), so a page run neither reads it nor writes over it. `fill` measures what
+ * fills a page short of its words or past them. Every run that checks pages compiles through here.
  */
 async function compileChecked(doc, { dir, stem, insights = null, draft = false, fitCap = FIT.perPage, named = null, fill = !draft }) {
   const gates = pageGateCache;
   pageGateCache ??= path.join(dir, `${stem}.gate-cache.json`);
   try {
     const fitCache = await openFitCache(path.join(dir, `${stem}.author-cache.json`), { doc, insights, fitCap });
-    const composeCache = await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
-    const compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named, composeCache, fill });
+    const composeCache = named ? null : await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
+    const compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named, composeCache, fill, pages: named });
     await fitCache.save();
-    await composeCache.save();
+    await composeCache?.save();
     return compiled;
   } finally { pageGateCache = gates; }
 }
 
-/** The pages a finding is answered on: those it names, or - a deck aggregate - those counted in it on the wrong side. */
-const answeringPages = (standings, parts) => (f) => (f.class === "G" ? contributorsOf(f, standings, { parts, rates: CRAFT_RATES }) : pagesOf(f));
-
 /**
- * A page check as a page run makes it (`--check --page <ids>`), in one call: the deck compiled as context, and what the
- * named pages answer for - `{ compiled, blocking }`, every blocking finding that names one of them or that one of them counts
- * towards. It reads the judgements of the session it runs under, and leaves the questions it met in that session's pending
+ * A page check as a page run makes it (`--check --page <ids>`), in one call: those pages compiled, composed and gated among
+ * the deck's structural pages, and what they answer for - `{ compiled, blocking }`, every blocking finding that names one
+ * of them; the deck's own rules are the whole-deck run's. It reads the judgements of the session it runs under, and leaves the questions it met in that session's pending
  * list. A reader that holds pages it did not write to the writer's own check reads them through this (self-check.mjs
  * --validate composes a section with its checker's replacements applied), so it finds what that check finds, as fast.
  * `fit` runs the fit search on a named page that does not fit and `fill` measures what fills one short of its words: each
@@ -2443,8 +2567,7 @@ const answeringPages = (standings, parts) => (f) => (f.class === "G" ? contribut
 export async function checkPages(doc, ids, { dir, stem, insights = null, fit = true, fill = true, fitCap = FIT.perPage } = {}) {
   const named = new Set([...ids].map(String));
   const compiled = await compileChecked(doc, { dir, stem, insights, named, fitCap: fit ? fitCap : 0, fill });
-  const answering = answeringPages(compiled.standings, compiled.parts);
-  return { compiled, blocking: compiled.blocking.filter((f) => answering(f).some((id) => named.has(String(id)))) };
+  return { compiled, blocking: compiled.blocking.filter((f) => pagesOf(f).some((id) => named.has(String(id)))) };
 }
 
 /**
@@ -2626,7 +2749,8 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     return code;
   }
   const draft = Boolean(values.draft);
-  // The pages a page run reports: the deck is compiled whole as their context, and nothing is written.
+  // The pages a page run reports: they are compiled, composed and gated among the deck's structural pages, every other page is
+  // read off what it declares, and nothing is written (page-run.mjs).
   const named = values.page === undefined ? null : new Set(String(values.page).split(",").map((id) => id.trim()).filter(Boolean));
   const known = new Set([...doc.pages, ...(doc.appendix || [])].map((page, index) => String(page?.id ?? `page-${index + 1}`)));
   const strangers = [...(named ?? [])].filter((id) => !known.has(id));
@@ -2670,11 +2794,13 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   // since is refused here, where the edit was made, unless the run means it (--reopen-spine) and takes the deck back to the critique.
   // `--json` prints its one object and nothing else: what these notices say of the whole deck the whole-deck run says.
   const notice = values.json ? () => {} : (text) => console.error(text);
+  // A page run holds the lock on its own pages, their arguments and their places in the deck's order (storyline.mjs spineLock).
   const lock = draft || values["reopen-spine"] ? null
-    : await spineLock(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`) }).catch(() => null);
+    : await spineLock(spec, path.resolve(values.out ?? path.join(dir, "out")), { deckPath: path.join(dir, `${stem}.deck.json`), ...(named ? { only: named, order: compiled.order } : {}) }).catch(() => null);
   const locked = lock ? spineLockFindings(lock) : [];
   if (values["reopen-spine"] && !draft) notice("--reopen-spine: the argument may change; every page whose argument moved goes back to the storyline critique (node runtime/storyline.mjs <id>.deck.json out/) before delivery.\n");
-  const revision = revisionStatement(spec, compiled.imported);
+  // What a revision does with each slide of the deck it was imported from is the deck's to say: a page run leaves it to the whole-deck run.
+  const revision = named ? null : revisionStatement(spec, compiled.imported);
   if (revision) notice(`${revisionLine(revision)}\n`);
   // Where a composed page is read as changed because the inventory cannot say otherwise, the run says so (review-passes.mjs unheldLine).
   const readAsChanged = revision ? revisionChanges(spec, compiled.imported) : null;
@@ -2698,75 +2824,74 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   // What the render measured replaces what the scene estimated of the same rule.
   const measured = new Set((rendered?.standings ?? []).map((st) => st.code));
   const standings = rendered?.standings?.length ? readStandings([...compiled.standings.filter((st) => !measured.has(st.code) && !(st.code === "DECK_SCENE_VOID" && measured.has("DECK_THIN_PAGES"))), ...rendered.standings]) : compiled.standings;
-  // A page run answers for its pages: every blocking finding that names one of them - a claim two pages share names both -
-  // and every aggregate one of them is counted in on the wrong side: a page holding a bare chart answers for the deck's bare charts.
-  const answering = answeringPages(standings, compiled.parts);
-  const about = (f) => answering(f).some((id) => named.has(id));
+  // A page run answers for its pages: every blocking finding that names one of them - a claim two pages share names both, and
+  // a run of one type every page of the run. It holds the page-local rules and the rules that read a page against its
+  // neighbours' declarations (page-run.mjs); the deck's other structure rules and its aggregates are the whole-deck run's,
+  // said in one line (`deckRules`).
+  const about = (f) => pagesOf(f).some((id) => named.has(id));
   const blocking = named ? everything.filter(about) : everything;
+  const deckRules = named ? deckRulesLine(path.basename(file)) : null;
   // A page run that rendered records what each page drew and whether it is clean: a section all of whose pages check clean
   // can be reviewed beside the others' writing (section-review.mjs), bound to these drawings.
   if (rendered?.drawn) await recordPageChecks(path.dirname(rendered.saved), { slides: rendered.drawn,
     pages: new Map([...doc.pages, ...(doc.appendix || [])].map((page, index) => [String(page?.id ?? `page-${index + 1}`), page])),
-    blocking: (id) => blocking.filter((f) => answering(f).includes(id)).map((f) => f.code), density: rendered.densityOf });
-  const beyond = named ? everything.filter((f) => f.class === "S" && !about(f)) : [];
-  const aggregatesBeyond = named ? everything.filter((f) => f.class === "G" && !about(f)) : [];
+    blocking: (id) => blocking.filter((f) => pagesOf(f).includes(id)).map((f) => f.code), density: rendered.densityOf });
   const ledger = pageBudgetLedger(budget.filter((b) => !named || named.has(String(b.id ?? ""))), pageGateAdvisories, spec);
   const standing = { S: standings.filter((st) => st.class === "S").map((st) => st.line), G: standings.filter((st) => st.class === "G").map((st) => st.line) };
-  const share = named ? contributions(standings, [...named], { parts: compiled.parts, rates: CRAFT_RATES }) : null;
   // What a revision that carries slides is not held to is said in a line, by code and by why (weight.mjs deckRuleUnread).
   const unheld = new Map();
   for (const f of advice) if (f.waived?.imported) unheld.set(f.waived.why, [...(unheld.get(f.waived.why) ?? []), f.code]);
   const counted = (codes) => [...new Set(codes)].map((code) => { const n = codes.filter((c) => c === code).length; return `${code}${n > 1 ? ` x${n}` : ""}`; }).join(", ");
   const notHeldLine = unheld.size ? `Not held (advisories): ${[...unheld].map(([why, codes]) => `${counted(codes)} - ${why}`).join("; ")}` : null;
   // What a revision's change may have left standing elsewhere is said in full where it only advises: the author checks each slide named.
-  const stale = advice.filter((f) => ["NUMBER_STALE", "WORDING_STALE"].includes(f.code) && !f.deferred);
+  const stale = advice.filter((f) => ["NUMBER_STALE", "WORDING_STALE"].includes(f.code) && !f.deferred && (!named || about(f)));
+  // A page run's render that left out a page of its own that did not compile or compose says which.
+  const leftOut = rendered?.left?.length ? ` ${rendered.left.join(", ")} did not compile or compose, and ${rendered.left.length === 1 ? "is" : "are"} not rendered.` : "";
   const tail = [
     // A run with questions open held fewer rules than the deck is held to: said on every run, blocked or not.
     ...(open ? [`Questions open (JUDGEMENTS_PENDING): ${open.repair}`] : []),
     ...(stale.length ? [`To check (advisories):\n${stale.map((f) => `  ${f.code} [${f.id ?? (f.pages || []).join(", ")}]\n    ${f.repair}`).join("\n")}`] : []),
     ...(notHeldLine ? [notHeldLine] : []),
-    ...(beyond.length ? [`Deck structure findings these pages are not named in (not counted in this run's exit code; the whole-deck run holds them):\n${findingsText(beyond, order)}`] : []),
-    ...(aggregatesBeyond.length ? [`Deck aggregate findings these pages are not counted in (not counted in this run's exit code; the whole-deck run holds them):\n${findingsText(aggregatesBeyond, order)}`] : []),
-    ...(share ? [`Each page's part in the deck's aggregates:\n${Object.entries(share).map(([id, lines]) => `  ${id}: ${lines.length ? lines.join("\n    ") : "counted in no aggregate out of its band"}`).join("\n")}`] : []),
-    `Where the deck stands:\n${standingText(standings)}`,
+    named ? `${deckRules}.` : `Where the deck stands:\n${standingText(standings)}`,
     ...(draft && deferredLines(spec, advice).length ? [`Left to the full compile - what the copy, the layout or the fit settles, none of it a fact the storyline critique is bound to (a count a code). A draft is the full compile of the spine completed with placeholder copy, and this is all it defers: ${Object.entries(DEFERRED).map(([kind, what]) => `${kind} - ${what}`).join("; ")}:\n${deferredLines(spec, advice).map((line) => `  ${line}`).join("\n")}`] : []),
     ...(draft && movedLines(spec).length ? [`Drawn in another form or placement than the page declares (the layout's choice, said now so the layout takes it):\n${movedLines(spec).map((line) => `  ${line}`).join("\n")}`] : []),
     ...(draft && readingLines(spec, insights).length ? [`${READINGS_NOTE}:\n${readingLines(spec, insights).map((line) => `  ${line}`).join("\n")}`] : []),
     ...(draft && fitChoiceLines(spec, insights).length ? [`${FITS_NOTE}:\n${fitChoiceLines(spec, insights).map((line) => `  ${line}`).join("\n")}`] : []),
-    ...(rendered ? [rendered.ran ? `Rendered ${rendered.slides} slide${rendered.slides === 1 ? "" : "s"} with the build's stages in ${Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10}s: ${rendered.blockers.length ? `${rendered.blockers.length} blocker${rendered.blockers.length === 1 ? "" : "s"} the build would report` : "the build would report no blocker"}${named ? " on these pages (the deck's aggregates are measured by the whole-deck render)" : ""}.`
+    ...(rendered ? [rendered.ran ? `Rendered ${rendered.slides} slide${rendered.slides === 1 ? "" : "s"} with the build's stages in ${Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10}s: ${rendered.blockers.length ? `${rendered.blockers.length} blocker${rendered.blockers.length === 1 ? "" : "s"} the build would report` : "the build would report no blocker"}${named ? " on these pages (the deck's aggregates are measured by the whole-deck render)" : ""}.${leftOut}`
       : `Not rendered: ${rendered.reason}.`] : []),
     // The page budgets go with a check, a draft and a refusal: what the author edits against.
     ...(ledger.length && (values.check || draft || named || blocking.length) ? [`Page budgets:\n${ledger.join("\n")}`] : []),
   ].join("\n\n");
   // The message is kept, so `--log` can say which limit keeps coming back.
   await log({ ok: !blocking.length, findings: blocking.map((f) => ({ code: f.code, class: f.class, ...(f.id ?? f.page ? { id: String(f.id ?? f.page) } : {}), ...(f.repair ?? f.reason ? { message: String(f.repair ?? f.reason).slice(0, 300) } : {}) })) });
-  // `--json`: the named pages' part of all of the above, and the deck's verdict in a line - the same findings, read compactly.
+  // `--json`: the named pages' part of all of the above, and the deck's rules in a line - the same findings, read compactly.
   if (values.json) {
     say(JSON.stringify(pageReport({ named, blocking, advice: advice.filter((f) => !f.waived?.imported), budget, doc, open,
-      concerns: (f, id) => answering(f).includes(id), elsewhere: beyond.length + aggregatesBeyond.length, unGated: pageGatesRan ? null : pageGatesError || "no reason given" })));
+      deckRules, unGated: pageGatesRan ? null : pageGatesError || "no reason given" })));
     return blocking.length ? 2 : 0;
   }
   if (blocking.length) {
     const counts = ["S", "P", "G"].map((cls) => [cls, blocking.filter((f) => f.class === cls).length]).filter(([, n]) => n).map(([cls, n]) => `${cls} ${n}`).join(", ");
-    console.error(`The deck is not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)} (${counts}):\n${findingsText(blocking, order)}\n\n${tail}`);
+    console.error(`${named ? "These pages are" : "The deck is"} not ready; nothing was written. ${blocking.length} finding${blocking.length === 1 ? "" : "s"} to fix in ${path.basename(file)} (${counts}):\n${findingsText(blocking, order)}\n\n${tail}`);
     // The deck.json left on disk, where it is not these pages: the build refuses it until a compile of them passes.
     const left = named ? null : (await unwrittenDeck({ dir, stem, file, why: "the pages are not ready" })).record;
     if (left?.onDisk === "stale") console.error(`\nThe ${left.file} on disk was compiled from older pages; the build refuses it (DECK_OLDER_THAN_PAGES) until ${left.writes} passes.`);
     return 2;
   }
-  // A page run's summary lists its own pages' advisories - the typed numbers no measure holds among them - beside the deck's.
-  const shown = (named ? advice.filter((f) => f.class !== "P" || about(f)) : advice).filter((f) => !f.waived?.imported);
-  const summary = { ...deckSummary({ values, draft, insights, spec, advisories: shown, pageGatesRan, pageGatesError }), ...(compiled.assets ? { assets: compiled.assets } : {}), standing,
+  // A page run's summary is of its own pages: their advisories, the typed numbers no measure holds among them, a line a page,
+  // and the deck's rules in a line; the deck's mix and where it stands are the whole-deck run's.
+  const shown = (named ? advice.filter(about) : advice).filter((f) => !f.waived?.imported);
+  const summary = { ...deckSummary({ values, draft, insights, spec, advisories: shown, pageGatesRan, pageGatesError, named }), ...(compiled.assets ? { assets: compiled.assets } : {}), ...(named ? {} : { standing }),
     ...(revision ? { revision: { ...revision, ...(unheld.size ? { notHeld: Object.fromEntries([...unheld].flatMap(([why, codes]) => codes.map((code) => [code, why]))) } : {}), ...(readAsChanged?.unheld.length ? { readAsChanged: readAsChanged.unheld } : {}) } } : {}),
-    ...(share ? { pages: share } : {}), ...(beyond.length ? { structureElsewhere: beyond.map((f) => f.code) } : {}), ...(aggregatesBeyond.length ? { aggregatesElsewhere: aggregatesBeyond.map((f) => f.code) } : {}),
-    ...(rendered ? { render: rendered.ran ? { slides: rendered.slides, seconds: Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10, blockers: rendered.blockers.length, ...(rendered.saved ? { images: path.relative(dir, rendered.saved) } : {}) } : { skipped: rendered.reason } } : {}) };
+    ...(named ? { pages: pagesSaid(named, spec, ledger), deckRules } : {}),
+    ...(rendered ? { render: rendered.ran ? { slides: rendered.slides, seconds: Math.round((rendered.timings?.wallMs ?? 0) / 100) / 10, blockers: rendered.blockers.length, ...(rendered.saved ? { images: path.relative(dir, rendered.saved) } : {}), ...(rendered.left?.length ? { left: rendered.left } : {}) } : { skipped: rendered.reason } } : {}) };
   if (draft) content.textContract = "draft";
   console.error(`${tail}\n`);
   if (values.check || named) {
     // Once a deck passes the scene's checks, the render is the one instrument left: said where a renderer is installed.
     if (!values.render && !draft && !named && rendererInstalled()) console.error("A renderer is installed: make the final check before the build with `--check --render`, which renders the deck with the build's own stages and reports what only the render shows.\n");
     // A clean check is not a compile: it says it wrote no deck.json, why, and what writes one, so the build is not run on an older one.
-    const deckJson = await unwrittenDeck({ dir, stem, file, why: named ? "a page run compiles the deck as context and writes nothing" : "--check checks the pages and writes nothing", open });
+    const deckJson = await unwrittenDeck({ dir, stem, file, why: named ? "a page run compiles the pages it names and writes nothing" : "--check checks the pages and writes nothing", open });
     console.error(`${deckJson.text}\n`);
     say(JSON.stringify({ ok: true, ...summary, deckJson: deckJson.record }, null, 1)); return 0;
   }
@@ -2982,6 +3107,17 @@ function alternativesOfFit(fit) {
 }
 
 /**
+ * What a clean page run says of each page it names, by id: its type, form and
+ * commentary placement as compiled, and its budget line (pageBudgetLedger),
+ * where the page gates measured one. `ledger` is the run's budget lines.
+ */
+function pagesSaid(named, spec, ledger) {
+  const slides = new Map([...spec.slides, ...(spec.appendix || [])].map((slide) => [String(slide.id), slide]));
+  return Object.fromEntries([...named].map((id) => { const t = slides.get(id)?.pageType, line = ledger.find((row) => row.slice(2).startsWith(`${id} `) || row.slice(2).trim() === id);
+    return [id, { ...(t ? { type: `${t.type}${t.form ? `/${t.form}` : ""}`, ...(t.commentary ? { commentary: t.commentary } : {}) } : {}), ...(line ? { budget: line.trim() } : {}) }]; }));
+}
+
+/**
  * A page run's report as one small object (`--json`): for each page named, the
  * findings it answers for with their repairs, its own advisories, its budget -
  * its body words against its floor and ceiling, and how much of the body it
@@ -2989,10 +3125,11 @@ function alternativesOfFit(fit) {
  * deck's verdict in a line. A writer's check printed 24 to 61 thousand
  * characters - the whole deck's standings and every page's budget - and the
  * BA deck's writers searched it for their own page 205 times: this is what
- * they searched for. `concerns(f, id)` says whether finding `f` is page `id`'s
- * to answer, as the page run decides it.
+ * they searched for. A finding is a page's to answer where it names the page;
+ * `deckRules` is the line that says the deck's own rules are the whole-deck
+ * run's (page-run.mjs deckRulesLine), and the verdict ends on it.
  */
-function pageReport({ named, blocking, advice, budget, doc, concerns, elsewhere, open, unGated = null }) {
+function pageReport({ named, blocking, advice, budget, doc, deckRules, open, unGated = null }) {
   const pages = new Map([...doc.pages, ...(doc.appendix || [])].map((page, index) => [String(page?.id ?? `page-${index + 1}`), page]));
   const appendix = new Set((doc.appendix || []).map((page, index) => String(page?.id ?? `page-${doc.pages.length + index + 1}`)));
   const shown = (f) => ({ code: f.code, class: f.class, ...(f.severity && f.severity !== "blocker" ? { severity: f.severity } : {}), ...(f.part ? { part: f.part } : {}),
@@ -3009,14 +3146,14 @@ function pageReport({ named, blocking, advice, budget, doc, concerns, elsewhere,
   };
   const report = Object.fromEntries([...named].map((id) => {
     const rows = budget.filter((b) => String(b.id ?? "") === id && b.floor).map(budgetOf), own = advice.filter((f) => pagesOf(f).includes(id));
-    return [id, { findings: blocking.filter((f) => concerns(f, id)).map(shown), ...(own.length ? { advisories: own.map(shown) } : {}),
+    return [id, { findings: blocking.filter((f) => pagesOf(f).includes(id)).map(shown), ...(own.length ? { advisories: own.map(shown) } : {}),
       budget: rows.length > 1 ? rows : rows[0] ?? null, limits: limitsOf(id) }];
   }));
   const counts = ["S", "P", "G"].map((cls) => [cls, blocking.filter((f) => f.class === cls).length]).filter(([, n]) => n).map(([cls, n]) => `${cls} ${n}`).join(", ");
   const deck = [blocking.length ? `not ready: ${blocking.length} finding${blocking.length === 1 ? "" : "s"} on these pages to fix (${counts})` : "ready on these pages: nothing on them blocks",
-    elsewhere ? `${elsewhere} finding${elsewhere === 1 ? "" : "s"} elsewhere in the deck these pages are not in (the whole-deck run holds them)` : "nothing elsewhere in the deck blocks",
     ...(unGated ? [`page gates did not run (${unGated}): nothing the build gates on the page was checked`] : []),
-    ...(open ? [`${open.measured.pending} question${open.measured.pending === 1 ? "" : "s"} of the copy open (JUDGEMENTS_PENDING): the rules that ask them did not hold`] : [])].join("; ");
+    ...(open ? [`${open.measured.pending} question${open.measured.pending === 1 ? "" : "s"} of the copy open (JUDGEMENTS_PENDING): the rules that ask them did not hold`] : []),
+    deckRules].join("; ");
   return { ok: !blocking.length, deck, pages: report };
 }
 
@@ -3091,7 +3228,7 @@ function movedLines(spec) {
 // The advisories a run prints with their text: the consistency of what the pages state, and the build bars.
 const SAID_IN_FULL = /^(?:NUMBERS_DISAGREE|NUMBER_STALE|WORDING_STALE|NUMBER_FORMATS_DIFFER|BRIDGE_UNRECONCILED|PROOF_REPEATS|BAR_[A-Z_]+)$/;
 
-function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, pageGatesError }) {
+function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, pageGatesError, named = null }) {
   const typed = spec.slides.filter((s) => s.pageType);
   const mix = (key) => Object.fromEntries([...typed.reduce((m, s) => m.set(s.pageType[key], (m.get(s.pageType[key]) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]));
   // What the chart pages plot, against strong decks' ~22 a page: the numbers
@@ -3105,8 +3242,10 @@ function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, 
   const drawn = structureMix([...spec.slides, ...(spec.appendix || [])], { drawnOf });
   const pct = (x) => `${Math.round(x * 100)}%`;
   const untraced = advisories.filter((f) => f.code === "NUMBER_UNTRACED");
-  const hint = draft && insights ? catalogueHint(insights, { players: spec.players, plan: insights.analysis?.plan, stem: spec.id }) : null;
-  const summary = { ...(draft ? { draft: true } : {}), pages: typed.length, types: mix("type"), sequence, commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
+  const hint = draft && insights && !named ? catalogueHint(insights, { players: spec.players, plan: insights.analysis?.plan, stem: spec.id }) : null;
+  // The deck's mix, what it draws and plots, and what its insight log and analyses carry, are the deck's: a page run (`named`)
+  // compiled its own pages among the structural ones, and leaves them to the whole-deck run.
+  const deck = named ? {} : { pages: typed.length, types: mix("type"), sequence, commentary: mix("commentary"), closes: typed.filter((s) => s.pageType.takeaway || s.pageType.commentary === "so-what-bar").length,
     structure: { twoPlusExhibits: `${drawn.multi.pages} of ${drawn.pages} (${pct(drawn.multi.share)}; floor ${pct(VARIETY.multiShareMin)}, strong decks a quarter to a third)`,
       exhibitBesideColumn: `${drawn.column.pages} of ${drawn.pages} (${pct(drawn.column.share)}; cap ${pct(VARIETY.columnShareMax)}, strong decks about one in eight)${drawn.column.pages ? `: ${drawn.column.ids.join(", ")}` : ""}`,
       skeletons: drawn.skeletons },
@@ -3116,7 +3255,8 @@ function deckSummary({ values, draft, insights, spec, advisories, pageGatesRan, 
     // What the runtime computed from the log's measures, and what it could not: each line a result a page can rest on by its id.
     ...(insights?.analysis?.results?.length ? { analyses: insights.analysis.results.map(analysisLine) } : {}),
     // The analyses about the declared players that the measures allow and the plan runs none of: said in a draft, before the first critique asks for them.
-    ...(hint ? { catalogue: hint } : {}),
+    ...(hint ? { catalogue: hint } : {}) };
+  const summary = { ...(draft ? { draft: true } : {}), ...deck,
     // How the critique will read what each page shows and has not drawn: what the layout is then held to.
     ...(draft && readingLines(spec, insights).length ? { readings: readingLines(spec, insights) } : {}),
     ...(draft && fitChoiceLines(spec, insights).length ? { fits: fitChoiceLines(spec, insights) } : {}),

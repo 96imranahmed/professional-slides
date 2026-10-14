@@ -65,46 +65,6 @@ export function standingText(standings) {
     .map((cls) => `${cls === "S" ? "Deck structure" : "Deck aggregates"} - value; bar: room\n${lines(cls).join("\n")}`).join("\n");
 }
 
-/**
- * The pages an aggregate finding is made of, beyond the ones it names: where
- * its rule reads a measure a page, the pages on the wrong side of the bar;
- * where it counts pages against a cap, the pages counted; and where it is a
- * rate over the deck's exhibits (`rates`: code -> { of, done }, the keys of
- * `parts`, each page's own counts), the pages holding one that falls short.
- */
-export function contributorsOf(finding, standings, { parts = {}, rates = {} } = {}) {
-  const read = standings.filter((s) => s.code === finding.code);
-  const counted = read.flatMap((s) => (s.each ? pulling(s) : s.side === "max" ? s.pages ?? [] : []));
-  const rate = rates[finding.code];
-  const short = rate ? Object.entries(parts).filter(([, part]) => (part[rate.of] ?? 0) > (part[rate.done] ?? 0)).map(([id]) => id) : [];
-  return [...new Set([...pagesOf(finding), ...counted, ...short].map(String))];
-}
-
-/**
- * What each of `ids` adds to every aggregate rule: its own measure against
- * the bar where the rule reads one a page, whether it is among the pages
- * the rule counted, and - for a rate over the deck's exhibits (`rates`, as
- * contributorsOf reads them, each with the `noun` it counts and what `done`
- * means) - how many of them the page holds and how many of those count.
- */
-export function contributions(standings, ids, { parts = {}, rates = {} } = {}) {
-  return Object.fromEntries(ids.map((id) => [id, standings.filter((s) => s.class === "G" && (s.each || s.pages || rates[s.code])).map((s) => {
-    const name = `${s.code}${s.key ? `.${s.key}` : ""}`;
-    const rate = rates[s.code];
-    if (rate && !s.each && !s.pages) {
-      const held = parts[id]?.[rate.of] ?? 0, done = parts[id]?.[rate.done] ?? 0;
-      if (!held) return null;
-      return `${name}: this page counts as ${held} ${rate.noun}${held === 1 ? "" : "s"}, ${done} ${rate.verb} (deck ${s.value} ${s.what}; floor ${s.bar})${done < held && ["over", "short", "at"].includes(s.state) ? " - pulls the deck the wrong way" : ""}`;
-    }
-    if (s.each) {
-      if (!(id in s.each)) return null;
-      const wrong = s.side === "min" ? s.each[id] < s.bar : s.each[id] > s.bar;
-      return `${name}: this page ${s.each[id]} (deck ${s.value}; ${s.side === "max" ? "cap" : "floor"} ${s.bar})${wrong && s.state !== "unread" ? " - pulls the deck the wrong way" : ""}`;
-    }
-    return s.pages.includes(id) ? `${name}: counted (${s.value} ${s.what}; ${s.side === "max" ? "cap" : "floor"} ${s.bar})` : null;
-  }).filter(Boolean)]));
-}
-
 /** A finding in a phrase, with by how much: what the fit search says is left on an alternative that fails. */
 export function briefOf(finding) {
   const m = finding.measured;

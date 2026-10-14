@@ -12,7 +12,8 @@
 // self-check, a judge and a render, often in a section whose writer had
 // finished. A section is reviewed here as soon as every page of it checks
 // clean on its render (author-deck.mjs --check --render --page <its ids>,
-// which records out/page-check/<id>.json): on the page dimensions, the
+// which records out/page-check/<id>.json, and renders the section's pages
+// whatever the other sections' pages are doing): on the page dimensions, the
 // density of its flagged pages and the evidence each page shows. The answer
 // binds to the drawings it read (page-check.mjs), and every finding carries
 // its fix - the full replacement of each field its repair changes - which
@@ -28,7 +29,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
-import { readPagesFileSync } from "./pages-file.mjs";
+import { readPagesFileSync, withPages } from "./pages-file.mjs";
 import { sectionPages } from "./brief.mjs";
 import { authorDeck, readInsights } from "./author-deck.mjs";
 import { alternativesOf } from "./analysis.mjs";
@@ -137,16 +138,18 @@ export async function validateSectionReview(answer, file, out) {
   return compileErrors(doc, file, record, fixes);
 }
 
-// The section with every fix in place, compiled and composed as a page run checks it: a page rule the fixed page trips is named.
+// The deck with every fix in place, its section's pages compiled and composed as a page run checks them (author-deck.mjs
+// --check --page): among the deck's structural pages, the rest of the deck read off what it declares, so another section
+// mid-edit refuses nothing here. A page rule the fixed page trips is named.
 async function compileErrors(doc, file, record, fixes) {
   const dir = path.dirname(path.resolve(file)), stem = stemOf(file);
-  const ids = new Set(record.pages.map((p) => p.id));
+  const ids = new Set(record.pages.map((p) => String(p.id)));
   const fixed = (page) => (fixes.has(String(page?.id)) ? applyFixes(page, fixes.get(String(page.id))) : page);
-  const section = { ...doc, pages: doc.pages.filter((page) => ids.has(String(page?.id))).map(fixed), appendix: (doc.appendix || []).filter((page) => ids.has(String(page?.id))).map(fixed) };
+  const deck = withPages(doc, { pages: doc.pages.map(fixed), appendix: doc.appendix?.map(fixed) });
   const insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) });
   const session = await loadJudgements(dir, stem);
   let compiled;
-  try { compiled = await withJudgements(session, () => authorDeck(section, { baseDir: dir, insights, fit: false })); }
+  try { compiled = await withJudgements(session, () => authorDeck(deck, { baseDir: dir, insights, fit: false, pages: ids })); }
   catch (error) { return (error.pageErrors ?? [error.message]).map((message) => `the section with its fixes does not compile: ${message}`); }
   const pageOf = (f) => String(f.id ?? "");
   return compiled.blocking.filter((f) => fixes.has(pageOf(f)) && classOf(f.code) === "P")
