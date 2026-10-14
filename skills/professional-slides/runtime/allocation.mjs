@@ -31,8 +31,10 @@ import { includedParts, partHomes, partsOf } from "./pages-file.mjs";
 
 // The section a page written in the pages file itself belongs to, beside the part files.
 export const ROOT_SECTION = "(the pages file)";
+// The page types the allocation never gives out (kindReach).
+const UNGIVEN = new Set(["summary", "picture"]);
 // The insights a kind is proven from in one section: enough that each insight can be given one kind and the rest still placed.
-const PROOFS = 3;
+const PROOFS = 6;
 const partName = (part) => String(part).replace(/^.*\//, "").replace(/(\.pages)?\.json$/, "");
 const pagesOf = (doc) => [...(doc?.pages || []), ...(doc?.appendix || [])].filter((page) => page && typeof page === "object" && !page.include);
 const evidenceIds = (page) => (Array.isArray(page?.evidence) ? page.evidence.map(String) : []);
@@ -131,7 +133,10 @@ export function kindReach(doc, insights, { fills = null, homes = evidenceHomes(d
     for (const id of ids) {
       const insight = insights?.get?.(id);
       if (!insight || !insight.shape) continue;
-      for (const type of Object.keys(TYPE_SHAPES).filter((t) => PAGE_TYPES[t] && TYPE_SHAPES[t].includes(insight.shape))) for (const form of Object.keys(PAGE_TYPES[type].forms)) {
+      // Every type the insight's shape rests under - a type that names no shapes (a mechanism, a set of parallel items, options)
+      // rests on any, as the plan reads it - in every form of it.
+      // The executive summary and a picture page are not given out: one opens the deck, the other draws a photograph.
+      for (const type of Object.keys(PAGE_TYPES).filter((t) => !UNGIVEN.has(t) && (!TYPE_SHAPES[t] || TYPE_SHAPES[t].includes(insight.shape)))) for (const form of Object.keys(PAGE_TYPES[type].forms ?? {})) {
         const page = { id: `allocate-${id}`, type, form, evidence: [id] };
         let slide = null;
         try { slide = declaredSlide({ ...page, commentary: placementsOf(type, form)[0] }, 0, { exhibitType: evidenceExhibits(page, insights, featured), players, stubs: stubsOf(page, insights) }); } catch { slide = null; }
@@ -140,8 +145,10 @@ export function kindReach(doc, insights, { fills = null, homes = evidenceHomes(d
         const fresh = kinds.filter((kind) => (proofs.get(kind) ?? new Set()).size < PROOFS && !(proofs.get(kind) ?? new Set()).has(id));
         if (!fresh.length) continue;
         // An insight with numbers is given only a form that draws them: one that sets them aside (people, logos, a memo) adds a
-        // kind by losing the evidence, and the page is redrawn when its claim is read.
-        if (Object.keys(insight.measures ?? {}).length && fills?.takesMeasures && !fills.takesMeasures(type, form)) continue;
+        // kind by losing the evidence, and the page is redrawn when its claim is read. An insight of statements takes the forms
+        // that set out statements - a flow, steps, a matrix, cards - and those alone.
+        const numbered = Object.keys(insight.measures ?? {}).length > 0;
+        if (fills?.takesMeasures && numbered !== fills.takesMeasures(type, form)) continue;
         if (seriesHidden([...kinds, String(PAGE_TYPES[type].forms[form] ?? "")], pageMeasures(page, registry)) || fills?.(page, type, form)) continue;
         for (const kind of fresh) { (proofs.get(kind) ?? proofs.set(kind, new Set()).get(kind)).add(id); (reach.get(kind) ?? reach.set(kind, []).get(kind)).push({ section, insight: id, type, form }); }
       }
@@ -162,28 +169,42 @@ export function allocateKinds(doc, insights, { fills = null, budgets = new Map()
   const length = plannedLength(doc, budgets), perTen = PLAN.craft.exhibitVarietyPerTen.min;
   const floor = Math.ceil((perTen * length) / 10 - 1e-9), target = floor + Math.max(1, Math.ceil(floor * 0.1));
   const reach = kindReach(doc, insights, { fills, homes });
-  // Most sections first: a kind many sections draw asks least of any page. Each insight carries one given kind at most - a page
-  // is one claim - and a section's load is its kinds for its budget, so the kinds spread as the pages do.
+  // Each insight carries one given kind at most - a page is one claim - so the kinds are matched to the insights that draw them
+  // (a maximum matching, by augmenting paths): a kind only one insight draws is not lost to a common kind that insight was
+  // spent on first. Kinds many sections draw are tried first, as they ask least of any page; among the insights that draw a
+  // kind, those of the section holding fewest kinds for its budget first, so the kinds spread as the pages do.
   const order = [...reach].sort((a, b) => new Set(b[1].map((p) => p.section)).size - new Set(a[1].map((p) => p.section)).size || a[0].localeCompare(b[0]));
   const bySection = new Map(sectionEvidence(doc, homes).map(({ section }) => [section, []]));
-  const load = (section) => (bySection.get(section)?.length ?? 0) / Math.max(1, budgets.get(section) ?? 1);
+  const count = new Map();
+  const load = (section) => (count.get(section) ?? 0) / Math.max(1, budgets.get(section) ?? 1);
   // A share already written (`allocation.kinds` in a part) stands: a section may be writing to it. Only the kinds the floor
   // still needs are placed, so evidence added later adds kinds without moving any a section was given.
-  const used = new Set(), placed = new Set();
-  let given = 0;
+  const holder = new Map(), match = new Map(), kept = new Set();
   for (const [section, entry] of partHomes(doc)) for (const item of entry.allocation?.kinds ?? []) {
-    if (!item || typeof item !== "object" || placed.has(item.kind)) continue;
-    (bySection.get(section) ?? bySection.set(section, []).get(section)).push({ kind: item.kind, insight: item.insight, type: item.type, form: item.form, kept: true });
-    used.add(item.insight); placed.add(item.kind); given += 1;
+    if (!item || typeof item !== "object" || kept.has(item.kind)) continue;
+    kept.add(item.kind); holder.set(item.insight, item.kind); match.set(item.kind, { section, insight: item.insight, type: item.type, form: item.form, kept: true });
+    count.set(section, (count.get(section) ?? 0) + 1);
   }
-  for (const [kind, proofs] of order) {
-    if (given >= target) break;
-    if (placed.has(kind)) continue;
-    const best = proofs.filter((p) => !used.has(p.insight)).sort((a, b) => load(a.section) - load(b.section) || (bySection.get(a.section)?.length ?? 0) - (bySection.get(b.section)?.length ?? 0))[0];
-    if (!best) continue;
-    used.add(best.insight); placed.add(kind); given += 1;
-    (bySection.get(best.section) ?? bySection.set(best.section, []).get(best.section)).push({ kind, insight: best.insight, type: best.type, form: best.form });
+  const proofsOf = new Map(order.map(([kind, proofs]) => [kind, proofs]));
+  const augment = (kind, seen) => {
+    for (const proof of [...proofsOf.get(kind)].sort((a, b) => load(a.section) - load(b.section))) {
+      if (seen.has(proof.insight)) continue;
+      seen.add(proof.insight);
+      const other = holder.get(proof.insight);
+      if (other !== undefined && (match.get(other)?.kept || !augment(other, seen))) continue;
+      holder.set(proof.insight, kind); match.set(kind, proof);
+      return true;
+    }
+    return false;
+  };
+  for (const [kind] of order) {
+    if (match.size >= target) break;
+    if (match.has(kind)) continue;
+    if (augment(kind, new Set())) count.set(match.get(kind).section, (count.get(match.get(kind).section) ?? 0) + 1);
   }
+  // A path that moved a kind to another of its insights may move it to another section: the counts are read again from the match.
+  for (const [kind, proof] of match) (bySection.get(proof.section) ?? bySection.set(proof.section, []).get(proof.section)).push({ kind, insight: proof.insight, type: proof.type, form: proof.form, ...(proof.kept ? { kept: true } : {}) });
+  const placed = new Set(match.keys()), given = match.size;
   return { floor, length, perTen, target, reachable: new Set([...reach.keys(), ...placed]).size, placed: given, short: Math.max(0, floor - given), bySection };
 }
 
