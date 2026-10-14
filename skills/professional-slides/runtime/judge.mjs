@@ -94,7 +94,7 @@ function pendingQuestions(file, { draft, fetchAssets, pages = null }) {
     const pending = await readJson(out, { optional: true });
     await fs.rm(dir, { recursive: true, force: true });
     if (!Array.isArray(pending)) throw new Error(`The compile did not run to the rules (exit ${run.status}): ${String(run.stderr || run.error?.message || "").trim().split("\n").slice(-4).join(" ")}`);
-    // A page run compiles the whole deck as its context, so the questions are kept to those asked where the named pages are.
+    // A page run gates its pages among the deck's structural pages, which ask questions of their own: only those asked where the named pages are are kept.
     return pages ? pending.filter((item) => (item.where ?? []).some((id) => pages.includes(String(id)))) : pending;
   });
 }

@@ -14,8 +14,8 @@ summary and an answer no page carried. These hold the repair:
   rule, so a refusal is never the first time its rule is mentioned;
 * a page that does not fit has its type's other forms and placements tried
   for it, composed and gated, and the finding lists the ones that pass;
-* `--page` reports a page against the whole deck, `--plan` allocates forms
-  and placements before the pages are written.
+* `--page` reports a page against its neighbours as they declare themselves,
+  `--plan` allocates forms and placements before the pages are written.
 """
 from __future__ import annotations
 
@@ -228,18 +228,16 @@ console.log(JSON.stringify({ before: { blocking: tell(before), line: line(before
         self.assertIn("VARIETY_PANELS", result["after"]["blocking"])
         self.assertIn("8 of 43 pages, 18.6%; floor 20%: short by 1 page - BLOCKS", result["after"]["line"])
 
-    def test_an_aggregate_names_each_pages_part_in_it(self):
+    def test_an_aggregate_names_each_pages_measure_in_it(self):
         result = run_node(PLANTED + '''
-import { contributions } from './skills/professional-slides/runtime/deck-report.mjs';
 const run = await authorDeck(structuredClone(clean), { baseDir: dir });
 const depth = run.standings.find((s) => s.code === 'EVIDENCE_DEPTH'), ink = run.standings.find((s) => s.code === 'DECK_INK');
-console.log(JSON.stringify({ depth: Object.keys(depth.each).length, ink: Object.keys(ink.each).slice(0, 3), part: contributions(run.standings, ['p03', 'p22b']) }));
+console.log(JSON.stringify({ depth: Object.keys(depth.each).length, ink: Object.keys(ink.each).slice(0, 3), p03: depth.each.p03 ?? null }));
 ''')
         self.assertGreater(result["depth"], 8)
         # The page gates name pages by position; the report names them by id.
         self.assertTrue(all(key.startswith("p") for key in result["ink"]), result["ink"])
-        self.assertTrue(any(line.startswith("EVIDENCE_DEPTH: this page") for line in result["part"]["p03"]))
-        self.assertTrue(any(line.startswith("DECK_INK: this page") for line in result["part"]["p22b"]))
+        self.assertIsNotNone(result["p03"])
 
 
 class FitSearchTests(unittest.TestCase):
@@ -348,7 +346,7 @@ class FitRepairTests(unittest.TestCase):
 
 
 class PageRunTests(unittest.TestCase):
-    def test_a_page_run_answers_for_its_pages_against_the_whole_deck(self):
+    def test_a_page_run_answers_for_its_pages_and_leaves_the_deck_to_the_whole_deck_run(self):
         with tempfile.TemporaryDirectory() as tmp:
             file = examples_deck(tmp, plant)
             # A healthy page of a deck with blockers elsewhere: its run is clean, and it writes nothing.
@@ -356,10 +354,14 @@ class PageRunTests(unittest.TestCase):
             self.assertEqual(healthy.returncode, 0, healthy.stderr[-600:])
             summary = json.loads(healthy.stdout)
             self.assertTrue(summary["ok"])
-            self.assertTrue(any(line.startswith("EVIDENCE_DEPTH: this page") for line in summary["pages"]["p07"]))
-            self.assertTrue(summary["standing"]["S"] and summary["standing"]["G"])
-            self.assertEqual(sorted(summary["structureElsewhere"]), ["PLAYERS_UNMARKED", "VARIETY_TYPE_RUN"])
-            self.assertIn("not counted in this run's exit code", healthy.stderr)
+            self.assertEqual(summary["pages"]["p07"]["type"], "relationship/scatter")
+            # The deck's structure and its aggregates are the whole-deck run's: one line says how many rules, and which run holds them.
+            self.assertNotIn("standing", summary)
+            self.assertRegex(summary["deckRules"], r"^\d+ deck-level rules are the whole-deck run's")
+            self.assertIn("node runtime/author-deck.mjs page-types.pages.json --check", summary["deckRules"])
+            self.assertIn(summary["deckRules"], healthy.stderr)
+            self.assertNotIn("Where the deck stands", healthy.stderr)
+            self.assertNotIn("PLAYERS_UNMARKED", healthy.stderr + healthy.stdout)
             self.assertFalse((Path(tmp) / "page-types.deck.json").exists())
             # The page with the empty band: its own finding, with its alternatives, and nobody else's.
             void = cli(file, "--check", "--page", "p10")
@@ -367,12 +369,13 @@ class PageRunTests(unittest.TestCase):
             self.assertIn("1 finding to fix in page-types.pages.json (P 1)", void.stderr)
             self.assertIn("SCENE_VOID [p10]", void.stderr)
             self.assertNotIn("COMPILE [p01]", void.stderr)
-            # A page whose declared type breaks a structure rule answers for the rule.
+            # A page whose declared type runs on from its neighbours' answers for the run, read off what they declare;
+            # the players rule, which reads the deck's opening pages, is the whole-deck run's.
             run = cli(file, "--check", "--page", "p03c,p07")
             self.assertEqual(run.returncode, 2)
-            # The run of three names it, and so does the players rule, which reads the first three analytical pages.
-            self.assertIn("(S 2, P 1)", run.stderr)
-            self.assertIn("VARIETY_TYPE_RUN", run.stderr.split("Where the deck stands:")[0])
+            self.assertIn("(S 1, P 1)", run.stderr)
+            self.assertIn("VARIETY_TYPE_RUN", run.stderr)
+            self.assertNotIn("PLAYERS_UNMARKED", run.stderr)
             self.assertIn("COMPILE [p03c]", run.stderr)
             log = [json.loads(line) for line in (Path(tmp) / "page-types.author-log.jsonl").read_text().splitlines()]
             self.assertEqual(log[-1]["named"], ["p03c", "p07"])
@@ -404,21 +407,23 @@ class PageRunTests(unittest.TestCase):
             # A run that names no page has no page part to print.
             self.assertEqual(cli(file, "--check", "--json").returncode, 1)
 
-    def test_a_page_run_composes_and_gates_only_what_changed(self):
-        """A page check edits one page of a hundred, and composing and gating every page again was 4.3s of a 5.4s check
-        on the BA deck. The composer's slides and the page gates' own results are kept beside the pages file, and a
-        page whose composed scene has not changed is read from them; what the run reports is what a run with neither
-        reports, before an edit and after it."""
+    def test_a_page_run_gates_only_what_changed(self):
+        """A page run composes its own pages among the deck's structural pages, and the page gates' own results are
+        kept beside the pages file: a page whose composed scene has not changed is read from them, and what the run
+        reports is what a run without them reports, before an edit and after it. The composer's memory is the
+        whole-deck run's, held by each slide's place in the deck: a page run neither reads it nor writes over it."""
         with tempfile.TemporaryDirectory() as tmp:
             file = examples_deck(tmp, plant)
-            caches = [Path(tmp) / "page-types.compose-cache.json", Path(tmp) / "page-types.gate-cache.json"]
+            caches = [Path(tmp) / "page-types.gate-cache.json"]
             first, second = cli(file, "--check", "--page", "p07"), cli(file, "--check", "--page", "p07")
             self.assertTrue(all(cache.exists() for cache in caches))
+            self.assertFalse((Path(tmp) / "page-types.compose-cache.json").exists())
             self.assertEqual((second.returncode, second.stdout, second.stderr), (first.returncode, first.stdout, first.stderr))
-            # p07 edited: read with the caches the run before it left, then with none.
+            # p07 edited where its budget reads it: read with the caches the run before it left, then with none.
             doc = json.loads(Path(file).read_text())
             [page] = [p for p in doc["pages"] if p.get("id") == "p07"]
             page["title"] = page["title"].rstrip(".") + " this year"
+            page["points"][0]["text"] += " The gap held in each of the three years."
             Path(file).write_text(json.dumps(doc))
             warm = cli(file, "--check", "--page", "p07")
             for cache in caches:

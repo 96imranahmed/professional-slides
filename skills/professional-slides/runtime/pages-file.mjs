@@ -51,6 +51,21 @@ export const partBudgets = (doc) => BUDGETS.get(doc) ?? new Map();
  */
 export const partHomes = (doc) => HOMES.get(doc) ?? new Map();
 
+/**
+ * `doc` holding other `pages` and `appendix`, read as `doc` was: the part each
+ * page came from, the parts it includes, their budgets, what each part holds
+ * and the files it was read from carry over. A page run compiles the pages it
+ * names among the deck's structural pages (page-run.mjs pageContext), and a
+ * section review compiles a section with its fixes in place: each is still
+ * the deck its parts make, so a finding names the part file to edit and the
+ * conventions key their sections by the same names.
+ */
+export function withPages(doc, { pages = doc.pages, appendix = doc.appendix } = {}) {
+  const copy = { ...doc, pages, ...(appendix === undefined ? {} : { appendix }) };
+  for (const kept of [PARTS, INCLUDED, BUDGETS, HOMES, READ]) if (kept.has(doc)) kept.set(copy, kept.get(doc));
+  return copy;
+}
+
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
   const parts = partsOf(doc);
