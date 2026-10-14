@@ -16,6 +16,7 @@ import { BODY_WIDTH, COLUMN_GAP, LAYOUT, CONNECTOR_WIDTH, withDeckDensity, withD
 import { pointsPerRow, resolveFill } from "./compose-points.mjs";
 import { imageProps, playerMarks, pictureCredits, sourcedPicture } from "./compose-pictures.mjs";
 import { composeSlide } from "./compose-page.mjs";
+import { chooseLayout } from "./compose-layouts.mjs";
 import { AGENDA_LIMITS, agendaStyleFor } from "./panels.mjs";
 
 const V3 = "professional-slides.deck/v3";
@@ -395,11 +396,127 @@ function composeDeckWith(spec, baseDir) {
     if (spec.cover.notes) cover.notes = spec.cover.notes;
     slides.push(cover);
   }
-  // The tracker is on by default once a deck has sections: pills above the title
-  // unless the deck tracks by repeating its contents page (`agenda`).
-  // The contents page and the tracker answer different questions - what the
-  // deck covers, and where you are in it - so they are two settings, and
-  // neither defaults from the other.
+  const { contentsMode, tabs, agendaMode, trackerStyle } = navigationOf(spec);
+  // A page run (author-deck.mjs --page) composes the pages it names among the deck's structural pages alone, and `pageRun`
+  // carries what the rest of the deck decides of them (page-run.mjs): whether the deck has an appendix - its divider is a
+  // section, which the tracker and the contents list - each page's place in the deck as declared, and the analytical pages
+  // that stand between the pages it composes.
+  const run = spec.pageRun ?? null;
+  const appendix = appendixOf(spec, { divider: Boolean(run?.appendix) });
+  const credits = pictureCredits(spec);
+  const storySlides = [...spec.slides, ...appendix, ...sourceLimitPages(spec), ...credits];
+  const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
+  // A tracker above the title drops the body a step (slide-chrome's trackerGap),
+  // which the table budget has to know or it plans rows the page cannot hold.
+  const trackerGap = spec.chrome && tabs ? 11 : 0;
+  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140) - trackerGap) / 508)) : 1;
+  const fill = resolveFill(spec);
+  // The weight contract: what a page of this deck is expected to carry. The
+  // deck's own `weight` wins, then the house profile a template produced, then
+  // the fill level.
+  const weight = resolveWeight(spec, fill);
+  // The shapes the last few analytical pages took, most recent first: the
+  // chooser breaks a tie on variety, so a section spreads across its repertoire
+  // instead of repeating whichever shape fitted first.
+  const recent = [], recentStyles = [];
+  // Each lone table cut across pages, with what would hold it on one (splitEstimate): carried beside the plan, never on a
+  // slide, for the authoring compile to refuse the page with.
+  const tableSplits = [];
+  const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => {
+    const parts = paginateTable(p, bodyScale);
+    // The runtime's own lists - the picture credits, the sources' limits - are no planned page held on one: one that runs past
+    // a page continues on the next, each part a page of its own (picture-credits-2), not one page cut in parts the compile
+    // refuses (PAGE_SPLITS) and the render with it. The BA retest credited 13 pictures, one past what the page holds.
+    if (parts.length > 1 && GENERATED.test(String(p.id ?? ""))) return parts.map(({ sourceSlideId: _cut, ...part }, i) => ({ ...part, id: i ? `${p.id}-${i + 1}` : p.id }));
+    if (parts.length > 1) tableSplits.push(splitEstimate(p, bodyScale));
+    return parts;
+  });
+  // A revision that carries slides from its source deck (revision.mjs) composes only some of the deck's pages: each stands
+  // among the carried slides, and prints the number of its place in the deck, not of its place among the composed pages.
+  const places = Array.isArray(spec.carried) && spec.carried.length ? composedPlaces(spec, [...slides, ...expanded]) : null;
+  // A page run's pages print the places they hold in the deck as declared, a page the composer cut in parts each part's
+  // place after its first; the generated pages, which a page run never names, keep their places among the pages composed.
+  const sourceOf = (page) => String(page.sourceSlideId ?? page.id);
+  const pinned = run?.places ? [...slides.map(() => null), ...expanded.map((page, index) => {
+    const own = run.places[sourceOf(page)];
+    return own === undefined ? null : own + index - expanded.findIndex((other) => sourceOf(other) === sourceOf(page));
+  })] : null;
+  const placeOf = (index) => pinned?.[index] ?? places?.[index] ?? index + 1;
+  const pageNumbers = new Map();
+  expanded.forEach((page, index) => {
+    for (const key of new Set([page.id, page.sourceSlideId].filter(Boolean))) {
+      const numbers = pageNumbers.get(key) || []; numbers.push(placeOf(slides.length + index)); pageNumbers.set(key, numbers);
+    }
+  });
+  // A page a page run does not compose is referred to by its place in the deck as declared.
+  for (const [id, place] of Object.entries(run?.places ?? {})) if (!pageNumbers.has(id)) pageNumbers.set(id, [place]);
+  // The layouts the analytical pages a page run does not compose would take, set in the chooser's memory before the page
+  // that follows them (`pageRun.between`, their declared stand-ins in deck order): its tie-break on variety then reads the
+  // shapes the deck before the page takes, as it does when the deck is composed whole.
+  const remember = (raw) => {
+    const between = run?.between?.[sourceOf(raw)];
+    if (!between || (raw.sourceSlideId && raw.id !== expanded.find((other) => sourceOf(other) === sourceOf(raw))?.id)) return;
+    for (const standIn of between) { try { recent.unshift(chooseLayout(standIn, recent)); } catch { /* a stand-in no layout takes adds nothing to the memory */ } }
+    recent.splice(4);
+  };
+  const resolveReferences = value => {
+    if (typeof value === "string") return value.replace(/\{\{page:([A-Za-z0-9_-]+)\}\}/g, (_, id) => {
+      const numbers = pageNumbers.get(id); if (!numbers) throw new Error(`Unknown page reference: ${id}`);
+      return numbers.length > 1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]);
+    });
+    if (Array.isArray(value)) return value.map(resolveReferences);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, resolveReferences(v)]));
+    return value;
+  };
+  // Every page is composed and every failure reported together.
+  mapAll(expanded, (raw) => {
+    // Hidden is the slide's state in the file, not its layout: it rides past
+    // the composer, and a page split in two hides both halves.
+    // So does the imported slide a revision's section stands for (`sourceSlide`), which is its record and never drawn.
+    const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
+    if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
+    remember(raw);
+    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles, { conventions: spec.conventions, players: spec.players });
+    if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
+    if (hidden) composed.hidden = true;
+    slides.push(composed);
+    recent.splice(4);
+    recentStyles.splice(9);
+  }, (raw, index) => raw?.sourceSlideId ?? raw?.id ?? `page-${index + 1}`);
+  return {
+    id: spec.id,
+    palette: spec.palette || "midnight",
+    // The ground every page is set on unless it names its own (`tone` on the page).
+    ...(spec.tone ? { ground: spec.tone } : {}),
+    ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
+    ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
+    ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
+    ...(spec.typography ? { typography: spec.typography } : {}),
+    ...(spec.chrome ? { chrome: spec.chrome } : {}),
+    fill,
+    weight,
+    ...(tableSplits.length ? { tableSplits } : {}),
+    slides: slides.map((s, index) => {
+      const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
+      if (places && s.kind !== "cover" && page.pageNumber === undefined) page.pageNumber = placeOf(index);
+      // A divider prints no number in the deck, and prints none in a page run's.
+      else if (pinned?.[index] != null && !["cover", "divider"].includes(s.kind) && page.pageNumber === undefined) page.pageNumber = pinned[index];
+      // The document title sits in the footer beside the page number.
+      if (spec.footer && s.kind !== "cover" && page.companyName === undefined) page.companyName = spec.footer;
+      return page;
+    })
+  };
+}
+
+/**
+ * How the deck says where the reader is: the tracker over its pages and the
+ * contents pages before its sections. The tracker is on by default once a
+ * deck has sections: pills above the title unless the deck tracks by
+ * repeating its contents page (`agenda`). The contents page and the tracker
+ * answer different questions - what the deck covers, and where you are in it
+ * - so they are two settings, and neither defaults from the other.
+ */
+function navigationOf(spec) {
   const sections = spec.slides.filter((s) => s.kind === "section").length;
   if (spec.tracker !== undefined && ![...TRACKER_NAMES, "repeat-contents", false].includes(spec.tracker)) {
     throw new Error(`Unknown tracker: ${spec.tracker}; use ${TRACKER_NAMES.map((n) => `"${n}"`).join(", ")}, "repeat-contents" or false`);
@@ -430,100 +547,42 @@ function composeDeckWith(spec, baseDir) {
     : spec.agenda && spec.agenda !== "once" ? "repeat-contents" : defaultTracker);
   const contentsMode = contentsModeOf(spec);
   const tabs = spec.sectionTabs ?? (TRACKER_NAMES.includes(trackerMode) && sections >= 2);
-  // `appendix: [...]`: the source pages behind the story - the model grid, the
-  // full table, the survey instrument - set at `density: "appendix"` behind an
-  // Appendix divider. A strong deck keeps its densest pages here, and a page that
-  // belongs in the appendix stops crowding the page that carries the argument.
-  const appendix = Array.isArray(spec.appendix) && spec.appendix.length
-    ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
-       ...spec.appendix.map((page) => ({ density: "appendix", ...page }))]
-    : [];
-  const credits = pictureCredits(spec);
-  const storySlides = [...spec.slides, ...appendix, ...sourceLimitPages(spec), ...credits];
   // The contents page leads the deck; `repeat-contents` also reprints it in
   // front of every later section, which is the other way a deck tracks.
   const agendaMode = trackerMode === "repeat-contents" ? true : contentsMode === "once" || contentsMode === true ? "once" : false;
   const trackerStyle = TRACKER_NAMES.includes(trackerMode) ? trackerMode : "pills";
-  const pages = agendaPages(tabs ? sectionTabs(storySlides, trackerStyle) : storySlides, contentsMode === false ? false : agendaMode, spec.agendaStyle);
-  // A tracker above the title drops the body a step (slide-chrome's trackerGap),
-  // which the table budget has to know or it plans rows the page cannot hold.
-  const trackerGap = spec.chrome && tabs ? 11 : 0;
-  const bodyScale = spec.chrome ? Math.max(0.4, Math.min(1.2, ((spec.chrome.footerTop ?? 684) - 36 - (spec.chrome.bodyTop ?? 140) - trackerGap) / 508)) : 1;
-  const fill = resolveFill(spec);
-  // The weight contract: what a page of this deck is expected to carry. The
-  // deck's own `weight` wins, then the house profile a template produced, then
-  // the fill level.
-  const weight = resolveWeight(spec, fill);
-  // The shapes the last few analytical pages took, most recent first: the
-  // chooser breaks a tie on variety, so a section spreads across its repertoire
-  // instead of repeating whichever shape fitted first.
-  const recent = [], recentStyles = [];
-  // Each lone table cut across pages, with what would hold it on one (splitEstimate): carried beside the plan, never on a
-  // slide, for the authoring compile to refuse the page with.
-  const tableSplits = [];
-  const expanded = pages.flatMap(splitReadingModes).flatMap(splitTables).flatMap((p) => {
-    const parts = paginateTable(p, bodyScale);
-    // The runtime's own lists - the picture credits, the sources' limits - are no planned page held on one: one that runs past
-    // a page continues on the next, each part a page of its own (picture-credits-2), not one page cut in parts the compile
-    // refuses (PAGE_SPLITS) and the render with it. The BA retest credited 13 pictures, one past what the page holds.
-    if (parts.length > 1 && GENERATED.test(String(p.id ?? ""))) return parts.map(({ sourceSlideId: _cut, ...part }, i) => ({ ...part, id: i ? `${p.id}-${i + 1}` : p.id }));
-    if (parts.length > 1) tableSplits.push(splitEstimate(p, bodyScale));
-    return parts;
-  });
-  // A revision that carries slides from its source deck (revision.mjs) composes only some of the deck's pages: each stands
-  // among the carried slides, and prints the number of its place in the deck, not of its place among the composed pages.
-  const places = Array.isArray(spec.carried) && spec.carried.length ? composedPlaces(spec, [...slides, ...expanded]) : null;
-  const placeOf = (index) => places?.[index] ?? index + 1;
-  const pageNumbers = new Map();
-  expanded.forEach((page, index) => {
-    for (const key of new Set([page.id, page.sourceSlideId].filter(Boolean))) {
-      const numbers = pageNumbers.get(key) || []; numbers.push(placeOf(slides.length + index)); pageNumbers.set(key, numbers);
-    }
-  });
-  const resolveReferences = value => {
-    if (typeof value === "string") return value.replace(/\{\{page:([A-Za-z0-9_-]+)\}\}/g, (_, id) => {
-      const numbers = pageNumbers.get(id); if (!numbers) throw new Error(`Unknown page reference: ${id}`);
-      return numbers.length > 1 ? `${numbers[0]}–${numbers.at(-1)}` : String(numbers[0]);
-    });
-    if (Array.isArray(value)) return value.map(resolveReferences);
-    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k,v]) => [k, resolveReferences(v)]));
-    return value;
-  };
-  // Every page is composed and every failure reported together.
-  mapAll(expanded, (raw) => {
-    // Hidden is the slide's state in the file, not its layout: it rides past
-    // the composer, and a page split in two hides both halves.
-    // So does the imported slide a revision's section stands for (`sourceSlide`), which is its record and never drawn.
-    const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
-    if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
-    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles, { conventions: spec.conventions, players: spec.players });
-    if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
-    if (hidden) composed.hidden = true;
-    slides.push(composed);
-    recent.splice(4);
-    recentStyles.splice(9);
-  }, (raw, index) => raw?.sourceSlideId ?? raw?.id ?? `page-${index + 1}`);
-  return {
-    id: spec.id,
-    palette: spec.palette || "midnight",
-    // The ground every page is set on unless it names its own (`tone` on the page).
-    ...(spec.tone ? { ground: spec.tone } : {}),
-    ...(spec.designLayout ? { design: spec.designLayout.name } : {}),
-    ...(spec.designLayout?.variation ? { variation: { seed: spec.designLayout.variation.seed, lean: spec.designLayout.variation.lean, leadPoints: spec.designLayout.variation.leadPoints, tracker: spec.tracker ?? null } } : {}),
-    ...(spec.pageTemplate ? { pageTemplate: spec.pageTemplate } : {}),
-    ...(spec.typography ? { typography: spec.typography } : {}),
-    ...(spec.chrome ? { chrome: spec.chrome } : {}),
-    fill,
-    weight,
-    ...(tableSplits.length ? { tableSplits } : {}),
-    slides: slides.map((s, index) => {
-      const page = spec.density && !s.density && s.kind !== "cover" ? { ...s, density: spec.density } : { ...s };
-      if (places && s.kind !== "cover" && page.pageNumber === undefined) page.pageNumber = placeOf(index);
-      // The document title sits in the footer beside the page number.
-      if (spec.footer && s.kind !== "cover" && page.companyName === undefined) page.companyName = spec.footer;
-      return page;
-    })
-  };
+  return { contentsMode, tabs, agendaMode, trackerStyle };
+}
+
+/**
+ * `appendix: [...]`: the source pages behind the story - the model grid, the
+ * full table, the survey instrument - set at `density: "appendix"` behind an
+ * Appendix divider. A strong deck keeps its densest pages here, and a page that
+ * belongs in the appendix stops crowding the page that carries the argument.
+ * `divider` keeps the divider where none of the appendix's pages is composed:
+ * a page run's deck, whose appendix is still a section of the deck.
+ */
+const appendixOf = (spec, { divider = false } = {}) => (Array.isArray(spec.appendix) && spec.appendix.length) || divider
+  ? [{ id: "appendix-divider", kind: "section", title: "Appendix", summary: "The workings behind the story" },
+     ...(spec.appendix || []).map((page) => ({ density: "appendix", ...page }))]
+  : [];
+
+/**
+ * Where each page of a deck stands, counted from 1 as its slides are
+ * numbered, read off its pages as declared: the cover, the contents pages
+ * its navigation adds, each section and page one slide, the appendix behind
+ * its divider. `spec` is the deck-level keys with `slides` and `appendix` as
+ * the pages file writes them. A page run composes the pages it names among
+ * the deck's structural pages alone (page-run.mjs), and they print these
+ * places and every reference to a page resolves to one (`pageRun.places`):
+ * a page the composer cuts in two, or one that does not compile, moves the
+ * pages after it, which a page run does not read.
+ */
+export function declaredPlaces(spec) {
+  const { contentsMode, agendaMode } = navigationOf(spec);
+  const pages = agendaPages([...spec.slides, ...appendixOf(spec)], contentsMode === false ? false : agendaMode, spec.agendaStyle);
+  const first = spec.cover ? 2 : 1;
+  return Object.fromEntries(pages.map((page, at) => [page?.id, first + at]).filter(([id]) => id !== undefined && id !== null).map(([id, place]) => [String(id), place]));
 }
 
 /**
