@@ -2067,7 +2067,7 @@ export async function spineLock(spec, directory, { deckPath = null, maxPasses: a
   const history = await readStorylineHistory(store);
   const latest = history.at(-1);
   if (!latest || bindingVersionOf(latest) !== BINDING_VERSION) return null;
-  const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL].includes(h.kind)).length;
+  const spent = passesSpent(history);
   const verdict = latest.review?.verdict ?? null;
   const closed = ["ready", "provisional"].includes(verdict) ? verdict : spent >= maxPasses ? "spent" : null;
   if (!closed) return null;
@@ -2255,6 +2255,16 @@ async function setAside(out) {
 // The record of an argument reading's fixes found applied (closeAppliedFixes): the runtime's, not a critic's, and not a pass
 // against the cap.
 const APPLIED = "applied-fixes";
+
+/**
+ * The critique passes a lineage has spent against its cap: the passes critics read. A post-review pass and a compile
+ * refusal's pass are granted beside the cap, and the runtime's record of fixes applied (APPLIED) is no reading at all.
+ * The lock and the next pass count alike: ba6's lock counted the applied record and closed the spine as spent after two
+ * readings, while the next pass was still the third the cap allows.
+ */
+export function passesSpent(history) {
+  return history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL, APPLIED].includes(h.kind)).length;
+}
 /**
  * What a pass that files failing argument items records beside them, so the fixes can close with no second reading:
  * `argumentFixes` { expect, binding } - each fixed page's hash, and the spine's binding, as they will read with every fix
@@ -2612,7 +2622,7 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   if (scope && latest.artifacts && Array.isArray(latest.rested)) scope.prior = { artifacts: latest.artifacts, rested: latest.rested };
   if (scope) {
     // The cap counts the critique's own passes; a post-review pass is granted by the deck review and counted against that.
-    const spent = history.filter((h) => ![POST_REVIEW, COMPILE_REFUSAL, APPLIED].includes(h.kind)).length;
+    const spent = passesSpent(history);
     scope.capped = spent + 1 > maxPasses;
     const moved = changedPages(latest.pageHashes, storylinePageHashes(spec, measures)) ?? { changed: scope.changed, deleted: scope.deleted };
     const reviewDir = path.join(store, REVIEW_HISTORY);

@@ -501,6 +501,15 @@ console.log(JSON.stringify({ blind: { facts: blind.facts ?? null, added: blind.a
 
 
 class SpineLockTests(unittest.TestCase):
+    def test_a_record_of_fixes_applied_spends_no_pass(self):
+        """ba6's lock counted the runtime's applied-fixes record as a reading and closed the spine as spent after two
+        critic passes, refusing seven writers' pages SPINE_LOCKED while the third pass the cap allows was still to run."""
+        result = run_node('''
+import { passesSpent } from './skills/professional-slides/runtime/storyline.mjs';
+console.log(JSON.stringify([passesSpent([{ pass: 1 }, { pass: 1, kind: 'applied-fixes' }, { pass: 2 }]), passesSpent([{ pass: 1 }, { kind: 'post-review' }, { pass: 2 }, { pass: 3 }])]));
+''')
+        self.assertEqual(result, [2, 3])
+
     def test_a_locked_page_is_told_which_declared_fact_moved_with_was_and_now(self):
         """SPINE_LOCKED said a page's argument moved and listed every fact it might be; the writer read the source to learn
         which. Where the lineage store holds the packet the critique answered, the lock reads the page as the critic was shown
