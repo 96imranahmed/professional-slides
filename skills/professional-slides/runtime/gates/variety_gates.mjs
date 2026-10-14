@@ -70,6 +70,7 @@ export const VARIETY_CODES = Object.freeze({
   SHARES_IN_TILES: "shares of one measure an order of magnitude apart set in tiles of one size",
   // Deck-level, read here from the compiled pages.
   VARIETY_TABLES: "one table construction on more than half of ten consecutive analytical pages",
+  HEADLINE_CROWDED: "more headline figures - a hero number or a strip over the exhibit - in ten consecutive analytical pages than strong decks set",
   PLAYERS_UNMARKED: "the deck declares the players it compares but no early page shows each one's mark - its logo, its outline or its photograph, as it declares",
   PROFILE_UNPICTURED: "a page introducing players or products as cards with no logo or picture on any of them",
 });

@@ -609,6 +609,22 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
 // The figures drawn to their size, whose items keep a number as `value` and print the figure as `display`.
 const SIZED_FIGURES = new Set(["nested-circles", "radial-bars"]);
 
+/**
+ * A bound chart's heading with the unit the runtime writes taken off its end,
+ * where the author already ended it with that unit - after a comma or in
+ * brackets, the same unit once normalised (measures.mjs normalUnit). The chart
+ * title sets the written unit after the heading (registry-chart-title.mjs), so
+ * a heading that kept its own read it twice: on the BA retest fd01's and
+ * pr02's charts were headed "Operating margin, 2025 or latest financial year,
+ * %, %". The heading is otherwise left as written.
+ */
+export function headingClearOfUnit(heading, unit) {
+  if (typeof heading !== "string" || typeof unit !== "string" || !unit.trim()) return heading;
+  const end = /(?:\s*,\s*|\s*\(\s*)([^,()]+?)\s*\)?\s*$/.exec(heading);
+  if (!end || end.index === 0 || normalUnit(end[1]) !== normalUnit(unit)) return heading;
+  return heading.slice(0, end.index).trimEnd();
+}
+
 /** An exhibit that names its measures - in its series, as its one `measure`, or item by item - filled from them. */
 function bindExhibit(ex, what, context) {
   const { page, bound, fail, state, viewed } = context;
@@ -759,7 +775,7 @@ function bindExhibit(ex, what, context) {
     if (marked.size) ex.events = [...marked.values()];
   }
   delete ex.measure; delete ex.pivot;
-  if (!perSeries && written !== undefined) ex.unit = written;
+  if (!perSeries && written !== undefined) { ex.unit = written; ex.heading = headingClearOfUnit(ex.heading, written); }
   if (twoScales) { ex.secondaryAxis = true; ex.secondaryUnit ??= units[1]; }
   ex.basis = basisOf(ex, [...new Set([...refs, ...targetRefs])], roles);
   delete ex.select;

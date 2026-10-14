@@ -73,6 +73,8 @@ const FIGURE_CAPTION_WIDTH = 200;
 // A pill or a figure this near its mark is read as its mark's, with no leader.
 const LEADER_ADJACENT = 18;
 const COLLISION_ROLES = new Set(["chart-mark", "chart-marker", "chart-point-highlight", "data-label", "chart-reference-label", "axis-title"]);
+// The labels a rule or a band carries over the plot: an event's flag, a period's name, a band's, a threshold's.
+const GUIDE_LABEL_ROLES = new Set(["chart-event-label", "chart-period-label", "chart-band-label", "chart-threshold-label", "chart-reference-label"]);
 
 // An annotation centres on the mark it points at, and its bold face is the
 // annotation face rather than the body bold. Over the shared builder.
@@ -997,8 +999,13 @@ export function renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles
   const annotations = normalizeEvidenceAnnotations(props);
   if (!annotations.length) return { placements: [], nodes: [] };
   annotations.forEach(assertEvidenceTextFits);
-  const collisionObstacles = annotationObstacleFrames(obstacles);
-  const besideObstacles = annotationObstacleFrames(obstacles, BESIDE_ROLES);
+  // The labels of the rules and bands drawn over the marks are labels like any other: a callout is placed clear of them on
+  // every path, not only in the open space. They arrive with the guides, which the box beside its mark and the one over it
+  // never read: on the BA retest hw02's "Largest one-year rise" box was set over the event label "Domestic band and band C
+  // added" and hid the top of its first line.
+  const guideLabels = guides.filter((node) => GUIDE_LABEL_ROLES.has(node.role));
+  const collisionObstacles = annotationObstacleFrames([...obstacles, ...guideLabels], new Set([...COLLISION_ROLES, ...GUIDE_LABEL_ROLES]));
+  const besideObstacles = annotationObstacleFrames([...obstacles, ...guideLabels], BESIDE_ROLES);
   // The open space is read against everything the chart has drawn so far, the rules and bands set over the marks included.
   const openObstacles = annotationObstacleFrames([...obstacles, ...guides], OPEN_ROLES);
   const leaderStops = annotationObstacleFrames([...obstacles, ...guides], LEADER_ROLES);

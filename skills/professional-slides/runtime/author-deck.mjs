@@ -158,7 +158,7 @@ import { DATA_KEYS, GRADE, FIT_WORDS, READING_TASKS, boundKeys, drawOrder, exhib
 import { featuredDraw } from "./design-systems.mjs";
 import { decimalsNeeded } from "./printed-numbers.mjs";
 import { alternativesOf, analysisInsights, analysisLine, catalogueHint, readAnalysis, ANALYSIS_OPS } from "./analysis.mjs";
-import { claimMarks, dependencyFindings, hazardFindings, metricsOf, relationRepair, requiredCitations, tileMeasures } from "./gates/dependency_gates.mjs";
+import { claimMarks, dependencyFindings, hazardFindings, metricsOf, pagePool, primaryCitations, relationRepair, requiredCitations, tileMeasures, titleCells } from "./gates/dependency_gates.mjs";
 import { craftFindings, sceneStatistics } from "./gates/craft_gates.mjs";
 import { activeJudgements, addPending, answersStand, askAgain, askingFrom, loadJudgements, notePageFigures, pendingFinding, pendingRequests, withJudgements } from "./judgements.mjs";
 import { pageChartAnnotated } from "./build-bars.mjs";
@@ -195,6 +195,8 @@ export const AUTHORING_CODES = Object.freeze({
   ANALYSIS_REQUIRED: "a deck that compares declared players has no computed comparison of them on common measures",
   ANALYSIS_UNRESTED: "a computed analysis that no page rests on",
   MEASURES_CONFLICT: "one measure recorded twice in the insight log - blocking where the two records hold different numbers, advisory where they agree",
+  SOURCE_PREDATES_PERIOD: "a recorded measure whose latest period ends after the date of a source it cites: a record cannot report a period it predates",
+  HEADLINE_REPEATS: "a headline figure over or beside the exhibit that prints the title's number again - where a labelled mark prints it too, or where the exhibit shows another measure (gates/dependency_gates.mjs headlineRepeats)",
   COMMENTARY_MOVED: "a page whose points are declared beside its exhibit and drawn under it, because they fill too little of the column beside a chart that uses its width - advised, with what holds the column",
   PAGE_SPLITS: "a page the composer draws as two slides or more - refused where it is one table past the rows a page holds, with what holds it on one; advised otherwise",
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
@@ -249,7 +251,7 @@ function tableSplitRepair(estimate, exhibit) {
 
 // The sources registry's own check is its module's (sources-registry.mjs), so the research step reads it too (analysis.mjs).
 export { registryProblems } from "./sources-registry.mjs";
-import { logSources, registryProblems } from "./sources-registry.mjs";
+import { logSources, registryProblems, sourceAgeProblems } from "./sources-registry.mjs";
 
 /** A page still carrying an imported slide's old copy, not yet given a page type. */
 const unmapped = (page) => page && typeof page === "object" && page.draft !== undefined && !page.type && !page.kind;
@@ -337,7 +339,9 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     }
     let slide;
     const { page: authored, dependencies } = withoutDependencies(page, measured, binding.bound.printed.get(page));
-    try { slide = compilePage(authored, index, { ...options, tileMeasures: tileMeasures(unbound[index], page, measured) }); } catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
+    // The sources every form of the page's source line names (dependency_gates.mjs primaryCitations): the title's numbers' and each exhibit's own.
+    const sourcePrimary = measured.size ? primaryCitations(page, measured, titleCells(page, unbound[index]?.title, binding.bound, pagePool(page, measured))) : null;
+    try { slide = compilePage(authored, index, { ...options, tileMeasures: tileMeasures(unbound[index], page, measured), sourcePrimary }); } catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (unknown.length) return refuse(index, `${slide.id ?? `page ${index + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`, { stage: "shape" });
@@ -584,6 +588,12 @@ export function deckSpineFindings(doc, insights = null) {
     if (unmeasured.length) out.push({ code: "MEASURES_MISSING", severity: "blocker", pages: unmeasured,
       repair: `${unmeasured.length} insight${unmeasured.length === 1 ? " records" : "s record"} numbers only as a sentence (${unmeasured.join(", ")}): give each its \`measures\` - { name: { unit, population, periods | members | period, values | value } } - the numbers its \`calculation\` describes, as data. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it (references/storylining.md#extract-the-insights-before-the-titles)` });
     out.push(...(insights.conflicts ?? []));
+    // A measure stated for a period its cited source predates: the source line and the figure cannot both be right.
+    const aged = sourceAgeProblems(doc.sources, insights);
+    if (aged.length) out.push({ code: "SOURCE_PREDATES_PERIOD", severity: "blocker", pages: [...new Set(aged.map((a) => a.ref.split("/")[0]))], measured: aged,
+      repair: `${aged.length === 1 ? "A measure runs" : `${aged.length} measures run`} to a period that ends after the date of a source ${aged.length === 1 ? "it cites" : "they cite"}, which cannot have reported it: ` +
+        `${aged.slice(0, 8).map((a) => `${a.ref} to ${a.period}, cited to ${a.name} (${a.date})`).join("; ")}${aged.length > 8 ? "; ..." : ""}. Cite the edition that reports the period (its registry \`date\` when it was published), ` +
+        "correct the period the values are for, or, where they are a plan, a target, a forecast or an announced rate set out ahead of their period, mark the measure `projected: true`" });
     const alternatives = alternativesOf(deck);
     const results = insights.analysis?.results ?? [];
     if (alternatives.length >= 2 && hasMeasures(insights)) {

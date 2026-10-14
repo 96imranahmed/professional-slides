@@ -930,10 +930,17 @@ def gate_thin_page(slide_no, slide, findings):
     # wrong band: the reference footer is 19 words against a 128-word body.
     body, footer, ratio = footer_share(slide)
     if footer and body and ratio > NOTE_HEAVY_SHARE:
+        # A source line the runtime derived names the sources of the title's numbers and each exhibit's primary source in
+        # every form it takes (page-types.mjs citationForms): it is not cut to the notes to make room, so the repair says
+        # what does make it.
+        derived = any(n.get("role") == "source-text" and (n.get("data") or {}).get("derived") for n in slide.get("nodes") or [])
         findings.append(finding(
             slide_no, "NOTE_HEAVY", {"body": body, "footer": footer},
             "a footer under a third of the page's text",
             "The notes are carrying the page. Put the qualification on the "
             "number it qualifies with a footnote marker, keep the block to two "
-            "to four numbered lines, and give the body the words instead.",
+            "to four numbered lines, and give the body the words instead."
+            + (" The source line names the sources of the title's numbers and of each exhibit's plotted measures, which "
+               "stay on the page: shorten the note, give those sources registry `short` names, or split the exhibit so "
+               "each page rests on fewer." if derived else ""),
         ))

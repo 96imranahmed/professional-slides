@@ -189,7 +189,45 @@ export function declaredStructure(spec, { planOf, insights = undefined, sourceKi
       count, of: entropy.pages, applies, blocks: true },
     { code: "PLAN_STYLE_ENTROPY", key: "entropy", what: "evenness of the declared architectures (0 to 1)", value: round(entropy.value), bar: PLAN.entropyMin, side: "min", unit: "entropy", applies, blocks: true });
   }
-  return { findings: [...variety, ...report.findings], standings };
+  const architectureOf = memo?.architectures ? (slide) => { if (!memo.architectures.has(slide)) memo.architectures.set(slide, declaredArchitecture(slide)); return memo.architectures.get(slide); } : declaredArchitecture;
+  const headlines = headlineStructure(spec.slides || [], architectureOf);
+  standings.push(...headlines.standings);
+  return { findings: [...variety, ...headlines.findings, ...report.findings], standings };
+}
+
+// Headline figures in any ten consecutive analytical pages (HEADLINE_CROWDED): a page whose architecture sets a large figure
+// over or beside its exhibit - a hero number, a strip of metrics (declaredArchitecture). On the BA retest the device stood
+// on twelve pages, three of four on pr01-pr05 and three in a row from lc06 to sh01, and mostly said the title's number
+// again; a reader stops reading it as the number that matters. Strong decks set a handful of stated numbers as a strip
+// over the exhibit they summarise (weight.json, the numbers family), and the reference measures no count of such pages per
+// ten: two is the bar until it does - a figure every fifth page.
+export const HEADLINE = Object.freeze({ window: 10, perWindowMax: 2 });
+const HEADLINE_ARCHITECTURES = new Set(["metrics-over-evidence", "hero-number-with-evidence"]);
+/** Whether a page sets a headline figure over or beside its exhibit, as its declared architecture reads it. */
+export const headlinePage = (slide, architectureOf = declaredArchitecture) => HEADLINE_ARCHITECTURES.has(architectureOf(slide));
+
+/**
+ * The headline rule over the deck's analytical pages in order: a standing
+ * (the most headline pages any ten consecutive pages hold) and a finding on
+ * the worst window past the bar, with how many windows are past it.
+ * PAGE_SHAPE_FLAT counts the same architectures and is not changed by it.
+ */
+export function headlineStructure(slides, architectureOf = declaredArchitecture) {
+  const analytical = slides.filter((s) => s?.pageType && !["statement", "summary"].includes(s.pageType.type));
+  const flagged = analytical.map((s) => headlinePage(s, architectureOf));
+  let most = [], worst = null, over = 0;
+  for (let at = 0; at + HEADLINE.window <= Math.max(analytical.length, HEADLINE.window); at += 1) {
+    const ids = analytical.slice(at, at + HEADLINE.window).filter((_, i) => flagged[at + i]).map((s) => s.id ?? null);
+    if (ids.length > most.length) most = ids;
+    if (ids.length > HEADLINE.perWindowMax) { over += 1; if (!worst || ids.length > worst.ids.length) worst = { ids, from: analytical[at]?.id ?? null, to: analytical[Math.min(at + HEADLINE.window, analytical.length) - 1]?.id ?? null }; }
+  }
+  const standings = [{ code: "HEADLINE_CROWDED", key: "perTen", what: `pages with a headline figure over or beside their exhibit in any ${HEADLINE.window} consecutive analytical pages`, value: most.length, bar: HEADLINE.perWindowMax, side: "max", unit: "pages",
+    applies: true, blocks: true, pages: most }];
+  if (!worst) return { standings, findings: [] };
+  return { standings, findings: [{ code: "HEADLINE_CROWDED", severity: "blocker", slide: worst.ids, measured: { pages: worst.ids.length, window: [worst.from, worst.to], ids: worst.ids, windowsOver: over }, threshold: HEADLINE.perWindowMax,
+    repair: `${worst.ids.length} of the ${HEADLINE.window} analytical pages from ${worst.from} to ${worst.to} set a headline figure over or beside their exhibit (${worst.ids.join(", ")}), and ${over} window${over === 1 ? " is" : "s are"} past ${HEADLINE.perWindowMax}: ` +
+      "repeated, the large figure stops marking the number that matters. Keep it where it says what neither the title nor the chart does, and give the others' band to their exhibits - a form or a placement without `kpi` or `metrics` " +
+      "(a numbers page's hero number drawn as its chart, a chart page's strip taken off) - so no ten pages hold more than " + `${HEADLINE.perWindowMax} (\`--plan\` proposes an allocation that passes)` }] };
 }
 // The share of a plan's pages one declared architecture may take (plan_gates.mjs gateEntropy).
 const PLAN_ARCHITECTURE_SHARE = 0.4;
@@ -1025,6 +1063,9 @@ export function sectionQuotas(doc, { insights = null, compiled = null, mine, fil
     quota("VARIETY_COMMENTARY", "below", "pages with points under the exhibit", VARIETY.belowShareMax, ids((item) => placement(item.slide) === "below")),
     quota("VARIETY_TAKEAWAY", null, "pages closing on a takeaway line or a so-what bar", VARIETY.takeawayShareMax, ids((item) => item.slide.pageType?.takeaway || item.slide.pageType?.commentary === "so-what-bar")),
     quota("VARIETY_COLUMN", null, "pages of one exhibit beside a text column", VARIETY.columnShareMax, columns.column.ids.map(String), columns.pages),
+    // The headline figures' budget, shared out as the other caps are: on the BA retest parallel writers each added the
+    // device to their own pages, and twelve came back with it.
+    quota("HEADLINE_CROWDED", null, `pages with a headline figure over or beside their exhibit (and no more than ${HEADLINE.perWindowMax} in any ${HEADLINE.window} consecutive)`, HEADLINE.perWindowMax / HEADLINE.window, ids((item) => headlinePage(item.slide))),
   ];
   // The kinds: a floor the deck's length sets, those the other sections draw, the section's own, and what its pages could add.
   const kindsOf = (items) => new Set(items.flatMap((item) => exhibitKinds(item.slide)));
