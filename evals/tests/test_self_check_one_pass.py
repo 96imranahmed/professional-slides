@@ -19,6 +19,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from judgement_oracle import self_check_judgements
 from node_probe import NODE, ROOT, RUNTIME
 
 FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
@@ -48,6 +49,11 @@ def node(*args):
 
 def sheet_hashes(text):
     return {m.group(1): m.group(2) for m in re.finditer(r"^(\S+)  .*\(sheet ([0-9a-f]{16})\)$", text, re.M)}
+
+
+def questions(pages):
+    """The questions the rules ask of the deck's copy, as the self-check brief lists them beside its claims."""
+    return json.loads((pages.parent / "out" / "self-check" / "questions" / "deck.json").read_text(encoding="utf-8"))["items"]
 
 
 def edit(pages, change):
@@ -102,8 +108,10 @@ class ValidateTests(unittest.TestCase):
             self.assertRegex(reasons, r"problem 1 \(fm title\): the replacement runs to \d+ words against 15")
             self.assertIn("problem 2 (fm rows[0].cells[1]): the replacement prints 9.9%, which no record holds", reasons)
             self.assertIn('problem 3 (fm rows[0].caption): fm has no claim at "field"', reasons)
+            # Every question the brief lists is answered in the same answer, those reading the relabelled row of the relabel.
             good = {"section": "deck", "pages": verdicts, "problems": [
-                {"slide": "fm", "field": "rows[0].label", "claim": "Margin", "record": "i-peers/margin is a net interest margin", "replacement": "Spread"}]}
+                {"slide": "fm", "field": "rows[0].label", "claim": "Margin", "record": "i-peers/margin is a net interest margin", "replacement": "Spread"}],
+                "judgements": self_check_judgements(questions(pages), [("fm", "Margin", "Spread")])}
             answer.write_text(json.dumps(good), encoding="utf-8")
             run = node(RUNTIME / "self-check.mjs", "--validate", answer, pages)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
@@ -119,7 +127,8 @@ class CarriedVerdictTests(unittest.TestCase):
             replacement = "Harbour's margin trails its peers as its lending grows fastest"
             answer = {"section": "deck", "pages": {page: {"sheet": h, "verified": page != "fm"} for page, h in hashes.items()}, "problems": [
                 {"slide": "fm", "field": "title", "claim": TITLE, "record": "i-peers ranks loan growth", "replacement": replacement},
-                {"slide": "fm", "field": "rows[0].label", "claim": "Margin", "record": "i-peers/margin is a net interest margin", "replacement": "Spread"}]}
+                {"slide": "fm", "field": "rows[0].label", "claim": "Margin", "record": "i-peers/margin is a net interest margin", "replacement": "Spread"}],
+                "judgements": self_check_judgements(questions(pages), [("fm", TITLE, replacement), ("fm", "Margin", "Spread")])}
             (out / "self-check" / "deck.json").write_text(json.dumps(answer), encoding="utf-8")
             check = node(RUNTIME / "self-check.mjs", "--validate", "out/self-check/deck.json", pages)
             self.assertEqual(check.returncode, 0, check.stdout + check.stderr)

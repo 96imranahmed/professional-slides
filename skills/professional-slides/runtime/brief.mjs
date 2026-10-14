@@ -32,7 +32,8 @@ import { axisOf, isPercentUnit, measureRegistry, valuesOf } from "./measures.mjs
 import { decimalsNeeded } from "./printed-numbers.mjs";
 import { recordedPlaces } from "./gates/dependency_gates.mjs";
 import { hazardLine, insightLines, itemLine } from "./answer-critique.mjs";
-import { claimSheetLines } from "./claim-sheet.mjs";
+import { claimSheetLines, linesRead } from "./claim-sheet.mjs";
+import { questionLines } from "./judgements.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
 import { conventionsOf, pageSubject, sectionName, sectionsOf } from "./conventions.mjs";
 import { evidenceHomes, plottableValues } from "./allocation.mjs";
@@ -185,9 +186,10 @@ function commandLines(role, { file, ids, deckFile, part, spine }) {
       "- the page types and the reading task each serves: `node runtime/author-deck.mjs --types`"],
     writer: [`- a page bound to its insight, to start from: \`node runtime/author-deck.mjs ${file} --scaffold <type>[/<form>] --evidence <insight-id> --id <page-id>\``,
       `- check your pages: \`node runtime/author-deck.mjs ${file} --check --page ${pages} --json\` - every blocking finding on them is yours to repair`,
-      `- stage the questions the rules ask of your pages: \`${judge}\` (exit 3: packets wait, each for a fresh reader; exit 0: none open)`],
+      `- the questions the rules ask of your pages are answered once, by the section's self-checker beside its claims (\`node runtime/author-deck.mjs ${file} --brief selfcheck${part ? ` --section ${partName(part)}` : ""}\`); where the section has no self-check, \`${judge}\` stages them for readers of their own (exit 3: packets wait, each for a fresh reader; exit 0: none open)`],
     critic: [`- the section packets are staged by \`node runtime/storyline.mjs ${deckFile} <out> --split\`: answer the section prompt you were given, save its JSON where the prompt says, and \`node runtime/storyline.mjs merge ${deckFile} <out>\` validates every part against its packet`],
-    selfcheck: [`- save your answer as ${answer} beside ${file} (the form above), then run \`node runtime/self-check.mjs --validate ${answer} ${file}\` - it prints every reason the answer would be refused; mend each and run it again until it says the answer would be recorded`,
+    selfcheck: [`- save your answer as ${answer} beside ${file} (the form above), then run \`node runtime/self-check.mjs --validate ${answer} ${file}\` - it prints every reason the answer would be refused; mend each and run it again until it says the answer is recorded`,
+      ...(spine ? [] : ["- the validation composes every page your replacements touch with all of them in place, and runs the page check the writer runs: a replacement under which a page has a blocking finding it does not have now is refused, with the finding's repair. Once it passes, your `judgements` are recorded in the deck's judgements file, as the judges' are"]),
       ...(spine ? ["- the lead applies your replacements to the titles and summaries before the storyline critique closes"]
         : [`- the lead records the deck's with \`node runtime/self-check.mjs ${file} out/\` after the build: a page whose replacements were applied word for word keeps your verdict`])],
     judge: [`- stage your section's questions: \`${judge}\` (exit 3: packets wait in judgements/<section>/; exit 0: none open)`,
@@ -248,10 +250,11 @@ function quotaLines(quotas, role, parts) {
  * The brief for `role` over `section` of the pages file: `{ lines }`, or `{ why }` where the section is not one of the file's.
  * `limitsOf(page)` is the limits block `--scaffold` prints for a page; `insights` the insight log as author-deck reads it,
  * null where there is none; `digest` the role's rules; `slotsOf`, for a writer, each page's measured slots by id; `sheet`, for a
- * self-checker, its pages' claims (claim-sheet.mjs), and `spine` where they are the titles and divider summaries alone; `quotas`,
+ * self-checker, its pages' claims (claim-sheet.mjs), and `spine` where they are the titles and divider summaries alone;
+ * `questions`, for a section's self-checker, the questions the rules ask of its pages that no judgement answers; `quotas`,
  * for a skeleton or a writer briefed on a section, its room under the deck's caps (deck-structure.mjs sectionQuotas).
  */
-export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null, spine = false, quotas = null }) {
+export function briefLines(doc, { role, section = null, file, stem, insights = null, limitsOf, digest, slotsOf = null, answerItems = [], answerHazards = [], sheet = null, questions = null, spine = false, quotas = null }) {
   const found = sectionPages(doc, section);
   if (found.why) return { why: found.why };
   const { pages, part } = found;
@@ -283,6 +286,18 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
       ...claimSheetLines(sheet ?? []));
     const rests = [...new Set(evidenceOf(pages))].map((id) => insights?.get?.(String(id))).filter(Boolean);
     lines.push("## The records they rest on", ...rests.flatMap((insight) => insightLines(insight)));
+    // The questions the rules ask of the same lines, for the same reader (author-deck.mjs openQuestions): one reading a line,
+    // so a line that both readings mend gets one fix that passes both.
+    if (questions) {
+      lines.push("", `## The questions the rules ask of your pages' copy (${questions.length}): answer each in \`judgements\`, beside the claims`);
+      if (!questions.length) lines.push("None is open: every question the rules ask of these pages is answered. Leave `judgements` empty.");
+      else {
+        const reads = new Map(questions.map((item) => [item.key, linesRead(item, sheet ?? [])]));
+        lines.push("A rule that turns on what a line means asks a question of it, and holds only where it is answered. Answer each once, from its subject and context (the page's other lines are the sheet above): `{ \"key\", \"verdict\", \"reason\", \"quote\", ...its fields, \"on\" }`, a field the kind or verdict does not take null.",
+          "Where one of your problems replaces a line a question reads (`reads`, of its subject or its context), judge the question as the page will read it with your replacement in place, and set `\"on\": \"replacement\"`: an answer given on the line as it stands is lost when the writer applies your fix, and the validation refuses it. Write the replacement so that it passes both readings.", "",
+          ...questionLines(questions, { reads }));
+      }
+    }
   }
   else {
     const { shared, sets, of } = limitSets(pages, limitsOf);

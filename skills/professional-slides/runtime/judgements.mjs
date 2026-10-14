@@ -288,9 +288,76 @@ export function answerSchema(items) {
     judgements: { type: "array", items: { type: "object", additionalProperties: false, required: Object.keys(properties), properties } } } };
 }
 
+/**
+ * The schema of a `judgements` block another answer carries in the judge answer format (self-check.mjs: a section's
+ * self-checker answers its pages' questions beside their claims): one entry per question, as a packet's answer has them,
+ * and `on`, "replacement" where the entry judges the text a replacement of the same answer puts in place of the line asked.
+ */
+export function judgementsBlockSchema(items) {
+  const entry = answerSchema(items).properties.judgements.items;
+  return { type: "array", items: { ...entry, required: [...entry.required, "on"], properties: { ...entry.properties, on: { type: ["string", "null"], enum: ["replacement", null] } } } };
+}
+
+/**
+ * Each question's answer as the deck's judgements file keeps it (recordAnswers): `item` the question as asked - its kind and
+ * subject - and `said` the answer's own fields, `key` and any field the record does not keep left out.
+ */
+export function verdictRecord(item, said, { at = new Date().toISOString(), by = null, omit = [] } = {}) {
+  const spec = JUDGEMENT_KINDS[item.kind];
+  const kept = Object.fromEntries(Object.entries(said).filter(([name, value]) => name !== "key" && !omit.includes(name) && value !== undefined));
+  return { kind: item.kind, version: spec.version, ...kept, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+}
+
+/**
+ * `verdicts` (by key) written into the deck's judgements file: the store read again as it stands and written in the same
+ * tick, whole, by a rename. Sections are judged and self-checked side by side, so another run may have recorded since this
+ * one read the store; a copy read earlier is never written back. `under` are verdicts a question asked in its own right
+ * overrides (a judge's replacement recorded under its own words: recordAnswers).
+ */
+export function writeVerdicts(dir, stem, verdicts, { under = {} } = {}) {
+  if (!Object.keys(verdicts).length && !Object.keys(under).length) return;
+  const file = judgementStorePath(dir, stem), staged = `${file}.${process.pid}.tmp`;
+  const standing = judgementStoreNow(dir, stem).verdicts ?? {};
+  writeFileSync(staged, `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: Object.assign(standing, under, verdicts) }, null, 1)}\n`);
+  renameSync(staged, file);
+}
+
 // What a question is read against: its context and what is shown beside it. Questions that share it - the lines of one page
 // of commentary - are staged side by side and shown it once.
 const surroundings = (item) => canonical([item.context ?? null, item.beside ?? null]);
+
+/**
+ * The questions a section's self-checker answers beside its claims, as lines of its brief: each kind's question, verdicts and
+ * fields once, then each question with its key, the page it is asked on and the lines of the claim sheet its subject reads
+ * (`reads`, by key: `{ subject, context }`, claim-sheet.mjs linesRead), its subject and its context, with the lines that
+ * context reads. What a question shows only to place its subject (`beside`: the page's other lines) is the claim sheet above
+ * it, and is not printed again. A failing line is mended once, as a problem of the self-check, and its question answered of
+ * the replacement: the self-check's replacement is the line's one fix.
+ */
+export function questionLines(items, { reads = new Map() } = {}) {
+  const byKind = new Map();
+  for (const item of items) byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item]);
+  const lines = (said) => (said?.length > 8 ? `${said.slice(0, 8).join(", ")} and ${said.length - 8} more` : (said ?? []).join(", "));
+  const context = (item) => `Context${reads.get(item.key)?.context?.length ? ` (reads ${lines(reads.get(item.key).context)})` : ""}: ${JSON.stringify(item.context)}`;
+  const asked = (item, shared) => [`- ${item.key} (on ${(item.where ?? []).join(", ") || "the deck"}${reads.get(item.key)?.subject?.length ? `; reads ${lines(reads.get(item.key).subject)}` : ""})`,
+    `  Subject: ${JSON.stringify(item.subject)}`, ...(item.context && !shared ? [`  ${context(item)}`] : [])];
+  // Questions read against the same context - the lines of one page's commentary against its exhibit - are shown it once.
+  const runs = (held) => {
+    const sorted = [...held].sort((a, b) => canonical(a.context ?? null).localeCompare(canonical(b.context ?? null))), out = [];
+    for (const item of sorted) { const last = out.at(-1); if (last && canonical(last[0].context ?? null) === canonical(item.context ?? null)) last.push(item); else out.push([item]); }
+    return out.flatMap((run) => (run.length > 1 && run[0].context ? [`The ${run.length} questions that follow are read against one ${context(run[0])}`, ...run.flatMap((item) => asked(item, true))] : run.flatMap((item) => asked(item, false))));
+  };
+  return [...byKind].flatMap(([kind, held]) => {
+    const spec = JUDGEMENT_KINDS[kind], failing = (spec.fix?.for || []).map((v) => `"${v}"`).join(" or ");
+    const fields = Object.entries(spec.fields || {}).map(([name, field]) => `  - \`${name}\`${field.for ? ` (with ${field.for.map((v) => `"${v}"`).join(" or ")})` : ""}: ${field.about}`);
+    return [`### ${kind}`, spec.asks, `Subject: ${spec.subject}`, "Verdicts:", ...Object.entries(spec.verdicts).map(([verdict, meaning]) => `  - "${verdict}": ${meaning}`),
+      ...(fields.length ? ["Fields:", ...fields] : []),
+      ...((spec.quoteFor || []).length ? [`With ${spec.quoteFor.map((v) => `"${v}"`).join(" or ")}, set \`quote\` to the words of the subject the verdict rests on, copied exactly.`] : []),
+      ...(spec.fix?.by === "replace" ? [`With ${failing}, mend the ${spec.fix.slot === "title" ? "title" : "line"} as one of your problems - its field and its whole replacement, with \`record\` naming this question and what it found - and answer this question of your replacement, \`"on": "replacement"\`, as "${spec.fix.passes}".`] : []),
+      ...(spec.fix?.by === "choose" ? [`With ${failing}, no one line mends it: set \`fix\` to the change the writer makes, in a sentence.`] : []),
+      "", ...runs(held), ""];
+  });
+}
 
 /**
  * The prompt a packet's reader is given: each kind's question once, then its subjects, then the form of the answer.
@@ -493,9 +560,9 @@ export async function recordAnswers(dir, stem, { by = null } = {}) {
     const checked = packetProblems(packet, answer);
     if (checked.problems.length) { problems.push(...checked.problems.map((problem) => `${name}: ${problem}`)); refused.push(folder); continue; }
     for (const item of packet.items) {
-      const { key: _key, ...said } = checked.given.get(item.key);
+      const said = checked.given.get(item.key);
       const spec = JUDGEMENT_KINDS[item.kind], replacement = spec.fix?.by === "replace" && spec.fix.for.includes(said.verdict) ? String(said.replacement).trim() : null;
-      verdicts[item.key] = { kind: item.kind, version: spec.version, ...said, subject: item.subject, answeredAt: at, ...(by ? { by } : {}) };
+      verdicts[item.key] = verdictRecord(item, said, { at, by });
       // The replacement is judged as it is given: recorded under its own words in the question's context, with the verdict it
       // passes on and the reader's reason, so the writer who applies it word for word is not asked again (runtime-defects 62).
       if (replacement) replaced[judgementKey(item.kind, replacement, item.context ?? null)] = { kind: item.kind, version: spec.version, verdict: spec.fix.passes,
@@ -505,14 +572,9 @@ export async function recordAnswers(dir, stem, { by = null } = {}) {
     answeredFolders.push(folder);
   }
   // Sections are judged side by side (judge.mjs --page), so another run may have recorded since this one began: the store is
-  // read again as it stands and written in the same tick, whole, by a rename - never from a copy read before the answers were.
-  // A question asked in its own right keeps its own reading over a replacement that happens to say the same words.
-  if (recorded) {
-    const file = judgementStorePath(dir, stem), staged = `${file}.${process.pid}.tmp`;
-    const standing = judgementStoreNow(dir, stem).verdicts ?? {};
-    writeFileSync(staged, `${JSON.stringify({ schema: JUDGEMENTS_SCHEMA, verdicts: Object.assign(standing, replaced, verdicts) }, null, 1)}\n`);
-    renameSync(staged, file);
-  }
+  // read again as it stands and written whole (writeVerdicts) - never from a copy read before the answers were. A question
+  // asked in its own right keeps its own reading over a replacement that happens to say the same words.
+  if (recorded) writeVerdicts(dir, stem, verdicts, { under: replaced });
   // A packet's folder goes only once its answers are in the store.
   for (const folder of answeredFolders) { await fs.rm(folder, { recursive: true, force: true }); await dropEmptyScope(path.join(dir, PACKET_DIR), path.relative(path.join(dir, PACKET_DIR), path.dirname(folder)) || null); }
   return { recorded, problems, refused, waiting };
