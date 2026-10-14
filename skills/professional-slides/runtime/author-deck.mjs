@@ -597,11 +597,20 @@ export function deckSpineFindings(doc, insights = null) {
       repair: `${unmeasured.length} insight${unmeasured.length === 1 ? " records" : "s record"} numbers only as a sentence (${unmeasured.join(", ")}): give each its \`measures\` - { name: { unit, population, periods | members | period, values | value } } - the numbers its \`calculation\` describes, as data. A sentence cannot be joined to another record, subtracted from one, or checked against the chart drawn from it (references/storylining.md#extract-the-insights-before-the-titles)` });
     out.push(...(insights.conflicts ?? []));
     // A measure stated for a period its cited source predates: the source line and the figure cannot both be right.
-    const aged = sourceAgeProblems(doc.sources, insights);
-    if (aged.length) out.push({ code: "SOURCE_PREDATES_PERIOD", severity: "blocker", pages: [...new Set(aged.map((a) => a.ref.split("/")[0]))], measured: aged,
-      repair: `${aged.length === 1 ? "A measure runs" : `${aged.length} measures run`} to a period that ends after the date of a source ${aged.length === 1 ? "it cites" : "they cite"}, which cannot have reported it: ` +
-        `${aged.slice(0, 8).map((a) => `${a.ref} to ${a.period}, cited to ${a.name} (${a.date})`).join("; ")}${aged.length > 8 ? "; ..." : ""}. Cite the edition that reports the period (its registry \`date\` when it was published), ` +
-        "correct the period the values are for, or, where they are a plan, a target, a forecast or an announced rate set out ahead of their period, mark the measure `projected: true`" });
+    // A record published before its period began cannot report it (a blocker); one published part-way through reports it as
+    // at its date, which the page has to say (an advisory the critic and the section review read).
+    const allAged = sourceAgeProblems(doc.sources, insights);
+    for (const [aged, severity] of [[allAged.filter((a) => a.before === "start"), "blocker"], [allAged.filter((a) => a.before !== "start"), "advisory"]]) {
+      if (!aged.length) continue;
+      out.push({ code: "SOURCE_PREDATES_PERIOD", severity, pages: [...new Set(aged.map((a) => a.ref.split("/")[0]))], measured: aged,
+        repair: severity === "blocker"
+          ? `${aged.length === 1 ? "A measure runs" : `${aged.length} measures run`} to a period that began after the newest source ${aged.length === 1 ? "it cites" : "they cite"} was published, which cannot have reported it: ` +
+            `${aged.slice(0, 8).map((a) => `${a.ref} to ${a.period}, cited to ${a.name} (${a.date})`).join("; ")}${aged.length > 8 ? "; ..." : ""}. Cite the edition that reports the period (its registry \`date\` when it was published), ` +
+            "correct the period the values are for, or, where they are a plan, a target, a forecast or an announced rate set out ahead of their period, mark the measure `projected: true` (a series' planned tail `assumed` from its first planned period)"
+          : `${aged.length === 1 ? "A measure is" : `${aged.length} measures are`} stated for a whole period by a source published part-way through it: ` +
+            `${aged.slice(0, 8).map((a) => `${a.ref} for ${a.period}, from ${a.name} (${a.date})`).join("; ")}${aged.length > 8 ? "; ..." : ""}. Where it is a figure as at that date - an edition's ranking, a year to date - say so where the page prints it ("as at Sep 2026", "January to August"); ` +
+            "where it is guidance or a target, mark the measure `projected: true`; where a later edition reports the whole period, cite it" });
+    }
     const alternatives = alternativesOf(deck);
     const results = insights.analysis?.results ?? [];
     if (alternatives.length >= 2 && hasMeasures(insights)) {

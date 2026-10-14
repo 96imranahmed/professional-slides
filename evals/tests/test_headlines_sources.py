@@ -117,7 +117,8 @@ const insights = [{{ id: "i", measures: {{ late: m({{ cite: ["wats24"] }}), targ
   fy: {{ unit: "%", population: "x", periods: ["FY25"], values: [1], cite: ["wats24"] }} }} }}];
 console.log(JSON.stringify(sourceAgeProblems(reg, insights)));
 ''')
-        self.assertEqual(result, [{"ref": "i/late", "period": "2025", "key": "wats24", "name": "IATA WATS 2024", "date": "4 Aug 2025"}])
+        # Published in August 2025, the edition reports 2025 at most as at its date: a figure the page has to say is part-year.
+        self.assertEqual(result, [{"ref": "i/late", "period": "2025", "key": "wats24", "name": "IATA WATS 2024", "date": "4 Aug 2025", "before": "end"}])
 
     def test_a_series_is_held_to_its_newest_source_or_each_period_to_its_own(self):
         """ba5: every historical series was refused because its first years cite results published years before 2025."""
@@ -127,11 +128,11 @@ const reg = {{ fy17: {{ name: "Results 2017", date: "2018-02-23" }}, fy25: {{ na
 const series = (extra) => ({{ unit: "%", population: "IAG", periods: ["2017", "2025"], values: [13.1, 15.1], ...extra }});
 const insights = [{{ id: "i", measures: {{ whole: series({{ cite: ["fy17", "fy25"] }}), split: series({{ cite: ["fy17", "fy25"], citeBy: {{ "2017": ["fy17"], "2025": ["fy17"] }} }}),
   half: {{ unit: "x", population: "LH", periods: ["2025", "H1 2026"], values: [2.0, 2.1], cite: ["h1"] }} }} }}];
-console.log(JSON.stringify(sourceAgeProblems(reg, insights).map((p) => [p.ref, p.period, p.key])));
+console.log(JSON.stringify(sourceAgeProblems(reg, insights).map((p) => [p.ref, p.period, p.key, p.before])));
 ''')
         # The series is held to its newest record (2025's results, Feb 2026): no fault. Read period by period, 2025 cites
         # only 2017's results; and a first half of 2026 cited to a March 2026 overview cannot be reported by it.
-        self.assertEqual(result, [["i/split", "2025", "fy17"], ["i/half", "H1 2026", "h1"]])
+        self.assertEqual(result, [["i/split", "2025", "fy17", "start"], ["i/half", "H1 2026", "h1", "end"]])
 
 
 class UnitHeadingTests(unittest.TestCase):

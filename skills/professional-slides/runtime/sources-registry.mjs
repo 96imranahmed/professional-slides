@@ -80,6 +80,8 @@ function periodEnd(label) {
 }
 // How long each kind of period parsePeriod reads runs, in months.
 const PERIOD_SPAN = Object.freeze({ quarter: 3, half: 6, month: 1, day: 1 / 31, season: 6 });
+/** Where a period begins, at the latest it can: its end less its length, a year twelve months. */
+const periodStart = (label) => { const end = periodEnd(label), p = parsePeriod(String(label ?? "").trim()); return end === null || !p ? null : end - (p.kind === "year" ? 12 : PERIOD_SPAN[p.kind] ?? 0); };
 
 /**
  * The recorded measures whose latest period ends after the date of the newest
@@ -109,7 +111,10 @@ export function sourceAgeProblems(registry, insights) {
     const checks = held.length ? held : [{ ...ends.reduce((a, b) => (b.end > a.end ? b : a)), keys: m.cite ?? [] }];
     for (const { label, end, keys } of checks) {
       const record = newest(keys);
-      if (record && end > record.date.through + 1e-9) out.push({ ref: m.ref, period: label, key: record.key, name: registry[record.key].short ?? registry[record.key].name, date: record.date.printed });
+      // Published before the period began, the record cannot report it at all; published part-way through, it reports the
+      // period as at its date - the Skytrax 2026 ranking of September 2026, a month's outages counted on its tenth day.
+      if (record && end > record.date.through + 1e-9) out.push({ ref: m.ref, period: label, key: record.key, name: registry[record.key].short ?? registry[record.key].name, date: record.date.printed,
+        before: record.date.through + 1e-9 < (periodStart(label) ?? end) ? "start" : "end" });
     }
   }
   return out;
