@@ -127,11 +127,13 @@ export function waivedRules(deck = {}) {
 /**
  * The rule a finding breaks: its code, or `CODE.tightened` when `measured`
  * falls between a bar a rules version lowered and the bar before it
- * (rules.tightened; page_gates.py rule_of reads the same).
+ * (rules.tightened; page_gates.py rule_of reads the same). `before` is a bar
+ * the finding carries where it differs page by page (WORDS: each reading
+ * task's own ceiling).
  */
-export function ruleOf(code, measured) {
+export function ruleOf(code, measured, before = RULES.tightened?.[code]?.before) {
   const tightened = RULES.tightened?.[code];
-  return tightened && typeof measured === "number" && Number.isFinite(measured) && measured <= tightened.before ? `${code}.tightened` : code;
+  return tightened && typeof measured === "number" && Number.isFinite(measured) && typeof before === "number" && measured <= before ? `${code}.tightened` : code;
 }
 
 /**
@@ -226,7 +228,7 @@ export function notHeldOn(finding, deck = {}) {
   if (unread) return { imported: true, carried: carriedCount(deck), composed: composedCount(deck), why: unread };
   const waived = waivedRules(deck);
   if (!waived.size) return null;
-  const rule = finding.rule ?? ruleOf(finding.code, finding.measured);
+  const rule = finding.rule ?? ruleOf(finding.code, finding.measured, finding.before ?? undefined);
   return waived.has(rule) || waived.has(finding.code) ? { rulesVersion: Number(deck.rulesVersion), introducedIn: ruleIntroduced(rule) } : null;
 }
 

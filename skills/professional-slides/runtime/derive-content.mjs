@@ -130,19 +130,31 @@ export const floorScaleOf = (density) => DENSITY_FLOOR_SCALE[density] ?? 1;
  * The page's word budget, set once and read by every check: the floor is the
  * lower quartile of pages doing its reading task, scaled by the deck's
  * density and less the share of the body a photograph holds; the ceiling is
- * the task's outlier fence (the upper quartile plus one and a half times the
- * spread), counted on the same words. The author's budget line, the page
- * gates and the text contract all read it here, so they cannot disagree.
+ * the task's upper quartile, counted on the same words. The author's budget
+ * line, the page gates, the text contract and the density profile the review
+ * reads (gates/density_profile.py, through the content plan's textReference)
+ * all read it here, so they cannot disagree.
+ *
+ * The ceiling was the outlier fence (the upper quartile plus one and a half
+ * times the spread) while the review read the middle half, so the review asked
+ * for cuts the writer's check allowed: on the BA retest (ba4) seven pages
+ * passed every gate and were judged too dense - pr11 at 180 body words against
+ * a fence of 293 and a band of 96-175, sy06 at 245 against 253 and 110-168.
+ * Held to the upper quartile on its own count, the check flags all seven, and
+ * two of the seventy pages the review accepted (na01, and pr12 by one word).
+ * An appendix page is looked up rather than read through, and drawn a step
+ * smaller, so it keeps the fence: the review accepted ap02 at 261 against
+ * 100-253 ("a definitions lookup read row by row"), and a memo set at the
+ * appendix's size fills its column only past the upper quartile.
+ * `fence` is the bar before rules version 12, which an older revision is
+ * still held to (render_gates.py gate_words, WORDS.tightened).
  */
 export function wordBudgetOf(task, slide, density) {
   const bank = READING_TASK_BANK[task]?.bodyWords;
   if (!bank) return null;
   const share = slide ? pictureShareOf(slide) : 0;
-  // The executive summary is read before anything else and in full, so it is
-  // held to its task's upper quartile (204 body words for a text page) rather
-  // than the outlier fence.
-  const ceiling = slide?.role === "executive-summary" ? Math.round(bank.q3) : Math.round(bank.q3 + 1.5 * (bank.q3 - bank.q1));
-  return { floor: Math.round(bank.q1 * floorScaleOf(density) * (1 - share)), ceiling };
+  const fence = Math.round(bank.q3 + 1.5 * (bank.q3 - bank.q1));
+  return { floor: Math.round(bank.q1 * floorScaleOf(density) * (1 - share)), ceiling: slide?.density === "appendix" ? fence : Math.round(bank.q3), fence };
 }
 
 /** The reading task a composed page performs: its exhibit family, and whether it has a commentary column. */

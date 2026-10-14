@@ -18,7 +18,7 @@ Every number the gates hold a page to is in [Gate thresholds](#gate-thresholds),
 | Body type | `TYPE_RANGE` | point size by role: body, dense table cells, chart furniture, titles, sources |
 | Characters per line | `CPL` | the longest laid-out line of a prose node |
 | Takeaway band length | `TAKEAWAY_LONG` | the takeaway band's lines: the reading said once |
-| Body words | `WORDS` | a page composed from a page type: its reading task's outlier fence (upper quartile plus 1.5 times the spread) on the same body count as its floor. Otherwise the body band by density profile, higher for a page of type than for one whose evidence is an exhibit. Table cells and chart furniture are evidence, not prose. An executive summary's ceiling is the text page's upper quartile |
+| Body words | `WORDS` | a page composed from a page type: its reading task's upper quartile on the same body count as its floor - the band the density profile flags for the review, read on the same count, so the review never asks to cut a page this let through. A page between it and the old outlier fence (upper quartile plus 1.5 times the spread) breaks `WORDS.tightened`. Otherwise the body band by density profile, higher for a page of type than for one whose evidence is an exhibit. Table cells and chart furniture are evidence, not prose. An executive summary's ceiling is the text page's upper quartile |
 | Hero exhibit, analytical page | `HERO_EXHIBIT` | the largest exhibit's share of the content area, and ink in its frame |
 | Layout repetition | `LAYOUT_MONOTONY` | content pages on one layout signature |
 | Page families | `PAGE_VARIETY` | distinct page families across the deck |

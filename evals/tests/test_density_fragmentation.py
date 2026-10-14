@@ -123,5 +123,35 @@ class OneReadTests(unittest.TestCase):
         self.assertEqual([[line["text"] for line in page] for page in pages], [["page one"], ["page two"], ["page three"]])
 
 
+class OneBandTests(unittest.TestCase):
+    """The writer's check and the profile the review reads hold a page to one
+    band on one count. On the BA retest (ba4) the writer was held to the
+    outlier fence on the plan's count and the profile to the middle half on the
+    render's, so seven pages that cleared every gate were judged too dense."""
+
+    def profile(self, rendered, held):
+        texts = ["", page_text("Title 0", rendered)]
+        deck = scene(1)
+        deck["slides"][1].update(held)
+        with mock.patch.object(density_profile, "extract", return_value=texts):
+            return density_profile.profile(Path("deck.pdf"), deck, content(1, "chart-with-commentary"))["pages"][0]
+
+    def test_a_page_inside_its_own_band_is_not_flagged_dense_whatever_the_render_counts(self):
+        # The render counts a chart's heading and axis rows the plan does not: 183 printed, 172 held.
+        page = self.profile([61, 61, 61], {"planBodyWords": 172, "wordFloor": 96, "wordCeiling": 175})
+        self.assertEqual(page["bodyWords"], 183)
+        self.assertEqual(page["held"], {"bodyWords": 172, "floor": 96, "ceiling": 175})
+        self.assertFalse([flag for flag in page["flags"] if flag.startswith(("dense", "thin"))])
+
+    def test_a_page_over_its_own_ceiling_is_flagged_on_the_count_its_writer_saw(self):
+        page = self.profile([61, 61, 61], {"planBodyWords": 180, "wordFloor": 96, "wordCeiling": 175})
+        self.assertIn("dense for its task: 180 body words against its band of 96 to 175", page["flags"])
+
+    def test_a_page_with_no_band_of_its_own_is_read_against_the_task_targets(self):
+        page = self.profile([61, 61, 61], {})
+        self.assertNotIn("held", page)
+        self.assertTrue(any(flag.startswith("dense for its task: 183 body words against a target of 96 to 175") for flag in page["flags"]))
+
+
 if __name__ == "__main__":
     unittest.main()

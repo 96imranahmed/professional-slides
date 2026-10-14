@@ -640,6 +640,8 @@ console.log(JSON.stringify(Object.fromEntries(Object.keys(READING_TASK_BANK).map
 ''')
         for task, budget in result.items():
             self.assertGreater(budget['ceiling'], budget['floor'], task)
+            # The ceiling is the upper quartile the review reads; the old outlier fence is kept as the bar an older revision is held to.
+            self.assertGreater(budget['fence'], budget['ceiling'], task)
 
 
 class EvidenceDepthTests(unittest.TestCase):

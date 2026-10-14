@@ -33,6 +33,7 @@ import { decimalsNeeded } from "./printed-numbers.mjs";
 import { recordedPlaces } from "./gates/dependency_gates.mjs";
 import { hazardLine, insightLines, itemLine } from "./answer-critique.mjs";
 import { claimSheetLines } from "./claim-sheet.mjs";
+import { READING_TASK_BANK } from "./text-contract.mjs";
 
 export const BRIEF_ROLES = Object.freeze(["skeleton", "writer", "critic", "judge", "selfcheck"]);
 // The fields the storyline critique reads of a page (storyline.mjs storyStructure): what a skeleton writes.
@@ -130,6 +131,24 @@ function limitSets(pages, limitsOf) {
   const shared = all.length > 1 ? Object.fromEntries(Object.entries(all[0]).filter(([key, value]) => all.every((limits) => compact(limits[key]) === compact(value)))) : {};
   const own = (limits) => Object.fromEntries(Object.entries(limits).filter(([key]) => !(key in shared)));
   return { shared, sets: [...sets].map(([key, { limits, ids }]) => [key, own(limits), ids]), of };
+}
+
+/**
+ * The body-word band a writer's page is held to, for each reading task its
+ * placement makes it (limits.mjs pageLimits): the floor, the reference decks'
+ * median and the ceiling - their upper quartile, which the density profile the
+ * review reads holds it to as well (derive-content.mjs wordBudgetOf). On ba4
+ * seven pages written under the old ceiling, the outlier fence, cleared every
+ * check and were judged too dense by the review.
+ */
+function bodyWordBand(page, limitsOf) {
+  if (!page.type) return null;
+  let limits;
+  try { limits = limitsOf(page); } catch { return null; }
+  const tasks = limits?.bodyWords ?? (page.form ? null : Object.assign({}, ...Object.values(limits?.forms ?? {}).map((f) => f.bodyWords ?? {})));
+  const bands = Object.entries(tasks ?? {}).filter(([, b]) => b && Number.isFinite(b.min) && Number.isFinite(b.max))
+    .map(([task, b]) => `${b.min}-${b.max} as ${task}${READING_TASK_BANK[task] ? ` (median ${Math.round(READING_TASK_BANK[task].bodyWords.median)})` : ""}`);
+  return bands.length ? `${bands.join("; ")} - the band the review reads; write near the median` : null;
 }
 
 /** The commands a role runs on its section, exactly as it runs them. */
@@ -237,6 +256,8 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
       const { id: _id, ...fields } = page;
       const shown = role === "writer" ? fields : Object.fromEntries(SPINE_FIELDS.filter((key) => key !== "id" && fields[key] !== undefined).map((key) => [key, fields[key]]));
       lines.push(`[${page.id}]${of.has(String(page.id)) ? ` limits: ${of.get(String(page.id))}` : page.type || page.kind ? "" : " (no type yet)"} ${compact(shown)}`);
+      const band = role === "writer" ? bodyWordBand(page, limitsOf) : null;
+      if (band) lines.push(`  body words: ${band}`);
       // The words each of its text slots holds where the deck sets it (--scaffold --id prints the same): written to them, the page composes.
       // A page with no copy yet does not compose at any slot length: its slots are its limits, and the line says so.
       if (slotsOf?.has(String(page.id))) {

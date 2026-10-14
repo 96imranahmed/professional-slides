@@ -141,6 +141,11 @@ class BriefTests(unittest.TestCase):
         slots = [json.loads(l.strip()[len("slots: "):]) for l in out.splitlines() if l.strip().startswith("slots: ")]
         self.assertTrue(slots, out)
         self.assertTrue(all("note" not in s and "together" in s for s in slots), slots)
+        # Each page's body-word band, the one the review reads, with the reference median to write near: on ba4 seven
+        # pages written under the old ceiling cleared every check and came back from the review too dense.
+        bands = [l.strip() for l in out.splitlines() if l.strip().startswith("body words: ")]
+        self.assertTrue(bands, out)
+        self.assertTrue(all("(median " in band and "the band the review reads" in band for band in bands), bands)
 
     def test_a_section_is_briefed_its_room_under_each_of_the_decks_caps(self):
         """On the BA retest fourteen skeleton agents each saw the deck's caps only on their own draft: 84 pages came
