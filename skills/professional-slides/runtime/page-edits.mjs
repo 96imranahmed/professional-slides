@@ -164,6 +164,9 @@ export function applyChanges(plan) {
     if (!same(JSON.parse(text), plan.expected.get(file).data)) throw new Error(`the edits to ${changes[0].part} did not write what they meant; nothing was written`);
     texts.set(file, text);
   }
+  // Sections are written side by side: a file another writer changed since the edits were planned is not written over.
+  const moved = [...texts.keys()].filter((file) => fs.readFileSync(file, "utf8") !== plan.expected.get(file).text);
+  if (moved.length) throw new Error(`${moved.map((file) => path.basename(file)).join(", ")} changed while the edits were planned; nothing was written - apply the file again`);
   for (const [file, text] of texts) { const staged = `${file}.${process.pid}.tmp`; fs.writeFileSync(staged, text); fs.renameSync(staged, file); }
   return [...byFile.values()].map((changes) => changes[0].part);
 }

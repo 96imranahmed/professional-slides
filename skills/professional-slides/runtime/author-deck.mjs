@@ -2544,7 +2544,8 @@ async function applyCommand(values, file, say) {
     return { code: 0 };
   }
   if (!pages.length) { console.error(`Nothing to change from ${from}.${openText}`); return { code: open.length ? 2 : 0 }; }
-  const written = plan.changes.length ? applyChanges(plan) : [];
+  let written = [];
+  try { written = plan.changes.length ? applyChanges(plan) : []; } catch (error) { console.error(error.message); return { code: 2 }; }
   console.error(`${plan.changes.length ? `Applied ${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"} from ${from} to ${written.join(", ")}:\n${plan.changes.map(changeLine).join("\n")}` : `Nothing to change from ${from}: the pages already read so.`}${already}${openText}\n` +
     `Checking ${pages.join(", ")} (--check --page ${pages.join(",")} --json):\n`);
   return { pages };
