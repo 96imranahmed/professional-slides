@@ -1058,6 +1058,10 @@ function reviewedDefect(page, id, exhibits, skip = new Set()) {
     // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
     // trough, now); four or more read as a series, and the eye reads the rhythm.
     if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || !timePositions(chart.categories)) continue;
+    // Columns over uneven dates are drawn where the dates fall (chart-categorical.mjs rowLabelling): only a data table's
+    // columns and an axis that marks breaks keep one slot a column, and only those can draw a rhythm the dates do not have.
+    // On ba5 four panels pages were refused for columns the renderer was already spacing by time.
+    if (!chart.categoryColumns && !(chart.categoryBreaks || []).length) continue;
     // An axis broken (`categoryBreaks`) after every category its next date does not follow says it skips, as a heading would.
     if (gapsBroken(chart.categories, chart.categoryBreaks)) continue;
     // A heading may tell the reader the columns are chosen dates (heading-says-snapshots); one that says nothing does not.

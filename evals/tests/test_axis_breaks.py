@@ -86,7 +86,7 @@ const page = { id: 'p', type: 'trend', form: 'column', commentary: 'on-exhibit',
   title: 'Journeys in FY26 are twice FY10s and a fifth above FY19s',
   exhibit: { categories: ['FY10', 'FY15', 'FY19', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'],
     series: [{ name: 'Journeys', values: [24, 33, 40, 42, 45, 46, 47, 48] }], change: { from: 'FY10', to: 'FY26' } } };
-assert.throws(() => compilePage(page), /TIME_AXIS_UNEVEN/, 'unmarked, the columns read as a rhythm');
+assert.doesNotThrow(() => compilePage(page), 'unmarked, the columns are drawn where the dates fall (chart-categorical.mjs rowLabelling)');
 assert.throws(() => compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15'] } }), /TIME_AXIS_UNEVEN/, 'one gap left unmarked still does');
 const slide = compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15', 'FY19'] } });
 const nodes = render('chart.column', { ...slide.exhibit, change: undefined });

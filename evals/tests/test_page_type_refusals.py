@@ -273,13 +273,17 @@ const trend = (categories, heading = 'Revenue, $B') => ({{ id: 'p1', type: 'tren
   exhibit: {{ heading, categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
     annotations: [{{ category: categories[1], text: 'The launch year doubled revenue as the new product reached every region' }}] }} }});
 answers['heading-says-snapshots'] = (said) => (said.heading.includes('selected years') ? 'says-snapshots' : 'reads-as-series');
+// Columns over uneven dates are drawn where the dates fall; only an axis that marks some gaps and not others keeps one slot a column.
+const broken = (page, at) => ({{ ...page, exhibit: {{ ...page.exhibit, categoryBreaks: at }} }});
 console.log(JSON.stringify({{
-  uneven: error(() => compilePage(trend(['2015', '2018', '2019', '2020', '2021']))),
-  snapshots: error(() => compilePage(trend(['2015', '2018', '2019', '2020', '2021'], 'Revenue in selected years, $B'))),
+  spaced: error(() => compilePage(trend(['2015', '2018', '2019', '2020', '2021']))),
+  uneven: error(() => compilePage(broken(trend(['2015', '2018', '2019', '2020', '2022']), ['2015']))),
+  snapshots: error(() => compilePage(broken(trend(['2015', '2018', '2019', '2020', '2022'], 'Revenue in selected years, $B'), ['2015']))),
   even: error(() => compilePage(trend(['2017', '2018', '2019', '2020', '2021']))),
 }}));
 ''')
-        self.assertIn("TIME_AXIS_UNEVEN", result["uneven"])
+        self.assertIsNone(result["spaced"])  # drawn where the dates fall: no rhythm the dates do not have
+        self.assertIn("TIME_AXIS_UNEVEN", result["uneven"])  # the 2020-2022 gap left unmarked on a broken axis
         self.assertIn("1-3 years apart", result["uneven"])
         self.assertIsNone(result["snapshots"])
         self.assertIsNone(result["even"])
@@ -293,7 +297,8 @@ const trend = (categories) => ({{ id: 'p1', type: 'trend', form: 'column', comme
   exhibit: {{ heading: 'Revenue, $B', categories, series: [{{ name: 'Rev', values: categories.map((_, i) => i + 1) }}, {{ name: 'Cost', values: categories.map((_, i) => i) }}],
     annotations: [{{ category: categories[1], text: 'The launch year doubled revenue as the new product reached every region' }}] }} }});
 answers['heading-says-snapshots'] = 'reads-as-series';
-console.log(JSON.stringify({{ three: error(() => compilePage(trend(['2015', '2018', '2019']))), four: error(() => compilePage(trend(['2015', '2018', '2019', '2020']))) }}));
+const broken = (page) => ({{ ...page, exhibit: {{ ...page.exhibit, categoryBreaks: ['2015'] }} }});
+console.log(JSON.stringify({{ three: error(() => compilePage(broken(trend(['2015', '2018', '2020'])))), four: error(() => compilePage(broken(trend(['2015', '2018', '2020', '2021'])))) }}));
 ''')
         self.assertNotIn("TIME_AXIS_UNEVEN", result["three"] or "")
         self.assertIn("TIME_AXIS_UNEVEN", result["four"])
@@ -605,7 +610,7 @@ const raised = {{
   TABLE_STACK: said(() => compilePage(panels('stack', [table('Northwind March round', three), terms]))),
   COMPARISON_MEASURES_DIFFER: said(() => compilePage(panels('row', [bars('Northwind revenue', '$bn'), bars('Southgate weekly users', 'm users')]), 0, {{ players: [{{ name: 'Northwind' }}, {{ name: 'Southgate Labs', short: 'Southgate' }}] }})),
   TOTAL_ROW_BLANK: said(() => compilePage(lookup([{{ label: 'Instrument', type: 'category' }}, 'OpenAI', 'Anthropic'], [...three.map(([a, b]) => [a, b, b]), ['Total', '', ' ']]))),
-  TIME_AXIS_UNEVEN: said(() => compilePage(column(['2015', '2018', '2019', '2020', '2021']))),
+  TIME_AXIS_UNEVEN: said(() => {{ const page = column(['2015', '2018', '2019', '2020', '2022']); return compilePage({{ ...page, exhibit: {{ ...page.exhibit, categoryBreaks: ['2015'] }} }}); }}),
   VERDICT_TABLE_PLAIN: said(() => compilePage(lookup([{{ label: 'Criterion', type: 'category' }}, 'Current edge', 'Reason'], [['Consumer reach', 'OpenAI', 'Weekly users'], ['Enterprise adoption', 'Anthropic', 'Ramp panel'], ['Coding', 'No verdict', 'Units differ']]))),
   SCENARIO_PROSE: said(() => compilePage({{ ...base, id: 'a', type: 'argument', form: 'sidebar', commentary: 'none', title: 'Three scenarios divide value across models, apps and clouds',
     paragraphs: [words(171, 0), words(62, 3), words(61, 5)], panel: {{ text: 'The base case is split leadership with a contested middle: models consolidate, applications fragment, and the clouds take the margin that neither of the other two keeps.' }} }})),

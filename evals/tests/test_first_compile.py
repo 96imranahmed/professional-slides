@@ -258,7 +258,7 @@ class EveryRefusalTests(unittest.TestCase):
         what the compile waives for a revision is not refused."""
         result = run_node(WORKED + '''
 const page = structuredClone(worked.pages.find((p) => p.id === 'f-trend-column'));
-page.exhibit.categories = ['FY15', 'FY16', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY26'];
+page.exhibit.categories = ['FY15', 'FY16', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY26']; page.exhibit.categoryBreaks = ['FY16'];  // FY23-FY26 left unmarked on a broken axis
 delete page.exhibit.heading; delete page.exhibit.unit;
 page.exhibit.dataLabels = false; page.bar = 'Too short';
 const failed = (pages, deck = {}) => compileDeck(deckOf(pages, deck), { partial: true }).failed.map((f) => [f.stage ?? null, f.message]);

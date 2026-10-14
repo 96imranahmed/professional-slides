@@ -761,6 +761,9 @@ function rowLabelling(chart) {
   // and a 2027 plan one slot apart, so five years and three drew as one step each. Each lane is as wide as the closest two
   // dates allow, and the even run is the case where every lane is a plot's width over the count. A data table's columns
   // and a broken axis (`categoryBreaks`, which says outright that it skips) keep their slots.
+  // A data table under the columns sets its periods one slot each, so dates at uneven gaps cannot stand where they fall; the
+  // columns would draw a rhythm the dates do not have, as a line over the same table would (chart-line.mjs lineOptions).
+  if (!horizontal && props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(categories)) throw new Error(`TIME_AXIS_UNEVEN: a data table sets its periods in even columns, and these dates are unevenly spaced (${categories[0]} to ${categories.at(-1)}) - drop the table and label the columns, mark the gaps (\`categoryBreaks\`), or plot evenly spaced periods`);
   const spacing = !horizontal && !props.categoryColumns && !(props.categoryBreaks || []).length ? timePositions(categories) : null;
   const closest = spacing ? Math.min(...spacing.slice(1).map((at, i) => at - spacing[i])) : 0;
   const categorySpan = spacing ? plot.width * closest / (1 + closest) : (horizontal ? plot.height : plot.width) / categories.length;
