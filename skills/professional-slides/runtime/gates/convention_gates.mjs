@@ -7,10 +7,10 @@
 // its own page, so a writer meets it on their own page check rather than at the whole-deck review. Each reads structure:
 // the exhibit's members against declared players and sets, its labels against the refused forms as exact strings, the
 // currency forms of a closed ISO set, the direction a measure records. What a line of copy names is asked, not matched
-// (player-name-form, judgement-kinds.json).
+// (player-name-form, judgement-kinds.json) - and asked only of a line that holds a form the deck refuses, as a whole word.
 import { registered } from "../errors.mjs";
 import { judged } from "../judgements.mjs";
-import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, playerNamed, refusedForms } from "../conventions.mjs";
+import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, playerNamed, refusedForms, refusedFormsIn } from "../conventions.mjs";
 
 export const CONVENTION_CODES = Object.freeze({
   SUBJECT_NOT_ACCENTED: "a chart or table that plots the page's subject marks another member, or not the subject, by an explicit focus of its own",
@@ -118,12 +118,15 @@ export function conventionFindings(spec, deck = null) {
       const wrong = new Map(typed.flatMap((line) => currencyFormsIn(line, form)).map((f) => [f.wrote, f.write]));
       if (wrong.size) add("CURRENCY_FORM", `the page types ${[...wrong].map(([wrote, write]) => `"${wrote}" where the deck writes "${write}"`).join(", ")} (\`conventions.currency: "${form}"\`): write ${[...wrong.values()].map((write) => `"${write}"`).join(", ")} in the title, commentary, cells and notes; units and headings the runtime writes itself`, { wrote: [...wrong.keys()] });
     }
-    // What a line of copy names is read, not matched: each line is its own question, the page's lines beside it.
+    // What a line of copy names is read, not matched: each line is its own question, the page's lines beside it. A line can
+    // only name a player by a refused form if it holds that form, so only a line holding one of the deck's refused forms as a
+    // whole word, in any case, is asked (conventions.mjs refusedFormsIn); the judgement still decides whether it names the
+    // player by it. Asked of every line, most of the questions were put of lines that could not fail them.
     if (askNames) {
       const lines = copyLines(slide), title = typeof slide.title === "string" ? slide.title.trim() : null;
       // The title's replacement is held to the title's slot - its words and its lines, measured in the band this page sets it in.
       const band = titleBand(deck, id);
-      for (const line of lines) {
+      for (const line of lines.filter((said) => refusedFormsIn(said, refused).length)) {
         const said = judged("player-name-form", line, { names }, id, { beside: { page: lines }, ...(line === title ? { slot: { name: "title", ...(band ? { measure: band } : {}) } } : {}) });
         if (said?.verdict === "refused-form")
           add("PLAYER_NAME_REFUSED", `"${line.slice(0, 90)}" names a player by a form the deck refuses ("${said.quote ?? ""}"): ${said.replacement ? `write "${said.replacement}"` : `name the player as \`conventions.names\` declares it (${Object.keys(names).map((name) => `"${name}"`).join(", ")})`}`, { line, quote: said.quote ?? null });

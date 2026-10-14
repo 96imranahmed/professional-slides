@@ -226,8 +226,37 @@ const item = {{ ...asked[0], key: asked[0].key }};
 const missing = answerProblems(item, {{ verdict: "refused-form", reason: "It names Lufthansa alone, which is ambiguous.", quote: "Lufthansa's" }});
 console.log(JSON.stringify({{ asked: asked.map((q) => q.subject), missing }}));
 ''')
-        self.assertEqual(sorted(result["asked"]), sorted(["IAG's margin was triple Lufthansa's", "IAG led every year."]))
+        # The line that holds no refused form cannot fail the question, and is not asked.
+        self.assertEqual(result["asked"], ["IAG's margin was triple Lufthansa's"])
         self.assertTrue(any("replacement" in problem for problem in result["missing"]))
+
+    def test_only_a_line_holding_a_refused_form_as_a_whole_word_is_asked(self):
+        """The name question is asked of a line only where the line holds a form the deck itself refuses (`names[...].not`),
+        read as a whole word in any case: a line without one cannot name a player by it. The judgement still decides."""
+        result = run_node(f'''
+import {{ conventionFindings }} from '{RUNTIME}/gates/convention_gates.mjs';
+import {{ judgementSession, withJudgements, pendingRequests }} from '{RUNTIME}/judgements.mjs';
+import {{ refusedForms, refusedFormsIn }} from '{RUNTIME}/conventions.mjs';
+const conventions = {{ names: {{ "Northgate Group": {{ not: ["Northgate", "NG plc"] }} }} }};
+const spec = {{ players: ["Northgate Group", "Harbour"], conventions, slides: [
+  {{ id: "p1", title: "Harbour's margin trails Northgate's by two points", points: ["NORTHGATE grew lending fastest.", "Northgates of the region lag.", "Harbour held its share."] }},
+  {{ id: "p2", title: "Harbour leads on cost", points: ["Its cost ratio fell every year.", "NG plc reports a year later."] }},
+  {{ id: "p3", title: "Northgate Group grew faster than any peer", points: ["Harbour grew second-fastest."] }},
+] }};
+const session = judgementSession({{}});
+withJudgements(session, () => conventionFindings(spec));
+const asked = pendingRequests(session).filter((q) => q.kind === "player-name-form").map((q) => [q.where[0], q.subject]);
+console.log(JSON.stringify({{ asked, held: refusedFormsIn("Northgate's lending", refusedForms(conventions)), none: refusedFormsIn("Northgates lag", refusedForms(conventions)) }}));
+''')
+        self.assertEqual(sorted(result["asked"]), sorted([
+            ["p1", "Harbour's margin trails Northgate's by two points"],
+            ["p1", "NORTHGATE grew lending fastest."],
+            ["p2", "NG plc reports a year later."],
+            # The declared name holds the refused form as a word: it is asked, and the reader decides.
+            ["p3", "Northgate Group grew faster than any peer"],
+        ]))
+        self.assertEqual(result["held"], ["Northgate"])
+        self.assertEqual(result["none"], [])
 
 
 class BriefTests(unittest.TestCase):

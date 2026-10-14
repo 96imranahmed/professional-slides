@@ -147,6 +147,17 @@ export function refusedForms(conventions) {
   return refused;
 }
 
+/**
+ * The forms of `refused` (refusedForms) that `text` holds as whole words, read without case: "Northgate's" and "NORTHGATE"
+ * hold the form "Northgate", "Northgates" does not. A line that holds none cannot name a player by a form the deck refuses,
+ * so the question is not put to a reader (gates/convention_gates.mjs); one that holds a form is asked, and the judgement
+ * decides what it names. The forms are the deck's own declaration (`conventions.names[...].not`), not a list of words.
+ */
+export function refusedFormsIn(text, refused) {
+  if (typeof text !== "string" || !text.trim() || !refused?.size) return [];
+  return [...refused.keys()].filter((form) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(form)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text));
+}
+
 // A magnitude written after a currency ("£m", "GBP bn") closes up against it; anything else ("per seat") keeps its space.
 const MAGNITUDE = /^(?:k|m|mn|bn|b|tn|thousand|million|billion|trillion)$/i;
 const CODE_UNIT = new RegExp(`^(${Object.keys(CURRENCIES).join("|")})(?:\\s+|$)(.*)$`);
