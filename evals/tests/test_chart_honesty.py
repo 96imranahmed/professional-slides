@@ -187,5 +187,30 @@ console.log(JSON.stringify({{ steps: elapsedSteps(dates), when: when(items), eve
         self.assertEqual(result["even"], ["2024", "2025", "2026"])  # even steps say nothing
 
 
+class PanelScaleTests(unittest.TestCase):
+    def test_bars_beside_a_line_keep_their_own_scale_and_two_upright_charts_share_one(self):
+        """BA retest fd01: ten margins from 2.5% to 15.8% took the -60% floor of a Covid line beside them and filled a quarter of their panel."""
+        result = run_node(f"""
+import {{ composeAll }} from '{RUNTIME}/compose-all.mjs';
+const groups = ['Ryanair', 'IAG', 'Norwegian', 'Turkish', 'easyJet', 'SAS', 'AF-KLM', 'TAP', 'Lufthansa', 'Wizz'];
+const years = ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'];
+const bars = {{ type: 'chart.bar', heading: 'Operating margin, 2025', unit: '%', categories: groups, series: [{{ name: 'Margin', values: [15.8, 15.1, 9.9, 9.1, 7.0, 6.2, 6.1, 5.7, 4.9, 2.5] }}] }};
+const line = {{ type: 'chart.line', heading: 'Operating margin, 2016-2025', unit: '%', categories: years, series: [{{ name: 'IAG', values: [11.4, 13.2, 13.3, 13.1, -55.8, -35.1, 5.4, 11.9, 13.8, 15.1] }}] }};
+const columns = {{ type: 'chart.column', heading: 'Operating margin, 2025', unit: '%', categories: groups.slice(0, 6), series: [{{ name: 'Margin', values: [15.8, 15.1, 9.9, 9.1, 7.0, 6.2] }}] }};
+const compose = (exhibits) => composeAll({{ schema: 'professional-slides.deck/v3', id: 't', design: 'consulting', cover: {{ title: 'T' }},
+  slides: [{{ id: 'p1', title: 'IAG earned the highest margin of the network groups', arrange: 'row', exhibits }}] }}, '.', {{ partial: true }}).deck.slides.find((s) => s.id === 'p1');
+const beside = compose([bars, line]);
+const panel = beside.componentInstances.find((c) => c.component === 'chart.bar').frame;
+const longest = Math.max(...beside.nodes.filter((n) => n.role === 'chart-mark' && n.frame.x < panel.x + panel.width).map((n) => n.frame.width));
+// Two upright charts of one unit still share a scale: the columns stand on the line's zero, high over its Covid low.
+const upright = compose([columns, line]);
+const left = upright.componentInstances.find((c) => c.component === 'chart.column').frame;
+const tallest = Math.max(...upright.nodes.filter((n) => n.role === 'chart-mark' && n.frame.x < left.x + left.width).map((n) => n.frame.height));
+console.log(JSON.stringify({{ share: longest / panel.width, column: tallest / left.height }}));
+""")
+        self.assertGreater(result["share"], 0.5)   # the longest bar takes most of its panel, not the last quarter
+        self.assertLess(result["column"], 0.35)    # columns beside the line still read on its -60 to 20 scale
+
+
 if __name__ == "__main__":
     unittest.main()

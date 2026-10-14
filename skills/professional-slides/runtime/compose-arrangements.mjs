@@ -152,9 +152,15 @@ function fitLineLabelsToPanels(exhibits, layout) {
 // The scale is shared within each unit, not only when every panel has the
 // same one: two "% y/y" bar panels beside a passenger column still share
 // theirs, down to a -18% bar that a zero minimum would put outside the axis.
+// It is shared only between panels whose values run the same way. A bar's
+// length across and a line's height up are not read against each other, so a
+// shared scale buys no comparison, and it costs the bars their width: the BA
+// retest's margin ranking (2.5% to 15.8%) took the -60 floor of the line
+// beside it, a 2020 Covid loss, and drew its ten bars in the last quarter of
+// their panel.
 function shareValueScales(charts) {
   const byUnit = new Map();
-  for (const ex of charts) byUnit.set(ex.unit, [...(byUnit.get(ex.unit) || []), ex]);
+  for (const ex of charts) { const key = `${ex.unit}|${horizontalChart(ex.type) ? "across" : "up"}`; byUnit.set(key, [...(byUnit.get(key) || []), ex]); }
   for (const group of byUnit.values()) {
     if (group.length < 2 || group.some((ex) => ex.yMax !== undefined)) continue;
     // Stacks extend separately above and below zero: netting signed
