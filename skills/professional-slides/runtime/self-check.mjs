@@ -335,9 +335,13 @@ export async function pageProblems(doc, { replaced, verdicts, dir, stem, insight
   const store = await readJudgementStore(dir, stem);
   const session = () => judgementSession({ verdicts: { ...(store.verdicts ?? {}), ...verdicts } });
   const check = { dir, stem, insights, fit: false, fill: false };
-  const now = await withJudgements(session(), () => checkPages(doc, touched, check));
+  const said = (error) => String(error?.message ?? error).split("\n")[0];
+  let now, then;
+  try { now = await withJudgements(session(), () => checkPages(doc, touched, check)); }
+  catch (error) { return { reasons: [`the pages do not compile as they stand (${said(error)}): a section is self-checked once its pages check clean`], pending: null }; }
   const fixedSession = session();
-  const then = await withJudgements(fixedSession, () => checkPages(replaced.doc, touched, check));
+  try { then = await withJudgements(fixedSession, () => checkPages(replaced.doc, touched, check)); }
+  catch (error) { return { reasons: [`with your ${linesOf(replaced.swaps)} in place the deck does not compile (${said(error)}): write the replacements so it does`], pending: null }; }
   const keyOf = (f) => `${f.code}|${f.id ?? ""}`, had = new Map();
   for (const f of now.blocking) had.set(keyOf(f), (had.get(keyOf(f)) ?? 0) + 1);
   // A page's body words as the page gates count them, with the replacements and without: how far a fix moved the page.
