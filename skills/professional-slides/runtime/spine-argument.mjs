@@ -36,7 +36,7 @@ export const ARGUMENT_FIXES = Object.freeze({
   evidence: "the page's whole new list of insights and analyses to rest on (its `evidence`), each an id in the log",
   measures: "the whole new list of measures its `settles` names (`settles.measures`), each an `<insight>/<measure>` the log records",
   peerSet: "the peer set the comparison uses: a name `conventions.peerSets` declares, or { name, members } to declare there, each member one the page's measures record",
-  basis: "a basis note: { measure, at, note }, written to that measure's `boundaries[at]` in the insight log; `at` is one of its periods or members, or \"value\" for a measure of one value",
+  basis: "a basis note: { measure, at, note }, written to that measure's `boundaries[at]` in the insight log; `at` is one of its periods or members, or, for a measure of one value, \"value\" or its own period",
 });
 const FIX_KEYS = Object.keys(ARGUMENT_FIXES);
 const IDS = { type: "array", minItems: 1, items: { type: "string", minLength: 1 } };
@@ -78,7 +78,7 @@ const isComparison = (settles, records) => {
 export function argumentRecords(registry) {
   return Object.fromEntries([...registry].map(([ref, m]) => {
     const axis = axisOf(m);
-    return [ref, { unit: m.unit ?? null, population: m.population ?? null, kind: axis.kind, labels: axis.labels, values: valuesOf(m),
+    return [ref, { unit: m.unit ?? null, population: m.population ?? null, kind: axis.kind, labels: axis.labels, values: valuesOf(m), period: m.period ?? null,
       boundaries: m.boundaries && typeof m.boundaries === "object" ? m.boundaries : {} }];
   }));
 }
@@ -303,7 +303,9 @@ function fixErrors(fix, item, at, { records, insightIds, peerSets, limits, divid
     else {
       const record = records[b.measure];
       if (!record) errors.push(`${at}: fix.basis names ${b.measure}, which the log does not record`);
-      else if (record.kind === "scalar" ? b.at !== "value" && b.at !== String(record.labels[0] ?? "") : !record.labels.includes(b.at)) errors.push(`${at}: fix.basis puts its note at "${b.at}", which ${b.measure} does not have - one of its ${record.kind === "scalar" ? "value" : record.labels.join(", ")}`);
+      // A measure of one value takes its note at "value" or at its own period, the label the critic reads it by (ba4's s9
+      // critic wrote "H1 2026" for a one-value measure and was refused for it, a second run for a form the record allows).
+      else if (record.kind === "scalar" ? b.at !== "value" && b.at !== String(record.period ?? "value") : !record.labels.includes(b.at)) errors.push(`${at}: fix.basis puts its note at "${b.at}", which ${b.measure} does not have - one of its ${record.kind === "scalar" ? ["value", record.period].filter(Boolean).join(", ") : record.labels.join(", ")}`);
       else if (String(record.boundaries?.[b.at] ?? "").trim() === b.note.trim()) errors.push(`${at}: fix.basis is the note ${b.measure} already holds at ${b.at}`);
       if (b.note.trim().split(/\s+/).length < NOTE_WORDS) errors.push(`${at}: fix.basis.note says the basis in ${NOTE_WORDS} words or more`);
     }

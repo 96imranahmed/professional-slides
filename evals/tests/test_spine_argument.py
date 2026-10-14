@@ -179,9 +179,24 @@ const deck = await stage('finance');
 const one = await S.prepareStoryline(deck.specPath, deck.out);
 const prompt = await fs.readFile(path.join(one.dir, 'prompt.md'), 'utf8');
 await clear(deck);
-console.log(JSON.stringify({ said: prompt.includes('"value" for a measure of one value') }));
+console.log(JSON.stringify({ said: prompt.includes('for a measure of one value, "value" or its own period') }));
 ''')
         self.assertTrue(result["said"])
+
+    def test_a_measure_of_one_value_takes_its_note_at_value_or_at_its_own_period(self):
+        # ba4's s9 critic wrote a one-value measure's note at its period, "H1 2026", and was refused for a form the record allows.
+        result = run_node('''
+import { argumentErrors, argumentRecords } from './skills/professional-slides/runtime/spine-argument.mjs';
+const records = argumentRecords(new Map([['i-h1/margin', { unit: '%', population: 'IAG', period: 'H1 2026', value: 5.2 }]]));
+const items = [{ id: 'compare:p1', page: 'p1' }];
+const at = (where) => argumentErrors([{ item: 'compare:p1', verdict: 'fails', code: 'MISLEADING_COMPARISON', problem: 'The half-year margin is set beside full-year margins of the rivals.',
+  fix: { basis: { measure: 'i-h1/margin', at: where, note: 'first half only, not a full financial year' } } }], { items, records }).filter((e) => /fix.basis puts/.test(e));
+console.log(JSON.stringify({ value: at('value'), period: at('H1 2026'), other: at('FY2025') }));
+''')
+        self.assertEqual(result["value"], [])
+        self.assertEqual(result["period"], [])
+        self.assertEqual(len(result["other"]), 1)
+        self.assertIn('one of its value, H1 2026', result["other"][0])
 
 
 class SplitTests(unittest.TestCase):
