@@ -82,7 +82,7 @@ export function conventionFindings(spec, deck = null) {
       for (const label of new Set(all)) if (refused.has(label))
         add("PLAYER_NAME_REFUSED", `${where} labels a member "${label}", a form the deck refuses (\`conventions.names\`): write ${refused.get(label).map((name) => `"${name}"`).join(" or ")}${refused.get(label).length > 1 ? ", whichever the label means" : ""}`, { wrote: label, write: refused.get(label) });
       // The peer set the exhibit compares: named in `peers`, or the declared set its players are exactly. The subject may
-      // stand beside a set it is not in (British Airways against the network groups). A set's members are read through the
+      // stand beside a set it is not in (the deck's own company against its peer group). A set's members are read through the
       // players' names, `short` forms and aliases as the labels are (conventions.mjs peerSetOf).
       if (sets && ex.chartData !== true) {
         const axes = [["series", labels.series], ["categories", labels.categories], ["points", labels.points], ["rows", labels.rows]].filter(([, list]) => Array.isArray(list))
