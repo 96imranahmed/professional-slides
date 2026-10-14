@@ -100,6 +100,7 @@ export const SLIDE_KEYS = Object.freeze({
   notes: "the speaker notes, which print in the file and never on the page",
   hidden: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide carries it",
   // the rest
+  subject: "the declared player this page is about, drawn in the accent wherever its charts plot it; the compile writes it from `deck.conventions` (its section's subject, else the deck's) where the page names none",
   sourceSlide: "on a revision's section or agenda page, the imported slide it stands for (a typed page keeps its own in `pageType`); never drawn",
   serves: "which ranked criteria this page answers",
   pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
@@ -182,10 +183,10 @@ const KINDS = {
  *
  * A message that already names its page keeps its own wording.
  */
-export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = [], deck = {}) {
   const id = slide?.id || `s${String(index + 1).padStart(2, "0")}`;
   try {
-    return composePage(slide, index, baseDir, fill, elements, recent, recentStyles);
+    return composePage(slide, index, baseDir, fill, elements, recent, recentStyles, deck);
   } catch (error) {
     if (!(error instanceof Error) || error.composedPage) throw error;
     const title = typeof slide?.title === "string" && slide.title.trim() ? ` ("${slide.title.trim()}")` : "";
@@ -203,10 +204,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
  * and an analytical page runs the remaining passes, takes the layout chosen
  * for it, and is arranged, closed and given its footer in that order.
  */
-function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
+function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = [], deck = {}) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
-  const ctx = { id, baseDir, fill };
+  // `deck`: what the deck holds across its pages - its conventions and the players they name (conventions.mjs).
+  const ctx = { id, baseDir, fill, conventions: deck.conventions ?? null, players: deck.players ?? null };
 
   // The first three passes run for every page; the fixed-shape pages then take
   // their own route and the rest go on through the pipeline.

@@ -496,7 +496,7 @@ function composeDeckWith(spec, baseDir) {
     // So does the imported slide a revision's section stands for (`sourceSlide`), which is its record and never drawn.
     const { sourceSlideId, hidden, sourceSlide: _imported, ...page } = resolveReferences(raw);
     if (hidden !== undefined && typeof hidden !== "boolean") throw new Error("`hidden` is true or false");
-    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles);
+    const composed = composeSlide(page, slides.length, baseDir, fill, weight.elements, recent, recentStyles, { conventions: spec.conventions, players: spec.players });
     if (sourceSlideId) composed.sourceSlideId = sourceSlideId;
     if (hidden) composed.hidden = true;
     slides.push(composed);

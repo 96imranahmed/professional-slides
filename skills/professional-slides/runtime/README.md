@@ -68,6 +68,7 @@ limits.mjs         every countable limit a page or a deck is held to, read from 
 spine-fit.mjs      the titles the storyline critique binds, composed where the deck's design sets them on every run, a draft and a plan too, with the room each has (SPINE_FIT_CODES)
 spine-exhibits.mjs the exhibits a spine fully determines - a bound or typed chart, a stub's view, a measure read whole, the executive summary's table - composed with placeholder copy in a draft and a plan, and refused where none can be drawn or the summary cannot fill its page (SPINE_EXHIBIT_CODES)
 deck-keys.mjs      the deck-level keys `deck` takes, each with its type: what `--schema deck` prints and the compile holds `deck` to
+conventions.mjs    `deck.conventions`: a page's subject, the refused names, peer sets, currency form and heat direction, applied by the composer; gates/convention_gates.mjs holds the rest per page
 players.mjs        the entities a deck compares (`players`), each with the mark it declares - a logo, a place's outline (maps.mjs placeOutline), a photograph - its checks, and the mark a page plans for it
 compose-all.mjs    composition that reports every failing page in one run, and each page's reading task
 derive-content.mjs the content plan and text plan read off the composed pages; each page's word floor and ceiling

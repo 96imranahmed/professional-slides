@@ -150,6 +150,12 @@ const LISTED = [
   ...codes("P", "BASIS_UNIT BASIS_AXIS BASIS_VALUES", ["basis", "view"]),
   ...codes("P", "PROOF_OFF_CLAIM PROOF_MISSING", ["basis", "settles"]),
   ...codes("P", "SOURCE_UNCITED", COPY),
+  // The deck's conventions on each page (convention_gates.mjs): the subject's accent and the peers' note are marks and copy;
+  // a refused name or currency form is the copy's or the title's; a heat column's direction is recorded on its measure.
+  ...codes("P", "SUBJECT_NOT_ACCENTED PEERS_OMITTED_UNSAID", COPY),
+  ...codes("P", "PEER_SET_UNDECLARED", ["copy", "view"]),
+  ...codes("P", "PLAYER_NAME_REFUSED CURRENCY_FORM", ["copy", "title"]),
+  ...codes("P", "HEAT_DIRECTION_UNRECORDED", ["record", "copy"]),
   // A reference the runtime cannot write out, and a typed number no measure of the page's evidence holds (bind.mjs).
   ...codes("P", "BINDING_UNRESOLVED", ["basis", "view"]),
   ...codes("P", "NUMBER_UNTRACED", COPY),

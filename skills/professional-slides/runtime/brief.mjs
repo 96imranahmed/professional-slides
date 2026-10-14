@@ -33,6 +33,7 @@ import { decimalsNeeded } from "./printed-numbers.mjs";
 import { recordedPlaces } from "./gates/dependency_gates.mjs";
 import { hazardLine, insightLines, itemLine } from "./answer-critique.mjs";
 import { claimSheetLines } from "./claim-sheet.mjs";
+import { conventionsOf, pageSubject, sectionName, sectionsOf } from "./conventions.mjs";
 
 export const BRIEF_ROLES = Object.freeze(["skeleton", "writer", "critic", "judge", "selfcheck"]);
 // The fields the storyline critique reads of a page (storyline.mjs storyStructure): what a skeleton writes.
@@ -52,6 +53,26 @@ const insightLine = (id, insight) => {
   const finding = String(insight?.finding ?? "");
   return `${id}${insight?.strength ? ` (${insight.strength}${insight.shape ? `, ${insight.shape}` : ""})` : ""}${finding ? `: ${finding}` : ""}`;
 };
+
+/**
+ * The deck's conventions in a few lines, and the subject of each of the section's pages where it is not the deck's: or the
+ * one line that says none is declared yet, which the skeleton fills before its pages are written.
+ */
+function conventionLines(doc, pages, part, role) {
+  const conventions = conventionsOf(doc.deck);
+  if (!conventions) return role === "skeleton" ? ["Conventions: none declared - the lead fills `deck.conventions` (subject, names, peerSets, currency, heat) before the skeleton is written; `--schema deck` prints its shape"] : [];
+  const { subject, names, peerSets, currency, heat } = conventions;
+  const lines = ["", "## The deck's conventions (`deck.conventions`): every page holds them",
+    ...(subject ? [`- subject: ${subject} - in the accent wherever a chart plots it; the runtime marks it, so name no other focus`] : []),
+    ...(names ? [`- names: ${Object.entries(names).map(([name, entry]) => `"${name}", never ${(entry?.not ?? []).map((form) => `"${form}"`).join(" or ")}`).join("; ")}`] : []),
+    ...(peerSets ? [`- peer sets: ${Object.entries(peerSets).map(([set, list]) => `"${set}" (${(list ?? []).join(", ")})`).join("; ")} - a comparison of players names its set in \`peers\` and what it leaves out in \`omits\``] : []),
+    ...(currency ? [`- currency: ${currency === "symbols" ? "symbols (£, $, €)" : "codes (GBP, USD, EUR)"} in every title, line and cell`] : []),
+    ...(heat ? [`- heat: ${heat}; a heat column's direction is its measure's recorded \`better\``] : [])];
+  const section = part ? sectionName(part) : null;
+  const own = pages.filter((page) => page && !page.kind).map((page) => [page.id, pageSubject(conventions, page, section ?? sectionsOf(doc)(page))]).filter(([, named]) => named && named !== subject);
+  if (own.length) lines.push(`- page subjects other than the deck's: ${own.map(([id, named]) => `${id} ${named}`).join("; ")}`);
+  return lines;
+}
 
 /** The section's pages in deck order, `{ pages, part }`, or `{ why }` where `section` names no part of the pages file. */
 export function sectionPages(doc, section) {
@@ -208,6 +229,9 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
     ...(deck.request ? [`Request: ${said(deck.request)}`] : []), ...(deck.answer ? [`Answer: ${said(deck.answer)}`] : []), ...(deck.density ? [`Density: ${deck.density}`] : [])];
   // What the answer critique raised before the skeleton (answer-critique.mjs): a page that builds on a claim the log does not
   // support is a page the storyline critique sends back, so the skeleton and its writers see what is open.
+  // The deck's conventions (conventions.mjs), which every section's pages hold: sixteen BA writers each chose their own accent,
+  // peers, names and currency, and the review was the first reader to see them disagree.
+  if (["skeleton", "writer", "selfcheck"].includes(role)) lines.push(...conventionLines(doc, pages, part, role));
   if (["skeleton", "writer", "selfcheck"].includes(role) && answerItems.length) {
     lines.push("", "## Raised on the answer before the skeleton (out/answer-critique.json): do not build on these as raised", ...answerItems.map((item) => `- ${itemLine(item)}`));
   }

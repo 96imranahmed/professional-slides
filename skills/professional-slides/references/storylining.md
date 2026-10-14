@@ -67,6 +67,18 @@ For a subject with public records, search for and download:
 
 Save what is downloaded under the task's `sources/` with its URL and retrieval date. Where a series is not published, say so and use the nearest defensible one. Declare what the deck compares - organisations, places, products - as `players` on the deck so the deck introduces them, each by the mark it declares (a logo, a place's outline, a photograph), before it compares them ([Design](design.md#make-every-exhibit-earn-its-page)). Only a declaration counts: the runtime does not guess the players from the titles. Research a comparison on the same measures for every member; `n/a` in a table is a finding where a substitute metric would hide it.
 
+### Deck conventions
+
+Section writers working side by side each choose an accent, a peer set, a name and a currency form unless the deck has already chosen them, and the deck review is then the first reader to see the choices disagree. The lead declares them in `deck.conventions` before the skeleton is written, each optional:
+
+- `subject`: the player drawn in the accent wherever a chart plots it; `sectionSubjects: { "<section>": "<player>" }` sets a section's own (the section as `--section` names it), and a page's own `subject` overrides both. The runtime marks the subject on every chart and players' table; an exhibit that names its own focus keeps it, and is refused if it marks another player beside the subject (`SUBJECT_NOT_ACCENTED`).
+- `names: { "<player>": { not: ["<ambiguous form>"] } }`: a form that could mean two companies ("Lufthansa" for the group or its airline). A label in that form is refused, and each title and commentary line is asked whether it uses one (`PLAYER_NAME_REFUSED`).
+- `peerSets: { "<set>": ["<player>", ...] }`: the comparison sets. An exhibit comparing players is one set exactly, or names its set in `peers` and what it leaves out, and why, in `omits` (printed as a note): `PEER_SET_UNDECLARED`, `PEERS_OMITTED_UNSAID`.
+- `currency: "symbols" | "codes"`: units and runtime headings are written in that form; a typed £ or GBP that breaks it is refused (`CURRENCY_FORM`).
+- `heat: "dark-is-better" | "dark-is-more"`: under dark-is-better a heat column shades by its measure's recorded `better` (a rank is better lower), and a column with no direction beside one better lower is refused (`HEAT_DIRECTION_UNRECORDED`).
+
+Every name it uses is a declared player's name or `short`. The skeleton, writer and self-check briefs print the conventions and each page's subject where it is not the deck's.
+
 A 50-page deck on a competitive question normally carries several trends with their rates, a ranked peer comparison, a share or mix, a players page with logos, a map where the subject has geography, and scorecard tables that judge. If the candidate exhibits are mostly single-period comparisons of two entities, the research is not finished.
 
 ## Extract the insights before the titles

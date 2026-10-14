@@ -690,7 +690,7 @@ function columnTreatments(ex) {
   const heat = heatColumns(ex, marks.map((m, i) => (m.heat ? i : -1)).filter((i) => i >= 0));
   const nextColumns = columns.map((c, i) => {
     if (!marks[i].heat && !marks[i].bubble && !marks[i].bar) return c;
-    const { heat: _h, bubble: _b, bar: _r, domain: _d, ...rest } = c;
+    const { heat: _h, bubble: _b, bar: _r, domain: _d, better: _w, ...rest } = c;
     if (marks[i].heat) return { ...rest, type: "heatmap" };
     if (!marks[i].bar) return rest;
     // One scale per bar column, shared across its rows: the bars in a column
@@ -775,6 +775,11 @@ const HEAT_STEPS = 5;
  * marked missing ("n/a", "not disclosed") keeps its words and takes no shade:
  * it is not the bottom of the scale. `cell(i, cell)` is the cell as drawn;
  * `scales` the scale each recorded column shares down its rows.
+ *
+ * A column whose measure is better lower (`better: "down"`, kept by the deck's
+ * `conventions.heat: "dark-is-better"` - conventions.mjs) is shaded the other
+ * way, its lowest figure darkest: ap05 set a Skytrax rank beside Which? scores,
+ * and shaded by size dark meant worse in one column and better in the next.
  */
 function heatColumns(ex, indexes) {
   const scales = {}, modes = new Map(), problems = [], declaredScales = new Map();
@@ -794,14 +799,15 @@ function heatColumns(ex, indexes) {
     if (outside.length) said.push(`${outside.map((text) => `"${text}"`).join(", ")} ${outside.length === 1 ? "lies" : "lie"} outside the \`domain\` it declares (${domain[0]} to ${domain[1]})`);
     if (!known.length) said.push("it has no number to shade");
     if (said.length) { problems.push(`the "${label}" heat column: ${said.join("; ")}`); continue; }
+    const down = column.better === "down";
     const scores = !declared && known.every((n) => Number.isInteger(n) && n >= 1 && n <= HEAT_STEPS);
-    if (scores) { modes.set(i, { scores: true }); continue; }
+    if (scores) { modes.set(i, { scores: true, down }); continue; }
     const [lo, hi] = declared ? domain : [Math.min(...known), Math.max(...known)];
     const unit = String(column.unit ?? "").trim() || figureUnit(texts[numbers.indexOf(known[0])]) || "";
-    const ends = declared ? [String(lo), String(hi)] : [texts[numbers.indexOf(lo)], texts[numbers.indexOf(hi)]];
+    const ends = (declared ? [String(lo), String(hi)] : [texts[numbers.indexOf(lo)], texts[numbers.indexOf(hi)]])[down ? "reverse" : "slice"]();
     const inUnits = (text) => (figureUnit(text) || !unit ? text : withUnit(text, unit));
-    // Columns that declare one domain in one unit are on one scale, and the key says so once: a shade means the same in each.
-    const sharedKey = declared ? `${lo}:${hi}:${unit}` : null;
+    // Columns that declare one domain in one unit, shaded the same way, are on one scale, and the key says so once: a shade means the same in each.
+    const sharedKey = declared ? `${lo}:${hi}:${unit}:${down ? "down" : "up"}` : null;
     if (sharedKey && declaredScales.has(sharedKey)) {
       const { id, labels } = declaredScales.get(sharedKey);
       labels.push(label);
@@ -809,24 +815,24 @@ function heatColumns(ex, indexes) {
       const tails = new Set(labels.map((text) => (text.includes(",") ? text.split(/,\s*/).pop().trim() : "")));
       const tail = tails.size === 1 ? [...tails][0] : "";
       scales[id].label = tail ? `${tail[0].toUpperCase()}${tail.slice(1)}${unit && !tail.includes(unit) ? ` (${unit})` : ""}` : unit ? `Every shaded column (${unit})` : "Every shaded column";
-      modes.set(i, { id, lo, hi });
+      modes.set(i, { id, lo, hi, down });
       continue;
     }
     const id = `${barScaleId(label).replace(/-bar$/, "")}-${i + 1}-heat`;
     scales[id] = { type: "heatmap", label: unit && !label.includes(unit) ? `${label} (${unit})` : label, min: 1, max: HEAT_STEPS, anchors: { 1: ends[0], [HEAT_STEPS]: ends[1] }, ramp: { low: inUnits(ends[0]), high: inUnits(ends[1]) },
       ...(ex.legend === false ? { legend: false } : {}), palette: "theme-sequential" };
     if (sharedKey) declaredScales.set(sharedKey, { id, labels: [label] });
-    modes.set(i, { id, lo, hi });
+    modes.set(i, { id, lo, hi, down });
   }
   if (problems.length) throw new Error(`A heat column shades numbers - whole scores from 1 to ${HEAT_STEPS} as they stand, any other figures by where each sits between the column's lowest and highest (or across the \`domain: [low, high]\` the column declares). ${problems.join(". ")[0].toUpperCase()}${problems.join(". ").slice(1)}`);
   const cell = (i, value) => {
     const mode = modes.get(i), text = String(value?.text ?? value ?? "").trim();
     if (MISSING_FIGURE.test(text)) return { type: "text", text, align: "right" };
     const n = barNumber(value);
-    if (mode.scores) return { type: "heatmap", value: n };
+    if (mode.scores) return { type: "heatmap", value: mode.down ? HEAT_STEPS + 1 - n : n };
     // Five equal steps of the range; a column whose figures are all one value sits at the middle step.
     const step = mode.hi > mode.lo ? 1 + Math.round(((n - mode.lo) / (mode.hi - mode.lo)) * (HEAT_STEPS - 1)) : Math.ceil(HEAT_STEPS / 2);
-    return { type: "heatmap", value: step, figure: text, scale: mode.id };
+    return { type: "heatmap", value: mode.down ? HEAT_STEPS + 1 - step : step, figure: text, scale: mode.id };
   };
   return { scales, cell };
 }
