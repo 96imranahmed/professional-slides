@@ -668,6 +668,20 @@ fs.rmSync(dir, {{ recursive: true, force: true }});
 
 
 class DependencyTests(unittest.TestCase):
+    def test_a_player_declared_only_to_name_and_mark_is_not_held_to_the_comparison(self):
+        """ba5: the conventions named thirteen more players - the subject, rivals in single comparisons, sister airlines - and
+        ANALYSIS_REQUIRED then asked for one comparison setting all twenty on common measures. `compared: false` declares an
+        entity the deck names and marks but does not decide between."""
+        result = run_node('''
+import { alternativesOf } from './skills/professional-slides/runtime/analysis.mjs';
+import { playerProblems } from './skills/professional-slides/runtime/players.mjs';
+const players = ['IAG', { name: 'Lufthansa Group' }, { name: 'British Airways', short: 'BA', compared: false }, { name: 'Emirates', compared: true }];
+console.log(JSON.stringify({ alternatives: alternativesOf({ players }), problems: playerProblems(players) }));
+''')
+        self.assertEqual(result["alternatives"], ["IAG", "Lufthansa Group", "Emirates"])
+        self.assertEqual(len(result["problems"]), 1)
+        self.assertIn("`compared` is false", result["problems"][0])
+
     def test_seeded_defects_are_caught_on_the_fixture_decks_and_clean_decks_raise_nothing(self):
         result = run_node('''
 import { measure, SEEDED } from './evals/quality/evidence-validity.mjs';

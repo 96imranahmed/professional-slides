@@ -42,6 +42,7 @@ const ENTRY_KEYS = Object.freeze({
   logoHint: "a word that steers this logo's search",
   outline: "a place's outline: `{ geography, region }`",
   image: "a photograph: `{ alt, search }`, or `{ alt, path, credit }` for a file supplied beside the pages file",
+  compared: "false where the deck names and marks the entity but does not decide between it and the others: it is left out of the comparison every compared player is held to (analysis.mjs alternativesOf)",
 });
 
 /**
@@ -188,6 +189,7 @@ export function playerProblems(players) {
     const unknown = Object.keys(p).filter((key) => !key.startsWith("$") && !Object.hasOwn(ENTRY_KEYS, key));
     if (unknown.length) say(`${unknown.map((key) => `\`${key}\``).join(", ")} ${unknown.length === 1 ? "is" : "are"} read by nothing - an entry takes ${Object.keys(ENTRY_KEYS).map((key) => `\`${key}\``).join(", ")}`);
     if (p.short !== undefined && !written(p.short)) say("`short` is a name, as a string");
+    if (p.compared !== undefined && p.compared !== false) say("`compared` is false, for an entity the deck names and marks but does not decide between - or left out");
     if (p.aliases !== undefined && !(Array.isArray(p.aliases) && p.aliases.every(written))) say("`aliases` is a list of names");
     if (p.mark !== undefined && !Object.hasOwn(MARK_KINDS, p.mark)) { say(`\`mark\` is one of ${Object.entries(MARK_KINDS).map(([kind, about]) => `"${kind}" (${about.split(":")[0]})`).join("; ")} - it was given ${JSON.stringify(p.mark)}`); return; }
     const kind = p.mark ?? "logo";

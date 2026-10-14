@@ -598,7 +598,10 @@ export async function readAnalysis(baseDir, stem, log, { alternatives = [] } = {
 }
 
 /** The players a deck declares, by name: the alternatives a comparison covers. */
-export const alternativesOf = (deck) => (Array.isArray(deck?.players) ? deck.players.map((p) => (p && typeof p === "object" ? p.name : p)).filter((name) => typeof name === "string" && name.trim()) : []);
+// The alternatives the deck decides between: its players, less any it declares only to name and mark (`compared: false`) - on
+// ba5 the conventions named thirteen more (the subject, rivals in single comparisons, sister airlines), and every one of them
+// was held to the deck's comparison of the network groups.
+export const alternativesOf = (deck) => (Array.isArray(deck?.players) ? deck.players.filter((p) => !(p && typeof p === "object" && p.compared === false)).map((p) => (p && typeof p === "object" ? p.name : p)).filter((name) => typeof name === "string" && name.trim()) : []);
 
 // How far the catalogue goes before it stops listing and says what it left
 // out: pairs grow with the square of the measures, and a list nobody reads to
