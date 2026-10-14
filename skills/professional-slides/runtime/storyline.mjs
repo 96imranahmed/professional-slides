@@ -698,11 +698,12 @@ const placedPageHash = (page, after, inAppendix) => sha256(JSON.stringify({ ...p
  * order is the deck's argument, said once for the deck - and a page the pass
  * read that is gone is `deleted`.
  */
-function movedArguments(prior, spec, measures = null) {
+function movedArguments(prior, spec, measures = null, { only = null, order = null } = {}) {
   const pages = storyStructure(spec, measures), appendix = new Set((spec.appendix || []).map((s) => String(s.id)));
   const recorded = Object.keys(prior), current = new Set(pages.map((p) => String(p.id)));
   const changed = [], placed = [];
-  for (const page of pages) {
+  // A page run reads the argument of its own pages (`only`), and the order of every page as declared (`order`).
+  for (const page of pages.filter((p) => !only || only.has(String(p.id)))) {
     const id = String(page.id), at = recorded.indexOf(id);
     if (at < 0) { changed.push(id); continue; }
     // The place the pass read it in: the page recorded before it, in or out of the appendix.
@@ -711,9 +712,11 @@ function movedArguments(prior, spec, measures = null) {
     else if (was !== appendix.has(id)) placed.push(id);
   }
   // The order of the pages both readings hold: a page outside their longest common run is one that moved.
-  const kept = pages.map((p) => String(p.id)).filter((id) => Object.hasOwn(prior, id) && !changed.includes(id)), before = recorded.filter((id) => kept.includes(id));
+  const kept = (order ?? pages.map((p) => p.id)).map(String).filter((id) => Object.hasOwn(prior, id) && !changed.includes(id)), before = recorded.filter((id) => kept.includes(id));
   const run = longestCommonRun(before, kept);
-  return { changed, deleted: recorded.filter((id) => !current.has(id)), moved: [...new Set([...placed, ...kept.filter((id) => !run.has(id))])] };
+  const moved = [...new Set([...placed, ...kept.filter((id) => !run.has(id))])];
+  if (only) return { changed, deleted: [], moved: moved.filter((id) => only.has(id)) };
+  return { changed, deleted: recorded.filter((id) => !current.has(id)), moved };
 }
 // The ids of the longest subsequence two orders share.
 function longestCommonRun(a, b) {
@@ -2053,7 +2056,11 @@ export async function storylineWarning(spec, directory, { deckPath = null } = {}
  */
 export const passCap = (spec, asked = MAX_PASSES) => Math.max(asked, Number.isInteger(spec?.storylinePasses?.max) ? spec.storylinePasses.max : 0);
 
-export async function spineLock(spec, directory, { deckPath = null, maxPasses: asked = MAX_PASSES } = {}) {
+// A page run (author-deck.mjs --page) holds the lock on the pages it names (`only`): `spec` holds them compiled among the
+// deck's structural pages, and `order` is every page id of the deck in order as the pages file declares it, which is all
+// the order reads. A page of theirs whose own argument moved is named, and so is one that changed place; another page's
+// argument, the request and the answer are the whole-deck run's to hold.
+export async function spineLock(spec, directory, { deckPath = null, maxPasses: asked = MAX_PASSES, only = null, order = null } = {}) {
   const maxPasses = passCap(spec, asked);
   if (spec?.purpose === "catalogue") return null;
   const history = await readStorylineHistory(await lineageStore(spec, directory, deckPath));
@@ -2064,9 +2071,10 @@ export async function spineLock(spec, directory, { deckPath = null, maxPasses: a
   const closed = ["ready", "provisional"].includes(verdict) ? verdict : spent >= maxPasses ? "spent" : null;
   if (!closed) return null;
   const measures = await readMeasures(spec, await locateDeck(spec, directory, deckPath));
-  if (latest.binding === storylineBinding(spec, measures)) return null;
+  if (!only && latest.binding === storylineBinding(spec, measures)) return null;
   // Only a page whose own argument differs from what the pass read is named; a page that only changed place is the deck's order (movedArguments).
-  const moved = movedArguments(latest.pageHashes, spec, measures);
+  const moved = movedArguments(latest.pageHashes, spec, measures, { only, order });
+  if (only && !moved.changed.length && !moved.moved.length) return null;
   return { closed, verdict, pass: latest.pass, spent, pages: [...moved.changed, ...moved.deleted], deleted: moved.deleted, moved: moved.moved };
 }
 

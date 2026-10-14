@@ -30,7 +30,7 @@
 import { EXIT, UsageError, isMain, parseCli, readJsonSync, runCli, writeJsonSync } from "../cli.mjs";
 import { checkTextPlan, textWords } from "../text-contract.mjs";
 import { DECK_LENGTH, PLAN, applyRulesVersion, waivedRules } from "../weight.mjs";
-import { judged } from "../judgements.mjs";
+import { judged, recordedJudgement } from "../judgements.mjs";
 
 export const CONTENT_CODES = Object.freeze({
   CONTENT_SCHEMA: "the content file is not a readable record of what the deck says",
@@ -177,10 +177,14 @@ export function runContentGates(content, options = {}) {
   checkPages(findings, pages);
   // The claims are read against one another (claims-repeat), and the answer against every page's claim (answer-contradicted),
   // at once: asked of the whole deck, so not while a page has not compiled or composed - a question over part of the deck
-  // would be asked again over the rest.
+  // would be asked again over the rest. A page run's content (`options.pages`) is the pages it names among the deck's
+  // structural pages, and the rules over the deck's spread and its answer are the whole-deck run's: its claims are read
+  // against the rest of the deck's by claimRepeatFindings, from what every page declares (page-run.mjs).
   const whole = !options.uncomposed?.size;
-  checkDeckSpread(findings, pages, standings, { whole });
-  checkAnswerCarried(findings, content, pages, standings, options.deck ?? content, { whole });
+  if (!options.pages) {
+    checkDeckSpread(findings, pages, standings, { whole });
+    checkAnswerCarried(findings, content, pages, standings, options.deck ?? content, { whole });
+  }
   return {...report(content, findings, pages, options.deck), textCoverage: textCheck, standings};
 }
 
@@ -266,14 +270,27 @@ function checkDeckSpread(findings, pages, standings = [], { whole = true } = {})
         "Review whether a specific finding needs emphasis. Explicitly neutral pages are valid; "
         + "add a highlight only where the claim identifies its exact target."));
     }
-    for (const [i, j] of claimRepeats(pages, whole)) {
-      findings.push(finding(pages[j].n ?? null, "CONTENT_CLAIM_REPEATS",
-        { pages: [pages[i].n ?? i + 1, pages[j].n ?? j + 1], claim: String(pages[j].claim).slice(0, 70) },
-        "one page per claim",
-        "Two pages prove the same thing. Merge them, or make the second one prove the next "
-        + "step rather than the same step with different evidence."));
-    }
+    findings.push(...repeatFindings(pages, claimRepeats(pages, whole)));
   }
+}
+
+const repeatFindings = (pages, pairs) => pairs.map(([i, j]) => finding(pages[j].n ?? null, "CONTENT_CLAIM_REPEATS",
+  { pages: [pages[i].n ?? i + 1, pages[j].n ?? j + 1], claim: String(pages[j].claim).slice(0, 70) },
+  "one page per claim",
+  "Two pages prove the same thing. Merge them, or make the second one prove the next "
+  + "step rather than the same step with different evidence."));
+
+/**
+ * The claims of a deck's content pages read against one another as the deck
+ * gates read them (CONTENT_CLAIM_REPEATS), for a page run: `pages` every page
+ * of the deck as its content plan records it, from what each declares. Claims
+ * written word for word alike repeat on their face; the reading of every claim
+ * at once (claims-repeat) is a question of the whole deck, which the whole-deck
+ * run asks - a page run reads the answer it recorded and asks nothing.
+ */
+export function claimRepeatFindings(pages) {
+  if (pages.length < CONTENT_THRESHOLDS.from) return [];
+  return repeatFindings(pages, claimRepeats(pages, true, { ask: false }));
 }
 
 /**
@@ -286,14 +303,16 @@ function checkDeckSpread(findings, pages, standings = [], { whole = true } = {})
  * compiled, since a question over part of the deck would be asked again over
  * the rest - and the pairs it names are the repeats.
  */
-function claimRepeats(pages, whole) {
+function claimRepeats(pages, whole, { ask = true } = {}) {
   const said = (text) => String(text ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}%]+/gu, " ").trim();
   const claims = pages.map((p, at) => ({ at, id: String(p.id ?? p.n ?? at + 1), claim: String(p.claim ?? "").trim() })).filter((c) => c.claim);
   const pairs = [];
   const add = (i, j) => { const pair = [Math.min(i, j), Math.max(i, j)]; if (i !== j && !pairs.some(([a, b]) => a === pair[0] && b === pair[1])) pairs.push(pair); };
   for (const [k, a] of claims.entries()) for (const b of claims.slice(k + 1)) if (said(a.claim) === said(b.claim)) add(a.at, b.at);
   if (whole && claims.length > 1) {
-    const read = judged("claims-repeat", claims.map(({ id, claim }) => ({ id, claim })));
+    // `ask: false` reads the answer recorded for these claims and leaves the question unasked where there is none.
+    const subject = claims.map(({ id, claim }) => ({ id, claim }));
+    const read = ask ? judged("claims-repeat", subject) : recordedJudgement("claims-repeat", subject);
     const at = (id) => claims.find((c) => c.id === String(id))?.at;
     if (read?.verdict === "repeats") for (const [a, b] of read.pairs || []) if (at(a) !== undefined && at(b) !== undefined) add(at(a), at(b));
   }
