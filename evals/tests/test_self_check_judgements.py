@@ -261,3 +261,28 @@ class PageReadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(NODE, "Node.js is not available")
+class SpineReadingTests(unittest.TestCase):
+    def test_a_spine_reading_answers_the_questions_its_own_title_replacement_raises(self):
+        """A spine reading lists no questions - the spine's are judge.mjs --draft's - but a title it replaces raises the
+        title questions again, and the validator asked for them in `judgements` while turning every judgement of a spine
+        reading away, so no spine reading that retitled a page could be recorded."""
+        passing = {"title-count-only": "compares", "title-leads-with-gap": "finding", "commentary-restates": "adds", "commentary-caveats": "finding"}
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned(tmp)
+            run = node(AUTHOR, pages, "--brief", "selfcheck", "--spine")
+            self.assertEqual(run.returncode, 0, run.stderr[-800:])
+            hashes = {m.group(1): m.group(2) for m in re.finditer(r"^(\S+)  .*\(sheet ([0-9a-f]{16})\)$", run.stdout, re.M)}
+            verdicts = {page: {"sheet": h, "verified": page != "f1"} for page, h in hashes.items()}
+            answer = {"scope": "spine", "pages": verdicts, "problems": [title_fix()]}
+            (pages.parent / "out" / "self-check").mkdir(parents=True, exist_ok=True)
+            first, said = validate(pages, answer)
+            asked = re.findall(r'^(\S+) \(([a-z-]+), on [^)]*\): with your replacements in place the rules ask this of ("(?:[^"\\]|\\.)*")', "\n".join(said.get("reasons", [])), re.M)
+            entries = [{"key": key, "verdict": passing[kind], "reason": "Read as the page stands with the replacement title in place, the line says what the evidence shows.", "quote": json.loads(subject), "on": None} for key, kind, subject in asked if kind in passing]
+            status, recorded = validate(pages, {**answer, "judgements": entries})
+        self.assertEqual(first, 2, said)
+        self.assertTrue(entries, said)
+        self.assertEqual(status, 0, recorded)
+        self.assertEqual(recorded["judgements"], len(entries))

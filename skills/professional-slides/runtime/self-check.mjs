@@ -218,7 +218,10 @@ export function judgementProblems(questions, answer, swaps, { by = null, pending
   const entries = answer?.judgements ?? [];
   if (!Array.isArray(entries)) return { reasons: ["\"judgements\" is a list: one answer for each question the brief lists"], verdicts, extra, foreseen };
   if (questions === null) {
-    if (entries.length) reasons.push(`"judgements": no questions were kept for this ${answer?.scope === "spine" ? "spine reading - the spine's questions are judge.mjs --draft's" : "section: run its brief again (author-deck.mjs --brief selfcheck --section <part>), which lists them"}`);
+    // A spine reading lists no questions - the spine's are judge.mjs --draft's - but a title it replaces raises its own, which
+    // it answers on its replacement: those entries are read as the questions the replacements raise (extraProblems).
+    if (answer?.scope === "spine") return { reasons, verdicts, extra: entries.map((entry, i) => ({ entry, i })), foreseen };
+    if (entries.length) reasons.push("\"judgements\": no questions were kept for this section: run its brief again (author-deck.mjs --brief selfcheck --section <part>), which lists them");
     return { reasons, verdicts, extra, foreseen };
   }
   const staged = stagedQuestions(questions, swaps);
