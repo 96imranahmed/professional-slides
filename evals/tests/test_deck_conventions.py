@@ -33,12 +33,19 @@ const players = {PLAYERS};
 const ok = deckKeyProblems({{ schema: "x", id: "d", players, conventions: {CONVENTIONS} }});
 const bad = deckKeyProblems({{ schema: "x", id: "d", players, conventions: {{ subject: "Lufthansa", sectionSubjects: {{ "6a-returns": "Norwegian" }}, peerSets: {{ rivals: ["IAG", "Emirates"] }}, currency: "£", heat: "up" }} }}, {{ sections: ["6a-returns"] }});
 const section = deckKeyProblems({{ schema: "x", id: "d", players, conventions: {{ sectionSubjects: {{ "returns": "IAG" }} }} }}, {{ sections: ["6a-returns", "6b-balance-fleet"] }});
-console.log(JSON.stringify({{ ok, bad, section }}));
+// A peer set is a comparison's members, players or not (ba5: the Which? field of fifteen airlines); a refused form is refused.
+const names = {{ "Lufthansa Group": {{ not: ["Lufthansa"] }} }};
+const field = deckKeyProblems({{ schema: "x", id: "d", players, conventions: {{ names, peerSets: {{ "Which? field": ["British Airways", "Jet2", "Emirates"] }} }} }});
+const refused = deckKeyProblems({{ schema: "x", id: "d", players, conventions: {{ names, peerSets: {{ rivals: ["IAG", "Lufthansa"] }} }} }});
+console.log(JSON.stringify({{ ok, bad, section, field, refused }}));
 ''')
         self.assertEqual(result["ok"], [])
         bad = " ".join(result["bad"])
-        for named in ('"Lufthansa"', '"Norwegian"', '"Emirates"', '"£"', '"up"'):
+        for named in ('"Lufthansa"', '"Norwegian"', '"£"', '"up"'):
             self.assertIn(named, bad)
+        self.assertNotIn('"Emirates"', bad)  # a peer set's member need not be a player
+        self.assertEqual(result["field"], [])
+        self.assertIn('names "Lufthansa", a form `names` refuses: write "Lufthansa Group"', " ".join(result["refused"]))
         self.assertIn("6a-returns, 6b-balance-fleet", " ".join(result["section"]))
 
 

@@ -10,7 +10,7 @@
 // (player-name-form, judgement-kinds.json).
 import { registered } from "../errors.mjs";
 import { judged } from "../judgements.mjs";
-import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, refusedForms } from "../conventions.mjs";
+import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, playerNamed, refusedForms } from "../conventions.mjs";
 
 export const CONVENTION_CODES = Object.freeze({
   SUBJECT_NOT_ACCENTED: "a chart or table that plots the page's subject marks another member, or not the subject, by an explicit focus of its own",
@@ -97,7 +97,8 @@ export function conventionFindings(spec, deck = null) {
           } else if (outside.length) add("PEER_SET_UNDECLARED", `${where} names \`peers: "${found.set}"\` and also compares ${quoted(outside)}, which that set does not hold: draw the set's members alone, or name the set that holds these, declaring it in \`conventions.peerSets\` if none does`, { set: found.set, outside });
           else {
             const said = ex.omits && typeof ex.omits === "object" ? ex.omits : {};
-            const unsaid = found.missing.filter((member) => !(typeof said[member] === "string" && said[member].trim()));
+            // A set may name members the deck does not declare as players; only a declared one can be found on the exhibit as left out.
+            const unsaid = found.missing.filter((member) => playerNamed(players, member) && !(typeof said[member] === "string" && said[member].trim()));
             if (unsaid.length) add("PEERS_OMITTED_UNSAID", `${where} draws on the "${found.set}" set and leaves out ${quoted(unsaid)} without saying why: add \`omits: { ${unsaid.map((member) => `"${member}": "<why it is not shown>"`).join(", ")} }\` to the exhibit (it prints as a note line), or show ${unsaid.length === 1 ? "it" : "them"}`, { set: found.set, unsaid });
           }
         }

@@ -26,7 +26,7 @@ export const CONVENTION_KEYS = Object.freeze({
   subject: "the player the deck is about: a declared player's name or `short`",
   sectionSubjects: "{ \"<section>\": \"<player>\" } - a section's own subject, the section as --section names it",
   names: "{ \"<player>\": { not: [\"<refused form>\", ...] } } - the forms that name the player ambiguously",
-  peerSets: "{ \"<set>\": [\"<player>\", ...] } - the named comparison sets",
+  peerSets: "{ \"<set>\": [\"<member>\", ...] } - the named comparison sets, players or not",
   currency: "\"symbols\" (£, $, €) or \"codes\" (GBP, USD, EUR)",
   heat: "\"dark-is-better\" or \"dark-is-more\"",
 });
@@ -97,8 +97,11 @@ export function conventionProblems(conventions, players, { sections = null } = {
   if (peerSets !== undefined) {
     if (!isObject(peerSets)) problems.push(`\`peerSets\` is ${CONVENTION_KEYS.peerSets}`);
     else for (const [set, members] of Object.entries(peerSets)) {
-      if (!Array.isArray(members) || members.length < 2 || !members.every((m) => typeof m === "string")) { problems.push(`\`peerSets["${set}"]\` is a list of two declared players or more`); continue; }
-      for (const member of members) problems.push(unknownPlayer(member, `\`peerSets["${set}"]\``));
+      if (!Array.isArray(members) || members.length < 2 || !members.every((m) => typeof m === "string" && m.trim())) { problems.push(`\`peerSets["${set}"]\` is a list of two members or more`); continue; }
+      // A set is a comparison's members, which need no mark: on ba5 the Which? and Skytrax fields named fifteen airlines and more,
+      // and each would have had to be a player with a logo. A member is held only to the names the deck refuses.
+      for (const member of members) for (const [name, entry] of Object.entries(isObject(names) ? names : {}))
+        if (isObject(entry) && Array.isArray(entry.not) && entry.not.includes(member)) problems.push(`\`peerSets["${set}"]\` names "${member}", a form \`names\` refuses: write "${name}"`);
     }
   }
   if (currency !== undefined && !CURRENCY_FORMS.includes(currency)) problems.push(`\`currency\` is ${CONVENTION_KEYS.currency}; it was given ${JSON.stringify(currency)}`);
