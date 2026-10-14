@@ -154,6 +154,29 @@ export async function readSheets(out) {
   return sheets;
 }
 
+// Where the questions a section's self-checker is given are kept, one file a section: out/self-check/questions/<part>.json
+// (the whole deck's as deck.json), beside the sheets and apart from the answers the join reads.
+const QUESTIONS = path.join("self-check", "questions");
+const QUESTIONS_SCHEMA = "professional-slides.self-check-questions/v1";
+const sectionFile = (part) => `${part ? path.basename(part).replace(/(\.pages)?\.json$/, "") : "deck"}.json`;
+
+/**
+ * Keep the questions the rules ask of a section that its self-checker answers beside its claims (author-deck.mjs --brief
+ * selfcheck): the answer is validated against them (self-check.mjs --validate). `part` is the section's part file, null for
+ * the whole deck.
+ */
+export async function recordQuestions(out, part, items) {
+  const dir = path.join(out, QUESTIONS);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, sectionFile(part)), `${JSON.stringify({ schema: QUESTIONS_SCHEMA, section: part ?? "deck", items }, null, 1)}\n`);
+}
+
+/** The questions kept for a section's self-checker (recordQuestions), as a list; null where its brief kept none. */
+export async function readQuestions(out, part) {
+  const kept = await fs.readFile(path.join(out, QUESTIONS, sectionFile(part)), "utf8").then(JSON.parse, () => null);
+  return kept?.schema === QUESTIONS_SCHEMA && Array.isArray(kept.items) ? kept.items : null;
+}
+
 /** A slot's room as a line says it: "15 words", "56 characters". */
 export const roomText = (limit) => [limit.words !== undefined ? `${limit.words} word${limit.words === 1 ? "" : "s"}` : null, limit.characters !== undefined ? `${limit.characters} character${limit.characters === 1 ? "" : "s"}` : null].filter(Boolean).join(", ");
 
@@ -180,6 +203,56 @@ export function withReplacements(doc, problems) {
     holder[route.at(-1)] = problem.replacement;
   }
   return { doc: copy, missing };
+}
+
+// A question the rules ask (judgements.mjs) reads a line where a text of its subject or context is the line's text as the reader
+// reads it, or - for a point's lead or its text, of three words or more, which a rule asks of as one line ("<lead> <text>") -
+// holds it. Every other line is read whole: a sentence that merely opens with a heading's words is not that heading.
+const strings = (value) => (typeof value === "string" ? [value] : Array.isArray(value) ? value.flatMap(strings) : value && typeof value === "object" ? Object.values(value).flatMap(strings) : []);
+const readsWhole = (claim) => !["lead", "text"].includes(roleOf(claim.field)) || claim.limit?.from === "as written" || textWords(claim.text) < 3;
+const holdsText = (text, line, whole) => Boolean(line.trim()) && (text === line || (!whole && text.includes(line)));
+// A rule that reads the page as written asks of the line with its tokens, `{{...}}`, as the author wrote it: that text is read too.
+const holdsLine = (text, claim) => [claim.text, claim.written].some((line) => holdsText(text, String(line ?? ""), readsWhole(claim)));
+
+/**
+ * The lines of `sheet` (claimSheet) a question reads, as `<page id> <field>`, of the pages it is asked on (`where`):
+ * `{ subject, context }`, the lines its subject holds and those its context holds (a table's other headers, the words of the
+ * exhibit a line of commentary is read against). A replacement of any of them asks the question again.
+ */
+export function linesRead(item, sheet) {
+  const where = new Set((item.where ?? []).map(String)), pages = sheet.filter((page) => where.has(String(page.id)));
+  const held = (value) => { const said = strings(value); return pages.flatMap((page) => page.claims.filter((claim) => said.some((text) => holdsLine(text, claim))).map((claim) => `${page.id} ${claim.field}`)); };
+  return { subject: held(item.subject), context: held(item.context ?? null) };
+}
+
+/**
+ * A question as it is asked once lines it reads are replaced: `swaps` each `{ slide, claim, to, written }` - the line as the
+ * sheet read it, the text the replacement reads as, and the replacement as written - and the question's subject and context
+ * with each line it reads on the page it is asked on put as its replacement reads (or as it is written, where the question
+ * reads the line as written): `{ subject, context, swapped }` (`swapped` the swaps it took), or null where it reads none of
+ * them. The compile asks it so once the writer applies the replacements word for word.
+ */
+export function askedWithReplacements(item, swaps) {
+  const where = new Set((item.where ?? []).map(String)), taken = [];
+  const swap = (value, pairs, whole) => {
+    if (typeof value === "string") {
+      const [from, to] = pairs.find(([line]) => holdsText(value, line, whole)) ?? [];
+      return from === undefined ? value : value === from ? to : value.split(from).join(to);
+    }
+    if (Array.isArray(value)) return value.map((child) => swap(child, pairs, whole));
+    return value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, swap(child, pairs, whole)])) : value;
+  };
+  let subject = item.subject, context = item.context ?? null;
+  for (const one of swaps.filter((s) => where.has(String(s.slide)) && s.claim.text.trim() && s.claim.text !== s.to)) {
+    // The line as read and, where its tokens print otherwise, as written: the longer is tried first, so neither is read inside the other.
+    const pairs = [[one.claim.text, one.to], ...(one.written !== undefined && one.claim.written !== one.claim.text ? [[String(one.claim.written), String(one.written)]] : [])]
+      .sort((a, b) => b[0].length - a[0].length);
+    const next = { subject: swap(subject, pairs, readsWhole(one.claim)), context: swap(context, pairs, readsWhole(one.claim)) };
+    if (JSON.stringify(next) === JSON.stringify({ subject, context })) continue;
+    ({ subject, context } = next);
+    taken.push(one);
+  }
+  return taken.length ? { subject, context, swapped: taken } : null;
 }
 
 /** The sheet as lines to read: each page, its evidence findings, then each claim with the room of its slot, its text as written where tokens print its numbers, and the record behind each number - "CHECK" where a number has none. */

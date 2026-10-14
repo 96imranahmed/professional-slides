@@ -125,7 +125,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS, alsoRefused } from "./page-types.mjs";
-import { claimSheet, claimSheetLines, recordSheets } from "./claim-sheet.mjs";
+import { claimSheet, claimSheetLines, recordQuestions, recordSheets } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
@@ -2424,6 +2424,18 @@ export async function checkPages(doc, ids, { dir, stem, insights = null, fit = t
   return { compiled, blocking: compiled.blocking.filter((f) => answering(f).some((id) => named.has(String(id)))) };
 }
 
+/**
+ * The questions the rules ask of `ids` that no recorded judgement answers - those `judge.mjs --page <ids>` stages - as its
+ * page check leaves them, in a session of the deck's recorded judgements of its own: what the run's other compositions ask
+ * (a slot measured at another length, an alternative form) is no reader's to answer. Each is a staged question
+ * (judgements.mjs pendingRequests): `{ key, kind, subject, context, where, beside? }`.
+ */
+export async function openQuestions(doc, ids, { dir, stem, insights = null }) {
+  const session = await loadJudgements(dir, stem), named = new Set([...ids].map(String));
+  await withJudgements(session, () => checkPages(doc, named, { dir, stem, insights, fit: false, fill: false }));
+  return pendingRequests(session).filter((item) => (item.where ?? []).some((id) => named.has(String(id))));
+}
+
 /** The CLI. Returns the exit code. */
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" }, limits: { type: "string", bare: "" },
@@ -2515,6 +2527,15 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     // sheets it is shown are kept by hash, so the join can carry a verdict through its own replacements and name any other line.
     const sheet = values.brief === "selfcheck" && insights ? claimSheet(doc, insights, (sectionPages(doc, values.section ?? null).pages ?? []).map((page) => String(page.id)), { spine: Boolean(values.spine), slotsOf }) : null;
     if (sheet && !values.spine) await recordSheets(path.join(dir, "out"), sheet);
+    // And the questions the rules ask of the section's copy that no judgement answers - those `judge.mjs --page` would stage
+    // for a reader of their own - beside the claims, for the same reader: two readers of one line each rewrite it without
+    // seeing the other's fix, and a line merged from both keeps neither reading. They are kept for the answer's validation
+    // (self-check.mjs), which reads a question on a line the answer replaces as asked of the replacement.
+    let questions = null;
+    if (sheet && !values.spine) {
+      questions = await openQuestions(doc, (sectionPages(doc, values.section ?? null).pages ?? []).map((page) => String(page.id)), { dir, stem, insights });
+      await recordQuestions(path.join(dir, "out"), sectionPages(doc, values.section ?? null).part, questions);
+    }
     // A section's room under each of the deck's caps, as the other sections already hold them (deck-structure.mjs sectionQuotas):
     // a skeleton is told every capped quota and the kinds, a writer the placements it chooses - so no section tips a cap blind.
     let quotas = null;
@@ -2532,7 +2553,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
       quotas = sectionQuotas(doc, { insights, compiled, mine: new Set(own.map((page) => String(page.id))), fills: values.brief === "skeleton" && insights ? evidenceFills(insights) : null,
         planned, budget: budgets.get(ownPart) ?? null });
     }
-    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf: values.brief === "writer" ? slotsOf : null, answerItems, answerHazards, sheet, spine: Boolean(values.spine), quotas });
+    const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf: values.brief === "writer" ? slotsOf : null, answerItems, answerHazards, sheet, questions, spine: Boolean(values.spine), quotas });
     if (brief.why) { console.error(brief.why); return 1; }
     say(brief.lines.join("\n"));
     return 0;
