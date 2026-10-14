@@ -119,6 +119,20 @@ console.log(JSON.stringify(sourceAgeProblems(reg, insights)));
 ''')
         self.assertEqual(result, [{"ref": "i/late", "period": "2025", "key": "wats24", "name": "IATA WATS 2024", "date": "4 Aug 2025"}])
 
+    def test_a_series_is_held_to_its_newest_source_or_each_period_to_its_own(self):
+        """ba5: every historical series was refused because its first years cite results published years before 2025."""
+        result = run_node(f'''
+import {{ sourceAgeProblems }} from '{RT}/sources-registry.mjs';
+const reg = {{ fy17: {{ name: "Results 2017", date: "2018-02-23" }}, fy25: {{ name: "Results 2025", date: "2026-02-27" }}, h1: {{ name: "Overview", date: "2026-03-06" }} }};
+const series = (extra) => ({{ unit: "%", population: "IAG", periods: ["2017", "2025"], values: [13.1, 15.1], ...extra }});
+const insights = [{{ id: "i", measures: {{ whole: series({{ cite: ["fy17", "fy25"] }}), split: series({{ cite: ["fy17", "fy25"], citeBy: {{ "2017": ["fy17"], "2025": ["fy17"] }} }}),
+  half: {{ unit: "x", population: "LH", periods: ["2025", "H1 2026"], values: [2.0, 2.1], cite: ["h1"] }} }} }}];
+console.log(JSON.stringify(sourceAgeProblems(reg, insights).map((p) => [p.ref, p.period, p.key])));
+''')
+        # The series is held to its newest record (2025's results, Feb 2026): no fault. Read period by period, 2025 cites
+        # only 2017's results; and a first half of 2026 cited to a March 2026 overview cannot be reported by it.
+        self.assertEqual(result, [["i/split", "2025", "fy17"], ["i/half", "H1 2026", "h1"]])
+
 
 class UnitHeadingTests(unittest.TestCase):
     def test_a_heading_ending_in_its_unit_keeps_it_once(self):
