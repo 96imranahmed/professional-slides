@@ -202,20 +202,22 @@ const RESERVED_GB = 2;
  * swap in use and its total where the platform says; `agents` is the most whose checks fit the cores and that memory, one at
  * least, and `why` names what limits it - and says when the machine is already swapping, which stalls every check at once.
  */
-export function capacity({ cpus, totalGb, availableGb, swap = null }) {
+export function capacity({ cpus, totalGb, availableGb, swap = null, pressure = null }) {
   const byCores = Math.max(1, cpus - 1), byMemory = Math.max(1, Math.floor((availableGb - RESERVED_GB) / AGENT_MEMORY_GB));
-  const swapping = Boolean(swap && swap.totalGb > 0 && swap.usedGb / swap.totalGb > 0.5);
+  // Under pressure now: the platform's own reading where it gives one (swap in use outlasts the pressure that put it there);
+  // otherwise swap mostly in use with little memory free beside it.
+  const swapping = pressure ? pressure !== "normal" : Boolean(swap && swap.totalGb > 0 && swap.usedGb / swap.totalGb > 0.5 && availableGb < RESERVED_GB + 4 * AGENT_MEMORY_GB);
   // Swapping already, the memory the platform calls free is what the other process will take back: half as many, then.
   const agents = Math.max(1, Math.floor(Math.min(byCores, byMemory) / (swapping ? 2 : 1)));
   const why = [byMemory < byCores ? `memory: ${availableGb.toFixed(1)} GB of ${totalGb.toFixed(0)} GB free for new work, about ${AGENT_MEMORY_GB} GB an agent's checks with ${RESERVED_GB} GB kept back` : `cores: ${cpus}, one kept back`,
-    ...(swapping ? [`the machine is swapping (${swap.usedGb.toFixed(1)} of ${swap.totalGb.toFixed(1)} GB of swap in use): another process holds the memory, and checks run side by side stall together until it is freed - free it, or run fewer agents at once`] : [])];
-  return { cpus, totalGb, availableGb, swap, agents, why };
+    ...(swapping ? [`the machine is under memory pressure${pressure ? ` (${pressure})` : ""}${swap ? `, ${swap.usedGb.toFixed(1)} of ${swap.totalGb.toFixed(1)} GB of swap in use` : ""}: another process holds the memory, and checks run side by side stall together until it is freed - free it, or run fewer agents at once`] : [])];
+  return { cpus, totalGb, availableGb, swap, pressure, agents, why };
 }
 
 /** The machine's cores and memory, read from the platform: free and reclaimable pages and the swap on macOS, free memory elsewhere. */
 async function machineCapacity(platform = process.platform) {
   const totalGb = os.totalmem() / 2 ** 30;
-  let availableGb = os.freemem() / 2 ** 30, swap = null;
+  let availableGb = os.freemem() / 2 ** 30, swap = null, pressure = null;
   if (platform === "darwin") {
     const vm = await run("vm_stat", [], process.env).catch(() => null);
     const page = Number(/page size of (\d+) bytes/.exec(vm?.stdout ?? "")?.[1]);
@@ -225,8 +227,11 @@ async function machineCapacity(platform = process.platform) {
     const usage = await run("sysctl", ["-n", "vm.swapusage"], process.env).catch(() => null);
     const mb = (name) => Number(new RegExp(`${name} = ([\\d.]+)M`).exec(usage?.stdout ?? "")?.[1] ?? NaN);
     if (Number.isFinite(mb("total"))) swap = { totalGb: mb("total") / 1024, usedGb: mb("used") / 1024 };
+    // The kernel's own reading of memory pressure: 1 normal, 2 warning, 4 critical.
+    const level = Number((await run("sysctl", ["-n", "kern.memorystatus_vm_pressure_level"], process.env).catch(() => null))?.stdout?.trim());
+    if (Number.isFinite(level) && level > 0) pressure = level >= 4 ? "critical" : level >= 2 ? "warning" : "normal";
   }
-  return capacity({ cpus: os.cpus().length, totalGb, availableGb, swap });
+  return capacity({ cpus: os.cpus().length, totalGb, availableGb, swap, pressure });
 }
 
 /** Everything a build needs, checked; `candidates` and `env` replace the interpreters tried and the environment searched. */

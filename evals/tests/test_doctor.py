@@ -257,10 +257,17 @@ console.log(JSON.stringify(capacity({json.dumps(machine)})));
         self.assertEqual(out["agents"], 4)
         self.assertIn("memory: 5.0 GB of 32 GB free for new work", out["why"][0])
 
-    def test_a_swapping_machine_is_advised_half_as_many_and_told_why(self):
-        out = self.capacity(cpus=10, totalGb=32, availableGb=24, swap={"totalGb": 10, "usedGb": 8})
+    def test_a_machine_under_memory_pressure_is_advised_half_as_many_and_told_why(self):
+        out = self.capacity(cpus=10, totalGb=32, availableGb=24, swap={"totalGb": 10, "usedGb": 8}, pressure="warning")
         self.assertEqual(out["agents"], 4)
-        self.assertIn("the machine is swapping (8.0 of 10.0 GB of swap in use)", out["why"][1])
+        self.assertIn("the machine is under memory pressure (warning), 8.0 of 10.0 GB of swap in use", out["why"][1])
+
+    def test_swap_left_in_use_after_the_pressure_has_passed_does_not_halve_the_advice(self):
+        # Swapped pages stay out after the memory comes back: the platform's own pressure reading decides.
+        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=12, swap={"totalGb": 8, "usedGb": 6.5}, pressure="normal")["agents"], 9)
+        # Where the platform gives no reading, swap mostly in use counts only with little memory free beside it.
+        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=12, swap={"totalGb": 8, "usedGb": 6.5})["agents"], 9)
+        self.assertEqual(self.capacity(cpus=10, totalGb=32, availableGb=4, swap={"totalGb": 8, "usedGb": 6.5})["agents"], 1)
 
     def test_one_agent_at_least(self):
         self.assertEqual(self.capacity(cpus=1, totalGb=4, availableGb=1)["agents"], 1)
