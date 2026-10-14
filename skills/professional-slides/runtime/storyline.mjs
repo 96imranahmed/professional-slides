@@ -85,7 +85,7 @@ import { percentUnit, printedNumbers, states } from "./printed-numbers.mjs";
 import { carriedSaid, withCarriedPages } from "./revision.mjs";
 import { naturalClass } from "./spine-witness.mjs";
 import { JUDGEMENT_KINDS } from "./judgements.mjs";
-import { argumentErrors, argumentLedgerItems, argumentPacket, argumentPrompt, fixApplied, withArgumentFixes } from "./spine-argument.mjs";
+import { ARGUMENT_ENTRY_SCHEMA, argumentErrors, argumentLedgerItems, argumentPacket, argumentPrompt, fixApplied, withArgumentFixes } from "./spine-argument.mjs";
 import { answerCritiqueRefusal, answerHashOf, answerHazards, hazardLine as answerHazardLine, itemLine as answerItemLine, openAnswerItems, readAnswerCritique } from "./answer-critique.mjs";
 
 // `provisional` is a storyline whose team has done everything the evidence in
@@ -233,7 +233,7 @@ export const STORYLINE_SCHEMA = {
     // One answer for each blocking item a retired lineage left open (review-passes.mjs carriedErrors); absent where the packet carries none.
     carried: CARRIED_SCHEMA,
     // A verdict on every argument item of a first pass (spine-argument.mjs): its form is checked item by item against the packet.
-    argument: { type: "array", items: { type: "object" } },
+    argument: { type: "array", items: ARGUMENT_ENTRY_SCHEMA },
   }
 };
 
@@ -277,7 +277,15 @@ const partSchema = (kind) => {
     }
   };
 };
-export const STORYLINE_PART_SCHEMAS = Object.freeze({ section: partSchema("section"), spine: partSchema("spine") });
+// A section's argument reading, read beside the spine critique: its verdicts and nothing else.
+const ARGUMENT_PART = { type: "object", additionalProperties: false, required: ["part", "binding", "argument"],
+  properties: { part: { type: "object", additionalProperties: false, required: ["kind", "id", "pages"], properties: { kind: { type: "string", enum: ["argument"] }, id: { type: "string" }, pages: { type: "array", items: { type: "string" } } } },
+    binding: HASH, provenance: PROVENANCE_SCHEMA, argument: { type: "array", items: ARGUMENT_ENTRY_SCHEMA } } };
+// The spine critique of a spine whose argument reading is split: a whole first pass, less the argument, with its part.
+const SPINE_ONLY_PART = (() => { const { pass: _p, verifies: _v, argument: _a, ...properties } = STORYLINE_SPINE_SCHEMA.properties;
+  return { ...STORYLINE_SPINE_SCHEMA, required: [...STORYLINE_SPINE_SCHEMA.required.filter((k) => !["pass", "verifies"].includes(k)), "part"],
+    properties: { part: { ...ARGUMENT_PART.properties.part, properties: { ...ARGUMENT_PART.properties.part.properties, kind: { type: "string", enum: ["spine"] } } }, ...properties } }; })();
+export const STORYLINE_PART_SCHEMAS = Object.freeze({ section: partSchema("section"), spine: partSchema("spine"), argument: ARGUMENT_PART, spineOnly: SPINE_ONLY_PART });
 
 const schemaFor = (mode, scope) => (scope ? (mode === "full" ? STORYLINE_VERIFICATION_SCHEMA : STORYLINE_SPINE_VERIFICATION_SCHEMA) : (mode === "full" ? STORYLINE_SCHEMA : STORYLINE_SPINE_SCHEMA));
 // The schema a critic is handed: the one its answer is validated against, less a key the packet gives it nothing to answer with.
@@ -289,12 +297,16 @@ const LEGACY_PILLAR = ["overlap", "strongestCounter", "reversal", "answered"];
 function offered(schema, { carried = false, argument = false } = {}) {
   const properties = Object.fromEntries(Object.entries(schema.properties).filter(([key]) => !DERIVED.includes(key) && (carried || key !== "carried") && (argument || key !== "argument")));
   if (properties.pillars) properties.pillars = { ...properties.pillars, items: { ...PILLAR, properties: Object.fromEntries(Object.entries(PILLAR.properties).filter(([key]) => !LEGACY_PILLAR.includes(key))) } };
-  // Offered, the argument reading is owed: validation refuses an answer without a verdict on every item.
-  return { ...schema, ...(argument && properties.argument ? { required: [...schema.required, "argument"] } : {}), properties };
+  // What validation requires, the schema handed over requires: the argument reading where it is owed, and the provenance a
+  // critic alone can say - its backend and model. The prompt's hash is the runtime's to stamp (stampProvenance). A real critic
+  // took three attempts at the ba4 packet because `provenance.model` was required by the validator and by no schema it was given.
+  if (properties.provenance) properties.provenance = { ...PROVENANCE_SCHEMA, required: ["backend", "model"] };
+  const required = [...new Set([...schema.required, ...(properties.provenance ? ["provenance"] : []), ...(argument && properties.argument ? ["argument"] : [])])];
+  return { ...schema, required, properties };
 }
 const offeredSchema = (mode, scope, { carried = false, argument = false } = {}) => offered(schemaFor(mode, scope), { carried: Boolean(scope) || carried, argument: !scope && argument });
 // The spine part answers the argument items of a split first pass: its critic reads every title.
-const offeredPart = (kind, { argument = false } = {}) => offered(STORYLINE_PART_SCHEMAS[kind], { argument: kind === "spine" && argument });
+const offeredPart = (kind, { argument = false } = {}) => offered(STORYLINE_PART_SCHEMAS[kind], { argument: kind === "argument" || argument });
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 
@@ -987,15 +999,22 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
     // The argument reading, read once, by the first pass: every title and comparison with the records behind it (spine-argument.mjs).
     ...(!scope ? { argument: argumentPacket(pages, { registry, insights: insightMap, sources: spec.sources ?? {}, conventions: spec.conventions ?? spec.deck?.conventions ?? null }) } : {}),
     players: spec.players ?? [], sources, insights, targetPages, totalPages: pages.length, contentPages, pages };
-  const argued = Boolean(packet.argument?.items.length);
+  // The argument reading split by section, side by side: on a split page-level critique each section's critic reads its own
+  // pages' items; on a spine critique whose one prompt would pass ARGUMENT_SPLIT_CHARS (or `--split`), a critic a section reads
+  // them beside the spine critic, who keeps the answer, the storyline and what runs across sections.
+  if (packet.argument?.items.length && (sections || split || (mode === "full" ? storylinePrompt(packet) : spinePrompt(packet)).length > ARGUMENT_SPLIT_CHARS))
+    packet.argumentParts = (sections ?? splitSections(pages.map((p) => ({ id: p.id, title: p.title, opens: p.kind === "section", counted: p.kind !== "carried" })), { max: STORYLINE_SECTION_MAX }))
+      .map((section) => ({ id: section.id, title: section.title, pages: section.pages }));
+  const argued = Boolean(packet.argument?.items.length) && !packet.argumentParts;
   const schema = offeredSchema(mode, scope, { carried: !scope && carried.length > 0, argument: argued });
   const previous = await readJson(path.join(store, PACKET_RECORD), { optional: true });
   const dir = await stageReview("storyline", {}, { previous: previous?.staging });
   packet.staging = dir;
   const main = (scope ? storylineVerificationPrompt(packet) : mode === "full" ? storylinePrompt(packet) : spinePrompt(packet))
     + validateStep(specPath, outputDirectory, path.join(path.resolve(outputDirectory), REVIEW_FILE));
-  const parts = sections ? [...sections.map((section) => [section.id, storylineSectionPrompt(packet, section)]), ["spine", storylineSpinePrompt(packet)]]
-    .map(([id, text]) => [id, text + validateStep(specPath, outputDirectory, path.join(dir, "parts", `${id}.json`))]) : [];
+  const parts = (sections ? [...sections.map((section) => [section.id, storylineSectionPrompt(packet, section)]), ["spine", storylineSpinePrompt(packet)]]
+    : packet.argumentParts ? [...packet.argumentParts.map((part) => [part.id, argumentSectionPrompt(packet, part)]), ["spine", spineOnlyPrompt(packet)]] : [])
+    .map(([id, text]) => [id, text + validateStep(specPath, outputDirectory, path.join(dir, "parts", `${id}.json`))]);
   packet.promptHash = sha256([main, ...parts.map(([, text]) => text)].join("\u0000"));
   const signed = (text) => `${text}${provenanceLine(packet.promptHash)}`;
   // The staged copy says what the critic is given; the record keeps the ledger the answer is checked against.
@@ -1003,11 +1022,11 @@ export async function buildStorylinePacket(specPath, outputDirectory, { scope = 
   await writeJson(path.join(dir, "packet.json"), { ...packet, scope: scope ? shownScope : null });
   await writeJson(path.join(dir, "schema.json"), schema);
   await fs.writeFile(path.join(dir, "prompt.md"), signed(main));
-  if (sections) {
+  if (parts.length) {
     await fs.mkdir(path.join(dir, "sections"), { recursive: true });
     await fs.mkdir(path.join(dir, "parts"), { recursive: true });
-    await writeJson(path.join(dir, "part-schema.json"), offeredPart("section"));
-    await writeJson(path.join(dir, "spine-part-schema.json"), offeredPart("spine", { argument: argued }));
+    await writeJson(path.join(dir, "part-schema.json"), sections ? offeredPart("section", { argument: Boolean(packet.argumentParts) }) : offeredPart("argument"));
+    await writeJson(path.join(dir, "spine-part-schema.json"), sections ? offeredPart("spine") : offeredPart("spineOnly"));
     for (const [id, text] of parts) await fs.writeFile(path.join(dir, "sections", `${id}.md`), signed(text));
   }
   await fs.mkdir(store, { recursive: true });
@@ -1377,7 +1396,7 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map((p) => marked(packet, compactLine(p), p)).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
+${reconcileLines(packet)}${limitsLine(packet)}${packet.argumentParts ? "" : argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1390,7 +1409,7 @@ Work through it in this order.
 3. The pillars, on their check above. For each in \`pillars\`: its pages, your verdict and a note on what holds it up or what it lacks.
 4. The pages, from their lines, on every page check - and a title (a section's too) that claims more than the periods or members its pages show, a comparison with one member - each as a finding on its pages.
 5. \`numbers\`: set every figure in a title or claim beside the measures recorded on its page and on each other page stating that quantity. \`sectionFlow\` and \`execSummary\`, a sentence or two each.
-6. Missing analyses, each with \`public\` known or speculative; cut or merge.${packet.argument?.items.length ? `
+6. Missing analyses, each with \`public\` known or speculative; cut or merge.${packet.argument?.items.length && !packet.argumentParts ? `
 6b. The argument reading: \`argument\`, a verdict on every one of its ${packet.argument.items.length} items, read on the records above.` : ""}
 7. Rate the storyline on the scale below and rank the top fixes (none, where nothing needs fixing).
 
@@ -1422,7 +1441,7 @@ ${analysesLines(packet)}
 
 THE STORYLINE (title, page type, what settles the claim, the measures it shows with their recorded values, the insights it rests on; drafted exhibits and copy are the author's sketch):
 ${packet.pages.map((p) => marked(packet, spineLine(p), p)).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
+${reconcileLines(packet)}${limitsLine(packet)}${packet.argumentParts ? "" : argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
@@ -1469,7 +1488,9 @@ ${checksPrompt()}
 
 ${CALIBRATION}
 
-Check every page check on every one of your pages.
+Check every page check on every one of your pages.${packet.argumentParts ? `
+${limitsLine(packet)}${argumentPrompt(packet.argument, section.pages)}
+Your part also returns \`argument\`: a verdict on every argument item of your pages.` : ""}
 
 ${PAGE_RULES}
 
@@ -1477,8 +1498,34 @@ ${itemRules()}
 Name only pages in your section; leave the spine sections as short notes ("see the spine critic"). Rate your section on the scale: ${ratingScale({ capped: false })}.
 
 Set part to ${JSON.stringify({ kind: "section", id: section.id, pages: section.pages })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("section"))}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("section", { argument: Boolean(packet.argumentParts) }))}`;
 }
+
+// Past this many characters (about 24K tokens at 3.8 a token), a spine critique's one prompt is split: its argument reading goes
+// to a critic a section. On ba4 one reader of the whole 278 KB prompt (178 items) took 20 minutes and three attempts and missed
+// defects its records showed - fd14's record against a pre-IFRS 16 year, na03, lc06, sh08; the 50-page probe's whole prompt is 25 KB.
+const ARGUMENT_SPLIT_CHARS = 90000;
+
+/** A section's argument reading, beside the spine critic: the answer, the conventions and every title for context, its own pages' records. */
+function argumentSectionPrompt(packet, part) {
+  const pages = packet.pages.filter((p) => part.pages.includes(p.id));
+  return `You are one of several critics reading a long storyline's argument in parallel, before anything is drawn. Yours is the argument reading of section ${part.id}, "${part.title}": pages ${part.pages.join(", ")}. A spine critic takes the answer, the pillars, the flow and everything that runs across sections; you return a verdict on each argument item of your pages, and nothing else. Be exacting and fair; judge from this packet alone: do not search the web or open other files.
+
+${requestLines(packet)}
+THE WHOLE TITLE SPINE, for context:
+${packet.pages.map((p) => `${p.n}. [${p.id}] ${p.title}`).join("\n")}
+
+${SPINE_HEADING.replace("THE SPINE", "THE SPINE OF YOUR PAGES")}
+${pages.map(compactLine).join("\n")}
+${limitsLine(packet)}${argumentPrompt(packet.argument, part.pages)}
+Set part to ${JSON.stringify({ kind: "argument", id: part.id, pages: part.pages })}. Bind to ${packet.binding}.
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("argument"))}`;
+}
+/** The spine critique of a spine whose argument reading is split by section: the whole first pass, less the argument items. */
+const spineOnlyPrompt = (packet) => `${spinePrompt(packet)}
+
+THE ARGUMENT READING of every title and comparison is read by section critics beside you (${packet.argumentParts.map((part) => part.id).join(", ")}): leave \`argument\` out. Set part to ${JSON.stringify({ kind: "spine", id: "spine", pages: packet.pages.filter(isContent).map((p) => p.id) })}, and leave out \`pass\` and \`verifies\`.
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spineOnly"))}`;
 
 /** The spine critic of a long page-level critique: the compact spine, not the whole page listing again. */
 export function storylineSpinePrompt(packet) {
@@ -1495,14 +1542,14 @@ ${sectionsLine(packet)}
 
 ${SPINE_HEADING}
 ${packet.pages.map(compactLine).join("\n")}
-${reconcileLines(packet)}${limitsLine(packet)}${argumentPrompt(packet.argument)}
+${reconcileLines(packet)}${limitsLine(packet)}${packet.argumentParts ? "" : argumentPrompt(packet.argument)}
 ${CRITIC_STANDARDS}
 
 ${checksPrompt()}
 
 ${CALIBRATION}
 
-You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\`${packet.argument?.items.length ? ", and `argument`, a verdict on every argument item" : ""} - and file spine findings listing every page they concern (${SPINE_CHECKS.join(", ")}). Leave \`pages\` empty. Your rating and summary become the critique's.
+You write the spine sections - \`spine\`, \`answer\`, \`answerParts\`, \`pillars\`, \`numbers\`, \`sectionFlow\`, \`execSummary\`, \`missingAnalyses\`, \`cutOrMerge\`, \`topFixes\`${packet.argument?.items.length && !packet.argumentParts ? ", and `argument`, a verdict on every argument item" : ""} - and file spine findings listing every page they concern (${SPINE_CHECKS.join(", ")}). Leave \`pages\` empty. Your rating and summary become the critique's.
 
 ${JUDGEMENT_RULES}
 
@@ -1511,7 +1558,7 @@ ${ANSWER_RULES}
 ${itemRules()}
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", pages: packet.pages.filter(isContent).map((p) => p.id) })}. Bind to ${packet.binding}.
-Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spine", { argument: Boolean(packet.argument?.items.length) }))}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(offeredPart("spine", { argument: Boolean(packet.argument?.items.length) && !packet.argumentParts }))}`;
 }
 
 export function storylineVerificationPrompt(packet) {
@@ -1777,7 +1824,11 @@ export function validateStorylineRecord(review, { ids, contentIds, scope = null,
   if (!review || typeof review !== "object") return ["storyline-review.json is missing: run the storyline critique (references/storylining.md#stress-test-the-storyline)"];
   // The whole record, not just the verdict: a truncated or hand-written
   // `{ verdict: "ready", binding }` is not a critique.
-  const structure = schemaErrors(review, schemaFor(mode, scope), "storyline review");
+  // The argument reading is checked whole by argumentErrors, which names every reason at once: a schema refusal of one entry
+  // would stop the reading there, and the critic would come back for the next.
+  const { argument: verdicts, ...rest } = review;
+  const structure = schemaErrors(rest, schemaFor(mode, scope), "storyline review");
+  if (scope && verdicts !== undefined) structure.push("storyline review carries `argument`, which a verification pass does not: the argument reading is the first pass's");
   if (structure.length) return structure;
   const errors = itemErrors(review, ids, null, { cap: mode === "spine" ? SPINE_ITEM_MAX : null, limits, dividers, sectionFits });
   if (promptHash !== undefined) errors.push(...provenanceErrors(review, promptHash));
@@ -2384,7 +2435,7 @@ async function validateStorylineAnswer(specPath, outputDirectory, file) {
   if (review.part) {
     // One part of a split critique, read as merge reads it: its page lists settled, then its checks.
     const { ids, contentIds } = packetContext(packet);
-    const settled = settleCritiqueForm(review, ids, contentIds);
+    const settled = settleCritiqueForm(stampProvenance(review, packet), ids, contentIds);
     mended.push(...settled.mended);
     errors.push(...partErrors(settled.review, packet).map((e) => `${review.part.id ?? "part"}: ${e}`));
   } else if (packet.binding !== review.binding || packet.pass !== review.pass) {
@@ -2544,20 +2595,39 @@ async function advanceStoryline(specPath, outputDirectory, { maxPasses: asked = 
   return { status: "packet-written", pass: next.pass, mode: wanted, dir, binding: next.binding, sections: next.sections?.length ?? 0, ...(retired ? { retired } : {}),
     ...(scope?.postReview && scope.postReview.origin !== "compile" ? { postReview: { reviewPass: scope.postReview.reviewPass, pages: scope.postReview.pages } } : {}),
     ...(scope?.postReview?.origin === "compile" ? { compileRefusal: { pages: scope.postReview.pages, refusals: scope.postReview.findings.map((f) => `${f.pages[0]}: ${f.code}`) } } : {}),
-    note: next.sections ? `Give each prompt in ${path.join(dir, "sections")} to its own fresh critic in parallel (no other context), save each answer as ${path.join(dir, "parts", "<id>.json")}, then run storyline.mjs merge` : `Give ${path.join(dir, "prompt.md")} to a fresh critic (no other context) and save its JSON as ${path.join(out, "storyline-review.json")}, then run this again` };
+    note: next.sections || next.argumentParts ? `Give each prompt in ${path.join(dir, "sections")} to its own fresh critic in parallel (no other context), save each answer as ${path.join(dir, "parts", "<id>.json")}, then run storyline.mjs merge` : `Give ${path.join(dir, "prompt.md")} to a fresh critic (no other context) and save its JSON as ${path.join(out, "storyline-review.json")}, then run this again` };
 }
 
 function partErrors(part, packet) {
   const meta = part?.part;
-  if (!meta || !["section", "spine"].includes(meta.kind)) return ["part must say { kind: section|spine, id, pages }"];
-  const structure = schemaErrors(part, STORYLINE_PART_SCHEMAS[meta.kind], meta.id);
+  if (!meta || !["section", "spine", "argument"].includes(meta.kind)) return ["part must say { kind: section|spine|argument, id, pages }"];
+  const split = Boolean(packet.argumentParts), spineOnly = split && !packet.sections && meta.kind === "spine";
+  const { argument: _verdicts, ...rest } = part, schema = STORYLINE_PART_SCHEMAS[spineOnly ? "spineOnly" : meta.kind];
+  const structure = schemaErrors(rest, { ...schema, required: schema.required.filter((key) => key !== "argument") }, meta.id);
   if (structure.length) return structure;
   const { ids, insightIds, promptHash, limits, dividers, argument } = packetContext(packet);
-  const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null, { limits, dividers }), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
-  if (meta.kind === "spine" && argument) errors.push(...argumentErrors(part.argument, { ...argument, insightIds, limits, dividers }));
-  if (meta.kind === "section" && part.argument !== undefined) errors.push("`argument` is the spine part's to answer: leave it out of a section's part");
+  // A section's critic answers its own pages' items: the whole set is checked again when the parts are joined.
+  const own = argument ? { ...argument, items: argument.items.filter((item) => (meta.pages || []).includes(item.page)), insightIds, limits, dividers } : null;
+  if (meta.kind === "argument") return [...(promptHash ? provenanceErrors(part, promptHash) : []), ...(own ? argumentErrors(part.argument, own) : [])];
+  const errors = [...itemErrors(part, ids, meta.kind === "section" ? meta.pages : null, { limits, dividers, cap: spineOnly ? SPINE_ITEM_MAX : null }), ...(promptHash ? provenanceErrors(part, promptHash) : [])];
+  if (meta.kind === "spine" && argument && !split) errors.push(...argumentErrors(part.argument, { ...argument, insightIds, limits, dividers }));
+  if (meta.kind === "spine" && split && part.argument !== undefined) errors.push("`argument` is read by the section critics: leave it out of the spine's part");
+  if (meta.kind === "section" && split && own) errors.push(...argumentErrors(part.argument, own));
+  if (meta.kind === "section" && !split && part.argument !== undefined) errors.push("`argument` is the spine part's to answer: leave it out of a section's part");
   if (meta.kind === "section") errors.push(...coverageErrors(part.pages, meta.pages, "page"), ...sourcingErrors(part.pages, storylineLedger([], part), insightIds));
   return errors;
+}
+
+/** A spine critique and its section critics' argument readings joined into one first pass: the spine part with every verdict. */
+function mergeArgumentParts(parts, packet, mended) {
+  const errors = parts.flatMap((part) => partErrors(part, packet).map((e) => `${part?.part?.id ?? "part"}: ${e}`));
+  const spines = parts.filter((p) => p?.part?.kind === "spine"), readings = parts.filter((p) => p?.part?.kind === "argument");
+  if (spines.length !== 1) errors.push(`a split spine critique needs exactly one spine part; got ${spines.length}`);
+  if (parts.some((p) => p?.binding !== packet.binding)) errors.push("a part is bound to a different spine than the packet");
+  for (const part of packet.argumentParts) if (readings.filter((p) => p.part.id === part.id).length !== 1) errors.push(`section ${part.id}'s argument reading needs exactly one part`);
+  if (errors.length) return { errors };
+  const { part: _part, ...spine } = spines[0];
+  return { review: { pass: 1, verifies: null, ...spine, binding: packet.binding, argument: readings.flatMap((p) => p.argument) }, errors: [], mended };
 }
 
 /** Join a long spine's parallel critiques into one first pass, as reviewer.mjs does for the deck. */
@@ -2565,7 +2635,8 @@ export function mergeStorylineParts(partsIn, packet) {
   const { ids, contentIds } = packetContext(packet);
   // Each part's page lists are settled as a whole critique's are, and what was settled is returned for the record.
   const mended = [];
-  const parts = partsIn.map((part) => { const settled = settleCritiqueForm(part, ids, contentIds); mended.push(...settled.mended.map((entry) => ({ ...entry, at: `${part?.part?.id ?? "part"}: ${entry.at}` }))); return settled.review; });
+  const parts = partsIn.map((part) => { const settled = settleCritiqueForm(part, ids, contentIds); mended.push(...settled.mended.map((entry) => ({ ...entry, at: `${part?.part?.id ?? "part"}: ${entry.at}` }))); return stampProvenance(settled.review, packet); });
+  if (packet.argumentParts && !packet.sections) return mergeArgumentParts(parts, packet, mended);
   const errors = [...parts.flatMap((part) => partErrors(part, packet).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
     ...partSetErrors(parts, contentIds, { key: "pages", binding: packet.binding, sections: packet.sections })];
   if (errors.length) return { errors };
@@ -2577,7 +2648,7 @@ export function mergeStorylineParts(partsIn, packet) {
     spine: lead.spine, answer: lead.answer, answerParts: lead.answerParts, pillars: lead.pillars, numbers: lead.numbers, sectionFlow: lead.sectionFlow, execSummary: lead.execSummary,
     missingAnalyses: relabel(lead, lead.missingAnalyses), cutOrMerge: relabel(lead, lead.cutOrMerge),
     findings: parts.flatMap((p) => relabel(p, p.findings)), topFixes: lead.topFixes, mergedFrom: parts.map((p) => p.part.id),
-    ...(lead.argument ? { argument: lead.argument } : {}),
+    ...(packet.argumentParts ? { argument: parts.filter((p) => p.part.kind === "section").flatMap((p) => p.argument || []) } : lead.argument ? { argument: lead.argument } : {}),
     // The spine critic answers the carried items; an item it files one as is renamed with its other items.
     ...(lead.carried ? { carried: lead.carried.map((answer) => (answer.finding ? { ...answer, finding: rename(lead, answer.finding) } : answer)) } : {}),
   };
@@ -2594,7 +2665,7 @@ export async function mergeStorylineDirectory(specPath, outputDirectory, options
   const out = path.resolve(outputDirectory);
   const spec = await readJson(specPath);
   const packet = await readJson(path.join(await lineageStore(spec, out, specPath), PACKET_RECORD), { optional: true });
-  if (!packet?.sections) return { status: "invalid", errors: ["no split storyline packet to merge against: run storyline.mjs --full on a long spine first"] };
+  if (!packet?.sections && !packet?.argumentParts) return { status: "invalid", errors: ["no split storyline packet to merge against: run storyline.mjs --full on a long spine, or --split, first"] };
   const { files, parts } = await readParts(path.join(packet.staging, "parts"));
   const { review, errors, mended } = mergeStorylineParts(parts, packet);
   if (errors.length) return { status: "invalid", errors, parts: files };

@@ -140,5 +140,83 @@ console.log(JSON.stringify({ given: await run(title), reworded: await run('Profi
         self.assertEqual(reworded["kinds"], ["critic"])
 
 
+class FormTests(unittest.TestCase):
+    def test_the_schema_handed_over_requires_every_field_validation_requires(self):
+        # The ba4 critic took three attempts: `provenance.model` was required by the validator and by no schema it was handed.
+        # Each field of a valid answer is taken out in turn; where the loop (which stamps the prompt hash itself) then refuses
+        # the answer, the schema the critic was given must have required that field.
+        result = run_node(ARGUED + '''
+const deck = await stage('finance');
+const one = await S.prepareStoryline(deck.specPath, deck.out);
+const packet = await packetOf(one);
+const schema = JSON.parse(await fs.readFile(path.join(one.dir, 'schema.json'), 'utf8'));
+await clear(deck);
+const ids = packet.pages.filter((p) => !p.kind || p.kind === 'content').map((p) => p.id);
+const valid = first(packet, ids, [], { argument: holds(packet, { 'compare:f5': fails('compare:f5', 'MISLEADING_COMPARISON', { basis: { measure: 'i-peers/capital', at: 'Eastbank', note: 'not published for FY26' } }) }) });
+const ctx = S.packetContext(packet);
+const refused = (answer) => S.judgeCritique(S.stampProvenance(answer, packet), ctx).errors.length > 0;
+const at = valid.argument.findIndex((entry) => entry.verdict === 'fails'), entry = schema.properties.argument.items;
+const levels = [
+  ['', (a) => a, schema.required],
+  ['provenance.', (a) => a.provenance, schema.properties.provenance.required],
+  ['argument[].', (a) => a.argument[at], [...entry.required, ...(entry.then?.required || [])]],
+  ['fix.basis.', (a) => a.argument[at].fix.basis, entry.properties.fix.properties.basis.required],
+];
+const unrequired = [];
+for (const [label, holder, required] of levels) for (const key of Object.keys(holder(valid))) {
+  const cut = structuredClone(valid); delete holder(cut)[key];
+  if (refused(cut) && !(required || []).includes(key)) unrequired.push(label + key);
+}
+console.log(JSON.stringify({ valid: refused(valid), unrequired, stampedHash: schema.properties.provenance.required.includes('promptHash') }));
+''')
+        self.assertFalse(result["valid"], result)
+        self.assertEqual(result["unrequired"], [])
+        self.assertFalse(result["stampedHash"])                            # the runtime stamps the hash: not the critic's to copy
+
+    def test_a_basis_note_on_a_measure_of_one_value_says_where_it_goes(self):
+        result = run_node(ARGUED + '''
+const deck = await stage('finance');
+const one = await S.prepareStoryline(deck.specPath, deck.out);
+const prompt = await fs.readFile(path.join(one.dir, 'prompt.md'), 'utf8');
+await clear(deck);
+console.log(JSON.stringify({ said: prompt.includes('"value" for a measure of one value') }));
+''')
+        self.assertTrue(result["said"])
+
+
+class SplitTests(unittest.TestCase):
+    def test_a_split_argument_reading_is_read_by_section_and_joined_whole(self):
+        # One ba4 reader of 178 items in a 73K-token prompt took 20 minutes and missed defects its records showed. Split, each
+        # section's critic reads its own pages' items beside the spine critic, and the join still refuses an item left out.
+        result = run_node(ARGUED + '''
+const deck = await stage('finance');
+const one = await S.prepareStoryline(deck.specPath, deck.out, { split: true });
+const packet = await packetOf(one);
+const ids = packet.pages.filter((p) => !p.kind || p.kind === 'content').map((p) => p.id);
+const staged = await fs.readdir(path.join(one.dir, 'sections'));
+const spinePrompt = await fs.readFile(path.join(one.dir, 'sections', 'spine.md'), 'utf8');
+const { pass: _p, verifies: _v, argument: _a, ...spine } = first(packet, ids, []);
+const save = (id, body) => fs.writeFile(path.join(one.dir, 'parts', `${id}.json`), JSON.stringify(body));
+const prov = { backend: 'subagent', model: 'fixture' };
+await save('spine', { ...spine, part: { kind: 'spine', id: 'spine', pages: ids } });
+const reading = (part, drop = null) => ({ part: { kind: 'argument', id: part.id, pages: part.pages }, binding: packet.binding, provenance: prov,
+  argument: packet.argument.items.filter((item) => part.pages.includes(item.page) && item.id !== drop).map((item) => ({ item: item.id, verdict: 'holds' })) });
+for (const part of packet.argumentParts) await save(part.id, reading(part, 'compare:f5'));
+const short = await S.mergeStorylineDirectory(deck.specPath, deck.out);
+for (const part of packet.argumentParts) await save(part.id, reading(part));
+const whole = await S.mergeStorylineDirectory(deck.specPath, deck.out);
+await clear(deck);
+console.log(JSON.stringify({ parts: packet.argumentParts.map((p) => p.id), staged, spineHasNone: !spinePrompt.includes('THE ARGUMENT READING. This is'),
+  short: short.status, said: (short.errors || []).some((e) => e.includes('compare:f5')), whole: whole.status }));
+''')
+        self.assertTrue(result["parts"], result)
+        self.assertIn("spine.md", result["staged"])
+        self.assertTrue(all(f"{p}.md" in result["staged"] for p in result["parts"]), result)
+        self.assertTrue(result["spineHasNone"], result)                    # the spine critic keeps the deck-level work only
+        self.assertEqual(result["short"], "invalid")
+        self.assertTrue(result["said"], result)
+        self.assertEqual(result["whole"], "ready", result)
+
+
 if __name__ == "__main__":
     unittest.main()

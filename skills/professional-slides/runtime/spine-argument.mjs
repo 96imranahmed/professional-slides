@@ -36,9 +36,25 @@ export const ARGUMENT_FIXES = Object.freeze({
   evidence: "the page's whole new list of insights and analyses to rest on (its `evidence`), each an id in the log",
   measures: "the whole new list of measures its `settles` names (`settles.measures`), each an `<insight>/<measure>` the log records",
   peerSet: "the peer set the comparison uses: a name `conventions.peerSets` declares, or { name, members } to declare there, each member one the page's measures record",
-  basis: "a basis note: { measure, at, note }, written to that measure's `boundaries[at]` in the insight log, `at` one of its periods or members",
+  basis: "a basis note: { measure, at, note }, written to that measure's `boundaries[at]` in the insight log; `at` is one of its periods or members, or \"value\" for a measure of one value",
 });
 const FIX_KEYS = Object.keys(ARGUMENT_FIXES);
+const IDS = { type: "array", minItems: 1, items: { type: "string", minLength: 1 } };
+/**
+ * One verdict as the schema states it: everything `argumentErrors` requires of an entry is required here, a failing entry's
+ * code, problem and fix under `then`. A real critic took three attempts at its answer because the schema it was handed left
+ * out what the validator required.
+ */
+export const ARGUMENT_ENTRY_SCHEMA = Object.freeze({
+  type: "object", required: ["item", "verdict"],
+  properties: {
+    item: { type: "string", minLength: 7 }, verdict: { type: "string", enum: ARGUMENT_VERDICTS },
+    code: { type: "string", enum: Object.keys(SPINE_ARGUMENT_CODES) }, problem: { type: "string", minLength: 20 },
+    fix: { type: "object", additionalProperties: false, properties: { title: { type: "string", minLength: 2 }, evidence: IDS, measures: IDS,
+      peerSet: { type: ["string", "object"] }, basis: { type: "object", required: ["measure", "at", "note"], properties: { measure: { type: "string" }, at: { type: "string" }, note: { type: "string" } } } } },
+  },
+  if: { properties: { verdict: { const: "fails" } } }, then: { required: ["code", "problem", "fix"] },
+});
 // The least a failing item's `problem` says: which record shows the defect.
 const PROBLEM_MIN = 20;
 const NOTE_WORDS = 3;
@@ -134,40 +150,57 @@ export function argumentPacket(pages, { registry, insights = new Map(), sources 
   const items = argumentItems(pages, records);
   const byPage = new Map();
   for (const item of items) byPage.set(item.page, [...(byPage.get(item.page) || []), item]);
-  const usedRefs = new Set(), usedInsights = new Set(), cited = new Map();
-  const pageLines = [], held = {};
+  const usedRefs = new Set(), cited = new Map();
+  const held = {}, byPageRecords = {};
   for (const p of pages) {
     const own = byPage.get(String(p.id));
     if (!own) continue;
     const refs = refsOfPage(p).filter((ref) => registry.has(ref));
     held[String(p.id)] = { title: String(p.title), refs, settlesRefs: Array.isArray(settlesOf(p)?.measures) ? settlesOf(p).measures : [] };
     const evidence = (p.evidence || []).map((e) => (typeof e === "string" ? e : e.id)).filter(Boolean);
-    refs.forEach((ref) => usedRefs.add(ref));
     // A computed measure is read with the records it is computed from: their boundaries and sources are its own.
-    refs.forEach((ref) => inputsOf(registry, ref).forEach((input) => usedRefs.add(input)));
-    evidence.forEach((id) => usedInsights.add(id));
+    const read = [...new Set([...refs, ...refs.flatMap((ref) => inputsOf(registry, ref))])];
+    read.forEach((ref) => usedRefs.add(ref));
+    byPageRecords[String(p.id)] = { line: null, refs: read, insights: evidence };
     const stated = refs.flatMap((ref) => { const { labels } = statedBy(p.title, records[ref]); if (labels.length) cited.set(ref, [...(cited.get(ref) || []), ...labels.map(([l]) => l)]); return labels.map(([label, v]) => `${ref}${label === null ? "" : `@${label}`} ${fmt(v)}`); });
     const loose = unrecordedNumbers(p.title, refs, records);
     const settles = settlesOf(p);
     // The title and the insights are on the page's line in THE SPINE: here only what that line does not say. A page that rests
     // on no measure and settles nothing has no line here, and its title item is read off its line there.
     if (!settles && !refs.length && !loose.length) continue;
-    pageLines.push([`[${p.id}] ${own.map((i) => i.id).join(", ")}`,
+    byPageRecords[String(p.id)].line = ([`[${p.id}] ${own.map((i) => i.id).join(", ")}`,
       ...(settles ? [`settles${settles.kind ? ` (${settles.kind})` : ""}: ${settles.what ?? ""}${settles.relation ? ` | relation ${settles.relation.kind ?? ""}: ${settles.relation.reason ?? ""}` : ""}`] : []),
       ...(refs.length ? [`measures ${refs.join(", ")}`] : []), ...(stated.length ? [`title states ${stated.join("; ")}`] : []),
       ...(loose.length ? [`title prints ${loose.join(", ")}, which no measure of the page records`] : [])].join(" | "));
   }
-  const insightLines = [...usedInsights].map((id) => { const item = insights.get(id); return item ? `- ${id}${item.strength ? ` [${item.strength}]` : ""}: ${item.finding ?? "(no finding)"}` : `- ${id}: NOT IN THE LOG`; });
-  const measureLines = [...usedRefs].map((ref) => measureRecordLine(ref, registry.get(ref), cited));
+  const allInsights = [...new Set(Object.values(byPageRecords).flatMap((r) => r.insights))];
+  const insightLines = Object.fromEntries(allInsights.map((id) => { const item = insights.get(id); return [id, item ? `- ${id}${item.strength ? ` [${item.strength}]` : ""}: ${item.finding ?? "(no finding)"}` : `- ${id}: NOT IN THE LOG`]; }));
+  const measureLines = Object.fromEntries([...usedRefs].map((ref) => [ref, measureRecordLine(ref, registry.get(ref), cited)]));
   const keys = [...new Set([...usedRefs].flatMap((ref) => registry.get(ref)?.cite || []))];
-  const sourceLines = keys.map((key) => { const s = sources?.[key]; return s ? `- ${key}: ${s.name ?? s.short ?? key}${s.retrieved ? ` (retrieved ${s.retrieved})` : ""}${s.status ? ` [${s.status}]` : ""}` : `- ${key}: NOT IN THE SOURCES REGISTRY`; });
+  const sourceLines = Object.fromEntries(keys.map((key) => { const s = sources?.[key]; return [key, s ? `- ${key}: ${s.name ?? s.short ?? key}${s.retrieved ? ` (retrieved ${s.retrieved})` : ""}${s.status ? ` [${s.status}]` : ""}` : `- ${key}: NOT IN THE SOURCES REGISTRY`]; }));
   const peerSets = conventions?.peerSets && typeof conventions.peerSets === "object" ? conventions.peerSets : {};
   return { items, records, conventions: conventions ?? null, peerSets, pages: held,
-    lines: { pages: pageLines, measures: measureLines, insights: insightLines, sources: sourceLines } };
+    lines: { byPage: byPageRecords, measures: measureLines, insights: insightLines, sources: sourceLines, cites: Object.fromEntries([...usedRefs].map((ref) => [ref, registry.get(ref)?.cite || []])) } };
 }
 
-/** The argument reading as the prompt prints it. */
-export function argumentPrompt(argument) {
+/**
+ * The argument reading cut to the pages `ids` (all of them where null): its items, and the records those pages rest on -
+ * their lines, each measure and insight they read once, each source those measures cite. What a section's critic is given.
+ */
+export function argumentFor(argument, ids = null) {
+  if (!argument) return null;
+  const keep = ids ? new Set(ids.map(String)) : null, mine = (id) => !keep || keep.has(String(id));
+  const pages = Object.entries(argument.lines.byPage).filter(([id]) => mine(id));
+  const refs = [...new Set(pages.flatMap(([, r]) => r.refs))], insights = [...new Set(pages.flatMap(([, r]) => r.insights))];
+  const keys = [...new Set(refs.flatMap((ref) => argument.lines.cites[ref] || []))];
+  return { items: argument.items.filter((item) => mine(item.page)), conventions: argument.conventions,
+    lines: { pages: pages.map(([, r]) => r.line).filter(Boolean), measures: refs.map((ref) => argument.lines.measures[ref]).filter(Boolean),
+      insights: insights.map((id) => argument.lines.insights[id]).filter(Boolean), sources: keys.map((key) => argument.lines.sources[key]).filter(Boolean) } };
+}
+
+/** The argument reading as the prompt prints it, for the pages `ids` (all of them where null). */
+export function argumentPrompt(whole, ids = null) {
+  const argument = argumentFor(whole, ids);
   if (!argument?.items?.length) return "";
   const codes = Object.entries(SPINE_ARGUMENT_CODES).map(([code, means]) => `- ${code}: ${means}`).join("\n");
   const fixes = Object.entries(ARGUMENT_FIXES).map(([key, means]) => `- \`${key}\`: ${means}`).join("\n");
