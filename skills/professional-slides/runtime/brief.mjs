@@ -214,15 +214,20 @@ function quotaLines(quotas, role, parts) {
     return [...tally].sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} ${count}`).join(", ");
   };
   const lines = quotas.quotas.filter((q) => role === "skeleton" || PLACEMENT_QUOTAS.has(q.code)).map((q) => {
-    const left = Math.max(q.room, 0), over = q.own.length - left;
+    // A section of a deck still being written is held to its fair share of the room - the cap's share of its own budget,
+    // rounded - where it has a budget; the cap's whole room is every section's at once only once all are written.
+    const fair = q.fair === undefined ? null : Math.round(q.fair);
+    const left = fair === null ? Math.max(q.room, 0) : Math.max(Math.min(q.room, fair), 0), over = q.own.length - left;
     const change = q.code === "VARIETY_TYPE_SHARE" ? "type" : q.code === "VARIETY_EXHIBIT_MIX" ? "exhibit" : q.code === "HEADLINE_CROWDED" ? "form without a headline figure" : "placement";
     const standing = over > 0 ? `: ${over} over - give ${over === 1 ? "one" : `${over} of them`} another ${change}` : over === 0 ? ": at the cap" : `: ${-over} to spare`;
-    return `- ${q.what} (${q.code}${q.key ? `.${q.key}` : ""}, at most ${Math.round(q.share * 100)}%): the deck's cap is ${q.cap} of ${q.of} pages; the other sections hold ${q.others.length}` +
-      `${q.others.length ? ` (${bySection(q.others)})` : ""}, which leaves this section ${left}${q.room < 0 ? ` (they are ${-q.room} over it already)` : ""}; it holds ${q.own.length}${q.own.length ? ` (${q.own.join(", ")})` : ""}${standing}`;
+    const of = quotas.planned ? `${q.of} pages planned (${quotas.pages} written)` : `${q.of} pages`;
+    const leaves = fair === null ? `which leaves this section ${left}` : `and this section's fair share, for its budget of ${quotas.budget} pages, is ${left} (${q.fair.toFixed(1)})`;
+    return `- ${q.what} (${q.code}${q.key ? `.${q.key}` : ""}, at most ${Math.round(q.share * 100)}%): the deck's cap is ${q.cap} of ${of}; the other sections hold ${q.others.length}` +
+      `${q.others.length ? ` (${bySection(q.others)})` : ""}, ${leaves}${q.room < 0 ? ` (they are ${-q.room} over it already)` : ""}; it holds ${q.own.length}${q.own.length ? ` (${q.own.join(", ")})` : ""}${standing}`;
   });
   if (role === "skeleton") {
     const k = quotas.kinds;
-    lines.push(`- kinds of exhibit (VARIETY_EXHIBIT_RANGE, at least ${k.perTen} per ten pages; advisory at the spine, held at the full compile): the floor is ${k.floor} for ${quotas.pages} pages, and the deck draws ${k.deck} so far - ` +
+    lines.push(`- kinds of exhibit (VARIETY_EXHIBIT_RANGE, at least ${k.perTen} per ten pages; advisory at the spine, held at the full compile): the floor is ${k.floor} for ${quotas.planned ?? quotas.pages} pages${quotas.planned ? " planned" : ""}, and the deck draws ${k.deck} so far - ` +
       `the other sections ${k.others.length}${k.others.length ? ` (${k.others.join(", ")})` : ""}; this section ${k.own.length}${k.own.length ? ` (${k.own.join(", ")})` : ""}, ${k.only.length} no other section draws${k.only.length ? ` (${k.only.join(", ")})` : ""}`,
     k.adds.length ? `  kinds the deck does not draw that this section's evidence holds (each read as --scaffold <type>/<form> --evidence reads it): ${k.adds.map((item) => `${item.id} as ${item.type}/${item.form} (${item.change === "form" ? "form change" : `type change from ${item.from}`}) adds ${item.adds.join(", ")}`).join("; ")}`
       : "  no form this section's evidence holds draws a kind the deck does not draw yet");

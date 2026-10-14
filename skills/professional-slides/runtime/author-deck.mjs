@@ -147,7 +147,7 @@ import { sourceKindsOf } from "./fit-review.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
-import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts } from "./pages-file.mjs";
 import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
 import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
@@ -2463,12 +2463,19 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     // A section's room under each of the deck's caps, as the other sections already hold them (deck-structure.mjs sectionQuotas):
     // a skeleton is told every capped quota and the kinds, a writer the placements it chooses - so no section tips a cap blind.
     let quotas = null;
-    const own = values.section ? sectionPages(doc, values.section).pages : null;
+    const { pages: own = null, part: ownPart = null } = values.section ? sectionPages(doc, values.section) : {};
     if (own && ["skeleton", "writer"].includes(values.brief)) {
+      // The length the sections are planned to: every part's budget, or the content pages a part without one already holds,
+      // and the content pages the pages file writes outside its parts.
+      const budgets = partBudgets(doc), parts = partsOf(doc);
+      const content = [...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && (!page.kind || page.kind === "content"));
+      const written = (part) => content.filter((page) => parts.get(String(page.id)) === part).length;
+      const planned = budgets.size ? includedParts(doc).reduce((sum, part) => sum + (budgets.get(part) ?? written(part)), content.filter((page) => !parts.has(String(page.id))).length) : null;
       let compiled = new Map();
       try { const { spec } = compileDeck(doc, { insights, partial: true }); compiled = new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])); }
       catch { compiled = new Map(); }
-      quotas = sectionQuotas(doc, { insights, compiled, mine: new Set(own.map((page) => String(page.id))), fills: values.brief === "skeleton" && insights ? evidenceFills(insights) : null });
+      quotas = sectionQuotas(doc, { insights, compiled, mine: new Set(own.map((page) => String(page.id))), fills: values.brief === "skeleton" && insights ? evidenceFills(insights) : null,
+        planned, budget: budgets.get(ownPart) ?? null });
     }
     const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf: values.brief === "writer" ? slotsOf : null, answerItems, answerHazards, sheet, spine: Boolean(values.spine), quotas });
     if (brief.why) { console.error(brief.why); return 1; }

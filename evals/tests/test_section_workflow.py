@@ -110,6 +110,26 @@ class BriefTests(unittest.TestCase):
     def brief(self, pages, *args):
         return subprocess.run([NODE, str(AUTHOR), str(pages), *args], capture_output=True, text=True, timeout=120)
 
+    def test_an_unwritten_deck_shares_its_caps_by_the_sections_budgets(self):
+        """ba5: before any section had a page, every skeleton brief read "the deck's cap is 0 of 0 pages", which leaves each
+        section nothing - no column, no takeaway, no figures. A part's `budget` sets the deck's planned length, and each
+        section is told the cap of that length and its own fair share of it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned_finance(tmp)
+            Path(tmp, "pages", "a.pages.json").write_text(json.dumps({"pages": [], "budget": 20}))
+            Path(tmp, "pages", "b.pages.json").write_text(json.dumps({"pages": [], "budget": 30}))
+            skeleton = self.brief(pages, "--brief", "skeleton", "--section", "a")
+            Path(tmp, "pages", "a.pages.json").write_text(json.dumps({"pages": [], "budget": 0}))
+            refused = self.brief(pages, "--brief", "skeleton", "--section", "a")
+        self.assertEqual(skeleton.returncode, 0, skeleton.stderr)
+        column = next(line for line in skeleton.stdout.splitlines() if "(VARIETY_COLUMN," in line)
+        # f0 is written in the root file: 50 planned in the parts and the one written page, 51 in all; a's share is 20 x 20%.
+        self.assertIn("the deck's cap is 10 of 51 pages planned (1 written)", column)
+        self.assertIn("this section's fair share, for its budget of 20 pages, is 4 (4.0)", column)
+        self.assertIn("the floor is 21 for 51 pages planned", skeleton.stdout)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("`budget` is the number of pages the section is planned to hold", refused.stderr)
+
     def test_a_writers_brief_holds_its_sections_pages_limits_tokens_and_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             pages = sectioned_finance(tmp)

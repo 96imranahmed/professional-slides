@@ -1040,7 +1040,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
  * VARIETY_TAKEAWAY and VARIETY_COLUMN as unclearable on its own pages, since
  * one section's fix tipped another's cap. `mine` is the section's page ids.
  */
-export function sectionQuotas(doc, { insights = null, compiled = null, mine, fills = null }) {
+export function sectionQuotas(doc, { insights = null, compiled = null, mine, fills = null, planned = null, budget = null }) {
   const registry = registryOf(insights), featured = drawOf(doc.deck);
   const all = [...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && !page.include && page.carry !== true);
   const content = all.map((page, index) => ({ page, index, id: String(page.id ?? `page-${index + 1}`) })).filter(({ page }) => !page.kind || page.kind === "content");
@@ -1048,9 +1048,15 @@ export function sectionQuotas(doc, { insights = null, compiled = null, mine, fil
     slide: compiled?.get?.(item.id) ?? declaredSlide(item.page, item.index, { exhibitType: evidenceExhibits(item.page, insights, featured), players: doc.deck?.players, stubs: stubsOf(item.page, insights) }) }))
     .filter((item) => item.slide);
   const n = content.length, ids = (test) => drawn.filter(test).map((item) => item.id);
+  // While the deck is still being written its caps are shares of the length its sections are planned to (`planned`, the
+  // sum of the parts' budgets), not of the pages written so far: on ba5 every skeleton brief read "the deck's cap is 0 of 0
+  // pages" before any section had a page. A section with a budget is told its fair share of each cap - the share of its own
+  // planned pages - so sections written side by side do not each take the whole room.
+  const length = Math.max(n, planned ?? 0);
   const quota = (code, key, what, share, held, of = n) => {
-    const cap = Math.floor(share * of + 1e-9), others = held.filter((id) => !mine.has(id)), own = held.filter((id) => mine.has(id));
-    return { code, ...(key ? { key } : {}), what, share, of, cap, others, own, room: cap - others.length };
+    const base = Math.max(of, length), cap = Math.floor(share * base + 1e-9), others = held.filter((id) => !mine.has(id)), own = held.filter((id) => mine.has(id));
+    const fair = budget && length > n ? share * budget : null;
+    return { code, ...(key ? { key } : {}), what, share, of: base, cap, others, own, room: cap - others.length, ...(fair !== null ? { fair } : {}) };
   };
   const placement = (slide) => (slide.pageType?.commentary === "beside-left" ? "beside" : slide.pageType?.commentary);
   // A type is shown where the section draws it or where it is the deck's commonest: the rest have room to spare.
@@ -1077,7 +1083,7 @@ export function sectionQuotas(doc, { insights = null, compiled = null, mine, fil
       exhibitType: evidenceExhibits(item.page, insights, featured), players: doc.deck?.players, shapes, drawn: deck }).map((change) => ({ id: item.id, ...change, page: item.page }));
   });
   const { offered, refused } = heldChanges(found, { registry, fills, most: 8 });
-  return { pages: n, quotas, kinds: { floor: Math.ceil((PLAN.craft.exhibitVarietyPerTen.min * n) / 10 - 1e-9), perTen: PLAN.craft.exhibitVarietyPerTen.min,
+  return { pages: n, planned: length > n ? length : null, budget, quotas, kinds: { floor: Math.ceil((PLAN.craft.exhibitVarietyPerTen.min * length) / 10 - 1e-9), perTen: PLAN.craft.exhibitVarietyPerTen.min,
     deck: deck.size, others: [...others].sort(), own: [...own].sort(), only: [...own].filter((kind) => !others.has(kind)).sort(),
     adds: offered.map(({ slide: _slide, page: _page, ...item }) => item), refused: refused.length } };
 }

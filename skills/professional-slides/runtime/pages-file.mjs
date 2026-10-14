@@ -27,13 +27,21 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const PARTS = new WeakMap(), INCLUDED = new WeakMap(), READ = new WeakMap();
+const PARTS = new WeakMap(), INCLUDED = new WeakMap(), BUDGETS = new WeakMap(), READ = new WeakMap();
 
 /** The part file each page id of `doc` was read from (relative to the pages file), for pages that came from one. */
 export const partsOf = (doc) => PARTS.get(doc) ?? new Map();
 
 /** Every part file `doc` includes, in order, relative to the pages file - one that holds no page yet among them. */
 export const includedParts = (doc) => INCLUDED.get(doc) ?? [];
+
+/**
+ * The pages each part is planned to hold (`budget` in the part file), by the
+ * part's path as includedParts names it: the lead's page budget for a section,
+ * written before its first page, which the section's quotas share the deck's
+ * caps by while the deck is still being written (deck-structure.mjs sectionQuotas).
+ */
+export const partBudgets = (doc) => BUDGETS.get(doc) ?? new Map();
 
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
@@ -115,7 +123,7 @@ export function readPagesFileSync(file) {
   const doc = readJsonFile(root, null, texts);
   const lists = ["pages", "appendix"].filter((key) => Array.isArray(doc?.[key]) && doc[key].some(isInclude));
   if (!lists.length) { if (doc && typeof doc === "object") READ.set(doc, { root, texts }); return doc; }
-  const parts = new Map(), seen = new Map(), included = new Map(), sources = new Map(Object.keys(doc.sources ?? {}).map((key) => [key, path.basename(root)]));
+  const parts = new Map(), seen = new Map(), included = new Map(), budgets = new Map(), sources = new Map(Object.keys(doc.sources ?? {}).map((key) => [key, path.basename(root)]));
   const registry = { ...(doc.sources ?? {}) };
   const relative = (at) => path.relative(base, at) || path.basename(at);
   const place = (page, at, index) => {
@@ -138,8 +146,12 @@ export function readPagesFileSync(file) {
     const part = readJsonFile(target, `${where} includes "${entry.include}"`, texts);
     const pages = Array.isArray(part) ? part : part?.pages;
     if (!Array.isArray(pages)) throw new Error(`${relative(target)} is a part of ${path.basename(root)}: write it as { "pages": [...] }`);
-    const extra = Array.isArray(part) ? [] : Object.keys(part).filter((key) => !["pages", "sources"].includes(key));
-    if (extra.length) throw new Error(`${relative(target)} carries ${extra.map((key) => `\`${key}\``).join(", ")}; a part holds \`pages\` and the \`sources\` they cite - the deck-level keys stay in ${path.basename(root)}`);
+    const extra = Array.isArray(part) ? [] : Object.keys(part).filter((key) => !["pages", "sources", "budget"].includes(key));
+    if (extra.length) throw new Error(`${relative(target)} carries ${extra.map((key) => `\`${key}\``).join(", ")}; a part holds \`pages\`, the \`sources\` they cite and its page \`budget\` - the deck-level keys stay in ${path.basename(root)}`);
+    if (!Array.isArray(part) && part.budget !== undefined) {
+      if (!Number.isInteger(part.budget) || part.budget < 1) throw new Error(`${relative(target)}: \`budget\` is the number of pages the section is planned to hold, a whole number of 1 or more`);
+      budgets.set(relative(target), part.budget);
+    }
     // A part may register the sources its pages cite; the same key means the same source everywhere.
     for (const [key, source] of Object.entries((!Array.isArray(part) && part.sources) || {})) {
       if (key in registry && JSON.stringify(registry[key]) !== JSON.stringify(source)) throw new Error(`Source "${key}" is registered twice with different entries: in ${sources.get(key)} and in ${relative(target)}`);
@@ -152,6 +164,7 @@ export function readPagesFileSync(file) {
   if (Object.keys(registry).length) whole.sources = registry;
   PARTS.set(whole, parts);
   INCLUDED.set(whole, [...included.keys()].map(relative));
+  BUDGETS.set(whole, budgets);
   READ.set(whole, { root, texts });
   return whole;
 }
