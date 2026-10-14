@@ -120,7 +120,7 @@ console.log(JSON.stringify({
         result = run_node(LOG + '''
 import { compileDeck, authorDeck } from './skills/professional-slides/runtime/author-deck.mjs';
 const cash = { heading: 'Cash and debt', series: [{ measure: 'i-bal/cash', name: 'Cash' }, { measure: 'i-bal/debt', name: 'Debt' }], highlights: [{ category: 'FY26' }] };
-const broken = page({ evidence: ['i-bal'], title: 'Margins of {{i-peers/margin@Alpha}} and {{i-peers/margin@Beta}} against {{i-peers/margin@Delta}}', exhibit: cash });
+const broken = page({ evidence: ['i-bal'], title: 'Margins of {{i-peers/margins@Alpha}} and {{i-peers/margins@Beta}} against {{i-peers/margins@Delta}}', exhibit: cash });
 const good = page({ id: 'p2', exhibit: cash });
 const partial = compileDeck(deckOf(broken, good), { insights, partial: true });
 let thrown = null; try { compileDeck(deckOf(broken), { insights }); } catch (error) { thrown = error.message; }
@@ -128,7 +128,7 @@ const run = await authorDeck(deckOf(broken, good), { baseDir: process.cwd(), ins
 console.log(JSON.stringify({
   unknown: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'i-bal/cahs', name: 'Cash' }] } })), bare: problems(page({ exhibit: { heading: 'Cash', series: [{ measure: 'cash' }] } })),
   noLog: bindDeck(deckOf(page({ exhibit: cash })), null).findings.map((f) => f.repair),
-  unrested: problems(broken), found: untracedFindings(deckOf(broken), insights).map((f) => [f.code, f.id, f.severity, f.measured]),
+  unrested: problems(broken), free: problems(page({ evidence: undefined, title: 'Alpha earns {{i-peers/margin@Alpha | 0}}% on its routes', exhibit: cash })), found: untracedFindings(deckOf(broken), insights).map((f) => [f.code, f.id, f.severity, f.measured]),
   partial: [partial.spec.slides.map((s) => s.id), partial.compileErrors, partial.bindingFindings.map((f) => f.code)], thrown,
   authored: [[...run.blocking, ...run.advisories].map((f) => `${f.code} ${f.id ?? ''}`.trim()), [...run.failedIds]],
   typedBeside: problems(page({ exhibit: { ...cash, categories: FY } })), typedSeries: problems(page({ exhibit: { heading: 'Cash', series: [cash.series[0], { name: 'Target', values: [1, 2, 3, 4, 5, 6] }] } })),
@@ -145,10 +145,12 @@ console.log(JSON.stringify({
         self.assertIn('names "i-bal/cahs", which the insight log\'s measures do not hold', result["unknown"][0])
         self.assertIn("a measure is named `<insight id>/<measure>`", result["bare"][0])
         self.assertIn("no insight log with measures is beside the pages file", result["noLog"][0])
-        # Three tokens of one insight the page does not rest on: one finding, naming the insight and the count.
+        # Three tokens that miss the same measure: one finding, naming it and the count.
         self.assertEqual(len(result["unrested"]), 1)
-        self.assertIn("names a measure of i-peers, which the page does not name in `evidence`", result["unrested"][0])
+        self.assertIn('names "i-peers/margins", which the insight log\'s measures do not hold', result["unrested"][0])
         self.assertIn("and 2 more references on the page with the same fault", result["unrested"][0])
+        # A page may print any measure the log records, whatever its `evidence` names.
+        self.assertEqual(result["free"], [])
         self.assertEqual(result["found"], [])  # the binding's finding is the page's: it has no numbers to trace yet
         # The page is left out of the compile, the rest of the deck compiles, and the finding is the binding's.
         self.assertEqual(result["partial"], [["p2"], [], ["BINDING_UNRESOLVED"]])
@@ -306,6 +308,16 @@ console.log(JSON.stringify({ finding: all.map((f) => [f.code, f.id, f.severity, 
         self.assertEqual(result["metric"], [["NUMBER_UNTRACED", ["metrics[0].sublabel: 7.7%", "metrics[1].value: 12.5%"]]])
         self.assertEqual(result["tokens"], ["title: 99.9 million"])  # what the runtime wrote is not traced; what is typed beside it is
         self.assertEqual(result["qualitative"], ["title: 12.5%"])  # a page that names no insight is traced to every measure the log records
+
+    def test_a_declared_players_name_is_not_read_as_a_number(self):
+        """Acceptance run: "GPT 6.1 Sol" in a picture's label was traced as the number 6.1."""
+        result = run_node(LOG + '''
+const players = [{ name: 'GPT 6.1 Sol', short: 'Sol' }, { name: 'Opus 5.5' }];
+const doc = (title) => ({ ...deckOf(page({ evidence: undefined, exhibit: undefined, type: 'argument', form: 'memo', title, paragraphs: ['One paragraph.'], panel: { text: 'A panel.' } })), deck: { ...deckOf().deck, players } });
+console.log(JSON.stringify({ named: untracedFindings(doc('GPT 6.1 Sol and Opus 5.5 took part'), insights), number: untracedFindings(doc('GPT 6.1 Sol scored 12.5 points'), insights).flatMap((f) => f.measured) }));
+''')
+        self.assertEqual(result["named"], [])
+        self.assertEqual(result["number"], ["title: 12.5"])
 
     def test_a_printed_number_states_a_record_at_the_precision_the_page_prints(self):
         result = run_node('''

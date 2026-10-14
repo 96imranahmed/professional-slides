@@ -814,7 +814,7 @@ export function compilePage(pageIn, index = 0, { players = null, spineOnly = fal
   const { slide, target, exhibits, setType, primary } = staged("shape", () => typedSlide(page, id, type, players));
   staged("evidence", () => checkExhibitData({ page, id, slide, exhibits, primary, adjusted }));
   staged("evidence", () => typedEvidence({ page, id, type, slide, exhibits, primary }));
-  const { points } = staged("copy", () => checkCommentary({ page, id, slide, exhibits, primary, adjusted }));
+  const { points } = staged("copy", () => checkCommentary({ page, id, slide, exhibits, primary, players, adjusted }));
   staged("layout", () => layOutPage({ page, id, type, slide, target, exhibits, setType, primary, points, adjusted }));
   return withPageType({ page, slide, adjusted });
 }
@@ -971,7 +971,7 @@ function typedEvidence({ page, id, type, slide, exhibits, primary }) {
 // width, so the body is one exhibit carrying its own explanation.
 const SIDE_TITLE_COMMENTARY = ["none", "on-exhibit", "in-exhibit"];
 /** The commentary the page carries, against what its `commentary` choice says it carries. */
-function checkCommentary({ page, id, slide, exhibits, primary, adjusted }) {
+function checkCommentary({ page, id, slide, exhibits, primary, players, adjusted }) {
   if (page.titlePlacement !== undefined && !["top", "side"].includes(page.titlePlacement))
     throw new Error(`${id}: \`titlePlacement\` is "top" (the default) or "side" (got ${JSON.stringify(page.titlePlacement)})`);
   if (page.titleNumeral !== undefined && page.titlePlacement !== "side") throw new Error(`${id}: \`titleNumeral\` is the figure set over a side title - it needs \`titlePlacement: "side"\``);
@@ -999,13 +999,16 @@ function checkCommentary({ page, id, slide, exhibits, primary, adjusted }) {
     if (kept.length) slide.highlight = kept; else delete slide.highlight;
   }
   const phrases = kept.map((p) => p.toLowerCase());
+  // A declared player's name is a name, whatever digits it holds: a point's figure is never read off "Opus 5.5".
+  const names = [...playerNames(players).keys()].filter((name) => /\d/.test(name));
+  const figureOf = (text) => pointFigure(names.reduce((said, name) => said.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (found) => " ".repeat(found.length)), String(text)));
   const pointTexts = (slide.points || []).map((point) => (typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`).toLowerCase());
   // A point the author left unmarked is marked on its own figure.
   if (points >= 2 && ["beside", "beside-left", "below"].includes(page.commentary)) {
     const derived = [];
     (slide.points || []).forEach((point, at) => {
       if ((point && typeof point === "object" && point.highlight) || phrases.some((p) => p && hasPhrase(pointTexts[at], p))) return;
-      const figure = pointFigure(typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`);
+      const figure = figureOf(typeof point === "string" ? point : `${point?.lead ?? ""} ${point?.text ?? ""}`);
       if (figure) derived.push(figure);
     });
     if (derived.length) slide.highlight = [...kept, ...derived];
@@ -1014,7 +1017,7 @@ function checkCommentary({ page, id, slide, exhibits, primary, adjusted }) {
   // page's phrases lands in is marked on its own figure.
   if ((page.paragraphs || []).length >= 2) {
     const prose = page.paragraphs.filter((p) => !(p && typeof p === "object" && p.highlight)).map((p) => proseParts(p).text);
-    const derived = prose.filter((text) => !phrases.some((p) => p && hasPhrase(text.toLowerCase(), p))).map(pointFigure).filter(Boolean);
+    const derived = prose.filter((text) => !phrases.some((p) => p && hasPhrase(text.toLowerCase(), p))).map(figureOf).filter(Boolean);
     const marked = slide.highlight === undefined ? [] : Array.isArray(slide.highlight) ? slide.highlight : [slide.highlight];
     if (derived.length) slide.highlight = [...marked, ...derived];
   }

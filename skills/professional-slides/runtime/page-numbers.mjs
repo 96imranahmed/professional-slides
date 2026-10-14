@@ -11,6 +11,7 @@ import { cellText, isTable, rowCells } from "./evidence.mjs";
 import { axisOf, isRatioUnit, measureRegistry, valuesOf } from "./measures.mjs";
 import { bindDeck, withoutTokens } from "./bind.mjs";
 import { measurementsIn, percentUnit, states } from "./printed-numbers.mjs";
+import { playerNames } from "./players.mjs";
 
 const exhibitsOf = (page) => [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : []), ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.exhibit) : [])].filter((ex) => ex && typeof ex === "object");
 // Every figure a page prints as a number with its label: a strip's metrics, a hero's `kpi`, the metric at the right
@@ -63,8 +64,11 @@ const NOT_PROSE = new Set(["id", "type", "form", "kind", "commentary", "why", "a
  * measurement and is not traced; nor is a year, a date, or digits inside a
  * label ("FY26", "Q3", "M25", "500-4", "15th").
  */
-function untracedNumbers(page, pool) {
-  return typedNumbers(page).filter(({ number }) => !pool.some((m) => traces(number, m))).map(({ field, number }) => ({ field, shown: number.shown }));
+function untracedNumbers(page, pool, names = []) {
+  // A declared player's name is a name, whatever digits it holds ("GPT 6.1 Sol"): it is taken out before the numbers are read.
+  const unnamed = (text) => names.reduce((said, name) => said.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " "), String(text));
+  return pageTexts(page).flatMap(({ field, text, written, figure }) => measurementsIn(unnamed(text), figure, unnamed(written)).map((number) => ({ field, number })))
+    .filter(({ number }) => !pool.some((m) => traces(number, m))).map(({ field, number }) => ({ field, shown: number.shown }));
 }
 
 // With no measure named, a number is matched across every measure the page rests on, so the units must agree: a
@@ -181,6 +185,8 @@ export function untracedFindings(doc, insights) {
   if (!registry.size) return [];
   const { doc: written, bound } = bindDeck(doc, insights);
   const authored = [...(doc.pages || []), ...(doc.appendix || [])];
+  // Longest first, so "GPT 6.1 Sol" goes before a short name it contains.
+  const names = [...playerNames(doc.deck?.players).keys()].filter((name) => /\d/.test(name)).sort((a, b) => b.length - a.length);
   const out = [];
   for (const [index, page] of [...(written.pages || []), ...(written.appendix || [])].entries()) {
     if (!page || typeof page !== "object" || !page.type) continue;
@@ -188,12 +194,13 @@ export function untracedFindings(doc, insights) {
     // A page whose references could not be bound has no numbers to hold yet: the binding's finding is its finding.
     if (bound.failed.has(id)) continue;
     const evidence = Array.isArray(page.evidence) ? page.evidence : [];
-    const pool = evidence.length ? [...pagePool(page, registry),
-      ...evidence.flatMap((owner) => (insights.get?.(owner)?.assumptions || []).filter((a) => typeof a?.value === "number").map((a) => ({ value: a.value, unit: a.unit })))]
-      : [...registry.values()];
-    const untraced = untracedNumbers(authored[index], pool);
+    const rested = [...pagePool(page, registry),
+      ...evidence.flatMap((owner) => (insights.get?.(owner)?.assumptions || []).filter((a) => typeof a?.value === "number").map((a) => ({ value: a.value, unit: a.unit })))];
+    // A page that names no measured insight is traced to every measure the log records.
+    const pool = rested.length ? rested : [...registry.values()];
+    const untraced = untracedNumbers(authored[index], pool, names);
     if (untraced.length) out.push({ code: "NUMBER_UNTRACED", id, severity: "advisory", measured: untraced.map((u) => `${u.field}: ${u.shown}`),
-      repair: `${id}: ${untraced.length} typed number${untraced.length === 1 ? " is" : "s are"} no value of a measure ${evidence.length ? "the page rests on" : "the insight log records"} - ${untraced.slice(0, 8).map((u) => `${u.shown} in \`${u.field}\``).join(", ")}${untraced.length > 8 ? ", ..." : ""}. ` +
+      repair: `${id}: ${untraced.length} typed number${untraced.length === 1 ? " is" : "s are"} no value of a measure ${rested.length ? "the page rests on" : "the insight log records"} - ${untraced.slice(0, 8).map((u) => `${u.shown} in \`${u.field}\``).join(", ")}${untraced.length > 8 ? ", ..." : ""}. ` +
         "Print a recorded number by reference - `{{<insight id>/<measure>@<period or member> | 0.0}}` - so the runtime writes it; a number nobody recorded is a measure to add to the insight log" });
   }
   return out;

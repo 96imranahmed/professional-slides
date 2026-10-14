@@ -246,17 +246,17 @@ function withoutBoundMarks(page) {
 
 /** One page's references written out in place; the problems with the ones that cannot be, as `[{ message, refs }]`. */
 function bindPage(page, registry, bound) {
-  // One problem for each thing wrong, however many references share it: twelve tokens of an insight the page does not rest on are one finding.
+  // One problem for each thing wrong, however many references share it: twelve tokens that miss the same measure are one finding.
   const problems = new Map();
   const evidence = Array.isArray(page.evidence) ? page.evidence : [];
   const fail = (message, refs = [], key = message) => { const seen = problems.get(key); if (seen) seen.count += 1; else problems.set(key, { message, refs, count: 1 }); return null; };
-  /** The measure a reference names, held to the page's evidence; null with the problem recorded. */
+  /** The measure a reference names; null with the problem recorded. Any measure the log records may be named. */
   const measureOf = (ref, what) => {
     const measure = registry.get(ref);
-    // The measures the page may name instead: those its `evidence` records, the ones a slip most likely meant.
-    const offered = [...registry.entries()].filter(([, m]) => evidence.includes(m.owner)).map(([key]) => key);
+    // The measures the page may have meant: those of the insights its `evidence` names, else every one the log records.
+    const rested = [...registry.entries()].filter(([, m]) => evidence.includes(m.owner)).map(([key]) => key);
+    const offered = rested.length ? rested : [...registry.keys()];
     if (!measure) return fail(`${what} names ${JSON.stringify(ref)}, which the insight log's measures do not hold${parseRef(String(ref)) ? "" : " - a measure is named `<insight id>/<measure>`"}${registry.size ? "" : " (no insight log with measures is beside the pages file)"}${offered.length ? `; the insights in the page's \`evidence\` record ${offered.slice(0, 8).join(", ")}${offered.length > 8 ? `, and ${offered.length - 8} more` : ""}` : ""}`, [ref], `unknown ${ref}`);
-    if (!evidence.includes(measure.owner)) return fail(`${what} names a measure of ${measure.owner}, which the page does not name in \`evidence\`: a page rests on the insights its numbers come from - name it there, or name a measure the page does rest on`, [ref], `unrested ${measure.owner}`);
     return measure;
   };
   /** One number of a measure: `<ref>` for a measure of one value, `<ref>@<label>` for one period or member of a longer one. */
