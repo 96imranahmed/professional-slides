@@ -122,6 +122,9 @@ build-bars.mjs     the bars delivery measures on the built scene (BUILD_BAR_CODE
 storyline.mjs      the storyline critique: spine or full packet, validation, the gate the deck review and delivery wait for
 reviewer.mjs       the deck review: rubric, pass-one, verification and confirmation schemas, section split and merge; backends codex | claude | packet
 review-passes.mjs  the loop both reviews share: page lists, statuses, ledger, pass cap, lineage under <deck dir>/.reviews/<id>/, staging, provenance, exit codes
+section-review.mjs one section reviewed beside the others' writing, on its clean page checks: the packet, and `--validate` of the answer and its closed fixes
+page-check.mjs     what a rendering page run drew (out/page-check/<id>.json) and which section reviews still stand on the build's pages: unchanged, fixed by their own fixes, or read again
+review-stages.mjs  the earliest stage able to catch each review code (review-stages.json), the final review's escapes, and packets split by reading cost
 deliver-deck.mjs   build -> gates -> request and waivers -> storyline ready -> build bars -> self-check -> review passes -> confirmation read -> <id>-DELIVERED.pptx or REJECTED.md
 emit/emit_pptx.py      scene -> editable PPTX (placeholders, native charts with workbooks, preset autoshapes and freeforms, palette -> theme)
 emit/assemble_pptx.py  a revision's deck: the source PPTX with its carried slides kept byte for byte, its edited slides' text rewritten in place and the composed slides set in with their own master; reads every carried slide back and compares it with the source (`revision.preserved`); `--check` tries the edits and writes nothing

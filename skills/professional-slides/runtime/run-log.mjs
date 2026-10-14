@@ -11,7 +11,7 @@
 // page - and it was only ever visible when an author kept a log by hand. Read
 // from this file it is a number a run is scored on (evals/quality/score.mjs):
 // nothing here is estimated, and a run with no log has no cost recorded.
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 
 // Entries of this version tell a check from a full compile and record the page count; earlier ones logged a check as "full".
 export const RUN_LOG_VERSION = 2;
@@ -19,6 +19,18 @@ export const RUN_LOG_VERSION = 2;
 export const PLAN_MODE = "plan";
 // What the log counts, said with every count read from it.
 const COUNTED = "author-deck.mjs runs that compile the deck (`runs`: draft, check, full and page runs) and that plan it (`plans`). Not counted: the catalogue commands (--types, --schema, --limits, --icons, --example, --scaffold, --log), analysis.mjs, storyline.mjs, build-deck.mjs and deliver-deck.mjs - none of them is logged here";
+
+/**
+ * A review's escapes, appended to the author log as one line per review pass
+ * (`mode: "review"`, no `ok`, so it is never counted as a run): each finding
+ * the final review raised that an earlier stage could have caught
+ * (review-stages.mjs), by code, page and stage. Read across runs, the codes
+ * that escape most are the first loop to deepen next.
+ */
+export function logEscapes(file, escapes, { pass = 1 } = {}) {
+  const items = escapes.flatMap((item) => (item.pages.length ? item.pages : [null]).map((page) => ({ code: item.code, page, stage: item.stage, severity: item.severity })));
+  appendFileSync(file, `${JSON.stringify({ at: new Date().toISOString(), v: RUN_LOG_VERSION, mode: "review", pass, escapes: items })}\n`);
+}
 
 /** The runs logged in an author log (`<id>.author-log.jsonl`), in order; none when the file is not there. A line that is not a run is left out. */
 export function readRunLog(file) {
