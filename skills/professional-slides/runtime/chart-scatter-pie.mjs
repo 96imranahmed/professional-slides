@@ -374,8 +374,10 @@ function placeScatterLabels(chart) {
     label.style = { ...label.style, ...(measured.lines?.length > 1 ? { lineHeight: measured.lineHeight } : {}), wrap: false };
     // A bubble wide enough to carry its name takes the label inside, in white,
     // as on a positioning matrix; the smaller ones keep an outside label.
-    if (bubble && mark.frame.width >= width + 12 && mark.frame.height >= height + 4) {
-      label.frame = { x: point.x - width / 2, y: point.y - height / 2, width, height };
+    // Inside, the name is set in bold: it is measured in bold, or the box is a regular name's width and the bold one overruns it.
+    const insideWidth = bubble && !face.bold ? Math.ceil(measureText(label.text, 100000, { ...face, fontFamily: tokenValue(token("font.bodySemibold")), bold: true }).width) + 2 : width;
+    if (bubble && mark.frame.width >= insideWidth + 12 && mark.frame.height >= height + 4) {
+      label.frame = { x: point.x - insideWidth / 2, y: point.y - height / 2, width: insideWidth, height };
       label.style = { ...label.style, color: tokenDefinition(token("color.onPrimary")), bold: true, align: "center" };
       label.data = { ...label.data, inside: true };
       continue;

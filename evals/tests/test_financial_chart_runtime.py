@@ -822,3 +822,17 @@ assert.throws(()=>REGISTRY.get('chart.scatter').render({id:'mixed',frame,props:{
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
+
+    def test_a_name_set_inside_a_bubble_is_measured_in_the_bold_it_is_set_in(self):
+        """A name inside a bubble is set in bold; measured in the regular face, its box was a regular name's width and the
+        bold name overran it, so a bubble chart drew only with its names turned off."""
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:760,height:430};
+const nodes=REGISTRY.get('chart.bubble').render({id:'hubs',frame,props:{points:[{name:'Istanbul',x:84,y:59,size:66000},{name:'Heathrow',x:84.5,y:-6,size:32000},{name:'Madrid',x:66,y:20,size:30000}],xMin:60,xMax:90,yMin:-20,yMax:80}}).nodes;
+const inside=nodes.filter(node=>node.role==='data-label'&&node.data?.inside);
+console.log(JSON.stringify({inside:inside.map(node=>({text:node.text,width:node.frame.width,bold:node.style.bold}))}));
+""")
+        self.assertTrue(result["inside"], "a bubble wide enough takes its name inside")
+        for label in result["inside"]:
+            self.assertTrue(label["bold"])
