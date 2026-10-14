@@ -39,10 +39,12 @@ import { ASSEMBLED_RENDERS, ASSEMBLED_SCENE } from "./revision.mjs";
 import { assetsPrompt } from "./asset-needs.mjs";
 import { dependencyNotes } from "./gates/dependency_gates.mjs";
 import { reviewFit } from "./fit-review.mjs";
+import { costSections, readingCost, PACKET_COST } from "./review-stages.mjs";
+import { standingSectionReviews } from "./page-check.mjs";
 import {
   SEVERITIES, PAGE_VERDICTS, STATUSES, NEW_BASES, MAX_PASSES, SEVERITY_DEFINITIONS, BLOCKING, ACCEPT_RATING, MAX_CONFIRMATIONS,
   pageListErrors, advanceLedger, openEntries, openBlocking, aboutImportedErrors, ABOUT_IMPORTED_RULE, verificationErrors, coverageErrors, verdictErrors, completenessErrors,
-  uniqueIds, detectBackend, nextPassScope, splitSections, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
+  uniqueIds, detectBackend, nextPassScope, partSetErrors, joinParts, readParts, callReviewer, reviewParts, readPasses, recordPass,
   PROVENANCE_SCHEMA, provenanceLine, provenanceErrors, sha256, requestOf, deckStatementFindings, unknownKeyErrors, stageReview, lineageStore, isAuthFailure, readConfirmations,
   requestStatement, requestProvenanceOf, evidenceScopeOf, answerStatusOf, ANSWERS_RULE, ANSWERS_SCHEMA, itemLines, reasonOf, RUBRIC_CLAUSES, dimensionAt, ratingScale, REVIEW_HISTORY, SAMPLING_WORDS, COMPLETENESS_NOTE, groupErrors,
 } from "./review-passes.mjs";
@@ -247,6 +249,9 @@ export const REVIEW_SCHEMA = {
     assessment: ASSESSMENT,
     // Set by the merge: the section and spine parts this review was joined from.
     mergedFrom: { type: "array", items: { type: "string" } },
+    // Set by the merge: each section review read while the deck was written - its pages standing, closed by its own fixes,
+    // carried open and given back to this read (page-check.mjs standingSectionReviews).
+    sectionReviews: { type: "array", items: { type: "object" } },
   }
 };
 
@@ -680,12 +685,15 @@ export const groupedErrors = (errors, dimensions = DIMENSIONS) => groupErrors(er
  * verdicts are recomputed from the joined findings, since a spine finding can
  * raise a page a section reviewer passed.
  */
-export function mergeReviewParts(parts, slideIds, { sections = null, binding, promptHash = null, waivers = [], floors = null } = {}) {
-  const errors = [...parts.flatMap((part) => validatePart(part, slideIds, { waivers, floors }).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
-    ...partSetErrors(parts, slideIds, { key: "slides", sections, binding }),
+export function mergeReviewParts(fresh, slideIds, { sections = null, binding, promptHash = null, waivers = [], floors = null, standing = [], sectionReviews = null } = {}) {
+  // The section reviews' standing parts were validated against their own packets and are bound to their pages by hash
+  // (page-check.mjs): they cover their pages here beside the fresh parts, and are not held to this packet's binding or prompt.
+  const errors = [...fresh.flatMap((part) => validatePart(part, slideIds, { waivers, floors }).map((e) => `${part?.part?.id ?? "part"}: ${e}`)),
+    ...partSetErrors([...fresh, ...standing.map((part) => ({ ...part, binding: binding ?? fresh[0]?.binding }))], slideIds, { key: "slides", sections, binding }),
     // Every part answers the same packet: the prompt hash it printed.
-    ...(promptHash ? parts.flatMap((part) => provenanceErrors(part, promptHash).map((e) => `${part?.part?.id ?? "part"}: ${e}`)) : [])];
+    ...(promptHash ? fresh.flatMap((part) => provenanceErrors(part, promptHash).map((e) => `${part?.part?.id ?? "part"}: ${e}`)) : [])];
   if (errors.length) return { errors };
+  const parts = [...fresh, ...standing];
 
   const order = new Map(slideIds.map((id, i) => [id, i]));
   const sort = (list) => [...new Set(list)].sort((a, b) => order.get(a) - order.get(b));
@@ -719,22 +727,28 @@ export function mergeReviewParts(parts, slideIds, { sections = null, binding, pr
     ...(lead.waivers ? { waivers: lead.waivers } : {}), pages, findings, completeness,
     assessment: lead.assessment, density: { deck: lead.density?.deck ?? "", pages: [...densityPages.values()] },
     mergedFrom: parts.map((p) => p.part.id),
+    // What each section review closed, carried open and gave back to this read: no page's reading is dropped unsaid.
+    ...(sectionReviews ? { sectionReviews } : {}),
   };
-  review.accepted = parts.every((p) => p.accepted === true) && !openBlocking(deckLedger([], review)).length;
+  review.accepted = fresh.every((p) => p.accepted === true) && !openBlocking(deckLedger([], review)).length;
   return { review, errors: [] };
 }
 
 /**
- * Split a long deck for parallel first-pass reviewers (splitSections): a
- * section per divider, the divider read with its section. A spine reviewer
- * reads the whole sequence alongside them.
+ * Split a long deck for parallel first-pass reviewers: a section per divider,
+ * the divider read with its section, cut by what its pages cost to read
+ * (review-stages.mjs costSections) rather than by a page count - ba4's eleven
+ * section packets of 5 to 14 pages cost 14 to 44 units, and the two dearest
+ * held the review for 18 minutes. A spine reviewer reads the whole sequence
+ * alongside them. `only` keeps the pages still to be read: the others stand
+ * on their section reviews (page-check.mjs standingSectionReviews).
  */
 export const SECTION_REVIEW_THRESHOLD = 24;
-export function reviewSections(scene, { max = 14 } = {}) {
+export function reviewSections(scene, { target = PACKET_COST, only = null } = {}) {
   const isDivider = (s) => !s.nodes?.some((n) => n.role === "action-title" || n.role === "cover-title")
     && ((s.componentInstances || []).some((c) => /section/.test(String(c.component))) || (s.nodes || []).some((n) => /divider|section-title/.test(String(n.role))));
   const titleOf = (s) => (s.nodes || []).find((n) => n.type === "text" && n.text)?.text?.replace(/\n/g, " ") ?? s.id;
-  return splitSections(scene.slides.map((s, i) => ({ id: s.id, title: titleOf(s), opens: i > 0 && isDivider(s) })), { max, key: "slides" });
+  return costSections(scene.slides.map((s, i) => ({ id: s.id, title: titleOf(s), opens: i > 0 && isDivider(s), cost: readingCost(s).cost, counted: !only || only.includes(s.id) })), { target, key: "slides" });
 }
 
 /**
@@ -1034,6 +1048,20 @@ function checklistOf(slide) {
 }
 
 
+/**
+ * One page as a review packet gives it: its title, text, exhibits, the gate
+ * findings on it, its image, which page dimensions it has something for, and
+ * what the compile recorded as stated from an assumption or printed without
+ * its sign (`stated`), which the reviewer judges the page says.
+ */
+export const packetSlide = (s, index, { gateFindings = [], image, stated = [] }) => ({
+  id: s.id, index,
+  title: s.nodes.find((n) => n.role === "action-title" || n.role === "cover-title")?.text?.replace(/\n/g, " ") ?? "",
+  text: textOf(s),
+  exhibits: (s.componentInstances || []).filter((c) => /^(chart\.|table|image-frame|metric)/.test(c.component)).map((c) => ({ component: c.component, frame: c.frame })),
+  gateFindings, ...(s.carried ? { carried: s.carried } : {}), image, ...checklistOf(s), stated,
+});
+
 const PACKET_RECORD = "review-packet.json";
 /** The record of the latest deck-review packet written for a deck: what its answer is checked against. */
 export const readPacketRecord = (store) => readJson(path.join(store, PACKET_RECORD), { optional: true });
@@ -1080,26 +1108,23 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
   const packetDir = await stageReview("review", staged, { previous: previous?.staging });
   const specSlides = new Map([...(spec.slides || []), ...(spec.appendix || [])].map((slide) => [slide.id, slide]));
   const statedNotes = (slide) => { const stated = slide?.pageType?.content?.settles?.stated; return stated ? dependencyNotes({ settles: { stated } }) : []; };
-  const slides = scene.slides.map((s, i) => ({
-    id: s.id, index: i + 1,
-    title: s.nodes.find((n) => n.role === "action-title" || n.role === "cover-title")?.text?.replace(/\n/g, " ") ?? "",
-    text: textOf(s),
-    exhibits: (s.componentInstances || []).filter((c) => /^(chart\.|table|image-frame|metric)/.test(c.component)).map((c) => ({ component: c.component, frame: c.frame })),
+  const slides = scene.slides.map((s, i) => packetSlide(s, i + 1, {
     // The gates number the pages they read: the composed pages, which an assembled deck sets among carried slides.
     gateFindings: s.carried ? [] : (gates.findings || []).filter((f) => f.slide === s.id || f.slide === (s.composed ?? i + 1)),
-    ...(s.carried ? { carried: s.carried } : {}),
-    image: path.join(packetDir, "rendered", `slide-${i + 1}.png`),
-    ...checklistOf(s),
-    // What the compile recorded as stated from an assumption, or printed without its sign: the reviewer judges whether the page says so.
-    stated: statedNotes(specSlides.get(s.id)),
-  }));
+    image: path.join(packetDir, "rendered", `slide-${i + 1}.png`), stated: statedNotes(specSlides.get(s.id)) }));
   const statistics = designStatistics(composedScene);
   const density = confirmation ? null : await readJson(path.join(dir, "density-profile.json"), { optional: true });
   const craft = ((await readJson(path.join(dir, "preflight-gates.json"), { optional: true }))?.findings || []).filter((f) => String(f.code).startsWith("CRAFT_"));
   // What the runtime read of the exhibits' fit to their claims (claim-fit.mjs): the first pass judges it; on a revision, of the pages it added or redrew.
   const fit = confirmation || scope ? [] : await reviewFit(spec, deckPath);
   const spreads = spreadFiles.map((f) => path.join(packetDir, "rendered", f));
-  const sections = !scope && !confirmation && !revision && slides.length > SECTION_REVIEW_THRESHOLD ? reviewSections(scene) : null;
+  // A first pass over sections reviewed while they were written reads on the page dimensions only the pages those reviews do
+  // not stand for (page-check.mjs): the spine reads the whole deck as before, and every other page keeps its section's reading.
+  const standing = !scope && !confirmation && !revision ? await standingSectionReviews(dir, scene) : null;
+  const sections = !scope && !confirmation && !revision && (standing || slides.length > SECTION_REVIEW_THRESHOLD) ? reviewSections(scene, { only: standing?.reread ?? null }) : null;
+  // The pages the build's density profile flags that no reading of this pass or of a standing section review judged: the spine's.
+  const judgedEarly = new Set((standing?.parts || []).flatMap((part) => (part.density?.pages || []).map((p) => p.slide)));
+  const densityLeft = standing ? (density?.pages || []).filter((p) => p.flags?.length && !standing.reread.includes(p.id) && !judgedEarly.has(p.id)).map((p) => p.id) : [];
   // The floors a repair must stay inside, for the pages this read covers: the pages a revision changed, the pages a verification rereads, or every page.
   const read = scope ? scope.mustInspect : !confirmation && revision ? revision.changed : null;
   // The floors are the build's, measured on the pages the runtime composed: a slide a revision carries is held to none.
@@ -1118,7 +1143,9 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
     waivers, storyline, assets: (await readJson(path.join(dir, "build-result.json"), { optional: true }))?.assets ?? null, revision: !scope && revision ? { changed: revision.changed, ...(revision.excused?.length ? { excused: revision.excused } : {}) } : null,
     // On a revision's later pass: the pages of the imported deck it left unchanged, which take no finding of their own.
     imported: scope && imported.length ? imported : null, montage: path.join(packetDir, "rendered", "montage.png"), spreads,
-    titles: slides.map((s) => `${s.index}. [${s.id}] ${s.title}`), slides, rubric: RUBRIC, severities: SEVERITY_DEFINITIONS, codes: CODES, schema };
+    titles: slides.map((s) => `${s.index}. [${s.id}] ${s.title}`), slides, rubric: RUBRIC, severities: SEVERITY_DEFINITIONS, codes: CODES, schema,
+    // Which pages stand on a section review, never what it found: the final readers judge independently.
+    ...(standing ? { standing: { pages: slides.map((s) => s.id).filter((id) => !standing.reread.includes(id)), reread: standing.reread, densityLeft } } : {}) };
   const main = confirmation ? confirmationPrompt(packet) : scope ? verificationPrompt(packet) : reviewPrompt(packet);
   const parts = sections ? [...sections.map((section) => [section.id, sectionPrompt(packet, section)]), ["spine", spinePrompt(packet)]] : [];
   // One hash over every prompt the packet holds: each answer, and each part of a split pass, echoes it.
@@ -1135,7 +1162,9 @@ export async function buildReviewPacket({ outputDirectory, spec, deckPath = null
     for (const [id, text] of parts) await fs.writeFile(path.join(packetDir, "sections", `${id}.md`), signed(text));
   }
   const record = { kind: packet.kind, pass: packet.pass, binding, verifies: packet.verifies, confirms: packet.confirms, promptHash: packet.promptHash,
-    staging: packetDir, sections, waivers, revision: packet.revision, out: dir, deck: deckPath ? path.resolve(deckPath) : null, writtenAt: new Date().toISOString() };
+    staging: packetDir, sections, waivers, revision: packet.revision, out: dir, deck: deckPath ? path.resolve(deckPath) : null, writtenAt: new Date().toISOString(),
+    // The standing section reviews as the merge joins them, kept here and not in the packet the readers are given.
+    ...(standing ? { standing: standing.parts, sectionReviews: standing.records } : {}) };
   await fs.mkdir(store, { recursive: true });
   await writeJson(path.join(store, PACKET_RECORD), record);
   return { packetDir, packet, record, store };
@@ -1263,7 +1292,10 @@ export function reviewPrompt(packet) {
 THIS IS A REVISION of the user's existing deck. ${revisionMakeup(slides)}The revision changed ${changed.size} of ${slides.length} pages, marked [changed] below: read those at full size on every dimension, give each an entry in \`pages\` and list them in \`opened\`. The other pages are the user's as they stand: read them in the spreads for the sequence, give them no entry, and file a finding only where a changed page is involved - a page finding on a changed page, a deck finding listing at least one.${excusedLine(packet.revision)}
 ${ABOUT_IMPORTED_RULE}
 ` : "";
-  const split = packet.sections?.length ? `
+  // Sections reviewed while they were written stand on their own readings: this pass is the spine's, plus the pages they do not cover.
+  const split = packet.standing ? `
+THIS DECK'S SECTIONS WERE REVIEWED AS THEY WERE WRITTEN. ${packet.standing.pages.length} of ${slides.length} pages stand on those readings, drawn as their reviewers saw them or changed only by those reviews' own fixes, and take no page reading here. Do not answer this prompt: give spine.md (the whole deck, on ${DECK_DIMENSIONS.join(", ")})${packet.sections.length ? ` and each prompt for the pages still to read (${packet.sections.map((s) => `${s.id}.md: ${s.slides.length} pages`).join("; ")}: changed since their section review, or never reviewed)` : ""} in the packet's sections/ folder to its own fresh reviewer at the same time and save each JSON answer as parts/<id>.json beside it; the merge joins them with the standing section reviews and refuses any part that misses a page.
+` : packet.sections?.length ? `
 THIS DECK IS LONG (${slides.length} pages), so read it in parallel where the harness can spawn subagents: give each prompt in the packet's sections/ folder (${packet.sections.map((s) => `${s.id}.md: ${s.slides.length} pages`).join("; ")}; and spine.md for the whole sequence) to its own fresh reviewer at the same time and save each JSON answer as parts/<id>.json beside it; the merge joins them into one review and refuses any part that misses a page. A harness with no subagents works through this prompt alone, page by page.
 ` : "";
   return `You are the first reader of a finished consulting deck, reviewing it against the user's request the way an engagement manager would the night before a steering committee. This is pass 1 of at most ${packet.maxPasses ?? MAX_PASSES}, and it is exhaustive. ${INDEPENDENT}
@@ -1333,7 +1365,11 @@ Set accepted=true only at a rating of ${ACCEPT_RATING} or more with no major or 
 /** One section of a long deck's first pass: its pages, closely, on every page dimension. */
 export function sectionPrompt(packet, section) {
   const slides = (packet.slides || []).filter((s) => section.slides.includes(s.id));
-  return `You are one of several reviewers reading a long consulting deck in parallel for its exhaustive first pass. Yours is section ${section.id}, "${section.title}": pages ${section.slides.join(", ")}. Other reviewers take the other sections, and a spine reviewer reads the whole sequence for consistency, rhythm and the executive summary and close. ${INDEPENDENT}
+  // A section read while the deck is written (section-review.mjs): its findings are fixed by its own writer, from the fixes it gives.
+  const intro = packet.early
+    ? `You review one section of a consulting deck while its other sections are still being written: section ${section.id}, "${section.title}", pages ${section.slides.join(", ")}. Every page of it compiled and rendered clean. You read it now so each defect is fixed while its writer still holds the section; a final reviewer later reads the whole deck for consistency, rhythm and the executive summary and close, and reads these pages again only where they change. ${INDEPENDENT}`
+    : `You are one of several reviewers reading a long consulting deck in parallel for its exhaustive first pass. Yours is section ${section.id}, "${section.title}": pages ${section.slides.join(", ")}. Other reviewers take the other sections, and a spine reviewer reads the whole sequence for consistency, rhythm and the executive summary and close. ${INDEPENDENT}`;
+  return `${intro}
 
 ${requestPrompt(packet)}
 
@@ -1352,7 +1388,7 @@ ${OPENED("every one of your pages")}
 
 ${FINDING_RULES}
 A defect recurring on several of your pages is a deck finding listing every one of them, under a page dimension; the merge joins it with the same defect seen from other sections. Name only pages in your section.
-
+${packet.early ? `\n${fixRules(packet.early)}\n` : ""}
 ${COMPLETENESS_RULES(PAGE_DIMENSIONS)}
 
 Codes (or a precise upper-case code of your own):
@@ -1377,8 +1413,22 @@ Set part to ${JSON.stringify({ kind: "section", id: section.id, slides: section.
 
 ${formPrompt(packet, { dimensions: PAGE_DIMENSIONS, page: section.slides[0] })}
 
-Return ONLY JSON matching this schema: ${JSON.stringify(SECTION_PART_SCHEMA)}`;
+Return ONLY JSON matching this schema: ${JSON.stringify(packet.early ? SECTION_REVIEW_SCHEMA : SECTION_PART_SCHEMA)}`;
 }
+
+// A section review's findings are closed by their own fixes: what a fix is and where an unfixable finding goes.
+export const FIX_ROUTES = Object.freeze({
+  spine: "the repair writes a field the storyline critique is bound to (a title, a type, what settles the claim, the evidence, a measure's basis or view): the lead takes it to the critique",
+  research: "the repair needs a figure or a source the deck's records do not hold: the lead sends it to research",
+});
+const FIX_SCHEMA = { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["page", "field", "value"],
+  properties: { page: { type: "string" }, field: { type: "string", minLength: 1 }, value: {} } } };
+/** A section review's answer: a section part whose findings each carry `fix`, the full replacement of what they change, or `route`. */
+export const SECTION_REVIEW_SCHEMA = (() => {
+  const base = partSchema("section"), items = base.properties.findings.items;
+  return { ...base, properties: { ...base.properties, findings: { type: "array", items: { ...items, properties: { ...items.properties, fix: FIX_SCHEMA, route: { type: "string", enum: Object.keys(FIX_ROUTES) } } } } } };
+})();
+const fixRules = (early) => `FIXES ARE CLOSED. Every finding of severity minor, major or blocker carries \`fix\`: the full replacement of each field its repair changes, as [{ "page", "field", "value" }] - \`page\` one of the finding's \`slides\`; \`field\` a dotted path into that page's record as written (an index for a list item: "points.1", "exhibit.annotations", "form"), every part of it but the last already there; \`value\` the field's whole new value, as the record writes it. Each page's record is in ${early.records}. The writer applies the fixes word for word and the page keeps your verdict with no second reading, so write each to the room its slot has. A finding no fix of those fields can close carries \`route\` and no fix: ${Object.entries(FIX_ROUTES).map(([route, why]) => `"${route}" where ${why}`).join("; ")}. Before you hand back, run \`${early.validate}\`: it applies every fix to the section and refuses a field that is not there, a field the critique is bound to, and a fix that leaves the page failing to compile or tripping a page rule; mend each refusal and run it again until it says the answer would be recorded.`;
 
 /** The spine of a long deck's first pass: what no section reviewer can see. */
 export function spinePrompt(packet) {
@@ -1417,7 +1467,7 @@ ${REFERENCES}
 
 ${ASSESS}
 
-${densityPrompt(packet.density, [])} Write density.deck for the whole deck; the section reviewers judge the flagged pages.
+${densityPrompt(packet.density, packet.standing?.densityLeft ?? [])} Write density.deck for the whole deck; the section reviewers judge the flagged pages${packet.standing?.densityLeft?.length ? `, except those listed: they stand on section reviews that read them before the build flagged them, so judge them here` : ""}.
 
 Set part to ${JSON.stringify({ kind: "spine", id: "spine", slides: (packet.slides || []).map((s) => s.id) })}. Bind to ${packet.binding}. Rate the whole deck out of ten; your rating and summary become the review's.
 
@@ -1587,6 +1637,7 @@ export async function mergeReviewDirectory(outputDirectory, partsDirectory = nul
   const scene = await readJson(path.join(dir, "scene.json"));
   const slideIds = (await reviewedDeck(dir)).scene.slides.map((s) => s.id);
   const { review, errors } = mergeReviewParts(parts, slideIds, { sections: record?.sections ?? null, binding: record?.binding, promptHash: record?.promptHash ?? null, waivers: record?.waivers ?? [],
+    standing: record?.standing ?? [], sectionReviews: record?.sectionReviews ?? null,
     floors: await reviewFloors(dir, scene, { spec, base: deckPath ? path.dirname(path.resolve(deckPath)) : null }) });
   // The errors as they were raised, and gathered by the rule each breaks: what to send back to the reviewers, once.
   if (errors.length) return { status: "invalid", errors, grouped: groupedErrors(errors), parts: files };
@@ -1603,7 +1654,7 @@ export async function mergeReviewDirectory(outputDirectory, partsDirectory = nul
  */
 export async function runReview({ outputDirectory, spec, deckPath = null, backend = "auto", model, timeoutMs = 600000, scope = null, confirmation = null, waivers = [], revision = null, imported = [] }) {
   const out = path.resolve(outputDirectory);
-  const { packetDir, packet } = await buildReviewPacket({ outputDirectory: out, spec, deckPath, scope, confirmation, waivers, revision, imported });
+  const { packetDir, packet, record } = await buildReviewPacket({ outputDirectory: out, spec, deckPath, scope, confirmation, waivers, revision, imported });
   const which = detectBackend(backend);
   const reviewPath = path.join(out, confirmation ? "confirmation.json" : "review.json");
   const deck = deckPath ? path.resolve(deckPath) : "<id>.deck.json";
@@ -1622,7 +1673,8 @@ export async function runReview({ outputDirectory, spec, deckPath = null, backen
       const jobs = [...packet.sections.map((section) => ({ id: section.id, prompt: prompts[section.id], images: packet.slides.filter((s) => section.slides.includes(s.id)).map((s) => s.image) })),
         { id: "spine", prompt: prompts.spine, images: [packet.montage, ...packet.spreads], schemaPath: path.join(packetDir, "spine-part-schema.json") }];
       const parts = await reviewParts(which, jobs, { partsDir: path.join(packetDir, "parts"), schemaPath: path.join(packetDir, "part-schema.json"), model, timeoutMs, cwd: packetDir, promptHash: packet.promptHash });
-      const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), { sections: packet.sections, binding: packet.binding, promptHash: packet.promptHash, waivers, floors: packet.floors });
+      const merged = mergeReviewParts(parts, packet.slides.map((s) => s.id), { sections: packet.sections, binding: packet.binding, promptHash: packet.promptHash, waivers, floors: packet.floors,
+        standing: record.standing ?? [], sectionReviews: record.sectionReviews ?? null });
       if (merged.errors.length) throw new Error(`The section reviews could not be merged:\n- ${groupedErrors(merged.errors).join("\n- ")}`);
       review = merged.review;
     } else {

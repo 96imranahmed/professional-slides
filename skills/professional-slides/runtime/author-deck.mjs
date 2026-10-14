@@ -149,6 +149,7 @@ import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile } from "./pages-file.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
+import { recordPageChecks } from "./page-check.mjs";
 import { RECORD_FILE as ANSWER_CRITIQUE_FILE, answerHazards as answerHazardsOf, openAnswerItems } from "./answer-critique.mjs";
 import * as WEIGHT from "./weight.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
@@ -1932,7 +1933,10 @@ async function renderCheck(compiled, { dir, stem, named }) {
       mkdirSync(saved, { recursive: true });
       result.render.renders.forEach((file, at) => { const id = idOf(at + 1); if (id) copyFileSync(file, path.join(saved, `${id}.png`)); });
     }
-    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories, ...(saved ? { saved } : {}),
+    // What each page drew, with the density profile's reading of it: the page check's record (page-check.mjs), which a section review binds to.
+    const drawn = saved ? new Map(scene.slides.map((slide) => [String(slide.sourceSlideId ?? slide.id), slide])) : null;
+    const densityOf = saved ? new Map((profile?.pages ?? []).map((page) => [String(page.id), page])) : null;
+    return { ran: Boolean(result.gates), reason: result.renderSkipped ?? null, status: result.status, slides: result.slides, timings: result.timings, blockers, advisories, ...(saved ? { saved, drawn, densityOf } : {}),
       standings: named || !result.gates ? [] : [...(result.gates.standings ?? []).map(numbered), ...(profile?.standings ?? [])] };
   } finally { rmSync(work, { recursive: true, force: true }); }
 }
@@ -2547,6 +2551,11 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   const answering = (f) => (f.class === "G" ? contributorsOf(f, standings, { parts: compiled.parts, rates: CRAFT_RATES }) : pagesOf(f));
   const about = (f) => answering(f).some((id) => named.has(id));
   const blocking = named ? everything.filter(about) : everything;
+  // A page run that rendered records what each page drew and whether it is clean: a section all of whose pages check clean
+  // can be reviewed beside the others' writing (section-review.mjs), bound to these drawings.
+  if (rendered?.drawn) await recordPageChecks(path.dirname(rendered.saved), { slides: rendered.drawn,
+    pages: new Map([...doc.pages, ...(doc.appendix || [])].map((page, index) => [String(page?.id ?? `page-${index + 1}`), page])),
+    blocking: (id) => blocking.filter((f) => answering(f).includes(id)).map((f) => f.code), density: rendered.densityOf });
   const beyond = named ? everything.filter((f) => f.class === "S" && !about(f)) : [];
   const aggregatesBeyond = named ? everything.filter((f) => f.class === "G" && !about(f)) : [];
   const ledger = pageBudgetLedger(budget.filter((b) => !named || named.has(String(b.id ?? ""))), pageGateAdvisories, spec);

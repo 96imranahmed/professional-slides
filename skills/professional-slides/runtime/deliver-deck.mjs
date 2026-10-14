@@ -63,6 +63,8 @@ import { reviewFloors, retitleLine, resizeLine } from "./review-floors.mjs";
 import { capMessage, deckStatementFindings, evidenceScopeOf, requestOf, requestProvenanceOf, provenanceErrors, lineageStore, restartLineage, readConfirmations, recordConfirmation, readInventory, revisionChanges, openAboutImported } from "./review-passes.mjs";
 import { writeLedger, validateSelfCheck, findingKey, CLAIM_CODES } from "./claims.mjs";
 import { storylineGate, storylineOutcome, POST_REVIEW_RULE } from "./storyline.mjs";
+import { escapesOf } from "./review-stages.mjs";
+import { logEscapes } from "./run-log.mjs";
 
 // Delivery's own findings: why a deck was refused around its review, as
 // opposed to a defect a gate or the reviewer found on a page. A review that
@@ -330,6 +332,15 @@ async function deliverSteps(context, { reviewer, model, reviewFile, skipBuild, f
     // What the rejection is grouped by: how many blocking findings each kind of repair reaches, and how many open findings the storyline critic could have decided.
     repairs: Object.fromEntries(["layout", "argument", "unstated"].map((reach) => [reach, outcome.blocking.filter((b) => b.reach === reach).length])), atSpine: (({ ids: _ids, ...counted }) => counted)(spineAgreement(outcome.ledger)),
     provenance: review.provenance, file: reviewFile ? path.resolve(reviewFile) : path.join(directory, "review.json") };
+  // What this read found that an earlier stage could have caught (review-stages.json): each escape by code, stage and page, in
+  // delivery.json and the author log, as the evidence for which first loop to deepen next. A section review's findings carried
+  // open are that review's, caught where they belong; on ba4, 129 of the 171 findings were page-level and reached the end.
+  const carried = new Set((review.sectionReviews || []).flatMap((entry) => entry.carried || []));
+  const escapes = escapesOf(review.findings.filter((f) => !carried.has(f.id)));
+  report.review.escapes = { count: escapes.count, of: escapes.of, byStage: escapes.byStage, byCode: escapes.byCode };
+  report.escapes = escapes.items;
+  if (review.sectionReviews) report.review.sectionReviews = review.sectionReviews;
+  logEscapes(path.join(path.dirname(specPath), `${deckStem(spec)}.author-log.jsonl`), escapes.items, { pass: review.pass });
   // What the reviewer filed about the imported deck is reported with the deck beside the critic's: it blocks nothing (openBlocking leaves it out).
   const told = openAboutImported(outcome.ledger).map((e) => ({ id: e.id, from: `deck review pass ${review.pass}`, severity: e.severity, pages: e.pages || [], reason: e.reason, repair: e.repair ?? null }));
   if (told.length) report.aboutImported = [...(report.aboutImported || []).filter((item) => !/^deck review/.test(item.from)), ...told];
@@ -486,6 +497,8 @@ async function reject({ report, directory, delivered, rejectedNote, advisories =
   const atSpine = blockers.filter((b) => b.decidable === "spine").length;
   const lines = [`# REJECTED at ${stage}`, "", `${blockers.length} blocking finding(s)${bars.length ? `, ${bars.length} of them a build bar missed` : ""}${listed.length ? `; ${listed.length} advisor${listed.length === 1 ? "y" : "ies"}, which do not block` : ""}. No deliverable was written.`, ""];
   if (grouped.length) lines.push(`${Object.keys(REACHES).filter((reach) => grouped.some((b) => b.reach === reach)).map((reach) => `${grouped.filter((b) => b.reach === reach).length} ${REACHES[reach].heading.toLowerCase()}`).join("; ")}.${atSpine ? ` ${atSpine} of the ${grouped.length} ${atSpine === 1 ? "is" : "are"} marked "${SPINE_LABEL}": the storyline critic read the same facts and passed them.` : ""}`, "");
+  // How many of the review's findings an earlier stage could have caught: said after the lead, before the lists.
+  if (report.review?.escapes) lines.push(escapeLine(report.review.escapes), "");
   if (blocking.length) lines.push("## Blockers", "", ...blocking.map((b) => line(b)), "");
   for (const [reach, { heading, intro }] of Object.entries(REACHES)) {
     const own = grouped.filter((b) => b.reach === reach);
@@ -500,6 +513,9 @@ async function reject({ report, directory, delivered, rejectedNote, advisories =
   return report;
 }
 
+// The escape count in a line: how many of the review's findings an earlier stage could have caught, and which.
+const escapeLine = (escapes) => `Escapes: ${escapes.count} of the review's ${escapes.of} findings could have been caught earlier (${Object.entries(escapes.byStage).filter(([, n]) => n).map(([stage, n]) => `${stage} ${n}`).join(", ") || "none"}); each is in delivery.json under \`escapes\`, by code and page.`;
+
 const USAGE = "Usage: deliver-deck.mjs <id>.deck.json output-directory [--reviewer auto|codex|claude|packet] [--model m] [--review review.json|confirmation.json|parts-dir] [--skip-build] [--full-review --reason text [--user-approved]] [--max-passes n]";
 
 async function main(argv) {
@@ -512,6 +528,7 @@ async function main(argv) {
   const report = await deliverDeck(path.resolve(spec), path.resolve(out), { reviewer: values.reviewer || "auto", model: values.model, reviewFile: values.review, skipBuild: values["skip-build"],
     fullReview: values["full-review"], reason: values.reason, userApproved: values["user-approved"], maxPasses: values["max-passes"] ? Number(values["max-passes"]) : MAX_PASSES });
   console.log(JSON.stringify(report));
+  if (report.review?.escapes) console.error(escapeLine(report.review.escapes));
   return report.accepted ? EXIT.ok : report.review?.status === "pending" ? EXIT.waiting : EXIT.refused;
 }
 
