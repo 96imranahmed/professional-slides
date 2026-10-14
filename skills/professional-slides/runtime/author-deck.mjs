@@ -20,6 +20,12 @@
 //                                                        form the measures fill; it says what it bound, and where it
 //                                                        fell back to the worked example, why;
 //                                                        its `limits` block is the limits the page is held to
+//   node runtime/author-deck.mjs <id>.pages.json --allocate [--write]
+//                                                        before the skeletons: each insight's home section (the part
+//                                                        files' `evidence`), the kinds of exhibit the deck's floor needs
+//                                                        given to the sections whose evidence draws them, each section's
+//                                                        depth, and the peer sets the comparisons will need; --write
+//                                                        writes each section's share to its part (`allocation`)
 //   node runtime/author-deck.mjs <id>.pages.json --log   what the compile and plan runs so far found, and what recurred
 //                                                        (it says what it counts: no other command is logged)
 //   node runtime/author-deck.mjs <id>.pages.json         compile to <id>.deck.json and <id>.plan.json; warns when
@@ -147,7 +153,7 @@ import { sourceKindsOf } from "./fit-review.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
-import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts, editPartSync, partHomes } from "./pages-file.mjs";
 import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
 import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
@@ -182,6 +188,7 @@ import { PLAN_MODE, RUN_LOG_VERSION, readRunLog, runCost } from "./run-log.mjs";
 import { sectionTitleRoom, spineFitFindings } from "./spine-fit.mjs";
 import { spineExhibitFindings } from "./spine-exhibits.mjs";
 import { deckKeyProblems, deckSchema } from "./deck-keys.mjs";
+import { allocationReport, homeFindings, owedKinds } from "./allocation.mjs";
 
 export const REVISION = "existing_deck_revision";
 
@@ -204,6 +211,10 @@ export const AUTHORING_CODES = Object.freeze({
   SPINE_LOCKED: "a page whose argument - its title, page type, what settles its claim, the insights and measures it rests on and shows - moved after the storyline critique closed (ready, provisional or its passes spent), refused unless the run says --reopen-spine and takes the deck back to the critique",
   SOURCE_NUMBERS_UNREAD: "an insight measure more than half of whose recorded values its own source files do not print, or print with the other sign - a slipped transcription, or a file that is not the one the number came from - advised, with the values",
   JUDGEMENTS_PENDING: "questions the rules ask of the copy - whether a column judges, a title leads with a gap, a picture shows what was asked - that no recorded judgement answers yet, so the rules that ask them did not hold: advised, until judge.mjs records the answers (delivery refuses a deck with any open)",
+  EVIDENCE_HOMED_TWICE: "an insight two part files both name in their `evidence`: each insight has one home, the section that builds pages on it, and another section that re-reads it on purpose lists it in its `rereads` (allocation.mjs)",
+  EVIDENCE_UNKNOWN: "a part file names, in its `evidence` or `rereads`, an insight the log does not hold",
+  EVIDENCE_ELSEWHERE: "a page that builds on an insight another section holds, without its part re-reading it on purpose (`rereads`): two sections written side by side would build on one finding",
+  EVIDENCE_UNHOMED: "a page that builds on an insight no section holds, in a deck whose sections declare the insights they hold: the section takes it home in its part's `evidence` first",
   SOURCES_UNFILED: "an insight whose `sources` are not files under sources/ - a name or a registry key where the path of the file the finding was read from belongs, or none at all - advised at the compile, and told to the storyline critic as a problem of the log",
   // Advisories, raised by the page-type compiler (page-types.mjs) and listed in the author's summary.
   TITLE_COUNT_ONLY: "a title that states a count with no comparator or consequence",
@@ -428,7 +439,10 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     doc: unmarked({ ...proof.doc, deck: doc.deck, pages: proof.doc.pages.map(witnessPage), ...(proof.doc.appendix ? { appendix: proof.doc.appendix.map((page, i) => witnessPage(page, proof.doc.pages.length + i)) } : {}) }), pages: proof.pages } : null;
   // A revision recorded under an older rules version hears the spine rules introduced since as advisories, and one that
   // carries slides hears the rules that measure the deck as advisories too (weight.mjs notHeldOn).
-  const spineFindings = [...WEIGHT.applyRulesVersion(deckSpineFindings(written ? written.doc : doc, insights), spec), ...(waiting.length ? [{ code: "REVISION_UNMAPPED", severity: draft ? "advisory" : "blocker", pages: waiting,
+  // Where the sections declare the insights they hold, each insight has one home and each page builds on its own section's
+  // (allocation.mjs): held from the spine on, so two sections written side by side never build on one finding. Read off the
+  // pages file as read (`docIn`), which knows the part each page and insight came from.
+  const spineFindings = [...WEIGHT.applyRulesVersion([...deckSpineFindings(written ? written.doc : doc, insights), ...homeFindings(docIn, insights)], spec), ...(waiting.length ? [{ code: "REVISION_UNMAPPED", severity: draft ? "advisory" : "blocker", pages: waiting,
     repair: `${waiting.length} imported slide${waiting.length === 1 ? " carries" : "s carry"} only their old copy (${waiting.join(", ")}): keep each as it is - \`carry: true\` beside its \`draft\`, and the build copies the slide from the source deck unchanged - or map it to a page type by its stable id - \`type\`, \`form\`, \`commentary\`, \`why\` and the exhibit its evidence needs (\`--scaffold <type>\` prints one; the inventory holds the slide's table cells and chart values) - or delete it from \`pages\` to drop the slide` }] : [])];
   if (partial) return { spec, findings: varietyFindings(spec, { structureOf, drawnOf }), spineFindings, bindingFindings: binding.findings, compileErrors: errors, failed, unmapped: waiting, witness };
   errors.push(...binding.findings.map((f) => f.repair));
@@ -1074,6 +1088,11 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // The plan record's advisories rest on the families a plan declares; here the compiled pages are read directly
   // and the contract's own rules say the same things exactly, so only what the plan gates refuse is reported.
   structure.findings = structure.findings.filter((f) => !/^PLAN_/.test(f.code) || isBlocker(f));
+  // A kinds floor the deck misses goes to the sections that owe a kind the allocation gave them (allocation.mjs): the lead
+  // routes each to its section, which draws it on the page its evidence suits, rather than redrawing pages to add any kind.
+  const owing = owedKinds(docIn, [...shaped.slides, ...(shaped.appendix || [])]);
+  if (owing.length) structure.findings = structure.findings.map((f) => (f.code === "VARIETY_EXHIBIT_RANGE" ? { ...f, measured: { ...(f.measured ?? {}), owed: owing },
+    repair: `${f.repair}. The allocation gave these kinds to sections that do not draw them yet: ${owing.map((o) => `${o.section} (${o.owed.join(", ")})`).join("; ")} - each is that section's to draw, on the page its evidence suits` } : f));
   const typed = [...shaped.slides, ...(shaped.appendix || [])].filter((slide) => slide.pageType);
   // The page's architecture as the gates measured it, or as its choices declare it where it did not compose.
   const measuredShape = new Map();
@@ -1831,7 +1850,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --allocate [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2209,7 +2228,7 @@ function evidenceFills(insights) {
     }
     return measured.get(key);
   };
-  return (page, type, form) => {
+  const fills = (page, type, form) => {
     const key = `${page.id}|${type}|${form}`;
     if (memo.has(key)) return memo.get(key);
     const reasons = [];
@@ -2228,6 +2247,10 @@ function evidenceFills(insights) {
     memo.set(key, why);
     return why;
   };
+  // Whether a form draws any measure at all, for a caller that gives out kinds (allocation.mjs kindReach): a form that draws
+  // none fills from any insight, and adds its kind by setting the numbers aside.
+  fills.takesMeasures = takesMeasures;
+  return fills;
 }
 
 async function planCommand(doc, { dir, stem, file, say, refusal = [], write = false, accept = false }) {
@@ -2383,7 +2406,7 @@ async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" }, limits: { type: "string", bare: "" },
     example: { type: "string", bare: "" }, scaffold: { type: "string" }, evidence: { type: "string" }, id: { type: "string" }, out: { type: "string" },
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
-    page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
+    page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, allocate: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
     "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, accept: { type: "boolean" }, "fetch-assets": { type: "boolean" }, json: { type: "boolean" },
     pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
@@ -2484,7 +2507,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
       try { const { spec } = compileDeck(doc, { insights, partial: true }); compiled = new Map([...spec.slides, ...(spec.appendix || [])].filter((slide) => slide.pageType).map((slide) => [String(slide.id), slide])); }
       catch { compiled = new Map(); }
       quotas = sectionQuotas(doc, { insights, compiled, mine: new Set(own.map((page) => String(page.id))), fills: values.brief === "skeleton" && insights ? evidenceFills(insights) : null,
-        planned, budget: budgets.get(ownPart) ?? null });
+        planned, budget: budgets.get(ownPart) ?? null, given: partHomes(doc).get(ownPart)?.allocation?.kinds ?? null });
     }
     const brief = briefLines(doc, { role: values.brief, section: values.section ?? null, file, stem, insights, limitsOf: (page) => scaffoldLimits(page, doc.deck.density), digest: briefDigest(values.brief), slotsOf: values.brief === "writer" ? slotsOf : null, answerItems, answerHazards, sheet, spine: Boolean(values.spine), quotas });
     if (brief.why) { console.error(brief.why); return 1; }
@@ -2492,6 +2515,27 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     return 0;
   }
   if (values.section !== undefined || values.spine) { console.error(`${values.spine ? "--spine" : "--section"} names what a --brief covers`); return 1; }
+  // What each section holds for the deck before its skeleton is written (allocation.mjs): run by the lead once the parts have
+  // their budgets and their evidence, so the floors no one section meets alone are each some section's from the start.
+  if (values.allocate) {
+    if (values.plan || values.check || values.draft) { console.error("--allocate runs before the skeletons, on its own: --allocate [--write]"); return 1; }
+    let insights;
+    try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch (error) { console.error(error.message); return 2; }
+    if (!insights) { console.error(`No insight log beside ${path.basename(file)}: the allocation reads each section's evidence from ${stem}.insights.json`); return 2; }
+    const budgets = partBudgets(doc);
+    const report = allocationReport(doc, insights, { fills: evidenceFills(insights), budgets });
+    say(report.lines.join("\n"));
+    if (values.write) {
+      if (report.blocking) { say("\nNothing written: settle the homes listed first, then run --allocate --write again."); return 2; }
+      const written = [];
+      for (const [section, given] of report.kinds.bySection) {
+        if (!includedParts(doc).includes(section)) continue;
+        if (editPartSync(file, section, (part) => { part.allocation = { kinds: given.map(({ kind, insight, type, form }) => ({ kind, insight, type, form })) }; })) written.push(section);
+      }
+      say(`\nWritten: ${written.length ? written.join(", ") : "nothing changed"} - each part's \`allocation\`, which its skeleton and writer briefs print and its pages' check holds.`);
+    }
+    return report.blocking || report.short ? 2 : 0;
+  }
   if (values.plan) {
     // A plan is logged as a compile is: it is a run of this tool that can be refused, and its cost is part of the deck's.
     const refusal = [];

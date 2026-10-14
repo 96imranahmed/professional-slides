@@ -27,7 +27,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const PARTS = new WeakMap(), INCLUDED = new WeakMap(), BUDGETS = new WeakMap(), READ = new WeakMap();
+const PARTS = new WeakMap(), INCLUDED = new WeakMap(), BUDGETS = new WeakMap(), HOMES = new WeakMap(), READ = new WeakMap();
 
 /** The part file each page id of `doc` was read from (relative to the pages file), for pages that came from one. */
 export const partsOf = (doc) => PARTS.get(doc) ?? new Map();
@@ -43,11 +43,22 @@ export const includedParts = (doc) => INCLUDED.get(doc) ?? [];
  */
 export const partBudgets = (doc) => BUDGETS.get(doc) ?? new Map();
 
+/**
+ * What each part holds for the deck, by the part's path as includedParts names it (allocation.mjs): `{ evidence, rereads,
+ * allocation }` - the insights the section builds its pages on, each homed in one part; those it re-reads on purpose from
+ * another; and the share of the deck's floors `--allocate --write` gave it. A part that declares none of them is listed with
+ * none, so every included part is a section the allocation reads.
+ */
+export const partHomes = (doc) => HOMES.get(doc) ?? new Map();
+
 /** `findings` with the part file named on each one whose page came from a part. */
 export function withParts(doc, findings) {
   const parts = partsOf(doc);
   return parts.size ? findings.map((f) => { const part = parts.get(String(f.id ?? f.page ?? "")); return part ? { ...f, part } : f; }) : findings;
 }
+
+// The keys a part file may hold beside its pages.
+const PART_KEYS = Object.freeze(["pages", "sources", "budget", "evidence", "rereads", "allocation"]);
 
 const isInclude = (entry) => entry && typeof entry === "object" && !Array.isArray(entry) && entry.include !== undefined;
 
@@ -123,7 +134,7 @@ export function readPagesFileSync(file) {
   const doc = readJsonFile(root, null, texts);
   const lists = ["pages", "appendix"].filter((key) => Array.isArray(doc?.[key]) && doc[key].some(isInclude));
   if (!lists.length) { if (doc && typeof doc === "object") READ.set(doc, { root, texts }); return doc; }
-  const parts = new Map(), seen = new Map(), included = new Map(), budgets = new Map(), sources = new Map(Object.keys(doc.sources ?? {}).map((key) => [key, path.basename(root)]));
+  const parts = new Map(), seen = new Map(), included = new Map(), budgets = new Map(), homes = new Map(), sources = new Map(Object.keys(doc.sources ?? {}).map((key) => [key, path.basename(root)]));
   const registry = { ...(doc.sources ?? {}) };
   const relative = (at) => path.relative(base, at) || path.basename(at);
   const place = (page, at, index) => {
@@ -146,12 +157,18 @@ export function readPagesFileSync(file) {
     const part = readJsonFile(target, `${where} includes "${entry.include}"`, texts);
     const pages = Array.isArray(part) ? part : part?.pages;
     if (!Array.isArray(pages)) throw new Error(`${relative(target)} is a part of ${path.basename(root)}: write it as { "pages": [...] }`);
-    const extra = Array.isArray(part) ? [] : Object.keys(part).filter((key) => !["pages", "sources", "budget"].includes(key));
-    if (extra.length) throw new Error(`${relative(target)} carries ${extra.map((key) => `\`${key}\``).join(", ")}; a part holds \`pages\`, the \`sources\` they cite and its page \`budget\` - the deck-level keys stay in ${path.basename(root)}`);
+    const extra = Array.isArray(part) ? [] : Object.keys(part).filter((key) => !PART_KEYS.includes(key));
+    if (extra.length) throw new Error(`${relative(target)} carries ${extra.map((key) => `\`${key}\``).join(", ")}; a part holds \`pages\`, the \`sources\` they cite, its page \`budget\`, the insights it holds (\`evidence\`, \`rereads\`) and its \`allocation\` - the deck-level keys stay in ${path.basename(root)}`);
     if (!Array.isArray(part) && part.budget !== undefined) {
       if (!Number.isInteger(part.budget) || part.budget < 1) throw new Error(`${relative(target)}: \`budget\` is the number of pages the section is planned to hold, a whole number of 1 or more`);
       budgets.set(relative(target), part.budget);
     }
+    // The insights the section holds and re-reads, each a list of insight ids; the allocation reads them (allocation.mjs).
+    for (const key of ["evidence", "rereads"]) if (!Array.isArray(part) && part[key] !== undefined && !(Array.isArray(part[key]) && part[key].every((id) => typeof id === "string" && id.trim())))
+      throw new Error(`${relative(target)}: \`${key}\` is a list of insight ids - ${key === "evidence" ? "the insights this section builds its pages on, each in one part" : "the insights it re-reads on purpose from another section"}`);
+    if (!Array.isArray(part) && part.allocation !== undefined && !(part.allocation && typeof part.allocation === "object" && !Array.isArray(part.allocation)))
+      throw new Error(`${relative(target)}: \`allocation\` is the object \`author-deck.mjs --allocate --write\` writes - { "kinds": [...] }`);
+    homes.set(relative(target), Array.isArray(part) ? {} : { ...(part.evidence ? { evidence: part.evidence.map(String) } : {}), ...(part.rereads ? { rereads: part.rereads.map(String) } : {}), ...(part.allocation ? { allocation: part.allocation } : {}) });
     // A part may register the sources its pages cite; the same key means the same source everywhere.
     for (const [key, source] of Object.entries((!Array.isArray(part) && part.sources) || {})) {
       if (key in registry && JSON.stringify(registry[key]) !== JSON.stringify(source)) throw new Error(`Source "${key}" is registered twice with different entries: in ${sources.get(key)} and in ${relative(target)}`);
@@ -165,12 +182,30 @@ export function readPagesFileSync(file) {
   PARTS.set(whole, parts);
   INCLUDED.set(whole, [...included.keys()].map(relative));
   BUDGETS.set(whole, budgets);
+  HOMES.set(whole, homes);
   READ.set(whole, { root, texts });
   return whole;
 }
 
 /** `readPagesFileSync`, for callers that read asynchronously. */
 export const readPagesFile = async (file) => readPagesFileSync(file);
+
+/**
+ * `edit(part)` applied to the part file `part` (its path as includedParts names it) as an object - its `budget`, `evidence`,
+ * `rereads`, `allocation` - and written back in the indentation it was written in, its keys in their order with any new one
+ * after them. A part `edit` leaves as it was writes nothing. Returns whether it wrote.
+ */
+export function editPartSync(file, part, edit) {
+  const base = path.dirname(path.resolve(file)), at = path.resolve(base, part);
+  if (!inside(base, at)) throw new Error(`${part} is outside the folder of ${path.basename(file)}`);
+  const raw = fs.readFileSync(at, "utf8"), doc = JSON.parse(raw);
+  const whole = Array.isArray(doc) ? { pages: doc } : doc, before = JSON.stringify(whole);
+  edit(whole);
+  if (JSON.stringify(whole) === before) return false;
+  const indent = /^[[{]\r?\n([ \t]+)/.exec(raw)?.[1] ?? 1;
+  fs.writeFileSync(at, `${JSON.stringify(whole, null, indent)}${raw.endsWith("\n") ? "\n" : ""}`);
+  return true;
+}
 
 /**
  * `edit(page)` applied to each page of a pages file whose id is in `ids`, in

@@ -35,6 +35,7 @@ import { hazardLine, insightLines, itemLine } from "./answer-critique.mjs";
 import { claimSheetLines } from "./claim-sheet.mjs";
 import { READING_TASK_BANK } from "./text-contract.mjs";
 import { conventionsOf, pageSubject, sectionName, sectionsOf } from "./conventions.mjs";
+import { evidenceHomes, plottableValues } from "./allocation.mjs";
 
 export const BRIEF_ROLES = Object.freeze(["skeleton", "writer", "critic", "judge", "selfcheck"]);
 // The fields the storyline critique reads of a page (storyline.mjs storyStructure): what a skeleton writes.
@@ -225,6 +226,14 @@ function quotaLines(quotas, role, parts) {
     return `- ${q.what} (${q.code}${q.key ? `.${q.key}` : ""}, at most ${Math.round(q.share * 100)}%): the deck's cap is ${q.cap} of ${of}; the other sections hold ${q.others.length}` +
       `${q.others.length ? ` (${bySection(q.others)})` : ""}, ${leaves}${q.room < 0 ? ` (they are ${-q.room} over it already)` : ""}; it holds ${q.own.length}${q.own.length ? ` (${q.own.join(", ")})` : ""}${standing}`;
   });
+  // The section's share of the deck's floors, given before its skeleton (allocation.mjs): the kinds it draws for the deck, each
+  // from an insight it holds in a form that draws it, and the depth its chart pages keep - its own to meet, whatever the others do.
+  if (quotas.share) {
+    const { share, given } = quotas, d = share.depth;
+    lines.push(`- this section's share of the deck (\`allocation\` in its part file, given by --allocate): it draws ${given.map((g) => (typeof g === "string" ? g : `${g.kind} (${g.insight} as ${g.type}/${g.form})`)).join(", ")} for the deck - ` +
+      `${share.owed.length ? `not drawn yet: ${share.owed.join(", ")}. Each was given to this section because its evidence draws it and no other section is counted on to: keep it on the page the evidence suits, in a form that carries that page's claim` : "every one drawn; keep them"}`,
+    `- depth: ${d.charts ? `${d.deep} of this section's ${d.charts} chart page${d.charts === 1 ? "" : "s"} plot ${d.floor} values or more, and at least ${d.need} must${d.deep < d.need ? ` - deepen ${d.thin.join(", ")} (a peer set, a second series, a longer window), or draw its evidence as a table or figures` : ""}` : `no chart page yet; at least half of them plot ${d.floor} values or more, so the deck's median holds`}`);
+  }
   if (role === "skeleton") {
     const k = quotas.kinds;
     lines.push(`- kinds of exhibit (VARIETY_EXHIBIT_RANGE, at least ${k.perTen} per ten pages; advisory at the spine, held at the full compile): the floor is ${k.floor} for ${quotas.planned ?? quotas.pages} pages${quotas.planned ? " planned" : ""}, and the deck draws ${k.deck} so far - ` +
@@ -300,9 +309,12 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
       "Choose within it: a page over its section's room tips the deck's cap for every section, and the whole-deck check refuses it.", ...quotaLines(quotas, role, partsOf(doc)));
   }
   if (role === "skeleton" && insights) {
-    // What a page may rest on: the insights the section's pages name, and those no page of the deck names yet.
-    const named = new Set(evidenceOf(pagesOf(doc))), own = evidenceOf(pages);
-    const free = [...insights.keys()].filter((id) => !named.has(id) && !insights.get(id)?.derived);
+    // What a page may rest on: the insights the section holds where the deck declares its homes (allocation.mjs), each the one
+    // section's to build on; otherwise those its pages name, and those no page of the deck names yet.
+    const homes = evidenceHomes(doc), held = part && homes.declared ? [...homes.home].filter(([, at]) => at === part).map(([id]) => id) : null;
+    const rereads = part && homes.declared ? [...(homes.rereads.get(part) ?? [])] : [];
+    const named = new Set(evidenceOf(pagesOf(doc))), own = held ? [...new Set([...held, ...rereads])] : evidenceOf(pages);
+    const free = held ? [] : [...insights.keys()].filter((id) => !named.has(id) && !insights.get(id)?.derived);
     // Each insight with the measures `settles.measures` may name: its name, unit and what it runs over.
     const registry = measureRegistry(insights);
     const withMeasures = (id) => {
@@ -310,9 +322,10 @@ export function briefLines(doc, { role, section = null, file, stem, insights = n
         const axis = axisOf(measure), over = axis.kind === "scalar" ? "one value" : `${axis.labels.length} ${axis.kind}: ${axis.labels.length > 4 ? `${axis.labels[0]} ... ${axis.labels.at(-1)}` : axis.labels.join(", ")}`;
         return `${measure.ref}${measure.unit ? ` (${measure.unit})` : ""} [${over}]`;
       });
-      return `- ${insightLine(id, insights.get(id))}${measures.length ? `\n  measures: ${measures.join("; ")}` : ""}`;
+      const plots = plottableValues(insights.get(id));
+      return `- ${insightLine(id, insights.get(id))}${rereads.includes(id) ? " [re-read from another section]" : ""}${measures.length ? `\n  measures: ${measures.join("; ")}${plots ? ` - plots up to ${plots} values` : ""}` : ""}`;
     };
-    lines.push("", "## Insights your pages rest on", ...own.map(withMeasures));
+    lines.push("", held ? `## The insights this section holds: its pages rest on these alone (${homes.home.size - held.length} more are other sections', and a page that builds on one is refused: EVIDENCE_ELSEWHERE)` : "## Insights your pages rest on", ...own.map(withMeasures));
     if (free.length) lines.push("", "## Insights no page rests on yet", ...free.map(withMeasures));
   }
   if (role === "writer") lines.push("", "## The measures your pages' evidence holds: each value, and the token that prints it", ...(insights ? measureLines(pages, insights) : ["No insight log beside the pages file: there are no measures to print by token."]));

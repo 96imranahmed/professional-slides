@@ -20,6 +20,7 @@ import { drawOrder, formDraw, kindOfForm, pageFit, otherTypes, sharedKinds } fro
 import { featuredDraw } from "./design-systems.mjs";
 import { architecture, planBlockers, runPlanGates, styleEntropy } from "./gates/plan_gates.mjs";
 import { classOf, standingRoom } from "./gates/gate_classes.mjs";
+import { sectionShare } from "./allocation.mjs";
 
 const exhibitsOf = (slide) => [slide.exhibit, ...(slide.exhibits || [])].filter((ex) => ex && typeof ex === "object");
 // The exhibits the page gates count as evidence (gates/deck_gates.py
@@ -584,7 +585,7 @@ const AREAS = new Set(["chart.area", "chart.stacked-area"]);
 const STACKS = new Set(["chart.stacked-area", "chart.stacked-column", "chart.stacked-bar", "chart.marimekko"]);
 
 /** The measures a page draws: those its claim names, else every measure of the insights it rests on. */
-function pageMeasures(page, registry) {
+export function pageMeasures(page, registry) {
   const named = (Array.isArray(page?.settles?.measures) ? page.settles.measures : []).map((ref) => registry.get(String(ref))).filter(Boolean);
   if (named.length) return named;
   const owners = new Set((Array.isArray(page?.evidence) ? page.evidence : []).map(String));
@@ -1040,7 +1041,7 @@ export function allocateStructure(doc, { insights = null, planOf, compiled = nul
  * VARIETY_TAKEAWAY and VARIETY_COLUMN as unclearable on its own pages, since
  * one section's fix tipped another's cap. `mine` is the section's page ids.
  */
-export function sectionQuotas(doc, { insights = null, compiled = null, mine, fills = null, planned = null, budget = null }) {
+export function sectionQuotas(doc, { insights = null, compiled = null, mine, fills = null, planned = null, budget = null, given = null }) {
   const registry = registryOf(insights), featured = drawOf(doc.deck);
   const all = [...(doc.pages || []), ...(doc.appendix || [])].filter((page) => page && typeof page === "object" && !page.include && page.carry !== true);
   const content = all.map((page, index) => ({ page, index, id: String(page.id ?? `page-${index + 1}`) })).filter(({ page }) => !page.kind || page.kind === "content");
@@ -1083,7 +1084,9 @@ export function sectionQuotas(doc, { insights = null, compiled = null, mine, fil
       exhibitType: evidenceExhibits(item.page, insights, featured), players: doc.deck?.players, shapes, drawn: deck }).map((change) => ({ id: item.id, ...change, page: item.page }));
   });
   const { offered, refused } = heldChanges(found, { registry, fills, most: 8 });
-  return { pages: n, planned: length > n ? length : null, budget, quotas, kinds: { floor: Math.ceil((PLAN.craft.exhibitVarietyPerTen.min * length) / 10 - 1e-9), perTen: PLAN.craft.exhibitVarietyPerTen.min,
+  // The section's share the allocation gave it (allocation.mjs, the part's `allocation.kinds`), against its pages as they stand.
+  const share = given ? sectionShare(drawn.filter((item) => mine.has(item.id)).map((item) => item.slide), given) : null;
+  return { pages: n, planned: length > n ? length : null, budget, quotas, ...(share ? { share, given } : {}), kinds: { floor: Math.ceil((PLAN.craft.exhibitVarietyPerTen.min * length) / 10 - 1e-9), perTen: PLAN.craft.exhibitVarietyPerTen.min,
     deck: deck.size, others: [...others].sort(), own: [...own].sort(), only: [...own].filter((kind) => !others.has(kind)).sort(),
     adds: offered.map(({ slide: _slide, page: _page, ...item }) => item), refused: refused.length } };
 }
