@@ -3,6 +3,7 @@
 // combo chart, columns with a line over them.
 import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenValue, shapePrimitive, rectPrimitive } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
+import { contrastRatio } from "./color.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods } from "./time-axis.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
@@ -399,11 +400,20 @@ function drawLines(chart) {
     if (endLabels) {
       const point = points.at(-1);
       // The label starts clear of the 10px marker, not on it.
-      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${stateLabel(item, categories)} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: lineColor(seriesIndex) });
+      pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${stateLabel(item, categories)} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: endLabelColor(lineColor(seriesIndex)) });
     }
   });
   return { pendingEndLabels };
 }
+
+// An end label is set in its line's colour, so it reads as that line's name, where that colour reads as type on the
+// page; a pale comparator line (the subject's peers in \`color.chartComparator\`) names itself in the ink instead.
+// gates/scene_gates.py GROUND_CONTRAST holds type at 2.5:1.
+const END_LABEL_CONTRAST = 2.5;
+const endLabelColor = (color) => {
+  const hex = tokenValue(color), ground = tokenValue(token("color.surface"));
+  return /^#[0-9A-Fa-f]{6}$/.test(String(hex)) && /^#[0-9A-Fa-f]{6}$/.test(String(ground)) && contrastRatio(hex, ground) < END_LABEL_CONTRAST ? INK : color;
+};
 
 /** The series' end labels, pushed apart, and the growth column beside them. */
 function placeEndLabels(chart) {

@@ -47,6 +47,21 @@ assert.ok(labels.length >= 1 && labels.every((n) => n.frame.y >= bottom - 2));
 console.log('{}');
 """)
 
+    def test_a_rank_runs_with_first_place_at_the_top(self):
+        """pr07 drew BA's fall from 13th to 23rd in Skytrax's ranking as a rise: a trellis of ranks sets 1 at the top."""
+        run_node(PRELUDE + """
+const ranks = [{ label: 'Alpha', values: [13, 18, 23, 23], rank: true }, { label: 'Beta', values: [9, 6, 4, 3], rank: true }];
+const nodes = render({ mark: 'line', categories: years, items: ranks });
+const end = (item) => nodes.find((n) => n.role === 'chart-marker' && n.data.item === item && n.data.category === 'FY26').frame.y;
+const first = (item) => nodes.find((n) => n.role === 'chart-line' && n.data.item === item).frame.y;
+// Alpha fell from 13th to 23rd: its line ends lower than it starts; Beta climbed to 3rd: its ends higher.
+assert.ok(end('Alpha') + 3.5 > first('Alpha'));
+assert.ok(end('Beta') + 3.5 < first('Beta'));
+assert.match(error(() => render({ mark: 'column', categories: years, items: ranks })), /RANK_FILLED/);
+assert.match(error(() => render({ mark: 'line', categories: years, items: [ranks[0], { label: 'Gamma', values: [1, 2, 3, 4] }] })), /a trellis is one measure/);
+console.log('{}');
+""")
+
     def test_own_scales_and_averages(self):
         run_node(PRELUDE + """
 const nodes = render({ mark: 'line', categories: years, items, scale: 'own', reference: 'average' });

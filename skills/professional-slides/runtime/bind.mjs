@@ -75,6 +75,7 @@ import { cellText, isTable, judgedCell, plottedValues, resultCells, rowCells } f
 import { axisOf, isPercentUnit, isRankMeasure, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
 import { decimalsNeeded, leadingScale, matches, measurementsIn, unitScale } from "./printed-numbers.mjs";
 import { registered } from "./errors.mjs";
+import { roundHalfAway } from "./value-format.mjs";
 import { kindOfForm } from "./claim-fit.mjs";
 import { chartDraws } from "./charts.mjs";
 
@@ -140,8 +141,10 @@ export function readFormat(format) {
   return read;
 }
 
-/** The digits `format` prints for a value, unsigned: at its decimal places, or with no pattern to one decimal place at most. */
-const digitsOf = (value, format) => { const scaled = Math.abs(value * format.factor); return format.decimals === null ? String(Math.round(scaled * 10) / 10) : scaled.toFixed(format.decimals); };
+/** The digits `format` prints for a value, unsigned: at its decimal places, or with no pattern to one decimal place at most.
+ * A half rounds up on the digits the record states, as a chart's labels round it (value-format.mjs): 26.685 prints 26.69,
+ * where `toFixed` reads the binary double below it and prints 26.68. */
+const digitsOf = (value, format) => { const scaled = Math.abs(value * format.factor); return format.decimals === null ? String(roundHalfAway(scaled, 1)) : roundHalfAway(scaled, format.decimals).toFixed(format.decimals); };
 
 /** A recorded value as `format` prints it; an undisclosed one prints as n/a. With no pattern, the number to one decimal place at most. */
 export function renderValue(value, format) {

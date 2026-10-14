@@ -52,13 +52,17 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * The declared player a mark's label stands for: the label read whole as a player's name, `short` or alias, else the one
  * player whose declared name the label holds as a whole phrase - fd01 drew "IAG operating margin" beside "Lufthansa Group
  * adjusted EBIT margin", each series one player's. The longest name holding wins ("Lufthansa Group" over "Lufthansa");
- * a label naming two players stands for neither. These are the deck's own declared names, not a list of words.
+ * a label naming two players stands for neither. A name that runs on into a capitalised word is part of a longer proper
+ * name ("United" in "United Kingdom"), not the player; an acronym after it ("IAG EBIT margin") is a descriptor. These are
+ * the deck's own declared names, not a list of words.
  */
 export function playerInLabel(players, label) {
   const whole = playerNamed(players, label);
   if (whole || typeof label !== "string") return whole;
   const text = label.trim();
-  const found = [...playerNames(players)].filter(([alias]) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(alias)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text));
+  const runsOn = (rest) => /^[ \u00A0]+\p{Lu}\p{Ll}/u.test(rest);
+  const found = [...playerNames(players)].filter(([alias]) => [...text.matchAll(new RegExp(`(^|[^\\p{L}\\p{N}])(${escapeRegExp(alias)})(?=$|[^\\p{L}\\p{N}])`, "giu"))]
+    .some((m) => !runsOn(text.slice(m.index + m[1].length + m[2].length))));
   const spans = found.filter(([alias]) => !found.some(([other]) => other !== alias && other.length > alias.length && other.includes(alias)));
   const named = new Set(spans.map(([, name]) => name));
   return named.size === 1 ? [...named][0] : null;

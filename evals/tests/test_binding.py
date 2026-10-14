@@ -240,10 +240,12 @@ class FigureAndTokenTests(unittest.TestCase):
 import { readFormat, renderValue } from './skills/professional-slides/runtime/bind.mjs';
 const print = (value, format) => { const read = readFormat(format); return typeof read === 'string' ? `refused: ${read}` : renderValue(value, read); };
 console.log(JSON.stringify([[-21.428, '+0.0%'], [4.255, '+0.0%'], [1251, 'CHF 0.0bn | /1000'], [0.57, '0% | x100'], [-0.86, '0.0%'], [-0.04, '+0.0%'], [1750, '0,0'], [1234567.5, 'US$0,0.0'], [54.93, ''], [648, undefined],
-  [-21.43, '0.0% | abs'], [null, '0.0'], [5.4, '0.00x'], [3, '00'], [3, '0 | twice']].map(([value, format]) => print(value, format))));
+  [-21.43, '0.0% | abs'], [null, '0.0'], [5.4, '0.00x'], [3, '00'], [3, '0 | twice'], [26.685, '£0.00'], [-1.005, '0.00'], [0.125, '']].map(([value, format]) => print(value, format))));
 ''')
         self.assertEqual(result[:13], ["-21.4%", "+4.3%", "CHF 1.3bn", "57%", "-0.9%", "0.0%", "1,750", "US$1,234,567.5", "54.9", "648", "21.4%", "n/a", "5.40x"])
         self.assertTrue(result[13].startswith("refused") and result[14].startswith("refused"))
+        # A half rounds up on the digits the record states, where the binary double would round it down.
+        self.assertEqual(result[15:], ["£26.69", "-1.01", "0.1"])
 
     def test_metrics_and_tokens_are_written_from_the_measures_they_name(self):
         result = run_node(LOG + '''

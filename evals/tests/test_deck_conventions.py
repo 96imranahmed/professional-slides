@@ -130,6 +130,23 @@ console.log(JSON.stringify({ declared: tokens("consulting", { subject: "IAG" }),
         self.assertEqual(keynote["fd02 IAG bar"], ["color.componentPrimary"])
         self.assertEqual(keynote["ap03 row"], ["color.componentPrimary"])
 
+    def test_a_pale_peer_line_names_itself_in_the_ink(self):
+        """fd09's end label for a peer line took the comparator grey and read at 1.37:1, under type's 2.5:1, which no copy could mend."""
+        result = run_node(f'''
+import {{ composeAll }} from '{RUNTIME}/compose-all.mjs';
+const slide = {{ id: "fd09", title: "IAG's margin beat Lufthansa Group's in every year outside the Covid losses", subject: "IAG", exhibit: {{ type: "chart.line", heading: "Operating margin, 2021-2025", unit: "%",
+  categories: ["2021", "2022", "2023", "2024", "2025"], directLabels: "end",
+  series: [{{ name: "IAG operating margin", values: [-10, 5, 12, 14, 15] }}, {{ name: "Lufthansa Group adjusted EBIT margin", values: [-6, 4, 6, 5, 5] }}] }} }};
+const out = composeAll({{ schema: "professional-slides.deck/v3", id: "d", design: "consulting", players: {PLAYERS}, conventions: {{ subject: "IAG" }}, slides: [slide] }}, ".", {{ partial: true }});
+const labels = {{}};
+const walk = (node) => {{ if (Array.isArray(node)) return node.forEach(walk); if (!node || typeof node !== "object") return;
+  if (node.data?.labelKind === "series-end") labels[node.data.series] = node.style?.color?.tokenId ?? node.style?.fill?.tokenId;
+  for (const value of Object.values(node)) if (value && typeof value === "object") walk(value); }};
+walk(out.deck.slides);
+console.log(JSON.stringify(labels));
+''')
+        self.assertEqual(result, {"IAG operating margin": "color.accent", "Lufthansa Group adjusted EBIT margin": "color.ink"})
+
     def test_the_accent_clears_the_grey_on_the_designs_that_take_it(self):
         """The subject is told from its peers by colour alone: the accent it takes reads at 3:1 against their grey."""
         result = run_node(f'''
@@ -291,6 +308,19 @@ console.log(JSON.stringify({
         # A reason keyed by the player's full name says why the set's "Harbour" is left out; "Ember" names no player and Ember Air is left unsaid.
         self.assertEqual([f["code"] for f in result["named"]], ["PEERS_OMITTED_UNSAID"])
         self.assertEqual(result["named"][0]["measured"]["unsaid"], ["Ember Air"])
+
+    def test_a_short_name_inside_a_longer_proper_name_is_not_the_player(self):
+        """hw03 plotted departure-tax countries and "United Kingdom" was read as the player United Airlines by its short "United"."""
+        result = run_node(self.PROBE + f'''
+import {{ playerInLabel }} from '{RUNTIME}/conventions.mjs';
+console.log(JSON.stringify({{
+  places: findings([{{ id: "p4", title: "t", exhibit: bar(["Northwind Islands", "Harbour Bay", "Delta Shore"]) }}]),
+  labels: ["Northwind Islands", "Northwind operating margin", "Northwind EBIT margin", "Harbour"].map((label) => playerInLabel(players, label)),
+}}));
+''')
+        self.assertEqual(result["places"], [])
+        # A lower-case word or an acronym after the name is a descriptor of the player; a capitalised word makes a longer name.
+        self.assertEqual(result["labels"], [None, "Northwind Airlines", "Northwind Airlines", "Harbour Air"])
 
     def test_each_peer_refusal_names_the_field_the_deck_key_and_the_counts(self):
         result = run_node(self.PROBE + '''

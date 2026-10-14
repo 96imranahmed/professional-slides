@@ -100,6 +100,13 @@ function normalized(props = {}) {
     if (item.focus !== undefined && !categories.includes(String(item.focus))) throw new Error(`panel "${item.label}" focuses "${item.focus}", which is not a category`);
   }
   const parts = stacked ? stackedParts(items, categories) : donut ? categories : null;
+  // A rank is a place, 1 the top (measures.mjs isRankMeasure, set by bind.mjs): its line runs with 1 at the top of every
+  // panel, as chart.line draws it, and a column's or bar's length would draw the worst place as the largest. pr07 drew
+  // BA's fall from 13th to 23rd as a rise.
+  const ranked = items.filter((item) => item?.rank === true);
+  if (ranked.length && ranked.length !== items.length) throw new Error(`${ranked.map((item) => item.label).join(", ")} ${ranked.length === 1 ? "is a rank" : "are ranks"} and the other panels quantities: a trellis is one measure on one scale`);
+  if (ranked.length && mark !== "line") throw new Error(`RANK_FILLED: the panels are ranks, places with 1 at the top, and a ${mark}'s length would draw the worst place as the largest - draw the trellis as "line"`);
+  const rank = ranked.length > 0;
   for (const h of props.highlights || []) if (!labels.has(String(h?.category ?? h))) throw new Error(`small multiples highlight a panel by its label; "${h?.category ?? h}" is not one`);
   if ((props.highlights || []).length >= items.length) throw new Error("highlighting every panel marks none of them");
   const percent = props.percent === true;
@@ -123,7 +130,7 @@ function normalized(props = {}) {
     const shares = categories.map((_, i) => sharesOfWhole(item.series.map((part) => part.values[i])));
     return { ...item, series: item.series.map((part, k) => ({ ...part, values: categories.map((_, i) => shares[i][k]) })) };
   }) : items;
-  return { mark, stacked, donut, categories, items: drawn, parts, percent, centre, reference, scale, rowLabels: rowLabels?.map(String), columnLabels: columnLabels?.map(String) };
+  return { mark, stacked, donut, rank, categories, items: drawn, parts, percent, centre, reference, scale, rowLabels: rowLabels?.map(String), columnLabels: columnLabels?.map(String) };
 }
 
 /** A panel's values on its scale: a stack's totals, category by category, or the values themselves. */
@@ -274,7 +281,8 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   const n = categories.length;
   const along = sideways(mark) ? plot.height : plot.width;
   const slot = along / n;
-  const span = (v) => (v - bounds.min) / bounds.span;
+  // A rank's line and its rule run with 1 at the top.
+  const span = layout.rank ? (v) => 1 - (v - bounds.min) / bounds.span : (v) => (v - bounds.min) / bounds.span;
   const labelled = n <= LABELLED_MARKS && mark !== "line";
   // The axis the marks stand on, or the baseline under a line; a stack's is drawn over its first segments, which would
   // otherwise cover it and leave a stub at either end.
