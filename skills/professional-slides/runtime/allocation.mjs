@@ -114,7 +114,11 @@ function sectionEvidence(doc, homes) {
     for (const ref of evidenceIds(page)) list.add(ref);
   }
   const order = [...includedParts(doc), ...(named.has(ROOT_SECTION) ? [ROOT_SECTION] : [])];
-  return order.map((section) => ({ section, insights: homes.declared && section !== ROOT_SECTION ? [...homes.home].filter(([, at]) => at === section).map(([id]) => id) : [...(named.get(section) ?? [])] }));
+  // With homes declared, a part holds its own insights, and the pages file itself - a summary re-reading every section - holds
+  // only those no part holds: it is given no kind another section's evidence draws.
+  const homed = (id) => homes.home.has(id) || homes.twice.some((t) => t.id === id);
+  return order.map((section) => ({ section, insights: !homes.declared ? [...(named.get(section) ?? [])]
+    : section === ROOT_SECTION ? [...(named.get(section) ?? [])].filter((id) => !homed(id)) : [...homes.home].filter(([, at]) => at === section).map(([id]) => id) }));
 }
 
 /**
