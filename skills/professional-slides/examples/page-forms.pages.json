@@ -2723,15 +2723,15 @@
    "points": [
     {
      "lead": "One line's mix moved",
-     "text": "Season tickets fell from 47% to 28% of Eastern journeys in two years and day tickets rose from 36% to 53%; on the other five lines no ticket type moved by more than three points."
+     "text": "Season tickets fell from 47% to 28% of Eastern journeys; on the other five lines no ticket type moved over three points."
     },
     {
      "lead": "Frequency, not price",
-     "text": "Eastern was the only line recast to a train every twenty minutes in FY25, and fares did not change; riders who no longer plan around a timetable stop buying a season ticket to cover it."
+     "text": "Eastern was the only line recast to a train every twenty minutes in FY25, and its fares did not change."
     },
     {
      "lead": "What it does to revenue",
-     "text": "A day-ticket journey earns about a third more than a season journey, so the shift adds revenue as long as the trains keep coming; the same recast on the Valley line is the next test."
+     "text": "A day-ticket journey earns about a third more than a season journey, so the shift adds revenue; the Valley line is the next test."
     }
    ],
    "highlight": [
@@ -4791,14 +4791,13 @@
    "id": "f-mechanism-framework",
    "type": "mechanism",
    "form": "framework",
-   "commentary": "below",
+   "commentary": "rail",
    "takeaway": false,
    "why": "The ambition, the levers that deliver it and what they stand on are a structure, and the reader should see which part carries which",
    "settles": {
     "kind": "structure",
     "what": "how the ambition, the three levers and the enabling programme fit together"
    },
-   "adds": "The points put a number on each part and say where the mechanism breaks",
    "title": "The plan rests on three levers and one enabling programme",
    "exhibit": {
     "variant": "house",
@@ -4834,21 +4833,7 @@
     ],
     "foundation": "Depot extension, 36 more crew and the 2029 power upgrade"
    },
-   "points": [
-    {
-     "lead": "Three levers, one total",
-     "text": "The timetable adds 5.1 million journeys, electrification 3.8 million and fares with housing 2.8 million. Together they take 48.3 million journeys to 60 million, and the timetable alone delivers over two fifths of the gain, which is why it carries the first two years of the plan."
-    },
-    {
-     "lead": "What they stand on",
-     "text": "None of the levers works without the foundation: the depot holds the added trains overnight, the crews run them and the power upgrade feeds the wires. A slip in the foundation moves every date above it, so the programme board reviews those three items first each month."
-    },
-    {
-     "lead": "Why this order",
-     "text": "The timetable needs only the depot and the crews, so it starts in December 2027. Electrification waits for the power upgrade in 2029, and fare reform follows once a year of the new timetable has shown how people travel and which tickets they buy."
-    }
-   ],
-   "pointsHeading": false,
+   "rail": "None of the levers works without the foundation: the depot holds the added trains, the crews run them and the power upgrade feeds the wires. A slip there moves every date above it, so the board reviews it first.",
    "source": "Source: illustrative data for a fictional operator"
   },
   {
@@ -4887,11 +4872,11 @@
    "points": [
     {
      "lead": "Off-peak trains touch one layer",
-     "text": "An added off-peak train uses units and track that are already paid for, so it adds only the variable layer of £6.10 a train-km. That is a third of the average cost of £17.60, which is why it pays back within 26 months."
+     "text": "An added off-peak train uses units and track already paid for, so it adds only the £6.10 variable layer, a third of the £17.60 average."
     },
     {
      "lead": "Electrification changes two",
-     "text": "Electric trains cut fuel by 40% and need less maintenance, so the top two layers both fall on the Eastern line, from £21.40 a train-km to £15.80. Spreading the fixed layers over a fifth more train-km takes the network average to £16.40."
+     "text": "Electric trains' lower fuel and maintenance bills cut the Eastern line from £21.40 a train-km to £15.80, and the network average to £16.40."
     }
    ],
    "pointsHeading": false,
@@ -5062,15 +5047,15 @@
    "points": [
     {
      "lead": "Geography halves the market",
-     "text": "Only 46 of every 100 car trips in the Dales corridor start and end within a mile of a station. The other 54 are out of reach of any timetable and are not counted in the plan."
+     "text": "Only 46 of 100 car trips start and end within a mile of a station; no timetable reaches the rest."
     },
     {
      "lead": "The wait is the largest loss the plan controls",
-     "text": "Of 29 off-peak trips near stations, only 14 would face a wait under 20 minutes today. A half-hourly service brings that to 27, nearly doubling the trips that can switch."
+     "text": "A half-hourly service takes the near-station trips facing a wait under 20 minutes from 14 to 27."
     },
     {
      "lead": "Fares are the smallest filter",
-     "text": "Eleven of the 14 would switch at the present fare, so price removes three trips where the wait removes fifteen. The fare reform is therefore sequenced last."
+     "text": "Price removes three trips where the wait removes fifteen, so the fare reform is sequenced last."
     }
    ],
    "pointsHeading": false,
@@ -5224,11 +5209,11 @@
    "points": [
     {
      "lead": "Start where the strengths are",
-     "text": "The empty off-peak seats and the Dales crews are both in hand today, which is why the first lever needs no new trains and no outside approval beyond the timetable bid."
+     "text": "The empty off-peak seats and the Dales crews are in hand today, so the first lever needs no new trains."
     },
     {
      "lead": "The weaknesses are one problem",
-     "text": "The Eastern fleet's failures and the Coast line's missing units have the same cure: electric trains in 2030 release eleven diesel units, enough to cover both."
+     "text": "The Eastern fleet's failures and the Coast line's missing units share a cure: electric trains in 2030 free eleven diesel units."
     }
    ],
    "pointsHeading": false,
@@ -5543,15 +5528,15 @@
    "points": [
     {
      "lead": "Two steps are done",
-     "text": "The draft timetable was agreed in March 2026 and the crew and fleet plan in August, both on their dates. The plan shows the Dales service needs 36 crew and no extra units."
+     "text": "Both were agreed on time, and the Dales service needs 36 crew and no extra units."
     },
     {
      "lead": "The path request is the live step",
-     "text": "The request goes to the infrastructure manager in the June 2027 round. It asks for two unused freight paths, which is why it is expected to be granted without a capacity study."
+     "text": "It goes in the June 2027 round and asks for two unused freight paths, so needs no capacity study."
     },
     {
      "lead": "What follows is fixed",
-     "text": "The safety case takes ten weeks once paths are offered, and the timetable is published twelve weeks before it starts. Neither can be shortened, so the request date sets the start date."
+     "text": "The safety case takes ten weeks and publication twelve, so the request date sets the start date."
     }
    ],
    "pointsHeading": false,
@@ -5576,56 +5561,64 @@
       "heading": "FY27",
       "label": "Prepare",
       "details": [
-       "Train 36 drivers and guards in three intakes",
-       "Extend the depot by twelve sidings",
-       "Lodge the Dales timetable bid in June",
-       "Award the power supply contract"
+       "36 crew trained",
+       "Twelve sidings added",
+       "Dales bid lodged",
+       "Power contract awarded",
+       "Valley bid drafted",
+       "Fares consultation opened"
       ]
      },
      {
       "heading": "FY28",
       "label": "Fill the off-peak",
       "details": [
-       "Half-hourly Dales service from December 2027",
-       "Half-hourly Valley service from May 2028",
-       "Later last trains from Skipton",
-       "Adds 5.1 million journeys by FY31"
+       "Dales half-hourly, Dec 2027",
+       "Valley half-hourly, May 2028",
+       "Later trains from Skipton",
+       "Sunday mornings added",
+       "Units freed from the peak",
+       "Adds 5.1m journeys"
       ]
      },
      {
       "heading": "FY29-FY30",
       "label": "Electrify the Eastern line",
       "details": [
-       "Power upgrade delivered in 2029",
-       "Wires energised in the second half of 2030",
-       "Eleven diesel units move to the Coast line",
-       "Adds 3.8 million journeys by FY31"
+       "Power upgrade, 2029",
+       "Wires energised, H2 2030",
+       "14 electric trains",
+       "11 diesels to the Coast",
+       "£390m programme",
+       "Adds 3.8m journeys"
       ]
      },
      {
       "heading": "FY30-FY31",
       "label": "Reform fares, serve new homes",
       "details": [
-       "Flexible season tickets on every line",
-       "Off-peak day returns priced by distance",
-       "Four station sites with 9,800 homes",
-       "Adds 2.8 million journeys by FY31"
+       "Flexible season tickets",
+       "Off-peak day returns",
+       "Fares priced by distance",
+       "Four station sites",
+       "9,800 new homes",
+       "Adds 2.8m journeys"
       ]
      }
     ]
    },
    "points": [
     {
-     "lead": "The first two phases need no one else",
-     "text": "Preparing and filling the off-peak depend only on the depot, the crews and a timetable bid, all within the operator's control. Their added trains pay back within 26 months, which supports the borrowing for electrification."
+     "lead": "The first two are ours",
+     "text": "They need only crews, sidings and a bid, and pay back in 26 months."
     },
     {
-     "lead": "Phase three is the large bet",
-     "text": "Electrification takes £390 million and depends on a power upgrade outside the operator's control. It is sequenced third so that a slip delays a third of the journeys, not all of them."
+     "lead": "Phase three is the bet",
+     "text": "£390 million, waiting on a power upgrade the operator does not control."
     },
     {
-     "lead": "Phase four needs a year of data",
-     "text": "Fare reform waits until the new timetable has run for twelve months, because the products are designed around how people then travel. The housing sites open in the same years and are served by trains already running."
+     "lead": "Phase four waits for data",
+     "text": "Fares follow a year of the new timetable, to fit how people travel."
     }
    ],
    "pointsHeading": false,
@@ -6188,27 +6181,27 @@
      {
       "date": "Mar 2027",
       "label": "Crews recruited",
-      "text": "Thirty-six drivers and guards are in post after three training intakes, enough to run a train every half hour."
+      "text": "Thirty-six drivers and guards in post after three training intakes."
      },
      {
       "date": "Jun 2027",
       "label": "Timetable bid lodged",
-      "text": "The bid asks for two unused freight paths between the peaks, so it needs no capacity study."
+      "text": "Asks for two unused freight paths, so needs no capacity study."
      },
      {
       "date": "Dec 2027",
       "label": "Dales service starts",
-      "text": "A half-hourly off-peak service runs from Leeds to Skipton, with a later last train home."
+      "text": "Half-hourly off-peak trains from Leeds to Skipton, a later last train home."
      },
      {
       "date": "2029",
       "label": "Power upgrade delivered",
-      "text": "The network operator energises the grid connection for the Eastern line."
+      "text": "The network operator energises the Eastern line's grid connection."
      },
      {
       "date": "H2 2030",
       "label": "Electric trains run",
-      "text": "Fourteen electric trains replace the diesel fleet between Leeds and Hull and free eleven units."
+      "text": "Fourteen electric trains replace the Leeds to Hull diesels and free eleven units."
      }
     ],
     "eras": [
@@ -6226,16 +6219,16 @@
    },
    "points": [
     {
-     "lead": "Three dates are the operator's own",
-     "text": "The crews, the bid and the Dales service depend on nobody else, and each has a named owner. A slip in any of them moves the start by one timetable round, which is six months."
+     "lead": "Three dates are ours",
+     "text": "Each has a named owner; a slip costs one timetable round, which is six months."
     },
     {
      "lead": "One date is exposed",
-     "text": "The grid connection is the only milestone the plan cannot recover by working faster. A year's delay costs a third of the plan, so the bi-mode order is held as the fallback."
+     "text": "A year's delay to the grid connection costs a third of the plan, so the bi-mode order is the fallback."
     },
     {
-     "lead": "What each date is worth",
-     "text": "The Dales service adds 2.4 million journeys a year and the electric trains 3.8 million, so a missed bid costs far less than late wires."
+     "lead": "What each is worth",
+     "text": "The Dales service adds 2.4 million journeys a year, the electric trains 3.8 million."
     }
    ],
    "source": "Source: illustrative data for a fictional operator; programme plan, September 2026"
@@ -6262,47 +6255,47 @@
      {
       "label": "Prepare",
       "period": "FY27",
-      "text": "Train 36 crew, extend the depot by twelve sidings and lodge the Dales timetable bid."
+      "text": "Train 36 crew, add twelve sidings and lodge the Dales bid."
      },
      {
       "label": "Fill the Dales",
       "period": "FY28",
-      "text": "Run a half-hourly off-peak service from December 2027, with a later last train from Skipton."
+      "text": "Half-hourly off-peak service from December 2027."
      },
      {
       "label": "Fill the Valley",
       "period": "FY29",
-      "text": "Bring Halifax and Huddersfield to the same pattern once the Halifax sidings are extended."
+      "text": "Halifax and Huddersfield follow once their sidings are extended."
      },
      {
       "label": "Electrify",
       "period": "FY29-FY30",
-      "text": "Energise the Eastern line after the 2029 power upgrade and replace its diesel fleet."
+      "text": "Energise the Eastern line after the 2029 power upgrade."
      },
      {
       "label": "Reform fares",
       "period": "FY30",
-      "text": "Launch flexible season tickets and off-peak day returns on every line."
+      "text": "Flexible season tickets and off-peak day returns."
      },
      {
       "label": "Serve new homes",
       "period": "FY31",
-      "text": "Open the four station housing sites, served by trains already running."
+      "text": "Four station housing sites, served by trains already running."
      }
     ]
    },
    "points": [
     {
      "lead": "Cheapest first",
-     "text": "The first three stages need only crews, sidings and a timetable bid, all within the operator's control, and their added trains pay back within 26 months. That revenue is what supports the borrowing for the fourth stage."
+     "text": "The first three stages need only crews, sidings and a bid, and pay back within 26 months, funding the fourth."
     },
     {
      "lead": "The fourth stage is the bet",
-     "text": "Electrification takes £390 million and waits on a power upgrade the operator does not control. Placed fourth, a slip delays a third of the journeys and leaves the timetable gains untouched."
+     "text": "Electrification takes £390 million and waits on a power upgrade; placed fourth, a slip delays a third of the journeys."
     },
     {
      "lead": "Fares come late",
-     "text": "Fare reform follows a full year of the new timetable, because the products are designed around how people then travel. Launched earlier, it would price a service that passengers had not yet seen."
+     "text": "Fare reform waits a year, so its products fit how people then travel."
     }
    ],
    "pointsHeading": false,
@@ -6488,15 +6481,15 @@
    "points": [
     {
      "lead": "The wait outweighs the fare",
-     "text": "The wait is named by twice as many drivers as the fare, so a timetable change addresses more of them than a fare cut and costs less for each trip it wins. That is why the half-hourly service comes first and fare reform last."
+     "text": "The wait is named by twice as many drivers as the fare, so a timetable change wins more of them than a fare cut, at less cost a trip."
     },
     {
      "lead": "The demand is stated, not assumed",
-     "text": "One in four drivers says a half-hourly train would get them out of the car once a week. Applied to the corridor's off-peak car trips, that is 1.4 million journeys a year, close to what the trial stations added."
+     "text": "One in four drivers says a half-hourly train would get them out of the car weekly: 1.4 million journeys a year across the corridor."
     },
     {
      "lead": "Fares need explaining first",
-     "text": "Two thirds did not know the off-peak fare, so a cut would go unnoticed by most of the people it is aimed at. The 2030 reform therefore starts with simpler products rather than lower prices, and it is measured on how many drivers can name the fare a year later."
+     "text": "Two thirds did not know the off-peak fare, so a cut would go unnoticed; the 2030 reform starts with simpler products, not lower prices."
     }
    ],
    "pointsHeading": false,
@@ -6861,7 +6854,7 @@
    "type": "profiles",
    "form": "cards",
    "commentary": "below",
-   "takeaway": false,
+   "takeaway": "With idle units in hand, Northvale can make the same move without buying a train.",
    "why": "Three peers are each introduced on a card with what they did and what it did for them, before the deck compares them",
    "settles": {
     "kind": "comparison",
@@ -6871,11 +6864,11 @@
    "points": [
     {
      "lead": "The same move three times",
-     "text": "Each of the three added off-peak trains before it changed a fare, and each gained between five and nine points of off-peak share within three years. None of them bought a train to do it: the units already stood idle between the peaks."
+     "text": "Each added off-peak trains before touching fares, using idle units, and gained five to nine points."
     },
     {
      "lead": "Where Northvale starts",
-     "text": "Northvale's 36% off-peak share is where Westmoor's was in 2021, on a network of similar size and with the same spare units between the peaks. The plan assumes it gains what Tideway gained, seven points, and treats Westmoor's nine as the upside."
+     "text": "Its 36% is Westmoor's 2021 share; the plan assumes Tideway's seven points, with Westmoor's nine as upside."
     }
    ],
    "title": "Three peers raised off-peak share by adding trains, not cutting fares",
@@ -6885,7 +6878,7 @@
      {
       "title": "Westmoor Trains",
       "value": "48%",
-      "text": "Moved every line to a half-hourly off-peak service in 2022 and raised its off-peak share from 39% in three years, with the fleet it already had.",
+      "text": "Its off-peak share rose from 39% in three years from 2022, on its own fleet.",
       "points": [
        "66 million journeys a year",
        "Half-hourly on all six lines",
@@ -6901,7 +6894,7 @@
      {
       "title": "Tideway Rail",
       "value": "46%",
-      "text": "Changed four of its six lines, starting with those that had spare units between the peaks, and gained seven points of off-peak share.",
+      "text": "Gained seven points of off-peak share with no new trains.",
       "points": [
        "52 million journeys a year",
        "Half-hourly on four lines",
@@ -6917,7 +6910,7 @@
      {
       "title": "Pennine Link",
       "value": "44%",
-      "text": "Runs a half-hourly service on a mostly diesel fleet, which shows that frequency does not have to wait for electrification.",
+      "text": "Shows that frequency does not have to wait for electrification.",
       "points": [
        "44 million journeys a year",
        "Half-hourly on three lines",
@@ -6957,19 +6950,19 @@
    "points": [
     {
      "lead": "A leisure market",
-     "text": "Four in five Saturday passengers on the Dales line are making a leisure trip, most of them to walk. They choose the day when the forecast is known, so they buy on the day and cannot be won with advance fares."
+     "text": "Four in five Saturday passengers on the Dales line are on a leisure trip, mostly to walk. They choose the day by the forecast, so advance fares cannot win them."
     },
     {
      "lead": "What they need",
-     "text": "A train every half hour out in the morning and a later one home: the last train leaves Skipton at 18:40, before most walks finish, and a trip that returns by car is often made by car the next time."
+     "text": "A train every half hour out and a later one home: the last train leaves Skipton at 18:40, before most walks finish."
     },
     {
      "lead": "What the trains carry now",
-     "text": "Saturday departures from Leeds between 09:00 and 11:00 run 88% to 97% full, fuller than the weekday peak, while the trains after 16:00 leave three quarters of their seats empty in both directions."
+     "text": "Saturday departures from Leeds between 09:00 and 11:00 run 88% to 97% full, while trains after 16:00 leave three quarters of their seats empty."
     },
     {
      "lead": "Why it matters to the plan",
-     "text": "The Dales line is the first to move to a half-hourly timetable, in December 2027. Its leisure market responds fastest to frequency, and it is the one line where the units, the crews and the paths are all already in hand."
+     "text": "The Dales line moves to a half-hourly timetable first, in December 2027: its units, crews and paths are already in hand."
     }
    ],
    "source": "Illustration drawn for this example; illustrative survey data for a fictional operator"

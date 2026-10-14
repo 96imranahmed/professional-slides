@@ -53,20 +53,25 @@ class PointsTests(unittest.TestCase):
     def test_points_beside_a_chart_and_under_an_exhibit_are_told_the_words_each_that_fill_the_page(self):
         result = run_node(DECK + '''
 const out = {};
-// p07b: three points beside a distribution. p24: three points under a row of profiles. p23: two points under a gantt.
+// p07b: three points beside a distribution. p24: three points, under a heading, under a row of profiles. p23: two points under a gantt.
 for (const id of ['p07b', 'p24', 'p23']) {
   const short = await run(id, (p) => setPoints(p, 6));
   out[id] = { short: short.codes, fills: short.fills, repair: short.repair, met: short.fills?.points?.min ? await meets(id, 'points', short.fills.points, setPoints) : null };
 }
+// p24 as it was drawn before its points took a heading: the row of profiles and three bare points under it.
+const bare = await run('p24', (p) => { delete p.pointsHeading; setPoints(p, 6); });
+out.bare = { short: bare.codes, fills: bare.fills, repair: bare.repair };
 console.log(JSON.stringify(out));
 ''')
-        # Under the band the review reads (the upper quartile, 180 body words) no length of p24's points fills the page
-        # under its row of profiles: the guidance says so and sends the author to the exhibit, rather than a range.
-        p24 = result["p24"]
-        self.assertTrue(p24["short"])
-        self.assertIsNone(p24["fills"]["points"]["min"])
-        self.assertIn("Text alone does not fill this page", p24["repair"])
-        for page, placed, count in (("p07b", "beside its exhibit", 3), ("p23", "under its exhibit", 2)):
+        # Under the band the review reads (the upper quartile, 180 body words) no length of three bare points fills a
+        # page under a row of four profiles: the guidance says so and sends the author to the exhibit, rather than a range.
+        bare = result["bare"]
+        self.assertTrue(bare["short"])
+        self.assertIsNone(bare["fills"]["points"]["min"])
+        self.assertIn("Text alone does not fill this page", bare["repair"])
+        # The worked page fills it inside the band: standing alone, its bare points left a dead band of 87px under them,
+        # and a heading over the points (`pointsHeading`) is the line of composition that closes it.
+        for page, placed, count in (("p07b", "beside its exhibit", 3), ("p24", "under its exhibit", 3), ("p23", "under its exhibit", 2)):
             with self.subTest(page=page):
                 case = result[page]
                 self.assertTrue(case["short"], "six words a point should leave the page short")
