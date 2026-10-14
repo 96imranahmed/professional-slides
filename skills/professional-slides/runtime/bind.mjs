@@ -250,7 +250,9 @@ function bindPage(page, registry, bound) {
   /** The measure a reference names, held to the page's evidence; null with the problem recorded. */
   const measureOf = (ref, what) => {
     const measure = registry.get(ref);
-    if (!measure) return fail(`${what} names ${JSON.stringify(ref)}, which the insight log's measures do not hold${parseRef(String(ref)) ? "" : " - a measure is named `<insight id>/<measure>`"}${registry.size ? "" : " (no insight log with measures is beside the pages file)"}`, [ref], `unknown ${ref}`);
+    // The measures the page may name instead: those its `evidence` records, the ones a slip most likely meant.
+    const offered = [...registry.entries()].filter(([, m]) => evidence.includes(m.owner)).map(([key]) => key);
+    if (!measure) return fail(`${what} names ${JSON.stringify(ref)}, which the insight log's measures do not hold${parseRef(String(ref)) ? "" : " - a measure is named `<insight id>/<measure>`"}${registry.size ? "" : " (no insight log with measures is beside the pages file)"}${offered.length ? `; the insights in the page's \`evidence\` record ${offered.slice(0, 8).join(", ")}${offered.length > 8 ? `, and ${offered.length - 8} more` : ""}` : ""}`, [ref], `unknown ${ref}`);
     if (!evidence.includes(measure.owner)) return fail(`${what} names a measure of ${measure.owner}, which the page does not name in \`evidence\`: a page rests on the insights its numbers come from - name it there, or name a measure the page does rest on`, [ref], `unrested ${measure.owner}`);
     return measure;
   };
@@ -282,10 +284,17 @@ function bindPage(page, registry, bound) {
   };
   const context = { page, bound, fail, measureOf, valueOf, formatOf, printOf, state, viewed };
 
-  const exhibits = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : []), ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.exhibit) : [])].filter((ex) => ex && typeof ex === "object");
-  exhibits.forEach((ex, i) => bindExhibit(ex, typeof ex.heading === "string" && ex.heading.trim() ? `"${ex.heading.trim()}"` : `exhibit ${i + 1}`, context));
-  const metrics = [...(Array.isArray(page.metrics) ? page.metrics : []), page.kpi, ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.metric) : [])].filter((m) => m && typeof m === "object");
-  metrics.forEach((metric, i) => bindFigure(metric, `metric ${i + 1}${metric.label ? ` ("${metric.label}")` : ""}`, context, true, metric));
+  // Each exhibit and figure is named by the field an edit names it with (`exhibits[1]`, `metrics[0]`, `kpi`,
+  // `blocks[2].metric`), with its heading or label: a refusal says where to write the fix, not which one in a count.
+  const placed = (pairs) => pairs.filter(([, item]) => item && typeof item === "object");
+  const exhibitsAt = placed([["exhibit", page.exhibit], ...(Array.isArray(page.exhibits) ? page.exhibits.map((ex, i) => [`exhibits[${i}]`, ex]) : []),
+    ...(Array.isArray(page.blocks) ? page.blocks.map((block, i) => [`blocks[${i}].exhibit`, block?.exhibit]) : [])]);
+  const exhibits = exhibitsAt.map(([, ex]) => ex);
+  exhibitsAt.forEach(([at, ex]) => bindExhibit(ex, `\`${at}\`${typeof ex.heading === "string" && ex.heading.trim() ? ` ("${ex.heading.trim()}")` : ""}`, context));
+  const metricsAt = placed([...(Array.isArray(page.metrics) ? page.metrics.map((m, i) => [`metrics[${i}]`, m]) : []), ["kpi", page.kpi],
+    ...(Array.isArray(page.blocks) ? page.blocks.map((block, i) => [`blocks[${i}].metric`, block?.metric]) : [])]);
+  const metrics = metricsAt.map(([, m]) => m);
+  metricsAt.forEach(([at, metric]) => bindFigure(metric, `\`${at}\`${metric.label ? ` ("${metric.label}")` : ""}`, context, true, metric));
 
   // Tokens last, over what is left: each is written out where it stands, and the exhibit or metric it stands in is recorded as stating that measure.
   // The keys of an exhibit that hold words beside what it shows, outside a table's cells.
@@ -632,7 +641,7 @@ function bindExhibit(ex, what, context) {
   const drawnAs = String(ex.type ?? (ex === (page.exhibit ?? page.exhibits?.[0]) ? kindOfForm(page.type, page.form) ?? "" : ""));
   // A fact grid's, stat list's, nested circles' or radial rings' items each name one number.
   if (Array.isArray(ex.items) && ex.items.some((item) => item && typeof item === "object" && item.measure !== undefined)) {
-    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}, item ${i + 1}${item.label ? ` ("${item.label}")` : ""}`, context, false, ex, SIZED_FIGURES.has(drawnAs)) : undefined)).filter(Boolean);
+    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}'s \`items[${i}]\`${item.label ? ` ("${item.label}")` : ""}`, context, false, ex, SIZED_FIGURES.has(drawnAs)) : undefined)).filter(Boolean);
     if (refs.length) bound.shown.set(ex, new Set([...(bound.shown.get(ex) ?? []), ...refs]));
   }
   const named_ = (key) => ex[key] && typeof ex[key] === "object" && !Array.isArray(ex[key]) && /"measure"\s*:/.test(JSON.stringify(ex[key]));
@@ -647,8 +656,8 @@ function bindExhibit(ex, what, context) {
   if (ex.basis && typeof ex.basis === "object" && (ex.basis.measures !== undefined || ex.basis.measure !== undefined)) return void fail(`${what} names its measures in its series, so its \`basis\` is written from them: keep only \`role\` and \`relevance\` there (a series that is context beside the claim's own says so itself: \`{ measure, role: "context", relevance }\`)`);
   const named = bySeries ? ex.series : [{ measure: ex.measure, name: ex.heading }];
   const untyped = named.findIndex((s) => !s || typeof s !== "object" || s.measure === undefined || s.values !== undefined);
-  if (untyped >= 0) return void fail(`${what}: series ${untyped + 1} ${named[untyped]?.measure === undefined ? "types its values while others name a measure" : "names a measure and types `values` as well"} - every series of a bound exhibit is { measure, name }; typed values belong in an exhibit that carries its own \`basis\``);
-  const series = named.map((s, i) => seriesOf([].concat(s.measure).map(String), `${what}, series ${i + 1}`, context));
+  if (untyped >= 0) return void fail(`${what}: \`series[${untyped}]\` ${named[untyped]?.measure === undefined ? "types its values while others name a measure" : "names a measure and types `values` as well"} - every series of a bound exhibit is { measure, name }; typed values belong in an exhibit that carries its own \`basis\``);
+  const series = named.map((s, i) => seriesOf([].concat(s.measure).map(String), `${what}'s \`series[${i}]\``, context));
   if (series.some((s) => !s)) return;
   const refs = series.flatMap((s) => s.refs);
   const axed = series.filter((s) => s.kind !== "scalar");

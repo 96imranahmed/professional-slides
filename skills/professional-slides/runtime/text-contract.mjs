@@ -120,6 +120,26 @@ export function subtractAll(text, blocks, slide, scene) {
   }
   return { rest, lost };
 }
+/**
+ * What is wrong with a page's text plan, a clause each, naming the blocks by their place (from 1) and id: none, empty, a
+ * block with no id, a role outside the plan's roles, no wording, an id written twice. Empty where the plan is whole.
+ */
+function planProblems(blocks) {
+  if (!Array.isArray(blocks)) return [`is ${blocks === undefined ? 'missing' : `a ${typeof blocks}, not a list of blocks`}`];
+  if (!blocks.length) return ['lists no block'];
+  const at = (i, b) => `block ${i + 1}${b?.id ? ` ("${b.id}")` : ''}`;
+  const out = [];
+  blocks.forEach((b, i) => {
+    if (!b?.id) out.push(`${at(i, b)} has no \`id\``);
+    if (!roles.has(b?.role)) out.push(`${at(i, b)} has role ${JSON.stringify(b?.role ?? null)}, not one of the ${roles.size}`);
+    if (typeof b?.text !== 'string' || !b.text.trim()) out.push(`${at(i, b)} has no \`text\``);
+  });
+  const seen = new Map();
+  blocks.forEach((b, i) => { if (b?.id) seen.set(b.id, [...(seen.get(b.id) ?? []), i + 1]); });
+  for (const [id, places] of seen) if (places.length > 1) out.push(`id "${id}" is written ${places.length} times (blocks ${places.join(', ')})`);
+  return out.length ? [`has ${blocks.length} block${blocks.length === 1 ? '' : 's'}, and ${out.length} ${out.length === 1 ? 'fault' : 'faults'}: ${out.slice(0, 6).join(', ')}${out.length > 6 ? `, and ${out.length - 6} more` : ''}`] : [];
+}
+
 // Each check takes the deck's { workflow, rulesVersion } as `deck`: a revision
 // recorded under an older rules version hears the rules introduced since as
 // advisories (weight.json rules), here as at every other gate.
@@ -128,10 +148,18 @@ export function checkTextPlan(content, {required = false, deck = null} = {}) {
   const findings = [], scores = [];
   if (!enabled) return {accepted:true, state:'legacy-unverified', findings, scores};
   for (const page of content.pages || []) {
-    const fail = (code, reason) => findings.push({page:page.n, id:page.id, code, reason, severity:'blocking'});
+    const fail = (code, reason, more = {}) => findings.push({page:page.n, id:page.id, code, reason, severity:'blocking', ...more});
     const blocks = page.textPlan;
-    if (!Array.isArray(blocks) || !blocks.length || blocks.some(b=>!b.id || !roles.has(b.role) || typeof b.text !== 'string' || !b.text.trim()) || new Set(blocks.map(b=>b.id)).size !== blocks.length) {
-      fail('TEXT_PLAN_INCOMPLETE','List every visible text block with a unique id, role and final wording.'); continue;
+    const wrong = planProblems(blocks);
+    if (wrong.length) {
+      // A plan the compile derived from the composed page (derive-content.mjs) is the page's own text: one that is empty or
+      // repeats an id says the page composed no text, or drew a node twice - the page is mended, not the plan.
+      const derived = content.derivedFrom === 'pages';
+      fail('TEXT_PLAN_INCOMPLETE', `${page.id ?? `page ${page.n}`}: ${derived ? 'the text plan read off the composed page' : `\`pages[${(page.n ?? 1) - 1}].textPlan\` in the content plan`} ${wrong.join('; ')}. `
+        + (derived && (!Array.isArray(blocks) || !blocks.length)
+          ? 'The page composed no text it can be read by: mend the refusal that kept it from composing (its compose finding), or give it the copy its type and form read (--scaffold <type>/<form> prints them).'
+          : `Write each visible block once as { id, role, text }: \`id\` unique on the page, \`role\` one of ${[...roles].join(', ')}, \`text\` its final wording.`));
+      continue;
     }
     // Body words as the task targets count them: the reading-task bank
     // drops any line opening with Source or Note, so a "Note: ..." block is not
@@ -180,7 +208,10 @@ export function checkTextPlan(content, {required = false, deck = null} = {}) {
     // quartile of the skill's targets for pages doing its job has not done that job;
     // whether a page above the floor is dense enough is the review's density
     // pass (runtime/gates/density_profile.py), not an exception granted here.
-    if (bodyWords<floor) fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; pages doing this job carry at least ${floor} (lower quartile) and ${median} at the median. The floor is hard: develop the missing explanation, the mechanism, the limitation or the consequence, or move the page to the reading task it actually performs. A rationale does not release it.`);
+    // The words to add are said as a number: the floor less the body, rounded up (the floor is a quartile, often fractional).
+    if (bodyWords<floor) { const short = Math.ceil(floor - bodyWords);
+      fail('TEXT_COVERAGE_LOW',`Planned body has ${bodyWords} words; pages doing this job carry at least ${floor} (lower quartile) and ${median} at the median (${ref.task}): add ${short} word${short === 1 ? '' : 's'} or more to the body - the commentary, captions, rail or bar, which count; a note or a source line does not. The floor is hard: develop the missing explanation, the mechanism, the limitation or the consequence, or move the page to the reading task it actually performs. A rationale does not release it.`,
+        { measured: { body: bodyWords, floor, median, short, task: ref.task } }); }
   }
   const held = applyRulesVersion(findings, deck ?? {});
   return {accepted:!held.some(f=>f.severity==='blocking'),state:'checked',findings:held,scores};

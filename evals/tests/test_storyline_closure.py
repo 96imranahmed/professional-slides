@@ -473,7 +473,52 @@ console.log(JSON.stringify(out));
 '''
 
 
+SPINE_FACTS = '''
+import fs from 'node:fs/promises'; import os from 'node:os'; import path from 'node:path';
+import * as S from './skills/professional-slides/runtime/storyline.mjs';
+import { spineLockFindings } from './skills/professional-slides/runtime/author-deck.mjs';
+const page = (id, title, evidence = [`i-${id}`]) => ({ id, title, points: ['A point written as copy, eight words long.'], pageType: { type: 'trend', form: 'line', content: { claim: title, settles: { kind: 'change', what: `what ${id} measures`, measures: [] }, evidence } } });
+const base = { id: 'lock', slides: ['a', 'b', 'c'].map((id) => page(id, `Page ${id} states its claim in words`)), appendix: [] };
+const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'spine-facts-'));
+const store = path.join(dir, '.reviews', 'lock'), history = path.join(store, 'storyline-history');
+await fs.mkdir(history, { recursive: true });
+const binding = S.storylineBinding(base);
+await fs.writeFile(path.join(history, 'pass-1.json'), JSON.stringify({ review: { verdict: 'ready' }, pass: 1, binding, pageHashes: S.storylinePageHashes(base), bindingVersion: 5 }));
+const lock = async (spec) => S.spineLock(spec, path.join(dir, 'out'), { deckPath: path.join(dir, 'lock.deck.json') });
+const moved = structuredClone(base);
+moved.slides[1] = page('b', 'Page b states a narrower claim now', ['i-b', 'i-z']);
+moved.slides.push(page('x', 'A page the critique never read'));
+// Without the packet the critique answered, the lock knows only which pages moved.
+const blind = await lock(moved);
+// With it - the spine as the critic was shown it, the store's record of the pass - it says what moved, was and now.
+await fs.writeFile(path.join(store, 'storyline-packet.json'), JSON.stringify({ binding, bindingVersion: 5, pass: 1,
+  pages: base.slides.map((p) => ({ id: p.id, kind: 'content', title: p.title, type: 'trend', settles: p.pageType.content.settles, evidence: p.pageType.content.evidence.map((id) => ({ id })), measures: [] })) }));
+const read = await lock(moved);
+await fs.rm(dir, { recursive: true, force: true });
+const repairs = (held) => Object.fromEntries(spineLockFindings(held).map((f) => [f.id ?? 'deck', f.repair]));
+console.log(JSON.stringify({ blind: { facts: blind.facts ?? null, added: blind.added, repairs: repairs(blind) }, read: { facts: read.facts, repairs: repairs(read) } }));
+'''
+
+
 class SpineLockTests(unittest.TestCase):
+    def test_a_locked_page_is_told_which_declared_fact_moved_with_was_and_now(self):
+        """SPINE_LOCKED said a page's argument moved and listed every fact it might be; the writer read the source to learn
+        which. Where the lineage store holds the packet the critique answered, the lock reads the page as the critic was shown
+        it: each declared fact that moved, its old and new value, and the edits that put the page's own fields back. A page
+        added since is said to be one the critique never read."""
+        result = run_node(SPINE_FACTS)
+        self.assertIsNone(result["blind"]["facts"])
+        self.assertEqual(result["blind"]["added"], ["x"])
+        self.assertIn("its title, its page type, what settles its claim", result["blind"]["repairs"]["b"])
+        self.assertIn("x has been added since: the critique never read it", result["blind"]["repairs"]["x"])
+        self.assertEqual(result["read"]["facts"]["b"], [
+            {"field": "title", "was": "Page b states its claim in words", "now": "Page b states a narrower claim now"},
+            {"field": "evidence", "was": ["i-b"], "now": ["i-b", "i-z"]}])
+        repair = result["read"]["repairs"]["b"]
+        self.assertIn('`title` was "Page b states its claim in words", now "Page b states a narrower claim now"; `evidence` was [i-b], now [i-b, i-z]', repair)
+        self.assertIn('{ "page": "b", "field": "title", "value": "Page b states its claim in words" }, { "page": "b", "field": "evidence", "value": ["i-b"] } with --apply', repair)
+        self.assertIn("--reopen-spine", repair)
+
     def test_the_lock_names_only_the_pages_whose_own_argument_moved(self):
         """The lock hashed each page with its place - the page before it and
         whether it stands in the appendix - so a page taken out flagged the page

@@ -334,7 +334,7 @@ def ground_contrast(slide):
             ground = ground_at(nodes, index, x + w / 2, y + h / 2, canvas)
             if ground and contrast(color, ground) < GROUND_CONTRAST["text"]:
                 lost.append({"kind": "text", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
-                             "role": node.get("role"), "text": " ".join(source_text(node).split())[:60]})
+                             "role": node.get("role"), "text": " ".join(source_text(node).split())[:60], **_token(style.get("color"))})
         elif node.get("role") in GROUND_MARK_ROLES:
             color = color_of(style.get("stroke") if node.get("type") == "line" else style.get("fill")) or color_of(style.get("stroke"))
             ground = ground_at(nodes, index, float(frame.get("x") or 0) + float(frame.get("width") or 0) / 2,
@@ -343,31 +343,69 @@ def ground_contrast(slide):
                 continue
             instance = (node.get("data") or {}).get("componentInstance") or node.get("id")
             record = {"kind": "marks", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
-                      "role": node.get("role"), "instance": instance}
+                      "role": node.get("role"), "instance": instance,
+                      **_token(style.get("stroke") if node.get("type") == "line" else style.get("fill") or style.get("stroke"))}
             if instance not in marks or record["ratio"] > marks[instance]["ratio"]:
                 marks[instance] = record
     lost += [record for record in marks.values() if record["ratio"] < GROUND_CONTRAST["marks"]]
     return sorted(lost, key=lambda record: record["ratio"])
 
 
+def _token(value):
+    """The palette token a style colour is drawn from, as {"token": id}, where the scene names one."""
+    token = value.get("tokenId") if isinstance(value, dict) else None
+    return {"token": token} if isinstance(token, str) and token else {}
+
+
+def _reading(color, ground, bar):
+    """The nearest colour to `color` that reads at `bar` on `ground`, as (hex,
+    ratio): mixed toward black or white, whichever the ground stands further
+    from, a twentieth at a time; None where even the pole does not."""
+    pole = "#000000" if contrast("#000000", ground) >= contrast("#FFFFFF", ground) else "#FFFFFF"
+    a = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(pole[i:i + 2], 16) for i in (1, 3, 5)]
+    for step in range(1, 21):
+        mixed = "#" + "".join("{:02X}".format(round(x + (y - x) * step / 20)) for x, y in zip(a, b))
+        if contrast(mixed, ground) >= bar + 0.05:
+            return mixed, round(contrast(mixed, ground), 2)
+    return None
+
+
 def gate_ground_contrast(slide_no, slide, findings):
     """GROUND_CONTRAST. Type, or an exhibit's marks, set where they cannot be
     read: under GROUND_CONTRAST on the ground they sit on. One finding a page,
-    naming the least legible and how many more."""
+    naming the least legible and how many more, the bar it is under, and the
+    key to change: where it sits on the page's own canvas, dark under colours
+    drawn for a light page, the palette's `color.canvas` and `tone`, which
+    derives the colours for the ground; elsewhere the palette token the type
+    or the marks are drawn in, with the nearest colour that reads there."""
     lost = ground_contrast(slide)
     if not lost:
         return
     worst = lost[0]
+    bar = GROUND_CONTRAST[worst["kind"]]
     what = ('Type "{}" ({})'.format(worst["text"], worst["role"]) if worst["kind"] == "text"
             else "Every mark of {}".format(worst["instance"]))
     more = " and {} more like it".format(len(lost) - 1) if len(lost) > 1 else ""
-    findings.append(finding(
-        slide_no, "GROUND_CONTRAST", {**worst, "count": len(lost)}, GROUND_CONTRAST[worst["kind"]],
-        "{} reads at {}:1 on its ground ({} on {}){}. Set a page on a dark or a brand-colour ground with `tone` - "
-        "on the deck or the page - which resolves every colour for that ground from the palette, rather than a "
-        "palette `color.canvas` under colours drawn for a light page; or give the type or the marks a colour that "
-        "reads on what they sit on.".format(what, worst["ratio"], worst["color"], worst["ground"], more),
-    ))
+    said = "{} reads at {}:1 on its ground ({} on {}){}, under the {}:1 {} {} held to.".format(
+        what, worst["ratio"], worst["color"], worst["ground"], more, bar, "type" if worst["kind"] == "text" else "an exhibit's marks",
+        "is" if worst["kind"] == "text" else "are")
+    canvas, toned = canvas_of(slide), slide.get("ground") in ("dark", "primary")
+    if worst["ground"] == canvas and not toned and grey_of(canvas) < 128:
+        # A palette's dark canvas under the colours a light page is drawn in: the deck's tone derives them for the ground.
+        field = 'deck.palette.colors["color.canvas"]'
+        repair = (" The page's ground is `{}`, {}, a dark canvas under colours drawn for a light page: take `color.canvas` out of "
+                  "`deck.palette.colors` and set `deck.tone` to \"dark\" (or the page's `tone` to \"dark\" for this page alone), which "
+                  "derives every colour for that ground from the palette.").format(field, canvas)
+    else:
+        token, nearest = worst.get("token"), _reading(worst["color"], worst["ground"], bar)
+        field = 'deck.palette.colors["{}"]'.format(token) if token else None
+        fix = "{} ({}:1 on {})".format(nearest[0], nearest[1], worst["ground"]) if nearest else "a colour further from {}".format(worst["ground"])
+        repair = (" {} drawn in {}: set {} to {}, the nearest colour that reads there - every page drawing that token takes it - or set "
+                  "the page on a ground with `tone` (\"dark\" or \"primary\", on the deck or the page), which derives every colour for "
+                  "it.").format("The type is" if worst["kind"] == "text" else "The marks are", "`{}`".format(token) if token else worst["color"],
+                                "`{}`".format(field) if field else "its colour", fix)
+    findings.append(finding(slide_no, "GROUND_CONTRAST", {**worst, "count": len(lost), **({"field": field} if field else {})}, bar, said + repair))
 
 
 # How much of its body a page inks, estimated from the scene (scene_ink.py):

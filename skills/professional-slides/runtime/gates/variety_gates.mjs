@@ -666,11 +666,17 @@ function reviewedDeckFindings(spec, slides, stand, memo = null) {
     const shown = new Set(early.flatMap((page) => [...marksOf(page)]));
     const named = entities.map((entity) => entity.name), unmarked = entities.filter((entity) => !shown.has(entity.name));
     stand("PLAYERS_UNMARKED", `declared players with no mark of their kind (logo, outline, photograph) on the cover or the first ${REVIEWED.earlyPages} pages`, unmarked.length, 0, "max", { unit: "players" });
-    if (unmarked.length) block("PLAYERS_UNMARKED", { players: named, unmarked: unmarked.map((entity) => entity.name), marks: Object.fromEntries(unmarked.map((entity) => [entity.name, entity.kind])), pages: early.map((p) => p.id ?? "cover") }, 0,
-      `The deck compares ${named.join(", ")}, and neither the cover nor the first ${REVIEWED.earlyPages} pages shows ${unmarked.length === entities.length ? "their marks" : `the mark of ${unmarked.map((entity) => entity.name).join(", ")}`}. ` +
-      "Introduce each by the mark it declares before the evidence starts: a `profiles` page (form `logos` naming each, or `logo-table` with a `logo` cell naming each `player` beside the numbers the deck will compare), " +
-      `or a \`logo\` column in an early table - a cell or a \`logos\` member that names a player draws its own mark. ${markRepairs(unmarked, spec)}`,
-      early.map((p) => p.id ?? "cover"));
+    if (unmarked.length) {
+      // The pages read, by id, and which players each already introduces: what the author keeps, and where the rest go.
+      const read = early.map((page) => page.id ?? "cover"), already = early.map((page) => [page.id ?? "cover", [...marksOf(page)]]).filter(([, found]) => found.length);
+      const first = analytical[0]?.id ?? null;
+      const roster = `{ "type": "profiles", "form": "logos", "commentary": "none", "exhibit": { "items": [${unmarked.map((entity) => `{ "name": "${entity.name}" }`).join(", ")}] } }`;
+      block("PLAYERS_UNMARKED", { players: named, unmarked: unmarked.map((entity) => entity.name), marks: Object.fromEntries(unmarked.map((entity) => [entity.name, entity.kind])), pages: read }, 0,
+        `The deck declares ${entities.length} players in \`deck.players\` (${named.join(", ")}), and ${unmarked.length} of them ${unmarked.length === 1 ? "shows" : "show"} no mark of the kind ${unmarked.length === 1 ? "it declares" : "they declare"} on the ${read.length} pages read for it - the cover and the first ${REVIEWED.earlyPages} analytical pages (${read.join(", ")}), where none may be left unmarked: ${unmarked.map((entity) => `${entity.name} (${entity.kind})`).join(", ")}.${already.length ? ` Already introduced: ${already.map(([id, found]) => `${found.join(", ")} on ${id}`).join("; ")}.` : ""} ` +
+        "Introduce each by the mark it declares before the evidence starts: a `profiles` page (form `logos` naming each, or `logo-table` with a `logo` cell naming each `player` beside the numbers the deck will compare), " +
+        `or a \`logo\` column in an early table - a cell or a \`logos\` member that names a player draws its own mark. ${first ? `For instance, a page before ${first}: \`${roster}\`, with its \`id\`, \`title\`, \`why\` and \`settles\`. ` : ""}${markRepairs(unmarked, spec)}`,
+        read);
+    }
   }
   // A page that introduces players or products as cards is about what they look like as much as what they do.
   for (const s of slides.filter((slide) => slide.pageType?.type === "profiles" && slide.pageType.form === "cards")) {

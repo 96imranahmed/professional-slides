@@ -24,7 +24,7 @@ from gate_config import (
 # vocabulary and is the only part that needs Pillow and numpy.
 from ink import CANVAS_H, CANVAS_W, SURFACE_LUMINANCE, load_grey, marked
 from scene_ink import dark_ground
-from nice_ticks import nice_axis, parse_number
+from nice_ticks import nice_axis, nice_range, parse_number
 # One definition of a word, the text contract's.
 from text_stats import word_count
 
@@ -638,11 +638,33 @@ def axis_groups(slide):
     return groups
 
 
+def _number_text(value):
+    """A tick value as an author writes it: no float tail, no needless decimals."""
+    return "{:g}".format(float("{:.10g}".format(value)))
+
+
+def _chart_named(slide, instance):
+    """The exhibit an axis belongs to, as `(path, heading)`: the field an edit
+    names it by where the composer's instance id says it (`<page>-exhibit` is
+    the page's `exhibit`, `<page>-exhibit-<n>` its `exhibits[n]`), and the
+    heading the chart draws over it, either None where the scene does not say."""
+    suffix = re.search(r"-exhibit(?:-(\d+))?$", str(instance).split(":")[-1])
+    path = None if not suffix else "exhibit" if suffix.group(1) is None else "exhibits[{}]".format(suffix.group(1))
+    heading = next((" ".join(source_text(node).split()).rstrip(",") for node in text_nodes(slide)
+                    if "heading" in str(node.get("role") or "") and (node.get("data") or {}).get("componentInstance") == instance
+                    and source_text(node).strip()), None)
+    return path, heading
+
+
 def gate_nice_ticks(slide_no, slide, findings):
     """NICE_TICKS. The unit is the axis, not the single label.
 
     A step off the 1/2/2.5/5 ladder fails the whole axis: 12.4 / 14.025 /
     15.65 / 17.275 / 18.9 steps by 1.625, the mark of interpolated extrema.
+    The automatic axis is divided by this rule (chart-axes.mjs tickCount), so
+    an axis that fails it is an authored domain: the repair names the
+    exhibit's bounds and the domain that holds the same values in whole steps
+    (nice_ticks.nice_range, as the renderer would choose it).
     """
     for owner, nodes in sorted(axis_groups(slide).items()):
         labels = [source_text(node) for node in nodes]
@@ -653,12 +675,28 @@ def gate_nice_ticks(slide_no, slide, findings):
         ok, detail = nice_axis(numeric)
         if ok:
             continue
+        instance, axis = owner.rsplit(":", 1)
+        # The drawn values, not the labels: a label prints the axis's unit and rounding, the node's data the tick itself.
+        ticks = sorted(float(v) for v in ((node.get("data") or {}).get("value") for node in nodes) if isinstance(v, (int, float))) or sorted(numeric)
+        low, high = ticks[0], ticks[-1]
+        keys = ("xMin", "xMax") if axis == "x" else ("yMin", "yMax")
+        path, heading = _chart_named(slide, instance)
+        named = "`{}`".format(path) if path else "the chart"
+        steps = sorted({round(b - a, 10) for a, b in zip(ticks, ticks[1:])})
+        drawn = "{} to {} in {} step{} of {}".format(_number_text(low), _number_text(high), len(ticks) - 1, "" if len(ticks) == 2 else "s",
+                                                    " / ".join(_number_text(s) for s in steps))
+        nice = nice_range([low, high]) if high > low else None
+        fix = ("set `{0}.{1}` to {3} and `{0}.{2}` to {4} - {5} whole steps of {6} - or take both out and the runtime sets the axis on whole "
+               "steps itself").format(path or "exhibit", keys[0], keys[1], _number_text(nice["min"]), _number_text(nice["max"]), nice["steps"],
+                                      _number_text(nice["step"])) if nice else "take `{}` and `{}` out and the runtime sets the axis on whole steps".format(*keys)
         findings.append(finding(
             slide_no, "NICE_TICKS",
-            {"axis": owner, "labels": labels, "reason": detail.get("reason")},
+            {"axis": owner, "labels": labels, "reason": detail.get("reason"), "ticks": ticks, **({"field": "{}.{}".format(path, keys[0])} if path else {})},
             "1 / 2 / 2.5 / 5 x 10^n",
-            "Round the axis domain outward to whole ladder steps instead of "
-            "interpolating the data extrema.",
+            "{}{} draws its {} axis {}: {}, where every step is 1, 2, 2.5 or 5 times a power of ten and every tick a whole number of "
+            "steps. The domain is the exhibit's own `{}` and `{}`: {}.".format(
+                named, ' ("{}")'.format(heading) if heading else "", axis,
+                drawn, detail.get("reason"), keys[0], keys[1], fix),
         ))
 
 
@@ -702,39 +740,57 @@ def page_bands(slide):
     second, so a note dropped in the body still counts as a note and a label
     near the footer still counts as body."""
     nodes = [n for n in slide.get("nodes", []) if n.get("type") == "text"]
-    body = footer = band = 0
+    counts = {"body": 0, "footer": 0, "band": 0}
     for node in nodes:
         words = word_count(source_text(node))
-        if not words:
+        if words:
+            counts[band_of(node)] += words
+    return PageText(nodes, counts["body"], counts["footer"], counts["band"])
+
+
+def band_of(node):
+    """The band of the page a text node's words count in: "body", "footer" or
+    "band" (the title band)."""
+    role = str(node.get("role") or "")
+    # Role decides first - a note dropped in the body is still a note, a
+    # label near the footer is still evidence - and position only settles
+    # the roles that can sit anywhere. A node with no frame is body text:
+    # the fixtures carry no geometry and the page gates still read them.
+    if role in FOOTER_ROLES:
+        return "footer"
+    if role in TITLE_ROLES or role in TITLE_BAND_ROLES:
+        return "band"
+    # The page's closing takeaway sits low on the page but is its
+    # conclusion, not a note: counted by position it made a short page
+    # with a takeaway line "footer-heavy" and pushed the line off.
+    if TAKEAWAY_ROLE.match(role) or role in CHART_LABEL_ROLES:
+        return "body"
+    frame = node.get("frame") or {}
+    top = float(frame.get("y", 0)) / CANVAS_H if frame.get("height") else None
+    if top is None:
+        return "body"
+    return "footer" if top > BODY_BOTTOM else "band" if top < BODY_TOP else "body"
+
+
+# What the footer's words are, by who writes them: the page's own `note` and
+# `footnotes`, its source line (typed, or derived from the `sources` registry),
+# and the furniture the runtime sets - the page number, the footer's lines -
+# with any other text set low enough to count as footer.
+FOOTER_PARTS = (("note", {"footnote", "footnote-text"}), ("source", {"source", "source-text"}),
+                ("furniture", {"page-number", "footer-left", "footer-right", "notes"}))
+
+
+def footer_parts(slide):
+    """The footer's words by who writes them, {"note", "source", "furniture",
+    "other"}, as NOTE_HEAVY counts them (page_bands)."""
+    parts = {name: 0 for name, _ in FOOTER_PARTS} | {"other": 0}
+    for node in (n for n in slide.get("nodes", []) if n.get("type") == "text"):
+        words = word_count(source_text(node))
+        if not words or band_of(node) != "footer":
             continue
         role = str(node.get("role") or "")
-        # Role decides first - a note dropped in the body is still a note, a
-        # label near the footer is still evidence - and position only settles
-        # the roles that can sit anywhere. A node with no frame is body text:
-        # the fixtures carry no geometry and the page gates still read them.
-        if role in FOOTER_ROLES:
-            footer += words
-            continue
-        if role in TITLE_ROLES or role in TITLE_BAND_ROLES:
-            band += words
-            continue
-        # The page's closing takeaway sits low on the page but is its
-        # conclusion, not a note: counted by position it made a short page
-        # with a takeaway line "footer-heavy" and pushed the line off.
-        if TAKEAWAY_ROLE.match(role) or role in CHART_LABEL_ROLES:
-            body += words
-            continue
-        frame = node.get("frame") or {}
-        top = float(frame.get("y", 0)) / CANVAS_H if frame.get("height") else None
-        if top is None:
-            body += words
-        elif top > BODY_BOTTOM:
-            footer += words
-        elif top < BODY_TOP:
-            band += words
-        else:
-            body += words
-    return PageText(nodes, body, footer, band)
+        parts[next((name for name, roles in FOOTER_PARTS if role in roles), "other")] += words
+    return parts
 
 
 def body_bands(slide):
@@ -934,13 +990,34 @@ def gate_thin_page(slide_no, slide, findings):
         # every form it takes (page-types.mjs citationForms): it is not cut to the notes to make room, so the repair says
         # what does make it.
         derived = any(n.get("role") == "source-text" and (n.get("data") or {}).get("derived") for n in slide.get("nodes") or [])
+        # The most the footer holds beside this body - its share at most NOTE_HEAVY_SHARE of the two - and what of it the
+        # page's own note can have once the source line and the furniture take theirs.
+        most = int(math.floor(body * NOTE_HEAVY_SHARE / (1.0 - NOTE_HEAVY_SHARE) + 1e-9))
+        parts = footer_parts(slide)
+        others = footer - parts["note"]
+        room = max(0, most - others)
+        cut = footer - most
+        said = ("The footer carries {} words to the body's {} ({:.0%} of the two, past the {:.0%} it may): the page's note "
+                "(`note`, `footnotes`) is {} words, the source line (`source`) {}, the page number and footer lines {}{}. Beside a "
+                "body of {} words the footer holds {} at most, so {} words come out.").format(
+            footer, body, ratio, NOTE_HEAVY_SHARE, parts["note"], parts["source"], parts["furniture"],
+            ", other text set in the footer band {}".format(parts["other"]) if parts["other"] else "", body, most, cut)
+        if parts["note"] and room:
+            fix = (" Cut `note` to {} words or fewer - put a qualification on the number it qualifies with a `footnotes` "
+                   "marker ({{ on, text }}), two to four numbered lines - or give the body the words, which raises what the footer may hold.").format(room)
+        elif parts["note"]:
+            fix = (" The note can hold 0 words: the source line and the furniture take {} of the {} the footer holds. Take `note` "
+                   "out, put its qualification on the number with a `footnotes` marker or in the body, or give the body the words.").format(others, most)
+        else:
+            fix = " Give the body the words, or shorten what the footer prints."
+        if derived:
+            fix += (" The source line names the sources of the title's numbers and of each exhibit's plotted measures, which "
+                    "stay on the page: give those sources registry `short` names (`sources.<key>.short`), or split the exhibit "
+                    "so each page rests on fewer.")
+        elif parts["source"] > max(0, most - parts["note"] - parts["furniture"]):
+            fix += " The typed `source` line is {} words: shorten it, or cite registry keys the runtime fits to the room.".format(parts["source"])
         findings.append(finding(
-            slide_no, "NOTE_HEAVY", {"body": body, "footer": footer},
-            "a footer under a third of the page's text",
-            "The notes are carrying the page. Put the qualification on the "
-            "number it qualifies with a footnote marker, keep the block to two "
-            "to four numbered lines, and give the body the words instead."
-            + (" The source line names the sources of the title's numbers and of each exhibit's plotted measures, which "
-               "stay on the page: shorten the note, give those sources registry `short` names, or split the exhibit so "
-               "each page rests on fewer." if derived else ""),
+            slide_no, "NOTE_HEAVY", {"body": body, "footer": footer, "share": round(ratio, 3), "most": most, "note": parts["note"],
+                                     "source": parts["source"], "furniture": parts["furniture"], "noteMost": room},
+            "a footer under a third of the page's text", said + fix,
         ))

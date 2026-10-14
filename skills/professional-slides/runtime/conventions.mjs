@@ -200,13 +200,18 @@ export function currencyFormsIn(text, form) {
  * A set an exhibit draws on only in part is named, never inferred: o03 ranked eight groups, fd01 ten and fd05 nine,
  * each read by its page as "Europe's groups".
  */
-export function peerSetOf(conventions, members, named = undefined) {
+export function peerSetOf(conventions, members, named = undefined, { players = null } = {}) {
+  // A set's member is read through the lookup a label is read through (playerNamed): a set that writes a declared player by
+  // its `short` or an alias holds that player, so a chart labelled "Northwind" or "Northwind Airlines" finds it there. A
+  // member that names no declared player stands as written. `missing` keeps each member as the set writes it.
+  const as = (member) => playerNamed(players, member) ?? member;
   const sets = Object.entries(isObject(conventions?.peerSets) ? conventions.peerSets : {}).map(([name, list]) => [name, Array.isArray(list) ? list : []]);
-  const read = ([name, list]) => ({ set: name, missing: list.filter((member) => !members.includes(member)), outside: members.filter((member) => !list.includes(member)) });
+  const holds = (list) => new Set(list.map(as));
+  const read = ([name, list]) => { const held = holds(list); return { set: name, missing: list.filter((member) => !members.includes(as(member))), outside: members.filter((member) => !held.has(member)) }; };
   if (named !== undefined) { const chosen = sets.find(([name]) => name === named); return chosen ? read(chosen) : { set: null, nearest: null }; }
-  const exact = sets.find(([, list]) => list.length === members.length && members.every((member) => list.includes(member)));
+  const exact = sets.find(([, list]) => holds(list).size === members.length && members.every((member) => holds(list).has(member)));
   if (exact) return read(exact);
-  const nearest = sets.filter(([, list]) => members.every((member) => list.includes(member))).sort((a, b) => a[1].length - b[1].length)[0];
+  const nearest = sets.filter(([, list]) => members.every((member) => holds(list).has(member))).sort((a, b) => a[1].length - b[1].length)[0];
   return { set: null, nearest: nearest ? read(nearest) : null };
 }
 
@@ -312,6 +317,9 @@ export function applyConventions(slide, { conventions = null, players = null } =
 /** A page's exhibits in order: its `exhibit`, its `exhibits`, and the exhibit of each of its `blocks`. */
 export const exhibitsOfPage = (page) => [...(page?.exhibit ? [page.exhibit] : []), ...(Array.isArray(page?.exhibits) ? page.exhibits : []),
   ...(Array.isArray(page?.blocks) ? page.blocks.map((block) => block?.exhibit).filter(Boolean) : [])];
+/** The field path of each of exhibitsOfPage's exhibits, in its order, as an edit names it: `exhibit`, `exhibits[1]`, `blocks[2].exhibit`. */
+export const exhibitPaths = (page) => [...(page?.exhibit ? ["exhibit"] : []), ...(Array.isArray(page?.exhibits) ? page.exhibits.map((_, i) => `exhibits[${i}]`) : []),
+  ...(Array.isArray(page?.blocks) ? page.blocks.map((block, i) => (block?.exhibit ? `blocks[${i}].exhibit` : null)).filter(Boolean) : [])];
 export const isHeatColumn = (column) => Boolean(column) && typeof column === "object" && (column.heat === true || column.type === "heatmap");
 const REFERENCE = /\{\{\s*([^@|}]+?)\s*(?:@[^|}]*)?(?:\|[^}]*)?\}\}/g;
 export const cellsOf = (row) => (Array.isArray(row) ? row : Array.isArray(row?.cells) ? row.cells : []);

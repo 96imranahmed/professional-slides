@@ -6,6 +6,12 @@
 //                                                        (with the type's countable limits as `x-limits`)
 //   node runtime/author-deck.mjs --schema deck           the deck-level keys `deck` takes: each with its type and
 //                                                        what it is for; the compile refuses a key not listed
+//   node runtime/author-deck.mjs --schema <type>/<form>  every field that form reads (form-fields.mjs): the exhibit
+//                                                        kind it draws, that kind's data, options and the marks it
+//                                                        draws with their shapes, the fields a bound exhibit names its
+//                                                        measures by, `peers` and `omits`, and the page's own fields
+//                                                        its placements read
+//   node runtime/author-deck.mjs --schema kinds          every exhibit kind, with the type/forms that draw it
 //   node runtime/author-deck.mjs [<id>.pages.json] --limits [<type>[/<form>]]
 //                                                        every countable limit, before a page is written: the
 //                                                        deck's, or one type's or form's (under the deck's density,
@@ -55,6 +61,17 @@
 //                                                        the same as one small object and nothing else: each page's
 //                                                        findings and repairs, advisories, budget and limits, and
 //                                                        the deck's verdict in a line
+//   node runtime/author-deck.mjs <id>.pages.json --apply <edits.json> [--dry-run]
+//                                                        field edits written into the files the pages are written in
+//                                                        (page-edits.mjs): a list of { page, field, value } (or
+//                                                        "delete": true, or "append": true), or a self-check answer,
+//                                                        a section-review answer or a judge's answer.json, each closed
+//                                                        fix of it - every byte the edits do not change kept as it
+//                                                        was; then what --check --page <the pages edited> --json
+//                                                        prints, and its exit code. Nothing is written where an edit
+//                                                        is refused (no such page or field, an `old` the field does
+//                                                        not read); --dry-run prints each change, was and now, and
+//                                                        writes nothing
 //   node runtime/author-deck.mjs <id>.pages.json --plan  before the pages are written: the spine's structure rules on
 //                                                        what its pages declare, and a form and commentary placement
 //                                                        for each page that satisfies them as far as that goes - a
@@ -131,7 +148,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync
 import { SHAPES, TYPE_SHAPES, plottedValues } from "./evidence.mjs";
 import { compilePage, declaredSlide, describeTypes, pageSchema, structureOf, drawnOf, architectureOf, PAGE_TYPES,
   typesForShape, titleGap, dataKeys, undrawnExhibit, withChoice, markedChart, titleBandProblems, accentTexts, exhibitRange, trellisPage, TEXT_LIMITS, alsoRefused } from "./page-types.mjs";
-import { claimSheet, claimSheetLines, recordQuestions, recordSheets } from "./claim-sheet.mjs";
+import { claimSheet, claimSheetLines, fieldAt, recordQuestions, recordSheets } from "./claim-sheet.mjs";
 import { deriveContent, wordBudgetOf } from "./derive-content.mjs";
 import { textWords, proseText } from "./text-contract.mjs";
 import { runContentGates } from "./gates/content_gates.mjs";
@@ -153,7 +170,9 @@ import { sourceKindsOf } from "./fit-review.mjs";
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { AGENDA_LIMITS } from "./panels.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
-import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts, editPartSync, partHomes } from "./pages-file.mjs";
+import { readPagesFile, withParts, editPagesSync, compiledFrom, staleCompile, partBudgets, partsOf, includedParts, editPartSync, partHomes, notJson } from "./pages-file.mjs";
+import { applyChanges, changeLine, editsFrom, planEdits } from "./page-edits.mjs";
+import { exhibitKinds, formFields, kindFields } from "./form-fields.mjs";
 import { conventionsOf, playerNamed, sectionNames, sectionsOf, stampConventions } from "./conventions.mjs";
 import { conventionFindings } from "./gates/convention_gates.mjs";
 import { BRIEF_ROLES, briefDigest, briefLines, sectionPages } from "./brief.mjs";
@@ -260,6 +279,37 @@ function tableSplitRepair(estimate, exhibit) {
   if (exhibit && !halvesProblems(exhibit, { asked: true }).length) ways.push(`set it in halves (\`split: "halves"\`), ${Math.ceil(rows / 2)} rows a side`);
   return `${id}: its table of ${rows} rows does not fit one page - set ${density}, its densest, a page holds ${holds} - so the composer cuts it into ${pages} slides, and the render refuses the cut: the content plan holds the page as one (TEXT_PLAN_PAGINATION). ` +
     `To hold one page, ${ways.join("; or ")}`;
+}
+
+/**
+ * A page short of its word floor (TEXT_COVERAGE_LOW, `measured.short` words) told where its body is written: each text field
+ * the floor counts - points, paragraphs, a rail, a bar, a takeaway, a panel, captions - by the path an edit names it with
+ * and its words now, and where the words it lacks go, each point held to the text block's cap. A page whose placement
+ * writes none is told its body is the exhibit's own words, and the placements that carry more. The fill search, where it
+ * ran (fill-guidance.mjs), measures the lengths that fill the page; this says where, on every page it refuses.
+ */
+function withBodyFields(f, page, density) {
+  const short = f.measured?.short;
+  if (!page?.type || !Number.isFinite(short)) return f;
+  const words = (text) => (typeof text === "string" ? textWords(text) : 0);
+  const pointWords = (point) => (typeof point === "string" ? words(point) : words(point?.lead) + words(point?.text));
+  const fields = [];
+  const list = (key, items, each) => { if (Array.isArray(items) && items.length) fields.push({ key, count: items.length, words: items.map(each) }); };
+  list("points", page.points, pointWords);
+  list("paragraphs", page.paragraphs, pointWords);
+  for (const key of ["rail", "bar", "takeaway"]) if (typeof page[key] === "string" && page[key].trim()) fields.push({ key, words: [words(page[key])] });
+  if (typeof page.panel?.text === "string") fields.push({ key: "panel.text", words: [words(page.panel.text)] });
+  (page.blocks || []).forEach((block, i) => list(`blocks[${i}].points`, block?.points, pointWords));
+  [["exhibit", page.exhibit], ...(page.exhibits || []).map((ex, i) => [`exhibits[${i}]`, ex])].forEach(([at, ex]) => { if (typeof ex?.caption === "string") fields.push({ key: `${at}.caption`, words: [words(ex.caption)] }); });
+  let cap = null;
+  try { cap = pageLimits(page.type, page.form, { commentary: page.commentary, density })?.textBlock?.words?.max ?? null; } catch { cap = null; }
+  const where = fields.map((field) => (field.count ? `\`${field.key}\` ${field.count} of ${field.words.join(", ")} words` : `\`${field.key}\` ${field.words[0]} words`));
+  const points = fields.find((field) => field.key === "points" || field.key === "paragraphs");
+  const per = points ? Math.ceil(short / points.count) : null;
+  const said = !fields.length
+    ? ` The page writes no body text of its own (commentary "${page.commentary}"): its body is the exhibit's words. Give it the placement that carries the explanation - points \`beside\` or \`below\` (a higher floor), a \`rail\`, or a \`so-what-bar\` - or move it to the reading task it performs.`
+    : ` Its body is written in ${where.join("; ")}. Add the ${short} words there${points ? ` - about ${per} more to each of the ${points.count} ${points.key}${cap ? `, each at most ${cap} words with its lead (TEXT_BLOCK_TOO_LONG)` : ""}, or another of them (\`{ "page": "${page.id}", "field": "${points.key}", "append": true, "value": { "lead": "...", "text": "..." } }\` with --apply)` : ""}.`;
+  return { ...f, reason: `${f.reason ?? ""}${said}` };
 }
 
 // The sources registry's own check is its module's (sources-registry.mjs), so the research step reads it too (analysis.mjs).
@@ -1177,6 +1227,9 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
     gateFindings = gateFindings.map(withFill);
     local.copy = local.copy.map(withFill);
   }
+  // A page short of its floor that the fill search did not measure is told where its body is written, field by field.
+  const authoredById = new Map([...doc.pages, ...(doc.appendix || [])].map((page, at) => [String(page?.id ?? `page-${at + 1}`), page]));
+  local.copy = local.copy.map((f) => (f.code === "TEXT_COVERAGE_LOW" && !f.fills ? withBodyFields(f, authoredById.get(String(f.id)), doc.deck?.density) : f));
   const stages = [];
   try { validateStageContract(structural, { content: local.content, plan: planOf(structural) }); }
   catch (error) { if (!isRefusal(error)) throw error; stages.push({ code: error.code, severity: "blocker", repair: `${error.message} - the build refuses the deck here. Give every page a unique \`id\`, and open the deck on a \`summary\` page (form \`executive-summary\`) ahead of its first section` }); }
@@ -1850,7 +1903,7 @@ const CHART_RATE = Object.freeze({ of: "charts", done: "chartsAnnotated", noun: 
 const TABLE_RATE = Object.freeze({ of: "tables", done: "tablesTreated", noun: "table", verb: "carrying a treatment" });
 const CRAFT_RATES = Object.freeze({ BAR_CHARTS_ANNOTATED: CHART_RATE, CRAFT_CHARTS_BARE: CHART_RATE, BAR_TABLES_TREATED: TABLE_RATE, CRAFT_TABLES_PLAIN: TABLE_RATE });
 
-const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --allocate [--write] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [type | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
+const USAGE = "Usage: author-deck.mjs <id>.pages.json [--check [--render] [--fetch-assets] | --draft | --plan [--write [--accept]] | --allocate [--write] | --apply <edits.json> [--dry-run] | --log | --repair-relation <page-id> | --claims [<id>[,<id>...]] | --brief skeleton|writer|critic|judge|selfcheck [--section <part>] [--spine]] [--page <id>[,<id>...] [--json]] [--fit-cap <n>] [--reopen-spine] [--pending <file>] | --types | --schema [<type> | <type>/<form> | <kind> | kinds | deck] | --limits [<type>[/<form>]] | --example <type>[/<form>] | --scaffold <type>[/<form>] [--evidence <insight-id>]";
 
 const digest = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 24);
 const CACHE_SCHEMA = "professional-slides.author-cache/v1";
@@ -2386,7 +2439,7 @@ async function planCommand(doc, { dir, stem, file, say, refusal = [], write = fa
 }
 
 /** SPINE_LOCKED, one finding a page whose argument moved after the critique closed (storyline.mjs spineLock). */
-function spineLockFindings(lock) {
+export function spineLockFindings(lock) {
   const how = lock.closed === "spent" ? `spent its ${lock.spent} passes` : `closed ${lock.verdict} at pass ${lock.pass}`;
   const back = `To change the argument, run again with --reopen-spine and take the deck back to the critique (node runtime/storyline.mjs <id>.deck.json out/)${lock.closed === "spent" ? ", whose next pass is past its cap: only the user can grant it (--max-passes)" : ""}`;
   // The order is the deck's: pages that kept their argument and changed place are named in one finding for the deck, not as pages whose argument moved.
@@ -2395,10 +2448,30 @@ function spineLockFindings(lock) {
     repair: `The storyline critique ${how}, and the order of its pages has moved since: ${moved.join(", ")} ${one ? "stands" : "stand"} elsewhere than the critique read ${one ? "it" : "them"} - another place in the sequence, or into or out of the appendix - with ${one ? "its" : "their"} own argument unchanged. The layout keeps what the critique read: put ${one ? "it" : "them"} back. ${back}.` }] : [];
   if (!lock.pages.length) return order.length ? order : [{ code: "SPINE_LOCKED", class: "S", severity: "blocker", id: null,
     repair: `The storyline critique ${how}, and the deck's answer, its request or the order of its pages has moved since. The layout keeps what the critique read: put it back. ${back}.` }];
-  return [...order, ...lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id,
+  return [...order, ...lock.pages.map((id) => ({ code: "SPINE_LOCKED", class: "S", severity: "blocker", id, ...(lock.facts?.[id]?.length ? { measured: { moved: lock.facts[id] } } : {}),
     repair: lock.deleted.includes(id)
       ? `The storyline critique ${how} with ${id} in the deck, and it has been taken out since. The layout keeps the pages the critique read: put it back. ${back}.`
-      : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
+      : (lock.added ?? []).includes(id)
+        ? `The storyline critique ${how}, and ${id} has been added since: the critique never read it. The layout keeps the pages the critique read: take it out, or carry its copy on a page the critique read without moving that page's argument. ${back}.`
+        : `The storyline critique ${how}, and ${id}'s argument has moved since: ${movedText(id, lock.facts?.[id] ?? null)} The layout keeps what the critique read; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
+}
+
+/**
+ * What moved of a locked page's argument, said field by field where the lock read the page as the critique was shown it
+ * (storyline.mjs spineLock `facts`): each declared fact with what it was and what it is, and the edits that put the
+ * page's own fields back. Where nothing it declares moved, what it shows of a measure or the measure's record did; where
+ * the lock could not read the page as the critique was shown it, the facts it may be.
+ */
+function movedText(id, facts) {
+  if (!facts) return "its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. Put the page back as it was.";
+  if (!facts.length) return "what it shows of a measure - which periods or members, and whether plotted, tabulated or stated as a figure - or a measure's recorded values, none of which its title, type, `settles`, `evidence` or measures say. Put the exhibit back to the view the critique read (its `select`, its `basis` view), or the record back to the values it read.";
+  const shown = (value) => (Array.isArray(value) ? `[${value.join(", ")}]` : JSON.stringify(value));
+  const said = facts.map((fact) => `\`${fact.field}\` was ${shown(fact.was)}, now ${shown(fact.now)}`).join("; ");
+  // The page's own fields an edit puts back; what settles a claim is read off its evidence where the page declares none.
+  const own = facts.filter((fact) => ["title", "type", "evidence"].includes(fact.field));
+  const edits = own.map((fact) => `{ "page": "${id}", "field": "${fact.field}", "value": ${JSON.stringify(fact.was)} }`);
+  const rest = facts.filter((fact) => !own.includes(fact)).map((fact) => `\`${fact.field}\``);
+  return `${said}. Put ${facts.length === 1 ? "it" : "them"} back${edits.length ? ` - ${edits.join(", ")} with --apply` : ""}${rest.length ? `${edits.length ? ", and " : " - "}${rest.join(", ")} as the critique read ${rest.length === 1 ? "it" : "them"}` : ""}.`;
 }
 
 /**
@@ -2466,11 +2539,21 @@ async function main(argv) {
     log: { type: "boolean" }, check: { type: "boolean" }, draft: { type: "boolean" }, "repair-relation": { type: "string", valueName: "a page id" },
     page: { type: "string", valueName: "one or more page ids, comma-separated" }, render: { type: "boolean" }, plan: { type: "boolean" }, allocate: { type: "boolean" }, "fit-cap": { type: "string", valueName: "a number of alternatives" },
     "reopen-spine": { type: "boolean" }, claims: { type: "string", bare: "" }, write: { type: "boolean" }, accept: { type: "boolean" }, "fetch-assets": { type: "boolean" }, json: { type: "boolean" },
-    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" } }, { usage: USAGE });
+    pending: { type: "string", valueName: "a file" }, brief: { type: "string", valueName: BRIEF_ROLES.join(", ") }, section: { type: "string", valueName: "a part file of the pages file" }, spine: { type: "boolean" },
+    apply: { type: "string", valueName: "a file of edits, or a reader's answer" }, "dry-run": { type: "boolean" } }, { usage: USAGE });
   const say = (text) => process.stdout.write(`${text}\n`);
   const listed = await catalogueCommand(values, file, say);
   if (listed !== undefined) return listed;
   if (!file) throw new UsageError(USAGE);
+  if (values["dry-run"] && values.apply === undefined) throw new UsageError(`--dry-run shows what an --apply would change: --apply <edits.json> --dry-run\n${USAGE}`);
+  // The edits are written first, and the run goes on as the check of the pages they name: the pages file is read after them.
+  if (values.apply !== undefined) {
+    const clash = ["draft", "plan", "brief", "claims", "log", "repair-relation", "page", "render", "write", "accept", "spine", "section"].filter((key) => values[key] !== undefined && values[key] !== false);
+    if (clash.length) throw new UsageError(`--apply runs its own check of the pages it changes (--check --page <them> --json), and takes no ${clash.map((key) => `--${key}`).join(", ")}\n${USAGE}`);
+    const applied = await applyCommand(values, file, say);
+    if (applied.code !== undefined) return applied.code;
+    Object.assign(values, { check: true, json: true, page: applied.pages.join(",") });
+  }
   // The pages file with its parts spliced in (pages-file.mjs): sections authored in separate files are one deck here.
   // A pages file or a part that cannot be read is said in a line, as every other refusal of the file is.
   let doc;
@@ -2500,6 +2583,53 @@ async function main(argv) {
   const session = await loadJudgements(dir, stem);
   try { return await withJudgements(session, () => authorRun({ values, file, doc, dir, stem, logPath, runs, say })); }
   finally { if (values.pending) await writeJson(path.resolve(values.pending), pendingRequests(session)); }
+}
+
+/**
+ * `--apply <edits.json>` (page-edits.mjs): the edits the file holds, checked
+ * against the pages as written and written into the files the pages are
+ * written in - all of them, or none where one is refused. Returns `{ code }`
+ * where the run ends here (a refusal, a dry run, nothing to change), else
+ * `{ pages }`: the pages the edits name, which the run then checks as
+ * `--check --page <them> --json` does. What the file holds that is not a closed
+ * fix - a finding routed elsewhere, a judge's choice, a line that is not the
+ * whole of one field - is said, for the writer to act on.
+ */
+async function applyCommand(values, file, say) {
+  const dir = path.dirname(path.resolve(file));
+  // An answer is named as its brief names it, beside the pages file (out/self-check/<part>.json): found there where it is not found from here.
+  const at = [path.resolve(values.apply), path.resolve(dir, values.apply)].find((candidate) => existsSync(candidate));
+  if (!at) { console.error(`No edits file at ${path.resolve(values.apply)}`); return { code: 1 }; }
+  let input, doc;
+  try { input = JSON.parse(readFileSync(at, "utf8")); } catch (error) { console.error(notJson(at, error)); return { code: 2 }; }
+  try { doc = await readPagesFile(file); } catch (error) { console.error(error.message); return { code: 2 }; }
+  const stem = doc.deck?.id ?? path.basename(file).replace(/\.pages\.json$/, "");
+  const listed = (d) => [...(d.pages || []), ...(d.appendix || [])].filter((page) => page && typeof page === "object" && page.id !== undefined).map((page) => [String(page.id), page]);
+  // The pages as their reader reads them, tokens written out: what a self-check's `claim` and a judge's line were read as.
+  let insights = null;
+  try { insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) }); } catch { insights = null; }
+  const printed = new Map(listed(bindDeck(doc, insights).doc));
+  const { kind, edits, open, why } = await editsFrom(input, { at, dir, pages: new Map(listed(doc)), printed });
+  if (why) { console.error(why); return { code: 2 }; }
+  const plan = planEdits(file, edits, { readAs: (id, field) => fieldAt(printed.get(id), field) });
+  const from = `${path.relative(process.cwd(), at) || at}${kind && kind !== "edits" ? ` (a ${kind} answer)` : ""}`;
+  const openText = open.length ? `\nNot applied - not a closed fix, so the writer's to act on (${open.length}):\n${open.map((line) => `  - ${line}`).join("\n")}` : "";
+  if (plan.refusals.length) {
+    console.error(`Nothing was written: ${plan.refusals.length} of the ${edits.length} edit${edits.length === 1 ? "" : "s"} in ${from} ${plan.refusals.length === 1 ? "is" : "are"} refused - mend ${plan.refusals.length === 1 ? "it" : "them"} and apply the file again:\n${plan.refusals.map((line) => `  - ${line}`).join("\n")}${openText}`);
+    return { code: 2 };
+  }
+  const already = plan.unchanged.length ? `\nAlready so (${plan.unchanged.length}): ${plan.unchanged.map((u) => `${u.page} ${u.field}`).join(", ")}` : "";
+  const pages = [...new Set([...plan.changes, ...plan.unchanged].map((change) => change.page))];
+  if (values["dry-run"]) {
+    say(plan.changes.length ? `${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"} --apply would write from ${from} (nothing written):\n${plan.changes.map(changeLine).join("\n")}${already}${openText}` : `Nothing to change from ${from}.${already}${openText}`);
+    return { code: 0 };
+  }
+  if (!pages.length) { console.error(`Nothing to change from ${from}.${openText}`); return { code: open.length ? 2 : 0 }; }
+  let written = [];
+  try { written = plan.changes.length ? applyChanges(plan) : []; } catch (error) { console.error(error.message); return { code: 2 }; }
+  console.error(`${plan.changes.length ? `Applied ${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"} from ${from} to ${written.join(", ")}:\n${plan.changes.map(changeLine).join("\n")}` : `Nothing to change from ${from}: the pages already read so.`}${already}${openText}\n` +
+    `Checking ${pages.join(", ")} (--check --page ${pages.join(",")} --json):\n`);
+  return { pages };
 }
 
 /** One run of the command on a pages file, with the deck's judgements the rules read. */
@@ -2828,8 +2958,17 @@ async function catalogueCommand(values, file, say) {
   if (values.schema !== undefined) {
     // The deck-level keys, from the table the compile holds `deck` to.
     if (values.schema === "deck") { say(JSON.stringify(deckSchema(), null, 2)); return 0; }
+    // Every field a form reads - its exhibit kind's data, options and marks among them - and every kind with the forms that draw it (form-fields.mjs).
+    if (values.schema === "kinds") { say(JSON.stringify(exhibitKinds(), null, 1)); return 0; }
+    if (values.schema.includes("/")) {
+      const [type, form] = values.schema.split("/");
+      try { say(JSON.stringify(formFields(type, form), null, 1)); return 0; } catch (error) { console.error(error.message); return 1; }
+    }
+    // An exhibit kind - what a typed exhibit (`{ type: "chart.column", ... }` in a panel) reads.
+    if (values.schema && !PAGE_TYPES[values.schema] && kindFields(values.schema)) { say(JSON.stringify(kindFields(values.schema), null, 1)); return 0; }
     // One type's schema carries that type's countable limits, form by form.
-    try { say(JSON.stringify({ ...pageSchema(values.schema || null), ...(values.schema ? { "x-limits": pageLimits(values.schema) } : {}) }, null, 2)); return 0; } catch (error) { console.error(error.message); return 1; }
+    try { say(JSON.stringify({ ...pageSchema(values.schema || null), ...(values.schema ? { "x-limits": pageLimits(values.schema) } : {}) }, null, 2)); return 0; }
+    catch (error) { console.error(`${error.message}; or <type>/<form> for the fields a form reads, an exhibit kind (\`--schema kinds\` lists them), or deck`); return 1; }
   }
   // The limits a page is held to are those of the deck it is written for: a
   // live pitch's word floors are a quarter of a pre-read's.

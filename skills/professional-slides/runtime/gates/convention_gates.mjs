@@ -10,7 +10,7 @@
 // (player-name-form, judgement-kinds.json) - and asked only of a line that holds a form the deck refuses, as a whole word.
 import { registered } from "../errors.mjs";
 import { judged } from "../judgements.mjs";
-import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, playerNamed, refusedForms, refusedFormsIn } from "../conventions.mjs";
+import { authorFocused, cellsOf, conventionsOf, currencyFormsIn, exhibitPaths, exhibitsOfPage, isHeatColumn, memberLabels, peerSetOf, playerInLabel, playerNamed, refusedForms, refusedFormsIn } from "../conventions.mjs";
 
 export const CONVENTION_CODES = Object.freeze({
   SUBJECT_NOT_ACCENTED: "a chart or table that plots the page's subject marks another member, or not the subject, by an explicit focus of its own",
@@ -68,7 +68,9 @@ export function conventionFindings(spec, deck = null) {
     const add = (code, repair, measured) => out.push({ code: registered(CONVENTION_CODES, code), id, severity: "blocker", ...(measured === undefined ? {} : { measured }), repair: `${id}: ${repair}` });
     exhibitsOfPage(slide).forEach((ex, at) => {
       if (!ex || typeof ex !== "object") return;
-      const where = `exhibit ${at + 1}${ex.heading ? ` ("${String(ex.heading).slice(0, 60)}")` : ""}`;
+      // The exhibit by the path an edit names it with (`exhibits[1]`, `blocks[0].exhibit`), and its heading where it has one.
+      const path = exhibitPaths(slide)[at] ?? `exhibits[${at}]`;
+      const where = `\`${path}\`${ex.heading ? ` ("${String(ex.heading).slice(0, 60)}")` : ""}`;
       const labels = memberLabels(ex), all = [...(labels.series ?? []), ...(labels.categories ?? []), ...(labels.points ?? []), ...(labels.rows ?? [])];
       // The subject's accent, where the exhibit names its own focus (unnamed, the renderer sets it: conventions.mjs subjectFocus).
       if (subject && authorFocused(ex) && all.some((label) => playerInLabel(players, label) === subject || label === subject)) {
@@ -80,26 +82,40 @@ export function conventionFindings(spec, deck = null) {
       for (const label of new Set(all)) if (refused.has(label))
         add("PLAYER_NAME_REFUSED", `${where} labels a member "${label}", a form the deck refuses (\`conventions.names\`): write ${refused.get(label).map((name) => `"${name}"`).join(" or ")}${refused.get(label).length > 1 ? ", whichever the label means" : ""}`, { wrote: label, write: refused.get(label) });
       // The peer set the exhibit compares: named in `peers`, or the declared set its players are exactly. The subject may
-      // stand beside a set it is not in (British Airways against the network groups).
+      // stand beside a set it is not in (the deck's own company against its peer group). A set's members are read through the
+      // players' names, `short` forms and aliases as the labels are (conventions.mjs peerSetOf).
       if (sets && ex.chartData !== true) {
-        const axes = [labels.series, labels.categories, labels.points, labels.rows].filter(Array.isArray).map((list) => [...new Set(list.map((label) => playerInLabel(players, label)).filter(Boolean))]);
-        const members = axes.sort((a, b) => b.length - a.length)[0] ?? [];
+        const axes = [["series", labels.series], ["categories", labels.categories], ["points", labels.points], ["rows", labels.rows]].filter(([, list]) => Array.isArray(list))
+          .map(([axis, list]) => [axis, [...new Set(list.map((label) => playerInLabel(players, label)).filter(Boolean))]]);
+        const [axis, members] = axes.sort((a, b) => b[1].length - a[1].length)[0] ?? [null, []];
         const peers = members.filter((member) => member !== subject);
-        const setLines = Object.entries(sets).map(([name, list]) => `"${name}": ${list.join(", ")}`).join("; ");
+        const setOf = (named, list) => peerSetOf(conventions, list, named, { players });
+        const setLines = Object.entries(sets).map(([name, list]) => `"${name}" (${list.length}: ${list.join(", ")})`).join("; ");
+        // The exhibit's own fields, by the path an edit names them (author-deck.mjs --apply): `exhibits[1].peers`, `exhibit.omits`.
+        const field = (key) => `\`${path}.${key}\``, axisWords = axis ?? "labels";
         // A head-to-head of the subject and one rival is no set's; an exhibit that names its set is held to it however few it shows.
         if (peers.length >= 2 || (ex.peers !== undefined && members.length >= 1)) {
-          const found = ex.peers !== undefined ? peerSetOf(conventions, members, String(ex.peers)) : [peerSetOf(conventions, members), peerSetOf(conventions, peers)].find((f) => f.set) ?? peerSetOf(conventions, peers);
+          const found = ex.peers !== undefined ? setOf(String(ex.peers), members) : [setOf(undefined, members), setOf(undefined, peers)].find((f) => f.set) ?? setOf(undefined, peers);
           const outside = found.set ? found.outside.filter((member) => member !== subject) : [];
-          if (ex.peers !== undefined && !found.set) add("PEER_SET_UNDECLARED", `${where} names \`peers: "${ex.peers}"\`, which is not a declared set - the deck's sets are ${setLines}`, { peers: ex.peers });
+          // The declared set that holds every member the exhibit compares, the fewest left over: the set to name instead.
+          const holder = setOf(undefined, peers).set ? setOf(undefined, peers) : setOf(undefined, peers).nearest;
+          const omitsFor = (list) => `{ ${list.map((member) => `"${member}": "<why it is not shown>"`).join(", ")} }`;
+          const asSet = `\`"<set name>": [${peers.map((member) => `"${member}"`).join(", ")}]\``;
+          const declare = `or declare the set in \`deck.conventions.peerSets\` - ${asSet} - and set ${field("peers")} to its name`;
+          if (ex.peers !== undefined && !found.set)
+            add("PEER_SET_UNDECLARED", `${where} names ${field("peers")} "${ex.peers}", which \`deck.conventions.peerSets\` does not declare (its ${Object.keys(sets).length} set${Object.keys(sets).length === 1 ? "" : "s"}: ${setLines}). Set ${field("peers")} to ${holder ? `"${holder.set}", which holds all ${peers.length} players its ${axisWords} compare${holder.missing.length ? `, with ${field("omits")} ${omitsFor(holder.missing)}` : ""}` : `a declared set's name`}, ${declare}`, { peers: ex.peers, members: peers, field: `${path}.peers` });
           else if (!found.set) {
-            const near = found.nearest;
-            add("PEER_SET_UNDECLARED", `${where} compares ${quoted(members)}, which is no declared peer set (${setLines}): ${near ? `name the set it draws from - \`peers: "${near.set}"\`, with \`omits: { ${near.missing.map((member) => `"${member}": "<why it is not shown>"`).join(", ")} }\` for the members it leaves out - or ` : "name the set it draws from in the exhibit's `peers`, with its members left out in `omits`, or "}declare a set of these players in \`conventions.peerSets\``, { members });
-          } else if (outside.length) add("PEER_SET_UNDECLARED", `${where} names \`peers: "${found.set}"\` and also compares ${quoted(outside)}, which that set does not hold: draw the set's members alone, or name the set that holds these, declaring it in \`conventions.peerSets\` if none does`, { set: found.set, outside });
+            add("PEER_SET_UNDECLARED", `${where} compares ${peers.length} players by its ${axisWords} - ${quoted(peers)} - and no set in \`deck.conventions.peerSets\` holds them (${setLines}): ${holder ? `"${holder.set}" holds all ${peers.length} and ${holder.missing.length} more - set ${field("peers")} to "${holder.set}"${holder.missing.length ? ` and ${field("omits")} to ${omitsFor(holder.missing)} for the ${holder.missing.length} it leaves out` : ""}, ${declare}` : `none holds all ${peers.length}, so declare the set in \`deck.conventions.peerSets\` - ${asSet} - and set ${field("peers")} to its name`}`, { members: peers, field: `${path}.peers` });
+          } else if (outside.length) add("PEER_SET_UNDECLARED", `${where} names ${field("peers")} "${found.set}" (${(sets[found.set] || []).length} members) and also compares ${outside.length} ${outside.length === 1 ? "player" : "players"} by its ${axisWords} that the set does not hold, ${quoted(outside)}: take ${outside.length === 1 ? "it" : "them"} off the exhibit's ${axisWords}, add ${outside.length === 1 ? "it" : "them"} to \`deck.conventions.peerSets["${found.set}"]\`, or set ${field("peers")} to ${holder ? `"${holder.set}", which holds all ${peers.length}` : "a set that holds all of them, declaring one if none does"}`, { set: found.set, outside, field: `${path}.peers` });
           else {
             const said = ex.omits && typeof ex.omits === "object" ? ex.omits : {};
+            // A reason keyed by any name of the player - its name, `short` or alias - says why that player is left out.
+            const saysWhy = (member) => Object.entries(said).some(([key, why]) => (key === member || (playerNamed(players, key) ?? key) === (playerNamed(players, member) ?? member)) && typeof why === "string" && why.trim());
             // A set may name members the deck does not declare as players; only a declared one can be found on the exhibit as left out.
-            const unsaid = found.missing.filter((member) => playerNamed(players, member) && !(typeof said[member] === "string" && said[member].trim()));
-            if (unsaid.length) add("PEERS_OMITTED_UNSAID", `${where} draws on the "${found.set}" set and leaves out ${quoted(unsaid)} without saying why: add \`omits: { ${unsaid.map((member) => `"${member}": "<why it is not shown>"`).join(", ")} }\` to the exhibit (it prints as a note line), or show ${unsaid.length === 1 ? "it" : "them"}`, { set: found.set, unsaid });
+            const unsaid = found.missing.filter((member) => playerNamed(players, member) && !saysWhy(member));
+            const stray = Object.keys(said).filter((key) => !found.missing.some((member) => (playerNamed(players, key) ?? key) === (playerNamed(players, member) ?? member)));
+            const size = (sets[found.set] || []).length;
+            if (unsaid.length) add("PEERS_OMITTED_UNSAID", `${where} draws on the "${found.set}" set of ${size} and shows ${size - found.missing.length}; it leaves out ${unsaid.length} without a reason - ${quoted(unsaid)}: set ${field("omits")} to ${omitsFor(unsaid)}${Object.keys(said).length ? `, beside the ${Object.keys(said).length} it gives` : ""} (it prints as a note line, "Left out of the ${found.set}: ..."), or show ${unsaid.length === 1 ? "it" : "them"}${stray.length ? `. ${field("omits")} also names ${quoted(stray)}, which the exhibit does not leave out of the set: take ${stray.length === 1 ? "it" : "them"} out` : ""}`, { set: found.set, unsaid, shown: size - found.missing.length, of: size, field: `${path}.omits` });
           }
         }
       }

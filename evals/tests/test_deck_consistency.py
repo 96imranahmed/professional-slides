@@ -430,6 +430,8 @@ console.log(JSON.stringify({
         self.assertEqual([[f["code"], f["severity"], f["pages"]] for f in result["tie"]], [["NUMBER_FORMATS_DIFFER", "blocker", ["p1"]]])
         self.assertEqual(result["tie"][0]["measured"], {"cell": "i6/perFlight@2025", "format": "0.0"})
         self.assertIn('"174" is not 174.5 rounded once; print it at `0.0`', result["tie"][0]["repair"])
+        # The edit that ends it, by the field the off print is written in.
+        self.assertIn('To print it one way: write `{{i6/perFlight@2025 | 0.0}}` for "174" in `title`', result["tie"][0]["repair"])
         self.assertEqual(result["one"], [])
 
     def test_a_revision_under_version_ten_hears_the_one_page_rule_as_advisory(self):
@@ -454,6 +456,7 @@ console.log(JSON.stringify({ apart: run([columns, quoted]), alike: run([columns,
 """)
         self.assertEqual([[f["code"], f["pages"]] for f in result["apart"]], [["NUMBER_FORMATS_DIFFER", ["p1", "p2"]]])
         self.assertIn('i4/visits@FY25 is "47.3" on p1 and "47.32" on p2; `0.00` prints it as recorded (47.32)', result["apart"][0]["repair"])
+        self.assertIn('To print it one way: on p1, set `exhibit.valueFormat` to { "decimals": 2 }', result["apart"][0]["repair"])
         self.assertEqual(result["alike"], [])
 
     def test_a_change_agrees_with_the_ends_the_deck_prints(self):
@@ -487,7 +490,7 @@ const bridge = (format) => ({ id: 'p1', type: 'bridge', form: 'waterfall', comme
   settles: { kind: 'structure', what: 'the spread', measures: ['i9/spread'] }, exhibit: { measure: 'i9/spread', totals: [0, 4], heading: 'Unit spread', ...(format ? { valueFormat: format } : {}) } });
 console.log(JSON.stringify({ one: run([bridge({ decimals: 1, sign: 'auto' })]).map((f) => [f.code, f.measured]), chosen: run([bridge(null)]) }));
 """)
-        self.assertEqual(result["one"], [["BRIDGE_UNRECONCILED", {"exhibit": '"Unit spread"', "printed": ["1.2", "0.1", "0.1", "0.0", "1.5"], "decimals": 1, "reconciles": "0.00"}]])
+        self.assertEqual(result["one"], [["BRIDGE_UNRECONCILED", {"exhibit": '`exhibit` ("Unit spread")', "printed": ["1.2", "0.1", "0.1", "0.0", "1.5"], "decimals": 1, "reconciles": "0.00"}]])
         self.assertEqual(result["chosen"], [])
 
 
