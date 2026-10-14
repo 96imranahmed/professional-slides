@@ -167,16 +167,24 @@ export function allocateKinds(doc, insights, { fills = null, budgets = new Map()
   const order = [...reach].sort((a, b) => new Set(b[1].map((p) => p.section)).size - new Set(a[1].map((p) => p.section)).size || a[0].localeCompare(b[0]));
   const bySection = new Map(sectionEvidence(doc, homes).map(({ section }) => [section, []]));
   const load = (section) => (bySection.get(section)?.length ?? 0) / Math.max(1, budgets.get(section) ?? 1);
-  const used = new Set();
+  // A share already written (`allocation.kinds` in a part) stands: a section may be writing to it. Only the kinds the floor
+  // still needs are placed, so evidence added later adds kinds without moving any a section was given.
+  const used = new Set(), placed = new Set();
   let given = 0;
+  for (const [section, entry] of partHomes(doc)) for (const item of entry.allocation?.kinds ?? []) {
+    if (!item || typeof item !== "object" || placed.has(item.kind)) continue;
+    (bySection.get(section) ?? bySection.set(section, []).get(section)).push({ kind: item.kind, insight: item.insight, type: item.type, form: item.form, kept: true });
+    used.add(item.insight); placed.add(item.kind); given += 1;
+  }
   for (const [kind, proofs] of order) {
     if (given >= target) break;
+    if (placed.has(kind)) continue;
     const best = proofs.filter((p) => !used.has(p.insight)).sort((a, b) => load(a.section) - load(b.section) || (bySection.get(a.section)?.length ?? 0) - (bySection.get(b.section)?.length ?? 0))[0];
     if (!best) continue;
-    used.add(best.insight); given += 1;
+    used.add(best.insight); placed.add(kind); given += 1;
     (bySection.get(best.section) ?? bySection.set(best.section, []).get(best.section)).push({ kind, insight: best.insight, type: best.type, form: best.form });
   }
-  return { floor, length, perTen, target, reachable: reach.size, placed: given, short: Math.max(0, floor - given), bySection };
+  return { floor, length, perTen, target, reachable: new Set([...reach.keys(), ...placed]).size, placed: given, short: Math.max(0, floor - given), bySection };
 }
 
 /**

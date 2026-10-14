@@ -2868,7 +2868,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
       const written = [];
       for (const [section, given] of report.kinds.bySection) {
         if (!includedParts(doc).includes(section)) continue;
-        if (editPartSync(file, section, (part) => { part.allocation = { kinds: given.map(({ kind, insight, type, form }) => ({ kind, insight, type, form })) }; })) written.push(section);
+        if (editPartSync(file, section, (part) => { part.allocation = { ...(part.allocation ?? {}), kinds: given.map(({ kind, insight, type, form }) => ({ kind, insight, type, form })) }; })) written.push(section);
       }
       say(`\nWritten: ${written.length ? written.join(", ") : "nothing changed"} - each part's \`allocation\`, which its skeleton and writer briefs print and its pages' check holds.`);
     }

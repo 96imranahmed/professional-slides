@@ -144,6 +144,25 @@ class KindAllocationTests(unittest.TestCase):
         self.assertTrue(all(f"- {insight}" not in held for insight in B_HOLDS), held)
         self.assertIn("- i-loans", held)
 
+    def test_a_share_once_written_stands_when_the_allocation_runs_again(self):
+        # A section may be writing to its share: evidence added later places the kinds still needed and moves none given.
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned(tmp, ["i-loans", "i-cash"], ["i-liquidity", "i-rule"], {"budget": 30}, {"budget": 30})
+            first = author(pages, "--allocate", "--write")
+            before = {part: json.loads(Path(tmp, "pages", f"{part}.pages.json").read_text())["allocation"]["kinds"] for part in ("a", "b")}
+            for part, more in (("a", ["i-credit", "i-earn"]), ("b", ["i-efficiency", "i-peers"])):
+                doc = json.loads(Path(tmp, "pages", f"{part}.pages.json").read_text())
+                doc["evidence"] += more
+                Path(tmp, "pages", f"{part}.pages.json").write_text(json.dumps(doc, indent=1) + "\n")
+            second = author(pages, "--allocate", "--write")
+            after = {part: json.loads(Path(tmp, "pages", f"{part}.pages.json").read_text())["allocation"]["kinds"] for part in ("a", "b")}
+        self.assertIn("KINDS_UNREACHABLE", first.stdout)
+        for part in ("a", "b"):
+            self.assertEqual(after[part][: len(before[part])], before[part], part)
+        self.assertGreater(sum(map(len, after.values())), sum(map(len, before.values())))
+        kinds = [item["kind"] for part in after.values() for item in part]
+        self.assertEqual(len(kinds), len(set(kinds)), after)
+
     def test_a_floor_the_evidence_cannot_reach_is_said_before_the_skeletons_and_the_shares_still_written(self):
         # Planned at 120 pages the floor is 48 kinds, far more than eight insights draw one a page: that is a research gap.
         with tempfile.TemporaryDirectory() as tmp:
