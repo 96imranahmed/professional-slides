@@ -2378,6 +2378,52 @@ function spineLockFindings(lock) {
       : `The storyline critique ${how}, and ${id}'s argument has moved since - its title, its page type, what settles its claim, the insights and measures it rests on and shows, or which periods or members of a measure it shows and how. The layout keeps what the critique read: put the page back as it was; copy, layout and a chart redrawn in another chart form are free. ${back}.` }))];
 }
 
+/**
+ * The `sources` registry the insight log's parts record (sources-registry.mjs logSources), for a pages file that has none in
+ * itself or its parts: `{ registry, files, problems }`, or null where the file has its own or the log records none.
+ */
+export async function loggedSources(doc, dir, stem) {
+  if (doc?.sources !== undefined) return null;
+  return readInsightLog(dir, stem).then((log) => logSources(dir, log)).catch(() => null);
+}
+
+/**
+ * The deck compiled for a check, as context: with the fit search's, the composer's and the page gates' caches beside the
+ * pages file, read and saved. `named` keeps the fit search to the pages a page run reports; `fill` measures what fills a
+ * page short of its words or past them. Every run that checks pages compiles through here.
+ */
+async function compileChecked(doc, { dir, stem, insights = null, draft = false, fitCap = FIT.perPage, named = null, fill = !draft }) {
+  const gates = pageGateCache;
+  pageGateCache ??= path.join(dir, `${stem}.gate-cache.json`);
+  try {
+    const fitCache = await openFitCache(path.join(dir, `${stem}.author-cache.json`), { doc, insights, fitCap });
+    const composeCache = await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
+    const compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named, composeCache, fill });
+    await fitCache.save();
+    await composeCache.save();
+    return compiled;
+  } finally { pageGateCache = gates; }
+}
+
+/** The pages a finding is answered on: those it names, or - a deck aggregate - those counted in it on the wrong side. */
+const answeringPages = (standings, parts) => (f) => (f.class === "G" ? contributorsOf(f, standings, { parts, rates: CRAFT_RATES }) : pagesOf(f));
+
+/**
+ * A page check as a page run makes it (`--check --page <ids>`), in one call: the deck compiled as context, and what the
+ * named pages answer for - `{ compiled, blocking }`, every blocking finding that names one of them or that one of them counts
+ * towards. It reads the judgements of the session it runs under, and leaves the questions it met in that session's pending
+ * list. A reader that holds pages it did not write to the writer's own check reads them through this (self-check.mjs
+ * --validate composes a section with its checker's replacements applied), so it finds what that check finds, as fast.
+ * `fit` runs the fit search on a named page that does not fit and `fill` measures what fills one short of its words: each
+ * adds to a finding's repair, and neither changes which findings block.
+ */
+export async function checkPages(doc, ids, { dir, stem, insights = null, fit = true, fill = true, fitCap = FIT.perPage } = {}) {
+  const named = new Set([...ids].map(String));
+  const compiled = await compileChecked(doc, { dir, stem, insights, named, fitCap: fit ? fitCap : 0, fill });
+  const answering = answeringPages(compiled.standings, compiled.parts);
+  return { compiled, blocking: compiled.blocking.filter((f) => answering(f).some((id) => named.has(String(id)))) };
+}
+
 /** The CLI. Returns the exit code. */
 async function main(argv) {
   const { values, positionals: [file] } = parseCli(argv, { types: { type: "boolean" }, schema: { type: "string", bare: "" }, icons: { type: "boolean" }, limits: { type: "string", bare: "" },
@@ -2400,7 +2446,7 @@ async function main(argv) {
   // insight log's parts (sources-registry.mjs logSources): on the BA retest the skeleton spent its draft rounds on a
   // registry refusal it could not fix from its own part file, with the log's sources files beside it all along.
   if (doc.sources === undefined) {
-    const logged = await readInsightLog(dir, stem).then((log) => logSources(dir, log)).catch(() => null);
+    const logged = await loggedSources(doc, dir, stem);
     if (logged?.problems.length) { console.error(`The insight log's sources files cannot be read as the deck's registry:\n- ${logged.problems.join("\n- ")}`); return 2; }
     if (logged) {
       doc.sources = logged.registry;
@@ -2529,11 +2575,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
     // composes and renders the pages with them - a title that fits beside no photograph, a page whose picture is of the
     // wrong thing, are seen at the compile rather than after the build. The choice is the build's (fetch-pictures.mjs).
     if (values["fetch-assets"]) console.error(await fetchAssets(doc, { insights, baseDir: dir }));
-    const fitCache = await openFitCache(path.join(dir, `${stem}.author-cache.json`), { doc, insights, fitCap });
-    const composeCache = await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
-    compiled = await authorDeck(doc, { baseDir: dir, insights, draft, fit: !draft && fitCap > 0, fitCap, fitCache, fitPages: named, composeCache });
-    await fitCache.save();
-    await composeCache.save();
+    compiled = await compileChecked(doc, { dir, stem, insights, draft, fitCap, named });
   } catch (error) {
     await log({ ok: false, findings: (error.pageErrors ?? [error.message]).map((message) => ({ code: "COMPILE", id: message.split(":")[0], message })) });
     console.error(error.message); return 2;
@@ -2584,7 +2626,7 @@ async function authorRun({ values, file, doc, dir, stem, logPath, runs, say }) {
   const standings = rendered?.standings?.length ? readStandings([...compiled.standings.filter((st) => !measured.has(st.code) && !(st.code === "DECK_SCENE_VOID" && measured.has("DECK_THIN_PAGES"))), ...rendered.standings]) : compiled.standings;
   // A page run answers for its pages: every blocking finding that names one of them - a claim two pages share names both -
   // and every aggregate one of them is counted in on the wrong side: a page holding a bare chart answers for the deck's bare charts.
-  const answering = (f) => (f.class === "G" ? contributorsOf(f, standings, { parts: compiled.parts, rates: CRAFT_RATES }) : pagesOf(f));
+  const answering = answeringPages(standings, compiled.parts);
   const about = (f) => answering(f).some((id) => named.has(id));
   const blocking = named ? everything.filter(about) : everything;
   // A page run that rendered records what each page drew and whether it is clean: a section all of whose pages check clean
