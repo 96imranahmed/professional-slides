@@ -7,15 +7,25 @@
 // Each section is self-checked once, after its last structural change (author-deck.mjs --brief selfcheck --section <part>):
 // its checker reproduces the section's claims from the records and saves out/self-check/<part>.json, a verdict per page bound
 // to the hash of the claims it read (claim-sheet.mjs sheetHash), and for each problem the field it is in and the field's whole
-// new text. `--validate` refuses an answer that leaves a page without a verdict, a replacement past its slot or printing a
-// number no record holds, or a problem in a field the page does not have - before the checker hands back. Delivery wants
-// out/self-check.json bound to the build's own claim ledger (claims.mjs validateSelfCheck), which only exists after the build.
-// This joins the two: a page whose claims are what its checker read, or what it read with every replacement applied word for
-// word, keeps its verdict under the ledger's hash; a page changed besides, or never checked, or with a fix not applied, is
-// named for another check, with the lines that changed.
+// new text. The same reader answers the questions the rules ask of the section's copy (judgements.mjs), which the brief lists
+// beside the claims - those `judge.mjs --page` would stage for a reader of their own - in a `judgements` block in the judge
+// answer format: one reading a line, so a line both readings mend gets one fix that passes both. A question on a line the
+// answer replaces is answered of the replacement (`"on": "replacement"`).
+//
+// `--validate` refuses an answer that leaves a page without a verdict, a replacement past its slot or printing a number no
+// record holds, a problem in a field the page does not have, a question unanswered or answered as judge.mjs would refuse it,
+// or answered on the text a replacement removes - and composes every page a replacement touches with all of them in place,
+// runs the page check the writer runs (author-deck.mjs checkPages), and refuses a replacement under which a page has a
+// blocking finding it did not have before, with the finding's repair. All before the checker hands back. An answer that
+// passes is recorded: its judgements go into <id>.judgements.json, as judge.mjs records a packet's.
+//
+// Delivery wants out/self-check.json bound to the build's own claim ledger (claims.mjs validateSelfCheck), which only exists
+// after the build. This joins the two: a page whose claims are what its checker read, or what it read with every replacement
+// applied word for word, keeps its verdict under the ledger's hash; a page changed besides, or never checked, or with a fix
+// not applied, is named for another check, with the lines that changed.
 //
 // Exit codes (EXIT in errors.mjs): 0 every page that makes claims has a current verdict and the record is complete (with
-// --validate, the answer would be recorded), 2 pages or findings are still to check (with --validate, the answer is refused),
+// --validate, the answer is recorded), 2 pages or findings are still to check (with --validate, the answer is refused),
 // 1 a crash or bad usage.
 //
 // On the BA retest the whole deck was self-checked after the build, by five readers at once: 64 problems on 41 of 95 pages,
@@ -26,14 +36,15 @@
 // applied word for word now closes its problem, and the page keeps its verdict without a second reading.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { EXIT, UsageError, isMain, parseCli, readJson, runCli, writeJson } from "./cli.mjs";
+import { EXIT, UsageError, isMain, parseCli, readJson, runCli, schemaErrors, writeJson } from "./cli.mjs";
 import { readPagesFileSync } from "./pages-file.mjs";
-import { readInsights } from "./author-deck.mjs";
+import { checkPages, loggedSources, readInsights } from "./author-deck.mjs";
 import { alternativesOf } from "./analysis.mjs";
 import { bindDeck } from "./bind.mjs";
 import { sectionPages } from "./brief.mjs";
-import { claimSheet, overruns, readSheets, roomText, sheetHash, withReplacements } from "./claim-sheet.mjs";
+import { askedWithReplacements, claimSheet, overruns, readQuestions, readSheets, roomText, sheetHash, withReplacements } from "./claim-sheet.mjs";
 import { findingKey, validateSelfCheck } from "./claims.mjs";
+import { JUDGEMENT_KINDS, answerProblems as judgementAnswerProblems, judgementKey, judgementSession, judgementsBlockSchema, pendingRequests, readJudgementStore, verdictRecord, withJudgements, writeVerdicts } from "./judgements.mjs";
 
 const USAGE = "Usage: self-check.mjs <id>.pages.json out/ [--spine \"<which pages the title-spine pass merged or cut, or why none>\"]\n       self-check.mjs --validate <answer.json> <id>.pages.json";
 const PARTS = "self-check";
@@ -173,7 +184,178 @@ export function answerProblems(doc, insights, answer, { sheets = new Map() } = {
     }
   }
   const expect = Object.fromEntries([...new Set(usable.map(({ problem }) => String(problem.slide)))].filter((id) => after.has(id)).map((id) => [id, sheetHash(after.get(id))]));
-  return { reasons, expect };
+  // What the writer leaves once it applies them: the pages with every usable replacement in place, and each replaced line as
+  // the sheet read it beside the text its replacement reads as - what the questions it answers are asked of then.
+  const swaps = usable.map(({ problem, at, claim }) => ({ slide: String(problem.slide), at, claim, written: problem.replacement, to: after.get(String(problem.slide))?.claims.find((c) => c.field === problem.field)?.text ?? null }))
+    .filter((swap) => swap.to !== null);
+  return { reasons, expect, part: found.part, replaced: { doc: fixed, swaps } };
+}
+
+// The verdicts of a kind whose failure a replacement mends (judgement-kinds.json `fix.by: "replace"`), which a self-check does
+// not give on a line it leaves standing: the line's one fix is the self-check's own replacement.
+const failsByLine = (kind, verdict) => JUDGEMENT_KINDS[kind]?.fix?.by === "replace" && JUDGEMENT_KINDS[kind].fix.for.includes(verdict);
+const linesOf = (swaps) => swaps.map((swap) => swap.at).join(", ");
+const whereOf = (item) => (item.where ?? []).join(", ") || "the deck";
+
+/**
+ * Every reason the answer's `judgements` would be refused, read against the questions its brief listed (`questions`, kept
+ * by claim-sheet.mjs recordQuestions) and the replacements the same answer makes (`swaps`): `{ reasons, verdicts, extra }`.
+ * Each question is answered once, in the judge answer format, and checked as judge.mjs checks a packet's answer
+ * (judgements.mjs answerProblems: a verdict of its kind, its reason, its quote words of its subject, the fields its verdict
+ * needs). A question that reads a line one of the answer's problems replaces is asked again of the replacement once the
+ * writer applies it, so its answer judges the replacement (`"on": "replacement"`) and is checked and recorded as that
+ * question; an answer given on the line as it stands is refused, since the writer's fix leaves it reading nothing. A line
+ * is mended once, so no answer carries a `replacement` of its own and none fails a question its replacement is to pass.
+ * Whether a replacement moves a question is read off the line's text (claim-sheet.mjs askedWithReplacements) and settled by
+ * the page check of the pages with the replacements in place (`pending`: the keys they ask that no answer judges, null where
+ * no page was checked): a question the page still asks of the text as it stands is answered of it.
+ * `verdicts` are the answers as the judgements file keeps them, by key; `extra` the entries keyed by no question listed,
+ * which may answer a question the pages ask only with the replacements in place (extraProblems); `foreseen` the keys the
+ * listed questions are asked under once the replacements are in place, which this has said all there is to say of.
+ */
+export function judgementProblems(questions, answer, swaps, { by = null, pending = null } = {}) {
+  const reasons = [], verdicts = {}, extra = [], foreseen = new Set();
+  const entries = answer?.judgements ?? [];
+  if (!Array.isArray(entries)) return { reasons: ["\"judgements\" is a list: one answer for each question the brief lists"], verdicts, extra, foreseen };
+  if (questions === null) {
+    if (entries.length) reasons.push(`"judgements": no questions were kept for this ${answer?.scope === "spine" ? "spine reading - the spine's questions are judge.mjs --draft's" : "section: run its brief again (author-deck.mjs --brief selfcheck --section <part>), which lists them"}`);
+    return { reasons, verdicts, extra, foreseen };
+  }
+  const staged = stagedQuestions(questions, swaps);
+  for (const { asked, question } of staged.values()) if (asked) foreseen.add(question.key);
+  const shape = judgementsBlockSchema(questions).items, given = new Map();
+  entries.forEach((entry, i) => {
+    if (!staged.has(entry?.key)) { extra.push({ entry, i }); return; }
+    const { item, asked, question } = staged.get(entry.key);
+    if (given.has(entry.key)) { reasons.push(`judgement ${i + 1} (${entry.key}): answered twice - one answer a question`); return; }
+    given.set(entry.key, entry);
+    const at = `judgement ${i + 1} (${entry.key} ${item.kind}, on ${whereOf(item)})`;
+    const malformed = schemaErrors(entry, shape, at, { absentIsNull: true, enums: false });
+    if (malformed.length) { reasons.push(...malformed); return; }
+    if (entry.on === "replacement" && !asked) { reasons.push(`${at}: "on": "replacement", and none of your problems replaces a line this question reads - answer it of the text as it stands, "on" null`); return; }
+    // Answered of the replacement, and asked of the text as it stands still: the page reads that text where the sheet did not.
+    if (entry.on === "replacement" && pending?.has(item.key)) { reasons.push(`${at}: with your replacements in place the page still asks this of the text as it stands - ${JSON.stringify(item.subject)} - so answer it of that text, "on" null`); return; }
+    // Answered of the line as it stands, which the page with the replacements in place no longer asks.
+    const moved = asked && (pending === null || pending.has(question.key));
+    if (entry.on !== "replacement" && moved) { reasons.push(`${at}: ${ofReplacement(asked)}`); return; }
+    const own = entry.on === "replacement" ? question : item;
+    reasons.push(...entryProblems(own, entry, at, { mine: entry.on === "replacement" ? asked.swapped : null }));
+    if (Object.hasOwn(JUDGEMENT_KINDS[item.kind].verdicts, entry.verdict)) verdicts[own.key] = { ...verdictRecord(own, entry, { by, omit: OMITTED }), ...(own !== item ? { replaces: item.key } : {}) };
+  });
+  for (const [key, { item, asked, question }] of staged) if (!given.has(key))
+    reasons.push(`${key} (${item.kind}, on ${whereOf(item)}): not answered - ${asked && (pending === null || pending.has(question.key)) ? ofReplacement(asked) : "answer every question the brief lists, once, in \"judgements\""}`);
+  return { reasons, verdicts, extra, foreseen };
+}
+
+/** Each listed question as the compile asks it once the replacements are in place, by its key: itself, or asked of the replacement (`asked`). */
+function stagedQuestions(questions, swaps) {
+  return new Map(questions.map((item) => {
+    const asked = askedWithReplacements(item, swaps);
+    return [item.key, { item, asked, question: asked ? { ...item, subject: asked.subject, context: asked.context, key: judgementKey(item.kind, asked.subject, asked.context) } : item }];
+  }));
+}
+
+/**
+ * The answer's judgements as the page check reads them, before they are checked: each entry of a listed question with a
+ * verdict its kind takes, under the key of the question it says it judges - the one asked of the replacement where it is
+ * answered `on` it. The page with the replacements in place is read under them, so a rule its own reading fails is seen.
+ */
+export function answeredVerdicts(questions, answer, swaps) {
+  const staged = stagedQuestions(questions ?? [], swaps), verdicts = {};
+  for (const entry of Array.isArray(answer?.judgements) ? answer.judgements : []) {
+    const { item, asked, question } = staged.get(entry?.key) ?? {};
+    if (!item || !Object.hasOwn(JUDGEMENT_KINDS[item.kind].verdicts, entry.verdict)) continue;
+    const own = entry.on === "replacement" && asked ? question : item;
+    verdicts[own.key] = verdictRecord(own, entry, { omit: OMITTED });
+  }
+  return verdicts;
+}
+
+/** What a question that reads a replaced line is answered of: the line as the replacement leaves it, said with the replacement. */
+const ofReplacement = (asked) => {
+  const one = asked.swapped.length === 1;
+  return `your ${linesOf(asked.swapped)} ${one ? "replaces" : "replace"} the text this question reads, so an answer on the text as it stands reads nothing once the writer applies ${one ? "it" : "them"}: judge it as it reads with ${one ? "the replacement" : "them"} in place - ${JSON.stringify(asked.subject)} - and set "on": "replacement"`;
+};
+
+// The fields an entry carries that the judgements file does not keep from a self-check: where it was answered, and a judge's own mend.
+const OMITTED = ["on", "replacement", "replacementReason"];
+
+/** Every problem with one entry against the question it answers (`mine`: the answer's own replacements it is asked of). */
+function entryProblems(question, entry, at, { mine = null } = {}) {
+  const fix = JUDGEMENT_KINDS[question.kind].fix;
+  if (typeof entry.replacement === "string" && entry.replacement.trim()) return [`${at}: a line's fix goes in "problems" - its field and its whole replacement - with this question answered of it ("on": "replacement"); leave \`replacement\` null`];
+  if (failsByLine(question.kind, entry.verdict)) return [mine
+    ? `${at}: your ${linesOf(mine)} ${mine.length === 1 ? "fails" : "fail"} this question ("${entry.verdict}"): write ${mine.length === 1 ? "the replacement" : "them"} so that, asked of ${mine.length === 1 ? "it" : "them"}, it answers "${fix.passes}"`
+    : `${at}: "${entry.verdict}" is mended once, as one of your problems: give the ${fix.slot === "title" ? "title" : "line"} its whole replacement in "problems" (\`record\` naming this question and what it found), and answer this question of the replacement, "on": "replacement", as "${fix.passes}"`];
+  const { on: _on, ...said } = entry;
+  return judgementAnswerProblems(question, said).map((problem) => `${at}: ${problem.replace(/^\S+ \([^)]*\): /, "")}`);
+}
+
+/**
+ * The entries keyed by no question the brief listed (`extra`), read against the questions the pages ask only once the
+ * replacements are in place that no answer judges (`open`, from the page check pageProblems runs): `{ reasons, verdicts }`.
+ * A question the substitution of a replacement did not foresee - a line the composer sets otherwise than the sheet reads it -
+ * is named by the validation under its key, and answered under it; one left open is named again.
+ */
+export function extraProblems(extra, open, { questions = [], by = null } = {}) {
+  const reasons = [], verdicts = {}, asked = new Map(open.map((item) => [item.key, item])), answered = new Set();
+  const shape = judgementsBlockSchema([...questions, ...open]).items;
+  for (const { entry, i } of extra) {
+    const question = asked.get(entry?.key), at = `judgement ${i + 1} (${entry?.key ?? "no key"}${question ? ` ${question.kind}, on ${whereOf(question)}` : ""})`;
+    if (!question) { reasons.push(`${at}: no question of this section's brief has that key, nor one its pages ask with your replacements in place - answer the questions the brief lists, under their keys`); continue; }
+    if (answered.has(question.key)) { reasons.push(`${at}: answered twice - one answer a question`); continue; }
+    answered.add(question.key);
+    const malformed = schemaErrors(entry, shape, at, { absentIsNull: true, enums: false });
+    if (malformed.length) { reasons.push(...malformed); continue; }
+    if (entry.on === "replacement") { reasons.push(`${at}: this question is asked of the page with your replacements in place already: set "on" null`); continue; }
+    reasons.push(...entryProblems(question, entry, at, { mine: [{ at: "replacement" }] }));
+    if (Object.hasOwn(JUDGEMENT_KINDS[question.kind].verdicts, entry.verdict)) verdicts[question.key] = verdictRecord(question, entry, { by, omit: OMITTED });
+  }
+  for (const question of open.filter((item) => !answered.has(item.key)))
+    reasons.push(`${question.key} (${question.kind}, on ${whereOf(question)}): with your replacements in place the rules ask this of ${JSON.stringify(question.subject)}${question.context ? ` (context ${JSON.stringify(question.context)})` : ""}, and no answer judges it - add it to "judgements" under this key, judged as the page reads with your replacements`);
+  return { reasons, verdicts };
+}
+
+/**
+ * The pages the replacements touch, checked as the writer's page check checks them (author-deck.mjs checkPages): once as
+ * they stand and once with every replacement in place, each under the deck's recorded judgements and the answer's
+ * (`verdicts`). `{ reasons, pending }`: a blocking finding a page has with the replacements and not without them, named with
+ * its repair and the replacements on the page - a callout past its box, a page past its share of notes, under its word floor
+ * or past its ceiling, a title over its lines, a table past its frame - and the questions the pages ask then that nothing
+ * answers (`pending`, null where no page was checked). A replacement checked against its slot alone still broke the page it
+ * was applied to: a callout of ten words did not fit its box, qualifications pushed notes past their share, and corrected
+ * points cut a page below its word floor.
+ */
+export async function pageProblems(doc, { replaced, verdicts, dir, stem, insights, also = [] }) {
+  // The pages the replacements are on, and any other a question they move is asked on (`also`): the same line of text on
+  // two pages is one question, and the page left as it stands still asks it.
+  const touched = [...new Set(replaced.swaps.map((swap) => swap.slide))];
+  if (!touched.length) return { reasons: [], pending: null };
+  touched.push(...[...new Set(also.map(String))].filter((id) => !touched.includes(id)));
+  const store = await readJudgementStore(dir, stem);
+  const session = () => judgementSession({ verdicts: { ...(store.verdicts ?? {}), ...verdicts } });
+  const check = { dir, stem, insights, fit: false, fill: false };
+  const now = await withJudgements(session(), () => checkPages(doc, touched, check));
+  const fixedSession = session();
+  const then = await withJudgements(fixedSession, () => checkPages(replaced.doc, touched, check));
+  const keyOf = (f) => `${f.code}|${f.id ?? ""}`, had = new Map();
+  for (const f of now.blocking) had.set(keyOf(f), (had.get(keyOf(f)) ?? 0) + 1);
+  // A page's body words as the page gates count them, with the replacements and without: how far a fix moved the page.
+  const bodyOf = (compiled, id) => (compiled.budget ?? []).find((row) => String(row.id ?? "") === id);
+  const words = (id) => {
+    const before = bodyOf(now.compiled, id), after = bodyOf(then.compiled, id);
+    return Number.isFinite(before?.body) && Number.isFinite(after?.body) && before.body !== after.body
+      ? ` Its body runs to ${after.body} words with them and ${before.body} as it stands${Number.isFinite(after.floor) && Number.isFinite(after.ceiling) ? `, and the page holds ${Math.ceil(after.floor)} to ${Math.floor(after.ceiling)}` : ""}.` : "";
+  };
+  const reasons = [];
+  for (const f of then.blocking) {
+    if (had.get(keyOf(f))) { had.set(keyOf(f), had.get(keyOf(f)) - 1); continue; }
+    const page = f.id !== undefined && f.id !== null ? String(f.id) : null, mine = replaced.swaps.filter((swap) => !page || swap.slide === page);
+    const shown = mine.length ? mine : replaced.swaps;
+    reasons.push(`${page ?? "the deck"}: with your ${linesOf(shown)} in place, ${page ? "the page" : "the deck"} has ${f.code}, which it does not have as the pages stand - ${String(f.repair ?? f.reason ?? "").trim().replace(/[.\s]+$/, "")}.${page ? words(page) : ""} Write ${shown.length === 1 ? "the replacement" : "the replacements"} so the page passes as it does now`);
+  }
+  const named = new Set(touched);
+  return { reasons, pending: pendingRequests(fixedSession).filter((item) => (item.where ?? []).some((id) => named.has(String(id)))) };
 }
 
 async function validate(answerFile, pagesFile) {
@@ -185,11 +367,32 @@ async function validate(answerFile, pagesFile) {
   if (!answer) { console.error(`No answer at ${named[0]}`); return EXIT.refused; }
   if (answer.unreadable) { console.log(JSON.stringify({ recorded: false, reasons: [`the answer does not parse: ${answer.unreadable}`] }, null, 1)); return EXIT.refused; }
   const doc = readPagesFileSync(file);
+  // The deck as the writer's page check reads it, under the name the compile and judge.mjs give its files (the deck's id): a
+  // pages file with no `sources` registry reads the one the insight log records.
+  const deck = doc.deck?.id ?? stem;
+  const logged = await loggedSources(doc, dir, deck);
+  if (logged && !logged.problems.length) doc.sources = logged.registry;
   const insights = await readInsights(dir, stem, { alternatives: alternativesOf(doc.deck) });
   if (!insights) { console.error(`No insight log beside ${path.basename(file)}: the claims are checked against ${stem}.insights.json`); return EXIT.refused; }
-  const { reasons, expect } = answerProblems(doc, insights, answer, { sheets: await readSheets(path.join(dir, "out")) });
-  console.log(JSON.stringify(reasons.length ? { recorded: false, reasons } : { recorded: true, pages: Object.keys(answer.pages ?? {}).length, problems: (answer.problems ?? []).length,
-    ...(Object.keys(expect).length ? { expect, note: "each page's claims hash to `expect` once its replacements are applied word for word: the join carries its verdict then, with no second reading" } : {}) }, null, 1));
+  const out = path.join(dir, "out"), by = { selfCheck: String(answer.section ?? "deck") };
+  const claims = answerProblems(doc, insights, answer, { sheets: await readSheets(out) });
+  const replaced = claims.replaced ?? { doc, swaps: [] };
+  // The questions the section's brief listed beside its claims, answered in the same answer; a spine reading has none.
+  const questions = answer.scope === "spine" || claims.part === undefined ? null : await readQuestions(out, claims.part);
+  // Every page a replacement touches, composed with all of them in place and checked as the writer will check it, under the
+  // answer's own judgements: then each judgement is read against what that page asks.
+  const also = (questions ?? []).filter((item) => askedWithReplacements(item, replaced.swaps)).flatMap((item) => item.where ?? []);
+  const pages = await pageProblems(doc, { replaced, verdicts: answeredVerdicts(questions, answer, replaced.swaps), dir, stem: deck, insights, also });
+  const judged = judgementProblems(questions, answer, replaced.swaps, { by, pending: pages.pending && new Set(pages.pending.map((item) => item.key)) });
+  const listed = new Set([...(questions ?? []).map((item) => item.key), ...judged.foreseen]);
+  const extra = extraProblems(judged.extra, (pages.pending ?? []).filter((item) => !listed.has(item.key)), { questions: questions ?? [], by });
+  const reasons = [...claims.reasons, ...judged.reasons, ...extra.reasons, ...pages.reasons], { expect } = claims;
+  // An answer that passes is recorded: its judgements go where judge.mjs records a packet's (<id>.judgements.json), so the
+  // writer's check after the replacements are applied finds every question answered.
+  const verdicts = { ...judged.verdicts, ...extra.verdicts };
+  if (!reasons.length) writeVerdicts(dir, deck, verdicts);
+  console.log(JSON.stringify(reasons.length ? { recorded: false, reasons } : { recorded: true, pages: Object.keys(answer.pages ?? {}).length, problems: (answer.problems ?? []).length, judgements: Object.keys(verdicts).length,
+    ...(Object.keys(expect).length ? { expect, note: "each page's claims hash to `expect` once its replacements are applied word for word: the join carries its verdict then, with no second reading, and the compile finds each of its questions answered" } : {}) }, null, 1));
   return reasons.length ? EXIT.refused : EXIT.ok;
 }
 
@@ -217,7 +420,7 @@ async function record(pagesFile, outputDirectory, { spine = null } = {}) {
 async function main(argv) {
   const { values, positionals: [pagesFile, outputDirectory] } = parseCli(argv, { spine: { type: "string", valueName: "a sentence" }, validate: { type: "string", valueName: "an answer file" } }, { usage: USAGE, strict: true });
   if (values.validate !== undefined) {
-    if (!pagesFile || outputDirectory || values.spine !== undefined || !/\.pages\.json$/.test(pagesFile)) throw new UsageError(`--validate checks one answer against the pages file and records nothing\n${USAGE}`);
+    if (!pagesFile || outputDirectory || values.spine !== undefined || !/\.pages\.json$/.test(pagesFile)) throw new UsageError(`--validate checks one answer against the pages file, and records only its judgements once it passes\n${USAGE}`);
     return validate(values.validate, pagesFile);
   }
   if (!pagesFile || !outputDirectory || !/\.pages\.json$/.test(pagesFile)) throw new UsageError(USAGE);
