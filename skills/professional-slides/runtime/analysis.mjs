@@ -57,7 +57,7 @@ export const ANALYSIS_OPS = Object.freeze({
   compare: { inputs: [1, 12], does: "every alternative on the same measures: one row a member, one column a measure, n/a where a member is undisclosed, the leader and rank on each measure, and who leads under each priority; over the deck's declared players, or the members named in `members`" },
   gap: { inputs: [2, 2], does: "the first measure less the second, label by label, on one unit" },
   ratio: { inputs: [2, 2], does: "the first measure over the second, label by label (`percent: true` for a percentage); a percentage among them is used as the number recorded, not as a fraction" },
-  sum: { inputs: [1, 12], does: "two or more measures in one unit added label by label, or the periods or members of one measure added up" },
+  sum: { inputs: [1, 12], does: "two or more measures in one unit added label by label, or the periods or members of one measure added up (a series' periods `from` and `to` where given)" },
   product: { inputs: [2, 8], does: "two or more measures multiplied label by label, divided by each measure in `over`; the unit is composed from theirs (x per y times y is x) and a percentage is applied as a fraction" },
   index: { inputs: [1, 8], does: "each series rebased to 100 at `base` (the first period by default), so series in different units share a scale" },
   growth: { inputs: [1, 1], does: "the change, the percentage change and the compound rate between `from` and `to` (the first and last period by default); for a measure in % the change in points alone" },
@@ -204,18 +204,24 @@ const OPS = {
     const off = inputs.find((other) => !sameUnit(m, other));
     if (off) unavailable(`${m.ref} is in ${m.unit} and ${off.ref} in ${off.unit}: a sum needs one unit`);
     if (inputs.length > 1) return combined(inputs, plan, (xs) => xs.reduce((total, x) => total + x, 0), { unit: m.unit }, (names) => names.join(" plus "));
-    // One measure: its periods or its members added up.
-    const axis = axisOf(m), values = valuesOf(m);
+    // One measure: its periods or its members added up - a series' periods `from` and `to` where the plan names them, as a
+    // growth reads them. On ba5 IAG's free cash flow over 2022-2025 (EUR 9.0bn) could not be summed: 2021 has no number.
+    const axis = axisOf(m);
     if (axis.kind === "scalar") unavailable(`${m.ref} is one value: a sum adds two or more measures, or the periods or members of one`);
     if (axis.kind === "periods" && isPercentUnit(m.unit)) unavailable(`${m.ref} is in ${m.unit}: the percentages of different periods do not add up to one`);
-    const holes = axis.labels.filter((label) => at(m, label) === null);
+    if ((plan.from !== undefined || plan.to !== undefined) && axis.kind !== "periods") unavailable(`${m.ref} is not a series: \`from\` and \`to\` name periods`);
+    const first = plan.from === undefined ? 0 : axis.labels.indexOf(String(plan.from)), last = plan.to === undefined ? axis.labels.length - 1 : axis.labels.indexOf(String(plan.to));
+    if (first < 0 || last < 0) unavailable(`${m.ref} has no period ${first < 0 ? plan.from : plan.to} (its periods are ${axis.labels.join(", ")})`);
+    if (last < first) unavailable(`${plan.to} does not come after ${plan.from} in ${m.ref}`);
+    const labels = axis.labels.slice(first, last + 1);
+    const holes = labels.filter((label) => at(m, label) === null);
     if (holes.length) unavailable(`${m.ref} has an undisclosed ${axis.kind === "periods" ? "period" : "member"} (${holes.join(", ")}): a total with a part missing is not the total`);
-    const total = round(values.reduce((sum, v) => sum + v, 0));
+    const total = round(labels.reduce((sum, label) => sum + at(m, label), 0));
     // Adding periods is right for a flow counted in each and wrong for a level held at each: the result says what was added.
-    const over = axis.kind === "periods" ? [`adds the ${axis.labels.length} periods of ${m.ref} (${axis.labels[0]} to ${axis.labels.at(-1)}): a total over time is right for a flow counted in each period, and wrong for a stock or a level, which is not added across periods`] : [];
-    return { measures: { result: { unit: m.unit, population: m.population, period: axis.kind === "periods" ? `${axis.labels[0]} to ${axis.labels.at(-1)}` : m.period, value: total } }, boundaries: [...over, ...boundariesOf([m], axis.labels)],
-      finding: `${m.ref} adds up to ${show(total)} ${m.unit} over ${axis.labels.length} ${axis.kind}`,
-      calculation: `sum(${m.ref}): the ${axis.labels.length} ${axis.kind} added up, computed by the runtime` };
+    const over = axis.kind === "periods" ? [`adds the ${labels.length} periods of ${m.ref} (${labels[0]} to ${labels.at(-1)}): a total over time is right for a flow counted in each period, and wrong for a stock or a level, which is not added across periods`] : [];
+    return { measures: { result: { unit: m.unit, population: m.population, period: axis.kind === "periods" ? `${labels[0]} to ${labels.at(-1)}` : m.period, value: total } }, boundaries: [...over, ...boundariesOf([m], labels)],
+      finding: `${m.ref} adds up to ${show(total)} ${m.unit} over ${labels.length} ${axis.kind}${labels.length < axis.labels.length ? ` (${labels[0]} to ${labels.at(-1)})` : ""}`,
+      calculation: `sum(${m.ref}): the ${labels.length} ${axis.kind} added up, computed by the runtime` };
   },
   product(inputs, plan, context) {
     const over = context.over || [];

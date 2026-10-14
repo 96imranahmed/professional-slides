@@ -87,6 +87,20 @@ console.log(JSON.stringify({ status: Object.fromEntries(Object.entries(by).map((
         self.assertIn("adds the 2 periods of a/beds (FY24 to FY25)", notes[0])
         self.assertIn("wrong for a stock or a level", notes[0])
 
+    def test_a_sum_over_a_series_adds_the_periods_from_and_to_name(self):
+        """ba5: IAG's free cash flow over 2022-2025 could not be summed, because 2021, outside the window, has no number."""
+        result = run_node(LOG + '''
+items[0].measures.cash = { unit: 'GBP m', population: 'North group', periods: ['FY23', 'FY24', 'FY25', 'FY26'], values: [null, 30, 40, 50] };
+const by = run([{ id: 'Window', op: 'sum', inputs: ['a/cash'], from: 'FY24', to: 'FY26' }, { id: 'Whole', op: 'sum', inputs: ['a/cash'] },
+  { id: 'Late', op: 'sum', inputs: ['a/cash'], from: 'FY24', to: 'FY30' }]);
+console.log(JSON.stringify({ window: [by.Window.measures.result.value, by.Window.measures.result.period, by.Window.finding], whole: by.Whole.status, late: [by.Late.status, by.Late.reason] }));
+''')
+        self.assertEqual(result["window"][:2], [120, "FY24 to FY26"])
+        self.assertIn("over 3 periods (FY24 to FY26)", result["window"][2])
+        self.assertEqual(result["whole"], "unavailable")  # FY23 undisclosed: the whole run has a part missing
+        self.assertEqual(result["late"][0], "unavailable")
+        self.assertIn("has no period FY30", result["late"][1])
+
     def test_the_catalogue_pairs_no_unlike_percentages_and_lists_no_pair_of_one_number(self):
         result = run_node(LOG + '''
 const { entries, counts } = analysisCatalogue(items);
