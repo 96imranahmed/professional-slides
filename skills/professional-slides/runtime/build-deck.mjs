@@ -166,6 +166,15 @@ function notePending(report, deck) {
  * page keeps its place, its tracker and its number; what the gates say of the
  * deck as a whole is then about a part of it, and the caller reads the page
  * findings alone.
+ *
+ * `scope: "pages"` builds a page run's deck (author-deck.mjs --check --render
+ * --page): the pages it names among the deck's structural pages, the rest of
+ * the deck read off its declarations (page-run.mjs). The rules over the whole
+ * deck - the stage contract's opening summary, the variety contract, an
+ * evaluation's length, the deck-wide content and plan rules - are the
+ * whole-deck run's, and are not read on a part of it: the content and plan
+ * gates still run and write their reports, and refuse nothing. So a section's
+ * pages render while the other sections are still being written.
  */
 export async function buildDeck(specPath, outputDirectory, options = {}) {
   // The rules that read what copy means read the deck's recorded judgements: the compile's, when it is the compile that
@@ -174,7 +183,7 @@ export async function buildDeck(specPath, outputDirectory, options = {}) {
   return withJudgements(session, () => buildWith(specPath, outputDirectory, options));
 }
 
-async function buildWith(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null } = {}) {
+async function buildWith(specPath, outputDirectory, { preflight = false, render = true, timeoutMs = 300000, python = pythonBin(), fetchLogos = true, source = null, only = null, scope = null } = {}) {
   const started = Date.now();
   const spec = source ? structuredClone(source.spec) : await readJson(specPath);
   const stem = deckStem(spec);
@@ -221,11 +230,12 @@ async function buildWith(specPath, outputDirectory, { preflight = false, render 
   // rebuild needs one - but the build output says the stage did not happen.
   const result = { status: "planned", outputDirectory: directory, timings, stages: {}, ...(logos.filled || logos.failed.length ? { logos } : {}), ...(flags.filled || flags.failed.length ? { flags } : {}), ...(pictures.filled || pictures.failed.length ? { pictures } : {}), ...(places.placed || places.failed.length ? { places } : {}), ...(assets ? { assets } : {}) };
   if (fetchedMs > 50) timings.assetsMs = fetchedMs;
-  const stages = await gateStages({ spec, stem, baseDir, directory, result, source });
-  validateStageContract(spec, stages);
-  await checkVariety({ spec, specPath, directory, result });
+  const pages = scope === "pages";
+  const stages = await gateStages({ spec, stem, baseDir, directory, result, source, pages });
+  if (!pages) validateStageContract(spec, stages);
+  if (!pages) await checkVariety({ spec, specPath, directory, result });
   transferHighlights(spec, stages);
-  const { deck, scenePath } = await composeScene({ spec, baseDir, directory, timings, result, stages });
+  const { deck, scenePath } = await composeScene({ spec, baseDir, directory, timings, result, stages, pages });
   if (only) await keepPages({ deck, stages, scenePath, result, only });
   // A revision that carries slides composes only the pages it gave a type: those are emitted and gated as a deck of their
   // own, and the deck the user receives is assembled from the source deck around them. A revision that composes no page
@@ -293,7 +303,7 @@ async function assembleRevision({ spec, stem, baseDir, directory, py, result, de
 }
 
 /** Each stage plan found beside the spec, gated with its report written and refused when rejected; returns the stages that were found. */
-async function gateStages({ spec, stem, baseDir, directory, result, source = null }) {
+async function gateStages({ spec, stem, baseDir, directory, result, source = null, pages = false }) {
   const stages = {};
   for (const [stage, suffix, run] of [["content", ".content.json", runContentGates],
                                       ["plan", ".plan.json", runPlanGates]]) {
@@ -304,12 +314,13 @@ async function gateStages({ spec, stem, baseDir, directory, result, source = nul
     if (parsed === null) { result.stages[stage] = { state: "absent", expectedAt: at }; continue; }
     if (stage === "content" && spec.workflow === "new_deck") parsed.textContract = "complete";
     // The deck's workflow and rules version decide which rules it predates.
-    const report = run(parsed, { required: stage === "content" && spec.workflow === "new_deck", deck: spec });
+    const report = run(parsed, { required: stage === "content" && spec.workflow === "new_deck", deck: spec, ...(pages ? { pages: true } : {}) });
     const reportAt = path.join(directory, `${stage}-gates.json`);
     await writeJson(reportAt, report);
     result.stages[stage] = { state: report.accepted ? "accepted" : "rejected", report: reportAt,
                              countsByCode: report.countsByCode ?? {} };
-    if (!report.accepted) {
+    // A page run's stage plans cover a part of the deck: their reports are kept, and the page findings in them are the compile's.
+    if (!report.accepted && !pages) {
       throw refuse(stage === "content" ? "CONTENT_REJECTED" : "PLAN_REJECTED", `${stage} gates rejected ${path.basename(at)}: `
         + `${JSON.stringify(report.countsByCode)}. See ${reportAt}.`, (report.findings || []).filter(isBlocking));
     }
@@ -367,7 +378,7 @@ function transferHighlights(spec, stages) {
 }
 
 /** Every page composed, audited against the spec and the content plan's text, and written as the scene and its planning record, with the claim ledger. */
-async function composeScene({ spec, baseDir, directory, timings, result, stages }) {
+async function composeScene({ spec, baseDir, directory, timings, result, stages, pages = false }) {
   // Every failing page reported in one run (compose-all.mjs).
   const planStarted = Date.now();
   const { deck, decisions } = composeAll(spec, baseDir);
@@ -375,10 +386,11 @@ async function composeScene({ spec, baseDir, directory, timings, result, stages 
   // rhythm, repetition and weakest page; a short one is a diagnostic.
   // The deck's length is every page it renders: the slides a revision carries are pages of it. Whether the rule is held on
   // this deck is the one decision every stage asks (weight.mjs notHeldOn): a refusal here is a refusal at the compile.
-  const pages = deck.slides.length + carriedCount(spec);
-  if (spec.purpose === "evaluation" && pages < EVALUATION_MIN_PAGES && !notHeldOn({ code: "EVALUATION_TOO_SHORT", measured: pages }, spec)) {
+  // A page run's deck is a part of the deck, and its length is the whole-deck run's to read.
+  const length = deck.slides.length + carriedCount(spec);
+  if (!pages && spec.purpose === "evaluation" && length < EVALUATION_MIN_PAGES && !notHeldOn({ code: "EVALUATION_TOO_SHORT", measured: length }, spec)) {
     // The page gates' code (gate_config.py COMPOSE_CODES), refused here before anything is emitted.
-    throw new RefusalError("EVALUATION_TOO_SHORT", `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${pages}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
+    throw new RefusalError("EVALUATION_TOO_SHORT", `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${length}. Widen the evidence, not the repetition, or drop purpose: "evaluation" for a diagnostic.`);
   }
   const contentAudit = auditContent(spec, deck);
   const textAudit = auditTextPlan(stages.content || {}, deck, { deck: spec });
