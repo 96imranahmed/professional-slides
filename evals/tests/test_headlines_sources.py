@@ -70,6 +70,35 @@ console.log(JSON.stringify({{ forms: citationForms(["b", "c", "a", "d"], reg, {{
         # With no primaries known (no measures name a source), the old floor stands: the count alone.
         self.assertEqual(result["bare"][-1], "Sources: 2 records, listed in the notes")
 
+    def test_a_ranking_of_members_each_from_its_own_report_keeps_the_titles_source_and_fits(self):
+        # fd01's case: ten groups' margins, each from its own results. Held as ten tied primaries, the line ran past every
+        # footer (NOTE_HEAVY on fd01, fd04, fd05, o01); the title's own source is the one a reader must find on the page.
+        result = run_node(f'''
+import {{ primaryCitations }} from '{RT}/gates/dependency_gates.mjs';
+import {{ citationForms }} from '{RT}/page-types.mjs';
+import {{ measureProblems, measureRegistry }} from '{RT}/measures.mjs';
+import {{ FOOTER_WORDS }} from '{RT}/page-template.mjs';
+import {{ textWords }} from '{RT}/text-contract.mjs';
+const members = Array.from({{ length: 10 }}, (_, i) => `Group ${{i}}`), keys = members.map((_, i) => `k${{i}}`);
+const reg = Object.fromEntries(keys.map((key, i) => [key, {{ name: `Group ${{i}} annual report and accounts 2025`, short: `Group ${{i}} FY2025 results`, date: "2026-02" }}]));
+const insight = (citeBy) => ({{ id: "i", cite: keys, measures: {{ margin: {{ unit: "%", population: "groups", period: "2025", members, values: members.map((_, i) => 5 + i), ...(citeBy ? {{ citeBy }} : {{}}) }} }} }});
+const page = {{ exhibit: {{ type: "chart.bar", basis: {{ measures: ["i/margin"] }} }} }};
+const titled = [{{ ref: "i/margin", label: "Group 3" }}];
+const run = (citeBy) => {{ const measured = measureRegistry([insight(citeBy)]), primary = primaryCitations(page, measured, titled), forms = citationForms(keys, reg, {{ primary }});
+  return {{ primary, last: forms.at(-1), words: textWords(forms.at(-1)) }}; }};
+console.log(JSON.stringify({{ by: run(Object.fromEntries(members.map((m, i) => [m, [keys[i]]]))), plain: run(null), max: FOOTER_WORDS,
+  problems: measureProblems(insight({{ "Group 3": ["k3"] }})), refused: measureProblems(insight({{ "Group 3": ["elsewhere"] }})).length }}));
+''')
+        self.assertEqual(result["by"]["primary"], ["k3"])
+        self.assertEqual(result["by"]["last"], "Sources: Group 3 FY2025 results, Feb 2026; +9 more in the notes")
+        self.assertLessEqual(result["by"]["words"], result["max"])
+        # Without `citeBy` the measure's ten keys say nothing of which holds the title's number: no primary is taken, and
+        # the first source stays named rather than the count alone.
+        self.assertEqual(result["plain"]["primary"], [])
+        self.assertEqual(result["plain"]["last"], "Sources: Group 0 FY2025 results, Feb 2026; +9 more in the notes")
+        self.assertEqual(result["problems"], [])
+        self.assertEqual(result["refused"], 1)
+
     def test_a_registry_date_must_be_a_date(self):
         result = run_node(f'''
 import {{ registryProblems }} from '{RT}/sources-registry.mjs';

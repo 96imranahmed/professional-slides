@@ -464,21 +464,33 @@ export function titleCells(page, title, bound, pool) {
  * The registry keys a page's source line names in every form the footer may
  * set it in (page-types.mjs citationForms): the sources of the measures the
  * title prints (`titled`, titleCells), then each exhibit's primary source -
- * the key most of the measures it plots cite, every key tied for most. Only
- * the rest may go to the notes as "+k more". On the BA retest eleven source
+ * the key most of the measures it plots cite, both where two tie, none
+ * where more do (a ranking whose every member is read from its own report
+ * has no one document behind it). Only the rest may go to the notes as "+k
+ * more"; the title's sources are always named. On the BA retest eleven source
  * lines deferred the whole citation: o01 and fd01 named a few sources and
  * sent ten and eleven to the notes, fd04 and fd05 printed only "N records,
  * listed in the notes", and a reader of the page could look up neither the
  * title's figures nor the chart's.
  */
+// The most keys an exhibit may hold as its primary sources when they tie: two records read together (a release and its
+// restatement, two halves of a year). Past that the exhibit has no primary of its own; the title's sources still stand.
+const PRIMARY_TIES_MAX = 2;
 export function primaryCitations(page, registry, titled = []) {
   const citeOf = (ref) => registry.get(ref)?.cite ?? [];
-  const title = titled.flatMap((cell) => citeOf(cell.ref));
+  // A title's number is one cell of its measure: the source of that cell where the measure records each cell's
+  // (`citeBy`), else the measure's own - where that is more than two records (a ranking's every member's report) it does
+  // not say which one holds this number, and none is taken for it.
+  const title = titled.flatMap((cell) => { const m = registry.get(cell.ref), own = m?.citeBy?.[String(cell.label ?? "")];
+    const keys = Array.isArray(own) ? own : citeOf(cell.ref); return keys.length > PRIMARY_TIES_MAX ? [] : keys; });
   const exhibits = [...exhibitsOf(page), ...metricsOf(page)].flatMap((item) => {
     const tally = new Map();
     for (const ref of refsOf(item.basis).filter((r) => registry.has(r))) for (const key of new Set(citeOf(ref))) tally.set(key, (tally.get(key) ?? 0) + 1);
     const most = Math.max(0, ...tally.values());
-    return [...tally].filter(([, n]) => most > 0 && n === most).map(([key]) => key);
+    const tied = [...tally].filter(([, n]) => most > 0 && n === most).map(([key]) => key);
+    // A ranking whose every member is read from its own report has no primary document: more than PRIMARY_TIES_MAX keys
+    // tied for most go with the secondaries. Held as primaries, fd01's ten groups' results ran no footer could fit.
+    return tied.length > PRIMARY_TIES_MAX ? [] : tied;
   });
   return [...new Set([...title, ...exhibits])];
 }

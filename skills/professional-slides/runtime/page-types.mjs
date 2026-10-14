@@ -1420,11 +1420,12 @@ export function citationOf(source, registry, id = "page") {
  * sources by name with the rest counted ("+3 more in the notes"), down to
  * the primaries alone. The primaries (`primary`, gates/dependency_gates.mjs
  * primaryCitations) are the sources of the numbers the title prints and each
- * exhibit's own - the one most of its plotted measures cite - and every form
+ * exhibit's own - the one most of its plotted measures cite, none where more
+ * than two tie - and every form
  * names them, first: on the BA retest the shortest forms named a few sources
  * or none ("+11 more in the notes", "14 records, listed in the notes") and a
  * reader of the page could look up neither the title's figures nor the
- * chart's. A page whose primaries are not known keeps the count alone. A
+ * chart's. A page with no measures to read them from keeps the count alone. A
  * source is named with the registry's `date` where it records one and the
  * name does not already carry it - the as-at date a reader needs. The footer
  * shows the first form that fits its lines and the words it has room for
@@ -1432,8 +1433,8 @@ export function citationOf(source, registry, id = "page") {
  * the footer's full line limit, and whatever it leaves out is kept whole in
  * the speaker notes. A citation typed as text has one form, the author's.
  */
-export function citationForms(keys, registry, { primary = [] } = {}) {
-  const held = keys.filter((key) => primary.includes(key));
+export function citationForms(keys, registry, { primary = null } = {}) {
+  const held = keys.filter((key) => (primary ?? []).includes(key));
   const first = held.length ? held : keys.slice(0, 1);
   const entries = [...first, ...keys.filter((key) => !first.includes(key))].map((key) => registry[key]);
   const label = entries.length > 1 ? "Sources" : "Source";
@@ -1447,12 +1448,14 @@ export function citationForms(keys, registry, { primary = [] } = {}) {
     return status && e.status ? `${dated} (${e.status})` : dated; };
   const named = (short, status, list = entries) => [...new Set(list.map((e) => nameOf(e, short, status)))];
   const brief = named(true, false), primaries = named(true, false, entries.slice(0, first.length));
-  // A page whose measures name no source of its own (a deck with no insight log, a typed list over unmeasured copy) keeps
-  // the old floor: the leading names counted down to the count alone, the list whole in the notes.
-  const floor = held.length ? primaries.length : 0;
+  // A page with no measures to read primaries from (`primary` null: a deck with no insight log) keeps the old floor: the
+  // leading names counted down to the count alone, the list whole in the notes. One whose measures name no primary - a
+  // title with no number, over a ranking of members each read from its own report - names its first source.
+  const known = Array.isArray(primary);
+  const floor = known ? Math.max(1, primaries.length) : 0;
   const counted = Array.from({ length: Math.max(0, brief.length - Math.max(floor, 1)) }, (_, i) => brief.length - 1 - i)
     .map((shown) => `${line(brief.slice(0, shown))}; +${brief.length - shown} more in the notes`);
-  return [...new Set([line(named(false, true)), line(named(true, true)), line(brief), ...counted, ...(held.length ? [] : [`${label}: ${entries.length} ${entries.length === 1 ? "record" : "records"}, listed in the notes`])])];
+  return [...new Set([line(named(false, true)), line(named(true, true)), line(brief), ...counted, ...(known ? [] : [`${label}: ${entries.length} ${entries.length === 1 ? "record" : "records"}, listed in the notes`])])];
 }
 
 /**
@@ -1487,7 +1490,7 @@ export function titleBandProblems(page, id, { rules = null, waived = waivedRules
  * rests on. A spine compile stops here; the exhibit and the copy are the full
  * compile's.
  */
-function spineOf(page, id, { insights = null, sources = null, rules = null, waived = new Set(), waivedAdvisories = [], sourcePrimary = [] } = {}) {
+function spineOf(page, id, { insights = null, sources = null, rules = null, waived = new Set(), waivedAdvisories = [], sourcePrimary = null } = {}) {
   const type = PAGE_TYPES[page.type];
   if (!type) throw new Error(`${id}: unknown page type "${page.type}"; one of ${Object.keys(PAGE_TYPES).join(", ")}`);
   for (const key of OWNED) if (page[key] !== undefined) throw new Error(`${id}: \`${key}\` is set by the page's choices, not written - choose \`commentary\`, \`form\` and \`takeaway\` instead`);
@@ -1720,7 +1723,7 @@ export function withChoice(page, form, commentary) {
  * last the cells. A blank total refused before the table is found too short
  * to be a table would be a fix made and then thrown away.
  */
-export function compilePage(pageIn, index = 0, { insights = null, players = null, spineOnly = false, sources = null, rules = null, tileMeasures = null, sourcePrimary = [] } = {}) {
+export function compilePage(pageIn, index = 0, { insights = null, players = null, spineOnly = false, sources = null, rules = null, tileMeasures = null, sourcePrimary = null } = {}) {
   if (!pageIn || typeof pageIn !== "object") throw new Error(`page ${index + 1} is not an object`);
   const page = structuredClone(pageIn);
   const id = page.id ?? `page-${index + 1}`;
@@ -2488,7 +2491,7 @@ export function describeTypes() {
     "Beyond one exhibit and a column: `parallel` form `labelled-rows` sets two to five `blocks` down the page, each a filled label with its bullets and an optional `metric` or small `exhibit` at the right; `panels` form `sequence` joins two or three headed exhibits with arrows (cause to effect, before to after).", "",
     "`why` - one sentence on why this type fits the claim.", "`settles` - { kind, what }, or `evidence` naming insight ids when there is an insight log (then `settles` is derived from them). A chart or table page is settled by a count, share, rank, rate, sequence, comparison or structure, never `qualitative`.", "",
     "Numbers by reference - where the insight log records measures, a page names the measure and the runtime writes the number: an exhibit's `series: [{ measure: \"<insight id>/<measure>\", name }]` takes its categories, values, unit and basis from the measures (`select: { from, to }`, `{ periods }` or `{ members, order }` narrows the axis; a series naming a recorded measure and then a scenario's path is one line with the assumed run bracketed); a metric, a `kpi`, a row block's `metric` or a fact-grid item is `{ measure, format, label }` (`format` \"+0.0%\", \"CHF 0.0bn | /1000\"); and `{{<insight id>/<measure>@<period or member> | 0.0}}` in any text prints that number. A series that is context beside the claim's own says so itself (`{ measure, role: \"context\", relevance }`); a table whose every measurement is a token, or a grid whose every figure is bound, needs no `basis`. Typed numbers stay allowed: an exhibit's with its `basis`, checked against the measure, and a number typed into text is traced to the measures the page rests on (NUMBER_UNTRACED, advised).", "",
-    "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, short, url, status, date } }` beside `deck` and `pages`), set as \"Source: name, date (status); name\" - `date` when the record was published or stands as at (\"2025-08-04\", \"2025-08\", \"2025\"), printed where the name does not carry it. A citation written from keys is fitted by the runtime to the footer's lines and to the words the footer has room for under NOTE_HEAVY, which counts the footer as drawn - `short` names, then the statuses dropped, then the secondary sources counted as \"+k more in the notes\", the full list kept in the speaker notes. Every form names the sources of the numbers the title prints and each exhibit's primary source (the one most of its plotted measures cite), and the last runs to the footer's full line limit; where even those do not fit, the page is refused - give them `short` names, or split the exhibit. A citation typed as text is the author's and is held to the footer's lines.", "",
+    "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, short, url, status, date } }` beside `deck` and `pages`), set as \"Source: name, date (status); name\" - `date` when the record was published or stands as at (\"2025-08-04\", \"2025-08\", \"2025\"), printed where the name does not carry it. A citation written from keys is fitted by the runtime to the footer's lines and to the words the footer has room for under NOTE_HEAVY, which counts the footer as drawn - `short` names, then the statuses dropped, then the secondary sources counted as \"+k more in the notes\", the full list kept in the speaker notes. Every form names the sources of the numbers the title prints and each exhibit's primary source (the one most of its plotted measures cite; an exhibit where more than two tie, a ranking of members each read from its own report, has none, and its sources are counted with the rest), and the last runs to the footer's full line limit; where even those do not fit, the page is refused - give them `short` names, or split the exhibit. A citation typed as text is the author's and is held to the footer's lines.", "",
     `\`subtitle\` - optional, on any analytical page: one line under the title (${SUBTITLE_WORDS} words at most) naming what the title leaves out - the measure and unit, the population, the period or the scope. It is set small above the title rule and counts with the title, not the body; it must not restate the title.`, "",
     "`node runtime/author-deck.mjs --example <type>` prints a worked page of any type; `--scaffold <type> [--evidence <insight-id>]` prints a page of that type that compiles, with the insight's measures named in its exhibit, to fill in.", "",
     "`highlight` - on a page with commentary points, a list with the phrase from each point the reader should see first (or `highlight` on the point). A point left unmarked is marked on its own figure (its first percentage, amount or count); a point with no figure is named in the advisories (POINT_UNMARKED). It is set in the accent wherever the page writes it - points, paragraphs, a rail or side panel, the bar or takeaway, captions, and table, matrix and comparison cells; a phrase that is only in the title, a heading or a callout is refused.", "",

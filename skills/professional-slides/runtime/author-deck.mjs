@@ -339,7 +339,7 @@ export function compileDeck(docIn, { insights = null, draft = false, partial = f
     let slide;
     const { page: authored, dependencies } = withoutDependencies(page, measured, binding.bound.printed.get(page));
     // The sources every form of the page's source line names (dependency_gates.mjs primaryCitations): the title's numbers' and each exhibit's own.
-    const sourcePrimary = measured.size ? primaryCitations(page, measured, titleCells(page, unbound[index]?.title, binding.bound, pagePool(page, measured))) : [];
+    const sourcePrimary = measured.size ? primaryCitations(page, measured, titleCells(page, unbound[index]?.title, binding.bound, pagePool(page, measured))) : null;
     try { slide = compilePage(authored, index, { ...options, tileMeasures: tileMeasures(unbound[index], page, measured), sourcePrimary }); } catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
     // Every key checked now, on every page, rather than one at a time by the build.
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));

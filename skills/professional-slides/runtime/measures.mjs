@@ -172,6 +172,11 @@ export function measureProblems(insight) {
     // A measure may be cited on its own, where its insight draws on several sources and this number on one of them.
     for (const field of ["cite", "sources"]) if (m[field] !== undefined && !(Array.isArray(m[field]) && m[field].length && m[field].every((entry) => typeof entry === "string" && entry.trim())))
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
+    // Where each member or period of a measure comes from its own record - a ranking of groups, each from its own results -
+    // `citeBy` says which: the source line then names the one behind the number the title prints (dependency_gates.mjs primaryCitations).
+    if (m.citeBy !== undefined && !(m.citeBy && typeof m.citeBy === "object" && !Array.isArray(m.citeBy) && Object.entries(m.citeBy).every(([label, keys]) => axis.labels.includes(label)
+      && Array.isArray(keys) && keys.length && keys.every((key) => typeof key === "string" && key.trim() && (m.cite ?? insight.cite ?? []).includes(key)))))
+      problems.push(`${at}: \`citeBy\` is { "<period or member>": ["<registry key>"] } - for a ${axis.kind === "periods" ? "period" : "member"} the measure records, the keys of its \`cite\` (or its insight's) that hold that value - or left out`);
     if (m.assumed !== undefined && m.assumed !== true) problems.push(`${at}: \`assumed\` is true for a number that is an assumption rather than a record, or left out`);
     // A plan, a target, a forecast or an announced rate is published before the periods it is for (sources-registry.mjs sourceAgeProblems).
     if (m.projected !== undefined && m.projected !== true) problems.push(`${at}: \`projected\` is true for values a source set out ahead of their periods - a plan, a target, a forecast, an announced rate - or left out`);
