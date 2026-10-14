@@ -174,6 +174,14 @@ class KindAllocationTests(unittest.TestCase):
         self.assertIn("against a floor of 49", run.stdout)
         self.assertIn("allocation", part)
 
+    def test_a_stack_is_given_only_to_the_parts_of_a_whole(self):
+        # The finance fixture's insights are series, not parts of one whole: stacked, they print a total that means nothing.
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = sectioned(tmp, A_HOLDS, B_HOLDS, {"budget": 30}, {"budget": 30})
+            run = author(pages, "--allocate")
+        for kind in ("chart.stacked-column", "chart.stacked-bar", "chart.stacked-area", "chart.marimekko"):
+            self.assertNotIn(f"{kind} (", run.stdout)
+
     def test_a_form_that_sets_the_numbers_aside_is_never_given(self):
         # Logos, people and cards draw no measure: given to an insight with numbers, they add a kind by losing the evidence.
         with tempfile.TemporaryDirectory() as tmp:

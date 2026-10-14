@@ -31,6 +31,8 @@ import { includedParts, partHomes, partsOf } from "./pages-file.mjs";
 
 // The section a page written in the pages file itself belongs to, beside the part files.
 export const ROOT_SECTION = "(the pages file)";
+// The kinds that add their series into one whole (deck-structure.mjs STACKS, with the stacked area).
+const STACKED = new Set(["chart.stacked-column", "chart.stacked-bar", "chart.stacked-area", "chart.marimekko"]);
 // The page types the allocation never gives out (kindReach).
 const UNGIVEN = new Set(["summary", "picture"]);
 // The insights a kind is proven from in one section: enough that each insight can be given one kind and the rest still placed.
@@ -145,7 +147,9 @@ export function kindReach(doc, insights, { fills = null, homes = evidenceHomes(d
         let slide = null;
         try { slide = declaredSlide({ ...page, commentary: placementsOf(type, form)[0] }, 0, { exhibitType: evidenceExhibits(page, insights, featured), players, stubs: stubsOf(page, insights) }); } catch { slide = null; }
         // The kinds the deck counts are the exhibits' (VARIETY_EXHIBIT_RANGE); the form's own drawing is read only for what it hides.
-        const kinds = [...new Set(slide ? exhibitKinds(slide) : [])];
+        // A stack adds its series into one whole, so it is given only to evidence recorded as the parts of one (shape `mix`): a
+        // series of shares of different populations, or a revenue beside a profit, stacks into a total that means nothing.
+        const kinds = [...new Set(slide ? exhibitKinds(slide) : [])].filter((kind) => !STACKED.has(kind) || insight.shape === "mix");
         const fresh = kinds.filter((kind) => (proofs.get(kind) ?? new Set()).size < PROOFS && !(proofs.get(kind) ?? new Set()).has(id));
         if (!fresh.length) continue;
         // An insight with numbers is given only a form that draws them: one that sets them aside (people, logos, a memo) adds a
