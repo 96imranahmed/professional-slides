@@ -115,7 +115,7 @@ A value label a reference line runs through stays on its column: the chart nudge
 
 - `valueBreak: { from, to }` on a bar or column chart, stacked or not, cuts that run of the value axis, so one mark ten times its neighbours keeps its place without flattening the rest. Each mark that crosses the cut carries a slanted gap, and every value stays printed.
 - A broken axis takes no value axis or gridlines. A mark ending inside the cut, a cut no mark crosses, and a reference or band at or past the cut are refused.
-- `categoryBreaks: ["FY10", "FY15"]` draws a "//" on the category axis after each named category, for periods that are not adjacent. A column chart of dates at uneven gaps broken at every gap passes `TIME_AXIS_UNEVEN`, as one headed "selected years" does.
+- `categoryBreaks: ["FY10", "FY15"]` draws a "//" on the category axis after each named category, for periods that are not adjacent. Columns over uneven dates stand where the dates fall; under a data table, or broken at some gaps and not others, the runtime breaks the axis after every long gap.
 
 **Marks on groups and labels:**
 

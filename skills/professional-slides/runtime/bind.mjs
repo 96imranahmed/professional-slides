@@ -774,6 +774,9 @@ function bindExhibit(ex, what, context) {
   if (shaped === undefined) {
     if (bySeries) ex.series = named.map(({ measure: _measure, role: _role, relevance: _relevance, state: _state, assumedFrom: _from, ...rest }, i) => ({ ...rest, name: seriesNames[i], ...(perSeries ? { unit: rest.unit ?? series[i].unit } : {}), values: values[i], ...states[i] }));
     else ex.values = values[0];
+    // A waterfall bound to one measure reads its members as the opening total, the steps and the closing total: its first
+    // and last bars stand on the axis, not on the running sum.
+    if (!bySeries && drawnAs === "chart.waterfall" && ex.totals === undefined && labels.length >= 3) ex.totals = [0, labels.length - 1];
     // A pie or a donut names its slices in `labels`; every other chart its axis in `categories`.
     ex[!bySeries && /pie|donut/.test(String(ex.type ?? page.form ?? "")) ? "labels" : "categories"] = labels;
   }

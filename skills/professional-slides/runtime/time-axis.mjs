@@ -153,15 +153,14 @@ export function spacedLabelIndices(xs, minGap) {
 }
 
 /**
- * Whether every gap longer than the axis's step is marked by a break after
- * the category before it (`categoryBreaks`): such an axis says outright that
- * it skips, so the reader sees no rhythm the dates do not have.
+ * The categories a dated run breaks after: each whose next date lies further off than the run's shortest step, so an axis
+ * that sets the dates one slot apart says outright where it skips.
  */
-export function gapsBroken(categories, breaks = []) {
+export function gapBreaks(categories) {
   const times = periodTimes(categories);
-  if (!times || !Array.isArray(breaks) || !breaks.length) return false;
-  const step = Math.min(...times.gaps), marked = new Set(breaks.map(String));
-  return times.gaps.every((gap, at) => gap - step < 0.01 || marked.has(String(categories[at])));
+  if (!times) return [];
+  const step = Math.min(...times.gaps);
+  return times.gaps.flatMap((gap, at) => (gap - step < 0.01 ? [] : [String(categories[at])]));
 }
 
 /**

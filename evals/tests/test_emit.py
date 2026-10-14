@@ -160,6 +160,19 @@ class NativeChartLabelTests(unittest.TestCase):
             self.assertTrue(any(l.find(qn('c:idx')).get('val')=='0' and l.find(qn('c:delete')).get('val')=='1' for l in labels))
 
 
+    def test_native_value_labels_are_set_on_one_line(self):
+        """Spacebar run: LibreOffice wrapped "269,979" on a narrow waterfall bar at its separator, and the saved page lost the number."""
+        for kind in ('column', 'stacked-column'):
+            scene=scene_fixture()
+            spec=scene['slides'][0]['componentInstances'][0]['nativeChart']
+            spec.update(type=kind,categories=['A','B'],series=[{'name':'First','values':[269979,2]},{'name':'Second','values':[4,3]}][:1 if kind=='column' else 2])
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/'labels.pptx';Emitter(scene).run(path)
+                chart=next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
+                bodies=[b for b in chart._chartSpace.iter(qn('a:bodyPr')) if b.getparent().getparent().tag in (qn('c:dLbls'),qn('c:dLbl'))]
+                self.assertTrue(bodies,kind)
+                self.assertEqual({b.get('wrap') for b in bodies},{'none'},kind)
+
 @needs_pptx
 class NativeChartExportTests(unittest.TestCase):
     """A chart compiled to go native keeps its axis, colours and shares in the saved file."""

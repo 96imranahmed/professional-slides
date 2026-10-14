@@ -91,6 +91,21 @@ console.log(JSON.stringify({
         self.assertEqual(result["rule"], [25] * 6)  # a measure of one value is a rule across the plot
         self.assertTrue(result["untouched"])  # a page that binds nothing is the author's own object
 
+    def test_a_waterfall_bound_to_one_measure_stands_its_opening_and_closing_totals_on_the_axis(self):
+        """Spacebar run: a bridge bound to its measure drew the opening and closing totals as two more floating steps,
+        and only `totals` typed by hand set them on the axis. The first and last members of a bridge are its totals."""
+        result = run_node(LOG + '''
+insights.set('i-bridge', { ...graded, id: 'i-bridge', shape: 'fact', sources: ['sources/c.csv'], cite: ['annual-report'], measures: {
+  walk: { unit: 'GBP m', population: 'the company', period: 'FY25 to FY26', members: ['FY25 profit', 'Volume', 'Price', 'Costs', 'FY26 profit'], values: [40, 6, 3, -4, 45] } } });
+const bridge = (ex) => exhibitOf({ heading: 'Profit, FY25 to FY26', measure: 'i-bridge/walk', ...ex }, { type: 'bridge', form: 'waterfall', evidence: ['i-bridge'],
+  settles: { kind: 'composition', what: 'what moved profit between the years', measures: ['i-bridge/walk'] } });
+console.log(JSON.stringify({ bound: bridge({}), kept: bridge({ totals: [0] }).totals }));
+''')
+        self.assertEqual(result["bound"]["categories"], ["FY25 profit", "Volume", "Price", "Costs", "FY26 profit"])
+        self.assertEqual(result["bound"]["values"], [40, 6, 3, -4, 45])
+        self.assertEqual(result["bound"]["totals"], [0, 4])
+        self.assertEqual(result["kept"], [0])  # totals the page names are its own
+
     def test_a_trellis_of_stacks_is_written_by_hand_and_a_donut_trellis_binds(self):
         # A stacked panel draws several parts, and a measure a panel fills one: written as single-value panels the stacked
         # mark would refuse them with no word of why. A donut's panel is one measure shared out over its members.

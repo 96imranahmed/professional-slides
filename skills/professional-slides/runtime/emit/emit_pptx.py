@@ -699,6 +699,11 @@ class Emitter:
             self._plot_labels(plot, spec, number_format)
         for i, ser in enumerate(plot.series):
             self._style_series(ser, i, spec, number_format, decimals)
+        # A value label is one number on one line. Wrapped, LibreOffice breaks a value on a narrow mark at its separator
+        # ("269," over "979", the Spacebar waterfall) and the saved page no longer reads the number the scene drew.
+        for body in chart._chartSpace.iter(qn("a:bodyPr")):
+            if body.getparent().tag == qn("c:txPr") and body.getparent().getparent().tag in (qn("c:dLbls"), qn("c:dLbl")):
+                body.set("wrap", "none")
         if kind == "donut" and spec.get("center"):
             self._donut_center(slide, f, spec, instance)
         self.stats["native_charts"] += 1

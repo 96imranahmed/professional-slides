@@ -27,7 +27,7 @@ import { measureInsight } from "./registry-text.mjs";
 import { calloutFits, calloutCapacity, countInWords } from "./chart-annotations.mjs";
 import { sideStatementLayout } from "./figures.mjs";
 import { hasPhrase, measureText } from "./text-layout.mjs";
-import { timePositions, describeGaps, isPeriodLabel, readablePeriod, gapsBroken } from "./time-axis.mjs";
+import { isPeriodLabel, readablePeriod } from "./time-axis.mjs";
 import { sourceDate } from "./sources-registry.mjs";
 import { columnQuestion } from "./compose-tables.mjs";
 import { halvesProblems } from "./compose-layouts.mjs";
@@ -837,7 +837,6 @@ function checkBlocks(page, id, exhibits) {
 // Defects a whole-deck review finds, refused here where the page is written
 // rather than left for the review to find.
 const BLANK = /^[\s\-–—]*$/;
-const COLUMN_CHARTS = new Set(["chart.column", "chart.stacked-column", "chart.combo"]);
 // What a heading, a column, a row label or a set of paragraphs means is read,
 // not matched against a list of words: each rule below that turns on it asks
 // its question of a model once (judgements.mjs, judgement-kinds.json) and
@@ -859,7 +858,6 @@ const REVIEW_RULES = [
   ["TABLE_STACK", "two or more tables set one above another (panels form stack, or in both rows of a grid)", "one table with the members as columns, or one table with the other evidence as a chart or a strip of numbers beside or above it; tables side by side in a row pass"],
   ["COMPARISON_MEASURES_DIFFER", "panels headed by different declared players, each on a measure of its own", "one panel per measure, the players as its bars or series"],
   ["TOTAL_ROW_BLANK", "a table row that closes the table as a total (`style: \"total\"`, or a label that reads as one) with nothing in its result cells", "a measure table adds its own total only where a column sums, and `total: true` where none does is refused"],
-  ["TIME_AXIS_UNEVEN", "a column chart of four or more dates at uneven gaps, whose heading does not tell the reader they are chosen dates", "a line or an area spaces dated categories by the time between them, so draw the series as one, say \"snapshots\" or \"selected years\" in the heading, or break the axis at each gap (`categoryBreaks`)"],
   ["VERDICT_TABLE_PLAIN", "on a lookup, options or matrix page, a column whose cells judge each row - who leads, a verdict, a rating, a status - in plain words", "give it a `type`: rag, harvey, check, lights, dot, or use a scorecard"],
   ["SCENARIO_PROSE", `two to four alternatives (scenarios, options, paths) the reader is to compare, as paragraphs of ${SCENARIO_WORDS} words or more each`, "set them as options, labelled rows or a table of trigger, who captures the value, the test, the counter-signal"],
   ["PROSE_PARAGRAPH_LONG", `a paragraph of more than ${PROSE_PARAGRAPH_MAX} words`, "two led paragraphs, each its own claim"],
@@ -1054,22 +1052,6 @@ function reviewedDefect(page, id, exhibits, skip = new Set()) {
   const total = !skip.has("TOTAL_ROW_BLANK") && [...tables.map((ex) => [ex.rows, ex.columns]), page.type === "matrix" ? [page.rows, page.columns] : [null]].map(([rows, headers]) => blankTotal(rows, headers, id)).find(Boolean);
   if (total) return `${id}: TOTAL_ROW_BLANK - the row "${total.label}" closes the table as a total with no value in any result cell; a total row carries its computed total - or delete it. ` +
     "Totals belong only where the columns share a basis (counts, amounts); `total: true` on a measure table sums the columns that add up";
-  for (const chart of exhibits.flatMap(chartsIn)) {
-    // Three columns are a comparison of chosen years (FY19, FY22, FY26: before,
-    // trough, now); four or more read as a series, and the eye reads the rhythm.
-    if (skip.has("TIME_AXIS_UNEVEN") || !COLUMN_CHARTS.has(chart?.type) || (chart.categories || []).length < 4 || !timePositions(chart.categories)) continue;
-    // Columns over uneven dates are drawn where the dates fall (chart-categorical.mjs rowLabelling): only a data table's
-    // columns and an axis that marks breaks keep one slot a column, and only those can draw a rhythm the dates do not have.
-    // On ba5 four panels pages were refused for columns the renderer was already spacing by time.
-    if (!chart.categoryColumns && !(chart.categoryBreaks || []).length) continue;
-    // An axis broken (`categoryBreaks`) after every category its next date does not follow says it skips, as a heading would.
-    if (gapsBroken(chart.categories, chart.categoryBreaks)) continue;
-    // A heading may tell the reader the columns are chosen dates (heading-says-snapshots); one that says nothing does not.
-    const told = { heading: String(chart.heading ?? "").trim(), unit: String(chart.unit ?? "").trim() };
-    const series = !told.heading && !told.unit ? true : judged("heading-says-snapshots", told, { categories: chart.categories.map(String) }, id)?.verdict === "reads-as-series";
-    if (series) return `${id}: TIME_AXIS_UNEVEN - the columns ${chart.categories.slice(0, 4).join(", ")}, ... are dated ${describeGaps(chart.categories)} apart but a column chart sets them one slot apart, so the reader sees a rhythm the dates do not have. ` +
-      "Plot the series as a line or an area (the runtime spaces dated points by the time between them), fill in the missing periods, or say in the heading that the columns are snapshots (\"selected years\", \"snapshots\")";
-  }
   const prose = proseDefect(page, id, skip);
   if (prose) return prose;
   if (["lookup", "options", "matrix"].includes(page.type) && !skip.has("VERDICT_TABLE_PLAIN")) {

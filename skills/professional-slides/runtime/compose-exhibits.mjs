@@ -7,6 +7,29 @@ import { SIZE, HUG } from "./compose-body.mjs";
 import { imageProps, resolveMediaRefs } from "./compose-pictures.mjs";
 import { styleTable } from "./compose-tables.mjs";
 
+const STACKED = new Set(["chart.stacked-column", "chart.stacked-bar"]);
+
+/**
+ * A stacked chart prints each stack's total unless the author turns it off (`stackTotals: false`): the reader should not
+ * have to add the segments to compare the bars. A stack of shares (`percent`, or stacks all one height), one with a
+ * negative part, a single series or labels switched off keeps what the author wrote. A stack with totals is drawn rather
+ * than set as a native chart (core.mjs nativeChartSpec), which has no total label. Totals computed here give way where the chart cannot be laid out
+ * with them (chart-categorical.mjs categoricalChart), so a callout the page wrote above a stack keeps its place.
+ */
+export function withStackTotals(ex) {
+  if (!ex || !STACKED.has(ex.type)) return ex;
+  if (ex.stackTotals === false) { const { stackTotals: _off, ...rest } = ex; return rest; }
+  const series = Array.isArray(ex.series) ? ex.series : [], categories = Array.isArray(ex.categories) ? ex.categories : [];
+  if (ex.stackTotals !== undefined || ex.percent || ex.dataLabels === false || series.length < 2 || !categories.length) return ex;
+  if (!series.every((s) => Array.isArray(s?.values) && s.values.length === categories.length && s.values.every((v) => Number.isFinite(v) && v >= 0))) return ex;
+  // Summed at the places the segments are written to, so 0.1 and 0.2 stand as 0.3.
+  const places = Math.min(10, Math.max(0, ...series.flatMap((s) => s.values.map((v) => (String(v).split(".")[1] || "").length))));
+  const totals = categories.map((_, at) => Number(series.reduce((sum, s) => sum + s.values[at], 0).toFixed(places)));
+  // Stacks of one height - shares of each answer, each summing to 100 within the segments' rounding - have no total to compare.
+  if (Math.max(...totals) - Math.min(...totals) <= (series.length * 10 ** -places) / 2) return ex;
+  return { ...ex, stackTotals: categories.map((category, at) => ({ category, value: totals[at] })), stackTotalsComputed: true };
+}
+
 /** Aliases that resolve to a table: compare (two headed columns), phase-table (chevron header, row labels), rows (label + text). */
 function tableAlias(ex) {
   if (ex.type === "compare") {
@@ -137,7 +160,7 @@ export function exhibitItem(exIn, id, baseDir, size = SIZE) {
         size: captionHeight ? { width: { fr: 1 }, height: captionHeight } : HUG }] };
   }
   const typeStep = exIn?._typeStep === true && size.height === "fill";
-  const ex = tableAlias(exIn);
+  const ex = withStackTotals(tableAlias(exIn));
   const { type, layout: _l, _typeStep: _t, _densityChosen: _d, ...rest } = ex;
   if (type === "image") return { id, component: "image-frame", props: { ...imageProps(ex.path ? ex : ex.image, baseDir), ...(ex.fit ? { fit: ex.fit } : {}) }, size };
   if (type === "cards" || type === "quadrants") {

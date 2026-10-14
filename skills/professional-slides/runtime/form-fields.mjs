@@ -289,7 +289,7 @@ export const MARKS = Object.freeze({
   bands: "[{ from, to, label?, style?: tint|box, axis?: value|category }] <= 3 - a value range or a run of categories",
   intervals: "[{ low: (number|null)[], high: (number|null)[], label? }] <= 3 - a scenario range or fan",
   valueBreak: "{ from, to } - a cut in the value axis",
-  categoryBreaks: "[category, ...] - a // after each, for periods that are not adjacent (TIME_AXIS_UNEVEN)",
+  categoryBreaks: "[category, ...] - a // after each, for periods that are not adjacent; columns over uneven dates under a data table, or broken at some gaps, are broken at every long gap",
   groupBrackets: "[{ categories: 2+ contiguous, label?, value?: sum|share|none }] <= 3",
   valueLabels: "[{ category, series?, display? (<= 12 characters, an estimate), estimate?, ring? }] - a value said another way",
   segmentGrowth: "{ from, to, label? } | list <= 3 - a growth column per segment",

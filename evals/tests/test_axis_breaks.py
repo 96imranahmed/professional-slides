@@ -79,7 +79,7 @@ console.log(JSON.stringify({
 
 
 class CategoryBreakTests(unittest.TestCase):
-    def test_chosen_years_broken_at_each_gap_pass_the_uneven_axis_rule(self):
+    def test_chosen_years_are_broken_at_every_long_gap_the_page_leaves_unmarked(self):
         run_node(PRELUDE + """
 const page = { id: 'p', type: 'trend', form: 'column', commentary: 'on-exhibit', takeaway: false, why: 'Journeys at chosen years, the gaps between them marked',
   settles: { kind: 'rate', what: 'annual journeys at FY10, FY19 and FY22 to FY26' }, adds: 'The change arrow gives the rate the columns imply',
@@ -87,7 +87,11 @@ const page = { id: 'p', type: 'trend', form: 'column', commentary: 'on-exhibit',
   exhibit: { categories: ['FY10', 'FY15', 'FY19', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'],
     series: [{ name: 'Journeys', values: [24, 33, 40, 42, 45, 46, 47, 48] }], change: { from: 'FY10', to: 'FY26' } } };
 assert.doesNotThrow(() => compilePage(page), 'unmarked, the columns are drawn where the dates fall (chart-categorical.mjs rowLabelling)');
-assert.throws(() => compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15'] } }), /TIME_AXIS_UNEVEN/, 'one gap left unmarked still does');
+// One gap left unmarked on an axis broken at the others: the runtime breaks it too, as it does under a data table.
+const partial = compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15'] } });
+const after = (nodes) => nodes.filter((n) => n.role === 'chart-break').map((n) => n.data.after);
+assert.deepEqual(after(render('chart.column', { ...partial.exhibit, change: undefined })), ['FY10', 'FY15', 'FY19']);
+assert.deepEqual(after(render('chart.column', { ...page.exhibit, change: undefined, categoryColumns: { label: 80 } })), ['FY10', 'FY15', 'FY19'], 'a data table under the columns');
 const slide = compilePage({ ...page, exhibit: { ...page.exhibit, categoryBreaks: ['FY10', 'FY15', 'FY19'] } });
 const nodes = render('chart.column', { ...slide.exhibit, change: undefined });
 assert.equal(nodes.filter((n) => n.role === 'chart-break-mark').length, 6, 'two strokes a break');

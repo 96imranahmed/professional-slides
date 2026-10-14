@@ -205,18 +205,6 @@
     "concludes"
    ]
   },
-  "heading-says-snapshots": {
-   "version": 1,
-   "asks": "Does this chart heading or unit tell the reader that its columns are separate snapshots at chosen dates rather than an evenly spaced series?",
-   "subject": "the chart's heading and unit; the context is its categories",
-   "verdicts": {
-    "says-snapshots": "the reader is told the columns are chosen dates",
-    "reads-as-series": "nothing tells the reader the gaps between the columns differ"
-   },
-   "quoteFor": [
-    "says-snapshots"
-   ]
-  },
   "heading-states-result": {
    "version": 1,
    "asks": "Does this chart heading or unit state a result the chart shows - a value, a change, a share, a rank reached - rather than only name the measure, its population, its period or its scale?",

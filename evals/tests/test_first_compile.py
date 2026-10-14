@@ -250,15 +250,14 @@ console.log(JSON.stringify({ heat: await read('scorecard/heatmap'), table: await
 
 
 class EveryRefusalTests(unittest.TestCase):
-    def test_a_page_with_three_defects_hears_all_three_in_one_compile(self):
+    def test_a_page_with_two_defects_hears_both_in_one_compile(self):
         """A page's rules each returned their first refusal, so an axis that skips years, value labels turned off and a
-        so-what bar left unwritten took three compiles to hear (the BA run). They are three independent mends: said in
-        one message, in the order the checks find them, the first keeping its `<id>: CODE - ` head. Two tables stacked
+        so-what bar left unwritten took three compiles to hear (the BA run); the runtime now breaks the axis itself. The
+        other two are independent mends: said in one message, in the order the checks find them. Two tables stacked
         that are each too short are two reasons of one rule, asked past each other; and a page with nothing wrong but
         what the compile waives for a revision is not refused."""
         result = run_node(WORKED + '''
 const page = structuredClone(worked.pages.find((p) => p.id === 'f-trend-column'));
-page.exhibit.categories = ['FY15', 'FY16', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY26']; page.exhibit.categoryBreaks = ['FY16'];  // FY23-FY26 left unmarked on a broken axis
 delete page.exhibit.heading; delete page.exhibit.unit;
 page.exhibit.dataLabels = false; page.bar = 'Too short';
 const failed = (pages, deck = {}) => compileDeck(deckOf(pages, deck), { partial: true }).failed.map((f) => [f.stage ?? null, f.message]);
@@ -266,13 +265,12 @@ const short = (heading, columns) => ({ type: 'table', heading, columns, rows: [[
 const stacked = { ...worked.pages.find((p) => p.type === 'panels' && p.form === 'row'), form: 'stack', commentary: 'none', exhibit: undefined,
   exhibits: [short('Trains a day', ['Line', 'Trains']), short('Staff on shift', ['Depot', 'Staff'])] };
 const labelsOff = structuredClone(worked.pages.find((p) => p.id === 'f-trend-column')); labelsOff.exhibit.dataLabels = false;
-console.log(JSON.stringify({ three: failed([page]), stacked: failed([stacked]), waived: failed([labelsOff], { workflow: 'existing_deck_revision', rulesVersion: 2 }) }));
+console.log(JSON.stringify({ two: failed([page]), stacked: failed([stacked]), waived: failed([labelsOff], { workflow: 'existing_deck_revision', rulesVersion: 2 }) }));
 ''')
-        [[stage, message]] = result["three"]
+        [[stage, message]] = result["two"]
         self.assertEqual(stage, "evidence")
-        self.assertTrue(message.startswith("f-trend-column: TIME_AXIS_UNEVEN - "), message)
-        self.assertIn(". Also refused on this page, so mend it in the same edit: the column switches its value labels off", message)
-        self.assertIn('; and commentary "so-what-bar" closes the page on the implication', message)
+        self.assertTrue(message.startswith("f-trend-column: the column switches its value labels off"), message)
+        self.assertIn('. Also refused on this page, so mend it in the same edit: commentary "so-what-bar" closes the page on the implication', message)
         [[_, message]] = result["stacked"]
         self.assertIn(": TABLE_STACK - 2 tables are set one above another", message)
         self.assertIn("Also refused on this page, so mend it in the same edit: TABLE_TOO_SHORT - a table of 2 rows", message)

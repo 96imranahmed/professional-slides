@@ -61,7 +61,6 @@ export const VARIETY_CODES = Object.freeze({
   TABLE_PANELS_MERGE: "two tables on one page with the same columns, which read as one table split in two - on different measures, nothing reads across",
   TABLE_STACK: "two or more tables set one above another on a page, so the reader holds one grid in mind while reading the next",
   COMPARISON_MEASURES_DIFFER: "panels headed by different players, each on its own measure, so nothing reads across",
-  TIME_AXIS_UNEVEN: "a column chart whose dated categories are unevenly spaced in time but drawn one slot apart",
   VERDICT_TABLE_PLAIN: "a lookup, options or matrix table whose judgement column (lead, verdict, confidence, status) is plain text",
   SCENARIO_PROSE: "two to four alternatives written as paragraphs of sixty words or more each",
   PROSE_PARAGRAPH_LONG: "a paragraph of more than sixty words, longer than a strong deck sets one block",
