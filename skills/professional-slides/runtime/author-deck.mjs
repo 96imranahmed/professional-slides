@@ -1059,8 +1059,9 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   // The kind the deck's plan gives each untyped stub is the whole deck's to give (openKindsByPage): a page run reads it off the whole deck.
   const open = scope ? openKindsByPage(whole, insights, sourceKinds) : null;
   const { spec, spineFindings: spineRules, bindingFindings, unmapped: waiting, failed, witness } = compileDeck(doc, { insights, draft, partial: true, baseDir, sourceKinds, openKinds: open });
-  // The rules on the spine are read over the whole deck (deckSpineFindings): a page run's are the whole-deck run's.
-  const spineFindings = scope ? [] : spineRules;
+  // The rules on the spine are read over the whole deck (deckSpineFindings): a page run's are the whole-deck run's, but for
+  // those it holds that name one of its pages - what a page builds on against the insights the part files hold.
+  const spineFindings = scope ? spineRules.filter((f) => heldOnPageRun(f) && namesOneOf(f, pages)) : spineRules;
   // What each page composed where a slide stood keeps of that slide - its title, its source line - checked against the inventory
   // and recorded on the page: those are the user's, and the rules that judge them advise there (revision.mjs stampKept).
   stampKept(spec, imported);

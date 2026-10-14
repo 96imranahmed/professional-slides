@@ -46,6 +46,9 @@ export const PAGE_RUN_HOLDS = Object.freeze({
   BRIDGE_UNRECONCILED: "what two pages print that is said to add up and does not",
   PROOF_REPEATS: "a proof an earlier page already gave, read off the bases each page declares and the measures they bind",
   SPINE_LOCKED: "the page's own argument and its place in the deck's order as declared, against the storyline the critique closed",
+  // A page's own evidence against the insights each part file declares it holds (allocation.mjs): no other page is read.
+  EVIDENCE_ELSEWHERE: "an insight the page builds on that another section's part file holds",
+  EVIDENCE_UNHOMED: "an insight the page builds on that no section's part file holds",
 });
 
 /**
