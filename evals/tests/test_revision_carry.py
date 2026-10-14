@@ -395,7 +395,6 @@ class RulesOnARevisionTests(unittest.TestCase):
         cls.result = run_node('''
 import { GATE_CLASSES, measuresDeck, readsWholeDeck } from "./skills/professional-slides/runtime/gates/gate_classes.mjs";
 import { DECK_LENGTH, RULES, RULES_VERSION, applyRulesVersion } from "./skills/professional-slides/runtime/weight.mjs";
-import { judged } from "./skills/professional-slides/runtime/build-deck.mjs";
 import { heldAtDelivery } from "./skills/professional-slides/runtime/deliver-deck.mjs";
 import { REVISION_CODES } from "./skills/professional-slides/runtime/revision.mjs";
 import { CONSISTENCY_CODES } from "./skills/professional-slides/runtime/gates/consistency_gates.mjs";
@@ -413,9 +412,10 @@ const judge = (deck, rule = (code) => code) => Object.fromEntries(codes.map((cod
 const revision = (more) => ({ workflow: "existing_deck_revision", rulesVersion: RULES_VERSION, ...more });
 // A revision by its counts: so many slides carried, so many pages composed.
 const made = (carried, composed, more = {}) => revision({ carried: Array.from({ length: carried }, (_, i) => ({ id: `s${i + 1}` })), slides: Array.from({ length: composed }, (_, i) => ({ id: `p${i + 1}`, pageType: {} })), ...more });
-// The three stages, each asked through the function it calls on its own findings: the compile's, the build's on a gate's report, delivery's on what it raises.
+// The two stages that hold a deck's rules, each asked through the function it calls on its own findings: the compile's, and
+// delivery's on what it raises. The build's gates are page-local and hold every deck alike.
 const stages = (deck) => Object.fromEntries(codes.map((code) => { const f = { code, severity: "blocker" };
-  return [code, [applyRulesVersion([f], deck)[0].severity === "blocker", judged({ findings: [f], passed: false }, deck).findings[0].severity === "blocker", heldAtDelivery([f], deck).length === 1]]; }));
+  return [code, [applyRulesVersion([f], deck)[0].severity === "blocker", heldAtDelivery([f], deck).length === 1]]; }));
 const decks = { fresh: { workflow: "new_deck", slides: [] }, rebuilt5: revision({ rulesVersion: 5 }), rebuilt6: revision({}), few5: made(27, 1, { rulesVersion: 5 }), few6: made(27, 1), mostly5: made(1, 41, { rulesVersion: 5 }), mostly6: made(1, 41) };
 console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.filter(measuresDeck), whole: codes.filter(readsWholeDeck), population: Math.min(...Object.values(DECK_LENGTH).filter((n) => typeof n === "number")), rules: RULES, version: RULES_VERSION,
   stages: Object.fromEntries(Object.entries(decks).map(([name, deck]) => [name, stages(deck)])),
@@ -477,7 +477,7 @@ console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.fil
     def test_a_deck_rule_is_held_over_the_composed_pages_wherever_they_are_enough_to_read_it(self):
         measures, whole, always, population = set(self.result["measures"]), set(self.result["whole"]), set(self.result["rules"]["always"]), self.result["population"]
         self.assertEqual(population, 8)
-        self.assertLessEqual({"NO_SUMMARY", "NO_SECTIONS", "NO_CONTENTS", "CONTENT_ANSWER_UNCARRIED", "EVALUATION_TOO_SHORT"}, whole)
+        self.assertLessEqual({"NO_SUMMARY", "NO_SECTIONS", "NO_CONTENTS", "CONTENT_ANSWER_UNCARRIED"}, whole)
         self.assertLessEqual(whole, measures)
 
         def unheld(name):
@@ -505,9 +505,9 @@ console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.fil
         # A measure counts over the deck's pages, so only structure and aggregate rules are measures.
         self.assertEqual({self.codes[code] for code in measures} - {"S", "G"}, set())
 
-    def test_the_compile_the_build_and_delivery_hold_the_same_findings_on_every_deck(self):
+    def test_the_compile_and_delivery_hold_the_same_findings_on_every_deck(self):
         # One function decides (weight.mjs notHeldOn), and each stage asks it of its own findings: for every code there is, on a new
-        # deck, a rebuild and a revision that carries slides, at rules versions 5 and 6, the three give one answer.
+        # deck, a rebuild and a revision that carries slides, at rules versions 5 and 6, the two give one answer.
         for deck, verdicts in self.result["stages"].items():
             apart = {code: held for code, held in verdicts.items() if len(set(held)) != 1}
             self.assertEqual(apart, {}, deck)
@@ -520,14 +520,13 @@ console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.fil
         # What a draft refuses of a page the critique would read differently from its witness (spine-witness.mjs) is no version's
         # rule and reads one composed page: every stage holds it on every deck, whatever it carries and whatever version it records.
         for deck in self.result["stages"]:
-            self.assertEqual(self.result["stages"][deck]["SPINE_UNDETERMINED"], [True, True, True], deck)
+            self.assertEqual(self.result["stages"][deck]["SPINE_UNDETERMINED"], [True, True], deck)
         self.assertNotIn("SPINE_UNDETERMINED", self.introduced)
         self.assertNotIn("SPINE_UNDETERMINED", self.result["measures"])
         self.assertEqual({verdicts["SPINE_UNDETERMINED"] for verdicts in self.result["byVersion"].values()}, {"held"})
-        # The two the stages used to disagree on: an evaluation's length, and a build bar under an older version.
+        # The one the stages used to disagree on: a build bar under an older version.
         for deck in ("few5", "few6", "mostly5", "mostly6", "rebuilt5"):
-            self.assertEqual(len(set(self.result["stages"][deck]["EVALUATION_TOO_SHORT"])), 1, deck)
-            self.assertEqual(self.result["stages"][deck]["BAR_CHARTS_ANNOTATED"], [True, True, True], deck)
+            self.assertEqual(self.result["stages"][deck]["BAR_CHARTS_ANNOTATED"], [True, True], deck)
 
     def test_the_rules_no_version_names_fall_where_a_point_change_needs_them(self):
         carrying = self.result["carrying"]
@@ -938,7 +937,7 @@ class BuildTests(SwappedDeck):
         self.assertEqual([s["parts"] for s in slides], [True] * 6 + [False, True])
         self.assertEqual([s["geometry"] for s in slides if s["parts"]], [0.0] * 7)
 
-    def test_a_revision_of_text_edits_composes_nothing_and_owes_a_self_check_of_what_it_rewrote(self):
+    def test_a_revision_of_text_edits_composes_nothing(self):
         def number(doc):
             for key in ("s02", "s08"):
                 self.page(doc, key)["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
@@ -950,19 +949,6 @@ class BuildTests(SwappedDeck):
         result = json.loads((work / "out" / "build-result.json").read_text())
         self.assertEqual((result["revision"]["carried"], result["revision"]["edited"], result["revision"]["composed"]), (5, 3, 0))
         self.assertFalse((work / "out" / "deck.composed.pptx").exists())
-        ledger = json.loads((work / "out" / "claims.json").read_text())
-        # The ledger holds the lines the revision rewrote, and none of the user's other claims.
-        self.assertEqual(sorted(ledger["pageHashes"]), ["s02", "s04", "s08"])
-        self.assertEqual([claim["text"] for claim in ledger["claims"] if claim["slide"] == "s02"], ["Revenue reached £12.6m in FY26, up 14% on FY25"])
-        checks = run_node(f'''
-import {{ validateSelfCheck }} from "./skills/professional-slides/runtime/claims.mjs";
-const ledger = {json.dumps(ledger)};
-const empty = {{ pageHashes: {{}}, findings: [] }};
-console.log(JSON.stringify({{ none: validateSelfCheck(null, ledger, {{ spinePass: false }}).length, nothingOwed: validateSelfCheck(null, empty, {{ spinePass: false }}),
-  newDeck: validateSelfCheck(null, empty).length,
-  done: validateSelfCheck({{ pages: Object.fromEntries(Object.entries(ledger.pageHashes).map(([id, claims]) => [id, {{ claims, verified: true }}])), findings: {{}} }}, ledger, {{ spinePass: false }}) }}));
-''')
-        self.assertEqual(checks, {"none": 1, "nothingOwed": [], "newDeck": 1, "done": []})
 
 
 class EvidenceOnARevisionTests(CarriedDeck):

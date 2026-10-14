@@ -493,11 +493,10 @@ def severity(item):
     return {"severity": "blocker" if blocks else "advisory", **({"blockAbove": bar} if bar is not None and blocks else {})}
 
 
-# Findings raised before the page is rendered: the composer's plan-time budget
-# and the deck's coverage check. They are not gates, but they share the shape.
+# Findings raised before the page is rendered: the deck's coverage check. It is
+# not a gate, but it shares the shape.
 COMPOSE_CODES = {
     "MISSING_EVIDENCE": "a ranked criterion with no comparative exhibit",
-    "EVALUATION_TOO_SHORT": "a deck marked as a skill evaluation composes fewer than fifty pages",
 }
 
 

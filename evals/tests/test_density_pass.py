@@ -132,20 +132,5 @@ console.log(JSON.stringify({{ words: DEVELOPED_POINT_WORDS,
         self.assertEqual(result["led"], [], "a page that carries no prose is not held to the prose band")
 
 
-class EvaluationLengthTests(unittest.TestCase):
-    def test_an_evaluation_deck_under_fifty_pages_is_refused(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec = {"schema": "professional-slides.deck/v3", "id": "short-eval", "purpose": "evaluation",
-                    "cover": {"title": "A short evaluation"},
-                    "slides": [{"title": f"Page {i} states one finding in a sentence", "layout": "text",
-                                "points": ["A point that says something about the finding."]} for i in range(5)]}
-            path = Path(tmp) / "short-eval.deck.json"
-            path.write_text(json.dumps(spec))
-            run = subprocess.run(["node", str(RUNTIME / "build-deck.mjs"), str(path), str(Path(tmp) / "out"), "--no-render"],
-                                 capture_output=True, text=True)
-            self.assertNotEqual(run.returncode, 0)
-            self.assertIn("EVALUATION_TOO_SHORT", run.stderr + run.stdout)
-
-
 if __name__ == "__main__":
     unittest.main()

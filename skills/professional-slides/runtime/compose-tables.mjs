@@ -8,8 +8,6 @@ import { groupThousands } from "./draw.mjs";
 import { SCALAR_FIGURE, figureUnit, withUnit } from "./value-format.mjs";
 import { decade } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
-import { resultCells } from "./evidence.mjs";
-import { judged } from "./judgements.mjs";
 
 /**
  * Table treatment is chosen from what the table says, not from the first option
@@ -20,20 +18,12 @@ import { judged } from "./judgements.mjs";
  *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
  *   listing   (anything else)                                      → open rules only
  */
-// What a column of words says of each row - a status, a direction, a
-// judgement or a fact - is read, not matched against a list of status words:
-// the column's header and its words are put to a model once (column-reads,
-// judgements.mjs) and the recorded answer sets the cells. A status column's
-// cells become pills in the colour of each cell's state, keeping the author's
-// words; a direction column's become trend rings; a progress column's
-// percentages become progress bars. A column not yet answered stays text, and
-// the compile lists its question as pending. Ticks and crosses are marks, not
-// words, and are read as such.
+// A column of words stays words: a status, a direction or progress is drawn as
+// a pill, a ring or a bar where the page types the column (`type: "rag"`, ...).
+// Ticks and crosses are marks, not words, and are read as such.
 const CELL_WORDS_MAX = 5;
 const BLANK_CELL = /^[\s\-–—]*$/;
 const PERCENT = /^(\d{1,3}(?:\.\d+)?)\s*%$/;
-const STATE_RAG = { positive: "on-track", caution: "behind", negative: "at-risk", neutral: "neutral" };
-const squeezed = (text) => String(text ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 // A cell the highlight pass has already claimed arrives as {text, highlight}
 // rather than as a string, and is still read for its state: a scorecard
 // whose highlight phrase is its own verdict word keeps the pill on the rows
@@ -61,34 +51,15 @@ export function columnQuestion(header, cells, headers) {
   return { subject: { header: String(header ?? ""), cells: [...new Set(plain)] }, context: { headers: (headers || []).map((h) => String(h ?? "")) } };
 }
 
-/** A cell as its column's reading sets it: ✓/✗ as a check, and a status, direction or progress cell as its typed cell. */
-export function readCell(value, reading) {
+/** A cell with ✓ or ✗ as a check; any other cell as written. */
+export function readCell(value) {
   const text = wordsOf(value);
   if (text === null) return value;
   if (/^(✓|✔)$/.test(text)) return { type: "check", value: "yes" };
   if (/^(✗|✘|✕)$/.test(text)) return { type: "check", value: "no" };
-  const read = (list) => (list || []).find((entry) => squeezed(entry?.cell) === squeezed(text))?.value;
-  if (reading?.verdict === "status" && STATE_RAG[read(reading.states)]) return { type: "rag", value: STATE_RAG[read(reading.states)], text };
-  if (reading?.verdict === "direction" && ["up", "flat", "down"].includes(read(reading.directions))) return { type: "trend", value: read(reading.directions) };
-  if (reading?.verdict === "progress" && PERCENT.test(text) && Number(text.match(PERCENT)[1]) <= 100) return { type: "progress", value: Number(text.match(PERCENT)[1]) };
   return value;
 }
 
-/** Each column's recorded reading (column-reads), by column index; the label column and a typed column are not read. */
-// A column still in words once the composer's own treatments have run is asked about as the author wrote the table - its
-// header, its cells and the table's headers before a gutter or a derived column was added - which is the question the
-// page's own check (page-types.mjs plainVerdict) asks of it, so the two share one answer.
-function columnReadings(ex, authored) {
-  const headers = (ex.columns || []).map(columnLabel), written = (authored.columns || []).map(columnLabel);
-  const cellsOf = (table, c) => (table.rows || []).map((row) => resultCells(row)[c - 1]);
-  return (ex.columns || []).map((column, c) => {
-    if (!c || (column && typeof column === "object" && ((column.type && column.type !== "text") || column.heat || column.bar || column.harvey))) return null;
-    const at = written.indexOf(headers[c], 1);
-    if (at < 1 || !columnQuestion(headers[c], cellsOf(ex, c), headers)) return null;
-    const asked = columnQuestion(written[at], cellsOf(authored, at), written);
-    return asked && judged("column-reads", asked.subject, asked.context);
-  });
-}
 const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
 
 /** Default rating scales so a spec can write `{ type: "harvey", value: 3 }` without declaring anchors. */
@@ -959,8 +930,7 @@ export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string"
     ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
     : { width: columnWeight(ex, i), ...c });
-  const readings = columnReadings(ex, authored);
-  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => readCell(cell, readings[i + (Array.isArray(row) || row?.label === undefined ? 0 : 1)])))));
+  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell) => readCell(cell)))));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
   // The recommended option's column is tinted end to end.

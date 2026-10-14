@@ -200,7 +200,7 @@ import { allocateStructure, declaredArchitecture, declaredStructure, drawOf, evi
 import { FIT, fitLines, fitSearch } from "./fit-search.mjs";
 import { fillGuidance, slotGuidance } from "./fill-guidance.mjs";
 import { briefOf, findingsText, inClassOrder, pagesOf, readStandings, standingText } from "./deck-report.mjs";
-import { EVALUATION_MIN_PAGES, buildDeck, validateStageContract } from "./build-deck.mjs";
+import { buildDeck } from "./build-deck.mjs";
 import { contentsProblem, contentsRoom, coverageFindings } from "./compose-deck.mjs";
 import { resolveFill } from "./compose-points.mjs";
 import { proseFill } from "./compose-text-pages.mjs";
@@ -1333,18 +1333,8 @@ export async function authorDeck(docIn, { baseDir, insights = null, draft = fals
   const authoredById = new Map([...doc.pages, ...(doc.appendix || [])].map((page, at) => [String(page?.id ?? `page-${at + 1}`), page]));
   local.copy = local.copy.map((f) => (f.code === "TEXT_COVERAGE_LOW" && !f.fills ? withBodyFields(f, authoredById.get(String(f.id)), doc.deck?.density) : f));
   const stages = [], standings = [];
-  // The stage contract, an evaluation's length, the brief's ranked criteria, the contents page and the share of titles that
-  // lead with a gap are read over the whole deck: a page run leaves them to the whole-deck run.
-  if (!scope) try { validateStageContract(structural, { content: local.content, plan: planOf(structural) }); }
-  catch (error) { if (!isRefusal(error)) throw error; stages.push({ code: error.code, severity: "blocker", repair: `${error.message} - the build refuses the deck here. Give every page a unique \`id\`, and open the deck on a \`summary\` page (form \`executive-summary\`) ahead of its first section` }); }
-  if (spec.purpose === "evaluation" && !scope) {
-    // Each page still to compose will add at least a slide.
-    // The deck's length is every page it renders, the slides a revision carries among them (the build counts the same).
-    const slides = (composed.deck?.slides.length ?? 0) + new Set([...uncompiled, ...uncomposed]).size + WEIGHT.carriedCount(spec);
-    standings.push({ code: "EVALUATION_TOO_SHORT", what: "pages the deck composes, cover and appendix included", value: slides, bar: EVALUATION_MIN_PAGES, side: "min", unit: "pages", applies: true, blocks: true });
-    if (slides < EVALUATION_MIN_PAGES) stages.push({ code: "EVALUATION_TOO_SHORT", severity: "blocker", measured: slides, threshold: EVALUATION_MIN_PAGES,
-      repair: `An evaluation deck renders at least ${EVALUATION_MIN_PAGES} pages, cover and appendix included; this one composes ${slides}. Widen the evidence, not the repetition, or drop \`purpose: "evaluation"\` for a diagnostic` });
-  }
+  // The brief's ranked criteria, the contents page and the share of titles that lead with a gap are read over the whole
+  // deck: a page run leaves them to the whole-deck run.
   if (!scope) stages.push(...coverageFindings(structural).map((f) => ({ ...f, slide: undefined, severity: "blocker" })));
   // The sections the contents page lists, against what its style holds (deckSpineFindings).
   const contents = scope ? null : contentsRoom({ ...doc.deck, slides: doc.pages, appendix: doc.appendix });
@@ -2141,7 +2131,7 @@ async function renderCheck(compiled, { dir, stem, named }) {
   const work = mkdtempSync(path.join(os.tmpdir(), "author-render-"));
   try {
     let result;
-    try { result = await buildDeck(path.join(dir, `${stem}.deck.json`), path.join(work, "out"), { fetchLogos: false, only: run?.only ?? named, ...(run ? { scope: "pages" } : {}), source: { spec, baseDir: dir, content: run?.content ?? compiled.content, plan: planOf(spec) } }); }
+    try { result = await buildDeck(path.join(dir, `${stem}.deck.json`), path.join(work, "out"), { fetchLogos: false, only: run?.only ?? named, source: { spec, baseDir: dir } }); }
     catch (error) {
       if (!isRefusal(error)) throw error;
       return { ran: false, reason: `the build refuses the deck before it renders (${error.code})`, blockers: [{ code: error.code, severity: "blocker", repair: error.message, class: classOf(error.code) }], advisories: [], standings: [] };

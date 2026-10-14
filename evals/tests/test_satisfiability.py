@@ -221,57 +221,6 @@ const reader = judgementSession({ oracle: (kind, said) => { asked.push(said.text
 const refusal = (props) => withJudgements(reader, () => { try { title.resolveVariant(props); return null; } catch (error) { return error.message; } });
 '''
 
-    def test_an_index_base_in_a_chart_heading_is_allowed_as_the_message_says(self):
-        result = run_node(self.PROBE + '''
-console.log(JSON.stringify({
-  bare: refusal({ heading: 'Passengers carried, 2018 = 100' }), fiscal: refusal({ heading: 'Seats flown, FY19 = 100' }), quarter: refusal({ heading: 'Orders, Q1 2019 = 100' }),
-  worded: refusal({ heading: 'Index, 2021 = 100' }), unit: refusal({ heading: 'Passengers carried', unit: '2018 = 100' }),
-  result: refusal({ heading: 'Passengers carried, 2018 = 100, up 12%' }), decimal: refusal({ heading: 'Passengers carried, 2018 = 100.5' }),
-  thousand: refusal({ heading: 'Revenue 2018 = 1000' }), noPeriod: refusal({ heading: 'Share = 100' }) }));
-''')
-        for allowed in ("bare", "fiscal", "quarter", "worded", "unit"):
-            self.assertIsNone(result[allowed], f"{allowed}: {result[allowed]}")
-        # A figure beside the base is still a result, and a number set equal to
-        # something that is not a period is not an index base.
-        self.assertIn('carries "12%"', result["result"])
-        for refused in ("decimal", "thousand", "noPeriod"):
-            self.assertIn("must not contain statistics", result[refused])
-
-    def test_a_share_of_a_base_period_is_a_unit_and_a_figure_after_it_is_still_a_result(self):
-        result = run_node(self.PROBE + '''
-const units = { year: '% of 2019', month: '% of Feb-2020 baseline', quarter: '% vs Q3-2019', share: 'Share of 2019 rent',
-  appended: '% of 2019, up 12%', equated: '% of 2019 = 85', decimal: '% of 2019.5' };
-describes.add('Share of 2019 rent');
-console.log(JSON.stringify(Object.fromEntries(Object.entries(units).map(([key, unit]) => [key, refusal({ heading: 'Weekly office attendance', unit })]))));
-''')
-        # A percentage of a base period is notation, set aside; a share of a base year in words is read, and described.
-        for allowed in ("year", "month", "quarter", "share"):
-            self.assertIsNone(result[allowed], f"{allowed}: {result[allowed]}")
-        # A year in words ("value of 2019") is a period: only its notation - a colon, a sign, a decimal - makes it a value.
-        for refused in ("appended", "equated", "decimal"):
-            self.assertIn("must not contain statistics", result[refused])
-
-    def test_every_example_the_message_lists_as_allowed_is_allowed(self):
-        # The refusal ends: a heading may name a period ("FY26", "2 August 2026"), a sample ("n = 240"), a set or a threshold
-        # that defines the measure ("top 40", "20 suppliers", "below 60% of median income"), a model by its designation
-        # ("X77", "505X"), an index base ("2019 = 100") or a rank scale ("1 = best"). The notation is set aside unasked; a set
-        # or a threshold is read, and a reader takes it for what defines the measure.
-        result = run_node(self.PROBE + '''
-const message = refusal({ heading: 'Revenue up 12%' });
-const listed = [...message.slice(message.indexOf('may name')).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-const scale = (text) => (/^1 = /.test(text) ? `rank, ${text}` : text);
-const read = ['top 40', '20 suppliers', 'below 60% of median income'];
-for (const text of read) { describes.add(`Operators by size, ${text}`); describes.add(text); }
-asked.length = 0;
-const headings = listed.map((text) => refusal({ heading: `Operators by size, ${scale(text)}` })), units = listed.map((text) => refusal({ heading: 'Operators by size', unit: scale(text) }));
-console.log(JSON.stringify({ listed, headings, units, asked: [...new Set(asked)] }));
-''')
-        self.assertEqual(result["listed"], ["FY26", "2 August 2026", "n = 240", "top 40", "20 suppliers", "below 60% of median income", "X77", "505X", "2019 = 100", "1 = best"])
-        self.assertEqual(result["headings"], [None] * 10)
-        self.assertEqual(result["units"], [None] * 10)
-        self.assertEqual(sorted(result["asked"]), sorted(["Operators by size, top 40", "Operators by size, 20 suppliers", "Operators by size, below 60% of median income",
-                                                          "top 40", "20 suppliers", "below 60% of median income"]))
-
     def test_a_form_the_catalogue_offers_is_not_refused_by_its_own_type(self):
         # The three forms no page could satisfy, each compiled at its least.
         result = run_node(STANDALONE + '''

@@ -456,5 +456,44 @@ console.log(JSON.stringify({
         self.assertIn("is the value a `style: \"figure\"` callout sets large", result["stray"])
         self.assertIn("is a pill, which holds one value", result["longPill"])
 
+class ArrowClearanceTests(unittest.TestCase):
+    """The arrow keeps clear of what it spans - marks, values, callouts, other arrows - or becomes a bracket above the
+    plot; the scene refuses a change arrow run through another annotation's label."""
+
+    def test_an_arrow_keeps_clear_of_what_it_spans_or_becomes_a_bracket(self):
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+import { renderChangeAnnotations } from './skills/professional-slides/runtime/chart-annotations.mjs';
+const column = REGISTRY.get('chart.column'), frame = { x: 60, y: 120, width: 900, height: 420 };
+const nodes = column.render({ id: 'c', frame, props: { categories: ['2019', '2020', '2021', '2022', '2023'], series: [{ name: 'Trips', values: [40, 99, 100, 98, 50] }], dataLabels: true,
+  changeAnnotations: [{ style: 'arrow', start: '2019', end: '2023', text: '+25%' }] } }).nodes;
+const pill = nodes.find((n) => n.role === 'annotation-surface');
+const hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const under = nodes.filter((n) => ['chart-mark', 'data-label'].includes(n.role) && hit(n.frame, pill.frame)).map((n) => n.id);
+// A callout set in the band above the plot, over a full-height bar between the two ends: nothing lifts the arrow clear of both.
+const plot = { x: 0, y: 40, width: 600, height: 300 }, pointMap = new Map([['category:A', { x: 50, y: 200 }], ['category:B', { x: 550, y: 200 }]]);
+const wall = { role: 'annotation-surface', frame: { x: 280, y: -60, width: 40, height: 400 } };
+const styles = (obstacles, arrowOnly = false) => [...new Set(renderChangeAnnotations({ id: 'x', plot, props: { changeAnnotations: [{ style: 'arrow', start: 'A', end: 'B', text: '+25%' }] }, pointMap, obstacles, arrowOnly })
+  .filter((n) => n.data?.annotationStyle).map((n) => n.data.annotationStyle))];
+console.log(JSON.stringify({ style: [...new Set(nodes.filter((n) => n.data?.annotationStyle).map((n) => n.data.annotationStyle))], under, open: styles([]), walled: styles([wall]), lineAxis: styles([wall], true) }));
+""")
+        # Over a peak, the arrow lifts into the band above the plot and its label sits on no bar and no value.
+        self.assertEqual(result["style"], ["arrow"])
+        self.assertEqual(result["under"], [])
+        # Where nothing lifts it clear, the change is read from a bracket - except on a line read off its value axis, which
+        # takes the arrow only.
+        self.assertEqual([result["open"], result["walled"], result["lineAxis"]], [["arrow"], ["bracket"], ["arrow"]])
+
+    def test_a_change_arrow_through_another_annotations_label_is_refused(self):
+        result = run_node("""
+import { sceneCollisions } from './skills/professional-slides/runtime/validate-overlap.mjs';
+const text = (key) => ({ id: `t-${key}`, type: 'text', role: 'annotation-text', text: '+12%', frame: { x: 100, y: 100, width: 60, height: 20 }, data: { annotationKey: key } });
+const shaft = (key) => ({ id: `l-${key}`, type: 'line', role: 'annotation-leader', frame: { x: 80, y: 110, width: 100, height: 0 }, data: { x1: 80, y1: 110, x2: 180, y2: 110, annotationKey: key } });
+const codes = (nodes) => sceneCollisions({ id: 's', nodes }).filter((f) => f.code === 'TEXT_ON_LINE').length;
+console.log(JSON.stringify({ own: codes([text('a'), shaft('a')]), other: codes([text('a'), shaft('b')]) }));
+""")
+        self.assertEqual(result, {"own": 0, "other": 1})
+
+
 if __name__ == "__main__":
     unittest.main()

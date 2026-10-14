@@ -29,30 +29,6 @@ const own = (run, id) => [...run.blocking].filter((f) => f.id === id && !/^CONTE
 '''
 
 
-class ChartHeadingTests(unittest.TestCase):
-    def test_a_member_count_a_designation_and_a_possessive_year_are_not_results_and_results_still_are(self):
-        result = run_node('''
-import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
-import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
-// A figure the notation leaves is read (heading-states-result): this reader takes a count of the members for what
-// defines the measure, and every other figure for a result. A designation and a possessive year are never asked about.
-const asked = [];
-const reader = judgementSession({ oracle: (kind, said) => { asked.push(said.text); return /suppliers|markets/.test(said.text) ? 'describes' : 'result'; } });
-const frame = { x: 72, y: 162, width: 1136, height: 431 };
-const said = (heading) => withJudgements(reader, () => { try { REGISTRY.get('chart.column').render({ id: 'c', frame, props: { heading, unit: 'units', categories: ['A', 'B', 'C', 'D'], series: [{ name: 's', values: [1, 2, 3, 4] }] } }); return null; } catch (error) { return error.message; } });
-const names = ['Depots in service, 20 suppliers', "Regional museum visitors at 2025's growth rate", 'Model 505X in service with the supplier, assumed path', 'Lines open (12 markets)', 'Units of the X77 on order'];
-const results = ['Visitors, 20 million', 'Visitors up 20 points', 'Growth of 12x since launch', 'Revenue, 5 pounds', 'Visitors: 2025', 'Visitors fell 20 halls', 'Stock, 500M'.replace('M', 'm')];
-const named = names.map(said), unasked = names.filter((name) => !asked.includes(name));
-console.log(JSON.stringify({ names: named, unasked, results: results.map((heading) => (said(heading) ?? '').slice(0, 60)), message: said('Visitors up 20 points') }));
-''')
-        self.assertEqual(result["names"], [None] * 5)
-        self.assertEqual(result["unasked"], ["Regional museum visitors at 2025's growth rate", "Model 505X in service with the supplier, assumed path", "Units of the X77 on order"])
-        self.assertTrue(all(text.startswith("Chart title heading must not contain statistics") for text in result["results"]), result["results"])
-        # The refusal lists what a heading may name, the two among it.
-        for said in ('"20 suppliers"', '"505X"'):
-            self.assertIn(said, result["message"])
-
-
 class SourceRecordTests(unittest.TestCase):
     def test_a_declared_record_named_as_a_ledger_is_the_source_named_and_a_pointer_to_a_ledger_is_still_refused(self):
         result = run_node('''

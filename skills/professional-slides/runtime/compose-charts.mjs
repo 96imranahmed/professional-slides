@@ -6,7 +6,6 @@
 import { defaultFocusIndex } from "./chart-categorical.mjs";
 import { sharesOfWhole } from "./chart-axes.mjs";
 import { CEILING_LADDER, niceCeiling } from "./nice-numbers.mjs";
-import { judged } from "./judgements.mjs";
 
 /**
  * The shared ceiling for peer charts. The ladder is fine-grained on purpose: a
@@ -141,30 +140,8 @@ export function decisiveFromTitle(ex, title) {
   return least === most ? ex : { ...ex, decisive: least ? "least" : "most" };
 }
 
-// A growth mark the author did not write is drawn where the page's claim rests on the series' change, which is read
-// (claim-states-change): on a column chart of one series, or a stack's totals, over four periods or more - where strong
-// decks set the arrow and its rate - and never on a flat or volatile series whose title is about something else. The
-// change is the compound annual rate where the two periods are years three or more apart, else the change between them.
-const GROWTH_PERIODS_MIN = 4, CAGR_YEARS_MIN = 3;
 const yearOf = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
-function claimedChange(ex, title) {
-  // A chart whose author already set callouts on it has marked its finding there: a second mark repeats them and takes the
-  // band they need.
-  if (!["chart.column", "chart.stacked-column"].includes(ex.type) || !String(title ?? "").trim() || ex.segmentGrowth || (ex.annotations || []).length) return null;
-  const categories = (ex.categories || []).map(String), series = Array.isArray(ex.series) ? ex.series : [];
-  if (categories.length < GROWTH_PERIODS_MIN || !categories.every((c) => PERIOD_CATEGORY.test(c)) || !(series.length === 1 || ex.type === "chart.stacked-column")) return null;
-  if (!series.every((sr) => Array.isArray(sr.values) && sr.values.length === categories.length && sr.values.every(Number.isFinite))) return null;
-  const read = judged("claim-states-change", { title: String(title).trim(), series: series.length === 1 ? String(series[0].name ?? ex.heading ?? "") : String(ex.heading ?? "the total"), periods: categories });
-  if (read?.verdict !== "states-change") return null;
-  const from = categories.includes(String(read.from)) ? String(read.from) : categories[0], to = categories.includes(String(read.to)) ? String(read.to) : categories.at(-1);
-  if (categories.indexOf(to) <= categories.indexOf(from)) return null;
-  const [a, b] = [yearOf(from), yearOf(to)];
-  return a !== null && b !== null && b - a >= CAGR_YEARS_MIN ? { cagr: { from, to } } : { change: { from, to } };
-}
-
-export function changeFromContent(exIn, title, { infer = true } = {}) {
-  const claimed = infer && exIn && CHANGE_TYPES.includes(exIn.type) && exIn.change === undefined && !exIn.cagr && !(exIn.changeAnnotations || []).length ? claimedChange(exIn, title) : null;
-  const ex = claimed ? { ...exIn, ...claimed } : exIn;
+export function changeFromContent(ex) {
   if (!ex || !CHANGE_TYPES.includes(ex.type) || ex.change === false || (!ex.change && !ex.cagr) || (ex.changeAnnotations || []).length) return ex;
   const categories = ex.categories || [], series = Array.isArray(ex.series) ? ex.series : [];
   if (categories.length < 2 || !series.length || !series.every((sr) => Array.isArray(sr.values) && sr.values.length === categories.length && sr.values.every(Number.isFinite))) return ex;

@@ -812,18 +812,6 @@ await done({{ dir: {json.dumps(made['dir'])}, store: {json.dumps(made['store'])}
 console.log(JSON.stringify({{ ok: true }}));
 ''')
 
-    def test_a_build_refusal_is_a_rejection_with_its_findings_not_a_crash(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec = Path(tmp) / 'short-eval.deck.json'
-            spec.write_text(json.dumps({'schema': 'professional-slides.deck/v3', 'id': 'short-eval', 'purpose': 'evaluation', 'cover': {'title': 'A short evaluation'},
-                                        'slides': [{'title': f'Page {i} states one finding in a sentence', 'layout': 'text', 'points': ['A point that says something about the finding.']} for i in range(5)]}))
-            out = Path(tmp) / 'out'
-            run = subprocess.run([NODE, str(RUNTIME / 'deliver-deck.mjs'), str(spec), str(out), '--reviewer', 'packet'], capture_output=True, text=True)
-            self.assertEqual(run.returncode, 2, run.stderr)
-            self.assertNotIn('    at ', run.stderr)
-            self.assertIn('EVALUATION_TOO_SHORT', (out / 'REJECTED.md').read_text())
-
-
 if __name__ == '__main__':
     unittest.main()
 

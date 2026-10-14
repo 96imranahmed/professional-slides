@@ -8,7 +8,6 @@ import { textWords, proseParts, proseText, PROSE_PARAGRAPH_MAX } from "./text-co
 import { measureProse, proseMeasure, measureList } from "./registry-text.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { HUG, SIZE, BODY_HEIGHT, LAYOUT, BODY_WIDTH } from "./compose-body.mjs";
-import { judged } from "./judgements.mjs";
 
 // A paragraph of the page's prose. It carries the phrase to set in the
 // accent (the page's highlight, or its point's) and, where a point's lead
@@ -295,9 +294,8 @@ function pointsHeight(points, width) {
  * set the reader refers to by number - steps in order, priorities, the "four
  * challenges" a title counts - and parallel findings carry a bold lead and no
  * mark. A composer with one shape sets page after page of identical numbered
- * lists; these are the alternatives a strong deck actually uses. Markers
- * follow how the items relate, which is read (itemsRelation), and a run of
- * one device is refused (COLUMN_MONOTONY).
+ * lists; these are the alternatives a strong deck actually uses. A page that
+ * numbers a sequence or letters options says so (`pointsStyle`).
  */
 const POINT_STYLES = {
   // Icon, then the lead running into the sentence in the house accent.
@@ -336,23 +334,10 @@ export function resolvePointsStyle(slide, points) {
   if (entries.some((e) => e.state)) return "numbered";
   if (entries.every((e) => e.number !== undefined)) return "numbered";
   if (!entries.some((e) => e.lead)) return "bulleted";
-  // How led points relate is read, not assumed (itemsRelation): a sequence, a ranking or a counted set is numbered, a set of
-  // alternatives lettered. Parallel findings have no implied order or invented icon; a varied deck marks them one of two
-  // unordered ways, the same way on every page - as it does while the question is not answered.
-  const marked = POINTS_BY_RELATION[itemsRelation(slide.title, entries.map((e) => e.lead))];
-  return marked ?? LAYOUT.variation?.leadPoints ?? "prose";
+  // Led points are parallel findings unless the page says otherwise: no implied order or invented icon, marked the deck's
+  // one unordered way on every page.
+  return LAYOUT.variation?.leadPoints ?? "prose";
 }
-
-// How a page's items relate, by the words of its title and the items' leads or titles: "sequence", "ranked", "counted",
-// "alternatives" or "parallel", or null where it is not asked or not yet answered. Asked of three items or more, each led -
-// two are a pair, and a list that leads nothing has no lead to read (items-relation, judgements.mjs).
-export function itemsRelation(title, leads, { least = 3 } = {}) {
-  const items = (leads || []).map((lead) => String(lead ?? "").trim());
-  if (items.length < least || items.some((item) => !item)) return null;
-  return judged("items-relation", { title: String(title ?? "").trim(), items })?.verdict ?? null;
-}
-// The points style each relation is marked in; parallel points take the deck's own lead style.
-const POINTS_BY_RELATION = Object.freeze({ sequence: "numbered", ranked: "numbered", counted: "numbered", alternatives: "lettered" });
 
 export function pointsItem(points, id, tone, fill, inColumn = false, style = null, centre = false) {
   // The side column is a track, not a shelf: its points spread down it. A list

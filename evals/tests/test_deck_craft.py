@@ -185,30 +185,5 @@ console.log(JSON.stringify(points.props.items.map(p => p.highlight ?? null)));
         self.assertEqual(result, [None, None])
 
 
-class ContentStageReachesThePageTests(unittest.TestCase):
-    """A stage whose output nothing reads is a checkpoint, not a stage."""
-
-    def setUp(self):
-        if not NODE:
-            self.skipTest("Node.js is not available")
-        self.tmp = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-
-    def test_the_content_plans_highlight_is_set_on_the_page(self):
-        spec = {"schema": "professional-slides.deck/v3", "id": "bound", "slides": [
-            {"id": "inserted", "title": "Context precedes the evidence without changing its focus", "points": ["The context has no selected phrase."]},
-            {"id": "target", "title": "The selected evidence supports a focused reader decision", "points": [{"lead": "Decision", "text": "A reversible first step preserves the next choice."}]}]}
-        plan = {"schema": "professional-slides.content/v1", "id": "bound", "question": "Which step should the reader take?", "answer": "Take a reversible first step.", "pages": [{"id": "target", "claim": spec["slides"][1]["title"], "settles": {"kind": "qualitative", "what": "A reversible decision"}, "adds": None, "highlight": "reversible first step"}]}
-        (self.tmp / "bound.deck.json").write_text(json.dumps(spec))
-        (self.tmp / "bound.content.json").write_text(json.dumps(plan))
-        out = self.tmp / "output"
-        result = subprocess.run([NODE, str(BUILD), str(self.tmp / "bound.deck.json"), str(out), "--preflight", "--python", sys.executable], cwd=ROOT, capture_output=True, text=True)
-        self.assertIn(result.returncode, (0, 2), result.stderr)
-        scene = json.loads((out / "scene.json").read_text())
-        accents = {s["id"]: [r["text"] for n in s["nodes"] for r in n.get("runs", []) if r.get("accent")] for s in scene["slides"]}
-        self.assertIn("reversible first step", " ".join(accents["target"]))
-        self.assertEqual(accents["inserted"], [])
-
-
 if __name__ == "__main__":
     unittest.main()

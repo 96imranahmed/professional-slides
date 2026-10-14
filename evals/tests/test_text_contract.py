@@ -28,13 +28,6 @@ console.log(JSON.stringify(runContentGates(JSON.parse(readFileSync({json.dumps(s
 import assert from 'node:assert/strict';
 import {checkTextPlan,auditTextPlan,auditExportText,normalizeText} from './skills/professional-slides/runtime/text-contract.mjs';
 import {runContentGates} from './skills/professional-slides/runtime/gates/content_gates.mjs';
-import {validateStageContract} from './skills/professional-slides/runtime/build-deck.mjs';
-const summary={id:'answer',role:'executive-summary',title:'Authorize the bounded preparation work under the specified condition'};
-const spec={workflow:'new_deck',cover:{title:'Decision brief'},slides:[summary]};
-const stages={content:{textContract:'complete',pages:[{id:'cover',claim:'Decision brief'},{id:'answer',claim:summary.title}]},plan:{pages:[{id:'cover',title:'Decision brief'},{id:'answer',title:summary.title}]}};
-assert.doesNotThrow(()=>validateStageContract(spec,stages));
-const missingCover=structuredClone(stages);missingCover.content.pages.shift();
-assert.throws(()=>validateStageContract(spec,missingCover),/missing or has a changed title for cover/);
 assert.equal(normalizeText('net-\ndemand'), 'net-demand');
 assert.notEqual(normalizeText('net demand'), 'net-demand');
 const page={id:'case',n:1,claim:'The first approval releases preparation subject to explicit constraints',settles:{kind:'comparison',what:'Two defined alternatives'},adds:null,highlight:null,textPlan:[{id:'title',role:'title',text:'The first approval releases preparation subject to explicit constraints'},{id:'reason',role:'body',text:'Preparation preserves an option but does not authorize construction. '+'The retained option keeps the approval path open while the gating permission is sought, '.repeat(3)+'and nothing is committed until then.'},{id:'data',role:'exhibit',text:'$31m'},{id:'source',role:'source',text:'Source: Designed fixture'}],textReference:{task:'chart-led'}};

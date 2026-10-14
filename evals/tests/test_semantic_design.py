@@ -149,24 +149,6 @@ assert.ok((await validateReviewBinding(review,dir,['a'])).length);
 console.log('{}');
 """)
 
-    def test_new_deck_contract_rejects_stale_titles_and_missing_summary(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import {validateStageContract} from './skills/professional-slides/runtime/build-deck.mjs';
-const summary={id:'answer',shape:'executive-summary',title:'Choose the supported option under the stated condition'};
-const evidence={id:'proof',title:'The evidence supports this choice on a common basis'};
-const spec={workflow:'new_deck',slides:[summary,evidence]};
-const stages={content:{pages:spec.slides.map(s=>({id:s.id,claim:s.title}))},plan:{pages:spec.slides.map(s=>({id:s.id,title:s.title}))}};
-assert.doesNotThrow(()=>validateStageContract(spec,stages));
-const changed=structuredClone(stages);changed.plan.pages[1].title='A stale plan';
-assert.throws(()=>validateStageContract(spec,changed),/changed title/);
-const missing=structuredClone(stages);missing.content.pages.pop();
-assert.throws(()=>validateStageContract(spec,missing),/missing/);
-assert.throws(()=>validateStageContract({...spec,slides:[evidence,summary]},stages),/opening executive summary/);
-assert.doesNotThrow(()=>validateStageContract({...spec,workflow:'existing_deck_revision'},{}));
-console.log('{}');
-""")
-
     def test_automatic_cards_do_not_discard_authored_phrase_focus(self):
         run_node("""
 import assert from 'node:assert/strict';

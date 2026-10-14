@@ -7,7 +7,6 @@ import { hasPhrase, measureText } from "./text-layout.mjs";
 import { figuresWithDecimals, formatValue } from "./value-format.mjs";
 import { formatTableValue } from "./compose-tables.mjs";
 import { TABLE_ALIGNED, SIDEWAYS_CATEGORIES, percentStack, focusFromTitle, decisiveFromTitle, changeFromContent, pairedBars } from "./compose-charts.mjs";
-import { applyConventions } from "./conventions.mjs";
 
 /**
  * `footnotes: [{ on, text }]`: the page's numbered notes. Each one prints a
@@ -270,17 +269,9 @@ export const SLIDE_PASSES = [
   ["footnotes", (slide) => applyFootnotes(slide)],
   ["paired-bars", (slide) => pairedBars(slide)],
 
-  // What the deck holds across its pages (conventions.mjs): its subject in the accent wherever a chart plots it, its
-  // currency's one form, its heat's one direction, and the peers an exhibit leaves out said in the note. Before the title
-  // is read for a focus, so the deck's subject outranks a title's guess.
-  ["deck-conventions", (slide, ctx) => applyConventions(slide, ctx ?? {})],
-
   // Normalize an authored percent stack or explicitly requested change annotation.
   ["read-the-data", (slide) => {
-    // A growth mark the author did not write is inferred on a page's lone chart only: small multiples share one title,
-    // and an arrow over each panel crowds charts drawn small.
-    const charts = (slide.exhibits || [slide.exhibit]).filter((ex) => String(ex?.type ?? "").startsWith("chart.")).length;
-    const derive = (ex) => decisiveFromTitle(focusFromTitle(changeFromContent(percentStack(ex), slide.title, { infer: charts === 1 }), slide.title), slide.title);
+    const derive = (ex) => decisiveFromTitle(focusFromTitle(changeFromContent(percentStack(ex)), slide.title), slide.title);
     if (slide.exhibit) return { ...slide, exhibit: derive(slide.exhibit) };
     if (slide.exhibits) return { ...slide, exhibits: slide.exhibits.map(derive) };
     return slide;

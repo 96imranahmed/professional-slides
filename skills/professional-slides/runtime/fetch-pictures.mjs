@@ -10,13 +10,9 @@
 // (else its alt text). The results that are JPEG files at least 1200px wide,
 // under CC0, CC BY, CC BY-SA or the public domain, are ranked - the latest
 // dated first, landscape before portrait among equals, then in search order -
-// and the first that shows what the picture is planned to show is taken: each
-// is looked at (picture-shows, judgements.mjs), since a search returns what
-// matches its words, and a file's name says neither whether it is a
-// photograph nor what of. A candidate not yet looked at is fetched as a
-// preview (assets/pictures/candidates/) and asked about, a few at a time, and
-// none after it is taken until it is answered: `judge.mjs <pages>
-// --fetch-assets` stages the previews for a model to look at. The picture
+// and the first is taken. A search returns what matches its words, so the
+// writer looks at the rendered page and sets `search`, `after` or `without`
+// where the picture shows something else. The picture
 // gets its `path` and a `credit` naming author and licence, which CC BY and
 // CC BY-SA require the deck to show. A picture that must come from the client
 // is marked `fetch: false` and stays a placeholder. A photograph is used once
@@ -37,22 +33,19 @@
 // beside the copy - is searched the same way among Commons' drawings
 // (`filetype:drawing`, its SVG files), held to the same licences, taken in
 // search order (a drawing's date and shape say nothing of whether it fits),
-// looked at as a drawing (illustration-shows) and rendered by Commons'
+// and rendered by Commons'
 // thumbnailer to a PNG 1600px wide, saved as assets/pictures/<alt>.png, its
 // credit naming the illustrator. Commons and not Openverse, whose API has an
 // illustration category: Openverse fills that category only where a provider
 // labels its files, and it points at each file on its provider's host in the
 // provider's own format, where Commons gives every drawing the licence record
 // a photograph's credit is written from and a PNG rendering at a width asked
-// for, through the API, the cache and the judged choice photographs already use.
+// for, through the API and the cache photographs already use.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
 import { isMain, parseCli, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { UA, slugOf } from "./fetch-logos.mjs";
 import { contentWords } from "./gates/content_gates.mjs";
-import { deckStem } from "./artifact-path.mjs";
-import { activeJudgements, judged, loadJudgements, recordedJudgement, withJudgements } from "./judgements.mjs";
 import { playerEntries, playerPhotographs } from "./players.mjs";
 import { isFlagRef } from "./flags.mjs";
 import { isIllustration } from "./compose-pictures.mjs";
@@ -150,46 +143,8 @@ export function commonsCandidates(pages, { exclude = new Set(), after = null, wi
   return ok.map((c, at) => ({ c, at })).sort((a, b) => (b.c.year ?? -Infinity) - (a.c.year ?? -Infinity) || Number(b.c.landscape) - Number(a.c.landscape) || a.at - b.at).map(({ c }) => c);
 }
 
-// The candidates looked at in one run before the rest wait on their answers: the first of a ranked list usually shows the subject.
-export const PREVIEWS_AT_ONCE = 4;
-/** What the question about a candidate is asked of: what the picture is to show, and the file's own title and description. */
-export const pictureQuestion = (picture, candidate) => ({ asked: String(picture.alt).trim(), file: candidate.title, description: candidate.description ?? "" });
-
-// The question a candidate is asked: whether a photograph shows the subject (picture-shows), or whether a drawing does
-// (illustration-shows) - a drawing is exactly what the first question turns away.
-const shows = (picture) => (isIllustration(picture)
-  ? { recorded: (question) => recordedJudgement("illustration-shows", question), ask: (question, image) => judged("illustration-shows", question, null, picture.alt, { image }) }
-  : { recorded: (question) => recordedJudgement("picture-shows", question), ask: (question, image) => judged("picture-shows", question, null, picture.alt, { image }) });
-
-/**
- * The candidate a picture takes: the first, in rank order, judged to show
- * what the picture is planned to show (picture-shows; illustration-shows for
- * a drawing). One not yet judged is fetched as a preview (`preview(candidate)`,
- * a local file) and asked about, and none after it is taken until it is
- * answered, so the choice does not turn on the order the answers came in.
- * `{ choice, waiting }`: `waiting`, how many candidates before any choice are
- * still to be answered.
- */
-export async function judgedChoice(candidates, picture, { preview = null } = {}) {
-  let waiting = 0;
-  const asking = shows(picture);
-  for (const candidate of candidates) {
-    const question = pictureQuestion(picture, candidate);
-    const said = asking.recorded(question);
-    if (said?.verdict === "shows" && !waiting) return { choice: candidate, waiting };
-    if (said) continue;
-    // A preview that cannot be fetched cannot be looked at: the candidate is passed over. With nothing to fetch it with
-    // (the dry run), it still stands before the ones after it.
-    if (preview && activeJudgements()) {
-      const image = await preview(candidate).catch(() => null);
-      if (!image) continue;
-      asking.ask(question, image);
-    }
-    waiting += 1;
-    if (waiting >= PREVIEWS_AT_ONCE) break;
-  }
-  return { choice: null, waiting };
-}
+/** The candidate a picture takes: the first in rank order. */
+export const choiceOf = (candidates) => candidates[0] ?? null;
 
 /** The Commons search for a picture's words: twelve files of its kind, with their sizes, licences and renderings 1600px wide. */
 export function commonsSearchUrl(query, kind = "photograph") {
@@ -217,13 +172,11 @@ const askOf = (picture) => ({ query: picture.search ?? picture.alt,
  * The photograph each placeholder takes, in the deck's order: the dry run and
  * the fetch both read this, so the one names what the other downloads. A file
  * a placeholder takes is passed over for the ones after it, and so is one the
- * records hold for another picture of the deck. `{ chosen, waiting }`:
- * `waiting`, the candidates fetched as previews to be judged before a choice.
+ * records hold for another picture of the deck. `{ chosen }`.
  */
-export async function choosePictures(placeholders, { records = new Map(), search = searchCommons, preview = null, fetch: request = null } = {}) {
+export async function choosePictures(placeholders, { records = new Map(), search = searchCommons, fetch: request = null } = {}) {
   const taken = new Set([...records.values()].map((r) => r.title).filter(Boolean));
   const chosen = new Map(), asked = new Map();
-  let waiting = 0;
   for (const picture of placeholders) {
     // One photograph planned on several pages - a player's mark, by its `alt` and search words - is one choice and one file.
     const same = JSON.stringify([picture.alt, picture.search ?? null]);
@@ -231,30 +184,15 @@ export async function choosePictures(placeholders, { records = new Map(), search
     asked.set(same, picture);
     const ask = askOf(picture), own = records.get(picture.alt)?.title;
     const exclude = new Set([...taken].filter((title) => title !== own));
-    const found = await judgedChoice(await search(ask.query, { ...ask.options, exclude, ...(request ? { fetch: request } : {}) }), picture, { preview });
-    chosen.set(picture, found.choice);
-    waiting += found.waiting;
-    if (found.choice?.title) taken.add(found.choice.title);
+    const choice = choiceOf(await search(ask.query, { ...ask.options, exclude, ...(request ? { fetch: request } : {}) }));
+    chosen.set(picture, choice);
+    if (choice?.title) taken.add(choice.title);
   }
-  return { chosen, waiting };
+  return { chosen };
 }
-
-// A drawing's preview is the PNG Commons renders of it; a photograph's, a JPEG.
-const previewName = (candidate) => `${createHash("sha256").update(candidate.title).digest("hex").slice(0, 16)}.${candidate.kind === "illustration" ? "png" : "jpg"}`;
-/** A candidate's preview, fetched once into assets/pictures/candidates/ and kept for the packet and the choice. */
-const previewer = (directory, request) => async (candidate) => {
-  const file = path.join(directory, "candidates", previewName(candidate));
-  if (await fs.access(file).then(() => true, () => false)) return file;
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await download(candidate, file, request);
-  return file;
-};
 
 const PNG_SIGNATURE = "89504e470d0a1a0a";
 async function download(choice, file, request = globalThis.fetch) {
-  // A candidate looked at as a preview is the file taken: it is not fetched twice.
-  const preview = path.join(path.dirname(file), "candidates", previewName(choice));
-  if (path.basename(path.dirname(file)) !== "candidates" && await fs.copyFile(preview, file).then(() => true, () => false)) return;
   const res = await request(choice.url, { headers: { "User-Agent": UA }, redirect: "follow" });
   if (!res.ok) throw new Error(`download ${res.status}`);
   const bytes = Buffer.from(await res.arrayBuffer());
@@ -292,8 +230,8 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
   }
   // Chosen together, in order, so no two pictures of the deck take one file (choosePictures).
   const wanted = fetchMissing ? placeholders.filter((picture) => state.get(picture).fetch) : [];
-  let chosen = new Map(), waiting = 0;
-  try { ({ chosen, waiting } = await choosePictures(wanted, { records, preview: previewer(directory, request), fetch: request })); } catch (error) { for (const picture of wanted) failed.push(`${picture.alt}: ${error.message}`); }
+  let chosen = new Map();
+  try { ({ chosen } = await choosePictures(wanted, { records, fetch: request })); } catch (error) { for (const picture of wanted) failed.push(`${picture.alt}: ${error.message}`); }
   // A photograph several pages plan (a player's mark) is chosen once (choosePictures) and downloaded once.
   const downloaded = new Map();
   for (const picture of placeholders) {
@@ -303,7 +241,7 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
         if (!fetchMissing || !chosen.has(picture)) continue;
         const choice = chosen.get(picture);
         const noun = isIllustration(picture) ? "illustration" : "photograph";
-        if (!choice) { failed.push(waiting ? `${picture.alt}: its candidate ${noun}s are to be looked at first (judge.mjs <pages> --fetch-assets)` : `${picture.alt}: no freely licensed ${noun} among the search's results shows what it is planned to show; set \`search\` to ${isIllustration(picture) ? "the words a drawing of it would be filed under" : "the place's own name"}, or supply the file`); continue; }
+        if (!choice) { failed.push(`${picture.alt}: no freely licensed ${noun} among the search's results; set \`search\` to ${isIllustration(picture) ? "the words a drawing of it would be filed under" : "the place's own name"}, or supply the file`); continue; }
         await fs.mkdir(directory, { recursive: true });
         if (downloaded.get(file) !== choice) await download(choice, file, request);
         downloaded.set(file, choice);
@@ -329,7 +267,7 @@ export async function autoFillPictures(spec, baseDir, { fetchMissing = true, wri
     };
     strip(spec);
   }
-  return { filled: filled.length, failed: [...new Set(failed)], ...(waiting ? { waiting } : {}) };
+  return { filled: filled.length, failed: [...new Set(failed)] };
 }
 
 const USAGE = "Usage: fetch-pictures.mjs <id>.deck.json [--dry-run]";
@@ -339,24 +277,19 @@ async function main(argv) {
   if (!specArg) throw new UsageError(USAGE);
   const specPath = path.resolve(specArg);
   const spec = await readJson(specPath);
-  // Which candidate shows the subject is read off the deck's recorded judgements, as the build reads it.
-  const session = await loadJudgements(path.dirname(specPath), deckStem(spec));
-  return withJudgements(session, async () => {
-    const directory = path.join(path.dirname(specPath), "assets", "pictures");
-    if (values["dry-run"]) {
-      // The choice the fetch makes, in the order it makes it: the records of the files already fetched count as taken.
-      const placeholders = picturePlaceholders(spec);
-      const { chosen } = await choosePictures(placeholders, { records: await readRecords(directory) });
-      console.log(JSON.stringify(placeholders.map((picture) => { const choice = chosen.get(picture);
-        return { alt: picture.alt, ...(isIllustration(picture) ? { kind: "illustration", illustration: choice?.page ?? null } : { photo: choice?.page ?? null }),
-          license: choice?.license ?? null, artist: choice?.artist ?? null, ...(choice?.year ? { year: choice.year } : {}) }; }), null, 1));
-      return;
-    }
-    const result = await autoFillPictures(spec, path.dirname(specPath), { write: true });
-    await writeJson(specPath, spec);
-    console.log(JSON.stringify(result, null, 1));
-    if (session.pending.size) console.error(`${session.pending.size} candidate picture${session.pending.size === 1 ? " is" : "s are"} to be looked at before ${session.pending.size === 1 ? "it" : "they"} can be taken: run node runtime/judge.mjs <id>.pages.json --fetch-assets, then fetch again.`);
-  });
+  const directory = path.join(path.dirname(specPath), "assets", "pictures");
+  if (values["dry-run"]) {
+    // The choice the fetch makes, in the order it makes it: the records of the files already fetched count as taken.
+    const placeholders = picturePlaceholders(spec);
+    const { chosen } = await choosePictures(placeholders, { records: await readRecords(directory) });
+    console.log(JSON.stringify(placeholders.map((picture) => { const choice = chosen.get(picture);
+      return { alt: picture.alt, ...(isIllustration(picture) ? { kind: "illustration", illustration: choice?.page ?? null } : { photo: choice?.page ?? null }),
+        license: choice?.license ?? null, artist: choice?.artist ?? null, ...(choice?.year ? { year: choice.year } : {}) }; }), null, 1));
+    return;
+  }
+  const result = await autoFillPictures(spec, path.dirname(specPath), { write: true });
+  await writeJson(specPath, spec);
+  console.log(JSON.stringify(result, null, 1));
 }
 
 if (isMain(import.meta.url)) runCli(main);

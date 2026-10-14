@@ -572,33 +572,6 @@ console.log(JSON.stringify({ satisfied: plan.satisfied, unsatisfied: plan.unsati
 class BuildParityTests(unittest.TestCase):
     """What the build checks before it renders is checked by the compile, under the build's own code."""
 
-    def test_an_evaluation_too_short_is_refused_by_the_check_as_by_the_build(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            work = Path(tmp)
-            for name in ("finance.pages.json", "finance.insights.json", "finance.analysis.json"):
-                shutil.copy(FIXTURES / name, work / name)
-            file = work / "finance.pages.json"
-            self.assertEqual(cli(file).returncode, 0)
-            compiled = file.read_text(encoding="utf-8")
-            doc = json.loads(compiled)
-            doc["deck"]["purpose"] = "evaluation"
-            file.write_text(json.dumps(doc), encoding="utf-8")
-            run = cli(file, "--check")
-            self.assertEqual(run.returncode, 2)
-            self.assertIn("EVALUATION_TOO_SHORT", run.stderr.split("Where the deck stands:")[0])
-            self.assertIn("EVALUATION_TOO_SHORT: pages the deck composes, cover and appendix included", run.stderr)
-            self.assertIn("floor 50: short by", run.stderr)
-            # The build refuses the same deck under the same code: the check met it first. The pages go back to the ones the
-            # deck.json was compiled from, which the build would otherwise refuse as older than its pages (DECK_OLDER_THAN_PAGES).
-            file.write_text(compiled, encoding="utf-8")
-            deck = work / "finance.deck.json"
-            spec = json.loads(deck.read_text())
-            spec["purpose"] = "evaluation"
-            deck.write_text(json.dumps(spec))
-            build = subprocess.run([NODE, str(SKILL / "runtime" / "build-deck.mjs"), str(deck), str(work / "out"), "--no-render", "--no-fetch"], cwd=ROOT, capture_output=True, text=True, timeout=300)
-            self.assertEqual(build.returncode, 2)
-            self.assertIn("EVALUATION_TOO_SHORT", build.stderr)
-
     def test_the_final_check_is_named_where_a_renderer_is_installed(self):
         result = run_node('''
 import { describe } from './skills/professional-slides/runtime/doctor.mjs';

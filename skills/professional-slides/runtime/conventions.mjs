@@ -14,9 +14,8 @@
 //   currency         "symbols" (£, $, €) or "codes" (GBP, USD, EUR), wherever a currency prints
 //   heat             "dark-is-better" or "dark-is-more": the one direction every heat scale runs
 //
-// The renderer applies what it can (the subject's focus, the currency's form, the heat's direction; compose-passes.mjs
-// "deck-conventions"); a per-page gate holds the rest (gates/convention_gates.mjs), so a writer meets each on their own
-// page check. Every key is optional, and a deck without `conventions` composes as it did.
+// A per-page gate holds them (gates/convention_gates.mjs), so a writer meets each on their own page check; the composer
+// draws each page as written. Every key is optional.
 import path from "node:path";
 import { playerEntries, playerNames } from "./players.mjs";
 import { isRankMeasure } from "./measures.mjs";
@@ -162,29 +161,6 @@ export function refusedFormsIn(text, refused) {
   return [...refused.keys()].filter((form) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(form)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(text));
 }
 
-// A magnitude written after a currency ("£m", "GBP bn") closes up against it; anything else ("per seat") keeps its space.
-const MAGNITUDE = /^(?:k|m|mn|bn|b|tn|thousand|million|billion|trillion)$/i;
-const CODE_UNIT = new RegExp(`^(${Object.keys(CURRENCIES).join("|")})(?:\\s+|$)(.*)$`);
-const SYMBOL_UNIT = new RegExp(`^([${Object.values(CURRENCIES).join("")}])\\s*(.*)$`);
-
-/**
- * A unit written in the deck's currency form: "GBP m" as "£m" under symbols, "£m" as "GBP m" under codes. A unit that
- * does not lead with a currency, or a deck that declares no form, keeps the unit as it is.
- */
-export function currencyUnit(unit, form) {
-  if (typeof unit !== "string" || !CURRENCY_FORMS.includes(form)) return unit;
-  const text = unit.trim();
-  if (form === "symbols") {
-    const coded = text.match(CODE_UNIT);
-    if (!coded) return unit;
-    const rest = coded[2].trim(), [first = ""] = rest.split(/\s+/);
-    return `${CURRENCIES[coded[1]]}${!rest ? "" : MAGNITUDE.test(first) ? rest : ` ${rest}`}`;
-  }
-  const symbol = text.match(SYMBOL_UNIT);
-  if (!symbol) return unit;
-  return `${CODE_OF[symbol[1]]}${symbol[2].trim() ? ` ${symbol[2].trim()}` : ""}`;
-}
-
 /**
  * Each currency form typed in `text` that breaks the deck's convention, as `{ wrote, write }`: a code where the deck writes
  * symbols, a symbol where it writes codes. The forms are the closed ISO set above, read as whole words.
@@ -219,22 +195,7 @@ export function peerSetOf(conventions, members, named = undefined, { players = n
   return { set: null, nearest: nearest ? read(nearest) : null };
 }
 
-/**
- * A currency written in the deck's form inside a runtime-written text - a chart heading the binding closes on its measure's
- * unit ("Revenue, GBP m"): a code before a figure or a magnitude as its symbol ("£1.2bn", "£m"), a symbol as its code.
- */
-export function currencyText(text, form) {
-  if (typeof text !== "string" || !CURRENCY_FORMS.includes(form)) return text;
-  if (form === "symbols") return text.replace(new RegExp(`(?<![\\p{L}\\p{N}])(${Object.keys(CURRENCIES).join("|")})(?![\\p{L}])(?:\\s+(?=\\d|(?:k|m|mn|bn|tn)(?![\\p{L}])))?`, "gu"), (_, code) => CURRENCIES[code]);
-  return text.replace(new RegExp(`([${Object.values(CURRENCIES).join("")}])\\s*`, "gu"), (_, symbol) => `${CODE_OF[symbol]} `).replace(/\s+$/, "");
-}
-
-const SERIES_CHARTS = new Set(["chart.column", "chart.bar", "chart.line", "chart.area", "chart.lollipop"]);
-const ONE_BAR = new Set(["chart.column", "chart.bar", "chart.lollipop"]);
-const STACKS = new Set(["chart.stacked-column", "chart.stacked-bar"]);
 const POINTS = new Set(["chart.scatter", "chart.bubble"]);
-// The chart colours a series may take (chart-axes.mjs SERIES): the second is the accent.
-const SERIES_COLOURS = 6;
 /** Whether the exhibit names its own focus: the author's mark stands, and the gate holds it to the subject (convention_gates.mjs). */
 export const authorFocused = (ex) => ex?.focus !== undefined || ex?.focusSeries !== undefined || ex?.colorIndices !== undefined || (Array.isArray(ex?.highlights) && ex.highlights.length > 0)
   || (ex?.type === "table" && (ex.highlightRow !== undefined || ex.decisive !== undefined));
@@ -245,77 +206,6 @@ export function memberLabels(ex) {
   if (type === "table") return { rows: (ex.rows || []).map((row) => labelOf(cellsOf(row)[0])) };
   return { series: (Array.isArray(ex?.series) ? ex.series : []).map((s) => labelOf(s?.name)), categories: (ex?.categories || []).map(labelOf),
     points: POINTS.has(type) ? (ex.points || []).map((p) => labelOf(p?.name)) : [] };
-}
-
-/**
- * The subject's focus on one exhibit, set by the renderer: where a chart plots the page's subject - a series, a category or
- * a point - the subject takes the mark `focusSeries`, `highlights` or `focus` already draws, the rest muted; where a table's
- * rows are players, the subject's row is highlighted. Where the subject is not plotted, no series takes the accent: three
- * series or more, or a stack's parts, skip the second colour, which the default order gave to whichever series was
- * second (pr02 put the accent on Iberia, fd01 on Lufthansa Group). An exhibit that names its own focus keeps it.
- */
-export function subjectFocus(ex, subject, players) {
-  if (!ex || !subject || authorFocused(ex)) return ex;
-  const type = String(ex.type ?? ""), is = (label) => Boolean(label) && (label === subject || playerInLabel(players, label) === subject);
-  const { series = [], categories = [], points = [], rows } = memberLabels(ex);
-  if (rows) {
-    const at = rows.findIndex(is);
-    return at >= 0 && rows.filter((label) => playerInLabel(players, label)).length >= 2 ? { ...ex, highlightRow: at, subjectRow: true } : ex;
-  }
-  if (POINTS.has(type)) { const point = points.find(is); return point && points.length > 2 ? { ...ex, focus: [ex.points[points.indexOf(point)].name] } : ex; }
-  const inSeries = series.findIndex(is), category = categories.findIndex(is);
-  // One colour for the subject on every kind: its series in the accent (`subjectAccent`), as its bar and its row's marker.
-  if (inSeries >= 0 && SERIES_CHARTS.has(type) && series.length >= 2) return { ...ex, focusSeries: ex.series[inSeries].name, subjectAccent: true };
-  if (category >= 0 && (SERIES_CHARTS.has(type) || STACKS.has(type)) && !["chart.line", "chart.area"].includes(type))
-    return { ...ex, highlights: [{ category: String(ex.categories[category]), style: ONE_BAR.has(type) && series.length <= 1 ? "bar" : "region-tint" }], subjectAccent: true };
-  if (inSeries < 0 && category < 0 && series.length < SERIES_COLOURS && ((SERIES_CHARTS.has(type) && series.length >= 3) || (STACKS.has(type) && series.length >= 2)))
-    return { ...ex, colorIndices: series.map((_, i) => (i === 0 ? 0 : i + 1)) };
-  return ex;
-}
-
-/**
- * The composer's pass over the deck's conventions (compose-passes.mjs "deck-conventions"): the subject's focus on every
- * exhibit, the currency's form in every unit and runtime-written heading, the heat's direction kept only where the deck
- * declares "dark-is-better", and an exhibit's `omits` - the peer-set members it leaves out, with why - as a note line.
- */
-export function applyConventions(slide, { conventions = null, players = null } = {}) {
-  // The subject is the deck's convention: a deck that declares none draws exactly as it did.
-  const subject = conventions ? slide.subject ?? pageSubject(conventions, {}, null, players) : null;
-  const form = conventions?.currency, merit = conventions?.heat === "dark-is-better";
-  const notes = [];
-  const apply = (exIn) => {
-    if (!exIn || typeof exIn !== "object") return exIn;
-    const { peers, omits, ...ex0 } = exIn;
-    if (omits && typeof omits === "object" && Object.keys(omits).length)
-      notes.push(`Left out of ${typeof peers === "string" ? `the ${peers}` : "the comparison"}: ${Object.entries(omits).map(([member, why]) => `${member} (${String(why).trim().replace(/\.$/, "")})`).join("; ")}.`);
-    let ex = subjectFocus(ex0, subject, players);
-    if (form) {
-      ex = { ...ex };
-      for (const key of ["unit", "xUnit", "yUnit", "sizeUnit"]) if (typeof ex[key] === "string") ex[key] = currencyUnit(ex[key], form);
-      if (typeof ex.heading === "string") ex.heading = currencyText(ex.heading, form);
-      if (Array.isArray(ex.series)) ex.series = ex.series.map((s) => (s && typeof s.unit === "string" ? { ...s, unit: currencyUnit(s.unit, form) } : s));
-    }
-    if (Array.isArray(ex.columns)) ex = { ...ex, columns: ex.columns.map((c) => {
-      if (!c || typeof c !== "object") return c;
-      const { better, ...rest } = c;
-      const column = form && typeof rest.unit === "string" ? { ...rest, unit: currencyUnit(rest.unit, form) } : rest;
-      // A heat column shades by merit only where the deck says so; elsewhere by size, as it always has.
-      return isHeatColumn(c) && merit && better !== undefined ? { ...column, better } : column;
-    }) };
-    return ex;
-  };
-  const out = { ...slide, ...(slide.exhibit ? { exhibit: apply(slide.exhibit) } : {}), ...(Array.isArray(slide.exhibits) ? { exhibits: slide.exhibits.map(apply) } : {}),
-    ...(Array.isArray(slide.blocks) ? { blocks: slide.blocks.map((block) => (block?.exhibit ? { ...block, exhibit: apply(block.exhibit) } : block)) } : {}) };
-  if (notes.length) out.note = Array.isArray(slide.note) ? [...slide.note, ...notes] : [slide.note, ...notes].filter(Boolean).join(" ");
-  // A tile's figure is printed from its measure in the format the page typed ("USD 0m" on hb06, "£0m" on pr04): its currency
-  // is written in the deck's form, as a chart's unit is.
-  if (form) {
-    const tile = (m) => (typeof m === "string" ? currencyText(m, form) : m && typeof m === "object"
-      ? { ...m, ...(typeof m.value === "string" ? { value: currencyText(m.value, form) } : {}), ...(typeof m.unit === "string" ? { unit: currencyUnit(m.unit, form) } : {}) } : m);
-    if (Array.isArray(slide.metrics)) out.metrics = slide.metrics.map(tile);
-    if (slide.kpi && typeof slide.kpi === "object") out.kpi = tile(slide.kpi);
-  }
-  return out;
 }
 
 /** A page's exhibits in order: its `exhibit`, its `exhibits`, and the exhibit of each of its `blocks`. */

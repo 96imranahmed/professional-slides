@@ -13,7 +13,6 @@ import {
 import { measureText } from "./text-layout.mjs";
 import { SCALAR_FIGURE } from "./value-format.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
-import { judged } from "./judgements.mjs";
 import { contrastRatio } from "./color.mjs";
 
 const CHANGE_ANNOTATION_STYLES = Object.freeze(["arrow", "bracket", "construction", "interval-label", "end-bubble"]);
@@ -1161,9 +1160,6 @@ export function normalizeChangeAnnotations(props = {}) {
       if (!["exact-source", "approximate-source-readings"].includes(annotation.basis)) throw new Error("Qualitative interval needs an explicit exact-source or approximate-source-readings basis");
       if (typeof annotation.qualification !== "string" || !annotation.qualification.trim()) throw new Error("Qualitative interval needs a qualification");
       if (annotation.showQualification !== undefined && typeof annotation.showQualification !== "boolean") throw new Error("showQualification must be boolean");
-      // A qualification marked approximate by its sign says so; one in words is read (qualification-says-approximate).
-      if (annotation.basis === "approximate-source-readings" && !/[~≈]/.test(annotation.qualification)
-        && judged("qualification-says-approximate", annotation.qualification.trim())?.verdict === "unqualified") throw new Error("Approximate interval qualification must explicitly identify approximate readings");
     } else if (!SCALAR_FIGURE.test(annotation.text)) throw new Error("Chart change bubbles require one numeric value; put the measure and period outside the bubble");
     return {
       ...annotation,

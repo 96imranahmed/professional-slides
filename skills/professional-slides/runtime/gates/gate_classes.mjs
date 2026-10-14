@@ -123,9 +123,9 @@ const LISTED = [
   // Headline figures crowded into ten pages (deck-structure.mjs headlineStructure): a form or a placement without one mends it.
   ...codes("S", "HEADLINE_CROWDED", ["layout", "type", "pages"]),
   // A summary, sections and unique ids are pages of the deck; the criteria a page serves and an evaluation's length are read off pages still to be drawn.
-  ...codes("S", "NO_SUMMARY NO_SECTIONS NO_CONTENTS STAGE_CONTRACT", ["pages"]),
-  ...codes("S", "MISSING_EVIDENCE EVALUATION_TOO_SHORT", ["layout", "pages"]),
-  ...codes("S", "STAGE_MISSING CONTENT_REJECTED PLAN_REJECTED VARIETY_REJECTED SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT", LAYOUT),
+  ...codes("S", "NO_SUMMARY NO_SECTIONS NO_CONTENTS", ["pages"]),
+  ...codes("S", "MISSING_EVIDENCE", ["layout", "pages"]),
+  ...codes("S", "SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT", LAYOUT),
   // A deck.json older than its pages (build-deck.mjs): the repair is the full compile that writes a current one.
   ...codes("S", "DECK_OLDER_THAN_PAGES", ["record"]),
 
@@ -187,7 +187,7 @@ const LISTED = [
   ...codes("P", "CONTENT_NO_CLAIM", ["title"]),
   ...codes("P", `TEXT_PLAN_INCOMPLETE TEXT_REFERENCE_MISSING TEXT_COVERAGE_LOW TEXT_BLOCK_TOO_LONG TEXT_TASK_MISMATCH
     CONTENT_ADDS_NOTHING TEXT_PAGE_UNPLANNED TEXT_PAGE_MISSING TEXT_PLAN_PAGINATION TEXT_PLAN_LOST
-    TEXT_UNPLANNED TEXT_EXPORT_LOST TEXT_EXPORT_UNPLANNED TEXT_PLAN_CHANGED CRAFT_SOURCE_CODES PLAN_EXHIBIT_REASON`, COPY),
+    TEXT_UNPLANNED TEXT_EXPORT_LOST TEXT_EXPORT_UNPLANNED CRAFT_SOURCE_CODES PLAN_EXHIBIT_REASON`, COPY),
   ...codes("P", "CONTENT_LAYOUT_LEAK CONTENT_LOST MISSING_VISUAL_INTENT MISSING_AUTHORED_CONTENT PLAN_VISUAL_ANCHOR", LAYOUT),
   // The composed scene and its render (gates/page_gates.py, validate-overlap.mjs): what the page holds, and what its words and marks say.
   ...codes("P", "TITLE_LINES TITLE_WORDS TITLE_COUNT", ["title"]),
@@ -314,14 +314,13 @@ const reasons = (why, list) => list.split(/\s+/).filter(Boolean).map((code) => [
 export const STANDING_FREE = Object.freeze(Object.fromEntries([
   ...reasons("holds or fails on a named statement, insight, analysis, section or file; nothing is counted toward a bar", `GENERATOR_SIGNATURE PILLAR_UNSUPPORTED
     REVISION_UNMAPPED REVISION_INVENTORY_MISSING REVISION_SOURCE_MISSING REVISION_SLIDE_SIZE REVISION_RULES_VERSION MEASURES_MISSING MEASURES_CONFLICT ANALYSIS_REQUIRED ANALYSIS_UNRESTED SOURCES_UNFILED SOURCE_NUMBERS_UNREAD EVIDENCE_HOMED_TWICE EVIDENCE_UNKNOWN EVIDENCE_ELSEWHERE EVIDENCE_UNHOMED SPINE_LOCKED REQUEST_MISSING WAIVERS_INVALID STATEMENT_INVALID
-    CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE STAGE_CONTRACT STAGE_MISSING DECK_OLDER_THAN_PAGES SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
+    CONTENT_CLAIM_REPEATS CONTENT_ANSWER_CONTRADICTED PLAN_SCHEMA MISSING_EVIDENCE DECK_OLDER_THAN_PAGES SLIDE_COUNT TEXT_EXPORT_PAGE_COUNT
     NUMBERS_DISAGREE NUMBER_STALE WORDING_STALE NUMBER_FORMATS_DIFFER PROOF_REPEATS BRIDGE_UNRECONCILED SOURCE_PREDATES_PERIOD`),
   ...reasons("an advisory on the families a plan declares; the variety contract and the craft floors hold the same quantity on the compiled deck, and theirs is the standing", `PLAN_TITLE_LENGTH
     PLAN_TABLE_SHARE PLAN_MEASURED_PAGES PLAN_EXHIBIT_MIX PLAN_EXHIBIT_RUN PLAN_NO_PICTURES PLAN_NO_ICONS PLAN_NO_INSIGHT PLAN_TABLE_DEPTH PLAN_TABLE_MONOTONY
     PLAN_UNANNOTATED_CHARTS PLAN_NO_HIGHLIGHT PLAN_EXHIBIT_VARIETY PLAN_CHART_MONOTONY`),
   ...reasons("a statement of the files the build would fetch, each named in the finding; the floor on what is drawn (CRAFT_PLAYERS_UNINTRODUCED) holds the standing", "ASSETS_NEEDED ASSETS_OFFLINE"),
   ...reasons("a statement of the questions the rules asked that no recorded judgement answers, each counted by kind in the finding; it is a step to take, not a bar the deck stands against", "JUDGEMENTS_PENDING"),
-  ...reasons("the build's refusal of a stage whose own findings carry the standing", "CONTENT_REJECTED PLAN_REJECTED VARIETY_REJECTED"),
   ...reasons("the lower floor of a rate whose build bar (BAR_TABLES_TREATED, BAR_CHARTS_ANNOTATED) writes the standing, against the delivery floor", "CRAFT_TABLES_PLAIN CRAFT_CHARTS_BARE"),
   ...reasons("a stage of the build that failed without a finding of its own", "READBACK_MISSING PREFLIGHT_FAILED GATES_FAILED"),
   ...reasons("an advisory naming the families of pages under their task's reference words; each page's own ratio is in the density profile, and the deck's in its `bodyWordsVsTaskMedian`", "FAMILY_LIGHT"),
@@ -353,7 +352,7 @@ export const measuresDeck = (code) => ["S", "G"].includes(GATE_CLASSES[code]) &&
 // introduced somewhere, and a kind of evidence or device it draws nowhere. A slide the revision carries may be the very page
 // such a rule asks for, and the runtime does not read it; so these need more than a population - a deck that is mostly the
 // runtime's own argument.
-const WHOLE_DECK = new Set(`NO_SUMMARY NO_SECTIONS NO_CONTENTS CONTENT_ANSWER_UNCARRIED EVALUATION_TOO_SHORT PLAYERS_UNMARKED CRAFT_PLAYERS_UNINTRODUCED
+const WHOLE_DECK = new Set(`NO_SUMMARY NO_SECTIONS NO_CONTENTS CONTENT_ANSWER_UNCARRIED PLAYERS_UNMARKED CRAFT_PLAYERS_UNINTRODUCED
   CRAFT_NO_TREND CRAFT_NO_ICONS CRAFT_NO_PICTURES PLAN_NO_PICTURES PLAN_NO_ICONS PLAN_NO_INSIGHT`.split(/\s+/));
 /** Does `code`, a rule that measures the deck, ask what the deck as a whole has - where every other such rule counts over a population of pages. */
 export const readsWholeDeck = (code) => measuresDeck(code) && WHOLE_DECK.has(code);

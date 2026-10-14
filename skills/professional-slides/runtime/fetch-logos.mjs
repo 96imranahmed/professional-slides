@@ -20,7 +20,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { isMain, parseCli, pythonBin, readJson, runCli, UsageError, writeJson, writeJsonWhole } from "./cli.mjs";
 import { spawn } from "node:child_process";
-import { judged } from "./judgements.mjs";
 import { logoPlayers } from "./players.mjs";
 
 export const UA = "professional-slides/1.0 (deck logo fetch; https://www.mediawiki.org/wiki/API:Etiquette)";
@@ -42,18 +41,13 @@ export async function articlesFor(player, hint) {
 }
 
 /**
- * The logo file named in an article's infobox: its `logo =` field, else its
- * `image =` field where that file is the organisation's logo. Whether it is -
- * an infobox's image is as often a photograph of the place or the fleet - is
- * read off the file's name (file-is-logo, judgements.mjs); unread, it is not
- * taken.
+ * The logo file named in an article's infobox: its `logo =` field. Its
+ * `image =` field is as often a photograph of the place or the fleet, so it is
+ * not taken; the page supplies the file instead.
  */
-export function logoFileFrom(wikitext, organisation = null) {
+export function logoFileFrom(wikitext) {
   const field = (name) => wikitext.match(new RegExp(`\\|\\s*${name}\\s*=\\s*(?:\\[\\[)?(?:File:|Image:)?([^|\\]\\n]+?\\.(?:svg|png|jpe?g|gif))`, "i"))?.[1]?.trim();
-  const named = field("logo") ?? field("logo_image");
-  if (named) return named;
-  const image = field("image");
-  return image && organisation && judged("file-is-logo", { organisation, file: image }, null, organisation)?.verdict === "logo" ? image : null;
+  return field("logo") ?? field("logo_image") ?? null;
 }
 
 // Crop a logo to its mark. Infobox logos often sit in a wide transparent or
@@ -100,7 +94,7 @@ export async function fetchLogo(player, directory, hint) {
   let title = null, file = null;
   for (const candidate of titles) {
     const parsed = await api({ action: "parse", page: candidate, prop: "wikitext", section: "0", redirects: "1" });
-    file = logoFileFrom(parsed.parse?.wikitext ?? "", player.name);
+    file = logoFileFrom(parsed.parse?.wikitext ?? "");
     if (file) { title = candidate; break; }
   }
   if (!file) return { name: player.name, article: titles[0], error: "no logo in the infobox of the top search results; set `wikipedia` on the player" };
