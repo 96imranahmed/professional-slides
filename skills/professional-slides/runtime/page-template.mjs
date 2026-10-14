@@ -124,8 +124,10 @@ export function pageTemplateLayout(frame, props = {}) {
   // for under the note bar (`sourceWordsMax`, set by the slide compile once it
   // has counted the page - core.mjs compileSlide): the footer as drawn counts
   // toward `NOTE_HEAVY`, so the runtime fits its own line under that bar and
-  // never asks the author to. The last form - the count alone - is drawn when
-  // no fuller one has room.
+  // never asks the author to. The last form - the primary sources alone, the
+  // rest counted - is drawn when no fuller one has room, at the footer's full
+  // line limit; where even that runs past it, the page is refused with what
+  // mends it, never set with its primaries deferred to the notes.
   const forms = Array.isArray(props.sourceForms) && props.sourceForms.length && props.source ? props.sourceForms : null;
   // Among the forms that still name every source, the fullest within the footer strong pages set - thirteen words at the
   // median, a quarter more allowed (FOOTER_WORDS) - is taken first: a source's short name identifies it, the full
@@ -140,6 +142,7 @@ export function pageTemplateLayout(frame, props = {}) {
       const layout = fits(text, wordsMax);
       if (layout) return { text, layout, data: forms ? { derived: true, ...(text !== forms[0] ? { fullCitation: forms[0] } : {}) } : {} };
     }
+    if (forms) throw new Error(`${refusal}: even its shortest form - "${forms.at(-1)}" - names the sources of the title's numbers and of each exhibit's plotted measures, which stay on the page. Give those sources registry \`short\` names, or split the exhibit so each page rests on fewer`);
     throw new Error(refusal);
   };
   const baselineTop = rowTop + (rowHeight - measure("7", 64).height) / 2;

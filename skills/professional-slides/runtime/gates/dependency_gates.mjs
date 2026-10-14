@@ -449,6 +449,84 @@ export function pageTexts(page) {
 export const typedNumbers = (page) => pageTexts(page).flatMap(({ field, text, written, figure }) => measurementsIn(text, figure, written).map((number) => ({ field, number })));
 
 /**
+ * What a page's title states of its measures: each token's measure and label,
+ * and each typed number that is one value of one measure of `pool` -
+ * `[{ ref, label, shown }]`, the label null for a measure of one value.
+ * `page` is the page as bound (its tokens written out), `title` the title as
+ * authored, `bound` the binding's record.
+ */
+export function titleCells(page, title, bound, pool) {
+  return [...(bound.stated.get(page) ?? []).filter((entry) => entry.how === "token" && /`title`$/.test(entry.field)).map((entry) => ({ ref: entry.ref, label: entry.label, shown: entry.shown })),
+    ...typedNumbers({ title }).flatMap(({ number }) => { const cells = statedCells(number, pool); return new Set(cells.map((cell) => `${cell.ref}@${cell.label}`)).size === 1 ? [{ ...cells[0], shown: number.shown }] : []; })];
+}
+
+/**
+ * The registry keys a page's source line names in every form the footer may
+ * set it in (page-types.mjs citationForms): the sources of the measures the
+ * title prints (`titled`, titleCells), then each exhibit's primary source -
+ * the key most of the measures it plots cite, every key tied for most. Only
+ * the rest may go to the notes as "+k more". On the BA retest eleven source
+ * lines deferred the whole citation: o01 and fd01 named a few sources and
+ * sent ten and eleven to the notes, fd04 and fd05 printed only "N records,
+ * listed in the notes", and a reader of the page could look up neither the
+ * title's figures nor the chart's.
+ */
+export function primaryCitations(page, registry, titled = []) {
+  const citeOf = (ref) => registry.get(ref)?.cite ?? [];
+  const title = titled.flatMap((cell) => citeOf(cell.ref));
+  const exhibits = [...exhibitsOf(page), ...metricsOf(page)].flatMap((item) => {
+    const tally = new Map();
+    for (const ref of refsOf(item.basis).filter((r) => registry.has(r))) for (const key of new Set(citeOf(ref))) tally.set(key, (tally.get(key) ?? 0) + 1);
+    const most = Math.max(0, ...tally.values());
+    return [...tally].filter(([, n]) => most > 0 && n === most).map(([key]) => key);
+  });
+  return [...new Set([...title, ...exhibits])];
+}
+
+// A headline figure is the large number set over or beside a page's exhibit: a hero's `kpi`, a strip's `metrics`.
+const headlineTiles = (page) => [...(page?.kpi && typeof page.kpi === "object" ? [page.kpi] : []), ...(Array.isArray(page?.metrics) ? page.metrics : [])].filter((tile) => tile && typeof tile === "object");
+const sameFigure = (a, b) => a.n === b.n && Boolean(a.percent) === Boolean(b.percent) && (a.scale ?? 1) === (b.scale ?? 1);
+const figureIn = (value) => measurementsIn(String(value ?? ""), true, String(value ?? ""))[0] ?? null;
+// The numbers an exhibit draws at its marks, by series, and whether it labels them.
+const markValues = (ex) => [...(Array.isArray(ex?.series) ? ex.series.flatMap((s) => (Array.isArray(s?.values) ? s.values : [])) : []), ...(Array.isArray(ex?.values) ? ex.values : [])].filter((v) => typeof v === "number" && Number.isFinite(v));
+const labelsMarks = (ex) => ex?.dataLabels !== false && ex?.showDataLabels !== false;
+
+/**
+ * Headline figures that say the title's number again (HEADLINE_REPEATS): one
+ * that prints the value the title states and a labelled mark of the exhibit
+ * prints too, and one that prints the title's number beside an exhibit of
+ * another measure, where the figure stands in for the comparison the chart
+ * never draws. Read by structure first - the cell a figure prints by
+ * reference against the cells the title states (titleCells) and the cells
+ * each exhibit draws (the binding's views) - and by the printed number where
+ * a figure, a title or a chart was typed. Never by words. On the BA retest a
+ * headline figure stood on twelve pages: on na03, na07, pr01, pr02, pr05 and
+ * sh01 the reader met one figure three times, and on na14, hb06, lc06, lc08,
+ * fd10 and hw03 the title's number stood over a chart of something else.
+ */
+function headlineRepeats(page, authored, bound, registry, titled) {
+  const charts = exhibitsOf(page).filter((ex) => markValues(ex).length || refsOf(ex.basis).length);
+  const tiles = headlineTiles(page), written = headlineTiles(authored);
+  if (!charts.length || !tiles.length) return [];
+  const titleNumbers = measurementsIn(String(page.title ?? ""));
+  return tiles.flatMap((tile, at) => {
+    const cell = written[at] ? recordedCell(written[at], registry) : null, figure = figureIn(tile.value);
+    const inTitle = (cell && titled.some((c) => c.ref === cell.ref && String(c.label ?? "") === String(cell.label ?? ""))) || (figure && titleNumbers.some((n) => sameFigure(n, figure)));
+    if (!inTitle) return [];
+    const drawn = (ex) => cell && (bound.views.get(ex)?.get(cell.ref)?.has(cell.label ?? null) ?? false);
+    const printedAt = (ex) => figure && markValues(ex).some((v) => Math.abs(v - figure.n) <= 0.5 * 10 ** -figure.decimals + 1e-9);
+    const onMark = charts.some((ex) => labelsMarks(ex) && (drawn(ex) || printedAt(ex)));
+    const plotsIt = charts.some((ex) => (cell ? refsOf(ex.basis).includes(cell.ref) : printedAt(ex)));
+    const what = `the ${tile === page.kpi ? "headline figure" : "metric"} ${tile.value}${tile.label ? ` ("${tile.label}")` : ""}`;
+    if (onMark) return [{ tile: at, value: String(tile.value), repeats: "title and mark",
+      repair: `${what} prints the number the title states, and the exhibit labels the same value on its mark: the reader meets one figure three times. Drop the figure and give its band to the exhibit (form or placement without \`kpi\`/\`metrics\`), or make it carry what neither the title nor the chart does - the change, the gap, the rate, a share of the total` }];
+    if (!plotsIt) return [{ tile: at, value: String(tile.value), repeats: "title beside another measure",
+      repair: `${what} prints the number the title states, over an exhibit of another measure: the title's comparison is never drawn. Drop the figure and give its band to the exhibit - plotting what the title compares where the chart does not - or make the figure carry what neither the title nor the chart does` }];
+    return [];
+  });
+}
+
+/**
  * The mark each page's own claim names on its charts: where the title states
  * a number of a measure at one period or member - by a token, or typed and
  * traced to exactly one such value of the measures the page rests on - and a
@@ -469,11 +547,7 @@ export function claimMarks(doc, insights) {
     if (!page || typeof page !== "object" || !page.type) return;
     const id = String(page.id ?? `page-${index + 1}`);
     if (bound.failed.has(id)) return;
-    const pool = pagePool(page, registry);
-    // What the title states: each token's measure and label, and each typed number that is one value of one measure.
-    const stated = [...(bound.stated.get(page) ?? []).filter((entry) => entry.how === "token" && /`title`$/.test(entry.field)).map((entry) => ({ ref: entry.ref, label: entry.label, shown: entry.shown })),
-      ...typedNumbers({ title: authored[index]?.title }).flatMap(({ number }) => { const cells = statedCells(number, pool); return new Set(cells.map((cell) => `${cell.ref}@${cell.label}`)).size === 1 ? [{ ...cells[0], shown: number.shown }] : []; })]
-      .filter((cell) => cell.label !== null && cell.label !== undefined);
+    const stated = titleCells(page, authored[index]?.title, bound, pagePool(page, registry)).filter((cell) => cell.label !== null && cell.label !== undefined);
     const marks = [];
     exhibitsOf(page).forEach((ex, at) => {
       const categories = (Array.isArray(ex.categories) ? ex.categories : Array.isArray(ex.labels) ? ex.labels : []).map(String), refs = refsOf(ex.basis);
@@ -709,6 +783,8 @@ export function dependencyFindings(doc, insights) {
     if (!proved && known.length && !out.some((f) => f.id === id && f.code === "PROOF_OFF_CLAIM"))
       add("PROOF_MISSING", `nothing on the page proves its claim: ${exhibits.some((ex) => ex.basis && refsIn(ex.basis, "context").length) && !proving.length ? "every measure its exhibits show is context" : "no exhibit or metric names a measure of the claim as proof"}. Plot ${known.join(", ")}, or name it in the metric that states it (a strip's \`metrics\`, a hero's \`kpi\`, a row block's \`metric\`, a fact-grid item: \`{ measure, format, label }\`, or a typed \`value\` with its \`basis\`), or the page argues from an exhibit about something else`, { claim: known });
     out.push(...relationFindings(page, id, registry));
+    for (const repeat of headlineRepeats(page, authored[index], bound, registry, titleCells(page, authored[index]?.title, bound, pagePool(page, registry))))
+      out.push({ code: "HEADLINE_REPEATS", id, severity: "blocker", measured: { value: repeat.value, repeats: repeat.repeats }, repair: `${id}: ${repeat.repair}` });
     const cites = requiredCitations(page, registry, [...(bound.printed.get(page) ?? [])]);
     if (cites.length && page.source !== undefined) {
       // A typed line is refused here whoever typed it. Where it is the line the slide a revision's page stands for already

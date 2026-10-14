@@ -173,6 +173,8 @@ export function measureProblems(insight) {
     for (const field of ["cite", "sources"]) if (m[field] !== undefined && !(Array.isArray(m[field]) && m[field].length && m[field].every((entry) => typeof entry === "string" && entry.trim())))
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
     if (m.assumed !== undefined && m.assumed !== true) problems.push(`${at}: \`assumed\` is true for a number that is an assumption rather than a record, or left out`);
+    // A plan, a target, a forecast or an announced rate is published before the periods it is for (sources-registry.mjs sourceAgeProblems).
+    if (m.projected !== undefined && m.projected !== true) problems.push(`${at}: \`projected\` is true for values a source set out ahead of their periods - a plan, a target, a forecast, an announced rate - or left out`);
     if (m.assumed === true && (typeof m.rationale !== "string" || m.rationale.trim().split(/\s+/).length < 4)) problems.push(`${at}: an assumed measure says why that number in \`rationale\``);
     // A dated event the values turn on - a switch, a law, a launch - is recorded with them, where the critic reads it and the chart draws it.
     if (m.events !== undefined && (axis.kind !== "periods" || !m.events || typeof m.events !== "object" || Array.isArray(m.events)

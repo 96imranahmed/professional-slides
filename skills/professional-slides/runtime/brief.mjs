@@ -156,7 +156,7 @@ function commandLines(role, { file, ids, deckFile, part, spine }) {
 }
 
 // The caps a writer chooses within: where the commentary sits and whether the page closes on a line. The rest are the skeleton's.
-const PLACEMENT_QUOTAS = new Set(["VARIETY_COMMENTARY", "VARIETY_COLUMN", "VARIETY_TAKEAWAY"]);
+const PLACEMENT_QUOTAS = new Set(["VARIETY_COMMENTARY", "VARIETY_COLUMN", "VARIETY_TAKEAWAY", "HEADLINE_CROWDED"]);
 
 /**
  * The section's room under each of the deck's caps (deck-structure.mjs
@@ -175,7 +175,7 @@ function quotaLines(quotas, role, parts) {
   };
   const lines = quotas.quotas.filter((q) => role === "skeleton" || PLACEMENT_QUOTAS.has(q.code)).map((q) => {
     const left = Math.max(q.room, 0), over = q.own.length - left;
-    const change = q.code === "VARIETY_TYPE_SHARE" ? "type" : q.code === "VARIETY_EXHIBIT_MIX" ? "exhibit" : "placement";
+    const change = q.code === "VARIETY_TYPE_SHARE" ? "type" : q.code === "VARIETY_EXHIBIT_MIX" ? "exhibit" : q.code === "HEADLINE_CROWDED" ? "form without a headline figure" : "placement";
     const standing = over > 0 ? `: ${over} over - give ${over === 1 ? "one" : `${over} of them`} another ${change}` : over === 0 ? ": at the cap" : `: ${-over} to spare`;
     return `- ${q.what} (${q.code}${q.key ? `.${q.key}` : ""}, at most ${Math.round(q.share * 100)}%): the deck's cap is ${q.cap} of ${q.of} pages; the other sections hold ${q.others.length}` +
       `${q.others.length ? ` (${bySection(q.others)})` : ""}, which leaves this section ${left}${q.room < 0 ? ` (they are ${-q.room} over it already)` : ""}; it holds ${q.own.length}${q.own.length ? ` (${q.own.join(", ")})` : ""}${standing}`;

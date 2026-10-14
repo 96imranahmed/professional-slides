@@ -16,8 +16,12 @@ export const OVERLAP_CODES = Object.freeze({
   MAP_LABEL_ASTRAY: "a map marker's label set nearer another marker than its own, with no leader to its own",
 });
 
-const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption", "exhibit-link-label"]);
-const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader", "exhibit-link-line"]);
+const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption", "exhibit-link-label", "chart-event-label"]);
+// An event's dashed rule is a line through the plot like a reference line, and was read as none: on the BA retest the
+// Covid-grounding rule ran through "207,000 flights" and "22" on hb01 and through "107" on hb02, and no check saw it.
+const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader", "exhibit-link-line", "chart-event-line"]);
+// A callout's box is filled: a label under it is hidden whether or not the callout's own words meet its ink.
+const COVERING_ROLES = new Set(["annotation-surface"]);
 const BOX_ROLES = new Set(["flow-step", "chart-mark", "fact-tile"]);
 const RULE_ROLES = new Set(["divider-accent", "cover-accent", "section-heading-rule", "takeaways-rule"]);
 const OLD_STYLE_DESCENDERS = /[34579]/;
@@ -124,6 +128,17 @@ export function sceneCollisions(slide) {
     const [[a, p], [b, q]] = [inked[i], inked[j]];
     const across = Math.min(p.x + p.width, q.x + q.width) - Math.max(p.x, q.x), down = Math.min(p.y + p.height, q.y + q.height) - Math.max(p.y, q.y);
     if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: a.id, other: b.id, roles: [a.role, b.role] });
+  }
+  // A label under another callout's box: the two inks need not meet for the label to be lost. On the BA retest hw02's
+  // callout box covered the top half of the event label "Domestic band and band C added" while the callout's words ended
+  // a pixel above it, so the ink test above passed it. The box's own words (one annotation key) are what it holds.
+  for (const box of nodes.filter((n) => n.type === "rect" && COVERING_ROLES.has(n.role) && n.frame)) {
+    const f = box.frame, key = box.data?.annotationKey;
+    for (const [text, ink] of inked) {
+      if (key !== undefined && text.data?.annotationKey === key) continue;
+      const across = Math.min(ink.x + ink.width, f.x + f.width) - Math.max(ink.x, f.x), down = Math.min(ink.y + ink.height, f.y + f.height) - Math.max(ink.y, f.y);
+      if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: text.id, other: box.id, roles: [text.role, box.role] });
+    }
   }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
     const size = Number(numeral.style?.fontSize?.value ?? 0) * 96 / 72, bottom = numeral.frame.y + numeral.frame.height;
