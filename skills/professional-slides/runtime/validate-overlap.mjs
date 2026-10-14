@@ -112,7 +112,9 @@ export function sceneCollisions(slide) {
       // annotation's label is the crossing this refuses.
       const key = line.data?.annotationKey;
       if (["annotation-leader", "data-label-leader"].includes(line.role) && ["annotation-text", "data-label"].includes(text.role) && (key === undefined || key === text.data?.annotationKey)) continue;
-      if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role] });
+      // An event's rule and label were read from rules version 12 (weight.json): the rule's variant `event`.
+      const event = line.role === "chart-event-line" || text.role === "chart-event-label";
+      if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role], ...(event ? { rule: "TEXT_ON_LINE.event" } : {}) });
     }
     for (const box of nodes.filter((n) => n.type === "rect" && BOX_ROLES.has(n.role))) {
       const f = box.frame, inside = ink.x >= f.x && ink.y >= f.y && ink.x + ink.width <= f.x + f.width && ink.y + ink.height <= f.y + f.height;
@@ -137,7 +139,7 @@ export function sceneCollisions(slide) {
     for (const [text, ink] of inked) {
       if (key !== undefined && text.data?.annotationKey === key) continue;
       const across = Math.min(ink.x + ink.width, f.x + f.width) - Math.max(ink.x, f.x), down = Math.min(ink.y + ink.height, f.y + f.height) - Math.max(ink.y, f.y);
-      if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: text.id, other: box.id, roles: [text.role, box.role] });
+      if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: text.id, other: box.id, roles: [text.role, box.role], rule: "TEXT_ON_TEXT.covered" });
     }
   }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
@@ -220,8 +222,8 @@ const OVERLAP_REPAIR = Object.freeze({
  * it composes, so the author meets them before the build does.
  */
 export function sceneDesignFindings(scene) {
-  return (scene?.slides || []).flatMap((slide, i) => [...sceneCollisions(slide), ...sceneChartFindings(slide)].map(({ code, slide: _, ...measured }) => ({
-    slide: i + 1, id: slide.sourceSlideId ?? slide.id, code, severity: OVERLAP_SEVERITY[code] ?? "blocker",
+  return (scene?.slides || []).flatMap((slide, i) => [...sceneCollisions(slide), ...sceneChartFindings(slide)].map(({ code, slide: _, rule, ...measured }) => ({
+    slide: i + 1, id: slide.sourceSlideId ?? slide.id, code, ...(rule ? { rule } : {}), severity: OVERLAP_SEVERITY[code] ?? "blocker",
     measured, threshold: code === "TEXT_ON_EDGE" ? "2px clear" : "no contact", repair: OVERLAP_REPAIR[code],
   })));
 }

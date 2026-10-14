@@ -1065,7 +1065,7 @@ export function sectionQuotas(doc, { insights = null, compiled = null, mine, fil
     quota("VARIETY_COLUMN", null, "pages of one exhibit beside a text column", VARIETY.columnShareMax, columns.column.ids.map(String), columns.pages),
     // The headline figures' budget, shared out as the other caps are: on the BA retest parallel writers each added the
     // device to their own pages, and twelve came back with it.
-    quota("HEADLINE_CROWDED", null, `pages with a headline figure over or beside their exhibit (and no more than ${HEADLINE.perWindowMax} in any ${HEADLINE.window} consecutive)`, HEADLINE.perWindowMax / HEADLINE.window, ids((item) => headlinePage(item.slide))),
+    quota("HEADLINE_CROWDED", null, `pages with a headline figure over or beside their exhibit, no more than ${HEADLINE.perWindowMax} in any ${HEADLINE.window} consecutive`, HEADLINE.perWindowMax / HEADLINE.window, ids((item) => headlinePage(item.slide))),
   ];
   // The kinds: a floor the deck's length sets, those the other sections draw, the section's own, and what its pages could add.
   const kindsOf = (items) => new Set(items.flatMap((item) => exhibitKinds(item.slide)));

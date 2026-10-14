@@ -148,6 +148,24 @@ console.log(JSON.stringify(sceneCollisions(slide).filter((f) => ["TEXT_ON_LINE",
         self.assertIn(["TEXT_ON_TEXT", "flag", "box"], result)
         self.assertNotIn(["TEXT_ON_TEXT", "note", "box"], result)
 
+    def test_a_revision_under_version_eleven_hears_the_widened_readings_as_advisories(self):
+        """Event rules and covering boxes were read from rules version 12: a revision recorded under 11 is not refused by them."""
+        result = run_node(f'''
+import {{ sceneDesignFindings }} from '{RT}/validate-overlap.mjs';
+import {{ applyRulesVersion }} from '{RT}/weight.mjs';
+const style = {{ fontFamily: {{ value: "Arial" }}, fontSize: {{ value: 10 }}, align: "center", valign: "top" }};
+const scene = {{ slides: [{{ id: "s", nodes: [
+  {{ type: "text", id: "label", role: "data-label", text: "207,000 flights", frame: {{ x: 600, y: 480, width: 120, height: 24 }}, style }},
+  {{ type: "line", id: "rule", role: "chart-event-line", frame: {{ x: 659, y: 360, width: 0, height: 250 }}, data: {{ x1: 659, y1: 360, x2: 659, y2: 610 }} }},
+  {{ type: "text", id: "flag", role: "chart-event-label", text: "Domestic band added", frame: {{ x: 180, y: 310, width: 150, height: 16 }}, style: {{ ...style, align: "left" }} }},
+  {{ type: "rect", id: "box", role: "annotation-surface", frame: {{ x: 219, y: 270, width: 239, height: 46 }}, data: {{ annotationKey: "k" }} }} ] }}] }};
+const found = sceneDesignFindings(scene).filter((f) => ["TEXT_ON_LINE", "TEXT_ON_TEXT"].includes(f.code));
+const under = (version) => applyRulesVersion(found, {{ workflow: 'existing_deck_revision', rulesVersion: version }}).map((f) => [f.rule, f.severity]).sort();
+console.log(JSON.stringify({{ eleven: under(11), twelve: under(12) }}));
+''')
+        self.assertEqual(result["eleven"], [["TEXT_ON_LINE.event", "advisory"], ["TEXT_ON_TEXT.covered", "advisory"]])
+        self.assertEqual(result["twelve"], [["TEXT_ON_LINE.event", "blocker"], ["TEXT_ON_TEXT.covered", "blocker"]])
+
     def test_an_event_rule_breaks_at_the_value_labels_it_crosses(self):
         result = run_node(f'''
 import {{ REGISTRY }} from '{RT}/registry.mjs';

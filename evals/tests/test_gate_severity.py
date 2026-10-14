@@ -19,7 +19,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from node_probe import requires_python_package, run_node
 
@@ -166,10 +165,10 @@ class RulesVersionTests(unittest.TestCase):
         found = []
         render_gates.gate_words(2, slide, found, "executive")
         self.assertEqual([(f["code"], f["measured"], f["threshold"], f.get("before")) for f in found], [("WORDS", 200, 175, 293)])
-        self.assertEqual(gate_config.rule_of(found[0]), "WORDS")   # no version lowered it yet: the coordinator records one
-        with mock.patch.dict(gate_config.RULES["tightened"], {"WORDS": {"version": 12}}):
-            self.assertEqual(gate_config.rule_of(found[0]), "WORDS.tightened")
-            self.assertEqual(gate_config.rule_of({**found[0], "measured": 300}), "WORDS")
+        # Rules version 12 lowered it (weight.json): between the two bars it is the tightened rule, past the fence the rule as it was.
+        self.assertIn("WORDS.tightened", gate_config.RULES["introduced"]["12"])
+        self.assertEqual(gate_config.rule_of(found[0]), "WORDS.tightened")
+        self.assertEqual(gate_config.rule_of({**found[0], "measured": 300}), "WORDS")
         over = []
         render_gates.gate_words(2, {**slide, "planBodyWords": 170}, over, "executive")
         self.assertEqual(over, [])

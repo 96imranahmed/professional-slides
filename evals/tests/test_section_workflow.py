@@ -166,7 +166,7 @@ class BriefTests(unittest.TestCase):
         self.assertIn("the deck's cap is 1 of 7 pages; the other sections hold 2 (b 2), which leaves this section 0 (they are 1 over it already); it holds 1 (f1): 1 over", close)
         self.assertEqual(close, next(line for line in held if "(VARIETY_TAKEAWAY," in line))
         # The writer is told the placements it chooses, the skeleton the types, the numbers family and the kinds too.
-        self.assertEqual(sorted(line.split("(", 1)[1].split(",")[0] for line in placed), ["VARIETY_COLUMN", "VARIETY_COMMENTARY.below", "VARIETY_TAKEAWAY"])
+        self.assertEqual(sorted(line.split("(", 1)[1].split(",")[0] for line in placed), ["HEADLINE_CROWDED", "VARIETY_COLUMN", "VARIETY_COMMENTARY.below", "VARIETY_TAKEAWAY"])
         trend = next(line for line in held if "(VARIETY_TYPE_SHARE.trend," in line)
         self.assertIn("the other sections hold 2 (b 2)", trend)
         self.assertIn("it holds 1 (f1)", trend)
