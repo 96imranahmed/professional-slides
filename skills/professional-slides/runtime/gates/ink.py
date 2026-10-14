@@ -55,10 +55,6 @@ def grey_contrast(a, b):
     return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
 
-def _threshold(grey, luminance):
-    return relative(grey.histogram(), luminance) if luminance < 255 else luminance
-
-
 def dark_background(histogram):
     """The commonest dark grey of a page set on a dark ground: its background."""
     return max(range(128), key=histogram.__getitem__)
@@ -110,51 +106,6 @@ def ink_matrix(grey, luminance=INK_LUMINANCE, dark=False):
 def ink_rows(grey, luminance=INK_LUMINANCE, dark=False):
     """rows[y] = count of marked pixels on row y of a load_grey array."""
     return ink_matrix(grey, luminance, dark).sum(axis=1).tolist()
-
-
-def load_ink_matrix(path, luminance=INK_LUMINANCE, dark=False):
-    """The 1280x720 ink mask as a numpy array (rows x columns of booleans), or
-    None when numpy or Pillow is not installed. Column-aware gates need the
-    grid; the row gates take its row sums."""
-    grey = load_grey(path)
-    return None if grey is None else ink_matrix(grey, luminance, dark)
-
-
-def load_ink_rows(path, luminance=INK_LUMINANCE, dark=False):
-    """Return rows[y] = count of pixels darker than `luminance` on that row of the
-    1280x720 canvas, or None when Pillow is not installed. Ink uses
-    INK_LUMINANCE; occupancy (for the dead-band and void gates) uses
-    SURFACE_LUMINANCE so a tinted card or band counts as designed space rather
-    than emptiness.
-
-    Pillow is optional (see requirements.txt), and it is the only thing these
-    three gates need that the rest of the file does not. Crashing here took the
-    whole report down - every scene-level gate included - on a machine that was
-    missing one package, which is the wrong trade: the pixel gates are a
-    supplement to the scene gates, not a precondition for them. Without numpy
-    the rows are counted with Pillow alone."""
-    grey = load_grey(path)
-    if grey is not None:
-        return ink_rows(grey, luminance, dark)
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-
-    with Image.open(path) as image:
-        grey = image.convert("L")
-        if grey.size != (CANVAS_W, CANVAS_H):
-            grey = grey.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
-        if dark and luminance < 255:
-            floor = dark_background(grey.histogram()) + (255 - luminance)
-            mask = grey.point(lambda p: 255 if p > floor else 0, mode="L")
-        else:
-            luminance = _threshold(grey, luminance)
-            mask = grey.point(lambda p: 255 if p < luminance else 0, mode="L")
-        return [
-            int(sum(mask.crop((0, y, CANVAS_W, y + 1)).histogram()[1:]))
-            for y in range(CANVAS_H)
-        ]
 
 
 def render_path(render_dir, slide_number):

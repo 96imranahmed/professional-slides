@@ -82,46 +82,5 @@ console.log(JSON.stringify(corpus.map((text) => ({
                 self.assertEqual(text_stats.words(text), js["words"])
                 self.assertEqual(text_stats.word_count(text), js["count"])
 
-    def test_content_words_match(self):
-        for text, js in zip(CORPUS + [None], self.js):
-            with self.subTest(text=text):
-                self.assertEqual(sorted(text_stats.content_words(text)), js["content"])
-
-    def test_the_cases_the_old_counters_split_on(self):
-        # Every token is a word, a dash and a bullet included; a line broken at
-        # a hyphen is one word; an invisible character is no word at all.
-        self.assertEqual(text_stats.word_count("Revenue — up 12%"), 4)
-        self.assertEqual(text_stats.word_count("self-\nfunded"), 1)
-        self.assertEqual(text_stats.word_count("­ ​"), 0)
-        self.assertEqual(text_stats.word_count(None), 0)
-        # A printed word carries a letter or a digit: the bullet and the dash
-        # pdftotext sets as tokens of their own are not ones.
-        self.assertEqual(text_stats.printed_words("• Revenue — up 12%"), ["Revenue", "up", "12%"])
-
-
-class OneDefinitionTests(unittest.TestCase):
-    def test_every_python_reader_uses_the_one_definition(self):
-        import density_profile
-        import page_gates
-        import render_gates
-        import scene_gates
-        self.assertIs(page_gates.word_count, text_stats.word_count)
-        self.assertIs(render_gates.word_count, text_stats.word_count)
-        self.assertIs(scene_gates.word_count, text_stats.word_count)
-        self.assertIs(density_profile.printed_words, text_stats.printed_words)
-        self.assertEqual(density_profile.words("• Revenue — up 12%"), 3)
-
-    def test_the_stopwords_live_in_one_file(self):
-        lists = json.loads((GATES / "stopwords.json").read_text(encoding="utf-8"))
-        self.assertEqual(text_stats.STOPWORDS, frozenset(lists["content"]))
-        # Every reader takes the file's list rather than a copy: the Python
-        # gates hold the very objects, and the Node gate drops every listed word.
-        kept = run_node(f"""
-import {{ contentWords }} from './skills/professional-slides/runtime/gates/content_gates.mjs';
-console.log(JSON.stringify([...contentWords({json.dumps(" ".join(sorted(lists["content"])) + " revenue")})]));
-""")
-        self.assertEqual(kept, ["revenue"])
-
-
 if __name__ == "__main__":
     unittest.main()

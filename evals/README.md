@@ -1,37 +1,10 @@
 # evals
 
-Verification for `skills/professional-slides` covers content and plan contracts,
-composition, export, readback, rendered geometry and delivery-review bindings.
+Verification for `skills/professional-slides` covers the pages file's contract,
+binding, composition, export, readback and rendered geometry.
 Passing these checks does not establish editorial or visual taste. The pipeline
 the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#pipeline);
 none of it is repeated here.
-
-## Quality eval
-
-`quality/` is the end-to-end measurement the unit suite cannot make: a headless
-agent given a brief and nothing else, the deck it delivers judged blind from
-its renders, and a pairwise comparison with the previous skill version on the
-same brief. Results accumulate in `quality/results.jsonl`, keyed by skill
-version, judge model, brief and run. Development briefs are in
-`quality/briefs/dev/`; `quality/briefs/heldout/` is never used for tuning. See
-`quality/README.md`.
-
-Each run packages this checkout, gives a headless agent the brief in an empty
-workspace, judges the delivered deck blind from its renders against
-`quality/rubric.md`, and compares it pairwise with the latest stored deck of a
-different skill version (the git tree hash of `skills/`) on the same brief.
-`quality/score.mjs` scores a run's plan and build apart - the plan gates and the
-build bars - and refuses to average them, because a plan that passes while its
-deck does not is a different problem from the reverse.
-
-```bash
-node evals/quality/run.mjs --set dev --runs 3 [--agent claude] [--judge claude] [--dry-run]
-node evals/quality/run.mjs --report                # the summary for this skill version
-node evals/quality/score.mjs out/deck.plan.json out/   # score one run's plan and build by hand
-node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught (typed, bound and traced numbers), clean fixture decks clear
-node evals/quality/critic-calibration.mjs --repeats 5 [--dry-run]   # the storyline critic on frozen packets: its spread, and planted anchors
-node evals/quality/variability.mjs                 # the plan under several seeds and design systems: decks differ where a claim leaves a choice of form, and nowhere else
-```
 
 ## Point changes
 
@@ -41,20 +14,12 @@ title, an exhibit redrawn - run the way `SKILL.md` tells an author to run it,
 on decks made on the spot. It checks that the change was made, that every
 other slide came out byte for byte as it went in, that a figure left behind
 on another slide was caught, and that nothing but the changed pages was
-refused, critiqued or reviewed; and it counts the commands the run took. See
+refused; and it counts the commands the run took. See
 `point-change/README.md`.
 
 ```bash
 node evals/point-change/run.mjs [--task <id>] [--agent claude]
 ```
-
-## Calibration
-
-`calibration/` re-derives the targets in `runtime/reading-tasks.json` and
-`runtime/weight.json` from a calibration set kept outside the repository and
-found through the `PS_CALIBRATION_CORPUS` environment variable. It holds
-tooling only: no data file that could name the set's documents sits in the
-repository, and the shipped targets are numbers. See `calibration/README.md`.
 
 ## Support code
 
@@ -98,39 +63,14 @@ node evals/scripts/dead_exports.mjs
 
 # deterministic page gates on any scene + render
 python3 skills/professional-slides/runtime/gates/page_gates.py \
-    scene.json render_dir/ [--report out.json] \
-    [--profile executive|pre-read|live-pitch] [--only CODE,CODE]
+    scene.json [render_dir/] [--report out.json] \
+    [--profile executive|pre-read|live-pitch|appendix] [--only CODE,CODE]
 
 # compile a spec into a scene the gates and the emitter can read
 node evals/scripts/compile_scene.mjs spec.json scene.json
 
 # rebuild a gate-readable scene from a .pptx built by an older pipeline
 python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
-```
-
-## Reference census
-
-`scripts/reference_census.py` measures a rendered deck page by page — words and
-numeric tokens, body ink, occupied grid cells, empty bands, title rules, and,
-given the scene or pages file, exhibits per page, one-exhibit-plus-column pages,
-plotted values per chart page and one-to-three-word title last lines — and sets
-it beside a reference census: another PDF, or a census JSON this script wrote.
-The sample of strong consulting pages it was built to compare against stays
-outside the repository.
-
-Every per-page statistic is taken over the deck's analytical pages: the cover,
-section dividers, agendas and generated pages (picture credits) are left out,
-told apart by the scene and the compiled deck spec, or guessed from the render
-without a scene; a scanned reference is measured whole, and the printed notes
-say which applied. Plotted values are the compiler's: given the compiled spec
-(`--deck`, or the `<id>.deck.json` beside `--pages`), the chart pages are those
-with `pageType.chart` - the chart page types and panels carrying a chart - and
-each counts `pageType.values`, the number `author-deck.mjs` prints as `plotted`.
-
-```bash
-python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
-    --scene out/scene.json --pages deck.pages.json \
-    --reference reference.pdf [--out census.json]
 ```
 
 ## Page gates

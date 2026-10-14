@@ -447,19 +447,6 @@ console.log(JSON.stringify({{ twoNumbers: error(() => compilePage(ranking(['i1']
         self.assertEqual(len(result['all']), 2)  # both broken pages, in one run
         self.assertTrue(any(e.startswith('c:') for e in result['all']))
 
-    def test_the_thin_page_floor_is_the_reading_task_floor(self):
-        import sys
-        sys.path.insert(0, str(RUNTIME / 'gates'))
-        import page_gates
-        words = lambda n: {'nodes': [{'type': 'text', 'role': 'paragraph', 'text': ' '.join(['word'] * n),
-                                      'frame': {'x': 80, 'y': 200, 'width': 800, 'height': 200}}], 'componentInstances': []}
-        chart_led, table_commentary = [], []
-        page_gates.gate_thin_page(1, {**words(60), 'readingTask': 'chart-led'}, chart_led)
-        page_gates.gate_thin_page(1, {**words(60), 'readingTask': 'table-with-commentary'}, table_commentary)
-        self.assertEqual(chart_led, [])  # 60 words is a full chart page carrying its own callouts
-        self.assertEqual(table_commentary[0]['code'], 'THIN_PAGE')
-
-
 class PublishedLimitsTests(unittest.TestCase):
     def test_limits_minimums_counts_highlights_and_the_answer_message(self):
         result = run_node(f'''
@@ -840,9 +827,7 @@ console.log(JSON.stringify({{ limits: TEXT_LIMITS, fifteen: error(page(words(15)
         import sys
         sys.path.insert(0, str(RUNTIME / 'gates'))
         import page_gates
-        self.assertEqual(result['limits']['titleWords'], page_gates.THRESHOLDS['title_words_max'])
         self.assertEqual(result['limits']['titleLines'], page_gates.THRESHOLDS['title_lines_max'])
-        self.assertEqual(result['limits']['takeawayLines'], page_gates.TAKEAWAY_LINES_MAX)
         self.assertEqual(result['limits']['titleWords'], 15)
         self.assertEqual(result['limits']['takeawayLines'], 2)
         self.assertIsNone(result['fifteen'])

@@ -16,7 +16,6 @@ of words.
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -24,10 +23,6 @@ from unittest import mock
 from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
-GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-sys.path.insert(0, str(GATES))
-import page_gates  # noqa: E402
-import render_gates  # noqa: E402
 
 BASE = "./skills/professional-slides"
 PHOTO = "examples/assets/hills.jpg"
@@ -225,56 +220,6 @@ assert.equal(dropped.findings[0].code,'MISSING_AUTHORED_CONTENT');
 console.log(JSON.stringify({{ok:true}}));
 ''')
         self.assertTrue(result["ok"])
-
-
-class PictureWordFloorTests(unittest.TestCase):
-    """The floor follows the body the picture leaves, and stops at the cap.
-
-    Without this a picture page fails THIN_PAGE every time: two labels, two
-    lines and a so-what is forty words against a floor of ninety-five, and the
-    only way to pass is to write the wall of text the picture replaced. With no
-    cap it would go the other way, and a page could grow its photograph instead
-    of making its argument.
-    """
-
-    def page(self, picture_fraction, roles="image"):
-        frame = page_gates.content_frame({})
-        area_side = (frame["width"] * frame["height"] * picture_fraction) ** 0.5
-        nodes = [{
-            "type": "image" if roles == "image" else "rect",
-            "role": "image-frame",
-            "frame": {"x": frame["x"], "y": frame["y"], "width": area_side, "height": area_side},
-        }]
-        return {"nodes": nodes, "contentFrame": frame}
-
-    def test_a_page_with_no_picture_keeps_the_deck_floor(self):
-        self.assertEqual(page_gates.picture_share({"nodes": []}), 0.0)
-
-    def test_the_share_is_measured_and_capped(self):
-        self.assertAlmostEqual(page_gates.picture_share(self.page(0.4)), 0.4, places=2)
-        cap = page_gates.PICTURE["shareMax"]
-        self.assertAlmostEqual(page_gates.picture_share(self.page(0.95)), cap, places=6)
-
-    def test_an_uncleared_picture_counts_as_the_picture_it_will_be(self):
-        # Otherwise the plan-time floor and the rendered floor disagree about
-        # the same page, which is the disagreement THIN_PLAN exists to avoid.
-        self.assertAlmostEqual(page_gates.picture_share(self.page(0.4, roles="rect")), 0.4, places=2)
-
-    def test_the_thin_page_floor_falls_with_the_picture(self):
-        floor = page_gates.WEIGHT["pageWords"]
-        words = int(round(floor * 0.7))  # under the deck floor, over the picture floor
-        slide = self.page(0.4)
-        page_gates.gate_thin_page(1, {"nodes": []}, plain := [])
-        self.assertTrue(plain, "a page with no picture and no words is still thin")
-        findings = []
-        # The thin-page gate reads the band count where it is defined.
-        with mock.patch.object(render_gates, "body_bands", lambda _slide: (words, 0, 0)):
-            page_gates.gate_thin_page(1, slide, findings)
-            self.assertEqual(findings, [], "a picture page is held to the body the picture left it")
-            bare = []
-            page_gates.gate_thin_page(1, {"nodes": [], "contentFrame": page_gates.content_frame({})}, bare)
-            self.assertEqual([f["code"] for f in bare], ["THIN_PAGE"])
-            self.assertEqual(bare[0]["threshold"], floor)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,6 @@ from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates"))
-import page_gates  # noqa: E402
 
 
 class WaffleTests(unittest.TestCase):
@@ -148,9 +147,6 @@ console.log(JSON.stringify(deck));
         # Reading order runs along each row.
         ordered = sorted(paragraphs, key=lambda n: (round(n["frame"]["y"]), n["frame"]["x"]))
         self.assertLess(ordered[0]["frame"]["x"], ordered[1]["frame"]["x"])
-        found = []
-        page_gates.gate_cpl(1, slide, found)
-        self.assertEqual(found, [], "no column too narrow for prose")
 
 
 class TopOfRegionTests(unittest.TestCase):

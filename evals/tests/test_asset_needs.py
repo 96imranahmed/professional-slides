@@ -19,7 +19,7 @@ from node_probe import ROOT, run_node
 
 NODE = shutil.which("node")
 RUNTIME = ROOT / "skills" / "professional-slides" / "runtime"
-FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+FIXTURES = ROOT / "evals" / "tests" / "fixtures" / "evidence"
 REASON = "The build machine has no network access and the client supplied no logo files"
 
 

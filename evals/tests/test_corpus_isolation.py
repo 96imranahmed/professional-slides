@@ -31,13 +31,13 @@ DOCUMENT_NAME = re.compile(r"[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf", re.I)
 FIRMS = re.compile(r"\b(?:mckinsey|bcg|bain|deloitte|accenture|kearney|booz|kpmg|pwc|l\.e\.k|oliver wyman)\b", re.I)
 # The directories that describe the calibration set or record runs against it.
 # Specimens and their decks are about their own subjects and may name anyone.
-CALIBRATION_FACING = ('evals/calibration', 'evals/quality', 'evals/README.md')
+CALIBRATION_FACING = ('evals/README.md',)
 
 
 def evals_text_files():
     for path in sorted((ROOT / 'evals').rglob('*')):
         rel = path.relative_to(ROOT).as_posix()
-        if not path.is_file() or path.suffix not in TEXT or '__pycache__' in rel or rel.startswith('evals/quality/runs/'):
+        if not path.is_file() or path.suffix not in TEXT or '__pycache__' in rel:
             continue
         if path.name == Path(__file__).name:  # this file spells the patterns out
             continue
@@ -74,16 +74,6 @@ class CorpusIsolationTests(unittest.TestCase):
                 if rel.startswith(CALIBRATION_FACING) and FIRMS.search(line):
                     offenders.append(f'{rel}:{i}: {FIRMS.search(line).group(0)}')
         self.assertEqual(offenders, [], '\n'.join(offenders[:40]))
-
-    def test_the_calibration_tools_find_the_set_through_the_environment(self):
-        for path in sorted((ROOT / 'evals' / 'calibration').glob('*.py')):
-            text = path.read_text(encoding='utf-8')
-            if 'corpus_root' in text and path.name != 'corpus.py':
-                self.assertIn('from corpus import corpus_root', text, path.name)
-        self.assertIn('PS_CALIBRATION_CORPUS', (ROOT / 'evals' / 'calibration' / 'corpus.py').read_text())
-        # No data file that could name the set's documents sits beside the tools.
-        data = [p.name for p in (ROOT / 'evals' / 'calibration').rglob('*') if p.suffix in {'.json', '.jsonl', '.csv'}]
-        self.assertEqual(data, [])
 
     def test_the_package_is_the_skill_alone(self):
         with tempfile.TemporaryDirectory() as tmp:

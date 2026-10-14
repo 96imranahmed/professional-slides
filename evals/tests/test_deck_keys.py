@@ -20,7 +20,7 @@ from pathlib import Path
 
 from node_probe import NODE, ROOT, RUNTIME, run_node
 
-FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+FIXTURES = ROOT / "evals" / "tests" / "fixtures" / "evidence"
 EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
 
 
@@ -41,17 +41,16 @@ class DeckKeyTests(unittest.TestCase):
         whole = json.loads(subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), "--schema"], capture_output=True, text=True).stdout)
         self.assertEqual(whole["properties"]["deck"]["properties"], keys)
 
-    def test_every_key_the_worked_decks_and_the_fixtures_use_is_listed(self):
+    def test_every_key_the_worked_decks_use_is_listed(self):
         # The table is the compile's, so a deck the repository ships cannot use a key it leaves out.
         result = run_node('''
 import { deckKeyProblems, deckSchema } from './skills/professional-slides/runtime/deck-keys.mjs';
 import fs from 'node:fs';
-const files = [...fs.readdirSync('./evals/quality/fixtures/evidence').filter((name) => name.endsWith('.pages.json')).map((name) => './evals/quality/fixtures/evidence/' + name),
-  './skills/professional-slides/examples/page-types.pages.json', './skills/professional-slides/examples/page-forms.pages.json'];
+const files = ['./skills/professional-slides/examples/page-types.pages.json', './skills/professional-slides/examples/page-forms.pages.json'];
 const decks = files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')).deck);
 console.log(JSON.stringify({ files: files.length, problems: decks.flatMap(deckKeyProblems), used: [...new Set(decks.flatMap(Object.keys))].filter((key) => !deckSchema().properties[key]) }));
 ''')
-        self.assertGreaterEqual(result["files"], 6)
+        self.assertEqual(result["files"], 2)
         self.assertEqual(result["problems"], [])
         self.assertEqual(result["used"], [])
 

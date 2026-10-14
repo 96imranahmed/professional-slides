@@ -23,7 +23,6 @@ from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates"))
-import page_gates  # noqa: E402
 
 DECK = r"""
 import {toDeckPlan} from './evals/support/compose.mjs';
@@ -95,9 +94,6 @@ console.log(JSON.stringify(deck));
         self.assertEqual(len(columns), 2)
         # Open type on the card: ink, not the reversed white a dark panel takes.
         self.assertTrue(all(n["style"]["color"]["tokenId"] != "color.onPrimary" for n in items))
-        found = []
-        page_gates.gate_cpl(1, slide, found)
-        self.assertEqual(found, [], "no column too narrow for prose")
 
 
 class ScalarFigureTests(unittest.TestCase):

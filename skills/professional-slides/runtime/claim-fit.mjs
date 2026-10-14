@@ -23,12 +23,6 @@
 //                  the tasks it carries and how well (directly, or with the
 //                  reader doing work), and the data it needs to be drawn.
 //
-// For a page - its type, `settles`, the measures it shows and the insights it
-// rests on - pageFit gives the forms of its type that carry its claim, graded,
-// and the same for each exhibit whose kind its form leaves open. The plan
-// (deck-structure.mjs), a scaffold and the fit search read it, the catalogue
-// prints it (`--types`), and the deck's standing counts the pages drawn in a
-// form that carries their claim less directly than another they could take.
 //
 // A form's judged content - the levels of a Harvey ball, the stages of a
 // mechanism, which of two diagrams a system is - is not in any measure, so the
@@ -385,24 +379,6 @@ const isTarget = (m, owner = null) => m.standard === true || Boolean(m.assumed) 
 // A measure every reference to it carries a place on: `ref@label` names one value of it.
 const bare = (ref) => String(ref).split("@")[0].trim();
 
-/**
- * The measures an exhibit shows, by reference, wherever it names them: the
- * series it binds, its one `measure`, the measures of a scatter's `points`, a
- * bullet's `targets`, a bridge and a box plot, the figures of its `items`,
- * and the `basis` a typed or compiled exhibit carries.
- */
-export function exhibitRefs(ex) {
-  if (!ex || typeof ex !== "object") return [];
-  const named = (node) => (typeof node === "string" ? [node] : Array.isArray(node) ? node.flatMap(named) : node && typeof node === "object" && node.measure !== undefined ? named(node.measure) : []);
-  const object = (node) => (node && typeof node === "object" && !Array.isArray(node) ? Object.values(node).flatMap((value) => (typeof value === "string" ? [value] : named(value))) : []);
-  const basis = ex.basis && typeof ex.basis === "object" ? [...(Array.isArray(ex.basis.measures) ? ex.basis.measures : []), ...(typeof ex.basis.measure === "string" ? [ex.basis.measure] : [])] : [];
-  // A range's low and high, where they name measures rather than carry values.
-  const bound = (end) => (typeof end === "string" || (end && typeof end === "object" && !Array.isArray(end)) ? named(end) : []);
-  return [...new Set([...(Array.isArray(ex.series) ? ex.series.flatMap(named) : []), ...named(ex.measure === undefined ? [] : [ex.measure]), ...object(ex.points), ...object(ex.boxes), ...bound(ex.low), ...bound(ex.high),
-    ...(ex.targets && !Array.isArray(ex.targets) ? named(ex.targets) : []), ...(ex.bridge && typeof ex.bridge === "object" ? [ex.bridge.from, ex.bridge.to, ...[].concat(ex.bridge.steps ?? [])].flatMap(named) : []),
-    ...(Array.isArray(ex.items) ? ex.items.flatMap(named) : []), ...basis].filter((ref) => typeof ref === "string").map((ref) => ref.trim()))];
-}
-
 /** Every text an exhibit draws as a label: its categories, its series' names, its items, points and rows. */
 function drawnLabels(ex) {
   const out = new Set();
@@ -425,143 +401,6 @@ function shownLabels(ex, axis) {
     return from >= 0 && to >= from ? axis.labels.slice(from, to + 1) : axis.labels;
   }
   return axis.labels;
-}
-
-/**
- * What a set of measures gives a reader to read, as the carriers ask of it:
- * `{ axis, labels, series, units, percent, index, signed, positive, whole,
- * top, swing, wholes, parts, bridge, additive, targets, assumed,
- * dated, spread, scalars, refs }`. `refs` are the measures named; those that run over the commonest
- * axis among them are the series, the single values the scalars. `ex` is the
- * exhibit that shows them, where one is written (its drawn labels, `select`
- * or declared view narrow the axis); `prefer` is the axis a page type reads
- * (a trend's periods) where the measures run over both. Null where none of
- * the references is a recorded measure.
- */
-export function profileOf(refs, { registry, insights = null, evidence = [], ex = null, prefer = null } = {}) {
-  // One value of a longer measure (`ref@label`) is a figure the page prints, as a measure of one value is.
-  const whole = [...new Set(refs.filter((ref) => !String(ref).includes("@")).map(bare))], picked = [...new Set(refs.filter((ref) => String(ref).includes("@")))].filter((ref) => registry?.has?.(bare(ref)));
-  const measures = whole.map((ref) => registry?.get?.(ref)).filter(Boolean);
-  if (!measures.length && !picked.length) return null;
-  const axed = measures.filter((m) => axisOf(m).kind !== "scalar"), single = [...measures.filter((m) => axisOf(m).kind === "scalar"), ...picked.map((ref) => ({ ...registry.get(bare(ref)), ref }))];
-  const kinds = ["periods", "members"].map((kind) => [kind, axed.filter((m) => axisOf(m).kind === kind).length]);
-  const axis = !axed.length ? "scalar" : prefer && kinds.find(([kind]) => kind === prefer)[1] ? prefer : kinds[0][1] >= kinds[1][1] ? "periods" : "members";
-  const along = axed.filter((m) => axisOf(m).kind === axis);
-  const ownerOf = (m) => insights?.get?.(m.owner) ?? null;
-  // A scenario's path carries a recorded series on past its last period: drawn with the series it starts from, the two are one line.
-  const carriesOn = (m) => axis === "periods" && m.assumed && along.some((other) => other !== m && !other.assumed && normalUnit(other.unit) === normalUnit(m.unit) && (m.inputs ?? []).includes(other.ref));
-  const series = along.filter((m) => !carriesOn(m));
-  if (!series.length) return { axis, labels: 0, series: 0, units: 0, scalars: single.length, targets: 0, refs: [...measures, ...single].map((m) => m.ref) };
-  // Over time the axis is every period any series shows - a path runs on from its record; over members it is the members
-  // every measure places (the first one's where they share none).
-  const shown = along.map((m) => shownLabels(ex ?? {}, axisOf(m)));
-  const common = shown[0].filter((label) => shown.every((labels) => labels.includes(label)));
-  const labels = axis === "periods" ? [...new Set(shown.flat())] : common.length ? common : shown[0];
-  const values = along.flatMap((m) => labels.map((label) => valuesOf(m)[axisOf(m).labels.indexOf(label)])).filter(finite);
-  const units = new Set(series.map((m) => normalUnit(m.unit)));
-  const names = new Set(series.map((m) => String(m.name).toLowerCase()));
-  // A threshold the series is read against: a single value in its unit that is a target (isTarget).
-  const targets = single.filter((m) => units.has(normalUnit(m.unit)) && isTarget(m, ownerOf(m))).length;
-  const sums = (Array.isArray(evidence) ? evidence : []).map((id) => insights?.get?.(id)).filter((item) => item?.derived && item.op === "sum" && Array.isArray(item.inputs));
-  const periods = series.map((m) => (typeof m.period === "string" ? m.period.trim().toLowerCase() : null));
-  return {
-    axis, labels: labels.length, series: series.length, units: units.size, scalars: single.length, targets, refs: measures.map((m) => m.ref),
-    percent: series.every((m) => isPercentUnit(m.unit)), index: series.every((m) => m.base !== undefined), signed: values.some((v) => v < 0), positive: values.length > 0 && values.every((v) => v > 0),
-    whole: values.length > 0 && values.every(Number.isInteger), top: values.length ? Math.max(...values.map(Math.abs)) : 0,
-    // How far the values move, as a share of their peak: what a mark standing on zero has to show.
-    swing: values.length && Math.max(...values.map(Math.abs)) > 0 ? (Math.max(...values) - Math.min(...values)) / Math.max(...values.map(Math.abs)) : 0,
-    total: series.length === 1 ? values.reduce((sum, v) => sum + v, 0) : null,
-    // How far the wholes differ in size where several series stack: each label's total, as a share of the largest.
-    wholes: (() => { const totals = labels.map((label) => along.map((m) => valuesOf(m)[axisOf(m).labels.indexOf(label)]).filter(finite).reduce((sum, v) => sum + v, 0)), peak = Math.max(0, ...totals.map(Math.abs));
-      return series.length >= 2 && peak > 0 ? (Math.max(...totals) - Math.min(...totals)) / peak : 0; })(),
-    parts: series.some((m) => ownerOf(m)?.shape === "mix" || ownerOf(m)?.op === "share"), bridge: series.some((m) => ownerOf(m)?.shape === "bridge"),
-    additive: sums.some((item) => series.filter((m) => item.inputs.includes(m.ref)).length >= 2), assumed: along.some((m) => m.assumed),
-    dated: series.length === 2 && periods.every(Boolean) && periods[0] !== periods[1],
-    spread: series.length === SPREAD.length && SPREAD.every((name) => names.has(name)),
-  };
-}
-
-/**
- * The reading task a profile sets, or null where the measures do not say:
- * what the reader is asked to do with what the page shows. `claim` is the
- * page's `settles` - its `kind` and the `relation` it asserts.
- */
-export function taskOf(p, claim = {}, type = null) {
-  if (!p) return null;
-  const kind = claim?.kind;
-  // A relation is asserted between measures: an exhibit of one series has none to show.
-  const relation = p.series >= 2 ? claim?.relation?.kind : undefined;
-  if (p.axis === "scalar" || !p.series) return p.scalars ? "figures" : null;
-  // The page type is the author's own statement of the task where the measures leave it open: a relationship page reads
-  // two or three measures against each other, a bridge its steps, a composition its parts.
-  if (type === "relationship" && p.axis === "members" && within(p.series, 2, 3)) return "relationship";
-  if (type === "bridge" && p.axis === "members" && p.series === 1) return "contribution";
-  if (type === "composition" && p.series >= 2 && p.units === 1) return p.axis === "periods" && p.labels > 3 ? "mix-over-time" : "mix-compared";
-  if (type === "composition" && p.axis === "members" && p.series === 1 && !p.signed) return p.percent && Math.abs((p.total ?? 0) - 100) > 1 && p.labels <= 5 ? "share-of-each" : "part-of-whole";
-  if (p.axis === "periods") {
-    // Parts of a whole over time are read as its mix - unless the claim is settled by a rate: then it is about how far each
-    // part moved, and the parts are series read against each other (two or three dates a pair, more a trend), not a stack whose
-    // upper bands have no baseline to read a change from.
-    if (p.series >= 2 && p.units === 1 && (p.parts || p.additive) && kind !== "rate") return p.labels <= 3 ? "mix-compared" : "mix-over-time";
-    // Two or three dates are a comparison, not a trend: each series is a member with a value at each date.
-    if (p.labels <= 3) return p.series >= 2 && p.units === 1 && p.labels >= 2 ? "pair" : "figures";
-    if (p.series >= 2 && (p.index || relation === "index")) return "index";
-    if (p.units > 1) return p.series === 2 && relation !== "separate" ? "two-scales" : relation === "separate" ? "many-series" : "index";
-    if (p.targets && p.series <= 2) return "target-over-time";
-    // A gap the claim asserts is read between two of the series, whatever else is drawn beside them as context.
-    if (relation === "gap") return "gap-over-time";
-    // Levels the claim compares are read on one scale, however many series there are: which is larger, and by how much.
-    return p.series >= 5 && relation !== "levels" ? "many-series" : "trend";
-  }
-  if (p.spread) return "spread";
-  if (p.bridge && p.series === 1) return "contribution";
-  if (p.series === 1) {
-    // Parts of one whole: a mix or a share analysis, or percentages that add up to a hundred. A percentage of each member's
-    // own whole adds up to nothing, and is read member by member.
-    const hundred = p.percent && Math.abs((p.total ?? 0) - 100) <= 1;
-    // Unless the claim ranks them: then the parts are members of a set, read against each other.
-    if (!p.signed && (hundred || (p.parts && !p.percent)) && kind !== "rank") return "part-of-whole";
-    if (kind === "share" && p.percent && p.labels <= 5) return "share-of-each";
-    if (p.targets) return "target";
-    if (p.labels <= 3) return "figures";
-    return p.labels >= 15 ? "distribution" : "rank";
-  }
-  if (p.units === 1 && (p.parts || p.additive)) return "mix-compared";
-  if (p.series === 2) {
-    if (p.units === 1) return relation === "separate" ? "profile" : "pair";
-    return relation !== "separate" && kind !== "rank" && p.labels >= 8 ? "relationship" : "profile";
-  }
-  return p.series === 3 && p.units > 1 && kind === "comparison" && relation !== "separate" && p.labels >= 8 ? "relationship" : "profile";
-}
-
-/** One carrier's grade for a task under a profile, and what the profile lacks for it to be drawn (null where it fills it). */
-export function gradeOf(row, task, p, typed = true) {
-  const grade = row.carries[task];
-  const value = typeof grade === "function" ? grade(p) : grade ?? GRADE.none;
-  return { grade: value, lacks: value ? row.needs(p, typed) : null };
-}
-
-/**
- * The carriers of `task` under profile `p`, graded: `{ ranked, top, equal,
- * lacking }`. `ranked` is every candidate that carries the task and can be
- * drawn, best first, each `{ type, form, kind, grade }`; `equal` those at the
- * best grade; `lacking` the candidates that would carry the task and that the
- * measures do not fill, each with what it `lacks`. `type` narrows the
- * candidates to one page type's forms; without it they are the kinds an
- * exhibit can take on a page that leaves its kind open - one entry a kind, at
- * the best grade any form drawing it reaches.
- */
-export function carriersFor(task, p, { type = null } = {}) {
-  if (!task || !p) return { ranked: [], top: GRADE.none, equal: [], lacking: [] };
-  const rows = CARRIERS.filter((row) => (type ? row.type === type : row.alone && row.kind && row.type !== "scorecard" && row.form !== "measure-table"));
-  const all = rows.map((row) => ({ row, ...gradeOf(row, task, p, Boolean(type)) })).filter((item) => item.grade > GRADE.none);
-  const graded = all.filter((item) => !item.lacks).map(({ row, grade }) => ({ type: row.type, form: row.form, kind: row.kind, grade }));
-  const best = new Map();
-  for (const item of graded) { const key = type ? item.form : item.kind; if (!best.has(key) || best.get(key).grade < item.grade) best.set(key, item); }
-  const ranked = [...best.values()].sort((a, b) => b.grade - a.grade);
-  const top = ranked[0]?.grade ?? GRADE.none;
-  const lacking = all.filter((item) => item.lacks && !best.has(type ? item.row.form : item.row.kind)).map(({ row, grade, lacks }) => ({ type: row.type, form: row.form, kind: row.kind, grade, lacks }));
-  return { ranked, top, equal: ranked.filter((item) => item.grade === top), lacking };
 }
 
 const exhibitsOf = (page) => [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : [])].filter((ex) => ex && typeof ex === "object");
@@ -601,72 +440,6 @@ function describe(page) {
   const exhibits = exhibitsOf(page ?? {}).map((ex, at) => (ex.basis === undefined && kept[at] ? { ...ex, basis: kept[at] } : ex));
   return { id: page?.id, type: record?.type ?? page?.type, form: record?.form ?? page?.form ?? null, settles: settles && typeof settles === "object" ? settles : {},
     evidence: (record ? record.content?.evidence : page?.evidence) ?? [], exhibits, imported: (record?.sourceSlide ?? page?.sourceSlide) !== undefined };
-}
-
-/**
- * How a page's choices fit its claim: for the page's type, the forms that
- * carry what it shows; and for a page whose form leaves the kind of an
- * exhibit open, the kinds that carry each exhibit's measures.
- *
- *   { id, type, form, task, profile,
- *     forms: { ranked, top, equal },            the forms of the type, graded for the page's task
- *     chosen: { form, grade } | null,           the declared form's grade, where it is a carrier read from measures
- *     exhibits: [{ at, refs, task, kind, written, grade, kinds: { ranked, top, equal } }],   `written` false for a cut the page has not drawn yet
- *     left: [{ where, has, grade, better: [...] }] }   what is drawn in a form that carries its claim less directly than another it could take
- *
- * `page` is a page of a pages file or a compiled slide. Null where the page's
- * type is unknown or none of its measures is recorded: there is no fit to
- * read, and nothing is proposed or questioned.
- */
-export function pageFit(page, { registry, insights = null } = {}) {
-  const d = describe(page);
-  if (!d.type || !registry?.size) return null;
-  const claimed = Array.isArray(d.settles.measures) ? d.settles.measures.filter((ref) => typeof ref === "string") : [];
-  const written = d.exhibits.map((ex, at) => ({ ex, at, refs: exhibitRefs(ex) }));
-  const context = { registry, insights, evidence: d.evidence };
-  const open = OPEN_KINDS.has(d.type);
-  // The exhibits a page with open kinds draws: the written ones by the measures each names, else one for each cut of the claim.
-  const drawn = written.filter((item) => item.refs.some((ref) => registry.has(ref)));
-  // A single value the claim names in a cut's unit - a standard, a target - is read with that cut: what its members are set against.
-  const single = claimed.filter((ref) => !String(ref).includes("@") && registry.has(ref) && axisOf(registry.get(ref)).kind === "scalar");
-  const withSingles = (refs) => [...refs, ...single.filter((ref) => refs.some((other) => normalUnit(registry.get(other).unit) === normalUnit(registry.get(ref).unit)))];
-  const cuts = open ? (drawn.length ? drawn : cutsOf(claimed, registry, d.settles.relation?.kind === "separate").map((refs, at) => ({ ex: null, at, refs: withSingles(refs) }))) : [];
-  const exhibits = cuts.map(({ ex, at, refs }) => {
-    const profile = profileOf(refs, { ...context, ex }), task = taskOf(profile, d.settles);
-    const kinds = carriersFor(task, profile);
-    // A kind the table does not hold - a range, a map, a set of cards - is the author's own choice, and is not graded; nor is a
-    // table among charts, which is chosen for the exact values a reader looks up, and no measure says whether they will.
-    const kind = ex?.type && KINDS.has(String(ex.type)) && String(ex.type) !== "table" ? String(ex.type) : null;
-    // An exhibit the spine declares and has not drawn - a `basis` stub with no `type` - has no kind yet: it is a cut still to be
-    // given one, as a cut nobody has written is. A stub that says it is a table or a figure (`as`) has said what it is.
-    const stub = undrawnStub(ex);
-    return { at, refs, task, profile, kind, written: ex !== null && !stub, stated: stub ? ex.basis?.as ?? null : null, grade: kind && kinds.ranked.length ? kinds.ranked.find((item) => item.kind === kind)?.grade ?? GRADE.none : null, kinds };
-  // A grid or a list of figures is its page's own form, and two or three values are figures whatever draws them: neither is ranked as a chart.
-  }).filter((item) => item.task && item.task !== "figures" && item.profile.series > 0 && !["fact-grid", "stat-list"].includes(d.form) && !["table", "figure"].includes(item.stated));
-  // The page's own profile: what its one exhibit shows, or its claim's measures; a page of cuts is profiled by how many it holds.
-  const primary = !open && drawn.length ? drawn[0] : null;
-  const refs = primary ? primary.refs : claimed;
-  let profile = profileOf(refs, { ...context, ex: primary?.ex ?? null, prefer: TYPE_AXIS[d.type] ?? null });
-  let task = null;
-  if (d.type === "panels") { if (exhibits.length) { profile = { cuts: d.form === "small-multiples" ? Math.max(exhibits.length, ...written.map((item) => (Array.isArray(item.ex?.items) ? item.ex.items.length : item.refs.length))) : Math.max(exhibits.length, written.length), axis: exhibits.every((item) => item.profile.axis === "periods") ? "periods" : "members", sequence: d.settles.kind === "sequence" }; task = "cuts"; } }
-  else if (d.type === "numbers") { if (profile && (profile.scalars || profile.series)) task = "figures"; }
-  else if (d.type === "lookup") { if (profile) task = "lookup"; }
-  else if (d.type === "scorecard") { if (profile && profile.series > 0 && profile.axis === "members") task = "profile"; }
-  else task = profile && profile.series > 0 ? taskOf(profile, d.settles, d.type) : null;
-  const forms = carriersFor(task, profile, { type: d.type });
-  // A figures page whose figures are single values of longer measures says nothing of how many it prints: no form is ranked.
-  const known = task && forms.ranked.length > 0 && !(d.type === "numbers" && !profile.scalars);
-  if (!known && !exhibits.length) return null;
-  const row = d.form ? carrierOf(d.type, d.form) : null;
-  // How many figures a numbers page prints is not in its measures - a value of a longer measure prints as one too - so its declared form is never questioned.
-  const chosen = known && row && !row.judged && d.type !== "numbers" ? { form: d.form, grade: forms.ranked.find((item) => item.form === d.form)?.grade ?? GRADE.none } : null;
-  // What is drawn in a form that serves the claim while another is its best fit. A form the table does not rank for the task at
-  // all is not named: the page compiles, so it draws something the measures' profile did not say, and that is the author's to judge.
-  const left = [
-    ...(chosen && chosen.grade === GRADE.work && forms.top === GRADE.direct ? [{ where: "form", has: d.form, grade: chosen.grade, better: forms.equal.map((item) => item.form) }] : []),
-    ...exhibits.filter((item) => item.grade === GRADE.work && item.kinds.top === GRADE.direct).map((item) => ({ where: `exhibit ${item.at + 1}`, has: item.kind, grade: item.grade, task: item.task, better: item.kinds.equal.map((kind) => kind.kind) })),
-  ];
-  return { id: d.id, type: d.type, form: d.form, imported: d.imported, task: known ? task : null, profile: known ? profile : null, forms: known ? forms : { ranked: [], top: GRADE.none, equal: [] }, chosen, exhibits, left };
 }
 
 /**

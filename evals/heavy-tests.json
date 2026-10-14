@@ -7,7 +7,6 @@
     "test_revision_carry.StaleTextTests": "end to end: --check on revisions that leave replaced words on another slide",
     "test_revision_honest.WholeWordTests": "end to end: edits and the stale check run through --check",
     "test_pages_parts.AuthoringFromPartsTests": "end to end: a sectioned deck compiled and checked against the single file",
-    "test_published_limits.LimitCommandTests": "end to end: the scaffold of every type printed and read for its limits",
     "test_design_intake.OptionSheetRenderTests": "end to end: the design-intake CLI renders its option sheets",
     "test_asset_needs.CompileNoticeTests": "end to end: a draft run that names the logos a build would fetch"
   }

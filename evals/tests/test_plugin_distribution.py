@@ -267,15 +267,15 @@ class ShippedPackageTests(RealPackage, unittest.TestCase):
                              cwd=self.dest, timeout=120, env={'PATH': '/usr/bin:/bin', 'PYTHONDONTWRITEBYTECODE': '1'})
         self.assertEqual(run.returncode, 0, run.stderr)
         result = json.loads(run.stdout)
-        # The page gates, the density profile and the shared word module need nothing outside the stdlib.
-        for rel in ('gates/page_gates.py', 'gates/gate_config.py', 'gates/text_stats.py', 'gates/density_profile.py',
+        # The page gates and the shared word module need nothing outside the stdlib.
+        for rel in ('gates/page_gates.py', 'gates/gate_config.py', 'gates/text_stats.py',
                     'gates/nice_ticks.py', 'emit/color.py'):
             self.assertIn(rel, result['loaded'])
         checkout = str((ROOT/'skills').resolve())
         self.assertEqual([f for f in result['files'] if f.startswith(checkout)], [],
                          'a shipped module imported a file from the checkout instead of the package')
         staged = [f for f in result['files'] if f.startswith(str(runtime.resolve()))]
-        for module in ('gate_config.py', 'render_gates.py', 'scene_gates.py', 'semantic_gates.py', 'deck_gates.py', 'text_stats.py'):
+        for module in ('gate_config.py', 'render_gates.py', 'scene_gates.py', 'text_stats.py'):
             self.assertTrue(any(f.endswith('/gates/' + module) for f in staged), module)
 
     def test_the_icon_is_sized_for_a_listing(self):

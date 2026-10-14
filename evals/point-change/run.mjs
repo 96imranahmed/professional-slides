@@ -36,7 +36,7 @@
  * written into the pages file, the next one only when a compile refused the
  * one before, and the run ends with the build. `--agent <name>` gives the
  * request and the deck to a real agent CLI instead (an entry of
- * evals/quality/config.json `agents`), told to build the revision in `work/`
+ * evals/point-change/agents.json), told to build the revision in `work/`
  * beside the deck, and scores what it leaves behind on `made`, `preserved`
  * and `asked`, with the wall time and the agent's transcript kept beside the
  * workspace.
@@ -55,7 +55,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain, parseCli, pythonBin } from "../../skills/professional-slides/runtime/cli.mjs";
 import { lastJson } from "../../skills/professional-slides/runtime/process.mjs";
-import { fillTemplate } from "../quality/lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -248,6 +247,12 @@ const withTranscript = (command) => { const at = command.findIndex((arg, i) => a
   return at < 0 ? command : [...command.slice(0, at), "--output-format", "stream-json", "--verbose", ...command.slice(at + 2)]; };
 
 /** One task given to a real agent CLI: the request and the deck in an empty workspace, and the deck it leaves scored. */
+/** An argv template with each `{name}` filled from `vars`; a name it does not hold stays as written. */
+function fillTemplate(command, vars) {
+  return command.map((arg) => String(arg).replace(/\{(\w+)\}/g, (whole, name) =>
+    (Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : whole)));
+}
+
 function runAgentTask(task, work, agent, plugin) {
   const workspace = path.join(work, `${task.id}-agent`);
   rmSync(workspace, { recursive: true, force: true });
@@ -300,8 +305,8 @@ async function main(argv) {
   const tasks = TASKS.filter((task) => !wanted || wanted.includes(task.id));
   let results;
   if (values.agent) {
-    const config = readJson(path.join(ROOT, "evals", "quality", "config.json")), agent = config.agents?.[values.agent];
-    if (!agent) { console.error(`No agent "${values.agent}" in evals/quality/config.json (${Object.keys(config.agents ?? {}).join(", ")})`); return 1; }
+    const config = readJson(path.join(HERE, "agents.json")), agent = config.agents?.[values.agent];
+    if (!agent) { console.error(`No agent "${values.agent}" in evals/point-change/agents.json (${Object.keys(config.agents ?? {}).join(", ")})`); return 1; }
     let plugin = null;
     if (agent.command.some((arg) => String(arg).includes("{plugin}"))) {
       plugin = path.join(work, "plugin");

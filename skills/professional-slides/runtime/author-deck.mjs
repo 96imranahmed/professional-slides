@@ -219,23 +219,19 @@ function conflictFindings(items) {
   ];
 }
 
-// The page gates' memory for a run of the command, `<id>.gate-cache.json` beside the pages file (page_gates.py PageCache):
-// a page gated before, unchanged, is read from it. Null outside the command, so a caller composing its own deck gates it afresh.
-let pageGateCache = null;
-
 /**
  * The build's own page gates (gates/page_gates.py), run on the composed deck:
  * the checks the build makes before it renders, so none surprises the author
  * there. `{ ran, findings, advisories }`, each finding with its page's id;
  * `ran: false` with the reason where Python or the gates could not run.
  */
-export function sceneGateFindings(deck, python = pythonBin(), { cache = pageGateCache } = {}) {
+export function sceneGateFindings(deck, python = pythonBin()) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "author-gates-"));
   try {
     const scene = path.join(dir, "scene.json"), out = path.join(dir, "gates.json");
     // The deck's asset manifest is no gate's to read, and half the scene.
     writeFileSync(scene, JSON.stringify({ ...deck, manifest: undefined }));
-    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out, ...(cache ? ["--page-cache", cache] : [])], { encoding: "utf8" });
+    const run = spawnSync(python, [fileURLToPath(new URL("./gates/page_gates.py", import.meta.url)), scene, "--report", out], { encoding: "utf8" });
     if (run.error || ![0, 2].includes(run.status) || !existsSync(out))
       return { ran: false, findings: [], advisories: [], reason: String(run.error?.message ?? run.stderr ?? `exit ${run.status}`).trim().split("\n").slice(-3).join(" ") || `exit ${run.status}` };
     const report = readJsonSync(out);
@@ -542,7 +538,6 @@ async function main(argv) {
     if (logged?.problems.length) { console.error(`The insight log's sources files cannot be read as the deck's registry:\n- ${logged.problems.join("\n- ")}`); return 2; }
     if (logged) doc.sources = logged.registry;
   }
-  pageGateCache = path.join(dir, `${stem}.gate-cache.json`);
   let insights, authored;
   const composeCache = named ? null : await openComposeCache(path.join(dir, `${stem}.compose-cache.json`), { doc, baseDir: dir });
   try {

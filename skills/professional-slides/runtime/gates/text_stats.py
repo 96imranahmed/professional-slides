@@ -24,10 +24,8 @@ definitions over the same strings.
 
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
-from pathlib import Path
 
 # JavaScript's `\s`: the characters String.prototype.split(/\s+/) splits on.
 # Python's own `\s` differs (it takes U+001C-U+001F and U+0085, and not
@@ -36,11 +34,6 @@ JS_SPACE = "\t\n\v\f\r    -     　﻿"
 SPACE = re.compile(f"[{JS_SPACE}]+")
 INVISIBLE = re.compile("[­​]")
 LINE_BREAK_HYPHEN = re.compile(f"-[{JS_SPACE}]*\r?\n[{JS_SPACE}]*")
-LETTER_OR_DIGIT = re.compile(r"[A-Za-z0-9]")
-CONTENT_WORD = re.compile(r"[a-z][a-z']+")
-
-STOPWORD_LISTS = json.loads((Path(__file__).resolve().parent / "stopwords.json").read_text(encoding="utf-8"))
-STOPWORDS = frozenset(STOPWORD_LISTS["content"])
 
 
 def normalize_text(value) -> str:
@@ -60,11 +53,3 @@ def word_count(value) -> int:
     return len(words(value))
 
 
-def printed_words(value) -> list:
-    """The words of `value` that carry a letter or a digit."""
-    return [w for w in words(value) if LETTER_OR_DIGIT.search(w)]
-
-
-def content_words(text) -> set:
-    return {w for w in CONTENT_WORD.findall(("" if text is None else str(text)).lower())
-            if w not in STOPWORDS and len(w) > 3}

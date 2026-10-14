@@ -8,7 +8,7 @@ an author to run it, and the checks below on what comes out.
 ```bash
 node evals/point-change/run.mjs                      # every task, scripted author, offline
 node evals/point-change/run.mjs --task retitle       # one task
-node evals/point-change/run.mjs --agent claude       # a real agent CLI (evals/quality/config.json `agents`)
+node evals/point-change/run.mjs --agent claude       # a real agent CLI (`agents.json`)
 node evals/point-change/run.mjs --tasks my.json      # tasks on a deck of your own (a task's `deck`, `files`)
 python3 evals/point-change/preservation.py source.pptx revised.pptx [--pairs 1:1,2:2,4:3]
 ```

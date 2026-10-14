@@ -18,7 +18,7 @@ from pathlib import Path
 
 from node_probe import NODE, ROOT, run_node
 
-FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+FIXTURES = ROOT / "evals" / "tests" / "fixtures" / "evidence"
 AUTHOR = ROOT / "skills" / "professional-slides" / "runtime" / "author-deck.mjs"
 
 # A log on a subject of its own: five series for one company, a peer set and a few single values.

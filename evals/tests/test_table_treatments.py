@@ -7,48 +7,9 @@ total band. Zebra banding is not one.
 
 from __future__ import annotations
 
-import sys
 import unittest
 
 from node_probe import ROOT, run_node
-
-GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-sys.path.insert(0, str(GATES))
-
-import deck_gates  # noqa: E402
-
-
-class DefinitionTests(unittest.TestCase):
-    @staticmethod
-    def page(*nodes):
-        return {"id": "p", "componentInstances": [{"id": "chrome", "component": "slide-chrome"}, {"id": "t", "instanceId": "p:t", "component": "table"}],
-                "nodes": [{"role": "action-title", "type": "text", "text": "A finding"},
-                          *({**n, "data": {**n.get("data", {}), "componentInstance": "p:t"}} for n in nodes)]}
-
-    def treated(self, *nodes):
-        slide = self.page(*nodes)
-        return deck_gates.table_treated(slide, slide["componentInstances"][1])
-
-    def test_zebra_banding_is_not_a_treatment(self):
-        self.assertFalse(self.treated({"role": "table-zebra-band"}, {"role": "table-cell"}))
-        self.assertFalse(self.treated({"role": "table-row-band", "data": {"rowStyle": "group"}}))
-
-    def test_each_named_treatment_is_one(self):
-        for node in ({"role": "table-cell", "data": {"cellType": "heatmap"}}, {"role": "table-rating-sector"},
-                     {"role": "table-dot"}, {"role": "table-bar"}, {"role": "table-progress-fill"},
-                     {"role": "table-status-pill"}, {"role": "table-check"}, {"role": "table-lamp"},
-                     {"role": "table-header-logo"}, {"role": "table-logo"}, {"role": "table-cell-icon-glyph"},
-                     {"role": "table-row-band", "data": {"rowStyle": "total"}}):
-            with self.subTest(node=node):
-                self.assertTrue(self.treated(node))
-
-    def test_a_treatment_belongs_to_its_own_table(self):
-        # Two tables on one page: the bars in the second do not treat the first.
-        slide = {"id": "p", "componentInstances": [{"id": "t1", "instanceId": "p:t1", "component": "table"},
-                                                   {"id": "t2", "instanceId": "p:t2", "component": "table"}],
-                 "nodes": [{"role": "table-cell", "data": {"componentInstance": "p:t1"}},
-                           {"role": "table-bar", "data": {"componentInstance": "p:t2"}}]}
-        self.assertEqual([deck_gates.table_treated(slide, c) for c in slide["componentInstances"]], [False, True])
 
 
 class ChartDataTableTests(unittest.TestCase):

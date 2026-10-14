@@ -225,33 +225,5 @@ console.log(JSON.stringify(deck));
             self.assertEqual(paragraphs[0].text.split("\x0b"), lines)
 
 
-@requires_python_package("numpy")
-class CensusRuleTests(unittest.TestCase):
-    """The census finds the rule under a title with a tracker over it."""
-
-    @classmethod
-    def setUpClass(cls):
-        spec = importlib.util.spec_from_file_location("reference_census", ROOT / "evals" / "scripts" / "reference_census.py")
-        cls.census = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.census)
-
-    def page(self, blocks, rule_y):
-        import numpy as np
-        image = np.full((675, 1200), 255, dtype=np.uint8)
-        for top, bottom, x1, x2 in blocks:
-            image[top:bottom, x1:x2:3] = 20  # text: dense but broken rows
-        image[rule_y, 56:1144] = 120
-        return image
-
-    def test_a_tracker_line_over_a_title_set_on_its_rule(self):
-        tracker, title = (33, 39, 56, 300), (93, 122, 56, 900)
-        self.assertTrue(self.census.title_rule(self.page([tracker, title], 131)))
-        # An exhibit heading between the title and the rule is still not a title rule.
-        heading = (150, 160, 56, 400)
-        self.assertFalse(self.census.title_rule(self.page([tracker, title, heading], 172)))
-        # Nor is a rule standing well clear of the title.
-        self.assertFalse(self.census.title_rule(self.page([tracker, title], 190)))
-
-
 if __name__ == "__main__":
     unittest.main()

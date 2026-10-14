@@ -115,14 +115,14 @@ class StageTests(unittest.TestCase):
                 self.assertLessEqual(page["after"]["y"] - (page["frame"]["y"] + page["frame"]["height"]), 17)
                 self.assertNotIn("internal", [v["kind"] for v in page["voids"]])
 
-    def test_a_page_with_stages_and_commentary_carries_no_blocking_void(self):
+    def test_a_page_with_stages_and_commentary_carries_no_void(self):
         for kind in ("roadmap", "timeline"):
             for count in (5, 7):
                 for layout in ("top", "left"):
                     with self.subTest(page=f"{kind}-{count}-{layout}"):
-                        self.assertEqual([v for v in self.pages[f"{kind}-{count}-{layout}"]["voids"] if v["severity"] == "blocker"], [])
+                        self.assertEqual(self.pages[f"{kind}-{count}-{layout}"]["voids"], [])
             # Seven stages hold a page on their own, over a closing bar.
-            self.assertEqual([v for v in self.pages[f"{kind}-7-full"]["voids"] if v["severity"] == "blocker"], [])
+            self.assertEqual(self.pages[f"{kind}-7-full"]["voids"], [])
 
     def test_nothing_is_stretched_to_cover_a_thin_page(self):
         # Three stages and a closing line are a third of a page: the group
@@ -131,7 +131,7 @@ class StageTests(unittest.TestCase):
         for kind in ("roadmap", "timeline"):
             page = self.pages[f"{kind}-3-full"]
             self.assertLess(page["frame"]["height"], 300)
-            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "blocker")])
+            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "advisory")])
 
     def test_the_frame_decides_between_columns_and_rows(self):
         # Beside the commentary the frame is tall: rows. Over three columns of
