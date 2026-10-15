@@ -51,10 +51,10 @@ console.log(JSON.stringify({
             self.skipTest("Node.js is not available")
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
-            run = subprocess.run([NODE, str(RUNTIME / "deliver-deck.mjs"), str(Path(tmp) / "x.deck.json"), str(out),
-                                  "--full-review", "--reason", "--user-approved"], capture_output=True, text=True)
+            run = subprocess.run([NODE, str(RUNTIME / "build-deck.mjs"), str(Path(tmp) / "x.deck.json"), str(out),
+                                  "--python", "--no-render"], capture_output=True, text=True)
             self.assertEqual(run.returncode, 1)
-            self.assertIn("--reason requires a value, not the option --user-approved", run.stderr)
+            self.assertIn("--python requires an executable, not the option --no-render", run.stderr)
             self.assertNotIn("    at ", run.stderr)
             self.assertFalse(out.exists())
 

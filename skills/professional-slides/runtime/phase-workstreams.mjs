@@ -133,8 +133,11 @@ export function measurePhaseWorkstreams({ frame, props }) {
   const legendText = ['Products', ...model.owners.map(o => o.label)];
   const legendWidths = legendText.map(t => measure(t, frame.width, true).width + 3 * inset);
   if (legendWidths.reduce((a,b) => a+b, 0) > frame.width) throw new Error('Product provider legend exceeds the phase-workstreams frame');
-  const productsHeadingHeight = measure('Products', frame.width, true).height + 2 * pad;
-  const productsHeight = Math.max(0, ...columns.map(c => c.products.reduce((h,p) => h + p.layout.height + 2 * productPad, 0) + Math.max(0,c.products.length-1)*itemGap)) + 2 * pad;
+  // A plan with no products, phased or recurring, has no products band: its
+  // heading over nothing read as a section the author forgot to fill.
+  const hasProducts = columns.some(c => c.products.length) || model.recurringProducts.length > 0;
+  const productsHeadingHeight = hasProducts ? measure('Products', frame.width, true).height + 2 * pad : 0;
+  const productsHeight = hasProducts ? Math.max(0, ...columns.map(c => c.products.reduce((h,p) => h + p.layout.height + 2 * productPad, 0) + Math.max(0,c.products.length-1)*itemGap)) + 2 * pad : 0;
   // Co-scoped recurring products are peer labels across the complete parent span.
   const groups = new Map();
   for (const p of model.recurringProducts) {
@@ -197,7 +200,7 @@ export function renderPhaseWorkstreams({ id, frame, props }) {
     b.items.forEach((item,i)=>text(`leadership-item-${item.id}`,'roadmap-leadership-item',item.text,b.x+m.inset+i*(b.itemWidth+m.inset),y+m.pad+b.labelLayout.height+m.gap,b.itemWidth,item.layout,{...data(item,[nid(key)]),phaseIds:b.phaseIds,placementBasis:b.placementBasis}));
   }
   let legendX=m.inset;
-  ['Products',...m.owners.map(o=>o.label)].forEach((label,i)=>{
+  if (m.bands.productsHeading.height) ['Products',...m.owners.map(o=>o.label)].forEach((label,i)=>{
     const key=i===0?'products-heading':`provider-${m.owners[i-1].id}`;
     const layout=measureText(label,m.legendWidths[i],{fontFamily:tokenValue('font.body'),fontSize:tokenValue('type.compact'),bold:true});
     if(i) surface(`${key}-swatch`,'roadmap-provider-key',legendX,m.bands.productsHeading.y+m.pad,m.inset,layout.height,i===2?'color.surfaceMuted':'color.surface',{dependencies:[nid(key)]});

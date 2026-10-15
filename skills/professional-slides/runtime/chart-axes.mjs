@@ -8,8 +8,9 @@
 // its own (evals/scripts/check_source_quality.mjs).
 import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, stableId, textPrimitive } from "./core.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
-import { STEP_LADDER, decade, stepCandidates, onLadder } from "./nice-numbers.mjs";
+import { STEP_LADDER, decade, stepCandidates, onLadder, wholeSteps } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
+import { groupThousands } from "./draw.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, evidenceBandSpan, evidenceRailWidth } from "./chart-annotations.mjs";
 
 export const FONT = token("font.body");
@@ -29,6 +30,57 @@ export const SERIES = [
   token("color.chartSeries5"),
   token("color.chartSeries6")
 ];
+
+/**
+ * Emphasis, one rule for every chart. The subject - a highlighted member, a focus series, a table's subject row - is drawn in
+ * `color.chartSubject`, which the palette resolves once for each ground (palettes.mjs subjectOf) so that it stands apart from
+ * both kinds of peer. Peers that are data in their own right keep the lead series colour (a ranked bar's other members, the
+ * other panels of a set of multiples); peers that are context go grey - the comparator for a filled mark, the rule grey for
+ * a line or a stem, since a hairline in the comparator's pale grey does not read: the probe's slope drew every line in the
+ * gridline grey, at 1.4:1. Each kind chose its own before, and an accent bar sat on the lead series' own colour.
+ */
+export const SUBJECT = token("color.chartSubject");
+// A subject's peers that are data take `color.chartPeer`: the lead series, unless it outshouts the subject, when they take a
+// calmer colour (palettes.mjs peerOf). A chart with no subject draws its marks in the lead series as before.
+export const PEER = token("color.chartPeer");
+export const CONTEXT_FILL = token("color.chartComparator");
+export const CONTEXT_LINE = token("color.rule");
+
+/**
+ * Which rows of a run get their name, one rule for every chart that names its members down a column - bars and stacks,
+ * lollipops, dumbbells. Forty members down a 420px plot give each row 10px, under the 13px line of the label face, and
+ * every name set in a box that tall prints at six pixels. When a row is thinner than a line the labels first step down to
+ * the smallest size the page sets type at (8pt), where 32 members that fit are all named; under that every nth row is named
+ * from the top, the `named` ones (the highlighted member, one a callout points at) always, and the rows beside a named one
+ * that its label would touch go unlabelled: the reader finds the subject by its colour and its name, and reads the field's
+ * shape from the marks. `span` is a row's height; returns `{ size, line, every, shown(index) }`.
+ */
+export const ROW_LABEL_MIN = token("type.source");
+export function rowLabels({ categories, span, named = new Set(), font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) } }) {
+  const fullLine = measureText("Ag", 1000, font).height;
+  const smallLine = measureText("Ag", 1000, { ...font, fontSize: tokenValue(ROW_LABEL_MIN) }).height;
+  const crowded = span < fullLine;
+  const size = crowded && span >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
+  const line = size === AXIS_LABEL ? fullLine : smallLine;
+  const every = crowded && span < line ? Math.ceil(line / span) : 1;
+  const shown = (index) => every === 1 || named.has(categories[index])
+    || (index % every === 0 && !categories.some((category, at) => named.has(category) && Math.abs(at - index) < every));
+  return { size, line, every, shown };
+}
+
+/**
+ * A row's name in its label column, right-aligned against the row's marks: one line where it fits, else wrapped to the
+ * column and centred on the row (`cy`), rather than one line running past the frame - a name wider than a column capped at
+ * 180-200px set 70px off the page.
+ */
+export function rowNameNode({ id, category, x, cy, width, size = AXIS_LABEL, bold = false, color = INK }) {
+  const layout = measureText(String(category), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), bold });
+  const wrapped = layout.lines.length > 1;
+  return textPrimitive({ id: stableId(id, "category", category), role: "category-label",
+    frame: { x, y: wrapped ? cy - layout.height / 2 : cy - 10, width, height: wrapped ? layout.height : 20 }, text: wrapped ? layout.text : String(category),
+    style: { ...textStyle(size, color, bold, "right"), ...(wrapped ? { valign: "top", lineHeight: layout.lineHeight, wrap: false } : {}) },
+    data: { category, ...(wrapped ? { textLayout: layout } : {}) } });
+}
 
 export const MIN_PLOT_HEIGHT = 100;
 
@@ -228,13 +280,19 @@ function range(values, includeZero) {
 }
 
 /**
- * How many ticks divide a domain into ladder steps: the preferred count if it
- * does, else three, five, six or two. An explicit domain keeps a readable
- * interval (four intervals on 0-6 print 1.5 steps and fail the tick gate),
- * and an automatic one is built on one of these counts (range above).
+ * How many ticks divide a domain into whole ladder steps (nice-numbers.mjs
+ * wholeSteps, the tick gate's own rule): the preferred count if it does, else
+ * three, five, six or two. An automatic domain is built on one of these counts
+ * (range above), whole steps from zero, so one of them always passes; drawn
+ * with a step that is on the ladder and not whole, -3,000 to 3,000 took three
+ * steps and printed -1,000 and 1,000, and the page failed NICE_TICKS on the
+ * axis the runtime chose. An explicit domain no count divides into whole steps
+ * keeps a ladder step where one count gives it (four intervals on 0-6 print
+ * 1.5 steps), and the tick gate says what to set.
  */
 export function tickCount(min, max, preferred = 4) {
-  return [preferred, 3, 5, 6, 2].find((count) => onLadder((max - min) / count)) ?? preferred;
+  const counts = [preferred, 3, 5, 6, 2];
+  return counts.find((count) => wholeSteps(min, max, count)) ?? counts.find((count) => onLadder((max - min) / count)) ?? preferred;
 }
 
 export function assertGridlineOption(props) {
@@ -250,7 +308,13 @@ export function resolveValueAxis(props, { valueCount, dataLabelsVisible }) {
   return !dataLabelsVisible;
 }
 
-export function normalizedCategoricalData(props, { seriesCount = null } = {}) {
+/**
+ * A chart's categories and series, checked. `gaps`: a series may leave a category without a value (null), drawn as a gap -
+ * no mark, no label, no line across it - on the charts that can say so (lines, columns, bars and their stacks). Every other
+ * chart needs a value in every category, and a gap is refused there with what to do: measures bound over periods that
+ * differ are set over all of them, each with its gaps, where a chart can show them (bind.mjs).
+ */
+export function normalizedCategoricalData(props, { seriesCount = null, gaps = false } = {}) {
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) {
     throw new Error("Categorical charts require one or more unique non-empty categories");
   }
@@ -262,8 +326,10 @@ export function normalizedCategoricalData(props, { seriesCount = null } = {}) {
     if (!item || typeof item !== "object" || Array.isArray(item) || typeof item.name !== "string" || !item.name.trim()) throw new Error(`series[${index}] requires a non-empty name`);
     if (names.has(item.name)) throw new Error(`Chart series names must be unique: ${item.name}`);
     names.add(item.name);
-    if (!Array.isArray(item.values) || item.values.length !== props.categories.length || item.values.some(value => !Number.isFinite(value))) {
-      throw new Error(`series[${index}].values must contain one finite value per category`);
+    const holes = Array.isArray(item.values) ? props.categories.filter((_, i) => item.values[i] === null) : [];
+    if (holes.length && !gaps) throw new Error(`series[${index}] (${item.name}) has no value for ${holes.join(", ")}: this chart needs a value in every category - a line, a column or a bar chart draws a gap there; or select the categories every series has`);
+    if (!Array.isArray(item.values) || item.values.length !== props.categories.length || item.values.some(value => value !== null && !Number.isFinite(value)) || !item.values.some(Number.isFinite)) {
+      throw new Error(`series[${index}].values must contain one finite value per category${gaps ? " (null for a gap)" : ""}`);
     }
     return { ...item, values: [...item.values] };
   });
@@ -284,6 +350,23 @@ export function numericBounds(values, { min, max, axis = "y", includeZero = fals
 }
 
 /**
+ * Parts as shares of their whole, to one decimal, by largest remainder: each
+ * set sums to exactly 100. Rounding each share on its own can bring a stack to
+ * 100.1, past the 0-100 axis a 100% stack is drawn on. A whole of nothing is
+ * all zeros. A 100% stacked chart and a trellis of them share it.
+ */
+export function sharesOfWhole(parts) {
+  const total = parts.reduce((sum, value) => sum + (value || 0), 0);
+  if (!total) return parts.map(() => 0);
+  const exact = parts.map((value) => ((value || 0) / total) * 1000);
+  const floors = exact.map(Math.floor);
+  let short = 1000 - floors.reduce((a, b) => a + b, 0);
+  const order = exact.map((value, k) => [value - floors[k], k]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, k] of order) { if (short <= 0) break; floors[k] += 1; short -= 1; }
+  return floors.map((value) => value / 10);
+}
+
+/**
  * Which labels a crowded period axis keeps, given how many slots one label
  * needs: the first, then every nth, at a step - the one needed, or one more -
  * that lands on the latest period, so both ends of the series are named and
@@ -300,6 +383,19 @@ export function periodLabelStep(count, needed) {
   return { every: needed, fromFirst: false };
 }
 
+/**
+ * Which of a run of evenly spaced periods are named: each where the widest name clears the pitch between them, else every
+ * nth from the first (periodLabelStep), and the latest where it clears the last one named - the first and the last, as a
+ * strong deck sets them. One rule for the line's axis and the combo's, which named 24 members on one another. `atLeast`: a
+ * step the run's calendar asks for (time-axis.mjs monthlyLabelStep).
+ */
+export function periodsNamed(categories, pitch, { atLeast = 1 } = {}) {
+  const widest = Math.max(...categories.map((category) => measureText(String(category), 400, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).width));
+  const { every } = periodLabelStep(categories.length, Math.max(atLeast, Math.ceil((widest + 10) / Math.max(1, pitch))));
+  const last = categories.length - 1, before = Math.floor(last / every) * every;
+  return (index) => index % every === 0 || (index === last && (last - before) * pitch >= widest + 10);
+}
+
 export function axisTickText(min, max, index, steps = 4) {
   const value = min + (max - min) * index / steps;
   // The domain is already rounded to whole steps, so the tick is exact; trim the
@@ -308,8 +404,11 @@ export function axisTickText(min, max, index, steps = 4) {
     const text = String(Number(entry.toPrecision(12)));
     return text.includes(".") ? text.split(".")[1].length : 0;
   }));
-  // Every tick prints that one precision: 0.0, 2.5, 5.0, not 0, 2.5, 5.
-  return (value + 0).toFixed(Math.min(10, decimals)).replace(/^-(0(\.0+)?)$/, "$1");
+  // Every tick prints that one precision: 0.0, 2.5, 5.0, not 0, 2.5, 5. Four figures and up take the thousands separator
+  // the chart's own labels print (value-format.mjs formatValue): an axis of 12000 beside labels of 12,000 read as two scales.
+  const [whole, fraction] = (value + 0).toFixed(Math.min(10, decimals)).replace(/^-(0(\.0+)?)$/, "$1").split(".");
+  const sign = whole.startsWith("-") ? "-" : "", digits = whole.replace("-", "");
+  return `${sign}${digits.length > 3 ? groupThousands(digits) : digits}${fraction ? `.${fraction}` : ""}`;
 }
 
 export function axisLabelWidth(bounds) {
@@ -317,12 +416,24 @@ export function axisLabelWidth(bounds) {
   return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL) }).width)));
 }
 
-export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48 } = {}) {
+/**
+ * Whether peers in one unit are of one magnitude, so one scale reads in each: every peer's largest value at least a tenth
+ * of the largest's. Under a tenth, the shared scale draws that peer's bars as slivers and the comparison it exists for
+ * cannot be read - the BA deck's connectivity panels set 4,866 points one pixel wide beside 1.9 million, and its punctuality
+ * page a 1.6% cancellation rate beside 77% on time - so each keeps its own scale, and its labels carry the numbers.
+ */
+export function oneMagnitude(valueSets) {
+  const tops = valueSets.map((values) => Math.max(0, ...values.filter(Number.isFinite).map(Math.abs)));
+  return Math.max(...tops) <= 10 * Math.min(...tops);
+}
+
+export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48, inverted = false } = {}) {
   steps = tickCount(yMin, yMax, steps);
   const nodes = [];
   if (showValueAxis) {
     for (let index = 0; index <= steps; index += 1) {
-      const y = plot.y + plot.height - plot.height * index / steps;
+      // A rank's axis is turned over (chart-line.mjs): its least value, first place, at the top.
+      const y = inverted ? plot.y + plot.height * index / steps : plot.y + plot.height - plot.height * index / steps;
       if (gridlines) {
         nodes.push(linePrimitive({
           id: stableId(id, "grid", index),

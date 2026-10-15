@@ -128,7 +128,7 @@ function defineFunnel() {
     category: "relationship",
     role: "funnel",
     tokens: [
-      "color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink",
+      "color.componentPrimary", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.onPrimary", "color.ink", "color.textSecondary",
       "font.body", "type.compact", "line.hairline", "radius.small"
     ],
     preferredSize: { width: 700, height: 360 },
@@ -146,6 +146,13 @@ function defineFunnel() {
         throw new Error("Funnel stages require non-negative values within a positive denominator");
       const max = props.stages[0].value;
       const height = frame.height / props.stages.length;
+      // Each stage after the first says what it kept: its share of the stage before it (`rates: "previous"`, the default), of
+      // the first stage (`"first"`), or nothing (`"none"`) - a narrowing the reader would otherwise have to divide out.
+      const rates = props.rates ?? "previous";
+      if (!["previous", "first", "none"].includes(rates)) throw new Error("Funnel rates are \"previous\" (each stage's share of the one before), \"first\" (of the first stage) or \"none\"");
+      const share = (index) => { const base = rates === "first" ? max : props.stages[index - 1].value; return base > 0 ? props.stages[index].value / base * 100 : null; };
+      const rateText = (index) => { const pct = share(index); if (pct === null) return null; const basis = rates === "first" ? props.stages[0].label : props.stages[index - 1].label;
+        return `${pct >= 10 ? Math.round(pct) : pct.toFixed(1)}% of ${String(basis).toLowerCase()}`; };
       return {
         nodes: props.stages.flatMap((stage, index) => {
           const plotWidth = frame.width * 0.6;
@@ -162,18 +169,17 @@ function defineFunnel() {
                 })
               ]
               : []),
-            textPrimitive({
-              id: stableId(id, "label", index),
-              role: "funnel-label",
-              frame: {
-                x: frame.x + plotWidth + 12,
-                y: frame.y + index * height + 3,
-                width: frame.width - plotWidth - 12,
-                height: height - 6
-              },
-              text: `${stage.label}  ${stage.value}`,
-              style: textStyle(COMPACT, INK, true, "left")
-            })
+            ...(() => {
+              const labelFrame = { x: frame.x + plotWidth + 12, y: frame.y + index * height + 3, width: frame.width - plotWidth - 12, height: height - 6 };
+              const rate = index > 0 && rates !== "none" ? rateText(index) : null;
+              const line = measureText("Ag", 400, { fontSize: tokenValue(COMPACT) }).height;
+              // The rate takes the line under the label where the stage's band holds two, else it follows the value in brackets.
+              if (rate && labelFrame.height >= line * 2 + 2) return [
+                textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: { ...labelFrame, height: labelFrame.height / 2 }, text: `${stage.label}  ${stage.value}`, style: { ...textStyle(COMPACT, INK, true, "left"), valign: "bottom" } }),
+                textPrimitive({ id: stableId(id, "rate", index), role: "funnel-rate", frame: { ...labelFrame, y: labelFrame.y + labelFrame.height / 2, height: labelFrame.height / 2 }, text: rate, style: { ...textStyle(COMPACT, SECONDARY, false, "left"), valign: "top" }, data: { rate: share(index), basis: rates } }),
+              ];
+              return [textPrimitive({ id: stableId(id, "label", index), role: "funnel-label", frame: labelFrame, text: rate ? `${stage.label}  ${stage.value} (${rate})` : `${stage.label}  ${stage.value}`, style: textStyle(COMPACT, INK, true, "left"), ...(rate ? { data: { rate: share(index), basis: rates } } : {}) })];
+            })()
           ];
         })
       };

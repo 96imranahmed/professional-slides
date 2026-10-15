@@ -3,7 +3,7 @@
 //
 // A page says its numbers three ways: plotted (an exhibit's values), printed
 // in a figure (a metric, a table cell) and typed into a sentence. The first
-// is held to its measure value by value (gates/dependency_gates.mjs); the
+// is traced to its measure (page-numbers.mjs); the
 // other two are text, and text mixes measurements with everything else that
 // has digits in it - a year, a period label, a model name, a date, an
 // ordinal. This module is the one reading of that text:

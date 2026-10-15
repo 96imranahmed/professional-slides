@@ -340,14 +340,3 @@ console.log(JSON.stringify({ placement: box.data.evidencePlacement, within, lead
         self.assertGreater(result['ownTop'], 150)  # full bands alone overrun the row's band
         self.assertEqual(result['peerTop'], 150)
         self.assertTrue(result['compact'])
-
-    def test_a_takeaway_line_is_body_not_footer(self):
-        import sys
-        sys.path.insert(0, str(RUNTIME / 'gates'))
-        import page_gates
-        slide = {'nodes': [
-            {'type': 'text', 'role': 'paragraph', 'text': ' '.join(['word'] * 30), 'frame': {'x': 80, 'y': 200, 'width': 800, 'height': 100}},
-            {'type': 'text', 'role': 'insight-body', 'text': ' '.join(['close'] * 20), 'frame': {'x': 80, 'y': 640, 'width': 800, 'height': 20}}]}
-        body, footer, _ = page_gates.body_bands(slide)
-        self.assertEqual((body, footer), (50, 0))
-

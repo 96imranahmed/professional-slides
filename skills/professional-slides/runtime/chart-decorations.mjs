@@ -7,11 +7,13 @@
 // chart definition says which it `draws` and which it `refuses`, and
 // `refuseUndrawn` refuses any other before the chart is laid out, so nothing
 // authored is dropped unseen.
-import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitive, isTokenReference } from "./core.mjs";
+import { ruleAround } from "./label-placement.mjs";
+import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitive, isTokenReference, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, renderAnnotationRail, renderChangeAnnotations, renderEvidenceAnnotations } from "./chart-annotations.mjs";
 import { FONT, INK, SECONDARY, GRID, CHART_LABEL, textStyle, lineStyle, CHART_ANNOTATION, labelBold } from "./chart-axes.mjs";
 import { formatValue } from "./value-format.mjs";
+import { bandNodes, bandValues, bandLabelRow } from "./chart-bands.mjs";
 
 // A target or capacity is part of the quantitative comparison. Include it in
 // automatic domains; numericBounds also rejects it outside an explicit domain.
@@ -25,7 +27,8 @@ import { formatValue } from "./value-format.mjs";
 // quarter of its span past the top, which holds the label; the 15% added again
 // on top of it left a quarter of the plot empty over a peak line.
 export const withReferenceValues = (values, props, { base = 0, padded = false } = {}) => {
-  const references = (props.referenceLines || []).map(reference => reference.value).filter(Number.isFinite);
+  // A value band (chart-bands.mjs) is a range the data is read against: its ends are in the domain as a reference is.
+  const references = [...(props.referenceLines || []).map(reference => reference.value), ...bandValues(props)].filter(Number.isFinite);
   const top = Math.max(...values.filter(Number.isFinite));
   const headroom = props.yMax === undefined && props.xMax === undefined && !padded ? references.filter(v => v > 0 && v >= base + (top - base) * 0.9).map(v => v + (v - base) * 0.15) : [];
   return [...values, ...references, ...headroom];
@@ -98,11 +101,15 @@ function eventRows(events) {
   return rows;
 }
 const eventBandHeight = (events) => { if (!events.length) return 0; const [first, second] = eventRows(events); return first + EVENT_ROW_GAP + (events.length > 1 ? second + EVENT_ROW_GAP : 0); };
-export function periodBandHeight(props = {}, categories = []) {
-  // The period band clears the value labels above the tallest column (26px).
-  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories));
+export function periodBandHeight(props = {}, categories = [], { horizontal = false } = {}) {
+  // The period band clears the value labels above the tallest column (26px). A labelled category band names its run in
+  // the same row (chart-bands.mjs), over a vertical chart; a bar chart's sits inside its band.
+  return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories))
+    + bandLabelRow(props, categories, { horizontal });
 }
-function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
+// An event's rule up the plot at `x` gives way to the value labels it would run through (label-placement.mjs ruleAround).
+const valueLabels = (nodes) => nodes.filter((node) => node.role === "data-label" && String(node.text ?? "").trim());
+function periodAndEventNodes({ id, plot, props, categoryMap, categories, obstacles = [] }) {
   const periods = normalizePeriods(props, categories), events = normalizeEvents(props, categories);
   const underlay = [], overlay = [];
   if (!periods.length && !events.length) return { underlay, overlay };
@@ -133,21 +140,43 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories }) {
     const fits = x + 6 + label.width <= plot.x + plot.width;
     const lx = fits ? x + 6 : x - 6 - label.width;
     overlay.push(textPrimitive({ id: stableId(id, "event-label", index), role: "chart-event-label", frame: { x: lx, y: labelTop, width: label.width + 2, height: label.height }, text: label.text, style: { ...textStyle(CHART_LABEL, INK, true, fits ? "left" : "right"), valign: "top", lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
-    underlay.push(linePrimitive({ id: stableId(id, "event-line", index), role: "chart-event-line", x1: x, y1: labelTop, x2: x, y2: plot.y + plot.height, style: lineStyle(INK, token("line.hairline"), "dash") }));
+    ruleAround({ x1: x, y1: labelTop, x2: x, y2: plot.y + plot.height }, valueLabels(obstacles)).forEach((run, segment) => underlay.push(linePrimitive({ id: segment ? stableId(id, "event-line", index, segment) : stableId(id, "event-line", index),
+      role: "chart-event-line", ...run, style: lineStyle(INK, token("line.hairline"), "dash") })));
   });
   return { underlay, overlay };
 }
 
-function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false }) {
+function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new Map(), yScale = null, xScale = null, scatterX = null, obstacles = [], allowBarHighlight = false, allowAnnotationRail = true, arrowOnly = false, allowOutsideReferenceLabels = false, markerOffset = 0, allowMarkers = false }) {
   const underlay = [];
   const overlay = [];
+  for (const reference of props.referenceLines || []) if (reference?.style !== undefined && !REFERENCE_STYLES.includes(reference.style)) throw new Error(`a reference line's style is ${REFERENCE_STYLES.map((s) => `"${s}"`).join(" or ")}`);
+  if (!allowMarkers && (props.referenceLines || []).some(isMarker)) throw new Error("an average marker (`style: \"marker\"`) sits on a bar, column or line chart's value axis; on this chart draw it as a reference line");
+  // Bands sit behind everything the chart draws over its data, their labels clear of the marks (chart-bands.mjs).
+  if (props.bands !== undefined) {
+    const bands = bandNodes({ id, plot, props, categories: props.categories || [], pointMap, yScale, xScale: yScale ? null : xScale, scatterX, obstacles,
+      changeBand: chartAnnotationBands({ changeAnnotations: props.changeAnnotations || [], annotationRail: null }).top });
+    underlay.push(...bands.underlay); overlay.push(...bands.overlay);
+  }
   if (props.categories && categoryMap.size && (props.periods || props.events)) {
-    const bands = periodAndEventNodes({ id, plot, props, categoryMap, categories: props.categories });
+    const bands = periodAndEventNodes({ id, plot, props, categoryMap, categories: props.categories, obstacles });
     underlay.push(...bands.underlay); overlay.push(...bands.overlay);
   }
   drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacles, underlay, overlay });
-  const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles });
+  // The value lines across the plot are drawn after the callouts, their labels clear of them; a callout set in the plot's
+  // open space keeps off the lines themselves, so they are passed where they will be.
+  const valueRules = yScale ? (props.referenceLines || []).filter((reference) => !isMarker(reference) && Number.isFinite(reference?.value))
+    .map((reference) => ({ type: "line", role: "chart-reference-line", frame: { x: plot.x, y: yScale(reference.value), width: plot.width, height: 0 } })) : [];
+  const evidenceAnnotations = renderEvidenceAnnotations({ id, plot, props, pointMap, obstacles, guides: [...underlay, ...overlay, ...valueRules] });
   const annotationPlacements = evidenceAnnotations.placements;
+  // An event's rule breaks at a callout set across it as it does at a value label: a callout beside its mark is placed
+  // after the rule and may stand across it (hb02's and sh01's on the BA retest ran through their callouts' words).
+  const callouts = evidenceAnnotations.nodes.filter((node) => ["annotation-surface", "annotation-text"].includes(node.role) && node.frame).map((node) => node.frame);
+  if (callouts.length) for (let i = underlay.length - 1; i >= 0; i -= 1) {
+    const rule = underlay[i], at = rule.data ?? {};
+    if (rule.role !== "chart-event-line" || ![at.x1, at.y1, at.y2].every(Number.isFinite) || !callouts.some((frame) => at.x1 >= frame.x - 2 && at.x1 <= frame.x + frame.width + 2)) continue;
+    const runs = ruleAround({ x1: at.x1, y1: Math.min(at.y1, at.y2), x2: at.x1, y2: Math.max(at.y1, at.y2) }, [], { boxes: callouts });
+    underlay.splice(i, 1, ...runs.map((run, segment) => linePrimitive({ id: `${rule.id}-${segment}`, role: "chart-event-line", ...run, style: rule.style })));
+  }
   const overlaps = (a, b, padding = 4) => !(
     a.x + a.width + padding <= b.x
     || b.x + b.width + padding <= a.x
@@ -155,7 +184,7 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
     || b.y + b.height + padding <= a.y
   );
   drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight, underlay });
-  drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps });
+  drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps, markerOffset });
   overlay.push(...evidenceAnnotations.nodes);
   // A change arrow keeps clear of what is set above the marks before it - reference and threshold labels, callouts - as it
   // does of the marks themselves.
@@ -164,22 +193,53 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   return { underlay, overlay };
 }
 
+/**
+ * `referenceLines: [{ value, label, style: "marker" }]`: the value marked on
+ * the value axis by a filled triangle and its label - "Ø 18.1", an average -
+ * with no line across the marks, as strong decks mark a field's average under
+ * its bars. On a bar chart the triangle points up from under the plot at the
+ * value; on a column or line chart it points left from the plot's right edge
+ * (past the value labels, `offset`), and the label follows it. Its row or
+ * gutter is reserved by the chart (markerGutter, MARKER_ROW).
+ */
+export const REFERENCE_STYLES = Object.freeze(["line", "marker"]);
+export const MARKER_ROW = 34;
+const MARKER_SIZE = 10;
+export const isMarker = (reference) => reference?.style === "marker";
+const markerText = (reference, props) => (typeof reference.label === "string" && reference.label.trim() ? reference.label.trim() : `Ø ${formatValue(reference.value, props)}`);
+/** The width a column or line chart's markers take at its right. */
+export function markerGutter(props = {}) {
+  const markers = (props.referenceLines || []).filter(isMarker);
+  if (!markers.length) return 0;
+  return MARKER_SIZE + 6 + Math.ceil(Math.max(...markers.map((reference) => measureText(markerText(reference, props), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true }).width))) + 4;
+}
+function markerNodes({ id, index, reference, props, plot, horizontal, at, offset = 0 }) {
+  const measured = measureText(markerText(reference, props), 200, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
+  const s = MARKER_SIZE, color = token("color.componentPrimary");
+  const points = horizontal ? [[0, 1], [0.5, 0], [1, 1]] : [[1, 0], [0, 0.5], [1, 1]];
+  const frame = horizontal ? { x: at - s / 2, y: plot.y + plot.height + 4, width: s, height: s * 0.9 } : { x: plot.x + plot.width + offset + 2, y: at - s / 2, width: s * 0.9, height: s };
+  const glyph = shapePrimitive({ id: stableId(id, "reference-marker", index), role: "chart-reference-marker", geometry: "customPolygon", frame, style: { fill: color, stroke: "none", lineWidth: token("line.hairline") }, data: { paths: [points], value: reference.value } });
+  const label = horizontal
+    ? { x: at - measured.width / 2 - 1, y: frame.y + frame.height + 2, width: measured.width + 2, height: measured.height, align: "center" }
+    : { x: frame.x + frame.width + 4, y: at - measured.height / 2, width: measured.width + 2, height: measured.height, align: "left" };
+  return [glyph, textPrimitive({ id: stableId(id, "reference-label", index), role: "chart-reference-label", frame: label, text: measured.text,
+    style: { ...textStyle(CHART_LABEL, color, true, label.align), valign: "top", lineHeight: measured.lineHeight, wrap: false }, data: { textLayout: measured, value: reference.value, marker: true } })];
+}
+
 // Horizontal charts carry a value axis along x: a reference is a vertical line
 // with its label set above the plot, clear of the bars.
 function drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacles, underlay, overlay }) {
   if (!yScale && xScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
+      if (isMarker(reference)) { overlay.push(...markerNodes({ id, index, reference, props, plot, horizontal: true, at: xScale(reference.value) })); continue; }
       const x = xScale(reference.value);
       // Interrupt the exact-value guide around direct labels, rather than
       // drawing through a value near the threshold. Its x position is unchanged.
-      const gaps = obstacles.filter(node => node.role === "data-label" && x >= node.frame.x - 4 && x <= node.frame.x + node.frame.width + 4)
-        .map(node => [Math.max(plot.y - 4, node.frame.y - 4), Math.min(plot.y + plot.height, node.frame.y + node.frame.height + 4)])
-        .sort((a, b) => a[0] - b[0]);
-      let cursor = plot.y - 4, segment = 0;
-      for (const [start, end] of [...gaps, [plot.y + plot.height, plot.y + plot.height]]) {
-        if (start > cursor) underlay.push(linePrimitive({ id: stableId(id, "reference-line", index, segment++), role: "chart-reference-line", x1: x, y1: cursor, x2: x, y2: start, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") }));
-        cursor = Math.max(cursor, end);
-      }
+      // A label's slot is wider than its figure (50px at least): the line breaks
+      // where the figure's ink is, or a median through a field of short labels
+      // vanished for six rows, the subject's among them.
+      ruleAround({ x1: x, y1: plot.y - 4, x2: x, y2: plot.y + plot.height }, valueLabels(obstacles), { gap: 4 }).forEach((run, segment) =>
+        underlay.push(linePrimitive({ id: stableId(id, "reference-line", index, segment), role: "chart-reference-line", ...run, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") })));
       if (reference.label) {
         const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
         const left = Math.min(plot.x + plot.width - measured.width, x + 6);
@@ -251,15 +311,18 @@ function drawRegionHighlights({ id, plot, props, categoryMap, allowBarHighlight,
 // A value axis up the page: each reference is a dashed line across the plot,
 // broken around value labels left on it, with its label in the first place
 // clear of the callouts, the marks and the plotted series.
-function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps }) {
+function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowOutsideReferenceLabels, underlay, overlay, annotationPlacements, overlaps, markerOffset = 0 }) {
   if (yScale) {
     for (const [index, reference] of (props.referenceLines || []).entries()) {
+      if (isMarker(reference)) { overlay.push(...markerNodes({ id, index, reference, props, plot, horizontal: false, at: yScale(reference.value), offset: markerOffset })); continue; }
       if(reference.placement === "outside-end" && !allowOutsideReferenceLabels) throw new Error("Outside reference labels are supported only on column charts");
       const y = yScale(reference.value);
       // A value label the chart left in place across this line (its column
       // too short to take the label inside) interrupts the line, as the
       // horizontal guide already does around a bar's value.
-      const gaps = obstacles.filter(node => node.role === "data-label" && node.data?.referenceGap)
+      // Any value label whose figure the line would cross breaks it, not only one left across it for want of room: a line
+      // chart's labels sit above their points, wherever the rule happens to run (the event rule above, on the BA retest).
+      const gaps = obstacles.filter(node => node.role === "data-label" && String(node.text ?? "").trim())
         .map(node => { const ink = measureDataLabel(node.text), top = node.frame.y + (node.frame.height - ink.height) / 2, left = node.frame.x + (node.frame.width - ink.width) / 2; return { top, bottom: top + ink.height, left: left - 4, right: left + ink.width + 4 }; })
         .filter(gap => y >= gap.top - 3 && y <= gap.bottom + 3)
         .sort((a, b) => a.left - b.left);
@@ -295,7 +358,7 @@ function drawVerticalReferenceLines({ id, plot, props, yScale, obstacles, allowO
         // the plot, which a line chart (with no outside gutter) cannot leave.
         ...[0.5, 0.25, 0.75, 0.375, 0.625, 0.125, 0.875].flatMap(at => [y - labelHeight - 8, y + 8].map(top => ({ x: plot.x + (plot.width - labelWidth) * at, y: top, width: labelWidth, height: labelHeight, align: "center" })))
       ];
-      const fits = (candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
+      const fits = (candidate) => candidate.y >= plot.y && candidate.y + candidate.height <= plot.y + plot.height && annotationPlacements.every(({ frame }) => !overlaps(candidate, frame)) && [...obstacles, ...overlay].filter((node) => ["chart-mark", "data-label", "chart-reference-label"].includes(node.role)).every((node) => !overlaps(candidate, node.frame)) && (reference.placement === "outside-end" || (props.referenceLines || []).filter((other) => !isMarker(other)).every(other => yScale(other.value) < candidate.y - 4 || yScale(other.value) > candidate.y + candidate.height + 4));
       // A label the series runs through is read as part of the line: the
       // first place clear of every plotted line and point is taken, and only
       // where there is none does the label settle for clear of the marks.
@@ -359,11 +422,24 @@ export const measureDataLabel = (text, width = 1000) => {
 };
 
 /**
+ * `segmentGrowth` or `seriesGrowth` as the columns it draws: one `{ from, to,
+ * label }`, or up to three of them side by side - "CAGR 2015-19 | 2019-24" -
+ * each its own column. Null where the chart asks for none.
+ */
+export const GROWTH_COLUMNS_MAX = 3;
+export function growthColumns(spec, categories, series, name) {
+  if (spec === undefined || spec === null || spec === false) return null;
+  const list = Array.isArray(spec) ? spec : [spec];
+  if (!list.length || list.length > GROWTH_COLUMNS_MAX) throw new Error(`${name} takes one { from, to } or a list of up to ${GROWTH_COLUMNS_MAX}, one column each`);
+  return list.map((g, at) => growthColumn(g, categories, series, list.length > 1 ? `${name}[${at}]` : name));
+}
+
+/**
  * The growth of each series between two categories: a compound annual rate
  * when both name years, otherwise the change. Stacked columns set it beside the
  * last stack (`segmentGrowth`), lines beside their end labels (`seriesGrowth`).
  */
-export function growthColumn(g, categories, series, name) {
+function growthColumn(g, categories, series, name) {
   const a = categories.indexOf(g?.from), b = categories.indexOf(g?.to);
   if (a < 0 || b <= a) throw new Error(`${name}.from and .to must name two categories in order`);
   const year = (c) => { const m = String(c).match(/(?:19|20)\d{2}/); return m ? Number(m[0]) : null; };
@@ -404,6 +480,18 @@ export const CHART_DECORATIONS = Object.freeze({
   periods: "periods (`periods`)",
   events: "events (`events`)",
   pointHighlights: "point highlights (`pointHighlights`)",
+  bands: "bands (`bands`)",
+  intervals: "intervals (`intervals`)",
+  valueBreak: "a broken value axis (`valueBreak`)",
+  categoryBreaks: "category-axis breaks (`categoryBreaks`)",
+  groupBrackets: "group brackets (`groupBrackets`)",
+  valueLabels: "value-label overrides (`valueLabels`)",
+  segmentGrowth: "a growth column per segment (`segmentGrowth`)",
+  seriesGrowth: "a growth column per line (`seriesGrowth`)",
+  stackBracket: "a bracket over a stack's segments (`stackBracket`)",
+  diverging: "a diverging scale (`diverging`)",
+  trendLine: "a fitted trend line (`trendLine`)",
+  categoryIcons: "icons, logos or flags beside its category labels (`categoryIcons`)",
 });
 const authoredDecoration = (value) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== false;
 // What a chart on a vertical category axis draws through the shared decorations.

@@ -112,18 +112,6 @@ export async function readJson(file, { optional = false } = {}) {
   return parseJson(text, file);
 }
 
-/**
- * The agent CLI this process runs inside, when it runs inside one: "claude"
- * under Claude Code (the CLI or the desktop app), "codex" under Codex, else
- * null. The reviews, the storyline critique and the copy judgements run
- * through that CLI (doctor.mjs checks it is installed and signed in).
- */
-export function hostCli(env = process.env) {
-  if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return "claude";
-  if (env.CODEX_SANDBOX || env.CODEX_SANDBOX_NETWORK_DISABLED || env.CODEX_THREAD_ID || env.CODEX_MANAGED_BY_NPM) return "codex";
-  return null;
-}
-
 /** readJson, synchronously. */
 export function readJsonSync(file, { optional = false } = {}) {
   let text;
@@ -136,3 +124,54 @@ export const writeJson = (file, value, options) => fsp.writeFile(file, formatJso
 
 /** writeJson, synchronously. */
 export const writeJsonSync = (file, value) => fs.writeFileSync(file, formatJson(value));
+
+/**
+ * writeJson to a file of this process's own beside `file`, renamed in whole: for a file other runs read while this one writes
+ * it - a deck's picture and logo records, its caches, written by section writers checking side by side. A reader caught
+ * mid-write by a plain write read half a file ("Unexpected end of JSON input").
+ */
+export async function writeJsonWhole(file, value) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  await fsp.writeFile(tmp, formatJson(value));
+  await fsp.rename(tmp, file);
+}
+
+/**
+ * The subset of JSON Schema the answer schemas use, checked field by field: every
+ * reason `value` does not match `schema`, as sentences naming where (`at`). A
+ * schema with `additionalProperties: false` refuses fields it does not name: an
+ * answer is what its schema asks for and nothing else. `absentIsNull` reads a
+ * required field left out as null, where the schema takes null: a judgement
+ * packet's schema requires every field because a strict structured output asks
+ * it, and the recording reads a field not given as null. `enums: false` leaves
+ * the enums to a caller that says which key or verdict is wrong in its own words.
+ */
+export function schemaErrors(value, schema, at, { absentIsNull = false, enums = true } = {}) {
+  const errors = [], options = { absentIsNull, enums };
+  const kind = Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
+  const types = [].concat(schema.type ?? []);
+  if (types.length && !types.some((t) => t === kind || (t === "integer" && kind === "number" && Number.isInteger(value))))
+    return [`${at} must be ${types.map((t) => (t === "object" ? "an object" : t === "null" ? "null" : `a ${t}`)).join(" or ")}`];
+  if (enums && schema.enum && !schema.enum.includes(value)) errors.push(`${at} must be one of ${schema.enum.join(", ")}`);
+  if (kind === "string") {
+    if (schema.minLength && value.trim().length < schema.minLength) errors.push(`${at} must be at least ${schema.minLength} characters`);
+    if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${at} is malformed`);
+  }
+  if (kind === "number" && ((schema.minimum !== undefined && value < schema.minimum) || (schema.maximum !== undefined && value > schema.maximum)))
+    errors.push(`${at} must be between ${schema.minimum ?? "-"} and ${schema.maximum ?? "-"}`);
+  if (kind === "array") {
+    if (schema.minItems && value.length < schema.minItems) errors.push(`${at} needs at least ${schema.minItems} item${schema.minItems === 1 ? "" : "s"}`);
+    if (schema.items) value.forEach((item, i) => errors.push(...schemaErrors(item, schema.items, `${at}[${i}]`, options)));
+  }
+  if (kind === "object") {
+    const nullable = (key) => [].concat(schema.properties?.[key]?.type ?? []).includes("null");
+    for (const key of schema.required || []) if (value[key] === undefined && !(absentIsNull && nullable(key))) errors.push(`${at} is missing \`${key}\``);
+    if (schema.additionalProperties === false) {
+      const extra = Object.keys(value).filter((key) => !(key in (schema.properties || {})));
+      if (extra.length) errors.push(`${at} carries ${extra.map((k) => `\`${k}\``).join(", ")}, which the schema does not allow: return exactly the schema's fields`);
+    }
+    for (const [key, sub] of Object.entries(schema.properties || {})) if (value[key] !== undefined) errors.push(...schemaErrors(value[key], sub, `${at}.${key}`, options));
+  }
+  return errors;
+}
+

@@ -133,6 +133,26 @@ console.log(JSON.stringify({{
         self.assertEqual(result["slots"], [])
         self.assertEqual(result["apart"], [])
 
+    def test_text_run_past_its_own_panel_is_found(self):
+        """Spacebar timed run: a label's third line ran off its dark block into the gap and under the next; no check read it."""
+        result = run_node(f"""
+import {{ sceneCollisions }} from '{RUNTIME}/validate-overlap.mjs';
+const data = (instance) => ({{ componentInstance: instance }});
+const panel = (id, y, instance, role = 'side-panel') => ({{ id, type: 'rect', role, frame: {{ x: 60, y, width: 228, height: 96 }}, style: {{ fill: {{ value: '#051C2C' }} }}, data: data(instance) }});
+const label = (lines, instance = 'p:label-1') => ({{ id: 't', type: 'text', role: 'side-panel-text', text: lines.join('\\n'), frame: {{ x: 84, y: 288, width: 180, height: 24 * lines.length }},
+  style: {{ align: 'left', valign: 'top', bold: true, fontFamily: {{ value: 'Georgia' }}, fontSize: {{ value: 14 }} }}, data: {{ ...data(instance), textLayout: {{ lines, lineHeight: 24, height: 24 * lines.length, width: 160 }} }} }});
+const off = (nodes) => sceneCollisions({{ id: 's', nodes }}).filter((f) => f.code === 'TEXT_OFF_GROUND').map((f) => [f.text, f.ground]);
+const three = ['Sol led on', 'research, memo', 'and consistency'];
+console.log(JSON.stringify({{
+  clipped: off([panel('a', 248, 'p:label-1'), label(three), panel('b', 356, 'p:label-2')]),
+  fits: off([panel('a', 248, 'p:label-1'), label(three.slice(0, 2))]),
+  // Another component's fill is not this text's ground, and a mark is no ground: a value label runs past its bar's tint.
+  other: off([panel('a', 248, 'p:other'), label(three)]),
+  mark: off([panel('a', 248, 'p:label-1', 'chart-band'), label(three)]) }}));
+""")
+        self.assertEqual(result["clipped"], [["t", "a"]])
+        self.assertEqual([result["fits"], result["other"], result["mark"]], [[], [], []])
+
     def test_a_label_is_read_by_its_glyphs_not_the_slot_it_is_set_in(self):
         """Fifty-page audit: read as its 60px slot, a value label had its own series' segments through it."""
         # A line chart's value label is a 60px slot round four figures. Read as
@@ -178,17 +198,14 @@ class SceneDesignFindingTests(unittest.TestCase):
         result = run_node(f"""
 import {{ sceneDesignFindings, OVERLAP_CODES, OVERLAP_SEVERITY }} from '{RUNTIME}/validate-overlap.mjs';
 import {{ withFindings, buildOutcome }} from '{RUNTIME}/build-deck.mjs';
-import {{ applyRulesVersion }} from '{RUNTIME}/weight.mjs';
 const text = (id, frame) => ({{ id, type: 'text', role: 'flow-arrow-label', text: 'agent role', frame, style: {{ align: 'left', valign: 'top', fontSize: {{ value: 10 }} }}, data: {{}} }});
 const arrow = {{ id: 'a', type: 'line', role: 'flow-arrow', frame: {{ x: 80, y: 107, width: 120, height: 0 }}, data: {{ x1: 80, y1: 107, x2: 200, y2: 107 }} }};
 const box = {{ id: 'b', type: 'rect', role: 'flow-step', frame: {{ x: 300, y: 80, width: 100, height: 60 }} }};
 const scene = {{ slides: [{{ id: 'cover', nodes: [] }}, {{ id: 'p1', nodes: [text('t', {{ x: 100, y: 100, width: 60, height: 14 }}), arrow] }}, {{ id: 'p2', nodes: [text('e', {{ x: 240, y: 100, width: 59, height: 14 }}), box] }}] }};
 const found = sceneDesignFindings(scene);
 const outcome = (findings) => buildOutcome({{ preflight: withFindings({{ passed: true, findings: [] }}, findings), readback: {{ accepted: true }} }}, {{ render: false }});
-const older = applyRulesVersion(found, {{ workflow: 'existing_deck_revision', rulesVersion: 2 }});
 console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.severity]), codes: Object.keys(OVERLAP_CODES).sort(), held: Object.keys(OVERLAP_SEVERITY).sort(),
-  status: outcome(found).status, blockers: outcome(found).blockers.map((b) => b.code), edgeOnly: outcome(found.filter((f) => f.code === 'TEXT_ON_EDGE')).status,
-  older: outcome(older).status }}));
+  status: outcome(found).status, blockers: outcome(found).blockers.map((b) => b.code), edgeOnly: outcome(found.filter((f) => f.code === 'TEXT_ON_EDGE')).status }}));
 """)
         self.assertEqual(result["codes"], result["held"], "every scene check has a severity")
         self.assertIn([2, "p1", "TEXT_ON_LINE", "blocker"], result["found"])
@@ -196,7 +213,6 @@ console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.
         self.assertEqual(result["status"], "built-with-blockers")
         self.assertEqual(result["blockers"], ["TEXT_ON_LINE"])
         self.assertEqual(result["edgeOnly"], "built-unrendered")
-        self.assertEqual(result["older"], "built-unrendered", "a revision under older rules hears it as advice")
 
     def test_the_build_and_authoring_run_the_scene_checks(self):
         """Fifty-page audit: the checks shipped unwired, imported by the eval suite alone."""
@@ -230,10 +246,10 @@ console.log(JSON.stringify({{ found: found.map((f) => [f.slide, f.id, f.code, f.
             preflight = json.loads((tmp / "out" / "preflight-gates.json").read_text())
             self.assertIn("planted", [f.get("id") for f in preflight["findings"]], "the build does not report the scene checks")
             authored = subprocess.run([*hooked, "--input-type=module", "--eval", f"""
-import {{ authorDeck, scaffoldPage }} from {json.dumps((ROOT / "skills/professional-slides/runtime/author-deck.mjs").as_uri())};
+import {{ authorDeck, scaffoldPage }} from './skills/professional-slides/runtime/author-deck.mjs';
 const doc = {{ deck: {{ schema: 'professional-slides.deck/v3', id: 'probe' }}, pages: [scaffoldPage('trend', {{ id: 'p01' }})] }};
 const out = await authorDeck(doc, {{ baseDir: {json.dumps(str(tmp))} }});
-console.log(JSON.stringify([...out.findings, ...out.pageGateAdvisories].map((f) => f.id ?? null)));
+console.log(JSON.stringify([...out.blocking, ...out.advisories].map((f) => f.id ?? null)));
 """], cwd=ROOT, capture_output=True, text=True, timeout=300)
             self.assertEqual(authored.returncode, 0, authored.stderr)
             self.assertIn("planted", json.loads(authored.stdout.strip().splitlines()[-1]), "authoring does not read the scene checks")

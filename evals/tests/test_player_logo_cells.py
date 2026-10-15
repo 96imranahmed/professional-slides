@@ -11,14 +11,10 @@ from node_probe import run_node
 AUTHOR = "./skills/professional-slides/runtime/author-deck.mjs"
 KIT = "./skills/professional-slides/runtime/page-types.mjs"
 
-# The rules that read what copy means ask a question (runtime/judgements.mjs); a test answers each kind in `answers`.
 PAGE = """
-import { judgementSession, withJudgements } from './skills/professional-slides/runtime/judgements.mjs';
-const answers = {};
-const reader = judgementSession({ oracle: (kind, subject, context) => { const a = answers[kind]; return typeof a === 'function' ? a(subject, context) : a ?? null; } });
 const S = { kind: 'comparison', what: 'Company filings and press reports, 2025 to 2026' };
 const base = { takeaway: false, why: 'The page compares the two firms on the same terms', settles: S, adds: 'The commentary names what the exhibit cannot: the terms behind each figure' };
-const error = (fn) => withJudgements(reader, () => { try { fn(); return null; } catch (e) { return e.message; } });
+const error = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
 """
 
 
@@ -78,8 +74,7 @@ const slide = {{ exhibit: {{ type: 'table', columns: [{{ label: 'Route', type: '
 markPlayerCells(slide, [{{ name: 'Anthropic' }}, {{ name: 'OpenAI' }}]);
 const table = (columns, cells) => ({{ ...base, id: 'p1', type: 'lookup', form: 'table', commentary: 'in-exhibit', title: 'The routes split between the two firms on reach and pay',
   exhibit: {{ columns, rows: [['Reach', 'a', cells[0]], ['Paid', 'b', cells[1]], ['Cash', 'c', cells[2]]] }} }});
-// A reader takes "Conversion known?" for another fact and "Implication" for the inference; "Split" says there is no verdict.
-Object.assign(answers, {{ 'header-concludes': (header) => (header === 'Implication' ? 'concludes' : 'names-a-fact'), 'pill-states-status': (text) => (text === 'Split' ? 'no-verdict' : 'status') }});
+// What a column header or a status pill says is the writer's: none of these is refused.
 console.log(JSON.stringify({{ columns: slide.exhibit.columns.map((c) => c.logo?.alt ?? null), edge: slide.exhibit.rows.map((r) => r[3]),
   gutter: error(() => compilePage(table(['Route', 'Evidence', {{ label: 'Conversion known?', implication: true }}], ['yes', 'no', 'no']))),
   inferred: error(() => compilePage(table(['Route', 'Evidence', {{ label: 'Implication', implication: true }}], ['Scale it', 'Hold', 'Test']))),
@@ -91,6 +86,6 @@ console.log(JSON.stringify({{ columns: slide.exhibit.columns.map((c) => c.logo?.
         self.assertEqual(result["edge"][0]["text"], "OpenAI leads")
         self.assertEqual(result["edge"][1]["player"], "Anthropic")
         self.assertEqual(result["edge"][2], "Split")
-        self.assertIn("names another fact", result["gutter"])
-        self.assertNotIn("names another fact", result["inferred"] or "")
-        self.assertIn('value: "neutral"', result["amber"])
+        self.assertIsNone(result["gutter"])
+        self.assertIsNone(result["inferred"])
+        self.assertIsNone(result["amber"])

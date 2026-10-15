@@ -5,35 +5,10 @@
 // figures want - bars on one shared scale, open-ended and range bars,
 // ratings, icons - and leaves untreated a grid that reads as text. `heavyTable` says when a table needs a page of its own.
 import { groupThousands } from "./draw.mjs";
-import { SCALAR_FIGURE, figureUnit, withUnit } from "./value-format.mjs";
+import { figureUnit, withUnit } from "./value-format.mjs";
 import { decade } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
-import { resultCells } from "./evidence.mjs";
-import { judged } from "./judgements.mjs";
 
-/**
- * Table treatment is chosen from what the table says, not from the first option
- * in the list. An explicit `treatment`, `variant` or object column wins.
- *   sequence  (rows numbered, or a Stage/Step/Phase first column) → numbered category
- *             markers on a filled first column ("categories" treatment)
- *   scorecard (criteria × options, ≥ 4 columns)                   → filled header ("standard")
- *   decision  (last column is a Decision/Then/So-what)             → filled header, accented last column
- *   listing   (anything else)                                      → open rules only
- */
-// What a column of words says of each row - a status, a direction, a
-// judgement or a fact - is read, not matched against a list of status words:
-// the column's header and its words are put to a model once (column-reads,
-// judgements.mjs) and the recorded answer sets the cells. A status column's
-// cells become pills in the colour of each cell's state, keeping the author's
-// words; a direction column's become trend rings; a progress column's
-// percentages become progress bars. A column not yet answered stays text, and
-// the compile lists its question as pending. Ticks and crosses are marks, not
-// words, and are read as such.
-const CELL_WORDS_MAX = 5;
-const BLANK_CELL = /^[\s\-–—]*$/;
-const PERCENT = /^(\d{1,3}(?:\.\d+)?)\s*%$/;
-const STATE_RAG = { positive: "on-track", caution: "behind", negative: "at-risk", neutral: "neutral" };
-const squeezed = (text) => String(text ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 // A cell the highlight pass has already claimed arrives as {text, highlight}
 // rather than as a string, and is still read for its state: a scorecard
 // whose highlight phrase is its own verdict word keeps the pill on the rows
@@ -46,49 +21,15 @@ const wordsOf = (cell) => {
   return typeof text === "string" || typeof text === "number" ? String(text).trim() : null;
 };
 
-/**
- * The column-reads question a column puts: its header and the distinct words
- * of its short cells, with the table's headers as context. Null where it is
- * not asked: a column with fewer than two cells of five words or less, or
- * fewer such cells than half its written ones, is prose or figures, and a
- * figure other than a percentage (which may be progress) is a measure.
- */
-export function columnQuestion(header, cells, headers) {
-  const written = (cells || []).filter((cell) => !(cell === null || cell === undefined || (typeof cell !== "object" && BLANK_CELL.test(String(cell)))));
-  const plain = written.map(wordsOf).filter((text) => text && !BLANK_CELL.test(text) && !/^(✓|✔|✗|✘|✕)$/.test(text)
-    && text.split(/\s+/).length <= CELL_WORDS_MAX && (!SCALAR_FIGURE.test(text) || PERCENT.test(text)));
-  if (plain.length < 2 || plain.length * 2 < written.length) return null;
-  return { subject: { header: String(header ?? ""), cells: [...new Set(plain)] }, context: { headers: (headers || []).map((h) => String(h ?? "")) } };
-}
-
-/** A cell as its column's reading sets it: ✓/✗ as a check, and a status, direction or progress cell as its typed cell. */
-export function readCell(value, reading) {
+/** A cell with ✓ or ✗ as a check; any other cell as written. */
+export function readCell(value) {
   const text = wordsOf(value);
   if (text === null) return value;
   if (/^(✓|✔)$/.test(text)) return { type: "check", value: "yes" };
   if (/^(✗|✘|✕)$/.test(text)) return { type: "check", value: "no" };
-  const read = (list) => (list || []).find((entry) => squeezed(entry?.cell) === squeezed(text))?.value;
-  if (reading?.verdict === "status" && STATE_RAG[read(reading.states)]) return { type: "rag", value: STATE_RAG[read(reading.states)], text };
-  if (reading?.verdict === "direction" && ["up", "flat", "down"].includes(read(reading.directions))) return { type: "trend", value: read(reading.directions) };
-  if (reading?.verdict === "progress" && PERCENT.test(text) && Number(text.match(PERCENT)[1]) <= 100) return { type: "progress", value: Number(text.match(PERCENT)[1]) };
   return value;
 }
 
-/** Each column's recorded reading (column-reads), by column index; the label column and a typed column are not read. */
-// A column still in words once the composer's own treatments have run is asked about as the author wrote the table - its
-// header, its cells and the table's headers before a gutter or a derived column was added - which is the question the
-// page's own check (page-types.mjs plainVerdict) asks of it, so the two share one answer.
-function columnReadings(ex, authored) {
-  const headers = (ex.columns || []).map(columnLabel), written = (authored.columns || []).map(columnLabel);
-  const cellsOf = (table, c) => (table.rows || []).map((row) => resultCells(row)[c - 1]);
-  return (ex.columns || []).map((column, c) => {
-    if (!c || (column && typeof column === "object" && ((column.type && column.type !== "text") || column.heat || column.bar || column.harvey))) return null;
-    const at = written.indexOf(headers[c], 1);
-    if (at < 1 || !columnQuestion(headers[c], cellsOf(ex, c), headers)) return null;
-    const asked = columnQuestion(written[at], cellsOf(authored, at), written);
-    return asked && judged("column-reads", asked.subject, asked.context);
-  });
-}
 const columnLabel = (c) => (typeof c === "string" ? c : c?.label || "");
 
 /** Default rating scales so a spec can write `{ type: "harvey", value: 3 }` without declaring anchors. */
@@ -143,7 +84,8 @@ const numberOf = (cell) => {
   // the derivation, and read as text it was empty and every row ranked first.
   // A bound or a range is not a figure to rank or share.
   if (cell && typeof cell === "object" && cell.type === "bars") return cell.values?.length === 1 && Number.isFinite(cell.values[0]) && [undefined, "approx"].includes(cell.bound) ? cell.values[0] : null;
-  const text = cellText(cell).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
+  // A shaded recorded value keeps its figure beside the step it is shaded in: the figure is the number, the step is not.
+  const text = (cell && typeof cell === "object" && cell.type === "heatmap" && cell.figure !== undefined ? String(cell.figure) : cellText(cell)).replace(/[,\s]/g, "").replace(/[$£€]/g, "").replace(/%$/, "");
   if (!/^-?\d*\.?\d+$/.test(text)) return null;
   return Number(text);
 };
@@ -296,12 +238,15 @@ function totalRow(ex) {
     // than printing a figure the table cannot justify.
     // A bar cell carries its number in `values`; its total is printed as text
     // in the band, since a total drawn on its parts' scale runs off the end.
+    // So is a heat column's: the sum of its cells lies past the range they are
+    // shaded across, and a plain figure there was read as a heat cell with no scale.
     const bars = typeof column === "object" && column?.type === "bars";
+    const heat = typeof column === "object" && (column?.type === "heatmap" || column?.heat === true);
     const values = body.map((row) => (bars ? (Number.isFinite(row.cells[index]?.values?.[0]) ? row.cells[index].values[0] : null) : numberOf(row.cells[index])));
     if (!addsUp(column, values)) return " ";
     if (values.some((value) => value === null)) return " ";
     const sum = String(Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10);
-    return bars ? { type: "text", text: sum } : sum;
+    return bars || heat ? { type: "text", text: sum } : sum;
   });
   const { total: _t, totalLabel: _l, ...rest } = ex;
   // A total row is its totals. The measure-table preset's total ("auto") is
@@ -686,7 +631,7 @@ function columnTreatments(ex) {
   const heat = heatColumns(ex, marks.map((m, i) => (m.heat ? i : -1)).filter((i) => i >= 0));
   const nextColumns = columns.map((c, i) => {
     if (!marks[i].heat && !marks[i].bubble && !marks[i].bar) return c;
-    const { heat: _h, bubble: _b, bar: _r, domain: _d, ...rest } = c;
+    const { heat: _h, bubble: _b, bar: _r, domain: _d, better: _w, ...rest } = c;
     if (marks[i].heat) return { ...rest, type: "heatmap" };
     if (!marks[i].bar) return rest;
     // One scale per bar column, shared across its rows: the bars in a column
@@ -771,9 +716,14 @@ const HEAT_STEPS = 5;
  * marked missing ("n/a", "not disclosed") keeps its words and takes no shade:
  * it is not the bottom of the scale. `cell(i, cell)` is the cell as drawn;
  * `scales` the scale each recorded column shares down its rows.
+ *
+ * A column whose measure is better lower (`better: "down"`, kept by the deck's
+ * `conventions.heat: "dark-is-better"` - conventions.mjs) is shaded the other
+ * way, its lowest figure darkest: ap05 set a Skytrax rank beside Which? scores,
+ * and shaded by size dark meant worse in one column and better in the next.
  */
 function heatColumns(ex, indexes) {
-  const scales = {}, modes = new Map(), problems = [];
+  const scales = {}, modes = new Map(), problems = [], declaredScales = new Map();
   const bodyCells = (i) => (ex.rows || []).map((row) => (Array.isArray(row) ? row : row?.cells || [])[i]);
   for (const i of indexes) {
     const column = ex.columns[i], label = String(columnLabel(column) || `column ${i + 1}`).trim();
@@ -790,26 +740,40 @@ function heatColumns(ex, indexes) {
     if (outside.length) said.push(`${outside.map((text) => `"${text}"`).join(", ")} ${outside.length === 1 ? "lies" : "lie"} outside the \`domain\` it declares (${domain[0]} to ${domain[1]})`);
     if (!known.length) said.push("it has no number to shade");
     if (said.length) { problems.push(`the "${label}" heat column: ${said.join("; ")}`); continue; }
+    const down = column.better === "down";
     const scores = !declared && known.every((n) => Number.isInteger(n) && n >= 1 && n <= HEAT_STEPS);
-    if (scores) { modes.set(i, { scores: true }); continue; }
+    if (scores) { modes.set(i, { scores: true, down }); continue; }
     const [lo, hi] = declared ? domain : [Math.min(...known), Math.max(...known)];
     const unit = String(column.unit ?? "").trim() || figureUnit(texts[numbers.indexOf(known[0])]) || "";
-    const ends = declared ? [String(lo), String(hi)] : [texts[numbers.indexOf(lo)], texts[numbers.indexOf(hi)]];
+    const ends = (declared ? [String(lo), String(hi)] : [texts[numbers.indexOf(lo)], texts[numbers.indexOf(hi)]])[down ? "reverse" : "slice"]();
     const inUnits = (text) => (figureUnit(text) || !unit ? text : withUnit(text, unit));
+    // Columns that declare one domain in one unit, shaded the same way, are on one scale, and the key says so once: a shade means the same in each.
+    const sharedKey = declared ? `${lo}:${hi}:${unit}:${down ? "down" : "up"}` : null;
+    if (sharedKey && declaredScales.has(sharedKey)) {
+      const { id, labels } = declaredScales.get(sharedKey);
+      labels.push(label);
+      // Named by what the columns' labels share after their last comma ("% satisfied"), else by the unit.
+      const tails = new Set(labels.map((text) => (text.includes(",") ? text.split(/,\s*/).pop().trim() : "")));
+      const tail = tails.size === 1 ? [...tails][0] : "";
+      scales[id].label = tail ? `${tail[0].toUpperCase()}${tail.slice(1)}${unit && !tail.includes(unit) ? ` (${unit})` : ""}` : unit ? `Every shaded column (${unit})` : "Every shaded column";
+      modes.set(i, { id, lo, hi, down });
+      continue;
+    }
     const id = `${barScaleId(label).replace(/-bar$/, "")}-${i + 1}-heat`;
     scales[id] = { type: "heatmap", label: unit && !label.includes(unit) ? `${label} (${unit})` : label, min: 1, max: HEAT_STEPS, anchors: { 1: ends[0], [HEAT_STEPS]: ends[1] }, ramp: { low: inUnits(ends[0]), high: inUnits(ends[1]) },
       ...(ex.legend === false ? { legend: false } : {}), palette: "theme-sequential" };
-    modes.set(i, { id, lo, hi });
+    if (sharedKey) declaredScales.set(sharedKey, { id, labels: [label] });
+    modes.set(i, { id, lo, hi, down });
   }
   if (problems.length) throw new Error(`A heat column shades numbers - whole scores from 1 to ${HEAT_STEPS} as they stand, any other figures by where each sits between the column's lowest and highest (or across the \`domain: [low, high]\` the column declares). ${problems.join(". ")[0].toUpperCase()}${problems.join(". ").slice(1)}`);
   const cell = (i, value) => {
     const mode = modes.get(i), text = String(value?.text ?? value ?? "").trim();
     if (MISSING_FIGURE.test(text)) return { type: "text", text, align: "right" };
     const n = barNumber(value);
-    if (mode.scores) return { type: "heatmap", value: n };
+    if (mode.scores) return { type: "heatmap", value: mode.down ? HEAT_STEPS + 1 - n : n };
     // Five equal steps of the range; a column whose figures are all one value sits at the middle step.
     const step = mode.hi > mode.lo ? 1 + Math.round(((n - mode.lo) / (mode.hi - mode.lo)) * (HEAT_STEPS - 1)) : Math.ceil(HEAT_STEPS / 2);
-    return { type: "heatmap", value: step, figure: text, scale: mode.id };
+    return { type: "heatmap", value: mode.down ? HEAT_STEPS + 1 - step : step, figure: text, scale: mode.id };
   };
   return { scales, cell };
 }
@@ -936,8 +900,7 @@ export function styleTable(ex) {
   const columns = ex.columns.map((c, i) => typeof c === "string"
     ? { label: c, type: "text", bold: i === 0, width: columnWeight(ex, i) }
     : { width: columnWeight(ex, i), ...c });
-  const readings = columnReadings(ex, authored);
-  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell, i) => readCell(cell, readings[i + (Array.isArray(row) || row?.label === undefined ? 0 : 1)])))));
+  const scaled = withDefaultScales(ex, ex.rows.map(row => mapTableCells(row, cells => cells.map((cell) => readCell(cell)))));
   const rowsIn = scaled.rows;
   if (scaled.scales) ex = { ...ex, scales: scaled.scales };
   // The recommended option's column is tinted end to end.
@@ -945,6 +908,9 @@ export function styleTable(ex) {
   if (ex.recommended !== undefined && recommended < 0) throw new Error(`Table recommended column "${ex.recommended}" is not a column label`);
   const extra = { ...(recommended >= 0 ? { highlightColumn: recommended } : Number.isInteger(ex.highlightColumn) ? { highlightColumn: ex.highlightColumn } : {}), ...(ex.scales ? { scales: ex.scales } : {}), ...(ex.columnWidths ? { columnWidths: ex.columnWidths } : {}) };
   if (ex.rowAlignment !== undefined) extra.rowAlignment = ex.rowAlignment;
+  // Every row's style at once (the `accented-rows` table bands each row in the
+  // accent tint): carried to the table, which holds it to its four row styles.
+  if (ex.rowStyle !== undefined) extra.rowStyle = ex.rowStyle;
   // A table that ends the chain with no treatment at all is a plain grid, and a
   // plain grid past five rows is where a reader loses their place. About 89% of
   // tables in strong decks carry a treatment of some kind, and the commonest
@@ -962,7 +928,9 @@ export function styleTable(ex) {
     const label = (r) => String((Array.isArray(r) ? r : r.cells)[0]?.text ?? (Array.isArray(r) ? r : r.cells)[0] ?? "").trim().toLowerCase();
     const at = Number.isInteger(ex.highlightRow) ? ex.highlightRow : rowsIn.findIndex((r) => label(r) === String(ex.highlightRow).trim().toLowerCase());
     if (at < 0 || at >= rowsIn.length) throw new Error(`Table highlightRow "${ex.highlightRow}" is not a row label or index`);
-    rowsIn[at] = Array.isArray(rowsIn[at]) ? { style: "accented", cells: rowsIn[at] } : { ...rowsIn[at], style: "accented" };
+    // The deck's declared subject (`subjectRow`, conventions.mjs) also takes the accent's own mark, as its bar and line do.
+    const subject = ex.subjectRow === true ? { subject: true } : {};
+    rowsIn[at] = Array.isArray(rowsIn[at]) ? { style: "accented", cells: rowsIn[at], ...subject } : { ...rowsIn[at], style: "accented", ...subject };
   }
   // A "#" column of row numbers becomes numbered discs with no filled box.
   const head0Raw = String(columns[0].label || "").trim();

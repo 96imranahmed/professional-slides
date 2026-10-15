@@ -346,18 +346,14 @@ for n in range(3):
         self.assertIn("tracker", result["notInferred"])
 
 
-    def test_the_title_rule_is_read_by_one_detector(self):
-        # The style inference and the census each had a title-rule detector,
-        # and they disagreed on what a rule under a title is. A rule under the
-        # title reads as one; a rule under an exhibit heading further down,
-        # with the heading between it and the title, does not.
+    def test_a_rule_under_the_title_reads_as_the_title_rule(self):
+        # A rule under the title reads as one; a rule under an exhibit heading
+        # further down, with the heading between it and the title, does not.
         out = self.python(f'''
-import importlib.util, sys
+import importlib.util
 from PIL import Image, ImageDraw
 spec = importlib.util.spec_from_file_location("infer_style", {str(RUNTIME / "infer-style.py")!r})
 infer = importlib.util.module_from_spec(spec); spec.loader.exec_module(infer)
-sys.path.insert(0, {str(ROOT / "evals" / "scripts")!r})
-import reference_census
 def page(heading):
     im = Image.new("RGB", (1280, 720), "#FFFFFF")
     d = ImageDraw.Draw(im)
@@ -367,11 +363,9 @@ def page(heading):
         d.rectangle([60, 140, 400, 152], fill="#222222")    # an exhibit heading
     d.line([(60, 170 if heading else 112), (1220, 170 if heading else 112)], fill="#222222", width=2)
     return im
-import numpy as np
-census = [reference_census.title_rule(np.asarray(page(h).resize((1200, 675)).convert("L"))) for h in (False, True)]
-print(infer.title_treatment(page(False).resize((640, 360)), (255, 255, 255)), infer.title_treatment(page(True).resize((640, 360)), (255, 255, 255)), *census)
+print(infer.title_treatment(page(False).resize((640, 360)), (255, 255, 255)), infer.title_treatment(page(True).resize((640, 360)), (255, 255, 255)))
 ''')
-        self.assertEqual(out.split(), ["rule", "None", "True", "False"])
+        self.assertEqual(out.split(), ["rule", "None"])
 
 
 if __name__ == "__main__":

@@ -160,6 +160,19 @@ class NativeChartLabelTests(unittest.TestCase):
             self.assertTrue(any(l.find(qn('c:idx')).get('val')=='0' and l.find(qn('c:delete')).get('val')=='1' for l in labels))
 
 
+    def test_native_value_labels_are_set_on_one_line(self):
+        """Spacebar run: LibreOffice wrapped "269,979" on a narrow waterfall bar at its separator, and the saved page lost the number."""
+        for kind in ('column', 'stacked-column'):
+            scene=scene_fixture()
+            spec=scene['slides'][0]['componentInstances'][0]['nativeChart']
+            spec.update(type=kind,categories=['A','B'],series=[{'name':'First','values':[269979,2]},{'name':'Second','values':[4,3]}][:1 if kind=='column' else 2])
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/'labels.pptx';Emitter(scene).run(path)
+                chart=next(s.chart for s in Presentation(path).slides[0].shapes if s.has_chart)
+                bodies=[b for b in chart._chartSpace.iter(qn('a:bodyPr')) if b.getparent().getparent().tag in (qn('c:dLbls'),qn('c:dLbl'))]
+                self.assertTrue(bodies,kind)
+                self.assertEqual({b.get('wrap') for b in bodies},{'none'},kind)
+
 @needs_pptx
 class NativeChartExportTests(unittest.TestCase):
     """A chart compiled to go native keeps its axis, colours and shares in the saved file."""
@@ -210,6 +223,36 @@ console.log(JSON.stringify(compileDeck({id:'pie',slides},REGISTRY)));
         self.assertNotIn('<c:showVal val="1"/>', xml)
         self.assertIn('formatCode="0%"', xml)
         self.assertNotIn('<c:dLblPos val="outEnd"/>', xml)
+
+
+@needs_emitter
+class PictureFrameTests(unittest.TestCase):
+    """A flag's hairline is its picture's own outline, and every picture carries its alt text and credit.
+
+    Japan's white flag on a white page had no edge; and python-pptx described
+    every picture as "image.png", which is what a screen reader read out."""
+
+    def test_a_picture_keeps_its_outline_its_alt_text_and_its_credit(self):
+        image = io.BytesIO(); Image.new('RGB', (30, 20), 'white').save(image, format='PNG')
+        uri = 'data:image/png;base64,' + base64.b64encode(image.getvalue()).decode()
+        def picture(name, **extra):
+            return {'id': name, 'type': 'image', 'role': 'category-logo', 'frame': {'x': 100, 'y': 100, 'width': 30, 'height': 20},
+                    'data': {'dataUri': uri, 'alt': f'Flag of {name}', 'authorization': f'Flag: A. Drawer, Public domain ({name})'}, **extra}
+        scene = {'typography': {'body': 'Arial', 'display': 'Arial'}, 'tokens': {}, 'slides': [{'id': 'one', 'tokens': {}, 'nodes': [
+            picture('Japan', style={'stroke': {'value': '#929BA3'}, 'lineWidth': {'value': 1}}), picture('Poland')]}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            file = Path(tmp) / 'flags.pptx'
+            Emitter(scene).run(file)
+            pictures = {shape.name: shape for shape in Presentation(file).slides[0].shapes if shape.shape_type == 13}
+        japan, poland = pictures['ps:Japan'], pictures['ps:Poland']
+        outline = japan._element.spPr.find(qn('a:ln'))
+        self.assertIsNotNone(outline)
+        self.assertEqual(outline.find(qn('a:solidFill')).find(qn('a:srgbClr')).get('val'), '929BA3')
+        self.assertEqual(int(outline.get('w')), 9525)  # a 1px hairline: 0.75pt
+        self.assertIsNone(poland._element.spPr.find(qn('a:ln')))  # a picture without a stroke keeps none
+        props = japan._element.nvPicPr.cNvPr
+        self.assertEqual(props.get('descr'), 'Flag of Japan')
+        self.assertEqual(props.get('title'), 'Flag: A. Drawer, Public domain (Japan)')
 
 
 if __name__ == "__main__":

@@ -148,12 +148,13 @@ def build_submission(source, output):
     package(source, destination)
     # Development README links omitted test tools; the public README is source.
     (destination / 'README.md').write_bytes((source / 'submission/README-DISTRIBUTION.md').read_bytes())
-    production = destination / 'skills/professional-slides/references/tools/production.md'
-    text = production.read_text().replace('pip install -r requirements.txt',
-                                             'pip install -r ../../requirements.txt')
+    # The skill's setup line names the requirements file from the repository root; the package has it two levels up.
+    skill = destination / 'skills/professional-slides/SKILL.md'
+    text = skill.read_text().replace('From the repository: `python3 -m pip install -r requirements.txt`.',
+                                     'From the skill directory: `python3 -m pip install -r ../../requirements.txt`.')
     if 'pip install -r ../../requirements.txt' not in text:
-        text += '\n## Install Python dependencies\n\nFrom the skill directory: `python3 -m pip install -r ../../requirements.txt`.\n'
-    production.write_text(text)
+        raise ValueError('SKILL.md no longer names the requirements file where the submission expects it')
+    skill.write_text(text)
     data = validate(destination)
     files = {p.relative_to(destination).as_posix(): {
         'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'bytes': p.stat().st_size}

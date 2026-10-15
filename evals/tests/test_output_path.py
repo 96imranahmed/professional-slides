@@ -48,10 +48,10 @@ class ArtifactNameTests(unittest.TestCase):
         """PR #4 review: a deck id of "../escape" could write or delete outside the output directory."""
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);out=root/'out';out.mkdir()
-            protected=root/'escape-DELIVERED.pptx';protected.write_text('keep')
+            protected=root/'escape.pptx';protected.write_text('keep')
             for value in ['../escape','/absolute','folder/file',r'folder\file']:
                 spec=root/'spec.json';spec.write_text(json.dumps({'schema':'professional-slides.deck/v3','id':value,'slides':[]}))
-                for command in ['build-deck.mjs','deliver-deck.mjs']:
+                for command in ['build-deck.mjs']:
                     result=subprocess.run([NODE,str(RUNTIME/command),str(spec),str(out)],capture_output=True,text=True)
                     self.assertEqual(result.returncode,1,result.stderr)
                     self.assertIn('safe filename',result.stderr)
@@ -68,7 +68,7 @@ class PackagedPluginOutputTests(unittest.TestCase):
                               env={**os.environ, 'RUNTIME_PYTHON': sys.executable}, cwd=ROOT, timeout=120)
 
     def test_package_compiles_examples_and_rejects_plugin_local_outputs(self):
-        """PR #4 follow-up: an installed plugin let build and deliver write inside the plugin, and through a symlink to it."""
+        """PR #4 follow-up: an installed plugin let the build write inside the plugin, and through a symlink to it."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             package = root / 'plugin'
@@ -92,20 +92,18 @@ class PackagedPluginOutputTests(unittest.TestCase):
             dangling = root / 'dangling'
             dangling.symlink_to(package / 'new-output', target_is_directory=True)
             for output in [package, package / 'new-output', alias / 'nested/output', dangling / 'nested']:
-                for command in ['build-deck.mjs', 'deliver-deck.mjs']:
+                for command in ['build-deck.mjs']:
                     result = self.cli(skill / f'runtime/{command}', spec, output, '--preflight')
                     self.assertEqual(result.returncode, 1, result.stderr)
                     self.assertIn('Plugin files are read-only', result.stderr)
             self.assertFalse((package / 'new-output').exists())
             self.assertFalse((package / 'nested').exists())
             self.assertFalse((package / 'scene.json').exists())
-            # A writable installation must retain existing reports and deliveries.
+            # A writable installation must retain existing reports.
             (package / 'scene.json').write_text('keep scene')
-            (package / 'safe-DELIVERED.pptx').write_text('keep delivery')
-            for command in ['build-deck.mjs', 'deliver-deck.mjs']:
+            for command in ['build-deck.mjs']:
                 self.cli(skill / f'runtime/{command}', spec, alias)
             self.assertEqual((package / 'scene.json').read_text(), 'keep scene')
-            self.assertEqual((package / 'safe-DELIVERED.pptx').read_text(), 'keep delivery')
             result = self.cli(skill / 'runtime/build-deck.mjs', spec, root / 'external', '--preflight')
             self.assertEqual(result.returncode, 0, result.stderr)
 

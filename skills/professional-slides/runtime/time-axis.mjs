@@ -93,6 +93,9 @@ export function isPeriodLabel(label) {
   return Boolean(span) && isPeriodLabel(span[1]) && (/^\d{2}$/.test(span[2]) ? /\d{2}$/.test(span[1]) : isPeriodLabel(span[2]));
 }
 
+// How many months each calendar period runs, so periods of different lengths can share one axis at their ends.
+const PERIOD_MONTHS = Object.freeze({ year: 12, half: 6, quarter: 3, month: 1 });
+
 /**
  * Where a run of period labels falls in elapsed time: `{ t, gaps, kind }`,
  * with `t` increasing, or null when the labels are not one kind of date read
@@ -102,11 +105,17 @@ export function isPeriodLabel(label) {
 export function periodTimes(categories) {
   if (!Array.isArray(categories) || categories.length < 3) return null;
   const parsed = categories.map(parsePeriod);
-  if (parsed.some((p) => !p) || new Set(parsed.map((p) => p.kind)).size !== 1) return null;
-  const kind = parsed[0].kind;
+  if (parsed.some((p) => !p)) return null;
+  const kinds = new Set(parsed.map((p) => p.kind));
+  // Calendar periods of different lengths - year-ends and then a half-year (2019, 2022, ..., 2025, H1 2026) - are read
+  // each at its close, which is when a year-end ratio or a twelve-month total stands: the BA retest's leverage line set
+  // H1 2026 a whole step after 2025, and 2019 to 2022 one step, where they are half a year and three years.
+  const mixed = kinds.size > 1;
+  if (mixed && [...kinds].some((k) => !(k in PERIOD_MONTHS))) return null;
+  const kind = mixed ? "mixed" : parsed[0].kind;
   const t = [];
   for (const [i, p] of parsed.entries()) {
-    let value = p.t;
+    let value = mixed ? p.t + PERIOD_MONTHS[p.kind] : p.t;
     if (kind === "bare-month") while (i && value <= t[i - 1]) value += 12;
     if (i && value <= t[i - 1]) return null;
     t.push(value);
@@ -143,11 +152,76 @@ export function spacedLabelIndices(xs, minGap) {
   }, []);
 }
 
+/**
+ * The categories a dated run breaks after: each whose next date lies further off than the run's shortest step, so an axis
+ * that sets the dates one slot apart says outright where it skips.
+ */
+export function gapBreaks(categories) {
+  const times = periodTimes(categories);
+  if (!times) return [];
+  const step = Math.min(...times.gaps);
+  return times.gaps.flatMap((gap, at) => (gap - step < 0.01 ? [] : [String(categories[at])]));
+}
+
+/**
+ * The gaps in a dated run that leave out at least one whole period at the
+ * run's own cadence, as `{ after, from, to }` (the index of the category
+ * before the gap and the two labels): a survey of 2015-2019, 2022, 2023 and
+ * 2025 has no 2020, 2021 or 2024. The cadence is the run's commonest gap (the
+ * shorter on a tie), so a triennial survey (2017, 2020, 2023) misses nothing
+ * and a run observed every one to three months is not broken where it bunches.
+ * A line drawn straight across such a gap states values for periods the
+ * series does not have - the BA retest's stacked area carried Heathrow's 2019
+ * passengers across the two Covid years it had a third of them - so a line
+ * breaks there and a filled area is refused it (chart-line.mjs, charts-extra.mjs).
+ */
+export function missingPeriods(categories) {
+  const times = periodTimes(categories);
+  if (!times) return [];
+  const counts = new Map();
+  for (const gap of times.gaps) counts.set(gap, (counts.get(gap) ?? 0) + 1);
+  const cadence = [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+  return times.gaps.flatMap((gap, after) => (gap >= 2 * cadence - 0.01 ? [{ after, from: String(categories[after]), to: String(categories[after + 1]) }] : []));
+}
+
+// A date given as approximate ("c. 2030", "circa 2030", "~2030") is still that date for the time between milestones.
+const APPROXIMATE = /^(?:c\.|ca\.|circa|~)\s*/i;
+// Kinds that name a moment on the calendar; a bare month or a scenario's "Year 2" has no year to measure from.
+const DATED = new Set(["year", "half", "quarter", "month", "day", "season"]);
+
+/**
+ * The time from each milestone to the one before it, in months, as a list as
+ * long as the labels (null for the first and wherever either date does not
+ * parse), or null when the steps are even - every known step within half as
+ * much again of the shortest - or fewer than two are known. A timeline sets
+ * its milestones in even columns so their text reads; the BA retest's runway
+ * timeline set Jul 2023 to 2035 that way, two months and five years one step
+ * each, so the steps are said where they are uneven (schedule-stages.mjs).
+ */
+export function elapsedSteps(labels) {
+  if (!Array.isArray(labels) || labels.length < 3) return null;
+  const at = labels.map((label) => {
+    const parsed = parsePeriod(String(label ?? "").trim().replace(APPROXIMATE, ""));
+    return parsed && DATED.has(parsed.kind) ? parsed.t : null;
+  });
+  const steps = at.map((t, i) => (i && t !== null && at[i - 1] !== null && t > at[i - 1] ? Math.round(t - at[i - 1]) : null));
+  const known = steps.filter((step) => step !== null);
+  if (known.length < 2 || Math.max(...known) < 1.5 * Math.min(...known)) return null;
+  return steps;
+}
+
+/** A step in months as a reader says it: "2 months", "18 months", "5 years". */
+export function sayElapsed(months) {
+  if (months < 24) return `${months} month${months === 1 ? "" : "s"}`;
+  const years = Math.round(months / 6) / 2;
+  return `${years} years`;
+}
+
 /** The gaps as a reader would say them, for a message: "1-3 months", "1-4 years". */
 export function describeGaps(categories) {
   const times = periodTimes(categories);
   if (!times) return "";
-  const unit = times.kind === "year" ? 12 : 1;
+  const unit = times.kind === "year" || times.kind === "mixed" ? 12 : 1;
   const lo = Math.min(...times.gaps) / unit, hi = Math.max(...times.gaps) / unit;
   const noun = unit === 12 ? "year" : "month";
   const fmt = (v) => String(Math.round(v * 10) / 10);

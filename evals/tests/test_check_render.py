@@ -27,12 +27,11 @@ from pathlib import Path
 from node_probe import HAS_RENDERER, NODE, ROOT, SKILL, requires_python_package
 
 sys.path.insert(0, str(SKILL / "runtime" / "gates"))
-import density_profile  # noqa: E402
 
 AUTHOR = SKILL / "runtime" / "author-deck.mjs"
 BUILD = SKILL / "runtime" / "build-deck.mjs"
 EXAMPLES = SKILL / "examples"
-FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+FIXTURES = ROOT / "evals" / "tests" / "fixtures" / "evidence"
 
 # Writes the deck, its plan and its content plan beside a pages file whatever the compile found: the files a
 # build reads, for a deck the check refuses, so the two can be compared on a deck with blockers.
@@ -127,21 +126,6 @@ class CheckIsTheBuildTests(unittest.TestCase):
             for line in checked.stderr.splitlines():
                 if "verified" in line:
                     self.assertIn("rendered in this deck", line)
-
-    def test_the_scene_estimate_of_the_words_a_block_stands_within_its_margin_of_the_render(self):
-        # The unrendered compile prints the deck's median words a block as an estimate read off the scene, with the margin it
-        # was calibrated to; the render measures the rule. On the worked deck the two agree inside that margin.
-        with tempfile.TemporaryDirectory() as tmp:
-            work = Path(tmp)
-            shutil.copytree(EXAMPLES / "assets", work / "assets")
-            shutil.copy(EXAMPLES / "page-types.pages.json", work / "page-types.pages.json")
-            value = lambda line: float(re.search(r"prose pages ([0-9.]+)", line).group(1))  # noqa: E731
-            floor = lambda summary: next(line for line in summary["standing"]["G"] if line.startswith("TEXT_FRAGMENTED.floor:"))  # noqa: E731
-            scene = json.loads(run(AUTHOR, work / "page-types.pages.json", "--check").stdout)
-            rendered = json.loads(run(AUTHOR, work / "page-types.pages.json", "--check", "--render").stdout)
-            self.assertIn("estimated from the scene", floor(scene))
-            self.assertNotIn("estimated", floor(rendered))
-            self.assertLessEqual(abs(value(floor(scene)) - value(floor(rendered))), density_profile.SCENE_TOLERANCE)
 
     def test_a_page_run_renders_only_its_pages(self):
         with tempfile.TemporaryDirectory() as tmp:

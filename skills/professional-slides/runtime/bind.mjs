@@ -72,11 +72,22 @@
 // ordinary typed page; the dependency gate does not re-check what the runtime
 // wrote, and reads every number that is still typed.
 import { cellText, isTable, judgedCell, plottedValues, resultCells, rowCells } from "./evidence.mjs";
-import { axisOf, isPercentUnit, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
+import { axisOf, isPercentUnit, isRankMeasure, isRatioUnit, measureRegistry, normalUnit, parseRef, valuesOf } from "./measures.mjs";
 import { decimalsNeeded, leadingScale, matches, measurementsIn, unitScale } from "./printed-numbers.mjs";
 import { registered } from "./errors.mjs";
-import { kindOfForm } from "./claim-fit.mjs";
+import { roundHalfAway } from "./value-format.mjs";
+import { PAGE_TYPES } from "./page-types.mjs";
 import { chartDraws } from "./charts.mjs";
+import { parsePeriod } from "./time-axis.mjs";
+
+// The charts that draw a gap in a series (chart-axes.mjs normalizedCategoricalData `gaps`).
+const GAP_KINDS = new Set(["chart.line", "chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"]);
+/** Every period any of `runs` has, in time order where every label reads as a date, else in the order first met. */
+function periodUnion(runs) {
+  const all = [...new Set(runs.flat())];
+  const times = all.map((label) => parsePeriod(label)?.t);
+  return times.every(Number.isFinite) ? all.map((label, i) => [label, times[i]]).sort((a, b) => a[1] - b[1]).map(([label]) => label) : all;
+}
 
 export const BINDING_CODES = Object.freeze({
   BINDING_UNRESOLVED: "an exhibit, a metric or a `{{...}}` token names a measure the runtime cannot bind: one the insight log does not hold, one from an insight the page does not rest on, or one whose axis, unit or format cannot fill what names it",
@@ -140,8 +151,10 @@ export function readFormat(format) {
   return read;
 }
 
-/** The digits `format` prints for a value, unsigned: at its decimal places, or with no pattern to one decimal place at most. */
-const digitsOf = (value, format) => { const scaled = Math.abs(value * format.factor); return format.decimals === null ? String(Math.round(scaled * 10) / 10) : scaled.toFixed(format.decimals); };
+/** The digits `format` prints for a value, unsigned: at its decimal places, or with no pattern to one decimal place at most.
+ * A half rounds up on the digits the record states, as a chart's labels round it (value-format.mjs): 26.685 prints 26.69,
+ * where `toFixed` reads the binary double below it and prints 26.68. */
+const digitsOf = (value, format) => { const scaled = Math.abs(value * format.factor); return format.decimals === null ? String(roundHalfAway(scaled, 1)) : roundHalfAway(scaled, format.decimals).toFixed(format.decimals); };
 
 /** A recorded value as `format` prints it; an undisclosed one prints as n/a. With no pattern, the number to one decimal place at most. */
 export function renderValue(value, format) {
@@ -243,15 +256,17 @@ function withoutBoundMarks(page) {
 
 /** One page's references written out in place; the problems with the ones that cannot be, as `[{ message, refs }]`. */
 function bindPage(page, registry, bound) {
-  // One problem for each thing wrong, however many references share it: twelve tokens of an insight the page does not rest on are one finding.
+  // One problem for each thing wrong, however many references share it: twelve tokens that miss the same measure are one finding.
   const problems = new Map();
   const evidence = Array.isArray(page.evidence) ? page.evidence : [];
   const fail = (message, refs = [], key = message) => { const seen = problems.get(key); if (seen) seen.count += 1; else problems.set(key, { message, refs, count: 1 }); return null; };
-  /** The measure a reference names, held to the page's evidence; null with the problem recorded. */
+  /** The measure a reference names; null with the problem recorded. Any measure the log records may be named. */
   const measureOf = (ref, what) => {
     const measure = registry.get(ref);
-    if (!measure) return fail(`${what} names ${JSON.stringify(ref)}, which the insight log's measures do not hold${parseRef(String(ref)) ? "" : " - a measure is named `<insight id>/<measure>`"}${registry.size ? "" : " (no insight log with measures is beside the pages file)"}`, [ref], `unknown ${ref}`);
-    if (!evidence.includes(measure.owner)) return fail(`${what} names a measure of ${measure.owner}, which the page does not name in \`evidence\`: a page rests on the insights its numbers come from - name it there, or name a measure the page does rest on`, [ref], `unrested ${measure.owner}`);
+    // The measures the page may have meant: those of the insights its `evidence` names, else every one the log records.
+    const rested = [...registry.entries()].filter(([, m]) => evidence.includes(m.owner)).map(([key]) => key);
+    const offered = rested.length ? rested : [...registry.keys()];
+    if (!measure) return fail(`${what} names ${JSON.stringify(ref)}, which the insight log's measures do not hold${parseRef(String(ref)) ? "" : " - a measure is named `<insight id>/<measure>`"}${registry.size ? "" : " (no insight log with measures is beside the pages file)"}${offered.length ? `; the insights in the page's \`evidence\` record ${offered.slice(0, 8).join(", ")}${offered.length > 8 ? `, and ${offered.length - 8} more` : ""}` : ""}`, [ref], `unknown ${ref}`);
     return measure;
   };
   /** One number of a measure: `<ref>` for a measure of one value, `<ref>@<label>` for one period or member of a longer one. */
@@ -282,10 +297,17 @@ function bindPage(page, registry, bound) {
   };
   const context = { page, bound, fail, measureOf, valueOf, formatOf, printOf, state, viewed };
 
-  const exhibits = [page.exhibit, ...(Array.isArray(page.exhibits) ? page.exhibits : []), ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.exhibit) : [])].filter((ex) => ex && typeof ex === "object");
-  exhibits.forEach((ex, i) => bindExhibit(ex, typeof ex.heading === "string" && ex.heading.trim() ? `"${ex.heading.trim()}"` : `exhibit ${i + 1}`, context));
-  const metrics = [...(Array.isArray(page.metrics) ? page.metrics : []), page.kpi, ...(Array.isArray(page.blocks) ? page.blocks.map((block) => block?.metric) : [])].filter((m) => m && typeof m === "object");
-  metrics.forEach((metric, i) => bindFigure(metric, `metric ${i + 1}${metric.label ? ` ("${metric.label}")` : ""}`, context, true, metric));
+  // Each exhibit and figure is named by the field an edit names it with (`exhibits[1]`, `metrics[0]`, `kpi`,
+  // `blocks[2].metric`), with its heading or label: a refusal says where to write the fix, not which one in a count.
+  const placed = (pairs) => pairs.filter(([, item]) => item && typeof item === "object");
+  const exhibitsAt = placed([["exhibit", page.exhibit], ...(Array.isArray(page.exhibits) ? page.exhibits.map((ex, i) => [`exhibits[${i}]`, ex]) : []),
+    ...(Array.isArray(page.blocks) ? page.blocks.map((block, i) => [`blocks[${i}].exhibit`, block?.exhibit]) : [])]);
+  const exhibits = exhibitsAt.map(([, ex]) => ex);
+  exhibitsAt.forEach(([at, ex]) => bindExhibit(ex, `\`${at}\`${typeof ex.heading === "string" && ex.heading.trim() ? ` ("${ex.heading.trim()}")` : ""}`, context));
+  const metricsAt = placed([...(Array.isArray(page.metrics) ? page.metrics.map((m, i) => [`metrics[${i}]`, m]) : []), ["kpi", page.kpi],
+    ...(Array.isArray(page.blocks) ? page.blocks.map((block, i) => [`blocks[${i}].metric`, block?.metric]) : [])]);
+  const metrics = metricsAt.map(([, m]) => m);
+  metricsAt.forEach(([at, metric]) => bindFigure(metric, `\`${at}\`${metric.label ? ` ("${metric.label}")` : ""}`, context, true, metric));
 
   // Tokens last, over what is left: each is written out where it stands, and the exhibit or metric it stands in is recorded as stating that measure.
   // The keys of an exhibit that hold words beside what it shows, outside a table's cells.
@@ -324,8 +346,8 @@ function bindPage(page, registry, bound) {
   for (const item of owners) if (bound.shown.has(item) && item.basis === undefined && !typing.has(item)) item.basis = basisOf(item, [...bound.shown.get(item)]);
   // What the runtime wrote into an exhibit or a figure is exactly what it shows of each measure it names: the periods or members
   // are recorded on its basis (`labels`, a list a measure, in the measure's own order) and the basis is marked `bound`, so the
-  // storyline critique reads the view from the references themselves, never from the wording of a header or a row label
-  // (storyline.mjs shownOf). One that still types a measurement is read as a typed exhibit is; `bound` is the runtime's to write.
+  // view is read from the references themselves, never from the wording of a header or a row label. One that still types a
+  // measurement is read as a typed exhibit is; `bound` is the runtime's to write.
   for (const item of owners) {
     const views = bound.views.get(item);
     // Written whole by the runtime (a bound chart, a bound figure), or printing every measurement it states by token.
@@ -355,7 +377,7 @@ function typedMeasurements(ex, filled) {
   if (Array.isArray(ex.rows) && (isTable(ex) || ex.rows.every((row) => rowCells(row).length)))
     return ex.rows.flatMap((row) => resultCells(row).flatMap((cell) => (judgedCell(cell) ? [] : cell && typeof cell === "object" ? (typeof cell.value === "number" ? [String(cell.value)] : figure(cellText(cell))) : figure(cell))));
   if (Array.isArray(ex.items) && !Array.isArray(ex.series))
-    return ex.items.flatMap((item) => (!item || typeof item !== "object" || filled.has(item) ? [] : Array.isArray(item.values) ? item.values.filter((value) => typeof value === "number").map(String) : item.value === undefined || item.value === null ? [] : figure(item.value)));
+    return ex.items.flatMap((item) => (!item || typeof item !== "object" || filled.has(item) ? [] : Array.isArray(item.series) ? item.series.flatMap((part) => (part?.values || []).filter((value) => typeof value === "number").map(String)) : Array.isArray(item.values) ? item.values.filter((value) => typeof value === "number").map(String) : item.value === undefined || item.value === null ? [] : figure(item.value)));
   const plotted = plottedValues(JSON.parse(withoutTokens(JSON.stringify(ex))));
   return plotted ? [`${plotted} plotted value${plotted === 1 ? "" : "s"}`] : [];
 }
@@ -377,14 +399,15 @@ function basisOf(item, measures, roles = null) {
 }
 
 /** A metric, a hero figure, a row's metric or a fact-grid item that names its number: `value` and `basis` written from it. */
-function bindFigure(item, what, { bound, fail, valueOf, formatOf, printOf, viewed }, carriesBasis, owner = null) {
+function bindFigure(item, what, { bound, fail, valueOf, formatOf, printOf, viewed }, carriesBasis, owner = null, sized = false) {
   if (item.measure === undefined) return;
   if (item.value !== undefined) return void fail(`${what} names its \`measure\` and types a \`value\` as well: leave \`value\` out and the runtime prints the recorded number in the \`format\``);
   const found = valueOf(item.measure, what), format = formatOf(item.format, what);
   if (!found || !format) return;
   const shown = printOf(found, format, what);
   if (shown === null) return;
-  item.value = shown;
+  // A figure drawn to its size (a nested circle, a radial ring) keeps the number to size it by, and prints the figure beside it.
+  if (sized) { item.value = found.value; item.display = shown; } else item.value = shown;
   if (owner) viewed(owner, found.ref, found.label);
   if (carriesBasis) item.basis = basisOf(item, [found.ref]);
   delete item.measure; delete item.format;
@@ -582,10 +605,19 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
       return { name: label, values: values.map((row) => row[j]), ...(from < 0 ? {} : assumed.every(Boolean) ? { state: "assumed" } : assumed.slice(from).every(Boolean) ? { assumedFrom: names[from] } : {}) }; });
     return null;
   }
-  // Small multiples draw a series an item, and the item says what its series is.
-  if (kind === "chart.sparklines") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); delete ex.series; return null; }
+  // Small multiples draw a series an item, and the item says what its series is. A trellis of stacks draws several
+  // series a panel, which one measure a panel cannot fill; a donut's panel is one measure shared out over its members.
+  if (kind === "chart.small-multiples" && ["stacked-column", "stacked-bar"].includes(ex.mark)) return `a trellis of stacks draws several parts a panel, and a measure a panel fills one: write each item's \`series\` (its parts and their values), or draw the trellis as "column", "bar", "line" or "donut"`;
+  if (kind === "chart.sparklines" || kind === "chart.small-multiples") { ex.items = names.map((name, i) => ({ label: name, values: values[i], ...states[i] })); if (kind === "chart.small-multiples") ex.categories = labels; delete ex.series; return null; }
   if (kind === "chart.treemap") { ex.items = labels.map((label, j) => ({ label, value: values[0][j] })); delete ex.series; return null; }
   if (kind === "chart.bubble-grid") { ex.rows = labels; ex.columns = names; ex.values = labels.map((_, j) => values.map((row) => row[j])); delete ex.series; return null; }
+  // A range is two measures over the members, the low then the high.
+  if (kind === "chart.range") {
+    if (values.length !== 2) return `a range written from measures names two, the low then the high, each over the same members; this names ${values.length}`;
+    ex.categories = labels; ex.low = values[0]; ex.high = values[1];
+    delete ex.series;
+    return null;
+  }
   if (kind === "chart.boxplot") {
     if (values.length !== BOX.length) return `a box plot written from measures names five, in order - ${BOX.join(", ")} - each over the same members; this names ${values.length}`;
     ex.categories = labels;
@@ -596,16 +628,38 @@ function shapeBound(ex, kind, { labels, names, values, pivot, states, rests }) {
   return undefined;
 }
 
+// The figures drawn to their size, whose items keep a number as `value` and print the figure as `display`.
+const SIZED_FIGURES = new Set(["nested-circles", "radial-bars"]);
+
+/**
+ * A bound chart's heading with the unit the runtime writes taken off its end,
+ * where the author already ended it with that unit - after a comma or in
+ * brackets, the same unit once normalised (measures.mjs normalUnit). The chart
+ * title sets the written unit after the heading (registry-chart-title.mjs), so
+ * a heading that kept its own read it twice: on the BA retest fd01's and
+ * pr02's charts were headed "Operating margin, 2025 or latest financial year,
+ * %, %". The heading is otherwise left as written.
+ */
+export function headingClearOfUnit(heading, unit) {
+  if (typeof heading !== "string" || typeof unit !== "string" || !unit.trim()) return heading;
+  const end = /(?:\s*,\s*|\s*\(\s*)([^,()]+?)\s*\)?\s*$/.exec(heading);
+  if (!end || end.index === 0 || normalUnit(end[1]) !== normalUnit(unit)) return heading;
+  return heading.slice(0, end.index).trimEnd();
+}
+
+// The kind a page's form draws its first exhibit as (page-types.mjs PAGE_TYPES), before the compiler types it.
+const kindOfForm = (type, form) => PAGE_TYPES[type]?.forms?.[form] ?? null;
+
 /** An exhibit that names its measures - in its series, as its one `measure`, or item by item - filled from them. */
 function bindExhibit(ex, what, context) {
   const { page, bound, fail, state, viewed } = context;
-  // A fact grid's or stat list's items each name one number.
-  if (Array.isArray(ex.items) && ex.items.some((item) => item && typeof item === "object" && item.measure !== undefined)) {
-    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}, item ${i + 1}${item.label ? ` ("${item.label}")` : ""}`, context, false, ex) : undefined)).filter(Boolean);
-    if (refs.length) bound.shown.set(ex, new Set([...(bound.shown.get(ex) ?? []), ...refs]));
-  }
   // The kind the exhibit will be drawn as: its own `type`, or the one its page's form sets (the compiler types it after the binding).
   const drawnAs = String(ex.type ?? (ex === (page.exhibit ?? page.exhibits?.[0]) ? kindOfForm(page.type, page.form) ?? "" : ""));
+  // A fact grid's, stat list's, nested circles' or radial rings' items each name one number.
+  if (Array.isArray(ex.items) && ex.items.some((item) => item && typeof item === "object" && item.measure !== undefined)) {
+    const refs = ex.items.map((item, i) => (item && typeof item === "object" ? bindFigure(item, `${what}'s \`items[${i}]\`${item.label ? ` ("${item.label}")` : ""}`, context, false, ex, SIZED_FIGURES.has(drawnAs)) : undefined)).filter(Boolean);
+    if (refs.length) bound.shown.set(ex, new Set([...(bound.shown.get(ex) ?? []), ...refs]));
+  }
   const named_ = (key) => ex[key] && typeof ex[key] === "object" && !Array.isArray(ex[key]) && /"measure"\s*:/.test(JSON.stringify(ex[key]));
   const declares = ex.basis && typeof ex.basis === "object" && (ex.basis.measures !== undefined || ex.basis.measure !== undefined);
   if ((named_("points") || named_("bridge")) && declares) return void fail(`${what} names its measures in its \`${named_("points") ? "points" : "bridge"}\`, so its \`basis\` is written from them: keep only \`role\` and \`relevance\` there`);
@@ -618,8 +672,8 @@ function bindExhibit(ex, what, context) {
   if (ex.basis && typeof ex.basis === "object" && (ex.basis.measures !== undefined || ex.basis.measure !== undefined)) return void fail(`${what} names its measures in its series, so its \`basis\` is written from them: keep only \`role\` and \`relevance\` there (a series that is context beside the claim's own says so itself: \`{ measure, role: "context", relevance }\`)`);
   const named = bySeries ? ex.series : [{ measure: ex.measure, name: ex.heading }];
   const untyped = named.findIndex((s) => !s || typeof s !== "object" || s.measure === undefined || s.values !== undefined);
-  if (untyped >= 0) return void fail(`${what}: series ${untyped + 1} ${named[untyped]?.measure === undefined ? "types its values while others name a measure" : "names a measure and types `values` as well"} - every series of a bound exhibit is { measure, name }; typed values belong in an exhibit that carries its own \`basis\``);
-  const series = named.map((s, i) => seriesOf([].concat(s.measure).map(String), `${what}, series ${i + 1}`, context));
+  if (untyped >= 0) return void fail(`${what}: \`series[${untyped}]\` ${named[untyped]?.measure === undefined ? "types its values while others name a measure" : "names a measure and types `values` as well"} - every series of a bound exhibit is { measure, name }; typed values belong in an exhibit that carries its own \`basis\``);
+  const series = named.map((s, i) => seriesOf([].concat(s.measure).map(String), `${what}'s \`series[${i}]\``, context));
   if (series.some((s) => !s)) return;
   const refs = series.flatMap((s) => s.refs);
   const axed = series.filter((s) => s.kind !== "scalar");
@@ -627,9 +681,18 @@ function bindExhibit(ex, what, context) {
   if (new Set(axed.map((s) => s.kind)).size > 1) return void fail(`${what} sets ${axed.filter((s) => s.kind === "periods").flatMap((s) => s.refs).join(", ")} (over periods) beside ${axed.filter((s) => s.kind === "members").flatMap((s) => s.refs).join(", ")} (over members): one axis is one or the other`, refs);
   const kind = axed[0].kind;
   // The axis every series has a place on, in the first one's order: no series is drawn with a hole the record does not have.
-  let labels = [...axed[0].at.keys()].filter((label) => axed.every((s) => s.at.has(label)));
+  // Over periods, a chart that draws a gap (chart-axes.mjs normalizedCategoricalData) runs over every period any series has,
+  // in time order, each series with its gaps: two bases of one profit, 2019-2023 and 2023-2025, are one run with a seam.
+  const gapped = kind === "periods" && GAP_KINDS.has(drawnAs);
+  let labels = gapped ? periodUnion(axed.map((s) => [...s.at.keys()])) : [...axed[0].at.keys()].filter((label) => axed.every((s) => s.at.has(label)));
   if (!labels.length) return void fail(`${what}: ${refs.join(", ")} share no ${kind === "periods" ? "period" : "member"}`, refs);
   const select = ex.select;
+  // Narrowed to the periods every series shares, a chart can lose most of a series without a word: the BA deck's loyalty
+  // page bound profit on two bases, 2019-2023 and 2023-2025, and drew 2023 alone. Under half the longest run is refused
+  // unless \`select\` asks for the shared periods.
+  const longest = Math.max(...axed.map((s) => s.at.size));
+  if (kind === "periods" && !gapped && select === undefined && labels.length * 2 < longest)
+    return void fail(`${what}: ${series.map((s, i) => `${named[i].name ?? s.refs.join(", ")} runs over ${[...s.at.keys()].join(", ")}`).join("; ")} - together they share only ${labels.join(", ")}, so a chart of them draws ${labels.length === 1 ? "that period alone" : "those periods alone"}. Draw each over its own periods (one series, or a panel each), or name the shared periods in \`select\``, refs);
   if (select !== undefined) {
     if (!select || typeof select !== "object" || Array.isArray(select)) return void fail(`${what}: \`select\` is { from, to } or { periods: [...] } over time, { members: [...], order } over a peer set`);
     const unknown = Object.keys(select).filter((key) => !(kind === "periods" ? ["from", "to", "periods"] : ["members", "order"]).includes(key));
@@ -670,9 +733,9 @@ function bindExhibit(ex, what, context) {
   const written = raw ? undefined : units[0];
   if (typeof ex.unit === "string" && ex.unit.trim() && !perSeries && (written === undefined || normalUnit(ex.unit) !== normalUnit(written)))
     return void fail(`${what} types its unit as "${ex.unit}", and ${refs.join(", ")} ${refs.length === 1 ? "is" : "are"} recorded in ${units.join(", ")}${raw ? ` and drawn as an index` : ""}: leave \`unit\` out of a bound exhibit and the runtime writes it`, refs);
-  const values = series.map((s) => labels.map((label) => (s.kind === "scalar" ? s.scalar : s.at.get(label).value)));
+  const values = series.map((s) => labels.map((label) => (s.kind === "scalar" ? s.scalar : s.at.get(label)?.value ?? null)));
   // The run of periods that rest on an assumption is said on the chart: bracketed above the plot, beside the recorded run.
-  const assumed = labels.map((label) => axed.some((s) => s.at.get(label).assumed));
+  const assumed = labels.map((label) => axed.some((s) => s.at.get(label)?.assumed));
   // A table turned over (`pivot`) sets its measures along the axis, not its periods: there is no run of periods to bracket,
   // and each series - one period across the measures - says what it is itself (shapeBound).
   if (kind === "periods" && assumed.some(Boolean) && ex.pivot !== true) {
@@ -685,8 +748,8 @@ function bindExhibit(ex, what, context) {
     // The bracket marks where the chart turns from record to assumption, read off the series that turn: a series that is an
     // assumption throughout says so in its own stroke and key (chart-decorations.mjs SERIES_STATES), and drawn beside a record
     // it does not put the record under "Assumed". Only where every series is assumed throughout is the whole axis bracketed.
-    const throughout = (s) => labels.every((label) => s.at.get(label).assumed || s.at.get(label).value === null);
-    const turning = axed.filter((s) => !throughout(s)), turn = labels.findIndex((label) => turning.some((s) => s.at.get(label).assumed));
+    const throughout = (s) => labels.every((label) => s.at.get(label)?.assumed || (s.at.get(label)?.value ?? null) === null);
+    const turning = axed.filter((s) => !throughout(s)), turn = labels.findIndex((label) => turning.some((s) => s.at.get(label)?.assumed));
     // The bracket is written only for a chart that draws one (charts.mjs chartDraws): small multiples, a slope or stacked areas
     // would refuse it as dropped unseen. There each series still says what it is (`state`, `assumedFrom`), and the page's note says it in words.
     const bracketed = chartDraws(drawnAs, "periods") !== false;
@@ -717,26 +780,30 @@ function bindExhibit(ex, what, context) {
   // is an assumption throughout is assumed, and one that turns from record to assumption is assumed from that period on.
   const stateOf = (s) => {
     if (s.kind === "scalar") return { state: "reference" };
-    const rests = labels.map((label) => s.at.get(label).assumed), drawn = labels.map((label) => s.at.get(label).value).filter((value) => typeof value === "number");
+    const rests = labels.map((label) => s.at.get(label)?.assumed), drawn = labels.map((label) => s.at.get(label)?.value).filter((value) => typeof value === "number");
     const level = drawn.length > 1 && drawn.every((value) => value === drawn[0]);
     if (level && (rests.every(Boolean) || s.measures.every((m) => m.standard === true))) return { state: "reference" };
     return rests.every(Boolean) ? { state: "assumed" } : rests.some(Boolean) && kind === "periods" ? { assumedFrom: labels[rests.indexOf(true)] } : {};
   };
   // A series that says its own `state` keeps it, in whichever shape the exhibit's kind is written.
-  const states = named.map((s, i) => (bySeries && (s.state !== undefined || s.assumedFrom !== undefined) ? { ...(s.state !== undefined ? { state: s.state } : {}), ...(s.assumedFrom !== undefined ? { assumedFrom: s.assumedFrom } : {}) } : stateOf(series[i])));
+  // A series of ranks says so (measures.mjs isRankMeasure), for the chart to set 1 at the top and to refuse it a filled mark.
+  const states = named.map((s, i) => ({ ...(bySeries && (s.state !== undefined || s.assumedFrom !== undefined) ? { ...(s.state !== undefined ? { state: s.state } : {}), ...(s.assumedFrom !== undefined ? { assumedFrom: s.assumedFrom } : {}) } : stateOf(series[i])),
+    ...(series[i].kind !== "scalar" && series[i].measures.length && series[i].measures.every(isRankMeasure) ? { rank: true } : {}) }));
   // Each value's own footing, measure by measure and label by label: what a table turned over reads its series' states from.
-  const rests = series.map((s) => labels.map((label) => (s.kind === "scalar" ? false : Boolean(s.at.get(label).assumed))));
+  const rests = series.map((s) => labels.map((label) => (s.kind === "scalar" ? false : Boolean(s.at.get(label)?.assumed))));
   const shaped = bySeries || drawnAs === "chart.treemap" ? shapeBound(ex, drawnAs, { labels, names: seriesNames, values, pivot, states, rests }) : undefined;
   if (typeof shaped === "string") return void fail(`${what}: ${shaped}`, refs);
   if (shaped === undefined) {
     if (bySeries) ex.series = named.map(({ measure: _measure, role: _role, relevance: _relevance, state: _state, assumedFrom: _from, ...rest }, i) => ({ ...rest, name: seriesNames[i], ...(perSeries ? { unit: rest.unit ?? series[i].unit } : {}), values: values[i], ...states[i] }));
     else ex.values = values[0];
+    // A waterfall bound to one measure reads its members as the opening total, the steps and the closing total: its first
+    // and last bars stand on the axis, not on the running sum.
+    if (!bySeries && drawnAs === "chart.waterfall" && ex.totals === undefined && labels.length >= 3) ex.totals = [0, labels.length - 1];
     // A pie or a donut names its slices in `labels`; every other chart its axis in `categories`.
     ex[!bySeries && /pie|donut/.test(String(ex.type ?? page.form ?? "")) ? "labels" : "categories"] = labels;
   }
   // A dated event a measure records (`events`: { "<period>": "what happened" }) is drawn where the exhibit plots that period,
-  // as the chart's own event marker: the critic reads it beside the values (storyline.mjs measureLine), and the reader sees
-  // it on the axis, from the one record. `events: false` on the exhibit draws none; events the author wrote stand.
+  // as the chart's own event marker: the reader sees it on the axis, from the one record. `events: false` on the exhibit draws none; events the author wrote stand.
   if (ex.events === false) delete ex.events;
   else if (kind === "periods" && ex.events === undefined && chartDraws(drawnAs, "events") === true) {
     const marked = new Map();
@@ -744,13 +811,13 @@ function bindExhibit(ex, what, context) {
     if (marked.size) ex.events = [...marked.values()];
   }
   delete ex.measure; delete ex.pivot;
-  if (!perSeries && written !== undefined) ex.unit = written;
+  if (!perSeries && written !== undefined) { ex.unit = written; ex.heading = headingClearOfUnit(ex.heading, written); }
   if (twoScales) { ex.secondaryAxis = true; ex.secondaryUnit ??= units[1]; }
   ex.basis = basisOf(ex, [...new Set([...refs, ...targetRefs])], roles);
   delete ex.select;
   bound.filled.add(ex);
   // Every number the exhibit plots, by the measure and the period or member it is the value of: a joined series by whichever measure holds each period.
-  for (const s of series) for (const label of s.kind === "scalar" ? [null] : labels) { const cell = label === null ? { ref: s.refs[0], label, value: s.scalar } : { ref: s.at.get(label).ref, label, value: s.at.get(label).value };
+  for (const s of series) for (const label of s.kind === "scalar" ? [null] : labels.filter((label) => s.at.has(label))) { const cell = label === null ? { ref: s.refs[0], label, value: s.scalar } : { ref: s.at.get(label).ref, label, value: s.at.get(label).value };
     // A period or member the exhibit sets on its axis is shown of every measure of the series that runs over it, recorded there or
     // not - a chart draws the gap, and a scenario's path joined to a record shows the period the two share.
     if (label === null) viewed(ex, cell.ref, null); else for (const m of s.measures) if (axisOf(m).labels.includes(label)) viewed(ex, m.ref, label);

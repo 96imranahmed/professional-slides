@@ -59,3 +59,43 @@ assert.throws(()=>chart.render({id:'bad',frame,props:{...props,dataLabels:false}
 console.log(JSON.stringify({accepted:true}));
 ''')
         self.assertTrue(result['accepted'])
+
+
+class StackTotalTests(unittest.TestCase):
+    def test_a_stack_prints_its_totals_unless_the_page_says_not_to(self):
+        """Spacebar run: stack totals were typed by hand or left off, so the reader added the segments to compare the bars."""
+        result = run_node(r'''
+import { withStackTotals, exhibitItem } from './skills/professional-slides/runtime/compose-exhibits.mjs';
+const ex = { type: 'chart.stacked-column', heading: 'Hours', categories: ['A', 'B'], series: [{ name: 'Build', values: [3, 0.1] }, { name: 'Review', values: [1, 0.2] }] };
+const totals = (e) => withStackTotals(e).stackTotals ?? null;
+console.log(JSON.stringify({ computed: totals(ex), composed: exhibitItem(ex, 'x', '.').props.stackTotals,
+  off: 'stackTotals' in withStackTotals({ ...ex, stackTotals: false }), percent: totals({ ...ex, percent: true }),
+  negative: totals({ ...ex, series: [ex.series[0], { name: 'Refund', values: [-1, 1] }] }), single: totals({ ...ex, series: [ex.series[0]] }),
+  shares: totals({ ...ex, series: [{ name: 'Agree', values: [61, 40] }, { name: 'Disagree', values: [40, 60] }] }),
+  typed: totals({ ...ex, stackTotals: [{ category: 'A', value: 4 }] }) }));
+''')
+        self.assertEqual(result["computed"], [{"category": "A", "value": 4}, {"category": "B", "value": 0.3}])
+        self.assertEqual(result["composed"], result["computed"])
+        self.assertFalse(result["off"])
+        self.assertIsNone(result["percent"])  # every stack of shares is the same height
+        self.assertIsNone(result["negative"])  # a part below the axis has no one total to print on top
+        self.assertIsNone(result["single"])
+        self.assertIsNone(result["shares"])  # stacks of one height within rounding: every total would read 100
+        self.assertEqual(result["typed"], [{"category": "A", "value": 4}])
+
+    def test_computed_totals_give_way_to_a_callout_the_page_wrote(self):
+        """The examples' fare-revenue stack calls out FY31 above its tallest column, where a computed total would sit."""
+        result = run_node(r'''
+import fs from 'node:fs';
+import { exhibitItem } from './skills/professional-slides/runtime/compose-exhibits.mjs';
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const page = JSON.parse(fs.readFileSync('skills/professional-slides/examples/page-types.pages.json')).pages.find((p) => p.id === 'p20');
+const { props } = exhibitItem({ type: 'chart.stacked-column', ...page.exhibit }, 'x', '.');
+const totals = (p) => REGISTRY.get('chart.stacked-column').render({ id: 'c', frame: { x: 60, y: 160, width: 1160, height: 470 }, props: p }).nodes
+  .filter((n) => n.data?.anchor === 'stack-total').length;
+const { annotations: _a, ...bare } = props;
+console.log(JSON.stringify({ called: totals(props), bare: totals(bare), categories: props.categories.length }));
+''')
+        self.assertEqual(result["called"], 0)
+        self.assertEqual(result["bare"], result["categories"])
+

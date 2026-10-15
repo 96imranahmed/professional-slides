@@ -43,12 +43,28 @@ import { identityColors } from './skills/professional-slides/runtime/design-syst
 import { contrastRatio } from './skills/professional-slides/runtime/palettes.mjs';
 const c = identityColors({ primary: '#740001', accent: '#D3A625' });
 let error = null; try { identityColors({ primary: 'gold' }); } catch (e) { error = e.message; }
-console.log(JSON.stringify({ primary: contrastRatio(c['color.componentPrimary'], '#FFFFFF'), accent: contrastRatio(c['color.accent'], '#FFFFFF'), mark: c['color.chartSeries2'], error }));
+console.log(JSON.stringify({ primary: contrastRatio(c['color.componentPrimary'], '#FFFFFF'), accent: contrastRatio(c['color.accent'], '#FFFFFF'), mark: c['color.chartSeries1'], last: c['color.chartSeries6'], error }));
 ''')
         self.assertGreaterEqual(result['primary'], 4.5)
         self.assertGreaterEqual(result['accent'], 4.5)
-        self.assertEqual(result['mark'], '#D3A625')  # the secondary colour is the second series; the accent is the brand
+        self.assertEqual(result['mark'], '#D3A625')  # the secondary colour leads the marks; the accent, the brand, marks the subject
+        self.assertLess(result['last'] and int(result['last'][1:3], 16), 0x60)  # the dark neutral draws only a sixth series
         self.assertIn('#RRGGBB', result['error'])
+
+    def test_marks_lead_with_the_palettes_colour_not_its_ink(self):
+        # Midnight and the BA deck's house palette led their series with the ink: every plain bar was near-black.
+        result = run_node('''
+import { resolvePalette, contrastRatio } from './skills/professional-slides/runtime/palettes.mjs';
+import { TOKENS, THEME_SLOT_TOKENS } from './skills/professional-slides/runtime/core.mjs';
+const series = (palette) => { const t = resolvePalette(palette, TOKENS, THEME_SLOT_TOKENS).tokens; return { ink: t['color.ink'].value, s: [1, 2, 3, 4, 5, 6].map((i) => t[`color.chartSeries${i}`].value) }; };
+const house = { base: 'midnight', colors: { 'color.ink': '#021B41', 'color.chartSeries1': '#021B41', 'color.chartSeries2': '#3468AD', 'color.chartSeries3': '#9EB7D8' } };
+const pale = { base: 'midnight', colors: { 'color.chartSeries1': '#F2F2F2', 'color.chartSeries2': '#E6E6E6', 'color.chartSeries3': '#2251FF' } };
+console.log(JSON.stringify({ midnight: series('midnight'), house: series(house), pale: series(pale), evergreen: series('evergreen') }));
+''')
+        self.assertEqual(result['midnight']['s'][:2], ['#2251FF', '#051C2C'])  # the dark series trades places, and still draws the second
+        self.assertEqual(result['house']['s'][:3], ['#3468AD', '#021B41', '#9EB7D8'])
+        self.assertEqual(result['pale']['s'][:3], ['#2251FF', '#E6E6E6', '#F2F2F2'])  # a lead too pale to read as a mark trades too
+        self.assertEqual(result['evergreen']['s'][0], '#0E7A5E')  # a lead that already reads as a colour stays
 
 
 class DesignCompositionTests(unittest.TestCase):

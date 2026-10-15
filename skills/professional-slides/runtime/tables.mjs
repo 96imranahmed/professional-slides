@@ -1,4 +1,4 @@
-import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
+import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { formatValue, figureUnit } from "./value-format.mjs";
 import {
   token,
@@ -14,11 +14,16 @@ import {
   houseStyle,
   readableOn,
   onFill,
+  reversedFill,
+  reversedType,
 } from "./core.mjs";
 import { measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { strongestContrastIndex } from "./palettes.mjs";
+import { SUBJECT } from "./chart-axes.mjs";
 import { contrastRatio } from "./color.mjs";
-import { numberMarker, stateMarker, iconMarker, MARK_TOKENS } from "./marks.mjs";
+import { numberMarker, stateMarker, iconMarker, markerSize, MARK_TOKENS } from "./marks.mjs";
+import { iconDefinition, unknownIcon } from "./icons.mjs";
+import { quoted, textWords } from "./text-contract.mjs";
 import { measureAt } from "./draw.mjs";
 import { textStyle as baseTextStyle } from "./text-style.mjs";
 
@@ -43,10 +48,19 @@ export const CELL_TYPES = Object.freeze([
   "dot",
   "check",
   "trend",
+  "sparkline",
+  "quote",
 ]);
+// A quote cell holds a voice in a sentence or two: past this it is a passage, and the table a transcript.
+const QUOTE_CELL_WORDS = 40;
+// A sparkline cell's line: its least width, and the most points it draws before it is a chart, not a cell.
+const SPARK = Object.freeze({ width: 56, height: 18, points: 24 });
 // A photo cell's height: three body lines, which is where a thumbnail stops
 // being a sliver and starts showing what it is of.
 const PHOTO_CELL_HEIGHT = 64;
+// A row-group label set on its side may stretch the rows it spans by half again their own height: "Definitions" down
+// one row of a two-line definition. Further, the rows are pushed apart for a word, and the label is too long for them.
+const VERTICAL_STRETCH = 1.5;
 // A portrait picture - a poster, a book cover - cropped to a landscape cell
 // would keep a band across its middle, a row of posters a row of unreadable
 // strips. It keeps its own shape, a little taller than a landscape
@@ -60,6 +74,10 @@ const isPortrait = (media) => media?.width > 0 && media?.height > media.width * 
 // runs long and low and a square mark stands to the cell's height.
 const LOGO_CELL_HEIGHT = 40;
 const LOGO_AREA = LOGO_CELL_HEIGHT * LOGO_CELL_HEIGHT * 2;
+// A flag alone in its cell stands this tall, every flag in the column alike:
+// flags differ only in proportion, so they share a height where logos share
+// an area, and a flag at a logo's 40px would outweigh its row.
+const FLAG_CELL_HEIGHT = 24;
 // Below this a wordmark squeezed by a narrow column stops being legible.
 const LOGO_MIN_HEIGHT = 12;
 // Cells that may lead with an icon before their label.
@@ -110,7 +128,10 @@ export const TABLE_TOKENS = [
   "color.componentPrimary",
   "color.componentPrimaryTint",
   "color.surfaceTint",
+  // A header band and a total row on a page whose type is pale (core.mjs reversedFill).
+  "color.band",
   "color.accent",
+  "color.chartSubject",
   "color.accentTint",
   "color.surface",
   "color.surfaceMuted",
@@ -256,6 +277,27 @@ function normalize(props) {
   );
   if (new Set(columns.map((c) => c.id)).size !== columns.length)
     throw new Error("Duplicate table column id");
+  // A label is printed as it stands: an object there was set as "[object Object]".
+  const unlabelled = columns.find((c) => c.label !== undefined && c.label !== null && !["string", "number"].includes(typeof c.label));
+  if (unlabelled) throw new Error(`Table column ${Number(unlabelled.id) + 1}'s \`label\` is its heading text (got ${JSON.stringify(unlabelled.label).slice(0, 60)})`);
+  // `headerIcon` stands over a column's label: one with no label has nothing to stand over, a header already naming a
+  // player by its mark has the place taken, and a chevron's point leaves no room over its label.
+  // `vertical: true` on a column: each of its labels set on its side, reading upward, down the rows it spans - the
+  // row-group label a well-made table runs down its left edge in a filled cell. The column is as narrow as its lines,
+  // so it carries no header, and it holds labels: a category or a text cell.
+  for (const column of columns.filter((c) => c.vertical !== undefined)) {
+    const name = `Table column ${Number(column.id) + 1}`;
+    if (column.vertical !== true) throw new Error(`${name}: \`vertical\` is true (its labels set on their side down their rows) or left out`);
+    if (!["category", "text"].includes(column.type)) throw new Error(`${name}: a vertical column sets row-group labels, as category or text cells; a ${column.type} column is read across`);
+    if (String(column.label ?? "").trim()) throw new Error(`${name}: a vertical column is as narrow as its labels' lines, with no room for a header; leave its \`label\` empty ("${column.label}")`);
+  }
+  for (const column of columns.filter((c) => c.headerIcon !== undefined)) {
+    const name = `Table column ${Number(column.id) + 1}${column.label ? ` ("${column.label}")` : ""}`;
+    if (!iconDefinition(column.headerIcon)) throw new Error(`${name}: ${unknownIcon(column.headerIcon, "column header icon")}`);
+    if (!String(column.label ?? "").trim()) throw new Error(`${name}: \`headerIcon\` stands over the column's label, and this column has none`);
+    if (markDrawable(column.logo)) throw new Error(`${name}: a header carries a player's mark (\`logo\`) or an icon (\`headerIcon\`), not both`);
+    if (props.headerShape === "chevron") throw new Error(`${name}: a chevron header has no room over its labels for an icon; drop \`headerIcon\` or the chevrons`);
+  }
   // `group`: the band above the header that names what a run of columns
   // measures ("Size", "Growth", "Specialization"); `unit`: the measure's unit
   // under the label, so the cells carry the number alone. Groups must be
@@ -335,6 +377,19 @@ function normalize(props) {
       if (cell.accent === undefined && (typeof cell.highlight === "string" || Array.isArray(cell.highlight))) { cell.accent = cell.highlight; delete cell.highlight; }
       if (!CELL_TYPES.includes(cell.type))
         throw new Error(`Unknown table cell type: ${cell.type}`);
+      // A label is set on its side by its column (`vertical`), which is narrowed to hold it; a cell turned in a column
+      // read across would run out of its box, and a figure or a mark in a vertical column has no side to be set on.
+      if (cell.vertical && !column.vertical) throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" is set \`vertical\` in a column read across; set \`vertical: true\` on its column`);
+      if (column.vertical && !cell.blank && !["category", "text"].includes(cell.type)) throw new Error(`Table cell in vertical column ${c + 1} is a ${cell.type} cell; a vertical column holds row-group labels, as category or text cells`);
+      if (column.vertical && (cell.sectionNumber !== undefined || cell.icon !== undefined)) throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" is set on its side, where a numbered disc or an icon would stand across it; drop the \`sectionNumber\` or \`icon\`, or set the column across`);
+      // `quote`: what someone said, in quotation marks, and `by` the voice under it - the market feedback a well-made
+      // page sets a column of. `by` names who said a quote, so on any other cell it would be dropped unseen.
+      if (cell.by !== undefined && cell.type !== "quote") throw new Error(`Table cell "${String(cell.text ?? "").slice(0, 40)}" names \`by\`, who said it, and is a ${cell.type ?? "text"} cell; set \`type: "quote"\` on the cell or its column`);
+      if (cell.type === "quote" && !cell.blank) {
+        const said = textWords(cell.text);
+        if (said > QUOTE_CELL_WORDS) throw new Error(`Table quote "${String(cell.text).slice(0, 40)}..." runs to ${said} words; a cell holds a voice in a sentence or two (${QUOTE_CELL_WORDS} words at most) - cut it to the words that carry the point`);
+        if (cell.by !== undefined && !(typeof cell.by === "string" && cell.by.trim())) throw new Error("A quote cell's `by` names who said it, as text");
+      }
       if (!["left", "center", "right"].includes(cell.align ?? "left"))
         throw new Error("Unknown table alignment");
       if (cell.sectionNumber !== undefined) {
@@ -530,14 +585,34 @@ const foreground = onFill;
 // A group row is a subheading, not a band: drawn in the zebra's grey it read
 // as one more striped row, so it is a bold label on a heavier rule instead.
 const rowBand = (style) =>
-  style === "accented" ? t("color.accentTint") : style === "total" ? primary : null;
+  style === "accented" ? t("color.accentTint") : style === "total" ? reversedFill(primary) : null;
 const categorySurface = (cell, props) =>
   cell.surface ?? (props.treatment === "dimensions" || props.variant === "plain" ? "plain" : "primary");
 
 // A player's mark set on a line of text - a column header, a verdict cell:
 // one line tall, and no wider than `most`.
+// A column's header icon, the glyph alone: a sixth over a numbered disc, smaller than a card's ringed icon as a table's
+// header is smaller than a card's title (28px at executive density).
+const headerIconSize = () => Math.round((markerSize() * 7) / 6);
 const headerMark = (media, lineHeight, most) =>
   logoFrame({ x: 0, y: 0, width: Math.min(most, lineHeight * 4), height: lineHeight }, media.width, media.height, { area: lineHeight * lineHeight * 2.4 });
+// Any mark set on a line of text, with the `slot` its words start after: a
+// logo as headerMark sets it, its slot its own width; a flag at the line's
+// height at its own proportions, centred in a 2:3 slot every flag shares, so
+// the names in a column of flags start level; and a mark whose file is still
+// to come as the slot it keeps, a flag's 2:3 or a wordmark's 1:2.
+const lineMark = (media, lineHeight, most) => {
+  if (isFlag(media)) {
+    const slot = Math.min(most, lineHeight * FLAG_ASPECT);
+    const frame = markDrawable(media) ? flagFrame({ x: 0, y: 0, width: slot, height: lineHeight }, media.width, media.height) : { x: 0, y: 0, width: slot, height: lineHeight };
+    return { ...frame, slot };
+  }
+  const frame = markDrawable(media) ? headerMark(media, lineHeight, most) : { x: 0, y: 0, width: Math.min(most, lineHeight * 2), height: lineHeight };
+  return { ...frame, x: 0, slot: frame.width };
+};
+// Whether a column header carries a mark: one drawn, or a flag still to come, which keeps its slot as a cell's does. A
+// player's logo still to come leaves the header to its name.
+const headerCarriesMark = (column) => markDrawable(column.logo) || (isFlag(column.logo) && Boolean(String(column.logo.alt ?? "").trim()));
 
 function contentLayout(cell, width, props, used) {
   const dense = props.density === "dense",
@@ -550,6 +625,7 @@ function contentLayout(cell, width, props, used) {
   if (inner <= 0) throw new Error("Table cell is too narrow for padding; widen the column or use compact density");
   if (["binary", "harvey", "heatmap", "bars"].includes(cell.type))
     cell.scaleRecord = scaleFor(cell, props, used);
+  if (cell.vertical && !cell.blank) return verticalLayout(cell, inner, { padding, size: dense ? "type.label" : compact ? "type.compact" : "type.body" });
   const fixed = fixedCellLayout(cell, { props, padding, gap, marker, inner });
   if (fixed) return fixed;
   if (!["body", "compact", "dense"].includes(props.density ?? "body"))
@@ -588,6 +664,8 @@ function contentLayout(cell, width, props, used) {
   // measure column carries two readings in one width.
   const subText = typeof cell.sub === "string" && cell.sub.trim() ? cell.sub.trim() : null;
   const sub = subText ? measure(subText, inner - offset, false, "type.label") : null;
+  // A quote's voice, bold at the right under its words, as a well-made page signs each one.
+  const by = cell.type === "quote" && typeof cell.by === "string" && cell.by.trim() ? measure(cell.by.trim(), inner, true, "type.label") : null;
   // `accent`: the phrase inside the cell that reads in the house colour.
   // (`highlight: true` is the older flag that marks a whole cell.)
   if (cell.accent !== undefined && cell.accent !== null) {
@@ -600,7 +678,7 @@ function contentLayout(cell, width, props, used) {
   }
   const blockHeight = (blocks.length
     ? sum(blocks.map((b) => b.height)) + (blocks.length - 1) * gap
-    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0);
+    : 0) + (lead ? lead.height + gap : 0) + (sub ? sub.height : 0) + (by ? v("space.1") + by.height : 0);
   const numberMarker =
     cell.type === "number" && cell.numberDisplay !== "plain"
       ? Math.max(
@@ -623,6 +701,7 @@ function contentLayout(cell, width, props, used) {
     blocks,
     lead,
     sub,
+    by,
     bold,
     size,
     marker,
@@ -640,24 +719,51 @@ function contentLayout(cell, width, props, used) {
   };
 }
 
+/**
+ * A label set on its side: laid out on one line along its rows, its `height`
+ * the run it needs down them (which a span then holds, measureRows); on two
+ * lines - `run` the narrower measure - when the column holds two and its rows
+ * are short of one. `lines` says how many the column's width holds.
+ */
+function verticalLayout(cell, inner, { padding, size, run = null }) {
+  const bold = cell.type === "category" || Boolean(cell.bold);
+  const text = requireText(cell.text, "cell");
+  const block = measure(text, run ?? 100000, bold, size);
+  return { padding, offset: 0, blocks: [block], bold, size, marker: 0, numberMarker: 0, numberWidth: 0, vertical: true,
+    lines: Math.max(1, Math.floor((inner + 0.5) / block.lineHeight)), blockHeight: block.width, height: Math.ceil(block.width) };
+}
+
 /** A cell whose height is its picture's or its mark's, not its text's: a logo, a photo, an implication disc, in-cell bars. Undefined for any other cell. */
 function fixedCellLayout(cell, { props, padding, gap, marker, inner }) {
+  if (cell.type === "logo" && !markDrawable(cell.media) && !String(cell.media?.alt ?? "").trim())
+    throw new Error("A logo cell needs its mark: a file, a country's `flag`, or `{ alt }` naming the logo still to come");
   if (cell.type === "logo" && cell.text) {
-    // A verdict naming its player: the mark at the height of a line of body
-    // type, the cell's words beside it ("Firm A leads").
+    // A verdict naming its player, or a row led by its country: the mark at
+    // the height of a line of body type, the cell's words beside it ("Firm A
+    // leads", a flag and "France").
     const media = cell.media;
-    mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height: 20 }, props: media, role: "table-logo" });
+    if (markDrawable(media)) mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height: 20 }, props: media, role: "table-logo" });
     const lineHeight = measure("M", inner, false, bodySize(props)).lineHeight;
-    const mark = headerMark(media, lineHeight, inner / 2);
-    const label = measure(cell.text, Math.max(1, inner - mark.width - gap), cell.bold, bodySize(props));
+    const mark = lineMark(media, lineHeight, inner / 2);
+    const label = measure(cell.text, Math.max(1, inner - mark.slot - gap), cell.bold, bodySize(props));
     return { height: Math.max(lineHeight, label.height), padding, mark, blocks: [label] };
+  }
+  if (cell.type === "logo" && isFlag(cell.media)) {
+    // A flag alone in its cell: the flag's height, which every flag in the column shares, at its own proportions.
+    const height = Math.max(FLAG_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
+    const media = cell.media, drawable = markDrawable(media);
+    if (drawable) mediaNode({ id: "logo-measure", frame: { x: 0, y: 0, width: inner, height }, props: media, role: "table-logo" });
+    const logo = flagFrame({ x: 0, y: 0, width: inner, height }, drawable ? media.width : FLAG_ASPECT, drawable ? media.height : 1, { most: FLAG_CELL_HEIGHT });
+    if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
+    return { height, padding, logo };
   }
   if (cell.type === "logo") {
     const height = Math.max(LOGO_CELL_HEIGHT, measure("M", inner, false, bodySize(props)).lineHeight);
-    const media = cell.media;
-    // mediaNode validates the embedded bitmap; logoFrame sizes it.
-    mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
-    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, media.width, media.height, { area: LOGO_AREA });
+    const media = cell.media, drawable = markDrawable(media);
+    // mediaNode validates the embedded bitmap; logoFrame sizes it. A logo
+    // still to come keeps a wordmark's slot, as a chart category's does.
+    if (drawable) mediaNode({id:"logo-measure", frame:{x:0,y:0,width:inner,height}, props:media, role:"table-logo"});
+    const logo = logoFrame({ x: 0, y: 0, width: inner, height }, drawable ? media.width : 2, drawable ? media.height : 1, { area: LOGO_AREA });
     if (logo.height < LOGO_MIN_HEIGHT) throw new Error(`Logo column is too narrow for ${media.alt || "a logo"} at a legible size (${Math.round(logo.height)}px tall); widen the column`);
     return {height, padding, logo};
   }
@@ -736,6 +842,13 @@ function markCellLayout(cell, { padding, gap, marker, inner, bold, size }) {
     if (inner - labelWidth - gap < v("space.6")) throw new Error("Table progress cell leaves no bar width; widen the column");
     return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, progress: { value, labelWidth, barHeight: v("space.2") }, height: Math.max(label.height, v("space.2")) };
   }
+  if (cell.type === "sparkline") {
+    const values = Array.isArray(cell.values) ? cell.values.map(Number) : [];
+    if (values.length < 3 || values.length > SPARK.points || values.some((value) => !Number.isFinite(value))) throw new Error(`Table sparkline cells take three to ${SPARK.points} numbers in \`values\`, in order`);
+    const label = measure(cell.text ?? String(cell.values.at(-1)), inner, true, "type.label");
+    if (inner - label.width - gap < SPARK.width) throw new Error("Table sparkline cell leaves no room for its line; widen the column");
+    return { padding, offset: 0, blocks: [label], bold: true, size: "type.label", marker, numberMarker: 0, numberWidth: 0, blockHeight: label.height, spark: { values, labelWidth: label.width }, height: Math.max(label.height, SPARK.height) };
+  }
   if (cell.type === "trend") {
     const key = { up: "up", positive: "up", strong: "up", improving: "up", flat: "flat", neutral: "flat", moderate: "flat", stable: "flat", down: "down", negative: "down", weak: "down", declining: "down" }[String(cell.value).toLowerCase()];
     if (!key) throw new Error(`Table trend cells take up, flat or down (got ${cell.value})`);
@@ -796,6 +909,8 @@ function cellTexts(cell, { gap, marker, bold }) {
       throw new Error("Table bullets require items");
     texts = cell.items.map((s) => requireText(s, "bullet"));
     offset = v("space.4");
+  } else if (cell.type === "quote") {
+    texts = [quoted(requireText(cell.text, "quote"))];
   } else if (cell.type === "category" && cell.sectionNumber !== undefined && !String(cell.text ?? "").trim()) {
     texts = []; // a bare numbered disc, as in a "#" column
   } else {
@@ -897,12 +1012,13 @@ function minimumDrawnWidth(cell, props = {}) {
     return Math.ceil(Math.max(label, v("space.6")) + gap + v("space.6"));
   }
   if (cell.type === "trend") return v("icon.small") + v("space.2");
+  if (cell.type === "sparkline") return Math.ceil(measure(cell.text ?? String((cell.values || []).at(-1) ?? ""), 100000, true, "type.label").width + gap + SPARK.width);
   if (cell.type === "dot" || cell.type === "check") return v("icon.small") + (cell.type === "check" ? v("space.2") : 0);
-  // A verdict with its player's mark: the mark, the gap and the longest word.
-  if (cell.type === "logo" && cell.text && cell.media?.width) {
+  // A verdict with its player's mark, or a flag before its country: the mark (or the slot it keeps), the gap and the longest word.
+  if (cell.type === "logo" && cell.text && (cell.media?.width || String(cell.media?.alt ?? "").trim())) {
     const lineHeight = measure("M", 1000, false, bodySize(props)).lineHeight;
     const words = String(cell.text).split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, cell.bold, bodySize(props)).width);
-    return Math.ceil(headerMark(cell.media, lineHeight, lineHeight * 4).width + v("space.2") + Math.max(0, ...words));
+    return Math.ceil(lineMark(cell.media, lineHeight, lineHeight * 4).slot + v("space.2") + Math.max(0, ...words));
   }
   return 0;
 }
@@ -910,10 +1026,12 @@ function minimumDrawnWidth(cell, props = {}) {
 function widenForWords(model, widths, props, { padding, textSize, chevronInset }) {
   const longest = (text, bold, size) => Math.max(0, ...String(text ?? "").split(/\s+/).filter(Boolean).map((word) => measure(word, 100000, bold, size).width));
   const need = model.columns.map((column, c) => {
-    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (markDrawable(column.logo) ? headerMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
+    let word = Math.max(longest(column.label, true, textSize) + 2 * chevronInset + (headerCarriesMark(column) ? lineMark(column.logo, measure("M", 1000, true, textSize).lineHeight, 1000).width + v("space.2") : 0), longest(column.unit, false, "type.label"));
     // A group band over this column alone must fit its label in this column.
     const group = column.group === undefined || column.group === null ? null : String(column.group);
     if (group && model.columns[c - 1]?.group !== column.group && model.columns[c + 1]?.group !== column.group) word = Math.max(word, longest(group, true, textSize));
+    // A header icon is a word the column cannot break.
+    if (column.headerIcon !== undefined) word = Math.max(word, headerIconSize());
     for (const row of model.cells) {
       const cell = row[c];
       if (!cell || cell.blank) continue;
@@ -1018,6 +1136,11 @@ export function measureTable({ frame, props }) {
       density === "dense" ? "space.1" : compact ? "space.2" : "space.3",
     ),
     gap = v(compact ? "space.1" : "space.2");
+  // A vertical column is as wide as its labels' lines and no wider: one, or two where a label set on one line would
+  // stretch its rows past half again their height (measureRows, then measured again here at two).
+  const verticalLines = props._verticalLines ?? 1;
+  const cellSize = density === "dense" ? "type.label" : compact ? "type.compact" : "type.body";
+  for (const column of model.columns) if (column.vertical) column.width = { px: Math.ceil(verticalLines * measure("M", 1000, true, cellSize).lineHeight + 2 * padding + gap) };
   const resolve = () => widenForWords(model, resolveWidths(model.columns, tableProps, frame.width), tableProps, {
     padding, chevronInset: props.headerShape === "chevron" ? v("space.5") : 0,
     textSize: density === "dense" ? "type.label" : density === "compact" ? "type.compact" : "type.body" });
@@ -1046,8 +1169,12 @@ export function measureTable({ frame, props }) {
       : density === "compact"
         ? "type.compact"
         : "type.body";
-  const { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight } = measureHeader({ props, model, padding, widths, paddingY, textSize });
-  const { layouts, sectionMarkerSize, heights } = measureRows({ props, model, density, tableProps, used, padding, gap, widths, paddingY });
+  const { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight, iconSize, iconBand } = measureHeader({ props, model, padding, widths, paddingY, textSize });
+  const { layouts, sectionMarkerSize, heights, overrun } = measureRows({ props, model, density, tableProps, used, padding, gap, widths, paddingY });
+  if (overrun) {
+    if (verticalLines < 2) return measureTable({ frame, props: { ...props, _verticalLines: 2 } });
+    throw new Error(`Table row label "${overrun.text}" runs ${Math.ceil(overrun.run)}px down rows ${Math.floor(overrun.natural)}px tall, set on its side on ${overrun.lines === 1 ? "one line" : "two lines"}; a vertical label stretches its rows by half again at most - shorten it to the words that name the group, or let it span more rows`);
+  }
   const legends = measureLegends({ frame, model, used, gap, textSize });
   // Reserve visible scale bars/swatches and labels together. Never infer row-local scales.
   const legendHeight = sum(legends.map((l) => l.height));
@@ -1091,6 +1218,8 @@ export function measureTable({ frame, props }) {
     groups,
     groupHeight,
     headerHeight,
+    iconSize,
+    iconBand,
     layouts,
     heights,
     stretched,
@@ -1109,8 +1238,8 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
   // band height on both sides (measured at a taller band so the label fits).
   const chevronInset = props.headerShape === "chevron" ? v("space.5") : 0;
   // A header naming a player sets the player's mark before its label.
-  const headerMarks = model.columns.map((c, i) => (c.label && markDrawable(c.logo)
-    ? headerMark(c.logo, measure("M", widths[i], true, textSize).lineHeight, (widths[i] - 2 * padding) / 3) : null));
+  const headerMarks = model.columns.map((c, i) => (c.label && headerCarriesMark(c)
+    ? lineMark(c.logo, measure("M", widths[i], true, textSize).lineHeight, (widths[i] - 2 * padding) / 3) : null));
   const headers = model.columns.map((c, i) =>
     c.label ? measure(c.label, widths[i] - 2 * padding - 2 * chevronInset - (headerMarks[i] ? headerMarks[i].width + v("space.2") : 0), true, textSize) : null,
   );
@@ -1134,8 +1263,14 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
     layout: measure(run.group, sum(widths.slice(run.start, run.end + 1)) - 2 * padding, true, textSize),
   }));
   const groupHeight = groups.length ? Math.max(...groups.map((g) => g.layout.height)) + paddingY + v("space.1") : 0;
+  // `headerIcon`: a line icon over a column's label, as a card sets one over its title. The band is the header's,
+  // so every label sits on one line under it whether its column has an icon or not.
+  const iconSize = headerIconSize(), iconBand = model.columns.some((c) => c.headerIcon !== undefined) ? iconSize + v("space.1") : 0;
+  model.columns.forEach((c, i) => {
+    if (c.headerIcon !== undefined && widths[i] - 2 * padding < iconSize) throw new Error(`Table column "${c.label}" is ${Math.floor(widths[i])}px wide, too narrow for its ${iconSize}px header icon; widen the column or drop the icon`);
+  });
   const naturalHeaderHeight = headers.some(Boolean)
-    ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight
+    ? Math.max(...headers.map((h) => h?.height ?? 0)) + unitHeight + 2 * paddingY + (chevronInset ? paddingY : 0) + groupHeight + iconBand
     : 0;
   // The shared band excludes the rule gap, as it does for chart and section
   // headings. Reserve it during measurement so peer rules align before rows
@@ -1143,7 +1278,7 @@ function measureHeader({ props, model, padding, widths, paddingY, textSize }) {
   const headerHeight = naturalHeaderHeight && !chevronInset
     ? Math.max(naturalHeaderHeight, props.headerBandHeight === undefined ? 0 : props.headerBandHeight + v("space.1"))
     : naturalHeaderHeight;
-  return { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight };
+  return { headerMarks, headers, units, unitHeight, groups, groupHeight, headerHeight, iconSize, iconBand };
 }
 
 /** Each cell's layout at its column's width - bar columns on a shared scale sharing one plot width - and the row heights: the minimum, the tallest cell, spans, and the heights a row-aligned peer shares. */
@@ -1190,23 +1325,47 @@ function measureRows({ props, model, density, tableProps, used, padding, gap, wi
         ? "space.6"
         : "space.8",
   );
+  // A label set on its side runs down its rows rather than across its column, so its rows are measured without it
+  // and then hold it, last of all.
+  const across = (cell) => cell && !cell.vertical;
   const heights = layouts.map((row, r) =>
     Math.max(
       minimumRowHeight,
       ...row.map((l, c) =>
-        l && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
+        l && across(model.cells[r][c]) && model.cells[r][c].rowSpan === 1 ? cellHeight(l) : 0,
       ),
     ),
   );
+  const hold = (r, cell, required) => {
+    const allocated = sum(heights.slice(r, r + cell.rowSpan));
+    if (required > allocated) {
+      const extra = (required - allocated) / cell.rowSpan;
+      for (let k = r; k < r + cell.rowSpan; k++) heights[k] += extra;
+    }
+  };
   model.cells.forEach((row, r) =>
     row.forEach((cell, c) => {
-      if (!cell || cell.rowSpan === 1) return;
-      const required = cellHeight(layouts[r][c]),
-        allocated = sum(heights.slice(r, r + cell.rowSpan));
-      if (required > allocated) {
-        const extra = (required - allocated) / cell.rowSpan;
-        for (let k = r; k < r + cell.rowSpan; k++) heights[k] += extra;
+      if (across(cell) && cell.rowSpan > 1) hold(r, cell, cellHeight(layouts[r][c]));
+    }),
+  );
+  // A vertical label may stretch its rows by half again their own height, set on one line or, where its column holds
+  // two, on two; past that it would push its rows apart for a word, and `overrun` asks the table for a second line or
+  // says the label is too long for its rows.
+  let overrun = null;
+  model.cells.forEach((row, r) =>
+    row.forEach((cell, c) => {
+      if (!cell?.vertical || cell.blank) return;
+      const natural = sum(heights.slice(r, r + cell.rowSpan)), most = natural * VERTICAL_STRETCH;
+      let layout = layouts[r][c];
+      if (cellHeight(layout) > most && layout.lines >= 2 && layout.blocks[0].lines.length === 1) {
+        const width = layout.blocks[0].width, words = Math.max(...String(cell.text).split(/\s+/).map((word) => measure(word, 100000, layout.bold, layout.size).width));
+        for (let run = Math.max(words, width / 2); run < width; run += 2) {
+          const two = verticalLayout(cell, widths[c] - 2 * padding, { padding, size: layout.size, run: Math.ceil(run) });
+          if (two.blocks[0].lines.length <= 2) { layout = layouts[r][c] = two; break; }
+        }
       }
+      if (cellHeight(layout) > most && !overrun) overrun = { text: String(cell.text), run: layout.height, natural, lines: layout.blocks[0].lines.length };
+      hold(r, cell, cellHeight(layout));
     }),
   );
   if (props._sharedRowHeights !== undefined) {
@@ -1215,7 +1374,7 @@ function measureRows({ props, model, density, tableProps, used, padding, gap, wi
       throw new Error("Shared table rows must preserve every measured cell height");
     heights.splice(0, heights.length, ...props._sharedRowHeights);
   }
-  return { layouts, sectionMarkerSize, heights };
+  return { layouts, sectionMarkerSize, heights, overrun };
 }
 
 /**
@@ -1440,6 +1599,8 @@ function drawTableHeader(table) {
   m.columns.forEach((column, c) => {
     if (!m.headerHeight) return;
     const filledHeader = banded(column) || bandedGutter(c);
+    // The reversed white on the accent of the recommended column, the band's own type on the band.
+    const headerType = (at) => (at === props.highlightColumn ? white : reversedType());
     if (filledHeader && props.headerShape === "chevron")
       // Phase tables: each header is a chevron pointing along the sequence.
       nodes.push(
@@ -1448,7 +1609,7 @@ function drawTableHeader(table) {
           role: "table-header-cell",
           geometry: "chevron",
           frame: { x: xs[c], y: frame.y, width: m.widths[c] - m.gap, height: m.headerHeight },
-          style: box(ink),
+          style: box(reversedFill(ink)),
           data: { column: c, headerShape: "chevron" },
         }),
       );
@@ -1471,21 +1632,29 @@ function drawTableHeader(table) {
           },
           // The recommended column's header takes the accent so the column
           // reads as the answer from the header down.
-          style: box(c === props.highlightColumn ? t("color.accent") : ink),
+          style: box(c === props.highlightColumn ? t("color.accent") : reversedFill(ink)),
           data: { column: c, ...(c === props.highlightColumn ? { highlightColumn: true } : {}) },
         }),
       );
     if (m.headers[c]) {
       const chevron = filledHeader && props.headerShape === "chevron";
       const inset = chevron ? m.headerHeight / 2 : 0;
-      const labelY = frame.y + m.paddingY + m.groupHeight;
+      // Every label stands under the header's icon band, a column with no icon of its own included: one baseline.
+      const labelY = frame.y + m.paddingY + m.groupHeight + m.iconBand;
+      if (column.headerIcon !== undefined) {
+        const align = column.align ?? "left", room = m.widths[c] - 2 * m.padding;
+        const x = xs[c] + m.padding + (align === "center" ? (room - m.iconSize) / 2 : align === "right" ? room - m.iconSize : 0);
+        // In the white of a filled header's band, else in the house's primary.
+        nodes.push(...iconMarker({ id: stableId(id, "header-icon", c), role: "table-header-icon", x, y: frame.y + m.paddingY + m.groupHeight, size: m.iconSize, icon: column.headerIcon, tone: filledHeader ? "inverse" : "plain", data: { column: c } }));
+      }
       const mark = m.headerMarks?.[c];
       if (mark) {
         const markBox = { x: xs[c] + m.padding + inset, y: labelY + (m.headers[c].lineHeight - mark.height) / 2, width: mark.width, height: mark.height };
         // On a filled header the mark sits on a white chip: a dark wordmark
         // on the navy band is a mark nobody can see.
-        if (filledHeader) nodes.push(rectPrimitive({ id: stableId(id, "header-chip", c), role: "table-header-chip", frame: { x: markBox.x - 3, y: markBox.y - 2, width: markBox.width + 6, height: markBox.height + 4 }, style: { ...box(white), radius: t("radius.small") }, data: { column: c } }));
-        nodes.push(mediaNode({ id: stableId(id, "header-logo", c), frame: markBox, props: column.logo, role: "table-header-logo" }));
+        if (filledHeader) nodes.push(rectPrimitive({ id: stableId(id, "header-chip", c), role: "table-header-chip", frame: { x: markBox.x - 3, y: markBox.y - 2, width: markBox.width + 6, height: markBox.height + 4 }, style: { ...box(reversedType()), radius: t("radius.small") }, data: { column: c } }));
+        nodes.push(markDrawable(column.logo) ? mediaNode({ id: stableId(id, "header-logo", c), frame: markBox, props: column.logo, role: "table-header-logo" })
+          : flagPlaceholder({ id: stableId(id, "header-logo-placeholder", c), role: "table-header-logo-placeholder", frame: markBox, data: { column: c, alt: column.logo.alt, flag: column.logo.flag } }));
       }
       const markShift = mark ? mark.width + v("space.2") : 0;
       putText(
@@ -1499,7 +1668,7 @@ function drawTableHeader(table) {
         m.headers[c],
         textStyle(
           true,
-          filledHeader ? white : ink,
+          filledHeader ? headerType(c) : ink,
           chevron ? "center" : column.align ?? "left",
           m.textSize,
         ),
@@ -1514,7 +1683,7 @@ function drawTableHeader(table) {
             width: m.widths[c] - 2 * m.padding - 2 * inset,
           },
           m.units[c],
-          textStyle(false, filledHeader ? white : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
+          textStyle(false, filledHeader ? headerType(c) : t("color.textSecondary"), chevron ? "center" : column.align ?? "left", "type.label"),
         );
     }
     // One continuous header rule unless an open header has an implication gutter, or the header sits over a chevron or
@@ -1574,6 +1743,9 @@ function drawRowBands(table) {
       ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
+    // The deck's subject row carries the subject's one colour at its edge (chart-axes.mjs SUBJECT): the colour its bar
+    // and its line take on every chart.
+    if (m.rows[r].subject === true) nodes.push(rectPrimitive({ id: stableId(id, "row-subject", r), role: "table-row-subject", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: 4, height: m.heights[r] - m.gap }, style: box(SUBJECT), data: { row: r } }));
   });
   // A group subheading: its bold label sits on one heavier rule across the
   // whole table, as the reference decks split a table into its groups.
@@ -1609,8 +1781,12 @@ function drawRowBands(table) {
     const bottom = ys[last] + m.heights[last] - m.gap / 2;
     const diameter = Math.min(v("icon.medium"), m.widths[c] - m.gap);
     const data = { column: c, relation: "implies", arrowVariant: "divider-chevron" };
-    // A table-level inference spans the evidence body. Row emphasis is independent.
-    const centreY = (top + bottom) / 2, reach = diameter / 2 + v("space.2");
+    // A table-level inference spans the evidence body. Row emphasis is independent. The disc sits on the row boundary
+    // nearest the middle: halfway down an odd number of rows is the middle of a row, and on the BA deck's IAG table the
+    // disc sat level with Asia Pacific's line alone - the mark against one row this device was drawn to avoid.
+    const middle = (top + bottom) / 2, bounds = m.rows.slice(0, last).map((_, r) => ys[r] + m.heights[r]);
+    const centreY = bounds.length ? bounds.reduce((best, y) => (Math.abs(y - middle) < Math.abs(best - middle) ? y : best)) : middle;
+    const reach = diameter / 2 + v("space.2");
     for (const [suffix, y1, y2] of [["top", top, centreY - reach], ["bottom", centreY + reach, bottom]]) {
       if (y2 <= y1) continue;
       nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, suffix), role: "table-implication",
@@ -1664,7 +1840,9 @@ function cellPlacements(table) {
   // A row led by a filled label block centres its cells on the block: the
   // block's label sits in its middle, and a one-line value hanging from the
   // row's top edge beside it puts the row on two baselines.
-  const filledRows = new Set(m.cells.flatMap((row, r) => row.some((cell) => cell && cell.type === "category" && categorySurface(cell, props) === "primary") ? [r] : []));
+  // A label set on its side down a run of rows is not one row's block, and centring the first row of its run on it would
+  // set that row on another line than the rest.
+  const filledRows = new Set(m.cells.flatMap((row, r) => row.some((cell) => cell && !cell.vertical && cell.type === "category" && categorySurface(cell, props) === "primary") ? [r] : []));
   return { bubblePill, pictureRows, filledRows };
 }
 
@@ -1694,7 +1872,7 @@ function drawTableCell(table, cell, r, c) {
   const band = categoryTotal ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
   let fill = null;
   if (cell.type === "category" && categorySurface(cell, props) === "primary")
-    fill = primary;
+    fill = reversedFill(primary);
   // `surface: "bubble"` sets the value in a filled pill rather than a
   // tinted cell - the same device the change annotation uses on a chart, so
   // one column of an otherwise flat table carries the emphasis.
@@ -1809,6 +1987,7 @@ function drawCellContent(table, cell, at) {
   } else if (cell.type === "rag") drawStatusPill(table, cell, at);
   else if (cell.type === "lights") drawLights(table, cell, at);
   else if (cell.type === "progress") drawProgress(table, cell, at);
+  else if (cell.type === "sparkline") drawSparkline(table, cell, at);
   else if (cell.type === "dot") drawDot(table, cell, at);
   else if (cell.type === "trend") drawTrend(table, cell, at);
   else if (cell.type === "check") drawCheck(table, cell, at);
@@ -1818,7 +1997,18 @@ function drawCellContent(table, cell, at) {
   else if (cell.type === "implication") drawImplicationMark(table, cell, at);
   else if (bubble) drawBubbleLabel(table, cell, at);
   else if (cell.type === "bars") drawBars(table, cell, at);
+  else if (cell.vertical) drawVerticalLabel(table, cell, at);
   else drawTextCell(table, cell, at);
+}
+
+/** A row-group label set on its side: laid out unturned along its rows, centred on its cell, then turned a quarter to read upwards. */
+function drawVerticalLabel(table, cell, at) {
+  const { nodes } = table;
+  const { r, c, l, inner, color, data } = at;
+  const block = l.blocks[0], width = Math.ceil(block.width) + 2;
+  const cx = inner.x + inner.width / 2, cy = inner.y + inner.height / 2;
+  nodes.push(textPrimitive({ id: stableId(table.id, "cell-text", r, c, 0), role: "table-cell-text", frame: { x: cx - width / 2, y: cy - block.height / 2, width, height: block.height }, text: block.text,
+    style: { ...textStyle(l.bold, color, "center", l.size), lineHeight: block.lineHeight, rotate: -90 }, data: { ...data, textLayout: block, vertical: true } }));
 }
 
 /** A RAG status as a pill with its state's word. */
@@ -1849,6 +2039,25 @@ function drawProgress(table, cell, at) {
   nodes.push(rectPrimitive({ id: stableId(cellId, "track"), role: "table-progress-track", frame: { x: inner.x, y: y0, width: trackWidth, height: barHeight }, style: box(t("color.chartGrid")), data }));
   if (value > 0) nodes.push(rectPrimitive({ id: stableId(cellId, "fill"), role: "table-progress-fill", frame: { x: inner.x, y: y0, width: trackWidth * value / 100, height: barHeight }, style: box(primary), data: { ...data, value } }));
   putText(stableId(cellId, "progress-label"), "table-progress-label", { x: inner.x + trackWidth + m.gap, y: area.y + (height - l.blocks[0].height) / 2, width: labelWidth }, l.blocks[0], textStyle(true, color, "right", "type.label"), data);
+}
+
+/**
+ * A row's values as a small line on the row's own scale - its shape, the
+ * reading a sparkline is for - with its last value printed beside it for the
+ * level, and a dot on that last point.
+ */
+function drawSparkline(table, cell, at) {
+  const { m, nodes, putText } = table;
+  const { l, height, area, cellId, data, color, inner } = at;
+  const { values, labelWidth } = l.spark;
+  const width = inner.width - labelWidth - m.gap, top = area.y + (height - SPARK.height) / 2;
+  const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+  const point = (value, i) => ({ x: inner.x + (width * i) / (values.length - 1), y: top + SPARK.height - ((value - lo) / span) * SPARK.height });
+  const points = values.map(point);
+  points.slice(1).forEach((p, i) => nodes.push(linePrimitive({ id: stableId(cellId, "spark", i), role: "table-sparkline", x1: points[i].x, y1: points[i].y, x2: p.x, y2: p.y, style: { stroke: primary, lineWidth: t("line.standard") }, data })));
+  const end = points.at(-1), dot = 5;
+  nodes.push(ellipsePrimitive({ id: stableId(cellId, "spark-end"), role: "table-sparkline-end", frame: { x: end.x - dot / 2, y: end.y - dot / 2, width: dot, height: dot }, style: { fill: primary, stroke: primary, lineWidth: t("line.hairline"), radius: t("radius.round") }, data: { ...data, value: values.at(-1) } }));
+  putText(stableId(cellId, "spark-label"), "table-sparkline-label", { x: inner.x + width + m.gap, y: area.y + (height - l.blocks[0].height) / 2, width: labelWidth }, l.blocks[0], textStyle(true, color, "right", "type.label"), data);
 }
 
 /** A dot, filled or open. */
@@ -1901,21 +2110,27 @@ function drawLabelledLogo(table, cell, at) {
   const { m, nodes, putText } = table;
   const { l, height, area, cellId, data, color, inner } = at;
   const top = area.y + (height - l.height) / 2, label = l.blocks[0];
-  const markBox = { x: inner.x, y: top + (label.lineHeight - l.mark.height) / 2, width: l.mark.width, height: l.mark.height };
-  const logo = mediaNode({ id: stableId(cellId, "logo"), frame: markBox, props: cell.media, role: "table-logo" });
-  logo.data = { ...logo.data, ...data, labelled: true };
-  nodes.push(logo);
-  putText(stableId(cellId, "text"), "table-cell-text", { x: inner.x + l.mark.width + v("space.2"), y: top, width: inner.width - l.mark.width - v("space.2") }, label, textStyle(cell.bold, color, "left", m.textSize), data);
+  const markBox = { x: inner.x + l.mark.x, y: top + (label.lineHeight - l.mark.height) / 2, width: l.mark.width, height: l.mark.height };
+  nodes.push(cellMark(cell, markBox, cellId, { ...data, labelled: true }));
+  putText(stableId(cellId, "text"), "table-cell-text", { x: inner.x + l.mark.slot + v("space.2"), y: top, width: inner.width - l.mark.slot - v("space.2") }, label, textStyle(cell.bold, color, "left", m.textSize), data);
 }
 
-/** A logo alone, sized to the common logo area. */
+/** A logo alone, sized to the common logo area; a flag alone, at the height its column's flags share. */
 function drawLogo(table, cell, at) {
   const { nodes } = table;
   const { l, height, area, cellId, data, inner } = at;
-  const box = logoFrame({ x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height }, cell.media.width, cell.media.height, { area: LOGO_AREA });
-  const logo = mediaNode({id:stableId(cellId,"logo"),frame:box,props:cell.media,role:"table-logo"});
-  logo.data = {...logo.data,...data,cellHeight:l.height,logoArea:LOGO_AREA};
-  nodes.push(logo);
+  const slot = { x: inner.x, y: area.y + (height - l.height) / 2, width: inner.width, height: l.height };
+  const drawable = markDrawable(cell.media), [w, h] = drawable ? [cell.media.width, cell.media.height] : [isFlag(cell.media) ? FLAG_ASPECT : 2, 1];
+  const box = isFlag(cell.media) ? flagFrame(slot, w, h, { most: FLAG_CELL_HEIGHT }) : logoFrame(slot, w, h, { area: LOGO_AREA });
+  nodes.push(cellMark(cell, box, cellId, { ...data, cellHeight: l.height, ...(isFlag(cell.media) ? {} : { logoArea: LOGO_AREA }) }));
+}
+
+/** A cell's mark in its box: the picture, or - its file still to come - the empty slot UNSOURCED_PICTURE counts. */
+function cellMark(cell, frame, cellId, data) {
+  if (!markDrawable(cell.media)) return flagPlaceholder({ id: stableId(cellId, "logo-placeholder"), role: "table-logo-placeholder", frame, data: { ...data, alt: cell.media.alt, ...(isFlag(cell.media) ? { flag: cell.media.flag } : {}) } });
+  const logo = mediaNode({ id: stableId(cellId, "logo"), frame, props: cell.media, role: "table-logo" });
+  logo.data = { ...logo.data, ...data };
+  return logo;
 }
 
 /** The implication marker in its gutter cell. */
@@ -2000,7 +2215,7 @@ function drawBars(table, cell, at) {
   cell.values.forEach((value, i) => {
     const y = contentY + i * (l.rowHeight + m.gap),
       barHeight = v("space.4"),
-      markColor = cell.markFocus ? t("color.accent") : barColor(scale, i),
+      markColor = cell.markFocus ? SUBJECT : barColor(scale, i),
       labelColor = cell.markFocus
         ? contrastRatio(tokenValue(t("color.accent")), tokenValue(focusSurface)) >= 4.5 ? t("color.accent") : foreground(focusSurface)
         : color,
@@ -2263,6 +2478,15 @@ function drawCellText(table, cell, at, y) {
       { x: inner.x + l.offset, y: y - m.gap, width: inner.width - l.offset },
       l.sub,
       textStyle(false, onLabel ? readableOn(t("color.textSecondary"), tint) : t("color.textSecondary"), cell.align ?? "left", l.size === "type.label" ? "type.label" : "type.label"),
+      data,
+    );
+  if (l.by)
+    putText(
+      stableId(id, "cell-by", r, c),
+      "table-cell-attribution",
+      { x: inner.x, y: y - m.gap + (l.sub ? l.sub.height : 0) + v("space.1"), width: inner.width },
+      l.by,
+      textStyle(true, color, "right", "type.label"),
       data,
     );
 }

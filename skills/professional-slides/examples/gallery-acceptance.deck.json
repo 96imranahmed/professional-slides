@@ -4515,6 +4515,229 @@
         }
       ],
       "id": "points-checklist"
+    },
+    {
+      "title": "Only the West grew in every year, and fastest in the last two",
+      "tag": "Illustrative",
+      "exhibit": {
+        "type": "chart.small-multiples",
+        "heading": "Journeys by region",
+        "unit": "million",
+        "mark": "column",
+        "categories": [
+          "FY23",
+          "FY24",
+          "FY25",
+          "FY26"
+        ],
+        "items": [
+          {
+            "label": "North",
+            "values": [
+              12,
+              12.4,
+              12.6,
+              12.5
+            ]
+          },
+          {
+            "label": "South",
+            "values": [
+              9.1,
+              9.3,
+              9.2,
+              9.4
+            ]
+          },
+          {
+            "label": "East",
+            "values": [
+              15.2,
+              14.8,
+              14.9,
+              15.1
+            ]
+          },
+          {
+            "label": "West",
+            "values": [
+              7.4,
+              8.6,
+              10.1,
+              11.8
+            ]
+          },
+          {
+            "label": "Central",
+            "values": [
+              20.1,
+              20.3,
+              20.2,
+              20.6
+            ]
+          },
+          {
+            "label": "Coast",
+            "values": [
+              5.2,
+              5.1,
+              5.3,
+              5.2
+            ]
+          }
+        ],
+        "highlights": [
+          {
+            "category": "West"
+          }
+        ],
+        "reference": "average"
+      },
+      "source": "Source: illustrative"
+    },
+    {
+      "title": "The City line earns 27% of revenue, more than half of it from season tickets",
+      "arrange": "breakout",
+      "exhibits": [
+        {
+          "type": "chart.bar",
+          "heading": "Revenue by line, FY26",
+          "unit": "£m",
+          "categories": [
+            "City",
+            "Valley",
+            "Dales",
+            "Eastern",
+            "Coast"
+          ],
+          "series": [
+            {
+              "name": "Revenue",
+              "values": [
+                41,
+                33,
+                32,
+                27,
+                19
+              ]
+            }
+          ],
+          "highlights": [
+            {
+              "category": "City"
+            }
+          ],
+          "native": false
+        },
+        {
+          "type": "chart.stacked-column",
+          "heading": "City line revenue by ticket, FY26",
+          "unit": "£m",
+          "categories": [
+            "City"
+          ],
+          "series": [
+            {
+              "name": "Season",
+              "values": [
+                22
+              ]
+            },
+            {
+              "name": "Leisure return",
+              "values": [
+                12
+              ]
+            },
+            {
+              "name": "Single",
+              "values": [
+                7
+              ]
+            }
+          ],
+          "native": false
+        }
+      ],
+      "breakout": {
+        "from": {
+          "exhibit": 0,
+          "category": "City"
+        },
+        "to": 1
+      },
+      "points": [
+        "Season tickets earn £22m of the City line's £41m, the largest share of any line",
+        "Three office days a week have cut City season sales by a fifth since FY22"
+      ],
+      "source": "Illustrative revenue data for a fictional operator",
+      "highlight": "£22m",
+      "id": "layout-breakout"
+    },
+    {
+      "id": "figure-nested-circles",
+      "title": "The plan can win £96m of a £1.2bn leisure market",
+      "exhibit": {
+        "type": "nested-circles",
+        "items": [
+          {
+            "label": "Regional leisure travel",
+            "value": 1200,
+            "display": "£1.2bn"
+          },
+          {
+            "label": "Trips Northvale's lines serve",
+            "value": 480,
+            "display": "£480m"
+          },
+          {
+            "label": "What the plan can win",
+            "value": 96,
+            "display": "£96m"
+          }
+        ]
+      },
+      "points": [
+        "Two-fifths of regional leisure travel runs between places the network serves",
+        "The plan can win a fifth of that by FY30"
+      ],
+      "source": "Illustrative market sizing for a fictional operator"
+    },
+    {
+      "id": "figure-venn",
+      "title": "Later weekend trains serve all three groups the plan targets",
+      "exhibit": {
+        "type": "venn",
+        "sets": [
+          {
+            "id": "walk",
+            "label": "Weekend walkers"
+          },
+          {
+            "id": "older",
+            "label": "Older passengers"
+          },
+          {
+            "id": "family",
+            "label": "Families"
+          }
+        ],
+        "overlaps": [
+          {
+            "sets": [
+              "walk",
+              "older",
+              "family"
+            ],
+            "label": "Later weekend trains"
+          }
+        ]
+      },
+      "points": [
+        "A later last train is the one change all three groups ask for",
+        "Each group's own asks come after the shared change"
+      ],
+      "source": "Illustrative passenger research for a fictional operator"
     }
   ],
   "fill": "airy"

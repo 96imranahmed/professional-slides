@@ -7,9 +7,10 @@ import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
 import { contrastRatio } from "./color.mjs";
 import { SECONDARY, CHART_ANNOTATION, textStyle, lineStyle, topLegend, tickCount, FONT, INK, CHART_LABEL, AXIS_LABEL, SERIES, MIN_PLOT_HEIGHT,
-  markWeight, chartFrame, fillStyle, assertGridlineOption, numericBounds, axisTickText, axes, labelBold } from "./chart-axes.mjs";
+  markWeight, chartFrame, fillStyle, assertGridlineOption, numericBounds, axisTickText, axes, labelBold, SUBJECT, CONTEXT_FILL, CONTEXT_LINE } from "./chart-axes.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount } from "./chart-annotations.mjs";
 import { withReferenceValues, withDecorations } from "./chart-decorations.mjs";
+import { bandXValues } from "./chart-bands.mjs";
 
 const SCATTER_QUADRANT_STYLES = Object.freeze(["threshold-lines", "alternating-tint", "focus-tint"]);
 const SCATTER_QUADRANT_KEYS = Object.freeze(["topLeft", "topRight", "bottomLeft", "bottomRight"]);
@@ -91,13 +92,14 @@ export function scatter({ id, frame, props, bubble = false }) {
   Object.assign(chart, scatterPlot(chart));
   Object.assign(chart, scatterScales(chart));
   Object.assign(chart, scatterAxes(chart));
+  drawTrendLine(chart);
   Object.assign(chart, drawScatterPoints(chart));
   Object.assign(chart, drawConnectedSeries(chart));
   placeScatterLabels(chart);
   const { nodes, plot, pointMap, categoryMap, yScale } = chart;
   // `referenceLines` on the value axis: the break-even, the parity line, the
   // 50% hurdle a curve is read against.
-  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, allowAnnotationRail: false });
+  return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale, scatterX: chart.xScale, allowAnnotationRail: false });
 }
 
 /** The points checked, and what the props decide: the focus, the series, whether they are joined and named at their ends, and the legend. */
@@ -178,8 +180,12 @@ function scatterPlot(chart) {
 function scatterScales(chart) {
   const { props, plot } = chart;
   // `xScale` / `yScale: { min, max }` name the same domain as xMin/xMax.
-  const xBounds = numericBounds(props.points.map(point => point.x), { min: props.xMin ?? props.xScale?.min, max: props.xMax ?? props.xScale?.max, axis: "x" });
-  const yBounds = numericBounds(withReferenceValues(props.points.map(point => point.y), props), { min: props.yMin ?? props.yScale?.min, max: props.yMax ?? props.yScale?.max, axis: "y" });
+  // A band on the x axis (chart-bands.mjs) is a range the points are read against, so its ends are in the domain; a ring
+  // round named points takes room round them, so the domain of a ringed scatter reaches a tenth past its points each way.
+  const ringed = (props.bands || []).some((band) => Array.isArray(band?.points));
+  const reach = (values) => { if (!ringed || values.length < 2) return []; const lo = Math.min(...values), hi = Math.max(...values), pad = (hi - lo) * 0.1; return [lo - pad, hi + pad]; };
+  const xBounds = numericBounds([...props.points.map(point => point.x), ...bandXValues(props), ...reach(props.points.map(point => point.x))], { min: props.xMin ?? props.xScale?.min, max: props.xMax ?? props.xScale?.max, axis: "x" });
+  const yBounds = numericBounds(withReferenceValues([...props.points.map(point => point.y), ...reach(props.points.map(point => point.y))], props), { min: props.yMin ?? props.yScale?.min, max: props.yMax ?? props.yScale?.max, axis: "y" });
   const xScale = (value) => plot.x + (value - xBounds.min) / xBounds.span * plot.width;
   const yScale = (value) => plot.y + plot.height - (value - yBounds.min) / yBounds.span * plot.height;
   const quadrants = normalizedQuadrants(props.quadrants, xBounds, yBounds);
@@ -226,6 +232,43 @@ function scatterAxes(chart) {
   return { nodes };
 }
 
+// A fit is a claim about the sample: under five points a line through them says more than they do.
+const TREND_LEAST = 5;
+/**
+ * `trendLine: { method: "linear", label? }`: the least-squares line through
+ * the points, drawn behind them across the x range they cover, and named with
+ * its basis - "Linear fit, R² = 0.62" unless `label` says otherwise, or nothing
+ * with `label: false`. A line where the points have no x spread, or past the
+ * linear method, is refused rather than drawn as a guess.
+ */
+function drawTrendLine(chart) {
+  const { id, props, plot, xScale, yScale, xBounds, yBounds, nodes } = chart;
+  const trend = props.trendLine;
+  if (!trend) return;
+  if (typeof trend !== "object" || (trend.method ?? "linear") !== "linear") throw new Error(`${id}: a trend line is \`{ method: "linear" }\` - the least-squares line through the points; another model is the analysis's to report, not the chart's to draw`);
+  const points = props.points;
+  if (points.length < TREND_LEAST) throw new Error(`${id}: a trend line through ${points.length} points says more than they do - fit it on ${TREND_LEAST} or more, or label the points and leave the reader to judge`);
+  const n = points.length, mx = points.reduce((s, p) => s + p.x, 0) / n, my = points.reduce((s, p) => s + p.y, 0) / n;
+  const sxx = points.reduce((s, p) => s + (p.x - mx) ** 2, 0), sxy = points.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0), syy = points.reduce((s, p) => s + (p.y - my) ** 2, 0);
+  if (!(sxx > 0)) throw new Error(`${id}: the points share one x, so no line can be fitted through them`);
+  const slope = sxy / sxx, intercept = my - slope * mx, r2 = syy > 0 ? (sxy * sxy) / (sxx * syy) : 1;
+  // Across the points' own x range, held inside the plot's y bounds.
+  const yAt = (x) => intercept + slope * x;
+  // An end past the y bounds moves back along the line to the bound it crosses.
+  const clip = (x) => { const y = yAt(x); return y < yBounds.min ? (yBounds.min - intercept) / slope : y > yBounds.max ? (yBounds.max - intercept) / slope : x; };
+  const x0 = clip(Math.min(...points.map((p) => p.x))), x1 = clip(Math.max(...points.map((p) => p.x)));
+  nodes.push(linePrimitive({ id: stableId(id, "trend-line"), role: "chart-trend-line", x1: xScale(x0), y1: yScale(yAt(x0)), x2: xScale(x1), y2: yScale(yAt(x1)),
+    style: lineStyle(SECONDARY, token("line.standard"), "dash"), data: { method: "linear", slope, intercept, r2 } }));
+  const text = trend.label === false ? null : typeof trend.label === "string" && trend.label.trim() ? trend.label.trim() : `Linear fit, R² = ${r2.toFixed(2)}`;
+  if (!text) return;
+  const layout = measureText(text, 240, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_ANNOTATION) });
+  // In the corner of the plot the line leaves clear: the foot of a rising line's right end, the head of a falling one's;
+  // set by its end, a label sat where the line ran on or was clipped, and the line struck through it.
+  const rising = slope >= 0, inset = 4;
+  nodes.push(textPrimitive({ id: stableId(id, "trend-label"), role: "chart-reference-label", frame: { x: plot.x + plot.width - Math.ceil(layout.width) - 2 - inset, y: rising ? plot.y + plot.height - layout.height - inset : plot.y + inset, width: Math.ceil(layout.width) + 2, height: layout.height },
+    text, style: { ...textStyle(CHART_ANNOTATION, SECONDARY, false, "right"), valign: "top" }, data: { trendLine: true, r2, textLayout: layout } }));
+}
+
 /** Each point (sized, for a bubble chart) and its label, and the maps callouts anchor to. */
 function drawScatterPoints(chart) {
   const { id, props, bubble, focus, focused, seriesNames, xScale, yScale, nodes } = chart;
@@ -249,7 +292,7 @@ function drawScatterPoints(chart) {
     const seriesIndex = seriesNames.length ? seriesNames.indexOf(point.series) : 0;
     const marked = focused.has(point.name);
     const pointColor = focus.length
-      ? (marked ? token("color.accent") : token("color.chartComparator"))
+      ? (marked ? SUBJECT : CONTEXT_FILL)
       : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
     nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(pointColor), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null, ...(marked ? { highlighted: true } : {}) } }));
     if (point.showLabel !== false && props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, marked ? token("color.accent") : INK, marked, "left") }));
@@ -271,7 +314,7 @@ function drawConnectedSeries(chart) {
     const groups = seriesNames.length ? seriesNames.map((name) => props.points.filter((point) => point.series === name)) : [props.points];
     groups.forEach((group, seriesIndex) => {
       const ordered = [...group].sort((a, b) => a.x - b.x);
-      const color = focus.length ? token("color.chartComparator") : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
+      const color = focus.length ? CONTEXT_LINE : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
       ordered.slice(1).forEach((point, at) => nodes.unshift(linePrimitive({ id: stableId(id, "segment", seriesNames[seriesIndex] ?? "value", at), role: "chart-line",
         x1: xScale(ordered[at].x), y1: yScale(ordered[at].y), x2: xScale(point.x), y2: yScale(point.y), style: lineStyle(color, weight.line) })));
       if (seriesEnds) {
@@ -331,8 +374,10 @@ function placeScatterLabels(chart) {
     label.style = { ...label.style, ...(measured.lines?.length > 1 ? { lineHeight: measured.lineHeight } : {}), wrap: false };
     // A bubble wide enough to carry its name takes the label inside, in white,
     // as on a positioning matrix; the smaller ones keep an outside label.
-    if (bubble && mark.frame.width >= width + 12 && mark.frame.height >= height + 4) {
-      label.frame = { x: point.x - width / 2, y: point.y - height / 2, width, height };
+    // Inside, the name is set in bold: it is measured in bold, or the box is a regular name's width and the bold one overruns it.
+    const insideWidth = bubble && !face.bold ? Math.ceil(measureText(label.text, 100000, { ...face, fontFamily: tokenValue(token("font.bodySemibold")), bold: true }).width) + 2 : width;
+    if (bubble && mark.frame.width >= insideWidth + 12 && mark.frame.height >= height + 4) {
+      label.frame = { x: point.x - insideWidth / 2, y: point.y - height / 2, width: insideWidth, height };
       label.style = { ...label.style, color: tokenDefinition(token("color.onPrimary")), bold: true, align: "center" };
       label.data = { ...label.data, inside: true };
       continue;

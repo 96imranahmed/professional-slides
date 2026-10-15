@@ -1,0 +1,36 @@
+{
+ "$comment": "Agent CLIs the point-change eval can run. Each command is an argv array; {prompt} is the task as a user would type it, {workspace} the directory the run starts in (also its cwd), {plugin} a freshly packaged copy of this checkout's plugin. An entry marked `unverified` carries flags not checked against the installed CLI; confirm them with `<cli> --help` first.",
+ "agents": {
+  "claude": {
+   "command": [
+    "claude",
+    "-p",
+    "{prompt}",
+    "--plugin-dir",
+    "{plugin}",
+    "--permission-mode",
+    "acceptEdits",
+    "--allowedTools",
+    "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch",
+    "--output-format",
+    "json",
+    "--no-session-persistence"
+   ],
+   "timeoutMinutes": 120,
+   "note": "Checked against `claude --help` (Claude Code): -p runs headless, --plugin-dir loads the packaged plugin (.claude-plugin/plugin.json) for this session only, --allowedTools grants file and shell access without prompts. The run has shell access in a temporary workspace; use a machine or sandbox where that is acceptable."
+  },
+  "codex": {
+   "command": [
+    "codex",
+    "exec",
+    "--full-auto",
+    "--skip-git-repo-check",
+    "-C",
+    "{workspace}",
+    "{prompt}"
+   ],
+   "timeoutMinutes": 120,
+   "unverified": "The codex CLI was not installed where this template was written. `codex exec` is its headless mode; confirm the flags with `codex exec --help`. Codex loads the plugin from its installed marketplace entry rather than from {plugin}: package and install this checkout (python3 evals/scripts/package_plugin.py, then add it to the marketplace) before a run, or every run measures whatever version is installed."
+  }
+ }
+}

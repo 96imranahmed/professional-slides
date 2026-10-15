@@ -1,7 +1,6 @@
 """How the build ends: refused, crashed, unrendered, or built - and how long it took.
 
-The build threw a plain Error for every input it refused (a content or plan
-gate, the variety contract, an evaluation too short), so the CLI printed a
+The build threw a plain Error for every input it refused, so the CLI printed a
 stack and exited 1, as it does for a bug. A refusal now exits EXIT.refused
 with its message alone; a crash keeps its stack and 1. A machine without
 LibreOffice or poppler crashed at the render; it now finishes unrendered and
@@ -44,28 +43,11 @@ class RefusalTests(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
-    def build(self, deck, *args, content=None, env=None):
+    def build(self, deck, *args, env=None):
         path = self.tmp / "probe.deck.json"
         path.write_text(deck if isinstance(deck, str) else json.dumps(deck), encoding="utf-8")
-        if content is not None:
-            (self.tmp / "probe.content.json").write_text(json.dumps(content), encoding="utf-8")
         return subprocess.run([NODE, str(BUILD), str(path), str(self.tmp / "out"), "--no-fetch", "--python", PYTHON, *args],
                               cwd=ROOT, capture_output=True, text=True, env=env)
-
-    def test_a_refused_input_exits_refused_with_its_message_alone(self):
-        run = self.build(spec(purpose="evaluation"), "--preflight")
-        self.assertEqual(run.returncode, 2, run.stderr)
-        self.assertIn("Refused (EVALUATION_TOO_SHORT)", run.stderr)
-        self.assertNotIn("    at ", run.stderr)
-
-    def test_a_rejected_content_plan_is_a_refusal_too(self):
-        bad = {"schema": "professional-slides.content/v1", "id": "probe",
-               "pages": [{"n": i, "claim": "Origins", "settles": {"kind": "qualitative", "what": "a premise"}, "adds": "", "highlight": ""}
-                         for i in range(1, 11)]}
-        run = self.build(spec(), "--preflight", content=bad)
-        self.assertEqual(run.returncode, 2, run.stderr)
-        self.assertIn("Refused (CONTENT_REJECTED): content gates rejected", run.stderr)
-        self.assertNotIn("    at ", run.stderr)
 
     def test_a_crash_keeps_its_stack_and_exits_one(self):
         run = self.build("{ not json", "--preflight")
@@ -79,8 +61,35 @@ class RefusalTests(unittest.TestCase):
 import { REFUSAL_CODES } from './skills/professional-slides/runtime/build-deck.mjs';
 console.log(JSON.stringify(Object.fromEntries(Object.entries(REFUSAL_CODES).map(([code, about]) => [code, String(about).trim().length > 0]))));
 """)
-        for code in ("CONTENT_REJECTED", "PLAN_REJECTED", "VARIETY_REJECTED", "STAGE_CONTRACT", "STAGE_MISSING", "TEXT_PLAN_CHANGED", "CONTENT_LOST"):
-            self.assertTrue(codes.get(code), code)
+        self.assertEqual(codes, {"CONTENT_LOST": True, "DECK_OLDER_THAN_PAGES": True})
+
+    def test_a_deck_json_older_than_its_pages_is_refused_naming_the_compile(self):
+        """On the BA retest the last `--check --render` wrote no deck.json, and
+        the build read one ten minutes older than the pages and reported five
+        blockers already fixed. The deck.json records the hash of the pages
+        file and each part; the build refuses one whose sources changed since,
+        naming the file that changed and the compile that writes a current one."""
+        (self.tmp / "pages").mkdir()
+        part = self.tmp / "pages" / "a.pages.json"
+        part.write_text(json.dumps({"pages": [{"id": "p1", "title": "One finding"}]}), encoding="utf-8")
+        (self.tmp / "probe.pages.json").write_text(json.dumps({"deck": {"id": "probe"}, "pages": [{"include": "pages/a.pages.json"}]}), encoding="utf-8")
+        compiled = run_node(f"""
+import {{ readPagesFileSync, compiledFrom }} from './skills/professional-slides/runtime/pages-file.mjs';
+console.log(JSON.stringify(compiledFrom(readPagesFileSync({json.dumps(str(self.tmp / "probe.pages.json"))}))));
+""")
+        self.assertEqual([compiled["pages"], sorted(compiled["files"])], ["probe.pages.json", ["pages/a.pages.json", "probe.pages.json"]])
+        # Its pages as they were compiled: the build goes on.
+        current = self.build(spec(compiledFrom=compiled), "--preflight")
+        self.assertNotIn("Refused", current.stderr)
+        shutil.rmtree(self.tmp / "out")
+        part.write_text(json.dumps({"pages": [{"id": "p1", "title": "One finding, retitled"}]}), encoding="utf-8")
+        stale = self.build(spec(compiledFrom=compiled), "--preflight")
+        self.assertEqual(stale.returncode, 2, stale.stderr)
+        self.assertIn("Refused (DECK_OLDER_THAN_PAGES)", stale.stderr)
+        self.assertIn("changed: pages/a.pages.json", stale.stderr)
+        self.assertIn("Run node runtime/author-deck.mjs probe.pages.json", stale.stderr)
+        self.assertNotIn("    at ", stale.stderr)
+        self.assertFalse((self.tmp / "out" / "scene.json").exists())
 
 
 @requires_python_package("pptx")
@@ -204,32 +213,21 @@ console.log(JSON.stringify({clean,lost,gated,unrendered}));
 
 
 @requires_python_package("pptx")
-class CoverageRefusalTests(unittest.TestCase):
-    def test_coverage_blocks_build_and_delivery_and_python_option_is_used(self):
-        """PR #4 review: a deck missing evidence for a criterion built and delivered, and --python lost to RUNTIME_PYTHON."""
+class PythonOptionTests(unittest.TestCase):
+    def test_the_python_option_wins_over_the_environment(self):
+        """PR #4 review: --python lost to RUNTIME_PYTHON."""
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory);spec=root/'spec.json';out=root/'out'
-            spec.write_text(json.dumps({'schema':'professional-slides.deck/v3','id':'coverage','cover':{'title':'Decision'},'criteria':['housing'],'slides':[]}))
-            command=[NODE,str(RUNTIME/'build-deck.mjs'),str(spec),str(out),'--python',sys.executable]
+            root = Path(directory); path = root / "probe.deck.json"; out = root / "out"
+            path.write_text(json.dumps(spec(1)))
+            command = [NODE, str(BUILD), str(path), str(out), "--no-fetch", "--python", sys.executable]
             # Explicit interpreter must win over an unusable default.
-            env={**os.environ,'RUNTIME_PYTHON':'/does-not-exist'}
-            pre=subprocess.run(command+['--preflight'],capture_output=True,text=True,env=env)
-            self.assertEqual(pre.returncode,2,pre.stderr)
-            self.assertEqual(json.loads(pre.stdout)['status'],'preflight-findings')
-            build=subprocess.run(command+['--no-render'],capture_output=True,text=True,env=env)
-            self.assertEqual(build.returncode,2,build.stderr)
-            self.assertEqual(json.loads(build.stdout)['status'],'built-with-blockers')
-            self.assertIn('MISSING_EVIDENCE',json.loads(build.stdout)['blockers']['byCode'])
-            report=json.loads((out/'preflight-gates.json').read_text())
-            self.assertEqual(report['countsByCode']['MISSING_EVIDENCE'],1)
-            review=root/'review.json';review.write_text(json.dumps({'accepted':True,'summary':'Accepted for the purpose of proving gates cannot be bypassed.','findings':[]}))
-            delivered=subprocess.run([NODE,str(RUNTIME/'deliver-deck.mjs'),str(spec),str(out),'--skip-build','--review',str(review)],capture_output=True,text=True)
-            self.assertEqual(delivered.returncode,2,delivered.stderr)
-            self.assertFalse((out/'coverage-DELIVERED.pptx').exists())
-            self.assertIn('MISSING_EVIDENCE',[x['code'] for x in json.loads(delivered.stdout)['blockers']])
-            invalid=subprocess.run(command[:-2]+['--python'],capture_output=True,text=True)
-            self.assertEqual(invalid.returncode,1)
-            self.assertIn('--python requires an executable',invalid.stderr)
+            env = {**os.environ, "RUNTIME_PYTHON": "/does-not-exist"}
+            pre = subprocess.run(command + ["--preflight"], capture_output=True, text=True, env=env)
+            self.assertIn(pre.returncode, (0, 2), pre.stderr)
+            self.assertIn(json.loads(pre.stdout)["status"], ("preflight-passed", "preflight-findings"))
+            invalid = subprocess.run(command[:-2] + ["--python"], capture_output=True, text=True)
+            self.assertEqual(invalid.returncode, 1)
+            self.assertIn("--python requires an executable", invalid.stderr)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,14 @@
 /**
  * Eval suite entry point.
  *
- *   node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
+ *   node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--fast] [--pattern GLOB] [--verbose]
  *
  *   --jobs N       worker processes (default: CPUs, at most 8)
  *   --serial       one worker process: the fallback when parallel runs misbehave
  *   --strict       fail when any test was skipped for a missing dependency
  *   --slow         also run the opt-in LibreOffice end-to-end tests (PS_RUN_SLOW=1)
+ *   --fast         leave out the heavy classes evals/heavy-tests.json lists: the
+ *                  tier to iterate on; the full suite runs once before a commit
  *   --pattern GLOB test modules to run (default test_*.py)
  *   --verbose      print each module as it finishes, and the workers' output
  *
@@ -24,11 +26,18 @@
  * run. Each worker keeps its own warm Node probe worker, so no two processes
  * share one.
  *
+ * One run at a time on a machine: a run takes a lock file in the temp folder
+ * holding its pid, and a second run waits for it with a line saying so. Two
+ * full suites started together each took about twice as long (176-246 s
+ * alone, 364-421 s together), so neither finished sooner than if it had
+ * queued. A lock whose pid is no longer running is taken over; a run that the
+ * runner's own tests start holds its parent's lock.
+ *
  * `evals/run.sh` is the fuller version: it also prints the example decks'
  * content-stage numbers and runs the source checks.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { linkSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
@@ -39,7 +48,11 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const TESTS = path.join(repo, "evals", "tests");
 const WORKER = path.join(repo, "evals", "scripts", "unittest_worker.py");
 const TIMINGS = path.join(os.tmpdir(), "professional-slides-test-timings.json");
-const USAGE = "Usage: run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]";
+const HEAVY = path.join(repo, "evals", "heavy-tests.json");
+const LOCK = path.join(os.tmpdir(), "professional-slides-test-run.lock");
+// Set for the workers, so that a run the runner's own tests start holds this run's lock rather than waiting on it.
+const LOCK_HELD = "PS_TEST_LOCK_HELD";
+const USAGE = "Usage: run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--fast] [--pattern GLOB] [--verbose]";
 // Import names for the requirements whose package name differs.
 const IMPORT_NAMES = { "python-pptx": "pptx", pillow: "PIL" };
 // A skip whose reason starts with this is a test the user has to ask for
@@ -55,12 +68,12 @@ function usage(message) {
 export function parseArgs(argv) {
   let parsed;
   try {
-    parsed = parseCli(argv, { jobs: { type: "string" }, serial: { type: "boolean" }, strict: { type: "boolean" }, slow: { type: "boolean" },
+    parsed = parseCli(argv, { jobs: { type: "string" }, serial: { type: "boolean" }, strict: { type: "boolean" }, slow: { type: "boolean" }, fast: { type: "boolean" },
       pattern: { type: "string", valueName: "a glob" }, verbose: { type: "boolean" } }, { strict: true });
   } catch (error) { usage(error.message); }
   const { values, positionals } = parsed;
   if (positionals.length) usage(`Unknown argument: ${positionals[0]}`);
-  const options = { jobs: null, serial: Boolean(values.serial), strict: Boolean(values.strict), slow: Boolean(values.slow), pattern: values.pattern ?? "test_*.py", verbose: Boolean(values.verbose) };
+  const options = { jobs: null, serial: Boolean(values.serial), strict: Boolean(values.strict), slow: Boolean(values.slow), fast: Boolean(values.fast), pattern: values.pattern ?? "test_*.py", verbose: Boolean(values.verbose) };
   if (values.jobs !== undefined) {
     options.jobs = Number(values.jobs);
     if (!Number.isInteger(options.jobs) || options.jobs < 1) usage("--jobs must be a positive whole number");
@@ -143,6 +156,56 @@ export function units(modules) {
   return modules.flatMap((name) => ((classes.get(name) ?? []).length ? classes.get(name).map((cls) => `${name}.${cls}`) : [name]));
 }
 
+/** The classes --fast leaves out, each with the reason it is heavy: `module.Class`, or a module for all of its classes. */
+export function heavyTests(file = HEAVY) {
+  return JSON.parse(readFileSync(file, "utf8")).classes;
+}
+
+/** The units of a run that --fast keeps: every one the heavy list names neither by itself nor by its module. */
+export function fastTier(unitNames, heavy = heavyTests()) {
+  return unitNames.filter((unit) => !Object.hasOwn(heavy, unit) && !Object.hasOwn(heavy, unit.split(".")[0]));
+}
+
+function running(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code === "EPERM"; }
+}
+
+/**
+ * Takes the run lock: a file holding this run's pid, written whole beside it
+ * and linked into place, so that no reader ever sees it half written and
+ * takes it for a dead run's. While a running process holds it, waits, saying
+ * so once; a lock whose pid is not running - a run killed before it could
+ * remove it - is taken over. Returns the release.
+ */
+export async function takeLock(file = LOCK, { pid = process.pid, say = (line) => console.error(line), poll = 1000 } = {}) {
+  const mine = `${file}.${pid}`;
+  writeFileSync(mine, `${pid}\n`);
+  try {
+    for (let told = false; ;) {
+      try {
+        linkSync(mine, file);
+        return () => { try { if (readFileSync(file, "utf8").trim() === String(pid)) unlinkSync(file); } catch { /* gone already */ } };
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+      }
+      let held;
+      try { held = readFileSync(file, "utf8"); } catch { continue; }   // released between the two calls
+      const holder = Number.parseInt(held, 10);
+      if (!(holder > 0) || !running(holder)) {
+        say(`Taking over the test-run lock ${file}: its pid ${held.trim() || "(none)"} is not running.`);
+        // Only the lock as it was read: another waiter may have taken it over already.
+        try { if (readFileSync(file, "utf8") === held) unlinkSync(file); } catch { /* taken */ }
+        continue;
+      }
+      if (!told) say(`Another test run (pid ${holder}) is running on this machine; waiting for it to finish (${file}).`);
+      told = true;
+      await new Promise((resolve) => { setTimeout(resolve, poll); });
+    }
+  } finally {
+    try { unlinkSync(mine); } catch { /* gone already */ }
+  }
+}
+
 /** Longest first: last run's time where known, a share of the file's size (a fair proxy) where not. */
 export function schedule(unitNames, timings = {}) {
   const perModule = {};
@@ -202,7 +265,7 @@ function runParallel(modules, { jobs, env, verbose }) {
 
 function rule(char) { return char.repeat(70); }
 
-export function report(results, { seconds, jobs, modules, python, strict }) {
+export function report(results, { seconds, jobs, modules, python, strict, leftOut = 0 }) {
   const lines = [];
   const failures = results.flatMap((r) => r.failures.map((f) => ({ kind: "FAIL", ...f })));
   const errors = results.flatMap((r) => r.errors.map((f) => ({ kind: "ERROR", ...f })));
@@ -227,6 +290,7 @@ export function report(results, { seconds, jobs, modules, python, strict }) {
     lines.push(strict ? "  --strict: skips fail the run." : "  Install what they need (see requirements.txt and evals/README.md), or run with --strict to fail on skips.", rule("!"), "");
   }
   if (optIn.length) lines.push(`${optIn.length} opt-in test${optIn.length === 1 ? "" : "s"} not run (--slow runs them).`, "");
+  if (leftOut) lines.push(`--fast: ${leftOut} heavy class${leftOut === 1 ? "" : "es"} not run (evals/heavy-tests.json). Run the full suite once before a commit or push.`, "");
   const bad = failures.length + errors.length + unexpected.length;
   const counts = [failures.length && `failures=${failures.length}`, errors.length && `errors=${errors.length}`,
     unexpected.length && `unexpected successes=${unexpected.length}`, skipped.length && `skipped=${skipped.length}`].filter(Boolean).join(", ");
@@ -237,6 +301,9 @@ export function report(results, { seconds, jobs, modules, python, strict }) {
 
 async function main(argv) {
   const options = parseArgs(argv);
+  const release = process.env[LOCK_HELD] ? () => {} : await takeLock();
+  process.on("exit", release);
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]]) process.once(signal, () => { release(); process.exit(code); });
   const found = preflight();
   if (!found.chosen) {
     console.error("No Python 3 interpreter found. Install python3 and the packages in requirements.txt.");
@@ -264,16 +331,18 @@ async function main(argv) {
     RUNTIME_NODE: process.env.RUNTIME_NODE || process.execPath,
     RUNTIME_NODE_MODULES: process.env.RUNTIME_NODE_MODULES || path.join(repo, "node_modules"),
     PS_RESULT_FD: "3",
+    [LOCK_HELD]: String(process.pid),
     ...(options.slow ? { PS_RUN_SLOW: "1" } : {}),
   };
   const timings = readTimings();
   const started = Date.now();
-  const work = units(modules);
+  const all = units(modules);
+  const work = options.fast ? fastTier(all) : all;
   const results = await runParallel(schedule(work, timings), { jobs, env, verbose: options.verbose });
   const seconds = (Date.now() - started) / 1000;
   for (const r of results) timings[r.module] = r.seconds;
   try { writeFileSync(TIMINGS, JSON.stringify(timings)); } catch { /* timings only order the next run */ }
-  const { text, failed } = report(results, { seconds, jobs: Math.min(jobs, work.length), modules: modules.length, python: chosen.exe, strict: options.strict });
+  const { text, failed } = report(results, { seconds, jobs: Math.min(jobs, work.length), modules: modules.length, python: chosen.exe, strict: options.strict, leftOut: all.length - work.length });
   console.log(text);
   return failed ? 1 : 0;
 }

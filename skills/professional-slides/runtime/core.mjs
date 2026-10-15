@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { resolvePalette, heatScaleTokens } from "./palettes.mjs";
-import { contrastRatio } from "./color.mjs";
+import { resolvePalette, heatScaleTokens, groundTokens, GROUNDS } from "./palettes.mjs";
+import { contrastRatio, relativeLuminance } from "./color.mjs";
 import { activeDesignTokens, withDesignTokens } from "./design-context.mjs";
 import { resolveTypography } from "./typography.mjs";
 import { lineBox, accentRuns } from "./text-layout.mjs";
@@ -80,12 +80,21 @@ export const TOKENS = Object.freeze({
   // glance - about 30 grey levels under the page - where a 6-12% tint of the
   // primary vanishes on a projector and in the page's measured weight.
   "color.surfaceTint": colour("--surface-tint", "#DADEE1"),
+  // The surface type is reversed out of on a page whose type is pale - a header
+  // band, a dark panel, the so-what bar (reversedFill): a step off a dark or a
+  // primary ground. On a light page those surfaces keep the ink or the primary
+  // they are drawn in, so its value there is the ink's (resolvePalette).
+  "color.band": colour("--band", "#06233B"),
   "color.calloutTint": colour("--callout-tint", "#FFF6DC"),
   "color.accent": colour("--accent", "#00A6E6"),
   "color.accentTint": colour("--accent-tint", "#DCF3FD"),
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
   "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
+  // The subject a chart marks - a highlighted member, a focus series - in one colour on every kind, derived per palette and
+  // ground (palettes.mjs subjectOf); the toolkit's own is its accent.
+  "color.chartSubject": colour("--chart-subject", "#00A6E6"),
+  "color.chartPeer": colour("--chart-peer", "#2251FF"),
   "color.chartSeries1": colour("--chart-series-1", "#06233B", "dk1"),
   "color.chartSeries2": colour("--chart-series-2", "#0B4F7D", "accent2"),
   "color.chartSeries3": colour("--chart-series-3", "#00A6E6", "accent3"),
@@ -200,6 +209,26 @@ export function onFill(fill) {
   const white = token("color.onPrimary"), ink = token("color.ink");
   return contrastRatio(value, tokenValue(white)) >= contrastRatio(value, tokenValue(ink)) ? white : ink;
 }
+
+/**
+ * Whether the page's type is lighter than its ground: a page set on the dark or
+ * the primary ground (palettes.mjs groundTokens), where the ink is the pale type.
+ */
+export function reversedGround() {
+  return relativeLuminance(tokenValue("color.ink")) > relativeLuminance(tokenValue("color.canvas"));
+}
+/**
+ * The fill of a surface type is reversed out of - a table's header band, a total
+ * row, a dark or primary panel, the so-what bar: `fill` (the ink or the primary)
+ * on a light page; on a reversed ground the band (`color.band`), a step off the
+ * ground. There the ink and the primary are the pale type and the light marks,
+ * and a header band drawn in them was a white block with navy type on a navy
+ * page. A diagram's boxes and a chart's marks are marks, not surfaces: they keep
+ * their colours and turn light as the bars do.
+ */
+export const reversedFill = (fill) => (reversedGround() ? token("color.band") : fill);
+/** The type on a reversedFill surface: the reversed white on a light page, the pale ink on a reversed ground. */
+export const reversedType = () => (reversedGround() ? token("color.ink") : token("color.onPrimary"));
 
 /**
  * `phrases` inside `text` as runs on a filled surface: in the accent where the
@@ -1005,6 +1034,15 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // A gap in a series is drawn as no mark; a native chart would plot it as zero or join across it, so that chart stays drawn.
+  if (Array.isArray(props.series) && props.series.some((item) => (item?.values || []).some((value) => value === null))) return null;
+  // A native area carries no value labels in the saved file (LibreOffice drops them), and the probe's area of slot sales
+  // lost every figure it printed (TEXT_EXPORT_LOST): an area that prints its values stays drawn.
+  if (type === "area" && renderedNodes?.some((node) => node.role === "data-label")) return null;
+  // So are columns over uneven dates (chart-categorical.mjs rowLabelling), unless a broken axis or a data table keeps their slots.
+  if (["column", "stacked-column"].includes(type) && !props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(props.categories)) return null;
+  // A rank's line runs with 1 at the top, which the native line's axis does not say (chart-line.mjs): that chart stays drawn.
+  if (Array.isArray(props.series) && props.series.some((item) => item?.rank === true)) return null;
   // A series that says it is assumed or a reference is drawn dashed, lighter or as a reference line (chart-decorations.mjs
   // SERIES_STATES), which a native series cannot say: that chart stays drawn.
   if (Array.isArray(props.series) && props.series.some((item) => item?.state !== undefined || item?.assumedFrom !== undefined)) return null;
@@ -1031,6 +1069,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // measured; PowerPoint lays out its own axes, so they would float free.
   if (props.categoryIcons || props.seriesGrowth) return null;
   if ((props.referenceLines || []).length || (props.annotations || []).length || (props.changeAnnotations || []).length || highlights.some((h) => h?.style !== "bar")) return null;
+  // Bands are placed against the plot we measured (chart-bands.mjs); a native chart has no band behind its marks.
+  // A survey question is set over the plot (chart-question.mjs), which a native chart frame would cover.
+  if (props.question || props.trendLine || props.diverging || props.categoryLabel === "above" || props.rowNotes || (props.bands || []).length || (props.intervals || []).length || props.valueBreak || (props.categoryBreaks || []).length || (props.groupBrackets || []).length || (props.valueLabels || []).length) return null;
   const categories = [...(props.categories || props.labels || [])];
   // The category labels the scene drew are the ones PowerPoint prints: a
   // ten-year line the scene labels FY17, FY20, FY23, FY26 would otherwise come
@@ -1071,6 +1112,11 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // format natively, so that chart stays drawn.
   if (new Set(places).size > 1 && Array.isArray(props.quotedFigures) && props.quotedFigures.length) return null;
   const labelDecimals = drawnLabels.length ? Math.max(...places) : null;
+  // So does its thousands separator. `valueFormat: { decimals: 0 }` draws 5035 (a declared format groups only when it says
+  // `grouping`), the native chart grouped every chart past a thousand and printed 5,035, and the text plan, read off the
+  // drawn label, lost 5035 from the saved page (TEXT_EXPORT_LOST, the BA deck's slot ranking). Said only where a label is
+  // drawn four figures with no separator, which is the one case the emitter's own rule (any value past a thousand) misreads.
+  const ungrouped = drawnLabels.some(node => /\d{4}/.test(node.text.replace(/\.\d+/g, "")));
   const ticks = (renderedNodes || []).filter(node => node.role === "axis-label" && Number.isFinite(node.data?.value)).map(node => node.data.value).sort((a,b)=>a-b);
   // A two-mark contrast paints one peer in the primary and the other grey, and
   // which one is the scene's decision (chart-categorical.mjs defaultFocusIndex: the named
@@ -1078,10 +1124,17 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // the scene painted, so a "2019 | 2024" chart reads the same way round in
   // PowerPoint.
   const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
-  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
+  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.chartSubject") : undefined;
   const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
+  // A highlighted mark takes the subject's colour (chart-axes.mjs SUBJECT): the emitter paints the token the scene painted it in.
+  const litMark = marks.find(node => highlights.some((h) => String(h.category) === String(node.data?.category)));
+  const highlightToken = litMark?.style?.fill?.tokenId;
+  // Its peers in the colour the scene drew them in: the peer colour, calmer than the subject where the lead outshouts it.
+  const peerToken = litMark && marks.some((node) => node.style?.fill?.tokenId === "color.chartPeer") ? "color.chartPeer" : undefined;
   return {
     ...(focusIndex >= 0 ? { focusIndex } : {}),
+    ...(highlightToken ? { highlightToken } : {}),
+    ...(peerToken ? { peerToken } : {}),
     labelBold,
     type,
     categories,
@@ -1099,11 +1152,13 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
     ...(type === "range" ? { low: [...(props.low || [])], high: [...(props.high || [])] } : {}),
     ...(Array.isArray(props.points) ? { points: props.points.map(p => ({ ...p })) } : {}),
     unit: props.unit ?? null,
-    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
+    // An area fills from its baseline, so its native axis starts at zero as the drawn one does (chart-line.mjs).
+    yMin: ticks.length ? ticks[0] : props.yMin ?? (["bar", "column", "stacked-bar", "stacked-column", "area"].includes(type) && series.every(item => item.values.every(value => value >= 0)) ? 0 : null),
     yMax: ticks.length ? ticks.at(-1) : props.yMax ?? null,
     ...(ticks.length>1 ? {yMajorUnit:ticks[1]-ticks[0]} : {}),
     dataLabels,
     ...(labelDecimals !== null ? { labelDecimals } : {}),
+    ...(ungrouped ? { labelGrouped: false } : {}),
     showValueAxis,
     // A pie or donut names its categories in its legend (the drawn chart's
     // "legend-top-right"); without one the native chart shows unlabelled wedges.
@@ -1158,15 +1213,53 @@ export function componentGeometry(nodes) {
     anchors: { contentTop: y, contentBottom: bottom, ...(headings.length ? { headerTop: Math.min(...headings.map(node => node.frame.y)) } : {}) } };
 }
 
+/**
+ * The ground each page is set on, and its tokens. The palette resolves once,
+ * for its light page; a page set on another ground (`tone` on the page, else on
+ * the deck: `ground` here) takes the same palette resolved for that ground
+ * (palettes.mjs groundTokens), chrome and body alike, so its title, rules,
+ * marks and footer all read on it and the rest of the deck is untouched. A
+ * fixed-shape page that paints its own ground - a dark cover, a navy divider, a
+ * dark takeaways page (a component's `ownGround`) - is drawn in the light
+ * page's tokens on any deck, as it was designed: on a dark deck its navy is the
+ * ground the deck's pages are set on.
+ */
+function groundsOf(lightTokens) {
+  const resolved = new Map([["light", lightTokens]]);
+  return (ground) => {
+    if (!resolved.has(ground)) resolved.set(ground, groundTokens(lightTokens, ground, THEME_SLOT_TOKENS));
+    return resolved.get(ground);
+  };
+}
+function groundOf(slideSpec, deckGround, registry, lightTokens) {
+  if (slideSpec.ground !== undefined) {
+    if (!GROUNDS.includes(slideSpec.ground)) throw new Error(`Unknown tone: ${JSON.stringify(slideSpec.ground)}; a page is set on ${GROUNDS.map((g) => `"${g}"`).join(", ")}`);
+    return slideSpec.ground;
+  }
+  if (deckGround === "light") return "light";
+  const children = slideSpec.composition?.children;
+  const sole = Array.isArray(children) && children.length === 1 ? children[0] : null;
+  const own = sole?.component && registry.get(sole.component)?.ownGround;
+  return own && withDesignTokens(lightTokens, () => own(sole.props || {})) ? "light" : deckGround;
+}
+
 function compileDeckInner(deckSpec, registry, {slideCache}={}) {
   assertNoLegacyPageTaxonomy(deckSpec);
-  const { tokens: designTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
-  const typography = resolveTypography(deckSpec.typography, designTokens);
+  const { tokens: lightTokens, ...palette } = resolvePalette(deckSpec.palette, TOKENS, THEME_SLOT_TOKENS);
+  const typography = resolveTypography(deckSpec.typography, lightTokens);
+  const deckGround = deckSpec.ground ?? "light";
+  if (!["light", "dark"].includes(deckGround)) throw new Error(`Unknown deck tone: ${JSON.stringify(deckGround)}; a deck is set on "light" (the default) or "dark", and a single page on "primary"`);
+  const tokensOn = groundsOf(lightTokens);
+  // The deck's tokens are its own ground's: the manifest, the theme the PowerPoint carries and the chrome of every page on it.
+  const designTokens = tokensOn(deckGround);
   const pageTemplate = registry.get("page-template")?.resolveTemplate(deckSpec.pageTemplate);
   return withDesignTokens(designTokens, () => {
-  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => compileSlide(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }));
+  const slides = mapAll(deckSpec.slides, (slideSpec, slideIndex) => {
+    const ground = groundOf(slideSpec, deckGround, registry, lightTokens);
+    return compileSlide(slideSpec, slideIndex, { registry, designTokens: tokensOn(ground), ground, typography, pageTemplate, palette, slideCache });
+  });
   const templateSequences = templateSequencesOf(slides);
-  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), ...(deckSpec.weight ? { weight: deckSpec.weight } : {}), tokens: designTokens, templateSequences };
+  const deck = { schema: SCENE_SCHEMA, id: deckSpec.id || "deck", slides, palette, typography, pageTemplate, ...(deckSpec.fill ? { fill: deckSpec.fill } : {}), tokens: designTokens, templateSequences };
   deck.manifest = buildManifest(deck);
   return deck;
   });
@@ -1201,7 +1294,7 @@ function compileSlide(slideSpec, slideIndex, context) {
  * nodes' tokens resolved and the scene's invariants asserted. A slide found in
  * `slideCache` is returned as a copy.
  */
-function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, typography, pageTemplate, palette, slideCache }) {
+function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, ground = "light", typography, pageTemplate, palette, slideCache }) {
   const cacheKey=slideCache ? hashJson({slideSpec,slideIndex,designTokens,typography,pageTemplate,chrome:CHROME}) : null;
   if(slideCache?.has(cacheKey))return structuredClone(slideCache.get(cacheKey));
   const slideId = slideSpec.id || `slide-${slideIndex + 1}`;
@@ -1265,13 +1358,21 @@ function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, 
     return heights;
   };
   const scene = { slideId, registry, pageTemplate, designTokens, slideTokens, nodes, componentInstances, chromeOwners, placements, headerBandHeight, sharedTableRows };
-  for (const { node, frame, ancestors = [], inRow: inRowPlacement = false } of placements) {
+  // A component that draws between other components - a breakout's fan from a
+  // mark to the panel that splits it - reads where they were drawn
+  // (`readsScene`), so it is placed after everything else on the slide.
+  const reads = (node) => node.nodeType !== "section" && registry.get(node.component)?.readsScene === true;
+  const deferred = [];
+  for (const placement of placements) {
+    const { node, frame, ancestors = [], inRow: inRowPlacement = false } = placement;
+    if (reads(node)) { deferred.push(placement); continue; }
     if (node.nodeType === "section") {
       placeSection(scene, { node, frame, ancestors, inRowPlacement });
       continue;
     }
     placeComponent(scene, { node, frame, ancestors });
   }
+  for (const { node, frame, ancestors = [] } of deferred) placeComponent(scene, { node, frame, ancestors });
   assertUniqueIds(nodes);
   for (const node of nodes) {
     const nodeTokens = chromeOwners.has(node.data.componentInstance) || node.data.componentAncestors?.some(owner => chromeOwners.has(owner)) ? designTokens : slideTokens;
@@ -1283,7 +1384,7 @@ function compileSlideAsWritten(slideSpec, slideIndex, { registry, designTokens, 
   // A derived citation the footer set in a shorter form is kept whole in the
   // speaker notes, so no source a page rests on is lost to the fit.
   const fullCitation = nodes.find((node) => node.data?.fullCitation)?.data.fullCitation;
-  const compiled = { id: slideId, notes: [slideSpec.notes, fullCitation].filter(Boolean).join("\n\n"), nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame };
+  const compiled = { id: slideId, notes: [slideSpec.notes, fullCitation].filter(Boolean).join("\n\n"), nodes, componentInstances, tokens: slideTokens, density, ...(slideSpec.template ? { template: structuredClone(slideSpec.template) } : {}), palette: palette.id, pageTemplate: resolvedPageTemplate, contentFrame: slideSpec.frame || contentFrame, ...(ground !== "light" ? { ground } : {}) };
   if (slideSpec.sourceSlideId) compiled.sourceSlideId = slideSpec.sourceSlideId;
   slideCache?.set(cacheKey,structuredClone(compiled));
   return compiled;
@@ -1378,7 +1479,8 @@ function placeComponent({ slideId, registry, pageTemplate, designTokens, slideTo
   let rendered;
   try {
     const placementTokens = chromePlacement ? designTokens : slideTokens;
-    rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props }));
+    const drawn = definition.readsScene ? { scene: { nodes: nodes.map((item) => ({ ...item })), instances: componentInstances.map(({ id, instanceId, component, frame: at }) => ({ id, instanceId, component, frame: at })) } } : {};
+    rendered = withDesignTokens(placementTokens, () => definition.render({ id: instanceId, frame, tokens: placementTokens, props, ...drawn }));
   } catch (error) {
     throw new Error(`Cannot render ${instanceId} (${definition.id}): ${error.message}`, { cause: error });
   }

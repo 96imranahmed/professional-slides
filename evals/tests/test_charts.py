@@ -43,7 +43,8 @@ class EventBandTests(unittest.TestCase):
         result = run_node('''
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const frame = { x: 0, y: 0, width: 900, height: 420 };
-const base = { categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], series: [{ name: 'Flights', values: [470, 200, 194, 380, 455, 476, 484] }], heading: 'Heathrow flights, thousands', unit: 'thousands' };
+// From zero, so the lone line's fill (its top the plot's) is drawn: a line over a floor above zero takes none (test_chart_honesty.py).
+const base = { categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], series: [{ name: 'Flights', values: [470, 200, 194, 380, 455, 476, 484] }], heading: 'Heathrow flights, thousands', unit: 'thousands', yMin: 0 };
 const one = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid' }] } }).nodes;
 const two = REGISTRY.get('chart.line').render({ id: 'c', frame, props: { ...base, events: [{ at: '2020', label: 'Covid grounds most flying' }, { at: '2022', label: 'Recovery begins across the network' }] } }).nodes;
 const flag = (nodes) => nodes.filter((n) => n.role === 'chart-event-label').map((n) => ({ y: n.frame.y, bottom: n.frame.y + n.frame.height }));
@@ -159,7 +160,8 @@ const render=(id,props,box=frame)=>REGISTRY.get(id).render({id:'review',frame:bo
         """PR #4 review: a line or area legend's swatches took default colours rather than the plot's, and direct labels squeezed into a narrow frame."""
         self.check_js("""
 for(const id of ['chart.line','chart.area']) {
- const props={categories:['A','B'],series:[{name:'One',values:[100,110]},{name:'Two',values:[105,108]}],colorIndices:[3,5]};
+ // Values that move well clear of zero: an area of 100 against 110 draws flat from zero and is refused for a line.
+ const props={categories:['A','B'],series:[{name:'One',values:[40,110]},{name:'Two',values:[55,108]}],colorIndices:[3,5]};
  const nodes=render(id,props);
  assert.deepEqual(nodes.filter(n=>n.role==='legend-swatch').map(n=>n.style.fill.tokenId),['color.chartSeries4','color.chartSeries6']);
  assert.throws(()=>render(id,{...props,directLabels:'end'},{...frame,width:300}),/plot width/);
@@ -416,16 +418,19 @@ console.log(JSON.stringify(nodes.filter((n) => n.role === 'data-label').map((n) 
 
 
 class ComboLabelPlacementTests(unittest.TestCase):
-    def test_a_line_label_moves_under_its_point_when_the_steep_segment_before_it_runs_through_the_box_above(self):
+    def test_a_line_label_keeps_clear_of_the_steep_segment_beside_it(self):
         result = run_node(PRELUDE + """
+import { resolveStyle } from './skills/professional-slides/runtime/core.mjs';
+import { sceneDesignFindings } from './skills/professional-slides/runtime/validate-overlap.mjs';
 const props = { categories: ['2019','2020','2021','2022','2023','2024','1H2025'], secondaryAxis: true, dataLabels: true,
   series: [{ name: 'Cap rate', values: [3.98, 4.58, 4.56, 4.36, 5.24, 6.23, 6.62] }, { name: 'Price per unit', values: [758217, 490607, 452380, 525856, 510046, 441514, 441957] }],
   valueFormat: { decimals: 1, suffix: '%' }, secondaryValueFormat: { prefix: '$', compactUnit: 'k', decimals: 0 }, highlights: [], referenceLines: [], annotations: [] };
-const nodes = REGISTRY.get('chart.combo').render({ id: 'c', frame: { x: 0, y: 0, width: 760, height: 430 }, props }).nodes;
-const label = (c) => nodes.find((n) => n.role === 'data-label' && n.data?.series === 'Price per unit' && n.data.category === c).frame;
-const point = (c) => nodes.find((n) => n.role === 'chart-marker' && n.id === `c:point:price-per-unit:${c}`);
-console.log(JSON.stringify({ first: label('2019').y, second: label('2020').y, point2020: point('2020')?.frame?.y ?? null }));
+const nodes = REGISTRY.get('chart.combo').render({ id: 'c', frame: { x: 0, y: 0, width: 760, height: 430 }, props }).nodes.map((n) => ({ ...n, style: resolveStyle(n.style || {}) }));
+const labels = nodes.filter((n) => n.role === 'data-label' && n.data?.series === 'Price per unit').map((n) => n.data.category);
+const findings = sceneDesignFindings({ slides: [{ id: 's', nodes }] }).filter((f) => f.severity === 'blocker').map((f) => f.code);
+console.log(JSON.stringify({ labels, findings }));
 """)
-        # 2019 tops the line, so its label sits above; 2020 sits under the steep fall from it, so its label goes under the point.
-        self.assertIsNotNone(result["point2020"])
-        self.assertGreater(result["second"], result["point2020"])
+        # The fall from 2019 runs steeply into 2020: each price is set where its measured ink clears that segment, the
+        # columns' values and the markers (label-placement.mjs), and every one finds a place.
+        self.assertEqual(result["labels"], ["2019", "2020", "2021", "2022", "2023", "2024", "1H2025"])
+        self.assertEqual(result["findings"], [])

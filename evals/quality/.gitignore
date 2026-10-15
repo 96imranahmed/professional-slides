@@ -1,3 +1,0 @@
-runs/
-# The keys runs under way hold on a results file (lib.mjs claimRun).
-*.claims/

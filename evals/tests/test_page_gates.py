@@ -25,7 +25,6 @@ sys.path.insert(0, str(GATES))
 import page_gates  # noqa: E402
 
 from node_probe import requires_python_package, example_scene, example_scene_file  # noqa: E402
-from judgement_oracle import answering  # noqa: E402
 
 # The three gates that read the renders need Pillow (see requirements.txt).
 # Everything else in this file works off the scene.
@@ -49,25 +48,6 @@ def slides_with(report, code):
 # The synthetic fixtures below measure geometry and typography. Density is a
 # separate contract (see test_deck_shape.py), so these scenes switch its floors
 # off rather than padding a fixture page to 95 words.
-WEIGHT_OFF = {"pageWords": 0, "columnFill": 0, "plotSpan": 0, "pointWords": 0, "tableFill": 0, "elements": 1}
-
-
-class ChartDataTableNumbersTests(unittest.TestCase):
-    def test_a_charts_own_data_table_prints_its_numbers(self):
-        # The model page (page-types p20b) prints its twelve figures in the
-        # table under its columns and leaves the bars unlabelled, so each
-        # figure is printed once; NUMBERS_ON_MARKS read the bars alone and
-        # flagged a chart whose every value is on the page. Stripped of the
-        # table, the same twelve marks carry no figure and the gate fires.
-        scene = copy.deepcopy(example_scene("page-types"))
-        model = next(s for s in scene["slides"] if s["id"] == "p20b")
-        self.assertTrue(any((n.get("data") or {}).get("chartData") for n in model["nodes"]))
-        self.assertFalse(any(n.get("role") == "data-label" and any(c.isdigit() for c in str(n.get("text"))) for n in model["nodes"]))
-        report = page_gates.run_gates({**scene, "slides": [model]}, gates={"NUMBERS_ON_MARKS"})
-        self.assertNotIn("NUMBERS_ON_MARKS", codes(report))
-        bare = {**model, "nodes": [n for n in model["nodes"] if not (n.get("data") or {}).get("chartData")]}
-        report = page_gates.run_gates({**scene, "slides": [bare]}, gates={"NUMBERS_ON_MARKS"})
-        self.assertIn("NUMBERS_ON_MARKS", codes(report))
 
 
 class MetricColumnVoidTests(unittest.TestCase):
@@ -95,40 +75,6 @@ console.log(JSON.stringify(planDeck(toDeckPlan({schema:'professional-slides.deck
         self.assertEqual(sum(1 for n in slide["nodes"] if n.get("role") == "metric-surface"), 3, "each tile is filled")
         report = page_gates.run_gates(scene, gates={"SCENE_VOID"})
         self.assertNotIn("SCENE_VOID", codes(report))
-
-
-class EvidenceMultiplicityTests(unittest.TestCase):
-    def test_area_and_label_counts_preserve_review_findings_without_forcing_filler(self):
-        from test_deck_shape import page, deck
-        process = page(1, ['chevron-process'])
-        process['contentFrame'] = {'x': 60, 'y': 152, 'width': 1160, 'height': 516}
-        process['componentInstances'] = [{'component': 'chevron-process', 'frame':
-            {'x': 60, 'y': 294, 'width': 1160, 'height': 172}}]
-        chart = page(2, ['chart.line'])
-        report = page_gates.run_gates(deck([process, chart], fill='full'),
-            gates={'HERO_EXHIBIT', 'NUMBERS_ON_MARKS'})
-        self.assertTrue(report['accepted'])
-        self.assertTrue({'HERO_EXHIBIT', 'NUMBERS_ON_MARKS'} <= codes(report))
-        self.assertTrue(all(f['severity'] == 'advisory' for f in report['findings']))
-        # Typography remains an independent blocking contract.
-        invalid = good_slide()
-        invalid['nodes'][0]['style']['fontSize']['value'] = 100
-        report = page_gates.run_gates({'slides': [invalid]}, gates={'TYPE_RANGE'})
-        self.assertFalse(report['accepted'])
-
-    def test_summary_and_single_exhibit_counts_do_not_waive_missing_argument(self):
-        from test_deck_shape import page, deck
-        gates = {"THIN_EVIDENCE", "MISSING_ARGUMENT"}
-        summary = {**page(1, ['points']), 'role': 'executive-summary'}
-        bridge = page(2, ['chart.waterfall'])
-        report = page_gates.run_gates(deck([summary, bridge], fill='full'), gates=gates)
-        self.assertTrue(report['accepted'])
-        self.assertEqual([f['measured'] for f in report['findings']], [0, 1])
-        self.assertTrue(all(f['severity'] == 'advisory' for f in report['findings']))
-        empty_comparison = page(3, ['image-frame', 'image-frame'], photos=2, texts=['London', 'New York'])
-        report = page_gates.run_gates(deck([empty_comparison], fill='full'), gates=gates)
-        self.assertFalse(report['accepted'])
-        self.assertTrue(any(f['code'] == 'MISSING_ARGUMENT' and f['severity'] == 'blocker' for f in report['findings']))
 
 
 def good_slide():
@@ -191,59 +137,11 @@ def good_slide():
     }
 
 
-class SelectedSectionNavigationTests(unittest.TestCase):
-    def slides(self):
-        return [{"nodes": [{"type": "text", "role": "tracker-compact-label",
-                            "text": "Origins" if i < 6 else "Adaptations",
-                            "data": {"trackerId": "sections", "sectionId": "a" if i < 6 else "b", "selected": True}}]}
-                for i in range(12)]
-
-    def findings(self, slides):
-        findings = []
-        page_gates.gate_deck_structure(slides, list(range(len(slides))), findings)
-        return findings
-
-    def test_selected_sections_do_not_require_extra_divider_pages(self):
-        self.assertEqual(self.findings(self.slides()), [])
-
-    def test_opening_summary_does_not_select_a_body_section(self):
-        slides = [{"role": "executive-summary", "nodes": []}] + self.slides()
-        self.assertEqual(self.findings(slides), [])
-        slides[4]["nodes"] = []
-        self.assertTrue(self.findings(slides))
-
-    def test_pill_labels_supply_the_same_selected_navigation(self):
-        slides = self.slides()
-        for slide in slides:
-            slide["nodes"][0]["role"] = "tracker-pill-label"
-        self.assertEqual(self.findings(slides), [])
-        slides[3]["nodes"][0]["data"]["selected"] = False
-        self.assertTrue(self.findings(slides))
-
-    def test_missing_selected_page_still_fails(self):
-        slides = self.slides()
-        slides[3]["nodes"] = []
-        self.assertTrue(self.findings(slides))
-
-    def test_one_section_or_unselected_labels_do_not_supply_navigation(self):
-        for change in ({"sectionId": "a"}, {"selected": False}, {"trackerId": ""}):
-            with self.subTest(change=change):
-                slides = self.slides()
-                for slide in slides:
-                    slide["nodes"][0]["data"].update(change)
-                self.assertTrue(self.findings(slides))
-
-    def test_inconsistent_tracker_ids_do_not_form_one_navigation(self):
-        slides = self.slides()
-        slides[0]["nodes"][0]["data"]["trackerId"] = "other"
-        self.assertTrue(self.findings(slides))
-
-
 class SyntheticGoodPageTests(unittest.TestCase):
     def test_a_page_that_meets_every_threshold_produces_no_findings(self):
         scene = {"slides": [{"id": "s01", "nodes": [], "componentInstances": [
             {"id": "cover", "component": "cover", "frame": {"x": 0, "y": 0, "width": 1280, "height": 720}}]},
-            good_slide()], "weight": WEIGHT_OFF}
+            good_slide()]}
         report = page_gates.run_gates(scene, render_dir=None)
         self.assertEqual(report["findings"], [], json.dumps(report["findings"], indent=1))
         self.assertTrue(report["accepted"])
@@ -255,7 +153,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
         def scene_with(mutate):
             slide = copy.deepcopy(base)
             mutate(slide)
-            return {"slides": [slide], "weight": WEIGHT_OFF}
+            return {"slides": [slide]}
 
         def node(slide, node_id):
             return next(n for n in slide["nodes"] if n["id"] == node_id)
@@ -268,17 +166,7 @@ class SyntheticGoodPageTests(unittest.TestCase):
 
         cases = {
             "TITLE_LINES": lambda s: set_title(s, "a b", ["a", "b", "c"]),
-            "TITLE_WORDS": lambda s: set_title(s, " ".join(f"word{i}" for i in range(20))),
             "TYPE_RANGE": lambda s: node(s, "p")["style"].update({"fontSize": {"value": 18}}),
-            "CPL": lambda s: node(s, "p")["data"]["textLayout"].update(
-                {"lines": ["x" * 120, "y" * 110], "source": "x" * 120}),
-            "NICE_TICKS": lambda s: node(s, "a2")["data"]["textLayout"].update(
-                {"lines": ["14.025"], "source": "14.025"}),
-            "HERO_EXHIBIT": lambda s: s["componentInstances"][1]["frame"].update(
-                {"width": 300, "height": 200}),
-            "WORDS": lambda s: node(s, "p")["data"]["textLayout"].update(
-                {"source": " ".join(["evidence"] * 200),
-                 "lines": [" ".join(["evidence"] * 40)] * 5}),
         }
         for code, mutate in cases.items():
             with self.subTest(code=code):
@@ -310,123 +198,11 @@ class SyntheticGoodPageTests(unittest.TestCase):
         paragraph["data"]["textLayout"] = {"source": " ".join(lines), "lines": lines}
         # This fixture measures geometry, not density: the weight floors are
         # off so a deliberately minimal page does not trip them.
-        report = page_gates.run_gates({"slides": [slide], "weight": WEIGHT_OFF}, render_dir=None)
+        report = page_gates.run_gates({"slides": [slide]}, render_dir=None)
         self.assertTrue(report["accepted"], report["findings"])
 
 
-
-
-class TextPageInkFloorTests(unittest.TestCase):
-    """A page of type is held to the ink its own words produce.
-
-    `ink_min` is calibrated on pages with an exhibit: the careful sample's ink
-    first quartile is 0.121 over 137 analytical slides, and the balanced floor
-    of 0.115 sits just under it. A page of body type cannot reach that at any
-    honest length. Rendering text pages from 93 to 185 words gives a straight
-    line at 0.00052 ink per word, so 0.115 needs about 220 words of body against
-    a reference body of 128 - the floor was not a high bar for those pages, it
-    was an impossible one, and an executive summary of five findings, four
-    metrics and a takeaway measured 0.096 and was reported as "mostly empty".
-
-    The floor for those pages is now the ink their own `pageWords` produces, so
-    the two gates agree by construction and a genuinely thin text page still
-    fails both.
-    """
-
-    def test_the_floor_follows_the_deck_word_floor(self):
-        page_gates.configure("balanced")
-        floor = page_gates.text_page_ink_floor()
-        words = page_gates.WEIGHT["pageWords"]
-        self.assertAlmostEqual(floor, 0.00052 * 0.9 * words, places=6)
-        # Well under the exhibit floor, and reachable by a page at its word floor:
-        # 95 words measured 0.0556 against this.
-        self.assertLess(floor, page_gates.THRESHOLDS["ink_min"])
-        self.assertLess(floor, 0.0556)
-
-    def test_a_denser_deck_asks_a_text_page_for_more_ink(self):
-        page_gates.configure("full")
-        full = page_gates.text_page_ink_floor()
-        page_gates.configure("balanced")
-        balanced = page_gates.text_page_ink_floor()
-        self.assertGreater(full, balanced)
-
-    def test_a_text_page_at_its_word_floor_passes_and_a_thin_one_fails(self):
-        page_gates.configure("balanced")
-        floor = page_gates.text_page_ink_floor()
-        canvas = float(page_gates.CANVAS_W * page_gates.CANVAS_H)
-
-        def rows_for(fraction):
-            rows = [0] * page_gates.CANVAS_H
-            per = int(fraction * canvas) // page_gates.FOOTER_TOP
-            for y in range(page_gates.FOOTER_TOP):
-                rows[y] = per
-            return rows
-
-        # 0.0556 is what a rendered 95-word text page actually measured.
-        findings = []
-        page_gates.gate_ink_and_dead_band(2, rows_for(0.0556), findings, text_page=True)
-        self.assertNotIn("INK_COVERAGE", [f["code"] for f in findings])
-        # A third of the word floor is a page that asserts and does not show.
-        findings = []
-        page_gates.gate_ink_and_dead_band(2, rows_for(0.018), findings, text_page=True)
-        ink = [f for f in findings if f["code"] == "INK_COVERAGE"]
-        self.assertEqual(len(ink), 1)
-        self.assertAlmostEqual(ink[0]["threshold"], round(floor, 4), places=4)
-        self.assertIn("word floor", ink[0]["repair"])
-
-
-
-class ShapeConstraintTests(unittest.TestCase):
-    """PAGE_SHAPE_FLAT says which of the two causes it found.
-
-    A deck can be flat because its pages name an explicit `layout`, which is
-    fixable by deleting a line, or because its pages carry one exhibit and no
-    commentary, which leaves the composer one viable shape and is not a layout
-    problem at all. Told the wrong one, an author goes looking for a shape that
-    does not exist - the Marvel rebuild ran 23 of 31 pages that way.
-    """
-
-    def setUp(self):
-        self.scene = load_scene()
-
-    def test_a_closing_line_under_the_exhibit_is_not_commentary(self):
-        # Every shape has room for a full-width band at the foot, so a page
-        # with one exhibit and a so-what still has one shape to take.
-        exhibit = {"component": "chart.bar", "frame": {"x": 60, "y": 160, "width": 1160, "height": 380}}
-        under = {"component": "insight", "frame": {"x": 60, "y": 560, "width": 1160, "height": 60}}
-        beside = {"component": "bullet-list", "frame": {"x": 820, "y": 180, "width": 400, "height": 300}}
-        self.assertTrue(page_gates.shape_constrained({"componentInstances": [exhibit, under]}))
-        self.assertFalse(page_gates.shape_constrained({"componentInstances": [exhibit, beside]}))
-
-    def test_two_exhibits_are_never_constrained(self):
-        pair = [{"component": "chart.bar", "frame": {"x": 60, "y": 160, "width": 560, "height": 380}},
-                {"component": "chart.line", "frame": {"x": 660, "y": 160, "width": 560, "height": 380}}]
-        self.assertFalse(page_gates.shape_constrained({"componentInstances": pair}))
-
-    def test_the_finding_names_the_constrained_pages(self):
-        page_gates.configure("balanced")
-        exhibit = {"component": "table", "frame": {"x": 60, "y": 160, "width": 1160, "height": 380}}
-        flat = [{"componentInstances": [exhibit]} for _ in range(12)]
-        findings = []
-        page_gates.gate_page_shape_flat(flat, list(range(12)), findings, "balanced")
-        self.assertEqual(len(findings), 1)
-        measured = findings[0]["measured"]
-        self.assertEqual(len(measured["constrainedPages"]), 12)
-        self.assertIn("evidence relationship", findings[0]["repair"])
-        self.assertIn("adding boxes", findings[0]["repair"])
-
-
 class ProfileTests(unittest.TestCase):
-    def test_density_profiles_only_move_the_word_budget(self):
-        scene = load_scene()
-        counts = {}
-        for profile in ("live-pitch", "executive", "pre-read"):
-            report = page_gates.run_gates(scene, render_dir=None, profile=profile)
-            counts[profile] = report["countsByCode"]
-        self.assertGreater(counts["live-pitch"].get("WORDS", 0), counts["pre-read"].get("WORDS", 0))
-        for code in ("TYPE_RANGE", "CPL", "HERO_EXHIBIT"):
-            self.assertEqual(counts["live-pitch"].get(code), counts["pre-read"].get(code))
-
     def test_an_unknown_profile_is_refused(self):
         with self.assertRaises(ValueError):
             page_gates.run_gates({"slides": []}, profile="dense")
@@ -459,7 +235,7 @@ class CliTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             scene = Path(tmp) / "scene.json"
-            scene.write_text(json.dumps({"slides": [good_slide()], "weight": WEIGHT_OFF}))
+            scene.write_text(json.dumps({"slides": [good_slide()]}))
             result = subprocess.run(
                 [sys.executable, str(GATES / "page_gates.py"), str(scene)],
                 capture_output=True, text=True, cwd=str(ROOT))
@@ -467,118 +243,19 @@ class CliTests(unittest.TestCase):
 
 
 class FootnoteAndRenderTests(unittest.TestCase):
-    def test_density_footnotes_and_missing_renders(self):
-        """PR #4 review: footnotes were counted as page words, and a missing render was not reported."""
+    def test_footnote_type_and_missing_renders(self):
+        """PR #4 review: a missing render was not reported. A footnote set at body size is off its scale."""
         slide=good_slide()
         slide['componentInstances']=[{'component':'slide-chrome'}]
         paragraph=next(n for n in slide['nodes'] if n['id']=='p')
-        # 140 words: over `live-pitch` (127, the corpus p25) and under
-        # `pre-read` (282, the corpus p75). It was 110 against a bare ceiling of
-        # 100 - which sat below the corpus p25, so the gate taxed pages for
-        # carrying what the reference decks carry.
-        paragraph['data']['textLayout']['source']=' '.join(['word']*140)
-        paragraph['text']=paragraph['data']['textLayout']['source']
-        slide['density']='live-pitch'
-        self.assertIn('WORDS',page_gates.run_gates({'slides':[slide]},gates={'WORDS'})['countsByCode'])
-        self.assertNotIn('WORDS',page_gates.run_gates({'slides':[slide]},profile='pre-read',gates={'WORDS'})['countsByCode'])
         note=copy.deepcopy(paragraph);note['id']='note';note['role']='footnote-text'
         note['style']['fontSize']['value']=20
         slide['nodes']=[note]
-        report=page_gates.run_gates({'slides':[slide]},gates={'WORDS','TYPE_RANGE'})
-        self.assertNotIn('WORDS',report['countsByCode']);self.assertIn('TYPE_RANGE',report['countsByCode'])
-        # The lexical-hedge half of this test went with `HEDGED_TITLE`: it
-        # asserted that "Some growth creates value" hedges and "Awesome growth
-        # creates value" does not, which is a claim about two words rather than
-        # about whether a title commits to a finding.
+        self.assertIn('TYPE_RANGE',page_gates.run_gates({'slides':[slide]})['countsByCode'])
         slide=good_slide()
         with tempfile.TemporaryDirectory() as directory:
-            report=page_gates.run_gates({'slides':[slide,{'nodes':[],'componentInstances':[{'component':'cover'}]}]},directory,gates={'WORDS'})
+            report=page_gates.run_gates({'slides':[slide,{'nodes':[],'componentInstances':[{'component':'cover'}]}]},directory,gates={'MISSING_RENDER'})
             self.assertEqual(report['countsByCode']['MISSING_RENDER'],2)
-
-
-class CplTests(unittest.TestCase):
-    def test_cpl_reads_points_that_run_too_wide(self):
-        """Fifty-six-page re-author: points under a row of panels ran 150 characters a line and CPL passed them."""
-        wide = {"type": "text", "role": "list-item", "text": "x" * 140, "data": {"textLayout": {"lines": ["word " * 28]}}}
-        narrow_card = {"type": "text", "role": "list-item", "text": "a\nb", "data": {"textLayout": {"lines": ["A short", "bullet"]}}}
-        findings = []
-        page_gates.gate_cpl(1, {"nodes": [wide, narrow_card]}, findings)
-        self.assertEqual([f["code"] for f in findings], ["CPL"])
-        self.assertIn("columns", findings[0]["repair"])
-
-
-class RestatementGateTests(unittest.TestCase):
-    @staticmethod
-    def node(role, text):
-        return {"type": "text", "role": role, "text": text, "data": {"textLayout": {"lines": [text]}}}
-
-    def page(self, callout=None):
-        names = ["Europe", "East Asia & Australasia", "Americas", "West Asia & Indian Ocean", "Africa", "Middle East",
-                 "North Atlantic routes", "Southern Cone routes"]
-        nodes = [self.node("category-label", n) for n in names]
-        nodes += [self.node("panel-caption", "Europe and East Asia with Australasia earn 59% of revenue; the Middle East only 7%")]
-        if callout:
-            nodes.append(self.node("annotation-text", callout))
-        return {"nodes": nodes, "componentInstances": []}
-
-    def test_the_callouts_are_put_to_the_reader_apart_from_the_exhibit(self):
-        """Fifty-six-page re-author: naming a chart's members was read as restating it, by a share of shared words. The
-        reader is given the members, the callout and the caption apart, and judges whether the caption reads them back."""
-        with answering({"commentary-restates": "adds"}) as asked:
-            findings = []
-            page_gates.gate_restatement(1, self.page("Europe and East Asia earn 59% of all revenue"), findings)
-        self.assertEqual(findings, [])
-        [(_, subject)] = asked
-        self.assertIn("Africa", subject["exhibit"])
-        self.assertEqual(subject["callouts"], ["Europe and East Asia earn 59% of all revenue"])
-        self.assertNotIn("Europe and East Asia earn 59% of all revenue", subject["exhibit"])
-
-    def test_a_caption_that_repeats_the_callout_is_told_so(self):
-        """Fifty-six-page re-author: a caption became a restatement the moment a callout was added."""
-        slide = self.page()
-        slide["nodes"] += [self.node("annotation-text", "Premium cabins earn the widest yield on long routes"),
-                           self.node("annotation-text", "Cargo bellies lift network margin through the winter season")]
-        slide["nodes"] = [n for n in slide["nodes"] if n["role"] != "panel-caption"] + [
-            self.node("panel-caption", "Premium cabins earn the widest yield and cargo bellies lift winter margin")]
-        findings = []
-        with answering({"commentary-restates": {"verdict": "restates", "lines": ["c1"]}}):
-            page_gates.gate_restatement(1, slide, findings)
-        self.assertEqual([f["code"] for f in findings], ["RESTATEMENT"])
-        self.assertIn("callout", findings[0]["measured"])
-        self.assertIn("callout", findings[0]["repair"])
-
-
-class PlotSpanTests(unittest.TestCase):
-    # The span floor is the fill level's; another test's deck may have left
-    # the module configured for an airy deck, whose floor is off.
-    def setUp(self):
-        page_gates.configure()
-
-    def test_a_bar_panel_that_spends_its_width_on_names_and_values_passes(self):
-        """Fifty-six-page re-author: PLOT_SPAN failed a bar panel whose width went on its names."""
-        frame = {"x": 647, "y": 152, "width": 560, "height": 465}
-        marks = [{"role": "chart-mark", "frame": {"x": 900 - (40 if i == 2 else 0), "y": 250 + i * 57, "width": 40 if i == 2 else 20 + i * 25, "height": 40}} for i in range(6)]
-        names = [{"role": "category-label", "type": "text", "frame": {"x": 655, "y": 250 + i * 57, "width": 168, "height": 40}} for i in range(6)]
-        values = [{"role": "data-label", "type": "text", "frame": {"x": 1030, "y": 250 + i * 57, "width": 50, "height": 40}} for i in range(6)]
-        slide = {"componentInstances": [{"component": "chart.bar", "frame": frame}], "nodes": marks + names + values}
-        findings = []
-        page_gates.gate_plot_span(1, slide, findings)
-        self.assertEqual(findings, [])
-        # The bars alone would have been measured short.
-        findings = []
-        page_gates.gate_plot_span(1, dict(slide, nodes=marks), findings)
-        self.assertEqual([f["code"] for f in findings], ["PLOT_SPAN"])
-
-
-class DeckThinPagesTests(unittest.TestCase):
-    def test_a_deck_of_thin_pages_blocks(self):
-        """Emirates deck at 8/10: a deck of thin pages blocks, a few do not."""
-        findings = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 8)]
-        page_gates.gate_deck_empty_pages(list(range(20)), findings, rendered=True)
-        self.assertEqual(findings[-1]['code'], 'DECK_THIN_PAGES')
-        few = [page_gates.finding(n, 'THIN_PAGE', 60, 95, 'x') for n in range(2, 6)]
-        page_gates.gate_deck_empty_pages(list(range(20)), few, rendered=True)
-        self.assertNotIn('DECK_THIN_PAGES', [f['code'] for f in few])
 
 
 if __name__ == "__main__":

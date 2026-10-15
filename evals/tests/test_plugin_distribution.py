@@ -85,7 +85,7 @@ class PluginDistributionTests(unittest.TestCase):
 
     def test_no_manifest_claims_google_slides_output(self):
         # The runtime writes PPTX. Google Slides is an import the user verifies
-        # separately (references/tools/production.md), not an output format.
+        # separately (SKILL.md, Setup), not an output format.
         for name in MANIFESTS:
             data = json.loads((ROOT/name).read_text())
             with self.subTest(manifest=name):
@@ -128,6 +128,26 @@ class PluginDistributionTests(unittest.TestCase):
             self.assertEqual(set(files),{*MANIFESTS,'skills/demo/SKILL.md'})
             self.assertFalse((dest/'output').exists())
             packager.package(source,dest)
+
+    def test_a_file_removed_while_the_tree_is_packaged_is_left_out(self):
+        # The suite runs side by side: one test plants a stray file beside the examples and removes it while another
+        # packages the tree. A file listed and gone before it is copied was never part of the source.
+        with tempfile.TemporaryDirectory() as tmp:
+            source, dest = Path(tmp)/'source', Path(tmp)/'package'
+            for name in [*MANIFESTS, 'skills/demo/SKILL.md', 'skills/demo/examples/stray.json']:
+                p=source/name; p.parent.mkdir(parents=True,exist_ok=True);p.write_text('{}')
+            copy = packager.shutil.copyfile
+            def vanishing(src, dst, *args, **kwargs):
+                if Path(src).name == 'stray.json':
+                    Path(src).unlink()
+                return copy(src, dst, *args, **kwargs)
+            packager.shutil.copyfile = vanishing
+            try:
+                packager.package(source, dest)
+            finally:
+                packager.shutil.copyfile = copy
+            files = json.loads((dest/'package-manifest.json').read_text())['files']
+            self.assertEqual(set(files), {*MANIFESTS, 'skills/demo/SKILL.md'})
 
     def test_the_allowlist_admits_the_skill_and_refuses_what_only_the_suite_uses(self):
         ships = lambda rel: packager.shipped(packager.PurePosixPath(rel))
@@ -247,15 +267,15 @@ class ShippedPackageTests(RealPackage, unittest.TestCase):
                              cwd=self.dest, timeout=120, env={'PATH': '/usr/bin:/bin', 'PYTHONDONTWRITEBYTECODE': '1'})
         self.assertEqual(run.returncode, 0, run.stderr)
         result = json.loads(run.stdout)
-        # The page gates, the density profile and the shared word module need nothing outside the stdlib.
-        for rel in ('gates/page_gates.py', 'gates/gate_config.py', 'gates/text_stats.py', 'gates/density_profile.py',
+        # The page gates and the shared word module need nothing outside the stdlib.
+        for rel in ('gates/page_gates.py', 'gates/gate_config.py', 'gates/text_stats.py',
                     'gates/nice_ticks.py', 'emit/color.py'):
             self.assertIn(rel, result['loaded'])
         checkout = str((ROOT/'skills').resolve())
         self.assertEqual([f for f in result['files'] if f.startswith(checkout)], [],
                          'a shipped module imported a file from the checkout instead of the package')
         staged = [f for f in result['files'] if f.startswith(str(runtime.resolve()))]
-        for module in ('gate_config.py', 'render_gates.py', 'scene_gates.py', 'semantic_gates.py', 'deck_gates.py', 'text_stats.py'):
+        for module in ('gate_config.py', 'render_gates.py', 'scene_gates.py', 'text_stats.py'):
             self.assertTrue(any(f.endswith('/gates/' + module) for f in staged), module)
 
     def test_the_icon_is_sized_for_a_listing(self):

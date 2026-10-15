@@ -4,10 +4,14 @@ A run under an interpreter without python-pptx used to skip the export tests
 and still print OK. The runner now picks an interpreter that has the
 requirements, says which, and ends with every skip listed; --strict turns a
 skip into a failure, except the tests a user has to opt into (--slow).
+--fast leaves out the heavy classes a checked-in list names, and one run at a
+time holds the machine.
 """
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -74,6 +78,95 @@ console.log(JSON.stringify({loose,strict,optInOnly,failing}));
         self.assertIn("FAIL: c.T.test_y", result["failing"]["text"])
 
 
+class FastTierTests(unittest.TestCase):
+    """--fast leaves out the classes evals/heavy-tests.json lists, and nothing else.
+
+    The full suite spent most of its CPU in some sixty classes - property sweeps and end-to-end authoring runs - so a run to
+    iterate on leaves them out. The list is checked in and read by name, so a heavy class renamed or removed must not
+    quietly slip back into the fast tier, nor a stale entry hide that the tier has grown."""
+
+    def test_the_fast_tier_leaves_out_the_listed_classes_and_modules_and_keeps_the_rest(self):
+        result = run_node('''
+import {units,fastTier,heavyTests,parseArgs} from './evals/scripts/run_tests.mjs';
+const u=units(['test_pages_parts','test_run_tests']);
+console.log(JSON.stringify({u,fast:fastTier(u),byModule:fastTier(u,{test_pages_parts:'every class of the module'}),flag:parseArgs(['--fast']).fast,plain:parseArgs([]).fast,heavy:heavyTests()}));
+''')
+        self.assertTrue(result["flag"])
+        self.assertFalse(result["plain"], "the default stays the full suite")
+        listed = [unit for unit in result["u"] if unit in result["heavy"]]
+        self.assertIn("test_pages_parts.AuthoringFromPartsTests", listed)
+        self.assertEqual(result["fast"], [unit for unit in result["u"] if unit not in result["heavy"]])
+        self.assertIn("test_pages_parts.PagesFileTests", result["fast"])
+        self.assertIn("test_run_tests.FastTierTests", result["fast"])
+        self.assertEqual(result["byModule"], [unit for unit in result["u"] if not unit.startswith("test_pages_parts.")])
+
+    def test_every_heavy_entry_names_what_the_runner_schedules_and_says_why(self):
+        result = run_node('''
+import fs from 'node:fs';
+import {units,heavyTests} from './evals/scripts/run_tests.mjs';
+const modules=fs.readdirSync('./evals/tests').filter((f)=>/^test_.*\\.py$/.test(f)).map((f)=>f.replace(/\\.py$/,''));
+console.log(JSON.stringify({units:units(modules),modules,heavy:heavyTests()}));
+''')
+        known = set(result["units"]) | set(result["modules"])
+        self.assertEqual([key for key in result["heavy"] if key not in known], [], "heavy-tests.json names a class the runner does not schedule")
+        self.assertEqual([key for key, why in result["heavy"].items() if not str(why).strip()], [], "an entry says why it is heavy")
+
+
+class RunLockTests(unittest.TestCase):
+    """One suite at a time: two full suites run together each took twice as long, so a second run waits for the first.
+
+    A run killed before it removed its lock leaves its pid behind; that lock is taken over, or no run would start again."""
+
+    def setUp(self):
+        # A folder of this test's own, never the lock a real run takes.
+        self.folder = Path(tempfile.mkdtemp(prefix="run-lock-"))
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+
+    def test_a_lock_left_by_a_run_that_is_no_longer_running_is_taken_over(self):
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ spawnSync }} from 'node:child_process';
+import {{ takeLock }} from './evals/scripts/run_tests.mjs';
+const file = {json.dumps(str(self.folder / "suite.lock"))};
+// The pid of a process that has exited: what a killed run leaves in its lock.
+const dead = spawnSync(process.execPath, ['-e', '']).pid;
+fs.writeFileSync(file, `${{dead}}\\n`);
+const said = [];
+const release = await takeLock(file, {{ pid: 4242, say: (line) => said.push(line), poll: 20 }});
+const held = fs.readFileSync(file, 'utf8').trim();
+release();
+console.log(JSON.stringify({{ dead, said, held, left: fs.existsSync(file), files: fs.readdirSync({json.dumps(str(self.folder))}) }}));
+''')
+        self.assertEqual(result["held"], "4242")
+        self.assertEqual(len(result["said"]), 1)
+        self.assertIn(f"pid {result['dead']} is not running", result["said"][0])
+        self.assertFalse(result["left"], "the release removes the lock")
+        self.assertEqual(result["files"], [], "nothing is left beside it")
+
+    def test_a_second_run_waits_for_a_running_holder_saying_so_once(self):
+        result = run_node(f'''
+import fs from 'node:fs';
+import {{ takeLock }} from './evals/scripts/run_tests.mjs';
+const file = {json.dumps(str(self.folder / "suite.lock"))};
+const first = await takeLock(file, {{ pid: process.pid, say: () => {{}} }});
+const said = [];
+let second = null;
+const waiting = takeLock(file, {{ pid: 4243, say: (line) => said.push(line), poll: 20 }}).then((release) => {{ second = release; }});
+await new Promise((resolve) => setTimeout(resolve, 200));
+const waited = second === null, heldBy = fs.readFileSync(file, 'utf8').trim();
+first();
+await waiting;
+const then = fs.readFileSync(file, 'utf8').trim();
+second();
+console.log(JSON.stringify({{ waited, heldBy, then, said, pid: process.pid }}));
+''')
+        self.assertTrue(result["waited"], "the second run does not start while the first holds the lock")
+        self.assertEqual(result["heldBy"], str(result["pid"]))
+        self.assertEqual(result["then"], "4243", "and takes it when the first lets go")
+        self.assertEqual(len(result["said"]), 1, result["said"])
+        self.assertIn(f"Another test run (pid {result['pid']}) is running", result["said"][0])
+
+
 class RunnerCommandTests(unittest.TestCase):
     def run_runner(self, *args):
         env = {k: v for k, v in os.environ.items() if k != "PS_RESULT_FD"}
@@ -86,6 +179,17 @@ class RunnerCommandTests(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
         self.assertRegex(out.stdout, r"Ran \d+ tests from 1 modules in [\d.]+s across \d process")
         self.assertTrue(out.stdout.rstrip().endswith("OK") or "OK (" in out.stdout)
+
+    def test_fast_runs_a_module_without_its_heavy_classes_and_says_how_many_it_left_out(self):
+        if not NODE:
+            self.skipTest("Node.js is not available")
+        heavy = json.loads((ROOT / "evals" / "heavy-tests.json").read_text(encoding="utf-8"))["classes"]
+        out = self.run_runner("--fast", "--pattern", "test_pages_parts.py", "--verbose")
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        left = len([key for key in heavy if key.startswith("test_pages_parts.")])
+        self.assertIn(f"--fast: {left} heavy class{'' if left == 1 else 'es'} not run (evals/heavy-tests.json)", out.stdout)
+        self.assertIn("test_pages_parts.PagesFileTests", out.stderr)
+        self.assertNotIn("test_pages_parts.AuthoringFromPartsTests", out.stderr)
 
     def test_serial_is_one_process(self):
         if not NODE:

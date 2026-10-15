@@ -24,11 +24,67 @@ export function decimalsFor(props, value) {
     ...numbers(props?.items).map((item) => (Array.isArray(item?.values) ? item.values.at(-1) : item?.value)),
     ...numbers(props?.boxes).map((box) => box?.median),
   ].filter((entry) => Number.isFinite(entry));
-  const chart = all.length > 1
-    ? (Math.max(...all.map((entry) => Math.abs(entry))) >= 100 ? 0 : all.some((entry) => !Number.isInteger(entry)) ? 1 : 0)
-    : Number.isInteger(value) ? 0 : Math.abs(value) >= 10 ? 0 : 1;
-  return Math.max(chart, quotedDecimals(props, value));
+  // A label the page's copy quotes to more places raises the whole chart to them, not that one label: the BA retest's
+  // lollipop printed Air France's 1.58% as "1.6" beside BA's quoted "1.60", higher-looking yet lower, and its bridge
+  // printed its quoted ends to two places and its steps to one, so the steps did not add up to the ends.
+  if (Number.isInteger(props?.labelDecimals)) return props.labelDecimals;
+  return all.length > 1 ? chartDecimals(all, props?.quotedFigures) : Math.max(Number.isInteger(value) ? 0 : Math.abs(value) >= 10 ? 0 : 1, quotedDecimals(props, value));
 }
+
+/**
+ * The one precision a chart prints `values` to: a decimal while the largest is
+ * under a hundred and any needs one, whole numbers above that - raised to the
+ * places the page's copy quotes any of them to (`quoted`, figuresWithDecimals).
+ * The consistency gate reads a chart's labels by this same rule
+ * (gates/consistency_gates.mjs), so what it holds to one rounding is what the
+ * chart prints.
+ */
+export function chartDecimals(values, quoted = []) {
+  const all = values.filter((entry) => Number.isFinite(entry));
+  const chart = Math.max(...all.map((entry) => Math.abs(entry))) >= 100 ? 0 : all.some((entry) => !Number.isInteger(entry)) ? 1 : 0;
+  return Math.max(chart, ...all.map((entry) => quotedDecimals({ quotedFigures: quoted }, entry)));
+}
+
+/**
+ * The fewest places, from `least` up to six, at which a bridge's printed steps
+ * add up to its printed totals: `values` in order, `totals` the indexes that
+ * are levels rather than steps. Rounded on their own, 0.63 + 0.01 - 0.12 +
+ * 0.19 = 0.71 prints as 0.63, +0.0, -0.1, +0.2 and 0.71, which add to 0.73
+ * (the BA retest's unit-spread bridge). Null where no precision reconciles -
+ * the recorded steps themselves do not add up to the recorded totals.
+ */
+export function bridgeDecimals(values, totals = [], least = 0) {
+  const at = new Set(totals);
+  const adds = (decimals) => {
+    let level = 0;
+    return values.every((value, index) => {
+      const printed = roundHalfAway(value, decimals);
+      if (!at.has(index)) { level += printed; return true; }
+      const ok = index === 0 || Math.abs(level - printed) < 0.5 * 10 ** -(decimals + 3);
+      level = printed;
+      return ok;
+    });
+  };
+  for (let decimals = least; decimals <= 6; decimals += 1) if (adds(decimals)) return decimals;
+  return null;
+}
+
+/**
+ * A bridge's chart props with the one precision its labels print at: the
+ * chart's own (decimalsFor), raised to the fewest places at which its printed
+ * steps add up to its printed totals (bridgeDecimals). A declared
+ * `valueFormat` is the author's and is kept; a bridge it leaves unreconciled is
+ * refused at the check (gates/consistency_gates.mjs BRIDGE_UNRECONCILED).
+ */
+export function bridgeLabelProps(props) {
+  const values = Array.isArray(props?.values) ? props.values : [];
+  if (props?.valueFormat || values.length < 2) return props;
+  const decimals = bridgeDecimals(values, props.totals ?? [], decimalsFor({ ...props, labelDecimals: undefined }, values[0]));
+  return decimals === null ? props : { ...props, labelDecimals: decimals };
+}
+
+/** `value` rounded half away from zero at `decimals` places, on its decimal value, as formatValue prints it. */
+export const roundHalfAway = (value, decimals) => Math.sign(value) * Math.round(Math.abs(value) * 10 ** decimals + 1e-9) / 10 ** decimals;
 
 // The most places a label takes from the page's copy: "11.6" and "4.75" are
 // quoted to the precision a reader compares; a longer figure is a table's.

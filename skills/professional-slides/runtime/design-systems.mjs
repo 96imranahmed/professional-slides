@@ -121,17 +121,16 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   if (identity.accent !== undefined && !hex(identity.accent)) throw new Error("identity.accent must be a #RRGGBB colour");
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
-  // Emphasis is the subject's own colour. A chart marks the bar the title is
-  // about in `color.accent` and draws the rest in series 1, so series 1 is a
-  // dark neutral warmed by the brand, the accent is the brand colour, and the
-  // secondary colour is the second series - with the brand as series 1, every
-  // rival bar would take the brand colour and the subject a soft secondary.
+  // Emphasis is the subject's own colour. A highlighted bar or point takes `color.accent`, the primary made readable, among
+  // marks in series 1, so series 1 is the subject's second colour - its accent, or the primary lifted - then a neutral warmed
+  // by the brand, the primary paled, and the dark neutral last: with the dark neutral first, every plain bar in a subject's
+  // deck was near-black (palettes.mjs leadWithColour), and with the brand as series 1 every rival bar took the subject's colour.
   const base = mix("#3A3A3A", identity.primary, 0.08);
   return {
     "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
     "color.accent": primary, "color.accentTint": mix(identity.primary, canvas, 0.88),
-    "color.chartSeries1": base, "color.chartSeries2": rawAccent, "color.chartSeries3": mix(primary, "#FFFFFF", 0.45),
-    "color.chartSeries4": mix(base, "#FFFFFF", 0.45), "color.chartSeries5": "#8A8A8A", "color.chartSeries6": "#C9C9C9"
+    "color.chartSeries1": rawAccent, "color.chartSeries2": mix(base, "#FFFFFF", 0.45), "color.chartSeries3": mix(identity.primary, "#FFFFFF", 0.7),
+    "color.chartSeries4": "#C9C9C9", "color.chartSeries5": "#8A8A8A", "color.chartSeries6": base
   };
 }
 
@@ -167,25 +166,7 @@ export function seededRandom(seed) {
 }
 
 /**
- * Where one choice falls in a deck's draw: a number from 0 to 1 fixed by the
- * seed and what is being chosen - a page's id and the form or exhibit kind
- * put to it. It orders the choices a deck is free to make between forms that
- * carry a page's claim equally well (deck-structure.mjs allocateStructure, a
- * scaffold's form), and nothing else: a form that fits better is never passed
- * over for it. Keyed by the page, not its place, so a page added to a deck
- * leaves every other page's draw as it was.
- */
-export function drawRank(seed, ...what) {
-  let h = 2166136261;
-  for (const ch of `${seed}:choice:${what.join(":")}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  // The hash leaves a string's last characters - the form, which is all that differs between two choices for one page - in a
-  // few of its bits, so two forms would rank in one order under most seeds. The finaliser spreads them over all thirty-two.
-  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-/**
- * The page types each system is built from (references/theming.md#design-systems),
+ * The page types each system is built from (references/design-intake.md),
  * each as the author reads it (`say`) and, where the entry names forms of the
  * catalogue or exhibit kinds, as the plan reads it: the `forms`
  * (`<type>/<form>`) and `kinds` a deck that features the entry prefers among

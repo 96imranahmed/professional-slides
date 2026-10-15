@@ -110,7 +110,13 @@ def package(source: Path, destination: Path):
     for p, rel in sorted(files):
         dest = destination / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(p, dest)
+        # A file listed and then removed before it is copied - a local run's scratch beside the examples, a test's stray
+        # file cleaned up while the suite runs side by side - was never part of the source: it is left out, not a crash.
+        try:
+            shutil.copyfile(p, dest)
+        except FileNotFoundError:
+            files.remove((p, rel))
+            continue
         manifest[rel.as_posix()] = {'sha256': hashlib.sha256(dest.read_bytes()).hexdigest(), 'bytes': dest.stat().st_size}
     (destination / 'package-manifest.json').write_text(json.dumps({'schemaVersion': 1, 'files': manifest}, indent=2)+'\n')
     return {'files': len(files), 'bytes': sum(x['bytes'] for x in manifest.values()), 'path': str(destination)}

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from node_probe import NODE, ROOT, RUNTIME, run_node
 
-FIXTURES = ROOT / "evals" / "quality" / "fixtures" / "evidence"
+FIXTURES = ROOT / "evals" / "tests" / "fixtures" / "evidence"
 EXAMPLES = ROOT / "skills" / "professional-slides" / "examples"
 
 
@@ -30,7 +30,7 @@ class DeckKeyTests(unittest.TestCase):
         self.assertEqual(printed.returncode, 0, printed.stderr)
         schema = json.loads(printed.stdout)
         keys = schema["properties"]
-        for name in ("request", "answer", "players", "assets", "design", "variation", "density", "tracker", "contents", "cover", "footer", "template", "waivers", "evidenceScope", "noPictures"):
+        for name in ("audience", "readerKnows", "players", "assets", "design", "variation", "density", "tracker", "contents", "cover", "footer", "template"):
             with self.subTest(key=name):
                 self.assertIn(name, keys)
                 self.assertTrue(keys[name]["description"].strip())
@@ -41,17 +41,16 @@ class DeckKeyTests(unittest.TestCase):
         whole = json.loads(subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), "--schema"], capture_output=True, text=True).stdout)
         self.assertEqual(whole["properties"]["deck"]["properties"], keys)
 
-    def test_every_key_the_worked_decks_and_the_fixtures_use_is_listed(self):
+    def test_every_key_the_worked_decks_use_is_listed(self):
         # The table is the compile's, so a deck the repository ships cannot use a key it leaves out.
         result = run_node('''
 import { deckKeyProblems, deckSchema } from './skills/professional-slides/runtime/deck-keys.mjs';
 import fs from 'node:fs';
-const files = [...fs.readdirSync('./evals/quality/fixtures/evidence').filter((name) => name.endsWith('.pages.json')).map((name) => './evals/quality/fixtures/evidence/' + name),
-  './skills/professional-slides/examples/page-types.pages.json', './skills/professional-slides/examples/page-forms.pages.json'];
+const files = ['./skills/professional-slides/examples/page-types.pages.json', './skills/professional-slides/examples/page-forms.pages.json'];
 const decks = files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')).deck);
 console.log(JSON.stringify({ files: files.length, problems: decks.flatMap(deckKeyProblems), used: [...new Set(decks.flatMap(Object.keys))].filter((key) => !deckSchema().properties[key]) }));
 ''')
-        self.assertGreaterEqual(result["files"], 6)
+        self.assertEqual(result["files"], 2)
         self.assertEqual(result["problems"], [])
         self.assertEqual(result["used"], [])
 
@@ -62,13 +61,14 @@ import { compileDeck } from './skills/professional-slides/runtime/author-deck.mj
 const base = { schema: 'professional-slides.deck/v3', id: 'd', request: 'Compare the two options for the board' };
 const thrown = (deck) => { try { compileDeck({ deck: { ...base, ...deck }, pages: [] }, { partial: true }); return null; } catch (error) { return error.message; } };
 console.log(JSON.stringify({ clean: deckKeyProblems({ ...base, design: 'consulting', players: ['A', 'B'], tracker: false, contents: 'once', $note: 'a comment the author keeps' }),
-  typo: deckKeyProblems({ ...base, targetpages: 20, audiance: 'the board' }), unknown: deckKeyProblems({ ...base, storylineTemplate: 'competitive-position' }),
+  typo: deckKeyProblems({ ...base, readerknows: 'the source', audiance: 'the board' }), retired: deckKeyProblems({ ...base, answer: 'Option A', rulesVersion: 12, waivers: [] }), unknown: deckKeyProblems({ ...base, storylineTemplate: 'competitive-position' }),
   template: deckKeyProblems({ ...base, template: 'competitive-position' }), house: deckKeyProblems({ ...base, template: 'house.json' }),
   kind: deckKeyProblems({ ...base, players: 'A, B', cover: 'Title' }), compile: thrown({ template: 'competitive-position', sectons: 3 }), passes: thrown({ brief: 'Follows the competitive-position template' }) }));
 ''')
         self.assertEqual(result["clean"], [])
+        self.assertEqual(result["retired"], [])  # keys older pages files carry are read past
         self.assertEqual(len(result["typo"]), 2)
-        self.assertIn("did you mean `targetPages`", result["typo"][0])
+        self.assertIn("did you mean `readerKnows`", result["typo"][0])
         self.assertIn("did you mean `audience`", result["typo"][1])
         self.assertIn("--schema deck", result["typo"][0])
         self.assertEqual(len(result["unknown"]), 1)
@@ -94,7 +94,7 @@ console.log(JSON.stringify({ clean: deckKeyProblems({ ...base, design: 'consulti
         doc = json.loads((FIXTURES / "finance.pages.json").read_text())
         doc["deck"]["template"] = "decision-architecture"
         (tmp / "finance.pages.json").write_text(json.dumps(doc))
-        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "finance.pages.json"), "--draft"], capture_output=True, text=True)
+        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "finance.pages.json"), "--check"], capture_output=True, text=True)
         self.assertEqual(run.returncode, 2)
         self.assertIn("`template` on `deck` names a house profile `.json`", run.stderr)
         self.assertNotIn("    at ", run.stderr)   # a refusal, not a stack

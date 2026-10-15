@@ -197,11 +197,7 @@ console.log(JSON.stringify({
   period: focusFromTitle(years,'Revenue tripled after 2022').highlights ?? null,
   token: namedInTitle(['Direct consumer attention','Selected enterprise paid adoption','Coding monetization'],'OpenAI leads on consumer attention'),
   shared: namedInTitle(['Enterprise API','Enterprise seats','Consumer'],'Enterprise buyers pay first'),
-  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell'),
-  // The compile counts the mark the title names: a trend whose title names one of its lines is marked.
-  compile: await (async () => { const {scaffoldPage}=await import('./skills/professional-slides/runtime/author-deck.mjs'); const {compilePage}=await import('./skills/professional-slides/runtime/page-types.mjs');
-    const p=scaffoldPage('trend'), ex=p.exhibit, series=[{name:'Eastern',values:ex.series[0].values.map(v=>v/2)},{name:'Dales',values:ex.series[0].values.map(v=>v/3)}];
-    return ['Journeys grew fastest on the Eastern line','Journeys grew on both lines'].map((title)=>{ try { compilePage({...p,title,exhibit:{type:ex.type,heading:ex.heading,unit:ex.unit,categories:ex.categories,series}},0); return 'compiled'; } catch (e) { return /marks its finding on the plot/.test(e.message) ? 'unmarked' : 'other'; } }); })() }));
+  plural: namedInTitle(['Revenue','Cost','Margin'],'Revenue grew while costs fell') }));
 ''')
         self.assertEqual(result["series"], "Anthropic")
         self.assertIsNone(result["both"], "a title that names both compares them")
@@ -210,7 +206,6 @@ console.log(JSON.stringify({
         self.assertEqual(result["token"], "Direct consumer attention")
         self.assertIsNone(result["shared"], "a word two labels carry names neither")
         self.assertIsNone(result["plural"])
-        self.assertEqual(result["compile"], ["other", "unmarked"])
 
     def test_highlight_from_title_cagr_badge_range_and_value_table(self):
         result = run_node(r'''
@@ -453,7 +448,7 @@ import assert from 'node:assert/strict';
 import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const make=(heading)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'mixed',slides:[{id:'s',title:'Read quantities and permissions together',layout:'two-up',exhibits:[
- {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['Scope'],series:[{name:'Amount',values:[31]}]},
+ {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['First work','Later work'],series:[{name:'Amount',values:[31,215]}]},
  {type:'table',...(heading?{heading}:{}),columns:['Scope','Amount'],rows:[['First work','$31m'],['Later work','$215m']]}
 ]}]})).deck.slides[0];
 const plain=make();
@@ -611,6 +606,24 @@ console.log(JSON.stringify({ n: pages.length, id: pages[0]?.id, rows: pages[0]?.
         self.assertEqual(result['id'], 'picture-credits')
         self.assertEqual(result['rows'], [['Cover', 'Hub', 'A, CC BY-SA 4.0, via Wikimedia Commons'], ['{{page:fleet}}', 'Cabin', 'B, CC BY 4.0, via Wikimedia Commons']])
         self.assertEqual(result['none'], 0)
+
+    def test_credits_past_one_page_continue_on_the_next(self):
+        """BA retest: 13 credited pictures against the 12 rows the credits page holds drew PAGE_SPLITS on a page no
+        author wrote, and the render refuses a split page. The credits are the runtime's own list: they continue on a
+        second page of their own (picture-credits-2), carrying no `sourceSlideId`, so nothing reads them as one page cut."""
+        result = run_node('''
+import { composeDeck } from './evals/support/compose.mjs';
+const credited = Array.from({ length: 40 }, (_, i) => ({ alt: `Aircraft ${i + 1} at the gate of a long-haul hub`, path: `p${i}.jpg`,
+  credit: `Photo: Photographer number ${i + 1}, CC BY-SA 4.0, via Wikimedia Commons, from the airline fleet category` }));
+const deck = composeDeck({ schema: 'professional-slides.deck/v3', id: 'credits', contents: false, cover: { title: 'Credits', archive: credited },
+  slides: [{ id: 'one', title: 'One page that argues something about the fleet', points: ['The fleet is old.'] }] });
+const credits = deck.slides.filter((s) => /^picture-credits/.test(String(s.id)));
+console.log(JSON.stringify({ ids: credits.map((s) => s.id), cut: credits.filter((s) => s.sourceSlideId).length }));
+''')
+        self.assertGreater(len(result['ids']), 1, result)
+        self.assertEqual(result['ids'][0], 'picture-credits')
+        self.assertEqual(result['ids'][1], 'picture-credits-2')
+        self.assertEqual(result['cut'], 0)
 
 
 class RailWidthTests(unittest.TestCase):

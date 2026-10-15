@@ -8,7 +8,7 @@
 // evidence as data - `unit`, `population`, the `periods` or `members` it runs
 // over, and its `values` - so the runtime can compute with it (analysis.mjs)
 // and hold each exhibit to the measure it says it plots
-// (gates/dependency_gates.mjs).
+// (page-numbers.mjs).
 //
 //   "measures": {
 //     "cash":   { "unit": "GBP m", "population": "the subject", "periods": ["FY24", "FY25", "FY26"], "values": [42.9, 49.7, 54.9] },
@@ -34,11 +34,7 @@
 import path from "node:path";
 import { readJson } from "./cli.mjs";
 import { inside, notJson } from "./pages-file.mjs";
-import { SHAPES, breadthProblem } from "./evidence.mjs";
-import { textWords } from "./text-contract.mjs";
 
-// Shapes whose evidence is numbers: an insight of one of these records its measures.
-const MEASURED_SHAPES = Object.freeze(["series", "peer-set", "mix", "measure-pair", "bridge", "fact"]);
 const NAME = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 const POLARITIES = ["up", "down"];
 
@@ -68,6 +64,16 @@ export function isPercentUnit(unit) {
   return PERCENT_UNITS.get(key);
 }
 
+/**
+ * Is the measure a rank: recorded in a rank unit ("rank", "rank, 1 = best", a
+ * position) and not said to be better higher. A rank is a place, not an
+ * amount - 1 is the top, and a move from 13th to 23rd is a fall - so it plots
+ * on an axis with 1 at the top, and never as a bar, a column or a filled area,
+ * whose size would draw the worst place as the most (the BA retest's Skytrax
+ * and loyalty ranks, drawn the wrong way up). Read off the recorded unit and
+ * `better`, never the measure's name.
+ */
+export const isRankMeasure = (measure) => /^(rank|ranking|position)\b/.test(normalUnit(measure?.unit)) && measure?.better !== "up";
 
 /** Is the unit a bare ratio, fraction or multiple: a number that a hundred times over is a percentage. */
 export const isRatioUnit = (unit) => /^(ratio|fraction|proportion|multiple|times|x)\b/.test(normalUnit(unit));
@@ -85,34 +91,6 @@ function factorsOf(unit) {
   const [head, ...rest] = LEADING.test(text) ? ["", ...text.replace(LEADING, "").split(PER)] : text.split(PER);
   const num = head.split(/\s+x\s+/).map((f) => f.trim()).filter((f) => f && normalUnit(f) !== "ratio");
   return { num, den: [...rest.map((f) => f.trim()).filter(Boolean), ...den] };
-}
-
-/**
- * The unit of a product of measures over other measures, with what cancels
- * cancelled: clinics times (m per clinic) is m, x over x is a ratio.
- * `{ unit, simple, scale }`: `simple` is false where more than one factor is
- * left above or below the line - a unit nobody would say, which the caller
- * reports rather than prints as if it were one. With `fractions`, a
- * percentage is applied as the fraction it is (46% of 140 m is 64.4 m): it
- * leaves the unit, and `scale` is what the value is multiplied by.
- */
-export function composeUnit(multiplied, divided = [], { fractions = false } = {}) {
-  let num = [], den = [], scale = 1;
-  for (const [units, flip] of [[multiplied, false], [divided, true]]) for (const unit of units) {
-    const f = factorsOf(unit);
-    (flip ? den : num).push(...f.num);
-    (flip ? num : den).push(...f.den);
-  }
-  if (fractions) {
-    scale = 0.01 ** (num.filter(isPercentUnit).length - den.filter(isPercentUnit).length);
-    num = num.filter((f) => !isPercentUnit(f)); den = den.filter((f) => !isPercentUnit(f));
-  }
-  for (const f of [...num]) {
-    const i = den.findIndex((d) => normalUnit(d) === normalUnit(f));
-    if (i >= 0) { den.splice(i, 1); num.splice(num.indexOf(f), 1); }
-  }
-  const unit = !num.length && !den.length ? "ratio" : `${num.join(" x ")}${den.length ? `${num.length ? " " : ""}per ${den.join(" per ")}` : ""}`;
-  return { unit, simple: num.length <= 1 && den.length <= 1, scale };
 }
 
 /** The axis a measure runs over: its periods, its members, or neither (one value). */
@@ -161,7 +139,14 @@ export function measureProblems(insight) {
     // A measure may be cited on its own, where its insight draws on several sources and this number on one of them.
     for (const field of ["cite", "sources"]) if (m[field] !== undefined && !(Array.isArray(m[field]) && m[field].length && m[field].every((entry) => typeof entry === "string" && entry.trim())))
       problems.push(`${at}: \`${field}\` on a measure is a list of ${field === "cite" ? "keys of the pages file's `sources` registry" : "source files"} - the ones this number comes from, where the insight draws on more - or left out, and the insight's own apply`);
+    // Where each member or period of a measure comes from its own record - a ranking of groups, each from its own results -
+    // `citeBy` says which: the source line then names the one behind the number the title prints (page-numbers.mjs primaryCitations).
+    if (m.citeBy !== undefined && !(m.citeBy && typeof m.citeBy === "object" && !Array.isArray(m.citeBy) && Object.entries(m.citeBy).every(([label, keys]) => axis.labels.includes(label)
+      && Array.isArray(keys) && keys.length && keys.every((key) => typeof key === "string" && key.trim() && (m.cite ?? insight.cite ?? []).includes(key)))))
+      problems.push(`${at}: \`citeBy\` is { "<period or member>": ["<registry key>"] } - for a ${axis.kind === "periods" ? "period" : "member"} the measure records, the keys of its \`cite\` (or its insight's) that hold that value - or left out`);
     if (m.assumed !== undefined && m.assumed !== true) problems.push(`${at}: \`assumed\` is true for a number that is an assumption rather than a record, or left out`);
+    // A plan, a target, a forecast or an announced rate is published before the periods it is for (sources-registry.mjs sourceAgeProblems).
+    if (m.projected !== undefined && m.projected !== true) problems.push(`${at}: \`projected\` is true for values a source set out ahead of their periods - a plan, a target, a forecast, an announced rate - or left out`);
     if (m.assumed === true && (typeof m.rationale !== "string" || m.rationale.trim().split(/\s+/).length < 4)) problems.push(`${at}: an assumed measure says why that number in \`rationale\``);
     // A dated event the values turn on - a switch, a law, a launch - is recorded with them, where the critic reads it and the chart draws it.
     if (m.events !== undefined && (axis.kind !== "periods" || !m.events || typeof m.events !== "object" || Array.isArray(m.events)
@@ -172,15 +157,6 @@ export function measureProblems(insight) {
   }
   return problems;
 }
-
-/** The ids of the number-bearing insights that record no measures. */
-export function unmeasuredInsights(insights) {
-  return [...(insights?.values?.() ?? insights ?? [])].filter((item) => !item?.derived && MEASURED_SHAPES.includes(item?.shape) && SHAPES[item.shape]
-    && !(item.measures && typeof item.measures === "object" && Object.keys(item.measures).length)).map((item) => item.id ?? "?");
-}
-
-/** Does any insight of the log record measures: the log then holds every page to them. */
-export const hasMeasures = (insights) => [...(insights?.values?.() ?? insights ?? [])].some((item) => item?.measures && typeof item.measures === "object" && Object.keys(item.measures).length > 0);
 
 /**
  * Every measure of the insight log (and of the analyses computed from it, which
@@ -385,35 +361,12 @@ export async function readInsightLog(baseDir, stem) {
   return { ...log, insights, parts };
 }
 
-// How an insight is graded, and what makes a measurement a finding: one
-// definition, read wherever the insight log is read (insightLogRefusal) and
-// where the critic is shown it (storyline.mjs).
-const INSIGHT_STRENGTHS = Object.freeze(["strong", "supporting", "context"]);
-export function insightGradeProblems(item) {
-  const id = item?.id ?? "?";
-  return [...(INSIGHT_STRENGTHS.includes(item?.strength) ? [] : [`${id}: \`strength\` is one of ${INSIGHT_STRENGTHS.join(", ")}${item?.strength === undefined ? "" : ` (got ${JSON.stringify(item.strength)})`}`]),
-    ...(typeof item?.soWhat === "string" && textWords(item.soWhat) >= 4 ? [] : [`${id}: \`soWhat\` says what follows for the decision, in a sentence`])];
-}
-
 /**
  * Why a log's insights cannot be compiled over, as the message every command
- * that reads the log refuses with, or null: its measures are well formed, each
- * insight records the shape of its data and is graded, and no chart-bearing
- * shape is too narrow to carry a page. One function, so a log the analyses run
- * over (analysis.mjs) is a log the pages compile over (author-deck.mjs
- * readInsights): the first command to read a log says everything any later
- * one would refuse it for. Each kind of problem lists every insight that has it.
+ * that reads the log refuses with, or null: its measures are well formed.
+ * Every insight with a problem is listed at once.
  */
 export function insightLogRefusal(items) {
   const measured = items.flatMap(measureProblems);
-  if (measured.length) return `The insight log's measures are not valid:\n- ${measured.join("\n- ")}`;
-  const unshaped = items.filter((item) => !SHAPES[item.shape]).map((item) => item.id ?? "?");
-  if (unshaped.length) return `The insight log records no data shape for ${unshaped.join(", ")}: give each insight a \`shape\` - one of ${Object.keys(SHAPES).join(", ")} - so the pages can be checked against the evidence they rest on`;
-  const graded = items.flatMap(insightGradeProblems);
-  if (graded.length) return `The insight log's findings are not graded:\n- ${graded.join("\n- ")}`;
-  // A shape is only as good as its breadth: a four-year "series" or a three-member "peer set" becomes a chart page too thin
-  // to argue anything. Every narrow insight is named at once, before a page rests on it.
-  const narrow = items.map(breadthProblem).filter(Boolean);
-  if (narrow.length) return `The insight log's data is too narrow for ${narrow.length} insight${narrow.length === 1 ? "" : "s"}:\n- ${narrow.join("\n- ")}`;
-  return null;
+  return measured.length ? `The insight log's measures are not valid:\n- ${measured.join("\n- ")}` : null;
 }

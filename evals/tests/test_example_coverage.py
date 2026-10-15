@@ -43,6 +43,9 @@ FURNITURE = {
     # The panel of a `layout: "sidebar"` page, placed from `panel`; the gallery's
     # sidebar page exercises it.
     "side-statement",
+    # The fan or bracket between two panels, placed from a page's `breakout` or
+    # `spread`; the gallery's breakout page exercises it.
+    "exhibit-link",
 }
 
 

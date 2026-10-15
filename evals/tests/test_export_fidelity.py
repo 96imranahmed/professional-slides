@@ -137,6 +137,39 @@ console.log(JSON.stringify(planDeck(toDeckPlan(spec,'.')).deck));
             self.assertEqual(chart.plots[0].data_labels.number_format, "0.0")
 
 
+class ThousandsSeparatorTests(unittest.TestCase):
+    def test_a_label_drawn_without_a_separator_is_saved_without_one(self):
+        """`valueFormat: { decimals: 0 }` draws 5035 - a declared format groups only when it says `grouping` - and the
+        native chart grouped every chart past a thousand and printed 5,035. The content plan reads the drawn label, so
+        the saved page lost a planned block (TEXT_EXPORT_LOST, the BA deck's slot ranking). The native chart now prints
+        what the drawn one did, and a chart drawn with separators keeps them."""
+        result = run_node("""
+import { toDeckPlan } from './evals/support/compose.mjs';
+import { planDeck } from './skills/professional-slides/runtime/planner.mjs';
+const chart = (valueFormat) => { const spec = {schema:'professional-slides.deck/v3',id:'g',cover:{title:'x'},slides:[{title:'BA holds ten times the slots of the next airline',layout:'exhibit-full',
+  exhibit:{type:'chart.bar',heading:'Peak-week slots, summer 2020',categories:['British Airways','Lufthansa','Virgin Atlantic','Aer Lingus'],series:[{name:'Slots',values:[5035,496,380,326]}],...(valueFormat ? {valueFormat} : {})}}]};
+  const deck = planDeck(toDeckPlan(spec,'.')).deck, page = deck.slides.at(-1);
+  const native = page.componentInstances.find((c) => c.nativeChart)?.nativeChart ?? null;
+  return { deck, labels: page.nodes.filter((n) => n.role === 'data-label').map((n) => n.text), grouped: native ? (native.labelGrouped ?? null) : 'drawn' }; };
+const declared = chart({ decimals: 0 }), plain = chart(null);
+console.log(JSON.stringify({ declared: { labels: declared.labels, grouped: declared.grouped }, plain: { labels: plain.labels, grouped: plain.grouped }, scene: declared.deck }));
+""")
+        self.assertIn("5035", result["declared"]["labels"])
+        self.assertIs(result["declared"]["grouped"], False)
+        self.assertIn("5,035", result["plain"]["labels"])
+        self.assertIsNone(result["plain"]["grouped"])
+        try:
+            from pptx import Presentation  # noqa: E402
+        except ModuleNotFoundError:
+            self.skipTest("needs python-pptx (python3 -m pip install -r requirements.txt)")
+        with tempfile.TemporaryDirectory() as tmp:
+            scene_path, pptx_path = Path(tmp) / "scene.json", Path(tmp) / "g.pptx"
+            scene_path.write_text(json.dumps(result["scene"]))
+            subprocess.run([sys.executable, str(RUNTIME / "emit" / "emit_pptx.py"), str(scene_path), str(pptx_path)], check=True, capture_output=True)
+            chart = next(s.chart for s in Presentation(pptx_path).slides[-1].shapes if s.has_chart)
+            self.assertEqual(chart.plots[0].data_labels.number_format, "0")
+
+
 class ScatterAxisTests(unittest.TestCase):
     def test_a_scatter_names_both_axes_and_ticks_at_its_declared_step(self):
         # A scatter accepted xLabel, yLabel and xScale and drew none of them:
@@ -263,6 +296,66 @@ class HiddenSlideTests(unittest.TestCase):
             pages = json.loads(Path(result["pageText"]).read_text())
             self.assertEqual(len(pages), 4)
             self.assertIn("backup", pages[2])
+
+
+def text_deck(path, texts):
+    """A deck of one text box a slide, saved to `path`."""
+    from pptx import Presentation
+    from pptx.util import Inches
+    prs = Presentation()
+    for text in texts:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        slide.shapes.add_textbox(Inches(1), Inches(1), Inches(6), Inches(1)).text_frame.text = text
+    prs.save(str(path))
+    return path
+
+
+class IncrementalRenderTests(unittest.TestCase):
+    """A rebuild after copy fixes re-rendered every slide: on ba4 a fix round
+    touched five pages and all 102 went through LibreOffice. Each slide's render
+    is kept by a key read off the parts it is drawn from, and only the slides
+    whose key is new are rendered, as a sub-deck of the same file."""
+
+    def setUp(self):
+        sys.path.insert(0, str(EMIT))
+
+    def test_a_slides_key_moves_with_its_own_parts_and_the_shared_design_only(self):
+        import render_pptx
+        with tempfile.TemporaryDirectory() as tmp:
+            one = render_pptx.slide_keys(text_deck(Path(tmp) / "a.pptx", ["alpha", "beta", "gamma"]), 96)
+            two = render_pptx.slide_keys(text_deck(Path(tmp) / "b.pptx", ["alpha", "beta changed", "gamma"]), 96)
+            self.assertEqual(len(set(one)), 3)
+            self.assertEqual([a == b for a, b in zip(one, two)], [True, False, True])
+            # The canvas is in the key: a render at another size is another render.
+            self.assertNotEqual(render_pptx.slide_keys(Path(tmp) / "a.pptx", 192)[0], one[0])
+
+    def test_a_subdeck_keeps_the_chosen_slides_in_order_and_every_other_part(self):
+        import render_pptx
+        from pptx import Presentation
+        with tempfile.TemporaryDirectory() as tmp:
+            deck = text_deck(Path(tmp) / "deck.pptx", ["one", "two", "three", "four"])
+            sub = render_pptx.subdeck(deck, [1, 3], Path(tmp) / "sub.pptx")
+            self.assertEqual([s.shapes[0].text_frame.text for s in Presentation(str(sub)).slides], ["two", "four"])
+            self.assertEqual(render_pptx.slide_keys(sub, 96), [render_pptx.slide_keys(deck, 96)[i] for i in (1, 3)])
+
+    @unittest.skipUnless(HAS_RENDERER and HAS_PILLOW, "needs LibreOffice, poppler and Pillow")
+    def test_a_rebuild_renders_only_the_changed_slide_and_matches_a_whole_render(self):
+        import render_pptx
+        import numpy as np
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "rendered"
+            first = render_pptx.render(text_deck(Path(tmp) / "deck.pptx", ["one", "two", "three"]), out)
+            self.assertEqual(first["slides"], {"rendered": 3, "reused": 0})
+            (Path(tmp) / "fixed").mkdir()
+            fixed = text_deck(Path(tmp) / "fixed" / "deck.pptx", ["one", "two fixed", "three"])
+            second = render_pptx.render(fixed, out)
+            self.assertEqual(second["slides"], {"rendered": 1, "reused": 2})
+            whole = render_pptx.render(fixed, Path(tmp) / "whole", incremental=False)
+            for a, b in zip(second["renders"], whole["renders"]):
+                self.assertTrue(np.array_equal(np.asarray(Image.open(a)), np.asarray(Image.open(b))), a)
+            self.assertEqual(json.loads(Path(second["pageText"]).read_text()), json.loads(Path(whole["pageText"]).read_text()))
+            self.assertIn("two fixed", json.loads(Path(second["pageText"]).read_text())[1])
 
 
 class PictureRowTests(unittest.TestCase):

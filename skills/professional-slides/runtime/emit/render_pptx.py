@@ -9,6 +9,12 @@ sheets, from the slide PNGs already in out_dir, so a build can draw them while
 its gates read the pages. Prints JSON with the list of files. This is the only
 renderer; it runs anywhere LibreOffice does.
 
+out_dir/render-cache.json keys each slide's render on the parts it is drawn
+from (slide_keys). Rendered again into the same out_dir, only the slides with
+a new key go through LibreOffice, as a sub-deck of the same file; every PNG
+and PDF page of an unchanged slide is the last render's. The PDF, the PNGs and
+page-text.json are always the whole deck, in its order.
+
 Exit 0 when the deck rendered, 3 when LibreOffice or poppler is not installed
 (the JSON then carries `skipped: true`, what is missing and how to install
 it, so a build can finish unrendered and say so), 1 on a crash.
@@ -17,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -232,7 +239,165 @@ def slide_files(out_dir: Path) -> list:
     return sorted(files, key=lambda s: int(Path(s).stem.split("-")[1]))
 
 
-def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> dict:
+# Each slide's render is kept by what it is drawn from, so a rebuild after copy
+# fixes renders only the slides that changed. On ba4 a fix round touched a
+# handful of pages and every build sent all 102 slides through LibreOffice.
+RENDER_CACHE = "render-cache.json"
+RENDER_CACHE_SCHEMA = "professional-slides.render-cache/v1"
+# The parts every slide is drawn through - the masters, layouts and theme, the
+# embedded fonts, the table styles and the slide size: one changed, every
+# slide renders again.
+DESIGN_PART = re.compile(r"ppt/(slideMasters|slideLayouts|theme|fonts)/[^/]+|ppt/(presentation|presProps|tableStyles)\.xml")
+SLIDE_LIST = re.compile(rb"<(?:\w+:)?sldIdLst\b.*?</(?:\w+:)?sldIdLst>|<(?:\w+:)?sldIdLst\b[^>]*/>", re.S)
+REL = re.compile(rb"<Relationship\b[^>]*>")
+ATTR = re.compile(rb'(\w+)="([^"]*)"')
+# Past this share of changed slides a sub-deck saves too little to be worth a second document.
+SUBDECK_SHARE_MAX = 0.5
+
+
+def rels_of(z: zipfile.ZipFile, names: set, part: str) -> list:
+    """[(Id, Type, target part or None, TargetMode target)] of `part`'s relationships, in Id order."""
+    folder, base = part.rsplit("/", 1)
+    rels = f"{folder}/_rels/{base}.rels"
+    if rels not in names:
+        return []
+    out = []
+    for tag in REL.findall(z.read(rels)):
+        attrs = {k.decode(): v.decode() for k, v in ATTR.findall(tag)}
+        target = attrs.get("Target", "")
+        if attrs.get("TargetMode") == "External":
+            out.append((attrs.get("Id", ""), attrs.get("Type", ""), None, target))
+            continue
+        resolved = os.path.normpath(target.lstrip("/") if target.startswith("/") else f"{folder}/{target}").replace(os.sep, "/")
+        out.append((attrs.get("Id", ""), attrs.get("Type", ""), resolved, None))
+    return sorted(out)
+
+
+def slide_parts(z: zipfile.ZipFile, names: set) -> list:
+    """The deck's slide parts in show order (presentation.xml's sldIdLst)."""
+    by_id = {rid: target for rid, _, target, _ in rels_of(z, names, "ppt/presentation.xml")}
+    listed = SLIDE_LIST.search(z.read("ppt/presentation.xml"))
+    ids = re.findall(rb'r:id="([^"]+)"', listed.group(0)) if listed else []
+    return [by_id[rid.decode()] for rid in ids if rid.decode() in by_id]
+
+
+def slide_keys(pptx: Path, dpi: int) -> list:
+    """One key per slide, in show order: the slide's own XML, the bytes of every
+    part it links to (its pictures, charts and their workbooks, followed down),
+    the layout it names, the design parts every slide shares and the canvas.
+    It is read off the deck LibreOffice is given rather than the scene, so an
+    emitter change keys as surely as a copy change; a part's name is not in it
+    where its bytes are, so a picture renumbered by an earlier slide's change
+    does not count as a change to this one."""
+    with zipfile.ZipFile(pptx) as z:
+        names = set(z.namelist())
+        design = hashlib.sha256(f"{RENDER_CACHE_SCHEMA}|{dpi}".encode())
+        for name in sorted(n for n in names if DESIGN_PART.fullmatch(n)):
+            data = z.read(name)
+            design.update(name.encode() + b"\0" + (SLIDE_LIST.sub(b"", data) if name == "ppt/presentation.xml" else data))
+        shared = design.hexdigest()
+        memo = {}
+
+        def part_key(part, trail=()):
+            if part in memo:
+                return memo[part]
+            h = hashlib.sha256(z.read(part) if part in names else b"missing")
+            for rid, kind, target, external in rels_of(z, names, part):
+                if kind.endswith("/notesSlide") or kind.endswith("/slide"):
+                    continue
+                if target is None:
+                    h.update(f"|{rid}|{kind}|{external}".encode())
+                elif DESIGN_PART.fullmatch(target) or target in trail:
+                    h.update(f"|{rid}|{kind}|{target}".encode())
+                else:
+                    h.update(f"|{rid}|{kind}|".encode() + part_key(target, trail + (part,)).encode())
+            memo[part] = h.hexdigest()
+            return memo[part]
+
+        return [hashlib.sha256(f"{shared}|{part_key(part)}".encode()).hexdigest()[:32] for part in slide_parts(z, names)]
+
+
+def subdeck(pptx: Path, keep: list, out: Path) -> Path:
+    """`pptx` with only the slides at the 0-based positions `keep` in its show:
+    the slide list in presentation.xml cut, every other part as it is, so each
+    kept slide is drawn through the same masters, layouts, theme and fonts."""
+    with zipfile.ZipFile(pptx) as zin:
+        names = set(zin.namelist())
+        rid_of = {target: rid for rid, _, target, _ in rels_of(zin, names, "ppt/presentation.xml")}
+        wanted = {rid_of[part] for i, part in enumerate(slide_parts(zin, names)) if i in set(keep)}
+        presentation = zin.read("ppt/presentation.xml")
+
+        def cut(match):
+            whole = match.group(0)
+            head = re.match(rb"<((?:\w+:)?sldIdLst)\b[^>]*>", whole)
+            if whole.endswith(b"/>") and head.group(0) == whole:
+                return whole
+            entries = re.findall(rb"<(?:\w+:)?sldId\b[^>]*/>", whole)
+            kept = [e for e in entries if re.search(rb'r:id="([^"]+)"', e).group(1).decode() in wanted]
+            return head.group(0) + b"".join(kept) + b"</" + head.group(1) + b">"
+        cut_xml = SLIDE_LIST.sub(cut, presentation, count=1)
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                zout.writestr(item, cut_xml if item.filename == "ppt/presentation.xml" else zin.read(item.filename))
+    return out
+
+
+def held_renders(out_dir: Path, dpi: int) -> dict:
+    """{key: (png, pdf, page index)} the last render in `out_dir` left, where its PDF and every PNG are still there."""
+    try:
+        cache = json.loads((out_dir / RENDER_CACHE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(cache, dict) or cache.get("schema") != RENDER_CACHE_SCHEMA or cache.get("dpi") != dpi:
+        return {}
+    pdf = out_dir / str(cache.get("pdf", ""))
+    keys = cache.get("keys") or []
+    if not pdf.is_file() or not all((out_dir / f"slide-{i + 1}.png").is_file() for i in range(len(keys))):
+        return {}
+    return {key: (out_dir / f"slide-{i + 1}.png", pdf, i) for i, key in enumerate(keys) if isinstance(key, str)}
+
+
+def render_changed(deck: Path, keys: list, held: dict, out_dir: Path, saved_pdf: Path, dpi: int, td: Path) -> dict | None:
+    """Render only the slides whose key the last render does not hold, as a
+    sub-deck of the same file, and splice: each PNG and PDF page of an unchanged
+    slide is the last render's, by its key. None where a whole render is the
+    cheaper one (most slides changed, or nothing is held)."""
+    changed = [i for i, key in enumerate(keys) if key not in held]
+    if not held or len(changed) > SUBDECK_SHARE_MAX * len(keys):
+        return None
+    from pypdf import PdfReader, PdfWriter
+    fresh_dir = td / "fresh"
+    fresh_dir.mkdir()
+    fresh_pdf = None
+    if changed:
+        fresh_pdf = to_pdf(subdeck(deck, changed, td / f"changed-{deck.name}"), td)
+        rasterise(fresh_pdf, fresh_dir, dpi)
+        slide_files(fresh_dir)
+    stage = td / "stage"
+    stage.mkdir()
+    writer, readers = PdfWriter(), {}
+    reader = lambda path: readers.setdefault(path, PdfReader(path))  # noqa: E731
+    at = {i: n for n, i in enumerate(changed)}
+    for i, key in enumerate(keys):
+        if i in at:
+            shutil.copyfile(fresh_dir / f"slide-{at[i] + 1}.png", stage / f"slide-{i + 1}.png")
+            writer.add_page(reader(fresh_pdf).pages[at[i]])
+        else:
+            png, pdf, page = held[key]
+            shutil.copyfile(png, stage / f"slide-{i + 1}.png")
+            writer.add_page(reader(pdf).pages[page])
+    spliced = td / "spliced.pdf"
+    with open(spliced, "wb") as handle:
+        writer.write(handle)
+    for old in out_dir.glob("slide-*.png"):
+        old.unlink()
+    for png in stage.glob("slide-*.png"):
+        shutil.move(str(png), out_dir / png.name)
+    shutil.copyfile(spliced, saved_pdf)
+    return {"rendered": len(changed), "reused": len(keys) - len(changed)}
+
+
+def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False, incremental: bool = True) -> dict:
     missing = missing_tools()
     if missing:
         return {"pptx": str(pptx), "skipped": True, "missing": sorted(missing), "install": list(missing.values()),
@@ -240,15 +405,21 @@ def render(pptx: Path, out_dir: Path, dpi: int = 96, montage: bool = False) -> d
                            "until then the pixel gates and the review sheets are skipped.".format(
                                " and ".join(sorted(missing)), "; ".join(missing.values()))}
     out_dir.mkdir(parents=True, exist_ok=True)
+    saved_pdf = out_dir / (pptx.stem + ".pdf")
     with tempfile.TemporaryDirectory() as td:
-        pdf = to_pdf(shown(pptx, Path(td) / "shown"), Path(td))
-        saved_pdf = out_dir / (pptx.stem + ".pdf")
-        shutil.copyfile(pdf, saved_pdf)
-        for old in out_dir.glob("slide-*.png"):
-            old.unlink()
-        rasterise(pdf, out_dir, dpi)
+        deck = shown(pptx, Path(td) / "shown")
+        keys = slide_keys(deck, dpi)
+        spliced = render_changed(deck, keys, held_renders(out_dir, dpi), out_dir, saved_pdf, dpi, Path(td)) if incremental else None
+        if spliced is None:
+            pdf = to_pdf(deck, Path(td))
+            shutil.copyfile(pdf, saved_pdf)
+            for old in out_dir.glob("slide-*.png"):
+                old.unlink()
+            rasterise(pdf, out_dir, dpi)
         files = slide_files(out_dir)
-    result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "size": list(canvas_size(dpi)), "renderer": "libreoffice"}
+    (out_dir / RENDER_CACHE).write_text(json.dumps({"schema": RENDER_CACHE_SCHEMA, "dpi": dpi, "pdf": saved_pdf.name, "keys": keys}))
+    result = {"pptx": str(pptx), "pdf": str(saved_pdf), "renders": files, "dpi": dpi, "size": list(canvas_size(dpi)), "renderer": "libreoffice",
+              "slides": spliced or {"rendered": len(keys), "reused": 0}}
     text_path = out_dir / "page-text.json"
     text_path.write_text(json.dumps(page_texts(saved_pdf), ensure_ascii=False))
     result["pageText"] = str(text_path)

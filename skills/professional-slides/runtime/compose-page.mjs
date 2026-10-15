@@ -4,13 +4,14 @@
 // fixed shapes (`KINDS`), and an analytical page takes the layout chosen for it
 // (compose-layouts.mjs) built from the arrangements (compose-arrangements.mjs).
 import { SIZE, HUG, LAYOUT } from "./compose-body.mjs";
+import { GROUNDS as GROUND_TONES } from "./palettes.mjs";
 import { imageProps, normalizePictures, sourcedPicture } from "./compose-pictures.mjs";
-import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem, itemsRelation } from "./compose-points.mjs";
+import { proseOf, bridgeVariant, resolvePointsStyle, pointsItem, sideTreatment, soWhatItem } from "./compose-points.mjs";
 import { metricsStrip, metricsBesideExhibit } from "./compose-metrics.mjs";
 import { SLIDE_PASSES } from "./compose-passes.mjs";
 import { chooseLayout } from "./compose-layouts.mjs";
 import { peerExhibitsRow, exhibitOverCommentary, labelledRows, centredCards, centredFigure, exhibitBesideCommentary, figureWithPoints,
-  fullWidthExhibit, tableHalves, heroNumber, splitTone, exhibitStack, exhibitGrid } from "./compose-arrangements.mjs";
+  fullWidthExhibit, tableHalves, heroNumber, splitTone, exhibitStack, exhibitGrid, exhibitDashboard } from "./compose-arrangements.mjs";
 import { picturesAcross, pictureHero, photoBackdrop } from "./compose-picture-pages.mjs";
 import { sidebarPage, textPage } from "./compose-text-pages.mjs";
 
@@ -38,11 +39,16 @@ export const SLIDE_KEYS = Object.freeze({
   kind: "statement, takeaways, section, agenda or cover; absent means an analytical page",
   shape: "one of the four heavy-page shapes: findings-matrix, measure-table, model-page, half-and-half",
   layout: "force a layout instead of letting the composer choose one",
-  arrange: "row, stack, grid or sequence (a row joined by arrows), when the page carries more than one exhibit",
+  arrange: "row, stack, grid, sequence (a row joined by arrows), breakout (an overview and the detail of one mark) or dashboard (a grid of areas), when the page carries more than one exhibit",
+  grid: "on a dashboard, its column and row tracks and each exhibit's area on them",
+  breakout: "on a breakout, the overview's mark ({ from: { exhibit, category, series }, to }) fanned out to the panel that splits it",
+  spread: "on a row of panels, the gap between a mark in one and a mark in a later one ({ from, to, label }), bracketed and named",
   density: "this page's density profile, overriding the deck's",
   // the title band
   title: "the action title: the finding, not the subject",
   titleLead: "a lead-in phrase set before the title in the accent",
+  titlePlacement: "side sets the title in a dark panel down the left, the body beside it; top (the default) runs it across the page",
+  titleNumeral: "on a side title, the finding's figure set large over it (\"47%\")",
   highlight: "the phrase the reader should see first, set in the accent wherever the page says it",
   subtitle: "the standfirst under the title: the measure, the population and the period",
   kicker: "the small label above the title naming the part of the argument",
@@ -94,10 +100,11 @@ export const SLIDE_KEYS = Object.freeze({
   notes: "the speaker notes, which print in the file and never on the page",
   hidden: "true keeps the slide in the file but out of the slide show (PowerPoint's Hide Slide); it is still rendered and reviewed. An imported hidden slide carries it",
   // the rest
+  subject: "the declared player this page is about, drawn in the accent wherever its charts plot it; the compile writes it from `deck.conventions` (its section's subject, else the deck's) where the page names none",
   sourceSlide: "on a revision's section or agenda page, the imported slide it stands for (a typed page keeps its own in `pageType`); never drawn",
   serves: "which ranked criteria this page answers",
   pageType: "the page type and choices the page was compiled from (author-deck.mjs); the build checks the structure still matches",
-  tone: "dark or light, on the fixed-shape pages",
+  tone: "the page's ground: dark (the house's own dark) or primary (a field of its primary) on an analytical page, light to keep it on the light page in a dark deck; on a statement dark, light or primary, on takeaways dark or light",
   accent: "an accent phrase inside a statement",
   style: "a per-kind style switch (an agenda in columns, say)",
   stackWeights: "the height shares of stacked exhibits",
@@ -123,6 +130,19 @@ function assertKnownSlideKeys(slide, id) {
 }
 
 /**
+ * The page's `tone`, held to the grounds a page of its kind is drawn on (`allowed`).
+ * Each was read only where it meant something and passed over in silence
+ * elsewhere: a divider given a tone, or an analytical page given one the
+ * runtime had no ground for, drew as if it had none.
+ */
+function fixedTone(slide, id, allowed) {
+  if (slide.tone === undefined) return undefined;
+  if (!allowed.length) throw new Error(`${id}: a ${slide.kind} page takes no \`tone\` - it is drawn on the design system's own ground for it, on the deck's \`tone\``);
+  if (!allowed.includes(slide.tone)) throw new Error(`${id}: \`tone\` on a ${slide.kind ?? "content"} page is ${allowed.map((t) => `"${t}"`).join(", ")}; it was given ${JSON.stringify(slide.tone)}`);
+  return slide.tone;
+}
+
+/**
  * The four pages that are not analytical pages.
  *
  * Each is a fixed shape with no layout to negotiate, so each is one function
@@ -131,19 +151,22 @@ function assertKnownSlideKeys(slide, id) {
  * `chrome` carries.
  */
 const KINDS = {
-  statement: (slide, { id }) => ({ kind: "statement", text: slide.text || slide.title,
+  // The page is its one sentence: an exhibit written with it was dropped without a word, so it is refused.
+  statement: (slide, { id }) => (slide.exhibit || (slide.exhibits || []).length ? (() => { throw new Error(`${id}: a statement page is its one sentence and draws no exhibit - set the evidence on its own page, or put a photograph behind the sentence as \`image\``); })() : { kind: "statement", text: slide.text || slide.title,
     ...(slide.accent ? { accent: slide.accent } : {}),
     ...(slide.subtext ? { subtext: slide.subtext } : {}),
-    ...(slide.tone === "dark" ? { mode: "dark" } : {}) }),
-  takeaways: (slide) => ({ kind: "takeaways",
+    // Dark paints the statement's own navy surface; light and primary set the sentence on that ground.
+    ...(fixedTone(slide, id, ["dark", "light", "primary"]) === "dark" ? { mode: "dark" } : slide.tone ? { ground: slide.tone } : {}) }),
+  takeaways: (slide, { id }) => ({ kind: "takeaways",
     ...(slide.title ? { title: slide.title } : {}),
     items: slide.points || slide.items,
-    ...(slide.tone === "light" ? { mode: "light" } : {}) }),
-  section: (slide) => ({ kind: "divider", title: slide.title,
+    ...(fixedTone(slide, id, ["dark", "light"]) === "light" ? { mode: "light", ground: "light" } : {}) }),
+  // A divider's ground is the design system's (a navy panel, a field of the primary, the page) on the deck's own ground.
+  section: (slide, { id }) => ({ kind: "divider", title: slide.title, ...(fixedTone(slide, id, []) ?? {}),
     ...(slide.summary ? { subtitle: slide.summary } : {}),
     ...(Array.isArray(slide.contents) ? { contents: slide.contents, contentsActive: slide.contentsActive } : {}),
     ...(slide.number !== undefined ? { number: slide.number } : {}) }),
-  agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column",
+  agenda: (slide, { id }) => ({ title: slide.title || "Contents", layout: "flow.column", ...(fixedTone(slide, id, ["dark", "light"]) ? { ground: slide.tone } : {}),
     items: [{ id: `${id}-agenda`, component: "agenda", props: { items: slide.items,
       ...(slide.active !== undefined ? { active: slide.active } : {}),
       ...(slide.style === "columns" ? { variant: "columns" } : {}) }, size: SIZE }] }),
@@ -160,10 +183,10 @@ const KINDS = {
  *
  * A message that already names its page keeps its own wording.
  */
-export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
+export function composeSlide(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = [], deck = {}) {
   const id = slide?.id || `s${String(index + 1).padStart(2, "0")}`;
   try {
-    return composePage(slide, index, baseDir, fill, elements, recent, recentStyles);
+    return composePage(slide, index, baseDir, fill, elements, recent, recentStyles, deck);
   } catch (error) {
     if (!(error instanceof Error) || error.composedPage) throw error;
     const title = typeof slide?.title === "string" && slide.title.trim() ? ` ("${slide.title.trim()}")` : "";
@@ -181,10 +204,11 @@ export function composeSlide(slide, index, baseDir, fill = "balanced", elements 
  * and an analytical page runs the remaining passes, takes the layout chosen
  * for it, and is arranged, closed and given its footer in that order.
  */
-function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = []) {
+function composePage(slide, index, baseDir, fill = "balanced", elements = 1, recent = [], recentStyles = [], deck = {}) {
   const id = slide.id || `s${String(index + 1).padStart(2, "0")}`;
   assertKnownSlideKeys(slide, id);
-  const ctx = { id, baseDir, fill };
+  // `deck`: what the deck holds across its pages - its conventions and the players they name (conventions.mjs).
+  const ctx = { id, baseDir, fill, conventions: deck.conventions ?? null, players: deck.players ?? null };
 
   // The first three passes run for every page; the fixed-shape pages then take
   // their own route and the rest go on through the pipeline.
@@ -200,9 +224,16 @@ function composePage(slide, index, baseDir, fill = "balanced", elements = 1, rec
   const items = [];
   const { metricsBelow, metricsBeside } = measuresOverPage(items, { id, slide, layout, exhibits });
   const pointsPlaced = arrangePage(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures, metricsBeside });
+  // A page photograph is drawn where its layout keeps a place for it - a strip beside the copy, a picture page's hero or
+  // backdrop - and was dropped unseen anywhere else.
+  if (slide.photo && !placesItem(items, (itemId) => itemId === `${id}-photo` || itemId === `${id}-backdrop`))
+    throw new Error(`${id}: \`photo\` is set as a strip beside the copy, and this ${layout} page keeps no place for it - choose commentary "beside" or "beside-left" so the page has a column beside the exhibit, or make the picture the page's subject (a picture page, or a \`pictures\` entry)`);
   closePage(items, { id, slide, layout, fill, pointsStyle, metricsBelow, pointsPlaced });
   return pageRecord(items, { id, slide, slideIn });
 }
+
+/** Whether an item whose id passes `match` is anywhere in the layout tree. */
+const placesItem = (items, match) => items.some((item) => item && (match(String(item.id ?? "")) || placesItem(item.items || [], match)));
 
 /** The passes after the first three, with the standfirst read off first; returns the slide they produce and the slide they started from. */
 function analyticalPasses(slide, id, ctx) {
@@ -226,16 +257,6 @@ function analyticalPasses(slide, id, ctx) {
   return { slide, slideIn };
 }
 
-// The tone a set of cards with no icon takes from how its cards relate (itemsRelation): parallel categories, or alternatives,
-// each under a band naming it; a sequence under large numerals; a ranking or a counted set numbered. A tone the author gave,
-// an icon to draw or a question not yet answered leaves the cards as written (numbered, the renderer's default).
-const CARD_TONE_BY_RELATION = Object.freeze({ parallel: "header", alternatives: "header", sequence: "big-number", ranked: "numbered", counted: "numbered" });
-function withCardTone(ex, title) {
-  if (ex?.type !== "cards" || ex.tone !== undefined || (ex.items || []).some((item) => item?.icon || item?.logo || item?.value)) return ex;
-  const tone = CARD_TONE_BY_RELATION[itemsRelation(title, (ex.items || []).map((item) => item?.title), { least: 2 })];
-  return tone ? { ...ex, tone } : ex;
-}
-
 /** The page's pictures, its layout (recorded in `recent`), its points style (recorded in `recentStyles`) and its exhibits. */
 function pagePlan(slide, id, recent, recentStyles) {
   const pictures = normalizePictures(slide, id);
@@ -247,7 +268,7 @@ function pagePlan(slide, id, recent, recentStyles) {
   const columnPoints = slide.points;
   const pointsStyle = columnPoints?.length ? resolvePointsStyle(slide, columnPoints) : null;
   if (pointsStyle && Array.isArray(recentStyles)) recentStyles.unshift(pointsStyle);
-  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))].map((ex) => withCardTone(ex, slide.title));
+  const exhibits = [...(slide.exhibits || (slide.exhibit ? [slide.exhibit] : []))];
   // A lone table whose density the composer chose (a findings matrix defaults
   // to compact, pagination picks the lightest step its estimate fits) may be
   // set a type step up when its frame holds it (`fillDensity` in tables.mjs).
@@ -300,6 +321,8 @@ function arrangePage(items, page) {
   const fullWidth = layout === "exhibit-full" || layout === "metrics-over-exhibit";
   if (fullWidth && (centredCards(exhibits[0]) || centredFigure(exhibits[0]))) return figureWithPoints(items, page);
   if (fullWidth) fullWidthExhibit(items, page);
+  // A table in halves with points sets them in columns under the panels, as the page with one table over its points does.
+  else if (layout === "table-halves" && slide.points?.length) { exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves: true }); return true; }
   else if (layout === "table-halves") tableHalves(items, page);
   else if (layout === "exhibit-left" || layout === "exhibit-right") exhibitBesideCommentary(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle });
   else if (layout === "exhibit-top") exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
@@ -307,7 +330,8 @@ function arrangePage(items, page) {
   else if (layout === "split-tone") splitTone(items, page);
   else if (layout === "stack") exhibitStack(items, page);
   else if (layout === "grid") exhibitGrid(items, page);
-  else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence") peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
+  else if (layout === "dashboard") exhibitDashboard(items, page);
+  else if (layout === "two-up" || layout === "two-up-contrast" || layout === "sequence" || layout === "breakout") peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, fill, pointsStyle, pictures });
   else if (layout === "labelled-rows") labelledRows(items, { id, slide, baseDir, fill });
   else if (layout === "picture-pair" || layout === "picture-strip") picturesAcross(items, page);
   else if (layout === "picture-hero") pictureHero(items, page);
@@ -356,5 +380,5 @@ function pageRecord(items, { id, slide, slideIn }) {
   const noteLine = Array.isArray(slide.note)
     ? (slide.note.length ? `Notes: ${slide.note.map((item, index) => `${index + 1}. ${String(item).trim().replace(/^\d+\.\s*/, "")}`).join("   ")}` : null)
     : prefixed("Note", slide.note);
-  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
+  return { id, role: slide.role ?? (slideIn.shape === "executive-summary" ? "executive-summary" : undefined), title: slide.title, layout: "flow.column", ...(fixedTone(slide, id, GROUND_TONES) ? { ground: slide.tone } : {}), ...(slide.titleLead ? { titleLead: slide.titleLead } : {}), ...(slide.titlePlacement ? { titlePlacement: slide.titlePlacement } : {}), ...(slide.titleNumeral ? { titleNumeral: slide.titleNumeral } : {}), ...(slide.tag ? { tag: slide.tag } : {}), ...(slide.kicker ? { kicker: slide.kicker } : {}), ...(slide.subtitle ? { subtitle: slide.subtitle } : {}), ...(slide._standfirstTakeaway ? { subtitleRole: "takeaway-standfirst" } : {}), ...(slide.density ? { density: slide.density } : {}), ...(slide.source ? { source: prefixed("Source", slide.source) } : {}), ...(slide.source && Array.isArray(slide.sourceForms) && slide.sourceForms.length ? { sourceForms: slide.sourceForms } : {}), ...(noteLine ? { note: noteLine } : {}), ...(slide.notes ? { notes: slide.notes } : {}), ...(slide.tracker ? { tracker: slide.tracker } : {}), items };
 }

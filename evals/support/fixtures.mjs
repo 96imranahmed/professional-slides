@@ -89,7 +89,8 @@ const VARIANT_BOARD_LAYOUTS = Object.freeze({
   connector: { capacity: 3, columns: 3 },
   "content-rail": { capacity: 2, columns: 2 },
   "chart-title": { capacity: 2, columns: 1 },
-  "tracker-label": { capacity: 3, columns: 1 },
+  // Sized from each variant's own frame: a side rail stands, the rest run along a row.
+  "tracker-label": { capacity: 2, columns: 2, fit: "preferred" },
   "tracker-page": { capacity: 1, columns: 1 },
   "quote-cluster": { capacity: 1, columns: 1 },
   "chart.line": { capacity: 2, columns: 2 },
