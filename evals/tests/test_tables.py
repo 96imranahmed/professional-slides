@@ -417,6 +417,21 @@ assert.ok(Math.abs(footWithTotal-foot)<1,'the total row is outside the rule');
 console.log('{}');
 ''')
 
+    def test_the_disc_sits_between_two_rows_not_on_one(self):
+        """BA retest: halfway down nine rows the disc sat level with Asia Pacific's line alone, a mark against one row."""
+        run_node('''
+import assert from 'node:assert/strict';
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const columns=['Market',{label:'',type:'implication',width:{px:52},divider:true},'What it means'];
+const blank={type:'implication',relation:'implies',draw:false};
+const rows=Array.from({length:5},(_,i)=>[`Market ${i+1}`,blank,'Priced up']);
+const nodes=REGISTRY.get('table').render({id:'t',frame:{x:0,y:0,width:900,height:400},props:{columns,rows}}).nodes;
+const disc=nodes.find(n=>n.role==='table-implication'&&n.type==='ellipse'), centre=disc.frame.y+disc.frame.height/2;
+const between=nodes.filter(n=>n.role==='table-rule'&&n.data?.rule==='row').map(n=>n.frame.y);
+assert.ok(between.some(y=>Math.abs(y-centre)<0.5),`the disc (${centre}) sits on a rule between rows (${between})`);
+console.log('{}');
+''')
+
 
 class HeaderBandTests(unittest.TestCase):
     def test_shared_header_band_does_not_create_headerless_or_chevron_rules(self):

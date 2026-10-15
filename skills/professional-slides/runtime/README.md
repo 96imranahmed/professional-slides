@@ -35,7 +35,7 @@ Each check is about one page or about the saved file. A blocking finding stops t
 | Group | Codes |
 | --- | --- |
 | The page cannot be drawn | `COMPILE`, `EXHIBIT_KEY_UNREAD`, `PAGE_DOES_NOT_COMPOSE`, `TITLE_LINES`, `HEADING_WRAPS`, `TOTAL_ROW_BLANK`; `PAGE_SPLITS` and `PAGE_ADJUSTED` advised |
-| Overlap and legibility | `TEXT_ON_TEXT`, `TEXT_ON_LINE`, `TEXT_ON_EDGE`, `DESCENDER_ON_RULE`, `MAP_LABEL_ASTRAY`, `GROUND_CONTRAST`, `RENDER_CONTRAST`, `TYPE_RANGE`, `SCATTER_UNKEYED`; `SCENE_VOID` advised |
+| Overlap and legibility | `TEXT_ON_TEXT`, `TEXT_OFF_GROUND`, `TEXT_ON_LINE`, `TEXT_ON_EDGE`, `DESCENDER_ON_RULE`, `MAP_LABEL_ASTRAY`, `GROUND_CONTRAST`, `RENDER_CONTRAST`, `TYPE_RANGE`, `SCATTER_UNKEYED`; `SCENE_VOID` advised |
 | A chart drawn wrongly | `AREA_BASELINE`, `RANK_FILLED`, `UNSCALED_FIGURE` |
 | A chart that compares nothing | `NO_COMPARISON` (also a treemap of near-equal parts), `SERIES_FLAT`, `ONE_COMPARISON` (chart-sense.mjs) |
 | The saved file differs from the scene | the readback codes (`MISSING_SHAPE`, `FRAME_DRIFT`, `TEXT_MISMATCH`, `SLIDE_COUNT`, ...), `TEXT_EXPORT_LOST`, `TEXT_EXPORT_PAGE_COUNT`, `TEXT_PLAN_PAGINATION`, `TEXT_PLAN_INCOMPLETE`, `MISSING_RENDER`, `RENDER_DRIFT`, `CONTENT_LOST`, `MISSING_VISUAL_INTENT` |

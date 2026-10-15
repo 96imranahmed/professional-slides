@@ -26,7 +26,7 @@ Read the titles down the deck alone: they should tell the whole argument. Read e
 
 ## Find the data first
 
-The titles a deck can prove depend on the data it has. Before writing them, read the source fully and collect what it measures: series over time, the whole set of members compared, shares, the steps of a change. Record each set of numbers in `<id>.insights.json` as a measure:
+The titles a deck can prove depend on the data it has. Before writing them, read the source fully and collect what it measures: series over time, the whole set of members compared, shares, the steps of a change. Record each set of numbers in `<id>.insights.json` as a measure, and give every measure its `unit`, the `population` it describes and the `period` it is for (a series lists its `periods`); the compile refuses a measure without them:
 
 ```json
 { "schema": "professional-slides.insights/v1", "insights": [

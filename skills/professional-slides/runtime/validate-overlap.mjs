@@ -13,6 +13,7 @@ export const OVERLAP_CODES = Object.freeze({
   DESCENDER_ON_RULE: "a display-face numeral's old-style descender set on a rule under it",
   SCATTER_UNKEYED: "a scatter coloured by series with no key and no named ends",
   TEXT_ON_TEXT: "two labels whose ink overlaps",
+  TEXT_OFF_GROUND: "text set in its own component's filled panel, tile or cell that runs past the fill's foot",
   MAP_LABEL_ASTRAY: "a map marker's label set nearer another marker than its own, with no leader to its own",
 });
 
@@ -23,6 +24,7 @@ const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", 
 // A callout's box is filled: a label under it is hidden whether or not the callout's own words meet its ink.
 const COVERING_ROLES = new Set(["annotation-surface"]);
 const BOX_ROLES = new Set(["flow-step", "chart-mark", "fact-tile"]);
+const MARK_ROLE = /^(chart-|map-|table-(bar|bubble|progress|rating|check|trend|implication|status)|metric-ring|gantt-(bar|milestone)|legend-|spectrum-|fact-gauge|matrix-point|step-column)/;
 const RULE_ROLES = new Set(["divider-accent", "cover-accent", "section-heading-rule", "takeaways-rule"]);
 const OLD_STYLE_DESCENDERS = /[34579]/;
 // How far two labels' ink may meet, each way, before they read as one over the other: the ink box's own rounding.
@@ -142,6 +144,27 @@ export function sceneCollisions(slide) {
       if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: text.id, other: box.id, roles: [text.role, box.role], rule: "TEXT_ON_TEXT.covered" });
     }
   }
+  // Text printed on its own component's fill - a panel, a tile, a header cell - that runs past the fill. The Spacebar
+  // run's labelled-rows label "Sol led on research, memo and consistency" set on three lines in a 96px block: its last
+  // line fell into the white gap and under the next block. The tests above read chart labels against chart marks, and
+  // the render's lost-text test reads text against the page, so white text off its dark panel was read by nothing.
+  // The ground is the smallest fill of the same component the text's ink starts on and its frame fits across: text laid
+  // out in the fill's width, which can only run past its foot. A label set by the data - a matrix point's name running
+  // from one quadrant into the next - is wider than the fill it starts on, and is placed there, not printed on it.
+  const filled = (n) => { const fill = n.style?.fill, value = fill && typeof fill === "object" ? fill.value : fill;
+    return Boolean(value) && !["none", "transparent"].includes(String(value)) && Number(n.style?.opacity ?? 1) > 0; };
+  // A mark is no ground, whatever sits on it (scene_gates.py SCENE_MARK_ROLE): a value label runs past the tint behind
+  // its category or the bar it labels by design, and a callout's box is read above.
+  const grounds = nodes.filter((n) => n.type === "rect" && n.frame && n.data?.componentInstance !== undefined && filled(n) && !MARK_ROLE.test(String(n.role ?? "")) && !COVERING_ROLES.has(n.role));
+  for (const [text, ink] of inked) {
+    const instance = text.data?.componentInstance;
+    if (instance === undefined) continue;
+    const ground = grounds.filter((n) => n.data.componentInstance === instance && text.frame.x >= n.frame.x - TEXT_CLEAR
+      && text.frame.x + text.frame.width <= n.frame.x + n.frame.width + TEXT_CLEAR && ink.y >= n.frame.y - TEXT_CLEAR && ink.y < n.frame.y + n.frame.height)
+      .sort((a, b) => a.frame.width * a.frame.height - b.frame.width * b.frame.height)[0];
+    const over = ground ? ink.y + ink.height - (ground.frame.y + ground.frame.height) : 0;
+    if (over > TEXT_CLEAR) findings.push({ code: "TEXT_OFF_GROUND", slide: slide.id, text: text.id, ground: ground.id, roles: [text.role, ground.role], over: Math.round(over) });
+  }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
     const size = Number(numeral.style?.fontSize?.value ?? 0) * 96 / 72, bottom = numeral.frame.y + numeral.frame.height;
     for (const rule of nodes.filter((n) => RULE_ROLES.has(n.role))) {
@@ -204,7 +227,7 @@ function mapLabelsAstray(slide) {
  * reader needs to tell its colours apart. A label within 2px of a neighbouring
  * box is cramped but legible - a spacing question, read beside the page.
  */
-export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_ON_EDGE: "advisory", MAP_LABEL_ASTRAY: "blocker" });
+export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_OFF_GROUND: "blocker", TEXT_ON_EDGE: "advisory", MAP_LABEL_ASTRAY: "blocker" });
 
 const OVERLAP_REPAIR = Object.freeze({
   TEXT_ON_LINE: "Move the label off the line: set a reference label at the end of its line clear of the series, a flow label above its arrow, a value label on the side of its point the line leaves open - or shorten it so it fits between the marks.",
@@ -212,6 +235,7 @@ const OVERLAP_REPAIR = Object.freeze({
   DESCENDER_ON_RULE: "Set the numeral in lining figures (the body face) or lift it off the rule by its descent.",
   SCATTER_UNKEYED: "Keep the scatter's legend, or connect each series (connect: true) so its name sits at its end.",
   TEXT_ON_TEXT: "Set one label clear of the other: fewer or shorter callouts on that part of the chart, a callout moved to the category its point leaves open, a shorter category name, or a wider slot.",
+  TEXT_OFF_GROUND: "Fit the text to the fill it is printed on: shorten it to the lines its panel, tile or cell holds, or give that block more height - fewer rows or items on the page.",
   MAP_LABEL_ASTRAY: "Set each marker's name beside its own marker: fewer markers in the cluster, a wider `crop` or a region map that spreads them, shorter names - or move the cluster's values into a ranked bar or a callout list beside the map.",
 });
 
@@ -224,6 +248,6 @@ const OVERLAP_REPAIR = Object.freeze({
 export function sceneDesignFindings(scene) {
   return (scene?.slides || []).flatMap((slide, i) => [...sceneCollisions(slide), ...sceneChartFindings(slide)].map(({ code, slide: _, rule, ...measured }) => ({
     slide: i + 1, id: slide.sourceSlideId ?? slide.id, code, ...(rule ? { rule } : {}), severity: OVERLAP_SEVERITY[code] ?? "blocker",
-    measured, threshold: code === "TEXT_ON_EDGE" ? "2px clear" : "no contact", repair: OVERLAP_REPAIR[code],
+    measured, threshold: code === "TEXT_ON_EDGE" ? "2px clear" : code === "TEXT_OFF_GROUND" ? "inside its fill" : "no contact", repair: OVERLAP_REPAIR[code],
   })));
 }

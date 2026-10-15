@@ -359,6 +359,27 @@ class ColumnVoidTests(unittest.TestCase):
         page_gates.gate_scene_void(2, grown, found)
         self.assertEqual(found, [])
 
+    def test_points_centred_beside_a_full_table_are_no_hole(self):
+        """Spacebar timed run: two points centred beside a taller table were told to sit at the top of their column,
+        which no page key does - the composer centres a column that does not fill its section, as the house asks."""
+        def page(blocks):
+            nodes = [text("table-cell-text", y, 20, x=84, width=700, lines=1) for y in range(170, 660, 48)]
+            nodes += [text("list-item", y, 60, x=816, width=392, lines=3) for y in blocks]
+            beside = content_page("beside", nodes)
+            beside["componentInstances"] = [
+                {"id": "chrome", "component": "slide-chrome", "frame": {"x": 0, "y": 0, "width": 1280, "height": 720}},
+                instance("beside-t", "table", 72, 162, 728, 506), instance("beside-l", "bullet-list", 816, 162, 392, 506)]
+            found = []
+            page_gates.gate_scene_void(2, beside, found)
+            return found
+        self.assertEqual(page([345, 425]), [])
+        # A gap inside the group is still a hole, and the repair names only what a page key does.
+        found = page([262, 522])
+        self.assertEqual([(f["code"], f["measured"]["column"]) for f in found], [("SCENE_VOID", "right")])
+        self.assertGreater(found[0]["measured"]["from"], 262, "the band is the gap between the points, not their margin")
+        self.assertNotIn("at the top", found[0]["repair"])
+        self.assertIn('commentary: "below"', found[0]["repair"])
+
     def test_one_page_one_finding(self):
         # A page whose rows already fail is named by the page's band, once; the
         # columns are only asked when the page passes.

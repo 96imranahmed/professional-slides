@@ -42,7 +42,6 @@ import { pictureFile, picturePlaceholders } from "./fetch-pictures.mjs";
 import { markersToPlace } from "./fetch-places.mjs";
 import { flagCountry, flagFile, flagRefs } from "./flags.mjs";
 import { isIllustration } from "./compose-pictures.mjs";
-import { textWords } from "./text-contract.mjs";
 import { logoPlayers } from "./players.mjs";
 
 export const ASSET_CODES = Object.freeze({
@@ -54,7 +53,6 @@ const FETCH = Object.freeze({
   build: "the build fetches what is missing (the default)",
   none: "nothing is fetched: the deck is built without the network, and says why in `reason`",
 });
-const REASON_WORDS = 6;
 
 /** The deck's declaration, read: `{ fetch: "none", reason }` when it is built without the network, else `{ fetch: "build" }`. */
 export const assetsDeclaration = (deck) => (deck?.assets?.fetch === "none" ? { fetch: "none", reason: String(deck.assets.reason ?? "").trim() } : { fetch: "build" });
@@ -69,7 +67,7 @@ export function assetsDeclarationErrors(deck) {
   if (!assets || typeof assets !== "object" || Array.isArray(assets) || !Object.hasOwn(FETCH, assets.fetch)) return [form];
   const extra = Object.keys(assets).filter((key) => !["fetch", "reason"].includes(key));
   return [...(extra.length ? [`\`assets\` takes fetch and reason only (got ${extra.join(", ")})`] : []),
-    ...(assets.fetch === "none" && textWords(assets.reason) < REASON_WORDS ? [`\`assets.fetch: "none"\` says in \`reason\` why the deck is built without the network, in a sentence`] : [])];
+    ...(assets.fetch === "none" && !String(assets.reason ?? "").trim() ? [`\`assets.fetch: "none"\` says in \`reason\` why the deck is built without the network`] : [])];
 }
 
 /** How many photographs are supplied beside the deck: the image files in its assets/pictures/ folder. */

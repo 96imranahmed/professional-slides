@@ -1781,8 +1781,12 @@ function drawRowBands(table) {
     const bottom = ys[last] + m.heights[last] - m.gap / 2;
     const diameter = Math.min(v("icon.medium"), m.widths[c] - m.gap);
     const data = { column: c, relation: "implies", arrowVariant: "divider-chevron" };
-    // A table-level inference spans the evidence body. Row emphasis is independent.
-    const centreY = (top + bottom) / 2, reach = diameter / 2 + v("space.2");
+    // A table-level inference spans the evidence body. Row emphasis is independent. The disc sits on the row boundary
+    // nearest the middle: halfway down an odd number of rows is the middle of a row, and on the BA deck's IAG table the
+    // disc sat level with Asia Pacific's line alone - the mark against one row this device was drawn to avoid.
+    const middle = (top + bottom) / 2, bounds = m.rows.slice(0, last).map((_, r) => ys[r] + m.heights[r]);
+    const centreY = bounds.length ? bounds.reduce((best, y) => (Math.abs(y - middle) < Math.abs(best - middle) ? y : best)) : middle;
+    const reach = diameter / 2 + v("space.2");
     for (const [suffix, y1, y2] of [["top", top, centreY - reach], ["bottom", centreY + reach, bottom]]) {
       if (y2 <= y1) continue;
       nodes.push(linePrimitive({ id: stableId(id, "implication-rule", c, suffix), role: "table-implication",

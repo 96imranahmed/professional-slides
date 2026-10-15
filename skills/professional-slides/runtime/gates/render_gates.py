@@ -40,10 +40,11 @@ from text_stats import word_count
 
 
 def column_repair(column):
-    return ("The {} column is empty from y {} to {} while the page beside it is full. Set the group at the top "
-            "of its column and give the height to what can use it - the exhibit at its frame's size, the "
-            "commentary moved under a short exhibit, a table with the rows or treated column it was given the "
-            "height for - or narrow the column. Do not stretch rows or pad text to cover the band.").format(
+    # Only what a page key does: where a group sits in its column and how wide the column is are the composer's.
+    return ("The {} column is empty from y {} to {} while the page beside it is full. Give the height to what "
+            "can use it - the exhibit at its frame's size, a table with the rows or treated column it was given "
+            "the height for - or set the commentary under a short exhibit (`commentary: \"below\"`). Do not "
+            "stretch rows or pad text to cover the band.").format(
                 column["name"], column["from"], column["to"])
 
 
@@ -216,10 +217,18 @@ def column_bands(slide, column_rows):
     the column scaled as the body is to the canvas, so a column as tall as the
     body is held to the page's own bar in pixels and a column in a shorter row
     to the same share of its own height. A hole inside the column - a waffle
-    floating mid-plot, points centred with air above and below - is held to
+    floating mid-plot, a gap between two blocks - is held to
     `internal_void_max`. A column that simply stops short is held to
     `column_void_max`, the tail of the right-column band on well-made pages:
     held to the page's dead band, a third of good side columns would fail.
+
+    A group of text or figures centred in its column (anchored) is set there
+    on purpose: a column that does not fill its section is centred on the
+    exhibit beside it, the house rule the composer follows
+    (compose-arrangements.mjs besideRow). Its margins are no hole, and the
+    advice to set it at the top asked for what no page key does: the Spacebar
+    run met it on five pages. A gap inside the group is still read, and a
+    chart's plot is not a group: air in it is the chart's size or headroom.
 
     One cell is read with its row rather than as a region of its own: one
     centred beside a filled block drawn the row's full height. That is a
@@ -249,6 +258,9 @@ def column_bands(slide, column_rows):
         bands = void_bands(rows, top, bottom, scale)
         if bands["lastInk"] is None:
             continue  # nothing drawn there at all: an unmeasured frame, not a half-empty one
+        if id(column) not in read_with_row and not column["plot"] and anchored(rows, top, bottom):
+            first = next(y for y in range(top, bottom) if rows[y] > ROW_MIN)
+            bands = void_bands(rows, first, bands["lastInk"] + 1, scale)
         hole = bands["internalVoid"] / THRESHOLDS["internal_void_max"]
         short = bands["deadBand"] / THRESHOLDS["column_void_max"]
         over = max(hole, short)

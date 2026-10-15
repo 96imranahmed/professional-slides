@@ -95,10 +95,10 @@ import {{ deckKeyProblems }} from './skills/professional-slides/runtime/deck-key
 import {{ assetsDeclaration }} from './skills/professional-slides/runtime/asset-needs.mjs';
 const check = (assets) => deckKeyProblems(assets === undefined ? {{}} : {{ assets }});
 console.log(JSON.stringify({{ good: check({{ fetch: 'none', reason: '{REASON}' }}), build: check({{ fetch: 'build' }}), absent: check(undefined),
-  unreasoned: check({{ fetch: 'none', reason: 'offline' }}), unknown: check({{ fetch: 'never' }}), bare: check('none'), extra: check({{ fetch: 'none', reason: '{REASON}', logos: false }}),
+  unreasoned: check({{ fetch: 'none', reason: ' ' }}), terse: check({{ fetch: 'none', reason: 'offline benchmark' }}), unknown: check({{ fetch: 'never' }}), bare: check('none'), extra: check({{ fetch: 'none', reason: '{REASON}', logos: false }}),
   read: [assetsDeclaration({{ assets: {{ fetch: 'none', reason: ' {REASON} ' }} }}), assetsDeclaration({{}}), assetsDeclaration({{ assets: {{ fetch: 'build' }} }})] }}));
 ''')
-        self.assertEqual([result['good'], result['build'], result['absent']], [[], [], []])
+        self.assertEqual([result['good'], result['build'], result['absent'], result['terse']], [[], [], [], []])
         for bad, said in [('unreasoned', 'says in `reason` why the deck is built without the network'), ('unknown', '`assets` is { fetch, reason }'), ('bare', 'it was given'), ('extra', 'takes fetch and reason only (got logos)')]:
             self.assertEqual(len(result[bad]), 1, bad)
             self.assertIn(said, result[bad][0], bad)
@@ -203,7 +203,7 @@ class CompileNoticeTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertNotIn("Assets:", run.stderr)
         self.assertNotIn("assets", json.loads(run.stdout))
-        bad = self.stage({"assets": {"fetch": "none", "reason": "offline"}})
+        bad = self.stage({"assets": {"fetch": "none", "reason": ""}})
         run = self.compile(bad, "--check")
         self.assertEqual(run.returncode, 2)
         self.assertIn("`assets` on `deck` is not in the form the build reads", run.stderr)

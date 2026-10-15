@@ -65,8 +65,8 @@ const NOT_PROSE = new Set(["id", "type", "form", "kind", "commentary", "why", "a
  * label ("FY26", "Q3", "M25", "500-4", "15th").
  */
 function untracedNumbers(page, pool, names = []) {
-  // A declared player's name is a name, whatever digits it holds ("GPT 6.1 Sol"): it is taken out before the numbers are read.
-  const unnamed = (text) => names.reduce((said, name) => said.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " "), String(text));
+  // A name is a name whatever digits it holds ("GPT 6.1 Sol"): it is taken out, whole, before the numbers are read.
+  const unnamed = (text) => names.reduce((said, name) => said.replace(new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "giu"), " "), String(text));
   return pageTexts(page).flatMap(({ field, text, written, figure }) => measurementsIn(unnamed(text), figure, unnamed(written)).map((number) => ({ field, number })))
     .filter(({ number }) => !pool.some((m) => traces(number, m))).map(({ field, number }) => ({ field, shown: number.shown }));
 }
@@ -185,8 +185,11 @@ export function untracedFindings(doc, insights) {
   if (!registry.size) return [];
   const { doc: written, bound } = bindDeck(doc, insights);
   const authored = [...(doc.pages || []), ...(doc.appendix || [])];
-  // Longest first, so "GPT 6.1 Sol" goes before a short name it contains.
-  const names = [...playerNames(doc.deck?.players).keys()].filter((name) => /\d/.test(name)).sort((a, b) => b.length - a.length);
+  // A name is a declared player's, or a member a measure records: the Spacebar run recorded its six models as members
+  // and declared no players, and "GPT 6.1 Sol" and "Opus 5.5" were read as untraced numbers on almost every page. A
+  // label of digits alone ("2024", "500") names nothing. Longest first, so "GPT 6.1 Sol" goes before a name it contains.
+  const members = [...registry.values()].flatMap((m) => (Array.isArray(m.members) ? m.members : [])).map((name) => String(name).trim().toLowerCase());
+  const names = [...new Set([...playerNames(doc.deck?.players).keys(), ...members])].filter((name) => /\d/.test(name) && /\p{L}/u.test(name)).sort((a, b) => b.length - a.length);
   const out = [];
   for (const [index, page] of [...(written.pages || []), ...(written.appendix || [])].entries()) {
     if (!page || typeof page !== "object" || !page.type) continue;

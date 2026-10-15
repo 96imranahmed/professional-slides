@@ -91,6 +91,19 @@ console.log(JSON.stringify({{ compiled: error(() => compilePage(page({{ items, c
         self.assertEqual(result["face"], "font.body", "figures are set in the body face, whose digits line up")
 
 
+class StatListTests(unittest.TestCase):
+    def test_a_dark_list_keeps_its_sentences_inside_its_panel(self):
+        """Manhattan deck m43: measured at the panel's width, a dark list's sentences ran 12px past its right edge."""
+        result = run_node(PRELUDE + """
+import { statListNodes } from './skills/professional-slides/runtime/figures.mjs';
+const frame = { x: 60, y: 152, width: 763, height: 516 };
+const items = [{ value: '24,000', text: 'rooms in the active development pipeline through 2028, across 24 projects, as counted by the State Comptroller in July 2026' }, { value: '61%', text: 'of them in Midtown and Lower Manhattan' }];
+const nodes = statListNodes({ id: 's', frame, props: { items, tone: 'dark' } });
+console.log(JSON.stringify(Math.max(...nodes.filter((n) => n.role === 'stat-text' || n.role === 'stat-rule').map((n) => n.frame.x + n.frame.width))));
+""")
+        self.assertLessEqual(result, 60 + 763 - 12, "the sentences and rules end inside the panel's padding")
+
+
 class SideStatementTests(unittest.TestCase):
     def test_a_dark_rail_where_the_accent_does_not_read_sets_the_phrase_bold(self):
         """Fifty-six-page re-author: on a dark rail the accent did not read, so the phrase is set bold."""
@@ -110,6 +123,16 @@ console.log(JSON.stringify({ darkBold: dark.style.bold, darkRuns: dark.runs, tin
         # weight so the bold phrase stands out.
         self.assertTrue(any(r.get("accent") for r in runs) or (result["darkBold"] is False and not all(r["bold"] for r in runs)))
         self.assertTrue(any((r.get("accent") or r["bold"]) and "95.2m" in r["text"] for r in result["tintRuns"]))
+
+    def test_a_statement_longer_than_its_panel_is_refused(self):
+        """Spacebar timed run: a labelled-rows label set on three lines ran past its 96px block, clipped, and no check read it."""
+        result = run_node(PRELUDE + """
+import { sideStatementNodes } from './skills/professional-slides/runtime/figures.mjs';
+const set = (text) => { try { return sideStatementNodes({ id: 'r', frame: { x: 60, y: 248, width: 228, height: 96 }, props: { text, tone: 'primary' } }).find((n) => n.role === 'side-panel-text').frame.y; } catch (error) { return error.message; } };
+console.log(JSON.stringify({ two: set('Six models, one evolving project'), three: set('Sol led on research, memo and consistency') }));
+""")
+        self.assertIsInstance(result["two"], (int, float))
+        self.assertIn('"Sol led on research, memo and consistency" sets on 3 lines and its 96px panel holds 2', result["three"])
 
 
 if __name__ == "__main__":

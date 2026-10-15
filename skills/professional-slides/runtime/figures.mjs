@@ -63,7 +63,10 @@ export function statListLayout(frame, props) {
   const items = normalizeStats(props);
   const columns = props.variant === "grid" ? 2 : 1;
   const gap = v("space.5"), colGap = v("space.6");
-  const colWidth = (frame.width - colGap * (columns - 1)) / columns;
+  // A dark list is set inside its panel's padding, and measured there: measured at the panel's width, its sentences ran
+  // 12px past the panel's right edge (the Manhattan deck's m43).
+  const inset = props.tone === "dark" ? v("space.3") : 0;
+  const colWidth = (frame.width - 2 * inset - colGap * (columns - 1)) / columns;
   const values = items.map((item) => measure(item.value, colWidth, "type.metric", true, FIGURES));
   const valueWidth = Math.min(colWidth * 0.42, Math.max(...values.map((m) => m.width)) + v("space.2"));
   const textWidth = colWidth - valueWidth - v("space.4");
@@ -74,7 +77,7 @@ export function statListLayout(frame, props) {
   const perColumn = Math.ceil(rows.length / columns);
   const columnHeights = Array.from({ length: columns }, (_, c) => rows.slice(c * perColumn, (c + 1) * perColumn)
     .reduce((sum, r, i) => sum + r.height + (i ? gap : 0), 0));
-  return { rows, columns, perColumn, colWidth, colGap, valueWidth, textWidth, gap, height: Math.max(...columnHeights) + 2 * v("space.3") };
+  return { rows, columns, perColumn, colWidth, colGap, valueWidth, textWidth, gap, inset, height: Math.max(...columnHeights) + 2 * v("space.3") };
 }
 
 export function statListNodes({ id, frame, props }) {
@@ -92,7 +95,7 @@ export function statListNodes({ id, frame, props }) {
     const gap = rows.length > 1 ? Math.min(Math.max(L.gap, room / (rows.length - 1)), L.gap * 2.2) : 0;
     const used = natural + gap * (rows.length - 1);
     let y = frame.y + pad + Math.max(0, (frame.height - 2 * pad - used) / 2);
-    const x = frame.x + (dark ? pad : 0) + c * (L.colWidth + L.colGap);
+    const x = frame.x + L.inset + c * (L.colWidth + L.colGap);
     rows.forEach((r, i) => {
       const rid = stableId(id, "stat", c * L.perColumn + i);
       nodes.push(label(stableId(rid, "value"), "stat-value", { x, y, width: L.valueWidth }, r.value,
@@ -101,7 +104,7 @@ export function statListNodes({ id, frame, props }) {
         style("type.body", dark ? WHITE : INK)));
       y += r.height;
       if (i < rows.length - 1) {
-        nodes.push(line(stableId(rid, "rule"), "stat-rule", x, y + gap / 2, x + L.colWidth - (dark ? 2 * pad : 0), y + gap / 2, dark ? WHITE : RULE));
+        nodes.push(line(stableId(rid, "rule"), "stat-rule", x, y + gap / 2, x + L.colWidth, y + gap / 2, dark ? WHITE : RULE));
         y += gap;
       }
     });
@@ -1349,6 +1352,13 @@ export function sideStatementNodes({ id, frame, props }) {
   out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
   y += v("space.4");
   if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : reversedType(), true))); y += L.kicker.height + v("space.3"); }
+  // The statement ends inside its panel. A labelled-rows page gives each label a fifth of the body, and a three-line label
+  // ran past its 96px block into the white gap and under the next one, clipped, with no check reading it.
+  const room = frame.y + frame.height - v("space.2") - y;
+  if (L.text.height > room + 0.5) {
+    const holds = Math.max(0, Math.floor((room + 0.5) / L.text.lineHeight));
+    throw new Error(`The statement "${clean(props.text)}" sets on ${L.text.lines.length} lines and its ${Math.round(frame.height)}px panel holds ${holds}; shorten it to ${holds} line${holds === 1 ? "" : "s"}`);
+  }
   const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
   out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);
   return out;

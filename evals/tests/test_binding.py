@@ -336,6 +336,19 @@ console.log(JSON.stringify({ named: untracedFindings(doc('GPT 6.1 Sol and Opus 5
         self.assertEqual(result["named"], [])
         self.assertEqual(result["number"], ["title: 12.5"])
 
+    def test_a_member_the_log_records_is_a_name_too(self):
+        """Spacebar timed run: six models recorded as members and declared as no players, and "GPT 6.1 Sol" and
+        "Opus 5.5" were untraced numbers on almost every page."""
+        models = "recorded.push({ ...graded, id: 'i-models', shape: 'fact', sources: ['sources/a.csv'], cite: ['annual-report'], measures: { score: { unit: 'points', population: 'six models', period: 'pilot run', members: ['GPT 6.1 Sol', 'Opus 5.5', '12.5'], values: [90, 77, 60] } } });\n"
+        result = run_node(LOG.replace("const insights = new Map", models + "const insights = new Map") + '''
+const said = (title) => untracedFindings(deckOf(page({ evidence: undefined, exhibit: undefined, type: 'argument', form: 'memo', title, paragraphs: ['One paragraph.'], panel: { text: 'A panel.' } })), insights).flatMap((f) => f.measured);
+console.log(JSON.stringify({ named: said('GPT 6.1 Sol and Opus 5.5 took part'), number: said('GPT 6.1 Sol scored 12.5 points'), longer: said('Opus 5.55 took part'), digits: said('Margins rose 12.5%') }));
+''')
+        self.assertEqual(result["named"], [])
+        self.assertEqual(result["number"], ["title: 12.5"])
+        self.assertEqual(result["longer"], ["title: 5.55"], "a name is read whole, never inside a longer number")
+        self.assertEqual(result["digits"], ["title: 12.5%"], "a member of digits alone names nothing")
+
     def test_a_printed_number_states_a_record_at_the_precision_the_page_prints(self):
         result = run_node('''
 import { matches } from './skills/professional-slides/runtime/printed-numbers.mjs';

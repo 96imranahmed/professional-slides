@@ -133,6 +133,26 @@ console.log(JSON.stringify({{
         self.assertEqual(result["slots"], [])
         self.assertEqual(result["apart"], [])
 
+    def test_text_run_past_its_own_panel_is_found(self):
+        """Spacebar timed run: a label's third line ran off its dark block into the gap and under the next; no check read it."""
+        result = run_node(f"""
+import {{ sceneCollisions }} from '{RUNTIME}/validate-overlap.mjs';
+const data = (instance) => ({{ componentInstance: instance }});
+const panel = (id, y, instance, role = 'side-panel') => ({{ id, type: 'rect', role, frame: {{ x: 60, y, width: 228, height: 96 }}, style: {{ fill: {{ value: '#051C2C' }} }}, data: data(instance) }});
+const label = (lines, instance = 'p:label-1') => ({{ id: 't', type: 'text', role: 'side-panel-text', text: lines.join('\\n'), frame: {{ x: 84, y: 288, width: 180, height: 24 * lines.length }},
+  style: {{ align: 'left', valign: 'top', bold: true, fontFamily: {{ value: 'Georgia' }}, fontSize: {{ value: 14 }} }}, data: {{ ...data(instance), textLayout: {{ lines, lineHeight: 24, height: 24 * lines.length, width: 160 }} }} }});
+const off = (nodes) => sceneCollisions({{ id: 's', nodes }}).filter((f) => f.code === 'TEXT_OFF_GROUND').map((f) => [f.text, f.ground]);
+const three = ['Sol led on', 'research, memo', 'and consistency'];
+console.log(JSON.stringify({{
+  clipped: off([panel('a', 248, 'p:label-1'), label(three), panel('b', 356, 'p:label-2')]),
+  fits: off([panel('a', 248, 'p:label-1'), label(three.slice(0, 2))]),
+  // Another component's fill is not this text's ground, and a mark is no ground: a value label runs past its bar's tint.
+  other: off([panel('a', 248, 'p:other'), label(three)]),
+  mark: off([panel('a', 248, 'p:label-1', 'chart-band'), label(three)]) }}));
+""")
+        self.assertEqual(result["clipped"], [["t", "a"]])
+        self.assertEqual([result["fits"], result["other"], result["mark"]], [[], [], []])
+
     def test_a_label_is_read_by_its_glyphs_not_the_slot_it_is_set_in(self):
         """Fifty-page audit: read as its 60px slot, a value label had its own series' segments through it."""
         # A line chart's value label is a 60px slot round four figures. Read as
