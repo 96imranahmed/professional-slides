@@ -59,8 +59,14 @@ class NarrowedSeriesTests(unittest.TestCase):
         # The BA deck's loyalty page bound profit on two bases, 2019-2023 and 2023-2025, and drew 2023 alone.
         result = run_node(LOG.replace("const insights = new Map", "recorded.push({ ...graded, id: 'i-basis', shape: 'series', sources: ['sources/a.csv'], cite: ['annual-report'], measures: { old: { unit: 'GBP m', population: 'the company', periods: ['FY21', 'FY22', 'FY23'], values: [176, 240, 280] }, restated: { unit: 'GBP m', population: 'the company', periods: ['FY23', 'FY24', 'FY25'], values: [367, 420, 469] } } });\nconst insights = new Map") + """
 const ex = (o = {}) => ({ heading: 'Profit', series: [{ measure: 'i-basis/old', name: 'Old basis' }, { measure: 'i-basis/restated', name: 'Restated' }], ...o });
-console.log(JSON.stringify({ narrowed: problems(page({ evidence: ['i-basis'], exhibit: ex() })), asked: problems(page({ evidence: ['i-basis'], exhibit: ex({ select: { periods: ['FY23'] } }) })) }));
+const line = exhibitOf(ex(), { evidence: ['i-basis'] });
+console.log(JSON.stringify({ line: { categories: line.categories, values: line.series.map((s) => s.values) },
+  narrowed: problems(page({ form: 'area', evidence: ['i-basis'], exhibit: ex() })), asked: problems(page({ form: 'area', evidence: ['i-basis'], exhibit: ex({ select: { periods: ['FY23'] } }) })) }));
 """)
+        # A line draws gaps, so it runs over every period either series has, each with its gaps.
+        self.assertEqual(result["line"]["categories"], ["FY21", "FY22", "FY23", "FY24", "FY25"])
+        self.assertEqual(result["line"]["values"], [[176, 240, 280, None, None], [None, None, 367, 420, 469]])
+        # An area fills every period, so it keeps the shared ones, and says so where that drops most of a series.
         self.assertTrue(any("share only FY23" in p for p in result["narrowed"]), result["narrowed"])
         self.assertFalse(any("share only" in p for p in result["asked"]))
 

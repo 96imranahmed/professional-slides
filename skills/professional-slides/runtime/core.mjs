@@ -1033,6 +1033,8 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // A gap in a series is drawn as no mark; a native chart would plot it as zero or join across it, so that chart stays drawn.
+  if (Array.isArray(props.series) && props.series.some((item) => (item?.values || []).some((value) => value === null))) return null;
   // A native area carries no value labels in the saved file (LibreOffice drops them), and the probe's area of slot sales
   // lost every figure it printed (TEXT_EXPORT_LOST): an area that prints its values stays drawn.
   if (type === "area" && renderedNodes?.some((node) => node.role === "data-label")) return null;

@@ -11,7 +11,7 @@ import { assertComparison } from "./chart-sense.mjs";
 import { placeLabels, spreadApart } from "./label-placement.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT_LINE, VALUE_HEADROOM, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
-  periodLabelStep } from "./chart-axes.mjs";
+  periodsNamed } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
 import { normalizeIntervals, intervalValues, intervalLabelWidth, intervalNodes } from "./chart-bands.mjs";
 
@@ -181,7 +181,8 @@ export function lineChart({ id, frame, props, area = false }) {
 function lineOptions(chart) {
   const { id, frame, props, area } = chart;
   assertGridlineOption(props);
-  const { categories, series } = normalizedCategoricalData(props);
+  // A line breaks at a gap in its record (null); an area fills every period, so it has none.
+  const { categories, series } = normalizedCategoricalData(props, { gaps: !area });
   // `focusSeries`: one line in the subject's colour, the others the context grey, so the subject reads first among its peers
   // (chart-axes.mjs SUBJECT, CONTEXT_LINE); the legend keys each line in the colour it is drawn in.
   if (props.focusSeries !== undefined && !series.some((item) => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
@@ -207,7 +208,7 @@ function lineOptions(chart) {
   }
   const endLabels = props.directLabels === "end" || props.endLabels === true;
   const showLegend = !endLabels && props.legend !== false && series.length > 1;
-  const values = series.flatMap((item) => item.values);
+  const values = series.flatMap((item) => item.values).filter(Number.isFinite);
   // `seriesGrowth: { from, to, label? }`: each line's growth in a column beside
   // its end label (a "CAGR 2020–30" column at the right
   // of a forecast). It rides on the end labels, which name the rows.
@@ -296,22 +297,19 @@ function lineAxes(chart) {
   // On a time-spaced axis the labels are the ones whose slots clear their
   // neighbours' (time-axis.mjs spacedLabelIndices).
   const spacedLabels = spacing ? spacedLabelIndices(categories.map((_, index) => slotX(index)), categorySlot + 4) : null;
-  // Dense periods (more categories than the plot has label slots) label every
-  // nth point, always keeping the first and last, as a strong deck does.
-  const pitch = categories.length > 1 ? (xScale(1) - xScale(0)) : plot.width;
-  const widest = Math.max(...categories.map((c) => measureText(String(c), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL) }).width));
-  const { every, fromFirst } = periodLabelStep(categories.length, Math.max(monthlyLabelStep(categories), Math.ceil((widest + 10) / Math.max(1, pitch))));
+  // Dense periods (more categories than the plot has label slots) name every nth point, and the first and last (periodsNamed).
+  const named = periodsNamed(categories, categories.length > 1 ? xScale(1) - xScale(0) : plot.width, { atLeast: monthlyLabelStep(categories) });
   categories.forEach((category, index) => {
     // Every label is centred on its point; the first and last may reach into
     // the chart's own insets so the spacing stays even.
     const categoryX = slotX(index);
     categoryMap.set(category, { x: categoryX, y: plot.y, width: categorySlot, height: plot.height });
-    const shown = spacedLabels ? spacedLabels.includes(index) : every === 1 || index % every === 0 || (!fromFirst && index === categories.length - 1);
+    const shown = spacedLabels ? spacedLabels.includes(index) : named(index);
     // The label is held inside the frame by its own width, not its slot's: a last point at the plot's edge, its slot clamped
     // in by half a slot, pushed "Q3-2026" into "Q3-2025" where its own ink needed a few pixels.
     const ink = Math.min(categorySlot, Math.ceil(measureText(String(category), 400, { fontFamily: tokenValue(token("font.body")), fontSize: tokenValue(AXIS_LABEL) }).width) + 4);
     const labelX = Math.max(frame.x, Math.min(frame.x + frame.width - ink, xScale(index) - ink / 2));
-    if (shown && !(!spacedLabels && every > 1 && index === categories.length - 1 && (index % every) !== 0 && (categories.length - 1 - Math.floor((categories.length - 1) / every) * every) * pitch < widest + 10)) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: labelX, y: plot.y + plot.height + 16, width: ink, height: Math.min(40, Math.ceil(labelHeight) + 4) }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
+    if (shown) nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: labelX, y: plot.y + plot.height + 16, width: ink, height: Math.min(40, Math.ceil(labelHeight) + 4) }, text: category, style: textStyle(AXIS_LABEL, INK, false, "center") }));
   });
   return { nodes, pointMap, categoryMap };
 }
@@ -339,11 +337,12 @@ function drawLines(chart) {
   // to a floor near its low, the BA retest's jet fuel drew a doubling as a five-fold rise.
   // A line broken at a missing period keeps a bare stroke too: filled run by run, the BA deck's low-cost share drew two
   // slabs that read as columns.
-  const lone = !area && !rank && !breaks.size && bounds.min <= 0 && bounds.max >= 0 && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
+  const lone = !area && !rank && !breaks.size && series[0].values.every(Number.isFinite) && bounds.min <= 0 && bounds.max >= 0 && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
   // The runs of periods a line joins: a break (lineOptions) ends one run and starts the next.
   const runs = categories.reduce((all, _, index) => (index && !breaks.has(index - 1) ? all.at(-1).push(index) : all.push([index]), all), []);
   series.forEach((item, seriesIndex) => {
-    const points = item.values.map((value, index) => ({ x: xScale(index), y: yScale(value), value, category: categories[index] }));
+    // A gap in the record (null) is no point: no marker, no label, and no segment into or out of it.
+    const points = item.values.map((value, index) => ({ x: xScale(index), y: Number.isFinite(value) ? yScale(value) : NaN, value, category: categories[index], gap: !Number.isFinite(value) }));
     if (area || lone) {
       const baselineValue = 0;
       const baselineY = yScale(baselineValue);
@@ -364,7 +363,7 @@ function drawLines(chart) {
     // among the series a thin dashed rule with no markers at all.
     const { state, from: assumedAt } = seriesState(item, categories);
     const reference = state === "reference", assumed = (index) => state === "assumed" && index >= assumedAt;
-    points.slice(1).forEach((point, index) => !breaks.has(index) && nodes.push(linePrimitive({
+    points.slice(1).forEach((point, index) => !breaks.has(index) && !point.gap && !points[index].gap && nodes.push(linePrimitive({
       id: stableId(id, "segment", item.name, index),
       role: "chart-line",
       x1: points[index].x,
@@ -374,9 +373,10 @@ function drawLines(chart) {
       style: reference || assumed(index + 1) ? lineStyle(lineColor(seriesIndex), token("line.standard"), "dash") : lineStyle(lineColor(seriesIndex), weight.line),
       ...(reference || assumed(index + 1) ? { data: { series: item.name, state } } : {})
     })));
-    const labelSides = lineLabelSides(points.map(point => (rank ? -point.value : point.value)));
+    const labelSides = lineLabelSides(points.map(point => (point.gap ? null : rank ? -point.value : point.value)));
     const radius = weight.marker / 2;
     points.forEach((point, pointIndex) => {
+      if (point.gap) return;
       if (!reference) nodes.push(ellipsePrimitive({
         id: stableId(id, "point", item.name, point.category),
         role: "chart-marker",
@@ -404,7 +404,7 @@ function drawLines(chart) {
       }
     });
     if (endLabels) {
-      const point = points.at(-1);
+      const point = points.filter((p) => !p.gap).at(-1);
       // The label starts clear of the 10px marker, not on it.
       pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${stateLabel(item, categories)} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: endLabelColor(lineColor(seriesIndex)) });
     }
@@ -487,8 +487,12 @@ export function comboChart({ id, frame, props }) {
   // The line's value sits over the bar's, as much as 52px over the top of the plot: the plot leaves that room under the
   // legend, where the sample's 85 sat on the legend's own row and a callout's leader crossed both.
   const labelled = props.dataLabels !== false;
+  const showValueAxis = resolveValueAxis(props, { valueCount: categories.length * 2, dataLabelsVisible: labelled });
+  // The value axis's gutter holds its widest tick ("1,000,000"), read off the scale the values will take.
+  const tickWidth = axisLabelWidth(numericBounds([0, ...series.flatMap((item) => item.values)], { axis: "y" }));
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
+    ...(showValueAxis ? { leftInset: Math.max(54, tickWidth + 8) } : {}),
     periodBand: periodBandHeight(props, categories),
     topLegend: true,
     headroom: labelled ? 56 : VALUE_HEADROOM,
@@ -499,8 +503,7 @@ export function comboChart({ id, frame, props }) {
   });
   // Labelled marks need no value axis; the bars take a zero-anchored domain and,
   // with `secondaryAxis`, the line takes its own padded domain (a margin over a revenue).
-  const showDataLabels = props.dataLabels !== false;
-  const showValueAxis = resolveValueAxis(props, { valueCount: categories.length * 2, dataLabelsVisible: showDataLabels });
+  const showDataLabels = labelled;
   const barSeries = series[0];
   const lineSeries = series[1];
   const lineRange = Math.max(...lineSeries.values) - Math.min(...lineSeries.values);
@@ -534,13 +537,17 @@ export function comboChart({ id, frame, props }) {
   const lineScale = secondary ? y2Scale : yScale;
   const categorySpan = plot.width / categories.length;
   const barWidth = categorySpan * 0.58;
+  // Only periods thin, as on columns (chart-categorical.mjs columnLabelPlan): a named member wraps in its slot, and a reader
+  // cannot count to one left out.
+  const named = categories.every((category) => /\d/.test(String(category))) ? periodsNamed(categories, categorySpan) : () => true;
   const nodes = [
     ...topLegend({ id, frame, items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: index, ...(item === lineSeries ? { mark: "line" } : {}) })) }),
-    ...axes(id, barPlot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
+    ...axes(id, barPlot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth: Math.max(48, axisLabelWidth(bounds)) })
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
   const linePoints = [];
+  const barLabels = [], lineLabels = [];
   // A currency leads its figure: suffixed, "$m" prints "888$m" on a deck that
   // writes "$878m" on every other page. The unit decides which end it goes on.
   const secondaryCurrency = String(props.secondaryUnit ?? "").trim().match(/^([$£€¥₹])\s*(.*)$/);
@@ -570,7 +577,7 @@ export function comboChart({ id, frame, props }) {
       frame: bar,
       style: fillStyle(SERIES[0])
     }));
-    nodes.push(textPrimitive({
+    if (named(index)) nodes.push(textPrimitive({
       id: stableId(id, "category", category),
       role: "category-label",
       frame: { x: x - categorySpan / 2, y: plot.y + plot.height + 16, width: categorySpan, height: 40 },
@@ -581,23 +588,21 @@ export function comboChart({ id, frame, props }) {
     const lineY = lineScale(lineSeries.values[index]);
     const linePoint = { x, y: lineY, changeX: x, changeY: lineY - 16 };
     if (showDataLabels) {
-      // The bar's value sits inside its top in white when the bar is tall enough, else above it;
-      // the line's value sits above its point, clear of the bar label.
-      const inside = !secondary && bar.height >= 40;
-      nodes.push(textPrimitive({ id: stableId(id, "value-label", barSeries.name, category), role: "data-label", frame: { x: bar.x, y: inside ? bar.y + 6 : bar.y - 26, width: bar.width, height: 24 }, text: formatValue(barSeries.values[index], props), style: textStyle(CHART_LABEL, inside ? token("color.onPrimary") : INK, true, "center"), data: { category, series: barSeries.name } }));
-      const text = formatValue(lineSeries.values[index], lineFormat);
-      // Above its point, unless a steep neighbour's segment runs through that box: then under the point, where it clears the bar label.
-      const above = Math.min(lineY - 30, inside ? bar.y - 26 : bar.y - 52), under = lineY + 8;
-      const half = Math.min(categorySpan, text.length * 7 + 8) / 2;
-      const crossed = (top) => [index - 1, index + 1].filter((j) => j >= 0 && j < categories.length).some((j) => {
-        const jx = plot.x + categorySpan * j + categorySpan / 2, jy = lineScale(lineSeries.values[j]);
-        return Array.from({ length: 21 }, (_, k) => k / 20).some((t) => { const px = x + (jx - x) * t, py = lineY + (jy - lineY) * t; return px > x - half && px < x + half && py > top && py < top + 24; });
-      });
-      const roomUnder = under + 24 <= (inside ? bar.y : bar.y - 28);
-      // A callout keyed to this category takes the space by its mark, so the label stays above there.
+      // The bar's value inside its top in white where the bar is tall enough, else over it; the line's over its point, else
+      // under it. Both are placed together once the line is drawn (label-placement.mjs), clear of each other, the bars, the
+      // markers and the line: a run of 24 printed the line's values across its own segments.
+      // A value wider than its slot has no place, and one set inside its bar must fit the bar.
+      const barText = formatValue(barSeries.values[index], props), wide = measureDataLabel(barText).width;
+      const slot = (y) => ({ x: x - categorySpan / 2, y, width: categorySpan, height: 24 });
+      const over = { frame: slot(bar.y - 26), style: textStyle(CHART_LABEL, INK, true, "center") };
+      const inside = { frame: slot(bar.y + 6), style: textStyle(CHART_LABEL, token("color.onPrimary"), true, "center") };
+      barLabels.push({ id: stableId(id, "value-label", barSeries.name, category), text: barText, own: bar, data: { category, series: barSeries.name },
+        frames: wide > categorySpan - 2 ? [] : [...(!secondary && bar.height >= 40 && wide <= bar.width - 4 ? [inside] : []), over] });
+      // A callout keyed to this category takes the space by its mark, so the label stays over it there.
       const called = (props.annotations || []).some((note) => String(note?.category) === String(category));
-      const ly = crossed(above) && roomUnder && !called && !crossed(under) ? under : above;
-      nodes.push(textPrimitive({ id: stableId(id, "value-label", lineSeries.name, category), role: "data-label", frame: { x: x - categorySpan / 2, y: ly, width: categorySpan, height: 24 }, text, style: textStyle(CHART_LABEL, SERIES[1], true, "center"), data: { category, series: lineSeries.name } }));
+      const lineText = formatValue(lineSeries.values[index], lineFormat);
+      lineLabels.push({ id: stableId(id, "value-label", lineSeries.name, category), text: lineText, data: { category, series: lineSeries.name },
+        frames: measureDataLabel(lineText).width > categorySpan - 2 ? [] : [slot(lineY - 30), ...(called ? [] : [slot(lineY + 8)]), slot(lineY - 52)] });
     }
     categoryMap.set(category, { x: x - categorySpan / 2, y: plot.y, width: categorySpan, height: plot.height });
     pointMap.set(`${barSeries.name}:${category}`, barPoint);
@@ -626,5 +631,14 @@ export function comboChart({ id, frame, props }) {
     frame: { x: point.x - 5, y: point.y - 5, width: 10, height: 10 },
     style: fillStyle(SERIES[1])
   })));
+  const { placed, dropped } = placeLabels([...barLabels, ...lineLabels], {
+    style: () => textStyle(CHART_LABEL, SERIES[1], true, "center"),
+    keepOut: nodes.filter((node) => node.role === "chart-mark" || node.role === "chart-marker").map((node) => node.frame),
+    lines: nodes.filter((node) => node.role === "chart-line").map((node) => node.data ?? node),
+    within: frame
+  });
+  // A value with no clear place is left out and the chart read off its value axis, as a line's is (lineChart).
+  if (dropped && !showValueAxis && props.showValueAxis === undefined) return comboChart({ id, frame, props: { ...props, showValueAxis: true } });
+  for (const label of placed) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: label.frame, text: label.text, style: label.style, data: label.data }));
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
 }

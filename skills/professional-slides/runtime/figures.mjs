@@ -927,7 +927,7 @@ export function capsulesLayout(frame, props) {
   const measured = items.map((item) => ({ item, title: measure(item.title, inner, "type.body", true), text: item.text ? measure(item.text, inner, "type.compact") : null }));
   const content = Math.max(...measured.map((m) => m.title.height + (m.text ? v("space.2") + m.text.height : 0)));
   const disc = 56, icon = 32;
-  return { measured, gap, width, inner, disc, icon, height: v("space.5") + disc + v("space.4") + content + v("space.4") + icon + v("space.5") };
+  return { measured, gap, width, inner, disc, icon, content, height: v("space.5") + disc + v("space.4") + content + v("space.4") + icon + v("space.5") };
 }
 
 export function capsulesNodes({ id, frame, props }) {
@@ -942,7 +942,10 @@ export function capsulesNodes({ id, frame, props }) {
     const x = x0 + i * (L.width + L.gap), cid = stableId(id, "capsule", i), fill = i % 2 ? PRIMARY : ACCENT;
     out.push(fillRect(stableId(cid, "body"), "capsule-body", { x, y: y0, width: L.width, height: h }, fill, { radius: "radius.round" }));
     out.push(...numberMarker({ id: stableId(cid, "number"), role: "capsule-number", x: x + (L.width - L.disc) / 2, y: y0 + v("space.5"), size: L.disc, number: i + 1, reverse: false }));
-    let y = y0 + v("space.5") + L.disc + v("space.4");
+    // The words sit midway between the number and the icon, at one height across the row: set under the number, they left
+    // the foot of each pillar an empty dark slab.
+    const top = y0 + v("space.5") + L.disc + v("space.4"), room = h - (v("space.5") + L.disc + v("space.4")) - (v("space.4") + L.icon + v("space.5"));
+    let y = top + Math.max(0, (room - L.content) / 2);
     out.push(label(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, style("type.body", WHITE, true, "center")));
     y += m.title.height + v("space.2");
     if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.compact", WHITE, false, "center")));

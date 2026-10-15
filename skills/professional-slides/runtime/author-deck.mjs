@@ -45,7 +45,7 @@ import { carriedEntries, carriedFindings, carriedProblem, isCarried, revisionCha
 import { ICONS, ICON_NAMES, ICON_ALIASES } from "./icons.mjs";
 import { deckLimits, pageLimits } from "./limits.mjs";
 import { readPagesFile, withParts, compiledFrom, staleCompile } from "./pages-file.mjs";
-import { exhibitKinds, formFields, kindFields } from "./form-fields.mjs";
+import { exhibitKinds, formFields, kindFields, unreadKeys } from "./form-fields.mjs";
 import { sceneDesignFindings } from "./validate-overlap.mjs";
 import { insightLogRefusal, measureConflicts, measureRegistry, readInsightLog } from "./measures.mjs";
 import { metricsOf, primaryCitations, requiredCitations, untracedFindings } from "./page-numbers.mjs";
@@ -247,6 +247,7 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const found = [];
   const add = (list) => found.push(...list);
   add(failed.filter((f) => !f.unbound).map(({ id, message, code }) => ({ code: code ?? "COMPILE", id: idOfMessage(message) ?? id, severity: "blocker", repair: message })));
+  add(unreadExhibitKeys(doc));
   add(bindingFindings);
   for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const note of slide?.pageType?.advisories ?? [])
     add([{ code: "PAGE_ADJUSTED", id: String(slide.id), severity: "advisory", repair: `${slide.id}: ${String(note).replace(/^PAGE_ADJUSTED:\s*/, "")}` }]);
@@ -282,6 +283,28 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   const failedIds = new Set([...failed, ...composing].map((f) => f.id).filter((id) => id !== undefined && id !== null).map(String));
   return { spec, deck: composed.deck ?? null, composed, complete, failed, failedIds, blocking: listed.filter(isBlocker), advisories: listed.filter((f) => !isBlocker(f)),
     gates: { ran: gates.ran, reason: gates.reason ?? null }, assets: assets.statement, revision: revisionStatement(spec, imported), readAsChanged: revised };
+}
+
+/**
+ * An exhibit key nothing reads (form-fields.mjs unreadKeys), refused: read past, it was dropped without a word - the BA
+ * deck's `marks: { referenceLines }` lost its reference line, and `peers` and `omits` said nothing on 34 exhibits.
+ */
+function unreadExhibitKeys(doc) {
+  const out = [];
+  for (const page of [...(doc.pages || []), ...(doc.appendix || [])]) {
+    if (!page || typeof page !== "object" || !PAGE_TYPES[page.type]) continue;
+    const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
+    const exhibits = [...(page.exhibit ? [[page.exhibit, "exhibit"]] : []), ...(page.exhibits || []).map((ex, i) => [ex, `exhibits[${i}]`])];
+    for (const [exhibit, where] of exhibits) {
+      const typed = where !== "exhibit" || exhibit?.type !== undefined;
+      for (const { key, kind } of unreadKeys(exhibit, typed ? { kind: exhibit?.type } : { type: page.type, form })) {
+        const hint = key === "marks" ? ` - a mark is written at the exhibit's top level (\`referenceLines\`, \`annotations\`, ...), not under \`marks\`, which only groups them in \`--schema\``
+          : ` - nothing reads it: \`node runtime/author-deck.mjs --schema ${kind}\` lists every field ${kind} reads, and a note of your own goes under a key that begins with \`$\``;
+        out.push({ code: "EXHIBIT_KEY_UNREAD", id: String(page.id), severity: "blocker", repair: `${page.id}: \`${where}.${key}\` is no field of ${kind}${hint}` });
+      }
+    }
+  }
+  return out;
 }
 
 const COMPOSE_CACHE_SCHEMA = "professional-slides.compose-cache/v2";

@@ -305,7 +305,13 @@ export function resolveValueAxis(props, { valueCount, dataLabelsVisible }) {
   return !dataLabelsVisible;
 }
 
-export function normalizedCategoricalData(props, { seriesCount = null } = {}) {
+/**
+ * A chart's categories and series, checked. `gaps`: a series may leave a category without a value (null), drawn as a gap -
+ * no mark, no label, no line across it - on the charts that can say so (lines, columns, bars and their stacks). Every other
+ * chart needs a value in every category, and a gap is refused there with what to do: measures bound over periods that
+ * differ are set over all of them, each with its gaps, where a chart can show them (bind.mjs).
+ */
+export function normalizedCategoricalData(props, { seriesCount = null, gaps = false } = {}) {
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) {
     throw new Error("Categorical charts require one or more unique non-empty categories");
   }
@@ -317,8 +323,10 @@ export function normalizedCategoricalData(props, { seriesCount = null } = {}) {
     if (!item || typeof item !== "object" || Array.isArray(item) || typeof item.name !== "string" || !item.name.trim()) throw new Error(`series[${index}] requires a non-empty name`);
     if (names.has(item.name)) throw new Error(`Chart series names must be unique: ${item.name}`);
     names.add(item.name);
-    if (!Array.isArray(item.values) || item.values.length !== props.categories.length || item.values.some(value => !Number.isFinite(value))) {
-      throw new Error(`series[${index}].values must contain one finite value per category`);
+    const holes = Array.isArray(item.values) ? props.categories.filter((_, i) => item.values[i] === null) : [];
+    if (holes.length && !gaps) throw new Error(`series[${index}] (${item.name}) has no value for ${holes.join(", ")}: this chart needs a value in every category - a line, a column or a bar chart draws a gap there; or select the categories every series has`);
+    if (!Array.isArray(item.values) || item.values.length !== props.categories.length || item.values.some(value => value !== null && !Number.isFinite(value)) || !item.values.some(Number.isFinite)) {
+      throw new Error(`series[${index}].values must contain one finite value per category${gaps ? " (null for a gap)" : ""}`);
     }
     return { ...item, values: [...item.values] };
   });
@@ -370,6 +378,19 @@ export function periodLabelStep(count, needed) {
   if (needed <= 1) return { every: 1, fromFirst: true };
   for (const every of [needed, needed + 1]) if ((count - 1) % every === 0) return { every, fromFirst: true };
   return { every: needed, fromFirst: false };
+}
+
+/**
+ * Which of a run of evenly spaced periods are named: each where the widest name clears the pitch between them, else every
+ * nth from the first (periodLabelStep), and the latest where it clears the last one named - the first and the last, as a
+ * strong deck sets them. One rule for the line's axis and the combo's, which named 24 members on one another. `atLeast`: a
+ * step the run's calendar asks for (time-axis.mjs monthlyLabelStep).
+ */
+export function periodsNamed(categories, pitch, { atLeast = 1 } = {}) {
+  const widest = Math.max(...categories.map((category) => measureText(String(category), 400, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }).width));
+  const { every } = periodLabelStep(categories.length, Math.max(atLeast, Math.ceil((widest + 10) / Math.max(1, pitch))));
+  const last = categories.length - 1, before = Math.floor(last / every) * every;
+  return (index) => index % every === 0 || (index === last && (last - before) * pitch >= widest + 10);
 }
 
 export function axisTickText(min, max, index, steps = 4) {

@@ -10,13 +10,14 @@ import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag,
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT_FILL, rowLabels, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
-  normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
+  normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes, axisLabelWidth } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
-import { timePositions } from "./time-axis.mjs";
+import { spacedLabelIndices, timePositions } from "./time-axis.mjs";
 import { categoryBreakNodes, cutGap, datedRun, slotBreaks, valueBreakNodes, valueCut } from "./axis-breaks.mjs";
 import { assertComparison } from "./chart-sense.mjs";
+import { placeLabels } from "./label-placement.mjs";
 import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings, normalizeRowNotes, rowNoteNodes, ROW_NOTE_GAP } from "./chart-marks.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
@@ -189,7 +190,7 @@ export function categoricalChart(context) {
         continue;
       }
       // Columns too narrow for their values are read off a value axis instead (columnLabelsFit).
-      if (error.labelsCrowded) { props = { ...props, dataLabels: false, showValueAxis: true }; continue; }
+      if (error.labelsCrowded && !(props.dataLabels === false && props.showValueAxis === true)) { props = { ...props, dataLabels: false, showValueAxis: true }; continue; }
       // Stack totals the composer computed (compose-exhibits.mjs withStackTotals) give way to what the page wrote.
       if (!props.stackTotalsComputed) throw error;
       const { stackTotals: _totals, stackTotalsComputed: _computed, ...rest } = props;
@@ -220,7 +221,7 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   Object.assign(chart, categoricalBounds(chart));
   // Columns over periods show a change a reader can see (chart-sense.mjs): a stack's in its parts, since a mix can move while
   // its total holds; a cut axis answers to the cut's own rule.
-  if (!chart.valueBreak && !chart.diverging) assertComparison({ id, categories: chart.categories, props, dated: !horizontal && datedRun(chart.categories), span: chart.bounds.span, series: chart.series });
+  if (!chart.valueBreak && !chart.diverging) assertComparison({ id, categories: chart.categories, props, dated: !horizontal && datedRun(chart.categories), span: chart.bounds.span, series: chart.recorded });
   Object.assign(chart, categoricalColors(chart));
   Object.assign(chart, categoricalAxes(chart));
   Object.assign(chart, brokenScales(chart));
@@ -228,7 +229,10 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   columnLabelsFit(chart);
   Object.assign(chart, barSpans(chart));
   drawDeltaHeadings(chart);
+  // Unstacked bars and columns place their values together once every bar is drawn (placeBarLabels).
+  chart.barLabels = !stacked && !chart.diverging && !chart.valueBreak && chart.showDataLabels ? [] : null;
   chart.categories.forEach((category, categoryIndex) => drawCategory(chart, category, categoryIndex));
+  placeBarLabels(chart);
   drawValueBreaks(chart);
   drawCategoryBreaks(chart);
   drawDivergingCentre(chart);
@@ -264,7 +268,12 @@ function categoricalData(chart) {
   const { id, props, horizontal, stacked } = chart;
   assertGridlineOption(props);
   if (horizontal && props.categoryColumns) throw new Error(`${id}: a data table's columns run across the page, and a bar chart's categories run down it - set the table beside the bars as a column, or draw columns`);
-  const { categories, series } = normalizedCategoricalData(props);
+  // A gap in a series (null) draws no bar and no label, and counts as nothing in a stack (drawCategoryMarks); the series as
+  // recorded, gaps and all, is what the sense check reads.
+  const { categories, series: recorded } = normalizedCategoricalData(props, { gaps: true });
+  const gaps = new Set(recorded.flatMap((item, si) => item.values.flatMap((value, ci) => (value === null ? [`${si}:${ci}`] : []))));
+  if (gaps.size && props.diverging) throw new Error(`${id}: a diverging scale sets every answer of a row side by side, and ${[...gaps].length} have no value - give each row its answers, or leave the row out`);
+  const series = recorded.map((item) => ({ ...item, values: item.values.map((value) => value ?? 0) }));
   // A rank (measures.mjs isRankMeasure) is a place with 1 at the top: a bar's length would draw the worst place as the
   // most. The BA retest's Skytrax panel drew 23rd as a longer bar than 2nd. Dots on a rank axis, or a table, say it.
   const ranks = series.filter((item) => item.rank === true);
@@ -310,7 +319,7 @@ function categoricalData(chart) {
   // A label said another way - a range, an approximation - or ringed (chart-marks.mjs).
   const valueLabels = normalizeValueLabels(props, categories, series);
   if (valueLabels.size && !showDataLabels) throw new Error("valueLabels change the values printed on the marks, and this chart prints none; drop dataLabels: false, or say it in a callout");
-  return { categories, series, stackLabels, barHighlighted, barHighlight, regionHighlight, chartProps, forecastKeyed, forecastLegend,
+  return { categories, series, recorded, gaps, stackLabels, barHighlighted, barHighlight, regionHighlight, chartProps, forecastKeyed, forecastLegend,
     showLegend, values, showDataLabels, showValueAxis, valueLabels };
 }
 
@@ -462,7 +471,7 @@ function columnLabelPlan(chart) {
 function categoricalPlot(chart) {
   const { frame, props, horizontal, stacked, categories, series, regionHighlight, forecastKeyed, forecastLegend, showLegend,
     showDataLabels, showValueAxis, barLabelGap, barLabelWidth, iconSlot, axisText, horizontalCategoryLabelWidth, noteColumnWidth,
-    negativeLabelGutter, totalHeight, totalWidth, referenceGutter, deltaWidth, deltaBand, columnLabels, bracketWidth, bracketBand, groupColumnWidth } = chart;
+    negativeLabelGutter, totalHeight, totalWidth, referenceGutter, deltaWidth, deltaBand, columnLabels, bracketWidth, bracketBand, groupColumnWidth, values } = chart;
   // The band under the columns is their labels': estimated at the slot the
   // plot will give each column, so the frame's own height checks count the
   // room it leaves, and settled on the measured labels once the plot is laid
@@ -484,13 +493,14 @@ function categoricalPlot(chart) {
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
     periodBand: periodBandHeight(props, categories, { horizontal }) + deltaBand + bracketBand,
-    // The 54px left gutter is the value axis's: it holds "1,200" and its tick.
+    // The left gutter is the value axis's: 54px holds "1,200" and its tick, and wider ticks ("2,500,000") take what they need,
+    // read off the scale the values will take (the final scale is set once the plot's height is known, categoricalBounds).
     // With the numbers on the marks there is no axis to hold, and a vertical
     // category label never leaves its own slot, so the plot keeps the width the
     // axis would have taken and only a reading margin is reserved. The gutter
     // also mirrors to the right when the plot is centred, so this is twice the
     // width back on every labelled column chart.
-    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) + groupColumnWidth : showValueAxis ? 54 : 16,
+    leftInset: horizontal ? horizontalCategoryLabelWidth + negativeLabelGutter + 16 + (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0) + groupColumnWidth : showValueAxis ? Math.max(54, axisLabelWidth(numericBounds([0, ...(stacked ? categories.map((_, i) => series.reduce((sum, item) => sum + Math.max(0, item.values[i]), 0)) : values)], { axis: "y" })) + 8) : 16,
     valueLabelInset: (horizontal ? (stacked ? totalWidth : showDataLabels ? barLabelWidth + barLabelGap : 0) : referenceGutter) + deltaWidth + noteColumnWidth + bracketWidth,
     totalLabelInset: horizontal ? 0 : totalHeight,
     centerPlot: !horizontal && !showValueAxis,
@@ -706,7 +716,7 @@ function categoricalAxes(chart) {
 
   nodes.push(...(horizontal
     ? horizontalAxes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })
-    : axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis })));
+    : axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth: Math.max(48, axisLabelWidth(bounds)) })));
   if (!horizontal && bounds.min < 0 && bounds.max > 0) nodes.push(linePrimitive({
     id: stableId(id, "zero-baseline"), role: "chart-axis",
     ...(horizontal
@@ -753,7 +763,11 @@ function rowLabelling(chart) {
   const rows = horizontal && !chart.labelAbove ? rowLabels({ categories, span: categorySpan, named, font: axisFont }) : null;
   const rowSize = rows?.size ?? AXIS_LABEL, rowLine = rows?.line ?? measureText("Ag", 1000, axisFont).height;
   const rowShown = (index) => !rows || rows.shown(index);
-  return { categorySpan, slotStart, timeSpaced: Boolean(spacing), rowSize, rowLine, rowShown };
+  // Columns where their dates fall stand closer than an even run's, so the periods named are those whose labels clear their
+  // neighbours' (time-axis.mjs spacedLabelIndices), as on a line: 2017, 2018 and 2019 a lane of 28px apart printed on each other.
+  const widest = spacing ? Math.max(...categories.map((category) => measureText(String(category), 1000, axisFont).width)) : 0;
+  const kept = spacing ? new Set(spacedLabelIndices(categories.map((_, index) => slotStart(index) + categorySpan / 2), widest + 8)) : null;
+  return { categorySpan, slotStart, timeSpaced: Boolean(spacing), rowSize, rowLine, rowShown, ...(kept ? { labelShown: (index) => kept.has(index) } : {}) };
 }
 
 /**
@@ -767,6 +781,33 @@ function columnLabelsFit(chart) {
   const room = categorySpan / Math.max(1, series.length) - 2;
   const widest = Math.max(...values.filter(Number.isFinite).map((value) => measureDataLabel(formatValue(value, props)).width));
   if (widest > room) throw Object.assign(new Error(`the columns' values (${Math.ceil(widest)}px) are wider than their columns (${Math.floor(room)}px)`), { labelsCrowded: true });
+}
+
+/**
+ * A stack's value wider than its column - or, set beside the stack, leaving the column too thin to draw - is read off a
+ * value axis instead (categoricalChart), unless the chart asks for every value; any other error stands.
+ */
+function stackCrowded(error, props, text, width) {
+  if (error && !/^Unbreakable text/.test(error.message)) return error;
+  return props.dataLabels === true
+    ? new Error(`${text} does not fit its ${Math.max(0, Math.floor(width))}px column, and the chart asks for every value (dataLabels: true): drop dataLabels to read the stacks off a value axis, or give the chart fewer members or more width`)
+    : Object.assign(new Error(`a stack's values do not fit its ${Math.max(0, Math.floor(width))}px columns`), { labelsCrowded: true });
+}
+
+/**
+ * An unstacked chart's values, placed together clear of each other and of every other bar (label-placement.mjs): each past
+ * its bar's end where that is clear, else inside the bar. A value with no clear place is left out, and the chart is drawn
+ * again read off a value axis (categoricalChart); a chart that asks for every value (`dataLabels: true`) is refused instead.
+ */
+function placeBarLabels(chart) {
+  const { nodes, frame, props, barLabels } = chart;
+  if (!barLabels) return;
+  const bars = nodes.filter((node) => node.role === "chart-mark").map((node) => node.frame);
+  const { placed, dropped } = placeLabels(barLabels, { style: () => null, keepOut: bars, within: frame, pad: 1 });
+  if (dropped && props.dataLabels !== true) throw Object.assign(new Error(`${dropped} of the chart's values have no clear place beside or inside their bars`), { labelsCrowded: true });
+  // A page that asks for every value (`dataLabels: true`) is not given two printed on each other.
+  if (dropped) throw new Error(`${dropped} of the chart's ${barLabels.length} values have no clear place beside or inside their bars, and the chart asks for every one (dataLabels: true): drop dataLabels to read them off a value axis, label fewer series, or give the chart fewer members or more width`);
+  for (const label of placed) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: label.frame, text: label.text, style: label.style, data: label.data }));
 }
 
 /** Each category's group of bars: its width (narrowed for stack labels set outside, or a bracket) and each bar's. */
@@ -790,12 +831,14 @@ function barSpans(chart) {
     for (const category of categories) for (const item of series) {
       const value=item.values[categories.indexOf(category)];
       const text=attachedLabelText(formatValue(value,props),stackLabels.secondary.get(`${category}:${item.name}`),props);
-      const label=measureDataLabel(text,Math.max(1,groupSpan-8));
-      if(label.height>Math.abs(value)/bounds.span*plot.height) stackExternalWidth=Math.max(stackExternalWidth,measureDataLabel(text,categorySpan*.45).width);
+      try {
+        const label=measureDataLabel(text,Math.max(1,groupSpan-8));
+        if(label.height>Math.abs(value)/bounds.span*plot.height) stackExternalWidth=Math.max(stackExternalWidth,measureDataLabel(text,categorySpan*.45).width);
+      } catch (error) { throw stackCrowded(error, props, text, groupSpan); }
     }
     if(stackExternalWidth) {
       groupSpan=Math.min(groupSpan,categorySpan-stackExternalWidth-tokenValue(token("space.3"))*2);
-      if(groupSpan<tokenValue(token("space.4"))) throw new Error("External stack label leaves insufficient mark width; enlarge the chart or reduce categories");
+      if(groupSpan<tokenValue(token("space.4"))) throw stackCrowded(null, props, "a value set beside its stack", groupSpan);
     }
   }
   if (stackBracket) groupSpan = Math.min(groupSpan, categorySpan * 0.5);
@@ -853,6 +896,7 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
   const diverging = chart.diverging;
   const order = diverging ? diverging.order : series.map((_, i) => i);
   order.forEach((seriesIndex) => {
+    if (chart.gaps.has(`${seriesIndex}:${categoryIndex}`)) return;
     const item = series[seriesIndex];
     const value = diverging ? diverging.sign(seriesIndex) * item.values[categoryIndex] : item.values[categoryIndex];
     const selected = barHighlighted.has(category);
@@ -891,7 +935,9 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
     if (showDataLabels && (!stacked || value !== 0) && (!horizontal || rowShown(categoryIndex))) {
       // A diverging scale's answers print unsigned: a share of respondents, whichever side of zero it is drawn.
       let labelText = attachedLabelText(said(seriesIndex)?.display ?? formatValue(diverging ? Math.abs(value) : value, props), stackLabels.secondary.get(`${category}:${item.name}`),props);
-      const labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1,bar.width-4) : 1000);
+      let labelMetrics;
+      try { labelMetrics = measureDataLabel(labelText, stacked && !horizontal ? Math.max(1, bar.width - 4) : 1000); }
+      catch (error) { throw stackCrowded(error, props, labelText, bar.width); }
       labelText = labelMetrics.text;
       const labelFrame = horizontal
         ? stacked
@@ -906,7 +952,18 @@ function drawCategoryMarks(chart, category, categoryIndex, categoryStart) {
             : { x: bar.x - 10, y: Math.min(plot.y + plot.height - 24, bar.y + bar.height + 2), width: bar.width + 20, height: 24 };
       // A fixed minimum may force an in-bar label; contrast against its fill.
       const labelOnFill = stacked || (!horizontal && value < 0 && labelFrame.y < bar.y + bar.height);
-      nodes.push(textPrimitive({
+      const labelData = { category, series: item.name, ...(said(seriesIndex)?.display ? { display: said(seriesIndex).display, value } : {}), ...(said(seriesIndex)?.estimate ? { estimate: true } : {}) };
+      // An unstacked bar's value offers two places - past the bar's end, then inside it in the colour that reads on its fill -
+      // and the chart's values are placed together (placeBarLabels, label-placement.mjs).
+      if (chart.barLabels) {
+        const size = horizontal ? rowSize : CHART_LABEL, align = horizontal ? (value >= 0 ? "left" : "right") : "center";
+        const insideFrame = horizontal
+          ? { x: value >= 0 ? bar.x + bar.width - barLabelWidth - 6 : bar.x + 6, y: labelFrame.y, width: barLabelWidth, height: labelFrame.height }
+          : { x: bar.x - 10, y: value >= 0 ? bar.y + 4 : bar.y + bar.height - 28, width: bar.width + 20, height: 24 };
+        chart.barLabels.push({ id: stableId(id, "value-label", item.name, category), text: labelText, data: labelData, own: bar, frames: [
+          { frame: labelFrame, align, style: textStyle(size, labelOnFill && !lighter(seriesIndex, categoryIndex) ? onFill(markColor) : INK, labelBold(), align) },
+          { frame: insideFrame, align: horizontal ? (value >= 0 ? "right" : "left") : "center", style: textStyle(size, lighter(seriesIndex, categoryIndex) ? INK : onFill(markColor), labelBold(), horizontal ? (value >= 0 ? "right" : "left") : "center") }] });
+      } else nodes.push(textPrimitive({
         id: stableId(id, "value-label", item.name, category),
         role: "data-label",
         frame: labelFrame,

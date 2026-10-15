@@ -1,0 +1,51 @@
+{
+  "chart.area": {
+    "TEXT_ON_TEXT": 3,
+    "OUTSIDE_FRAME": 5
+  },
+  "chart.boxplot": {
+    "OUTSIDE_FRAME": 4,
+    "TEXT_ON_TEXT": 15
+  },
+  "chart.column": {
+    "TEXT_ON_LINE": 32
+  },
+  "chart.combo": {
+    "OUTSIDE_FRAME": 4
+  },
+  "chart.line": {
+    "TEXT_ON_TEXT": 6,
+    "OUTSIDE_FRAME": 13
+  },
+  "chart.lollipop": {
+    "TEXT_ON_LINE": 4,
+    "TEXT_ON_TEXT": 5
+  },
+  "chart.marimekko": {
+    "TEXT_UNPLANNED": 13
+  },
+  "chart.radar": {
+    "OUTSIDE_FRAME": 3
+  },
+  "chart.slope": {
+    "OUTSIDE_FRAME": 5,
+    "TEXT_ON_TEXT": 1
+  },
+  "chart.small-multiples": {
+    "OUTSIDE_FRAME": 3,
+    "TEXT_ON_TEXT": 3
+  },
+  "chart.sparklines": {
+    "TEXT_ON_LINE": 7
+  },
+  "chart.stacked-area": {
+    "OUTSIDE_FRAME": 4
+  },
+  "chart.stacked-column": {
+    "TEXT_ON_LINE": 16
+  },
+  "chart.waterfall": {
+    "TEXT_UNPLANNED": 28,
+    "OUTSIDE_FRAME": 8
+  }
+}

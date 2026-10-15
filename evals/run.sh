@@ -41,4 +41,8 @@ done
 echo "== node-side gates =="
 "$NODE" evals/scripts/check_source_quality.mjs
 
+echo "== chart stress =="
+# Every chart kind drawn under awkward inputs; a crash, broken geometry or a finding count past the baseline fails.
+"$NODE" evals/scripts/chart_stress.mjs || suite_status=1
+
 exit "$suite_status"

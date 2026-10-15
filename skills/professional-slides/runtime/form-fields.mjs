@@ -116,7 +116,7 @@ export const KINDS = Object.freeze({
     options: { secondaryAxis: "true - the line on its own scale (`y2Min`, `y2Max`)", secondaryUnit: "string - the line's unit", secondaryValueFormat: "valueFormat - the line's" } },
   "chart.waterfall": { chart: true, axis: true, bound: true, data: { categories: CATEGORICAL.categories, values: "number[one per category] - a total's level, a step's change", totals: "int[] - the indices that are totals ([0, last])" },
     options: { orientation: "\"vertical\" | \"horizontal\"", labelDecimals: "int - the labels' decimals", bridge: "{ from?: { measure: ref@label, name? }, steps: { measure } | [{ measure, name }], to: { measure }, residual?: \"<label>\" } - the bridge written from measures, reconciled" } },
-  "chart.scatter": { chart: true, bound: true, data: { points: POINTS.points }, options: { ...POINTS, points: undefined, trendLine: undefined } },
+  "chart.scatter": { chart: true, bound: true, data: { points: POINTS.points }, options: { ...POINTS, points: undefined, trendLine: "{ method?: \"linear\", label? } - a fitted line (5+ points)" } },
   "chart.bubble": { chart: true, bound: true, data: { points: "[{ name, x, y, size > 0, series? }] - required (or bound with `size: { measure }`)" }, options: { ...POINTS, points: undefined, sizeLegend: "{ label, markerSize? } - what a bubble's area shows" } },
   "chart.pie": { chart: true, bound: true, data: { labels: "string[2-5] unique - the parts", values: "number[one per label] >= 0; a part under 5% is refused" },
     options: { variant: "\"outside-labels\" (default) | \"legend-top-right\" | \"shared-legend\"", legend: "boolean", dataLabels: "false", categoryKeys: "string[] - one colour key across neighbouring charts" } },
@@ -302,6 +302,8 @@ export const MARKS = Object.freeze({
 
 // How a bound exhibit names its measures, and how a typed one says which it shows (bind.mjs, page-numbers.mjs).
 const BOUND = Object.freeze({
+  role: "\"proof\" | \"context\" - what the bound exhibit is to the claim (as `basis.role`)",
+  relevance: "string - why a context exhibit is on the page (as `basis.relevance`)",
   "series[].measure": "\"<insight>/<measure>\" | [ref, ref] - the runtime writes the categories, values, unit and basis (two refs: a record then a scenario, one line)",
   "series[].role": "\"context\" - a series beside the claim's own",
   select: "{ from?, to? } | { periods: [...] } over periods; { members: [...], order?: descending|ascending } over members - narrows the axis",
@@ -342,8 +344,38 @@ function exhibitFields(kind) {
   return {
     ...defined({ ...own.data }), ...defined({ ...own.options }), ...(entry.note ? { note: entry.note } : {}), ...shared,
     ...(Object.keys(marks).length ? { marks } : {}),
-    ...(own.bound ? { bound: own.table ? { tokens: BOUND.tokens, basis: BOUND.basis } : own.chart ? BOUND : { "items[].measure": "ref + `format` - the runtime writes the value", tokens: BOUND.tokens } } : {}),
+    ...(own.bound ? { bound: own.table ? { tokens: BOUND.tokens, basis: BOUND.basis } : own.chart || own.data?.series ? BOUND : { "items[].measure": "ref + `format` - the runtime writes the value", tokens: BOUND.tokens } } : {}),
   };
+}
+
+// What every typed exhibit may carry whatever its kind: its heading and caption on a panels page, its place on a dashboard,
+// and what it shows.
+const EXHIBIT = Object.freeze({
+  heading: "string - the panel's heading",
+  caption: "string - the finding under the panel",
+  area: "{ column, row, columnSpan?, rowSpan? } - its place on a dashboard",
+  basis: BOUND.basis,
+});
+
+/**
+ * The keys of an authored exhibit that nothing reads: neither its kind's fields (what `--schema` prints for it), nor the
+ * fields every typed exhibit takes, nor a `$` note. `kind` is the exhibit's own `type` or, untyped, the kind its page's
+ * form draws (`type`, `form`); a page construction with no exhibit kind returns none. Read past, such a key was dropped
+ * without a word: the BA deck's `marks: { referenceLines }` lost its reference line, and `peers` and `omits` - which no
+ * code has read since the deck conventions were cut - said nothing on 34 exhibits.
+ */
+export function unreadKeys(exhibit, { type, form, kind = exhibit?.type } = {}) {
+  if (!exhibit || typeof exhibit !== "object" || Array.isArray(exhibit)) return [];
+  const drawnKind = kind ?? (type && form ? kindOf(type, form) : null);
+  const fields = drawnKind ? exhibitFields(drawnKind) : null;
+  if (!fields) return [];
+  const top = (key) => key.split(/[.[]/)[0];
+  const known = new Set(["type", ...Object.keys(EXHIBIT), ...Object.keys(FORM_EXTRAS[`${type}/${form}`] ?? {}).map(top)]);
+  for (const [key, value] of Object.entries(fields)) {
+    if ((key === "marks" || key === "bound") && value && typeof value === "object") for (const inner of Object.keys(value)) known.add(top(inner));
+    else if (key !== "note") known.add(top(key));
+  }
+  return Object.keys(exhibit).filter((key) => !known.has(key) && !key.startsWith("$")).map((key) => ({ key, kind: drawnKind }));
 }
 
 /**

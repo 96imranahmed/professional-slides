@@ -191,7 +191,9 @@
    ],
    "exhibit": {
     "heading": "Service operated and punctuality",
-    "unit": "million train-km; % on time",
+    "unit": "million train-km",
+    "secondaryAxis": true,
+    "secondaryUnit": "% on time",
     "categories": [
      "FY21",
      "FY22",
@@ -3789,7 +3791,7 @@
      "Line",
      "Off-peak trains a weekday",
      "Journeys, million",
-     "Growth FY23-FY26",
+     { "label": "Growth FY23-FY26", "bubble": true },
      {
       "label": "What it means",
       "implication": true

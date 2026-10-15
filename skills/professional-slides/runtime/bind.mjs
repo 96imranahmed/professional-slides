@@ -78,6 +78,16 @@ import { registered } from "./errors.mjs";
 import { roundHalfAway } from "./value-format.mjs";
 import { PAGE_TYPES } from "./page-types.mjs";
 import { chartDraws } from "./charts.mjs";
+import { parsePeriod } from "./time-axis.mjs";
+
+// The charts that draw a gap in a series (chart-axes.mjs normalizedCategoricalData `gaps`).
+const GAP_KINDS = new Set(["chart.line", "chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"]);
+/** Every period any of `runs` has, in time order where every label reads as a date, else in the order first met. */
+function periodUnion(runs) {
+  const all = [...new Set(runs.flat())];
+  const times = all.map((label) => parsePeriod(label)?.t);
+  return times.every(Number.isFinite) ? all.map((label, i) => [label, times[i]]).sort((a, b) => a[1] - b[1]).map(([label]) => label) : all;
+}
 
 export const BINDING_CODES = Object.freeze({
   BINDING_UNRESOLVED: "an exhibit, a metric or a `{{...}}` token names a measure the runtime cannot bind: one the insight log does not hold, one from an insight the page does not rest on, or one whose axis, unit or format cannot fill what names it",
@@ -671,14 +681,17 @@ function bindExhibit(ex, what, context) {
   if (new Set(axed.map((s) => s.kind)).size > 1) return void fail(`${what} sets ${axed.filter((s) => s.kind === "periods").flatMap((s) => s.refs).join(", ")} (over periods) beside ${axed.filter((s) => s.kind === "members").flatMap((s) => s.refs).join(", ")} (over members): one axis is one or the other`, refs);
   const kind = axed[0].kind;
   // The axis every series has a place on, in the first one's order: no series is drawn with a hole the record does not have.
-  let labels = [...axed[0].at.keys()].filter((label) => axed.every((s) => s.at.has(label)));
+  // Over periods, a chart that draws a gap (chart-axes.mjs normalizedCategoricalData) runs over every period any series has,
+  // in time order, each series with its gaps: two bases of one profit, 2019-2023 and 2023-2025, are one run with a seam.
+  const gapped = kind === "periods" && GAP_KINDS.has(drawnAs);
+  let labels = gapped ? periodUnion(axed.map((s) => [...s.at.keys()])) : [...axed[0].at.keys()].filter((label) => axed.every((s) => s.at.has(label)));
   if (!labels.length) return void fail(`${what}: ${refs.join(", ")} share no ${kind === "periods" ? "period" : "member"}`, refs);
   const select = ex.select;
   // Narrowed to the periods every series shares, a chart can lose most of a series without a word: the BA deck's loyalty
   // page bound profit on two bases, 2019-2023 and 2023-2025, and drew 2023 alone. Under half the longest run is refused
   // unless \`select\` asks for the shared periods.
   const longest = Math.max(...axed.map((s) => s.at.size));
-  if (kind === "periods" && select === undefined && labels.length * 2 < longest)
+  if (kind === "periods" && !gapped && select === undefined && labels.length * 2 < longest)
     return void fail(`${what}: ${series.map((s, i) => `${named[i].name ?? s.refs.join(", ")} runs over ${[...s.at.keys()].join(", ")}`).join("; ")} - together they share only ${labels.join(", ")}, so a chart of them draws ${labels.length === 1 ? "that period alone" : "those periods alone"}. Draw each over its own periods (one series, or a panel each), or name the shared periods in \`select\``, refs);
   if (select !== undefined) {
     if (!select || typeof select !== "object" || Array.isArray(select)) return void fail(`${what}: \`select\` is { from, to } or { periods: [...] } over time, { members: [...], order } over a peer set`);
@@ -720,9 +733,9 @@ function bindExhibit(ex, what, context) {
   const written = raw ? undefined : units[0];
   if (typeof ex.unit === "string" && ex.unit.trim() && !perSeries && (written === undefined || normalUnit(ex.unit) !== normalUnit(written)))
     return void fail(`${what} types its unit as "${ex.unit}", and ${refs.join(", ")} ${refs.length === 1 ? "is" : "are"} recorded in ${units.join(", ")}${raw ? ` and drawn as an index` : ""}: leave \`unit\` out of a bound exhibit and the runtime writes it`, refs);
-  const values = series.map((s) => labels.map((label) => (s.kind === "scalar" ? s.scalar : s.at.get(label).value)));
+  const values = series.map((s) => labels.map((label) => (s.kind === "scalar" ? s.scalar : s.at.get(label)?.value ?? null)));
   // The run of periods that rest on an assumption is said on the chart: bracketed above the plot, beside the recorded run.
-  const assumed = labels.map((label) => axed.some((s) => s.at.get(label).assumed));
+  const assumed = labels.map((label) => axed.some((s) => s.at.get(label)?.assumed));
   // A table turned over (`pivot`) sets its measures along the axis, not its periods: there is no run of periods to bracket,
   // and each series - one period across the measures - says what it is itself (shapeBound).
   if (kind === "periods" && assumed.some(Boolean) && ex.pivot !== true) {
@@ -735,8 +748,8 @@ function bindExhibit(ex, what, context) {
     // The bracket marks where the chart turns from record to assumption, read off the series that turn: a series that is an
     // assumption throughout says so in its own stroke and key (chart-decorations.mjs SERIES_STATES), and drawn beside a record
     // it does not put the record under "Assumed". Only where every series is assumed throughout is the whole axis bracketed.
-    const throughout = (s) => labels.every((label) => s.at.get(label).assumed || s.at.get(label).value === null);
-    const turning = axed.filter((s) => !throughout(s)), turn = labels.findIndex((label) => turning.some((s) => s.at.get(label).assumed));
+    const throughout = (s) => labels.every((label) => s.at.get(label)?.assumed || (s.at.get(label)?.value ?? null) === null);
+    const turning = axed.filter((s) => !throughout(s)), turn = labels.findIndex((label) => turning.some((s) => s.at.get(label)?.assumed));
     // The bracket is written only for a chart that draws one (charts.mjs chartDraws): small multiples, a slope or stacked areas
     // would refuse it as dropped unseen. There each series still says what it is (`state`, `assumedFrom`), and the page's note says it in words.
     const bracketed = chartDraws(drawnAs, "periods") !== false;
@@ -767,7 +780,7 @@ function bindExhibit(ex, what, context) {
   // is an assumption throughout is assumed, and one that turns from record to assumption is assumed from that period on.
   const stateOf = (s) => {
     if (s.kind === "scalar") return { state: "reference" };
-    const rests = labels.map((label) => s.at.get(label).assumed), drawn = labels.map((label) => s.at.get(label).value).filter((value) => typeof value === "number");
+    const rests = labels.map((label) => s.at.get(label)?.assumed), drawn = labels.map((label) => s.at.get(label)?.value).filter((value) => typeof value === "number");
     const level = drawn.length > 1 && drawn.every((value) => value === drawn[0]);
     if (level && (rests.every(Boolean) || s.measures.every((m) => m.standard === true))) return { state: "reference" };
     return rests.every(Boolean) ? { state: "assumed" } : rests.some(Boolean) && kind === "periods" ? { assumedFrom: labels[rests.indexOf(true)] } : {};
@@ -777,7 +790,7 @@ function bindExhibit(ex, what, context) {
   const states = named.map((s, i) => ({ ...(bySeries && (s.state !== undefined || s.assumedFrom !== undefined) ? { ...(s.state !== undefined ? { state: s.state } : {}), ...(s.assumedFrom !== undefined ? { assumedFrom: s.assumedFrom } : {}) } : stateOf(series[i])),
     ...(series[i].kind !== "scalar" && series[i].measures.length && series[i].measures.every(isRankMeasure) ? { rank: true } : {}) }));
   // Each value's own footing, measure by measure and label by label: what a table turned over reads its series' states from.
-  const rests = series.map((s) => labels.map((label) => (s.kind === "scalar" ? false : Boolean(s.at.get(label).assumed))));
+  const rests = series.map((s) => labels.map((label) => (s.kind === "scalar" ? false : Boolean(s.at.get(label)?.assumed))));
   const shaped = bySeries || drawnAs === "chart.treemap" ? shapeBound(ex, drawnAs, { labels, names: seriesNames, values, pivot, states, rests }) : undefined;
   if (typeof shaped === "string") return void fail(`${what}: ${shaped}`, refs);
   if (shaped === undefined) {
@@ -804,7 +817,7 @@ function bindExhibit(ex, what, context) {
   delete ex.select;
   bound.filled.add(ex);
   // Every number the exhibit plots, by the measure and the period or member it is the value of: a joined series by whichever measure holds each period.
-  for (const s of series) for (const label of s.kind === "scalar" ? [null] : labels) { const cell = label === null ? { ref: s.refs[0], label, value: s.scalar } : { ref: s.at.get(label).ref, label, value: s.at.get(label).value };
+  for (const s of series) for (const label of s.kind === "scalar" ? [null] : labels.filter((label) => s.at.has(label))) { const cell = label === null ? { ref: s.refs[0], label, value: s.scalar } : { ref: s.at.get(label).ref, label, value: s.at.get(label).value };
     // A period or member the exhibit sets on its axis is shown of every measure of the series that runs over it, recorded there or
     // not - a chart draws the gap, and a scenario's path joined to a record shows the period the two share.
     if (label === null) viewed(ex, cell.ref, null); else for (const m of s.measures) if (axisOf(m).labels.includes(label)) viewed(ex, m.ref, label);

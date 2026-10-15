@@ -13,6 +13,8 @@ export function labelInk(frame, text, style) {
 }
 
 const meets = (a, b, pad) => a.x < b.x + b.width + pad && b.x < a.x + a.width + pad && a.y < b.y + b.height + pad && b.y < a.y + a.height + pad;
+// A label's own bar is known by its box, not its object: a drawn mark keeps a copy of the frame it was given.
+const same = (a, b) => Boolean(b) && ["x", "y", "width", "height"].every((key) => Math.abs(a[key] - b[key]) < 0.5);
 
 /** Whether the segment `{ x1, y1, x2, y2 }` passes through `box`. */
 function crosses(box, { x1, y1, x2, y2 }) {
@@ -34,14 +36,17 @@ export function placeLabels(labels, { style, keepOut = [], lines = [], within = 
   const taken = [], placed = [];
   let dropped = 0;
   for (const label of labels) {
-    const choice = label.frames.map((frame) => ({ frame: frame.frame ?? frame, align: frame.align ?? label.align ?? "center" })).find(({ frame, align }) => {
-      const ink = labelInk(frame, label.text, style(align));
+    // A frame may carry its own style (a value set inside its bar, in the colour that reads on the fill), and a label the box
+    // it may sit on (`own`, its bar).
+    const styled = (choice) => choice.style ?? style(choice.align);
+    const choice = label.frames.map((frame) => ({ frame: frame.frame ?? frame, align: frame.align ?? label.align ?? "center", style: frame.style })).find((choice) => {
+      const ink = labelInk(choice.frame, label.text, styled(choice));
       if (within && (ink.x < within.x - 1 || ink.y < within.y - 1 || ink.x + ink.width > within.x + within.width + 1 || ink.y + ink.height > within.y + within.height + 1)) return false;
-      return ![...taken, ...keepOut].some((box) => meets(ink, box, pad)) && !lines.some((line) => crosses(ink, line));
+      return ![...taken, ...keepOut.filter((box) => !same(box, label.own))].some((box) => meets(ink, box, pad)) && !lines.some((line) => crosses(ink, line));
     });
     if (!choice) { dropped += 1; continue; }
-    taken.push(labelInk(choice.frame, label.text, style(choice.align)));
-    placed.push({ ...label, frame: choice.frame, align: choice.align });
+    taken.push(labelInk(choice.frame, label.text, styled(choice)));
+    placed.push({ ...label, frame: choice.frame, align: choice.align, style: styled(choice) });
   }
   return { placed, dropped };
 }

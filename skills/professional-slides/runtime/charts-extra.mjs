@@ -424,14 +424,16 @@ function stackedAreaLayout(frameIn, props) {
   const bounds = numericBounds([0, ...totals], { min: 0, max: props.yMax, axis: "y" });
   const labelWidth = axisLabelWidth(bounds);
   // Callouts take their bands above the plot, as on any chart.
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: 70, centerPlot: false, annotations: props.annotations });
-  return { series, categories, totals, bounds, labelWidth, plot, height: aspectHeight(frame, plot) };
+  // Each layer's latest value is set past the plot's right end, in a gutter as wide as the widest of them.
+  const endWidth = Math.max(64, ...series.map((s) => Math.ceil(measure(formatValue(s.values.at(-1), props), 1000, { bold: labelBold() }).width) + 6));
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: endWidth + 6, centerPlot: false, annotations: props.annotations });
+  return { series, categories, totals, bounds, labelWidth, endWidth, plot, height: aspectHeight(frame, plot) };
 }
 function stackedAreaChart({ id, frame, props }) {
   // Opaque layers fill the plot from the baseline: a reference line drawn
   // behind them shows only above the stack, and its label sits on the fills.
   if ((props.referenceLines || []).length) throw new Error(`${id}: a stacked area's layers fill the plot and would hide a reference line behind them - state the level in a callout at the period the total reaches it, or draw the total as a line chart with its reference line`);
-  const { series, categories, totals, bounds, labelWidth, plot } = stackedAreaLayout(frame, props);
+  const { series, categories, totals, bounds, labelWidth, endWidth, plot } = stackedAreaLayout(frame, props);
   assertComparison({ id, categories, series, span: bounds.span, props, dated: datedRun(categories) });
   // Layers fill from zero, so a rank (measures.mjs isRankMeasure) is never one; and a fill carried across periods the run
   // leaves out (time-axis.mjs missingPeriods) states values the record does not have - the BA retest's stack of Heathrow's
@@ -440,11 +442,13 @@ function stackedAreaChart({ id, frame, props }) {
   if (ranks.length) throw new Error(`RANK_FILLED: ${ranks.map((s) => s.name).join(", ")} is a rank, and a filled layer draws the worst place as the largest - draw it as chart.line, which sets 1 at the top`);
   const gaps = missingPeriods(categories);
   if (gaps.length) throw new Error(`AREA_GAP: the run leaves out the periods between ${gaps.map((gap) => `${gap.from} and ${gap.to}`).join(", ")}, and a stacked area would fill straight across them - draw stacked columns (each period its own stack), or the series as chart.line, which breaks at a gap`);
-  // Uneven dated observations sit where they fall in time (time-axis.mjs), and
-  // only the labels whose 80px slots clear their neighbours' are set.
+  // Uneven dated observations sit where they fall in time (time-axis.mjs), and the periods named, evenly spaced or not, are
+  // those whose labels clear their neighbours' (spacedLabelIndices): 24 months each named printed on one another.
   const spacing = timePositions(categories);
   const xAt = (i) => plot.x + plot.width * (spacing ? spacing[i] : i / Math.max(1, categories.length - 1));
-  const labelled = spacing ? spacedLabelIndices(categories.map((_, i) => xAt(i)), 84) : categories.map((_, i) => i);
+  const widest = Math.max(...categories.map((c) => measure(c, 1000, { size: AXIS_LABEL }).width));
+  const labelled = spacedLabelIndices(categories.map((_, i) => xAt(i)), widest + 10);
+  const slot = Math.max(80, widest + 4);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
   const nodes = [
     ...(props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : []),
@@ -463,9 +467,9 @@ function stackedAreaChart({ id, frame, props }) {
     const bottom = lower.map((v, i) => norm(plot, xAt(i), yAt(v))).reverse();
     nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name, baselineValue: bounds.min } }));
     const last = categories.length - 1;
-    if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: endTops[si], width: 64, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
+    if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: endTops[si], width: endWidth, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
   });
-  categories.forEach((c, i) => labelled.includes(i) && nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - 40, y: plot.y + plot.height + 12, width: 80, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
+  categories.forEach((c, i) => labelled.includes(i) && nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - slot / 2, y: plot.y + plot.height + 12, width: slot, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
   // A callout names a period and, for one band, its series: it points at the
   // middle of that band there; without a series, at the top of the stack -
   // the period's total.

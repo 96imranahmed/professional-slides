@@ -34,7 +34,7 @@ Each check is about one page or about the saved file. A blocking finding stops t
 
 | Group | Codes |
 | --- | --- |
-| The page cannot be drawn | `COMPILE`, `PAGE_DOES_NOT_COMPOSE`, `TITLE_LINES`, `HEADING_WRAPS`, `TOTAL_ROW_BLANK`; `PAGE_SPLITS` and `PAGE_ADJUSTED` advised |
+| The page cannot be drawn | `COMPILE`, `EXHIBIT_KEY_UNREAD`, `PAGE_DOES_NOT_COMPOSE`, `TITLE_LINES`, `HEADING_WRAPS`, `TOTAL_ROW_BLANK`; `PAGE_SPLITS` and `PAGE_ADJUSTED` advised |
 | Overlap and legibility | `TEXT_ON_TEXT`, `TEXT_ON_LINE`, `TEXT_ON_EDGE`, `DESCENDER_ON_RULE`, `MAP_LABEL_ASTRAY`, `GROUND_CONTRAST`, `RENDER_CONTRAST`, `TYPE_RANGE`, `SCATTER_UNKEYED`; `SCENE_VOID` advised |
 | A chart drawn wrongly | `AREA_BASELINE`, `RANK_FILLED`, `UNSCALED_FIGURE` |
 | A chart that compares nothing | `NO_COMPARISON`, `SERIES_FLAT`, `ONE_COMPARISON` (chart-sense.mjs) |

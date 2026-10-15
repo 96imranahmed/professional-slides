@@ -5,9 +5,14 @@ runs, outliers, forty members, long names, skipped years - at four frames, and r
 These are the faults it found that a reader would see, each held where it was fixed: the subject's colour, shared by
 every kind; the axis jumps, shared; the sense check on a chart over time; and the labels placed together.
 """
+import json
+import shutil
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
-from node_probe import run_node
+from node_probe import NODE, ROOT, RUNTIME, run_node
 
 PRELUDE = """
 import assert from 'node:assert/strict';
@@ -185,6 +190,120 @@ const combo = draw('chart.combo', REGISTRY.get('chart.combo').sample);
 console.log(JSON.stringify({ area: blocking(area), multiples: blocking(multiples), combo: blocking(combo) }));
 """)
         self.assertEqual(result, {"area": [], "multiples": [], "combo": []})
+
+
+class PlacedValueTests(unittest.TestCase):
+    def test_a_value_takes_its_next_clear_place_and_may_sit_on_its_own_bar(self):
+        result = run_node(PRELUDE + """
+import { placeLabels } from './skills/professional-slides/runtime/label-placement.mjs';
+const bar = { x: 100, y: 100, width: 60, height: 200 }, neighbour = { x: 100, y: 60, width: 60, height: 36 };
+const label = (own) => ({ text: '1,250', own, frames: [{ x: 100, y: 70, width: 60, height: 24 }, { x: 100, y: 106, width: 60, height: 24 }] });
+const style = () => ({ fontFamily: 'Arial', fontSize: 12, color: '#000000', align: 'center' });
+const free = placeLabels([label(bar)], { style, keepOut: [bar, neighbour] });
+const blocked = placeLabels([label(null)], { style, keepOut: [bar, neighbour] });
+console.log(JSON.stringify({ free: free.placed.map((l) => l.frame.y), blocked: blocked.dropped }));
+""")
+        self.assertEqual(result, {"free": [106], "blocked": 1})  # over the bar is taken, so inside it; never on a bar not its own
+
+    def test_values_a_chart_insists_on_are_refused_when_they_cannot_be_placed(self):
+        result = run_node(PRELUDE + """
+const members = Array.from({ length: 24 }, (_, i) => 'M' + i);
+const crowded = { categories: members, series: [{ name: 'a', values: members.map((_, i) => 1000 + i) }, { name: 'b', values: members.map((_, i) => 900 + i) }] };
+const read = draw('chart.column', crowded);
+console.log(JSON.stringify({ insists: refusal(() => draw('chart.column', { ...crowded, dataLabels: true })),
+  read: { labels: read.filter((n) => n.role === 'data-label').length, axis: read.some((n) => n.role === 'axis-label'), findings: blocking(read) } }));
+""")
+        self.assertIn("asks for every one (dataLabels: true)", result["insists"])
+        self.assertEqual(result["read"], {"labels": 0, "axis": True, "findings": []})
+
+    def test_wide_ticks_widen_the_gutter_and_dense_periods_are_named_clear_of_each_other(self):
+        result = run_node(PRELUDE + """
+const wide = draw('chart.column', { categories: years(4, 2021), series: [{ name: 'Seats', values: [900000, 1600000, 2100000, 2500000] }], dataLabels: false, gridlines: true });
+const months = Array.from({ length: 24 }, (_, i) => `M${String(i + 1).padStart(2, '0')}-25`);
+const area = draw('chart.stacked-area', { categories: months, series: [{ name: 'A', values: months.map((_, i) => 20 + i) }, { name: 'B', values: months.map((_, i) => 10 + (i % 5)) }] });
+const combo = draw('chart.combo', { categories: months, series: [{ name: 'Revenue', values: months.map((_, i) => 100 + i * 3) }, { name: 'Margin', values: months.map((_, i) => 10 + (i % 4)) }] });
+const dated = draw('chart.column', { categories: ['2015', '2017', '2018', '2019', '2023', '2024', '2025'], series: [{ name: 'm', values: [52, 68, 75, 53, 70, 76, 55] }] }, { x: 60, y: 160, width: 380, height: 300 });
+const named = (nodes) => nodes.filter((n) => n.role === 'category-label').map((n) => n.text);
+console.log(JSON.stringify({ gutter: wide.filter((n) => n.role === 'axis-label').every((n) => inkBox(n).x >= frame.x - 1),
+  area: { named: named(area).length, first: named(area)[0], findings: blocking(area) }, combo: { named: named(combo).length, findings: blocking(combo) },
+  dated: { named: named(dated), findings: blocking(dated) } }));
+""")
+        self.assertTrue(result["gutter"])  # "2,500,000" sits inside the frame, not off its left edge
+        self.assertEqual(result["area"]["findings"], [])
+        self.assertEqual(result["area"]["first"], "M01-25")
+        self.assertLess(result["area"]["named"], 24)
+        self.assertEqual(result["combo"]["findings"], [])
+        self.assertLess(result["combo"]["named"], 24)
+        self.assertEqual(result["dated"]["findings"], [])
+        self.assertIn("2015", result["dated"]["named"])
+        self.assertLess(len(result["dated"]["named"]), 7)
+
+
+class GapTests(unittest.TestCase):
+    def test_a_line_and_its_columns_leave_a_gap_where_a_series_has_no_value(self):
+        result = run_node(PRELUDE + """
+const props = { categories: years(5, 2021), series: [{ name: 'Holidays', values: [10, 12, null, 15, 17] }, { name: 'Group', values: [30, 34, 37, 41, 44] }] };
+const line = draw('chart.line', props);
+const columns = draw('chart.column', props);
+const ofA = (nodes, role) => nodes.filter((n) => n.role === role && n.data?.series === 'Holidays');
+console.log(JSON.stringify({ segments: line.filter((n) => n.id.startsWith('c:segment:holidays:')).length, labels: ofA(line, 'data-label').map((n) => n.data.category),
+  native: nativeChartSpec('chart.line', props, frame, line) === null, bars: ofA(columns, 'chart-mark').map((n) => n.data.category),
+  findings: [...blocking(line), ...blocking(columns)], area: refusal(() => draw('chart.area', props)) }));
+""")
+        self.assertEqual(result["segments"], 2)  # 2021-22 and 2024-25: nothing drawn across 2023
+        self.assertNotIn("2023", result["labels"])
+        self.assertTrue(result["native"])  # the native chart cannot leave the gap, so the drawn one stands
+        self.assertEqual(result["bars"], ["2021", "2022", "2024", "2025"])
+        self.assertEqual(result["findings"], [])
+        self.assertIn("no value for", result["area"])
+
+
+class ExhibitKeyTests(unittest.TestCase):
+    def test_a_key_nothing_reads_is_refused_and_a_note_of_ones_own_is_not(self):
+        tmp = Path(tempfile.mkdtemp(prefix="unread-keys-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        examples = ROOT / "skills" / "professional-slides" / "examples"
+        shutil.copytree(examples / "assets", tmp / "assets")
+        doc = json.loads((examples / "page-forms.pages.json").read_text())
+        doc["pages"] = [page for page in doc["pages"] if page["id"] in ("f-trend-target-band", "f-ranking-side-title")]
+        doc.pop("appendix", None)
+        band, side = doc["pages"]
+        band["exhibit"]["marks"] = {"referenceLines": [{"value": 50, "label": "Target"}]}
+        band["exhibit"]["peers"] = ["Peer"]
+        side["exhibit"]["$why"] = "a note of the author's own"
+        (tmp / "u.pages.json").write_text(json.dumps(doc))
+        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "u.pages.json"), "--check"], capture_output=True, text=True)
+        out = run.stdout + run.stderr
+        self.assertEqual(run.returncode, 2)
+        self.assertEqual(out.count("EXHIBIT_KEY_UNREAD"), 2)
+        self.assertIn("`exhibit.marks` is no field of chart.line - a mark is written at the exhibit's top level", out)
+        self.assertIn("`exhibit.peers` is no field of chart.line", out)
+        self.assertNotIn("$why", out)
+
+    def test_a_table_column_can_set_its_rates_in_a_bubble(self):
+        # A growth rate or a margin beside counts reads as one: the worked lookup table sets its CAGR column as pills.
+        doc = json.loads((ROOT / "skills" / "professional-slides" / "examples" / "page-forms.pages.json").read_text())
+        table = next(page for page in doc["pages"] if page["id"] == "f-lookup-table")
+        self.assertIn({"label": "Growth FY23-FY26", "bubble": True}, table["exhibit"]["columns"])
+        self.assertIn("bubble", (ROOT / "skills" / "professional-slides" / "references" / "drawing.md").read_text())
+
+
+class CapsuleTests(unittest.TestCase):
+    def test_a_capsules_words_sit_midway_between_its_number_and_its_icon(self):
+        # Set under the number, the words left the foot of each tall pillar an empty dark slab (the BA deck's UBS page).
+        result = run_node(PRELUDE + """
+import { capsulesNodes } from './skills/professional-slides/runtime/figures.mjs';
+const items = [{ title: 'Spatial tasks', text: 'Notes attached to artifacts', icon: 'map-pin' }, { title: 'Multi-human work', text: 'Concurrent edits and ownership of artifacts across a team', icon: 'people' }];
+const nodes = capsulesNodes({ id: 'k', frame: { x: 60, y: 160, width: 1160, height: 460 }, props: { items } });
+const of = (role) => nodes.filter((n) => n.role === role);
+const body = of('capsule-body')[0].frame, number = of('capsule-number').find((n) => n.frame).frame, icon = of('capsule-icon-glyph')[0].frame;
+const titles = of('capsule-title').map((n) => n.frame.y), texts = of('capsule-text');
+const wordsTop = titles[0], wordsBottom = Math.max(...texts.map((n) => n.frame.y + n.frame.height));
+console.log(JSON.stringify({ aligned: new Set(titles).size === 1, above: wordsTop - (number.y + number.height), below: icon.y - wordsBottom, tall: body.height }));
+""")
+        self.assertTrue(result["aligned"])
+        self.assertGreater(result["tall"], 400)  # still a pillar
+        self.assertLess(abs(result["above"] - result["below"]), 60)  # the words in the middle of the space, not under the number
 
 
 class FileTests(unittest.TestCase):
