@@ -749,9 +749,11 @@ class Emitter:
             # 0.0, 2.5, 5.0 rather than General's 0, 2.5, 5.
             ticks = [spec.get("yMin") or 0, spec.get("yMax") or 0, spec["yMajorUnit"]]
             places = max(len(f"{float(t):.12g}".partition(".")[2]) for t in ticks)
-            if places:
-                va.tick_labels.number_format = ("#,##0" if grouped else "0") + "." + "0" * min(places, 6)
-                va.tick_labels.number_format_is_linked = False
+            # Four figures and up take the separator the drawn axis prints (chart-axes.mjs axisTickText): left to
+            # PowerPoint's General format, 12,000 in the scene came out 12000 on the saved page.
+            big = max(abs(float(t)) for t in ticks) >= 1000
+            va.tick_labels.number_format = ("#,##0" if big else "0") + ("." + "0" * min(places, 6) if places else "")
+            va.tick_labels.number_format_is_linked = False
         ca = chart.category_axis
         # A crowded row of bars names every member at 8pt in the scene
         # (charts.mjs ROW_LABEL_MIN); the native chart sets the same size.

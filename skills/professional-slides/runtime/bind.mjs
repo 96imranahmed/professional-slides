@@ -674,6 +674,12 @@ function bindExhibit(ex, what, context) {
   let labels = [...axed[0].at.keys()].filter((label) => axed.every((s) => s.at.has(label)));
   if (!labels.length) return void fail(`${what}: ${refs.join(", ")} share no ${kind === "periods" ? "period" : "member"}`, refs);
   const select = ex.select;
+  // Narrowed to the periods every series shares, a chart can lose most of a series without a word: the BA deck's loyalty
+  // page bound profit on two bases, 2019-2023 and 2023-2025, and drew 2023 alone. Under half the longest run is refused
+  // unless \`select\` asks for the shared periods.
+  const longest = Math.max(...axed.map((s) => s.at.size));
+  if (kind === "periods" && select === undefined && labels.length * 2 < longest)
+    return void fail(`${what}: ${series.map((s, i) => `${named[i].name ?? s.refs.join(", ")} runs over ${[...s.at.keys()].join(", ")}`).join("; ")} - together they share only ${labels.join(", ")}, so a chart of them draws ${labels.length === 1 ? "that period alone" : "those periods alone"}. Draw each over its own periods (one series, or a panel each), or name the shared periods in \`select\``, refs);
   if (select !== undefined) {
     if (!select || typeof select !== "object" || Array.isArray(select)) return void fail(`${what}: \`select\` is { from, to } or { periods: [...] } over time, { members: [...], order } over a peer set`);
     const unknown = Object.keys(select).filter((key) => !(kind === "periods" ? ["from", "to", "periods"] : ["members", "order"]).includes(key));

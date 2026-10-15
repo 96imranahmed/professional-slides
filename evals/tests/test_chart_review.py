@@ -133,6 +133,15 @@ console.log(JSON.stringify({ breaks: line.filter((n) => n.role === 'chart-break'
         self.assertEqual(result["segments"], 4)  # none across 2016 or 2020-22
         self.assertIsNone(result["wider"])  # the 2015-2017 segment is not drawn at all
 
+    def test_a_lone_line_broken_at_a_gap_keeps_a_bare_stroke(self):
+        # Filled run by run, the BA deck's low-cost share drew two slabs that read as columns.
+        result = run_node(PRELUDE + """
+const fills = (categories) => draw('chart.line', { categories, yMin: 0, series: [{ name: 'Share', values: [30.3, 31.9, 32.5, 34.5, 35.2] }] }).filter((n) => n.role === 'chart-area').length;
+console.log(JSON.stringify({ gapped: fills(['2018', '2019', '2022', '2024', '2025']), even: fills(['2021', '2022', '2023', '2024', '2025']) }));
+""")
+        self.assertEqual(result["gapped"], 0)
+        self.assertEqual(result["even"], 1)
+
 
 class LabelTests(unittest.TestCase):
     def test_line_labels_are_placed_together_clear_of_each_other_and_the_axis(self):

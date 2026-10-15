@@ -337,7 +337,9 @@ function drawLines(chart) {
   // a line in its own interval, whose envelope is the shading.
   // The fill is an area from zero, so a line whose scale does not reach zero, or a rank's, keeps a bare stroke: filled down
   // to a floor near its low, the BA retest's jet fuel drew a doubling as a five-fold rise.
-  const lone = !area && !rank && bounds.min <= 0 && bounds.max >= 0 && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
+  // A line broken at a missing period keeps a bare stroke too: filled run by run, the BA deck's low-cost share drew two
+  // slabs that read as columns.
+  const lone = !area && !rank && !breaks.size && bounds.min <= 0 && bounds.max >= 0 && series.length === 1 && weight.loneArea > 0 && props.area !== false && categories.length > 1 && seriesState(series[0], categories).state === "recorded" && !chart.intervals.length;
   // The runs of periods a line joins: a break (lineOptions) ends one run and starts the next.
   const runs = categories.reduce((all, _, index) => (index && !breaks.has(index - 1) ? all.at(-1).push(index) : all.push([index]), all), []);
   series.forEach((item, seriesIndex) => {

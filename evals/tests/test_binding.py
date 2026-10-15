@@ -54,6 +54,17 @@ const codes = (p) => untracedFindings(deckOf(p), insights).map((f) => f.code);
 '''
 
 
+class NarrowedSeriesTests(unittest.TestCase):
+    def test_series_over_different_periods_are_not_narrowed_to_what_they_share_without_a_word(self):
+        # The BA deck's loyalty page bound profit on two bases, 2019-2023 and 2023-2025, and drew 2023 alone.
+        result = run_node(LOG.replace("const insights = new Map", "recorded.push({ ...graded, id: 'i-basis', shape: 'series', sources: ['sources/a.csv'], cite: ['annual-report'], measures: { old: { unit: 'GBP m', population: 'the company', periods: ['FY21', 'FY22', 'FY23'], values: [176, 240, 280] }, restated: { unit: 'GBP m', population: 'the company', periods: ['FY23', 'FY24', 'FY25'], values: [367, 420, 469] } } });\nconst insights = new Map") + """
+const ex = (o = {}) => ({ heading: 'Profit', series: [{ measure: 'i-basis/old', name: 'Old basis' }, { measure: 'i-basis/restated', name: 'Restated' }], ...o });
+console.log(JSON.stringify({ narrowed: problems(page({ evidence: ['i-basis'], exhibit: ex() })), asked: problems(page({ evidence: ['i-basis'], exhibit: ex({ select: { periods: ['FY23'] } }) })) }));
+""")
+        self.assertTrue(any("share only FY23" in p for p in result["narrowed"]), result["narrowed"])
+        self.assertFalse(any("share only" in p for p in result["asked"]))
+
+
 class BoundExhibitTests(unittest.TestCase):
     def test_a_bound_exhibit_takes_its_axis_values_unit_and_basis_from_its_measures(self):
         result = run_node(LOG + '''
