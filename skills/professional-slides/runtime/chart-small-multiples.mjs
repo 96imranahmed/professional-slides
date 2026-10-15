@@ -37,7 +37,7 @@ import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
 import { datedRun, unjoined } from "./axis-breaks.mjs";
 import { ruleAround } from "./label-placement.mjs";
 import { assertComparison } from "./chart-sense.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, SUBJECT, fillStyle, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, SUBJECT, PEER, fillStyle, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
 
 export const SMALL_MULTIPLES = Object.freeze({ min: 2, max: 12, marks: Object.freeze(["column", "bar", "line", "stacked-column", "stacked-bar", "donut"]), parts: Object.freeze({ min: 2, max: SERIES.length }) });
 const STACKED = new Set(["stacked-column", "stacked-bar"]);
@@ -283,7 +283,7 @@ function lineX(plot, categories, i) {
 }
 
 /** One panel's marks: its columns, bars or line, their labels where few, its focus and its reference rule; or its stacks, or its donut. */
-function panelNodes({ id, layout, panel, highlighted, props }) {
+function panelNodes({ id, layout, panel, highlighted, peers, props }) {
   const { mark, categories, reference } = layout;
   const { item, plot, bounds } = panel;
   const nodes = [];
@@ -292,7 +292,7 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   // The rest in the lead series, as a single-series chart is drawn, and the panel the page is about in the subject's colour
   // (chart-axes.mjs SUBJECT). In the house's primary, every panel of the BA deck's small multiples was near-black and its
   // subject the lighter of the two.
-  const subject = SUBJECT, color = highlighted ? subject : SERIES[0];
+  const subject = SUBJECT, color = highlighted ? subject : peers ? PEER : SERIES[0];
   const n = categories.length;
   const along = sideways(mark) ? plot.height : plot.width;
   const slot = along / n;
@@ -394,7 +394,7 @@ export function smallMultiplesChart({ id, frame, props }) {
     if (subject && parts) nodes.push(rectPrimitive({ id: stableId(id, "panel", panel.at, "highlight"), role: "chart-panel-highlight", frame: { x: panel.cell.x - 6, y: panel.cell.y - 4, width: panel.cell.width + 12, height: panel.cell.height + 8 }, style: fillStyle(token("color.accentTint"), "none"), data: { item: panel.item.label, highlight: true } }));
     if (!rowLabels) nodes.push(textPrimitive({ id: stableId(id, "panel", panel.at, "title"), role: "category-label", frame: { x: panel.cell.x, y: panel.cell.y, width: panel.cell.width, height: TITLE }, text: panel.item.label,
       style: textStyle(AXIS_LABEL, subject ? SUBJECT : INK, true, layout.donut ? "center" : "left"), data: { item: panel.item.label, panelTitle: true } }));
-    nodes.push(...panelNodes({ id, layout, panel, highlighted: subject, props }));
+    nodes.push(...panelNodes({ id, layout, panel, highlighted: subject, peers: highlighted.size > 0, props }));
   }
   // The shared axis, named once: under the bottom row's panels, or beside the left column's. A donut's parts are the key's.
   const n = categories.length;

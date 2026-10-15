@@ -40,6 +40,9 @@ export const SERIES = [
  * gridline grey, at 1.4:1. Each kind chose its own before, and an accent bar sat on the lead series' own colour.
  */
 export const SUBJECT = token("color.chartSubject");
+// A subject's peers that are data take `color.chartPeer`: the lead series, unless it outshouts the subject, when they take a
+// calmer colour (palettes.mjs peerOf). A chart with no subject draws its marks in the lead series as before.
+export const PEER = token("color.chartPeer");
 export const CONTEXT_FILL = token("color.chartComparator");
 export const CONTEXT_LINE = token("color.rule");
 

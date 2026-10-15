@@ -10,7 +10,7 @@ import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag,
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT_FILL, rowLabels, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
-  normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes, axisLabelWidth } from "./chart-axes.mjs";
+  normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes, axisLabelWidth, PEER } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
@@ -684,11 +684,12 @@ function categoricalColors(chart) {
   const focusCategoryIndex = twoMarkContrast ? defaultFocusIndex(categories) : -1;
   const colorFor = (seriesIndex, categoryIndex) => {
     if (chart.diverging) return chart.diverging.colors.get(seriesIndex);
-    // Highlight the answer: the bar the title is about takes the subject's colour; the others keep their series colour,
-    // never grey. Forecast periods are lighter. A two-mark or two-series contrast sets the point against the grey (SUBJECT).
+    // Highlight the answer: the bar the title is about takes the subject's colour; the others are data, never grey - the lead
+    // series' in the peer colour (palettes.mjs peerOf), the rest in their own. Forecast periods are lighter. A two-mark or two-series contrast sets the point against the grey (SUBJECT).
     if (barHighlighted.has(categories[categoryIndex])) return SUBJECT;
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
-    if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
+    // The bars beside a highlighted one are data: the lead series' among them take the peer colour, calmer than the subject.
+    if (barHighlight) { const index = colorIndexFor(seriesIndex, categoryIndex); return index === 0 ? PEER : SERIES[index]; }
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? SUBJECT : CONTEXT_FILL;
     if (twoMarkContrast) return categoryIndex === focusCategoryIndex ? SUBJECT : CONTEXT_FILL;

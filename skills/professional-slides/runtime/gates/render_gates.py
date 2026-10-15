@@ -8,8 +8,12 @@ appends what it finds.
 
 from __future__ import annotations
 
+import base64
+import io
 import math
 import re
+
+from PIL import Image
 
 from gate_config import (
     BODY_ROLES,
@@ -337,6 +341,56 @@ def gate_type_range(slide_no, slide, findings, profile=DEFAULT_PROFILE):
                 slide_no, "TYPE_RANGE", {"role": role, "pt": round(size, 2)}, [low, high],
                 f"Snap {role} to the modular scale inside {low}-{high} pt.",
             ))
+
+
+# A picture is taken for a screenshot when its four commonest exact colours cover this share of it: an interface's fills and
+# page repeat exactly, a photograph's pixels almost never do. It is refused drawn under SCREENSHOT_SCALE of its own width,
+# where a retina capture's 28-pixel type falls under six.
+SCREENSHOT_FLAT = 0.4
+SCREENSHOT_SCALE = 0.2
+
+
+def _flat_share(image):
+    """The share of `image` its four commonest exact colours cover, read on a nearest-neighbour sample."""
+    width, height = image.size
+    sample = image.convert("RGB").resize((160, max(1, round(160 * height / max(1, width)))), Image.NEAREST)
+    colours = sorted(sample.getcolors(sample.width * sample.height) or [], reverse=True)
+    return sum(count for count, _ in colours[:4]) / max(1, sample.width * sample.height)
+
+
+def gate_picture_unreadable(slide_no, slide, findings):
+    """PICTURE_UNREADABLE. A screenshot drawn too small for its text to be read.
+
+    A photograph is seen, and reads as a thumbnail; a screenshot is read, and its type shrinks with it. The Spacebar deck
+    set six 2,400-pixel app captures in 379 by 114-pixel slots of a picture strip, each drawn at 4% of its own width, its
+    labels under a pixel high, and every gate passed it.
+    """
+    for node in slide.get("nodes", []):
+        if node.get("type") != "image" or str(node.get("role") or "") != "image":
+            continue
+        uri = str((node.get("data") or {}).get("dataUri") or "")
+        if not uri.startswith("data:image/"):
+            continue
+        try:
+            image = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+            image.load()
+        except Exception:  # noqa: BLE001 - a picture the gate cannot decode is the emitter's to refuse
+            continue
+        frame = node.get("frame") or {}
+        width, height = image.size
+        fit = (node.get("style") or {}).get("fit") or (node.get("data") or {}).get("fit") or "contain"
+        ratios = (frame.get("width", 0) / max(1, width), frame.get("height", 0) / max(1, height))
+        scale = max(ratios) if fit == "cover" else min(ratios)
+        if scale >= SCREENSHOT_SCALE or _flat_share(image) < SCREENSHOT_FLAT:
+            continue
+        findings.append(finding(
+            slide_no, "PICTURE_UNREADABLE",
+            {"node": node.get("id"), "pixels": [width, height], "drawn": [round(width * scale), round(height * scale)], "scale": round(scale, 3)},
+            f"a screenshot drawn at {SCREENSHOT_SCALE:.0%} of its width or more",
+            f"This screenshot is drawn {round(width * scale)} pixels wide, {scale:.0%} of its own {width}, so its text cannot be "
+            "read. Show fewer at a size that reads - one beside its point (picture-hero) or two (picture-pair) - crop it to "
+            "the part the page is about, or say in words what it shows.",
+        ))
 
 
 def gate_unsourced_picture(slide_no, slide, findings):

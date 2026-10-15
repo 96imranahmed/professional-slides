@@ -490,7 +490,7 @@ const explicit=compileDeck({slides:[slide({categories:['Current','Future'],serie
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'crimson',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 // Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.chartSubject','color.chartSeries1']);
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartPeer','color.chartSubject','color.chartPeer']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -520,7 +520,7 @@ for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['cha
 for(const palette of ['midnight','evergreen','crimson']) for(const categories of [['A','B'],['B','A']]) {
   const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]},palette).filter(n=>n.role==='chart-mark');
   const lit=marks.find(n=>n.data.category==='B'),peer=marks.find(n=>n.data.category==='A');
-  assert.equal(peer.style.fill.tokenId,'color.chartSeries1');
+  assert.equal(peer.style.fill.tokenId,'color.chartPeer');
   assert.equal(lit.style.fill.tokenId,'color.chartSubject',palette);
   assert.ok(contrastRatio(lit.style.fill.value,peer.style.fill.value)>=1.5,palette);
 }

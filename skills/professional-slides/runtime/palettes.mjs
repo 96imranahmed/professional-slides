@@ -52,11 +52,15 @@ export const PALETTES = Object.freeze({
   "toolkit": { label: "Toolkit", basis: "Neutral palette retained for component fixtures", colors: {} }
 });
 
+// The theme's heat scale runs from the page to the lead series' mid colour, not to the near-black primary: the Spacebar
+// deck's category table set half its cells in navy, the darkest page in a deck of light ones. A lead that is a grey (crimson's)
+// runs to the primary, which is the house's colour there.
 export function heatScaleTokens(colors) {
+  const lead = colors['color.chartSeries1'], toward = isHex(lead) && chroma(lead) >= 10 ? lead : colors['color.componentPrimary'];
   return Object.fromEntries(['theme-sequential','red-white','red-white-green','red-yellow-green'].flatMap(palette=>Array.from({length:11},(_,i)=>{
     const f=i/10,canvas=colors['color.canvas'],negative=colors['color.negative'],positive=colors['color.positive'];
     const midpoint=palette==='red-yellow-green'?'#F4E76E':canvas;
-    const value=palette==='theme-sequential'?mix(canvas,colors['color.componentPrimary'],f):palette==='red-white'?mix(negative,canvas,f):f<=.5?mix(negative,midpoint,f*2):mix(midpoint,positive,(f-.5)*2);
+    const value=palette==='theme-sequential'?mix(canvas,toward,f):palette==='red-white'?mix(negative,canvas,f):f<=.5?mix(negative,midpoint,f*2):mix(midpoint,positive,(f-.5)*2);
     return [`color.heat.${palette}.${i}`,{kind:'color',cssVar:`--heat-${palette}-${i}`,value,themeSlot:null}];
   })));
 }
@@ -111,6 +115,34 @@ export function subjectOf(value) {
   return value(SUBJECT_KEYS.find((key) => score(key) >= 1) ?? SUBJECT_KEYS.reduce((best, key) => (score(key) > score(best) ? key : best)));
 }
 
+// How colourful a colour is: its CIELAB chroma, 0 for a grey, about 100 for an electric blue.
+function chroma(hex) {
+  const linear = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const [r, g, b] = [1, 3, 5].map((i) => linear(parseInt(hex.slice(i, i + 2), 16)));
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047), y = f(0.2126 * r + 0.7152 * g + 0.0722 * b), z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  return Math.hypot(500 * (x - y), 200 * (y - z));
+}
+
+// The colour a highlighted subject's peers take when they are data (`color.chartPeer`): the lead series, unless it
+// outshouts the subject or the subject cannot be told from it. A near-neutral subject among strongly coloured peers reads as the one left out, not the one picked
+// out - the Spacebar deck's navy bar among rust ones (chroma 15 against 45), midnight's near-black among electric blue,
+// graphite's black among lime - while the BA house's navy among its own lighter blue (28 against 42) reads as chosen. Where
+// the lead is more colourful than the subject by more than PEER_LOUDER, the peers take the first series colour that is not,
+// still reads as a mark on the canvas and stands as far from the subject as a mark from its ground (MARK_CONTRAST) - a deep
+// teal at 1.9:1 left midnight's near-black subject hard to find; failing every one, the ink halfway to the canvas.
+const PEER_LOUDER = 20;
+export function peerOf(value, subject) {
+  const lead = value("color.chartSeries1"), canvas = value("color.canvas");
+  if (![lead, canvas, subject].every(isHex)) return lead;
+  const calm = (color) => chroma(color) - chroma(subject) <= PEER_LOUDER;
+  // The lead stays where the subject stands out from it: darker or lighter by a mark's contrast (the BA house's navy among
+  // its blue, 3.0:1), or more colourful (crimson's red among grey). Toolkit's navy among a deeper blue, at 1.9:1, did not.
+  if (calm(lead) && (contrastRatio(lead, subject) >= MARK_CONTRAST || chroma(subject) - chroma(lead) > PEER_LOUDER)) return lead;
+  const reads = (color) => contrastRatio(color, canvas) >= CANVAS_CONTRAST["color.componentPrimary"][0] && contrastRatio(color, subject) >= MARK_CONTRAST;
+  return SERIES_KEYS.map(value).find((color) => isHex(color) && calm(color) && reads(color)) ?? mix(value("color.ink"), canvas, 0.5);
+}
+
 export function resolvePalette(id = "midnight", baseTokens, slots) {
   // A palette object `{ base, colors, label? }` (a house profile imported from a
   // template deck) overlays its colours and style tokens on a named base.
@@ -136,6 +168,7 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
   assertCanvasContrast(tokens);
   leadWithColour(tokens);
   if (tokens["color.chartSubject"]) tokens["color.chartSubject"] = { ...tokens["color.chartSubject"], value: subjectOf((key) => tokens[key]?.value) };
+  if (tokens["color.chartPeer"]) tokens["color.chartPeer"] = { ...tokens["color.chartPeer"], value: peerOf((key) => tokens[key]?.value, tokens["color.chartSubject"].value) };
   // The filled surface follows the page it sits on: the palette's own ink mixed
   // toward its own canvas, so a warm paper page gets a warm stone and a navy
   // house a cool grey, and a house profile with its own ink needs no new colour.
@@ -237,7 +270,7 @@ const GROUND_ROLES = Object.freeze({
   reversed: ["color.onPrimary"],
   text: ["color.textSecondary", "color.chartUnit"],
   surfaces: ["color.surface", "color.surfaceMuted", "color.rule", "color.chartGrid"],
-  derived: ["color.surfaceTint", "color.band", "color.chartSubject"],
+  derived: ["color.surfaceTint", "color.band", "color.chartSubject", "color.chartPeer"],
   marks: ["color.componentPrimary", "color.chartComparator", "color.chartSeries1", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.chartSeries5", "color.chartSeries6"],
   accent: ["color.accent"],
   status: ["color.positive", "color.caution", "color.negative", "color.info"],
@@ -294,6 +327,7 @@ export function groundTokens(tokens, ground, slots) {
   for (const key of GROUND_ROLES.tints) set(key, towardOn(groundColor, liftedOn(value(key), groundColor, 4.5), was(key)));
   set("color.band", bandOn(groundColor, pale, resolved["color.componentPrimary"]));
   set("color.chartSubject", subjectOf((key) => resolved[key] ?? value(key)));
+  set("color.chartPeer", peerOf((key) => resolved[key] ?? value(key), resolved["color.chartSubject"]));
   const named = new Set(Object.values(GROUND_ROLES).flat());
   const missing = Object.entries(tokens).filter(([key, definition]) => definition.kind === "color" && !key.startsWith("color.heat.") && !named.has(key)).map(([key]) => key);
   if (missing.length) throw new Error(`No ground role for ${missing.join(", ")}: name it in palettes.mjs GROUND_ROLES, so a page on a dark ground does not draw it in its light-page colour`);

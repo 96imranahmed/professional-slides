@@ -806,6 +806,9 @@ class Emitter:
         idx = spec.get("colorIndices")
         ci = idx[i] if idx and i < len(idx) else i
         color = self.series_colors[ci % len(self.series_colors)] if self.series_colors else None
+        if spec.get("peerToken") and ci == 0:
+            # A highlighted bar's peers in the colour the scene drew them in.
+            color = self.colors.get(spec["peerToken"], color)
         if len(spec["series"]) == 2 and not idx and spec["type"] not in ("range", "line", "area"):
             # The scene decides which peer is the point (focusIndex, from
             # its painted marks); without one the second is the grey.

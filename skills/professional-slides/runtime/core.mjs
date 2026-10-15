@@ -94,6 +94,7 @@ export const TOKENS = Object.freeze({
   // The subject a chart marks - a highlighted member, a focus series - in one colour on every kind, derived per palette and
   // ground (palettes.mjs subjectOf); the toolkit's own is its accent.
   "color.chartSubject": colour("--chart-subject", "#00A6E6"),
+  "color.chartPeer": colour("--chart-peer", "#2251FF"),
   "color.chartSeries1": colour("--chart-series-1", "#06233B", "dk1"),
   "color.chartSeries2": colour("--chart-series-2", "#0B4F7D", "accent2"),
   "color.chartSeries3": colour("--chart-series-3", "#00A6E6", "accent3"),
@@ -1128,9 +1129,12 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // A highlighted mark takes the subject's colour (chart-axes.mjs SUBJECT): the emitter paints the token the scene painted it in.
   const litMark = marks.find(node => highlights.some((h) => String(h.category) === String(node.data?.category)));
   const highlightToken = litMark?.style?.fill?.tokenId;
+  // Its peers in the colour the scene drew them in: the peer colour, calmer than the subject where the lead outshouts it.
+  const peerToken = litMark && marks.some((node) => node.style?.fill?.tokenId === "color.chartPeer") ? "color.chartPeer" : undefined;
   return {
     ...(focusIndex >= 0 ? { focusIndex } : {}),
     ...(highlightToken ? { highlightToken } : {}),
+    ...(peerToken ? { peerToken } : {}),
     labelBold,
     type,
     categories,

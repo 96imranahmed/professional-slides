@@ -6,7 +6,7 @@ import { linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValu
 import { bridgeLabelProps, formatValue } from "./value-format.mjs";
 import { measureText, ENGINE_RESERVE } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, PRIMARY, CHART_LABEL, AXIS_LABEL, LABEL_BAND, chartFrame, labelBold, textStyle, lineStyle, fillStyle,
-  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend, SUBJECT } from "./chart-axes.mjs";
+  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend, SUBJECT, PEER } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, normalizedHighlights } from "./chart-decorations.mjs";
 
 // A bridge's steps narrower than this share of their top are drawn on a broken scale (see `broken` below).
@@ -399,7 +399,7 @@ export function rangeChart({ id, frame, props: authored }) {
     const low = props.low[index], high = props.high[index];
     const y = plot.y + index * rowSpan + (rowSpan - barHeight) / 2;
     const x0 = xScale(low), x1 = Math.max(xScale(high), x0 + 2);
-    const fill = barHighlight ? (barHighlight.category === category ? SUBJECT : SERIES[0]) : SERIES[0];
+    const fill = barHighlight ? (barHighlight.category === category ? SUBJECT : PEER) : SERIES[0];
     nodes.push(rectPrimitive({ id: stableId(id, "range", category), role: "chart-mark", frame: { x: x0, y, width: x1 - x0, height: barHeight }, style: fillStyle(fill), data: { category, low, high, highlighted: barHighlight?.category === category } }));
     nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, labelBold(), "right"), data: { category, end: "low" } }));
     nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category, end: "high" } }));

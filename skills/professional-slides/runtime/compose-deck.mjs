@@ -336,8 +336,10 @@ function composeDeckWith(spec, baseDir) {
     // photograph; otherwise the photo takes the right half and `tone: "dark"`
     // paints the title half navy (a classic split cover).
     // The players the deck compares, by their marks, where the logos are on
-    // disk (the player's own `logo`, or assets/logos/ as the build fetches it).
-    const marks = playerMarks(spec, baseDir);
+    // disk (the player's own `logo`, or assets/logos/ as the build fetches it). A logo or a place's outline reads in a
+    // cover's small tile; a photograph or a screenshot does not - the Spacebar cover set four app captures as thumbnails
+    // over its title - so a cover with no photograph of its own stays type.
+    const marks = playerMarks(spec, baseDir).filter((mark) => mark.mark !== "image");
     if (marks.length >= 2 && !spec.cover.image) cover.marks = marks;
     // A cover photograph planned and not fetched yet is the build's to fill (fetch-pictures.mjs): until then the cover composes without it.
     if (spec.cover.image && sourcedPicture(spec.cover.image)) { cover.variant = spec.cover.layout === "full" ? "full-image" : "half-image"; cover.image = imageProps(spec.cover.image, baseDir); if (spec.cover.tone) cover.tone = spec.cover.tone; }

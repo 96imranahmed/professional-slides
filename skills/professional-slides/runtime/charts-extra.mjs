@@ -3,10 +3,11 @@
 // shapes (never a native chart), shares the plot frame, axes, legend and label
 // helpers of chart-axes.mjs and the decorations of chart-decorations.mjs, and
 // answers measureContent from its layout so a hug measurement responds to width.
-import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, tokenValue, onFill } from "./core.mjs";
+import { contrastRatio } from "./color.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle,
-  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, SUBJECT, CONTEXT_FILL, CONTEXT_LINE, rowLabels, rowNameNode } from "./chart-axes.mjs";
+  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, SUBJECT, PEER, CONTEXT_FILL, CONTEXT_LINE, rowLabels, rowNameNode } from "./chart-axes.mjs";
 import { withDecorations, withReferenceValues } from "./chart-decorations.mjs";
 import { TOKENS } from "./core.mjs";
 import { assertComparison } from "./chart-sense.mjs";
@@ -119,6 +120,7 @@ function lollipopChart({ id, frame, props }) {
   const { series, categories, plot, bounds, labelWidth, valueWidth, negativeGutter, rowHeight } = lollipopLayout(frame, props);
   // Crowded rows are named by the shared rule (chart-axes.mjs rowLabels), the subject always.
   const rows = rowLabels({ categories, span: rowHeight, named: new Set(categories.filter((c) => highlighted(props, c))) });
+  rows.lit = categories.some((c) => highlighted(props, c));
   assertHighlighted(id, props, categories, "the members a lollipop ranks");
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const zero = xAt(Math.max(bounds.min, Math.min(0, bounds.max)));
@@ -130,7 +132,7 @@ function lollipopChart({ id, frame, props }) {
     pointMap.set(`${series[0].name}:${c}`, { x: xAt(v), y });
     categoryMap.set(c, { x: plot.x, y: y - rowHeight / 2, width: plot.width, height: rowHeight });
     const focus = highlighted(props, c);
-    const color = focus ? SUBJECT : PRIMARY;
+    const color = focus ? SUBJECT : rows.lit ? PEER : PRIMARY;
     // The name sits left of the gutter a negative value's label takes, not over it: "-24" was set on "Lufthansa Group".
     if (rows.shown(i)) nodes.push(rowNameNode({ id, category: c, x: plot.x - labelWidth - 8 - negativeGutter, cy: y, width: labelWidth, size: rows.size, bold: focus }));
     nodes.push(linePrimitive({ id: stableId(id, "stem", c), role: "chart-line", x1: zero, y1: y, x2: xAt(v), y2: y, style: lineStyle(color, token("line.standard")), data: { category: c, value: v } }));
@@ -321,11 +323,20 @@ function treemapLayout(frameIn, props) {
 function treemapChart({ id, frame, props, tokens = TOKENS }) {
   const { items, rects, keyed, key, body } = treemapLayout(frame, props);
   assertHighlighted(id, props, items.map((item) => item.label), "the tiles a treemap draws");
+  // A treemap compares sizes: tiles within a factor of two of each other read as equal, and the area says nothing - the
+  // Spacebar deck drew a rubric of five 15s and a 25 as six near-equal tiles.
+  const values = items.map((item) => item.value).filter((value) => value > 0);
+  if (values.length > 1 && Math.max(...values) < 2 * Math.min(...values))
+    throw new Error(`NO_COMPARISON: ${id}: the tiles run from ${Math.min(...values)} to ${Math.max(...values)}, within a factor of two of each other, so they read as equal and their areas compare nothing - set the parts as bars, or as a table with what each part holds`);
   const total = items.reduce((s, it) => s + it.value, 0);
   const hasFocus = items.some(item => highlighted(props, item.label));
+  // Tiles in the palette's mid colours: a series that reads as type (10:1 on the page, a near-black navy) is left to the
+  // subject, or a treemap of equals sets every other tile near-black.
+  const canvas = tokenValue(token("color.canvas")), mid = SERIES.filter((color) => contrastRatio(tokenValue(color), canvas) < 10);
+  const tileColor = (index) => (props.colorIndices ? colorFor(props, index) : (mid.length ? mid : SERIES)[Math.min(index, 5) % (mid.length || SERIES.length)]);
   const nodes = [];
   rects.forEach(({ item, frame: r }, index) => {
-    const fill = highlighted(props, item.label) ? SUBJECT : hasFocus ? CONTEXT_FILL : colorFor(props, Math.min(index, 5));
+    const fill = highlighted(props, item.label) ? SUBJECT : hasFocus ? CONTEXT_FILL : tileColor(index);
     const tile = tileOf(r);
     nodes.push(rectPrimitive({ id: stableId(id, "tile", item.label), role: "chart-mark", frame: tile, style: fillStyle(fill, token("color.surface")), data: { label: item.label, value: item.value, share: item.value / total } }));
     const color = onFill(fill);
@@ -402,7 +413,7 @@ function boxPlotChart({ id, frame, props }) {
   const nodes = [...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis: true, labelWidth })];
   categories.forEach((c, i) => {
     const b = boxes[i], cx = plot.x + slot * i + slot / 2, focus = highlighted(props, c);
-    const color = focus ? SUBJECT : PRIMARY;
+    const color = focus ? SUBJECT : categories.some((other) => highlighted(props, other)) ? PEER : PRIMARY;
     nodes.push(linePrimitive({ id: stableId(id, "whisker", c), role: "chart-line", x1: cx, y1: yAt(b.max), x2: cx, y2: yAt(b.min), style: lineStyle(INK, token("line.hairline")), data: { category: c } }));
     for (const [k, v] of [["cap-max", b.max], ["cap-min", b.min]]) nodes.push(linePrimitive({ id: stableId(id, k, c), role: "chart-line", x1: cx - boxW / 4, y1: yAt(v), x2: cx + boxW / 4, y2: yAt(v), style: lineStyle(INK, token("line.hairline")) }));
     nodes.push(rectPrimitive({ id: stableId(id, "box", c), role: "chart-mark", frame: { x: cx - boxW / 2, y: yAt(b.q3), width: boxW, height: Math.max(1, yAt(b.q1) - yAt(b.q3)) }, style: fillStyle(color, token("color.surface")), data: { category: c, ...b } }));
@@ -507,7 +518,7 @@ function sparklinesChart({ id, frame, props }) {
     const xAt = (i) => inner.x + inner.width * i / (it.values.length - 1);
     const yAt = (v) => inner.y + inner.height - (v - bounds.min) / bounds.span * inner.height;
     const focus = highlighted(props, it.label);
-    const color = focus ? SUBJECT : PRIMARY;
+    const color = focus ? SUBJECT : items.some((other) => highlighted(props, other.label)) ? PEER : PRIMARY;
     nodes.push(textPrimitive({ id: stableId(id, "label", it.label), role: "category-label", frame: { x: cell.x + 8, y: cell.y + 6, width: cell.width - 16, height: 18 }, text: it.label, style: textStyle(AXIS_LABEL, INK, true, "left") }));
     nodes.push(linePrimitive({ id: stableId(id, "baseline", it.label), role: "chart-gridline", x1: inner.x, y1: inner.y + inner.height, x2: inner.x + inner.width, y2: inner.y + inner.height, style: lineStyle(GRID, token("line.hairline")) }));
     for (let i = 1; i < it.values.length; i++) nodes.push(linePrimitive({ id: stableId(id, "segment", it.label, i), role: "chart-line", x1: xAt(i - 1), y1: yAt(it.values[i - 1]), x2: xAt(i), y2: yAt(it.values[i]), style: lineStyle(color, token("line.standard")), data: { item: it.label } }));

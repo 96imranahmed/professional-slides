@@ -120,6 +120,7 @@ GATE_CODES = {
     "GROUND_CONTRAST": "type, or every mark of an exhibit, the scene sets where it cannot be read on its ground",
     "RENDER_CONTRAST": "type the scene sets legibly that the render shows lost on its ground",
     "UNSOURCED_PICTURE": "a picture frame drawn empty because its file was never cleared",
+    "PICTURE_UNREADABLE": "a screenshot drawn too small for its text to be read",
     "UNSCALED_FIGURE": "a figure drawn to a scale its own printed numbers contradict",
     "AREA_BASELINE": "a filled area whose baseline is not zero, so its fill overstates every change",
     "MISSING_RENDER": "a page the gates could not measure because it did not render",

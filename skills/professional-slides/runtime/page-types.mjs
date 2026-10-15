@@ -1314,7 +1314,9 @@ export function describeTypes() {
   for (const [name, t] of Object.entries(PAGE_TYPES)) {
     const n = (Array.isArray(t.exhibits) ? `${t.exhibits[0]}-${t.exhibits[1]}` : t.exhibits) + Object.keys(t.forms).filter((form) => FORM_EXHIBITS[`${name}/${form}`] !== undefined).map((form) => ` (form ${form}: ${exhibitRange(name, form).join("-").replace(/^(\d+)-\1$/, "$1")})`).join("");
     const data = Object.entries(t.forms).map(([form, target]) => [form, dataKeys(target, { type: name, form })]).filter(([, keys]) => keys.length);
-    lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).join(" | ")}`,
+    const sparing = Object.keys(t.forms).filter((form) => SPARING_FORMS[`${name}/${form}`]);
+    lines.push(`## ${name}`, t.task, "", `- form: ${Object.keys(t.forms).filter((form) => !sparing.includes(form)).join(" | ")}`,
+      ...(sparing.length ? [`- use sparingly: ${sparing.map((form) => `${form} - ${SPARING_FORMS[`${name}/${form}`]}`).join("; ")}`] : []),
       ...(() => { const limits = Object.entries(t.forms).map(([form, target]) => [form, limitOf(name, form, target)]).filter(([, l]) => l);
         return limits.length ? [`- holds: ${limits.map(([form, l]) => `${form} ${l.min}${l.max ? `-${l.max}` : "+"} ${l.key}${l.valueChars ? ` (values ${l.valueChars} characters at most)` : ""}${l.columns ? ` (\`columns\` 1-${l.columns}, or left out)` : ""}`).join("; ")}`] : []; })(),
       ...(data.length ? [`- data: ${[...data.reduce((m, [form, keys]) => m.set(keys.join(", "), [...(m.get(keys.join(", ")) || []), form]), new Map())]
@@ -1323,6 +1325,21 @@ export function describeTypes() {
   }
   return lines.join("\n");
 }
+
+// Forms strong decks seldom use, listed after the rest with the case each earns its place in. Listed alike, they were
+// reached for as readily as bars and tables: the Spacebar deck's two weakest pages were a treemap of near-equal weights and
+// a row of capsules.
+const SPARING_FORMS = Object.freeze({
+  "composition/treemap": "six or more parts whose sizes differ several-fold, too many for bars; near-equal parts are refused",
+  "composition/marimekko": "a mix that differs between members whose own sizes differ too, both read at once",
+  "composition/waffle": "one or two shares the reader should count out of a hundred",
+  "composition/pictogram": "a share of people or things the reader should picture - 1 in 5",
+  "composition/radial-bars": "a few items' progress toward one full mark",
+  "relationship/bubble-grid": "a third measure read across rows and columns at once",
+  "mechanism/sankey": "flows between stages whose sizes are the point",
+  "mechanism/venn": "an overlap between two or three sets that is itself the finding",
+  "parallel/capsules": "two to five priorities that each stand as a column with a sentence; cards or labelled rows say the same with less ink",
+});
 
 // Which way a measure is good news: a delta or a trend arrow is coloured by
 // it. On a metric, a table column (every trend cell under it), a row, or a cell.

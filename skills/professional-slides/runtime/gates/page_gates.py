@@ -44,7 +44,7 @@ from gate_config import *  # noqa: E402,F401,F403
 from render_gates import *  # noqa: E402,F401,F403
 from scene_gates import *  # noqa: E402,F401,F403
 from gate_config import CANVAS_H, CANVAS_W, DEFAULT_PROFILE, FOOTER_TOP, GATE_CODES, GENERATED_PAGE, PROFILES, THRESHOLDS, finding, is_cover  # noqa: E402
-from render_gates import gate_title, gate_type_range, gate_unsourced_picture, source_text, void_bands, without_title_rule  # noqa: E402
+from render_gates import gate_picture_unreadable, gate_title, gate_type_range, gate_unsourced_picture, source_text, void_bands, without_title_rule  # noqa: E402
 from scene_gates import (GROUND_CONTRAST, _text_box, contrast, gate_area_baseline, gate_ground_contrast, gate_heading_wraps,  # noqa: E402
                          gate_scene_void, gate_unscaled_figure, scene_text_boxes, scene_void)
 from ink import SURFACE_LUMINANCE, grey_contrast, ink_matrix, ink_rows, load_grey, render_path  # noqa: E402
@@ -212,6 +212,7 @@ def run_gates(scene, render_dir=None, profile=None, gates=None):
             gate_title(slide_no, slide, found)
             gate_heading_wraps(slide_no, slide, found)
             gate_unsourced_picture(slide_no, slide, found)
+            gate_picture_unreadable(slide_no, slide, found)
             gate_unscaled_figure(slide_no, slide, found)
             gate_area_baseline(slide_no, slide, found)
             gate_scene_void(slide_no, slide, found)

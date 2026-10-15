@@ -8,14 +8,14 @@
 // primitives every other component uses, so the PowerPoint emitter and the
 // HTML renderer need nothing new, and each measures itself and refuses content
 // it cannot set rather than overflowing.
-import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted, reversedFill, reversedType } from "./core.mjs";
+import { token, tokenValue, stableId, ellipsePrimitive, linePrimitive, shapePrimitive, readableOn, emphasisRuns, cardMuted, reversedFill, reversedType, onFill } from "./core.mjs";
 import { MARK_TOKENS, numberMarker, iconMarker } from "./marks.mjs";
 import { measureAt, fillRect, measuredLabel } from "./draw.mjs";
 import { mediaNode } from "./media.mjs";
 import { measureTextRuns } from "./text-layout.mjs";
 import { quoted } from "./text-contract.mjs";
 
-const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink");
+const PRIMARY = token("color.componentPrimary"), ACCENT = token("color.accent"), INK = token("color.ink"), MID = token("color.chartSeries1");
 const WHITE = token("color.onPrimary"), SECONDARY = token("color.textSecondary"), RULE = token("color.rule");
 const MUTED = token("color.surfaceMuted"), TINT = token("color.accentTint");
 const FONT = token("font.body"), DISPLAY = token("font.display");
@@ -26,7 +26,7 @@ const FIGURES = FONT;
 const v = (id) => tokenValue(token(id));
 
 export const FIGURE_TOKENS = Object.freeze([...new Set([...MARK_TOKENS,
-  "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary",
+  "color.componentPrimary", "color.accent", "color.accentTint", "color.ink", "color.onPrimary", "color.textSecondary", "color.chartSeries1",
   "color.rule", "color.surfaceMuted", "color.surfaceTint", "color.band", "font.body", "font.display", "type.metric", "type.heading", "type.body",
   "type.compact", "type.label", "space.1", "space.2", "space.3", "space.4", "space.5", "space.6",
   "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round"])]);
@@ -939,16 +939,18 @@ export function capsulesNodes({ id, frame, props }) {
   // as tall and narrow rather than as a lozenge around its text.
   const h = Math.max(L.height, frame.height * 0.92), y0 = frame.y + (frame.height - h) / 2;
   L.measured.forEach((m, i) => {
-    const x = x0 + i * (L.width + L.gap), cid = stableId(id, "capsule", i), fill = i % 2 ? PRIMARY : ACCENT;
+    // Pillars in the palette's mid colour, every one alike - they are parallel - with type in whichever of white and the ink
+    // reads on it: alternating the primary and the accent set four near-black pillars on the Spacebar and BA decks.
+    const x = x0 + i * (L.width + L.gap), cid = stableId(id, "capsule", i), fill = MID, type = onFill(MID);
     out.push(fillRect(stableId(cid, "body"), "capsule-body", { x, y: y0, width: L.width, height: h }, fill, { radius: "radius.round" }));
     out.push(...numberMarker({ id: stableId(cid, "number"), role: "capsule-number", x: x + (L.width - L.disc) / 2, y: y0 + v("space.5"), size: L.disc, number: i + 1, reverse: false }));
     // The words sit midway between the number and the icon, at one height across the row: set under the number, they left
     // the foot of each pillar an empty dark slab.
     const top = y0 + v("space.5") + L.disc + v("space.4"), room = h - (v("space.5") + L.disc + v("space.4")) - (v("space.4") + L.icon + v("space.5"));
     let y = top + Math.max(0, (room - L.content) / 2);
-    out.push(label(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, style("type.body", WHITE, true, "center")));
+    out.push(label(stableId(cid, "title"), "capsule-title", { x: x + v("space.4"), y, width: L.inner }, m.title, style("type.body", type, true, "center")));
     y += m.title.height + v("space.2");
-    if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.compact", WHITE, false, "center")));
+    if (m.text) out.push(label(stableId(cid, "text"), "capsule-text", { x: x + v("space.4"), y, width: L.inner }, m.text, style("type.compact", type, false, "center")));
     if (m.item.icon) out.push(...iconMarker({ id: stableId(cid, "icon"), role: "capsule-icon", x: x + (L.width - L.icon) / 2, y: y0 + h - v("space.5") - L.icon, size: L.icon, icon: m.item.icon, tone: "inverse" }));
   });
   return out;

@@ -18,7 +18,7 @@ When the user gives a source and no more ("make a deck from this"), ask these th
 2. **The answer.** One sentence that answers the question, sharp enough to be wrong. It opens the deck as the executive summary's title, or the first finding's.
 3. **The findings that prove it.** Three to five sections, each a claim that holds part of the answer up. Together they leave nothing needed to accept it; no two say the same thing. For a comparison, one section per criterion that decides it; for a recommendation, one per condition the choice depends on.
 4. **Pages under each finding.** Each page title proves part of its section's claim. A page whose title does not prove its section's claim is in the wrong section, or the section is missing a claim.
-5. **What follows.** The implication, the recommendation, the limits of the evidence and what would change the answer. Close on it.
+5. **What follows.** The implication, the recommendation, the limits of the evidence and what would change the answer. Limits the source states itself take a page, not a footnote. The deck ends on the implication: its last page says what the reader should take away or do, not only what comes next.
 
 Read the titles down the deck alone: they should tell the whole argument. Read each level across: the sections should not overlap and together should be enough.
 
