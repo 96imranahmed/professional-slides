@@ -1317,14 +1317,14 @@ export function speechNodes({ id, frame, props }) {
 
 /* ---------------------------------------------------------- side-statement */
 
-// The panel of a sidebar page: the statement set large in a filled column, a
-// short accent bar above it. A question, a claim or the page's single figure;
-// the evidence sits beside it.
+// The panel of a sidebar page: the statement set large in a filled column, with its icon above it where it has one and
+// nothing else - a short accent bar over every label made a page of labelled rows a stack of ornaments. A question, a
+// claim or the page's single figure; the evidence sits beside it.
 //
 // The statement keeps a heading's measure, about 45 characters, however wide
 // the panel: beside a short memo the panel takes the width the prose leaves,
 // and a 700px statement runs as two long lines across it.
-const STATEMENT_MEASURE = 440;
+const STATEMENT_MEASURE = 440, SIDE_ICON = 28;
 const sideFill = (tone) => (tone === "primary" ? reversedFill(PRIMARY) : tone === "muted" ? MUTED : tone === "tint" ? TINT : reversedFill(INK));
 // `highlight`: the page's phrase inside the statement, so the one claim the
 // page sets large is emphasised as the points beside it are. The accent where
@@ -1339,7 +1339,8 @@ export function sideStatementLayout(frame, props) {
     : measure(props.text, inner, "type.heading", true, DISPLAY);
   if (text.lines.length > 8) throw new Error("A side statement runs to eight lines at most; it is the page's reading, not its argument");
   const kicker = clean(props.kicker) ? measure(props.kicker, inner, "type.label", true) : null;
-  return { inner, text, kicker, emphasis, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + v("space.4") + 2 * v("space.5") };
+  const icon = props.icon ? SIDE_ICON : 0;
+  return { inner, text, kicker, emphasis, icon, height: text.height + (kicker ? kicker.height + v("space.3") : 0) + (icon ? icon + v("space.3") : 0) + 2 * v("space.5") };
 }
 
 export function sideStatementNodes({ id, frame, props }) {
@@ -1349,15 +1350,14 @@ export function sideStatementNodes({ id, frame, props }) {
   const ink = light ? INK : reversedType(), out = [fillRect(stableId(id, "panel"), "side-panel", frame, fill)];
   let y = frame.y + Math.max(v("space.5"), (frame.height - L.height) / 2 + v("space.5"));
   const x = frame.x + v("space.5");
-  out.push(fillRect(stableId(id, "bar"), "side-panel-bar", { x, y, width: 32, height: 3 }, ACCENT));
-  y += v("space.4");
+  if (L.icon) { out.push(...iconMarker({ id: stableId(id, "icon"), role: "side-panel-icon", x, y, size: L.icon, icon: props.icon, tone: light ? "plain" : "inverse" })); y += L.icon + v("space.3"); }
   if (L.kicker) { out.push(label(stableId(id, "kicker"), "side-panel-kicker", { x, y, width: L.inner }, L.kicker, style("type.label", light ? SECONDARY : reversedType(), true))); y += L.kicker.height + v("space.3"); }
   // The statement ends inside its panel. A labelled-rows page gives each label a fifth of the body, and a three-line label
   // ran past its 96px block into the white gap and under the next one, clipped, with no check reading it.
   const room = frame.y + frame.height - v("space.2") - y;
   if (L.text.height > room + 0.5) {
     const holds = Math.max(0, Math.floor((room + 0.5) / L.text.lineHeight));
-    throw new Error(`The statement "${clean(props.text)}" sets on ${L.text.lines.length} lines and its ${Math.round(frame.height)}px panel holds ${holds}; shorten it to ${holds} line${holds === 1 ? "" : "s"}`);
+    throw new Error(`The statement "${clean(props.text)}" sets on ${L.text.lines.length} lines and its ${Math.round(frame.height)}px panel holds ${holds}; shorten it to ${holds} line${holds === 1 ? "" : "s"}${L.icon ? ", or drop its icon" : ""}`);
   }
   const text = label(stableId(id, "text"), "side-panel-text", { x, y, width: L.inner }, L.text, style("type.heading", ink, !L.emphasis || L.emphasis.accent, "left", DISPLAY));
   out.push(L.emphasis ? { ...text, runs: L.text.runs } : text);

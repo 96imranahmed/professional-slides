@@ -223,7 +223,7 @@ export const KINDS = Object.freeze({
     options: { tone: "outline | header | numbered | plain | disc | big-number | dark | columns | stat (needs `value` on every card)", align: "\"center\"", valign: "\"middle\"", question: "string - a panel on the left", columns: "int - cards a row" } },
   capsules: { data: { items: "[{ title, text?, icon? }] 2-5" }, options: {} },
   "arrow-rows": { data: { items: "[{ label, text?, icon? }] 2-6 - the last takes the accent" }, options: {} },
-  "labelled-rows": { page: { blocks: "[{ label (<= 5 words), points: 2-4 points, metric?: { value | measure, label, delta? } | exhibit?: { type, ... } }] 2-5 - every row a metric or exhibit, or none; no `exhibit` on the page" } },
+  "labelled-rows": { page: { blocks: "[{ label (<= 5 words), icon? (an icon name, set over the label), points: 2-4 points, metric?: { value | measure, label, delta? } | exhibit?: { type, ... } }] 2-5 - every row a metric or exhibit, or none; no `exhibit` on the page" } },
   logos: { data: { items: "[{ name, caption?, image?: media }] 2-12 - a declared player's mark fills `image` by name" }, options: {} },
   people: { data: { items: "[{ name, role?, points?: [string] <= 3, image?: { path, alt, credit } | { alt, search } }] 2-5" }, options: {} },
   map: { data: { geography: "preset (world, europe, usa, ...) | \"country:<ISO or name>\" | an imported { id, title, source, geojson }", markers: "[{ label?, id?, longitude + latitude | country | x + y, value?, display?, style?: \"badge\", hub?, size?, fraction?, number? }]" },

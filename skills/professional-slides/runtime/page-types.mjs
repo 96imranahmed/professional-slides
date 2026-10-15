@@ -428,7 +428,7 @@ const CONSTRUCTION_DATA = {
   text: ["paragraphs"], sidebar: ["panel", "paragraphs"], statement: ["text"], "executive-summary": ["points"], takeaways: ["items"],
   "picture-hero": ["pictures"], "picture-pair": ["pictures"], "picture-strip": ["pictures"], "photo-backdrop": ["photo", "exhibit"],
   "two-up-contrast": ["exhibits"], "table-halves": ["exhibits"], row: ["exhibits"], grid: ["exhibits"], stack: ["exhibits"], sequence: ["exhibits"],
-  "labelled-rows": ["blocks (each a `label`, up to four `points`, and optionally a `metric` { value, label } or a small `exhibit` - a table, or a headed chart on a page of two blocks)"],
+  "labelled-rows": ["blocks (each a `label`, optionally its `icon`, up to four `points`, and optionally a `metric` { value, label } or a small `exhibit` - a table, or a headed chart on a page of two blocks)"],
   "aligned-bars": ["categories", "series (one per measure: name, unit, values)", "highlights (the subject)"],
 };
 // Forms that read more than their component's sample says.
@@ -557,8 +557,8 @@ function checkBlocks(page, id, exhibits) {
     const where = `${id}: block ${at + 1}`;
     if (!block || typeof block !== "object" || typeof block.label !== "string" || !block.label.trim()) throw new Error(`${where} needs its \`label\``);
     if (!Array.isArray(block.points) || block.points.length > BLOCK_POINTS_MAX) throw new Error(`${where} carries up to ${BLOCK_POINTS_MAX} \`points\` beside its label; it has ${Array.isArray(block.points) ? block.points.length : "none"}`);
-    const keys = Object.keys(block).filter((key) => !["label", "points", "metric", "exhibit"].includes(key));
-    if (keys.length) throw new Error(`${where}: unknown key${keys.length === 1 ? "" : "s"} ${keys.map((k) => `\`${k}\``).join(", ")} - a block is { label, points, metric | exhibit }`);
+    const keys = Object.keys(block).filter((key) => !["label", "icon", "points", "metric", "exhibit"].includes(key));
+    if (keys.length) throw new Error(`${where}: unknown key${keys.length === 1 ? "" : "s"} ${keys.map((k) => `\`${k}\``).join(", ")} - a block is { label, icon?, points, metric | exhibit }`);
     if (block.metric && block.exhibit) throw new Error(`${where} carries a \`metric\` or an \`exhibit\` at its right, not both`);
     if (block.metric && !(block.metric.value !== undefined && String(block.metric.value).trim() && block.metric.label)) throw new Error(`${where}: a block's \`metric\` is { value, label }`);
     if (block.metric && String(block.metric.value).length > 10) throw new Error(`${where}: a block's metric is a figure of 10 characters at most ("${block.metric.value}"); put the unit in the label`);
@@ -1302,7 +1302,7 @@ export function describeTypes() {
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
     `\`takeaway\` - optional: the closing sentence, ${TEXT_LIMITS.takeawayLines} lines; absent, the page closes on its exhibit.`, "",
     "`bar` - with commentary `so-what-bar`, the implication in a filled bar across the foot of the exhibit, two lines at most.", "",
-    "`subtitle` - optional: one line under the title naming what the title leaves out - the measure and unit, the population, the period or the scope.", "",
+    "`subtitle` - optional, and left out unless the deck the user gave as the style to follow sets a line under its titles: one line naming what the title leaves out - the measure and unit, the population, the period or the scope. Without one, the exhibit's heading carries the measure and unit.", "",
     "Numbers by reference - where the insight log records measures, a page names the measure and the runtime writes the number: an exhibit's `series: [{ measure: \"<insight id>/<measure>\", name }]` takes its categories, values, unit and basis from the measures; a metric, a `kpi`, a row block's `metric` or a fact-grid item is `{ measure, format, label }`; and `{{<insight id>/<measure>@<period or member> | 0.0}}` in any text prints that number. A number typed into text is traced to the measures the page rests on (NUMBER_UNTRACED, advised).", "",
     "`source` - the citation as text, or a list of keys into the pages file's `sources` registry (`{ key: { name, short, url, status, date } }`), fitted by the runtime to the footer, the full list kept in the speaker notes.", "",
     "`highlight` - the phrase from each point the reader should see first; a point left unmarked is marked on its own figure. A phrase the page writes nowhere an accent is drawn is set aside.", "",
@@ -1373,7 +1373,7 @@ export function pageSchema(only = null) {
     required: ["id", "type", "title"],
     properties: {
       id: { type: "string" }, type: { const: name }, title: { type: "string" },
-      subtitle: { type: "string", description: "optional standfirst under the title: the measure and unit, the population, the period or the scope, in one line" },
+      subtitle: { type: "string", description: "optional standfirst under the title, left out unless the reference deck sets one: the measure and unit, the population, the period or the scope, in one line" },
       form: { enum: Object.keys(t.forms), default: Object.keys(t.forms)[0] }, commentary: { enum: [...new Set([...t.commentary, ...Object.keys(t.forms).flatMap((form) => FORM_COMMENTARY[`${name}/${form}`] || [])])] },
       takeaway: { oneOf: [{ const: false }, { type: "string", minLength: 8 }], description: `optional closing sentence, ${TEXT_LIMITS.takeawayLines} lines at most; absent or false, the page closes on its exhibit` },
       source: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" }, minItems: 1 }], description: "the citation as text, or keys of the pages file's `sources` registry" },

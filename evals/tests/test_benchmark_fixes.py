@@ -45,6 +45,23 @@ class StorylineTests(unittest.TestCase):
         self.assertIn("Limits the source states itself take a page", (SKILL / "references" / "storylining.md").read_text())
 
 
+class OrnamentTests(unittest.TestCase):
+    def test_a_label_panel_carries_its_icon_or_nothing_and_subtitles_are_left_out_by_default(self):
+        # A short accent bar over every label made a page of labelled rows a stack of ornaments (user, 2026-10-15).
+        result = run_node(PRELUDE + """
+import { sideStatementNodes } from './skills/professional-slides/runtime/figures.mjs';
+const frame = { x: 60, y: 160, width: 228, height: 150 };
+const roles = (props) => sideStatementNodes({ id: 's', frame, props: { tone: 'primary', ...props } }).map((n) => n.role);
+console.log(JSON.stringify({ plain: roles({ text: 'One narrow workflow' }), icon: roles({ text: 'One narrow workflow', icon: 'flag' }) }));
+""")
+        self.assertNotIn("side-panel-bar", result["plain"] + result["icon"])
+        self.assertEqual([r for r in result["plain"] if r != "side-panel"], ["side-panel-text"])
+        self.assertIn("side-panel-icon-glyph", result["icon"])
+        guide = (SKILL / "references" / "storylining.md").read_text()
+        self.assertIn("A page takes a `subtitle` only where the deck the user gave as the style to follow sets a line under its titles", guide)
+        self.assertNotIn("The period, population and unit go in the `subtitle`", guide)
+
+
 class PeerColourTests(unittest.TestCase):
     def test_a_highlighted_bar_stands_out_from_its_peers_on_every_palette(self):
         result = run_node(PRELUDE + """

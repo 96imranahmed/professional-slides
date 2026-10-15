@@ -39,7 +39,7 @@ A page then prints the numbers by reference - an exhibit's `series: [{ "measure"
 
 ## Titles
 
-Each title states the finding, not the topic: the subject, what it did, and by how much or against what - in two lines at most, about ten words as the norm. The period, population and unit go in the `subtitle`.
+Each title states the finding, not the topic: the subject, what it did, and by how much or against what - in two lines at most, about ten words as the norm. The period, population and unit go in the exhibit's heading or its column heads. A page takes a `subtitle` only where the deck the user gave as the style to follow sets a line under its titles; otherwise it has none.
 
 | Instead of | Write |
 | --- | --- |
@@ -47,7 +47,7 @@ Each title states the finding, not the topic: the subject, what it did, and by h
 | Agent results | Agent A completed four tasks in five; the next best completed three |
 | Runtime and score | The fastest agents scored no lower than the slowest |
 
-Match the verb to the evidence: a measured result *is*, a sensitivity *could reach*, an approved plan *will*. Where the evidence is thinner than the wording, narrow the claim - a segment, a period, a softer verb - and keep its direction; the limitation goes in the subtitle or a note, not in place of the finding. Hedges (*may*, *potentially*, *various*, *considerations*) mark a finding not yet written: replace each with the measured fact.
+Match the verb to the evidence: a measured result *is*, a sensitivity *could reach*, an approved plan *will*. Where the evidence is thinner than the wording, narrow the claim - a segment, a period, a softer verb - and keep its direction; the limitation goes in a note (or the subtitle, where the deck uses them), not in place of the finding. Hedges (*may*, *potentially*, *various*, *considerations*) mark a finding not yet written: replace each with the measured fact.
 
 Structural pages keep their fixed heading: a contents page, a section divider, `Executive summary` or `Executive summary: <answer>`.
 
@@ -60,7 +60,7 @@ A summary carries the answer and the case for it, in four to six developed state
 - **A page says one thing.** The title is the claim; the exhibit is the evidence; the commentary says what the exhibit cannot - the mechanism, the cause, the consequence. It does not read the chart back.
 - **Points are sentences**, each a claim with its evidence: "Agent A finished in half the time on the long tasks, where the others timed out" rather than "Agent A: faster".
 - **Prose runs in short paragraphs**, each under a bold `lead` the reader can scan: `{ "lead": "Timing is the real exposure", "text": "..." }`.
-- **Numbers are exact and consistent.** One figure has one value on every page, at one precision. Say the unit once, in the heading or the subtitle.
+- **Numbers are exact and consistent.** One figure has one value on every page, at one precision. Say the unit once, in the exhibit's heading.
 - **Notes carry method and caveats**, in `note` or a footnote, not in the title or the points.
 - **Labels are short**: a chart's heading names the measure and the population; an axis names its unit; a table's header names what its column holds.
 

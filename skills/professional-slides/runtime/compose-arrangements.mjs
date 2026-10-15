@@ -442,7 +442,7 @@ export function labelledRows(items, { id, slide, baseDir, fill }) {
   if (blocks.length < 2) throw new Error(`${id}: a labelled-rows page carries two or more \`blocks\`, each { label, points }`);
   const rows = blocks.map((block, at) => {
     if (!block?.label || !(block.points || []).length) throw new Error(`${id}: block ${at + 1} needs its \`label\` and \`points\``);
-    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary" },
+    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary", ...(block.icon ? { icon: block.icon } : {}) },
       size: { width: BLOCK_LABEL_WIDTH, height: "fill" } };
     const text = { id: `${id}-text-${at}`, layout: "flow.column", leftover: "center", size: { width: { fr: 1 }, height: "fill" },
       items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, false, null)] };
