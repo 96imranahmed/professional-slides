@@ -33,7 +33,7 @@ const nodes=get(table), plain=structuredClone(table);plain.rows[1][1].markFocus=
 const before=get(plain), bars=nodes.filter(n=>n.role==='table-bar'), oldBars=before.filter(n=>n.role==='table-bar');
 assert.deepEqual(bars.map(n=>n.frame),oldBars.map(n=>n.frame),'focus must preserve signed geometry and shared units');
 assert.equal(bars[0].style.fill.tokenId,oldBars[0].style.fill.tokenId,'unselected maximum remains neutral');
-assert.equal(bars[1].style.fill.tokenId,'color.accent');assert.equal(bars[1].data.markFocus,true);
+assert.equal(bars[1].style.fill.tokenId,'color.chartSubject');assert.equal(bars[1].data.markFocus,true);
 assert.deepEqual(nodes.filter(n=>['table-cell','table-row-band'].includes(n.role)),before.filter(n=>['table-cell','table-row-band'].includes(n.role)),'mark focus adds no background');
 const labels=nodes.filter(n=>n.role==='table-cell-text'&&n.data.cellType==='bars');
 assert.ok(labels.some(n=>n.text==='0'&&n.data.markFocus),'zero retains its focus label without fabricating a bar');

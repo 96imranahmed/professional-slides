@@ -33,14 +33,17 @@ import { ellipsePrimitive, linePrimitive, onFill, rectPrimitive, stableId, textP
 import { formatValue } from "./value-format.mjs";
 import { measureAt } from "./draw.mjs";
 import { legendNodes, legendRowCount } from "./legends.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, fillStyle, highlightAmongSeries, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
+import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
+import { datedRun, unjoined } from "./axis-breaks.mjs";
+import { ruleAround } from "./label-placement.mjs";
+import { assertComparison } from "./chart-sense.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, SUBJECT, fillStyle, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
 
 export const SMALL_MULTIPLES = Object.freeze({ min: 2, max: 12, marks: Object.freeze(["column", "bar", "line", "stacked-column", "stacked-bar", "donut"]), parts: Object.freeze({ min: 2, max: SERIES.length }) });
 const STACKED = new Set(["stacked-column", "stacked-bar"]);
 // The marks that run their categories down the page, and the ones that key their parts in colour.
 const sideways = (mark) => mark === "bar" || mark === "stacked-bar";
 const keyed = (mark) => STACKED.has(mark) || mark === "donut";
-const ACCENT = token("color.accent");
 const GAP_X = 18, GAP_Y = 16, TITLE = 18, AXIS = 16, HEADER = 20;
 // Values print on a panel's marks while they are this few: past it a panel's figures crowd its plot.
 const LABELLED_MARKS = 6;
@@ -269,6 +272,16 @@ function donutNodes({ layout, panel, key, props, highlighted }) {
   return nodes;
 }
 
+/**
+ * Where a line panel sets period `i`: where its date falls when the periods are dates at uneven gaps (time-axis.mjs
+ * timePositions), as a line chart does, else one even step apart. Set one step apart, the BA deck's multiples drew 2019
+ * beside 2023 and joined them across the Covid years.
+ */
+function lineX(plot, categories, i) {
+  const n = categories.length, at = timePositions(categories);
+  return plot.x + (n === 1 ? plot.width / 2 : at ? plot.width * at[i] : (plot.width * i) / (n - 1));
+}
+
 /** One panel's marks: its columns, bars or line, their labels where few, its focus and its reference rule; or its stacks, or its donut. */
 function panelNodes({ id, layout, panel, highlighted, props }) {
   const { mark, categories, reference } = layout;
@@ -276,10 +289,10 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   const nodes = [];
   const key = (...parts) => stableId(id, "panel", panel.at, ...parts);
   if (layout.donut) return donutNodes({ layout, panel, key, props, highlighted });
-  // The rest in the lead series, as a single-series chart is drawn, and the panel the page is about apart from them: in the
-  // accent, or the primary where the accent is the lead's own colour (chart-axes.mjs subjectToken). In the house's primary,
-  // every panel of the BA deck's small multiples was near-black and its subject the lighter of the two.
-  const subject = highlightAmongSeries(), color = highlighted ? subject : SERIES[0];
+  // The rest in the lead series, as a single-series chart is drawn, and the panel the page is about in the subject's colour
+  // (chart-axes.mjs SUBJECT). In the house's primary, every panel of the BA deck's small multiples was near-black and its
+  // subject the lighter of the two.
+  const subject = SUBJECT, color = highlighted ? subject : SERIES[0];
   const n = categories.length;
   const along = sideways(mark) ? plot.height : plot.width;
   const slot = along / n;
@@ -294,11 +307,12 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   if (layout.stacked) nodes.push(...stackNodes({ layout, panel, key, props }), axis);
   else if (mark === "line") {
     nodes.push(axis);
-    const x =(i) => plot.x + (n === 1 ? plot.width / 2 : (plot.width * i) / (n - 1));
+    const x = (i) => lineX(plot, categories, i);
     const y = (v) => plot.y + plot.height - span(v) * plot.height;
+    const gaps = unjoined(categories);
     item.values.forEach((v, i) => {
       const next = item.values[i + 1];
-      if (Number.isFinite(v) && Number.isFinite(next)) nodes.push(linePrimitive({ id: key("segment", i), role: "chart-line", x1: x(i), y1: y(v), x2: x(i + 1), y2: y(next), style: lineStyle(color, token("line.standard")), data: { item: item.label } }));
+      if (Number.isFinite(v) && Number.isFinite(next) && !gaps.has(i)) nodes.push(linePrimitive({ id: key("segment", i), role: "chart-line", x1: x(i), y1: y(v), x2: x(i + 1), y2: y(next), style: lineStyle(color, token("line.standard")), data: { item: item.label } }));
     });
     const last = item.values.map((v, i) => [v, i]).filter(([v]) => Number.isFinite(v)).at(-1);
     if (last) {
@@ -335,13 +349,11 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   if (ref !== null) {
     const at = span(ref);
     const text = reference === "average" && !Number.isFinite(item.reference) ? `Ø ${formatValue(ref, props)}` : formatValue(ref, props);
-    if (sideways(mark)) {
-      const x = plot.x + at * plot.width;
-      nodes.push(linePrimitive({ id: key("reference"), role: "chart-reference-line", x1: x, y1: plot.y - 2, x2: x, y2: plot.y + plot.height, style: lineStyle(SECONDARY, token("line.hairline"), "dash"), data: { item: item.label, value: ref } }));
-    } else {
-      const y = plot.y + plot.height - at * plot.height;
-      nodes.push(linePrimitive({ id: key("reference"), role: "chart-reference-line", x1: plot.x, y1: y, x2: plot.x + plot.width, y2: y, style: lineStyle(SECONDARY, token("line.hairline"), "dash"), data: { item: item.label, value: ref } }));
-    }
+    // The rule gives way to the panel's value labels it would run through (label-placement.mjs ruleAround).
+    const x = plot.x + at * plot.width, y = plot.y + plot.height - at * plot.height;
+    const rule = sideways(mark) ? { x1: x, y1: plot.y - 2, x2: x, y2: plot.y + plot.height } : { x1: plot.x, y1: y, x2: plot.x + plot.width, y2: y };
+    const labels = nodes.filter((node) => node.role === "data-label" && node.data?.item === item.label);
+    ruleAround(rule, labels).forEach((run, k) => nodes.push(linePrimitive({ id: k ? key("reference", k) : key("reference"), role: "chart-reference-line", ...run, style: lineStyle(SECONDARY, token("line.hairline"), "dash"), data: { item: item.label, value: ref } })));
     const width = Math.ceil(measure(text, 200).width) + 2;
     // Named where it reads as the panel's own figure and touches no mark: a bar panel's under the rule's foot; a column or
     // line panel's at the right of its title, or over its plot where the grid's headers stand in for titles.
@@ -358,6 +370,9 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
 export function smallMultiplesChart({ id, frame, props }) {
   const layout = smallMultiplesLayout(frame, props);
   const { mark, categories, cells, columns, rowLabels, columnLabels, top, left, parts } = layout;
+  // Panels of one measure over periods show a change a reader can see in at least one panel, on the scale it is drawn on.
+  if (!layout.donut && !layout.stacked && (mark === "line" || mark === "column"))
+    assertComparison({ id, categories, props, dated: datedRun(categories), series: cells.map((panel) => ({ name: panel.item.label, values: panel.item.values })), span: cells.map((panel) => panel.bounds.span) });
   const highlighted = new Set((props.highlights || []).map((h) => String(h?.category ?? h)));
   const nodes = [];
   // One key over the trellis: a part keeps its colour in every panel, so it is named once.
@@ -378,7 +393,7 @@ export function smallMultiplesChart({ id, frame, props }) {
     // A stack or a donut keeps a colour a part, so the subject's panel is set on the accent's tint, its title in the accent.
     if (subject && parts) nodes.push(rectPrimitive({ id: stableId(id, "panel", panel.at, "highlight"), role: "chart-panel-highlight", frame: { x: panel.cell.x - 6, y: panel.cell.y - 4, width: panel.cell.width + 12, height: panel.cell.height + 8 }, style: fillStyle(token("color.accentTint"), "none"), data: { item: panel.item.label, highlight: true } }));
     if (!rowLabels) nodes.push(textPrimitive({ id: stableId(id, "panel", panel.at, "title"), role: "category-label", frame: { x: panel.cell.x, y: panel.cell.y, width: panel.cell.width, height: TITLE }, text: panel.item.label,
-      style: textStyle(AXIS_LABEL, subject ? ACCENT : INK, true, layout.donut ? "center" : "left"), data: { item: panel.item.label, panelTitle: true } }));
+      style: textStyle(AXIS_LABEL, subject ? SUBJECT : INK, true, layout.donut ? "center" : "left"), data: { item: panel.item.label, panelTitle: true } }));
     nodes.push(...panelNodes({ id, layout, panel, highlighted: subject, props }));
   }
   // The shared axis, named once: under the bottom row's panels, or beside the left column's. A donut's parts are the key's.
@@ -393,12 +408,14 @@ export function smallMultiplesChart({ id, frame, props }) {
     const bottom = Math.max(...cells.map((p) => p.row));
     for (const panel of cells.filter((p) => p.row === bottom || (p.row === bottom - 1 && !cells.some((q) => q.row === bottom && q.col === p.col)))) {
       const { plot } = panel, slot = plot.width / n;
-      const x = (i) => (mark === "line" ? plot.x + (n === 1 ? plot.width / 2 : (plot.width * i) / (n - 1)) : plot.x + (i + 0.5) * slot);
+      const x = (i) => (mark === "line" ? lineX(plot, categories, i) : plot.x + (i + 0.5) * slot);
       const widest = Math.max(...categories.map((c) => measure(c, 400, false, AXIS_LABEL).width));
       const every = Math.max(1, Math.ceil((widest + 6) / Math.max(1, mark === "line" ? plot.width / Math.max(1, n - 1) : slot)));
+      // Dates at uneven gaps stand where they fall, and are labelled where their labels clear one another.
+      const spaced = mark === "line" && timePositions(categories) ? spacedLabelIndices(categories.map((_, i) => x(i)), widest + 6) : null;
       categories.forEach((category, i) => {
-        if (i % every !== 0 && i !== n - 1) return;
-        if (i === n - 1 && i % every !== 0 && (i - Math.floor(i / every) * every) * (plot.width / n) < widest + 6) return;
+        if (spaced ? !spaced.includes(i) : i % every !== 0 && i !== n - 1) return;
+        if (!spaced && i === n - 1 && i % every !== 0 && (i - Math.floor(i / every) * every) * (plot.width / n) < widest + 6) return;
         const width = Math.ceil(measure(category, 400, false, AXIS_LABEL).width) + 4;
         nodes.push(textPrimitive({ id: stableId(id, "category", panel.at, i), role: "category-label", frame: { x: Math.max(panel.cell.x - 4, Math.min(x(i) - width / 2, panel.cell.x + panel.cell.width - width + 4)), y: plot.y + plot.height + 3, width, height: AXIS - 2 },
           text: category, style: textStyle(AXIS_LABEL, SECONDARY, false, "center"), data: { category } }));

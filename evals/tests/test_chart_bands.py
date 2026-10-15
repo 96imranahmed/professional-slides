@@ -130,7 +130,9 @@ console.log(JSON.stringify(out));
 
     def test_a_banded_chart_is_drawn_not_native(self):
         run_node(PRELUDE + """
-assert.ok(nativeChartSpec('chart.column', punctual, frame, render('chart.column', punctual)), 'a bare column chart is native');
+// Bare, the columns move enough to read on their zero baseline (chart-sense.mjs); the banded chart compares its level to the band.
+const bare = { ...punctual, series: [{ name: 'On time', values: [72.1, 80.6, 90.3, 85.7, 87.9, 91.2, 92.0, 91.5] }] };
+assert.ok(nativeChartSpec('chart.column', bare, frame, render('chart.column', bare)), 'a bare column chart is native');
 const banded = { ...punctual, bands: [{ from: 90, to: 95 }] };
 assert.equal(nativeChartSpec('chart.column', banded, frame, render('chart.column', banded)), null);
 console.log('{}');

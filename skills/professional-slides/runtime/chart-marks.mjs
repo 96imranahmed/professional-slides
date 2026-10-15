@@ -136,7 +136,7 @@ export function labelRings({ id, nodes, valueLabels }) {
     const cx = label.style.align === "left" ? label.frame.x + ink.width / 2 : label.style.align === "right" ? label.frame.x + label.frame.width - ink.width / 2 : label.frame.x + label.frame.width / 2;
     const cy = label.frame.y + label.frame.height / 2;
     const width = ink.width + 16, height = ink.height + 10;
-    out.push(ellipsePrimitive({ id: stableId(label.id, "ring"), role: "chart-label-ring", frame: { x: cx - width / 2, y: cy - height / 2, width, height }, style: { fill: "none", stroke: token("color.accent"), lineWidth: token("line.standard") }, data: { category: label.data.category, series: label.data.series } }));
+    out.push(ellipsePrimitive({ id: stableId(label.id, "ring"), role: "chart-label-ring", frame: { x: cx - width / 2, y: cy - height / 2, width, height }, style: { fill: "none", stroke: token("color.chartSubject"), lineWidth: token("line.standard") }, data: { category: label.data.category, series: label.data.series } }));
   }
   return out;
 }

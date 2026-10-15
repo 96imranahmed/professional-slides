@@ -5,8 +5,11 @@ import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenV
 import { formatValue } from "./value-format.mjs";
 import { contrastRatio } from "./color.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods, gapBreaks } from "./time-axis.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, categoryBreakNodes, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
+import { timePositions, spacedLabelIndices, monthlyLabelStep } from "./time-axis.mjs";
+import { categoryBreakNodes, datedRun, slotBreaks, unjoined } from "./axis-breaks.mjs";
+import { assertComparison } from "./chart-sense.mjs";
+import { placeLabels, spreadApart } from "./label-placement.mjs";
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT_LINE, VALUE_HEADROOM, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
@@ -163,6 +166,8 @@ export function lineChart({ id, frame, props, area = false }) {
   Object.assign(chart, lineAxes(chart));
   drawIntervals(chart);
   Object.assign(chart, drawLines(chart));
+  // A value label with no clear place is left out, and the chart is then read off its value axis: drawn again with one.
+  if (chart.droppedLabels && !chart.showValueAxis && props.showValueAxis === undefined) return lineChart({ id, frame, props: { ...props, showValueAxis: true }, area });
   placeEndLabels(chart);
   drawPointHighlights(chart);
   chart.nodes.push(...(chart.intervalLabels || []));
@@ -177,17 +182,14 @@ function lineOptions(chart) {
   const { id, frame, props, area } = chart;
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props);
-  // `focusSeries`: one line in the primary, the others a muted grey, so the
-  // subject reads first among its peers.
+  // `focusSeries`: one line in the subject's colour, the others the context grey, so the subject reads first among its peers
+  // (chart-axes.mjs SUBJECT, CONTEXT_LINE); the legend keys each line in the colour it is drawn in.
   if (props.focusSeries !== undefined && !series.some((item) => item.name === props.focusSeries)) throw new Error("focusSeries must name an exact chart series");
-  // The deck's declared subject (`subjectAccent`, conventions.mjs) is the accent's alone, on a line as on a bar: fd01 drew
-  // IAG's bar in the accent and IAG's line beside it in navy.
-  // Its peers then take the bars' comparator grey, which the accent clears; `color.rule` sat at 1.0 to 2.4 to 1 under it.
-  const subjectTone = props.subjectAccent ? subjectToken() : null;
   const lineColor = (seriesIndex) => props.focusSeries !== undefined
-    ? (series[seriesIndex].name === props.focusSeries ? token(subjectTone ?? "color.componentPrimary") : token(subjectTone ? "color.chartComparator" : "color.rule"))
+    ? (series[seriesIndex].name === props.focusSeries ? SUBJECT : CONTEXT_LINE)
     : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
-  if (area && categories.length < 2) throw new Error("Area charts require at least two categories");
+  // A line joins periods: with one there is nothing to join (chart-sense.mjs NO_COMPARISON).
+  assertComparison({ id, categories, series, span: 1, props, dated: false, line: true });
   // A rank is a place, 1 the top (measures.mjs isRankMeasure): its line runs on an axis with 1 at the top, so a climb from
   // 8th to 4th draws as a rise, and an area - whose fill would make the worst place the largest - is refused it. The BA
   // retest drew IAG's climb to 4th as a fall and BA's fall to 23rd as a filled climb.
@@ -218,10 +220,9 @@ function lineOptions(chart) {
   // of the second lands on the segment climbing into it, and thinned labels
   // leave the first one on the value axis - so such a line is read off its
   // value axis, with the latest value labelled at its end.
-  const spacing = timePositions(categories);
-  // A table's columns are even; points on an uneven time axis would drift
-  // off them, the further the more uneven the gaps.
-  if (spacing && props.categoryColumns) throw new Error(`${id}: a data table sets its periods in even columns, and these dates are unevenly spaced (${categories[0]} to ${categories.at(-1)}) - their points cannot sit over the columns; drop the table and label the points, or plot evenly spaced periods`);
+  // A table's columns are even, so over a data table the periods take one slot each and the axis breaks after each long gap
+  // (axis-breaks.mjs), as columns over a table do; elsewhere they stand where the dates fall.
+  const spacing = props.categoryColumns ? null : timePositions(categories);
   const crowded = Boolean(spacing) && spacing.slice(1).some((v, i) => (v - spacing[i]) * (frame.width - 120) < 64);
   const labelAt = (index) => !crowded || index === categories.length - 1;
   const showDataLabels = props.dataLabels === true || (props.dataLabels !== false && !endLabels && values.length <= 8);
@@ -235,11 +236,11 @@ function lineOptions(chart) {
   // An area's axis runs from zero. A rank's takes the ladder its places span, turned over (linePlot), so its ticks stay whole steps.
   const floor = area ? Math.min(0, ...reach) : undefined;
   const bounds = numericBounds(withReferenceValues(reach, props, { base: props.yMin ?? floor ?? Math.min(...reach), padded: tight }), { min: props.yMin ?? floor, max: props.yMax, axis: "y", tight, includeZero: area });
+  assertComparison({ id, categories, series, span: bounds.span, props, dated: datedRun(categories) });
   const labelWidth = axisLabelWidth(bounds);
   const labelHeightAt = (slot) => Math.max(...categories.map((c) => { try { return measureText(String(c), slot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL), wrapWidthRatio: ENGINE_RESERVE }).height; } catch { return 28; } }));
-  // A period the run leaves out at its own cadence (time-axis.mjs missingPeriods) breaks every line there: a segment drawn
-  // across 2020-21 states values the record does not have.
-  const breaks = new Set(missingPeriods(categories).map((gap) => gap.after));
+  // A period the run leaves out breaks every line there (axis-breaks.mjs unjoined).
+  const breaks = unjoined(categories);
   return { categories, series, lineColor, endLabels, showLegend, seriesGrowth, spacing, labelAt, showDataLabels, showValueAxis, bounds,
     labelWidth, labelHeightAt, intervals, rank, breaks };
 }
@@ -279,9 +280,14 @@ function lineAxes(chart) {
   const { id, frame, props, categories, series, showLegend, spacing, showValueAxis, bounds, labelWidth, plot, labelSlot, labelHeight, xScale, rank } = chart;
   const nodes = [
     // Where a series says it is assumed or a reference, the key is a line - solid for a record, dashed for the rest - and says which.
-    ...(showLegend ? topLegend({ id, frame, variant: statesSeries(props) ? "line" : "swatch", items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: props.colorIndices?.[index] ?? index,
+    ...(showLegend ? topLegend({ id, frame, variant: statesSeries(props) ? "line" : "swatch", items: series.map((item, index) => ({ label: stateLabel(item, categories), colorIndex: props.colorIndices?.[index] ?? index, color: chart.lineColor(index),
       ...(seriesState(item, categories).state !== "recorded" ? { state: "forecast" } : {}) })) }) : []),
-    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth, inverted: rank })
+    ...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis, labelWidth, inverted: rank }),
+    // Periods one slot apart (over a data table) say where they skip (axis-breaks.mjs).
+    ...(spacing ? [] : categoryBreakNodes(id, plot, slotBreaks(categories, props.categoryBreaks).map((after) => {
+      const at = categories.map(String).indexOf(after);
+      return { after, at: (xScale(at) + xScale(at + 1)) / 2 };
+    })))
   ];
   const pointMap = new Map();
   const categoryMap = new Map();
@@ -322,8 +328,8 @@ function drawIntervals(chart) {
 
 /** Each series: its area or lone fill, segments, markers and value labels; returns the end labels still to place. */
 function drawLines(chart) {
-  const { id, props, area, categories, series, lineColor, endLabels, labelAt, showDataLabels, bounds, plot, yScale, xScale, nodes, pointMap, rank, breaks } = chart;
-  const pendingEndLabels = [];
+  const { id, frame, props, area, categories, series, lineColor, endLabels, labelAt, showDataLabels, bounds, plot, yScale, xScale, nodes, pointMap, rank, breaks } = chart;
+  const pendingEndLabels = [], pointLabels = [];
   const weight = markWeight();
   // A line alone on its plot takes a light fill beneath it (markWeight); two
   // or more lines keep bare strokes, where fills would stack into mud.
@@ -384,17 +390,15 @@ function drawLines(chart) {
       if (showDataLabels && !reference && labelAt(points.indexOf(point)) && !(endLabels && point.category === categories.at(-1))) {
         const first = point.category === categories[0];
         const last = point.category === categories.at(-1);
-        nodes.push(textPrimitive({
-          id: stableId(id, "value-label", item.name, point.category),
-          role: "data-label",
-          frame: first
-            ? { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }
-            : last ? { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }
-            : { x: point.x - 30, y: labelSides[points.indexOf(point)] === "below" ? point.y + radius : point.y - 22 - radius, width: 60, height: 24 },
-          text: formatValue(point.value, props),
-          data: { series: item.name, category: point.category, value: point.value, labelKind: "point" },
-          style: textStyle(CHART_LABEL, INK, labelBold(), first ? "right" : last ? "left" : "center")
-        }));
+        const above = { frame: { x: point.x - 30, y: point.y - 22 - radius, width: 60, height: 24 }, align: "center" };
+        const below = { frame: { x: point.x - 30, y: point.y + radius, width: 60, height: 24 }, align: "center" };
+        const side = first ? [{ frame: { x: point.x - 68, y: point.y - 12, width: 60, height: 24 }, align: "right" }]
+          : last ? [{ frame: { x: point.x + 8, y: point.y - 12, width: 60, height: 24 }, align: "left" }] : [];
+        // Each label offers its frames in order - beside an end point, else the side its line leaves open - and the chart's
+        // labels are placed together (label-placement.mjs), the subject's first.
+        pointLabels.push({ text: formatValue(point.value, props), subject: props.focusSeries === item.name,
+          frames: [...side, ...(labelSides[points.indexOf(point)] === "below" ? [below, above] : [above, below])],
+          id: stableId(id, "value-label", item.name, point.category), data: { series: item.name, category: point.category, value: point.value, labelKind: "point" } });
       }
     });
     if (endLabels) {
@@ -403,7 +407,16 @@ function drawLines(chart) {
       pendingEndLabels.push({ id: stableId(id, "end-label", item.name), x: point.x + 9, y: point.y - 12, text: `${stateLabel(item, categories)} ${formatValue(point.value, props)}`, data: { series: item.name, category: point.category, value: point.value, labelKind: "series-end" }, color: endLabelColor(lineColor(seriesIndex)) });
     }
   });
-  return { pendingEndLabels };
+  // The value labels, placed together clear of each other, the markers and every line, above the period labels.
+  const { placed, dropped } = placeLabels([...pointLabels.filter((label) => label.subject), ...pointLabels.filter((label) => !label.subject)], {
+    style: (align) => textStyle(CHART_LABEL, INK, labelBold(), align),
+    keepOut: nodes.filter((node) => node.role === "chart-marker").map((node) => node.frame),
+    lines: nodes.filter((node) => node.role === "chart-line" && node.type === "line").map((node) => node.data ?? node),
+    within: { x: frame.x, y: plot.y - 30, width: frame.width, height: plot.height + 30 }
+  });
+  for (const label of placed) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: label.frame, text: label.text, data: label.data,
+    style: textStyle(CHART_LABEL, INK, labelBold(), label.align) }));
+  return { pendingEndLabels, droppedLabels: dropped };
 }
 
 // An end label is set in its line's colour, so it reads as that line's name, where that colour reads as type on the
@@ -418,14 +431,11 @@ const endLabelColor = (color) => {
 /** The series' end labels, pushed apart, and the growth column beside them. */
 function placeEndLabels(chart) {
   const { id, seriesGrowth, plot, nodes, pendingEndLabels } = chart;
-  // End labels of lines that finish close together push apart (22px minimum)
-  // inside the plot, in y order, so no series name sits on another.
+  // End labels of lines that finish close together push apart (22px minimum) inside the plot, so no series name sits on
+  // another (label-placement.mjs spreadApart).
   if (pendingEndLabels.length) {
-    const step = 22, sorted = [...pendingEndLabels].sort((a, b) => a.y - b.y);
-    for (let i = 1; i < sorted.length; i++) sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + step);
-    const overflow = sorted.at(-1).y + 24 - (plot.y + plot.height);
-    if (overflow > 0) for (const label of sorted) label.y -= overflow;
-    for (let i = sorted.length - 2; i >= 0; i--) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - step);
+    const tops = spreadApart(pendingEndLabels.map((label) => label.y), 22, plot.y - 24, plot.y + plot.height - 2);
+    pendingEndLabels.forEach((label, k) => { label.y = tops[k]; });
     for (const label of pendingEndLabels) nodes.push(textPrimitive({ id: label.id, role: "data-label", frame: { x: label.x, y: label.y, width: 176, height: 24 }, text: label.text, data: label.data, style: textStyle(CHART_LABEL, label.color, true, "left") }));
     // The columns start a gap after the longest end label, so the rates read
     // as that label's next words rather than a column across the page; a column a period.
@@ -433,7 +443,7 @@ function placeEndLabels(chart) {
     for (const [k, growth] of (seriesGrowth || []).entries()) {
       const x = plot.x + plot.width + 9 + Math.min(176, longest) + 16 + k * 80, width = 76;
       const key = (...parts) => (k ? stableId(id, ...parts, k) : stableId(id, ...parts));
-      nodes.push(textPrimitive({ id: key("growth-heading"), role: "chart-delta-label", frame: { x, y: sorted[0].y - 22, width, height: 20 }, text: growth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
+      nodes.push(textPrimitive({ id: key("growth-heading"), role: "chart-delta-label", frame: { x, y: Math.min(...pendingEndLabels.map((label) => label.y)) - 22, width, height: 20 }, text: growth.label, style: textStyle(token("type.compact"), SECONDARY, false, "left"), data: { growthHeading: true } }));
       for (const label of pendingEndLabels) {
         const row = growth.rows.find((entry) => entry.name === label.data.series);
         nodes.push(textPrimitive({ id: key("growth", row.name), role: "chart-delta-label", frame: { x, y: label.y, width, height: 24 }, text: row.text, style: textStyle(CHART_LABEL, INK, true, "left"), data: { series: row.name, growth: row.text } }));
@@ -472,10 +482,14 @@ const LINE_RISE_MIN = 48;
 export function comboChart({ id, frame, props }) {
   assertGridlineOption(props);
   const { categories, series } = normalizedCategoricalData(props, { seriesCount: 2 });
+  // The line's value sits over the bar's, as much as 52px over the top of the plot: the plot leaves that room under the
+  // legend, where the sample's 85 sat on the legend's own row and a callout's leader crossed both.
+  const labelled = props.dataLabels !== false;
   const plot = chartFrame(frame, {
     topInset: props.plotTopInset,
     periodBand: periodBandHeight(props, categories),
     topLegend: true,
+    headroom: labelled ? 56 : VALUE_HEADROOM,
     annotations: props.annotations,
     changeAnnotations: props.changeAnnotations,
     annotationRail: props.annotationRail,
@@ -511,6 +525,7 @@ export function comboChart({ id, frame, props }) {
   const barPlot = secondary ? { ...plot, y: plot.y + plot.height * lineShare + 40, height: plot.height * (1 - lineShare) - 40 } : plot;
   if (barPlot.height < 40) throw new Error("Combo chart needs more height for separate scales and labels; give it more height or drop secondaryAxis");
   const bounds = numericBounds(withReferenceValues(secondary ? barSeries.values : series.flatMap(item => item.values), props), { min: props.yMin, max: props.yMax, axis: "y", includeZero: true, tight: !showValueAxis && props.gridlines !== true });
+  assertComparison({ id, categories, series: [barSeries, lineSeries], span: [bounds.span, secondary ? lineBounds.span : bounds.span], props, dated: datedRun(categories), line: true });
   const yScale = (value) => barPlot.y + barPlot.height - (value - bounds.min) / bounds.span * barPlot.height;
   const lineBand = { top: plot.y + 30, height: Math.max(0, plot.height * lineShare - 30) };
   const y2Scale = (value) => (lineSeries.rank === true ? lineBand.top + (value - lineBounds.min) / lineBounds.span * lineBand.height : lineBand.top + lineBand.height - (value - lineBounds.min) / lineBounds.span * lineBand.height);
@@ -588,12 +603,12 @@ export function comboChart({ id, frame, props }) {
     pointMap.set(`category:${category}`, barPoint.y < linePoint.y ? barPoint : linePoint);
     linePoints.push({ ...linePoint, category });
   });
-  // A combo's slots stand one apart whatever the dates, so a run that skips periods breaks its axis after each long gap
-  // (time-axis.mjs gapBreaks), and its line breaks across a period the run leaves out, as a line chart's does: the BA deck's
-  // capacity page drew IAG's line straight from 2019 to 2023, across the three Covid years, one slot apart.
+  // A combo's slots stand one apart whatever the dates, so a run that skips periods breaks its axis after each long gap, and
+  // its line across a period the run leaves out (axis-breaks.mjs): the BA deck's capacity page drew IAG's line straight from
+  // 2019 to 2023, across the three Covid years, one slot apart.
   const positionOf = (category) => categories.map(String).indexOf(String(category));
-  nodes.push(...categoryBreakNodes(id, barPlot, gapBreaks(categories).map((after) => ({ after, at: plot.x + categorySpan * (positionOf(after) + 1) }))));
-  const missing = new Set(missingPeriods(categories).map((gap) => gap.after));
+  nodes.push(...categoryBreakNodes(id, barPlot, slotBreaks(categories, props.categoryBreaks).map((after) => ({ after, at: plot.x + categorySpan * (positionOf(after) + 1) }))));
+  const missing = unjoined(categories);
   linePoints.slice(1).forEach((point, index) => missing.has(index) || nodes.push(linePrimitive({
     id: stableId(id, "segment", lineSeries.name, index),
     role: "chart-line",

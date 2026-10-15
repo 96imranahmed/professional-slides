@@ -332,7 +332,10 @@ class Emitter:
         align = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}.get(style.get("align"), PP_ALIGN.LEFT)
         layout0 = (node.get("data") or {}).get("textLayout") or {}
         single_label = node.get("role") in LABEL_ROLES and len(layout0.get("lines") or [1]) == 1
-        tf.word_wrap = not single_label
+        # A label the engine set on two lines or more keeps its breaks (below): re-wrapped by the renderer, "Winter 2015-16"
+        # broke at its hyphen into "Winter 2015-" and "16".
+        set_lines = node.get("role") in LABEL_ROLES and len(layout0.get("lines") or []) > 1 and "\n" not in str(layout0.get("source") if layout0.get("source") is not None else node.get("text", ""))
+        tf.word_wrap = not (single_label or set_lines)
         tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE  # <a:normAutofit/>
         tf.vertical_anchor = {"top": MSO_ANCHOR.TOP, "mid": MSO_ANCHOR.MIDDLE, "middle": MSO_ANCHOR.MIDDLE, "bottom": MSO_ANCHOR.BOTTOM}.get(style.get("valign"), MSO_ANCHOR.TOP)
         for side in ("margin_left", "margin_right", "margin_top", "margin_bottom"):
@@ -341,7 +344,7 @@ class Emitter:
         runs = layout.get("sourceRuns") or node.get("runs")
         paragraphs = self.paragraphs_of(node)
         first = True
-        if (node.get("data") or {}).get("balanced") and layout.get("lines"):
+        if ((node.get("data") or {}).get("balanced") or set_lines) and layout.get("lines"):
             # A balanced title: the engine chose where its lines break so the
             # last is not a stranded word. A soft break (a:br) at each keeps
             # that break in PowerPoint, whose metrics differ by a few percent,
@@ -806,7 +809,7 @@ class Emitter:
             # its painted marks); without one the second is the grey.
             focus = spec.get("focusIndex")
             if focus is not None and i == focus:
-                color = self.colors.get("color.componentPrimary", color)
+                color = self.colors.get("color.chartSubject", color)
             elif i == (1 if focus is None else 1 - focus):
                 color = self.colors.get("color.chartComparator", color)
         return color
@@ -919,7 +922,7 @@ class Emitter:
         """The highlighted bar in the token the scene drew it in, the forecast
         lightened, and a two-bar contrast painted as the scene painted it."""
         kind = spec["type"]
-        accent = self.colors.get(spec.get("highlightToken") or "color.accent") or self.colors.get("color.componentPrimary")
+        accent = self.colors.get(spec.get("highlightToken") or "color.chartSubject") or self.colors.get("color.accent")
         forecast = self.colors.get("color.chartSeries6")
         highlight_indices = set(spec.get("highlightIndices") or [])
         forecast_index = spec.get("forecastIndex", -1)
@@ -931,7 +934,7 @@ class Emitter:
             elif kind in ("column", "bar") and forecast_index is not None and forecast_index >= 0 and j >= forecast_index and forecast:
                 point_color = forecast
             elif two_mark_contrast:
-                point_color = self.colors.get("color.componentPrimary" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
+                point_color = self.colors.get("color.chartSubject" if j == spec.get("focusIndex", 0) else "color.chartComparator", color)
             if point_color:
                 pt.format.fill.solid(); pt.format.fill.fore_color.rgb = rgb(point_color)
 
@@ -953,7 +956,7 @@ class Emitter:
 
     def _range_labels(self, ser, spec: dict):
         """A floating band's low and high, inside its end."""
-        accent = self.colors.get(spec.get("highlightToken") or "color.accent") or self.colors.get("color.componentPrimary")
+        accent = self.colors.get(spec.get("highlightToken") or "color.chartSubject") or self.colors.get("color.accent")
         highlight_indices = set(spec.get("highlightIndices") or [])
         lows, highs = spec.get("low") or [], spec.get("high") or []
         for j, pt in enumerate(ser.points):

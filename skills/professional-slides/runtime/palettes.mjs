@@ -84,7 +84,7 @@ function assertCanvasContrast(tokens) {
 // near-black house navy do); one that does not trades places with the first series that does. Midnight, the toolkit and the
 // BA deck's house palette led with the ink, and every plain bar in those decks was near-black with the blues unused. The
 // dark series takes the place the lead left - the second, in both - so two lines stay apart, and a subject highlighted among
-// the lead colour takes the primary (chart-axes.mjs subjectToken).
+// the lead colour takes the primary (subjectOf).
 const SERIES_KEYS = Object.freeze([1, 2, 3, 4, 5, 6].map((index) => `color.chartSeries${index}`));
 const TYPE_DARK = 10;
 function leadWithColour(tokens) {
@@ -95,6 +95,20 @@ function leadWithColour(tokens) {
   if (lead <= 0) return;
   [values[0], values[lead]] = [values[lead], values[0]];
   SERIES_KEYS.forEach((key, index) => { tokens[key] = { ...tokens[key], value: values[index] }; });
+}
+
+// The subject's colour (`color.chartSubject`), decided once per palette and ground: the first of the accent, the primary and
+// the ink that stands apart from both kinds of peer a subject is drawn among - the lead series (1.5:1), where a highlighted
+// bar's other members keep their colour, and the comparator grey (MARK_CONTRAST), where its peers are context. Each chart
+// kind chose its own before, and they disagreed: an accent bar that was the lead series' own colour (midnight, the BA house
+// palette once the ink left the lead), an evergreen subject at 1.1:1 on its green peers, a slope's subject among lines in the
+// gridline grey. Where none clears both, the one nearest to clearing them.
+const SUBJECT_KEYS = Object.freeze(["color.accent", "color.componentPrimary", "color.ink"]);
+export function subjectOf(value) {
+  const lead = value("color.chartSeries1"), grey = value("color.chartComparator");
+  if (![lead, grey, ...SUBJECT_KEYS.map(value)].every(isHex)) return value("color.accent");
+  const score = (key) => Math.min(contrastRatio(value(key), lead) / 1.5, contrastRatio(value(key), grey) / MARK_CONTRAST);
+  return value(SUBJECT_KEYS.find((key) => score(key) >= 1) ?? SUBJECT_KEYS.reduce((best, key) => (score(key) > score(best) ? key : best)));
 }
 
 export function resolvePalette(id = "midnight", baseTokens, slots) {
@@ -121,6 +135,7 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
   const tokens = Object.fromEntries(Object.entries(baseTokens).map(([key, value]) => [key, { ...value, value: preset.colors[key] ?? value.value }]));
   assertCanvasContrast(tokens);
   leadWithColour(tokens);
+  if (tokens["color.chartSubject"]) tokens["color.chartSubject"] = { ...tokens["color.chartSubject"], value: subjectOf((key) => tokens[key]?.value) };
   // The filled surface follows the page it sits on: the palette's own ink mixed
   // toward its own canvas, so a warm paper page gets a warm stone and a navy
   // house a cool grey, and a house profile with its own ink needs no new colour.
@@ -222,7 +237,7 @@ const GROUND_ROLES = Object.freeze({
   reversed: ["color.onPrimary"],
   text: ["color.textSecondary", "color.chartUnit"],
   surfaces: ["color.surface", "color.surfaceMuted", "color.rule", "color.chartGrid"],
-  derived: ["color.surfaceTint", "color.band"],
+  derived: ["color.surfaceTint", "color.band", "color.chartSubject"],
   marks: ["color.componentPrimary", "color.chartComparator", "color.chartSeries1", "color.chartSeries2", "color.chartSeries3", "color.chartSeries4", "color.chartSeries5", "color.chartSeries6"],
   accent: ["color.accent"],
   status: ["color.positive", "color.caution", "color.negative", "color.info"],
@@ -278,6 +293,7 @@ export function groundTokens(tokens, ground, slots) {
   for (const key of GROUND_ROLES.status) set(key, liftedOn(value(key), groundColor, Math.max(4.5, was(key))));
   for (const key of GROUND_ROLES.tints) set(key, towardOn(groundColor, liftedOn(value(key), groundColor, 4.5), was(key)));
   set("color.band", bandOn(groundColor, pale, resolved["color.componentPrimary"]));
+  set("color.chartSubject", subjectOf((key) => resolved[key] ?? value(key)));
   const named = new Set(Object.values(GROUND_ROLES).flat());
   const missing = Object.entries(tokens).filter(([key, definition]) => definition.kind === "color" && !key.startsWith("color.heat.") && !named.has(key)).map(([key]) => key);
   if (missing.length) throw new Error(`No ground role for ${missing.join(", ")}: name it in palettes.mjs GROUND_ROLES, so a page on a dark ground does not draw it in its light-page colour`);

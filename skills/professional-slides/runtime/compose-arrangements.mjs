@@ -11,6 +11,7 @@ import { defaultHighlightStyle } from "./core.mjs";
 import { measureCaption, proseMeasure, measureProse, measureInsight } from "./registry-text.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
 import { plotHeadroom, topBand, horizontalChart, oneMagnitude } from "./chart-axes.mjs";
+import { FLAT_SHARE } from "./chart-sense.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { stepsLayout } from "./extras.mjs";
 import { factGridLayout } from "./figures.mjs";
@@ -182,7 +183,9 @@ function shareValueScales(charts) {
     const min = Math.min(0, ...values), max = Math.max(0, ...values);
     const sharedMin = min < 0 ? -sharedBound(-min) : 0;
     const sharedMax = max > 0 ? sharedBound(max) : min < 0 ? 0 : 1;
-    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
+    // Whether any peer moves on the shared scale: a flat panel beside one that does is read against it (chart-sense.mjs).
+    const moves = group.some((ex) => ex.series.some((se) => { const v = se.values.filter(Number.isFinite); return v.length > 1 && (Math.max(...v) - Math.min(...v)) / (sharedMax - sharedMin) >= FLAT_SHARE; }));
+    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; ex.peerScale = { moves }; }
   }
 }
 

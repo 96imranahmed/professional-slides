@@ -36,7 +36,8 @@ Each check is about one page or about the saved file. A blocking finding stops t
 | --- | --- |
 | The page cannot be drawn | `COMPILE`, `PAGE_DOES_NOT_COMPOSE`, `TITLE_LINES`, `HEADING_WRAPS`, `TOTAL_ROW_BLANK`; `PAGE_SPLITS` and `PAGE_ADJUSTED` advised |
 | Overlap and legibility | `TEXT_ON_TEXT`, `TEXT_ON_LINE`, `TEXT_ON_EDGE`, `DESCENDER_ON_RULE`, `MAP_LABEL_ASTRAY`, `GROUND_CONTRAST`, `RENDER_CONTRAST`, `TYPE_RANGE`, `SCATTER_UNKEYED`; `SCENE_VOID` advised |
-| A chart drawn wrongly | `AREA_BASELINE`, `UNSCALED_FIGURE` |
+| A chart drawn wrongly | `AREA_BASELINE`, `RANK_FILLED`, `UNSCALED_FIGURE` |
+| A chart that compares nothing | `NO_COMPARISON`, `SERIES_FLAT`, `ONE_COMPARISON` (chart-sense.mjs) |
 | The saved file differs from the scene | the readback codes (`MISSING_SHAPE`, `FRAME_DRIFT`, `TEXT_MISMATCH`, `SLIDE_COUNT`, ...), `TEXT_EXPORT_LOST`, `TEXT_EXPORT_PAGE_COUNT`, `TEXT_PLAN_PAGINATION`, `TEXT_PLAN_INCOMPLETE`, `MISSING_RENDER`, `RENDER_DRIFT`, `CONTENT_LOST`, `MISSING_VISUAL_INTENT` |
 | A number | `BINDING_UNRESOLVED`, `NUMBERS_DISAGREE`, `BRIDGE_UNRECONCILED`, `MEASURES_CONFLICT`; `NUMBER_UNTRACED` advised |
 | Pictures and assets | `UNSOURCED_PICTURE`, `ASSETS_NEEDED`, `ASSETS_OFFLINE` |
@@ -68,6 +69,10 @@ evidence.mjs         tables and cells read without the layout engine; how many v
 
 compose-all.mjs      composition that reports every failing page in one run
 compose-*.mjs        the composer: deck -> planner items, exhibits, charts, tables, points, pictures, arrangements
+chart-axes.mjs       what every chart shares: scales and axes, the subject's and its peers' colours, row labels thinned when crowded
+axis-breaks.mjs      axis jumps for every chart: a period axis broken after a gap, no line across a missing period, a value cut
+label-placement.mjs  value labels placed clear of one another and the lines, a rule broken around labels, labels pushed apart
+chart-sense.mjs      whether a chart shows a comparison: NO_COMPARISON, SERIES_FLAT, ONE_COMPARISON
 planner.mjs          items -> composition tree; core.mjs tokens, grid, layout and the scene
 registry*.mjs        the component registry; charts*.mjs, chart-*.mjs the charts; tables.mjs, panels.mjs, maps.mjs, ... the rest
 text-layout.mjs      text measurement (font-metrics.mjs, fonts/); text-contract.mjs the one word count and the export text check

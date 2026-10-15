@@ -49,7 +49,7 @@ for(const palette of ['midnight','evergreen','crimson']) {
  assert.ok(contrastRatio(tokens['color.accent'].value,tokens['color.canvas'].value)>=4.5);
  assert.ok(contrastRatio(tokens['color.accent'].value,tokens['color.onPrimary'].value)>=4.5);
  const tiles=scene.slides[1].nodes.filter(n=>n.role==='chart-mark');
- assert.equal(tiles.find(n=>n.data.label==='Core').style.fill.tokenId,'color.accent');
+ assert.equal(tiles.find(n=>n.data.label==='Core').style.fill.tokenId,'color.chartSubject');
  assert.ok(tiles.filter(n=>n.data.label!=='Core').every(n=>n.style.fill.tokenId==='color.chartComparator'));
  const title=scene.slides[2].nodes.find(n=>n.role==='action-title');
  assert.equal(title.data.textLayout.source,spec.slides[2].title);

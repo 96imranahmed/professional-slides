@@ -487,7 +487,7 @@ console.log(JSON.stringify({ style: [...new Set(nodes.filter((n) => n.data?.anno
         result = run_node("""
 import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 const frame = { x: 40, y: 60, width: 760, height: 420 };
-const series = [{ name: 'BA', values: [174, 180, 185, 186] }, { name: 'IAG', values: [273, 306, 325, 338] }];
+const series = [{ name: 'BA', values: [120, 148, 171, 186] }, { name: 'IAG', values: [273, 306, 325, 338] }];
 const change = (name) => ({ start: { category: '2016', series: name }, end: { category: '2019', series: name }, text: '+6%' });
 const colours = (props) => REGISTRY.get('chart.combo').render({ id: 'c', frame, props: { categories: ['2016', '2017', '2018', '2019'], ...props } }).nodes
   .filter((n) => n.role === 'annotation-surface').map((n) => n.style.fill.tokenId);

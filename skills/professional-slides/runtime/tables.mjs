@@ -19,7 +19,7 @@ import {
 } from "./core.mjs";
 import { measureTextRuns, accentRuns } from "./text-layout.mjs";
 import { strongestContrastIndex } from "./palettes.mjs";
-import { subjectToken } from "./chart-axes.mjs";
+import { SUBJECT } from "./chart-axes.mjs";
 import { contrastRatio } from "./color.mjs";
 import { numberMarker, stateMarker, iconMarker, markerSize, MARK_TOKENS } from "./marks.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
@@ -131,6 +131,7 @@ export const TABLE_TOKENS = [
   // A header band and a total row on a page whose type is pale (core.mjs reversedFill).
   "color.band",
   "color.accent",
+  "color.chartSubject",
   "color.accentTint",
   "color.surface",
   "color.surfaceMuted",
@@ -1742,9 +1743,9 @@ function drawRowBands(table) {
       ? t("color.surfaceMuted") : rowBand(m.rows[r].style ?? props.rowStyle);
     if (!band) return;
     nodes.push(rectPrimitive({ id: stableId(id, "row-band", r), role: "table-row-band", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: frame.width - m.gap, height: m.heights[r] - m.gap }, style: box(band), data: { row: r, rowStyle: m.rows[r].style ?? props.rowStyle } }));
-    // The deck's subject row carries the subject's one colour at its edge (chart-axes.mjs subjectToken): the colour its bar
+    // The deck's subject row carries the subject's one colour at its edge (chart-axes.mjs SUBJECT): the colour its bar
     // and its line take on every chart.
-    if (m.rows[r].subject === true) nodes.push(rectPrimitive({ id: stableId(id, "row-subject", r), role: "table-row-subject", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: 4, height: m.heights[r] - m.gap }, style: box(t(subjectToken())), data: { row: r } }));
+    if (m.rows[r].subject === true) nodes.push(rectPrimitive({ id: stableId(id, "row-subject", r), role: "table-row-subject", frame: { x: frame.x, y: ys[r] + m.gap / 2, width: 4, height: m.heights[r] - m.gap }, style: box(SUBJECT), data: { row: r } }));
   });
   // A group subheading: its bold label sits on one heavier rule across the
   // whole table, as the reference decks split a table into its groups.
@@ -2210,7 +2211,7 @@ function drawBars(table, cell, at) {
   cell.values.forEach((value, i) => {
     const y = contentY + i * (l.rowHeight + m.gap),
       barHeight = v("space.4"),
-      markColor = cell.markFocus ? t("color.accent") : barColor(scale, i),
+      markColor = cell.markFocus ? SUBJECT : barColor(scale, i),
       labelColor = cell.markFocus
         ? contrastRatio(tokenValue(t("color.accent")), tokenValue(focusSurface)) >= 4.5 ? t("color.accent") : foreground(focusSurface)
         : color,

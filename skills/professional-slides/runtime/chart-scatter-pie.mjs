@@ -7,7 +7,7 @@ import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
 import { contrastRatio } from "./color.mjs";
 import { SECONDARY, CHART_ANNOTATION, textStyle, lineStyle, topLegend, tickCount, FONT, INK, CHART_LABEL, AXIS_LABEL, SERIES, MIN_PLOT_HEIGHT,
-  markWeight, chartFrame, fillStyle, assertGridlineOption, numericBounds, axisTickText, axes, labelBold } from "./chart-axes.mjs";
+  markWeight, chartFrame, fillStyle, assertGridlineOption, numericBounds, axisTickText, axes, labelBold, SUBJECT, CONTEXT_FILL, CONTEXT_LINE } from "./chart-axes.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount } from "./chart-annotations.mjs";
 import { withReferenceValues, withDecorations } from "./chart-decorations.mjs";
 import { bandXValues } from "./chart-bands.mjs";
@@ -292,7 +292,7 @@ function drawScatterPoints(chart) {
     const seriesIndex = seriesNames.length ? seriesNames.indexOf(point.series) : 0;
     const marked = focused.has(point.name);
     const pointColor = focus.length
-      ? (marked ? token("color.accent") : token("color.chartComparator"))
+      ? (marked ? SUBJECT : CONTEXT_FILL)
       : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
     nodes.push(ellipsePrimitive({ id: stableId(id, "point", point.name), role: "chart-marker", frame: { x: x - size / 2, y: y - size / 2, width: size, height: size }, style: fillStyle(pointColor), data: { series: point.series ?? null, sizeValue: bubble ? point.size : null, ...(marked ? { highlighted: true } : {}) } }));
     if (point.showLabel !== false && props.dataLabels !== false) nodes.push(textPrimitive({ id: stableId(id, "label", point.name), role: "data-label", frame: { x: x + size / 2 + 4, y: y - 12, width: 96, height: 24 }, text: point.name, style: textStyle(CHART_LABEL, marked ? token("color.accent") : INK, marked, "left") }));
@@ -314,7 +314,7 @@ function drawConnectedSeries(chart) {
     const groups = seriesNames.length ? seriesNames.map((name) => props.points.filter((point) => point.series === name)) : [props.points];
     groups.forEach((group, seriesIndex) => {
       const ordered = [...group].sort((a, b) => a.x - b.x);
-      const color = focus.length ? token("color.chartComparator") : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
+      const color = focus.length ? CONTEXT_LINE : SERIES[props.colorIndices?.[seriesIndex] ?? seriesIndex % SERIES.length];
       ordered.slice(1).forEach((point, at) => nodes.unshift(linePrimitive({ id: stableId(id, "segment", seriesNames[seriesIndex] ?? "value", at), role: "chart-line",
         x1: xScale(ordered[at].x), y1: yScale(ordered[at].y), x2: xScale(point.x), y2: yScale(point.y), style: lineStyle(color, weight.line) })));
       if (seriesEnds) {

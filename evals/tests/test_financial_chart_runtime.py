@@ -482,7 +482,7 @@ for(const palette of ['midnight','evergreen','crimson']) {
   const deck=compileDeck({palette,slides:[slide({categories:['Dubai','Doha'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
-  assert.equal(marks[0].style.fill.tokenId,'color.componentPrimary');
+  assert.equal(marks[0].style.fill.tokenId,'color.chartSubject');
   assert.equal(marks[1].style.fill.tokenId,'color.chartComparator');
   assert.ok(contrastRatio(marks[0].style.fill.value,marks[1].style.fill.value)>=3);
 }
@@ -490,7 +490,7 @@ const explicit=compileDeck({slides:[slide({categories:['Current','Future'],serie
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'crimson',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 // Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.chartSubject','color.chartSeries1']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -509,19 +509,19 @@ for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['cha
   const props=reversed?{...base,categories:[...base.categories].reverse(),series:[...base.series].reverse().map(s=>({...s,values:[...s.values].reverse()}))}:base;
   const nodes=render(kind,props,palette),marks=nodes.filter(n=>n.role==='chart-mark'),swatches=nodes.filter(n=>n.role==='legend-swatch');
   for(const mark of marks) {
-    assert.equal(mark.style.fill.tokenId,mark.data.series==='Actual'?'color.componentPrimary':'color.chartComparator');
+    assert.equal(mark.style.fill.tokenId,mark.data.series==='Actual'?'color.chartSubject':'color.chartComparator');
     const swatch=swatches.find(n=>n.data.categoryKey===mark.data.series);
     assert.equal(swatch.style.fill.value,mark.style.fill.value);
   }
   assert.ok(contrastRatio(swatches[0].style.fill.value,swatches[1].style.fill.value)>=3);
 }
-// A highlighted bar stands apart from the lead series it sits among: midnight leads with its accent, so the subject takes the
-// primary; evergreen's green accent sits at 1.1:1 on its green lead, so the subject takes the primary or the ink.
+// A highlighted bar stands apart from the lead series it sits among, in every palette: midnight leads with its accent and
+// evergreen's green accent sits at 1.1:1 on its green lead, so the subject's colour is resolved per palette (subjectOf).
 for(const palette of ['midnight','evergreen','crimson']) for(const categories of [['A','B'],['B','A']]) {
   const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]},palette).filter(n=>n.role==='chart-mark');
   const lit=marks.find(n=>n.data.category==='B'),peer=marks.find(n=>n.data.category==='A');
   assert.equal(peer.style.fill.tokenId,'color.chartSeries1');
-  assert.equal(lit.style.fill.tokenId,{midnight:'color.componentPrimary',evergreen:'color.ink',crimson:'color.accent'}[palette],palette);
+  assert.equal(lit.style.fill.tokenId,'color.chartSubject',palette);
   assert.ok(contrastRatio(lit.style.fill.value,peer.style.fill.value)>=1.5,palette);
 }
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
@@ -549,7 +549,7 @@ import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs
 import {changeFromContent} from './evals/support/compose.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
-const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];
+const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.chartSubject').map(n=>n.data[key]))];
 const pair=(a,b)=>({categories:['Revenue','Profit'],series:[{name:a,values:[40,50]},{name:b,values:[55,70]}]});
 for(const kind of ['chart.column','chart.bar']) {
   for(const [a,b,latest] of [['2019','2024','2024'],['2024','2019','2024'],['FY23','FY24','FY24'],['FY2024-25','FY2025-26','FY2025-26'],
@@ -563,7 +563,7 @@ for(const kind of ['chart.column','chart.bar']) {
 // The comparator stays the grey, and the legend keys the same fills.
 const nodes=compiled('chart.column',pair('2019','2024')).nodes;
 for(const mark of nodes.filter(n=>n.role==='chart-mark')) {
-  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.componentPrimary':'color.chartComparator');
+  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.chartSubject':'color.chartComparator');
   assert.equal(nodes.find(n=>n.role==='legend-swatch'&&n.data.categoryKey===mark.data.series).style.fill.value,mark.style.fill.value);
 }
 // The native chart paints the peer the scene painted.

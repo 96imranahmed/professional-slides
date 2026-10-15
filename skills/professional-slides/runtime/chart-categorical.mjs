@@ -8,18 +8,19 @@ import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
 import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, highlightAmongSeries, categoryBreakNodes, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, SUBJECT, CONTEXT_FILL, rowLabels, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
   growthColumns, seriesState, stateLabel, markerGutter, isMarker, MARKER_ROW } from "./chart-decorations.mjs";
 import { bandAxis } from "./chart-bands.mjs";
-import { timePositions, gapBreaks } from "./time-axis.mjs";
+import { timePositions } from "./time-axis.mjs";
+import { categoryBreakNodes, cutGap, datedRun, slotBreaks, valueBreakNodes, valueCut } from "./axis-breaks.mjs";
+import { assertComparison } from "./chart-sense.mjs";
 import { normalizeGroupBrackets, bracketGutter, bracketNodes, BRACKET_BAND, normalizeValueLabels, labelRings, normalizeRowNotes, rowNoteNodes, ROW_NOTE_GAP } from "./chart-marks.mjs";
 
 // The smallest a crowded row of bars sets its names and values at (8pt)
 // before it labels every nth row instead.
-const ROW_LABEL_MIN = token("type.source");
 
 function stackLabelPlan(props, categories, series, stacked) {
   const totals = new Map(), secondary = new Map();
@@ -187,6 +188,8 @@ export function categoricalChart(context) {
         props = { ...props, referenceLines: props.referenceLines.map((line, index) => index === error.referenceIndex ? { ...line, placement: "outside-end" } : line) };
         continue;
       }
+      // Columns too narrow for their values are read off a value axis instead (columnLabelsFit).
+      if (error.labelsCrowded) { props = { ...props, dataLabels: false, showValueAxis: true }; continue; }
       // Stack totals the composer computed (compose-exhibits.mjs withStackTotals) give way to what the page wrote.
       if (!props.stackTotalsComputed) throw error;
       const { stackTotals: _totals, stackTotalsComputed: _computed, ...rest } = props;
@@ -215,10 +218,14 @@ function categoricalChartOnce({ id, frame, props, horizontal = false, stacked = 
   Object.assign(chart, categoricalPlot(chart));
   Object.assign(chart, categoryGroupLayouts(chart));
   Object.assign(chart, categoricalBounds(chart));
+  // Columns over periods show a change a reader can see (chart-sense.mjs): a stack's in its parts, since a mix can move while
+  // its total holds; a cut axis answers to the cut's own rule.
+  if (!chart.valueBreak && !chart.diverging) assertComparison({ id, categories: chart.categories, props, dated: !horizontal && datedRun(chart.categories), span: chart.bounds.span, series: chart.series });
   Object.assign(chart, categoricalColors(chart));
   Object.assign(chart, categoricalAxes(chart));
   Object.assign(chart, brokenScales(chart));
   Object.assign(chart, rowLabelling(chart));
+  columnLabelsFit(chart);
   Object.assign(chart, barSpans(chart));
   drawDeltaHeadings(chart);
   chart.categories.forEach((category, categoryIndex) => drawCategory(chart, category, categoryIndex));
@@ -548,8 +555,7 @@ function categoricalBounds(chart) {
   // The cut is a fixed few pixels whatever the scale: set now the plot's length is known, and the domain reaches the
   // compressed top once the cut has its width.
   if (valueBreak) {
-    const length = horizontal ? plot.width : plot.height;
-    valueBreak.gap = BREAK_PX / length * bounds.span;
+    cutGap(valueBreak, horizontal ? plot.width : plot.height, bounds.span);
     const top = Math.max(...(stacked ? stackExtents : values).map(chart.compress));
     if (explicitMax !== undefined) { bounds.max = chart.compress(explicitMax); bounds.span = bounds.max - bounds.min; }
     else if (top > bounds.max) { bounds.max = top; bounds.span = bounds.max - bounds.min; }
@@ -557,8 +563,6 @@ function categoricalBounds(chart) {
   return { bounds };
 }
 
-// The cut a broken axis draws across a mark: wide enough to read as a gap, short of a value's worth of plot.
-const BREAK_PX = 14;
 
 /**
  * `diverging: { neutral }` on a stacked bar or column: a Likert scale. The
@@ -597,36 +601,13 @@ function divergingPlan(chart) {
   return { diverging: { neutral, order, sign, colors, ends } };
 }
 
-/**
- * `valueBreak: { from, to }` on a bar or column chart, stacked or not: the
- * run of the value axis from `from` to `to` is cut out, so an outlier - one
- * column ten times its neighbours - keeps its place without flattening the
- * rest, and every mark that crosses the cut carries a slanted gap across it.
- * The values stay printed on the marks: a broken axis cannot be read off a
- * scale, so it takes no value axis or gridlines. A mark ending inside the cut
- * would be drawn at a length that is neither its value nor the cut's, and a
- * cut no mark crosses breaks nothing; both are refused.
- */
+/** `valueBreak: { from, to }` on a bar or column chart, stacked or not (axis-breaks.mjs valueCut): stacks end at their sums. */
 function valueBreakPlan(chart) {
   const { props, stacked, categories, series, values, showDataLabels, showValueAxis } = chart;
-  const identity = { valueBreak: null, compress: (v) => v };
-  if (props.valueBreak === undefined || props.valueBreak === null) return identity;
-  const { from, to } = props.valueBreak ?? {};
-  if (!Number.isFinite(from) || !Number.isFinite(to) || !(from > 0 && to > from)) throw new Error("valueBreak cuts the axis from one positive value to a higher one: { from, to }, 0 < from < to");
-  if (showValueAxis || props.gridlines === true) throw new Error("a broken axis cannot be read off a scale - its values are printed on its marks; drop showValueAxis and gridlines, or draw the outlier unbroken");
-  if (!showDataLabels) throw new Error("a broken axis prints every value on its mark, since the cut leaves no scale to read; drop dataLabels: false");
   const ends = stacked
     ? categories.flatMap((_, at) => { let sum = 0; return series.map((item) => (sum += Math.max(0, item.values[at]))); })
     : values;
-  const inside = ends.find((v) => v > from && v < to);
-  if (inside !== undefined) throw new Error(`valueBreak cuts ${from} to ${to}, and a mark ends at ${inside}, inside the cut; move the cut so every mark ends below it or past it`);
-  if (!ends.some((v) => v >= to)) throw new Error(`valueBreak cuts ${from} to ${to}, which no mark crosses; a cut is for a mark that would flatten the rest - drop it`);
-  for (const reference of [...(props.referenceLines || []).map((r) => r?.value), ...(props.bands || []).flatMap((b) => [b?.from, b?.to])].filter(Number.isFinite))
-    if (reference > from) throw new Error(`a reference or band at ${reference} sits at or past the cut (${from} to ${to}), where the scale is no longer one; keep references under the cut`);
-  const valueBreak = { from, to, gap: 0 };
-  // Below the cut the scale is the data's; past it every value moves down by the run cut out, plus the cut's own few pixels.
-  const compress = (v) => (v <= from ? v : v >= to ? v - (to - from) + valueBreak.gap : from + (v - from) / (to - from) * valueBreak.gap);
-  return { valueBreak, compress };
+  return valueCut(props, ends, { showValueAxis, showDataLabels });
 }
 
 /** On a broken axis the scales place a value by its compressed position. */
@@ -649,25 +630,10 @@ function drawDivergingCentre(chart) {
     style: { fill: INK, stroke: "none", lineWidth: token("line.hairline") }, data: { diverging: true } }));
 }
 
-/** The slanted gap across every mark that crosses a broken axis's cut. */
+/** The slanted gap across every mark that crosses a broken axis's cut (axis-breaks.mjs valueBreakNodes). */
 function drawValueBreaks(chart) {
-  const { id, horizontal, valueBreak, nodes, yScale, xScale } = chart;
-  if (!valueBreak) return;
-  const [lo, hi] = horizontal ? [xScale(valueBreak.from), xScale(valueBreak.to)] : [yScale(valueBreak.to), yScale(valueBreak.from)];
-  const slant = 5;
-  for (const mark of nodes.filter((node) => node.role === "chart-mark")) {
-    const f = mark.frame;
-    const crosses = horizontal ? f.x < lo + 0.5 && f.x + f.width > hi - 0.5 : f.y < lo + 0.5 && f.y + f.height > hi - 0.5;
-    if (!crosses) continue;
-    // A parallelogram in the page's colour laid across the mark, leaning as a hand-drawn "//" does.
-    const points = horizontal
-      ? [[lo - slant, f.y + f.height + 2], [lo + slant, f.y - 2], [hi + slant, f.y - 2], [hi - slant, f.y + f.height + 2]]
-      : [[f.x - 2, hi + slant], [f.x + f.width + 2, hi - slant], [f.x + f.width + 2, lo - slant], [f.x - 2, lo + slant]];
-    const box = { x: Math.min(...points.map((p) => p[0])), y: Math.min(...points.map((p) => p[1])) };
-    box.width = Math.max(...points.map((p) => p[0])) - box.x; box.height = Math.max(...points.map((p) => p[1])) - box.y;
-    nodes.push(shapePrimitive({ id: stableId(mark.id, "break"), role: "chart-break", geometry: "customPolygon", frame: box, style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") },
-      data: { paths: [points.map(([x, y]) => [Number(((x - box.x) / box.width).toFixed(6)), Number(((y - box.y) / box.height).toFixed(6))])], from: valueBreak.from, to: valueBreak.to, category: mark.data.category, series: mark.data.series } }));
-  }
+  const { horizontal, valueBreak, nodes, yScale, xScale } = chart;
+  nodes.push(...valueBreakNodes(nodes.filter((node) => node.role === "chart-mark"), valueBreak, horizontal ? xScale : yScale, horizontal));
 }
 
 /**
@@ -708,17 +674,14 @@ function categoricalColors(chart) {
   const focusCategoryIndex = twoMarkContrast ? defaultFocusIndex(categories) : -1;
   const colorFor = (seriesIndex, categoryIndex) => {
     if (chart.diverging) return chart.diverging.colors.get(seriesIndex);
-    const primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
-    // Highlight the answer: the bar the title is about takes the accent, or the primary where the accent is the lead series'
-    // own colour (subjectToken); the others keep their series colour, never grey. Forecast periods are lighter.
-    // The deck's declared subject takes its one colour among the grey (subjectToken).
-    if (barHighlighted.has(categories[categoryIndex])) return props.subjectAccent ? token(subjectToken()) : highlightAmongSeries();
+    // Highlight the answer: the bar the title is about takes the subject's colour; the others keep their series colour,
+    // never grey. Forecast periods are lighter. A two-mark or two-series contrast sets the point against the grey (SUBJECT).
+    if (barHighlighted.has(categories[categoryIndex])) return SUBJECT;
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
-    // The deck's declared subject takes the accent, as its bar does (`subjectAccent`, conventions.mjs).
-    if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? (props.subjectAccent ? token(subjectToken()) : primary) : comparator;
-    if (twoMarkContrast) return categoryIndex === focusCategoryIndex ? primary : comparator;
+    if (twoSeriesContrast) return seriesIndex === focusSeriesIndex ? SUBJECT : CONTEXT_FILL;
+    if (twoMarkContrast) return categoryIndex === focusCategoryIndex ? SUBJECT : CONTEXT_FILL;
     return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
   };
   const legendItems = forecastKeyed
@@ -766,8 +729,7 @@ function rowLabelling(chart) {
   // an axis broken at some gaps sets the rest one slot apart: either way the axis is broken after every long gap (time-axis.mjs
   // gapBreaks), which says outright that it skips.
   if (!horizontal && (props.categoryColumns || (props.categoryBreaks || []).length) && timePositions(categories)) {
-    const breaks = new Set([...(props.categoryBreaks || []), ...gapBreaks(categories)].map(String));
-    chart.props = props = { ...props, categoryBreaks: categories.map(String).filter((category) => breaks.has(category)) };
+    chart.props = props = { ...props, categoryBreaks: slotBreaks(categories, props.categoryBreaks) };
   }
   const spacing = !horizontal && !props.categoryColumns && !(props.categoryBreaks || []).length ? timePositions(categories) : null;
   const closest = spacing ? Math.min(...spacing.slice(1).map((at, i) => at - spacing[i])) : 0;
@@ -786,16 +748,25 @@ function rowLabelling(chart) {
   // that all fit at 8pt are all named, not every second one at 10pt. And a
   // member a callout names keeps its label as the subject does: a note on an
   // unnamed bar says nothing. page-types.mjs describeTypes publishes the rule.
-  const fullLine = measureText("Ag", 1000, axisFont).height;
-  const smallLine = measureText("Ag", 1000, { ...axisFont, fontSize: tokenValue(ROW_LABEL_MIN) }).height;
-  const crowded = horizontal && !stacked && categorySpan < fullLine && !chart.labelAbove;
-  const rowSize = crowded && categorySpan >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
-  const rowLine = rowSize === AXIS_LABEL ? fullLine : smallLine;
-  const rowEvery = crowded && categorySpan < rowLine ? Math.ceil(rowLine / categorySpan) : 1;
+  // Rows thinner than a label's line are named by the shared rule (chart-axes.mjs rowLabels), stacked or not.
   const named = new Set([...barHighlighted, ...(props.annotations || []).map((a) => a?.category).filter(Boolean)]);
-  const rowShown = (index) => rowEvery === 1 || named.has(categories[index])
-    || (index % rowEvery === 0 && !categories.some((category, at) => named.has(category) && Math.abs(at - index) < rowEvery));
+  const rows = horizontal && !chart.labelAbove ? rowLabels({ categories, span: categorySpan, named, font: axisFont }) : null;
+  const rowSize = rows?.size ?? AXIS_LABEL, rowLine = rows?.line ?? measureText("Ag", 1000, axisFont).height;
+  const rowShown = (index) => !rows || rows.shown(index);
   return { categorySpan, slotStart, timeSpaced: Boolean(spacing), rowSize, rowLine, rowShown };
+}
+
+/**
+ * Whether the values over a run of columns fit their columns: forty columns in a panel give each 7px, and their values,
+ * printed over them, ran into one another. Where the widest value is wider than its column, the chart is drawn again with
+ * a value axis and no labels (categoricalChart). A chart that asks for its labels (`dataLabels: true`) keeps them.
+ */
+function columnLabelsFit(chart) {
+  const { props, horizontal, stacked, series, values, showDataLabels, categorySpan } = chart;
+  if (horizontal || stacked || !showDataLabels || props.dataLabels === true || props.valueBreak || chart.diverging) return;
+  const room = categorySpan / Math.max(1, series.length) - 2;
+  const widest = Math.max(...values.filter(Number.isFinite).map((value) => measureDataLabel(formatValue(value, props)).width));
+  if (widest > room) throw Object.assign(new Error(`the columns' values (${Math.ceil(widest)}px) are wider than their columns (${Math.floor(room)}px)`), { labelsCrowded: true });
 }
 
 /** Each category's group of bars: its width (narrowed for stack labels set outside, or a bracket) and each bar's. */
@@ -1137,15 +1108,20 @@ function drawCategoryLabel(chart, category, categoryIndex, categoryStart) {
       data: { category, textLayout: noteLayout, note: true, ...(noteColumn ? { column: true } : {}) }
     }));
   }
+  // A name wider than the label column (capped at barLabelColumn's 180px) wraps within it, centred on its bar, rather than
+  // running past the frame on a single line: "Lufthansa Group mainline and regional airlines" set 70px off the page.
+  const rowWrap = horizontal && !barLabelLayout && !hideCategoryLabels ? measureText(String(category), horizontalCategoryLabelWidth - iconSlot, { fontFamily: tokenValue(FONT), fontSize: tokenValue(rowSize) }) : null;
+  const wrapped = rowWrap && rowWrap.lines.length > 1 ? rowWrap : null;
+  const blockLayout = barLabelLayout ?? wrapped;
   if (!hideCategoryLabels && (horizontal ? rowShown(categoryIndex) : labelShown(categoryIndex))) nodes.push(textPrimitive({
     id: stableId(id, "category", category),
     role: "category-label",
     frame: horizontal
-      ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : Math.min(categoryStart, categoryStart + groupSpan / 2 - rowLine / 2), width: horizontalCategoryLabelWidth - iconSlot, height: barLabelLayout ? barLabelLayout.height : Math.max(groupSpan, rowLine) }
+      ? { x: plot.x - horizontalCategoryLabelWidth - negativeLabelGutter - 8 - (regionHighlight ? REGION_HIGHLIGHT_INLINE_PAD : 0), y: barLabelLayout ? barBlockTop : wrapped ? categoryStart + groupSpan / 2 - wrapped.height / 2 : Math.min(categoryStart, categoryStart + groupSpan / 2 - rowLine / 2), width: horizontalCategoryLabelWidth - iconSlot, height: blockLayout ? blockLayout.height : Math.max(groupSpan, rowLine) }
       : { x: categoryMap.get(category).labelCenter-labelSpan/2, y: plot.y + plot.height + (regionHighlight ? 18 : 8) + iconSlot, width: labelSpan, height: categoryLayouts[categoryIndex].height },
-    text: horizontal ? (barLabelLayout ? barLabelLayout.text : category) : categoryLayouts[categoryIndex].text,
-    style: { ...textStyle(horizontal && !barLabelLayout ? rowSize : AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : barLabelLayout ? {valign:"top",lineHeight:barLabelLayout.lineHeight,wrap:false} : {}) },
-    data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : barLabelLayout ? {textLayout:barLabelLayout} : {})}
+    text: horizontal ? (blockLayout ? blockLayout.text : category) : categoryLayouts[categoryIndex].text,
+    style: { ...textStyle(horizontal && !barLabelLayout ? rowSize : AXIS_LABEL, SECONDARY, false, horizontal ? "right" : "center"), ...(!horizontal ? {valign:"top",lineHeight:categoryLayouts[categoryIndex].lineHeight,wrap:false} : blockLayout ? {valign:"top",lineHeight:blockLayout.lineHeight,wrap:false} : {}) },
+    data: {category,...(!horizontal ? {textLayout:categoryLayouts[categoryIndex]} : blockLayout ? {textLayout:blockLayout} : {})}
   }));
 }
 

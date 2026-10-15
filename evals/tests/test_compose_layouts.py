@@ -448,7 +448,7 @@ import assert from 'node:assert/strict';
 import {toDeckPlan} from './evals/support/compose.mjs';
 import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const make=(heading)=>planDeck(toDeckPlan({schema:'professional-slides.deck/v3',id:'mixed',slides:[{id:'s',title:'Read quantities and permissions together',layout:'two-up',exhibits:[
- {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['Scope'],series:[{name:'Amount',values:[31]}]},
+ {type:'chart.column',heading:'Programme authority',unit:'$m',categories:['First work','Later work'],series:[{name:'Amount',values:[31,215]}]},
  {type:'table',...(heading?{heading}:{}),columns:['Scope','Amount'],rows:[['First work','$31m'],['Later work','$215m']]}
 ]}]})).deck.slides[0];
 const plain=make();

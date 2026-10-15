@@ -91,6 +91,9 @@ export const TOKENS = Object.freeze({
   "color.rule": colour("--rule", "#929BA3"),
   "color.chartGrid": colour("--chart-gridline", "#D4D8DC"),
   "color.chartComparator": colour("--chart-comparator", "#D9DDE0"),
+  // The subject a chart marks - a highlighted member, a focus series - in one colour on every kind, derived per palette and
+  // ground (palettes.mjs subjectOf); the toolkit's own is its accent.
+  "color.chartSubject": colour("--chart-subject", "#00A6E6"),
   "color.chartSeries1": colour("--chart-series-1", "#06233B", "dk1"),
   "color.chartSeries2": colour("--chart-series-2", "#0B4F7D", "accent2"),
   "color.chartSeries3": colour("--chart-series-3", "#00A6E6", "accent3"),
@@ -1030,6 +1033,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // (chart-line.mjs, time-axis.mjs). PowerPoint's category axis would set them one
   // slot apart again, so those lines and areas stay drawn, as the sparse line does.
   if (["line", "area"].includes(type) && timePositions(props.categories)) return null;
+  // A native area carries no value labels in the saved file (LibreOffice drops them), and the probe's area of slot sales
+  // lost every figure it printed (TEXT_EXPORT_LOST): an area that prints its values stays drawn.
+  if (type === "area" && renderedNodes?.some((node) => node.role === "data-label")) return null;
   // So are columns over uneven dates (chart-categorical.mjs rowLabelling), unless a broken axis or a data table keeps their slots.
   if (["column", "stacked-column"].includes(type) && !props.categoryColumns && !(props.categoryBreaks || []).length && timePositions(props.categories)) return null;
   // A rank's line runs with 1 at the top, which the native line's axis does not say (chart-line.mjs): that chart stays drawn.
@@ -1115,10 +1121,9 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   // the scene painted, so a "2019 | 2024" chart reads the same way round in
   // PowerPoint.
   const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
-  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
+  const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.chartSubject") : undefined;
   const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
-  // A highlighted mark takes the accent, or the primary where the palette's lead series is the accent (chart-axes.mjs
-  // subjectToken): the emitter paints the token the scene painted it in.
+  // A highlighted mark takes the subject's colour (chart-axes.mjs SUBJECT): the emitter paints the token the scene painted it in.
   const litMark = marks.find(node => highlights.some((h) => String(h.category) === String(node.data?.category)));
   const highlightToken = litMark?.style?.fill?.tokenId;
   return {

@@ -274,7 +274,7 @@ export function registerCharts(registry) {
     const tokens = [
       "font.body", "type.heading", "type.body", "type.chartLabel", "type.chartAnnotation", "type.compact", "type.label", "type.source", "color.ink", "color.textSecondary",
       "font.bodySemibold", "weight.semibold",
-      "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.rule",
+      "color.chartGrid", "color.chartComparator", "color.componentPrimary", "color.componentPrimaryTint", "color.accent", "color.chartSubject", "color.rule",
       "color.canvas", "color.surface", "color.surfaceMuted", "color.onPrimary", "color.negative", "line.hairline", "line.standard", "radius.none", "radius.small", "radius.round", "icon.medium",
       ...SERIES.map((item) => item.tokenId), ...LEGEND_TOKENS, ...MARK_WEIGHT_TOKENS, ...(chart.tokens || []), "color.accent", "color.accentTint", "color.positive", "color.negative", "color.negativeTint", "color.surfaceMuted", "color.onPrimary", "type.compact"
     ];

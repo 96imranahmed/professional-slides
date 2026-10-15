@@ -35,6 +35,15 @@ Choose the chart a reader of this kind of document expects for this kind of clai
 
 Keep one table whole: a table of every category's scores reads better as one table than as three. Do not split a chart to make pages, and do not add a chart where a sentence says it.
 
+## Show a comparison
+
+A chart earns its page by showing a comparison the reader can see. Name it before drawing - what against what - and draw that comparison, not the data around it. These compare nothing, and `author-deck` refuses them (`runtime/chart-sense.mjs`):
+
+- **A run that barely moves** (`SERIES_FLAT`): every series moves less than a tenth of the axis it is drawn on - often because a zero baseline or a second series at another level blew the axis out. The chart reads as a level. Say the level in the title or as figures; set the latest period's values side by side as bars where the point is how they compare; or plot what moves - the change on the period before, each series indexed to its first period, or a line whose axis starts near its values. A level set against a target line or band is exempt: it compares.
+- **One comparison drawn as a long series** (`ONE_COMPARISON`): six periods or more whose only number marks are one change between the same two periods, while the periods between stay within those two and close to the straight line between them. Draw the two periods (two columns, or a `slope`) with the change on them, or give the periods between a mark of their own (a callout, an event, a band) where what happens there is the point.
+
+One value drawn as a chart, or one period on a chart that joins periods, compares nothing either (`NO_COMPARISON`): two figures for one year are two columns side by side, or the figures themselves.
+
 ## Draw it honestly
 
 - **Every position encodes a measure.** A scatter's axes are two measured quantities with their units; categories sit at fixed positions as labels. Do not jitter or offset marks to separate them; label them instead.
@@ -46,7 +55,7 @@ Keep one table whole: a table of every category's scores reads better as one tab
 
 ## Mark what matters
 
-- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about, in the accent (or the primary where the palette's bars are already in the accent); `focusSeries` the line, its peers grey.
+- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about; `focusSeries` the line or the slope's line. The subject takes one colour on every chart, resolved per palette so it stands apart from its peers: other bars keep the series colour, other lines and points go grey.
 - **Put the number on the chart** where it carries the claim: a growth rate (`cagr`), a change bracketed (`changeAnnotations`), a target line (`referenceLines`), a band (`bands`). A sentence callout (`annotations`) explains a mechanism at a mark; a chart holds three.
 - **Colour means something.** Status red, amber and green mark a state or a verdict - on track, behind, met, missed - in a pill, a light, a check or a cross. Never colour a chart series, a player or a surface by status. A delta and a trend arrow are coloured by whether the move is good news: set `better: "down"` for a cost, churn or a wait.
 - **Players carry their marks.** Declare the companies, places or products the deck compares in `players` on `deck`; a table cell naming one is drawn as its logo, outline or photograph.
@@ -64,7 +73,7 @@ Keep one table whole: a table of every category's scores reads better as one tab
 | `in-exhibit` | the explanation in the exhibit's cells |
 | `captions` | a finding under each panel (`caption` on each exhibit) |
 | `so-what-bar` | one implication in a filled bar under the exhibit (`bar`) |
-| `none` | the exhibit carries the page |
+| `none` | the exhibit carries the page (types that hold one; `--types` lists each type's placements) |
 
 A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines at most). Most pages do not need one: the title carries the message.
 

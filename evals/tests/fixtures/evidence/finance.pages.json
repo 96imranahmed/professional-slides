@@ -413,12 +413,6 @@
      "unit": "branches",
      "categories": [
       "FY19",
-      "FY20",
-      "FY21",
-      "FY22",
-      "FY23",
-      "FY24",
-      "FY25",
       "FY26"
      ],
      "series": [
@@ -426,12 +420,6 @@
        "name": "Branches",
        "values": [
         42,
-        42,
-        41,
-        41,
-        40,
-        40,
-        40,
         40
        ]
       }

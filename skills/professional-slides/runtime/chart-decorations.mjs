@@ -7,6 +7,7 @@
 // chart definition says which it `draws` and which it `refuses`, and
 // `refuseUndrawn` refuses any other before the chart is laid out, so nothing
 // authored is dropped unseen.
+import { ruleAround } from "./label-placement.mjs";
 import { linePrimitive, stableId, textPrimitive, token, tokenValue, rectPrimitive, isTokenReference, shapePrimitive } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { chartAnnotationBands, renderAnnotationRail, renderChangeAnnotations, renderEvidenceAnnotations } from "./chart-annotations.mjs";
@@ -106,26 +107,8 @@ export function periodBandHeight(props = {}, categories = [], { horizontal = fal
   return (normalizePeriods(props, categories).length ? PERIOD_BAND + PERIOD_LABEL_GAP : 0) + eventBandHeight(normalizeEvents(props, categories))
     + bandLabelRow(props, categories, { horizontal });
 }
-// Where a value label's figure sits across its slot: a label's slot is wider than its figure (50px at least), so a rule
-// breaks where the figure's ink is, not the whole slot.
-function labelInk(node) {
-  const w = measureDataLabel(node.text).width, f = node.frame, align = node.style?.align;
-  const left = align === "right" ? f.x + f.width - w : align === "center" ? f.x + (f.width - w) / 2 : f.x;
-  return { left, right: left + w };
-}
-
-// A rule up the plot at `x` from `top` to `bottom`, broken where a value label's ink lies across it: on the BA retest the
-// dashed Covid-grounding rule ran through "207,000 flights" and "22" on hb01 and "107" on hb02, the values at the very
-// period the event marks. The rule keeps its x; only the stretch behind the figure is left out.
-function brokenRule(x, top, bottom, labels, boxes = []) {
-  const crossed = [...labels.filter((node) => node.role === "data-label" && String(node.text ?? "").trim() && x >= labelInk(node).left - 4 && x <= labelInk(node).right + 4).map((node) => node.frame),
-    ...boxes.filter((frame) => x >= frame.x - 2 && x <= frame.x + frame.width + 2)];
-  const gaps = crossed.map((frame) => [Math.max(top, frame.y - 2), Math.min(bottom, frame.y + frame.height + 2)]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
-  const runs = [];
-  let cursor = top;
-  for (const [start, end] of [...gaps, [bottom, bottom]]) { if (start > cursor) runs.push([cursor, start]); cursor = Math.max(cursor, end); }
-  return runs;
-}
+// An event's rule up the plot at `x` gives way to the value labels it would run through (label-placement.mjs ruleAround).
+const valueLabels = (nodes) => nodes.filter((node) => node.role === "data-label" && String(node.text ?? "").trim());
 function periodAndEventNodes({ id, plot, props, categoryMap, categories, obstacles = [] }) {
   const periods = normalizePeriods(props, categories), events = normalizeEvents(props, categories);
   const underlay = [], overlay = [];
@@ -157,8 +140,8 @@ function periodAndEventNodes({ id, plot, props, categoryMap, categories, obstacl
     const fits = x + 6 + label.width <= plot.x + plot.width;
     const lx = fits ? x + 6 : x - 6 - label.width;
     overlay.push(textPrimitive({ id: stableId(id, "event-label", index), role: "chart-event-label", frame: { x: lx, y: labelTop, width: label.width + 2, height: label.height }, text: label.text, style: { ...textStyle(CHART_LABEL, INK, true, fits ? "left" : "right"), valign: "top", lineHeight: label.lineHeight, wrap: false }, data: { textLayout: label } }));
-    brokenRule(x, labelTop, plot.y + plot.height, obstacles).forEach(([y1, y2], segment) => underlay.push(linePrimitive({ id: segment ? stableId(id, "event-line", index, segment) : stableId(id, "event-line", index),
-      role: "chart-event-line", x1: x, y1, x2: x, y2, style: lineStyle(INK, token("line.hairline"), "dash") })));
+    ruleAround({ x1: x, y1: labelTop, x2: x, y2: plot.y + plot.height }, valueLabels(obstacles)).forEach((run, segment) => underlay.push(linePrimitive({ id: segment ? stableId(id, "event-line", index, segment) : stableId(id, "event-line", index),
+      role: "chart-event-line", ...run, style: lineStyle(INK, token("line.hairline"), "dash") })));
   });
   return { underlay, overlay };
 }
@@ -191,8 +174,8 @@ function decorations({ id, plot, props, pointMap = new Map(), categoryMap = new 
   if (callouts.length) for (let i = underlay.length - 1; i >= 0; i -= 1) {
     const rule = underlay[i], at = rule.data ?? {};
     if (rule.role !== "chart-event-line" || ![at.x1, at.y1, at.y2].every(Number.isFinite) || !callouts.some((frame) => at.x1 >= frame.x - 2 && at.x1 <= frame.x + frame.width + 2)) continue;
-    const runs = brokenRule(at.x1, Math.min(at.y1, at.y2), Math.max(at.y1, at.y2), [], callouts);
-    underlay.splice(i, 1, ...runs.map(([y1, y2], segment) => linePrimitive({ id: `${rule.id}-${segment}`, role: "chart-event-line", x1: at.x1, y1, x2: at.x1, y2, style: rule.style })));
+    const runs = ruleAround({ x1: at.x1, y1: Math.min(at.y1, at.y2), x2: at.x1, y2: Math.max(at.y1, at.y2) }, [], { boxes: callouts });
+    underlay.splice(i, 1, ...runs.map((run, segment) => linePrimitive({ id: `${rule.id}-${segment}`, role: "chart-event-line", ...run, style: rule.style })));
   }
   const overlaps = (a, b, padding = 4) => !(
     a.x + a.width + padding <= b.x
@@ -255,15 +238,8 @@ function drawHorizontalReferenceLines({ id, plot, props, yScale, xScale, obstacl
       // A label's slot is wider than its figure (50px at least): the line breaks
       // where the figure's ink is, or a median through a field of short labels
       // vanished for six rows, the subject's among them.
-      const ink = labelInk;
-      const gaps = obstacles.filter(node => node.role === "data-label" && x >= ink(node).left - 4 && x <= ink(node).right + 4)
-        .map(node => [Math.max(plot.y - 4, node.frame.y - 4), Math.min(plot.y + plot.height, node.frame.y + node.frame.height + 4)])
-        .sort((a, b) => a[0] - b[0]);
-      let cursor = plot.y - 4, segment = 0;
-      for (const [start, end] of [...gaps, [plot.y + plot.height, plot.y + plot.height]]) {
-        if (start > cursor) underlay.push(linePrimitive({ id: stableId(id, "reference-line", index, segment++), role: "chart-reference-line", x1: x, y1: cursor, x2: x, y2: start, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") }));
-        cursor = Math.max(cursor, end);
-      }
+      ruleAround({ x1: x, y1: plot.y - 4, x2: x, y2: plot.y + plot.height }, valueLabels(obstacles), { gap: 4 }).forEach((run, segment) =>
+        underlay.push(linePrimitive({ id: stableId(id, "reference-line", index, segment), role: "chart-reference-line", ...run, style: lineStyle(token("color.componentPrimary"), token("line.standard"), "dash") })));
       if (reference.label) {
         const measured = measureText(reference.label, 260, { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: true });
         const left = Math.min(plot.x + plot.width - measured.width, x + 6);

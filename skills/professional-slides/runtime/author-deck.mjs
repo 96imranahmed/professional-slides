@@ -250,7 +250,9 @@ export async function authorDeck(docIn, { baseDir = null, insights = null, pages
   add(bindingFindings);
   for (const slide of [...(spec.slides || []), ...(spec.appendix || [])]) for (const note of slide?.pageType?.advisories ?? [])
     add([{ code: "PAGE_ADJUSTED", id: String(slide.id), severity: "advisory", repair: `${slide.id}: ${String(note).replace(/^PAGE_ADJUSTED:\s*/, "")}` }]);
-  const composing = (composed.pageErrors ?? (composed.error ? [composed.error] : [])).map((message) => ({ code: "PAGE_DOES_NOT_COMPOSE", id: idOfMessage(message), severity: "blocker", repair: message }));
+  // A chart refused for what it shows says so by its own code (chart-sense.mjs, chart-line.mjs): the page composes, its chart compares nothing.
+  const composeCode = (message) => String(message).match(/(?:^|: )(NO_COMPARISON|SERIES_FLAT|ONE_COMPARISON|AREA_BASELINE|RANK_FILLED): /)?.[1] ?? "PAGE_DOES_NOT_COMPOSE";
+  const composing = (composed.pageErrors ?? (composed.error ? [composed.error] : [])).map((message) => ({ code: composeCode(message), id: idOfMessage(message), severity: "blocker", repair: message }));
   add(composing);
   // A page the composer drew as two slides or more: a table past the rows a page holds is continued, its title marked.
   const splitInto = new Map();

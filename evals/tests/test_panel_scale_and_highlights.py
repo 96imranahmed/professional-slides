@@ -97,8 +97,8 @@ const aligned = { ...base, id: 'a', type: 'ranking', form: 'aligned-bars', comme
     { name: 'Load factor', unit: '%', values: [85, 78, 83, 86, 85, 88, 87, 82] },
     { name: 'Journeys', unit: 'million', values: [22, 53, 93, 122, 29, 43, 22, 42] }] } };
 const [d, a] = compose([distribution, aligned]);
-// The subject's colour: the accent, or the primary where the palette leads its series with the accent (chart-axes.mjs subjectToken).
-const accent = (n) => ['color.accent', 'color.componentPrimary'].includes(n.style?.fill?.tokenId);
+// The subject's colour, resolved once per palette (chart-axes.mjs SUBJECT).
+const accent = (n) => ['color.chartSubject'].includes(n.style?.fill?.tokenId);
 const lit = d.nodes.filter((n) => n.role === 'chart-mark' && accent(n)).map((n) => n.data.category);
 const bands = d.nodes.filter((n) => n.role === 'chart-highlight').length + a.nodes.filter((n) => n.role === 'chart-highlight').length;
 const litAligned = a.nodes.filter((n) => n.role === 'chart-mark' && accent(n)).map((n) => n.data.category);

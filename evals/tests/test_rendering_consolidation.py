@@ -42,7 +42,7 @@ const props={categories:['A','B','C'],series:[{name:'Value',values:[40,70,55]}],
 const frame={x:0,y:0,width:600,height:360};
 const nodes=REGISTRY.get('chart.column').render({id:'c',frame,props}).nodes;
 const marks=nodes.filter((n)=>n.role==='chart-mark');
-console.log(JSON.stringify({accent:marks.filter((n)=>n.style.fill.tokenId==='color.accent').map((n)=>n.data.category),
+console.log(JSON.stringify({accent:marks.filter((n)=>n.style.fill.tokenId==='color.chartSubject').map((n)=>n.data.category),
   bands:nodes.filter((n)=>n.role==='chart-highlight').length, native:nativeChartSpec('chart.column',props,frame,nodes)?.highlightIndices??null}));
 """)
         self.assertEqual(result["accent"], ["B"], "the column itself is lit, as a bar is")

@@ -6,12 +6,11 @@
 // (chart-*.mjs, charts-extra.mjs) imports from here and charts.mjs registers
 // them all, so the chart modules form no import cycle - each one imports on
 // its own (evals/scripts/check_source_quality.mjs).
-import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, rectPrimitive, stableId, textPrimitive } from "./core.mjs";
+import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, stableId, textPrimitive } from "./core.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
 import { STEP_LADDER, decade, stepCandidates, onLadder, wholeSteps } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
-import { contrastRatio } from "./color.mjs";
-import { MARK_CONTRAST } from "./palettes.mjs";
+import { groupThousands } from "./draw.mjs";
 import { chartAnnotationBands, evidenceAnnotationTopBandCount, evidenceBandSpan, evidenceRailWidth } from "./chart-annotations.mjs";
 
 export const FONT = token("font.body");
@@ -33,21 +32,52 @@ export const SERIES = [
 ];
 
 /**
- * The token a subject is drawn in among its peers, decided once per palette: the accent, unless it sits too close to the
- * peers' colour to pick out, then the primary, then the ink. Among the comparator grey (a declared subject, conventions'
- * `subjectAccent`, `subjectRow`) it needs a mark's 3:1 (palettes.mjs MARK_CONTRAST): the accent cleared it on the consulting,
- * editorial and journal designs (4.2, 4.5, 4.3 to 1) and not on keynote (2.5), the graphite palette (1.7) or the toolkit
- * palette (2.0). Among the lead series (`"color.chartSeries1"`, the bars a highlighted bar stands among) it needs 1.5:1: the
- * accent fails where the palette leads with it - midnight's blue and the BA deck's house blue once the ink went to the end of
- * the series (palettes.mjs leadWithColour) - and on evergreen, whose green accent and green lead read at 1.1:1.
+ * Emphasis, one rule for every chart. The subject - a highlighted member, a focus series, a table's subject row - is drawn in
+ * `color.chartSubject`, which the palette resolves once for each ground (palettes.mjs subjectOf) so that it stands apart from
+ * both kinds of peer. Peers that are data in their own right keep the lead series colour (a ranked bar's other members, the
+ * other panels of a set of multiples); peers that are context go grey - the comparator for a filled mark, the rule grey for
+ * a line or a stem, since a hairline in the comparator's pale grey does not read: the probe's slope drew every line in the
+ * gridline grey, at 1.4:1. Each kind chose its own before, and an accent bar sat on the lead series' own colour.
  */
-export function subjectToken(peers = "color.chartComparator") {
-  const least = peers === "color.chartComparator" ? MARK_CONTRAST : 1.5, against = tokenValue(peers), hex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
-  const apart = (key) => !hex(tokenValue(key)) || !hex(against) || contrastRatio(tokenValue(key), against) >= least;
-  return ["color.accent", "color.componentPrimary"].find(apart) ?? "color.ink";
+export const SUBJECT = token("color.chartSubject");
+export const CONTEXT_FILL = token("color.chartComparator");
+export const CONTEXT_LINE = token("color.rule");
+
+/**
+ * Which rows of a run get their name, one rule for every chart that names its members down a column - bars and stacks,
+ * lollipops, dumbbells. Forty members down a 420px plot give each row 10px, under the 13px line of the label face, and
+ * every name set in a box that tall prints at six pixels. When a row is thinner than a line the labels first step down to
+ * the smallest size the page sets type at (8pt), where 32 members that fit are all named; under that every nth row is named
+ * from the top, the `named` ones (the highlighted member, one a callout points at) always, and the rows beside a named one
+ * that its label would touch go unlabelled: the reader finds the subject by its colour and its name, and reads the field's
+ * shape from the marks. `span` is a row's height; returns `{ size, line, every, shown(index) }`.
+ */
+export const ROW_LABEL_MIN = token("type.source");
+export function rowLabels({ categories, span, named = new Set(), font = { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) } }) {
+  const fullLine = measureText("Ag", 1000, font).height;
+  const smallLine = measureText("Ag", 1000, { ...font, fontSize: tokenValue(ROW_LABEL_MIN) }).height;
+  const crowded = span < fullLine;
+  const size = crowded && span >= smallLine ? ROW_LABEL_MIN : AXIS_LABEL;
+  const line = size === AXIS_LABEL ? fullLine : smallLine;
+  const every = crowded && span < line ? Math.ceil(line / span) : 1;
+  const shown = (index) => every === 1 || named.has(categories[index])
+    || (index % every === 0 && !categories.some((category, at) => named.has(category) && Math.abs(at - index) < every));
+  return { size, line, every, shown };
 }
-/** A highlighted mark among marks in the lead series colour. */
-export const highlightAmongSeries = () => token(subjectToken("color.chartSeries1"));
+
+/**
+ * A row's name in its label column, right-aligned against the row's marks: one line where it fits, else wrapped to the
+ * column and centred on the row (`cy`), rather than one line running past the frame - a name wider than a column capped at
+ * 180-200px set 70px off the page.
+ */
+export function rowNameNode({ id, category, x, cy, width, size = AXIS_LABEL, bold = false, color = INK }) {
+  const layout = measureText(String(category), width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(size), bold });
+  const wrapped = layout.lines.length > 1;
+  return textPrimitive({ id: stableId(id, "category", category), role: "category-label",
+    frame: { x, y: wrapped ? cy - layout.height / 2 : cy - 10, width, height: wrapped ? layout.height : 20 }, text: wrapped ? layout.text : String(category),
+    style: { ...textStyle(size, color, bold, "right"), ...(wrapped ? { valign: "top", lineHeight: layout.lineHeight, wrap: false } : {}) },
+    data: { category, ...(wrapped ? { textLayout: layout } : {}) } });
+}
 
 export const MIN_PLOT_HEIGHT = 100;
 
@@ -350,8 +380,11 @@ export function axisTickText(min, max, index, steps = 4) {
     const text = String(Number(entry.toPrecision(12)));
     return text.includes(".") ? text.split(".")[1].length : 0;
   }));
-  // Every tick prints that one precision: 0.0, 2.5, 5.0, not 0, 2.5, 5.
-  return (value + 0).toFixed(Math.min(10, decimals)).replace(/^-(0(\.0+)?)$/, "$1");
+  // Every tick prints that one precision: 0.0, 2.5, 5.0, not 0, 2.5, 5. Four figures and up take the thousands separator
+  // the chart's own labels print (value-format.mjs formatValue): an axis of 12000 beside labels of 12,000 read as two scales.
+  const [whole, fraction] = (value + 0).toFixed(Math.min(10, decimals)).replace(/^-(0(\.0+)?)$/, "$1").split(".");
+  const sign = whole.startsWith("-") ? "-" : "", digits = whole.replace("-", "");
+  return `${sign}${digits.length > 3 ? groupThousands(digits) : digits}${fraction ? `.${fraction}` : ""}`;
 }
 
 export function axisLabelWidth(bounds) {
@@ -368,21 +401,6 @@ export function axisLabelWidth(bounds) {
 export function oneMagnitude(valueSets) {
   const tops = valueSets.map((values) => Math.max(0, ...values.filter(Number.isFinite).map(Math.abs)));
   return Math.max(...tops) <= 10 * Math.min(...tops);
-}
-
-/**
- * A "//" across the category axis after each break, `{ after, at }`: the category the axis breaks after and the position
- * along the axis midway to the next one. The periods either side are not adjacent (FY10 beside FY20).
- */
-export function categoryBreakNodes(id, plot, breaks, horizontal = false) {
-  const axisAt = horizontal ? plot.x : plot.y + plot.height;
-  return breaks.flatMap(({ after, at }) => [
-    rectPrimitive({ id: stableId(id, "category-break", after), role: "chart-break", frame: horizontal ? { x: axisAt - 6, y: at - 4, width: 12, height: 8 } : { x: at - 4, y: axisAt - 6, width: 8, height: 12 },
-      style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") }, data: { after } }),
-    ...[[0, -3], [1, 3]].map(([k, offset]) => linePrimitive({ id: stableId(id, "category-break", after, k), role: "chart-break-mark",
-      ...(horizontal ? { x1: axisAt - 6, y1: at + offset + 3, x2: axisAt + 6, y2: at + offset - 3 } : { x1: at + offset - 3, y1: axisAt + 6, x2: at + offset + 3, y2: axisAt - 6 }),
-      style: lineStyle(INK, token("line.standard")), data: { after } }))
-  ]);
 }
 
 export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48, inverted = false } = {}) {

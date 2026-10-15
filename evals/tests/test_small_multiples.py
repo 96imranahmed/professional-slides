@@ -39,7 +39,7 @@ assert.ok(equal.length);
 for (const [a, y, b, z] of equal) assert.ok(Math.abs(column(a, y).height - column(b, z).height) < 0.5, `${a} ${y} and ${b} ${z}`);
 const fill = (item) => nodes.find((n) => n.role === 'chart-mark' && n.data.item === item).style.fill.tokenId;
 // The rest in the lead series, as a plain chart; the subject apart from them (outside a deck the toolkit's tokens: the accent).
-assert.equal(fill('West'), 'color.accent');
+assert.equal(fill('West'), 'color.chartSubject');
 assert.equal(fill('North'), 'color.chartSeries1');
 // The axis is labelled once, under the bottom row.
 const labels = nodes.filter((n) => n.role === 'category-label' && n.data?.category === 'FY23');
@@ -152,7 +152,7 @@ if (total(a, 0) === total(b, 0)) assert.ok(Math.abs(height(a.label, 0) - height(
 assert.ok(Math.abs(height(a.label, 0) / height(a.label, 1) - total(a, 0) / total(a, 1)) < 0.01, 'heights stand in proportion to the totals');
 // The subject's panel keeps its parts' colours, set on the accent's tint under an accent title.
 assert.equal(nodes.filter((n) => n.role === 'chart-panel-highlight').map((n) => n.data.item).join(), 'East');
-assert.equal(nodes.find((n) => n.data?.panelTitle && n.text === 'East').style.color.tokenId, 'color.accent');
+assert.equal(nodes.find((n) => n.data?.panelTitle && n.text === 'East').style.color.tokenId, 'color.chartSubject');
 assert.deepEqual(fills(nodes, 'East').map(([, f]) => f), fills(nodes, 'North').map(([, f]) => f));
 // Values print inside the segments that hold them.
 assert.ok(nodes.some((n) => n.role === 'data-label' && n.data.placement === 'inside' && n.data.part === 'Season'));
