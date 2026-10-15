@@ -38,8 +38,9 @@ for (const a of items) for (const b of items) for (const [i, y] of years.entries
 assert.ok(equal.length);
 for (const [a, y, b, z] of equal) assert.ok(Math.abs(column(a, y).height - column(b, z).height) < 0.5, `${a} ${y} and ${b} ${z}`);
 const fill = (item) => nodes.find((n) => n.role === 'chart-mark' && n.data.item === item).style.fill.tokenId;
+// The rest in the lead series, as a plain chart; the subject apart from them (outside a deck the toolkit's tokens: the accent).
 assert.equal(fill('West'), 'color.accent');
-assert.equal(fill('North'), 'color.componentPrimary');
+assert.equal(fill('North'), 'color.chartSeries1');
 // The axis is labelled once, under the bottom row.
 const labels = nodes.filter((n) => n.role === 'category-label' && n.data?.category === 'FY23');
 const bottom = Math.max(...nodes.filter((n) => n.role === 'chart-mark').map((n) => n.frame.y + n.frame.height));

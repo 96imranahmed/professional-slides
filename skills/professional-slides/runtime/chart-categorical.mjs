@@ -8,7 +8,7 @@ import { iconDefinition, unknownIcon } from "./icons.mjs";
 import { iconMarker } from "./marks.mjs";
 import { mediaNode, logoFrame, markDrawable, flagFrame, flagPlaceholder, isFlag, FLAG_ASPECT } from "./media.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, highlightAmongSeries, categoryBreakNodes, VALUE_HEADROOM, BAR_HEADROOM, LABEL_BAND, labelBand, markWeight, tableSpan,
   chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend, legendRowsFor, assertGridlineOption, resolveValueAxis,
   normalizedCategoricalData, numericBounds, periodLabelStep, axes, horizontalAxes } from "./chart-axes.mjs";
 import { withReferenceValues, REGION_HIGHLIGHT_INLINE_PAD, normalizedHighlights, periodBandHeight, withDecorations, measureDataLabel,
@@ -682,13 +682,7 @@ function drawCategoryBreaks(chart) {
   for (const name of props.categoryBreaks) {
     const at = categories.indexOf(name);
     if (at < 0 || at === categories.length - 1) throw new Error(`categoryBreaks names "${name}", which is not a category the axis continues past (${categories.slice(0, 8).join(", ")})`);
-    const mid = slotStart(at) + categorySpan;
-    const axisAt = horizontal ? plot.x : plot.y + plot.height;
-    const mask = horizontal ? { x: axisAt - 6, y: mid - 4, width: 12, height: 8 } : { x: mid - 4, y: axisAt - 6, width: 8, height: 12 };
-    nodes.push(rectPrimitive({ id: stableId(id, "category-break", name), role: "chart-break", frame: mask, style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") }, data: { after: name } }));
-    for (const [k, offset] of [[0, -3], [1, 3]]) nodes.push(linePrimitive({ id: stableId(id, "category-break", name, k), role: "chart-break-mark",
-      ...(horizontal ? { x1: axisAt - 6, y1: mid + offset + 3, x2: axisAt + 6, y2: mid + offset - 3 } : { x1: mid + offset - 3, y1: axisAt + 6, x2: mid + offset + 3, y2: axisAt - 6 }),
-      style: lineStyle(INK, token("line.standard")), data: { after: name } }));
+    nodes.push(...categoryBreakNodes(id, plot, [{ after: name, at: slotStart(at) + categorySpan }], horizontal));
   }
 }
 
@@ -714,11 +708,11 @@ function categoricalColors(chart) {
   const focusCategoryIndex = twoMarkContrast ? defaultFocusIndex(categories) : -1;
   const colorFor = (seriesIndex, categoryIndex) => {
     if (chart.diverging) return chart.diverging.colors.get(seriesIndex);
-    const accent = token("color.accent"), primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
-    // Highlight the answer: the bar the title is about takes the accent; the
-    // others keep their series colour (navy), never grey. Forecast periods are lighter.
-    // The deck's declared subject takes its one colour (subjectToken): the accent, or the primary where the accent does not clear the grey.
-    if (barHighlighted.has(categories[categoryIndex])) return props.subjectAccent ? token(subjectToken()) : accent;
+    const primary = token("color.componentPrimary"), comparator = token("color.chartComparator");
+    // Highlight the answer: the bar the title is about takes the accent, or the primary where the accent is the lead series'
+    // own colour (subjectToken); the others keep their series colour, never grey. Forecast periods are lighter.
+    // The deck's declared subject takes its one colour among the grey (subjectToken).
+    if (barHighlighted.has(categories[categoryIndex])) return props.subjectAccent ? token(subjectToken()) : highlightAmongSeries();
     if (forecastIndex >= 0 && categoryIndex >= forecastIndex && !stacked && series.length === 1) return token("color.chartSeries6");
     if (barHighlight) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];
     if (props.colorIndices !== undefined || stacked) return SERIES[colorIndexFor(seriesIndex, categoryIndex)];

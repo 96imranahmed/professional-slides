@@ -20,6 +20,7 @@ Choose the chart a reader of this kind of document expects for this kind of clai
 | --- | --- | --- |
 | Which is larger, and by how much? | Sorted bars | `ranking`, `bar` |
 | How did a measure move over time? | A line; columns for a few periods | `trend`, `line` or `column` |
+| How did members of different sizes move against their own starting point? | Indexed lines, the base period at 100 | `trend`, `indexed` |
 | How does a total divide into parts, and how does the mix differ? | Stacked bars | `composition`, `stacked-bar` |
 | What makes up the change between two totals? | Waterfall | `bridge`, `waterfall` |
 | How do two measures move together? | Scatter; bubble for a third measure | `relationship`, `scatter` or `bubble` |
@@ -45,7 +46,7 @@ Keep one table whole: a table of every category's scores reads better as one tab
 
 ## Mark what matters
 
-- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about; `focusSeries` the line. The rest stay grey.
+- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about, in the accent (or the primary where the palette's bars are already in the accent); `focusSeries` the line, its peers grey.
 - **Put the number on the chart** where it carries the claim: a growth rate (`cagr`), a change bracketed (`changeAnnotations`), a target line (`referenceLines`), a band (`bands`). A sentence callout (`annotations`) explains a mechanism at a mark; a chart holds three.
 - **Colour means something.** Status red, amber and green mark a state or a verdict - on track, behind, met, missed - in a pill, a light, a check or a cross. Never colour a chart series, a player or a surface by status. A delta and a trend arrow are coloured by whether the move is good news: set `better: "down"` for a cost, churn or a wait.
 - **Players carry their marks.** Declare the companies, places or products the deck compares in `players` on `deck`; a table cell naming one is drawn as its logo, outline or photograph.

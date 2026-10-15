@@ -1117,8 +1117,13 @@ export function nativeChartSpec(componentId, props = {}, frame, renderedNodes) {
   const marks = (renderedNodes || []).filter(node => node.role === "chart-mark");
   const primaryMark = marks.some(node => node.style?.fill?.tokenId === "color.chartComparator") ? marks.find(node => node.style?.fill?.tokenId === "color.componentPrimary") : undefined;
   const focusIndex = primaryMark ? (series.length === 2 ? series.findIndex(item => item.name === primaryMark.data?.series) : categories.indexOf(primaryMark.data?.category)) : -1;
+  // A highlighted mark takes the accent, or the primary where the palette's lead series is the accent (chart-axes.mjs
+  // subjectToken): the emitter paints the token the scene painted it in.
+  const litMark = marks.find(node => highlights.some((h) => String(h.category) === String(node.data?.category)));
+  const highlightToken = litMark?.style?.fill?.tokenId;
   return {
     ...(focusIndex >= 0 ? { focusIndex } : {}),
+    ...(highlightToken ? { highlightToken } : {}),
     labelBold,
     type,
     categories,

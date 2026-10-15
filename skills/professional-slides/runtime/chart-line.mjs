@@ -5,8 +5,8 @@ import { ellipsePrimitive, linePrimitive, stableId, textPrimitive, token, tokenV
 import { formatValue } from "./value-format.mjs";
 import { contrastRatio } from "./color.mjs";
 import { ENGINE_RESERVE, measureText } from "./text-layout.mjs";
-import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods } from "./time-axis.mjs";
-import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
+import { timePositions, spacedLabelIndices, monthlyLabelStep, missingPeriods, gapBreaks } from "./time-axis.mjs";
+import { FONT, INK, SECONDARY, CHART_LABEL, AXIS_LABEL, SERIES, subjectToken, categoryBreakNodes, chartFrame, labelBold, textStyle, lineStyle, fillStyle, topLegend,
   assertGridlineOption, numericBounds, axisLabelWidth, axes, labelBand, markWeight, tableSpan, resolveValueAxis, normalizedCategoricalData,
   periodLabelStep } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, periodBandHeight, measureDataLabel, growthColumns, seriesState, stateLabel, statesSeries, markerGutter } from "./chart-decorations.mjs";
@@ -588,7 +588,13 @@ export function comboChart({ id, frame, props }) {
     pointMap.set(`category:${category}`, barPoint.y < linePoint.y ? barPoint : linePoint);
     linePoints.push({ ...linePoint, category });
   });
-  linePoints.slice(1).forEach((point, index) => nodes.push(linePrimitive({
+  // A combo's slots stand one apart whatever the dates, so a run that skips periods breaks its axis after each long gap
+  // (time-axis.mjs gapBreaks), and its line breaks across a period the run leaves out, as a line chart's does: the BA deck's
+  // capacity page drew IAG's line straight from 2019 to 2023, across the three Covid years, one slot apart.
+  const positionOf = (category) => categories.map(String).indexOf(String(category));
+  nodes.push(...categoryBreakNodes(id, barPlot, gapBreaks(categories).map((after) => ({ after, at: plot.x + categorySpan * (positionOf(after) + 1) }))));
+  const missing = new Set(missingPeriods(categories).map((gap) => gap.after));
+  linePoints.slice(1).forEach((point, index) => missing.has(index) || nodes.push(linePrimitive({
     id: stableId(id, "segment", lineSeries.name, index),
     role: "chart-line",
     x1: linePoints[index].x,

@@ -2,7 +2,7 @@ import { linePrimitive, stableId, token } from "./core.mjs";
 import { legendNodes, LEGEND_TOKENS } from "./legends.mjs";
 import { CHART_GUIDANCE } from "./guidance.mjs";
 import { barLabelColumn } from "./chart-categorical.mjs";
-import { numericBounds } from "./chart-axes.mjs";
+import { numericBounds, oneMagnitude } from "./chart-axes.mjs";
 
 function assertEquivalentComparisons(props) {
   if (!props.comparison) return;
@@ -55,7 +55,7 @@ export function registerChartGroup(registry) {
       // the numerical domain alone does not guarantee pixels per unit.
       if (aligned) charts = charts.map(chart => {
         const peers = charts.filter(peer => chart.unit && peer.unit === chart.unit);
-        if (peers.length < 2) return chart;
+        if (peers.length < 2 || !oneMagnitude(peers.map(peer => peer.props.series.flatMap(series => series.values)))) return chart;
         const values = peers.flatMap(peer => peer.props.series.flatMap(series => series.values));
         const explicit = peers.flatMap(peer => [peer.props.xMin, peer.props.xMax]).filter(Number.isFinite);
         const bounds = numericBounds([...values, ...explicit], { includeZero: true, tight: true, axis: "x" });

@@ -19,7 +19,7 @@ for (const palette of ['midnight','evergreen','crimson']) {
  assert.ok(bar&&value,'the total retains the mark and its numeric label');
  const surface=scene.tokens['color.componentPrimary'].value;
  assert.ok(contrastRatio(value.style.color.value,surface)>=4.5,`${palette} total label`);
- assert.ok(Math.max(contrastRatio(bar.style.fill.value,surface),contrastRatio(bar.style.stroke.value,surface))>=3,`${palette} total bar boundary`);
+ assert.ok(Math.max(contrastRatio(bar.style.fill.value,surface),bar.style.stroke?.value?contrastRatio(bar.style.stroke.value,surface):1)>=3,`${palette} total bar boundary`);
  const first=scene.nodes.find(n=>n.role==='table-bar'&&n.data?.row===0);
  assert.equal(first.style.fill.value,bar.style.fill.value,'row band does not change series identity');
 }

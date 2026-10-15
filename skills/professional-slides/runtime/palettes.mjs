@@ -67,8 +67,9 @@ export function heatScaleTokens(colors) {
 // 2.8:1 - still reads as a filled bar, and refusing it would refuse the house; under 2:1 a mark is lost. The accent is a
 // brand's own and is not held here: where it sets text the runtime darkens it to read (design-systems.mjs readable).
 const CANVAS_CONTRAST = Object.freeze({ "color.ink": [4.5, "text"], "color.componentPrimary": [2, "a chart's marks"] });
+const isHex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
 function assertCanvasContrast(tokens) {
-  const canvas = tokens["color.canvas"]?.value, isHex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
+  const canvas = tokens["color.canvas"]?.value;
   if (!isHex(canvas)) return;
   for (const [key, [least, role]] of Object.entries(CANVAS_CONTRAST)) {
     const color = tokens[key]?.value;
@@ -76,6 +77,24 @@ function assertCanvasContrast(tokens) {
     const ratio = contrastRatio(color, canvas);
     if (ratio < least) throw new Error(`The palette's ${key} (${color}) reads at ${ratio.toFixed(1)}:1 on the canvas (${canvas}), and ${role} needs ${least}:1 - on a dark canvas set a light ${key}, or keep the canvas light; for dark pages keep the palette as drawn for its light page and set \`tone: "dark"\` on the deck or the page, which derives every colour for the dark ground from it`);
   }
+}
+
+// Marks lead with the palette's colours, not its type. Series 1 draws every single-series chart, so it must read as a mark
+// (2:1 on the canvas, the floor CANVAS_CONTRAST holds the primary to) without reading as type (10:1, as the ink and a
+// near-black house navy do); one that does not trades places with the first series that does. Midnight, the toolkit and the
+// BA deck's house palette led with the ink, and every plain bar in those decks was near-black with the blues unused. The
+// dark series takes the place the lead left - the second, in both - so two lines stay apart, and a subject highlighted among
+// the lead colour takes the primary (chart-axes.mjs subjectToken).
+const SERIES_KEYS = Object.freeze([1, 2, 3, 4, 5, 6].map((index) => `color.chartSeries${index}`));
+const TYPE_DARK = 10;
+function leadWithColour(tokens) {
+  const canvas = tokens["color.canvas"]?.value, values = SERIES_KEYS.map((key) => tokens[key]?.value);
+  if (!isHex(canvas) || !values.every(isHex)) return;
+  const reads = (color) => { const ratio = contrastRatio(color, canvas); return ratio >= CANVAS_CONTRAST["color.componentPrimary"][0] && ratio < TYPE_DARK; };
+  const lead = values.findIndex(reads);
+  if (lead <= 0) return;
+  [values[0], values[lead]] = [values[lead], values[0]];
+  SERIES_KEYS.forEach((key, index) => { tokens[key] = { ...tokens[key], value: values[index] }; });
 }
 
 export function resolvePalette(id = "midnight", baseTokens, slots) {
@@ -101,6 +120,7 @@ export function resolvePalette(id = "midnight", baseTokens, slots) {
   }
   const tokens = Object.fromEntries(Object.entries(baseTokens).map(([key, value]) => [key, { ...value, value: preset.colors[key] ?? value.value }]));
   assertCanvasContrast(tokens);
+  leadWithColour(tokens);
   // The filled surface follows the page it sits on: the palette's own ink mixed
   // toward its own canvas, so a warm paper page gets a warm stone and a navy
   // house a cool grey, and a house profile with its own ink needs no new colour.

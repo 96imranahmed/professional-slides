@@ -33,7 +33,7 @@ import { ellipsePrimitive, linePrimitive, onFill, rectPrimitive, stableId, textP
 import { formatValue } from "./value-format.mjs";
 import { measureAt } from "./draw.mjs";
 import { legendNodes, legendRowCount } from "./legends.mjs";
-import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, fillStyle, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
+import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, SECONDARY, SERIES, fillStyle, highlightAmongSeries, labelBold, lineStyle, numericBounds, sharesOfWhole, textStyle } from "./chart-axes.mjs";
 
 export const SMALL_MULTIPLES = Object.freeze({ min: 2, max: 12, marks: Object.freeze(["column", "bar", "line", "stacked-column", "stacked-bar", "donut"]), parts: Object.freeze({ min: 2, max: SERIES.length }) });
 const STACKED = new Set(["stacked-column", "stacked-bar"]);
@@ -276,8 +276,10 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
   const nodes = [];
   const key = (...parts) => stableId(id, "panel", panel.at, ...parts);
   if (layout.donut) return donutNodes({ layout, panel, key, props, highlighted });
-  // The panel the page is about in the accent, the rest in the house's primary: a series colour may share the accent's hue.
-  const color = highlighted ? ACCENT : token("color.componentPrimary");
+  // The rest in the lead series, as a single-series chart is drawn, and the panel the page is about apart from them: in the
+  // accent, or the primary where the accent is the lead's own colour (chart-axes.mjs subjectToken). In the house's primary,
+  // every panel of the BA deck's small multiples was near-black and its subject the lighter of the two.
+  const subject = highlightAmongSeries(), color = highlighted ? subject : SERIES[0];
   const n = categories.length;
   const along = sideways(mark) ? plot.height : plot.width;
   const slot = along / n;
@@ -305,7 +307,7 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
     }
     if (item.focus !== undefined) {
       const i = categories.indexOf(String(item.focus)), v = item.values[i];
-      if (Number.isFinite(v)) nodes.push(ellipsePrimitive({ id: key("focus"), role: "chart-marker", frame: { x: x(i) - 4.5, y: y(v) - 4.5, width: 9, height: 9 }, style: fillStyle(ACCENT), data: { item: item.label, category: item.focus, value: v, focus: true } }));
+      if (Number.isFinite(v)) nodes.push(ellipsePrimitive({ id: key("focus"), role: "chart-marker", frame: { x: x(i) - 4.5, y: y(v) - 4.5, width: 9, height: 9 }, style: fillStyle(subject), data: { item: item.label, category: item.focus, value: v, focus: true } }));
     }
   } else {
     nodes.push(axis);
@@ -317,7 +319,7 @@ function panelNodes({ id, layout, panel, highlighted, props }) {
       const frame = mark === "bar"
         ? { x: plot.x + Math.min(zero, end) * plot.width, y: plot.y + at, width: Math.max(1, Math.abs(end - zero) * plot.width), height: Math.max(2, size) }
         : { x: plot.x + at, y: plot.y + plot.height - Math.max(zero, end) * plot.height, width: Math.max(2, size), height: Math.max(1, Math.abs(end - zero) * plot.height) };
-      nodes.push(rectPrimitive({ id: key("mark", i), role: "chart-mark", frame, style: fillStyle(focus ? ACCENT : color), data: { item: item.label, category: categories[i], value: v, ...(focus ? { focus: true } : {}) } }));
+      nodes.push(rectPrimitive({ id: key("mark", i), role: "chart-mark", frame, style: fillStyle(focus ? subject : color), data: { item: item.label, category: categories[i], value: v, ...(focus ? { focus: true } : {}) } }));
       if (labelled || focus) {
         const text = formatValue(v, props);
         const box = mark === "bar"

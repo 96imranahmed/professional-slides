@@ -6,7 +6,7 @@
 // (chart-*.mjs, charts-extra.mjs) imports from here and charts.mjs registers
 // them all, so the chart modules form no import cycle - each one imports on
 // its own (evals/scripts/check_source_quality.mjs).
-import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, stableId, textPrimitive } from "./core.mjs";
+import { token, tokenValue, houseStyle, chartAnnotationStyle, linePrimitive, rectPrimitive, stableId, textPrimitive } from "./core.mjs";
 import { legendRowCount, legendNodes } from "./legends.mjs";
 import { STEP_LADDER, decade, stepCandidates, onLadder, wholeSteps } from "./nice-numbers.mjs";
 import { measureText } from "./text-layout.mjs";
@@ -33,16 +33,21 @@ export const SERIES = [
 ];
 
 /**
- * The one token the deck's declared subject is drawn in on every kind - a line, a bar or its highlight, a table row's
- * marker (conventions.mjs `subjectAccent`, `subjectRow`) - decided once per palette: the accent, where it reads at a mark's
- * 3:1 (palettes.mjs MARK_CONTRAST) against the comparator grey, else the primary everywhere. The accent cleared it on the
- * consulting, editorial and journal designs (4.2, 4.5, 4.3 to 1) and not on keynote (2.5), the graphite palette (1.7) or
- * the toolkit palette (2.0), where a subject in the accent would sit in its peers' grey.
+ * The token a subject is drawn in among its peers, decided once per palette: the accent, unless it sits too close to the
+ * peers' colour to pick out, then the primary, then the ink. Among the comparator grey (a declared subject, conventions'
+ * `subjectAccent`, `subjectRow`) it needs a mark's 3:1 (palettes.mjs MARK_CONTRAST): the accent cleared it on the consulting,
+ * editorial and journal designs (4.2, 4.5, 4.3 to 1) and not on keynote (2.5), the graphite palette (1.7) or the toolkit
+ * palette (2.0). Among the lead series (`"color.chartSeries1"`, the bars a highlighted bar stands among) it needs 1.5:1: the
+ * accent fails where the palette leads with it - midnight's blue and the BA deck's house blue once the ink went to the end of
+ * the series (palettes.mjs leadWithColour) - and on evergreen, whose green accent and green lead read at 1.1:1.
  */
-export function subjectToken() {
-  const accent = tokenValue("color.accent"), grey = tokenValue("color.chartComparator");
-  return /^#[0-9A-Fa-f]{6}$/.test(String(accent)) && /^#[0-9A-Fa-f]{6}$/.test(String(grey)) && contrastRatio(accent, grey) < MARK_CONTRAST ? "color.componentPrimary" : "color.accent";
+export function subjectToken(peers = "color.chartComparator") {
+  const least = peers === "color.chartComparator" ? MARK_CONTRAST : 1.5, against = tokenValue(peers), hex = (value) => /^#[0-9A-Fa-f]{6}$/.test(String(value));
+  const apart = (key) => !hex(tokenValue(key)) || !hex(against) || contrastRatio(tokenValue(key), against) >= least;
+  return ["color.accent", "color.componentPrimary"].find(apart) ?? "color.ink";
 }
+/** A highlighted mark among marks in the lead series colour. */
+export const highlightAmongSeries = () => token(subjectToken("color.chartSeries1"));
 
 export const MIN_PLOT_HEIGHT = 100;
 
@@ -352,6 +357,32 @@ export function axisTickText(min, max, index, steps = 4) {
 export function axisLabelWidth(bounds) {
   const steps = tickCount(bounds.min, bounds.max);
   return Math.max(48, ...Array.from({ length: steps + 1 }, (_, index) => Math.ceil(measureText(axisTickText(bounds.min, bounds.max, index, steps), 1000, { fontSize: tokenValue(AXIS_LABEL) }).width)));
+}
+
+/**
+ * Whether peers in one unit are of one magnitude, so one scale reads in each: every peer's largest value at least a tenth
+ * of the largest's. Under a tenth, the shared scale draws that peer's bars as slivers and the comparison it exists for
+ * cannot be read - the BA deck's connectivity panels set 4,866 points one pixel wide beside 1.9 million, and its punctuality
+ * page a 1.6% cancellation rate beside 77% on time - so each keeps its own scale, and its labels carry the numbers.
+ */
+export function oneMagnitude(valueSets) {
+  const tops = valueSets.map((values) => Math.max(0, ...values.filter(Number.isFinite).map(Math.abs)));
+  return Math.max(...tops) <= 10 * Math.min(...tops);
+}
+
+/**
+ * A "//" across the category axis after each break, `{ after, at }`: the category the axis breaks after and the position
+ * along the axis midway to the next one. The periods either side are not adjacent (FY10 beside FY20).
+ */
+export function categoryBreakNodes(id, plot, breaks, horizontal = false) {
+  const axisAt = horizontal ? plot.x : plot.y + plot.height;
+  return breaks.flatMap(({ after, at }) => [
+    rectPrimitive({ id: stableId(id, "category-break", after), role: "chart-break", frame: horizontal ? { x: axisAt - 6, y: at - 4, width: 12, height: 8 } : { x: at - 4, y: axisAt - 6, width: 8, height: 12 },
+      style: { fill: token("color.canvas"), stroke: "none", lineWidth: token("line.hairline") }, data: { after } }),
+    ...[[0, -3], [1, 3]].map(([k, offset]) => linePrimitive({ id: stableId(id, "category-break", after, k), role: "chart-break-mark",
+      ...(horizontal ? { x1: axisAt - 6, y1: at + offset + 3, x2: axisAt + 6, y2: at + offset - 3 } : { x1: at + offset - 3, y1: axisAt + 6, x2: at + offset + 3, y2: axisAt - 6 }),
+      style: lineStyle(INK, token("line.standard")), data: { after } }))
+  ]);
 }
 
 export function axes(id, plot, yMin, yMax, steps = 4, { gridlines = false, showValueAxis = true, labelWidth = 48, inverted = false } = {}) {

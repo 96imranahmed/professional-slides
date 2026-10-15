@@ -6,7 +6,7 @@ import { linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValu
 import { bridgeLabelProps, formatValue } from "./value-format.mjs";
 import { measureText, ENGINE_RESERVE } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, PRIMARY, CHART_LABEL, AXIS_LABEL, LABEL_BAND, chartFrame, labelBold, textStyle, lineStyle, fillStyle,
-  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend } from "./chart-axes.mjs";
+  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend, highlightAmongSeries } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, normalizedHighlights } from "./chart-decorations.mjs";
 
 // A bridge's steps narrower than this share of their top are drawn on a broken scale (see `broken` below).
@@ -236,7 +236,7 @@ export function waffleChart({ id, frame, props }) {
   const picked = highlightedCategory(props, categories, id);
   categories.forEach((category, index) => {
     const lit = picked !== null && String(category) === picked;
-    const dotFill = lit ? token("color.accent") : fill;
+    const dotFill = lit ? highlightAmongSeries() : fill;
     const x0 = plot.x + index * slot + (slot - blockWidth) / 2;
     // Under the heading, not centred in the plot: what the dots leave is one
     // band at the foot, which a column gives to the block under it
@@ -296,7 +296,7 @@ export function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
       const cx = L.plot.x + c * L.cellW + L.cellW / 2;
       const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
       const lit = picked !== null && String(row) === picked;
-      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? token("color.accent") : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
+      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? highlightAmongSeries() : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
       const inside = d >= 24;
       nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
     });
@@ -350,7 +350,7 @@ export function marimekko({ id, frame, props, tokens = TOKENS }) {
       const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
       const lit = picked !== null && String(category) === picked;
       pointMap.set(`${sr.name}:${category}`, { x: x + w / 2, y: y + h / 2 });
-      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? token("color.accent") : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
+      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? highlightAmongSeries() : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
       const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
       const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold() });
       if (h >= label.height + 4 && w >= label.width + 6) {
@@ -394,7 +394,7 @@ export function rangeChart({ id, frame, props: authored }) {
     const low = props.low[index], high = props.high[index];
     const y = plot.y + index * rowSpan + (rowSpan - barHeight) / 2;
     const x0 = xScale(low), x1 = Math.max(xScale(high), x0 + 2);
-    const fill = barHighlight ? (barHighlight.category === category ? token("color.accent") : SERIES[0]) : SERIES[0];
+    const fill = barHighlight ? (barHighlight.category === category ? highlightAmongSeries() : SERIES[0]) : SERIES[0];
     nodes.push(rectPrimitive({ id: stableId(id, "range", category), role: "chart-mark", frame: { x: x0, y, width: x1 - x0, height: barHeight }, style: fillStyle(fill), data: { category, low, high, highlighted: barHighlight?.category === category } }));
     nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, labelBold(), "right"), data: { category, end: "low" } }));
     nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category, end: "high" } }));

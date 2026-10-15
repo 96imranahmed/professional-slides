@@ -6,7 +6,7 @@
 import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle,
-  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./chart-axes.mjs";
+  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, highlightAmongSeries } from "./chart-axes.mjs";
 import { withDecorations, withReferenceValues } from "./chart-decorations.mjs";
 import { TOKENS } from "./core.mjs";
 import { measureAt } from "./draw.mjs";
@@ -130,7 +130,7 @@ function lollipopChart({ id, frame, props }) {
     pointMap.set(`${series[0].name}:${c}`, { x: xAt(v), y });
     categoryMap.set(c, { x: plot.x, y: y - rowHeight / 2, width: plot.width, height: rowHeight });
     const focus = highlighted(props, c);
-    const color = focus ? ACCENT : PRIMARY;
+    const color = focus ? highlightAmongSeries() : PRIMARY;
     nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right") }));
     nodes.push(linePrimitive({ id: stableId(id, "stem", c), role: "chart-line", x1: zero, y1: y, x2: xAt(v), y2: y, style: lineStyle(color, token("line.standard")), data: { category: c, value: v } }));
     nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c), role: "chart-mark", frame: { x: xAt(v) - 7, y: y - 7, width: 14, height: 14 }, style: fillStyle(color), data: { category: c, value: v, highlighted: focus } }));
@@ -397,7 +397,7 @@ function boxPlotChart({ id, frame, props }) {
   const nodes = [...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis: true, labelWidth })];
   categories.forEach((c, i) => {
     const b = boxes[i], cx = plot.x + slot * i + slot / 2, focus = highlighted(props, c);
-    const color = focus ? ACCENT : PRIMARY;
+    const color = focus ? highlightAmongSeries() : PRIMARY;
     nodes.push(linePrimitive({ id: stableId(id, "whisker", c), role: "chart-line", x1: cx, y1: yAt(b.max), x2: cx, y2: yAt(b.min), style: lineStyle(INK, token("line.hairline")), data: { category: c } }));
     for (const [k, v] of [["cap-max", b.max], ["cap-min", b.min]]) nodes.push(linePrimitive({ id: stableId(id, k, c), role: "chart-line", x1: cx - boxW / 4, y1: yAt(v), x2: cx + boxW / 4, y2: yAt(v), style: lineStyle(INK, token("line.hairline")) }));
     nodes.push(rectPrimitive({ id: stableId(id, "box", c), role: "chart-mark", frame: { x: cx - boxW / 2, y: yAt(b.q3), width: boxW, height: Math.max(1, yAt(b.q1) - yAt(b.q3)) }, style: fillStyle(color, token("color.surface")), data: { category: c, ...b } }));
@@ -495,7 +495,7 @@ function sparklinesChart({ id, frame, props }) {
     const xAt = (i) => inner.x + inner.width * i / (it.values.length - 1);
     const yAt = (v) => inner.y + inner.height - (v - bounds.min) / bounds.span * inner.height;
     const focus = highlighted(props, it.label);
-    const color = focus ? ACCENT : PRIMARY;
+    const color = focus ? highlightAmongSeries() : PRIMARY;
     nodes.push(textPrimitive({ id: stableId(id, "label", it.label), role: "category-label", frame: { x: cell.x + 8, y: cell.y + 6, width: cell.width - 16, height: 18 }, text: it.label, style: textStyle(AXIS_LABEL, INK, true, "left") }));
     nodes.push(linePrimitive({ id: stableId(id, "baseline", it.label), role: "chart-gridline", x1: inner.x, y1: inner.y + inner.height, x2: inner.x + inner.width, y2: inner.y + inner.height, style: lineStyle(GRID, token("line.hairline")) }));
     for (let i = 1; i < it.values.length; i++) nodes.push(linePrimitive({ id: stableId(id, "segment", it.label, i), role: "chart-line", x1: xAt(i - 1), y1: yAt(it.values[i - 1]), x2: xAt(i), y2: yAt(it.values[i]), style: lineStyle(color, token("line.standard")), data: { item: it.label } }));

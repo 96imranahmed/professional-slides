@@ -102,5 +102,25 @@ console.log('{}');
 """)
 
 
+class ComboGapTests(unittest.TestCase):
+    def test_a_combo_over_skipped_years_breaks_its_axis_and_its_line(self):
+        # A combo's slots stand one apart whatever the dates: the BA deck's capacity page drew 2019 beside 2023 and IAG's
+        # line straight across the three Covid years.
+        run_node(PRELUDE + """
+const props = { categories: ['2015', '2017', '2018', '2019', '2023', '2024', '2025'],
+  series: [{ name: 'BA', values: [174, 180, 185, 186, 168, 175, 178] }, { name: 'IAG', values: [273, 306, 325, 338, 323, 343, 351] }] };
+const nodes = render('chart.combo', props);
+assert.deepEqual(nodes.filter((n) => n.role === 'chart-break').map((n) => n.data.after), ['2015', '2019']);
+const segments = nodes.filter((n) => n.role === 'chart-line');
+assert.equal(segments.length, 4, 'no segment across 2016 or across 2020-22');
+const point = (c) => nodes.find((n) => n.role === 'chart-marker' && n.id.endsWith(c)).frame;
+assert.ok(!segments.some((n) => n.data.x1 <= point('2019').x + 5 && n.data.x2 >= point('2023').x), 'the line does not join 2019 to 2023');
+const even = render('chart.combo', { ...props, categories: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'] });
+assert.equal(even.filter((n) => n.role === 'chart-break').length, 0);
+assert.equal(even.filter((n) => n.role === 'chart-line').length, 6);
+console.log('{}');
+""")
+
+
 if __name__ == "__main__":
     unittest.main()

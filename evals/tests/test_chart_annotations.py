@@ -482,6 +482,23 @@ console.log(JSON.stringify({ style: [...new Set(nodes.filter((n) => n.data?.anno
         # takes the arrow only.
         self.assertEqual([result["open"], result["walled"], result["lineAxis"]], [["arrow"], ["bracket"], ["arrow"]])
 
+    def test_a_change_over_one_of_several_series_takes_its_colour(self):
+        # Two navy bubbles over the same years on the BA deck's capacity page said -4.3% and +4.0%, and neither said whose.
+        result = run_node("""
+import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
+const frame = { x: 40, y: 60, width: 760, height: 420 };
+const series = [{ name: 'BA', values: [174, 180, 185, 186] }, { name: 'IAG', values: [273, 306, 325, 338] }];
+const change = (name) => ({ start: { category: '2016', series: name }, end: { category: '2019', series: name }, text: '+6%' });
+const colours = (props) => REGISTRY.get('chart.combo').render({ id: 'c', frame, props: { categories: ['2016', '2017', '2018', '2019'], ...props } }).nodes
+  .filter((n) => n.role === 'annotation-surface').map((n) => n.style.fill.tokenId);
+const one = REGISTRY.get('chart.column').render({ id: 'c', frame, props: { categories: ['2016', '2017', '2018', '2019'], series: [series[0]], changeAnnotations: [{ ...change(undefined), start: { category: '2016' }, end: { category: '2019' } }] } }).nodes
+  .filter((n) => n.role === 'annotation-surface').map((n) => n.style.fill.tokenId);
+console.log(JSON.stringify({ line: colours({ series, changeAnnotations: [change('IAG')] }), bars: colours({ series, changeAnnotations: [change('BA')] }), one }));
+""")
+        self.assertEqual(result["line"], ["color.chartSeries2"])
+        self.assertEqual(result["bars"], ["color.chartSeries1"])
+        self.assertEqual(result["one"], ["color.componentPrimary"])  # one series: the bubble keeps the primary
+
     def test_a_change_arrow_through_another_annotations_label_is_refused(self):
         result = run_node("""
 import { sceneCollisions } from './skills/professional-slides/runtime/validate-overlap.mjs';

@@ -10,7 +10,7 @@
 import { defaultHighlightStyle } from "./core.mjs";
 import { measureCaption, proseMeasure, measureProse, measureInsight } from "./registry-text.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
-import { plotHeadroom, topBand, horizontalChart } from "./chart-axes.mjs";
+import { plotHeadroom, topBand, horizontalChart, oneMagnitude } from "./chart-axes.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { stepsLayout } from "./extras.mjs";
 import { factGridLayout } from "./figures.mjs";
@@ -158,19 +158,20 @@ function fitLineLabelsToPanels(exhibits, layout) {
 // retest's margin ranking (2.5% to 15.8%) took the -60 floor of the line
 // beside it, a 2020 Covid loss, and drew its ten bars in the last quarter of
 // their panel.
+// And only between panels of one magnitude (chart-axes.mjs oneMagnitude).
+// Stacks extend separately above and below zero: netting signed
+// segments or forcing zero as the minimum truncates real evidence.
+const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
+  ? (ex.categories || []).flatMap((_, i) => [
+    ex.series.reduce((sum, se) => sum + Math.min(0, se.values[i] || 0), 0),
+    ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
+  ])
+  : ex.series.flatMap(se => se.values);
 function shareValueScales(charts) {
   const byUnit = new Map();
   for (const ex of charts) { const key = `${ex.unit}|${horizontalChart(ex.type) ? "across" : "up"}`; byUnit.set(key, [...(byUnit.get(key) || []), ex]); }
   for (const group of byUnit.values()) {
-    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined)) continue;
-    // Stacks extend separately above and below zero: netting signed
-    // segments or forcing zero as the minimum truncates real evidence.
-    const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
-      ? (ex.categories || []).flatMap((_, i) => [
-        ex.series.reduce((sum, se) => sum + Math.min(0, se.values[i] || 0), 0),
-        ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
-      ])
-      : ex.series.flatMap(se => se.values);
+    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined) || !oneMagnitude(group.map(extent))) continue;
     // Every mark the scale has to hold, from every panel: reference lines and
     // targets too, each with the 15% the chart itself gives a line near the
     // top so its label has room (chart-decorations.mjs withReferenceValues).
@@ -190,7 +191,7 @@ function shareValueScales(charts) {
 // Compare horizontal peers in the shared editable scene coordinate system.
 function shareBarDomain(charts, { id, slide }) {
   const horizontalPeers = charts.filter(ex => horizontalChart(ex.type));
-  if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
+  if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit) && oneMagnitude(horizontalPeers.map(extent))) {
     // An unset minimum is the lowest bar of any peer, not zero: zero puts a
     // negative bar outside its own axis.
     const lowest = Math.min(0, ...horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)));

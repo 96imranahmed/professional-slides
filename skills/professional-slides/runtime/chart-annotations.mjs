@@ -1273,7 +1273,7 @@ function overlaps(a, b, padding = 6) {
   );
 }
 
-function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow") {
+function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow", color = RULE) {
   const directional = style === "arrow" || style === "construction" || style === "interval-label";
   return linePrimitive({
     id: stableId(id, "change", index, part),
@@ -1282,7 +1282,7 @@ function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow"
     y1,
     x2,
     y2,
-    style: { stroke: RULE, lineWidth: directional ? STANDARD : HAIRLINE, dash: "solid" },
+    style: { stroke: color, lineWidth: directional ? STANDARD : HAIRLINE, dash: "solid" },
     data: {
       endArrow,
       ...(endArrow ? { endArrowType: "triangle" } : {}),
@@ -1293,13 +1293,13 @@ function line(id, index, part, x1, y1, x2, y2, endArrow = false, style = "arrow"
   });
 }
 
-function labelNodes(id, index, frame, text, style) {
+function labelNodes(id, index, frame, text, style, color = PRIMARY) {
   return [
     ellipsePrimitive({
       id: stableId(id, "change-label-surface", index),
       role: "annotation-surface",
       frame,
-      style: { fill: PRIMARY, stroke: PRIMARY, lineWidth: HAIRLINE, opacity: 1 },
+      style: { fill: color, stroke: color, lineWidth: HAIRLINE, opacity: 1 },
       data: { annotationStyle: style, annotationKey: `${id}:${index}:${style}` }
     }),
     textPrimitive({
@@ -1307,7 +1307,7 @@ function labelNodes(id, index, frame, text, style) {
       role: "annotation-text",
       frame: { x: frame.x + 10, y: frame.y + 4, width: frame.width - 20, height: frame.height - 8 },
       text,
-      style: textStyle(ANNOTATION, ON_PRIMARY, true),
+      style: textStyle(ANNOTATION, color === PRIMARY ? ON_PRIMARY : onFill(color), true),
       data: { annotationStyle: style, annotationKey: `${id}:${index}:${style}` }
     })
   ];
@@ -1377,8 +1377,19 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
   // The band the chart frame already held back above the plot for these
   // annotations; an arrow may climb into it rather than overlap the marks.
   const changeBand = chartAnnotationBands(props).top;
+  // On a chart of several series, a change over one series is drawn in that series' colour, as the legend keys it: the BA
+  // deck's capacity page set BA's -4.3% and IAG's +4.0% as two navy bubbles over the same years, and neither said whose.
+  const swatches = obstacles.filter((node) => node.role === "legend-swatch" && node.data?.categoryKey !== undefined);
+  const seriesColor = (annotation) => {
+    const name = annotation.start?.series;
+    if (!name || name !== annotation.end?.series || swatches.length < 2) return undefined;
+    const swatch = swatches.find((node) => String(node.data.categoryKey) === String(name));
+    const fill = swatch?.style?.fill;
+    return fill && fill !== "none" ? fill : swatch?.style?.stroke;
+  };
 
   annotations.forEach((annotation, index) => {
+    const color = seriesColor(annotation);
     const start = resolveAnchor(pointMap, annotation.start, id);
     const end = resolveAnchor(pointMap, annotation.end, id);
     if (Math.hypot(end.x - start.x, end.y - start.y) < 20) throw new Error(`${id} change annotation endpoints are too close to show clearly; annotate a longer interval or print the change as a data label`);
@@ -1409,8 +1420,8 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       // Clear the end mark and its value label, then a short leader and the bubble.
       const x0 = end.x + 44, x1 = x0 + 14;
       const frame = { x: x1, y: y - measured.height / 2, width: measured.width, height: measured.height };
-      nodes.push(line(id, index, "leader", x0, y, x1, y, false, annotation.style));
-      labels.push({ frame, annotation, index });
+      nodes.push(line(id, index, "leader", x0, y, x1, y, false, annotation.style, color));
+      labels.push({ frame, annotation, index, color });
       return;
     }
     // An arrow between two marks too close for its bubble becomes a bracket
@@ -1442,9 +1453,9 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       const frame = labelFrame(annotation.text, midpoint.x, midpoint.y, plot);
       const gap = Math.abs(ux) * frame.width / 2 + Math.abs(uy) * frame.height / 2 + 5;
-      nodes.push(line(id, index, "arrow-start", start.x, start.y, midpoint.x - ux * gap, midpoint.y - uy * gap, false, annotation.style));
-      nodes.push(line(id, index, "arrow-end", midpoint.x + ux * gap, midpoint.y + uy * gap, end.x, end.y, true, annotation.style));
-      labels.push({ frame, annotation, index });
+      nodes.push(line(id, index, "arrow-start", start.x, start.y, midpoint.x - ux * gap, midpoint.y - uy * gap, false, annotation.style, color));
+      nodes.push(line(id, index, "arrow-end", midpoint.x + ux * gap, midpoint.y + uy * gap, end.x, end.y, true, annotation.style, color));
+      labels.push({ frame, annotation, index, color });
       return;
     }
 
@@ -1458,11 +1469,11 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
     const compact = annotation.compact === true;
     const bracketY = evidenceBand ? plot.y - evidenceBand - (compact ? 18 : 34) : Math.max(plot.y - (compact ? 18 : 34), intervalTop - (compact ? 18 : 34));
     const frame = compact ? compactLabelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 10, plot) : labelFrame(annotation.text, (leftX + rightX) / 2, bracketY - 24, plot);
-    nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, style));
-    nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, style));
-    nodes.push(line(id, index, "end-drop", end.x, bracketY, end.x, end.y, style === "construction", style));
+    nodes.push(line(id, index, "span", leftX, bracketY, rightX, bracketY, false, style, color));
+    nodes.push(line(id, index, "start-drop", start.x, bracketY, start.x, start.y, false, style, color));
+    nodes.push(line(id, index, "end-drop", end.x, bracketY, end.x, end.y, style === "construction", style, color));
     // A bracket's label may slide along its own span to clear a neighbour's.
-    labels.push({ frame, annotation: style === annotation.style ? annotation : { ...annotation, style }, index, span: [leftX, rightX] });
+    labels.push({ frame, annotation: style === annotation.style ? annotation : { ...annotation, style }, index, span: [leftX, rightX], color });
   });
 
   // Neighbouring brackets whose labels meet slide them apart along their own
@@ -1484,10 +1495,10 @@ export function renderChangeAnnotations({ id, plot, props, pointMap, obstacles =
       if (overlaps(labels[index].frame, labels[peer].frame)) throw new Error("Chart change annotation labels overlap even after sliding along their brackets (overlapping intervals cannot share the band); widen the exhibit, shorten the labels, or annotate intervals that do not overlap");
     }
   }
-  labels.forEach(({ frame, annotation, index, measured, data }) => {
+  labels.forEach(({ frame, annotation, index, measured, data, color }) => {
     if (annotation.style === "interval-label") nodes.push(textPrimitive({id:stableId(id,"change-label",index),role:"annotation-text",frame,text:measured.text,style:textStyle(ANNOTATION,INK),data:{...data,textLayout:{lines:measured.lines,lineHeight:measured.lineHeight}}}));
     else if (annotation.compact === true) nodes.push(textPrimitive({ id: stableId(id, "change-label", index), role: "annotation-text", frame, text: annotation.text, style: textStyle(ANNOTATION, INK, true), data: { annotationStyle: annotation.style, annotationKey: `${id}:${index}:${annotation.style}`, compact: true } }));
-    else nodes.push(...labelNodes(id, index, frame, annotation.text, annotation.style));
+    else nodes.push(...labelNodes(id, index, frame, annotation.text, annotation.style, color));
   });
   return nodes;
 }

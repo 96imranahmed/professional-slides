@@ -916,10 +916,10 @@ class Emitter:
                 labels.insert(0, label)
 
     def _bar_point_fills(self, ser, spec: dict, color):
-        """The highlighted bar in the accent, the forecast lightened, and a
-        two-bar contrast painted as the scene painted it."""
+        """The highlighted bar in the token the scene drew it in, the forecast
+        lightened, and a two-bar contrast painted as the scene painted it."""
         kind = spec["type"]
-        accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
+        accent = self.colors.get(spec.get("highlightToken") or "color.accent") or self.colors.get("color.componentPrimary")
         forecast = self.colors.get("color.chartSeries6")
         highlight_indices = set(spec.get("highlightIndices") or [])
         forecast_index = spec.get("forecastIndex", -1)
@@ -953,7 +953,7 @@ class Emitter:
 
     def _range_labels(self, ser, spec: dict):
         """A floating band's low and high, inside its end."""
-        accent = self.colors.get("color.accent") or self.colors.get("color.componentPrimary")
+        accent = self.colors.get(spec.get("highlightToken") or "color.accent") or self.colors.get("color.componentPrimary")
         highlight_indices = set(spec.get("highlightIndices") or [])
         lows, highs = spec.get("low") or [], spec.get("high") or []
         for j, pt in enumerate(ser.points):

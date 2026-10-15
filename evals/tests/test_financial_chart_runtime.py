@@ -515,10 +515,14 @@ for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['cha
   }
   assert.ok(contrastRatio(swatches[0].style.fill.value,swatches[1].style.fill.value)>=3);
 }
-for(const categories of [['A','B'],['B','A']]) {
-  const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]}).filter(n=>n.role==='chart-mark');
-  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.accent');
-  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartSeries1');
+// A highlighted bar stands apart from the lead series it sits among: midnight leads with its accent, so the subject takes the
+// primary; evergreen's green accent sits at 1.1:1 on its green lead, so the subject takes the primary or the ink.
+for(const palette of ['midnight','evergreen','crimson']) for(const categories of [['A','B'],['B','A']]) {
+  const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]},palette).filter(n=>n.role==='chart-mark');
+  const lit=marks.find(n=>n.data.category==='B'),peer=marks.find(n=>n.data.category==='A');
+  assert.equal(peer.style.fill.tokenId,'color.chartSeries1');
+  assert.equal(lit.style.fill.tokenId,{midnight:'color.componentPrimary',evergreen:'color.ink',crimson:'color.accent'}[palette],palette);
+  assert.ok(contrastRatio(lit.style.fill.value,peer.style.fill.value)>=1.5,palette);
 }
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);

@@ -272,7 +272,9 @@ async function readBackAndRender({ render, spec, directory, py, result, deck, sc
       result.renderSkipped = result.render?.message ?? "The deck was not rendered: the renderer is not installed.";
     } else {
       // Every text the scene drew, found on its rendered page.
-      result.textCoverage = auditExportText(deriveContent(spec, deck), deck, await readReport(result.render.pageText));
+      // A check of named pages (author-deck --check --page, keepPages) renders those alone, so only their text is looked for.
+      const content = deriveContent(spec, deck), kept = result.partial ? new Set(result.partial.map(String)) : null;
+      result.textCoverage = auditExportText(kept ? { ...content, pages: content.pages.filter((page) => kept.has(String(page.id))) } : content, deck, await readReport(result.render.pageText));
       await writeJson(path.join(directory, "rendered-text-coverage.json"), result.textCoverage);
       result.renderDirectory = renderDirectory;
       // The page gates and the contact sheets each read the renders and nothing else, so they run together.
