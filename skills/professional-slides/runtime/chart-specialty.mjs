@@ -113,6 +113,9 @@ function horizontalWaterfall({ id, frame, props }) {
     const value = props[key];
     if (Array.isArray(value) ? value.length : value) throw new Error(`${id}: a horizontal bridge takes its notes in the page's commentary - \`${key}\` is drawn on the vertical bridge; drop it or the orientation`);
   }
+  // Each step's value is printed at its bar, so the horizontal bridge draws no scale: a scale asked of it is refused, not dropped.
+  assertGridlineOption(props);
+  if (props.gridlines === true || props.showValueAxis === true) throw new Error(`${id}: a horizontal bridge prints each step's value at its bar and draws no value axis or gridlines - drop \`${props.gridlines === true ? "gridlines" : "showValueAxis"}\`, or draw the vertical bridge`);
   const running = [];
   let total = 0;
   props.values.forEach((value, index) => { total = props.totals?.includes(index) ? value : total + value; running.push(total); });

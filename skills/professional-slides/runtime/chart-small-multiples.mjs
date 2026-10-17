@@ -98,6 +98,7 @@ function normalized(props = {}) {
     if (item.series !== undefined) throw new Error(`panel "${item.label}" carries \`series\`, which only a stacked mark draws; a ${mark} panel carries its \`values\``);
     if (!Array.isArray(item.values) || item.values.length !== categories.length || item.values.some((v) => v !== null && !Number.isFinite(v)))
       throw new Error(`panel "${item.label}" carries one value a ${donut ? "part" : "category"} (${categories.length})${mark === "line" ? ", null for a gap" : ""}`);
+    if (item.values.every((v) => v === null)) throw new Error(`panel "${item.label}" is gaps alone, with no value to draw, scale or average; give it its values or leave the panel out`);
     if (mark !== "line" && item.values.some((v) => v === null)) throw new Error(`panel "${item.label}" leaves a ${donut ? "part" : mark} empty; a missing value is 0${donut ? "" : ", or the panel draws a line"}`);
     if (donut && (item.values.some((v) => v < 0) || item.values.filter((v) => v > 0).length < 2)) throw new Error(`panel "${item.label}" shares out a whole: every part 0 or more, and two or more above 0`);
     if (item.focus !== undefined && !categories.includes(String(item.focus))) throw new Error(`panel "${item.label}" focuses "${item.focus}", which is not a category`);
@@ -128,12 +129,15 @@ function normalized(props = {}) {
   if ((rowLabels === undefined) !== (columnLabels === undefined)) throw new Error("a grid read both ways names its rows and its columns: rowLabels and columnLabels together");
   if (rowLabels && (!Array.isArray(rowLabels) || !Array.isArray(columnLabels) || rowLabels.length * columnLabels.length !== items.length))
     throw new Error(`rowLabels and columnLabels head a grid of ${rowLabels?.length ?? 0} by ${columnLabels?.length ?? 0}; the items fill it in reading order, so there are ${(rowLabels?.length ?? 0) * (columnLabels?.length ?? 0)} of them (this has ${items.length})`);
+  const columns = props.columns;
+  if (columns !== undefined && (!Number.isInteger(columns) || columns < 1 || columns > items.length))
+    throw new Error(`columns is the panels a row holds, a whole number from 1 to the ${items.length} panels; leave it out and the trellis sets the count its mark reads best in`);
   // A 100% stack is drawn from its shares: each category's parts shared out of their total.
   const drawn = percent ? items.map((item) => {
     const shares = categories.map((_, i) => sharesOfWhole(item.series.map((part) => part.values[i])));
     return { ...item, series: item.series.map((part, k) => ({ ...part, values: categories.map((_, i) => shares[i][k]) })) };
   }) : items;
-  return { mark, stacked, donut, rank, categories, items: drawn, parts, percent, centre, reference, scale, rowLabels: rowLabels?.map(String), columnLabels: columnLabels?.map(String) };
+  return { mark, stacked, donut, rank, categories, items: drawn, parts, percent, centre, reference, scale, columns, rowLabels: rowLabels?.map(String), columnLabels: columnLabels?.map(String) };
 }
 
 /** A panel's values on its scale: a stack's totals, category by category, or the values themselves. */
@@ -164,7 +168,7 @@ export function smallMultiplesLayout(frameIn, props = {}) {
   // Measured at a width alone, the trellis is as tall as its rows need at the shape its mark reads best in, and no shorter.
   const measuring = !Number.isFinite(frameIn.height);
   const guess = { ...frameIn, height: Math.round(frameIn.width * 0.45) };
-  const columns = columnLabels ? columnLabels.length : columnsFor(items.length, measuring ? guess : frameIn, mark, props.columns);
+  const columns = columnLabels ? columnLabels.length : columnsFor(items.length, measuring ? guess : frameIn, mark, spec.columns);
   const rows = Math.ceil(items.length / columns);
   const least = across ? categories.length * 10 + TITLE + 24 : donut ? DONUT_LEAST + TITLE + 24 : 96;
   const frame = measuring ? { ...frameIn, height: legend + (columnLabels ? HEADER : 0) + (across || donut ? 0 : AXIS) + rows * Math.max(least, ((frameIn.width - (columns - 1) * GAP_X) / columns) / aspectOf(mark)) + (rows - 1) * GAP_Y } : frameIn;
@@ -240,7 +244,7 @@ function donutNodes({ layout, panel, key, props, highlighted }) {
   const circle = { x: plot.x + (plot.width - size) / 2, y: plot.y + (plot.height - size) / 2, width: size, height: size };
   const cx = circle.x + size / 2, cy = circle.y + size / 2;
   const total = item.values.reduce((sum, v) => sum + v, 0);
-  const share = (v) => { const pct = Math.round((100 * v) / total); return pct ? `${pct}%` : "<1%"; };
+  const share = (v) => { const pct = Math.round((100 * v) / total); return pct || !v ? `${pct}%` : "<1%"; };
   // The ring is the outer quarter of the circle each side: the hole is the pie module's, 46% across.
   const hole = size * 0.46, ring = (size - hole) / 2, middle = hole / 2 + ring / 2;
   let angle = -90;

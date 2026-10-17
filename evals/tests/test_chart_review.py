@@ -281,12 +281,55 @@ class ExhibitKeyTests(unittest.TestCase):
         self.assertIn("`exhibit.peers` is no field of chart.line", out)
         self.assertNotIn("$why", out)
 
+    def test_a_labelled_rows_block_exhibit_is_read_for_unread_keys_too(self):
+        tmp = Path(tempfile.mkdtemp(prefix="unread-block-keys-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        examples = ROOT / "skills" / "professional-slides" / "examples"
+        shutil.copytree(examples / "assets", tmp / "assets")
+        doc = json.loads((examples / "page-types.pages.json").read_text())
+        doc["pages"] = [page for page in doc["pages"] if page["id"] == "p24b"]
+        doc.pop("appendix", None)
+        doc["pages"][0]["blocks"][0]["exhibit"]["typoOption"] = True
+        (tmp / "b.pages.json").write_text(json.dumps(doc))
+        run = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(tmp / "b.pages.json"), "--check"], capture_output=True, text=True)
+        out = run.stdout + run.stderr
+        self.assertEqual(run.returncode, 2)
+        self.assertIn("`blocks[0].exhibit.typoOption` is no field of chart.column", out)
+
     def test_a_table_column_can_set_its_rates_in_a_bubble(self):
         # A growth rate or a margin beside counts reads as one: the worked lookup table sets its CAGR column as pills.
         doc = json.loads((ROOT / "skills" / "professional-slides" / "examples" / "page-forms.pages.json").read_text())
         table = next(page for page in doc["pages"] if page["id"] == "f-lookup-table")
         self.assertIn({"label": "Growth FY23-FY26", "bubble": True}, table["exhibit"]["columns"])
         self.assertIn("bubble", (ROOT / "skills" / "professional-slides" / "references" / "drawing.md").read_text())
+
+
+class ReviewRefusalTests(unittest.TestCase):
+    def test_a_trellis_takes_a_whole_column_count_prints_a_zero_share_as_zero_and_refuses_a_panel_of_gaps(self):
+        result = run_node(PRELUDE + """
+const two = [{ label: 'A', values: [1, 2] }, { label: 'B', values: [2, 3] }];
+const columns = [0, 1.5, '2', 3].map((n) => refusal(() => draw('chart.small-multiples', { mark: 'column', columns: n, categories: ['a', 'b'], items: two })));
+const gaps = refusal(() => draw('chart.small-multiples', { mark: 'line', reference: 'average', categories: ['a', 'b', 'c'], items: [{ label: 'A', values: [1, 2, 3] }, { label: 'B', values: [null, null, null] }] }));
+const donut = draw('chart.small-multiples', { mark: 'donut', centre: 'X', categories: ['X', 'Y', 'Z'], items: [{ label: 'A', values: [0, 3, 4] }, { label: 'B', values: [0.2, 50, 49.8] }] }, { x: 60, y: 160, width: 1160, height: 480 });
+const centres = donut.filter((n) => n.role === 'chart-centre-value').map((n) => n.text);
+console.log(JSON.stringify({ columns, two: draw('chart.small-multiples', { mark: 'column', columns: 2, categories: ['a', 'b'], items: two }).length > 0, gaps, centres }));
+""")
+        self.assertTrue(all(message and "a whole number from 1 to the 2 panels" in message for message in result["columns"]))
+        self.assertTrue(result["two"])
+        self.assertIn("gaps alone", result["gaps"])
+        self.assertEqual(result["centres"], ["0%", "<1%"])
+
+    def test_a_horizontal_bridge_refuses_the_scale_it_does_not_draw(self):
+        result = run_node(PRELUDE + """
+const props = { orientation: 'horizontal', categories: ['FY24', 'Price', 'Volume', 'FY25'], values: [100, 12, -5, 107], totals: [0, 3] };
+console.log(JSON.stringify({ plain: draw('chart.waterfall', props).length > 0, without: draw('chart.waterfall', { ...props, gridlines: false, showValueAxis: false }).length > 0,
+  gridlines: refusal(() => draw('chart.waterfall', { ...props, gridlines: true })), axis: refusal(() => draw('chart.waterfall', { ...props, showValueAxis: true })), typed: refusal(() => draw('chart.waterfall', { ...props, gridlines: 'yes' })) }));
+""")
+        self.assertTrue(result["plain"])
+        self.assertTrue(result["without"])
+        self.assertIn("draws no value axis or gridlines - drop `gridlines`", result["gridlines"])
+        self.assertIn("drop `showValueAxis`", result["axis"])
+        self.assertIn("gridlines must be true or false", result["typed"])
 
 
 class CapsuleTests(unittest.TestCase):

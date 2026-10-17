@@ -294,7 +294,9 @@ function unreadExhibitKeys(doc) {
   for (const page of [...(doc.pages || []), ...(doc.appendix || [])]) {
     if (!page || typeof page !== "object" || !PAGE_TYPES[page.type]) continue;
     const form = page.form ?? Object.keys(PAGE_TYPES[page.type].forms)[0];
-    const exhibits = [...(page.exhibit ? [[page.exhibit, "exhibit"]] : []), ...(page.exhibits || []).map((ex, i) => [ex, `exhibits[${i}]`])];
+    // A labelled-rows block's exhibit names its own type, as one of `exhibits` does.
+    const exhibits = [...(page.exhibit ? [[page.exhibit, "exhibit"]] : []), ...(page.exhibits || []).map((ex, i) => [ex, `exhibits[${i}]`]),
+      ...(Array.isArray(page.blocks) ? page.blocks : []).map((block, i) => [block?.exhibit, `blocks[${i}].exhibit`]).filter(([ex]) => ex)];
     for (const [exhibit, where] of exhibits) {
       const typed = where !== "exhibit" || exhibit?.type !== undefined;
       for (const { key, kind } of unreadKeys(exhibit, typed ? { kind: exhibit?.type } : { type: page.type, form })) {
