@@ -55,7 +55,7 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 
 ## Mark what matters
 
-- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about; `focusSeries` the line or the slope's line. The subject takes one colour on every chart, resolved per palette so it stands apart from its peers: other bars keep the series colour - or a calmer one where the palette's lead colour would outshout the subject - and other lines and points go grey.
+- **Highlight the subject.** `highlights: [{ category }]` lights the bar or point the page is about; `focusSeries` the line or the slope's line. The subject takes the palette's accent - the contrasting colour strong decks draw it in - on every chart; its peers keep the series colour where the subject stands out from it, and otherwise go to a neutral grey, lighter or darker than the subject so it is found without seeing hue. Other lines and points go grey.
 - **Put the number on the chart** where it carries the claim: a growth rate (`cagr`), a change bracketed (`changeAnnotations`), a target line (`referenceLines`), a band (`bands`). A sentence callout (`annotations`) explains a mechanism at a mark; a chart holds three.
 - **Treat a table's columns by what they hold.** A column of one kind of figure the rows are compared on - a CAGR, a margin, a growth rate - sits in matching bubbles (`columns[].bubble: true`); a column of amounts takes bars in its cells (`bar: true`); a grid of scores takes heat (`heat`); a closing "what it means" column is `implication: true`. `--schema lookup/table` lists every column treatment.
 - **Colour means something.** Status red, amber and green mark a state or a verdict - on track, behind, met, missed - in a pill, a light, a check or a cross. Never colour a chart series, a player or a surface by status. A delta and a trend arrow are coloured by whether the move is good news: set `better: "down"` for a cost, churn or a wait.
@@ -76,7 +76,9 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 | `so-what-bar` | one implication in a filled bar under the exhibit (`bar`) |
 | `none` | the exhibit carries the page (types that hold one; `--types` lists each type's placements) |
 
-A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines at most). Most pages do not need one: the title carries the message.
+**The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance two or three mechanisms the chart cannot show.
+
+A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines at most). Most pages do not need one: the title carries the message. A filled bar under the exhibit (`so-what-bar`) is rarer still - one strong page in ten - and belongs to the page whose implication its title cannot hold, such as the deck's last.
 
 ## What a page holds
 

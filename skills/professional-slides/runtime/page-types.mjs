@@ -71,7 +71,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { line: CHART("line"), column: CHART("column"), "stacked-column": CHART("stacked-column"), area: CHART("area"),
       "stacked-area": CHART("stacked-area"), combo: CHART("combo"), slope: CHART("slope"), indexed: CHART("line"),
       sparklines: CHART("sparklines"), model: "model-page" },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   ranking: {
     task: "where the members of a set stand on one measure",
@@ -81,7 +81,7 @@ export const PAGE_TYPES = Object.freeze({
     // football field, a target's band by line - where the middle half is not known.
     forms: { bar: CHART("bar"), column: CHART("column"), lollipop: CHART("lollipop"), dumbbell: CHART("dumbbell"), bullet: CHART("bullet"),
       distribution: CHART("bar"), "aligned-bars": "aligned-bars", boxplot: CHART("boxplot"), range: CHART("range") },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   composition: {
     task: "what a whole is made of, and how the mix differs between members or periods",
@@ -91,17 +91,17 @@ export const PAGE_TYPES = Object.freeze({
     // whole, as arcs round one centre.
     forms: { "stacked-bar": CHART("stacked-bar"), "stacked-column": CHART("stacked-column"), marimekko: CHART("marimekko"),
       waffle: CHART("waffle"), donut: CHART("donut"), treemap: CHART("treemap"), pie: CHART("pie"), pictogram: "pictogram", "radial-bars": "radial-bars" },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   relationship: {
     task: "how two measures move together across the members",
     forms: { scatter: CHART("scatter"), bubble: CHART("bubble"), "bubble-grid": CHART("bubble-grid") },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   bridge: {
     task: "what a change between two totals is made of",
     forms: { waterfall: CHART("waterfall") },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   panels: {
     task: "one question answered for two to four cuts, measures or members side by side - or up to twelve as small multiples",
@@ -141,7 +141,7 @@ export const PAGE_TYPES = Object.freeze({
     forms: { ...Object.fromEntries(["flow", "tree", "cycle", "steps", "framework", "layers", "relationship-network", "funnel",
       "sankey", "quadrants", "matrix", "spectrum", "process", "chevron-process", "zone-matrix", "rank-flow", "organization", "placement", "venn"].map((f) => [f, f])),
       "insight-tree": "insight-tree-table" },
-    commentary: [...ANY_TEXT, "on-exhibit", "none"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT, "none"], exhibits: 1,
   },
   schedule: {
     task: "what happens when: phases, milestones, workstreams",
@@ -179,7 +179,7 @@ export const PAGE_TYPES = Object.freeze({
   place: {
     task: "where things are: a network, a footprint, a regional pattern",
     forms: { map: "map" },
-    commentary: [...ANY_TEXT, "on-exhibit"], exhibits: 1,
+    commentary: ["on-exhibit", ...ANY_TEXT], exhibits: 1,
   },
   picture: {
     task: "what the subject looks like: an aircraft, a site, a product",
@@ -718,6 +718,15 @@ function defaultCommentary(page) {
   const allowed = placementsOf(page.type, page.form);
   const exhibits = exhibitsOf(page);
   const said = (text) => typeof text === "string" && text.trim();
+  // Points beside a chart or a table are a column the page asks for, not the default: strong decks set one beside under a
+  // fifth of their chart and table pages, and carry the point the title rests on on the exhibit itself; the skill had set
+  // a column on three of four. A page that writes points over such an exhibit chooses where they go.
+  const kinds = exhibits.length ? exhibits.map((ex) => String(ex.type ?? PAGE_TYPES[page.type]?.forms?.[page.form] ?? "")) : [String(PAGE_TYPES[page.type]?.forms?.[page.form] ?? "")];
+  const data = kinds.some((kind) => kind.startsWith("chart.") || kind === "table");
+  if (data && allowed.includes("beside") && ((page.points || []).length || (page.paragraphs || []).length)) {
+    const table = kinds.every((kind) => kind === "table");
+    throw Object.assign(new Error(`${page.id ?? "page"}: the page writes \`points\` over a ${table ? "table" : "chart"} without saying where they go. Most strong pages carry the point on the exhibit itself: ${table ? "set it in the table (an implication column, `commentary: \"in-exhibit\"`)" : "set the one the title rests on as a callout (`annotations: [{ category, text }]`, a change mark or a labelled reference line) with `commentary: \"on-exhibit\"`"} and drop the points; or ask for the column - \`commentary: "beside"\` - or the band under the exhibit - \`commentary: "below"\``), { code: "COMMENTARY_UNCHOSEN" });
+  }
   const asked = [
     ...((page.points || []).length || (page.paragraphs || []).length ? ["beside", "below"] : []),
     ...(said(page.rail) ? ["rail"] : []),
@@ -1298,7 +1307,7 @@ export function railCapacity() {
 /** The catalogue as the author reads it. */
 export function describeTypes() {
   const lines = ["# Page types", "",
-    "Every analytical page is one of these. `type` is required; `form` defaults to the type's first, and `commentary` to the placement the page's own text asks for (points beside, a `rail`, a `bar`, a caption on every panel, callouts on the chart), else none.", "",
+    "Every analytical page is one of these. `type` is required; `form` defaults to the type's first, and `commentary` to the placement the page's own text asks for (a `rail`, a `bar`, a caption on every panel, callouts on the chart), else none. Points over a chart or a table go where the page says (`beside`, `below`), and most pages carry the point on the exhibit instead: a callout on the chart, an implication column in the table.", "",
     "`commentary` - where the explanation lives:", ...Object.entries(COMMENTARY).map(([k, v]) => `- \`${k}\`: ${v}`), "",
     `\`takeaway\` - optional: the closing sentence, ${TEXT_LIMITS.takeawayLines} lines; absent, the page closes on its exhibit.`, "",
     "`bar` - with commentary `so-what-bar`, the implication in a filled bar across the foot of the exhibit, two lines at most.", "",

@@ -60,8 +60,9 @@ const palettes = [...Object.keys(PALETTES).filter((p) => p !== 'toolkit'), ...Ob
 const weak = [];
 for (const palette of palettes) for (const ground of ['light', 'dark']) {
   const t = groundTokens(resolvePalette(palette, TOKENS, THEME_SLOT_TOKENS).tokens, ground, THEME_SLOT_TOKENS), v = (k) => t[k].value;
-  const lead = contrastRatio(v('color.chartSubject'), v('color.chartSeries1')), grey = contrastRatio(v('color.chartSubject'), v('color.chartComparator'));
-  if (lead < 1.5 || grey < 3) weak.push(`${palette.id ?? palette} ${ground}: ${lead.toFixed(2)} / ${grey.toFixed(2)}`);
+  // Its data peers take the peer colour (palettes.mjs peerOf), its context peers the comparator grey.
+  const peer = contrastRatio(v('color.chartSubject'), v('color.chartPeer')), grey = contrastRatio(v('color.chartSubject'), v('color.chartComparator'));
+  if (peer < 1.5 || grey < 3) weak.push(`${palette.id ?? palette} ${ground}: ${peer.toFixed(2)} / ${grey.toFixed(2)}`);
 }
 console.log(JSON.stringify({ weak }));
 """)

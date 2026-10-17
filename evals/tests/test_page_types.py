@@ -50,7 +50,7 @@ console.log(JSON.stringify({{
   layout: ok.layout, type: ok.exhibit.type, pageType: ok.pageType.type, close: ok.soWhat ?? null,
   sideLayout: side.layout, sideClose: side.soWhat, arrange: panels.arrange,
   defaults: (({{ pageType }}) => [pageType.form, pageType.commentary])(compilePage({{ ...base, form: undefined, commentary: undefined }})),
-  pointsDefault: compilePage({{ ...base, commentary: undefined, points: ['One', 'Two'] }}).pageType.commentary,
+  pointsDefault: error({{ ...base, commentary: undefined, points: ['One', 'Two'] }}),
   noCommentary: error({{ ...base, commentary: undefined }}), noTakeaway: error({{ ...base, takeaway: undefined }}),
   noForm: error({{ ...base, form: 'pie' }}), layoutWritten: error({{ ...base, layout: 'exhibit-top' }}),
   pointsOnExhibit: compilePage({{ ...base, points: ['x'] }}).pageType.advisories, bare: error({{ ...base, exhibit: {{ ...base.exhibit, annotations: [] }} }}),
@@ -68,7 +68,8 @@ console.log(JSON.stringify({{
         self.assertEqual(result['arrange'], 'row')
         # A form defaults to the type's first, commentary to what the page's own text asks for.
         self.assertEqual(result['defaults'], ['line', 'on-exhibit'])
-        self.assertEqual(result['pointsDefault'], 'beside')
+        # Points over a chart are a column the page asks for, not the default (strong decks set one under one page in five).
+        self.assertIn('without saying where they go', result['pointsDefault'])
         self.assertIsNone(result['noCommentary'])
         self.assertIn('`form` is one of', result['noForm'])
         self.assertIsNone(result['noTakeaway'])  # takeaway is optional: absent, the page closes on its exhibit

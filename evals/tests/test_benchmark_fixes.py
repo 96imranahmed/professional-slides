@@ -62,6 +62,22 @@ console.log(JSON.stringify({ plain: roles({ text: 'One narrow workflow' }), icon
         self.assertNotIn("The period, population and unit go in the `subtitle`", guide)
 
 
+class CommentaryTests(unittest.TestCase):
+    def test_points_over_a_chart_are_placed_by_the_page_and_the_point_goes_on_the_chart(self):
+        # Strong decks set a column beside under one chart or table page in five and annotate four chart pages in five; the
+        # skill had set one on three of four, by default.
+        result = run_node(PRELUDE + """
+import { compileDeck } from './skills/professional-slides/runtime/author-deck.mjs';
+const page = (more) => ({ id: 'p1', type: 'ranking', form: 'bar', title: 'Sol scored 90 of 100, 13 points ahead of Opus', takeaway: false,
+  exhibit: { heading: 'Audit score', unit: 'points', categories: ['Sol', 'Opus'], series: [{ name: 'Score', values: [90, 77] }] }, ...more });
+const doc = (more) => ({ deck: { schema: 'professional-slides.deck/v3', id: 't', cover: { title: 'T' } }, pages: [page(more)] });
+const failed = (more) => compileDeck(doc(more), { partial: true }).failed.map((f) => f.code ?? 'COMPILE');
+console.log(JSON.stringify({ unchosen: failed({ points: ['Sol led on research'] }), asked: failed({ points: ['Sol led on research'], commentary: 'beside' }),
+  onChart: failed({ commentary: 'on-exhibit', exhibit: { heading: 'Audit score', unit: 'points', categories: ['Sol', 'Opus'], series: [{ name: 'Score', values: [90, 77] }], annotations: [{ category: 'Sol', text: 'Led on research, memo and consistency' }] } }) }));
+""")
+        self.assertEqual(result, {"unchosen": ["COMMENTARY_UNCHOSEN"], "asked": [], "onChart": []})
+
+
 class PeerColourTests(unittest.TestCase):
     def test_a_highlighted_bar_stands_out_from_its_peers_on_every_palette(self):
         result = run_node(PRELUDE + """
@@ -76,11 +92,13 @@ const fills = (list) => list.filter((n) => n.role === 'chart-mark').map((n) => n
 console.log(JSON.stringify({ out, lit: fills(nodes), plain: fills(plain.nodes) }));
 """)
         out = result["out"]
-        self.assertEqual(out["spacebar"]["peer"], "#919192")  # rust peers outshouted the navy subject; they go grey
-        self.assertEqual(out["ba"]["peer"], out["ba"]["lead"])  # navy among its own lighter blue already reads as chosen
-        self.assertEqual(out["crimson"]["peer"], out["crimson"]["lead"])  # red among grey stands out by colour
-        for name in ("midnight", "graphite", "evergreen", "toolkit", "spacebar"):
-            self.assertGreaterEqual(out[name]["apart"], 3, name)
+        # The subject takes the accent, as strong decks draw it, and its peers a neutral tone (palettes.mjs subjectOf, peerOf).
+        self.assertEqual((out["spacebar"]["subject"], out["spacebar"]["peer"]), ("#A8543A", "#919192"))  # rust among grey
+        self.assertEqual(out["midnight"]["subject"], "#2251FF")
+        self.assertEqual(out["ba"]["subject"], "#3468AD")
+        self.assertEqual(out["crimson"]["peer"], out["crimson"]["lead"])  # red among its own grey
+        for name, palette in out.items():
+            self.assertGreaterEqual(palette["apart"], 1.5, name)  # apart in lightness too, for a reader who cannot see hue
         self.assertEqual(result["lit"], ["color.chartPeer", "color.chartSubject", "color.chartPeer"])
         self.assertEqual(result["plain"], ["color.chartSeries1"] * 3)  # no subject, no peers: the lead colour as before
 

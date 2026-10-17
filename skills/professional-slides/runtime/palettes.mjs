@@ -101,15 +101,21 @@ function leadWithColour(tokens) {
   SERIES_KEYS.forEach((key, index) => { tokens[key] = { ...tokens[key], value: values[index] }; });
 }
 
-// The subject's colour (`color.chartSubject`), decided once per palette and ground: the first of the accent, the primary and
-// the ink that stands apart from both kinds of peer a subject is drawn among - the lead series (1.5:1), where a highlighted
-// bar's other members keep their colour, and the comparator grey (MARK_CONTRAST), where its peers are context. Each chart
-// kind chose its own before, and they disagreed: an accent bar that was the lead series' own colour (midnight, the BA house
-// palette once the ink left the lead), an evergreen subject at 1.1:1 on its green peers, a slope's subject among lines in the
-// gridline grey. Where none clears both, the one nearest to clearing them.
+// The subject's colour (`color.chartSubject`), decided once per palette and ground. Strong decks draw the mark a page is
+// about in a contrasting colour among calm peers - two colours on most chart pages, the accent and a quiet one - so the
+// subject takes the palette's accent where the accent is a colour (ACCENT_CHROMA) that reads as a mark on the canvas and
+// apart from the comparator grey; else the first series colour that is (the Spacebar deck's rust, its accent being navy).
+// A palette with no colour at all - greys and ink - keeps the old choice: the first of the accent, the primary and the ink
+// that stands apart from both kinds of peer, the lead series (1.5:1) and the comparator grey (MARK_CONTRAST), or the one
+// nearest to clearing them.
+const ACCENT_CHROMA = 30;
 const SUBJECT_KEYS = Object.freeze(["color.accent", "color.componentPrimary", "color.ink"]);
 export function subjectOf(value) {
-  const lead = value("color.chartSeries1"), grey = value("color.chartComparator");
+  const lead = value("color.chartSeries1"), grey = value("color.chartComparator"), canvas = value("color.canvas");
+  const coloured = (color) => isHex(color) && isHex(canvas) && isHex(grey) && chroma(color) >= ACCENT_CHROMA
+    && contrastRatio(color, canvas) >= CANVAS_CONTRAST["color.componentPrimary"][0] && contrastRatio(color, grey) >= MARK_CONTRAST;
+  const accent = ["color.accent", ...SERIES_KEYS].map(value).find(coloured);
+  if (accent) return accent;
   if (![lead, grey, ...SUBJECT_KEYS.map(value)].every(isHex)) return value("color.accent");
   const score = (key) => Math.min(contrastRatio(value(key), lead) / 1.5, contrastRatio(value(key), grey) / MARK_CONTRAST);
   return value(SUBJECT_KEYS.find((key) => score(key) >= 1) ?? SUBJECT_KEYS.reduce((best, key) => (score(key) > score(best) ? key : best)));
@@ -124,23 +130,23 @@ function chroma(hex) {
   return Math.hypot(500 * (x - y), 200 * (y - z));
 }
 
-// The colour a highlighted subject's peers take when they are data (`color.chartPeer`): the lead series, unless it
-// outshouts the subject or the subject cannot be told from it. A near-neutral subject among strongly coloured peers reads as the one left out, not the one picked
-// out - the Spacebar deck's navy bar among rust ones (chroma 15 against 45), midnight's near-black among electric blue,
-// graphite's black among lime - while the BA house's navy among its own lighter blue (28 against 42) reads as chosen. Where
-// the lead is more colourful than the subject by more than PEER_LOUDER, the peers take the first series colour that is not,
-// still reads as a mark on the canvas and stands as far from the subject as a mark from its ground (MARK_CONTRAST) - a deep
-// teal at 1.9:1 left midnight's near-black subject hard to find; failing every one, the ink halfway to the canvas.
+// The colour a highlighted subject's peers take when they are data (`color.chartPeer`): the lead series where the subject
+// stands out from it - by a mark's contrast, or by being the more colourful (crimson's red among grey) - and the lead does not
+// outshout it. Otherwise a neutral mid tone, as strong decks set the rest of a highlighted chart: the palette's first grey
+// that reads as a mark without reading as type, else the ink halfway to the canvas. The subject being the accent, the lead
+// is often its own colour (midnight's electric blue, BA's blue, Spacebar's rust), and the rest go grey around it.
 const PEER_LOUDER = 20;
 export function peerOf(value, subject) {
   const lead = value("color.chartSeries1"), canvas = value("color.canvas");
   if (![lead, canvas, subject].every(isHex)) return lead;
-  const calm = (color) => chroma(color) - chroma(subject) <= PEER_LOUDER;
-  // The lead stays where the subject stands out from it: darker or lighter by a mark's contrast (the BA house's navy among
-  // its blue, 3.0:1), or more colourful (crimson's red among grey). Toolkit's navy among a deeper blue, at 1.9:1, did not.
-  if (calm(lead) && (contrastRatio(lead, subject) >= MARK_CONTRAST || chroma(subject) - chroma(lead) > PEER_LOUDER)) return lead;
-  const reads = (color) => contrastRatio(color, canvas) >= CANVAS_CONTRAST["color.componentPrimary"][0] && contrastRatio(color, subject) >= MARK_CONTRAST;
-  return SERIES_KEYS.map(value).find((color) => isHex(color) && calm(color) && reads(color)) ?? mix(value("color.ink"), canvas, 0.5);
+  // Apart by lightness as well as by colour (1.5:1 at least), so a reader who cannot see the hue still finds the subject:
+  // evergreen's green among a grey of its own lightness, 1.1:1, was one colour to a deuteranope.
+  const apart = (color) => { const ratio = contrastRatio(color, subject); return ratio >= 1.5 && (ratio >= MARK_CONTRAST || chroma(subject) - chroma(color) > PEER_LOUDER); };
+  if (chroma(lead) - chroma(subject) <= PEER_LOUDER && apart(lead)) return lead;
+  const reads = (color) => contrastRatio(color, canvas) >= CANVAS_CONTRAST["color.componentPrimary"][0] && contrastRatio(color, canvas) < 7;
+  const neutral = (color) => isHex(color) && chroma(color) < 15 && reads(color) && apart(color);
+  const greys = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.45, 0.4, 0.35, 0.3].map((share) => mix(value("color.ink"), canvas, share));
+  return SERIES_KEYS.map(value).find(neutral) ?? greys.find((grey) => reads(grey) && apart(grey)) ?? greys[0];
 }
 
 export function resolvePalette(id = "midnight", baseTokens, slots) {

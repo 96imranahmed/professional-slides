@@ -146,7 +146,7 @@ export function compileDeck(docIn, { insights = null, partial = false } = {}) {
     const { page: authored } = withoutDependencies(page, measured, binding.bound.printed.get(page));
     let slide;
     try { slide = compilePage(authored, index, { ...options, ...(measured.size ? { sourcePrimary: primaryCitations(page, measured) } : {}) }); }
-    catch (error) { return refuse(index, error.message, { stage: error.stage ?? null }); }
+    catch (error) { return refuse(index, error.message, { stage: error.stage ?? null, ...(error.code ? { code: error.code } : {}) }); }
     const unknown = Object.keys(slide).filter((key) => !(key in SLIDE_KEYS));
     if (unknown.length) return refuse(index, `${slide.id ?? `page ${index + 1}`}: unknown page key${unknown.length === 1 ? "" : "s"} ${unknown.map((k) => `\`${k}\``).join(", ")} - a key the composer does not read (an exhibit's own props go inside the exhibit)`);
     return slide;

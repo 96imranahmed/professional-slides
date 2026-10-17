@@ -310,7 +310,7 @@
    "id": "f-trend-target-band",
    "type": "trend",
    "form": "line",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "title": "Punctuality has sat inside the target range for three years running",
    "exhibit": {
     "heading": "Trains arriving within five minutes, FY19-FY26",
@@ -352,30 +352,26 @@
       "label": "New timetable",
       "style": "box"
      }
+    ],
+    "annotations": [
+     {
+      "category": "FY22",
+      "text": "Leaf-fall season on an unchanged timetable"
+     },
+     {
+      "category": "FY24",
+      "text": "Junction recovery time lifts it above 91%"
+     }
     ]
    },
    "source": "Source: illustrative data for a fictional operator; synthetic",
-   "takeaway": false,
-   "points": [
-    {
-     "lead": "Below the range",
-     "text": "Punctuality sat under 90% in five of the eight years, with FY22's dip the result of a leaf-fall season run on an unchanged timetable."
-    },
-    {
-     "lead": "The new timetable",
-     "text": "Recovery time at the two busiest junctions lifted punctuality above 91% in FY24, and it has stayed in the range since."
-    },
-    {
-     "lead": "Holding it",
-     "text": "FY26's 91.5% is a point and a half above the floor; one bad autumn would take the operator back under it."
-    }
-   ]
+   "takeaway": false
   },
   {
    "id": "f-trend-event-band",
    "type": "trend",
    "form": "line",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "title": "Journeys fell by a third during the six-week strike and recovered within a month",
    "exhibit": {
     "heading": "Weekly journeys",
@@ -422,30 +418,26 @@
     ],
     "valueFormat": {
      "decimals": 2
-    }
+    },
+    "annotations": [
+     {
+      "category": "May",
+      "text": "0.61m a week, the year's lowest"
+     },
+     {
+      "category": "Sep",
+      "text": "Back above March's 0.97m a week"
+     }
+    ]
    },
    "source": "Source: illustrative data for a fictional operator; synthetic",
-   "takeaway": false,
-   "points": [
-    {
-     "lead": "A third lost",
-     "text": "Journeys fell from 0.97 million a week in March to 0.61 million in May, the lowest week of the year."
-    },
-    {
-     "lead": "Back within a month",
-     "text": "By June journeys were within one per cent of March, and by September they were above it."
-    },
-    {
-     "lead": "Revenue",
-     "text": "The six weeks cost about £9m in fares, of which delay-repay and season-ticket refunds were £2m, and none of it has been recovered from the dispute."
-    }
-   ]
+   "takeaway": false
   },
   {
    "id": "f-trend-intervals",
    "type": "trend",
    "form": "line",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "title": "Journeys reach 60 million by FY31 in four outcomes of five",
    "exhibit": {
     "heading": "Annual journeys",
@@ -547,24 +539,16 @@
       "value": 60,
       "label": "Target 60m"
      }
+    ],
+    "annotations": [
+     {
+      "category": "FY31",
+      "text": "Four outcomes in five reach 60 million"
+     }
     ]
    },
    "source": "Source: illustrative data for a fictional operator; synthetic",
-   "takeaway": false,
-   "points": [
-    {
-     "lead": "Most outcomes clear 60m",
-     "text": "The central forecast passes 60 million in FY31, and four outcomes in five land at or above the target."
-    },
-    {
-     "lead": "What widens the fan",
-     "text": "Hybrid working and fares policy drive the spread; leisure growth alone keeps the low case above 50 million."
-    },
-    {
-     "lead": "Narrowing it",
-     "text": "A fares settlement by FY28 would halve the width of the inner band by fixing the largest single input."
-    }
-   ]
+   "takeaway": false
   },
   {
    "id": "f-ground-dark-chart",
@@ -750,13 +734,9 @@
    "id": "f-ranking-dumbbell",
    "type": "ranking",
    "form": "dumbbell",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "Every trial route gained off-peak journeys; Skipton gained most",
-   "highlight": [
-    "41%",
-    "one journey in five"
-   ],
    "exhibit": {
     "heading": "Off-peak journeys per weekday",
     "unit": "thousand",
@@ -796,18 +776,15 @@
      {
       "category": "Leeds-Skipton"
      }
+    ],
+    "annotations": [
+     {
+      "category": "Leeds-Skipton",
+      "series": "Half-hourly, FY26",
+      "text": "Largest gain of the six trial routes"
+     }
     ]
    },
-   "points": [
-    {
-     "lead": "Gains on every route",
-     "text": "The six routes that moved to a half-hourly off-peak service gained between 16% and 41% in two years, and Leeds to Skipton gained most because its hourly train had been the fullest. No trial route lost journeys, and the hourly routes beside them grew by 4% over the same period."
-    },
-    {
-     "lead": "Mostly new travel",
-     "text": "Surveys on the trial trains found that one journey in five had moved from the peak; the rest were trips not made by rail before. The trial ran on lines with spare units, so it says nothing about the Coast line, where the fleet is committed until 2030."
-    }
-   ],
    "source": "Source: illustrative data for a fictional operator; timetable trial, FY24 to FY26"
   },
   {
@@ -981,7 +958,7 @@
    "id": "f-ranking-value-break",
    "type": "ranking",
    "form": "column",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "title": "The Airport line carries more journeys per km than the next four lines together",
    "exhibit": {
     "type": "chart.column",
@@ -1020,30 +997,22 @@
      {
       "category": "Airport"
      }
+    ],
+    "annotations": [
+     {
+      "category": "Airport",
+      "text": "412 thousand per route-km, on 11 km of track"
+     }
     ]
    },
    "source": "Source: illustrative data for a fictional operator; synthetic",
-   "takeaway": false,
-   "points": [
-    {
-     "lead": "A line of its own",
-     "text": "The Airport line carries 412 thousand journeys per route-km, more than the next four lines together, on just eleven kilometres of track."
-    },
-    {
-     "lead": "The rest are close",
-     "text": "The other seven lines run between 22 and 48 thousand, a spread the broken axis keeps legible."
-    },
-    {
-     "lead": "Fleet first",
-     "text": "Moving two of the newest units to the Airport line would add more seats where they are used than any other move in the fleet plan."
-    }
-   ]
+   "takeaway": false
   },
   {
    "id": "f-ranking-group-brackets",
    "type": "ranking",
    "form": "bar",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "title": "The three biggest stations carry more than half of all journeys",
    "exhibit": {
     "type": "chart.bar",
@@ -1115,24 +1084,16 @@
        "Market"
       ]
      }
+    ],
+    "annotations": [
+     {
+      "category": "Central",
+      "text": "With Harbour and Airport: 56% of journeys"
+     }
     ]
    },
    "source": "Source: illustrative data for a fictional operator; synthetic",
-   "takeaway": false,
-   "points": [
-    {
-     "lead": "Three stations",
-     "text": "Central, Harbour and Airport carry 22.8 million of the 40.9 million journeys, 56% of the whole."
-    },
-    {
-     "lead": "The suburbs",
-     "text": "The six suburban stations each carry less than the average of 4.5 million, and 44% between them."
-    },
-    {
-     "lead": "Where to invest",
-     "text": "Gate-line upgrades at the three core stations reach half of all passengers for a third of the budget, so they come first in the plan."
-    }
-   ]
+   "takeaway": false
   },
   {
    "id": "f-ranking-range",
@@ -1197,7 +1158,7 @@
    "id": "f-ranking-flags",
    "type": "ranking",
    "form": "bar",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "Swiss and Japanese railways carry 47% and 44% of journeys off-peak, against Northvale's 36%",
    "exhibit": {
@@ -1260,22 +1221,14 @@
       "value": 36,
       "label": "Northvale 36%"
      }
+    ],
+    "annotations": [
+     {
+      "category": "Austria",
+      "text": "At 42%, five million more off-peak journeys"
+     }
     ]
    },
-   "points": [
-    {
-     "lead": "A timetable, not a fare",
-     "text": "The four railways above 39% all run regional trains at least every half hour between the peaks, and none prices the off-peak more than 30% below the peak fare."
-    },
-    {
-     "lead": "Where Northvale sits",
-     "text": "At 36% Northvale would rank sixth of the eight, between Denmark and Germany, on an hourly off-peak timetable on three of its five lines."
-    },
-    {
-     "lead": "What the gap is worth",
-     "text": "Reaching Austria's 42% on Northvale's 48 million journeys means about five million more off-peak journeys a year, with the peak left as it is."
-    }
-   ],
    "source": "Source: illustrative data for a fictional operator; synthetic national benchmarks"
   },
   {
@@ -1345,13 +1298,9 @@
    "id": "f-composition-marimekko",
    "type": "composition",
    "form": "marimekko",
-   "commentary": "beside",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "The City line is two fifths of journeys and the most peak-heavy",
-   "highlight": [
-    "19.6 million",
-    "two thirds"
-   ],
    "exhibit": {
     "heading": "Journeys by line and time of travel, FY26",
     "unit": "million",
@@ -1383,18 +1332,20 @@
        1
       ]
      }
+    ],
+    "annotations": [
+     {
+      "category": "City",
+      "series": "Peak",
+      "text": "Two thirds in the peak, on full trains"
+     },
+     {
+      "category": "Eastern",
+      "series": "Off-peak",
+      "text": "The thinnest off-peak share on the network"
+     }
     ]
    },
-   "points": [
-    {
-     "lead": "Size and mix together",
-     "text": "The City line carries 19.6 million of the 48.3 million journeys, and two thirds of them in the peak, where its trains are full. Growth there needs longer trains or more track, which the plan does not buy before FY31."
-    },
-    {
-     "lead": "Where off-peak is thin",
-     "text": "The Eastern and Coast lines together carry 3.2 million off-peak journeys on 11.5 million in total, the thinnest off-peak share on the network. Those two lines are where a half-hourly timetable has the most empty seats to fill."
-    }
-   ],
    "source": "Source: illustrative data for a fictional operator; ticket sales by line and time of travel"
   },
   {
@@ -1670,13 +1621,9 @@
    "id": "f-relationship-bubble",
    "type": "relationship",
    "form": "bubble",
-   "commentary": "below",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "The largest hourly stations are where a half-hourly service pays most",
-   "highlight": [
-    "1.9 million",
-    "six stations"
-   ],
    "exhibit": {
     "heading": "Off-peak service, growth and size, FY23-FY26",
     "xLabel": "Off-peak trains per weekday",
@@ -1752,18 +1699,14 @@
      "min": 0,
      "max": 20,
      "step": 5
-    }
-   },
-   "points": [
-    {
-     "lead": "Size decides the order",
-     "text": "Scarborough carries 1.9 million journeys a year on an hourly service and grew 6%, a third of the rate of stations its size with a train every half hour. Moving it and Selby to half-hourly reaches more passengers than moving Malton and Goole together."
     },
-    {
-     "lead": "The threshold holds at every size",
-     "text": "All six stations above 30 trains a day grew by 14% or more, whether they carry 0.9 million journeys or 3.4 million. Size changes how much a faster timetable is worth, not whether it works."
-    }
-   ],
+    "annotations": [
+     {
+      "category": "Scarborough",
+      "text": "Hourly: grew 6%, a third of its peers"
+     }
+    ]
+   },
    "pointsHeading": false,
    "source": "Source: illustrative data for a fictional operator; ticket sales by origin station"
   },
@@ -1830,7 +1773,7 @@
    "id": "f-relationship-trend-line",
    "type": "relationship",
    "form": "scatter",
-   "commentary": "beside",
+   "commentary": "on-exhibit",
    "takeaway": false,
    "title": "Each extra off-peak train an hour adds about eleven riders a train-hour",
    "exhibit": {
@@ -1912,22 +1855,14 @@
     ],
     "trendLine": {
      "method": "linear"
-    }
+    },
+    "annotations": [
+     {
+      "category": "Skipton",
+      "text": "Held back by frequency, not demand"
+     }
+    ]
    },
-   "points": [
-    {
-     "lead": "The slope",
-     "text": "Across the twelve routes, each extra train an hour carries about eleven more riders a train-hour, with no sign of the line flattening at four."
-    },
-    {
-     "lead": "Below the line",
-     "text": "Skipton runs one train an hour and carries 24 riders, close to the line: the route is held back by frequency, not demand."
-    },
-    {
-     "lead": "What it is worth",
-     "text": "A second off-peak train an hour on the Skipton line would add about £1.2m a year in fares at today's average yield."
-    }
-   ],
    "source": "Source: illustrative data for a fictional operator; synthetic"
   },
   {
@@ -3791,7 +3726,10 @@
      "Line",
      "Off-peak trains a weekday",
      "Journeys, million",
-     { "label": "Growth FY23-FY26", "bubble": true },
+     {
+      "label": "Growth FY23-FY26",
+      "bubble": true
+     },
      {
       "label": "What it means",
       "implication": true

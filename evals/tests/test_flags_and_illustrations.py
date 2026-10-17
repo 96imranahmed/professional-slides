@@ -38,7 +38,7 @@ const composed = async (page, dir = EXAMPLES) => {
   if (out.error || out.pageErrors.length) throw new Error(out.error ?? out.pageErrors.join('; '));
   return out.deck.slides.find((s) => s.id === page.id).nodes;
 };
-const table = (rows, columns = ['Railway', 'Off-peak share']) => ({ ...worked('f-ranking-flags'), id: 't', type: 'lookup', form: 'table',
+const table = (rows, columns = ['Railway', 'Off-peak share']) => ({ ...worked('f-ranking-flags'), id: 't', type: 'lookup', form: 'table', commentary: 'none',
   title: 'Every railway above 40% off-peak runs a half-hourly regional timetable', exhibit: { columns, rows } });
 """
 
