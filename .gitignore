@@ -49,3 +49,4 @@ author-log.jsonl
 .contextignore
 .env
 .env.*
+*.compose-cache.json
