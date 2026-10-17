@@ -78,6 +78,8 @@ One value drawn as a chart, or one period on a chart that joins periods, compare
 
 **The point goes on the exhibit.** Strong decks annotate four chart pages in five and set a column of points beside under one in five: the title states the finding, and the mark it rests on carries a callout (`annotations`), a change mark (`changeAnnotations`, `cagr`) or a labelled reference line, with `commentary: "on-exhibit"`; a table carries it in an implication column (`in-exhibit`). Points over a chart or a table go where the page says - `beside` or `below` - and a page that writes them without saying is refused (`COMMENTARY_UNCHOSEN`): ask for the column where the page needs one, for instance two or three mechanisms the chart cannot show.
 
+**A table carries its explanation in a column of the table, not a band under it.** Strong decks set nothing under a table but its notes: what a row means goes in a closing column (`implication: true`, with `commentary: "in-exhibit"`) or a description column, and a claim the whole table supports goes in its title, or in points beside the table (`beside`) where it needs more than the title holds.
+
 A page closes on its exhibit unless it has a `takeaway` (one sentence, two lines at most). Most pages do not need one: the title carries the message. A filled bar under the exhibit (`so-what-bar`) is rarer still - one strong page in ten - and belongs to the page whose implication its title cannot hold, such as the deck's last.
 
 ## What a page holds
