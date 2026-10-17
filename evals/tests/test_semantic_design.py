@@ -19,7 +19,7 @@ for (const palette of ['midnight','evergreen','crimson']) {
  assert.ok(bar&&value,'the total retains the mark and its numeric label');
  const surface=scene.tokens['color.componentPrimary'].value;
  assert.ok(contrastRatio(value.style.color.value,surface)>=4.5,`${palette} total label`);
- assert.ok(Math.max(contrastRatio(bar.style.fill.value,surface),contrastRatio(bar.style.stroke.value,surface))>=3,`${palette} total bar boundary`);
+ assert.ok(Math.max(contrastRatio(bar.style.fill.value,surface),bar.style.stroke?.value?contrastRatio(bar.style.stroke.value,surface):1)>=3,`${palette} total bar boundary`);
  const first=scene.nodes.find(n=>n.role==='table-bar'&&n.data?.row===0);
  assert.equal(first.style.fill.value,bar.style.fill.value,'row band does not change series identity');
 }
@@ -49,7 +49,7 @@ for(const palette of ['midnight','evergreen','crimson']) {
  assert.ok(contrastRatio(tokens['color.accent'].value,tokens['color.canvas'].value)>=4.5);
  assert.ok(contrastRatio(tokens['color.accent'].value,tokens['color.onPrimary'].value)>=4.5);
  const tiles=scene.slides[1].nodes.filter(n=>n.role==='chart-mark');
- assert.equal(tiles.find(n=>n.data.label==='Core').style.fill.tokenId,'color.accent');
+ assert.equal(tiles.find(n=>n.data.label==='Core').style.fill.tokenId,'color.chartSubject');
  assert.ok(tiles.filter(n=>n.data.label!=='Core').every(n=>n.style.fill.tokenId==='color.chartComparator'));
  const title=scene.slides[2].nodes.find(n=>n.role==='action-title');
  assert.equal(title.data.textLayout.source,spec.slides[2].title);
@@ -131,39 +131,6 @@ import {planDeck} from './skills/professional-slides/runtime/planner.mjs';
 const plan=composeDeck({schema:'professional-slides.deck/v3',id:'summary',contents:false,slides:[{id:'answer',shape:'executive-summary',title:'A focused opening answers the reader’s question',points:[{lead:'Answer',text:'Choose the supported option under the stated condition.'},{lead:'Consequence',text:'Begin with the reversible step and evaluate its result.'}]}]});
 assert.equal(plan.slides[0].role,'executive-summary');
 assert.equal(planDeck(plan).deck.slides[0].role,'executive-summary');
-console.log('{}');
-""")
-
-    def test_a_review_cannot_survive_a_changed_render(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
-import {reviewBinding,validateReviewBinding} from './skills/professional-slides/runtime/reviewer.mjs';
-const dir=await fs.mkdtemp(path.join(os.tmpdir(),'review-binding-'));
-try{await fs.mkdir(path.join(dir,'rendered'));await fs.writeFile(path.join(dir,'scene.json'),JSON.stringify({slides:[{id:'a'}]}));await fs.writeFile(path.join(dir,'deck.pptx'),'editable');await fs.writeFile(path.join(dir,'build-result.json'),JSON.stringify({pptxPath:path.join(dir,'deck.pptx')}));await fs.writeFile(path.join(dir,'rendered/slide-1.png'),'pixels');
-const review={binding:await reviewBinding(dir),inspectedSlides:['a'],rating:7};
-assert.deepEqual(await validateReviewBinding(review,dir,['a']),[]);
-await fs.writeFile(path.join(dir,'rendered/slide-1.png'),'different pixels');
-assert.ok((await validateReviewBinding(review,dir,['a'])).length);
-}finally{await fs.rm(dir,{recursive:true,force:true});}
-console.log('{}');
-""")
-
-    def test_new_deck_contract_rejects_stale_titles_and_missing_summary(self):
-        run_node("""
-import assert from 'node:assert/strict';
-import {validateStageContract} from './skills/professional-slides/runtime/build-deck.mjs';
-const summary={id:'answer',shape:'executive-summary',title:'Choose the supported option under the stated condition'};
-const evidence={id:'proof',title:'The evidence supports this choice on a common basis'};
-const spec={workflow:'new_deck',slides:[summary,evidence]};
-const stages={content:{pages:spec.slides.map(s=>({id:s.id,claim:s.title}))},plan:{pages:spec.slides.map(s=>({id:s.id,title:s.title}))}};
-assert.doesNotThrow(()=>validateStageContract(spec,stages));
-const changed=structuredClone(stages);changed.plan.pages[1].title='A stale plan';
-assert.throws(()=>validateStageContract(spec,changed),/changed title/);
-const missing=structuredClone(stages);missing.content.pages.pop();
-assert.throws(()=>validateStageContract(spec,missing),/missing/);
-assert.throws(()=>validateStageContract({...spec,slides:[evidence,summary]},stages),/opening executive summary/);
-assert.doesNotThrow(()=>validateStageContract({...spec,workflow:'existing_deck_revision'},{}));
 console.log('{}');
 """)
 

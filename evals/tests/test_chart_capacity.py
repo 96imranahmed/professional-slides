@@ -284,7 +284,10 @@ const render=p=>owner.render({id:'probe',frame:{x:0,y:0,width:1160,height:480},p
 for(const change of [p=>delete p.gapPolicy,p=>p.categories=['a'],p=>p.xAxis.unit='',p=>p.series[0].unit='USD',p=>p.series[0].points[0].xUnit='month',p=>p.series[0].points[0].y=null,p=>p.series[0].points.push(null),p=>p.series[0].points[1].key='start',p=>p.series[0].points[1].x=1999,p=>p.series[0].points[1].x=2000,p=>p.series[0].points[3].x=2019,p=>p.series[1].status='before',p=>p.gapPolicy='connect-observations',p=>p.series[0].values=[1,2],p=>p.xAxis.ticks[1].value=2000]){
  const props=structuredClone(base);change(props);assert.throws(()=>render(props),/Sparse line:/);
 }
-assert.throws(()=>render({categories:['A','B'],series:[{name:'Value',values:[1,null]}]}),/finite/);
+// A categorical line draws a gap (null) as a break, no segment into or out of it; an area fills every period and refuses one.
+const gapped=render({categories:['A','B','C'],series:[{name:'Value',values:[1,null,3]}]}).nodes;
+assert.equal(gapped.filter(n=>n.role==='chart-line').length,0,'a gap breaks the line');
+assert.throws(()=>REGISTRY.get('chart.area').render({id:'a',frame:{x:0,y:0,width:700,height:400},props:{categories:['A','B','C'],series:[{name:'Value',values:[1,null,3]}]}}),/no value for B/);
 assert.throws(()=>REGISTRY.get('chart.area').render({id:'area',frame:{x:0,y:0,width:1160,height:480},props:base}),/chart.line only/);
 console.log(JSON.stringify({accepted:true}));
 ''')

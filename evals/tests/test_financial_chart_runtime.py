@@ -85,111 +85,6 @@ console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result['accepted'])
 
-    def test_chart_titles_reject_statistics_across_all_shared_entry_points(self):
-        result = run_node("""
-import assert from 'node:assert/strict';
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
-const describes=new Set(),asked=[];
-const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
-const read=(fn)=>withJudgements(reader,fn);
-const frame={x:60,y:60,width:1000,height:500};
-const title=REGISTRY.get('chart-title');
-const data={categories:['2024','2025'],series:[{name:'Homicides',values:[382,305]}]};
-// A heading with no figure in it ("Revenue doubled") is not asked about: the figure is what the notation reads.
-const invalid=['NYPD: 382 to 305','SF: 35 to 28','Decline of −20.2%','Revenue $1.2bn','Share 1/3','Rate 35 per 100,000','NYPD: 2025','Revenue in 2025: 305','Revenue, 2025.5','Twenty percent decline','SF: ３５ to ２８','Revenue FY14.5','Revenue FY14: 17%'];
-invalid.push('Net employment change to 2030: +16%', 'Reported Gini change versus 2016: one percent', 'Revenue to 2030.5', 'Revenue versus 2016%', 'Disrupted workers within one year: 25%');
-read(()=>{
-for(const heading of invalid) {
- assert.throws(()=>title.measureContent({frame,props:{heading}}),/must not contain statistics/);
- assert.throws(()=>title.render({id:'title',frame,props:{heading}}),/must not contain statistics/);
- assert.throws(()=>title.render({id:'title',frame,props:{text:heading}}),/must not contain statistics/);
- assert.throws(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}),/must not contain statistics/);
- const charts=[heading,'SF reported homicides'].map(heading=>({heading,component:'chart.column',props:data}));
- assert.throws(()=>REGISTRY.get('chart-group').render({id:'group',frame,props:{charts}}),/must not contain statistics/);
-}
-for(const heading of ['NYPD reported homicides','Reported homicides in 2025','Revenue, 2025','Revenue (2025)','Revenue FY2025','Revenue Q1 2025','Revenue 2024–2025','Revenue FY14','FY14–FY17 average earnings impact','Revenue FY14–17','Revenue FY2014–2017']) {
- assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading,unit:'index'}}));
-}
-describes.add('homicides per 100,000');
-for(const unit of ['%','$B','USD millions, 2026','homicides per 100,000','baseline = 100','index, base = 1']) {
- assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}));
-}
-for(const unit of ['index, 382 to 305','−20.2%','35 per 100,000','baseline = 100, result = 120','baseline = 100.5','baseline = 100%']) {
- assert.throws(()=>title.render({id:'title',frame,props:{heading:'Reported homicides',unit}}),/must not contain statistics/);
-}
-for(const heading of ['Net employment change to 2030, midpoint adoption','Reported Gini change versus 2016','Reported Gini change vs. 2016']) {
- assert.doesNotThrow(()=>title.measureContent({frame,props:{heading}}));
- assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading}}));
- assert.doesNotThrow(()=>REGISTRY.get('chart.column').render({id:'chart',frame,props:{...data,heading}}));
-}
-describes.add('Disrupted workers within 1 year, %');
-for(const unit of ['Disrupted workers within one year, %','Disrupted workers within 1 year, %']) {
- assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}));
-}
-for(const unit of ['Disrupted workers within one year, 25%','Disrupted workers within one year, one percent']) {
- assert.throws(()=>title.render({id:'title',frame,props:{heading:'Worker disruption',unit}}),/must not contain statistics/);
-}
-// The action title remains free to state a quantified conclusion.
-assert.doesNotThrow(()=>REGISTRY.get('section-heading').render({id:'section',frame,props:{heading:'Homicides fell 20%'}}));
-});
-// With no answer recorded, nothing is refused: the question waits.
-assert.doesNotThrow(()=>title.render({id:'title',frame,props:{heading:'NYPD: 382 to 305'}}));
-console.log(JSON.stringify({accepted:true}));
-""")
-        self.assertTrue(result['accepted'])
-
-    def test_chart_titles_accept_years_and_dates_but_not_results(self):
-        # "Destinations, today and 2030 goal" was refused as a statistic by the
-        # same message that asked for an explicit period.
-        result = run_node("""
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
-const describes=new Set(),asked=[];
-const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
-const read=(fn)=>withJudgements(reader,fn);
-const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
-const accepted=heading=>read(()=>{try{title.render({id:'t',frame,props:{heading}});return true;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return false;}});
-// A year names the period unless its notation makes it a value (after a colon, a sign or "=", or with a decimal or a unit):
-// the periods are set aside without a question, and a reader takes every figure left for a result.
-const periods=['Destinations, today and 2030 goal','2030 target capacity','Seats, 2024 vs 2030 plan','Capacity 2019 and 2030','Fleet by 2030','Passengers FY26','Revenue 2025-26','Revenue Q3 2025','Balance at 31 March 2026','Balance as of 2026-03-31','Balance on 31/03/2026','Balance at March 31, 2026'];
-const results=['Revenue +12%','Revenue up 3.4x','Revenue up 12x','Revenue fell 20%','Revenue $1.2bn','Revenue 5bn','Share 45%','NYPD: 2025','Revenue, 2025.5','Revenue versus 2016%','Margin up 40pp'];
-const refusedPeriods=periods.filter(h=>!accepted(h)), unasked=[...asked];
-console.log(JSON.stringify({refusedPeriods,unasked,acceptedResults:results.filter(accepted)}));
-""")
-        self.assertEqual(result, {"refusedPeriods": [], "unasked": [], "acceptedResults": []})
-
-    def test_chart_titles_accept_rank_scales_and_set_sizes_and_name_the_result_they_refuse(self):
-        # "rank, 1 = best" and "busiest day 2 August 2026, top 40" describe the
-        # measure and were refused; "the leader's 53.2m" is a value and stays
-        # refused, with the figure named so the author knows what to move.
-        result = run_node("""
-import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
-import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// A figure the notation leaves is asked about (heading-states-result): this reader takes each for a result, but those named in `describes`.
-const describes=new Set(),asked=[];
-const reader=judgementSession({oracle:(kind,said)=>{asked.push(said.text);return describes.has(said.text)?'describes':'result';}});
-const read=(fn)=>withJudgements(reader,fn);
-const title=REGISTRY.get('chart-title'),frame={x:60,y:60,width:1000,height:500};
-const refusal=props=>read(()=>{try{title.render({id:'t',frame,props});return null;}catch(error){if(!/must not contain statistics/.test(error.message))throw error;return error.message;}});
-// A set size is a figure the notation does not settle: it is read, and a reader takes these for the set the chart shows.
-const headings=['Hub connectivity index, busiest day 2 August 2026, top 40',"World's Top 100 airlines, rank (1 = best)",'Largest 20 carriers by seats, Sep 2026'];
-headings.forEach((h)=>describes.add(h));
-const units=['rank, 1 = best','rank (1 = best)','ranking; 1 = highest'];
-const results=["Passengers: actual and required path to the leader's 53.2m",'Revenue +12%','Revenue up 3.4x','Revenue $1.2bn','Revenue fell 20%','NYPD: 2025','Top 40%','Top 3 grew 40%','Top 10.5'];
-const badUnits=['rank, 1 = best, 3.2','rank, 2 = best'];
-console.log(JSON.stringify({
-  refusedHeadings:headings.filter(heading=>refusal({heading})),
-  refusedUnits:units.filter(unit=>refusal({heading:'Airline ranking',unit})),
-  acceptedResults:results.filter(heading=>!refusal({heading})),
-  acceptedUnits:badUnits.filter(unit=>!refusal({heading:'Airline ranking',unit})),
-  named:refusal({heading:results[0]}).includes('carries "53.2m"'),
-}));
-""")
-        self.assertEqual(result, {"refusedHeadings": [], "refusedUnits": [], "acceptedResults": [], "acceptedUnits": [], "named": True})
-
     def test_growth_bracket_stays_near_small_marks_on_a_shared_scale(self):
         result = run_node("""
 import assert from 'node:assert/strict';
@@ -587,7 +482,7 @@ for(const palette of ['midnight','evergreen','crimson']) {
   const deck=compileDeck({palette,slides:[slide({categories:['Dubai','Doha'],series:[{name:'Measure',values:[80,150]}]})]},REGISTRY);
   const marks=deck.slides[0].nodes.filter(n=>n.role==='chart-mark');
   assert.equal(marks.length,2);
-  assert.equal(marks[0].style.fill.tokenId,'color.componentPrimary');
+  assert.equal(marks[0].style.fill.tokenId,'color.chartSubject');
   assert.equal(marks[1].style.fill.tokenId,'color.chartComparator');
   assert.ok(contrastRatio(marks[0].style.fill.value,marks[1].style.fill.value)>=3);
 }
@@ -595,7 +490,7 @@ const explicit=compileDeck({slides:[slide({categories:['Current','Future'],serie
 assert.deepEqual(explicit.map(n=>n.style.fill.tokenId),['color.chartSeries2','color.chartSeries2']);
 const focused=compileDeck({palette:'crimson',slides:[slide({categories:['A','B','C'],series:[{name:'Measure',values:[40,70,55]}],highlights:[{category:'B',style:'bar'}]})]},REGISTRY).slides[0].nodes.filter(n=>n.role==='chart-mark');
 // Highlight the answer: the named bar takes the accent; the others keep the series colour, never grey.
-assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartSeries1','color.accent','color.chartSeries1']);
+assert.deepEqual(focused.map(n=>n.style.fill.tokenId),['color.chartPeer','color.chartSubject','color.chartPeer']);
 assert.deepEqual(focused.map(n=>n.data.highlighted),[false,true,false]);
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -614,16 +509,20 @@ for(const palette of ['midnight','evergreen','crimson']) for(const kind of ['cha
   const props=reversed?{...base,categories:[...base.categories].reverse(),series:[...base.series].reverse().map(s=>({...s,values:[...s.values].reverse()}))}:base;
   const nodes=render(kind,props,palette),marks=nodes.filter(n=>n.role==='chart-mark'),swatches=nodes.filter(n=>n.role==='legend-swatch');
   for(const mark of marks) {
-    assert.equal(mark.style.fill.tokenId,mark.data.series==='Actual'?'color.componentPrimary':'color.chartComparator');
+    assert.equal(mark.style.fill.tokenId,mark.data.series==='Actual'?'color.chartSubject':'color.chartComparator');
     const swatch=swatches.find(n=>n.data.categoryKey===mark.data.series);
     assert.equal(swatch.style.fill.value,mark.style.fill.value);
   }
   assert.ok(contrastRatio(swatches[0].style.fill.value,swatches[1].style.fill.value)>=3);
 }
-for(const categories of [['A','B'],['B','A']]) {
-  const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]}).filter(n=>n.role==='chart-mark');
-  assert.equal(marks.find(n=>n.data.category==='B').style.fill.tokenId,'color.accent');
-  assert.equal(marks.find(n=>n.data.category==='A').style.fill.tokenId,'color.chartSeries1');
+// A highlighted bar stands apart from the lead series it sits among, in every palette: midnight leads with its accent and
+// evergreen's green accent sits at 1.1:1 on its green lead, so the subject's colour is resolved per palette (subjectOf).
+for(const palette of ['midnight','evergreen','crimson']) for(const categories of [['A','B'],['B','A']]) {
+  const marks=render('chart.column',{categories,series:[{name:'Value',values:[40,70]}],highlights:[{category:'B',style:'bar'}]},palette).filter(n=>n.role==='chart-mark');
+  const lit=marks.find(n=>n.data.category==='B'),peer=marks.find(n=>n.data.category==='A');
+  assert.equal(peer.style.fill.tokenId,'color.chartPeer');
+  assert.equal(lit.style.fill.tokenId,'color.chartSubject',palette);
+  assert.ok(contrastRatio(lit.style.fill.value,peer.style.fill.value)>=1.5,palette);
 }
 assert.throws(()=>render('chart.column',{...base,focusSeries:'Unknown'}),/exact chart series/);
 assert.throws(()=>render('chart.column',{...base,colorIndices:[0,1]}),/conflicts/);
@@ -650,7 +549,7 @@ import {defaultFocusIndex} from './skills/professional-slides/runtime/charts.mjs
 import {changeFromContent} from './evals/support/compose.mjs';
 const frame={x:60,y:160,width:900,height:460};
 const compiled=(kind,props)=>compileDeck({palette:'crimson',slides:[{id:'f',composition:component({id:'f',component:kind,frame,props})}]},REGISTRY).slides[0];
-const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.componentPrimary').map(n=>n.data[key]))];
+const primary=(kind,props,key='series')=>[...new Set(compiled(kind,props).nodes.filter(n=>n.role==='chart-mark'&&n.style.fill.tokenId==='color.chartSubject').map(n=>n.data[key]))];
 const pair=(a,b)=>({categories:['Revenue','Profit'],series:[{name:a,values:[40,50]},{name:b,values:[55,70]}]});
 for(const kind of ['chart.column','chart.bar']) {
   for(const [a,b,latest] of [['2019','2024','2024'],['2024','2019','2024'],['FY23','FY24','FY24'],['FY2024-25','FY2025-26','FY2025-26'],
@@ -664,7 +563,7 @@ for(const kind of ['chart.column','chart.bar']) {
 // The comparator stays the grey, and the legend keys the same fills.
 const nodes=compiled('chart.column',pair('2019','2024')).nodes;
 for(const mark of nodes.filter(n=>n.role==='chart-mark')) {
-  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.componentPrimary':'color.chartComparator');
+  assert.equal(mark.style.fill.tokenId,mark.data.series==='2024'?'color.chartSubject':'color.chartComparator');
   assert.equal(nodes.find(n=>n.role==='legend-swatch'&&n.data.categoryKey===mark.data.series).style.fill.value,mark.style.fill.value);
 }
 // The native chart paints the peer the scene painted.
@@ -800,8 +699,9 @@ assert.equal(stackedMarks.length,2);
 assert.ok(stackedMarks.every(node=>node.frame.height>1));
 assert.ok(stackedMarks[0].frame.y+stackedMarks[0].frame.height<=stackedMarks[1].frame.y+0.01||stackedMarks[1].frame.y+stackedMarks[1].frame.height<=stackedMarks[0].frame.y+0.01);
 const horizontal=REGISTRY.get('chart.bar').render({id:'horizontal',frame,props:{categories:['Loss','Gain'],series:[{name:'Measure',values:[-30,50]}],yMin:-40,yMax:60,gridlines:true}}).nodes;
-assert.equal(horizontal.filter(node=>node.role==='axis-label').length,5);
-assert.equal(horizontal.filter(node=>node.role==='chart-gridline').length,5);
+// -40 to 60 in whole ladder steps of 20, zero among them: the step the tick gate holds every axis to (NICE_TICKS).
+assert.equal(horizontal.filter(node=>node.role==='axis-label').length,6);
+assert.equal(horizontal.filter(node=>node.role==='chart-gridline').length,6);
 const area=REGISTRY.get('chart.area').render({id:'area',frame,props:{categories:['Q1','Q2','Q3'],series:[{name:'Demand',values:[10,24,18]}]}}).nodes.filter(node=>node.role==='chart-area');
 assert.equal(area.length,1);
 assert.equal(area[0].type,'shape');
@@ -821,3 +721,17 @@ assert.throws(()=>REGISTRY.get('chart.scatter').render({id:'mixed',frame,props:{
 console.log(JSON.stringify({accepted:true}));
 """)
         self.assertTrue(result["accepted"])
+
+    def test_a_name_set_inside_a_bubble_is_measured_in_the_bold_it_is_set_in(self):
+        """A name inside a bubble is set in bold; measured in the regular face, its box was a regular name's width and the
+        bold name overran it, so a bubble chart drew only with its names turned off."""
+        result = run_node("""
+import {REGISTRY} from './skills/professional-slides/runtime/registry.mjs';
+const frame={x:60,y:150,width:760,height:430};
+const nodes=REGISTRY.get('chart.bubble').render({id:'hubs',frame,props:{points:[{name:'Istanbul',x:84,y:59,size:66000},{name:'Heathrow',x:84.5,y:-6,size:32000},{name:'Madrid',x:66,y:20,size:30000}],xMin:60,xMax:90,yMin:-20,yMax:80}}).nodes;
+const inside=nodes.filter(node=>node.role==='data-label'&&node.data?.inside);
+console.log(JSON.stringify({inside:inside.map(node=>({text:node.text,width:node.frame.width,bold:node.style.bold}))}));
+""")
+        self.assertTrue(result["inside"], "a bubble wide enough takes its name inside")
+        for label in result["inside"]:
+            self.assertTrue(label["bold"])

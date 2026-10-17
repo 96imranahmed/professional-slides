@@ -1,0 +1,13 @@
+{
+  "about": "The test classes `node evals/scripts/run_tests.mjs --fast` leaves out: the property sweeps, which compile or compose a page many times over a grid of forms, fixtures or settings, and the end-to-end authoring runs, which run author-deck.mjs as an author does. Each took over ~4.5 s of a worker when listed, and together most of the suite's CPU time. --fast is for iterating; the full suite (no flag) runs them too, and runs once before a commit or push. A key is a class (`module.Class`) or a whole module; tests/test_run_tests.py fails on a key that names nothing the runner schedules. Not to be confused with --slow, which adds the opt-in LibreOffice tests.",
+  "classes": {
+    "test_revision_streams.OneStaleRuleTests": "end to end: revisions made each way, authored and checked for what they left behind",
+    "test_revision_streams.OwnDeckReimportedTests": "end to end: a deck this runtime built, reimported and checked",
+    "test_revision_carry.CompileScopeTests": "end to end: the starter compiled in every mode, with --check and --plan",
+    "test_revision_carry.StaleTextTests": "end to end: --check on revisions that leave replaced words on another slide",
+    "test_revision_honest.WholeWordTests": "end to end: edits and the stale check run through --check",
+    "test_pages_parts.AuthoringFromPartsTests": "end to end: a sectioned deck compiled and checked against the single file",
+    "test_design_intake.OptionSheetRenderTests": "end to end: the design-intake CLI renders its option sheets",
+    "test_asset_needs.CompileNoticeTests": "end to end: a draft run that names the logos a build would fetch"
+  }
+}

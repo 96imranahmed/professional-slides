@@ -15,23 +15,21 @@ from __future__ import annotations
 
 import math
 import re
+import sys
+from pathlib import Path
 
-from gate_config import (
-    ARGUMENT_COMPONENTS, DATA_COMPONENTS, DECK_HABIT, FOOTER_TOP, GENERATED_PAGE, SOURCE_ROLES,
-    THRESHOLDS, TITLE_ROLES, WEIGHT, all_components, finding, font_size, is_cover, is_exhibit,
-    layout_of, photo_nodes, source_text, standing, text_nodes, top_level_instances,
-)
+from gate_config import FOOTER_TOP, THRESHOLDS, finding, font_size, layout_of, source_text, text_nodes
 from ink import CANVAS_W, SURFACE_LUMINANCE
-from render_gates import (
-    VOID_TOP, column_bands, column_repair, nodes_inside, scene_column_rows, side_columns, void_bands,
-)
+from render_gates import VOID_TOP, column_bands, column_repair, scene_column_rows, void_bands
 # The same measure estimated from the scene, so it runs at authoring, and the
 # scene's colours read the one way both scene measures read them.
-from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of
-from scene_ink import estimate as scene_ink_estimate
+from scene_ink import GLYPH_BAND, SHAPE_TYPES, canvas_of, color_of, grey_of, ground_at
 from text_stats import word_count
 # What a title counts is read, not matched (judgements.py).
-from judgements import judged
+
+# WCAG contrast, the one definition the scene and the emitter read (emit/color.py).
+sys.path.insert(1, str(Path(__file__).resolve().parent.parent / "emit"))
+from color import contrast  # noqa: E402
 
 
 # A shape that holds text is a container: a card, a panel, a tile, a table
@@ -67,12 +65,6 @@ def _text_box(node):
         y += (height - ink_h) / 2 if valign in ("mid", "middle", "center") else (height - ink_h) if valign == "bottom" else 0
         height = ink_h
     return x, y, width, height
-
-
-def scene_rows(slide):
-    """The occupied pixels on each canvas row above the footer, drawn from the
-    scene the way the render's void gates read the PNG (scene_mask)."""
-    return [row.count(1) for row in scene_mask(slide)]
 
 
 def scene_mask(slide):
@@ -285,318 +277,125 @@ def gate_scene_void(slide_no, slide, findings):
     if "column" in void:
         measured.update(column=void["column"], columnInternalVoid=round(void["internalVoid"], 4), columnDeadBand=round(void["deadBand"], 4),
                         **({"plot": True} if void.get("plot") else {}))
+    # The repair names only what the page has not done: a roadmap whose points already sat beside it was told to set them
+    # there, and the author rebuilt for nothing.
+    beside = any(n.get("type") == "text" and str(n.get("role") or "").startswith(("list-", "commentary", "point"))
+                 and (n.get("frame") or {}).get("x", 0) > CANVAS_W * 0.55 for n in slide.get("nodes", []))
     findings.append(finding(
         slide_no, "SCENE_VOID", measured, void["threshold"],
         column_repair(void) if "column" in void else
         "A band of the page (y {}-{}) carries nothing. Give the exhibit the height - the phases or rows "
         "with their detail, the chart at the frame's size - size tiles and cards to what they hold, start "
-        "the body under the title rather than centring it in air, set the commentary beside the exhibit "
-        "rather than under a strip of air, or merge the page with a neighbour. Do not stretch rows or pad "
-        "text to cover the band.".format(void["from"], void["to"]),
+        "the body under the title rather than centring it in air, {}or merge the page with a neighbour. Do not "
+        "stretch rows or pad text to cover the band.".format(void["from"], void["to"],
+            "" if beside else "set the commentary beside the exhibit rather than under a strip of air, "),
     ))
 
 
-# How much of its body a page inks, estimated from the scene (scene_ink.py):
-# the rendered measure strong analytical decks sit at a median of about 0.26
-# on, where a deck drawn as type on the canvas with hairlines sat at 0.18 with
-# the same words. `page_floor` is where a page with an exhibit reads light at
-# a glance: about half the lower quartile of strong pages (0.195), the level
-# of the lightest pages two real decks drew - a lone thin line, a table of text
-# on the page colour, white cards on cream measured 0.06-0.09. `deck_median`
-# is the level under which the deck as a whole reads light. Both advisory: the
-# estimate is fitted (R^2 0.90, mean error 0.017 a page), and the repair is a
-# construction, not a number to hit.
-SCENE_INK_THRESHOLDS = {"page_floor": 0.10, "deck_median": 0.20}
-SCENE_INK_REPAIR = (
-    "Give the exhibit its weight rather than adding words: keep the house surfaces on (a filled table "
-    "header and label column, filled cards, a lone line's markers and area, filled phase blocks - "
-    "style.tableHeader, style.tableLabels, style.cards, style.marks, style.timeline; no `headerBand: false`), "
-    "set loose rows of text as a table or cards, or pair a lone chart with a second exhibit that carries "
-    "its breakdown.")
+# Type and marks read against what they are set on (scene_ink.ground_at): the
+# page's canvas, or the band, panel or bar under them. The palette holds its ink
+# and primary to its canvas (palettes.mjs CANVAS_CONTRAST), and a page set on a
+# dark or a primary ground takes colours derived for that ground (groundTokens);
+# but a palette written with a dark canvas over the house's light-page series
+# drew a chart navy on navy, and every gate passed it. The bars are where type
+# and marks are lost, not WCAG's: the quietest type the runtime sets on its own
+# light page - a comparator's label in the rule grey, white on a pale series -
+# reads at 2.8:1, so `text` stops short of it; an exhibit is lost when none of
+# its marks reads at the palette's floor for a mark (2:1).
+GROUND_CONTRAST = {"text": 2.5, "marks": 2.0}
+GROUND_MARK_ROLES = frozenset({"chart-mark", "chart-line", "chart-marker", "chart-segment", "table-bar"})
 
 
-def analytical(slide, index):
-    """A page that argues: it carries an action title or a reading task and is
-    neither a cover nor a structural or generated page. The one definition
-    (weight.json analyticalPage) the census and the review's statistics count too."""
-    argues = bool(slide.get("readingTask")) or any(n.get("role") == "action-title" for n in slide.get("nodes", []))
-    return argues and not is_cover(slide, index) and not GENERATED_PAGE.match(str(slide.get("id") or ""))
-
-
-def gate_scene_ink(slide_no, slide, findings, ink=None):
-    """SCENE_INK. Advisory. A page with an exhibit whose scene will ink less
-    of its body than SCENE_INK_THRESHOLDS `page_floor` - the rendered measure,
-    estimated before the render (scene_ink.estimate). A page of prose is left
-    to its word floor: its weight is its words, and asking it for ink is
-    asking for padding. `ink` is the page's estimate when the caller has it."""
-    if not any(is_exhibit(c) for c in slide.get("componentInstances", [])):
-        return
-    ink = scene_ink_estimate(slide) if ink is None else ink
-    if ink >= SCENE_INK_THRESHOLDS["page_floor"]:
-        return
-    findings.append(finding(
-        slide_no, "SCENE_INK", ink, SCENE_INK_THRESHOLDS["page_floor"],
-        "The page will ink about {:.0%} of its body; a page with an exhibit reads light under {:.0%}. {}".format(
-            ink, SCENE_INK_THRESHOLDS["page_floor"], SCENE_INK_REPAIR),
-    ))
-
-
-def gate_deck_ink(slides, content_indexes, findings, estimate=scene_ink_estimate):
-    """DECK_INK. Advisory. The median analytical page's estimated ink against
-    SCENE_INK_THRESHOLDS `deck_median`: one light page can be right, a light
-    deck is a construction habit. Advisory rather than blocking, because the
-    remedy is a design choice the author makes page by page, and a bar that
-    blocks invites fills drawn to pass it. `estimate` reads one page's ink."""
-    each = {index + 1: round(estimate(slides[index]), 3) for index in content_indexes if analytical(slides[index], index)}
-    inks = list(each.values())
-    median = sorted(inks)[len(inks) // 2] if inks else 0
-    standing("DECK_INK", "median analytical page's estimated ink share of its body", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"], "min",
-             unit="share", applies=len(inks) >= DECK_HABIT["from"], each=each)
-    if len(inks) < DECK_HABIT["from"] or median >= SCENE_INK_THRESHOLDS["deck_median"]:
-        return
-    findings.append(finding(
-        None, "DECK_INK", round(median, 3), SCENE_INK_THRESHOLDS["deck_median"],
-        "The median analytical page will ink about {:.0%} of its body; strong decks carry about 26% with the "
-        "same words. Fix the construction across the deck, not the copy: {}".format(median, SCENE_INK_REPAIR),
-    ))
-
-
-def gate_thin_column(slide_no, slide, findings):
-    """THIN_COLUMN and POINT_DEPTH. The commentary column is a track the page
-    paid for: it reaches the bottom of the exhibit beside it, and its points
-    carry a sentence rather than a label."""
-    floor = WEIGHT.get("columnFill") or 0
-    depth = WEIGHT.get("pointWords") or 0
-    for column in side_columns(slide):
-        frame = column.get("frame") or {}
-        height = float(frame.get("height") or 0)
-        if height < 120:
-            continue
-        # A toned panel fills its own surface; what matters is the text in it.
-        content = nodes_inside(slide, frame, lambda n: n.get("type") in ("text", "image") or str(n.get("role") or "") in ("list-marker", "list-icon"))
-        if not content:
-            continue
-        bottom = max((n["frame"].get("y", 0) + n["frame"].get("height", 0)) for n in content)
-        reach = (bottom - frame.get("y", 0)) / height
-        if floor > 0 and reach < floor:
-            findings.append(finding(
-                slide_no, "THIN_COLUMN", round(reach, 3), floor,
-                "Inspect whether the commentary develops a useful consequence. "
-                "Center a complete sparse group or give its space to evidence; "
-                "add material only when a specific premise is missing.",
-            ))
-        if depth <= 0:
-            continue
-        items = [n for n in content if str(n.get("role") or "") in ("list-item", "list-lead")]
-        if len(items) >= 2:
-            words = sum(word_count(source_text(n)) for n in items)
-            leads = len([n for n in items if str(n.get("role")) == "list-lead"])
-            bodies = max(1, len(items) - leads)
-            mean = words / float(bodies)
-            if mean < depth:
-                findings.append(finding(
-                    slide_no, "POINT_DEPTH", round(mean, 1), depth,
-                    "The points are labels, not findings. Write each as a lead "
-                    "and a sentence: what the evidence says, and what follows "
-                    "from it for the decision.",
-                ))
-
-
-def gate_plot_span(slide_no, slide, findings):
-    """PLOT_SPAN. The marks should span the exhibit frame they were given. A bar
-    chart whose bars cross half its box is a page that paid for an exhibit and
-    printed a diagram."""
-    floor = WEIGHT.get("plotSpan") or 0
-    if floor <= 0:
-        return
-    for instance in slide.get("componentInstances", []):
-        component = str(instance.get("component") or "")
-        if component not in ("chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar"):
-            continue
-        frame = instance.get("frame") or {}
-        marks = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") == "chart-mark")
-        if len(marks) < 2:
-            continue
-        # A chart that brackets periods, flags events or carries a growth arrow
-        # spends that band on content, not on air: those bands are ink.
-        annotated = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") in (
-            "chart-period-label", "chart-event-label", "chart-annotation",
-            "chart-annotation-label", "chart-bracket-label", "chart-callout",
-            "chart-change-label", "chart-delta-label", "annotation-text",
-            "annotation-surface", "chart-badge", "chart-reference-label"))
-        if annotated:
-            continue
-        # Peers in a row share one plot frame: when the annotated panel reserves
-        # a band for its growth arrows, the panel beside it reserves the same
-        # band so their baselines coincide. That band is the row's, not this
-        # chart's failure to fill.
-        peer_annotated = False
-        for other in slide.get("componentInstances", []):
-            if other is instance or not str(other.get("component") or "").startswith("chart."):
+def ground_contrast(slide):
+    """What the page sets that is lost on its ground: each run of type that
+    reads under GROUND_CONTRAST `text` against what it sits on, and each exhibit
+    none of whose marks reads at `marks`, as [{kind, ratio, color, ground, role,
+    text | instance}], the least legible first."""
+    nodes = [n for n in slide.get("nodes", []) if n.get("frame")]
+    canvas = canvas_of(slide)
+    lost, marks = [], {}
+    for index, node in enumerate(nodes):
+        style, frame = node.get("style") or {}, node["frame"]
+        if node.get("type") == "text":
+            color = color_of(style.get("color"))
+            if not color or not word_count(source_text(node)):
                 continue
-            other_frame = other.get("frame") or {}
-            if abs(float(other_frame.get("y") or 0) - float(frame.get("y") or 0)) > 8:
+            x, y, w, h = _text_box(node)
+            ground = ground_at(nodes, index, x + w / 2, y + h / 2, canvas)
+            if ground and contrast(color, ground) < GROUND_CONTRAST["text"]:
+                lost.append({"kind": "text", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
+                             "role": node.get("role"), "text": " ".join(source_text(node).split())[:60], **_token(style.get("color"))})
+        elif node.get("role") in GROUND_MARK_ROLES:
+            color = color_of(style.get("stroke") if node.get("type") == "line" else style.get("fill")) or color_of(style.get("stroke"))
+            ground = ground_at(nodes, index, float(frame.get("x") or 0) + float(frame.get("width") or 0) / 2,
+                               float(frame.get("y") or 0) + float(frame.get("height") or 0) / 2, canvas)
+            if not color or not ground:
                 continue
-            if abs(float(other_frame.get("height") or 0) - float(frame.get("height") or 0)) > 8:
-                continue
-            if nodes_inside(slide, other_frame, lambda n: str(n.get("role") or "") in (
-                    "chart-period-label", "chart-event-label", "chart-annotation",
-                    "chart-annotation-label", "chart-bracket-label", "chart-callout",
-                    "chart-change-label", "chart-delta-label", "annotation-text",
-                    "annotation-surface", "chart-badge", "chart-reference-label")):
-                peer_annotated = True
-                break
-        if peer_annotated:
-            continue
-        # The marks are read with their names and values: a bar chart spends
-        # its width on the members' names and its values' gutters, which are
-        # the chart's own content, not air. Read on the bars alone, a change
-        # chart of six regions ("West Asia & Indian Ocean") with a bar below
-        # zero spanned 0.48 of its panel with every value on a tight scale, and
-        # nothing the author could tighten; what the gate is for - a loose
-        # scale, an empty reserved band - still leaves the span short.
-        def span_of(instance_frame, horizontal_axis):
-            instance_marks = nodes_inside(slide, instance_frame, lambda n: str(n.get("role") or "") == "chart-mark")
-            if len(instance_marks) < 2:
-                return None
-            inked = instance_marks + nodes_inside(slide, instance_frame, lambda n: str(n.get("role") or "") in ("data-label", "category-label"))
-            if horizontal_axis:
-                lo = min(m["frame"].get("x", 0) for m in inked)
-                hi = max(m["frame"].get("x", 0) + m["frame"].get("width", 0) for m in inked)
-                return (hi - lo) / max(1.0, float(instance_frame.get("width") or 1))
-            lo = min(m["frame"].get("y", 0) for m in inked)
-            hi = max(m["frame"].get("y", 0) + m["frame"].get("height", 0) for m in inked)
-            return (hi - lo) / max(1.0, float(instance_frame.get("height") or 1))
-
-        horizontal = component in ("chart.bar", "chart.stacked-bar")
-        span = span_of(frame, horizontal)
-        if span is None:
-            continue
-        # Small multiples share one value scale, so the panel holding the
-        # smaller series fills less of its frame by design: the panel that
-        # carries the scale proves it is honest.
-        peer_filled = False
-        for other in slide.get("componentInstances", []):
-            if other is instance or not str(other.get("component") or "") == component:
-                continue
-            other_frame = other.get("frame") or {}
-            if abs(float(other_frame.get("y") or 0) - float(frame.get("y") or 0)) > 8:
-                continue
-            if abs(float(other_frame.get("height") or 0) - float(frame.get("height") or 0)) > 8:
-                continue
-            other_span = span_of(other_frame, horizontal)
-            if other_span is not None and other_span >= floor:
-                peer_filled = True
-                break
-        if peer_filled:
-            continue
-        if span < floor:
-            findings.append(finding(
-                slide_no, "PLOT_SPAN", round(span, 3), floor,
-                "The marks use a fraction of the exhibit. Tighten the value "
-                "scale, drop the reserved annotation band if nothing annotates, "
-                "widen the bars for few categories, or give the freed width back "
-                "to the commentary column.",
-            ))
-            return
+            instance = (node.get("data") or {}).get("componentInstance") or node.get("id")
+            record = {"kind": "marks", "ratio": round(contrast(color, ground), 2), "color": color, "ground": ground,
+                      "role": node.get("role"), "instance": instance,
+                      **_token(style.get("stroke") if node.get("type") == "line" else style.get("fill") or style.get("stroke"))}
+            if instance not in marks or record["ratio"] > marks[instance]["ratio"]:
+                marks[instance] = record
+    lost += [record for record in marks.values() if record["ratio"] < GROUND_CONTRAST["marks"]]
+    return sorted(lost, key=lambda record: record["ratio"])
 
 
-def gate_thin_table(slide_no, slide, findings):
-    """THIN_TABLE. A table using a fraction of the page's row budget is a table
-    that stopped at the summary level."""
-    floor = WEIGHT.get("tableFill") or 0
-    if floor <= 0:
+def _token(value):
+    """The palette token a style colour is drawn from, as {"token": id}, where the scene names one."""
+    token = value.get("tokenId") if isinstance(value, dict) else None
+    return {"token": token} if isinstance(token, str) and token else {}
+
+
+def _reading(color, ground, bar):
+    """The nearest colour to `color` that reads at `bar` on `ground`, as (hex,
+    ratio): mixed toward black or white, whichever the ground stands further
+    from, a twentieth at a time; None where even the pole does not."""
+    pole = "#000000" if contrast("#000000", ground) >= contrast("#FFFFFF", ground) else "#FFFFFF"
+    a = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(pole[i:i + 2], 16) for i in (1, 3, 5)]
+    for step in range(1, 21):
+        mixed = "#" + "".join("{:02X}".format(round(x + (y - x) * step / 20)) for x, y in zip(a, b))
+        if contrast(mixed, ground) >= bar + 0.05:
+            return mixed, round(contrast(mixed, ground), 2)
+    return None
+
+
+def gate_ground_contrast(slide_no, slide, findings):
+    """GROUND_CONTRAST. Type, or an exhibit's marks, set where they cannot be
+    read: under GROUND_CONTRAST on the ground they sit on. One finding a page,
+    naming the least legible and how many more, the bar it is under, and the
+    key to change: where it sits on the page's own canvas, dark under colours
+    drawn for a light page, the palette's `color.canvas` and `tone`, which
+    derives the colours for the ground; elsewhere the palette token the type
+    or the marks are drawn in, with the nearest colour that reads there."""
+    lost = ground_contrast(slide)
+    if not lost:
         return
-    for instance in top_level_instances(slide):
-        if str(instance.get("component") or "") != "table":
-            continue
-        frame = instance.get("frame") or {}
-        height = float(frame.get("height") or 0)
-        if height < 200:
-            continue
-        rows = nodes_inside(slide, frame, lambda n: str(n.get("role") or "") in ("table-row-rule", "table-cell-text", "table-cell"))
-        if not rows:
-            continue
-        bottom = max((n["frame"].get("y", 0) + n["frame"].get("height", 0)) for n in rows)
-        used = (bottom - frame.get("y", 0)) / height
-        if used < floor:
-            findings.append(finding(
-                slide_no, "THIN_TABLE", round(used, 3), floor,
-                "The table uses a fraction of the page it was given. Bring the "
-                "next level of detail — the rows behind the summary, the column "
-                "that shows the basis — or make the table a strip and put the "
-                "freed height into the argument.",
-            ))
-            return
-
-
-def gate_numbers_on_marks(slide_no, slide, findings):
-    """NUMBERS_ON_MARKS. An exhibit page prints its numbers. A chart whose values
-    live on an axis makes the reader do arithmetic to quote it."""
-    if not WEIGHT.get("pageWords"):
-        return  # an airy deck speaks its numbers aloud; the page need not print them
-    charts = [c for c in slide.get("componentInstances", []) if str(c.get("component") or "").startswith("chart.")]
-    if not charts:
-        return
-    # A chart over its own data table (the model page) prints its figures in
-    # the table, one under each category, and leaves its marks unlabelled so
-    # each figure is printed once: the table's figures are the chart's.
-    labels = [n for n in text_nodes(slide) if str(n.get("role") or "") == "data-label"
-              or (str(n.get("role") or "") == "table-cell-text" and (n.get("data") or {}).get("chartData") is True)]
-    numeric = [n for n in labels if re.search(r"\d", source_text(n))]
-    marks = [n for n in slide.get("nodes", []) if str(n.get("role") or "") == "chart-mark"]
-    # While the marks are countable, every one of them carries its value: ten
-    # labelled bars is ten blocks of evidence, and it is what lets the axis go.
-    wanted = len(marks) if 0 < len(marks) <= 12 else 3
-    if len(numeric) >= wanted:
-        return
-    findings.append(finding(
-        slide_no, "NUMBERS_ON_MARKS", len(numeric), wanted,
-        "Inspect whether values needed for the claim are readable through direct "
-        "labels, a quantitative axis or anchored annotations. Label decisive "
-        "values; a raw mark count does not require labelling every observation.",
-    ))
-
-
-ANNOTATION_ROLES = {
-    "chart-period-label", "chart-event-label", "chart-annotation", "chart-annotation-label",
-    "chart-bracket-label", "chart-callout", "chart-change-label", "chart-delta-label",
-    "annotation-text", "annotation-surface", "chart-badge", "chart-reference-label",
-    "chart-period-divider", "category-note",
-}
-
-
-def gate_unannotated(slide_no, slide, findings):
-    """UNANNOTATED. A reference chart says what happened on the chart: a bracket
-    over the periods, a flag at the event, the change in a bubble, a note under
-    the category. A plot with nothing but marks hands the reading back to the
-    reader, and it is a page of marks where theirs is a page of evidence."""
-    if not WEIGHT.get("pageWords"):
-        return
-    # Only the charts that have somewhere to put an annotation: a waffle, a
-    # bubble grid or a treemap has no plot band to bracket, and asking for one
-    # would be asking for a page that cannot be built.
-    annotatable = {"chart.column", "chart.bar", "chart.stacked-column", "chart.stacked-bar",
-                   "chart.line", "chart.area", "chart.stacked-area", "chart.combo",
-                   "chart.range", "chart.waterfall", "chart.scatter", "chart.bubble"}
-    charts = [c for c in slide.get("componentInstances", []) if str(c.get("component") or "") in annotatable]
-    if not charts:
-        return
-    marks = [n for n in slide.get("nodes", []) if str(n.get("role") or "") == "chart-mark"]
-    # Two or more marks provide an opportunity for a useful local comparison.
-    # An advisory count cannot establish that a further annotation is needed.
-    if len(marks) < 2:
-        return
-    annotated = [n for n in slide.get("nodes", []) if str(n.get("role") or "") in ANNOTATION_ROLES]
-    if annotated:
-        return
-    findings.append(finding(
-        slide_no, "UNANNOTATED", 0, "one annotation on the chart",
-        "Check whether a decisive comparator, event or scope condition is "
-        "missing at its relevant mark. If so, add a supported local annotation. "
-        "A chart whose values, labels and title already establish the claim "
-        "does not need a redundant callout to satisfy this count.",
-    ))
+    worst = lost[0]
+    bar = GROUND_CONTRAST[worst["kind"]]
+    what = ('Type "{}" ({})'.format(worst["text"], worst["role"]) if worst["kind"] == "text"
+            else "Every mark of {}".format(worst["instance"]))
+    more = " and {} more like it".format(len(lost) - 1) if len(lost) > 1 else ""
+    said = "{} reads at {}:1 on its ground ({} on {}){}, under the {}:1 {} {} held to.".format(
+        what, worst["ratio"], worst["color"], worst["ground"], more, bar, "type" if worst["kind"] == "text" else "an exhibit's marks",
+        "is" if worst["kind"] == "text" else "are")
+    canvas, toned = canvas_of(slide), slide.get("ground") in ("dark", "primary")
+    if worst["ground"] == canvas and not toned and grey_of(canvas) < 128:
+        # A palette's dark canvas under the colours a light page is drawn in: the deck's tone derives them for the ground.
+        field = 'deck.palette.colors["color.canvas"]'
+        repair = (" The page's ground is `{}`, {}, a dark canvas under colours drawn for a light page: take `color.canvas` out of "
+                  "`deck.palette.colors` and set `deck.tone` to \"dark\" (or the page's `tone` to \"dark\" for this page alone), which "
+                  "derives every colour for that ground from the palette.").format(field, canvas)
+    else:
+        token, nearest = worst.get("token"), _reading(worst["color"], worst["ground"], bar)
+        field = 'deck.palette.colors["{}"]'.format(token) if token else None
+        fix = "{} ({}:1 on {})".format(nearest[0], nearest[1], worst["ground"]) if nearest else "a colour further from {}".format(worst["ground"])
+        repair = (" {} drawn in {}: set {} to {}, the nearest colour that reads there - every page drawing that token takes it - or set "
+                  "the page on a ground with `tone` (\"dark\" or \"primary\", on the deck or the page), which derives every colour for "
+                  "it.").format("The type is" if worst["kind"] == "text" else "The marks are", "`{}`".format(token) if token else worst["color"],
+                                "`{}`".format(field) if field else "its colour", fix)
+    findings.append(finding(slide_no, "GROUND_CONTRAST", {**worst, "count": len(lost), **({"field": field} if field else {})}, bar, said + repair))
 
 
 # A figure that draws a baseline or an axis has said it is a plot, and a plot's
@@ -660,67 +459,32 @@ def gate_unscaled_figure(slide_no, slide, findings):
             break
 
 
-# "Three of four", "five of the six": a title that counts is a title a reader
-# checks, in about a second, against the thing underneath it.
-NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
-COUNT_CLAIM = re.compile(
-    r"\b(?P<part>one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})\s+"
-    r"of\s+(?:the\s+)?(?P<whole>one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})\b", re.I)
+def gate_area_baseline(slide_no, slide, findings):
+    """AREA_BASELINE. A filled area whose baseline is not zero.
 
-
-def _count_word(text):
-    lowered = str(text).lower()
-    return NUMBER_WORDS.get(lowered, int(lowered) if lowered.isdigit() else None)
-
-
-def gate_title_count(slide_no, slide, findings):
-    """TITLE_COUNT. The title counts, and the page shows a different number.
-
-    "Three of four common tastes point at DC" over a 2x2 whose four panels end
-    DC, Marvel, DC, Marvel says three where the page shows two. A reader counts
-    to two in one second and stops trusting every other number in the deck.
-
-    Only a title that names both parts of a count is measured, and only against
-    a set of peers the page actually draws - four panel headings, six rows, ten
-    cards. What the title counts, and how many of the set carry it, is read
-    (title-count-check): a set that is not what the title counts passes.
+    An area encodes each value as the area between it and the baseline, so a
+    fill drawn down to a floor near the series' low makes a doubling look like
+    a five-fold rise: the BA retest's jet fuel line was filled to about USD 1.45
+    a gallon and its low-cost share to about 29%. The chart renderers fill from
+    zero or not at all (chart-line.mjs, charts-extra.mjs); this reads the scene
+    they drew, so a fill from any other floor - a new renderer's, a hand-drawn
+    one - is refused wherever it comes from.
     """
-    title = ""
-    for node in text_nodes(slide):
-        if str(node.get("role") or "") == "action-title":
-            title = source_text(node)
-            break
-    if not title:
-        return
-    claim = COUNT_CLAIM.search(title)
-    if not claim:
-        return
-    part, whole = _count_word(claim.group("part")), _count_word(claim.group("whole"))
-    if not part or not whole or part > whole or whole < 2 or whole > 12:
-        return
-    groups = {}
-    for node in text_nodes(slide):
-        role = str(node.get("role") or "")
-        if role in TITLE_ROLES or role in SOURCE_ROLES:
+    for node in slide.get("nodes", []):
+        if str(node.get("role") or "") != "chart-area":
             continue
-        groups.setdefault(role, []).append(source_text(node).strip())
-    for role, texts in groups.items():
-        if len(texts) != whole:
+        data = node.get("data") or {}
+        base = data.get("baselineValue")
+        if not isinstance(base, (int, float)) or isinstance(base, bool) or base == 0:
             continue
-        said = judged("title-count-check", {"title": title.strip(), "labels": texts}, None, slide_no)
-        if not said or said.get("verdict") != "disagrees":
-            continue
-        found = said.get("counted")
         findings.append(finding(
-            slide_no, "TITLE_COUNT", {"title": title[:70], "counted": found, "of": whole},
-            part,
-            f"The title says {claim.group(0)} and the page draws {found:g} of {whole} carrying what it counts. "
-            "A reader checks a count like this without meaning to, in about a second, and a "
-            "title its own exhibit contradicts costs the page every other number on it. Count it off "
-            "the exhibit and rewrite whichever is wrong.",
+            slide_no, "AREA_BASELINE",
+            {"node": node.get("id"), "series": data.get("series"), "baselineValue": base},
+            "an area filled from zero",
+            f"The area under {data.get('series') or 'a series'} is filled down to {base:g}, not to zero, so its "
+            "filled height overstates every change. Start the value scale at zero (drop a yMin above zero), or "
+            "draw the series as a line, which reads its change off its own scale.",
         ))
-        return
 
 
 def gate_heading_wraps(slide_no, slide, findings):
@@ -741,8 +505,12 @@ def gate_heading_wraps(slide_no, slide, findings):
         measure = wrapped if isinstance(wrapped, dict) else {}
         text = str(measure.get("text") or source_text(node))
         width, available = measure.get("width"), measure.get("available")
-        fit = (f" is {width}px on one line; this frame gives its heading {available}px, "
-               f"about {int(len(text) * available / width)} characters" if width and available else " wraps")
+        # The composer measures what of the heading fits its line (registry-chart-title.mjs): the cut to make, exactly.
+        fits = measure.get("fits") if isinstance(measure.get("fits"), dict) else None
+        room = (f": its first {fits['words']} word{'' if fits['words'] == 1 else 's'} ({fits['characters']} characters) fit, "
+                f"so a heading of {fits['characters']} characters or fewer, in words like these, sets on one line" if fits
+                else f", about {int(len(text) * available / width)} characters" if width and available else "")
+        fit = (f" is {width}px on one line; this frame gives its heading {available}px{room}" if width and available else " wraps")
         if measure.get("reason") == "unit":
             repair = (f"\"{text}\"{fit}. The unit is a phrase, so it cannot sit beside the heading: make it a unit "
                       "(\"$k\", \"% y/y\") and move the basis (\"published base-salary band\") into the note under the page.")
@@ -752,85 +520,3 @@ def gate_heading_wraps(slide_no, slide, findings):
         findings.append(finding(slide_no, "HEADING_WRAPS", text[:90], "one line", repair))
 
 
-def gate_thin_evidence(slide_no, slide, findings):
-    """Report exhibit multiplicity for semantic review, not as a proof quota.
-
-    One bridge can reconcile six quantities; one table can develop several
-    premises. Conversely, two empty comparisons do not establish an argument.
-    """
-    wanted = int(WEIGHT.get("elements") or 1)
-    if wanted < 2:
-        return
-    instances = [c for c in slide.get("componentInstances", [])
-                 if str(c.get("id") or "") not in ("chrome", "cover", "page-template")]
-    elements = len([c for c in instances if is_exhibit(c)])
-    if any(str(c.get("component") or "") == "metric" for c in instances):
-        elements += 1
-    if elements >= wanted:
-        return
-    findings.append(finding(
-        slide_no, "THIN_EVIDENCE", elements, wanted,
-        "Review whether the title's promised evidence is developed on this page. "
-        "Name any missing premise and repair its existing exhibit or content. "
-        "A complete standalone exhibit or developed synthesis needs no extra "
-        "component solely to meet this count.",
-    ))
-
-
-def gate_missing_argument(slide_no, slide, findings):
-    """MISSING_ARGUMENT. A page of photographs, or a two-sided comparison, with
-    no sentence that says what it means. A caption names what you are looking at;
-    it does not tell the reader that one side beats the other, or why that
-    matters. Data pages are exempt: their title and their marks carry the claim."""
-    components = all_components(slide)
-    if any(c.startswith("chart.") for c in components) or any(c in DATA_COMPONENTS for c in components):
-        return
-    exhibits = [c for c in top_level_instances(slide) if is_exhibit(c)]
-    photos = photo_nodes(slide)
-    comparison = len(exhibits) == 2
-    if not photos and not comparison:
-        return
-    if any(c in ARGUMENT_COMPONENTS for c in components):
-        return
-    findings.append(finding(
-        slide_no, "MISSING_ARGUMENT",
-        {"photos": len(photos), "panels": len(exhibits)},
-        "one insight, so-what or points column",
-        "State the missing interpretation or decision consequence in the "
-        "existing argument region: the page's `takeaway` (a closing sentence), "
-        "its `bar` under commentary \"so-what-bar\", or developed `points` "
-        "under commentary \"beside\" or \"below\" (a deck spec written by "
-        "hand: `soWhat` or an `insight`). Explain the comparison's result without "
-        "inventing a winner or adding a fixed number of commentary blocks.",
-    ))
-
-
-def gate_metric_stack(slide_no, slide, findings):
-    """METRIC_STACK. One or two big numbers parked above a table read as two
-    pages glued together: the number floats in air and the table starts again
-    below it. A number that the table proves belongs beside it."""
-    instances = top_level_instances(slide)
-    if any(str(c.get("component") or "").startswith("chart.") for c in instances):
-        return
-    rows = []
-    for instance in sorted(instances, key=lambda c: (c.get("frame") or {}).get("y", 0)):
-        component = str(instance.get("component") or "")
-        frame = instance.get("frame") or {}
-        if component == "metric":
-            if rows and rows[-1]["kind"] == "metric" and abs(rows[-1]["y"] - frame.get("y", 0)) < 8:
-                rows[-1]["count"] += 1
-                continue
-            rows.append({"kind": "metric", "y": frame.get("y", 0), "count": 1})
-        elif component in {"table", "comparison-table", "trend-rows"}:
-            rows.append({"kind": "table", "y": frame.get("y", 0), "count": 1})
-    for first, second in zip(rows, rows[1:]):
-        if first["kind"] == "metric" and second["kind"] == "table" and first["count"] <= 2:
-            findings.append(finding(
-                slide_no, "METRIC_STACK", {"tiles": first["count"]},
-                "three tiles in a strip, or the number beside the table",
-                "Move the number beside its evidence — `kpi: { value, label }` in "
-                "the side column with the table as the hero — or give the strip "
-                "three tiles so it reads as a row of measures rather than one "
-                "figure floating over a table.",
-            ))
-            return

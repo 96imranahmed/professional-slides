@@ -110,6 +110,10 @@ function candidates(sample){
   const values=[...(sample.series||[]).flatMap(s=>s.values),...(sample.values||[]).flat(),...(sample.low||[]),...(sample.high||[])].filter(Number.isFinite);
   const mid=values.length?Math.round((Math.min(...values)+Math.max(...values))/2):1;
   const first=members[0], last=members.at(-1), second=members[1]??first;
+  const lo=values.length?Math.min(...values):0, hi=values.length?Math.max(...values):1;
+  const sorted=[...new Set(values.filter(v=>v>0))].sort((a,b)=>a-b);
+  const gaps=sorted.slice(1).map((v,i)=>[v-sorted[i],sorted[i],v]).sort((a,b)=>b[0]-a[0]);
+  const cut=gaps.length?{from:gaps[0][1]+gaps[0][0]/4,to:gaps[0][2]-gaps[0][0]/4}:null;
   const names=[second,...series];
   return {
     annotations:[[{category:last,text:'A note on this mark'}],...series.map(s=>[{category:last,series:s,text:'A note on this mark'}])],
@@ -122,6 +126,22 @@ function candidates(sample){
     periods:[[{from:first,to:second,label:'Phase one'}]],
     events:[[{at:second,label:'Launch'}]],
     pointHighlights:[[{category:first}]],
+    // Bands and breaks (chart-bands.mjs, chart-categorical.mjs): a run of members, a value range, a ring of points, a cut
+    // across the widest gap between the values.
+    bands:[[{from:first,to:second,label:'A run'}],[{from:lo,to:hi,label:'A range'}],[{axis:'y',from:lo,to:hi}],[{points:[first,second]}]],
+    intervals:(sample.series||[]).slice(0,1).map(s=>[{low:s.values.map(v=>v-1),high:s.values.map(v=>v+1),label:'Range'}]),
+    valueBreak:cut?[cut]:[],
+    categoryBreaks:[[first]],
+    groupBrackets:[[{categories:[first,second]}]],
+    valueLabels:[[{category:first,ring:true}],...series.map(s=>[{category:first,series:s,ring:true}])],
+    segmentGrowth:[{from:first,to:last}],
+    seriesGrowth:[{from:first,to:last}],
+    stackBracket:series.length>1?[series.slice(0,2)]:[],
+    diverging:series.length>1?[series.length%2?{neutral:series[(series.length-1)/2]}:true]:[],
+    // A fit through the points (chart-scatter-pie.mjs): five points or more.
+    trendLine:(sample.points||[]).length>=5?[{method:'linear'}]:[],
+    // An icon beside a category's label (chart-categorical.mjs categoryIcons).
+    categoryIcons:first!==undefined?[{[first]:'plane'}]:[],
   };
 }
 const MARK_KEYS=['annotations','highlights','referenceLines','focusSeries','focus','changeAnnotations','pointHighlights','periods','events','annotationRail'];

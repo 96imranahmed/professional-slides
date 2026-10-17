@@ -3,17 +3,21 @@
 // waffle, bubble grid and marimekko measure their height from the same layout
 // they draw (`*Layout`), which their registry entries answer measureContent from.
 import { linePrimitive, rectPrimitive, stableId, textPrimitive, token, tokenValue, ellipsePrimitive, TOKENS, onFill } from "./core.mjs";
-import { formatValue } from "./value-format.mjs";
+import { bridgeLabelProps, formatValue } from "./value-format.mjs";
 import { measureText, ENGINE_RESERVE } from "./text-layout.mjs";
 import { FONT, INK, SECONDARY, PRIMARY, CHART_LABEL, AXIS_LABEL, LABEL_BAND, chartFrame, labelBold, textStyle, lineStyle, fillStyle,
-  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend } from "./chart-axes.mjs";
+  assertGridlineOption, resolveValueAxis, numericBounds, axes, tableSpan, GRID, legendRowsFor, SERIES, topLegend, SUBJECT, PEER } from "./chart-axes.mjs";
 import { withReferenceValues, withDecorations, normalizedHighlights } from "./chart-decorations.mjs";
 
 // A bridge's steps narrower than this share of their top are drawn on a broken scale (see `broken` below).
 const WATERFALL_BREAK_SHARE = 1 / 7;
 
 export function waterfall({ id, frame, props }) {
+  if (props.orientation !== undefined && !["vertical", "horizontal"].includes(props.orientation)) throw new Error(`${id}: a bridge's \`orientation\` is "vertical" (the default, steps across) or "horizontal" (steps down the page, names in a column)`);
+  if (props.orientation === "horizontal") return horizontalWaterfall({ id, frame, props });
   assertGridlineOption(props);
+  // Every label at the one precision at which the printed steps add up to the printed totals (value-format.mjs bridgeLabelProps).
+  const labelled = bridgeLabelProps(props);
   if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
   if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
   if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
@@ -78,7 +82,7 @@ export function waterfall({ id, frame, props }) {
       const y = bar.y + bar.height - 26 - dy;
       nodes.push(linePrimitive({ id: stableId(id, "axis-break", category, at), role: "chart-axis-break", x1: bar.x - 4, y1: y + 5, x2: bar.x + bar.width + 4, y2: y - 5, style: lineStyle(token("color.surface"), token("line.medium")) }));
     }
-    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, props) : `${value >= 0 ? "+" : ""}${formatValue(value, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: bar.x - 10, y: value < 0 ? yScale(end) + 3 : yScale(end) - 26, width: bar.width + 20, height: 24 }, text: isTotal ? formatValue(value, labelled) : `${value >= 0 ? "+" : ""}${formatValue(value, labelled)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "center") }));
     if (index > 0) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: plot.x + (index - 1) * span + span * 0.8, y1: yScale(previous), x2: plot.x + index * span + span * 0.2, y2: yScale(previous), style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
     const point = { x: bar.x + bar.width / 2, y: bar.y, changeX: bar.x + bar.width / 2, changeY: bar.y - 38 };
     pointMap.set(`value:${category}`, point);
@@ -89,6 +93,72 @@ export function waterfall({ id, frame, props }) {
     previous = end;
   });
   return withDecorations(nodes, { id, plot, props, pointMap, categoryMap, yScale });
+}
+
+// A horizontal bridge's rows: the least a step's row takes, the share of it its bar fills, and the room at the bar ends for a figure.
+const HBRIDGE = Object.freeze({ row: 26, bar: 0.62, labelRoom: 64, nameMax: 260 });
+/**
+ * A bridge read down the page (`orientation: "horizontal"`): each step a row,
+ * its name in a column at the left - names too long to sit under columns, a
+ * dozen steps a page wide - its bar running from where the last ended, and
+ * its figure at the bar's end. It takes its notes in the commentary: a callout
+ * or a reference line set here is refused rather than dropped.
+ */
+function horizontalWaterfall({ id, frame, props }) {
+  if (!Array.isArray(props.categories) || !props.categories.length || props.categories.some(category => typeof category !== "string" || !category.trim()) || new Set(props.categories).size !== props.categories.length) throw new Error("Waterfall charts require unique non-empty categories");
+  if (!Array.isArray(props.values) || props.values.length !== props.categories.length || props.values.some(value => !Number.isFinite(value))) throw new Error("Waterfall values must contain one finite value per category");
+  if (props.totals !== undefined && (!Array.isArray(props.totals) || props.totals.some(index => !Number.isInteger(index) || index < 0 || index >= props.categories.length) || new Set(props.totals).size !== props.totals.length)) throw new Error("Waterfall totals must contain unique valid category indices");
+  const labelled = bridgeLabelProps(props);
+  for (const key of ["annotations", "referenceLines", "changeAnnotations", "annotationRail", "periods", "events"]) {
+    const value = props[key];
+    if (Array.isArray(value) ? value.length : value) throw new Error(`${id}: a horizontal bridge takes its notes in the page's commentary - \`${key}\` is drawn on the vertical bridge; drop it or the orientation`);
+  }
+  // Each step's value is printed at its bar, so the horizontal bridge draws no scale: a scale asked of it is refused, not dropped.
+  assertGridlineOption(props);
+  if (props.gridlines === true || props.showValueAxis === true) throw new Error(`${id}: a horizontal bridge prints each step's value at its bar and draws no value axis or gridlines - drop \`${props.gridlines === true ? "gridlines" : "showValueAxis"}\`, or draw the vertical bridge`);
+  const running = [];
+  let total = 0;
+  props.values.forEach((value, index) => { total = props.totals?.includes(index) ? value : total + value; running.push(total); });
+  const n = props.categories.length, rowHeight = frame.height / n;
+  if (rowHeight < HBRIDGE.row) throw new Error(`${id}: ${n} steps need ${Math.ceil(n * HBRIDGE.row)}px down the page and have ${Math.floor(frame.height)}px; fewer steps, or the vertical bridge`);
+  const nameWidth = Math.min(HBRIDGE.nameMax, frame.width * 0.28);
+  const names = props.categories.map((category) => measureText(category, nameWidth, { fontFamily: tokenValue(FONT), fontSize: tokenValue(AXIS_LABEL) }));
+  const tallName = names.find((layout) => layout.height > rowHeight);
+  if (tallName) throw new Error(`${id}: the step "${props.categories[names.indexOf(tallName)]}" needs ${Math.ceil(tallName.height)}px and its row has ${Math.floor(rowHeight)}px; shorten it`);
+  const plot = { x: frame.x + nameWidth + 12 + HBRIDGE.labelRoom, y: frame.y, width: frame.width - nameWidth - 12 - 2 * HBRIDGE.labelRoom, height: frame.height };
+  if (plot.width < 160) throw new Error(`${id}: a horizontal bridge needs more width for its bars`);
+  // Steps that are a sliver of their totals are drawn as the vertical bridge draws them: the totals cut near their start and
+  // the scale opened on the band the steps move through (WATERFALL_BREAK_SHARE).
+  const steps = props.values.map((value, index) => (props.totals?.includes(index) ? null : [running[index] - value, running[index]])).filter(Boolean);
+  const stepLow = steps.length ? Math.min(...steps.flat()) : 0, stepHigh = steps.length ? Math.max(...steps.flat()) : 0;
+  const broken = props.yMin === undefined && props.yMax === undefined && steps.length > 0 && stepLow > 0 && running.every((level) => level > 0)
+    && stepHigh - stepLow < WATERFALL_BREAK_SHARE * stepHigh ? Math.max(0, stepLow - (stepHigh - stepLow)) : null;
+  const bounds = numericBounds(broken === null ? [0, ...running, ...steps.flat()] : [broken, ...running, ...steps.flat()], { min: broken ?? props.yMin, max: props.yMax, axis: "x", includeZero: broken === null, tight: true });
+  const xScale = (value) => plot.x + (value - bounds.min) / bounds.span * plot.width;
+  const nodes = broken === null ? [linePrimitive({ id: stableId(id, "zero-baseline"), role: "chart-axis", x1: xScale(0), y1: plot.y, x2: xScale(0), y2: plot.y + plot.height, style: lineStyle(INK) })] : [];
+  let previous = 0, lastBar = null;
+  props.categories.forEach((category, index) => {
+    const value = props.values[index], isTotal = props.totals?.includes(index);
+    const start = isTotal ? (broken ?? 0) : previous, end = isTotal ? value : previous + value;
+    const y = frame.y + index * rowHeight, barHeight = rowHeight * HBRIDGE.bar;
+    const bar = { x: xScale(Math.min(start, end)), y: y + (rowHeight - barHeight) / 2, width: Math.max(2, Math.abs(xScale(end) - xScale(start))), height: barHeight };
+    const fill = isTotal ? PRIMARY : value >= 0 ? token("color.chartSeries2") : token("color.chartSeries3");
+    nodes.push(rectPrimitive({ id: stableId(id, "bar", category), role: "chart-mark", frame: bar, style: fillStyle(fill), data: { category, value, total: Boolean(isTotal), ...(isTotal && broken !== null ? { axisBreak: broken } : {}) } }));
+    // The cut: two strokes of the page across the total near its start, so it reads as cut and not as short.
+    if (isTotal && broken !== null) for (const [at, dx] of [[0, 0], [1, 7]]) {
+      const x = bar.x + 22 + dx;
+      nodes.push(linePrimitive({ id: stableId(id, "axis-break", category, at), role: "chart-axis-break", x1: x - 5, y1: bar.y + bar.height + 4, x2: x + 5, y2: bar.y - 4, style: lineStyle(token("color.surface"), token("line.medium")) }));
+    }
+    const name = names[index];
+    nodes.push(textPrimitive({ id: stableId(id, "category", category), role: "category-label", frame: { x: frame.x, y: y + (rowHeight - name.height) / 2, width: nameWidth, height: name.height }, text: name.text, style: { ...textStyle(AXIS_LABEL, INK, Boolean(isTotal), "right"), valign: "top", lineHeight: name.lineHeight, wrap: false }, data: { textLayout: name } }));
+    // The figure at the end the step runs to: past the right end of a rise or a total, before the left end of a fall.
+    const text = isTotal ? formatValue(value, labelled) : `${value >= 0 ? "+" : ""}${formatValue(value, labelled)}`;
+    const right = isTotal || value >= 0;
+    nodes.push(textPrimitive({ id: stableId(id, "value-label", category), role: "data-label", frame: { x: right ? bar.x + bar.width + 4 : bar.x - HBRIDGE.labelRoom, y: y + (rowHeight - 24) / 2, width: HBRIDGE.labelRoom - 4, height: 24 }, text, style: textStyle(CHART_LABEL, INK, labelBold(), right ? "left" : "right"), data: { category, value } }));
+    if (lastBar) nodes.push(linePrimitive({ id: stableId(id, "connector", index), role: "chart-connector", x1: xScale(previous), y1: lastBar.y + lastBar.height, x2: xScale(previous), y2: bar.y, style: lineStyle(SECONDARY, token("line.hairline"), "dash") }));
+    previous = end; lastBar = bar;
+  });
+  return nodes;
 }
 
 /**
@@ -160,16 +230,21 @@ export function waffleLayout(frameIn, props) {
   const { columns, rows, cell } = best ?? shape(10);
   const pitch = cell * (1 + gapRatio);
   const blockWidth = columns * cell + (columns - 1) * cell * gapRatio, blockHeight = rows * cell + (rows - 1) * cell * gapRatio;
-  return { categories, values, percent, plot, slot, columns, rows, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight, height: (plot.y - frame.y) + labelBand + blockHeight + categoryBand + 8 };
+  // A unit chart draws one dot a unit, and its dots must fit the plot at their smallest: 1.8 million respondents drew 1.8
+  // million dots and ran the composer out of memory. Measured against a frame's height; a height-free measure has none.
+  const room = plot.height - labelBand - categoryBand;
+  const fits = !Number.isFinite(frameIn.height) || blockHeight <= room + 0.5;
+  return { categories, values, percent, plot, slot, columns, rows, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight, fits, room, height: (plot.y - frame.y) + labelBand + blockHeight + categoryBand + 8 };
 }
 export function waffleChart({ id, frame, props }) {
-  const { categories, values, percent, plot, slot, columns, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight } = waffleLayout(frame, props);
+  const { categories, values, percent, plot, slot, columns, rows, categoryLayouts, labelBand, categoryBand, cell, pitch, blockWidth, blockHeight, fits, room } = waffleLayout(frame, props);
+  if (!fits) throw new Error(`${id}: a unit chart draws one dot a unit, and ${Math.max(...values)} units need ${rows} rows of ${Math.round(cell)}px dots, ${Math.round(blockHeight)}px against the plot's ${Math.round(room)}px - draw the counts as columns or bars, or the shares as a unit chart of 100 (\`percent: true\`)`);
   const nodes = [];
   const fill = props.color ? token(props.color) : PRIMARY, empty = GRID;
   const picked = highlightedCategory(props, categories, id);
   categories.forEach((category, index) => {
     const lit = picked !== null && String(category) === picked;
-    const dotFill = lit ? token("color.accent") : fill;
+    const dotFill = lit ? SUBJECT : fill;
     const x0 = plot.x + index * slot + (slot - blockWidth) / 2;
     // Under the heading, not centred in the plot: what the dots leave is one
     // band at the foot, which a column gives to the block under it
@@ -229,7 +304,7 @@ export function bubbleGrid({ id, frame, props, tokens = TOKENS }) {
       const cx = L.plot.x + c * L.cellW + L.cellW / 2;
       const d = value > 0 ? Math.max(14, L.maxDiameter * Math.sqrt(value / L.max)) : 0;
       const lit = picked !== null && String(row) === picked;
-      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? token("color.accent") : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
+      if (d) nodes.push(ellipsePrimitive({ id: stableId(id, "bubble", row, column), role: "chart-mark", frame: { x: cx - d / 2, y: cy - d / 2, width: d, height: d }, style: fillStyle(lit ? SUBJECT : fill), data: { row, column, value, ...(lit ? { highlighted: true, highlightStyle: "bar" } : {}) } }));
       const inside = d >= 24;
       nodes.push(textPrimitive({ id: stableId(id, "value", row, column), role: "data-label", frame: inside || !d ? { x: cx - Math.max(d, 48) / 2, y: cy - 10, width: Math.max(d, 48), height: 20 } : { x: cx - 24, y: cy - d / 2 - 22, width: 48, height: 20 }, text: formatValue(value, props), style: textStyle(CHART_LABEL, inside ? insideColor : INK, labelBold(), "center") }));
     });
@@ -283,7 +358,7 @@ export function marimekko({ id, frame, props, tokens = TOKENS }) {
       const colorIndex = props.colorIndices?.[si] ?? si % SERIES.length;
       const lit = picked !== null && String(category) === picked;
       pointMap.set(`${sr.name}:${category}`, { x: x + w / 2, y: y + h / 2 });
-      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? token("color.accent") : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
+      nodes.push(rectPrimitive({ id: stableId(id, "segment", category, sr.name), role: "chart-mark", frame: { x, y, width: w, height: h }, style: fillStyle(SERIES[colorIndex], lit ? SUBJECT : token("color.surface")), data: { category, series: sr.name, value: v, share: v / total, colorIndex, ...(lit ? { highlighted: true, highlightStyle: "column" } : {}) } }));
       const text = props.percentLabels === false ? formatValue(v, props) : `${Math.round(100 * v / total)}%`;
       const label = measureText(text, Math.max(20, w - 6), { fontFamily: tokenValue(FONT), fontSize: tokenValue(CHART_LABEL), bold: labelBold() });
       if (h >= label.height + 4 && w >= label.width + 6) {
@@ -304,7 +379,10 @@ export function marimekko({ id, frame, props, tokens = TOKENS }) {
   return withDecorations(nodes, { id, plot, props: { ...props, highlights: [] }, pointMap, allowAnnotationRail: false });
 }
 
-export function rangeChart({ id, frame, props }) {
+export function rangeChart({ id, frame, props: authored }) {
+  // A member is picked out by its bar in the accent: a tint across a row of a range chart started after the row's name and
+  // ran past its rules.
+  const props = { ...authored, ...(Array.isArray(authored.highlights) ? { highlights: authored.highlights.map((h) => ({ style: "bar", ...h })) } : {}) };
   assertGridlineOption(props);
   const categories = props.categories || [];
   if (!categories.length || !Array.isArray(props.low) || !Array.isArray(props.high) || props.low.length !== categories.length || props.high.length !== categories.length) throw new Error("Range chart requires categories with one low and one high value each");
@@ -324,7 +402,7 @@ export function rangeChart({ id, frame, props }) {
     const low = props.low[index], high = props.high[index];
     const y = plot.y + index * rowSpan + (rowSpan - barHeight) / 2;
     const x0 = xScale(low), x1 = Math.max(xScale(high), x0 + 2);
-    const fill = barHighlight ? (barHighlight.category === category ? token("color.accent") : SERIES[0]) : SERIES[0];
+    const fill = barHighlight ? (barHighlight.category === category ? SUBJECT : PEER) : SERIES[0];
     nodes.push(rectPrimitive({ id: stableId(id, "range", category), role: "chart-mark", frame: { x: x0, y, width: x1 - x0, height: barHeight }, style: fillStyle(fill), data: { category, low, high, highlighted: barHighlight?.category === category } }));
     nodes.push(textPrimitive({ id: stableId(id, "low-label", category), role: "data-label", frame: { x: x0 - labelWidth - 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(low, props), style: textStyle(CHART_LABEL, INK, labelBold(), "right"), data: { category, end: "low" } }));
     nodes.push(textPrimitive({ id: stableId(id, "high-label", category), role: "data-label", frame: { x: x1 + 4, y: y - 2, width: labelWidth, height: barHeight + 4 }, text: formatValue(high, props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category, end: "high" } }));

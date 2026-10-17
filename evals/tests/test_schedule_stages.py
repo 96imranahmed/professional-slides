@@ -61,6 +61,12 @@ COMPOSE = '''
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 import { sceneGateFindings } from './skills/professional-slides/runtime/author-deck.mjs';
 import { stagesLayout } from './skills/professional-slides/runtime/schedule-stages.mjs';
+import { planRole } from './skills/professional-slides/runtime/derive-content.mjs';
+import { textWords } from './skills/professional-slides/runtime/text-contract.mjs';
+// A page's body words: its body, exhibit and qualification text, notes and sources left out.
+const textOf = (n) => String(n.data?.textLayout?.source ?? n.text ?? '');
+const bodyWords = (scene) => scene.nodes.filter((n) => n.type === 'text' && ['body', 'exhibit', 'qualification'].includes(planRole(n.role)) && !/^\s*(source|sources|note|notes|footnote)\b[:\s]/i.test(textOf(n)))
+  .reduce((sum, n) => sum + textWords(textOf(n)), 0);
 function measure(page) {
   const spec = { schema: 'professional-slides.deck/v3', id: 'sched', design: 'consulting', slides: [page] };
   let deck;
@@ -73,7 +79,7 @@ function measure(page) {
   const voids = [...gates.findings, ...gates.advisories].filter((f) => /VOID|DEAD_BAND/.test(f.code)).map((f) => ({ code: f.code, severity: f.severity, kind: f.measured?.kind, band: f.measured?.band }));
   const roles = own.filter((n) => n.type === 'text').reduce((m, n) => ({ ...m, [n.role]: (m[n.role] || 0) + 1 }), {});
   const texts = own.filter((n) => /-text$/.test(n.role));
-  return { words: scene.planBodyWords, roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
+  return { words: bodyWords(scene), roles, frame, inkBottom: Math.max(...own.map((n) => n.frame.y + (n.frame.height || 0))), after,
     rows: new Set(texts.map((n) => Math.round(n.frame.y))).size, columns: new Set(texts.map((n) => Math.round(n.frame.x))).size, voids,
     inside: own.every((n) => n.frame.x >= frame.x - 1 && n.frame.x + (n.frame.width || 0) <= frame.x + frame.width + 1 && n.frame.y + (n.frame.height || 0) <= frame.y + frame.height + 1) };
 }
@@ -115,14 +121,14 @@ class StageTests(unittest.TestCase):
                 self.assertLessEqual(page["after"]["y"] - (page["frame"]["y"] + page["frame"]["height"]), 17)
                 self.assertNotIn("internal", [v["kind"] for v in page["voids"]])
 
-    def test_a_page_with_stages_and_commentary_carries_no_blocking_void(self):
+    def test_a_page_with_stages_and_commentary_carries_no_void(self):
         for kind in ("roadmap", "timeline"):
             for count in (5, 7):
                 for layout in ("top", "left"):
                     with self.subTest(page=f"{kind}-{count}-{layout}"):
-                        self.assertEqual([v for v in self.pages[f"{kind}-{count}-{layout}"]["voids"] if v["severity"] == "blocker"], [])
+                        self.assertEqual(self.pages[f"{kind}-{count}-{layout}"]["voids"], [])
             # Seven stages hold a page on their own, over a closing bar.
-            self.assertEqual([v for v in self.pages[f"{kind}-7-full"]["voids"] if v["severity"] == "blocker"], [])
+            self.assertEqual(self.pages[f"{kind}-7-full"]["voids"], [])
 
     def test_nothing_is_stretched_to_cover_a_thin_page(self):
         # Three stages and a closing line are a third of a page: the group
@@ -131,7 +137,7 @@ class StageTests(unittest.TestCase):
         for kind in ("roadmap", "timeline"):
             page = self.pages[f"{kind}-3-full"]
             self.assertLess(page["frame"]["height"], 300)
-            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "blocker")])
+            self.assertEqual([(v["kind"], v["severity"]) for v in page["voids"]], [("dead", "advisory")])
 
     def test_the_frame_decides_between_columns_and_rows(self):
         # Beside the commentary the frame is tall: rows. Over three columns of
@@ -215,7 +221,7 @@ class RenderedScheduleTests(unittest.TestCase):
         forms = json.loads((SKILL / "examples" / "page-forms.pages.json").read_text(encoding="utf-8"))
         worked = json.loads((SKILL / "examples" / "page-types.pages.json").read_text(encoding="utf-8"))
         schedule = [page for page in forms["pages"] if page["type"] == "schedule"]
-        self.assertEqual(sorted(page["form"] for page in schedule), ["roadmap", "timeline"])
+        self.assertEqual(sorted(page["form"] for page in schedule), ["roadmap", "rollout", "timeline"])
         summary = next(page for page in worked["pages"] if page.get("type") == "summary")
         deck = {key: value for key, value in worked["deck"].items() if key != "workflow"}
         deck["id"] = "schedules"
@@ -237,7 +243,7 @@ class RenderedScheduleTests(unittest.TestCase):
             self.assertFalse(gates.get("pixelGatesSkipped"), "the page gates measured the renders")
             voids = [f for f in gates["findings"] if any(word in f["code"] for word in ("VOID", "DEAD_BAND"))]
             self.assertEqual(voids, [])
-            self.assertEqual(len(sorted((out / "rendered").glob("slide-*.png"))), 4)  # cover, summary, timeline, roadmap
+            self.assertEqual(len(sorted((out / "rendered").glob("slide-*.png"))), 5)  # cover, summary, timeline, roadmap, rollout
 
 
 if __name__ == "__main__":

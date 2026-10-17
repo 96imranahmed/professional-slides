@@ -1,10 +1,11 @@
 // Media primitives: a sample image read from assets/ on first use, a bitmap's
 // dimensions, the media node every embedded picture is drawn as (fitted or
 // cropped to its frame) - and a place's outline, where a compared place's
-// mark is its outline rather than a file - and a logo's frame inside its slot. The media
-// components are registry-media.mjs's.
+// mark is its outline rather than a file - a logo's frame inside its slot,
+// and a flag's: its frame, its hairline and the slot it keeps before its file
+// arrives. The media components are registry-media.mjs's.
 import { readFileSync } from "node:fs";
-import { primitive, shapePrimitive, token } from "./core.mjs";
+import { primitive, rectPrimitive, shapePrimitive, token } from "./core.mjs";
 import { readJsonSync } from "./cli.mjs";
 
 // The component samples' images, read and encoded when a sample is first
@@ -130,8 +131,44 @@ export function mediaNode({ id, frame, props, role = "image", fit = "contain" })
       width,
       height,
     },
+    // A flag carries a hairline round it, drawn as the picture's own outline:
+    // Japan's or Poland's white field on a white page has no edge otherwise.
+    ...(isFlag(props) ? { style: flagEdge() } : {}),
     data: { ...props, circular: false },
   });
+}
+
+// A flag's edge: the outline of its picture, and the stroke of its placeholder.
+const flagEdge = () => ({ stroke: token("color.rule"), lineWidth: token("line.hairline") });
+
+/** Whether a mark is a flag: a picture the compile planned from a country's name (flags.mjs). */
+export const isFlag = (media) => Boolean(media && typeof media === "object" && media.flag !== undefined);
+
+/** The proportions a flag is planned at before its file is read: the commonest, 2:3. */
+export const FLAG_ASPECT = 1.5;
+
+/**
+ * A flag's frame inside its slot: the slot's height (or `most`, if less) at
+ * the flag's own proportions, narrowed where a long flag would overrun the
+ * slot's width. Flags down a column share a height, as a reader runs down
+ * them, where logos share an area (logoFrame): Switzerland's square flag and
+ * Qatar's long one stand level, each as wide as it is drawn.
+ */
+export function flagFrame(box, width, height, { most = box.height, align = "center" } = {}) {
+  const aspect = width > 0 && height > 0 ? width / height : FLAG_ASPECT;
+  let h = Math.min(box.height, most), w = h * aspect;
+  if (w > box.width) { w = box.width; h = w / aspect; }
+  const x = align === "right" ? box.x + box.width - w : align === "left" ? box.x : box.x + (box.width - w) / 2;
+  return { x, y: box.y + (box.height - h) / 2, width: w, height: h };
+}
+
+/**
+ * The slot a planned flag keeps until its file is on disk: an empty frame at
+ * a flag's proportions in the muted surface, with the flag's hairline, which
+ * UNSOURCED_PICTURE counts as a picture nobody supplied.
+ */
+export function flagPlaceholder({ id, frame, role, data = {} }) {
+  return rectPrimitive({ id, role, frame, style: { fill: token("color.surfaceMuted"), ...flagEdge(), radius: token("radius.none") }, data });
 }
 
 /**

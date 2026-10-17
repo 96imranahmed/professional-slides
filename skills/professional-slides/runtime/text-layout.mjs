@@ -4,7 +4,22 @@ import { fontContext } from "./font-metrics.mjs";
 const measurements=new Map();
 const MAX_MEASUREMENTS=4096;
 function cachedMeasurement(key,fn){if(measurements.has(key)){const value=measurements.get(key);measurements.delete(key);measurements.set(key,value);return structuredClone(value);}const value=fn();measurements.set(key,structuredClone(value));if(measurements.size>MAX_MEASUREMENTS)measurements.delete(measurements.keys().next().value);return value;}
-function measureWidth(ctx,text){return cachedMeasurement(JSON.stringify([ctx.font,text]),()=>({width:ctx.measureText(text).width}));}
+// The bundled tables sum each character's advance with no kerning, so a string's width is the sum of its words' and
+// spaces' widths, exactly, in integer font units. Words are measured once per font (Pretext's prepare) and lines are
+// set by adding their units (its layout): no string is measured twice and no cache entry is copied.
+const UNITS = new Map();
+function unitsFor(ctx) {
+  let entry = UNITS.get(ctx.font);
+  if (!entry) {
+    const { face, scale } = ctx.faceOf();
+    const words = new Map();
+    const of = (text) => { let u = words.get(text); if (u === undefined) { u = 0; for (const char of text) { const cp = char.codePointAt(0); u += face.advances[cp] ?? (cp === 0x20 ? face.space : face.default); } if (words.size > 200000) words.clear(); words.set(text, u); } return u; };
+    entry = { of, scale };
+    UNITS.set(ctx.font, entry);
+  }
+  return entry;
+}
+function measureWidth(ctx,text){if(ctx.backend==="table"){const {of,scale}=unitsFor(ctx);return {width:of(String(text))*scale};}return cachedMeasurement(JSON.stringify([ctx.font,text]),()=>({width:ctx.measureText(text).width}));}
 
 // Line boxes sit on a 4px baseline grid: Arial's natural box is 1.117em, so every
 // size rounds up to the next multiple of 4px (12pt → 20px, 14pt → 24px, 24pt → 36px).
@@ -26,6 +41,7 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
   const ctx = fontContext();
   if (!ctx.hasFont(fontFamily)) throw new Error(`Required font is not installed: ${fontFamily}`);
   ctx.font = `${bold ? "bold" : "normal"} ${fontSize * 96 / 72}px "${fontFamily}"`;
+  if (ctx.backend === "table") return measureTextPrepared(ctx, text, width, wrapWidthRatio, fontSize);
   const lines = [];
   for (const paragraph of String(text ?? "").split("\n")) {
     let line = "";
@@ -43,6 +59,28 @@ export function measureText(text, width, { fontFamily = activeDesignTokens()?.["
   }
   const lineHeight = lineBox(fontSize);
   return { source: String(text ?? ""), text: lines.join("\n"), lines, width: Math.max(...lines.map((line) => measureWidth(ctx,line).width)), lineHeight, height: lines.length * lineHeight };
+}
+
+// The same wrap set by adding word units: a candidate line's width is its line's units, a space's and the word's.
+function measureTextPrepared(ctx, text, width, wrapWidthRatio, fontSize) {
+  const { of, scale } = unitsFor(ctx);
+  const space = of(" ");
+  const lines = [], units = [];
+  for (const paragraph of String(text ?? "").split("\n")) {
+    let line = "", lineUnits = 0;
+    for (const word of paragraph.split(/\s+/)) {
+      const wordUnits = of(word);
+      const candidate = line ? `${line} ${word}` : word, candidateUnits = line ? lineUnits + space + wordUnits : wordUnits;
+      if (line && candidateUnits * scale > width * wrapWidthRatio) {
+        lines.push(line); units.push(lineUnits);
+        line = word; lineUnits = wordUnits;
+      } else { line = candidate; lineUnits = candidateUnits; }
+      if (lineUnits * scale > width + 0.01) throw new Error(`Unbreakable text exceeds its width: ${line} (${Math.ceil(lineUnits * scale)}px in ${Math.floor(width)}px); widen its box, or shorten or hyphenate the word`);
+    }
+    lines.push(line); units.push(lineUnits);
+  }
+  const lineHeight = lineBox(fontSize);
+  return { source: String(text ?? ""), text: lines.join("\n"), lines, width: Math.max(...units.map((u) => u * scale)), lineHeight, height: lines.length * lineHeight };
 }
 
 // Styled runs share a single font family, point size and line box. Only emphasis

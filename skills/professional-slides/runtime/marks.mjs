@@ -2,7 +2,7 @@
 // process step, a table tracker, a map pin, an agenda item — is drawn here, so
 // they match to the pixel; every icon-in-a-circle likewise. Components pass a
 // frame and get primitives back; they never draw a numeral themselves.
-import { rectPrimitive, token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive } from "./core.mjs";
+import { rectPrimitive, token, tokenValue, stableId, textPrimitive, ellipsePrimitive, shapePrimitive, reversedType } from "./core.mjs";
 import { measureText } from "./text-layout.mjs";
 import { iconDefinition, unknownIcon } from "./icons.mjs";
 
@@ -45,7 +45,8 @@ export function iconMarker({ id, role = "icon", x, y, size, icon, tone = "outlin
   const ring = !["plain", "inverse", "accent", "faint"].includes(tone);
   // `accent`: the glyph alone in the house accent, so an icon list reads in the
   // same colour as the phrases it highlights.
-  const strokeColor = tone === "filled" || tone === "inverse" ? WHITE
+  // On a filled field the glyph takes that field's type: the band's pale type where the page itself is dark (core.mjs reversedFill).
+  const strokeColor = tone === "filled" ? WHITE : tone === "inverse" ? reversedType()
     : tone === "accent" ? token("color.accent")
     : tone === "muted" ? token("color.textSecondary")
     : tone === "faint" ? token("color.rule") : PRIMARY;

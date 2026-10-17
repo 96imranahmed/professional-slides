@@ -3,16 +3,20 @@
 // shapes (never a native chart), shares the plot frame, axes, legend and label
 // helpers of chart-axes.mjs and the decorations of chart-decorations.mjs, and
 // answers measureContent from its layout so a hug measurement responds to width.
-import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, onFill } from "./core.mjs";
+import { ellipsePrimitive, linePrimitive, rectPrimitive, shapePrimitive, stableId, textPrimitive, token, tokenValue, onFill } from "./core.mjs";
+import { contrastRatio } from "./color.mjs";
 import { formatValue } from "./value-format.mjs";
 import { AXIS_LABEL, CHART_LABEL, FONT, GRID, INK, MIN_PLOT_HEIGHT, PRIMARY, SECONDARY, SERIES, axes, axisLabelWidth, chartFrame, fillStyle,
-  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend } from "./chart-axes.mjs";
+  labelBold, legendRowsFor, lineStyle, markWeight, numericBounds, textStyle, topLegend, SUBJECT, PEER, CONTEXT_FILL, CONTEXT_LINE, rowLabels, rowNameNode } from "./chart-axes.mjs";
 import { withDecorations, withReferenceValues } from "./chart-decorations.mjs";
 import { TOKENS } from "./core.mjs";
+import { assertComparison } from "./chart-sense.mjs";
+import { spreadApart } from "./label-placement.mjs";
+import { datedRun } from "./axis-breaks.mjs";
 import { measureAt } from "./draw.mjs";
-import { timePositions, spacedLabelIndices } from "./time-axis.mjs";
+import { timePositions, spacedLabelIndices, missingPeriods } from "./time-axis.mjs";
+import { smallMultiplesChart, smallMultiplesLayout } from "./chart-small-multiples.mjs";
 
-const ACCENT = token("color.accent");
 const measure = (text, width, { bold = false, size = CHART_LABEL } = {}) => measureAt(text, width, { size, bold, font: FONT });
 const norm = (frame, x, y) => [Number(((x - frame.x) / frame.width).toFixed(6)), Number(((y - frame.y) / frame.height).toFixed(6))];
 const probe = (frame) => (Number.isFinite(frame.height) ? frame : { ...frame, height: 400 });
@@ -47,7 +51,8 @@ function slopeLayout(frameIn, props) {
   const frame = probe(frameIn);
   const { series, categories } = seriesOf(props, 1, 12);
   if (categories.length < 2 || categories.length > 4) throw new Error("Slope chart takes two to four periods");
-  const labelWidth = Math.max(90, ...series.map((sr) => Math.ceil(measure(`${sr.name}  ${formatValue(sr.values.at(-1), props)}`, 220, { bold: true }).width) + 8));
+  // Each side holds the widest of its own labels: a first value wider than the last ("Corporate  1,800") set past the frame.
+  const labelWidth = Math.max(90, ...series.flatMap((sr) => [sr.values[0], sr.values.at(-1)].map((v) => Math.ceil(measure(`${sr.name}  ${formatValue(v, props)}`, 220, { bold: true }).width) + 8)));
   // Callouts take their bands above the plot, as on any chart.
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth, valueLabelInset: labelWidth, centerPlot: false, annotations: props.annotations });
   const bounds = numericBounds(withReferenceValues(series.flatMap((sr) => sr.values), props), { min: props.yMin, max: props.yMax, axis: "y", tight: true });
@@ -57,7 +62,8 @@ function slopeChart({ id, frame, props }) {
   const { series, categories, plot, bounds } = slopeLayout(frame, props);
   // A slope's lines are its series, so a highlight names one of them.
   assertHighlighted(id, props, series.map((sr) => sr.name), "the series a slope draws");
-  const subjects = series.filter((sr) => highlighted(props, sr.name));
+  // The subject is a highlighted line or the focus series, as on a line chart.
+  const subjects = series.filter((sr) => highlighted(props, sr.name) || props.focusSeries === sr.name);
   const subject = series.length === 1 ? series[0] : subjects.length === 1 ? subjects[0] : null;
   // A callout points at one series in one period; with several lines and no
   // single subject, a period alone does not say which.
@@ -70,15 +76,8 @@ function slopeChart({ id, frame, props }) {
     nodes.push(linePrimitive({ id: stableId(id, "column", c), role: "chart-gridline", x1: xAt(i), y1: plot.y, x2: xAt(i), y2: plot.y + plot.height, style: lineStyle(GRID, token("line.hairline")) }));
     nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - 60, y: plot.y + plot.height + 12, width: 120, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, true, "center") }));
   });
-  // End labels push apart when series finish close together.
-  const place = (side) => {
-    const rows = series.map((sr, si) => ({ si, y: yAt(side === "left" ? sr.values[0] : sr.values.at(-1)) - 10 })).sort((a, b) => a.y - b.y);
-    for (let i = 1; i < rows.length; i++) rows[i].y = Math.max(rows[i].y, rows[i - 1].y + 20);
-    const overflow = rows.length ? rows.at(-1).y + 20 - (plot.y + plot.height) : 0;
-    if (overflow > 0) for (const r of rows) r.y -= overflow;
-    for (let i = rows.length - 2; i >= 0; i--) rows[i].y = Math.min(rows[i].y, rows[i + 1].y - 20);
-    return new Map(rows.map((r) => [r.si, r.y]));
-  };
+  // End labels push apart when series finish close together (label-placement.mjs spreadApart).
+  const place = (side) => new Map(spreadApart(series.map((sr) => yAt(side === "left" ? sr.values[0] : sr.values.at(-1)) - 10), 20, frame.y, plot.y + plot.height).map((y, si) => [si, y]));
   const left = place("left"), right = place("right");
   const pointMap = new Map();
   series.forEach((sr) => categories.forEach((c, i) => {
@@ -87,8 +86,9 @@ function slopeChart({ id, frame, props }) {
     if (sr === subject) pointMap.set(`value:${c}`, point);
   }));
   series.forEach((sr, si) => {
-    const focus = highlighted(props, sr.name) || (series.length === 1);
-    const color = focus ? (series.length === 1 ? PRIMARY : ACCENT) : token("color.chartGrid");
+    // No subject, every line is data and takes the lead colour; with one, it takes the subject's and the rest are context.
+    const focus = subjects.includes(sr) || series.length === 1 || !subjects.length;
+    const color = series.length === 1 || !subjects.length ? PRIMARY : focus ? SUBJECT : CONTEXT_LINE;
     const width = focus ? token("line.standard") : token("line.hairline");
     for (let i = 1; i < categories.length; i++) nodes.push(linePrimitive({ id: stableId(id, "segment", sr.name, i), role: "chart-line", x1: xAt(i - 1), y1: yAt(sr.values[i - 1]), x2: xAt(i), y2: yAt(sr.values[i]), style: lineStyle(color, width), data: { series: sr.name, highlighted: focus } }));
     categories.forEach((c, i) => nodes.push(ellipsePrimitive({ id: stableId(id, "point", sr.name, c), role: "chart-mark", frame: { x: xAt(i) - 4, y: yAt(sr.values[i]) - 4, width: 8, height: 8 }, style: fillStyle(color), data: { series: sr.name, category: c, value: sr.values[i] } })));
@@ -114,10 +114,13 @@ function lollipopLayout(frameIn, props) {
   const plot = chartFrame(frame, { topInset: props.plotTopInset, leftInset: labelWidth + 8 + (negative ? valueWidth + 4 : 0), valueLabelInset: valueWidth + 12, centerPlot: false });
   const bounds = numericBounds(series[0].values, { min: props.xMin, max: props.xMax, axis: "x", includeZero: true });
   const rowHeight = Math.min(72, (plot.height + 24) / categories.length);
-  return { series, categories, plot, bounds, labelWidth, valueWidth, rowHeight, height: rowsHeight(frame, plot, categories.length) };
+  return { series, categories, plot, bounds, labelWidth, valueWidth, negativeGutter: negative ? valueWidth + 4 : 0, rowHeight, height: rowsHeight(frame, plot, categories.length) };
 }
 function lollipopChart({ id, frame, props }) {
-  const { series, categories, plot, bounds, labelWidth, valueWidth, rowHeight } = lollipopLayout(frame, props);
+  const { series, categories, plot, bounds, labelWidth, valueWidth, negativeGutter, rowHeight } = lollipopLayout(frame, props);
+  // Crowded rows are named by the shared rule (chart-axes.mjs rowLabels), the subject always.
+  const rows = rowLabels({ categories, span: rowHeight, named: new Set(categories.filter((c) => highlighted(props, c))) });
+  rows.lit = categories.some((c) => highlighted(props, c));
   assertHighlighted(id, props, categories, "the members a lollipop ranks");
   const xAt = (v) => plot.x + (v - bounds.min) / bounds.span * plot.width;
   const zero = xAt(Math.max(bounds.min, Math.min(0, bounds.max)));
@@ -129,14 +132,15 @@ function lollipopChart({ id, frame, props }) {
     pointMap.set(`${series[0].name}:${c}`, { x: xAt(v), y });
     categoryMap.set(c, { x: plot.x, y: y - rowHeight / 2, width: plot.width, height: rowHeight });
     const focus = highlighted(props, c);
-    const color = focus ? ACCENT : PRIMARY;
-    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right") }));
+    const color = focus ? SUBJECT : rows.lit ? PEER : PRIMARY;
+    // The name sits left of the gutter a negative value's label takes, not over it: "-24" was set on "Lufthansa Group".
+    if (rows.shown(i)) nodes.push(rowNameNode({ id, category: c, x: plot.x - labelWidth - 8 - negativeGutter, cy: y, width: labelWidth, size: rows.size, bold: focus }));
     nodes.push(linePrimitive({ id: stableId(id, "stem", c), role: "chart-line", x1: zero, y1: y, x2: xAt(v), y2: y, style: lineStyle(color, token("line.standard")), data: { category: c, value: v } }));
     nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c), role: "chart-mark", frame: { x: xAt(v) - 7, y: y - 7, width: 14, height: 14 }, style: fillStyle(color), data: { category: c, value: v, highlighted: focus } }));
     const label = v < 0
       ? { frame: { x: xAt(v) - 12 - valueWidth, y: y - 10, width: valueWidth, height: 20 }, align: "right" }
       : { frame: { x: xAt(v) + 12, y: y - 10, width: Math.max(20, frame.x + frame.width - xAt(v) - 12), height: 20 }, align: "left" };
-    nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: label.frame, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), label.align), data: { category: c } }));
+    if (rows.shown(i)) nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: label.frame, text: formatValue(v, props), style: textStyle(rows.size === AXIS_LABEL ? CHART_LABEL : rows.size, INK, labelBold(), label.align), data: { category: c } }));
   });
   // Callouts and reference lines are the shared chart decorations; the subject
   // is already drawn in the accent above, so highlights are not drawn twice.
@@ -169,6 +173,8 @@ export function dumbbellChart({ id, frame, props }) {
   // the eye from a label across the empty half of the plot to its dots.
   const weight = markWeight(), dot = Math.round(14 * weight.dot), r = dot / 2;
   const pointMap = new Map(), categoryMap = new Map();
+  // Crowded rows are named by the shared rule (chart-axes.mjs rowLabels), the subject always.
+  const rows = rowLabels({ categories, span: rowHeight, named: new Set(categories.filter((c) => (props.highlights || []).some((h) => h?.category === c || h === c))) });
   categories.forEach((c, i) => {
     const y = plot.y + i * rowHeight + rowHeight / 2, a = series[0].values[i], b = series[1].values[i];
     // A callout names a state by its series; naming the category alone, it
@@ -184,12 +190,12 @@ export function dumbbellChart({ id, frame, props }) {
     // The subject's row (`highlights: [{ category }]`): its name set bold and
     // the change between its states drawn in the accent.
     const focus = (props.highlights || []).some((h) => h?.category === c || h === c);
-    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8 - valueGutter, y: y - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, focus, "right"), data: { category: c } }));
-    nodes.push(linePrimitive({ id: stableId(id, "bar", c), role: "chart-line", x1: xAt(a), y1: y, x2: xAt(b), y2: y, style: lineStyle(focus ? ACCENT : weight.bands ? token("color.rule") : GRID, weight.connector), data: { category: c, ...(focus ? { highlighted: true } : {}) } }));
+    if (rows.shown(i)) nodes.push(rowNameNode({ id, category: c, x: plot.x - labelWidth - 8 - valueGutter, cy: y, width: labelWidth, size: rows.size, bold: focus }));
+    nodes.push(linePrimitive({ id: stableId(id, "bar", c), role: "chart-line", x1: xAt(a), y1: y, x2: xAt(b), y2: y, style: lineStyle(focus ? SUBJECT : weight.bands ? CONTEXT_LINE : GRID, weight.connector), data: { category: c, ...(focus ? { highlighted: true } : {}) } }));
     [a, b].forEach((v, si) => {
       nodes.push(ellipsePrimitive({ id: stableId(id, "dot", c, series[si].name), role: "chart-mark", frame: { x: xAt(v) - r, y: y - r, width: dot, height: dot }, style: fillStyle(colorFor(props, si)), data: { category: c, series: series[si].name, value: v, ...(focus ? { highlighted: true } : {}) } }));
       const leftMost = si === (a <= b ? 0 : 1);
-      nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - r - 5 - valueWidth : xAt(v) + r + 5, y: y - 10, width: valueWidth, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
+      if (rows.shown(i)) nodes.push(textPrimitive({ id: stableId(id, "value", c, series[si].name), role: "data-label", frame: { x: leftMost ? xAt(v) - r - 5 - valueWidth : xAt(v) + r + 5, y: y - 10, width: valueWidth, height: 20 }, text: formatValue(v, props), style: textStyle(CHART_LABEL, INK, labelBold(), leftMost ? "right" : "left"), data: { category: c, series: series[si].name } }));
     });
   });
   // Callouts and reference lines are the shared chart decorations (chart-decorations.mjs):
@@ -223,16 +229,18 @@ function bulletChart({ id, frame, props }) {
   categories.forEach((c, i) => {
     const y = plot.y + i * rowHeight, band = Math.max(14, rowHeight * 0.6), y0 = y + (rowHeight - band) / 2;
     const v = series[0].values[i], t = targets[i];
-    nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: plot.x - labelWidth - 8, y: y + rowHeight / 2 - 10, width: labelWidth, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "right") }));
+    nodes.push(rowNameNode({ id, category: c, x: plot.x - labelWidth - 8, cy: y + rowHeight / 2, width: labelWidth }));
     const stops = ranges.length ? ranges[i] : [bounds.max];
     let from = bounds.min;
     stops.forEach((stop, k) => {
       nodes.push(rectPrimitive({ id: stableId(id, "band", c, k), role: "chart-band", frame: { x: xAt(from), y: y0, width: Math.max(0, xAt(Math.min(stop, bounds.max)) - xAt(from)), height: band }, style: fillStyle(bandShades[Math.min(k, 2)]), data: { category: c, band: k } }));
       from = Math.min(stop, bounds.max);
     });
+    // The target is a tick in the ink, across the band: in the accent it took the bar's own colour wherever the palette leads
+    // with the accent (midnight, the BA house blue).
     const met = v >= t;
     nodes.push(rectPrimitive({ id: stableId(id, "measure", c), role: "chart-mark", frame: { x: xAt(bounds.min), y: y0 + band * 0.3, width: Math.max(0, xAt(v) - xAt(bounds.min)), height: band * 0.4 }, style: fillStyle(met ? PRIMARY : INK), data: { category: c, value: v, target: t, met } }));
-    nodes.push(linePrimitive({ id: stableId(id, "target", c), role: "chart-reference-line", x1: xAt(t), y1: y0 - 3, x2: xAt(t), y2: y0 + band + 3, style: lineStyle(ACCENT, token("line.standard")), data: { category: c, target: t } }));
+    nodes.push(linePrimitive({ id: stableId(id, "target", c), role: "chart-reference-line", x1: xAt(t), y1: y0 - 3, x2: xAt(t), y2: y0 + band + 3, style: lineStyle(INK, token("line.standard")), data: { category: c, target: t } }));
     nodes.push(textPrimitive({ id: stableId(id, "value", c), role: "data-label", frame: { x: xAt(Math.max(v, t)) + 10, y: y + rowHeight / 2 - 10, width: Math.max(20, frame.x + frame.width - xAt(Math.max(v, t)) - 10), height: 20 }, text: `${formatValue(v, props)} / ${formatValue(t, props)}`, style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { category: c } }));
   });
   return nodes;
@@ -315,11 +323,20 @@ function treemapLayout(frameIn, props) {
 function treemapChart({ id, frame, props, tokens = TOKENS }) {
   const { items, rects, keyed, key, body } = treemapLayout(frame, props);
   assertHighlighted(id, props, items.map((item) => item.label), "the tiles a treemap draws");
+  // A treemap compares sizes: tiles within a factor of two of each other read as equal, and the area says nothing - the
+  // Spacebar deck drew a rubric of five 15s and a 25 as six near-equal tiles.
+  const values = items.map((item) => item.value).filter((value) => value > 0);
+  if (values.length > 1 && Math.max(...values) < 2 * Math.min(...values))
+    throw new Error(`NO_COMPARISON: ${id}: the tiles run from ${Math.min(...values)} to ${Math.max(...values)}, within a factor of two of each other, so they read as equal and their areas compare nothing - set the parts as bars, or as a table with what each part holds`);
   const total = items.reduce((s, it) => s + it.value, 0);
   const hasFocus = items.some(item => highlighted(props, item.label));
+  // Tiles in the palette's mid colours: a series that reads as type (10:1 on the page, a near-black navy) is left to the
+  // subject, or a treemap of equals sets every other tile near-black.
+  const canvas = tokenValue(token("color.canvas")), mid = SERIES.filter((color) => contrastRatio(tokenValue(color), canvas) < 10);
+  const tileColor = (index) => (props.colorIndices ? colorFor(props, index) : (mid.length ? mid : SERIES)[Math.min(index, 5) % (mid.length || SERIES.length)]);
   const nodes = [];
   rects.forEach(({ item, frame: r }, index) => {
-    const fill = highlighted(props, item.label) ? ACCENT : hasFocus ? token("color.chartComparator") : colorFor(props, Math.min(index, 5));
+    const fill = highlighted(props, item.label) ? SUBJECT : hasFocus ? CONTEXT_FILL : tileColor(index);
     const tile = tileOf(r);
     nodes.push(rectPrimitive({ id: stableId(id, "tile", item.label), role: "chart-mark", frame: tile, style: fillStyle(fill, token("color.surface")), data: { label: item.label, value: item.value, share: item.value / total } }));
     const color = onFill(fill);
@@ -396,7 +413,7 @@ function boxPlotChart({ id, frame, props }) {
   const nodes = [...axes(id, plot, bounds.min, bounds.max, 4, { gridlines: props.gridlines === true, showValueAxis: true, labelWidth })];
   categories.forEach((c, i) => {
     const b = boxes[i], cx = plot.x + slot * i + slot / 2, focus = highlighted(props, c);
-    const color = focus ? ACCENT : PRIMARY;
+    const color = focus ? SUBJECT : categories.some((other) => highlighted(props, other)) ? PEER : PRIMARY;
     nodes.push(linePrimitive({ id: stableId(id, "whisker", c), role: "chart-line", x1: cx, y1: yAt(b.max), x2: cx, y2: yAt(b.min), style: lineStyle(INK, token("line.hairline")), data: { category: c } }));
     for (const [k, v] of [["cap-max", b.max], ["cap-min", b.min]]) nodes.push(linePrimitive({ id: stableId(id, k, c), role: "chart-line", x1: cx - boxW / 4, y1: yAt(v), x2: cx + boxW / 4, y2: yAt(v), style: lineStyle(INK, token("line.hairline")) }));
     nodes.push(rectPrimitive({ id: stableId(id, "box", c), role: "chart-mark", frame: { x: cx - boxW / 2, y: yAt(b.q3), width: boxW, height: Math.max(1, yAt(b.q1) - yAt(b.q3)) }, style: fillStyle(color, token("color.surface")), data: { category: c, ...b } }));
@@ -418,19 +435,31 @@ function stackedAreaLayout(frameIn, props) {
   const bounds = numericBounds([0, ...totals], { min: 0, max: props.yMax, axis: "y" });
   const labelWidth = axisLabelWidth(bounds);
   // Callouts take their bands above the plot, as on any chart.
-  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: 70, centerPlot: false, annotations: props.annotations });
-  return { series, categories, totals, bounds, labelWidth, plot, height: aspectHeight(frame, plot) };
+  // Each layer's latest value is set past the plot's right end, in a gutter as wide as the widest of them.
+  const endWidth = Math.max(64, ...series.map((s) => Math.ceil(measure(formatValue(s.values.at(-1), props), 1000, { bold: labelBold() }).width) + 6));
+  const plot = chartFrame(frame, { topInset: props.plotTopInset, topLegend: props.legend !== false ? legendRowsFor(series.map((s) => s.name), frame) : false, leftInset: Math.max(labelWidth + 8, 54), valueLabelInset: endWidth + 6, centerPlot: false, annotations: props.annotations });
+  return { series, categories, totals, bounds, labelWidth, endWidth, plot, height: aspectHeight(frame, plot) };
 }
 function stackedAreaChart({ id, frame, props }) {
   // Opaque layers fill the plot from the baseline: a reference line drawn
   // behind them shows only above the stack, and its label sits on the fills.
   if ((props.referenceLines || []).length) throw new Error(`${id}: a stacked area's layers fill the plot and would hide a reference line behind them - state the level in a callout at the period the total reaches it, or draw the total as a line chart with its reference line`);
-  const { series, categories, totals, bounds, labelWidth, plot } = stackedAreaLayout(frame, props);
-  // Uneven dated observations sit where they fall in time (time-axis.mjs), and
-  // only the labels whose 80px slots clear their neighbours' are set.
+  const { series, categories, totals, bounds, labelWidth, endWidth, plot } = stackedAreaLayout(frame, props);
+  assertComparison({ id, categories, series, span: bounds.span, props, dated: datedRun(categories) });
+  // Layers fill from zero, so a rank (measures.mjs isRankMeasure) is never one; and a fill carried across periods the run
+  // leaves out (time-axis.mjs missingPeriods) states values the record does not have - the BA retest's stack of Heathrow's
+  // passengers drew about 70m through 2020-21, when it carried about 20m. A line breaks at the gap; columns stand apart.
+  const ranks = series.filter((s) => s.rank === true);
+  if (ranks.length) throw new Error(`RANK_FILLED: ${ranks.map((s) => s.name).join(", ")} is a rank, and a filled layer draws the worst place as the largest - draw it as chart.line, which sets 1 at the top`);
+  const gaps = missingPeriods(categories);
+  if (gaps.length) throw new Error(`AREA_GAP: the run leaves out the periods between ${gaps.map((gap) => `${gap.from} and ${gap.to}`).join(", ")}, and a stacked area would fill straight across them - draw stacked columns (each period its own stack), or the series as chart.line, which breaks at a gap`);
+  // Uneven dated observations sit where they fall in time (time-axis.mjs), and the periods named, evenly spaced or not, are
+  // those whose labels clear their neighbours' (spacedLabelIndices): 24 months each named printed on one another.
   const spacing = timePositions(categories);
   const xAt = (i) => plot.x + plot.width * (spacing ? spacing[i] : i / Math.max(1, categories.length - 1));
-  const labelled = spacing ? spacedLabelIndices(categories.map((_, i) => xAt(i)), 84) : categories.map((_, i) => i);
+  const widest = Math.max(...categories.map((c) => measure(c, 1000, { size: AXIS_LABEL }).width));
+  const labelled = spacedLabelIndices(categories.map((_, i) => xAt(i)), widest + 10);
+  const slot = Math.max(80, widest + 4);
   const yAt = (v) => plot.y + plot.height - (v - bounds.min) / bounds.span * plot.height;
   const nodes = [
     ...(props.legend !== false ? topLegend({ id, frame, items: series.map((s, i) => ({ label: s.name, colorIndex: props.colorIndices?.[i] ?? i })) }) : []),
@@ -442,14 +471,16 @@ function stackedAreaChart({ id, frame, props }) {
     sr.values.forEach((v, i) => { cumulative[i] += v; });
     return { sr, lower, upper: [...cumulative] };
   });
+  // Each layer's value at its middle on the right, pushed apart where thin layers end close together (spreadApart).
+  const endTops = spreadApart(layers.map(({ lower, upper }) => yAt((upper.at(-1) + lower.at(-1)) / 2) - 10), 18, plot.y - 10, plot.y + plot.height + 10);
   layers.forEach(({ sr, lower, upper }, si) => {
     const top = upper.map((v, i) => norm(plot, xAt(i), yAt(v)));
     const bottom = lower.map((v, i) => norm(plot, xAt(i), yAt(v))).reverse();
-    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name } }));
-    const last = categories.length - 1, mid = (upper[last] + lower[last]) / 2;
-    if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: yAt(mid) - 10, width: 64, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
+    nodes.push(shapePrimitive({ id: stableId(id, "layer", sr.name), role: "chart-area", geometry: "customPolygon", frame: { x: plot.x, y: plot.y, width: plot.width, height: plot.height }, style: { fill: colorFor(props, si), stroke: token("color.surface"), lineWidth: token("line.hairline") }, data: { paths: [[...top, ...bottom]], series: sr.name, baselineValue: bounds.min } }));
+    const last = categories.length - 1;
+    if (upper[last] - lower[last] > 0) nodes.push(textPrimitive({ id: stableId(id, "end-label", sr.name), role: "data-label", frame: { x: plot.x + plot.width + 6, y: endTops[si], width: endWidth, height: 20 }, text: formatValue(sr.values[last], props), style: textStyle(CHART_LABEL, INK, labelBold(), "left"), data: { series: sr.name } }));
   });
-  categories.forEach((c, i) => labelled.includes(i) && nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - 40, y: plot.y + plot.height + 12, width: 80, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
+  categories.forEach((c, i) => labelled.includes(i) && nodes.push(textPrimitive({ id: stableId(id, "category", c), role: "category-label", frame: { x: xAt(i) - slot / 2, y: plot.y + plot.height + 12, width: slot, height: 20 }, text: c, style: textStyle(AXIS_LABEL, INK, false, "center") })));
   // A callout names a period and, for one band, its series: it points at the
   // middle of that band there; without a series, at the top of the stack -
   // the period's total.
@@ -487,7 +518,7 @@ function sparklinesChart({ id, frame, props }) {
     const xAt = (i) => inner.x + inner.width * i / (it.values.length - 1);
     const yAt = (v) => inner.y + inner.height - (v - bounds.min) / bounds.span * inner.height;
     const focus = highlighted(props, it.label);
-    const color = focus ? ACCENT : PRIMARY;
+    const color = focus ? SUBJECT : items.some((other) => highlighted(props, other.label)) ? PEER : PRIMARY;
     nodes.push(textPrimitive({ id: stableId(id, "label", it.label), role: "category-label", frame: { x: cell.x + 8, y: cell.y + 6, width: cell.width - 16, height: 18 }, text: it.label, style: textStyle(AXIS_LABEL, INK, true, "left") }));
     nodes.push(linePrimitive({ id: stableId(id, "baseline", it.label), role: "chart-gridline", x1: inner.x, y1: inner.y + inner.height, x2: inner.x + inner.width, y2: inner.y + inner.height, style: lineStyle(GRID, token("line.hairline")) }));
     for (let i = 1; i < it.values.length; i++) nodes.push(linePrimitive({ id: stableId(id, "segment", it.label, i), role: "chart-line", x1: xAt(i - 1), y1: yAt(it.values[i - 1]), x2: xAt(i), y2: yAt(it.values[i]), style: lineStyle(color, token("line.standard")), data: { item: it.label } }));
@@ -508,5 +539,6 @@ export const EXTRA_CHARTS = [
   { id: "chart.radar", render: radarChart, layout: radarLayout, draws: ["highlights", "focusSeries"], sample: { heading: "(Insert measure and population)", categories: ["Scale", "Cost", "Speed", "Quality", "Talent", "Data"], series: [{ name: "Us", values: [4, 3, 5, 4, 2, 3] }, { name: "Best peer", values: [5, 4, 3, 5, 4, 4] }], focusSeries: "Us", max: 5 } },
   { id: "chart.boxplot", render: boxPlotChart, layout: boxPlotLayout, draws: ["highlights"], sample: { heading: "(Insert measure and population)", categories: ["Retail", "Tech", "Energy", "Health"], boxes: [{ min: -40, q1: -12, median: -2, q3: 8, max: 30 }, { min: -55, q1: -25, median: -10, q3: 4, max: 20 }, { min: -30, q1: -8, median: 3, q3: 14, max: 35 }, { min: -20, q1: -5, median: 5, q3: 12, max: 28 }], unit: "% TSR" } },
   { id: "chart.stacked-area", render: stackedAreaChart, layout: stackedAreaLayout, draws: ["annotations"], refuses: ["referenceLines"], sample: { heading: "(Insert measure and population)", categories: ["2020", "2021", "2022", "2023", "2024"], series: [{ name: "Mobility", values: [220, 600, 1400, 2400, 3800] }, { name: "Storage", values: [48, 90, 190, 300, 450] }, { name: "Electronics", values: [20, 40, 100, 150, 200] }], unit: "GWh" } },
+  { id: "chart.small-multiples", render: smallMultiplesChart, layout: smallMultiplesLayout, draws: ["highlights"], sample: { heading: "(Insert measure and population)", mark: "column", categories: ["FY22", "FY23", "FY24", "FY25", "FY26"], items: [{ label: "North", values: [12, 14, 15, 17, 18] }, { label: "South", values: [9, 9, 10, 10, 11] }, { label: "East", values: [15, 13, 12, 12, 11] }, { label: "West", values: [7, 8, 10, 13, 15] }, { label: "Central", values: [20, 20, 21, 21, 22] }, { label: "Coast", values: [5, 6, 6, 7, 7] }], highlights: [{ category: "West" }], reference: "average", unit: "£m" } },
   { id: "chart.sparklines", render: sparklinesChart, layout: sparklinesLayout, draws: ["highlights"], sample: { heading: "(Insert measure and population)", items: [{ label: "A1 Virus contained", values: [100, 92, 96, 101, 104] }, { label: "A2 Muted recovery", values: [100, 90, 92, 95, 99] }, { label: "A3 Resurgence", values: [100, 88, 84, 90, 94] }, { label: "B1 Slow growth", values: [100, 85, 86, 88, 90] }, { label: "B2 Prolonged", values: [100, 82, 78, 80, 84] }, { label: "B3 Depression", values: [100, 78, 70, 72, 74] }], columns: 3, highlights: [{ category: "A1 Virus contained" }], unit: "Real GDP, index" } },
 ];

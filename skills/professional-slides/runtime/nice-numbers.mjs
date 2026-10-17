@@ -27,6 +27,24 @@ export function onLadder(step) {
   return ROUNDING_LADDER.some((value) => Math.abs(normalized - value) < 1e-9);
 }
 
+/**
+ * Whether [min, max] divided into `count` equal steps is an axis a reader
+ * would choose: the step on the ladder, and every tick a whole number of steps
+ * from zero. It is the rule the tick gate holds a drawn axis to
+ * (gates/nice_ticks.py nice_axis), and the one the renderer divides a domain
+ * by (chart-axes.mjs tickCount), so an axis the renderer chooses passes the
+ * gate. On the ladder alone is not enough: -3,000 to 3,000 in three steps of
+ * 2,000 reads -3,000, -1,000, 1,000, 3,000 - every tick an odd thousand, none
+ * a whole step - where six steps of 1,000 read the axis a reader expects.
+ */
+export function wholeSteps(min, max, count) {
+  const step = (max - min) / count;
+  if (!(step > 0) || !Number.isFinite(step) || !onLadder(step)) return false;
+  // Held as the gate holds it: a tick off a whole step by more than a millionth of the axis's largest value.
+  const scale = Math.max(Math.abs(min), Math.abs(max)) || 1;
+  return Math.abs(Math.round(min / step) * step - min) <= scale * 1e-6;
+}
+
 /** Candidate steps in ascending order, starting a decade below the rough step. */
 export function* stepCandidates(rough) {
   const start = Math.floor(Math.log10(rough > 0 && Number.isFinite(rough) ? rough : 1)) - 1;

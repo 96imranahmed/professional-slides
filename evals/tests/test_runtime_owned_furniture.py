@@ -21,18 +21,12 @@ axis rows and data labels counted, since the band counted them.
 from __future__ import annotations
 
 import json
-import sys
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from node_probe import ROOT, run_node
 
-GATES = ROOT / "skills" / "professional-slides" / "runtime" / "gates"
-sys.path.insert(0, str(GATES))
-import density_profile  # noqa: E402
-import gate_config  # noqa: E402
-import render_gates  # noqa: E402
 
 LONG = "Northvale Rail annual report and accounts for the financial year FY{n}, operating statistics annex"
 
@@ -50,11 +44,11 @@ async function page(source, sources, { base = chart, note } = {}) {
   const composed = await composeForAuthoring(spec, dir);
   const slide = composed.deck?.slides.find((s) => s.id === base.id);
   const node = slide?.nodes.find((n) => n.role === 'source-text');
-  const gates = composed.deck ? sceneGateFindings(composed.deck, undefined, spec) : null;
-  const budget = gates?.budget.find((b) => b.id === base.id);
+  const gates = composed.deck ? sceneGateFindings(composed.deck) : null;
+  const bands = slide ? pageBandsOf(slide) : null;
   return { error: composed.error ?? null, pageErrors: composed.pageErrors ?? [], text: node?.text ?? null, lines: node?.data.textLayout.lines.length ?? null, derived: node?.data.derived === true,
-    notes: slide?.notes ?? null, compiledSource: spec.slides[0].source, forms: spec.slides[0].sourceForms ?? null, bands: slide ? pageBandsOf(slide) : null, share: NOTE_SHARE_MAX,
-    footer: budget?.footer, body: budget?.body, codes: gates ? [...gates.findings, ...gates.advisories].filter((f) => f.id === base.id).map((f) => f.code) : [] };
+    notes: slide?.notes ?? null, compiledSource: spec.slides[0].source, forms: spec.slides[0].sourceForms ?? null, bands, share: NOTE_SHARE_MAX,
+    footer: bands?.footer, body: bands?.body, codes: gates ? [...gates.findings, ...gates.advisories].filter((f) => f.id === base.id).map((f) => f.code) : [] };
 }
 '''
 
@@ -72,7 +66,7 @@ class DerivedCitationTests(unittest.TestCase):
 
     def assertWithinTheBar(self, result):
         self.assertNotIn("NOTE_HEAVY", result["codes"])
-        self.assertLessEqual(result["footer"] / (result["footer"] + result["body"]), render_gates.NOTE_HEAVY_SHARE)
+        self.assertLessEqual(result["footer"] / (result["footer"] + result["body"]), result["share"])
 
     def test_a_citation_that_fits_is_set_in_full(self):
         result = self.probe(2, wordy=True)
@@ -142,7 +136,6 @@ class DerivedCitationTests(unittest.TestCase):
         self.assertWithinTheBar(derived)
         for year in range(20, 28):  # and nothing it left out is lost
             self.assertIn(f"FY{year}", derived["notes"])
-        self.assertIn("NOTE_HEAVY", typed["codes"])
         self.assertGreater(typed["footer"], 40)
 
     def test_the_fullest_form_with_room_is_the_one_drawn(self):
@@ -178,12 +171,10 @@ class DerivedCitationTests(unittest.TestCase):
 
     def test_a_note_beside_a_derived_citation_is_counted_and_not_shortened(self):
         # The runtime shortens only its own line: the citation falls back to
-        # the count alone, the author's note is drawn whole, and the page is
-        # still refused for the note.
+        # the count alone, and the author's note is drawn whole.
         note = "Note: " + " ".join(["figures exclude the wholesale book and the branches sold in March;"] * 3)
         result = self.probe(2, note=note)
         self.assertEqual(result["text"], "Sources: 2 records, listed in the notes")
-        self.assertIn("NOTE_HEAVY", result["codes"])
         self.assertGreaterEqual(result["footer"], len(note.split()))
 
     def test_a_typed_citation_past_three_lines_is_still_refused(self):
@@ -198,38 +189,8 @@ console.log(JSON.stringify({ ok: registryProblems({ a: { name: 'Annual report', 
 ''')
         self.assertEqual(result["ok"], [])
         self.assertEqual(result["bad"], ['source "reports": `short` is text'])
-        self.assertIn("{ name, short, url, status, retrieved }", result["unknown"][0])
+        self.assertIn("{ name, short, url, status, retrieved, date }", result["unknown"][0])
         self.assertIn("written by the compiler", result["written"])
-
-    def test_the_page_gate_counts_a_derived_source_like_a_typed_one(self):
-        def slide(derived):
-            source = {"type": "text", "role": "source-text", "text": "Source: " + " ".join(["word"] * 30), "data": {"derived": True} if derived else {}}
-            return {"nodes": [{"type": "text", "role": "paragraph", "text": " ".join(["word"] * 42)}, source,
-                              {"type": "text", "role": "footnote-text", "text": "Note: three words"}]}
-        for derived in (False, True):
-            body, footer, ratio = render_gates.footer_share(slide(derived))
-            self.assertEqual((body, footer), (42, 34))
-            self.assertGreater(ratio, render_gates.NOTE_HEAVY_SHARE)
-            findings = []
-            with mock.patch.object(render_gates, "body_floor", return_value=1):
-                render_gates.gate_thin_page(1, slide(derived), findings)
-            self.assertIn("NOTE_HEAVY", [f["code"] for f in findings])
-
-    def test_the_runtime_counts_a_page_as_the_note_gate_does(self):
-        # The fit reads the page with the gate's bands (derive-content.mjs
-        # pageBandsOf, render_gates.page_bands): one count, held equal on every
-        # page of the example deck.
-        result = run_node(CITE + '''
-const { spec } = compileDeck(example);
-const composed = await composeForAuthoring(spec, dir);
-console.log(JSON.stringify({ share: NOTE_SHARE_MAX, slides: composed.deck.slides.map((slide) => ({ nodes: slide.nodes.filter((n) => n.type === 'text'), bands: pageBandsOf(slide) })) }));
-''')
-        self.assertEqual(result["share"], render_gates.NOTE_HEAVY_SHARE)
-        self.assertGreater(len(result["slides"]), 30)
-        for slide in result["slides"]:
-            bands = render_gates.page_bands(slide)
-            self.assertEqual((slide["bands"]["body"], slide["bands"]["footer"], slide["bands"]["titleBand"]), (bands.body, bands.footer, bands.title_band))
-
 
 CONTENTS = '''
 import fs from 'node:fs';
@@ -243,11 +204,10 @@ const chart = example.pages.find((p) => p.type === 'trend' && p.form === 'line')
 const columnsSeed = Array.from({ length: 200 }, (_, i) => `seed-${i}`).find((seed) => variationChoices(seed).agendaStyle === 'columns');
 async function deck(sections, deckKeys = {}, summary = null) {
   const pages = Array.from({ length: sections }, (_, i) => [{ kind: 'section', id: `s${i}`, title: `Part ${i + 1}`, ...(summary ? { summary } : {}) }, { ...chart, id: `p${i}` }]).flat();
-  const { spec, spineFindings } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined, ...deckKeys }, pages });
+  const { spec } = compileDeck({ deck: { ...example.deck, workflow: undefined, rulesVersion: undefined, ...deckKeys }, pages });
   const composed = await composeForAuthoring(spec, dir);
   const agenda = composed.deck?.slides.find((s) => s.id === 'agenda-1');
-  return { unfit: spineFindings.filter((f) => f.code === 'CONTENTS_UNFIT').map((f) => ({ severity: f.severity, measured: f.measured, repair: f.repair })),
-    pageErrors: (composed.pageErrors ?? []).filter((m) => /agenda/.test(m)), error: composed.error ?? null,
+  return { pageErrors: (composed.pageErrors ?? []).filter((m) => /agenda/.test(m)), error: composed.error ?? null,
     style: agenda?.componentInstances.find((c) => c.component === 'agenda')?.variant ?? null,
     details: agenda ? agenda.nodes.filter((n) => n.role === 'agenda-detail').length : null, labels: agenda ? agenda.nodes.filter((n) => n.role === 'agenda-label').length : null };
 }
@@ -264,36 +224,7 @@ console.log(JSON.stringify({ seed: columnsSeed, limits: AGENDA_LIMITS, six: awai
         # Seven sections under the same draw: the list, not a refusal at composition.
         self.assertEqual(result["seven"]["style"], "list")
         self.assertEqual(result["seven"]["pageErrors"], [])
-        self.assertEqual(result["seven"]["unfit"], [])
         self.assertEqual(result["seven"]["labels"], result["limits"]["columns"]["max"] + 1)
-
-    def test_a_named_style_that_cannot_fit_is_refused_at_compile(self):
-        result = run_node(CONTENTS + '''
-console.log(JSON.stringify({ limits: AGENDA_LIMITS, fits: await deck(AGENDA_LIMITS.columns.max, { agendaStyle: 'columns' }), over: await deck(AGENDA_LIMITS.columns.max + 1, { agendaStyle: 'columns' }),
-  many: await deck(AGENDA_LIMITS.list.max + 1), most: await deck(AGENDA_LIMITS.list.max), hidden: await deck(AGENDA_LIMITS.list.max + 1, { contents: false }) }));
-''')
-        limits = result["limits"]
-        self.assertEqual(result["fits"]["unfit"], [])
-        self.assertEqual(result["fits"]["style"], "columns")  # the author's style wins where it fits
-        [finding] = result["over"]["unfit"]
-        self.assertEqual(finding["severity"], "blocker")
-        self.assertEqual(finding["measured"], {"sections": limits["columns"]["max"] + 1, "style": "columns", "holds": [limits["columns"]["min"], limits["columns"]["max"]]})
-        self.assertIn("Remove `agendaStyle`", finding["repair"])
-        self.assertEqual(result["over"]["pageErrors"], [])  # and the page still composes, as the list
-        # Past what any style holds, the deck is told so where it is authored.
-        [finding] = result["many"]["unfit"]
-        self.assertEqual(finding["measured"]["style"], "list")
-        self.assertEqual(result["most"]["unfit"], [])
-        self.assertEqual(result["hidden"]["unfit"], [])  # no contents page, nothing to hold
-
-    def test_the_repair_applied_literally_clears_it(self):
-        # "Remove `agendaStyle` - the runtime then sets the list".
-        result = run_node(CONTENTS + '''
-console.log(JSON.stringify({ removed: await deck(AGENDA_LIMITS.columns.max + 1, {}) }));
-''')
-        self.assertEqual(result["removed"]["unfit"], [])
-        self.assertEqual(result["removed"]["style"], "list")
-        self.assertEqual(result["removed"]["pageErrors"], [])
 
     def test_a_list_too_tall_with_its_summaries_drops_them_rather_than_failing(self):
         long = "A long summary of what this section covers, running to several lines so that ten of them cannot fit one page, and then some more words to be sure."
@@ -308,103 +239,6 @@ console.log(JSON.stringify({{ few: await deck(3, {{}}, {json.dumps(long)}), ten:
 
 def text(role, value, owner=None):
     return {"type": "text", "role": role, "text": value, "data": {"componentInstance": owner} if owner else {}}
-
-
-class FurnitureTests(unittest.TestCase):
-    """The fragmentation profile measures a page as the band was measured, less the runtime's tracker."""
-
-    SLIDE = {"id": "p1", "componentInstances": [{"id": "chrome", "component": "slide-chrome"}, {"id": "p1-exhibit", "component": "chart.line"},
-                                                 {"id": "p1-points", "component": "bullet-list"}],
-             "nodes": [text("action-title", "Journeys recovered and then stalled"), text("tracker-number", "1"), text("tracker-number", "2"), text("tracker-number", "3"),
-                       text("tracker-label", "Where ridership stands"),
-                       text("section-heading", "Passenger journeys, fiscal years,", "p1:p1-exhibit"), text("chart-unit", "million", "p1:p1-exhibit"),
-                       text("axis-label", "60"), text("axis-label", "40"), text("category-label", "FY24"), text("category-label", "FY25"), text("category-label", "FY26"),
-                       text("legend-label", "Journeys"), text("data-label", "Peak 52.4"), text("annotation-text", "Growth slowed to under two percent", "p1:p1-exhibit"),
-                       text("section-heading", "What the stall means", "p1:p1-points"), text("page-number", "07"), text("footer-right", "Northvale Rail")]}
-    PAGE = "\n".join([
-        "1 2 3", "", "Journeys recovered and then stalled", "",
-        "Passenger journeys, fiscal years, million", "",
-        "60                                         Peak 52.4",
-        "40              Growth slowed to under two percent",
-        "",
-        "FY24      FY25      FY26", "", "Journeys", "",
-        "What the stall means",
-        "The peak is full on every line and the off-peak is half empty, so growth has",
-        "to come between the peaks until the electric trains arrive.",
-        "",
-        "Northvale Rail                                         07", ""])
-
-    def test_only_the_tracker_is_furniture(self):
-        verdict = {(n["role"], n["text"]): gate_config.is_tracker(n) for n in self.SLIDE["nodes"]}
-        for key in [("tracker-number", "1"), ("tracker-label", "Where ridership stands")]:
-            self.assertTrue(verdict[key], key)
-        # A chart's heading, unit, axes, labels and legend are counted, as they were on the reference pages the band was measured on;
-        # so are the page's footer, a callout, a heading over the points, the title and a table's cells.
-        for key in [("chart-unit", "million"), ("axis-label", "60"), ("category-label", "FY24"), ("legend-label", "Journeys"), ("data-label", "Peak 52.4"),
-                    ("section-heading", "Passenger journeys, fiscal years,"), ("page-number", "07"), ("footer-right", "Northvale Rail"),
-                    ("annotation-text", "Growth slowed to under two percent"), ("section-heading", "What the stall means"), ("action-title", "Journeys recovered and then stalled")]:
-            self.assertFalse(verdict[key], key)
-        self.assertFalse(gate_config.is_tracker(text("table-status-label", "At risk")))
-        self.assertFalse(gate_config.is_tracker(text("table-cell-text", "14.6")))
-
-    def test_a_page_is_measured_as_the_band_was_less_the_tracker(self):
-        # The band (weight.json plan.textForm) was measured on reference PDFs with pdftotext, which reads a chart's heading
-        # and its axis row as text like any other. Taking those out of our pages measured them against a band that had
-        # counted them: the same copy read about ten words a block larger, and the floor was that much lower.
-        header = density_profile.header_lines(self.SLIDE)
-        plain = density_profile.page_blocks(self.PAGE, header)
-        measured = density_profile.page_blocks(self.PAGE, header, density_profile.furniture_runs(self.SLIDE))
-        # As pdftotext reads it: the tracker strip, the chart heading, the two rows of the plot, the category row, the commentary, the footer.
-        self.assertEqual(plain, [3, 5, 10, 3, 30, 3])
-        # Measured: the same blocks, less the tracker strip alone.
-        self.assertEqual(measured, [5, 10, 3, 30, 3])
-
-    def test_a_tracker_label_on_a_shared_line_is_taken_out_and_the_copy_kept(self):
-        runs = density_profile.furniture_runs(self.SLIDE)
-        self.assertEqual(density_profile.without_furniture("1 2 3", runs), "")
-        self.assertEqual(density_profile.without_furniture("Where ridership stands", runs), "")
-        self.assertEqual(density_profile.without_furniture("Where ridership stands                 Growth slowed to under two percent", runs), "Growth slowed to under two percent")
-        # What a chart draws stays, and so does a bare number on a shared row, which could as well be an axis value.
-        self.assertEqual(density_profile.without_furniture("FY24      FY25      FY26", runs), "FY24      FY25      FY26")
-        self.assertEqual(density_profile.without_furniture("2              Growth slowed to under two percent", runs), "2              Growth slowed to under two percent")
-        self.assertEqual(density_profile.without_furniture("In section 2 the peak was full", runs), "In section 2 the peak was full")
-
-    def test_a_tracker_label_level_with_a_paragraph_does_not_cut_it(self):
-        slide = {"id": "p", "componentInstances": [], "nodes": [text("tracker-label", "Demand")]}
-        page = "\n".join(["Title", "", "The first line of a paragraph that runs", "                                              Demand", "on to its second line here.", ""])
-        self.assertEqual(density_profile.page_blocks(page, {"Title"}, density_profile.furniture_runs(slide)), [14])
-
-    def test_chart_scaffolding_counts_toward_the_measure_as_it_did_in_the_calibration(self):
-        # Ten prose pages, each a chart whose heading and axis row are two short blocks beside two developed points of
-        # twenty-five words: 12, 6, 25 and 25 words a block, a page mean of 17, inside the band. With the chart's
-        # scaffolding left out the same pages would read 25 words a block, over it: the reference pages' labels were counted.
-        pages = 10
-        chart = [text("section-heading", "Passenger journeys by fiscal year and by line, in millions of journeys", "x:ex"), text("category-label", "FY21"), text("category-label", "FY22"),
-                 text("category-label", "FY23"), text("category-label", "FY24"), text("category-label", "FY25"), text("category-label", "FY26")]
-        slides = [{"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []}] + [
-            {"id": f"p{i}", "componentInstances": [{"id": "ex", "component": "chart.line"}], "nodes": [text("action-title", f"Title {i}"), *chart]} for i in range(pages)]
-        content = {"pages": [{"id": f"p{i}", "textReference": {"task": "chart-with-commentary"}} for i in range(pages)]}
-        page = "\n\n".join(["Title {i}", "Passenger journeys by fiscal year and by line, in millions of journeys", "FY21 FY22 FY23 FY24 FY25 FY26"] + [" ".join(["copy"] * 25)] * 2) + "\n"
-        with mock.patch.object(density_profile, "extract", return_value=[""] + [page.format(i=i) for i in range(pages)]):
-            report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
-        self.assertEqual(report["pages"][0]["blockSizes"], [12, 6, 25, 25])
-        self.assertEqual(report["deck"]["wordsPerBlock"]["measured"], 17)
-        self.assertEqual([f["code"] for f in report["findings"] if f["code"] == "TEXT_FRAGMENTED"], [])
-
-    def test_the_band_is_the_column_reading_and_fragments_block(self):
-        form = density_profile.TEXT_FORM["wordsPerBlock"]
-        self.assertEqual((form["q1"], form["q3"]), (10.2, 22.6))
-        pages = 10
-        slides = [{"id": "cover", "componentInstances": [{"component": "cover"}], "nodes": []}] + [
-            {"id": f"p{i}", "componentInstances": [{"component": "slide-chrome"}], "nodes": [text("action-title", f"Title {i}"), text("axis-label", "word")]} for i in range(pages)]
-        content = {"pages": [{"id": f"p{i}", "textReference": {"task": "chart-with-commentary"}} for i in range(pages)]}
-        fragment = "\n\n".join([f"Title {{i}}", " ".join(["copy"] * 15)] + [" ".join(["copy"] * 6)] * 8) + "\n"
-        texts = [""] + [fragment.format(i=i) for i in range(pages)]
-        with mock.patch.object(density_profile, "extract", return_value=texts):
-            report = density_profile.profile(Path("deck.pdf"), {"slides": slides}, content, None)
-        self.assertEqual(report["findings"][0]["code"], "TEXT_FRAGMENTED")
-        self.assertEqual(report["findings"][0]["severity"], "blocker")
-        self.assertEqual(report["findings"][0]["threshold"], [10.2, 22.6])
 
 
 if __name__ == "__main__":

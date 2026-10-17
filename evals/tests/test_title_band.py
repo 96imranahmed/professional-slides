@@ -46,18 +46,20 @@ const page=(deck,props)=>{
 class TitleRuleTests(unittest.TestCase):
     def test_each_design_system_draws_its_own_rule(self):
         result = run_node(CHROME + r"""
-const consulting=page({design:'consulting'},{title:'Short title'}).rule;
-const editorial=page({design:'editorial'},{title:'Short title'}).rule;
-const evergreen=page({palette:'evergreen'},{title:'Short title'}).rule;
+// No design or palette sets a line under the title by default (strong decks rarely do); a house that asks for one gets it.
+const defaults=['consulting','editorial'].map((design)=>!!page({design},{title:'Short title'}).rule).concat(['midnight','evergreen','crimson','graphite'].map((palette)=>!!page({palette},{title:'Short title'}).rule));
+const asked=(colors)=>page({palette:{base:'midnight',colors:{'style.titleRule':'rule',...colors}}},{title:'Short title'}).rule;
+const consulting=asked({'style.titleRuleLength':'content','style.titleRuleColor':'rule'}), edge=asked({'style.titleRuleLength':'full'}), bar=asked({'style.titleRuleLength':'short','style.titleRuleColor':'accent','line.titleRule':4});
 const journal=page({design:'journal'},{title:'Short title'});
 const keynote=page({design:'keynote'},{title:'Short title'});
-console.log(JSON.stringify({
+console.log(JSON.stringify({ defaults,
   consulting:[consulting.data.x1,consulting.data.x2,consulting.style.lineWidth.value,consulting.style.stroke.tokenId],
-  editorial:[editorial.data.x1,editorial.data.x2],
-  evergreen:[evergreen.data.x2-evergreen.data.x1,evergreen.style.lineWidth.value,evergreen.style.stroke.tokenId],
+  editorial:[edge.data.x1,edge.data.x2],
+  evergreen:[bar.data.x2-bar.data.x1,bar.style.lineWidth.value,bar.style.stroke.tokenId],
   journal:!!journal.rule, keynote:!!keynote.rule, tab:!!journal.role('title-tab'), block:!!keynote.role('title-band')}));
 """)
-        self.assertEqual(result["consulting"], [60, 1220, 1, "color.rule"])   # margin to margin, a grey hairline
+        self.assertEqual(result["defaults"], [False] * 6)
+        self.assertEqual(result["consulting"], [60, 1220, 1, "color.rule"])   # asked for: margin to margin, a grey hairline
         self.assertEqual(result["editorial"], [0, 1280])                      # edge to edge
         self.assertEqual(result["evergreen"], [64, 4, "color.accent"])        # a short accent bar
         # A tab or a block already closes the band: no second rule under it.
@@ -67,7 +69,8 @@ console.log(JSON.stringify({
 
     def test_the_title_sits_on_a_fixed_rule_and_the_body_starts_below_it(self):
         result = run_node(CHROME + r"""
-const deck={design:'consulting'};
+// A house that asks for a rule under its titles (none is set by default).
+const deck={palette:{base:'midnight',colors:{'style.titleRule':'rule','style.titleRuleLength':'full','style.titleRuleColor':'rule'}}};
 const one=page(deck,{title:'Short title'}), two=page(deck,{title:'""" + LONG + r"""'});
 const tracked=page(deck,{title:'Short title',tracker:{trackerId:'map',items:['A','B','C'].map(id=>({id,label:`Section ${id}`})),selectedId:'B',construction:'compact-label',mode:'light'}});
 const bottom=(p)=>p.title.frame.y+p.title.data.textLayout.height;
@@ -89,10 +92,10 @@ console.log(JSON.stringify({
 
     def test_the_rule_is_set_by_tokens_a_palette_may_override(self):
         result = run_node(CHROME + r"""
-const custom=page({palette:{base:'midnight',colors:{'style.titleRuleLength':'full','style.titleRuleColor':'ink','line.titleRule':2,'layout.titleRuleGap':16}}},{title:'Short title'});
+const custom=page({palette:{base:'midnight',colors:{'style.titleRule':'rule','style.titleRuleLength':'full','style.titleRuleColor':'ink','line.titleRule':2,'layout.titleRuleGap':16}}},{title:'Short title'});
 const errors=[];
 for (const colors of [{'line.titleRule':'thick'},{'layout.titleRuleGap':-4},{'spacing.x':3}]) { try { page({palette:{base:'midnight',colors}},{title:'T'}); } catch (e) { errors.push(e.message); } }
-for (const colors of [{'style.titleRuleLength':'half'},{'style.titleRuleColor':'green'}]) { try { page({palette:{base:'midnight',colors}},{title:'T'}); } catch (e) { errors.push(e.message); } }
+for (const colors of [{'style.titleRule':'rule','style.titleRuleLength':'half'},{'style.titleRule':'rule','style.titleRuleColor':'green'}]) { try { page({palette:{base:'midnight',colors}},{title:'T'}); } catch (e) { errors.push(e.message); } }
 const off=page({palette:{base:'midnight',colors:{'style.titleRule':'none'}}},{title:'Short title'});
 console.log(JSON.stringify({x:[custom.rule.data.x1,custom.rule.data.x2],width:custom.rule.style.lineWidth.value,stroke:custom.rule.style.stroke.tokenId,
   gap:custom.out.contentFrame.y-custom.rule.frame.y,errors:errors.length,off:!!off.rule,offTitle:off.title.frame.y}));
@@ -121,7 +124,7 @@ console.log(JSON.stringify({x:[custom.rule.data.x1,custom.rule.data.x2],width:cu
 class StandfirstTests(unittest.TestCase):
     def test_the_standfirst_sits_between_title_and_rule_and_pushes_only_a_tall_band(self):
         result = run_node(CHROME + r"""
-const deck={design:'consulting'}, sub='Announced deal value by segment, India, $B';
+const deck={palette:{base:'midnight',colors:{'style.titleRule':'rule','style.titleRuleLength':'full','style.titleRuleColor':'rule'}}}, sub='Announced deal value by segment, India, $B';
 const one=page(deck,{title:'Short title',subtitle:sub}), two=page(deck,{title:'""" + LONG + r"""',subtitle:sub});
 const check=(p)=>({under:p.sub.frame.y>=p.title.frame.y+p.title.data.textLayout.height, above:p.sub.frame.y+p.sub.frame.height<p.rule.frame.y,
   smaller:p.sub.style.fontSize.value<p.title.style.fontSize.value, secondary:p.sub.style.color.tokenId, body:p.out.contentFrame.y, rule:p.rule.frame.y});
@@ -138,27 +141,20 @@ console.log(JSON.stringify({one:check(one),two:check(two)}));
 
     def test_a_page_type_takes_a_one_line_standfirst_that_adds_to_its_title(self):
         result = run_node(r"""
-import {compilePage, pageSchema, describeTypes, SUBTITLE_WORDS} from './skills/professional-slides/runtime/page-types.mjs';
+import {compilePage, pageSchema, describeTypes} from './skills/professional-slides/runtime/page-types.mjs';
 import {planRole} from './skills/professional-slides/runtime/derive-content.mjs';
 import fs from 'node:fs';
 const base=JSON.parse(fs.readFileSync('./skills/professional-slides/examples/page-types.pages.json','utf8')).pages.find(p=>p.id==='p03');
 const error=(page)=>{ try { compilePage(page); return null; } catch (e) { return e.message; } };
 const ok=compilePage({...base,subtitle:'Passenger journeys a year, all lines, FY19 to FY26'});
 const schema=pageSchema().properties.pages.items.oneOf.filter(t=>t.properties.type);
-console.log(JSON.stringify({kept:ok.subtitle, limit:SUBTITLE_WORDS,
-  long:error({...base,subtitle:'Passenger journeys a year on every one of the five lines in the network, counted at the gates, FY19 to FY26'}),
-  restates:error({...base,subtitle:base.title.split(' ').slice(0,8).join(' ')}),
-  empty:error({...base,subtitle:' '}),
+console.log(JSON.stringify({kept:ok.subtitle,
   statement:error({id:'s',type:'statement',form:'statement',commentary:'none',takeaway:false,why:'The claim stands alone as the message page',text:'The peak is full',title:'The peak is full',subtitle:'All lines'}),
   schema:schema.every(t=>t.properties.subtitle && !t.required.includes('subtitle')),
   described:/`subtitle`/.test(describeTypes()),
   roles:[planRole('action-subtitle'),planRole('takeaway-standfirst'),planRole('action-title')]}));
 """)
         self.assertEqual(result["kept"], "Passenger journeys a year, all lines, FY19 to FY26")
-        self.assertEqual(result["limit"], 16)
-        self.assertIn("words", result["long"])
-        self.assertIn("repeats the title", result["restates"])
-        self.assertIn("one line", result["empty"])
         self.assertIn("no title band", result["statement"])
         self.assertTrue(result["schema"])
         self.assertTrue(result["described"])
@@ -223,34 +219,6 @@ console.log(JSON.stringify(deck));
             # where the render broke it.
             self.assertEqual(len(paragraphs), 1)
             self.assertEqual(paragraphs[0].text.split("\x0b"), lines)
-
-
-@requires_python_package("numpy")
-class CensusRuleTests(unittest.TestCase):
-    """The census finds the rule under a title with a tracker over it."""
-
-    @classmethod
-    def setUpClass(cls):
-        spec = importlib.util.spec_from_file_location("reference_census", ROOT / "evals" / "scripts" / "reference_census.py")
-        cls.census = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cls.census)
-
-    def page(self, blocks, rule_y):
-        import numpy as np
-        image = np.full((675, 1200), 255, dtype=np.uint8)
-        for top, bottom, x1, x2 in blocks:
-            image[top:bottom, x1:x2:3] = 20  # text: dense but broken rows
-        image[rule_y, 56:1144] = 120
-        return image
-
-    def test_a_tracker_line_over_a_title_set_on_its_rule(self):
-        tracker, title = (33, 39, 56, 300), (93, 122, 56, 900)
-        self.assertTrue(self.census.title_rule(self.page([tracker, title], 131)))
-        # An exhibit heading between the title and the rule is still not a title rule.
-        heading = (150, 160, 56, 400)
-        self.assertFalse(self.census.title_rule(self.page([tracker, title, heading], 172)))
-        # Nor is a rule standing well clear of the title.
-        self.assertFalse(self.census.title_rule(self.page([tracker, title], 190)))
 
 
 if __name__ == "__main__":

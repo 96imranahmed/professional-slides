@@ -68,6 +68,9 @@ export const TABLE_VARIANTS={
  ['Area A',bullets('(Insert observed condition 1)','(Insert observed condition 2)'),{},'(Insert implication)'],
  ['Area B',bullets('(Insert observed condition 1)','(Insert observed condition 2)'),{},'(Insert implication)'],
  ['Area C',bullets('(Insert observed condition 1)','(Insert observed condition 2)'),{},'(Insert implication)']
- ]}}
+ ]}},
+ 'sparkline-rows':{preferredSize:size,props:{treatment:'standard',columns:[text('(Insert member)',.34),text('(Insert latest figure)',.22,'number'),text('(Insert the series and its window)',.44,'sparkline')],rows:[['(Insert member 1)',{value:41,text:'41'},{values:[38,22,30,35,38,40,41],text:'41'}],['(Insert member 2)',{value:32,text:'32'},{values:[20,12,18,24,27,30,32],text:'32'}],['(Insert member 3)',{value:19,text:'19'},{values:[25,14,17,18,19,19,19],text:'19'}]]}},
+ // Voices by segment: what each side said, in quotation marks, signed under its words.
+ 'quote-cells':{preferredSize:size,props:{treatment:'standard',columns:[text('(Insert segment)',.2,'category'),text('(Insert one side)',.4,'quote'),text('(Insert the other side)',.4,'quote')],rows:[1,2,3].map(n=>[`(Insert segment ${n})`,{text:`(Insert what one side said ${n})`,by:'(Insert who said it)'},{text:`(Insert what the other side said ${n})`,by:'(Insert who said it)'}])}},
 };
 if (Object.keys(TABLE_VARIANTS).join() !== TABLE_VARIANT_NAMES.join()) throw new Error('TABLE_VARIANTS must hold one sample per table-variants.mjs name, in its order');

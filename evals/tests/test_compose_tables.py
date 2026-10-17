@@ -33,7 +33,7 @@ const nodes=get(table), plain=structuredClone(table);plain.rows[1][1].markFocus=
 const before=get(plain), bars=nodes.filter(n=>n.role==='table-bar'), oldBars=before.filter(n=>n.role==='table-bar');
 assert.deepEqual(bars.map(n=>n.frame),oldBars.map(n=>n.frame),'focus must preserve signed geometry and shared units');
 assert.equal(bars[0].style.fill.tokenId,oldBars[0].style.fill.tokenId,'unselected maximum remains neutral');
-assert.equal(bars[1].style.fill.tokenId,'color.accent');assert.equal(bars[1].data.markFocus,true);
+assert.equal(bars[1].style.fill.tokenId,'color.chartSubject');assert.equal(bars[1].data.markFocus,true);
 assert.deepEqual(nodes.filter(n=>['table-cell','table-row-band'].includes(n.role)),before.filter(n=>['table-cell','table-row-band'].includes(n.role)),'mark focus adds no background');
 const labels=nodes.filter(n=>n.role==='table-cell-text'&&n.data.cellType==='bars');
 assert.ok(labels.some(n=>n.text==='0'&&n.data.markFocus),'zero retains its focus label without fabricating a bar');
@@ -212,38 +212,16 @@ assert.equal(explicit.rows[0][2].tone,'negative');
 console.log('{}');
 ''')
 
-    def test_a_column_is_asked_about_as_the_author_wrote_the_table(self):
-        # The composer adds a gutter before an implication column; the question it asks is the page check's, of the table
-        # as written, so the two share one answer.
-        result = run_node(r'''
-import {styleTable, columnQuestion} from './skills/professional-slides/runtime/compose-tables.mjs';
-import {judgementSession, withJudgements, judgementKey} from './skills/professional-slides/runtime/judgements.mjs';
-const asked = [];
-const reader = judgementSession({oracle:(kind, subject, context) => { if (kind === 'column-reads') asked.push(judgementKey(kind, subject, context)); return null; }});
-const columns = ['Line', 'Status', {label: 'What it means', implication: true}];
-const rows = [['Eastern', 'Stalled', 'Electrify first'], ['Valley', 'Slipping', 'Extend the sidings'], ['Dales', 'Ahead of plan', 'Grows first']];
-const styled = withJudgements(reader, () => styleTable({columns, rows}));
-const own = columnQuestion('Status', rows.map((row) => row[1]), ['Line', 'Status', 'What it means']);
-console.log(JSON.stringify({asked, own: judgementKey('column-reads', own.subject, own.context), gutter: styled.columns.length > columns.length}));
-''')
-        self.assertTrue(result["gutter"])
-        self.assertIn(result["own"], result["asked"])
-
     def test_verdict_cells_recommended_column_and_total_rows_are_inferred(self):
         result = run_node(r'''
 import assert from 'node:assert/strict';
 import {styleTable, paginateTable} from './evals/support/compose.mjs';
-import {judgementSession, withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// What each column gives its rows is read (column-reads): here a reader says the status column states a state of each row
-// and the percentages are progress. Unanswered, the words stay words.
-const reader=judgementSession({oracle:(kind,subject)=>kind!=='column-reads'?null:subject.header==='Overall status'?{verdict:'status',states:[{cell:'At risk',value:'negative'},{cell:'On track',value:'positive'}]}
-  :subject.header==='% complete'?'progress':'facts'});
+// A column of words stays words: the page types a status or progress column to draw it as pills or bars. Ticks are marks.
 const table={columns:['#','Workstream','Overall status','% complete','Signed'],rows:[['1','Alpha','At risk','40%','✓'],['2','Beta','On track','100%',{type:'check',value:'no'}],['Total','','','62%','']]};
-const t=withJudgements(reader,()=>styleTable(table));
-assert.deepEqual(styleTable(table).rows[0][2],'At risk');
+const t=styleTable(table);
 assert.equal(t.rows[0][0].sectionNumber,1);assert.equal(t.rows[0][0].surface,'plain');
-assert.deepEqual(t.rows[0][2],{type:'rag',value:'at-risk',text:'At risk'});
-assert.deepEqual(t.rows[0][3],{type:'progress',value:40});
+assert.deepEqual(t.rows[0][2],'At risk');
+assert.deepEqual(t.rows[0][3],'40%');
 assert.deepEqual(t.rows[0][4],{type:'check',value:'yes'});
 assert.deepEqual(t.rows[1][4],{type:'check',value:'no'});
 assert.equal(t.rows[2].style,'total');

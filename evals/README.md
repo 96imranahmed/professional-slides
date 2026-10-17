@@ -1,37 +1,10 @@
 # evals
 
-Verification for `skills/professional-slides` covers content and plan contracts,
-composition, export, readback, rendered geometry and delivery-review bindings.
+Verification for `skills/professional-slides` covers the pages file's contract,
+binding, composition, export, readback and rendered geometry.
 Passing these checks does not establish editorial or visual taste. The pipeline
-the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#pipeline);
+the skill itself runs is [SKILL.md](../skills/professional-slides/SKILL.md#the-process);
 none of it is repeated here.
-
-## Quality eval
-
-`quality/` is the end-to-end measurement the unit suite cannot make: a headless
-agent given a brief and nothing else, the deck it delivers judged blind from
-its renders, and a pairwise comparison with the previous skill version on the
-same brief. Results accumulate in `quality/results.jsonl`, keyed by skill
-version, judge model, brief and run. Development briefs are in
-`quality/briefs/dev/`; `quality/briefs/heldout/` is never used for tuning. See
-`quality/README.md`.
-
-Each run packages this checkout, gives a headless agent the brief in an empty
-workspace, judges the delivered deck blind from its renders against
-`quality/rubric.md`, and compares it pairwise with the latest stored deck of a
-different skill version (the git tree hash of `skills/`) on the same brief.
-`quality/score.mjs` scores a run's plan and build apart - the plan gates and the
-build bars - and refuses to average them, because a plan that passes while its
-deck does not is a different problem from the reverse.
-
-```bash
-node evals/quality/run.mjs --set dev --runs 3 [--agent claude] [--judge claude] [--dry-run]
-node evals/quality/run.mjs --report                # the summary for this skill version
-node evals/quality/score.mjs out/deck.plan.json out/   # score one run's plan and build by hand
-node evals/quality/evidence-validity.mjs           # the evidence contract: seeded defects caught (typed, bound and traced numbers), clean fixture decks clear
-node evals/quality/critic-calibration.mjs --repeats 5 [--dry-run]   # the storyline critic on frozen packets: its spread, and planted anchors
-node evals/quality/variability.mjs                 # the plan under several seeds and design systems: decks differ where a claim leaves a choice of form, and nowhere else
-```
 
 ## Point changes
 
@@ -41,20 +14,12 @@ title, an exhibit redrawn - run the way `SKILL.md` tells an author to run it,
 on decks made on the spot. It checks that the change was made, that every
 other slide came out byte for byte as it went in, that a figure left behind
 on another slide was caught, and that nothing but the changed pages was
-refused, critiqued or reviewed; and it counts the commands the run took. See
+refused; and it counts the commands the run took. See
 `point-change/README.md`.
 
 ```bash
 node evals/point-change/run.mjs [--task <id>] [--agent claude]
 ```
-
-## Calibration
-
-`calibration/` re-derives the targets in `runtime/reading-tasks.json` and
-`runtime/weight.json` from a calibration set kept outside the repository and
-found through the `PS_CALIBRATION_CORPUS` environment variable. It holds
-tooling only: no data file that could name the set's documents sits in the
-repository, and the shipped targets are numbers. See `calibration/README.md`.
 
 ## Support code
 
@@ -66,6 +31,14 @@ layering policy.
 
 ## Commands
 
+Iterate on the modules a change touches, `--pattern "test_<module>.py"`, or on
+the fast tier, `--fast` (about a third of the full suite's wall time): every
+test except the property sweeps and end-to-end authoring classes listed, each
+with its reason, in `heavy-tests.json`. Run the full suite, with no flag, once
+before a commit or push. One run holds the machine at a time: a second run
+waits for the first, saying so, since two run together each take twice as long;
+a lock left by a run that was killed is taken over.
+
 ```bash
 # everything: unit tests, the example decks' content stage and the source checks
 evals/run.sh
@@ -76,8 +49,9 @@ evals/run.sh --slow
 # unit tests only: parallel, with a dependency preflight and a skip report.
 # --jobs N workers (default: CPUs, at most 8); --serial one worker; --strict fails
 # on a test skipped for a missing dependency; --slow adds the opt-in LibreOffice
-# end-to-end tests (PS_RUN_SLOW=1); --pattern GLOB picks modules; --verbose
-node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--pattern GLOB] [--verbose]
+# end-to-end tests (PS_RUN_SLOW=1); --fast leaves out the heavy classes
+# evals/heavy-tests.json lists; --pattern GLOB picks modules; --verbose
+node evals/scripts/run_tests.mjs [--jobs N] [--serial] [--strict] [--slow] [--fast] [--pattern GLOB] [--verbose]
 python3 -m unittest discover -s evals/tests -p 'test_*.py'
 
 # source checks (npm run check:syntax): syntax, the embedded probes, and dead
@@ -89,8 +63,8 @@ node evals/scripts/dead_exports.mjs
 
 # deterministic page gates on any scene + render
 python3 skills/professional-slides/runtime/gates/page_gates.py \
-    scene.json render_dir/ [--report out.json] \
-    [--profile executive|pre-read|live-pitch] [--only CODE,CODE]
+    scene.json [render_dir/] [--report out.json] \
+    [--profile executive|pre-read|live-pitch|appendix] [--only CODE,CODE]
 
 # compile a spec into a scene the gates and the emitter can read
 node evals/scripts/compile_scene.mjs spec.json scene.json
@@ -99,47 +73,13 @@ node evals/scripts/compile_scene.mjs spec.json scene.json
 python3 evals/scripts/pptx_scene_probe.py deck.pptx scene.json
 ```
 
-## Reference census
-
-`scripts/reference_census.py` measures a rendered deck page by page — words and
-numeric tokens, body ink, occupied grid cells, empty bands, title rules, and,
-given the scene or pages file, exhibits per page, one-exhibit-plus-column pages,
-plotted values per chart page and one-to-three-word title last lines — and sets
-it beside a reference census: another PDF, or a census JSON this script wrote.
-The sample of strong consulting pages it was built to compare against stays
-outside the repository.
-
-Every per-page statistic is taken over the deck's analytical pages: the cover,
-section dividers, agendas and generated pages (picture credits) are left out,
-told apart by the scene and the compiled deck spec, or guessed from the render
-without a scene; a scanned reference is measured whole, and the printed notes
-say which applied. Plotted values are the compiler's: given the compiled spec
-(`--deck`, or the `<id>.deck.json` beside `--pages`), the chart pages are those
-with `pageType.chart` - the chart page types and panels carrying a chart - and
-each counts `pageType.values`, the number `author-deck.mjs` prints as `plotted`.
-
-```bash
-python3 evals/scripts/reference_census.py out/rendered/deck.pdf \
-    --scene out/scene.json --pages deck.pages.json \
-    --reference reference.pdf [--out census.json]
-```
-
 ## Page gates
 
 `runtime/gates/page_gates.py` measures the resolved scene and, where the
 question is optical, the rendered PNG. Exit 0 pass, 2 findings. Every finding is
 `{slide, code, measured, threshold, repair}`.
 
-See the [evaluation contract](../skills/professional-slides/references/evaluation/index.md)
-for blocking checks and advisory statistics. Each generated report carries
-the thresholds actually used; the [page-gate implementation](../skills/professional-slides/runtime/gates/page_gates.py)
-owns the profile and role-specific rules.
-
-Whether a page needs additional interpretation is an editorial review decision. There is no mandatory closing-consequence gate: a necessary caveat may complete the evidence, and a separate `soWhat` is optional.
-
-Content-stage summaries distinguish quantitative evidence kinds from structured
-qualitative kinds. Neither share certifies that a claim is sourced or correct;
-the reviewer must inspect its evidence.
+The codes the gates raise, grouped by what they catch, are listed in the [runtime guide](../skills/professional-slides/runtime/README.md#what-is-checked); each generated report carries the thresholds actually used, and [gate_config.py](../skills/professional-slides/runtime/gates/gate_config.py) owns them.
 
 Install Node test dependencies with `npm ci`, then install the browser used by
 rendered overlap tests with `npx playwright install chromium`. Use Node 20.9+

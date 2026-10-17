@@ -304,7 +304,7 @@ const marks = deck.slides[0].nodes.filter((n) => n.role === 'chart-mark');
 const fill = (series) => [...new Set(marks.filter((m) => m.data.series === series).map((m) => m.style.fill.tokenId))];
 console.log(JSON.stringify({ subject: fill('Anthropic'), peers: [...new Set(['OpenAI', 'Google', 'Other'].flatMap(fill))] }));
 """)
-        self.assertEqual(result["subject"], ["color.componentPrimary"])
+        self.assertEqual(result["subject"], ["color.chartSubject"])
         self.assertEqual(result["peers"], ["color.chartComparator"])
 
 

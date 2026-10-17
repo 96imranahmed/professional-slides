@@ -58,6 +58,30 @@ console.log(JSON.stringify({ one: scale(1), two: scale(2) }));
         self.assertAlmostEqual(result['one']['perUnit'], result['two']['perUnit'], delta=0.05)
         self.assertAlmostEqual(result['one']['coastPerUnit'], result['two']['coastPerUnit'], delta=0.05)
 
+    def test_panels_a_hundred_times_apart_keep_their_own_scales(self):
+        # Three connectivity indices recorded in "points" took one scale: 4,866 drew one pixel wide beside 1.9 million.
+        result = run_node(PRELUDE + """
+const bars = (heading, values) => ({ type: 'chart.bar', heading, unit: 'points', categories: ['Istanbul', 'Amsterdam', 'Heathrow'], series: [{ name: heading, values }], caption: caption(heading) });
+const page = { ...base, id: 'p', type: 'panels', form: 'row', commentary: 'captions', title: 'Heathrow ranks third on raw connectivity but first on economic reach',
+  exhibits: [bars('Direct connectivity', [4866, 4580, 4579]), bars('Power City Access', [1264884, 1011578, 1921318]), bars('Hub connectivity', [6100, 5200, 4300])] };
+const [slide] = compose([page]);
+const widest = (i) => Math.max(...marksOf(slide.nodes, i).map((n) => n.frame.width));
+const near = { ...page, exhibits: [page.exhibits[0], page.exhibits[2]] };
+const [pair] = compose([near]);
+const perUnit = (nodes, i, value) => marksOf(nodes, i)[0].frame.width / value;
+// Aligned bars too: a 1.6% cancellation rate beside 77% on time drew as stubs.
+const members = ['BA', 'Jet2', 'KLM', 'easyJet'];
+const aligned = { ...base, id: 'a', type: 'ranking', form: 'aligned-bars', commentary: 'below', points: ['BA leads on time.', 'It cancels least late.'],
+  title: 'BA beats easyJet on punctuality and late cancellations', exhibit: { categories: members, highlights: [{ category: 'BA' }], series: [
+    { name: 'On time', unit: '%', values: [76.8, 67.4, 69.8, 72.6] }, { name: 'Which? score', unit: '%', values: [72, 76, 72, 67] }, { name: 'Cancelled', unit: '%', values: [1.6, 0.1, 2.7, 0.7] }] } };
+const [rows] = compose([aligned]);
+const cancelled = Math.max(...rows.nodes.filter((n) => n.role === 'chart-mark' && n.data?.series === 'Cancelled').map((n) => n.frame.width));
+console.log(JSON.stringify({ widths: [0, 1, 2].map(widest), shared: Math.abs(perUnit(pair.nodes, 0, 4866) - perUnit(pair.nodes, 1, 6100)) / perUnit(pair.nodes, 0, 4866), cancelled }));
+""")
+        self.assertGreater(min(result['widths']), 100)  # every panel's bars read
+        self.assertLess(result['shared'], 0.05)  # two panels of one magnitude still share theirs
+        self.assertGreater(result['cancelled'], 60)
+
 
 class HighlightTests(unittest.TestCase):
     def test_a_highlighted_bar_is_drawn_in_the_accent_everywhere(self):
@@ -73,7 +97,8 @@ const aligned = { ...base, id: 'a', type: 'ranking', form: 'aligned-bars', comme
     { name: 'Load factor', unit: '%', values: [85, 78, 83, 86, 85, 88, 87, 82] },
     { name: 'Journeys', unit: 'million', values: [22, 53, 93, 122, 29, 43, 22, 42] }] } };
 const [d, a] = compose([distribution, aligned]);
-const accent = (n) => n.style?.fill?.tokenId === 'color.accent';
+// The subject's colour, resolved once per palette (chart-axes.mjs SUBJECT).
+const accent = (n) => ['color.chartSubject'].includes(n.style?.fill?.tokenId);
 const lit = d.nodes.filter((n) => n.role === 'chart-mark' && accent(n)).map((n) => n.data.category);
 const bands = d.nodes.filter((n) => n.role === 'chart-highlight').length + a.nodes.filter((n) => n.role === 'chart-highlight').length;
 const litAligned = a.nodes.filter((n) => n.role === 'chart-mark' && accent(n)).map((n) => n.data.category);
@@ -121,9 +146,9 @@ const perUnit = (slide, i, v) => { const m = marksOf(slide.nodes, i).find((n) =>
 console.log(JSON.stringify({ otherTops: [top(other, 0), top(other, 1)], otherBases: [base_(other, 0), base_(other, 1)],
   samePerUnit: [perUnit(same, 0, 59), perUnit(same, 1, 391)], sameBases: [base_(same, 0), base_(same, 1)] }));
 """)
-        # Another unit: the plain panel's plot rises into the band the callout
-        # needed on its neighbour; the baselines still meet.
-        self.assertLess(result['otherTops'][1], result['otherTops'][0] - 40)
+        # Another unit: the callout takes its own panel's open space, and the plain
+        # panel beside it is never pushed down to match; the baselines still meet.
+        self.assertLessEqual(result['otherTops'][1], result['otherTops'][0] + 0.5)
         self.assertEqual(result['otherBases'][0], result['otherBases'][1])
         # One unit, one scale: the band stays shared so a unit is one height.
         self.assertAlmostEqual(result['samePerUnit'][0], result['samePerUnit'][1], delta=0.01)
@@ -140,10 +165,11 @@ const slides = compose(['Op01', 'Op31', 'Op40'].map((c) => page(c, note(c))));
 const boxes = slides.map((s) => { const box = s.nodes.find((n) => n.role === 'annotation-surface');
   const clash = s.nodes.filter((n) => n.role === 'chart-mark').some((m) => !(box.frame.x + box.frame.width <= m.frame.x || m.frame.x + m.frame.width <= box.frame.x || box.frame.y + box.frame.height <= m.frame.y || m.frame.y + m.frame.height <= box.frame.y));
   return { clash }; });
-console.log(JSON.stringify({ boxes, second: error(() => compilePage(page('Op31', [...note('Op31'), { category: 'Op01', text: 'The field leader' }]))) }));
+console.log(JSON.stringify({ boxes, second: compilePage(page('Op31', [...note('Op31'), { category: 'Op01', text: 'The field leader' }])).pageType.advisories }));
 """)
         self.assertEqual(result['boxes'], [{'clash': False}] * 3)
-        self.assertIn('a distribution carries one callout', result['second'])
+        # A second callout has no room between rows ten pixels apart: it is set aside, and the page says so.
+        self.assertTrue(any("rows are too close for a second callout" in note for note in result['second']))
 
 
 class BridgeCalloutTests(unittest.TestCase):
@@ -166,7 +192,7 @@ console.log(JSON.stringify({ rail: r.nodes.filter((n) => n.role === 'annotation-
         self.assertEqual(result['below'], 2)
         self.assertIn('carries 2 callouts at most', result['three'])
 
-    def test_three_callouts_keep_the_band_on_a_bridge_beside_a_column(self):
+    def test_three_callouts_on_a_bridge_beside_a_column_are_all_placed_most_in_the_plot(self):
         # The bridge as it sits beside a rail under a two-line title: 747px by
         # 516. It failed "give the chart more height" (the endpoint label row
         # was taken after the frame had compacted its bands), and a little
@@ -186,7 +212,12 @@ for (const height of [516, 440]) {
 }
 console.log(JSON.stringify(out));
 """)
-        self.assertEqual(result, {'516': ['band'] * 3, '440': ['band'] * 3})
+        # All three are placed, none in a rail and none over another; each takes the plot's open space where it has a clear
+        # leader to its step, and only a note with none takes the band (it took all three, 88px off the plot).
+        for height, placed in result.items():
+            self.assertEqual(len(placed), 3, height)
+            self.assertNotIn('rail', placed, height)
+            self.assertLess(placed.count('band'), 3, height)
 
 
 class PanelWidthTests(unittest.TestCase):
@@ -210,7 +241,7 @@ const spec = nativeChartSpec('chart.line', props, frame, nodes);
 const named = ['Northern', 'Southern', 'Atlantic', 'Pacifica', 'Midlands', 'Highland', 'Lowlands', 'Eastward', 'Westward', 'Frontier'];
 const namedRow = { ...row, id: 'n', exhibits: row.exhibits.map((ex) => ({ ...ex, categories: named })) };
 console.log(JSON.stringify({ sequence: labels(s), row: labels(r), legends, hidden: spec.hiddenCategoryIndices, drawn: nodes.filter((n) => n.role === 'category-label').map((n) => n.text),
-  named: error(() => compose([namedRow])), catalogue: describeTypes() }));
+  named: error(() => compose([namedRow])) }));
 """)
         self.assertEqual(result['sequence'], ['FY17', 'FY20', 'FY23', 'FY26'] * 3)
         self.assertEqual(result['row'], ['FY17', 'FY20', 'FY23', 'FY26'] * 3)
@@ -220,7 +251,6 @@ console.log(JSON.stringify({ sequence: labels(s), row: labels(r), legends, hidde
         # Names are never dropped; the refusal says what a panel holds.
         self.assertIn('Column names are wider than their columns', result['named'])
         self.assertIn('holds about', result['named'])
-        self.assertRegex(result['catalogue'], r'a column panel holds about \d+ named columns .* in a row of two, \d+ in a row of three and \d+ in a row of four')
 
 
 class NativeChartAgreementTests(unittest.TestCase):

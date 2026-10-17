@@ -51,6 +51,14 @@ class TableContext {
     }
     return { width: units * scale };
   }
+  // The face the font string names and its px-per-unit scale: what measureText sums, for a caller that measures
+  // words once and sets lines by adding their advances (text-layout.mjs).
+  faceOf() {
+    const { bold, px, family } = parseFont(this.font);
+    const table = loadTable(ALIASES[family.toLowerCase()] || family);
+    if (!table) throw new Error(`Required font is not installed: ${family}`);
+    return { face: table.faces[bold ? "bold" : "regular"], scale: px / table.unitsPerEm };
+  }
   // Natural line box for the face at a pixel size, in px: (winAscent + winDescent) / upm.
   lineBox(px, family = "Arial", bold = false) {
     const table = loadTable(ALIASES[family.toLowerCase()] || family);

@@ -31,13 +31,13 @@ DOCUMENT_NAME = re.compile(r"[a-z]+-[a-z0-9-]+-(?:19|20)\d\d\.pdf", re.I)
 FIRMS = re.compile(r"\b(?:mckinsey|bcg|bain|deloitte|accenture|kearney|booz|kpmg|pwc|l\.e\.k|oliver wyman)\b", re.I)
 # The directories that describe the calibration set or record runs against it.
 # Specimens and their decks are about their own subjects and may name anyone.
-CALIBRATION_FACING = ('evals/calibration', 'evals/quality', 'evals/README.md')
+CALIBRATION_FACING = ('evals/README.md',)
 
 
 def evals_text_files():
     for path in sorted((ROOT / 'evals').rglob('*')):
         rel = path.relative_to(ROOT).as_posix()
-        if not path.is_file() or path.suffix not in TEXT or '__pycache__' in rel or rel.startswith('evals/quality/runs/'):
+        if not path.is_file() or path.suffix not in TEXT or '__pycache__' in rel:
             continue
         if path.name == Path(__file__).name:  # this file spells the patterns out
             continue
@@ -45,12 +45,6 @@ def evals_text_files():
 
 
 class CorpusIsolationTests(unittest.TestCase):
-    def test_shipped_task_targets_are_numbers_only(self):
-        tasks = json.loads((SKILL / 'runtime' / 'reading-tasks.json').read_text())['tasks']
-        for name, task in tasks.items():
-            self.assertEqual(set(task), {'commentary', 'bodyWords', 'totalWords'}, name)
-            self.assertLessEqual(task['bodyWords']['q1'], task['bodyWords']['median'])
-
     def test_nothing_in_the_package_mentions_the_corpus(self):
         # Scan the real package, not the source tree: it is what gets shared.
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,35 +69,13 @@ class CorpusIsolationTests(unittest.TestCase):
                     offenders.append(f'{rel}:{i}: {FIRMS.search(line).group(0)}')
         self.assertEqual(offenders, [], '\n'.join(offenders[:40]))
 
-    def test_the_calibration_tools_find_the_set_through_the_environment(self):
-        for path in sorted((ROOT / 'evals' / 'calibration').glob('*.py')):
-            text = path.read_text(encoding='utf-8')
-            if 'corpus_root' in text and path.name != 'corpus.py':
-                self.assertIn('from corpus import corpus_root', text, path.name)
-        self.assertIn('PS_CALIBRATION_CORPUS', (ROOT / 'evals' / 'calibration' / 'corpus.py').read_text())
-        # No data file that could name the set's documents sits beside the tools.
-        data = [p.name for p in (ROOT / 'evals' / 'calibration').rglob('*') if p.suffix in {'.json', '.jsonl', '.csv'}]
-        self.assertEqual(data, [])
-
     def test_the_package_is_the_skill_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / 'pkg'
             package_plugin.package(ROOT, dest)
             files = json.loads((dest / 'package-manifest.json').read_text())['files']
             self.assertFalse([f for f in files if f.startswith('evals/')])
-            self.assertIn('skills/professional-slides/runtime/reading-tasks.json', files)
-
-    def test_a_page_names_its_task_and_is_held_to_its_numbers(self):
-        from node_probe import run_node
-        result = run_node('''
-import { checkTextPlan } from './skills/professional-slides/runtime/text-contract.mjs';
-const page = (task) => ({ n: 1, id: 'p', textPlan: [{ id: 't', role: 'title', text: 'A title' }, { id: 'b', role: 'body', text: 'word '.repeat(20) }], textReference: { task } });
-const run = (task) => checkTextPlan({ textContract: 'complete', pages: [page(task)] }).findings.map(f => f.code);
-console.log(JSON.stringify({ none: run(undefined), thin: run('chart-with-commentary'), led: run('chart-led') }));
-''')
-        self.assertEqual(result['none'], ['TEXT_REFERENCE_MISSING'])
-        self.assertIn('TEXT_COVERAGE_LOW', result['thin'])
-        self.assertIn('TEXT_COVERAGE_LOW', result['led'])
+            self.assertIn('skills/professional-slides/SKILL.md', files)
 
 
 if __name__ == '__main__':

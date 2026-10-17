@@ -13,11 +13,18 @@ export const OVERLAP_CODES = Object.freeze({
   DESCENDER_ON_RULE: "a display-face numeral's old-style descender set on a rule under it",
   SCATTER_UNKEYED: "a scatter coloured by series with no key and no named ends",
   TEXT_ON_TEXT: "two labels whose ink overlaps",
+  TEXT_OFF_GROUND: "text set in its own component's filled panel, tile or cell that runs past the fill's foot",
+  MAP_LABEL_ASTRAY: "a map marker's label set nearer another marker than its own, with no leader to its own",
 });
 
-const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption"]);
-const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader"]);
+const LABEL_ROLES = new Set(["flow-arrow-label", "data-label", "chart-reference-label", "annotation-text", "axis-title", "category-label", "legend-label", "chart-threshold-label", "insight-caption", "exhibit-link-label", "chart-event-label"]);
+// An event's dashed rule is a line through the plot like a reference line, and was read as none: on the BA retest the
+// Covid-grounding rule ran through "207,000 flights" and "22" on hb01 and through "107" on hb02, and no check saw it.
+const LINE_ROLES = new Set(["flow-arrow", "chart-line", "chart-reference-line", "chart-threshold-line", "annotation-leader", "data-label-leader", "exhibit-link-line", "chart-event-line"]);
+// A callout's box is filled: a label under it is hidden whether or not the callout's own words meet its ink.
+const COVERING_ROLES = new Set(["annotation-surface"]);
 const BOX_ROLES = new Set(["flow-step", "chart-mark", "fact-tile"]);
+const MARK_ROLE = /^(chart-|map-|table-(bar|bubble|progress|rating|check|trend|implication|status)|metric-ring|gantt-(bar|milestone)|legend-|spectrum-|fact-gauge|matrix-point|step-column)/;
 const RULE_ROLES = new Set(["divider-accent", "cover-accent", "section-heading-rule", "takeaways-rule"]);
 const OLD_STYLE_DESCENDERS = /[34579]/;
 // How far two labels' ink may meet, each way, before they read as one over the other: the ink box's own rounding.
@@ -59,12 +66,23 @@ export function inkBox(node) {
   return placed(node, width, lines.length * line, top, bottom);
 }
 
-/** The box from `top` to `bottom` of a block `width` by `height`, placed in the node's frame by its alignment. */
+/**
+ * The box from `top` to `bottom` of a block `width` by `height`, placed in the
+ * node's frame by its alignment - and, for a label turned a quarter (a table's
+ * row-group label set on its side, a rail's tab), turned with it about the
+ * frame's centre: unturned, its ink lay across the columns beside it.
+ */
 function placed(node, width, height, top, bottom) {
   const align = node.style?.align ?? "left", valign = node.style?.valign ?? "top";
   const x = align === "center" ? node.frame.x + (node.frame.width - width) / 2 : align === "right" ? node.frame.x + node.frame.width - width : node.frame.x;
   const y = valign === "mid" || valign === "middle" ? node.frame.y + (node.frame.height - height) / 2 : valign === "bottom" ? node.frame.y + node.frame.height - height : node.frame.y;
-  return { x, y: y + top, width, height: bottom - top };
+  const box = { x, y: y + top, width, height: bottom - top };
+  const turn = ((Number(node.style?.rotate || 0) % 360) + 360) % 360;
+  if (turn !== 90 && turn !== 270) return box;
+  const cx = node.frame.x + node.frame.width / 2, cy = node.frame.y + node.frame.height / 2;
+  // A quarter turn clockwise takes (dx, dy) from the centre to (-dy, dx); a quarter back, to (dy, -dx).
+  const [dx0, dx1, dy0, dy1] = [box.x - cx, box.x + box.width - cx, box.y - cy, box.y + box.height - cy];
+  return turn === 90 ? { x: cx - dy1, y: cy + dx0, width: box.height, height: box.width } : { x: cx + dy0, y: cy - dx1, width: box.height, height: box.width };
 }
 
 function crosses(box, line, pad = -1) {
@@ -96,7 +114,9 @@ export function sceneCollisions(slide) {
       // annotation's label is the crossing this refuses.
       const key = line.data?.annotationKey;
       if (["annotation-leader", "data-label-leader"].includes(line.role) && ["annotation-text", "data-label"].includes(text.role) && (key === undefined || key === text.data?.annotationKey)) continue;
-      if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role] });
+      // An event's rule and label cross under their own variant `event`.
+      const event = line.role === "chart-event-line" || text.role === "chart-event-label";
+      if (crosses(ink, line)) findings.push({ code: "TEXT_ON_LINE", slide: slide.id, text: text.id, line: line.id, roles: [text.role, line.role], ...(event ? { rule: "TEXT_ON_LINE.event" } : {}) });
     }
     for (const box of nodes.filter((n) => n.type === "rect" && BOX_ROLES.has(n.role))) {
       const f = box.frame, inside = ink.x >= f.x && ink.y >= f.y && ink.x + ink.width <= f.x + f.width && ink.y + ink.height <= f.y + f.height;
@@ -112,6 +132,38 @@ export function sceneCollisions(slide) {
     const [[a, p], [b, q]] = [inked[i], inked[j]];
     const across = Math.min(p.x + p.width, q.x + q.width) - Math.max(p.x, q.x), down = Math.min(p.y + p.height, q.y + q.height) - Math.max(p.y, q.y);
     if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: a.id, other: b.id, roles: [a.role, b.role] });
+  }
+  // A label under another callout's box: the two inks need not meet for the label to be lost. On the BA retest hw02's
+  // callout box covered the top half of the event label "Domestic band and band C added" while the callout's words ended
+  // a pixel above it, so the ink test above passed it. The box's own words (one annotation key) are what it holds.
+  for (const box of nodes.filter((n) => n.type === "rect" && COVERING_ROLES.has(n.role) && n.frame)) {
+    const f = box.frame, key = box.data?.annotationKey;
+    for (const [text, ink] of inked) {
+      if (key !== undefined && text.data?.annotationKey === key) continue;
+      const across = Math.min(ink.x + ink.width, f.x + f.width) - Math.max(ink.x, f.x), down = Math.min(ink.y + ink.height, f.y + f.height) - Math.max(ink.y, f.y);
+      if (across > TEXT_CLEAR && down > TEXT_CLEAR) findings.push({ code: "TEXT_ON_TEXT", slide: slide.id, text: text.id, other: box.id, roles: [text.role, box.role], rule: "TEXT_ON_TEXT.covered" });
+    }
+  }
+  // Text printed on its own component's fill - a panel, a tile, a header cell - that runs past the fill. The Spacebar
+  // run's labelled-rows label "Sol led on research, memo and consistency" set on three lines in a 96px block: its last
+  // line fell into the white gap and under the next block. The tests above read chart labels against chart marks, and
+  // the render's lost-text test reads text against the page, so white text off its dark panel was read by nothing.
+  // The ground is the smallest fill of the same component the text's ink starts on and its frame fits across: text laid
+  // out in the fill's width, which can only run past its foot. A label set by the data - a matrix point's name running
+  // from one quadrant into the next - is wider than the fill it starts on, and is placed there, not printed on it.
+  const filled = (n) => { const fill = n.style?.fill, value = fill && typeof fill === "object" ? fill.value : fill;
+    return Boolean(value) && !["none", "transparent"].includes(String(value)) && Number(n.style?.opacity ?? 1) > 0; };
+  // A mark is no ground, whatever sits on it (scene_gates.py SCENE_MARK_ROLE): a value label runs past the tint behind
+  // its category or the bar it labels by design, and a callout's box is read above.
+  const grounds = nodes.filter((n) => n.type === "rect" && n.frame && n.data?.componentInstance !== undefined && filled(n) && !MARK_ROLE.test(String(n.role ?? "")) && !COVERING_ROLES.has(n.role));
+  for (const [text, ink] of inked) {
+    const instance = text.data?.componentInstance;
+    if (instance === undefined) continue;
+    const ground = grounds.filter((n) => n.data.componentInstance === instance && text.frame.x >= n.frame.x - TEXT_CLEAR
+      && text.frame.x + text.frame.width <= n.frame.x + n.frame.width + TEXT_CLEAR && ink.y >= n.frame.y - TEXT_CLEAR && ink.y < n.frame.y + n.frame.height)
+      .sort((a, b) => a.frame.width * a.frame.height - b.frame.width * b.frame.height)[0];
+    const over = ground ? ink.y + ink.height - (ground.frame.y + ground.frame.height) : 0;
+    if (over > TEXT_CLEAR) findings.push({ code: "TEXT_OFF_GROUND", slide: slide.id, text: text.id, ground: ground.id, roles: [text.role, ground.role], over: Math.round(over) });
   }
   for (const numeral of nodes.filter((n) => n.type === "text" && n.style?.valign === "bottom" && n.style?.fontFamily?.tokenId === "font.display" && OLD_STYLE_DESCENDERS.test(String(n.text ?? "")))) {
     const size = Number(numeral.style?.fontSize?.value ?? 0) * 96 / 72, bottom = numeral.frame.y + numeral.frame.height;
@@ -139,6 +191,32 @@ export function sceneChartFindings(slide) {
     const coloured = new Set(mine.filter((n) => n.role === "chart-marker").map((n) => n.style?.fill?.tokenId ?? n.style?.fill)).size > 1;
     if (series.size > 1 && coloured && !named) findings.push({ code: "SCATTER_UNKEYED", slide: slide.id, instance, series: [...series] });
   }
+  return [...findings, ...mapLabelsAstray(slide)];
+}
+
+/**
+ * A map marker's label nearer another marker's disc than its own, with no
+ * leader drawn to its own (MAP_LABEL_ASTRAY): a reader takes a name for the
+ * marker it sits beside. The BA retest's hub map set London Heathrow's name
+ * beside Amsterdam's +4.4% disc and Amsterdam's beside Heathrow's -4.1%, so
+ * the page read Heathrow as shrinking - the reverse of its title. Read off the
+ * scene: each label and disc carries the index of the marker it belongs to
+ * (maps.mjs), and distance is from the label's frame to the disc's edge.
+ */
+function mapLabelsAstray(slide) {
+  const nodes = slide.nodes || [], findings = [];
+  const discs = nodes.filter((n) => n.role === "map-marker" && Number.isInteger(n.data?.markerIndex) && n.frame);
+  const led = new Set(nodes.filter((n) => n.role === "map-label-leader" && Number.isInteger(n.data?.markerIndex)).map((n) => `${n.data?.componentInstance ?? ""}|${n.data.markerIndex}`));
+  const reach = (f, disc) => { const r = disc.frame.width / 2, cx = disc.frame.x + r, cy = disc.frame.y + disc.frame.height / 2;
+    return Math.max(0, Math.hypot(Math.max(f.x - cx, 0, cx - f.x - f.width), Math.max(f.y - cy, 0, cy - f.y - f.height)) - r); };
+  for (const label of nodes.filter((n) => n.role === "map-label" && Number.isInteger(n.data?.markerIndex) && n.frame)) {
+    const map = label.data?.componentInstance ?? "", index = label.data.markerIndex;
+    if (led.has(`${map}|${index}`)) continue;
+    const mine = discs.filter((d) => (d.data?.componentInstance ?? "") === map);
+    const own = Math.min(...mine.filter((d) => d.data.markerIndex === index).map((d) => reach(label.frame, d)));
+    const nearer = mine.filter((d) => d.data.markerIndex !== index && reach(label.frame, d) + 1 < own).sort((a, b) => reach(label.frame, a) - reach(label.frame, b))[0];
+    if (Number.isFinite(own) && nearer) findings.push({ code: "MAP_LABEL_ASTRAY", slide: slide.id, text: label.id, label: String(label.text ?? ""), marker: index, nearer: nearer.data.markerIndex, gap: [Math.round(own), Math.round(reach(label.frame, nearer))] });
+  }
   return findings;
 }
 
@@ -149,7 +227,7 @@ export function sceneChartFindings(slide) {
  * reader needs to tell its colours apart. A label within 2px of a neighbouring
  * box is cramped but legible - a spacing question, read beside the page.
  */
-export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_ON_EDGE: "advisory" });
+export const OVERLAP_SEVERITY = Object.freeze({ TEXT_ON_LINE: "blocker", DESCENDER_ON_RULE: "blocker", SCATTER_UNKEYED: "blocker", TEXT_ON_TEXT: "blocker", TEXT_OFF_GROUND: "blocker", TEXT_ON_EDGE: "advisory", MAP_LABEL_ASTRAY: "blocker" });
 
 const OVERLAP_REPAIR = Object.freeze({
   TEXT_ON_LINE: "Move the label off the line: set a reference label at the end of its line clear of the series, a flow label above its arrow, a value label on the side of its point the line leaves open - or shorten it so it fits between the marks.",
@@ -157,6 +235,8 @@ const OVERLAP_REPAIR = Object.freeze({
   DESCENDER_ON_RULE: "Set the numeral in lining figures (the body face) or lift it off the rule by its descent.",
   SCATTER_UNKEYED: "Keep the scatter's legend, or connect each series (connect: true) so its name sits at its end.",
   TEXT_ON_TEXT: "Set one label clear of the other: fewer or shorter callouts on that part of the chart, a callout moved to the category its point leaves open, a shorter category name, or a wider slot.",
+  TEXT_OFF_GROUND: "Fit the text to the fill it is printed on: shorten it to the lines its panel, tile or cell holds, or give that block more height - fewer rows or items on the page.",
+  MAP_LABEL_ASTRAY: "Set each marker's name beside its own marker: fewer markers in the cluster, a wider `crop` or a region map that spreads them, shorter names - or move the cluster's values into a ranked bar or a callout list beside the map.",
 });
 
 /**
@@ -166,8 +246,8 @@ const OVERLAP_REPAIR = Object.freeze({
  * it composes, so the author meets them before the build does.
  */
 export function sceneDesignFindings(scene) {
-  return (scene?.slides || []).flatMap((slide, i) => [...sceneCollisions(slide), ...sceneChartFindings(slide)].map(({ code, slide: _, ...measured }) => ({
-    slide: i + 1, id: slide.sourceSlideId ?? slide.id, code, severity: OVERLAP_SEVERITY[code] ?? "blocker",
-    measured, threshold: code === "TEXT_ON_EDGE" ? "2px clear" : "no contact", repair: OVERLAP_REPAIR[code],
+  return (scene?.slides || []).flatMap((slide, i) => [...sceneCollisions(slide), ...sceneChartFindings(slide)].map(({ code, slide: _, rule, ...measured }) => ({
+    slide: i + 1, id: slide.sourceSlideId ?? slide.id, code, ...(rule ? { rule } : {}), severity: OVERLAP_SEVERITY[code] ?? "blocker",
+    measured, threshold: code === "TEXT_ON_EDGE" ? "2px clear" : code === "TEXT_OFF_GROUND" ? "inside its fill" : "no contact", repair: OVERLAP_REPAIR[code],
   })));
 }

@@ -14,6 +14,8 @@ export const PANEL_MIN_WIDTH = 300;
 // columns: used to measure a side column against what it holds before the
 // planner turns fractions into pixels.
 export const BODY_WIDTH = 1160, BODY_HEIGHT = 508, CONNECTOR_WIDTH = 44, COLUMN_GAP = 16;
+// The gutter a breakout's fan or a spread's bracket crosses between two panels.
+export const LINK_GUTTER = 72;
 // How deep a commentary column should run down its track: the gates hold a
 // column's trailing band to a fifth of its height (column_void_max), so a
 // column that narrows to reach four fifths clears it with the list's own gaps

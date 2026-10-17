@@ -17,17 +17,17 @@ export const DESIGN_SYSTEMS = Object.freeze({
   consulting: {
     label: "Consulting",
     use: "Steering committees, board papers and diligence, where the reader expects the familiar analytical grammar.",
-    character: "Open white canvas, sans titles top-left over a thin grey rule, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
+    character: "Open white canvas, sans titles top-left with no rule under them, commentary rail on the right, tinted takeaway band, dark cover and numbered chapter panels.",
     base: "midnight", colors: {},
-    // A thin grey rule margin to margin closes the title band, as it does on
-    // three strong analytical pages in four.
-    style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel", titleRule: "rule", titleRuleLength: "content", titleRuleColor: "rule" },
+    // No line under the title: strong decks rarely set one (a short accent bar under it, on under one page in ten). A house
+    // that sets one (a reference deck, `titleRule` in the preferences) still draws it.
+    style: { takeaway: "band", coverLayout: "block", dividerLayout: "panel", titleRule: "none" },
     commentary: "right", takeaway: "band", tracker: undefined, chrome: undefined, coverImage: "half", shapeBias: {}
   },
   editorial: {
     label: "Editorial",
     use: "Pre-reads, strategy narratives and essays read alone, where the argument is carried by sentences as much as by charts.",
-    character: "Warm paper canvas, large regular-weight serif titles over a hairline run edge to edge, wide margins, commentary on the left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages with no dark panels.",
+    character: "Warm paper canvas, large regular-weight serif titles, wide margins, commentary on the left of the exhibit, the takeaway as a serif close over a hairline, typographic cover and chapter pages with no dark panels.",
     base: "midnight",
     colors: {
       "color.canvas": "#FAF7F2", "color.surfaceMuted": "#F0EBE3", "color.ink": "#221E1A", "color.textSecondary": "#5E564C",
@@ -35,7 +35,7 @@ export const DESIGN_SYSTEMS = Object.freeze({
       "color.chartSeries1": "#7A2E1E", "color.chartSeries2": "#C07A55", "color.chartSeries3": "#3F5A66", "color.chartSeries4": "#A9B8BE", "color.chartSeries5": "#7D746A", "color.chartSeries6": "#D4CCC0",
       "color.chartComparator": "#DDD5CA", "color.chartGrid": "#E2DBD0", "color.rule": "#A39A8E",
       "font.display": "Georgia", "type.actionTitle": 26, "type.actionTitleLong": 23, "type.deckTitle": 40,
-      "style.titleWeight": "regular", "style.titleRule": "rule", "style.titleRuleLength": "full", "style.titleRuleColor": "rule", "style.tagPlacement": "above-title", "style.listMarker": "dash",
+      "style.titleWeight": "regular", "style.titleRule": "none", "style.titleRuleLength": "full", "style.titleRuleColor": "rule", "style.tagPlacement": "above-title", "style.listMarker": "dash",
       "style.tableRows": "rules", "style.labelWeight": "regular", "style.chartHeading": "text"
     },
     style: { takeaway: "rule", coverLayout: "editorial", dividerLayout: "editorial" },
@@ -121,17 +121,16 @@ export function identityColors(identity, canvas = "#FFFFFF") {
   if (identity.accent !== undefined && !hex(identity.accent)) throw new Error("identity.accent must be a #RRGGBB colour");
   const primary = readable(identity.primary, canvas, 4.5);
   const rawAccent = identity.accent ?? mix(identity.primary, "#FFFFFF", 0.35);
-  // Emphasis is the subject's own colour. A chart marks the bar the title is
-  // about in `color.accent` and draws the rest in series 1, so series 1 is a
-  // dark neutral warmed by the brand, the accent is the brand colour, and the
-  // secondary colour is the second series - with the brand as series 1, every
-  // rival bar would take the brand colour and the subject a soft secondary.
+  // Emphasis is the subject's own colour. A highlighted bar or point takes `color.accent`, the primary made readable, among
+  // marks in series 1, so series 1 is the subject's second colour - its accent, or the primary lifted - then a neutral warmed
+  // by the brand, the primary paled, and the dark neutral last: with the dark neutral first, every plain bar in a subject's
+  // deck was near-black (palettes.mjs leadWithColour), and with the brand as series 1 every rival bar took the subject's colour.
   const base = mix("#3A3A3A", identity.primary, 0.08);
   return {
     "color.componentPrimary": primary, "color.componentPrimaryTint": mix(primary, canvas, 0.88),
     "color.accent": primary, "color.accentTint": mix(identity.primary, canvas, 0.88),
-    "color.chartSeries1": base, "color.chartSeries2": rawAccent, "color.chartSeries3": mix(primary, "#FFFFFF", 0.45),
-    "color.chartSeries4": mix(base, "#FFFFFF", 0.45), "color.chartSeries5": "#8A8A8A", "color.chartSeries6": "#C9C9C9"
+    "color.chartSeries1": rawAccent, "color.chartSeries2": mix(base, "#FFFFFF", 0.45), "color.chartSeries3": mix(identity.primary, "#FFFFFF", 0.7),
+    "color.chartSeries4": "#C9C9C9", "color.chartSeries5": "#8A8A8A", "color.chartSeries6": base
   };
 }
 
@@ -167,25 +166,7 @@ export function seededRandom(seed) {
 }
 
 /**
- * Where one choice falls in a deck's draw: a number from 0 to 1 fixed by the
- * seed and what is being chosen - a page's id and the form or exhibit kind
- * put to it. It orders the choices a deck is free to make between forms that
- * carry a page's claim equally well (deck-structure.mjs allocateStructure, a
- * scaffold's form), and nothing else: a form that fits better is never passed
- * over for it. Keyed by the page, not its place, so a page added to a deck
- * leaves every other page's draw as it was.
- */
-export function drawRank(seed, ...what) {
-  let h = 2166136261;
-  for (const ch of `${seed}:choice:${what.join(":")}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  // The hash leaves a string's last characters - the form, which is all that differs between two choices for one page - in a
-  // few of its bits, so two forms would rank in one order under most seeds. The finaliser spreads them over all thirty-two.
-  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-/**
- * The page types each system is built from (references/theming.md#design-systems),
+ * The page types each system is built from (references/design-intake.md),
  * each as the author reads it (`say`) and, where the entry names forms of the
  * catalogue or exhibit kinds, as the plan reads it: the `forms`
  * (`<type>/<form>`) and `kinds` a deck that features the entry prefers among

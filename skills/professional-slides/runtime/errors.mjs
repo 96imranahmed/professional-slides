@@ -1,14 +1,13 @@
-// One exit-code scheme for every command of the pipeline (build-deck,
-// deliver-deck, storyline, reviewer merge; runtime/README.md#exit-codes), so a
-// calling agent reads any step's status the same way: 0 done, 1 a crash or a
-// usage error, 2 refused (blockers, a rejection, an invalid answer, a capped
-// loop), 3 waiting on a reviewer - a packet was written for one.
-export const EXIT = Object.freeze({ ok: 0, error: 1, refused: 2, waiting: 3 });
+// One exit-code scheme for every command of the pipeline (author-deck,
+// build-deck; runtime/README.md#exit-codes), so a calling agent reads any
+// step's status the same way: 0 done, 1 a crash or a usage error, 2 refused
+// (a finding that blocks, or input the command cannot take).
+export const EXIT = Object.freeze({ ok: 0, error: 1, refused: 2 });
 
 // A refusal is the input breaking a rule the author can repair, not a crash.
 // Every CLI prints its message without a stack trace and exits EXIT.refused (2);
 // a crash keeps EXIT.error (1). `findings` carries the same records a gate
-// report does, so a caller can write them (deliver-deck writes REJECTED.md).
+// report does, so a caller can list them with the rest.
 export class RefusalError extends Error {
   constructor(code, message, findings = []) {
     super(message);

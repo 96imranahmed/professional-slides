@@ -10,13 +10,14 @@
 import { defaultHighlightStyle } from "./core.mjs";
 import { measureCaption, proseMeasure, measureProse, measureInsight } from "./registry-text.mjs";
 import { chartAnnotationBands, evidenceBandSpan } from "./chart-annotations.mjs";
-import { plotHeadroom, topBand, horizontalChart } from "./chart-axes.mjs";
+import { plotHeadroom, topBand, horizontalChart, oneMagnitude } from "./chart-axes.mjs";
+import { FLAT_SHARE } from "./chart-sense.mjs";
 import { legendRowCount } from "./legends.mjs";
 import { stepsLayout } from "./extras.mjs";
 import { factGridLayout } from "./figures.mjs";
 import { renderTable, withoutInferredBars } from "./tables.mjs";
 import { metricHeight } from "./panels.mjs";
-import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, BODY_HEIGHT, SIDE_COLUMN_SHORT, SIDE_COLUMN_DEPTH, SIDE_COLUMN_MIN_WIDTH } from "./compose-body.mjs";
+import { SIZE, HUG, BODY_WIDTH, COLUMN_GAP, CONNECTOR_WIDTH, LINK_GUTTER, BODY_HEIGHT, SIDE_COLUMN_SHORT, SIDE_COLUMN_DEPTH, SIDE_COLUMN_MIN_WIDTH } from "./compose-body.mjs";
 import { heavyTable, styleTable } from "./compose-tables.mjs";
 import { sharedBound, SIDEWAYS_CATEGORIES } from "./compose-charts.mjs";
 import { exhibitItem, headedPanel } from "./compose-exhibits.mjs";
@@ -24,6 +25,10 @@ import { paragraph, pointColumns, pointsItem, sideTreatment, listDepth, pointsPe
 import { photoStrip } from "./compose-pictures.mjs";
 import { metricsColumn } from "./compose-metrics.mjs";
 import { hasCommentary } from "./compose-layouts.mjs";
+import { fitsQuarter } from "./compose-text-pages.mjs";
+
+/** A link's end by the exhibit's place on the page: `1`, or `{ exhibit: 1, ... }` as the compile writes it. */
+const placeOf = (end) => (typeof end === "number" ? end : end?.exhibit ?? 0);
 
 /**
  * Two peer exhibits side by side: `two-up` and `two-up-contrast`.
@@ -36,12 +41,19 @@ export function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, f
   shareCaptionHeight(exhibits, { id, slide, layout });
   fitLineLabelsToPanels(exhibits, layout);
   const charts = exhibits.filter((ex) => String(ex.type).startsWith("chart.") && Array.isArray(ex.series));
-  shareValueScales(charts);
-  shareBarDomain(charts, { id, slide });
+  // A breakout's detail is the overview's mark enlarged: on its own scale its
+  // split fills the panel and the fan opens to it, where on the overview's
+  // scale it stood the mark's height and the lines ran flat.
+  if (layout !== "breakout") {
+    shareValueScales(charts);
+    shareBarDomain(charts, { id, slide });
+  }
   sharePlotFrame(charts);
   // Chart beside a narrow table (three columns or fewer): the chart takes 3:2.
   const panelSize = (ex, index) => {
     if (slide.pairedWeights) return { width: { fr: slide.pairedWeights[index] }, height: "fill" };
+    // The overview reads across its members; the detail is one mark split, a narrow panel.
+    if (layout === "breakout") return { width: { fr: index === placeOf(slide.breakout?.to ?? 1) ? 1 : 2 }, height: "fill" };
     if (exhibits.length !== 2) return SIZE;
     const other = exhibits.find((_, i) => i !== index);
     const narrow = (t) => t?.type === "table" && (t.columns || []).length <= 3;
@@ -70,8 +82,21 @@ export function peerExhibitsRow(items, { id, slide, layout, exhibits, baseDir, f
   // The arrow is the relation; a row of peers without it is a comparison.
   const row = layout === "sequence"
     ? panels.flatMap((panel, i) => (i ? [{ id: `${id}-step-${i}`, component: "connector", props: { variant: "arrow" }, size: { width: CONNECTOR_WIDTH, height: "fill" } }, panel] : [panel]))
+    : layout === "breakout" || slide.spread
+    // A breakout's fan and a spread's bracket cross the gutter: the panel after
+    // the first is set in from it, so the lines have the room to read as lines.
+    ? panels.map((panel, i) => (i ? { id: `${id}-set-in-${i}`, layout: "flow.column", padding: { left: LINK_GUTTER }, size: panel.size, items: [{ ...panel, size: SIZE }] } : panel))
     : panels;
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: row });
+  const exhibitId = (end) => `${id}-exhibit-${placeOf(end)}`;
+  const links = [
+    ...(slide.breakout ? [{ kind: "breakout", from: { ...slide.breakout.from, exhibit: exhibitId(slide.breakout.from ?? 0) }, to: { exhibit: exhibitId(slide.breakout.to ?? 1) } }] : []),
+    ...(slide.spread ? [{ kind: "spread", label: slide.spread.label, from: { ...slide.spread.from, exhibit: exhibitId(slide.spread.from) }, to: { ...slide.spread.to, exhibit: exhibitId(slide.spread.to) } }] : []),
+  ];
+  const rowItem = { id: `${id}-row`, layout: "flow.row", size: SIZE, items: row };
+  // The lines are drawn over the row once its charts are drawn (exhibit-links.mjs).
+  items.push(links.length
+    ? { id: `${id}-linked`, layout: "overlay", size: SIZE, items: [rowItem, ...links.map((props, k) => ({ id: `${id}-link-${k}`, component: "exhibit-link", props, size: SIZE }))] }
+    : rowItem);
   if (slide.points?.length) items.push(pointsUnderPanels(slide.points, { id, slide, layout, panels, fill, pointsStyle }));
 }
 
@@ -128,19 +153,26 @@ function fitLineLabelsToPanels(exhibits, layout) {
 // The scale is shared within each unit, not only when every panel has the
 // same one: two "% y/y" bar panels beside a passenger column still share
 // theirs, down to a -18% bar that a zero minimum would put outside the axis.
+// It is shared only between panels whose values run the same way. A bar's
+// length across and a line's height up are not read against each other, so a
+// shared scale buys no comparison, and it costs the bars their width: the BA
+// retest's margin ranking (2.5% to 15.8%) took the -60 floor of the line
+// beside it, a 2020 Covid loss, and drew its ten bars in the last quarter of
+// their panel.
+// And only between panels of one magnitude (chart-axes.mjs oneMagnitude).
+// Stacks extend separately above and below zero: netting signed
+// segments or forcing zero as the minimum truncates real evidence.
+const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
+  ? (ex.categories || []).flatMap((_, i) => [
+    ex.series.reduce((sum, se) => sum + Math.min(0, se.values[i] || 0), 0),
+    ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
+  ])
+  : ex.series.flatMap(se => se.values);
 function shareValueScales(charts) {
   const byUnit = new Map();
-  for (const ex of charts) byUnit.set(ex.unit, [...(byUnit.get(ex.unit) || []), ex]);
+  for (const ex of charts) { const key = `${ex.unit}|${horizontalChart(ex.type) ? "across" : "up"}`; byUnit.set(key, [...(byUnit.get(key) || []), ex]); }
   for (const group of byUnit.values()) {
-    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined)) continue;
-    // Stacks extend separately above and below zero: netting signed
-    // segments or forcing zero as the minimum truncates real evidence.
-    const extent = ex => ["chart.stacked-column", "chart.stacked-bar"].includes(ex.type)
-      ? (ex.categories || []).flatMap((_, i) => [
-        ex.series.reduce((sum, se) => sum + Math.min(0, se.values[i] || 0), 0),
-        ex.series.reduce((sum, se) => sum + Math.max(0, se.values[i] || 0), 0),
-      ])
-      : ex.series.flatMap(se => se.values);
+    if (group.length < 2 || group.some((ex) => ex.yMax !== undefined) || !oneMagnitude(group.map(extent))) continue;
     // Every mark the scale has to hold, from every panel: reference lines and
     // targets too, each with the 15% the chart itself gives a line near the
     // top so its label has room (chart-decorations.mjs withReferenceValues).
@@ -151,7 +183,9 @@ function shareValueScales(charts) {
     const min = Math.min(0, ...values), max = Math.max(0, ...values);
     const sharedMin = min < 0 ? -sharedBound(-min) : 0;
     const sharedMax = max > 0 ? sharedBound(max) : min < 0 ? 0 : 1;
-    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; }
+    // Whether any peer moves on the shared scale: a flat panel beside one that does is read against it (chart-sense.mjs).
+    const moves = group.some((ex) => ex.series.some((se) => { const v = se.values.filter(Number.isFinite); return v.length > 1 && (Math.max(...v) - Math.min(...v)) / (sharedMax - sharedMin) >= FLAT_SHARE; }));
+    for (const ex of group) { ex.yMin = ex.yMin ?? sharedMin; ex.yMax = sharedMax; ex.peerScale = { moves }; }
   }
 }
 
@@ -160,7 +194,7 @@ function shareValueScales(charts) {
 // Compare horizontal peers in the shared editable scene coordinate system.
 function shareBarDomain(charts, { id, slide }) {
   const horizontalPeers = charts.filter(ex => horizontalChart(ex.type));
-  if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit)) {
+  if (horizontalPeers.length >= 2 && !slide.pairedWeights && horizontalPeers.every(ex => ex.unit === horizontalPeers[0].unit) && oneMagnitude(horizontalPeers.map(extent))) {
     // An unset minimum is the lowest bar of any peer, not zero: zero puts a
     // negative bar outside its own axis.
     const lowest = Math.min(0, ...horizontalPeers.flatMap(ex => ex.series.flatMap(series => series.values)));
@@ -301,8 +335,10 @@ function commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }
   return null;
 }
 
-export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle }) {
-  const stair = slide.pageType ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
+// `halves`: the exhibit is a table set in halves (`split: "halves"`), and its points run in columns under the two panels
+// as they do under one: set as one list across the page, they ran past the measure a line is read at.
+export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle, halves = false }) {
+  const stair = slide.pageType && !halves ? commentaryOverSteps({ id, slide, exhibits, baseDir, fill, pointsStyle }) : null;
   if (stair) { items.push(stair); return; }
   // Three or four facts in a row over two or three points are a strip of
   // tiles and a strip of text with a third of the page empty under them. When
@@ -328,8 +364,8 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   // A wide exhibit - ten categories, a twelve-row table - has no width to
   // give a side column, and three findings read better as three columns than
   // as three stacked paragraphs in a 360px gutter.
-  const item = exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
-  if (String(exhibits[0].type).startsWith("chart.") && item.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
+  const item = halves ? null : exhibitItem(exhibits[0], `${id}-exhibit`, baseDir, { width: { fr: 1 }, height: "fill" });
+  if (String(exhibits[0].type).startsWith("chart.") && item?.props?.unit && !item.props.unitPlacement) item.props.unitPlacement = "inline";
   // A point's lead becomes the column's heading only when its sentence can
   // stand without it. Points are often written to run on from the lead ("Core
   // regionals carry the most activity" + "with 54 use cases in ideation"),
@@ -380,7 +416,7 @@ export function exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fil
   const headBelow = !columns.every((column) => column.heading)
     ? belowHeading : slide.pointsHeading || null;
   items.push({ id: `${id}-stack`, layout: "flow.column", size: SIZE, items: [
-    headedPanel(exhibits[0], item, `${id}-exhibit`, false),
+    halves ? halvesRow(id, exhibits[0], baseDir) : headedPanel(exhibits[0], item, `${id}-exhibit`, false),
     { id: `${id}-below`, ...(headBelow ? { heading: headBelow } : {}), size: HUG, ...pointColumns(columns, `${id}-below`) },
   ] });
 }
@@ -406,7 +442,7 @@ export function labelledRows(items, { id, slide, baseDir, fill }) {
   if (blocks.length < 2) throw new Error(`${id}: a labelled-rows page carries two or more \`blocks\`, each { label, points }`);
   const rows = blocks.map((block, at) => {
     if (!block?.label || !(block.points || []).length) throw new Error(`${id}: block ${at + 1} needs its \`label\` and \`points\``);
-    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary" },
+    const label = { id: `${id}-label-${at}`, component: "side-statement", props: { text: String(block.label).trim(), tone: "primary", ...(block.icon ? { icon: block.icon } : {}) },
       size: { width: BLOCK_LABEL_WIDTH, height: "fill" } };
     const text = { id: `${id}-text-${at}`, layout: "flow.column", leftover: "center", size: { width: { fr: 1 }, height: "fill" },
       items: [pointsItem(block.points, `${id}-points-${at}`, "open", fill, false, null)] };
@@ -509,7 +545,8 @@ export function exhibitBesideCommentary(items, { id, slide, layout, exhibits, ba
   // categories run across, or a flow read left to right. Bars read down their
   // rows and a table down its lines; set under points they lose the height
   // they are read by.
-  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type)) || exhibits[0].type === "flow";
+  // A radar is round: under its points it would sit no larger in a band the page's width, so it keeps its column beside them.
+  const widens = (String(exhibits[0].type).startsWith("chart.") && !SIDEWAYS_CATEGORIES.has(exhibits[0].type) && exhibits[0].type !== "chart.radar") || exhibits[0].type === "flow";
   if (pointsOnly && widens && fill !== "airy" && slide.pointsAlign !== "middle" && slide.points.length <= 4
       && (sideExtras + listDepth(list, drawnTrack(sideFr), slide.density)) / trackHeight < SIDE_COLUMN_SHORT) {
     exhibitOverCommentary(items, { id, slide, exhibits, baseDir, fill, pointsStyle });
@@ -681,7 +718,11 @@ export function fullWidthExhibit(items, { id, slide, exhibits, baseDir, metricsB
 // to 12 top-left to bottom-right, and both panels repeat the header, which
 // is what makes them readable as halves of one table rather than two.
 export function tableHalves(items, { id, exhibits, baseDir }) {
-  const ex = exhibits[0];
+  items.push(halvesRow(id, exhibits[0], baseDir));
+}
+
+/** The two panels of a halved table, side by side in one row. */
+function halvesRow(id, ex, baseDir) {
   const rows = ex.rows || [];
   if (rows.length < 2) throw new Error(`${id}: a halved table needs rows to halve`);
   const at = Math.ceil(rows.length / 2);
@@ -689,10 +730,16 @@ export function tableHalves(items, { id, exhibits, baseDir }) {
   // Widths derived per half can put a column nine pixels further right on
   // the right-hand panel, and two tables that nearly line up read worse than
   // two that plainly do not.
-  const shared = styleTable(ex).columns;
-  const half = (part, suffix) => exhibitItem({ ...ex, columns: shared, rows: part, heading: suffix === "a" ? ex.heading : undefined },
+  const styled = styleTable(ex), shared = styled.columns;
+  // A column of bars - the author's (`bar: true` on a table asked to halve) or the one the composer draws on a measure with
+  // a unit - is drawn to one scale across both panels: the halves take the whole table's bar cells and its scale, as a
+  // table cut across pages does (compose-deck.mjs paginateTable). Set over the raw rows, each half met a bar column with
+  // no scale, and a ranking of twenty stations with its journeys in millions did not compose.
+  const barred = shared.some((column) => column?.type === "bars");
+  const body = barred ? styled.rows : rows;
+  const half = (part, suffix) => exhibitItem({ ...ex, columns: shared, rows: part, heading: suffix === "a" ? ex.heading : undefined, ...(barred ? { scales: styled.scales } : {}) },
     `${id}-exhibit-${suffix}`, baseDir, { width: { fr: 1 }, height: "fill" });
-  items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(rows.slice(0, at), "a"), half(rows.slice(at), "b")] });
+  return { id: `${id}-row`, layout: "flow.row", size: SIZE, items: [half(body.slice(0, at), "a"), half(body.slice(at), "b")] };
 }
 
 // One figure carries the page: the number set large with its explanation,
@@ -758,6 +805,30 @@ export function exhibitStack(items, { id, slide, exhibits, baseDir, fill, points
     const side = { id: `${id}-side`, ...(slide.pointsHeading === false ? {} : { heading: slide.pointsHeading || "What it means" }), treatment: sideTreatment(slide), layout: "flow.column", size: { width: { fr: slide.kpi || insights.length ? 1.5 : 1 }, height: "fill" }, items: sideItems };
     items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [stacked, side] });
   } else items.push({ ...stacked, size: SIZE });
+}
+
+/**
+ * A dashboard: two to six headed exhibits on a grid of areas - a hero chart
+ * over two columns beside two satellites, a map beside a table - each in the
+ * cell its `area` names (page-types.mjs dashboardGrid), the tracks as wide
+ * and as tall as their weights. The strip of figures over it is the page's
+ * (measuresOverPage); the rail, where the page has one, stands at its right
+ * as a boxed column. A text `panel` heads itself, so it takes no band.
+ */
+export function exhibitDashboard(items, { id, slide, exhibits, baseDir }) {
+  const grid = slide.grid;
+  if (!grid) throw new Error(`${id}: a dashboard carries its grid (page-types.mjs dashboardGrid)`);
+  const cells = exhibits.map((exhibit, i) => {
+    const { area, ...ex } = exhibit;
+    const item = { ...exhibitItem(ex, `${id}-exhibit-${i}`, baseDir), size: SIZE };
+    return { ...(ex.type === "panel" ? item : headedPanel(ex, item, `${id}-exhibit-${i}`)), cell: grid.areas[i] };
+  });
+  const board = { id: `${id}-dashboard`, layout: "grid", gridColumns: grid.columns, gridRows: grid.rows, size: SIZE, items: cells };
+  if (slide.panel?.text) {
+    const rail = { id: `${id}-rail`, component: "side-statement", props: { text: slide.panel.text, tone: slide.panel.tone ?? "muted" }, size: { width: { fr: 1 }, height: "fill" } };
+    // A quarter of the row where the statement fits there, a third where it does not, as a sidebar page's panel (compose-text-pages.mjs).
+    items.push({ id: `${id}-row`, layout: "flow.row", size: SIZE, items: [{ ...board, size: { width: { fr: fitsQuarter(rail.props) ? 3 : 2 }, height: "fill" } }, rail] });
+  } else items.push(board);
 }
 
 // Two rows of two small exhibits, every panel headed.

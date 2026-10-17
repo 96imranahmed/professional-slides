@@ -37,7 +37,7 @@ def chart_scene():
 import { composeAll } from './skills/professional-slides/runtime/compose-all.mjs';
 const spec = { schema: 'professional-slides.deck/v3', id: 'det', cover: { title: 'Determinism' }, slides: [
   { id: 's1', title: 'Segments stack to the whole in every year', exhibit: { type: 'chart.stacked-column', categories: ['2022', '2023', '2024'],
-    series: [{ name: 'A', values: [3, 4, 5] }, { name: 'B', values: [2, 2, 3] }] } },
+    series: [{ name: 'A', values: [3, 4, 5] }, { name: 'B', values: [2, 2, 3] }], stackTotals: false } },  // totals are drawn, not native
   { id: 's2', title: 'A second chart keeps the workbook count honest', exhibit: { type: 'chart.column', categories: ['A', 'B', 'C', 'D'],
     series: [{ name: 'x', values: [4, 3, 2, 1] }] } }] };
 console.log(JSON.stringify(JSON.stringify(composeAll(spec, process.cwd()).deck)));

@@ -16,6 +16,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,7 +32,6 @@ IMPORT = RUNTIME / "import-deck.py"
 ASSEMBLE = RUNTIME / "emit" / "assemble_pptx.py"
 AUTHOR = RUNTIME / "author-deck.mjs"
 BENCH = ROOT / "evals" / "point-change"
-WEIGHT = json.loads((RUNTIME / "weight.json").read_text())
 
 
 def load(name: str, file: Path):
@@ -96,19 +96,20 @@ class CarriedDeck(unittest.TestCase):
         return next(page for page in doc["pages"] if page["id"] == key)
 
     def author(self, work, *flags):
-        return sh(NODE, AUTHOR, work / "deck.pages.json", *flags)
+        self.last_run = sh(NODE, AUTHOR, work / "deck.pages.json", *flags)
+        return self.last_run
 
     def refused(self, work):
-        """The findings the last author run refused the deck for, as (code, page id)."""
-        entries = [json.loads(line) for line in (work / "deck.author-log.jsonl").read_text().splitlines()]
-        return [(f["code"], f.get("id")) for f in entries[-1]["findings"]]
+        """The findings the last author run refused the deck for, as (code, page id): each printed "  CODE [id]" over its repair."""
+        refused = self.last_run.stderr.partition("nothing was written.")[2]
+        found = re.findall(r"^ {2}([A-Z][A-Z_]+)(?: \[([^\]]+)\])?\n {4}", refused, re.M)
+        return [(code, where.split(" in ")[0].split(", ")[0] if where and "," not in where else None) for code, where in found]
 
 
 class ImportTests(CarriedDeck):
-    def test_the_carry_starter_keeps_every_slide_and_records_what_it_was_made_under(self):
+    def test_the_carry_starter_keeps_every_slide(self):
         deck, pages = self.starter["deck"], self.starter["pages"]
-        self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "deck", "workflow": "existing_deck_revision", "inventory": "deck.inventory.json",
-                                "rulesVersion": WEIGHT["rulesVersion"], "request": ""})
+        self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "deck", "workflow": "existing_deck_revision", "inventory": "deck.inventory.json"})
         # Every slide is a page, the title slide among them: nothing of the user's deck is the runtime's to redraw until the author says so.
         self.assertEqual([(p["id"], p["sourceSlide"], p["carry"]) for p in pages], [(f"s0{n}", n, True) for n in range(1, 9)])
         self.assertTrue(all("draft" in p and "type" not in p for p in pages))
@@ -154,7 +155,6 @@ class ImportTests(CarriedDeck):
         doc = json.loads((out / "deck.pages.json").read_text())
         self.assertEqual(doc["deck"]["cover"], {"title": "Harbour Coffee: FY26 review", "subtitle": "Board pre-read, March 2026"})
         self.assertEqual(doc["deck"]["footer"], "Harbour Coffee | Board pre-read | Confidential")
-        self.assertEqual(doc["deck"]["rulesVersion"], WEIGHT["rulesVersion"])
         self.assertEqual([p["id"] for p in doc["pages"]], [f"s0{n}" for n in range(2, 9)])
         self.assertTrue(all("carry" not in p for p in doc["pages"]))
         # An unmapped slide is still refused - and the refusal says it can be carried instead.
@@ -167,55 +167,16 @@ class ImportTests(CarriedDeck):
 class CompileScopeTests(CarriedDeck):
     def test_the_starter_compiles_as_written_in_every_mode(self):
         work = self.revise()
-        for flags in (["--draft"], ["--check"], []):
+        for flags in (["--check"], []):
             done = self.author(work, *flags)
             self.assertEqual(done.returncode, 0, f"{flags}: {done.stderr[:800]}")
         spec = json.loads((work / "deck.deck.json").read_text())
         self.assertEqual(spec["slides"], [])
         self.assertEqual([(c["id"], c["sourceSlide"], c["after"]) for c in spec["carried"]], [(f"s0{n}", n, None) for n in range(1, 9)])
-        self.assertEqual(spec["rulesVersion"], WEIGHT["rulesVersion"])
         summary = last_json(done.stdout)
         self.assertEqual(summary["revision"]["carried"], 8)
         self.assertEqual(summary["revision"]["composed"], [])
         self.assertIn("8 carried as they are", done.stderr)
-
-    def test_a_composed_page_is_held_to_every_page_rule_and_no_other_page_is_named(self):
-        def topic(doc):
-            at = doc["pages"].index(self.page(doc, "s07"))
-            doc["pages"][at] = {**DONUT, "title": "Sales mix by channel", "points": ["Wholesale is 22% of sales"]}
-        # A title the revision wrote is the revision's: a label of its own is refused, as on any page.
-        work = self.revise(lambda doc: (topic(doc), self.page(doc, "s07").update(title="Channel mix")))
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 2)
-        found = self.refused(work)
-        # The page the revision composes answers for its title and its words, as any page does...
-        self.assertIn(("CONTENT_NO_CLAIM", "s07"), found)
-        # ...and nothing is refused of a slide it carries, nor of the deck those slides make.
-        self.assertEqual({page for _, page in found}, {"s07"})
-        # The slide's own title, kept word for word, is the user's: advised on, never refused (weight.json rules.kept).
-        work = self.revise(topic)
-        self.author(work, "--check")
-        self.assertNotIn(("CONTENT_NO_CLAIM", "s07"), self.refused(work) if (work / "deck.author-log.jsonl").exists() else [])
-
-    def test_a_rule_that_measures_the_deck_advises_while_slides_are_carried(self):
-        def swap(doc):
-            doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
-        work = self.revise(swap)
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 0, done.stderr[:1500])
-        summary = last_json(done.stdout)
-        # The deck states no answer for a summary to carry: a new deck is refused for it, and this one is told.
-        self.assertIn("CONTENT_ANSWER_UNCARRIED", summary["revision"]["notHeld"])
-        # ...and why: the one page it composes is no population for a rule over a deck.
-        self.assertIn("fewer than the 8 a rule over a deck reads from", summary["revision"]["notHeld"]["CONTENT_ANSWER_UNCARRIED"])
-        self.assertEqual(summary["revision"]["composed"], ["s07"])
-        self.assertEqual(summary["revision"]["carried"], 7)
-        self.assertFalse(any("CONTENT_ANSWER_UNCARRIED" in line for line in summary["advisories"]))
-        self.assertIn("Not held (advisories)", done.stderr)
-        # A plan and a draft are of the page the runtime composes: the carried slides are not asked for a type.
-        for flag in ("--plan", "--draft", "--page"):
-            self.assertEqual(self.author(work, *([flag] if flag != "--page" else ["--check", "--page", "s02"])).returncode, 0, flag)
 
     def test_a_carried_page_is_the_slide_and_at_most_a_text_edit(self):
         cases = {
@@ -249,7 +210,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_slide_is_carried_once_and_not_also_redrawn(self):
         def twice(doc):
             doc["pages"].append({**self.page(doc, "s02"), "id": "s02b"})
-            doc["pages"].append({**DONUT, "id": "n01"})
+            doc["pages"].append({**copy.deepcopy(DONUT), "id": "n01"})
             doc["deck"]["density"] = "live-pitch"
         work = self.revise(twice)
         self.assertEqual(self.author(work, "--check").returncode, 2)
@@ -271,7 +232,7 @@ class CompileScopeTests(CarriedDeck):
     def test_a_composed_page_needs_slides_of_the_size_it_is_composed_at(self):
         def swap(doc):
             doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
+            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = copy.deepcopy(DONUT)
         work = self.revise(swap)
         inventory = json.loads((work / "deck.inventory.json").read_text())
         inventory["slideSize"] = {"width": 960, "height": 720}
@@ -354,216 +315,11 @@ console.log(JSON.stringify(consistencyFindings(doc, null, { spec, inventory, cha
 ''')
         self.assertEqual(result, [{"severity": "blocker", "pages": ["s1", "s3"]}, {"severity": "advisory", "pages": ["s1", "s4"]}])
 
-    def test_no_recorded_version_excuses_what_a_revision_leaves_behind_and_a_lowered_one_says_why(self):
-        def older(reason=None):
-            def change(doc):
-                doc["deck"]["rulesVersion"] = 5
-                if reason:
-                    doc["deck"]["rulesVersionReason"] = reason
-                self.page(doc, "s02")["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
-            return change
-        # The import stamped the current version: a pages file that records a lower one is asking to be held to less, and says why.
-        self.assertEqual(self.inventory["rulesVersion"], WEIGHT["rulesVersion"])
-        work = self.revise(older())
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 2)
-        self.assertEqual(set(self.refused(work)), {("NUMBER_STALE", "s02"), ("REVISION_RULES_VERSION", None)})
-        self.assertIn('`"rulesVersionReason": "..."`', done.stderr)
-        # With its reason the version stands - and the stale rule is no version's: it judges only what this revision changed.
-        work = self.revise(older("The deck was authored and accepted under version five last quarter"))
-        done = self.author(work, "--check")
-        self.assertEqual(done.returncode, 2)
-        self.assertEqual(self.refused(work), [("NUMBER_STALE", "s02")])
-        self.assertIn(f"Held to rules version 5, below the {WEIGHT['rulesVersion']} its import stamped", done.stderr)
-
-        def everywhere(doc):
-            older("The deck was authored and accepted under version five last quarter")(doc)
-            self.page(doc, "s08")["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
-            self.page(doc, "s04")["replace"] = [{"old": "12.4", "new": "12.6"}]
-        work = self.revise(everywhere)
-        self.assertEqual(self.author(work).returncode, 0)
-        # The version the deck records is kept: the compile does not stamp today's over it.
-        self.assertEqual(json.loads((work / "deck.deck.json").read_text())["rulesVersion"], 5)
-
-
-@unittest.skipUnless(NODE, "needs Node.js")
-class RulesOnARevisionTests(unittest.TestCase):
-    """Every finding code there is, on a revision: which a point change is held to, which it hears as advice, and why."""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.result = run_node('''
-import { GATE_CLASSES, measuresDeck, readsWholeDeck } from "./skills/professional-slides/runtime/gates/gate_classes.mjs";
-import { DECK_LENGTH, RULES, RULES_VERSION, applyRulesVersion } from "./skills/professional-slides/runtime/weight.mjs";
-import { judged } from "./skills/professional-slides/runtime/build-deck.mjs";
-import { heldAtDelivery } from "./skills/professional-slides/runtime/deliver-deck.mjs";
-import { REVISION_CODES } from "./skills/professional-slides/runtime/revision.mjs";
-import { CONSISTENCY_CODES } from "./skills/professional-slides/runtime/gates/consistency_gates.mjs";
-import { BUILD_BAR_CODES } from "./skills/professional-slides/runtime/build-bars.mjs";
-import { VARIETY_CODES } from "./skills/professional-slides/runtime/gates/variety_gates.mjs";
-import { DEPENDENCY_CODES } from "./skills/professional-slides/runtime/gates/dependency_gates.mjs";
-import { CODES as REVIEW_CODES } from "./skills/professional-slides/runtime/reviewer.mjs";
-import { SPINE_WITNESS_CODES } from "./skills/professional-slides/runtime/spine-witness.mjs";
-// The vocabularies the round's four streams added to or wrote: the carried slides', what the pages state between them and the
-// build bars at the compile, the fit of forms to claims, and the reviewer's own.
-const streams = { revision: Object.keys(REVISION_CODES), consistency: Object.keys(CONSISTENCY_CODES), bars: Object.keys(BUILD_BAR_CODES), variety: Object.keys(VARIETY_CODES),
-  dependency: Object.keys(DEPENDENCY_CODES), review: Object.keys(REVIEW_CODES), witness: Object.keys(SPINE_WITNESS_CODES) };
-const codes = Object.keys(GATE_CLASSES);
-const judge = (deck, rule = (code) => code) => Object.fromEntries(codes.map((code) => { const [f] = applyRulesVersion([{ code, rule: rule(code), severity: "blocker" }], deck); return [code, f.severity === "blocker" ? "held" : f.waived]; }));
-const revision = (more) => ({ workflow: "existing_deck_revision", rulesVersion: RULES_VERSION, ...more });
-// A revision by its counts: so many slides carried, so many pages composed.
-const made = (carried, composed, more = {}) => revision({ carried: Array.from({ length: carried }, (_, i) => ({ id: `s${i + 1}` })), slides: Array.from({ length: composed }, (_, i) => ({ id: `p${i + 1}`, pageType: {} })), ...more });
-// The three stages, each asked through the function it calls on its own findings: the compile's, the build's on a gate's report, delivery's on what it raises.
-const stages = (deck) => Object.fromEntries(codes.map((code) => { const f = { code, severity: "blocker" };
-  return [code, [applyRulesVersion([f], deck)[0].severity === "blocker", judged({ findings: [f], passed: false }, deck).findings[0].severity === "blocker", heldAtDelivery([f], deck).length === 1]]; }));
-const decks = { fresh: { workflow: "new_deck", slides: [] }, rebuilt5: revision({ rulesVersion: 5 }), rebuilt6: revision({}), few5: made(27, 1, { rulesVersion: 5 }), few6: made(27, 1), mostly5: made(1, 41, { rulesVersion: 5 }), mostly6: made(1, 41) };
-console.log(JSON.stringify({ classes: GATE_CLASSES, streams, measures: codes.filter(measuresDeck), whole: codes.filter(readsWholeDeck), population: Math.min(...Object.values(DECK_LENGTH).filter((n) => typeof n === "number")), rules: RULES, version: RULES_VERSION,
-  stages: Object.fromEntries(Object.entries(decks).map(([name, deck]) => [name, stages(deck)])),
-  few: judge(made(27, 1)), some: judge(made(20, 10)), mostly: judge(made(1, 41)), added: judge(made(5, 20)),
-  fresh: judge({ workflow: "new_deck", rulesVersion: 1, carried: [{}] }),
-  rebuilt: judge(revision({})),
-  carrying: judge(revision({ carried: [{ id: "s01" }, { id: "s02" }] })),
-  byVersion: Object.fromEntries(Array.from({ length: RULES_VERSION }, (_, i) => i + 1).map((version) => [version, judge(revision({ rulesVersion: version }))])),
-  carryingOld: judge(revision({ rulesVersion: 3, carried: [{ id: "s01" }] })),
-  variants: Object.fromEntries(Object.entries(RULES.introduced).flatMap(([version, rules]) => rules.filter((rule) => rule.includes(".")).map((rule) => [rule,
-    applyRulesVersion([{ code: rule.split(".")[0], rule, severity: "blocker" }], revision({ rulesVersion: Number(version) - 1 }))[0].waived ?? "held"]))) }));
-''')
-        cls.codes = cls.result["classes"]
-        cls.introduced = {rule: int(version) for version, rules in cls.result["rules"]["introduced"].items() for rule in rules}
-
-    def test_every_versioned_and_unexcused_rule_is_a_registered_code(self):
-        named = {rule.split(".")[0] for rule in self.introduced} | set(self.result["rules"]["always"])
-        self.assertEqual(sorted(named - set(self.codes)), [])
-        self.assertEqual(self.result["version"], max(int(v) for v in self.result["rules"]["introduced"]))
-
-    def test_the_walk_covers_every_code_of_every_stream_and_no_retired_one(self):
-        carrying = self.result["carrying"]
-        for stream, codes in self.result["streams"].items():
-            self.assertTrue(codes, stream)
-            for code in codes:
-                # Classed once, and so judged by the walk: every code has a verdict on a revision that carries slides.
-                self.assertIn(code, self.codes, f"{stream}: {code} has no class")
-                self.assertIn(code, carrying, f"{stream}: {code}")
-        # One stale-number rule and one stale-wording rule, and no third code for what a revision leaves behind.
-        self.assertEqual({code for code in self.codes if "STALE" in code}, {"NUMBER_STALE", "WORDING_STALE"})
-        # They judge only what the revision itself changed, so no recorded version excuses them: they are rules no revision is excused.
-        self.assertEqual({rule for rule in self.introduced if "STALE" in rule}, set())
-        self.assertLessEqual({"NUMBER_STALE", "WORDING_STALE"}, set(self.result["rules"]["always"]))
-        self.assertEqual(self.introduced["NUMBERS_DISAGREE"], 6)
-        # A build bar is delivery's refusal of every deck, whatever version it records: it is no version's rule, at any stage.
-        self.assertEqual({rule for rule in self.introduced if rule.startswith("BAR_")}, set())
-        # The fit of a form to its claim advises on any deck; on a revision that carries slides it is read of the composed pages.
-        for code in ("VARIETY_KIND_SHARE", "VARIETY_FIT_UNUSED"):
-            self.assertEqual(self.codes[code], "S")
-
-    def test_a_new_deck_is_held_to_every_rule(self):
-        self.assertEqual({code for code, verdict in self.result["fresh"].items() if verdict != "held"}, set())
-
-    def test_a_revision_recorded_under_the_current_version_and_recomposed_whole_is_held_to_every_rule(self):
-        self.assertEqual({code for code, verdict in self.result["rebuilt"].items() if verdict != "held"}, set())
-
-    def test_each_version_waives_exactly_the_rules_introduced_after_it(self):
-        for version, verdicts in self.result["byVersion"].items():
-            for code, verdict in verdicts.items():
-                since = self.introduced.get(code)
-                if code in self.result["rules"]["always"] or since is None or since <= int(version):
-                    self.assertEqual(verdict, "held", f"{code} at version {version}")
-                else:
-                    self.assertEqual(verdict, {"rulesVersion": int(version), "introducedIn": since}, f"{code} at version {version}")
-        # A rule only one variant of which began to block is waived by that variant's name.
-        for rule, verdict in self.result["variants"].items():
-            self.assertEqual(verdict, {"rulesVersion": self.introduced[rule] - 1, "introducedIn": self.introduced[rule]}, rule)
-
-    def test_a_deck_rule_is_held_over_the_composed_pages_wherever_they_are_enough_to_read_it(self):
-        measures, whole, always, population = set(self.result["measures"]), set(self.result["whole"]), set(self.result["rules"]["always"]), self.result["population"]
-        self.assertEqual(population, 8)
-        self.assertLessEqual({"NO_SUMMARY", "NO_SECTIONS", "NO_CONTENTS", "CONTENT_ANSWER_UNCARRIED", "EVALUATION_TOO_SHORT"}, whole)
-        self.assertLessEqual(whole, measures)
-
-        def unheld(name):
-            return {code for code, verdict in self.result[name].items() if verdict != "held"}
-        # Nothing composed, or one page among twenty-seven carried slides: no population, so no deck rule - and every page rule.
-        for name, carried, composed in (("carrying", 2, 0), ("few", 27, 1)):
-            verdicts = self.result[name]
-            self.assertEqual(unheld(name), measures - always, name)
-            for code in measures - always:
-                self.assertEqual({key: verdicts[code][key] for key in ("imported", "carried", "composed")}, {"imported": True, "carried": carried, "composed": composed}, code)
-                self.assertIn(f"fewer than the {population} a rule over a deck reads from", verdicts[code]["why"])
-        # Ten pages composed among twenty carried: a share, a rate or a run has its population and is held; what the deck as a
-        # whole must have is not, while most of the deck is the user's own slides, which may hold it.
-        self.assertEqual(unheld("some"), whole)
-        self.assertIn("20 of the deck's 30 pages are the user's own slides", self.result["some"]["NO_SUMMARY"]["why"])
-        for code in ("VARIETY_EXHIBIT_MIX", "VARIETY_TYPE_SHARE", "TITLE_GAP_SHARE", "EVIDENCE_DEPTH", "TEXT_FRAGMENTED", "PAGE_SHAPE_FLAT", "CONTENT_UNMEASURED"):
-            self.assertEqual(self.result["some"][code], "held", code)
-        # Forty-one pages composed and one slide carried, or twenty pages added to a deck of five: the deck is the runtime's
-        # argument, and one carried slide changes nothing it is held to.
-        self.assertEqual(unheld("mostly"), set())
-        self.assertEqual(unheld("added"), set())
-        for code, cls in self.codes.items():
-            if cls == "P":
-                self.assertEqual({self.result[name][code] for name in ("carrying", "few", "some", "mostly")}, {"held"}, f"{code} is a page rule: the page a revision composes answers for it")
-        # A measure counts over the deck's pages, so only structure and aggregate rules are measures.
-        self.assertEqual({self.codes[code] for code in measures} - {"S", "G"}, set())
-
-    def test_the_compile_the_build_and_delivery_hold_the_same_findings_on_every_deck(self):
-        # One function decides (weight.mjs notHeldOn), and each stage asks it of its own findings: for every code there is, on a new
-        # deck, a rebuild and a revision that carries slides, at rules versions 5 and 6, the three give one answer.
-        for deck, verdicts in self.result["stages"].items():
-            apart = {code: held for code, held in verdicts.items() if len(set(held)) != 1}
-            self.assertEqual(apart, {}, deck)
-        held = lambda deck: {code for code, verdict in self.result["stages"][deck].items() if verdict[0]}
-        self.assertEqual(held("fresh"), set(self.codes))
-        self.assertEqual(held("rebuilt6"), set(self.codes))
-        self.assertEqual(set(self.codes) - held("rebuilt5"), {code for code in self.codes if (self.introduced.get(code) or 0) > 5})
-        self.assertEqual(set(self.codes) - held("mostly6"), set())
-        self.assertEqual(set(self.codes) - held("few6"), set(self.result["measures"]) - set(self.result["rules"]["always"]))
-        # What a draft refuses of a page the critique would read differently from its witness (spine-witness.mjs) is no version's
-        # rule and reads one composed page: every stage holds it on every deck, whatever it carries and whatever version it records.
-        for deck in self.result["stages"]:
-            self.assertEqual(self.result["stages"][deck]["SPINE_UNDETERMINED"], [True, True, True], deck)
-        self.assertNotIn("SPINE_UNDETERMINED", self.introduced)
-        self.assertNotIn("SPINE_UNDETERMINED", self.result["measures"])
-        self.assertEqual({verdicts["SPINE_UNDETERMINED"] for verdicts in self.result["byVersion"].values()}, {"held"})
-        # The two the stages used to disagree on: an evaluation's length, and a build bar under an older version.
-        for deck in ("few5", "few6", "mostly5", "mostly6", "rebuilt5"):
-            self.assertEqual(len(set(self.result["stages"][deck]["EVALUATION_TOO_SHORT"])), 1, deck)
-            self.assertEqual(self.result["stages"][deck]["BAR_CHARTS_ANNOTATED"], [True, True, True], deck)
-
-    def test_the_rules_no_version_names_fall_where_a_point_change_needs_them(self):
-        carrying = self.result["carrying"]
-        # What says a page of the revision's own cannot be built, or is not the page that was written: held.
-        for code in ("COMPILE", "PAGE_DOES_NOT_COMPOSE", "BINDING_UNRESOLVED", "SPINE_UNFIT", "SPINE_UNDRAWABLE", "SPINE_UNDETERMINED", "SPINE_UNFILLED", "CONTENT_NO_CLAIM", "TEXT_COVERAGE_LOW",
-                     "PAGE_TYPE_EDITED", "REVISION_UNMAPPED", "REVISION_INVENTORY_MISSING", "REVISION_CARRY_INVALID", "REVISION_SOURCE_MISSING", "REVISION_SLIDE_SIZE",
-                     "REVISION_CARRY_DRIFT", "WAIVERS_INVALID", "STATEMENT_INVALID", "MEASURES_CONFLICT", "GENERATOR_SIGNATURE", "CONTENT_CLAIM_REPEATS", "CONTENTS_UNFIT", "UNSOURCED_PICTURE"):
-            self.assertEqual(carrying[code], "held", code)
-        # What a point change may not leave behind it, and what its own pages say between them: held, and scoped by the check itself.
-        for code in ("NUMBER_STALE", "WORDING_STALE", "NUMBERS_DISAGREE", "PROOF_REPEATS"):
-            self.assertEqual(carrying[code], "held", code)
-        # A build bar is read over the pages the runtime drew - on this revision the pages it composed - so it is held there,
-        # at the compile as at delivery, and with it the two craft floors that read a bar's rate lower down.
-        for code in ("BAR_EXHIBIT_VARIETY", "BAR_TABLES_TREATED", "BAR_CHARTS_ANNOTATED", "BAR_DRAWINGS_PER_PAGE", "BAR_UNSOURCED_PICTURES", "CRAFT_TABLES_PLAIN", "CRAFT_CHARTS_BARE"):
-            self.assertEqual(carrying[code], "held", code)
-            self.assertNotIn(code, self.result["measures"], code)
-        # What the user's deck never met, and the few composed pages cannot be counted toward: advice.
-        for code in ("NO_SUMMARY", "NO_SECTIONS", "NO_CONTENTS", "CONTENT_ANSWER_UNCARRIED", "CONTENT_UNMEASURED", "VARIETY_EXHIBIT_MIX", "VARIETY_TYPE_SHARE", "TITLE_GAP_SHARE",
-                     "EVIDENCE_DEPTH", "DECK_FLAT", "TEXT_FRAGMENTED", "DECK_THIN_PAGES", "CRAFT_NO_PICTURES", "CRAFT_EXHIBIT_VARIETY", "PAGE_SHAPE_FLAT",
-                     "VARIETY_KIND_SHARE", "VARIETY_FIT_UNUSED"):
-            self.assertEqual((carrying[code]["imported"], carrying[code]["carried"], carrying[code]["composed"]), (True, 2, 0), code)
-
-    def test_an_older_revision_that_carries_slides_hears_both_reasons_in_their_order(self):
-        old = self.result["carryingOld"]
-        # A deck measure is the imported deck's own whatever its version; a page rule introduced since is waived by its version.
-        self.assertEqual((old["NO_SECTIONS"]["imported"], old["NO_SECTIONS"]["carried"]), (True, 1))
-        self.assertEqual(old["SOURCE_UNCITED"], {"rulesVersion": 3, "introducedIn": 4})
-        self.assertEqual(old["COMPILE"], "held")
-        self.assertEqual(old["REVISION_UNMAPPED"], "held")
-
 
 @unittest.skipUnless(NODE, "needs Node.js")
 class RevisionChangesTests(unittest.TestCase):
     PROBE = '''
-import { revisionChanges } from "./skills/professional-slides/runtime/review-passes.mjs";
-import { storyStructure, storylineBinding } from "./skills/professional-slides/runtime/storyline.mjs";
+import { revisionChanges } from "./skills/professional-slides/runtime/revision.mjs";
 const slide = (index, title, text) => ({ index, id: `s0${index}`, title, subtitle: null, hidden: false, paragraphs: [{ text, level: 0 }], tables: [], charts: [], pictures: [] });
 const inventory = { slides: [slide(1, "Cover", "A deck"), slide(2, "Summary", "Revenue reached 12.4"), slide(3, "Revenue by year", "It doubled"), slide(4, "Regions", "London is thin"), slide(5, "Next steps", "Approve the plan")] };
 const carry = (n, more = {}) => ({ id: `s0${n}`, sourceSlide: n, title: inventory.slides[n - 1].title, after: null, ...more });
@@ -655,86 +411,6 @@ console.log(JSON.stringify({ own: drawn("assets/board/s03-1.png"), dotted: drawn
         self.assertEqual({name: drawn for name, drawn in result.items()},
                          {"own": [], "dotted": [], "above": [], "windows": [], "otherDeck": ["s03"], "other": ["s03"]})
 
-    def test_the_critique_is_bound_to_a_carried_slides_title_and_place_and_to_no_word_of_it(self):
-        result = self.changes('''
-const base = deck([1, 2, 3, 4, 5].map((n) => carry(n)));
-const bind = (carried, slides = []) => storylineBinding(deck(carried, slides));
-console.log(JSON.stringify({ structure: storyStructure(deck([carry(1), carry(2), { ...carry(4), after: "s03" }], [typed("s03", "Revenue doubled in four years", 3)])).map((p) => [p.id, p.kind, p.title]),
-  same: bind(base.carried) === bind(base.carried.map((c) => (c.id === "s02" ? { ...c, replace: [{ old: "12.4", new: "12.6" }] } : c))),
-  retitled: bind(base.carried) === bind(base.carried.map((c) => (c.id === "s04" ? { ...c, title: "London grows fastest" } : c))),
-  reordered: bind(base.carried) === bind([carry(1), carry(3), carry(2), carry(4), carry(5)]),
-  dropped: bind(base.carried) === bind(base.carried.slice(0, 4)) }));''')
-        self.assertEqual(result["structure"], [["s01", "carried", "Cover"], ["s02", "carried", "Summary"], ["s03", "content", "Revenue doubled in four years"], ["s04", "carried", "Regions"]])
-        self.assertTrue(result["same"])
-        self.assertFalse(result["retitled"])
-        self.assertFalse(result["reordered"])
-        self.assertFalse(result["dropped"])
-
-
-class StorylineScopeTests(CarriedDeck):
-    def storyline(self, work):
-        done = sh(NODE, RUNTIME / "storyline.mjs", work / "deck.deck.json", work / "out")
-        return done.returncode, last_json(done.stdout)
-
-    def test_a_text_edit_needs_no_critique_and_a_new_title_stages_one_for_that_slide(self):
-        def number(doc):
-            for key in ("s02", "s08"):
-                self.page(doc, key)["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
-            self.page(doc, "s04")["replace"] = [{"old": "12.4", "new": "12.6"}]
-        work = self.revise(number)
-        self.assertEqual(self.author(work).returncode, 0)
-        code, said = self.storyline(work)
-        self.assertEqual((code, said["status"], said["pass"]), (0, "ready", 0))
-        # The compile's own warning about the storyline gate is silent too: there is nothing to critique.
-        self.assertNotIn("storyline gate is not ready", self.author(work).stderr)
-
-        # A critique on record from before the binding changed is retired without one being asked of a spine that is the user's own.
-        history = work / ".reviews" / "deck" / "storyline-history"
-        history.mkdir(parents=True)
-        (history / "pass-1.json").write_text(json.dumps({"review": {"verdict": "revise", "pass": 1, "binding": "0" * 64}, "binding": "0" * 64, "pass": 1, "bindingVersion": 1, "pageHashes": {}, "ledger": []}))
-        gate = run_node(f"""
-import {{ storylineGate }} from './skills/professional-slides/runtime/storyline.mjs';
-import fs from 'node:fs';
-const deck = {json.dumps(str(work / "deck.deck.json"))};
-console.log(JSON.stringify(await storylineGate(JSON.parse(fs.readFileSync(deck, 'utf8')), {json.dumps(str(work / "out"))}, {{ deckPath: deck }})));
-""")
-        self.assertEqual(gate, [])
-        code, said = self.storyline(work)
-        self.assertEqual((code, said["status"], said["pass"]), (0, "ready", 0))
-
-        work = self.revise(lambda doc: self.page(doc, "s04").update(title="London grows fastest on the thinnest margin"))
-        self.assertEqual(self.author(work).returncode, 0)
-        code, said = self.storyline(work)
-        self.assertEqual((code, said["status"]), (3, "packet-written"))
-        packet = json.loads((Path(said["dir"]) / "packet.json").read_text())
-        self.assertEqual(packet["revision"], {"changed": ["s04"], "dropped": []})
-        self.assertEqual([(p["id"], p["kind"]) for p in packet["pages"]], [(f"s0{n}", "carried") for n in range(1, 9)])
-        prompt = (Path(said["dir"]) / "prompt.md").read_text()
-        # The changed slide is marked, and the others are shown as the user's own, by what they say.
-        self.assertIn("4. [s04] London grows fastest on the thinnest margin | a slide of the user's deck, carried as it is (edited in place by this revision)", prompt)
-        self.assertIn("[changed]", prompt)
-        self.assertEqual(prompt.count("[changed]") - prompt.count("marked [changed]"), 1)
-        self.assertIn("2. [s02] Summary | a slide of the user's deck, carried as it is | says: Revenue reached £12.4m in FY26", prompt)
-        self.assertNotIn("Harbour Coffee | Board pre-read | Confidential", prompt)
-        # What the deck is made of is said from the counts, not from there being a carried slide.
-        self.assertIn("Of its 8 pages, 7 are the user's own slides, carried into the new deck unchanged, 1 is a slide of theirs with words edited in place. The deck is the user's own", prompt)
-        by_title = said["binding"]
-        shutil.rmtree(said["dir"], ignore_errors=True)
-
-        # The same title written through `replace` is the same change: the slide's title is read as the edits leave it.
-        through = self.revise(lambda doc: self.page(doc, "s04").update(replace=[{"old": "Store performance by region", "new": "London grows fastest on the thinnest margin"}]))
-        self.assertEqual(self.author(through).returncode, 0)
-        self.assertEqual(next(c for c in json.loads((through / "deck.deck.json").read_text())["carried"] if c["id"] == "s04")["retitled"], "London grows fastest on the thinnest margin")
-        code, said = self.storyline(through)
-        self.assertEqual((code, said["status"]), (3, "packet-written"))
-        packet = json.loads((Path(said["dir"]) / "packet.json").read_text())
-        self.assertEqual(packet["revision"], {"changed": ["s04"], "dropped": []})
-        self.assertIn("4. [s04] London grows fastest on the thinnest margin | a slide of the user's deck, carried as it is (edited in place by this revision)", (Path(said["dir"]) / "prompt.md").read_text())
-        # The two decks are bound alike: the critique of one is the critique of the other.
-        self.assertEqual(said["binding"], by_title)
-        shutil.rmtree(said["dir"], ignore_errors=True)
-
-
 class SwappedDeck(CarriedDeck):
     """The user's deck with slide 7 redrawn as a composed page, compiled and built without a render."""
 
@@ -746,7 +422,7 @@ class SwappedDeck(CarriedDeck):
         shutil.copytree(cls.bed, cls.swapped)
         doc = copy.deepcopy(cls.starter)
         doc["deck"]["density"] = "live-pitch"
-        doc["pages"][6] = dict(DONUT)
+        doc["pages"][6] = copy.deepcopy(DONUT)
         (cls.swapped / "deck.pages.json").write_text(json.dumps(doc, ensure_ascii=False))
         authored = sh(NODE, AUTHOR, cls.swapped / "deck.pages.json")
         # The exit code is said with the output: a compile killed from outside (a negative code) prints nothing of its own.
@@ -754,7 +430,6 @@ class SwappedDeck(CarriedDeck):
         built = sh(NODE, RUNTIME / "build-deck.mjs", cls.swapped / "deck.deck.json", cls.swapped / "out", "--no-render")
         assert built.returncode == 0, built.stderr[:2000] + built.stdout[:2000]
         cls.build = json.loads((cls.swapped / "out" / "build-result.json").read_text())
-
 
 
 class AssemblerTests(SwappedDeck):
@@ -938,7 +613,7 @@ class BuildTests(SwappedDeck):
         self.assertEqual([s["parts"] for s in slides], [True] * 6 + [False, True])
         self.assertEqual([s["geometry"] for s in slides if s["parts"]], [0.0] * 7)
 
-    def test_a_revision_of_text_edits_composes_nothing_and_owes_a_self_check_of_what_it_rewrote(self):
+    def test_a_revision_of_text_edits_composes_nothing(self):
         def number(doc):
             for key in ("s02", "s08"):
                 self.page(doc, key)["replace"] = [{"old": "£12.4m", "new": "£12.6m"}]
@@ -950,26 +625,13 @@ class BuildTests(SwappedDeck):
         result = json.loads((work / "out" / "build-result.json").read_text())
         self.assertEqual((result["revision"]["carried"], result["revision"]["edited"], result["revision"]["composed"]), (5, 3, 0))
         self.assertFalse((work / "out" / "deck.composed.pptx").exists())
-        ledger = json.loads((work / "out" / "claims.json").read_text())
-        # The ledger holds the lines the revision rewrote, and none of the user's other claims.
-        self.assertEqual(sorted(ledger["pageHashes"]), ["s02", "s04", "s08"])
-        self.assertEqual([claim["text"] for claim in ledger["claims"] if claim["slide"] == "s02"], ["Revenue reached £12.6m in FY26, up 14% on FY25"])
-        checks = run_node(f'''
-import {{ validateSelfCheck }} from "./skills/professional-slides/runtime/claims.mjs";
-const ledger = {json.dumps(ledger)};
-const empty = {{ pageHashes: {{}}, findings: [] }};
-console.log(JSON.stringify({{ none: validateSelfCheck(null, ledger, {{ spinePass: false }}).length, nothingOwed: validateSelfCheck(null, empty, {{ spinePass: false }}),
-  newDeck: validateSelfCheck(null, empty).length,
-  done: validateSelfCheck({{ pages: Object.fromEntries(Object.entries(ledger.pageHashes).map(([id, claims]) => [id, {{ claims, verified: true }}])), findings: {{}} }}, ledger, {{ spinePass: false }}) }}));
-''')
-        self.assertEqual(checks, {"none": 1, "nothingOwed": [], "newDeck": 1, "done": []})
 
 
 class EvidenceOnARevisionTests(CarriedDeck):
     def test_a_revision_needs_no_insight_log_and_one_page_may_bring_its_own(self):
         def swap(doc):
             doc["deck"]["density"] = "live-pitch"
-            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = dict(DONUT)
+            doc["pages"][doc["pages"].index(self.page(doc, "s07"))] = copy.deepcopy(DONUT)
         work = self.revise(swap)
         done = self.author(work, "--check")
         self.assertEqual(done.returncode, 0, done.stderr[:800])
@@ -1020,64 +682,25 @@ class PointChangeBenchmarkTests(unittest.TestCase):
                 self.assertEqual(r["checks"]["asked"]["unasked"], [], r["task"])
             number = by["number-propagates"]
             # The first compile is refused for the figure left on the closing slide and in the table's total - the same
-            # quantity under "Revenue (£m)"; the review then reads the three slides edited.
+            # quantity under "Revenue (£m)".
             self.assertEqual(number["cost"]["refusedRuns"], 1)
             self.assertEqual(sorted(number["checks"]["stale"]["named"]), ["s04", "s08"])
-            self.assertEqual(number["checks"]["scoped"]["review"]["pages"], 3)
-            self.assertFalse(number["checks"]["scoped"]["critique"]["staged"])
-            self.assertEqual(by["retitle"]["checks"]["scoped"]["critique"]["changed"], ["s04"])
             self.assertEqual(by["exhibit-swap"]["cost"]["composed"], 1)
             # The swap's `made` asks for a title that is no longer the label, in whatever words the author chose.
             self.assertTrue(by["exhibit-swap"]["checks"]["made"]["retitled"][0]["ok"])
             # One figure said five ways: the first move is refused naming the table, "£12.4 million", the close and the speaker's
-            # notes; the edits reach all of them, and the run is carried to an accepted delivery that lists each change.
+            # notes, and the edits reach all of them.
             notations = by["notations"]
             self.assertEqual(sorted(notations["checks"]["stale"]["named"]), ["s04", "s05", "s06", "s08"])
-            self.assertTrue(notations["checks"]["delivered"]["accepted"])
-            self.assertEqual(len(notations["checks"]["delivered"]["made"]), 5)
-            self.assertIn('slide 5 (s05): "£12.4m" replaced by "£12.6m" (its speaker notes among them, where they printed it)', notations["checks"]["delivered"]["made"])
-            self.assertEqual(notations["cost"]["sequence"][-2:], ["deliver(3)", "deliver"])
             # The figure typed bare stands only inside longer numbers: refused with them named, and they are untouched at the end.
             bare = by["bare-number"]
             self.assertEqual(bare["checks"]["refusedFor"], {"ok": True, "wanted": ["REVISION_CARRY_INVALID"], "got": ["NUMBER_STALE", "REVISION_CARRY_INVALID"]})
             self.assertTrue(all(p["ok"] for p in bare["checks"]["made"]["prints"]))
-            # The pie redrawn under the slide's own label title: compiled at the first attempt, and no critique staged.
+            # The pie redrawn under the slide's own label title: compiled at the first attempt.
             swap = by["swap-own-title"]
-            # The copy questions the compile asks are answered (judge) before the full compile, as a run answers them.
-            self.assertEqual(swap["cost"]["sequence"], ["import", "check", "judge", "compile", "storyline", "build", "deliver(3)"])
-            self.assertFalse(swap["checks"]["scoped"]["critique"]["staged"])
-            self.assertEqual(swap["checks"]["scoped"]["review"]["changed"], ["s07"])
-            # The retitle that contradicts a slide nobody asked to change: the critic's finding about the imported deck blocks
-            # nothing, the deck is delivered with it reported to the user, and the slide it names is byte for byte the source's.
-            told = by["retitle-contradicts"]["checks"]["delivered"]
-            self.assertEqual((told["accepted"], told["stage"]), (True, "delivered"))
-            self.assertEqual([(item["severity"], item["pages"], item["from"]) for item in told["aboutImported"]], [("blocker", ["s02", "s04"], "storyline critique")])
-            self.assertEqual(told["made"], ['slide 4 (s04): title set to "London grows fastest on the thinnest margin"'])
-            self.assertEqual(by["retitle-contradicts"]["checks"]["scoped"]["critique"]["status"], "ready")
+            self.assertEqual(swap["cost"]["sequence"], ["import", "check", "compile", "build"])
+            # The retitle that contradicts a slide nobody asked to change: that slide is byte for byte the source's.
             self.assertEqual(by["retitle-contradicts"]["checks"]["preserved"]["identical"], 7)
-
-    def test_delivery_states_the_exact_self_check_record_a_revision_owes(self):
-        with tempfile.TemporaryDirectory() as work:
-            done = sh(NODE, BENCH / "run.mjs", "--task", "number-propagates", "--work", work)
-            self.assertEqual(done.returncode, 0, done.stdout + done.stderr[-2000:])
-            deck = Path(work) / "number-propagates"
-            ledger = json.loads((deck / "out" / "claims.json").read_text())
-            (deck / "out" / "self-check.json").unlink()
-            refused = sh(NODE, RUNTIME / "deliver-deck.mjs", deck / "deck.deck.json", deck / "out", "--skip-build", "--reviewer", "packet")
-            self.assertEqual(refused.returncode, 2)
-            report = last_json(refused.stdout)
-            self.assertEqual(report["rejectedAt"], "self-check")
-            said = report["blockers"][0]["repair"]
-            # The record, with the ids and the hashes it must hold: the form is not the author's to guess.
-            expected = {"pages": {page: {"claims": claims, "verified": True} for page, claims in ledger["pageHashes"].items()}, "findings": {}}
-            self.assertEqual(sorted(expected["pages"]), ["s02", "s04", "s08"])
-            self.assertIn(f"For this revision the record is exactly: {json.dumps(expected, separators=(',', ':'))}", said)
-            self.assertIn("no `spine` entry", said)
-            # Written as said, it is accepted: delivery goes on to the review packet, and lists every change the revision made.
-            (deck / "out" / "self-check.json").write_text(json.dumps(expected))
-            again = sh(NODE, RUNTIME / "deliver-deck.mjs", deck / "deck.deck.json", deck / "out", "--skip-build", "--reviewer", "packet")
-            self.assertEqual(again.returncode, 3, again.stdout[-800:])
-            self.assertEqual(len(last_json(again.stdout)["made"]), 3)
 
     def test_an_edit_nobody_asked_for_fails_the_benchmark(self):
         # The restated figure, and beside it a "correction" the request did not ask for: the growth rate the figure implies.
@@ -1121,57 +744,6 @@ class PointChangeBenchmarkTests(unittest.TestCase):
             self.assertEqual(failed, {"own": set(), "other": {"made"}, "beside": {"asked"}})
             self.assertTrue(by["own"]["accepted"])
             self.assertIn("33%", by["beside"]["checks"]["asked"]["unasked"][0]["what"])
-
-    def test_a_review_of_the_changed_page_delivers_the_assembled_deck_and_one_of_an_untouched_slide_is_refused(self):
-        with tempfile.TemporaryDirectory() as work:
-            done = sh(NODE, BENCH / "run.mjs", "--task", "retitle", "--work", work)
-            self.assertEqual(done.returncode, 0, done.stdout + done.stderr[-2000:])
-            deck = Path(work) / "retitle"
-            result = run_node(f"""
-import fs from 'node:fs/promises'; import path from 'node:path';
-import * as R from './skills/professional-slides/runtime/reviewer.mjs';
-import {{ deliverDeck }} from './skills/professional-slides/runtime/deliver-deck.mjs';
-const dir = {json.dumps(str(deck))}, spec = path.join(dir, 'deck.deck.json'), out = path.join(dir, 'out');
-const record = async () => JSON.parse(await fs.readFile(path.join(dir, '.reviews', 'deck', 'review-packet.json'), 'utf8'));
-const review = (rec, ids) => ({{ pass: 1, verifies: null, accepted: true, summary: 'The changed page reads as part of the deck. Nothing must change.', rating: 8.5, binding: rec.binding, opened: [...ids],
-  provenance: {{ backend: 'subagent', model: 'fixture-reviewer', promptHash: rec.promptHash }},
-  pages: ids.map((slide) => ({{ slide, verdict: 'ok', checks: Object.fromEntries(R.PAGE_DIMENSIONS.map((d) => [d, `checked ${{d}} on the page`])) }})), findings: [],
-  completeness: R.DIMENSIONS.map((d) => ({{ dimension: d, result: 'clean', note: `Checked ${{d}} on the changed page and found nothing to raise.` }})),
-  assessment: Object.fromEntries(R.ASSESSMENT_KEYS.map((k) => [k, `A sentence about ${{k}}.`])), density: {{ deck: 'No density profile was built for this deck, so no medians are compared.', pages: [] }} }});
-const answer = async (name, ids) => {{ const file = path.join(dir, name); await fs.writeFile(file, JSON.stringify(review(await record(), ids))); return deliverDeck(spec, out, {{ skipBuild: true, reviewFile: file }}); }};
-const off = await answer('off.json', ['s02']);
-await deliverDeck(spec, out, {{ skipBuild: true, reviewer: 'packet' }});
-const packet = JSON.parse(await fs.readFile(path.join((await record()).staging, 'packet.json'), 'utf8'));
-const ok = await answer('ok.json', ['s04']);
-const same = (await fs.readFile(path.join(out, 'deck.pptx'))).equals(await fs.readFile(path.join(out, 'deck-DELIVERED.pptx')));
-console.log(JSON.stringify({{ off: {{ at: off.rejectedAt, why: off.blockers.map((b) => b.reason) }}, ok: {{ accepted: ok.accepted, stage: ok.stage, revision: ok.revision, mode: ok.reviewMode }}, same,
-  slides: packet.slides.map((s) => [s.id, Boolean(s.carried), s.gateFindings.length]), changed: packet.revision.changed }}));
-""")
-        # A review that reads a slide the revision carried untouched answers another question.
-        self.assertEqual(result["off"]["at"], "invalid review")
-        self.assertTrue(any("s02 did not change in this revision" in why for why in result["off"]["why"]))
-        self.assertEqual(result["ok"], {"accepted": True, "stage": "delivered", "revision": {"changed": 1, "of": 8}, "mode": "revision"})
-        # What is delivered is the assembled deck: the user's slides around the one that changed.
-        self.assertTrue(result["same"])
-        self.assertEqual(result["changed"], ["s04"])
-        self.assertEqual([s[:2] for s in result["slides"]], [[f"s0{n}", True] for n in range(1, 9)])
-
-
-class ReviewerToldWhatChangedTests(unittest.TestCase):
-    def test_a_slide_hidden_or_shown_again_is_marked_as_such_for_the_reviewer(self):
-        """A carried slide whose only change is that the slide show hides it was described to the reviewer as a slide with
-        words edited in place: the mark and the deck's makeup now say what changed."""
-        result = run_node("""
-import { reviewPrompt } from './skills/professional-slides/runtime/reviewer.mjs';
-const slides = [{ id: 's01', title: 'A', carried: { slide: 1, edited: false, reworded: false } }, { id: 's02', title: 'B', carried: { slide: 2, edited: true, reworded: false, hidden: true } },
-  { id: 's03', title: 'C', carried: { slide: 3, edited: true, reworded: false, hidden: false } }, { id: 's04', title: 'D', carried: { slide: 4, edited: true, reworded: true } }, { id: 'p05', title: 'E' }];
-const prompt = reviewPrompt({ slides, revision: { changed: ['s02', 's03', 's04', 'p05'] } });
-console.log(JSON.stringify({ marks: prompt.split('\\n').filter((l) => l.startsWith('- [') && l.includes('[changed')).map((l) => l.slice(l.indexOf('[changed'))), makeup: prompt.match(/Of its 5 pages, [^.]*\\./)?.[0] }));
-""")
-        self.assertEqual(result["marks"], ["[changed: hidden from the slide show]", "[changed: put back into the slide show]", "[changed]", "[changed]"])
-        self.assertEqual(result["makeup"], "Of its 5 pages, 1 is the user's own slide, carried unchanged, 1 is a slide of theirs with words edited in place, "
-                         "1 is a slide of theirs this revision hides from the slide show, 1 is a slide of theirs it puts back into the slide show, 1 is a page the revision composed.")
-
 
 if __name__ == "__main__":
     unittest.main()

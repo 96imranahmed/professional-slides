@@ -3,13 +3,22 @@
 // titles, the cover, the section divider, the takeaways and statement pages,
 // and the footer lines (source, footnote, page number).
 import { token, tokenValue, CHROME, rectPrimitive, stableId, textPrimitive, TITLE_VARIANTS, resolveTitleVariant, houseStyle, normalizeInsets,
-  insetFrame, ellipsePrimitive, linePrimitive, SLIDE, STYLE_TOKENS, DEFAULT_TITLE_VARIANT } from "./core.mjs";
+  insetFrame, ellipsePrimitive, linePrimitive, SLIDE, STYLE_TOKENS, DEFAULT_TITLE_VARIANT, reversedFill, reversedType } from "./core.mjs";
 import { textWords } from "./text-contract.mjs";
 import { measureText, measureTextRuns, balancedWrap } from "./text-layout.mjs";
 import { PAGE_TEMPLATE_TOKENS, renderPageTemplate, PAGE_RULES, PAGE_BRANDING, pageTemplateLayout, resolvePageTemplate } from "./page-template.mjs";
-import { TRACKER_TOKENS, trackerLabelNodes } from "./trackers.mjs";
+import { TRACKER_TOKENS, trackerLabelNodes, SIDE_RAIL } from "./trackers.mjs";
 import { mediaNode, logoFrame, markDrawable } from "./media.mjs";
 import { contrastRatio } from "./color.mjs";
+
+// The contrast a rule, a non-text mark, needs against the surface it is drawn on (WCAG 1.4.11).
+const MARK_CONTRAST = 3;
+/** The colour a cover's rule takes: the first that reads on the cover's surface. */
+export function coverRuleColor(dark) {
+  const surface = tokenValue(dark ? INK : token("color.canvas"));
+  const candidates = [PRIMARY, token("color.accent"), dark ? token("color.onPrimary") : INK];
+  return candidates.find((color) => contrastRatio(tokenValue(color), surface) >= MARK_CONTRAST) ?? candidates.at(-1);
+}
 import { FONT, DISPLAY, INK, SECONDARY, PRIMARY, RULE, WHITE, HAIRLINE, textStyle, boxStyle, openLine, headingLayout, STANDARD, component,
   lightChevronNode, MUTED_SURFACE, BODY, SURFACE, SMALL_RADIUS, SECTION_HEADING_TOKENS, sectionHeadingNodes, PRIMARY_TINT, refineVariantAxes,
   refineSectionHeader } from "./registry-shared.mjs";
@@ -207,10 +216,72 @@ function defineSectionBoundary() {
   });
 }
 
+// The side title's panel: its width from the page's left edge, the gap to the
+// body beside it, and how many lines the title may take down the column.
+export const SIDE_TITLE = Object.freeze({ panel: 380, gap: 40, lines: 7 });
+
+/**
+ * The title in a dark panel down the left of the page (`titlePlacement:
+ * "side"`), the finding's numeral over it when the page names one
+ * (`titleNumeral`), the standfirst under it; the body takes the rest of the
+ * width from the title's top. The panel stops above the source line, which
+ * stays on the page. A tracker in the title row is set as the section's name
+ * at the panel's top; a side rail keeps the right margin.
+ */
+function sideTitleChrome({ id, frame, props, page, railed, railNodes }) {
+  const pad = tokenValue(token("space.6")), panelRight = frame.x + SIDE_TITLE.panel;
+  const x = frame.x + CHROME.left, width = SIDE_TITLE.panel - CHROME.left - pad;
+  const bottom = frame.y + CHROME.sourceTop - tokenValue(token("space.3"));
+  // The panel is a surface type is reversed out of: the band on a page whose own type is pale (core.mjs reversedFill).
+  const reversed = reversedType(), panel = reversedFill(PRIMARY);
+  const nodes = [rectPrimitive({ id: stableId(id, "title-panel"), role: "title-band", frame: { x: frame.x, y: frame.y, width: SIDE_TITLE.panel, height: bottom - frame.y }, style: boxStyle(panel, "none", HAIRLINE, token("radius.none")), data: { titlePlacement: "side" } })];
+  const set = (key, role, text, y, size, color, { bold = false, family = FONT } = {}) => {
+    const layout = measureText(text, width, { fontFamily: tokenValue(family), fontSize: tokenValue(size), bold });
+    nodes.push(textPrimitive({ id: stableId(id, key), role, frame: { x, y, width, height: layout.height }, text: layout.text, style: { ...textStyle(size, color, bold, "left", "top"), fontFamily: family, lineHeight: layout.lineHeight, wrap: false }, data: { textLayout: layout, titlePlacement: "side" } }));
+    return layout;
+  };
+  let y = frame.y + CHROME.titleTop;
+  if (props.tracker && !railed) {
+    const section = (props.tracker.items || []).find((item) => String(item.id) === String(props.tracker.selectedId));
+    if (section) y += set("tracker", "tracker-compact-label", section.label, y, token("type.label"), reversed, { bold: true }).height + tokenValue(token("space.3"));
+  }
+  const kicker = typeof props.kicker === "string" && props.kicker.trim() ? props.kicker.trim() : null;
+  if (kicker) y += set("kicker", "kicker", kicker, y, token("type.compact"), reversed, { bold: true }).height + tokenValue(token("space.2"));
+  // The finding's numeral, in the accent where it reads on the panel, else reversed.
+  const numeral = typeof props.titleNumeral === "string" && props.titleNumeral.trim() ? props.titleNumeral.trim() : null;
+  if (numeral) {
+    const accent = contrastRatio(tokenValue(token("color.accent")), tokenValue(panel)) >= MARK_CONTRAST ? token("color.accent") : reversed;
+    // Figures are set in the body face, whose digits are lining (components.md): the display face's old-style 4 and 7 descend.
+    const layout = set("title-numeral", "title-numeral", numeral, y, token("type.coverTitle"), accent, { bold: true });
+    if (layout.lines.length > 1) throw new Error(`A side title's numeral is a figure on one line ("${numeral}"); put the words in the title`);
+    y += layout.height + tokenValue(token("space.3"));
+  }
+  const bold = houseStyle("style.titleWeight") !== "regular";
+  const title = set("title", "action-title", props.title, y, token("type.actionTitle"), reversed, { bold, family: DISPLAY });
+  if (title.lines.length > SIDE_TITLE.lines) throw new Error(`A side title runs to ${title.lines.length} lines down its column, past ${SIDE_TITLE.lines}; cut it to the finding`);
+  y += title.height;
+  const subtitle = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
+  if (subtitle) y += tokenValue(token("space.4")) + set("subtitle", props.subtitleRole === "takeaway-standfirst" ? "takeaway-standfirst" : "action-subtitle", subtitle, y + tokenValue(token("space.4")), BODY, reversed).height;
+  if (y > bottom - pad) throw new Error("A side title and its standfirst run past the panel; shorten them");
+  const top = frame.y + CHROME.titleTop, left = panelRight + SIDE_TITLE.gap;
+  const contentFrame = { x: left, y: top, width: page.contentFrame.x + page.contentFrame.width - left, height: page.contentFrame.y + page.contentFrame.height - top };
+  return { ...page, contentFrame, nodes: [...nodes, ...railNodes, ...page.nodes] };
+}
+
 /** The slide chrome: the page template, then the title band - tracker, kicker, action title, tag, standfirst and rule or band - and the content frame the body is laid out in under it. */
 function renderSlideChrome({ id, frame, props }) {
   const page = renderPageTemplate({ id, frame, props });
-  const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 }, props: props.tracker }) : [];
+  // A side rail runs down the right margin, from the title's top to the source
+  // line, clear of the body; every other tracker sits in the title row.
+  const railed = props.tracker?.construction === "compact-side-rail";
+  const trackerFrame = railed
+    // Under a title block (keynote) the rail starts where the body does, not on the block.
+    ? (() => { const top = (props.titleVariant === undefined ? houseStyle("style.titleRule") : "none") === "block" ? CHROME.bodyTop : CHROME.titleTop;
+      return { x: frame.x + frame.width - CHROME.right + (CHROME.right - SIDE_RAIL.width) / 2, y: frame.y + top, width: SIDE_RAIL.width, height: CHROME.sourceTop - top - tokenValue(token("space.2")) }; })()
+    : { x: frame.x + CHROME.left, y: frame.y + 30, width: page.titleWidth, height: 20 };
+  if (props.titlePlacement !== undefined && props.titlePlacement !== "side" && props.titlePlacement !== "top") throw new Error(`titlePlacement is "top" (the default) or "side" (got ${JSON.stringify(props.titlePlacement)})`);
+  if (props.titlePlacement === "side") return sideTitleChrome({ id, frame, props, page, railed, railNodes: railed ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: trackerFrame, props: props.tracker }) : [] });
+  const tracker = props.tracker ? trackerLabelNodes({ id: stableId(id, "tracker"), frame: trackerFrame, props: props.tracker }) : [];
   // `kicker`: the small label above the title that says what part of the
   // argument this page belongs to ("People", "Commercial evidence"). A
   // well-made page carries a dozen words of this band furniture against our
@@ -242,7 +313,8 @@ function renderSlideChrome({ id, frame, props }) {
   const subtitleText = typeof props.subtitle === "string" && props.subtitle.trim() ? props.subtitle.trim() : null;
   const tagPlacement = props.tag ? houseStyle("style.tagPlacement") : "top-right";
   // An above-title tag (a small accent label, as in a country or section spotlight) sits in the title's top margin.
-  const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: props.tracker || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
+  const inRow = tracker.length && !railed;
+  const titles = titleNodes({ id, frame, props: { text: props.title, lead: props.titleLead, variant: props.titleVariant, rule: props.titleRule, availableTitleWidth: page.titleWidth, titleTop: inRow || kicker.length ? 58 : CHROME.titleTop }, chrome: true });
   const title = titles.find((node) => node.role === "action-title");
   // The rule is drawn below, once the band's height is known.
   const ruled = titles.some((node) => node.role === "title-rule");
@@ -293,13 +365,14 @@ function renderSlideChrome({ id, frame, props }) {
     // open page, and the body starts a small step (space.4) below its edge
     // rather than the standard space.5 below the title.
     const lift = 8;
-    for (const node of [...titles, ...tracker, ...kicker]) if (node.frame) node.frame = { ...node.frame, y: node.frame.y - lift };
+    for (const node of [...titles, ...(railed ? [] : tracker), ...kicker]) if (node.frame) node.frame = { ...node.frame, y: node.frame.y - lift };
     titleBottom -= lift;
     const blockBottom = titleBottom + tokenValue(token("space.3"));
-    titles.unshift(rectPrimitive({ id: stableId(id, "title-band"), role: "title-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: blockBottom }, style: boxStyle(PRIMARY, "none", HAIRLINE, token("radius.none")), data: { block: true } }));
-    for (const node of [...titles, ...tracker, ...kicker]) {
+    // On a page whose type is pale the block is the band, as every surface type is reversed out of (core.mjs reversedFill).
+    titles.unshift(rectPrimitive({ id: stableId(id, "title-band"), role: "title-band", frame: { x: frame.x, y: frame.y, width: frame.width, height: blockBottom }, style: boxStyle(reversedFill(PRIMARY), "none", HAIRLINE, token("radius.none")), data: { block: true } }));
+    for (const node of [...titles, ...(railed ? [] : tracker), ...kicker]) {
       if (node.type === "text" && node.frame && node.frame.y < blockBottom) {
-        node.style = { ...node.style, color: WHITE };
+        node.style = { ...node.style, color: reversedType() };
         // An accent lead ("Sector outlook:") keeps its weight but reverses too.
         const plain = (runs) => Array.isArray(runs) ? runs.map((run) => ({ ...run, accent: false })) : runs;
         if (Array.isArray(node.runs)) node.runs = plain(node.runs);
@@ -319,7 +392,7 @@ function renderSlideChrome({ id, frame, props }) {
   const gap = tokenValue(token("space.5"));
   // A tracker above the title (pill tabs, a label) sits in the same band as
   // the title, so the body starts a step lower to keep it off the content.
-  const trackerGap = tracker.length || kicker.length ? tokenValue(token("space.3")) : 0;
+  const trackerGap = inRow || kicker.length ? tokenValue(token("space.3")) : 0;
   const floorTop = Math.max(CHROME.bodyTop + trackerGap, page.logoFrame ? page.logoFrame.y + page.logoFrame.height + gap : 0);
   let contentTop = Math.max(floorTop, titleBottom + gap + trackerGap);
   if (ruled) {
@@ -349,6 +422,7 @@ function defineSlideChrome() {
     id: "slide-chrome", category: "shared", role: "slide-chrome",
     tokens: [
       "color.canvas",
+      "color.band",
       "color.ink",
       "color.componentPrimary",
       "color.accent",
@@ -367,7 +441,12 @@ function defineSlideChrome() {
       "line.titleRule",
       "color.rule",
       "space.2",
+      "space.3",
       "space.4",
+      "space.6",
+      "type.coverTitle",
+      "type.label",
+      "type.body",
       "radius.small",
       "radius.none",
       ...STYLE_TOKENS,
@@ -387,7 +466,7 @@ function definePageTemplate() {
 
 function defineSection() {
   return component({
-    id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "color.ink", "color.accentTint", "color.onPrimary", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
+    id: "section", category: "structure", role: "section", tokens: ["color.surface", "color.surfaceMuted", "color.rule", "color.ink", "color.accentTint", "color.onPrimary", "color.band", "space.4", "space.5", "line.standard", "radius.none", "radius.small", ...SECTION_HEADING_TOKENS], preferredSize: { width: 520, height: 300 }, sample: { treatment: "open", heading: "(Insert section heading)" },
     render: ({ id, frame, props }) => {
       const treatment = props.treatment || "open";
       const edge = props.edge || "contained";
@@ -398,7 +477,7 @@ function defineSection() {
       const padding = sectionPadding(props);
       // Side panels from the 2020–24 decks: a navy "Key insights" column (dark),
       // a grey commentary column (muted) and an accent-tinted message column (tint).
-      const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? PRIMARY : treatment === "dark" ? INK : treatment === "tint" ? token("color.accentTint") : SURFACE;
+      const fill = treatment === "muted" ? MUTED_SURFACE : treatment === "primary" ? reversedFill(PRIMARY) : treatment === "dark" ? reversedFill(INK) : treatment === "tint" ? token("color.accentTint") : SURFACE;
       const stroke = treatment === "open" ? RULE : fill;
       const nodes = [];
       const headerFrame = { x: frame.x + padding.left, y: frame.y + padding.top, width: frame.width - padding.left - padding.right, height: frame.height };
@@ -423,8 +502,14 @@ function defineSectionTitle() {
   return component({ id: "section-title", category: "shared", role: "title", tokens: ["font.display", "type.sectionTitle", "color.ink", "color.rule", "line.hairline", "space.2"], preferredSize: { width: 720, height: 64 }, sample: { text: "(Insert section title)" }, render: ({ id, frame, props }) => ({ nodes: titleNodes({ id, frame, props, section: true }) }) });
 }
 
+// Whether a fixed-shape page paints its own ground - a navy cover, a dark
+// divider panel, a field of the primary, a photograph - rather than sitting on
+// the page's: such a page is drawn in the light page's tokens on any deck, as it
+// was designed (core.mjs groundOf), and the rest are set on the deck's ground.
+const owning = (definition, ownGround) => Object.assign(definition, { ownGround });
+
 function defineCover() {
-  return component({
+  return owning(component({
     id: "cover",
     category: "navigation",
     role: "cover",
@@ -488,8 +573,9 @@ function defineCover() {
           nodes.push(mediaNode({ id: stableId(id, "mark", at), frame: logoFrame({ x: tile.x + 20, y: tile.y + 16, width: tileWidth - 40, height: tileHeight - 32 }, mark.width, mark.height, { area: (tileWidth - 40) * (tileHeight - 32) * 0.5 }), props: mark, role: "cover-mark" }));
         });
       }
-      // Accent rule above the title: the one graphic element on a text cover.
-      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", PRIMARY, token("line.standard")));
+      // Accent rule above the title: the one graphic element on a text cover, in the first of the house colour, the accent and
+      // the reversed white (the ink on a light cover) that reads at 3:1 on the cover - a navy rule on a navy cover is no rule.
+      nodes.push(openLine(stableId(id, "accent"), x, y - gap, x + 72, y - gap, "cover-accent", coverRuleColor(dark), token("line.standard")));
       if (props.logo?.trim()) {
         const logo = measureText(props.logo, 320, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.heading")), bold: true });
         nodes.push(textPrimitive({ id: stableId(id, "logo"), role: "cover-logo", frame: { x, y: frame.y + CHROME.titleTop, width: 320, height: logo.height }, text: logo.text, style: { ...textStyle(token("type.heading"), ink, true, "left", "top"), fontFamily: DISPLAY, lineHeight: logo.lineHeight, wrap: false }, data: { textLayout: logo } }));
@@ -500,6 +586,11 @@ function defineCover() {
       if (date) { y += gap; nodes.push(textPrimitive({ id: stableId(id, "date"), role: "cover-date", frame: { x, y, width, height: date.height }, text: date.text, style: { ...textStyle(BODY, secondary, false, "left", "top"), lineHeight: date.lineHeight, wrap: false }, data: { textLayout: date } })); }
       return { nodes };
     }
+  }), (props) => {
+    const variant = props.variant ?? "dark";
+    if (variant === "plain") return false;
+    // A photograph is its own ground; the editorial and journal covers are typographic, set on the page.
+    return variant !== "dark" || ["block", "keynote"].includes(houseStyle("style.coverLayout"));
   });
 }
 
@@ -665,7 +756,7 @@ function renderSectionDivider({ id, frame, props }) {
 }
 
 function defineSectionDivider() {
-  return component({
+  return owning(component({
     id: "section-divider",
     category: "navigation",
     role: "divider",
@@ -698,14 +789,14 @@ function defineSectionDivider() {
     preferredSize: { ...SLIDE },
     sample: { title: "(Insert section title)" },
     render: renderSectionDivider
-  });
+  }), (props) => { const layout = houseStyle("style.dividerLayout"); return layout === "panel" ? (props.mode ?? "dark") === "dark" : layout === "keynote"; });
 }
 
 // A closing page: navy, "Key takeaways", the
 // three or four messages as big serif numerals with bold copy, an optional
 // photograph on the right (registry-media.mjs). Structural, like a divider.
 function defineTakeaways() {
-  return component({
+  return owning(component({
     id: "takeaways",
     category: "navigation",
     role: "takeaways",
@@ -794,14 +885,14 @@ function defineTakeaways() {
       const items = (Array.isArray(props.items) ? props.items : []).map((item) => measureTakeaway(String(item), width - 64));
       return { height: CHROME.titleTop + 8 + title.height + tokenValue(token("space.4")) + 12 + items.reduce((sum, item) => sum + item.height + 16, 0) };
     }
-  });
+  }), (props) => (props.mode ?? "dark") === "dark");
 }
 
 // The statement page: one sentence set large and
 // centred, its key phrase in the accent (bold white on navy), a short accent
 // rule above; with a photograph (registry-media.mjs) the sentence sits on a navy card.
 function defineStatement() {
-  return component({
+  return owning(component({
     id: "statement",
     category: "navigation",
     role: "statement",
@@ -866,7 +957,7 @@ function defineStatement() {
       const layout = measureText(String(props.text ?? ""), width, { fontFamily: tokenValue(DISPLAY), fontSize: tokenValue(token("type.deckTitle")) });
       return { height: 4 + 2 * tokenValue(token("space.4")) + layout.height };
     }
-  });
+  }), (props) => (props.mode ?? "light") === "dark" || Boolean(props.image));
 }
 
 function defineSource() {
@@ -884,6 +975,8 @@ function defineFootnote() {
     tokens: ["font.body", "type.source", "color.textSecondary"],
     preferredSize: { width: 600, height: 34 },
     sample: { text: "Note: (Insert note)" },
+    // The note's lines at the width it is given, in the source size it is set in.
+    measureContent: ({ frame, props }) => ({ height: measureText(String(props.text ?? ""), frame.width, { fontFamily: tokenValue(FONT), fontSize: tokenValue(SOURCE) }).height }),
     render: ({ id, frame, props }) => ({
       nodes: [
         textPrimitive({

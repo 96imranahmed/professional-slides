@@ -133,17 +133,21 @@ console.log(JSON.stringify({ ref: pick(render({ design: 'editorial', identity: {
         self.assertEqual({n["fillToken"] for n in journal}, {"color.surface"})
 
     def test_a_lone_line_takes_weight_and_an_area_and_two_lines_do_not(self):
+        # The area is filled from zero, so a lone line takes it on a scale that reaches zero; on a scale from a floor near its
+        # low the fill would draw a small move as a large one (the BA retest's jet fuel), and the line stays bare.
         result = run_node(RENDER + '''
 const cats = ['FY17', 'FY18', 'FY19', 'FY20', 'FY21', 'FY22'];
-const one = render({}, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
+const one = render({}, 'chart.line', { categories: cats, yMin: 0, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
+const floored = render({}, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
 const two = render({}, 'chart.line', { categories: cats, series: [{ name: 'A', values: [1, 2, 3, 4, 5, 6] }, { name: 'B', values: [2, 3, 3, 4, 4, 5] }] });
 const light = render({ surfaces: 'open' }, 'chart.line', { categories: cats, series: [{ name: 'Cargo', values: [2.5, 2.6, 2.7, 2.4, 1.9, 2.1] }] });
 const summary = (nodes) => ({ areas: nodes.filter((n) => n.role === 'chart-area').map((n) => n.data.lone ?? false),
   lines: [...new Set(nodes.filter((n) => n.role === 'chart-line').map((n) => n.lineToken))],
   markers: [...new Set(nodes.filter((n) => n.role === 'chart-marker').map((n) => n.frame.width))] });
-console.log(JSON.stringify({ one: summary(one), two: summary(two), light: summary(light) }));
+console.log(JSON.stringify({ one: summary(one), floored: summary(floored), two: summary(two), light: summary(light) }));
 ''')
         self.assertEqual(result["one"], {"areas": [True], "lines": ["line.medium"], "markers": [12]})
+        self.assertEqual(result["floored"], {"areas": [], "lines": ["line.medium"], "markers": [12]})
         self.assertEqual(result["two"]["areas"], [])
         self.assertEqual(result["two"]["lines"], ["line.medium"])
         self.assertEqual(result["light"], {"areas": [], "lines": ["line.standard"], "markers": [10]})
@@ -200,25 +204,6 @@ def text(x, y, w, lines, size=12, color="#000000"):
 
 
 class SceneInkTests(unittest.TestCase):
-    def test_the_estimate_reads_what_the_render_counts(self):
-        body = (720 * 0.92 - 720 * 0.15) * 1280
-        self.assertEqual(scene_ink.estimate(slide([])), 0.0)
-        # A dark block is ink by its area; one hairline across the page is not.
-        block = scene_ink.estimate(slide([rect(0, 200, 1280, 100, "#051C2C")]))
-        self.assertAlmostEqual(block, 1280 * 100 / body, delta=0.02)
-        self.assertEqual(scene_ink.estimate(slide([{"type": "line", "role": "rule", "frame": {"x": 60, "y": 300, "width": 1160, "height": 0},
-                                                     "style": {"stroke": {"value": "#929BA3"}, "lineWidth": {"value": 1}}, "data": {"x1": 60, "y1": 300, "x2": 1220, "y2": 300}}])), 0.0)
-        # A tint a few levels off the page is air; the filled surface is not.
-        self.assertEqual(scene_ink.estimate(slide([rect(60, 200, 400, 200, "#F0F0F0")])), 0.0)
-        self.assertGreater(scene_ink.estimate(slide([rect(60, 200, 400, 200, "#DCDFE1")])), 0.05)
-        # Lines of type count by their glyph band and width.
-        prose = scene_ink.estimate(slide([text(60, 200, 1000, ["A line of body copy"] * 12)]))
-        self.assertGreater(prose, 0.05)
-        self.assertLess(prose, 0.3)
-        # A disc is filled as a disc, not spread thin over its box.
-        disc = {"type": "ellipse", "role": "cycle-hub", "frame": {"x": 400, "y": 200, "width": 200, "height": 200}, "style": {"fill": {"value": "#DCDFE1"}}}
-        self.assertAlmostEqual(scene_ink.estimate(slide([disc])), 3.1416 * 100 * 100 / body, delta=0.01)
-
     def test_the_native_plot_is_the_emitters_and_the_colours_are_shared(self):
         # A copy of the emitter's CHART_PLOT_ROLES kept beside the estimate had
         # lost eleven of its roles; it is read from the emitter now. And the
@@ -233,72 +218,6 @@ class SceneInkTests(unittest.TestCase):
         self.assertIs(page_gates.canvas_of, scene_ink.canvas_of)
         cream = slide([rect(0, 0, 1280, 720, "#F5F0E6")])
         self.assertEqual(scene_ink.canvas_of(cream), "#F5F0E6")
-
-    def test_a_light_exhibit_page_is_named_and_a_page_of_prose_is_not(self):
-        findings = []
-        page_gates.gate_scene_ink(1, slide([text(60, 200, 600, ["Label"] * 2)]), findings)
-        self.assertEqual([f["code"] for f in findings], ["SCENE_INK"])
-        self.assertIn("rather than adding words", findings[0]["repair"])
-        prose = []
-        page_gates.gate_scene_ink(1, slide([text(60, 200, 600, ["Label"] * 2)], instances=[{"component": "paragraph"}], task="text-page"), prose)
-        self.assertEqual(prose, [])
-        weighted = []
-        page_gates.gate_scene_ink(1, slide([rect(60, 200, 1160, 300, "#051C2C")]), weighted)
-        self.assertEqual(weighted, [])
-
-    def test_a_light_deck_is_named_once(self):
-        light = [slide([text(60, 200, 600, ["Label"] * 3)]) for _ in range(12)]
-        findings = []
-        page_gates.gate_deck_ink(light, list(range(1, 12)), findings)
-        self.assertEqual(findings, [], "under twelve analytical pages the deck is not judged")
-        page_gates.gate_deck_ink([slide([])] + light, list(range(1, 13)), findings)
-        self.assertEqual([f["code"] for f in findings], ["DECK_INK"])
-        heavy = [slide([rect(60, 200, 1160, 300, "#051C2C")]) for _ in range(13)]
-        clean = []
-        page_gates.gate_deck_ink(heavy, list(range(1, 13)), clean)
-        self.assertEqual(clean, [])
-
-    def test_the_codes_are_advisory(self):
-        # Registration is held for every gate code at once (test_weight_contract.GateVocabularyTests).
-        for code in ("SCENE_INK", "DECK_INK"):
-            self.assertIn(code, page_gates.ADVISORY_CODES)
-
-
-class InkEstimateTests(unittest.TestCase):
-    """The ink estimate reads what the render will count."""
-
-    CANVAS = "#FAF7F2"
-
-    def slide(self, nodes, instances=None):
-        return {"tokens": {"color.canvas": {"value": self.CANVAS}}, "nodes": nodes, "componentInstances": instances or []}
-
-    @staticmethod
-    def text(x, y, width, lines, color="#6B645C", size=10):
-        return {"type": "text", "role": "fact-text", "frame": {"x": x, "y": y, "width": width, "height": 16 * len(lines)},
-                "text": "\n".join(lines), "style": {"color": {"value": color}, "fontSize": {"value": size}},
-                "data": {"textLayout": {"lines": lines, "lineHeight": 16, "width": width}}}
-
-    def test_grey_type_on_a_tint_counts_in_patches_not_all_or_nothing(self):
-        """Fifty-six-page re-author: the ink estimate missed hollow tiles' grey type."""
-        tile = {"type": "rect", "role": "fact-tile", "frame": {"x": 72, "y": 190, "width": 560, "height": 193}, "style": {"fill": {"value": "#F0EBE3"}}}
-        lines = ["Carried in 2025 on 97 narrowbody aircraft, from secondary regional cities"] * 3
-        with_text = scene_ink.estimate(self.slide([tile, self.text(88, 300, 540, lines)]))
-        without = scene_ink.estimate(self.slide([tile]))
-        self.assertGreater(with_text, without, "hollow tiles' grey type reads as some ink, as the render reads it")
-        # Evenly painted, as the first fit painted it, the same type counted less.
-        self.assertLess(scene_ink.estimate(self.slide([tile, self.text(88, 300, 540, lines)]), 0.16, 1.2, 0.0, 1.0, 1.0), with_text)
-
-    def test_a_native_charts_plot_and_a_hairline_read_lighter(self):
-        """Fifty-six-page re-author: the ink estimate passed a page of native line charts."""
-        line = {"type": "line", "role": "chart-line", "frame": {"x": 100, "y": 300, "width": 900, "height": 0},
-                "style": {"stroke": {"value": "#C49A6C"}, "lineWidth": {"value": 3.5}},
-                "data": {"x1": 100, "y1": 300, "x2": 1000, "y2": 300, "componentInstance": "p:chart"}}
-        drawn = scene_ink.estimate(self.slide([line]))
-        native = scene_ink.estimate(self.slide([line], [{"instanceId": "p:chart", "nativeChart": {}}]))
-        self.assertLessEqual(native, drawn)
-        rule = {"type": "line", "role": "section-heading-rule", "frame": {"x": 72, "y": 300, "width": 1136, "height": 0},
-                "style": {"stroke": {"value": "#221E1A"}, "lineWidth": {"value": 1}}, "data": {}}
-        self.assertLess(scene_ink.estimate(self.slide([rule])), scene_ink.estimate(self.slide([rule]), hairline=1.0) + 1e-9)
 
 
 if __name__ == "__main__":

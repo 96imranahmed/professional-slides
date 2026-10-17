@@ -24,7 +24,7 @@ const page = (cells) => ({{ id: 'p1', type: 'lookup', form: 'table', commentary:
 const run = async (cells) => {{
   const out = await authorDeck({{ deck: {{ schema: 'professional-slides.deck/v3', id: 'd' }}, pages: [page(cells)] }}, {{ baseDir: fs.mkdtempSync(path.join(os.tmpdir(), 'pills-')) }});
   const slide = out.deck.slides.find((s) => s.id === 'p1');
-  return {{ errors: out.findings.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').map((f) => f.repair),
+  return {{ errors: out.blocking.filter((f) => f.code === 'PAGE_DOES_NOT_COMPOSE').map((f) => f.repair),
     pills: slide ? slide.nodes.filter((n) => n.role === 'table-bubble').length : 0 }};
 }};
 console.log(JSON.stringify({{ words: await run(['$12.5B', 'Duration unclear', '~$1.7B']), units: await run(['$12.5B', '40%', '~$1.7B']),

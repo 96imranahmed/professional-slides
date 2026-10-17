@@ -11,10 +11,10 @@ import { REGISTRY } from './skills/professional-slides/runtime/registry.mjs';
 import { componentFixtureSpecs, componentVariantFixtureSpecs } from './evals/support/fixtures.mjs';
 const page=REGISTRY.get('tracker-page'),label=REGISTRY.get('tracker-label');
 assert.equal(Object.keys(page.variants).length,18);
-assert.equal(Object.keys(label.variants).length,8);
+assert.equal(Object.keys(label.variants).length,10);
 const fixtures=[...componentFixtureSpecs(),...componentVariantFixtureSpecs()];
 assert.equal(fixtures.filter(s=>s.target==='tracker-page').length,18);
-assert.equal(fixtures.filter(s=>s.target==='tracker-label').length,8);
+assert.equal(fixtures.filter(s=>s.target==='tracker-label').length,10);
 assert.equal(page.variants['split-selected-long-light'].props.items.length,8);
 const items=['A','B','C','D'].map(id=>({id,label:`Section ${id}`}));
 const frame={x:0,y:0,width:1280,height:720};
@@ -132,9 +132,8 @@ const slide=compileDeck({slides:[planned.spec]},REGISTRY).slides[0];
 const tracker=slide.nodes.find(n=>n.role==='tracker-compact-label'),title=slide.nodes.find(n=>n.role==='action-title');
 assert.ok(tracker.frame.y+tracker.frame.height<title.frame.y);
 assert.equal(tracker.data.sectionId,'B');
-assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'with-line');
-const rule=slide.nodes.find(n=>n.role==='title-rule');
-assert.ok(tracker.frame.y+tracker.frame.height<rule.frame.y && title.frame.y+title.frame.height<rule.frame.y,'tracker and title sit above the rule');
+assert.equal(slide.componentInstances.find(n=>n.component==='slide-chrome').variant,'without-line');
+assert.ok(!slide.nodes.some(n=>n.role==='title-rule'),'no line under the title by default');
 assert.equal(planned.decision.tracker.selectedId,'B');
 console.log(JSON.stringify({accepted:true}));
 """)
@@ -167,7 +166,7 @@ const left=(deck)=>{
   assert.ok(nodes.length,'the deck drew a tracker');
   return Math.min(...nodes.map(n=>n.frame?n.frame.x:n.x1).filter(x=>x!==undefined));
 };
-assert.deepEqual([...TRACKER_NAMES],['pills','label','breadcrumb','number-strip']);
+assert.deepEqual([...TRACKER_NAMES],['pills','label','breadcrumb','number-strip','side-rail']);
 // Pills hug the right of the title band, which the chrome reserves for them.
 assert.ok(left(build('pills'))>600,'pills sit right');
 // The other three are the left-anchored tracker, at the page's left margin.

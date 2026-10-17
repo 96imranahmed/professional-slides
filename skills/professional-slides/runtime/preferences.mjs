@@ -11,9 +11,9 @@
 //   node runtime/preferences.mjs path                       where the file lives (which location, and why, on stderr)
 //   node runtime/preferences.mjs from-site <url>            the brand's colours and typefaces read off its website, as answers to set
 //
-// The intake (references/theming.md#design-intake) asks how a user's decks
+// The intake (references/design-intake.md) asks how a user's decks
 // should look: a reference deck, the design system, colours, tracker, title
-// treatment, surfaces and density. Those are a person's habits, not a deck's,
+// treatment and surfaces. Those are a person's habits, not a deck's,
 // so asking them before every deck is friction and silently defaulting them
 // puts every deck in the consulting frame. They live in one file per
 // user, outside any project (inside the workspace only when that location
@@ -52,9 +52,7 @@ export const TITLE_TREATMENTS = Object.freeze({
   none: { "style.titleRule": "none" }
 });
 
-// Density in the reader's terms. The floors are weight.json's `pageWords` for
-// the fill each density implies (airy, balanced, full); the live-pitch figure
-// is the importer's own threshold for a presented deck.
+// Density in the reader's terms: how much a page of each carries, as a guide to write to.
 export const DENSITIES = Object.freeze({
   "live-pitch": "presented to a room: one idea a page, about 40 body words or fewer, the largest type",
   executive: "presented or sent: about 95 to 120 body words a page with commentary beside the evidence",
@@ -79,7 +77,10 @@ export const ANSWERS = Object.freeze({
   tracker: { ask: true, default: "auto", check: oneOf(["auto", ...TRACKERS, "repeat-contents", "none"]), sheet: "trackers.png" },
   titleRule: { ask: true, default: "system", check: oneOf(Object.keys(TITLE_TREATMENTS)), sheet: "title-treatments.png" },
   surfaces: { ask: true, default: "reference", check: oneOf(Object.keys(SURFACES)), sheet: "surfaces.png" },
-  density: { ask: true, default: "executive", check: oneOf(Object.keys(DENSITIES)) },
+  // How much a page carries is the deck's, set at the storyline from how this reader reads it (storylining.md); a stored
+  // "executive" overrode a pre-read deck's reader. Only a reference deck's own density (`house`) carries over; an answer
+  // stored here is kept in the file and not applied.
+  density: { ask: false, default: null, check: oneOf(Object.keys(DENSITIES)) },
   typography: { ask: false, default: null, check: (v) => v === null || (v && typeof v === "object" && Object.keys(v).every((k) => ["body", "display"].includes(k) && typeof v[k] === "string" && v[k].trim())) ? null : 'use { "body": "Face", "display": "Face" } or null' },
   footer: { ask: false, default: null, check: text },
   wordmark: { ask: false, default: null, check: text },
@@ -224,7 +225,7 @@ export function unsetAnswers(prefs) {
  *   titleRule    -> palette.colors style.titleRule (+ Length, Color, line.titleRule)
  *   tracker      -> tracker ("none" is false; "auto" leaves the system and variation to choose)
  *   surfaces     -> surfaces
- *   density      -> density (fill follows: live-pitch airy, executive balanced, pre-read full)
+ *   density      -> nothing: the storyline sets it from the reader; a reference deck's comes with `house`
  *   typography   -> typography (a non-Arial body takes a bold semibold mapping)
  *   footer       -> footer;  wordmark -> logo (the cover's wordmark)
  *   house        -> design, palette, typography, chrome, pageTemplate, density, fill, weight
@@ -255,7 +256,6 @@ export function deckKeys(input) {
   if (palette) keys.palette = palette;
   if (v.tracker !== undefined && v.tracker !== "auto") keys.tracker = v.tracker === "none" ? false : v.tracker;
   if (v.surfaces !== undefined) keys.surfaces = v.surfaces;
-  if (v.density !== undefined) keys.density = v.density;
   if (v.typography) {
     const body = v.typography.body ?? "Arial";
     keys.typography = { body, display: v.typography.display ?? body, ...(body !== "Arial" ? { semibold: { family: body, nativeBold: true, effectiveWeight: 700 } } : {}) };
@@ -284,7 +284,7 @@ export function applyToDeck(document, keys) {
 /** One line for the user: what was reused and how to change it. */
 export function reuseLine(prefs, file = preferencesPath()) {
   const values = answerValues(prefs);
-  const shown = Object.entries(values).filter(([k]) => k !== "house" && k !== "reference").map(([k, v]) => `${k} ${typeof v === "object" && v ? JSON.stringify(v) : v}`);
+  const shown = Object.entries(values).filter(([k]) => k !== "house" && k !== "reference" && k !== "density").map(([k, v]) => `${k} ${typeof v === "object" && v ? JSON.stringify(v) : v}`);
   if (values.house) shown.unshift("the reference deck's frame");
   if (!shown.length) return "";
   return `Reusing your stored design preferences (${shown.join(", ")}); say if you want any changed, or edit ${file}.`;

@@ -21,9 +21,8 @@ Four things land in out-dir:
                          `unheld` counts what the slide draws that the
                          inventory does not hold (shapes drawn without text, a
                          diagram, an embedded object, a film)
-    <id>.pages.json      the starter: a deck/v3 head that names the inventory
-                         and the rules version the revision is made under, and
-                         a page per slide carrying its old copy as `draft`
+    <id>.pages.json      the starter: a deck/v3 head that names the inventory,
+                         and a page per slide carrying its old copy as `draft`
                          (its furniture left out) and, when the slide was
                          hidden, `hidden: true`
     <id>.source.pptx     the deck itself, byte for byte: what a carried slide
@@ -458,16 +457,6 @@ def draft_of(slide: dict) -> dict:
     return {key: value for key, value in draft.items() if value not in (None, [], "")}
 
 
-def rules_version() -> int | None:
-    """The rules version this runtime enforces (weight.json), which the
-    starter records: a rule introduced after the import is an advisory to this
-    revision, as it is to any deck that predates it."""
-    try:
-        return json.loads((Path(__file__).resolve().parent / "weight.json").read_text(encoding="utf-8"))["rulesVersion"]
-    except (OSError, KeyError, ValueError):
-        return None
-
-
 def starter(identifier: str, inventory_name: str, slides: list, furniture: list, carry: bool = False) -> dict:
     """The deck head and a page per slide. A hidden slide's page carries
     `hidden: true` beside its draft, not in it: mapping the page replaces the
@@ -483,9 +472,7 @@ def starter(identifier: str, inventory_name: str, slides: list, furniture: list,
     page), the deck's footer when one line repeats on the slides (several are
     a footer among a tracker's labels, and the author says which), and every
     other slide a page to map."""
-    version = rules_version()
-    deck = {"schema": DECK_SCHEMA, "id": identifier, "workflow": "existing_deck_revision", "inventory": inventory_name,
-            **({"rulesVersion": version} if version is not None else {}), "request": ""}
+    deck = {"schema": DECK_SCHEMA, "id": identifier, "workflow": "existing_deck_revision", "inventory": inventory_name}
     page = lambda s: {"id": s["id"], "sourceSlide": s["index"], "title": s["title"] or "", **({"hidden": True} if s["hidden"] else {})}
     if carry:
         return {"deck": deck, "pages": [{**page(s), "carry": True, "draft": draft_of(s)} for s in slides]}
@@ -550,8 +537,6 @@ def read_inventory(path: Path, identifier: str, assets: Path | None) -> dict:
     return {
         "schema": INVENTORY_SCHEMA, "id": identifier,
         "source": {"file": path.name, "sha256": digest},
-        # The rules version the import stamps on the starter is recorded here too: a pages file that later records a lower one says why (revision.mjs).
-        **({"rulesVersion": rules_version()} if rules_version() is not None else {}),
         "slideSize": {"width": px(prs.slide_width or 0), "height": px(prs.slide_height or 0)},
         **({"furniture": furniture} if furniture else {}),
         "slides": slides,

@@ -23,7 +23,6 @@ from node_probe import run_node
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "skills" / "professional-slides" / "runtime" / "gates"))
-import page_gates  # noqa: E402
 
 DECK = r"""
 import {toDeckPlan} from './evals/support/compose.mjs';
@@ -43,7 +42,7 @@ const props={categories:['A','B','C'],series:[{name:'Value',values:[40,70,55]}],
 const frame={x:0,y:0,width:600,height:360};
 const nodes=REGISTRY.get('chart.column').render({id:'c',frame,props}).nodes;
 const marks=nodes.filter((n)=>n.role==='chart-mark');
-console.log(JSON.stringify({accent:marks.filter((n)=>n.style.fill.tokenId==='color.accent').map((n)=>n.data.category),
+console.log(JSON.stringify({accent:marks.filter((n)=>n.style.fill.tokenId==='color.chartSubject').map((n)=>n.data.category),
   bands:nodes.filter((n)=>n.role==='chart-highlight').length, native:nativeChartSpec('chart.column',props,frame,nodes)?.highlightIndices??null}));
 """)
         self.assertEqual(result["accent"], ["B"], "the column itself is lit, as a bar is")
@@ -95,9 +94,6 @@ console.log(JSON.stringify(deck));
         self.assertEqual(len(columns), 2)
         # Open type on the card: ink, not the reversed white a dark panel takes.
         self.assertTrue(all(n["style"]["color"]["tokenId"] != "color.onPrimary" for n in items))
-        found = []
-        page_gates.gate_cpl(1, slide, found)
-        self.assertEqual(found, [], "no column too narrow for prose")
 
 
 class ScalarFigureTests(unittest.TestCase):
@@ -125,27 +121,6 @@ console.log(JSON.stringify({units:Object.fromEntries(figures.map((f)=>[f,figureU
         self.assertIn("mixes figures with words", result["worded"])
         self.assertEqual(result["rail"], [True] * 10, "a bubble takes what a pill takes")
         self.assertEqual(result["railWords"], [False] * 5)
-
-    def test_the_verdict_check_reads_measures_by_the_same_pattern(self):
-        # Read off the compiler's refusals: a verdict column of figures is a
-        # measure exactly where SCALAR_FIGURE reads a figure, and words where it does not.
-        result = run_node(r"""
-import {SCALAR_FIGURE} from './skills/professional-slides/runtime/value-format.mjs';
-import {compilePage} from './skills/professional-slides/runtime/page-types.mjs';
-import {judgementSession,withJudgements} from './skills/professional-slides/runtime/judgements.mjs';
-// A column of words is asked whether it judges its rows: a reader says "Confidence" does. A column of figures is never asked.
-const reader=judgementSession({oracle:(kind,subject)=>kind==='column-reads'?(subject.header==='Confidence'?'judges':'facts'):null});
-const base={takeaway:false,why:'The page compares the two firms on the same terms',settles:{kind:'comparison',what:'Company filings, 2025 to 2026'},adds:'The commentary names what the exhibit cannot'};
-const page=(cell)=>({...base,id:'p1',type:'lookup',form:'table',commentary:'none',title:'The near-term commercial call is split between the two firms',
-  exhibit:{columns:[{label:'Criterion',type:'category'},'Confidence','Reason'],rows:[['Consumer reach',cell,'Weekly users'],['Enterprise adoption',cell,'Ramp panel'],['Coding',cell,'Units differ']]}});
-const refused=(cell)=>withJudgements(reader,()=>{try{compilePage(page(cell));return false;}catch(e){return /VERDICT_TABLE_PLAIN/.test(e.message);}});
-const cells=['+25bps','12 pts','4.5/5','$12.5bn','3.2x','~40%','−1.5pp','1,200','€4bn+','High','Medium','Duration unclear','about 50','~50–60'];
-console.log(JSON.stringify(cells.map((cell)=>({cell,figure:SCALAR_FIGURE.test(cell),refused:refused(cell)}))));
-""")
-        self.assertTrue(any(r["figure"] for r in result) and any(not r["figure"] for r in result))
-        for row in result:
-            with self.subTest(cell=row["cell"]):
-                self.assertEqual(row["refused"], not row["figure"])
 
 
 class FlatComboLineTests(unittest.TestCase):

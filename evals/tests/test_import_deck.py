@@ -251,10 +251,8 @@ class ImportDeckTests(unittest.TestCase):
 
     def test_starter_takes_the_cover_and_drafts_the_rest(self):
         deck = self.starter["deck"]
-        # The starter records the rules version the revision is made under: a rule introduced later is an advisory to it.
-        current = json.loads((RUNTIME / "weight.json").read_text())["rulesVersion"]
         self.assertEqual(deck, {"schema": "professional-slides.deck/v3", "id": "board-pack-q3-v2", "workflow": "existing_deck_revision",
-                                "inventory": "board-pack-q3-v2.inventory.json", "rulesVersion": current, "request": "",
+                                "inventory": "board-pack-q3-v2.inventory.json",
                                 "cover": {"title": "Northvale growth plan", "subtitle": "Board meeting March 2026"}})
         pages = self.starter["pages"]
         self.assertEqual([(p["id"], p["sourceSlide"]) for p in pages], [("s02", 2), ("s03", 3), ("s04", 4), ("s05", 5)])
@@ -401,7 +399,7 @@ class HiddenSlideRoundTripTests(unittest.TestCase):
             kept = {k: page[k] for k in ("id", "sourceSlide", "hidden") if k in page}
             mapped.append({**bodies[body], **kept})
         mapped[2]["hidden"] = False
-        deck = {**self.starter["deck"], **{k: example["deck"][k] for k in ("request", "design", "brief", "question", "answer")}}
+        deck = {**self.starter["deck"], **{k: example["deck"][k] for k in ("design", "brief", "question")}}
         pages = self.tmp / "pack.pages.json"
         pages.write_text(json.dumps({"deck": deck, "pages": mapped}))
         authored = subprocess.run([NODE, str(RUNTIME / "author-deck.mjs"), str(pages)], capture_output=True, text=True, cwd=ROOT, timeout=240)
