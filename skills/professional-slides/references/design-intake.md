@@ -17,7 +17,6 @@ Ask the reader questions first (who reads the deck, what they already know, what
 | 3 | Colours: the subject's own, your brand's, or a named palette? | `subject`, `brand` (one or two hex colours), `system`, `midnight`, `evergreen`, `crimson`, `graphite` | `subject` | `palettes.png` |
 | 4 | How should pages show where the reader is? | `pills`, `label`, `breadcrumb`, `number-strip`, `side-rail`, `repeat-contents`, `none`, `auto` | `auto` | `trackers.png` |
 | 5 | Title treatment, and filled or open surfaces? | title: `system`, `rule`, `full`, `bar`, `band`, `block`, `tab`, `none`; surfaces: `reference`, `open` | `system`; `reference` | `title-treatments.png`, `surfaces.png` |
-| 6 | How is it read? | `live-pitch` (presented, one idea a page), `executive` (presented or sent), `pre-read` (read alone, more text a page) | `executive` | - |
 
 | `design` | For | Frame |
 | --- | --- | --- |
@@ -28,7 +27,7 @@ Ask the reader questions first (who reads the deck, what they already know, what
 
 A user who answers only some questions takes the defaults for the rest. With a structured question tool (Claude Code's `AskUserQuestion`, up to four questions a call), put the recommended option first; without one, ask in one numbered message with the defaults marked.
 
-**A reference deck answers most of it.** A PPTX or POTX: `$RUNTIME_PYTHON runtime/import-template.py <file> --out house.json`, then `node runtime/preferences.mjs set --from-house house.json --reference <file>`; its palette, faces, margins, title rule, nearest system and density are stored as inferred. Note whether its content pages set a line under the title: only then do this deck's pages carry a `subtitle`. A PDF or screenshots: `$RUNTIME_PYTHON runtime/infer-style.py <file.pdf | page.png ...>` reads the canvas, the main colours and the title treatment off the pixels and says what it could not read. Tell the user what was inferred, then ask only what is still missing.
+**A reference deck answers most of it.** A PPTX or POTX: `$RUNTIME_PYTHON runtime/import-template.py <file> --out house.json`, then `node runtime/preferences.mjs set --from-house house.json --reference <file>`; its palette, faces, margins, title rule, nearest system and density are stored as inferred; its density is the one setting here that is the deck's rather than the person's, and it carries over only from a reference deck - otherwise the storyline sets it from how this reader reads the deck. Note whether its content pages set a line under the title: only then do this deck's pages carry a `subtitle`. A PDF or screenshots: `$RUNTIME_PYTHON runtime/infer-style.py <file.pdf | page.png ...>` reads the canvas, the main colours and the title treatment off the pixels and says what it could not read. Tell the user what was inferred, then ask only what is still missing.
 
 **A website answers the colours and the type.** `node runtime/preferences.mjs from-site <url>` reads the site's stylesheets and proposes `colours: "brand"` with `brand: { primary, accent }` and `typography: { body, display }`. Show the user what it found before storing it. A face the deck is set in is measured from its installed files (`$RUNTIME_PYTHON runtime/font-table.py --family "<face>"`); where it is not installed, the deck is set in Arial and says so.
 
@@ -36,7 +35,7 @@ Once the user has given colours or picked a look, `node runtime/design-options.m
 
 ## 3. Store and apply
 
-`node runtime/preferences.mjs set design=editorial colours=brand 'brand={"primary":"#0B6E4F","accent":"#F2A900"}' tracker=label density=pre-read` stores answers as soon as they are given; `get`, `clear [key]` and `path` read, forget and locate them. `node runtime/preferences.mjs apply <id>.pages.json` writes the deck keys the answers set into the pages file's `deck`, filling only keys the deck does not already set. The deck file is then the record of the choice.
+`node runtime/preferences.mjs set design=editorial colours=brand 'brand={"primary":"#0B6E4F","accent":"#F2A900"}' tracker=label` stores answers as soon as they are given; `get`, `clear [key]` and `path` read, forget and locate them. `node runtime/preferences.mjs apply <id>.pages.json` writes the deck keys the answers set into the pages file's `deck`, filling only keys the deck does not already set. The deck file is then the record of the choice.
 
 | Answer | Deck keys |
 | --- | --- |
@@ -44,7 +43,7 @@ Once the user has given colours or picked a look, `node runtime/design-options.m
 | `colours: "brand"` + `brand` | `identity: { primary, accent }` |
 | `colours:` a palette | `palette` |
 | `colours: "subject"` | nothing: set `identity` per deck when the subject has its own colours (a brand's, a flag's) |
-| `tracker`, `surfaces`, `density`, `typography` | the key of the same name (`tracker: "none"` is `false`; `auto` leaves it to the deck's `variation`) |
+| `tracker`, `surfaces`, `typography` | the key of the same name (`tracker: "none"` is `false`; `auto` leaves it to the deck's `variation`) |
 | `titleRule` | the palette's title-rule styles |
 | `footer`, `wordmark` | `footer`, `logo` |
 | a house profile | `design`, `palette`, `typography`, `chrome`, `pageTemplate`, `density`, `fill` |

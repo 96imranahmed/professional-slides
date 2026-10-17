@@ -6,7 +6,7 @@ A storyline is the order in which one reader needs to hear an argument. Write it
 
 Ask before writing a title:
 
-- **Who reads it, and how.** A board walked through it in twenty minutes, a team reading it alone, a room watching it presented. This sets how many pages, how much text a page carries (`density`: `live-pitch`, `executive`, `pre-read`) and whether the deck needs an appendix.
+- **Who reads it, and how.** A board walked through it in twenty minutes, a team reading it alone, a room watching it presented. This sets how many pages, whether the deck needs an appendix, and how much text a page carries: record it as `density` on `deck` - `live-pitch` for a room watching it presented, `executive` for a deck presented or sent ahead, `pre-read` for one read alone. A reference deck the user gave sets it instead, when its import inferred one; a habit stored from another deck does not.
 - **What they already know.** Have they seen the source? Do they know its terms, the method, the players? A deck summarising a benchmark for people who have never seen the benchmark must first say what was measured, on what, and how it was scored; the same deck for the benchmark's own team skips that and goes straight to the findings. Record the answer as `readerKnows` on `deck`.
 - **What it is for.** A decision, a recommendation, an update, an explanation. Record it as `decision`, and the question the deck answers as `question`.
 
@@ -53,7 +53,7 @@ Structural pages keep their fixed heading: a contents page, a section divider, `
 
 ## The executive summary
 
-A summary carries the answer and the case for it, in four to six developed statements: each a claim, the evidence for it, and what follows. The first states the situation and the question; the rest answer it, one per section, with the material limitation and what would change the answer. Read alone, it should let the reader explain the answer and the strongest case against it. Use `summary` form `executive-summary` (developed points) or `parallel` form `labelled-rows` (a label and its points per row).
+A summary carries the answer and the case for it, in four to six developed statements: each a claim, the evidence for it, and what follows. The first states the situation and the question; the rest answer it, one per section, with the material limitation and what would change the answer. Read alone, it should let the reader explain the answer and the strongest case against it. Choose its form by what each statement carries. Statements of two or three lines, each read in turn as part of one argument, are `summary` form `executive-summary`. Statements that each have a short handle - a section, a criterion, a finding in four words - with two or three supporting points, or a figure, beside it are `parallel` form `labelled-rows`: the reader scans the labels, then reads the row that matters to them. Short statements set as developed points leave the foot of the page empty; labelled rows give each its own band.
 
 ## Body copy
 

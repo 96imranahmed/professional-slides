@@ -36,7 +36,8 @@ class PreferencesFileTests(unittest.TestCase):
 
     def test_answers_round_trip_with_when_and_how_they_were_chosen(self):
         missing = json.loads(cli(self.home, "show").stdout)["missing"]
-        self.assertEqual(missing, ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "density"])
+        # Density is the deck's, set at the storyline from its reader, so the intake does not ask it.
+        self.assertEqual(missing, ["reference", "design", "colours", "tracker", "titleRule", "surfaces"])
         cli(self.home, "set", "design=editorial", "colours=brand", 'brand={"primary":"#0B6E4F","accent":"#F2A900"}', "tracker=label",
             "--reference", str(self.home / "house.pptx"))
         cli(self.home, "set", "titleRule=system", "surfaces=reference", "density=executive", "--source", "default")
@@ -114,7 +115,7 @@ class PreferencesFileTests(unittest.TestCase):
 
     def test_nothing_unanswered_is_applied_and_each_unset_answer_names_its_default(self):
         shown = json.loads(cli(self.home, "show").stdout)
-        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces", "density"]
+        asked = ["reference", "design", "colours", "tracker", "titleRule", "surfaces"]
         self.assertEqual([u["key"] for u in shown["unset"]], asked)
         self.assertEqual({u["key"]: u["default"] for u in shown["unset"]}["design"], "consulting", "the recommendation is shown")
         self.assertEqual(shown["deckKeys"], {}, "an empty store sets no deck key")
@@ -128,7 +129,7 @@ class PreferencesFileTests(unittest.TestCase):
         cli(self.home, "set", "design=journal", "density=pre-read")
         shown = json.loads(cli(self.home, "show").stdout)
         self.assertEqual([u["key"] for u in shown["unset"]], ["reference", "colours", "tracker", "titleRule", "surfaces"])
-        self.assertEqual(shown["deckKeys"], {"design": "journal", "density": "pre-read"})
+        self.assertEqual(shown["deckKeys"], {"design": "journal"})  # a stored density is kept, not applied: the storyline sets it
 
     def test_invalid_answers_and_files_are_refused(self):
         for pair in ["tracker=tabs", "design=corporate", "colours=teal", "titleRule=underline", "density=dense", "nonsense=1", 'brand={"primary":"red"}']:
@@ -194,7 +195,7 @@ console.log(JSON.stringify(out));
         self.assertEqual(result["paletteUnset"], {"palette": "crimson"})
         none = result["none"]
         self.assertIs(none["tracker"], False)
-        self.assertEqual((none["surfaces"], none["density"], none["footer"], none["logo"]), ("open", "live-pitch", "Acme | Confidential", "Acme"))
+        self.assertEqual((none["surfaces"], none.get("density"), none["footer"], none["logo"]), ("open", None, "Acme | Confidential", "Acme"))
         self.assertEqual(none["typography"]["semibold"]["family"], "Calibri")
         # A key the deck already sets is the deck's choice and is kept.
         self.assertEqual(result["applied"]["document"]["deck"]["tracker"], "label")
